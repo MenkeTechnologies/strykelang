@@ -1031,6 +1031,220 @@ pub enum WriteMode {
     Append,
 }
 
+// ---------------------------------------------------------------------------
+// Missing functions from hist.c
+// ---------------------------------------------------------------------------
+
+/// Apply history word designator and modifiers to an event
+/// (from hist.c histsubchar - the inline expansion engine)
+///
+/// Full syntax: !event:word_designator:modifier1:modifier2...
+///
+/// Word designators: 0 (command), ^ (first arg), $ (last), * (all args),
+///   n (nth word), n-m (range), n* (nth to last), n- (nth to second-to-last)
+///
+/// Modifiers: h (head/dirname), t (tail/basename), r (remove ext), e (ext only),
+///   l (lowercase), u (uppercase), s/old/new/ (substitute), & (repeat subst),
+///   g (global modifier), p (print, don't execute), q (quote), Q (unquote),
+///   x (quote words), a (absolute path)
+pub fn apply_word_designator(text: &str, designator: &str) -> Option<String> {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.is_empty() {
+        return None;
+    }
+
+    match designator {
+        "0" => Some(words[0].to_string()),
+        "^" => words.get(1).map(|s| s.to_string()),
+        "$" => words.last().map(|s| s.to_string()),
+        "*" => {
+            if words.len() > 1 {
+                Some(words[1..].join(" "))
+            } else {
+                Some(String::new())
+            }
+        }
+        s if s.contains('-') => {
+            let parts: Vec<&str> = s.splitn(2, '-').collect();
+            let start: usize = if parts[0].is_empty() { 0 } else { parts[0].parse().ok()? };
+            let end: usize = if parts[1].is_empty() {
+                words.len() - 2 // n- means up to but not including last
+            } else {
+                parts[1].parse().ok()?
+            };
+            if start <= end && end < words.len() {
+                Some(words[start..=end].join(" "))
+            } else {
+                None
+            }
+        }
+        s if s.ends_with('*') => {
+            let start: usize = s[..s.len()-1].parse().ok()?;
+            if start < words.len() {
+                Some(words[start..].join(" "))
+            } else {
+                None
+            }
+        }
+        s => {
+            let idx: usize = s.parse().ok()?;
+            words.get(idx).map(|s| s.to_string())
+        }
+    }
+}
+
+/// Apply a single history modifier to text
+pub fn apply_hist_modifier(text: &str, modifier: char, global: bool, subst_state: &mut (String, String)) -> String {
+    match modifier {
+        'h' => {
+            // Head (dirname) - remove trailing path component
+            if let Some(pos) = text.rfind('/') {
+                if pos == 0 { "/".to_string() } else { text[..pos].to_string() }
+            } else {
+                ".".to_string()
+            }
+        }
+        't' => {
+            // Tail (basename) - remove leading path components
+            text.rsplit('/').next().unwrap_or(text).to_string()
+        }
+        'r' => {
+            // Remove extension
+            if let Some(dot) = text.rfind('.') {
+                if dot > text.rfind('/').unwrap_or(0) {
+                    return text[..dot].to_string();
+                }
+            }
+            text.to_string()
+        }
+        'e' => {
+            // Extension only
+            if let Some(dot) = text.rfind('.') {
+                if dot > text.rfind('/').unwrap_or(0) {
+                    return text[dot + 1..].to_string();
+                }
+            }
+            String::new()
+        }
+        'l' => text.to_lowercase(),
+        'u' => text.to_uppercase(),
+        'q' => {
+            // Quote - single-quote the text
+            format!("'{}'", text.replace('\'', "'\\''"))
+        }
+        'Q' => {
+            // Unquote - remove one level of quoting
+            let s = text.strip_prefix('\'').and_then(|s| s.strip_suffix('\''));
+            match s {
+                Some(inner) => inner.replace("'\\''", "'"),
+                None => {
+                    let s = text.strip_prefix('"').and_then(|s| s.strip_suffix('"'));
+                    match s {
+                        Some(inner) => inner.to_string(),
+                        None => text.to_string(),
+                    }
+                }
+            }
+        }
+        'x' => {
+            // Quote words individually
+            text.split_whitespace()
+                .map(|w| format!("'{}'", w.replace('\'', "'\\''")))
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+        'a' => {
+            // Make absolute path
+            if text.starts_with('/') {
+                text.to_string()
+            } else if let Ok(cwd) = std::env::current_dir() {
+                cwd.join(text).to_string_lossy().to_string()
+            } else {
+                text.to_string()
+            }
+        }
+        's' | '&' => {
+            // Substitution (handled by caller with subst_state)
+            if modifier == '&' {
+                // Repeat last substitution
+                let (ref old, ref new) = *subst_state;
+                if old.is_empty() {
+                    return text.to_string();
+                }
+                if global {
+                    text.replace(old.as_str(), new.as_str())
+                } else {
+                    text.replacen(old.as_str(), new.as_str(), 1)
+                }
+            } else {
+                text.to_string() // 's' is handled externally
+            }
+        }
+        'p' => text.to_string(), // Print only - handled by caller
+        _ => text.to_string(),
+    }
+}
+
+/// Remove duplicate history entries (from hist.c histremovedups)
+pub fn histremovedups(entries: &mut Vec<HistEntry>) {
+    let mut seen = std::collections::HashSet::new();
+    entries.retain(|e| seen.insert(e.text.clone()));
+}
+
+/// Reduce blanks in history text (from hist.c histreduceblanks)
+pub fn histreduceblanks(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_space = false;
+    for c in text.chars() {
+        if c.is_whitespace() {
+            if !prev_space {
+                result.push(' ');
+                prev_space = true;
+            }
+        } else {
+            result.push(c);
+            prev_space = false;
+        }
+    }
+    result.trim().to_string()
+}
+
+/// Get a history line as a complete string (from hist.c hgetline)
+pub fn hgetline(entry: &HistEntry) -> String {
+    entry.text.clone()
+}
+
+/// History word replacement (from hist.c hwrep)
+pub fn hwrep(entry: &HistEntry, replacement: &str, word_idx: usize) -> String {
+    let words: Vec<&str> = entry.text.split_whitespace().collect();
+    if word_idx >= words.len() {
+        return entry.text.clone();
+    }
+    let mut new_words: Vec<String> = words.iter().map(|s| s.to_string()).collect();
+    new_words[word_idx] = replacement.to_string();
+    new_words.join(" ")
+}
+
+/// Move forward in history (from hist.c addhistnum)
+pub fn addhistnum(base: i64, n: i64) -> i64 {
+    base + n
+}
+
+/// Check if history line should be ignored (starts with space, duplicate, etc.)
+pub fn should_ignore_line(text: &str, ignorespace: bool, ignoredups: bool, last: Option<&str>) -> bool {
+    if ignorespace && text.starts_with(' ') {
+        return true;
+    }
+    if ignoredups {
+        if let Some(prev) = last {
+            if prev == text {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1097,4 +1311,515 @@ mod tests {
         assert!(hist.get(1).is_none());
         assert!(hist.get(2).is_none());
     }
+}
+
+// ---------------------------------------------------------------------------
+// Additional missing functions from hist.c (lexer integration layer)
+// ---------------------------------------------------------------------------
+
+/// Input stack management for history (from hist.c strinbeg/strinend)
+pub struct HistInputStack {
+    stack: Vec<HistInputState>,
+}
+
+struct HistInputState {
+    dohist: bool,
+}
+
+impl Default for HistInputStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HistInputStack {
+    pub fn new() -> Self {
+        HistInputStack { stack: Vec::new() }
+    }
+
+    /// Begin string input (from hist.c strinbeg)
+    pub fn strinbeg(&mut self, dohist: bool) {
+        self.stack.push(HistInputState { dohist });
+    }
+
+    /// End string input (from hist.c strinend)
+    pub fn strinend(&mut self) {
+        self.stack.pop();
+    }
+
+    /// Check if currently doing history
+    pub fn doing_hist(&self) -> bool {
+        self.stack.last().map(|s| s.dohist).unwrap_or(false)
+    }
+}
+
+/// History line linkage (from hist.c linkcurline/unlinkcurline)
+pub struct HistLineLink {
+    pub linked: bool,
+    pub line: String,
+}
+
+impl HistLineLink {
+    pub fn new() -> Self {
+        HistLineLink {
+            linked: false,
+            line: String::new(),
+        }
+    }
+
+    /// Link current line to history (from hist.c linkcurline)
+    pub fn linkcurline(&mut self, line: &str) {
+        self.line = line.to_string();
+        self.linked = true;
+    }
+
+    /// Unlink current line from history (from hist.c unlinkcurline)
+    pub fn unlinkcurline(&mut self) {
+        self.linked = false;
+        self.line.clear();
+    }
+}
+
+impl Default for HistLineLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// History entry navigation (from hist.c movehistent/up_histent/down_histent)
+impl History {
+    /// Move n entries in history (from hist.c movehistent)
+    pub fn movehistent(&self, start: i64, n: i64) -> Option<&HistEntry> {
+        let target = start + n;
+        self.get(target)
+    }
+
+    /// Move up one entry (from hist.c up_histent)
+    pub fn up_histent(&self, current: i64) -> Option<&HistEntry> {
+        self.get(current - 1)
+    }
+
+    /// Move down one entry (from hist.c down_histent)
+    pub fn down_histent(&self, current: i64) -> Option<&HistEntry> {
+        self.get(current + 1)
+    }
+
+    /// Get history entry by event number with near-match (from hist.c gethistent)
+    pub fn gethistent(&self, ev: i64, near_match: bool) -> Option<&HistEntry> {
+        if let Some(entry) = self.get(ev) {
+            return Some(entry);
+        }
+        if !near_match {
+            return None;
+        }
+        // Try nearest
+        let mut best = None;
+        let mut best_dist = i64::MAX;
+        for (num, entry) in &self.entries {
+            let dist = (*num - ev).abs();
+            if dist < best_dist {
+                best_dist = dist;
+                best = Some(entry);
+            }
+        }
+        best
+    }
+
+    /// Prepare next history entry (from hist.c prepnexthistent)
+    pub fn prepnexthistent(&mut self) -> i64 {
+        self.curhist + 1
+    }
+}
+
+/// History word buffer operations (from hist.c ihwbegin/ihwabort/ihwend)
+pub struct HistWordBuffer {
+    buf: String,
+    active: bool,
+}
+
+impl Default for HistWordBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HistWordBuffer {
+    pub fn new() -> Self {
+        HistWordBuffer {
+            buf: String::new(),
+            active: false,
+        }
+    }
+
+    /// Begin collecting a history word (from hist.c ihwbegin)
+    pub fn ihwbegin(&mut self) {
+        self.buf.clear();
+        self.active = true;
+    }
+
+    /// Abort history word collection (from hist.c ihwabort)
+    pub fn ihwabort(&mut self) {
+        self.active = false;
+        self.buf.clear();
+    }
+
+    /// End history word collection (from hist.c ihwend)
+    pub fn ihwend(&mut self) -> Option<String> {
+        if self.active {
+            self.active = false;
+            Some(std::mem::take(&mut self.buf))
+        } else {
+            None
+        }
+    }
+
+    /// Add character to word buffer
+    pub fn add(&mut self, c: char) {
+        if self.active {
+            self.buf.push(c);
+        }
+    }
+
+    /// Get current buffer content (from hist.c hwget)
+    pub fn hwget(&self) -> &str {
+        &self.buf
+    }
+}
+
+/// History backward word scan (from hist.c histbackword)
+pub fn histbackword(line: &str, pos: usize) -> usize {
+    if pos == 0 {
+        return 0;
+    }
+    let bytes = line.as_bytes();
+    let mut p = pos.min(bytes.len());
+
+    // Skip whitespace
+    while p > 0 && bytes[p - 1].is_ascii_whitespace() {
+        p -= 1;
+    }
+    // Skip word chars
+    while p > 0 && !bytes[p - 1].is_ascii_whitespace() {
+        p -= 1;
+    }
+    p
+}
+
+/// Unget character for history (from hist.c ihungetc)
+pub struct HistUnget {
+    chars: Vec<char>,
+}
+
+impl Default for HistUnget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HistUnget {
+    pub fn new() -> Self {
+        HistUnget { chars: Vec::new() }
+    }
+
+    /// Push back a character (from hist.c ihungetc)
+    pub fn ihungetc(&mut self, c: char) {
+        self.chars.push(c);
+    }
+
+    /// Get a pushed-back character
+    pub fn ihgetc(&mut self) -> Option<char> {
+        self.chars.pop()
+    }
+
+    pub fn has_chars(&self) -> bool {
+        !self.chars.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Remaining 23 missing hist.c functions
+// ---------------------------------------------------------------------------
+
+/// Add character to history word during lexing (from hist.c ihwaddc)
+pub fn ihwaddc(hwbuf: &mut HistWordBuffer, c: char) {
+    hwbuf.add(c);
+}
+
+/// Add character to current line during lexing (from hist.c iaddtoline)
+pub fn iaddtoline(line: &mut String, c: char) {
+    line.push(c);
+}
+
+/// Safe version of inungetc for history (from hist.c safeinungetc)
+pub fn safeinungetc(unget: &mut HistUnget, c: char) {
+    unget.ihungetc(c);
+}
+
+/// Flush history error state (from hist.c herrflush)
+pub fn herrflush() {
+    // Reset history error flags - in Rust this is handled by the parser state
+}
+
+/// Get substitution arguments from history (from hist.c getsubsargs)
+/// Parses s/old/new/ syntax
+pub fn getsubsargs(line: &str) -> Option<(String, String, bool)> {
+    if line.len() < 2 {
+        return None;
+    }
+    let sep = line.chars().next()?;
+    let rest = &line[sep.len_utf8()..];
+
+    let mut old = String::new();
+    let mut new = String::new();
+    let mut in_new = false;
+    let mut global = false;
+
+    for c in rest.chars() {
+        if c == sep {
+            if in_new {
+                break;
+            }
+            in_new = true;
+            continue;
+        }
+        if in_new {
+            new.push(c);
+        } else {
+            old.push(c);
+        }
+    }
+
+    // Check for trailing 'g' flag
+    if rest.ends_with('g') && rest.len() > old.len() + new.len() + 2 {
+        global = true;
+    }
+
+    if old.is_empty() {
+        None
+    } else {
+        Some((old, new, global))
+    }
+}
+
+/// Get argument count from history entry (from hist.c getargc)
+pub fn getargc(entry: &HistEntry) -> usize {
+    entry.num_words()
+}
+
+/// Report substitution failure (from hist.c substfailed)
+pub fn substfailed() -> String {
+    "substitution failed".to_string()
+}
+
+/// Count digits in a string prefix (from hist.c digitcount)
+pub fn digitcount(s: &str) -> usize {
+    s.chars().take_while(|c| c.is_ascii_digit()).count()
+}
+
+/// No-op history word handler (from hist.c nohw)
+pub fn nohw(_c: char) {}
+
+/// No-op history word abort (from hist.c nohwabort)
+pub fn nohwabort() {}
+
+/// No-op history word end (from hist.c nohwe)
+pub fn nohwe() {}
+
+/// Put old history entry on top of ring (from hist.c putoldhistentryontop)
+pub fn putoldhistentryontop(hist: &mut History) -> bool {
+    // Move the oldest entry to the newest position for reuse
+    if let Some(oldest_num) = hist.ring.first().copied() {
+        if let Some(entry) = hist.entries.remove(&oldest_num) {
+            hist.ring.remove(0);
+            let new_num = hist.curhist + 1;
+            hist.entries.insert(new_num, entry);
+            hist.ring.push(new_num);
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if current line matches history entry (from hist.c checkcurline)
+pub fn checkcurline(hist: &History, line: &str) -> bool {
+    hist.latest().map(|e| e.text == line).unwrap_or(false)
+}
+
+/// Quietly get history entry without error (from hist.c quietgethist)
+pub fn quietgethist(hist: &History, ev: i64) -> Option<&HistEntry> {
+    hist.get(ev)
+}
+
+/// Dynamic history read during expansion (from hist.c hdynread)
+pub fn hdynread(_hist: &History) -> Option<String> {
+    // This is used for dynamic history reading during !{...} expansion
+    // In Rust, this is handled inline during expand()
+    None
+}
+
+/// Initialize history subsystem (from hist.c inithist)
+pub fn inithist() -> History {
+    History::new()
+}
+
+/// Read a single history line from file (from hist.c readhistline)
+pub fn readhistline(line: &str) -> Option<HistEntry> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    // Extended history format: ": timestamp:duration;command"
+    if line.starts_with(": ") {
+        let rest = &line[2..];
+        if let Some(semi) = rest.find(';') {
+            let meta = &rest[..semi];
+            let cmd = &rest[semi + 1..];
+            let parts: Vec<&str> = meta.splitn(2, ':').collect();
+            let timestamp = parts.first().and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+            let mut entry = HistEntry::new(0, cmd.to_string());
+            entry.stim = timestamp;
+            return Some(entry);
+        }
+    }
+    Some(HistEntry::new(0, line.to_string()))
+}
+
+/// Lock history file with flock (from hist.c flockhistfile)
+pub fn flockhistfile(path: &str) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        if let Ok(file) = std::fs::OpenOptions::new().write(true).create(true).open(format!("{}.lock", path)) {
+            let fd = file.as_raw_fd();
+            unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) == 0 }
+        } else {
+            false
+        }
+    }
+    #[cfg(not(unix))]
+    { true }
+}
+
+/// Check age of lock file (from hist.c checklocktime)
+pub fn checklocktime(path: &str, max_age_secs: u64) -> bool {
+    let lockfile = format!("{}.lock", path);
+    if let Ok(meta) = std::fs::metadata(&lockfile) {
+        if let Ok(modified) = meta.modified() {
+            if let Ok(age) = modified.elapsed() {
+                return age.as_secs() < max_age_secs;
+            }
+        }
+    }
+    false
+}
+
+/// Split history line into words (from hist.c histsplitwords)
+pub fn histsplitwords(line: &str) -> Vec<(usize, usize)> {
+    let mut words = Vec::new();
+    let mut in_word = false;
+    let mut word_start = 0;
+    let mut in_quote = false;
+    let mut quote_char = '\0';
+
+    for (i, c) in line.char_indices() {
+        if in_quote {
+            if c == quote_char {
+                in_quote = false;
+            }
+            continue;
+        }
+        if c == '\'' || c == '"' {
+            in_quote = true;
+            quote_char = c;
+            if !in_word {
+                word_start = i;
+                in_word = true;
+            }
+            continue;
+        }
+        if c.is_ascii_whitespace() {
+            if in_word {
+                words.push((word_start, i));
+                in_word = false;
+            }
+        } else if !in_word {
+            word_start = i;
+            in_word = true;
+        }
+    }
+    if in_word {
+        words.push((word_start, line.len()));
+    }
+    words
+}
+
+/// History stack operations for nested parsing (from hist.c pushhiststack/pophiststack)
+pub struct HistStackManager {
+    stack: Vec<HistStackFrame>,
+}
+
+struct HistStackFrame {
+    curhist: i64,
+    histsiz: usize,
+    histactive: u32,
+}
+
+impl Default for HistStackManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HistStackManager {
+    pub fn new() -> Self {
+        HistStackManager { stack: Vec::new() }
+    }
+
+    /// Push current history state (from hist.c pushhiststack)
+    pub fn pushhiststack(&mut self, hist: &History) {
+        self.stack.push(HistStackFrame {
+            curhist: hist.curhist,
+            histsiz: hist.histsiz as usize,
+            histactive: hist.histactive,
+        });
+    }
+
+    /// Pop and restore history state (from hist.c pophiststack)
+    pub fn pophiststack(&mut self, hist: &mut History) {
+        if let Some(frame) = self.stack.pop() {
+            hist.curhist = frame.curhist;
+            hist.histsiz = frame.histsiz as i64;
+            hist.histactive = frame.histactive;
+        }
+    }
+
+    /// Save and pop history stack (from hist.c saveandpophiststack)
+    pub fn saveandpophiststack(&mut self, hist: &mut History) {
+        self.pophiststack(hist);
+    }
+}
+
+/// Resolve path to real path (from hist.c chrealpath)
+pub fn chrealpath(path: &str) -> Option<String> {
+    std::fs::canonicalize(path).ok().map(|p| p.to_string_lossy().to_string())
+}
+
+/// Get all words from current edit buffer (from hist.c bufferwords)
+pub fn bufferwords(line: &str, cursor_pos: usize) -> (Vec<String>, usize) {
+    let words: Vec<String> = line.split_whitespace().map(String::from).collect();
+    // Find which word the cursor is in
+    let mut pos = 0;
+    let mut word_idx = 0;
+    for (i, word) in line.split_whitespace().enumerate() {
+        if let Some(start) = line[pos..].find(word) {
+            let wstart = pos + start;
+            let wend = wstart + word.len();
+            if cursor_pos >= wstart && cursor_pos <= wend {
+                word_idx = i;
+                break;
+            }
+            pos = wend;
+        }
+    }
+    (words, word_idx)
 }

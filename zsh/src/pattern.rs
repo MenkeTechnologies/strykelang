@@ -1279,6 +1279,119 @@ pub fn pattern_range_to_string(range_type_idx: usize) -> Option<String> {
     COLON_CLASSES.get(range_type_idx).map(|s| format!("[:{}:]", s))
 }
 
+// ---------------------------------------------------------------------------
+// C-internal pattern compiler functions - implemented differently in Rust
+// These are provided as thin wrappers/stubs for API completeness
+// ---------------------------------------------------------------------------
+
+/// Clear multibyte shift state (from pattern.c clear_shiftstate) - no-op in Rust
+pub fn clear_shiftstate() {}
+
+/// Advance past metafied char (from pattern.c metacharinc) - no-op in Rust (native UTF-8)
+pub fn metacharinc(s: &str, pos: usize) -> usize {
+    let c = s[pos..].chars().next().map(|c| c.len_utf8()).unwrap_or(1);
+    pos + c
+}
+
+/// Add bytes to pattern buffer (from pattern.c patadd) - Rust uses Vec<PatNode>
+pub fn patadd(prog: &mut Vec<PatNode>, node: PatNode) {
+    prog.push(node);
+}
+
+/// Set up pattern compiler char sets (from pattern.c patcompcharsset) - no-op in Rust
+pub fn patcompcharsset() {}
+
+/// Initialize pattern compilation (from pattern.c patcompstart) - no-op in Rust
+pub fn patcompstart() {}
+
+/// Compile top-level pattern switch (alternation) - implemented as PatCompiler::compile_branch
+pub fn patcompswitch(pattern: &str, flags: PatFlags) -> Result<PatProg, String> {
+    patcompile(pattern, flags)
+}
+
+/// Compile a pattern branch - implemented as PatCompiler::compile_branch_inner
+pub fn patcompbranch(pattern: &str, flags: PatFlags) -> Result<PatProg, String> {
+    patcompile(pattern, flags)
+}
+
+/// Compile a single pattern piece - implemented as PatCompiler::compile_piece
+pub fn patcomppiece(pattern: &str, flags: PatFlags) -> Result<PatProg, String> {
+    patcompile(pattern, flags)
+}
+
+/// Compile negation pattern - implemented as PatCompiler handling of ^ and !()
+pub fn patcompnot(pattern: &str, flags: PatFlags) -> Result<PatProg, String> {
+    let negated = format!("^({})", pattern);
+    patcompile(&negated, flags)
+}
+
+/// Add node to bytecode (from pattern.c patnode) - Rust uses Vec<PatNode>
+pub fn patnode(prog: &mut Vec<PatNode>, node: PatNode) -> usize {
+    let idx = prog.len();
+    prog.push(node);
+    idx
+}
+
+/// Insert node at position (from pattern.c patinsert) - Rust uses Vec::insert
+pub fn patinsert(prog: &mut Vec<PatNode>, pos: usize, node: PatNode) {
+    if pos <= prog.len() {
+        prog.insert(pos, node);
+    }
+}
+
+/// Set tail pointer (from pattern.c pattail) - no-op in Rust AST model
+pub fn pattail(_prog: &[PatNode], _p: usize, _val: usize) {}
+
+/// Set optional tail pointer (from pattern.c patoptail) - no-op in Rust AST model
+pub fn patoptail(_prog: &[PatNode], _p: usize, _val: usize) {}
+
+/// Get char reference (from pattern.c charref) - Rust native char
+pub fn charref(s: &str, pos: usize) -> Option<char> {
+    s[pos..].chars().next()
+}
+
+/// Get next char (from pattern.c charnext) - Rust native char iteration
+pub fn charnext(s: &str, pos: usize) -> usize {
+    metacharinc(s, pos)
+}
+
+/// Get char and advance (from pattern.c charrefinc) - Rust native char
+pub fn charrefinc(s: &str, pos: &mut usize) -> Option<char> {
+    let c = s[*pos..].chars().next()?;
+    *pos += c.len_utf8();
+    Some(c)
+}
+
+/// Get previous char width (from pattern.c charsub) - Rust native char
+pub fn charsub(s: &str, pos: usize) -> usize {
+    if pos == 0 { return 0; }
+    let prev = s[..pos].chars().next_back().map(|c| c.len_utf8()).unwrap_or(1);
+    pos - prev
+}
+
+/// Initialize pattern try (from pattern.c pattrystart) - no-op in Rust
+pub fn pattrystart() {}
+
+/// Prepare string for pattern matching (from pattern.c patmungestring) - identity in Rust
+pub fn patmungestring(s: &str) -> String {
+    s.to_string()
+}
+
+/// Multibyte pattern match range (from pattern.c mb_patmatchrange) - uses native char
+pub fn mb_patmatchrange(range: &[char], ch: char, igncase: bool) -> bool {
+    patmatchrange(range, ch, igncase)
+}
+
+/// Multibyte pattern match index (from pattern.c mb_patmatchindex)
+pub fn mb_patmatchindex(range: &[char], idx: usize) -> Option<char> {
+    patmatchindex(range, idx)
+}
+
+/// Allocate pattern string buffer (from pattern.c patallocstr) - no-op in Rust
+pub fn patallocstr(s: &str) -> String {
+    s.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

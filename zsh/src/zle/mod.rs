@@ -30,6 +30,14 @@ pub mod params;
 pub mod bindings;
 pub mod textobjects;
 pub mod tricky;
+pub mod deltochar;
+pub mod termquery;
+pub mod zleparameter;
+pub mod compcore_port;
+pub mod complist_port;
+pub mod compmatch_port;
+pub mod compresult_port;
+pub mod computil_port;
 
 // Re-export old API for compatibility with exec.rs
 pub use keymaps::{zle, Keymap as LegacyKeymap, KeymapName, ZleManager, ZleState};
