@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knapsack problem/0-1
+
+fn knapsack($w, $weights, $values, $n) {
+    if ($n == 0 || $w == 0) { return 0 }
+    
+    my $weight_n = $weights->[$n-1]
+    my $value_n = $values->[$n-1]
+
+    if ($weight_n > $w) {
+        return knapsack($w, $weights, $values, $n-1)
+    }
+    
+    my $v_incl_rest = knapsack($w - $weight_n, $weights, $values, $n-1)
+    my $incl = $value_n + $v_incl_rest
+    
+    my $excl = knapsack($w, $weights, $values, $n-1)
+    
+    return $incl > $excl ? $incl : $excl
+}
+
+my $weights = [1, 2, 3]
+my $values = [6, 10, 12]
+assert_eq knapsack(5, $weights, $values, 3), 22, "knapsack capacity 5"
+
+my $w2 = [1, 2, 5, 6, 7]
+my $v2 = [1, 6, 18, 22, 28]
+assert_eq knapsack(11, $w2, $v2, 5), 40, "knapsack capacity 11"
+
+test_run
