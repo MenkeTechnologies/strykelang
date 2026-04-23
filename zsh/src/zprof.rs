@@ -3,7 +3,7 @@
 //! Provides zprof builtin for profiling shell functions.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Profile data for a single function
 #[derive(Debug, Clone)]

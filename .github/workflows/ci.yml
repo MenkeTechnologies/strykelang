@@ -104,12 +104,38 @@ jobs:
       - name: Run stryke test on rosetta project
         run: ./target/release/s test examples/rosetta/t
 
+  zshrs-corpus:
+    name: zshrs corpus tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p zsh
+      - name: Run zshrs corpus tests
+        run: bash zsh/test_corpus/run_corpus.sh
+        env:
+          ZSHRS: ${{ github.workspace }}/target/release/zshrs
+      - name: Upload corpus failure log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zshrs-corpus-failures-${{ matrix.os }}
+          path: zsh/test_corpus/corpus_failures.log
+          if-no-files-found: ignore
+          retention-days: 30
+
   release-build:
     name: Release Build
     # Only blocks on real-bug signals. fmt / clippy are advisory (see
     # their `continue-on-error`); listing them here would make the entire
     # release pipeline wait on cosmetic lints.
-    needs: [check, test, doc, parity, stryke-test]
+    needs: [check, test, doc, parity, stryke-test, zshrs-corpus]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

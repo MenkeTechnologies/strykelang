@@ -9,7 +9,6 @@
 //! - Meta-character encoding for internal tokens
 
 use std::collections::VecDeque;
-use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 
 /// Size of the shell input buffer

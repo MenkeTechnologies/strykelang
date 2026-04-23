@@ -2,7 +2,7 @@
 //!
 //! Provides standard math functions like sin, cos, sqrt, log, etc.
 
-use std::f64::consts::{E, PI};
+use std::f64::consts::PI;
 
 /// Math number type - can be integer or float
 #[derive(Debug, Clone, Copy)]
@@ -589,6 +589,7 @@ pub mod constants {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use constants::E;
 
     #[test]
     fn test_abs() {

@@ -3,10 +3,8 @@
 //! Provides watch/log functionality for monitoring user logins/logouts.
 
 use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
-use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::io::BufRead;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(unix)]
 use std::ffi::CStr;
@@ -239,8 +237,8 @@ pub fn watch_match(pattern: &str, value: &str) -> bool {
 }
 
 fn glob_match(pattern: &str, text: &str) -> bool {
-    let mut p_chars: Vec<char> = pattern.chars().collect();
-    let mut t_chars: Vec<char> = text.chars().collect();
+    let p_chars: Vec<char> = pattern.chars().collect();
+    let t_chars: Vec<char> = text.chars().collect();
 
     let mut p_idx = 0;
     let mut t_idx = 0;
@@ -540,7 +538,7 @@ pub fn do_watch(
     for (key, entry) in &old_active {
         if !new_active.contains_key(key) {
             if check_watch_entry(entry, &state.watch_list, current_user) {
-                let mut logged_out = (*entry).clone();
+                let logged_out = (*entry).clone();
                 events.push(logged_out);
             }
         }

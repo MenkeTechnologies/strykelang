@@ -4,7 +4,12 @@
 
 use crate::history::HistoryEngine;
 use crate::math::MathEval;
+use crate::pcre::PcreState;
 use crate::prompt::{expand_prompt, PromptContext};
+use crate::tcp::TcpSessions;
+use crate::zftp::Zftp;
+use crate::zprof::Profiler;
+use crate::zutil::StyleTable;
 use compsys::cache::CompsysCache;
 use std::collections::HashSet;
 use std::io::Write;
@@ -377,6 +382,12 @@ pub struct ShellExecutor {
     returning: Option<i32>,  // Set by return builtin, cleared after function returns
     breaking: i32,           // break level (0 = not breaking, N = break N levels)
     continuing: i32,         // continue level
+    // New module state
+    pub pcre_state: PcreState,
+    pub tcp_sessions: TcpSessions,
+    pub zftp: Zftp,
+    pub profiler: Profiler,
+    pub style_table: StyleTable,
 }
 
 impl ShellExecutor {
@@ -447,6 +458,11 @@ impl ShellExecutor {
             returning: None,
             breaking: 0,
             continuing: 0,
+            pcre_state: PcreState::new(),
+            tcp_sessions: TcpSessions::new(),
+            zftp: Zftp::new(),
+            profiler: Profiler::new(),
+            style_table: StyleTable::new(),
         }
     }
     
@@ -1107,9 +1123,32 @@ impl ShellExecutor {
             match val {
                 ShellWord::ArrayLiteral(elements) => {
                     // Array assignment: arr=(a b c) or arr+=(a b c)
+                    // For associative arrays: assoc=(k1 v1 k2 v2)
                     let new_elements: Vec<String> = elements.iter().map(|e| self.expand_word(e)).collect();
-                    if *is_append {
-                        // Append to existing array
+                    
+                    // Check if this is an associative array
+                    if self.assoc_arrays.contains_key(var) {
+                        // Associative array: treat pairs as key-value
+                        if *is_append {
+                            let assoc = self.assoc_arrays.get_mut(var).unwrap();
+                            let mut iter = new_elements.iter();
+                            while let Some(key) = iter.next() {
+                                if let Some(val) = iter.next() {
+                                    assoc.insert(key.clone(), val.clone());
+                                }
+                            }
+                        } else {
+                            let mut assoc = HashMap::new();
+                            let mut iter = new_elements.iter();
+                            while let Some(key) = iter.next() {
+                                if let Some(val) = iter.next() {
+                                    assoc.insert(key.clone(), val.clone());
+                                }
+                            }
+                            self.assoc_arrays.insert(var.clone(), assoc);
+                        }
+                    } else if *is_append {
+                        // Append to existing indexed array
                         let arr = self.arrays.entry(var.clone()).or_insert_with(Vec::new);
                         arr.extend(new_elements);
                     } else {
@@ -10013,37 +10052,92 @@ impl ShellExecutor {
 
     /// zsh zstyle - configure styles for completion
     fn builtin_zstyle(&mut self, args: &[String]) -> i32 {
-        // Parse zstyle commands: zstyle [pattern] [style] [values...]
         if args.is_empty() {
-            // List all styles
-            for style in &self.zstyles {
-                println!(
-                    "zstyle '{}' {} {}",
-                    style.pattern,
-                    style.style,
-                    style.values.join(" ")
-                );
+            // List all styles  
+            for (pattern, style, values) in self.style_table.list(None) {
+                println!("zstyle '{}' {} {}", pattern, style, values.join(" "));
             }
             return 0;
         }
 
-        if args.len() >= 2 {
-            let pattern = args[0].clone();
-            let style = args[1].clone();
-            let values: Vec<String> = args[2..].to_vec();
+        // Handle options
+        if args[0].starts_with('-') {
+            match args[0].as_str() {
+                "-d" => {
+                    // Delete style
+                    let pattern = args.get(1).map(|s| s.as_str());
+                    let style = args.get(2).map(|s| s.as_str());
+                    self.style_table.delete(pattern, style);
+                    return 0;
+                }
+                "-g" => {
+                    // Get style into array
+                    if args.len() >= 4 {
+                        let array_name = &args[1];
+                        let context = &args[2];
+                        let style = &args[3];
+                        if let Some(values) = self.style_table.get(context, style) {
+                            self.arrays.insert(array_name.clone(), values.to_vec());
+                            return 0;
+                        }
+                    }
+                    return 1;
+                }
+                "-s" => {
+                    // Get style as scalar
+                    if args.len() >= 4 {
+                        let var_name = &args[1];
+                        let context = &args[2];
+                        let style = &args[3];
+                        let sep = args.get(4).map(|s| s.as_str()).unwrap_or(" ");
+                        if let Some(values) = self.style_table.get(context, style) {
+                            self.variables.insert(var_name.clone(), values.join(sep));
+                            return 0;
+                        }
+                    }
+                    return 1;
+                }
+                "-t" => {
+                    // Test style (check if true/yes)
+                    if args.len() >= 3 {
+                        let context = &args[1];
+                        let style = &args[2];
+                        return if self.style_table.test_bool(context, style).unwrap_or(false) { 0 } else { 1 };
+                    }
+                    return 1;
+                }
+                "-L" => {
+                    // List in re-usable format
+                    for (pattern, style, values) in self.style_table.list(None) {
+                        let values_str = values.iter()
+                            .map(|v| format!("'{}'", v.replace('\'', "'\\''")))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        println!("zstyle '{}' {} {}", pattern, style, values_str);
+                    }
+                    return 0;
+                }
+                _ => {}
+            }
+        }
 
-            // Check for existing style and update or add
-            let existing = self
-                .zstyles
-                .iter_mut()
-                .find(|s| s.pattern == pattern && s.style == style);
+        // Set style: zstyle pattern style values...
+        if args.len() >= 2 {
+            let pattern = &args[0];
+            let style = &args[1];
+            let values: Vec<String> = args[2..].to_vec();
+            self.style_table.set(pattern, style, values, false);
+            
+            // Also update legacy zstyles for backward compat
+            let existing = self.zstyles.iter_mut()
+                .find(|s| s.pattern == *pattern && s.style == *style);
             if let Some(s) = existing {
-                s.values = values;
+                s.values = args[2..].to_vec();
             } else {
                 self.zstyles.push(ZStyle {
-                    pattern,
-                    style,
-                    values,
+                    pattern: pattern.clone(),
+                    style: style.clone(),
+                    values: args[2..].to_vec(),
                 });
             }
         }
@@ -13347,7 +13441,7 @@ impl ShellExecutor {
                         // Calculate duration until that time today/tomorrow
                         let now = SystemTime::now();
                         let target_secs = (hour * 3600 + min * 60 + sec) as u64;
-                        let day_secs = 86400u64;
+                        let _day_secs = 86400u64;
                         
                         // Simplified: just add as seconds from now
                         let run_at = now + Duration::from_secs(target_secs);
@@ -13955,53 +14049,17 @@ impl ShellExecutor {
 
     /// zprof - profiling support
     fn builtin_zprof(&mut self, args: &[String]) -> i32 {
-        if args.is_empty() {
-            // Display profiling data
-            println!("num  calls                time                       self            name");
-            println!("-----------------------------------------------------------------------------------");
-            
-            if self.profile_data.is_empty() {
-                if !self.profiling_enabled {
-                    println!("(profiling not enabled - run 'zmodload zsh/zprof' first)");
-                } else {
-                    println!("(no profiling data collected)");
-                }
-                return 0;
-            }
-            
-            // Sort by total time descending
-            let mut entries: Vec<_> = self.profile_data.iter().collect();
-            entries.sort_by(|a, b| b.1.total_time_us.cmp(&a.1.total_time_us));
-            
-            for (i, (name, entry)) in entries.iter().enumerate() {
-                let total_ms = entry.total_time_us as f64 / 1000.0;
-                let self_ms = entry.self_time_us as f64 / 1000.0;
-                println!(
-                    "{:3})  {:5}           {:10.2}ms  {:5.1}%    {:10.2}ms  {:5.1}%    {}",
-                    i + 1,
-                    entry.calls,
-                    total_ms,
-                    if total_ms > 0.0 { 100.0 } else { 0.0 },
-                    self_ms,
-                    if total_ms > 0.0 { (self_ms / total_ms) * 100.0 } else { 0.0 },
-                    name
-                );
-            }
-            return 0;
-        }
+        use crate::zprof::ZprofOptions;
         
-        match args[0].as_str() {
-            "-c" => {
-                // Clear profiling data
-                self.profile_data.clear();
-                println!("zprof: profiling data cleared");
-            }
-            _ => {
-                eprintln!("zprof: unknown option: {}", args[0]);
-                return 1;
-            }
+        let options = ZprofOptions {
+            clear: args.iter().any(|a| a == "-c"),
+        };
+        
+        let (status, output) = crate::zprof::builtin_zprof(&mut self.profiler, &options);
+        if !output.is_empty() {
+            print!("{}", output);
         }
-        0
+        status
     }
 
     /// zsocket - create/manage sockets
@@ -14965,33 +15023,30 @@ impl ShellExecutor {
 
     /// pcre_compile - compile a PCRE pattern
     fn builtin_pcre_compile(&mut self, args: &[String]) -> i32 {
+        use crate::pcre::{pcre_compile, PcreCompileOptions};
+        
         let mut pattern = String::new();
-        let mut flags = String::new();
-        let mut i = 0;
-        while i < args.len() {
-            match args[i].as_str() {
-                "-a" => flags.push('A'),
-                "-i" | "-s" => flags.push_str(&args[i][1..]),
-                "-x" => flags.push('x'),
+        let mut options = PcreCompileOptions::default();
+        
+        for arg in args {
+            match arg.as_str() {
+                "-a" => options.anchored = true,
+                "-i" => options.caseless = true,
+                "-m" => options.multiline = true,
+                "-s" => options.dotall = true,
+                "-x" => options.extended = true,
                 s if !s.starts_with('-') => pattern = s.to_string(),
                 _ => {}
             }
-            i += 1;
         }
+        
         if pattern.is_empty() {
             eprintln!("pcre_compile: no pattern specified");
             return 1;
         }
-        let regex_pattern = if flags.is_empty() {
-            pattern
-        } else {
-            format!("(?{}){}", flags.to_lowercase(), pattern)
-        };
-        match regex::Regex::new(&regex_pattern) {
-            Ok(_) => {
-                self.variables.insert("PCRE_PATTERN".to_string(), regex_pattern);
-                0
-            }
+        
+        match pcre_compile(&pattern, &options, &mut self.pcre_state) {
+            Ok(()) => 0,
             Err(e) => {
                 eprintln!("pcre_compile: {}", e);
                 1
@@ -15001,10 +15056,13 @@ impl ShellExecutor {
 
     /// pcre_match - match string against compiled PCRE
     fn builtin_pcre_match(&mut self, args: &[String]) -> i32 {
+        use crate::pcre::{pcre_match, PcreMatchOptions};
+        
         let mut var_name = "MATCH".to_string();
         let mut array_name = "match".to_string();
         let mut string = String::new();
         let mut i = 0;
+        
         while i < args.len() {
             match args[i].as_str() {
                 "-v" => { i += 1; if i < args.len() { var_name = args[i].clone(); } }
@@ -15014,40 +15072,45 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        let pattern = match self.variables.get("PCRE_PATTERN") {
-            Some(p) => p.clone(),
-            None => {
-                eprintln!("pcre_match: no pattern compiled");
-                return 1;
-            }
+        
+        let options = PcreMatchOptions {
+            match_var: Some(var_name.clone()),
+            array_var: Some(array_name.clone()),
+            ..Default::default()
         };
-        let re = match regex::Regex::new(&pattern) {
-            Ok(r) => r,
+        
+        match pcre_match(&string, &options, &self.pcre_state) {
+            Ok(result) => {
+                if result.matched {
+                    if let Some(m) = result.full_match {
+                        self.variables.insert(var_name, m);
+                    }
+                    let matches: Vec<String> = result.captures.into_iter()
+                        .filter_map(|c| c)
+                        .collect();
+                    self.arrays.insert(array_name, matches);
+                    0
+                } else {
+                    1
+                }
+            }
             Err(e) => {
                 eprintln!("pcre_match: {}", e);
-                return 1;
+                1
             }
-        };
-        if let Some(caps) = re.captures(&string) {
-            if let Some(m) = caps.get(0) {
-                self.variables.insert(var_name, m.as_str().to_string());
-            }
-            let matches: Vec<String> = caps.iter()
-                .skip(1)
-                .filter_map(|m| m.map(|m| m.as_str().to_string()))
-                .collect();
-            self.arrays.insert(array_name, matches);
-            0
-        } else {
-            1
         }
     }
 
     /// pcre_study - optimize compiled PCRE (no-op in Rust regex)
     fn builtin_pcre_study(&mut self, _args: &[String]) -> i32 {
-        if self.variables.contains_key("PCRE_PATTERN") { 0 } else {
-            eprintln!("pcre_study: no pattern compiled");
-            1
+        use crate::pcre::pcre_study;
+        
+        match pcre_study(&self.pcre_state) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("pcre_study: {}", e);
+                1
+            }
         }
     }
 }

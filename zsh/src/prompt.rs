@@ -551,7 +551,7 @@ impl<'a> PromptExpander<'a> {
 
     /// Parse and process a % escape sequence
     fn process_percent(&mut self) {
-        let mut arg = self.parse_number().unwrap_or(0);
+        let arg = self.parse_number().unwrap_or(0);
 
         // Check for conditional
         if self.peek() == Some('(') {

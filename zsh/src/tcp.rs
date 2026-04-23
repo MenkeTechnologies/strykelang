@@ -3,10 +3,9 @@
 //! Provides ztcp builtin for TCP socket operations.
 
 use std::collections::HashMap;
-use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::io::{self};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::time::Duration;
 
 /// TCP session flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -267,14 +266,14 @@ pub fn resolve_host(host: &str) -> io::Result<IpAddr> {
 
 /// Reverse DNS lookup
 pub fn reverse_lookup(addr: &IpAddr) -> Option<String> {
-    use std::net::ToSocketAddrs;
+    
 
     let socket_addr = SocketAddr::new(*addr, 0);
     let hostname = dns_lookup_reverse(&socket_addr);
     hostname
 }
 
-fn dns_lookup_reverse(addr: &SocketAddr) -> Option<String> {
+fn dns_lookup_reverse(_addr: &SocketAddr) -> Option<String> {
     None
 }
 
@@ -446,6 +445,7 @@ pub fn builtin_ztcp(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::Ipv6Addr;
 
     #[test]
     fn test_tcp_session_type_char() {

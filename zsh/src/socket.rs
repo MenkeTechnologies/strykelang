@@ -2,10 +2,8 @@
 //!
 //! Provides zsocket builtin for Unix domain socket operations.
 
-use std::collections::HashMap;
 use std::io;
 use std::os::unix::io::RawFd;
-use std::path::Path;
 
 /// Options for zsocket builtin
 #[derive(Debug, Default)]
@@ -38,7 +36,7 @@ impl UnixSocket {
 /// Create a listening Unix socket
 #[cfg(unix)]
 pub fn socket_listen(path: &str) -> io::Result<RawFd> {
-    use std::ffi::CString;
+    
 
     let fd = unsafe { libc::socket(libc::PF_UNIX, libc::SOCK_STREAM, 0) };
     if fd < 0 {

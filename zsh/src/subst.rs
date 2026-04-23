@@ -191,7 +191,7 @@ pub fn param_expand(s: &str, params: &HashMap<String, String>, opts: &SubstOptio
 
 fn parse_brace_param(chars: &mut std::iter::Peekable<std::str::Chars>, 
                      params: &HashMap<String, String>,
-                     opts: &SubstOptions) -> Result<String, String> {
+                     _opts: &SubstOptions) -> Result<String, String> {
     let mut name = String::new();
     let mut operator = None;
     let mut operand = String::new();

@@ -11,7 +11,17 @@
 //! - Fish-style features (`fish_features` module)
 //! - Mathematical expression evaluation (`math` module)
 
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unused_assignments)]
+#![allow(unreachable_patterns)]
+#![allow(deprecated)]
+#![allow(unexpected_cfgs)]
+
 pub mod attr;
+pub mod cap;
+pub mod clone;
 pub mod tokens;
 pub mod lexer;
 pub mod parser;
@@ -39,6 +49,9 @@ pub mod hashnameddir;
 pub mod mem;
 pub mod init;
 pub mod hist;
+pub mod hlgroup;
+pub mod ksh93;
+pub mod langinfo;
 pub mod mapfile;
 pub mod subst;
 pub mod params;
@@ -51,8 +64,12 @@ pub mod socket;
 pub mod datetime;
 pub mod files;
 pub mod mathfunc;
+pub mod nearcolor;
+pub mod newuser;
+pub mod param_private;
 pub mod parameter;
 pub mod random;
+pub mod random_real;
 pub mod regex_mod;
 pub mod stat;
 pub mod system;

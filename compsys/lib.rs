@@ -7,6 +7,9 @@
 //! - zsh Src/Zle/compcore.c, complete.c, computil.c
 //! - fish src/complete.rs (for Rust patterns)
 
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 pub mod arguments;
 pub mod base;
 pub mod cache;
