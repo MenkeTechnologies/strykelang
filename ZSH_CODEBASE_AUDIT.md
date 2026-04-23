@@ -326,6 +326,25 @@ All blocking. All synchronous. All on the hot path between the user pressing Ent
 
 zshrs indexes functions at install time in SQLite. Function lookup is one indexed database query — no fpath scanning, no disk I/O on the hot path, no `.zwc` litter.
 
+## Worst Engineering Principles Known to Man
+
+Every principle of software engineering — violated:
+
+- **Testing:** Zero unit tests. Ship and pray. For 30 years.
+- **Separation of concerns:** 1,502-line function that handles all command execution. One function does everything.
+- **Information hiding:** 1,940 global mutable statics. Every file reaches into every other file's state.
+- **Memory safety:** Custom heap allocator that hides leaks. 174 alloc-without-free error paths. "The OS will clean up after us."
+- **Structured programming:** 186 gotos. 12 levels of nesting. 31 switch statements over 100 lines.
+- **Type safety:** 1,032 C casts. Void pointers everywhere. Trust the developer to get it right (they didn't).
+- **Readability:** 208 single-character variable declarations. `int c; char *s; int d;` — good luck debugging.
+- **Performance:** Library code written as interpreted shell script. 11,656 lines interpreted per Tab press. Disk I/O blocking the user on the hot path.
+- **Modularity:** Signal handling via manual queue/unqueue calls (524 of them). Miss one and the shell corrupts.
+- **Documentation:** 385 TODO/FIXME/HACK/XXX/BUG markers — acknowledged problems nobody fixed. A shell option literally named `SUNKEYBOARDHACK`.
+- **Build system:** Autoconf from the 90s. Custom `.mdh`/`.pro` file generation. Try building it on a new platform.
+- **Test isolation:** Tests depend on shared mutable state from prior tests. Can't run one test. Can't parallelize. Can't bisect.
+
+This is the default shell on macOS.
+
 ## The Biggest Scandal in Shell History
 
 All of this ships as the default shell on hundreds of millions of Macs:
