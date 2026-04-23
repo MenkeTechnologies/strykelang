@@ -382,6 +382,41 @@ In the last 3 years, two developers account for 60% of all commits:
 
 If Bart Schaefer and Oliver Kiddle stop contributing, zsh development effectively ends. The default shell on every Mac would be unmaintained.
 
+### What They Actually Work On: Shell Script Edits for Decades
+
+In the last 3 years (868 commits), here's what the zsh team has been doing:
+
+| Area | Commits | Percentage |
+|------|---------|------------|
+| Completion shell scripts | 278 | **32%** |
+| Other (misc, config, build) | 418 | 48% |
+| Documentation | 87 | 10% |
+| Tests | 60 | 7% |
+| **Core engine** (parser, lexer, exec, params, glob) | **13** | **1.5%** |
+| ZLE | 12 | 1.4% |
+
+**32% of all commits are editing completion shell scripts.** Adding `--verbose` to `_apt`. Updating `_git` for new options. Fixing `_ssh` flags. Shell script maintenance. For decades.
+
+The core engine — the parser, lexer, parameter expansion, command execution, the actual C code that runs your commands — received **13 commits in 3 years**. 11 of those were signal handling tweaks. One was a `free()` bug. One was a multios fix.
+
+**Zero improvements to the parser in 3 years. Zero improvements to the lexer. Zero improvements to parameter expansion. Zero improvements to command execution.** The 1,502-line `execcmd()` with 18 gotos hasn't been touched. The 186 gotos are still there. The 1,940 global statics are still there. The 174 memory leak points are still there.
+
+They're not fixing the engine. They're not refactoring. They're not adding tests. They're editing shell scripts and calling it development.
+
+Recent completion commits — this is what "zsh development" looks like:
+
+```
+update apt completion
+fix completion of ssh (option -E)
+complete fortune databases
+update git completion for new options in 2.51
+completion updates for Unix utilities in macOS 15.5
+update _pmap, _date, _pgrep, _sysctl
+fix _man for NetBSD
+```
+
+This is not shell development. This is shell script maintenance. The underlying C engine rots while they polish the shell-script completions that run at interpreter speed.
+
 ### No Onboarding
 
 - No `CONTRIBUTING.md`
