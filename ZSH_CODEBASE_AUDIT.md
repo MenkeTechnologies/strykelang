@@ -268,6 +268,62 @@ zshrs uses SQLite-backed completion indexing. One database lookup instead of 11,
 
 Every one of these is **interpreted shell script** that runs on every Tab press for that command. Not compiled. Not optimized. Interpreted.
 
+## Autoload: Disk I/O Blocking the User on the Hot Path
+
+When you define an autoloaded function in zsh, this is what you get:
+
+```
+zpwrAgIntoFzf () {
+    # undefined
+    builtin autoload -Xz
+}
+```
+
+That's not a function. It's a stub. The real function body doesn't exist in memory. When you type `zpwrAgIntoFzf` and press Enter, here's what happens — **blocking your input**:
+
+1. Shell sees the stub, triggers autoload
+2. **Scans every directory in `$fpath`** — 43 directories in a typical setup
+3. Stats each directory
+4. Looks for a file named `zpwrAgIntoFzf` in each one
+5. If `.zwc` (wordcode) files exist, reads those binary blobs too
+6. Reads the matching file from disk
+7. Parses it as shell script
+8. Replaces the stub with the real function body
+9. Finally executes it
+
+**All of this happens synchronously, blocking the user, on every first invocation of every autoloaded function.**
+
+With 986 completion functions autoloaded via `compinit`, plus user functions, plus framework functions (oh-my-zsh, prezto, zinit all use autoload heavily), a typical shell session has hundreds of these stubs waiting to trigger disk I/O the moment you call them.
+
+### .zwc Files: Fake Compilation
+
+`.zwc` files are zsh's "compiled" format — binary blobs scattered across every fpath directory. They're not real compilation:
+
+- They skip the lex/parse step — that's it
+- The shell still **interprets every line** at shell-script speed
+- No optimization, no bytecode, no JIT
+- Undocumented binary format with no versioning
+- Littered across the filesystem with no cleanup mechanism
+
+### The Call Stack
+
+```
+User presses Enter
+  → shell sees autoload stub
+    → scan 43 fpath directories (stat syscalls)
+      → find file on disk (open, read syscalls)
+        → check for .zwc (more open, read syscalls)
+          → parse shell script (lex.c with 22 gotos)
+            → replace stub with function body
+              → finally execute the function
+```
+
+All blocking. All synchronous. All on the hot path between the user pressing Enter and seeing output.
+
+### The zshrs Alternative
+
+zshrs indexes functions at install time in SQLite. Function lookup is one indexed database query — no fpath scanning, no disk I/O on the hot path, no `.zwc` litter.
+
 ## Conclusion
 
 Read the code. That's all you need to know about why this port exists.
