@@ -892,7 +892,9 @@ No amount of turbo mode, instant prompts, deferred loading, or compdef hijacking
 
 The entire zsh plugin ecosystem is 702 monkey patches pretending the pig is not a pig.
 
-You don't put lipstick on a pig. You replace the pig.
+ZSH's plugin ecosystem is the most elaborate workaround layer ever built for a shell. Hundreds of developers have spent thousands of hours writing sophisticated monkey patches — turbo loading, instant prompts, compiled daemons, deferred completions — all to compensate for fundamental architectural failures in the underlying shell. The result looks impressive from the outside, but every "feature" is a patch hiding a deficiency that should have been fixed in the engine decades ago.
+
+You don't fix a broken foundation by decorating the walls. You rebuild the foundation.
 
 ### zshrs: A Real Extension Model
 
