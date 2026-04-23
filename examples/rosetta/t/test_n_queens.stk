@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: N-queens problem
+
+fn is_safe($board, $row, $col) {
+    my $i = 0
+    while ($i < $row) {
+        my $prev_col = $board->[$i]
+        if ($prev_col == $col || 
+            $prev_col - $i == $col - $row || 
+            $prev_col + $i == $col + $row) {
+            return 0
+        }
+        $i++
+    }
+    1
+}
+
+fn solve_n_queens($n, $row, $board, $results) {
+    if ($row == $n) {
+        my @sol = @$board
+        push(@$results, \@sol)
+        return
+    }
+    my $col = 0
+    while ($col < $n) {
+        if (is_safe($board, $row, $col)) {
+            $board->[$row] = $col
+            solve_n_queens($n, $row + 1, $board, $results)
+        }
+        $col++
+    }
+}
+
+my $results = []
+solve_n_queens(4, 0, [], $results)
+assert_eq scalar(@$results), 2, "4-queens has 2 solutions"
+
+# pipe check
+4 |> { my $r = []; solve_n_queens($_, 0, [], $r); scalar(@$r) } |> assert_eq(2, "pipe 4-queens")
+
+test_run

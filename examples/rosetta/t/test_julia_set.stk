@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Julia set
+
+fn julia_iter($z_re, $z_im, $c_re, $c_im, $max_iter) {
+    my $iter = 0
+    while ($iter < $max_iter) {
+        my $re2 = $z_re * $z_re
+        my $im2 = $z_im * $z_im
+        if ($re2 + $im2 > 4.0) { return $iter }
+        
+        my $next_re = $re2 - $im2 + $c_re
+        my $next_im = 2.0 * $z_re * $z_im + $c_im
+        
+        $z_re = $next_re
+        $z_im = $next_im
+        $iter++
+    }
+    $max_iter
+}
+
+# Use assertions that are less sensitive to precision
+my $it1 = julia_iter(0, 0, -0.7, 0.27015, 100)
+assert_ok $it1 > 90, "point in set stays long"
+
+my $it2 = julia_iter(1.5, 1.5, -0.7, 0.27015, 100)
+assert_ok $it2 < 5, "point outside set escapes fast"
+
+test_run

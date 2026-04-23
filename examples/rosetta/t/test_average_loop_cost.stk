@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Average loop cost
+
+fn loop_cost($n) {
+    my $sum = 0
+    my $i = 0
+    while ($i < $n) {
+        $sum += $i
+        $i++
+    }
+    $sum
+}
+
+assert_eq loop_cost(10), 45, "loop cost 10"
+assert_eq loop_cost(100), 4950, "loop cost 100"
+
+# pipe check
+1000 |> loop_cost |> assert_eq(499500, "pipe loop cost")
+
+test_run
