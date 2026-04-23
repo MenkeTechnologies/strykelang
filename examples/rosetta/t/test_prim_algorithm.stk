@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prim's algorithm
+
+fn my_prim($n, $edges) {
+    my $adj = {}
+    for my $i (0..$n-1) { $adj->{$i} = [] }
+    for my $e (@$edges) {
+        my ($u, $v, $w) = @$e
+        push @{$adj->{$u}}, [$v, $w]
+        push @{$adj->{$v}}, [$u, $w]
+    }
+    
+    my %visited = (0 => 1)
+    my @mst = ()
+    my $total_w = 0
+    
+    while (scalar(keys %visited) < $n) {
+        my $min_edge = undef
+        my $min_w = 1e18
+        
+        for my $u (keys %visited) {
+            for my $v_ref (@{$adj->{$u}}) {
+                my ($v, $w) = @$v_ref
+                if (!exists $visited{$v} && $w < $min_w) {
+                    $min_w = $w
+                    $min_edge = [$u, $v, $w]
+                }
+            }
+        }
+        
+        if (!defined($min_edge)) { last }
+        
+        push @mst, $min_edge
+        $total_w += $min_edge->[2]
+        $visited{$min_edge->[1]} = 1
+    }
+    ($total_w, [@mst])
+}
+
+my $edges = [
+    [0, 1, 10],
+    [0, 2, 6],
+    [0, 3, 5],
+    [1, 3, 15],
+    [2, 3, 4]
+]
+my ($total_w, $mst) = my_prim(4, $edges)
+assert_eq $total_w, 19, "Prim MST total weight is 19"
+
+test_run

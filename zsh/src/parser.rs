@@ -408,6 +408,16 @@ pub enum CompoundCommand {
         name: Option<String>,
         body: Box<ShellCommand>,
     },
+    /// repeat N do ... done
+    Repeat {
+        count: String,
+        body: Vec<ShellCommand>,
+    },
+    /// { try-block } always { always-block }
+    Try {
+        try_body: Vec<ShellCommand>,
+        always_body: Vec<ShellCommand>,
+    },
     Cond(CondExpr),
     Arith(String),
     WithRedirects(Box<ShellCommand>, Vec<Redirect>),

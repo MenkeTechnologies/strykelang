@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: A* search algorithm
+
+fn h($node, $end) {
+    abs($node->[0] - $end->[0]) + abs($node->[1] - $end->[1])
+}
+
+fn my_astar($grid, $start, $end) {
+    my $rows = scalar(@$grid)
+    my $cols = scalar(@{$grid->[0]})
+    my $open = [[$start->[0], $start->[1], 0, h($start, $end)]] # r, c, g, f
+    my %closed
+    
+    while (scalar(@$open) > 0) {
+        # find node with min f
+        my $best_idx = 0
+        for my $i (1..scalar(@$open)-1) {
+            if ($open->[$i][3] < $open->[$best_idx][3]) {
+                $best_idx = $i
+            }
+        }
+        my $curr = splice @$open, $best_idx, 1
+        my ($r, $c, $g, $f) = @$curr
+        
+        if ($r == $end->[0] && $c == $end->[1]) {
+            return $g
+        }
+        
+        my $key = "$r,$c"
+        if (exists $closed{$key}) { next }
+        $closed{$key} = 1
+        
+        for my $d ([0,1], [0,-1], [1,0], [-1,0]) {
+            my $nr = $r + $d->[0]
+            my $nc = $c + $d->[1]
+            if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
+                if ($grid->[$nr][$nc] == 0) {
+                    push @$open, [$nr, $nc, $g + 1, $g + 1 + h([$nr, $nc], $end)]
+                }
+            }
+        }
+    }
+    -1
+}
+
+my $grid = [
+    [0, 0, 0],
+    [0, 1, 0],
+    [0, 0, 0]
+]
+my $dist = my_astar($grid, [0, 0], [2, 2])
+# Path: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) or similar, length 4
+assert_eq $dist, 4, "A* distance on 3x3 grid with obstacle"
+
+test_run

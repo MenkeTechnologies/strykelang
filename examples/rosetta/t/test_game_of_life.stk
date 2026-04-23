@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Conway's Game of Life (1 iteration)
+
+fn count_neighbors($grid, $r, $c, $rows, $cols) {
+    my $count = 0
+    for my $dr (-1..1) {
+        for my $dc (-1..1) {
+            if ($dr == 0 && $dc == 0) { next }
+            my $nr = $r + $dr
+            my $nc = $c + $dc
+            if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
+                if ($grid->[$nr][$nc]) { $count++ }
+            }
+        }
+    }
+    $count
+}
+
+fn life_step($grid) {
+    my $rows = scalar(@$grid)
+    my $cols = scalar(@{$grid->[0]})
+    my @next = ()
+    for my $r (0..$rows-1) {
+        $next[$r] = []
+        for my $c (0..$cols-1) {
+            my $n = count_neighbors($grid, $r, $c, $rows, $cols)
+            if ($grid->[$r][$c]) {
+                $next[$r][$c] = ($n == 2 || $n == 3 ? 1 : 0)
+            } else {
+                $next[$r][$c] = ($n == 3 ? 1 : 0)
+            }
+        }
+    }
+    ([@next])
+}
+
+# Blinker:
+# 0 0 0    0 1 0
+# 1 1 1 -> 0 1 0
+# 0 0 0    0 1 0
+my $blinker = [[0, 0, 0], [1, 1, 1], [0, 0, 0]]
+my $next = life_step($blinker)
+
+assert_eq $next->[0][1], 1, "blinker step [0][1]"
+assert_eq $next->[1][1], 1, "blinker step [1][1]"
+assert_eq $next->[2][1], 1, "blinker step [2][1]"
+assert_eq $next->[1][0], 0, "blinker step [1][0]"
+
+test_run
