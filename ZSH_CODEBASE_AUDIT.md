@@ -366,6 +366,44 @@ And nobody noticed because nobody reads shell source code.
 
 Apple chose zsh as the macOS default in 2019 because the license changed from GPL to MIT. Not because anyone audited the code. Not because anyone ran the tests. Not because anyone profiled the completion system. Because of a license.
 
+## Not Production Grade
+
+ZSH is not production-grade software. It never was.
+
+Production-grade means unit tests. ZSH has zero. Production-grade means memory safety guarantees. ZSH has a custom heap allocator with 174 leak points. Production-grade means code review standards. ZSH has 1,502-line functions with 18 gotos that nobody refactored in 30 years.
+
+Alpha-quality code in somebody's basement has more engineering discipline than this. Hobby projects on GitHub have CI pipelines, unit tests, and code review. ZSH has none of these and ships as the default shell on every developer machine Apple sells.
+
+This is not a matter of opinion. The numbers are measured directly from the source:
+
+- **Zero** unit tests
+- **147,233** lines of untested C
+- **1,940** global mutable statics
+- **174** memory leak points
+- **186** gotos
+- **11,656** lines of interpreted shell script per Tab press
+- **986** files scanned from disk on every shell startup
+- **30 years** without refactoring
+
+Software with these characteristics cannot be shipped to developer machines worldwide. It must be replaced.
+
+## zshrs: The Replacement
+
+zshrs is a ground-up Rust port that eliminates every class of defect documented above:
+
+| ZSH | zshrs |
+|-----|-------|
+| Zero unit tests | Comprehensive test suite with per-test isolation |
+| Custom heap allocator (1,882 lines) | Rust ownership — no manual memory management |
+| 1,032 C casts | Rust type system — no unsafe casts |
+| 524 manual signal queue/unqueue calls | Rust concurrency primitives |
+| 1,940 global mutable statics | Encapsulated state |
+| 186 gotos | Structured control flow |
+| 105,050 lines of interpreted shell script for completions | SQLite-indexed completions with native code |
+| fpath scan on every startup (986 files) | One-time indexing, database lookup |
+| Disk I/O blocking user on autoload | Pre-indexed function lookup |
+| `.zwc` fake compilation | No intermediate format needed — it's compiled Rust |
+
 ## Conclusion
 
 Read the code. That's all you need to know about why this port exists.
