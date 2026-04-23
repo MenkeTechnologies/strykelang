@@ -3322,8 +3322,12 @@ impl ShellExecutor {
     fn expand_word_split(&mut self, word: &ShellWord) -> Vec<String> {
         match word {
             ShellWord::Literal(s) => {
-                // Check if this is an array expansion ${arr[@]}
-                self.expand_string_split(s)
+                // First do brace expansion, then variable expansion on each result
+                let brace_expanded = self.expand_braces(s);
+                brace_expanded
+                    .into_iter()
+                    .flat_map(|item| self.expand_string_split(&item))
+                    .collect()
             }
             ShellWord::SingleQuoted(s) => vec![s.clone()],
             ShellWord::DoubleQuoted(parts) => {
