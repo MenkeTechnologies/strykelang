@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zig-zag matrix
+
+fn zigzag_matrix($n) {
+    my @matrix = ()
+    for my $i (0..$n-1) { $matrix[$i] = [] }
+    
+    my $x = 0
+    my $y = 0
+    for my $i (0..$n*$n-1) {
+        $matrix[$y][$x] = $i
+        if (($x + $y) % 2 == 0) {
+            if ($x == $n - 1) {
+                $y++
+            } elsif ($y == 0) {
+                $x++
+            } else {
+                $x++
+                $y--
+            }
+        } else {
+            if ($y == $n - 1) {
+                $x++
+            } elsif ($x == 0) {
+                $y++
+            } else {
+                $x--
+                $y++
+            }
+        }
+    }
+    ([@matrix])
+}
+
+my $m3 = zigzag_matrix(3)
+# 0 1 5
+# 2 4 6
+# 3 7 8
+assert_eq $m3->[0][0], 0, "m[0][0]"
+assert_eq $m3->[0][1], 1, "m[0][1]"
+assert_eq $m3->[1][1], 4, "m[1][1]"
+assert_eq $m3->[2][2], 8, "m[2][2]"
+
+my $m5 = zigzag_matrix(5)
+assert_eq $m5->[4][4], 24, "m5[4][4] is 24"
+
+test_run

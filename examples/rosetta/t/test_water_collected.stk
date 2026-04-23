@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Water collected between towers
+
+fn collect_water($towers_ref) {
+    my @towers = @$towers_ref
+    my $n = scalar(@towers)
+    if ($n < 3) { return 0 }
+    
+    my @left_max = ()
+    my $curr_left = 0
+    for my $i (0..$n-1) {
+        if ($towers[$i] > $curr_left) { $curr_left = $towers[$i] }
+        push @left_max, $curr_left
+    }
+    
+    my @right_max = ()
+    my $curr_right = 0
+    # Manual reverse iteration to avoid potential unshift/rev issues
+    for my $i (0..$n-1) {
+        my $idx = $n - 1 - $i
+        if ($towers[$idx] > $curr_right) { $curr_right = $towers[$idx] }
+        $right_max[$idx] = $curr_right
+    }
+    
+    my $total = 0
+    for my $i (0..$n-1) {
+        my $min_height = $left_max[$i] < $right_max[$i] ? $left_max[$i] : $right_max[$i]
+        $total += $min_height - $towers[$i]
+    }
+    $total
+}
+
+assert_eq collect_water([1, 5, 3, 7, 2]), 2, "water in [1,5,3,7,2]"
+assert_eq collect_water([5, 3, 7, 2, 6, 4, 5, 9, 1, 2]), 14, "water in longer sequence"
+assert_eq collect_water([1, 2, 3, 4, 5]), 0, "no water in ascending"
+
+test_run

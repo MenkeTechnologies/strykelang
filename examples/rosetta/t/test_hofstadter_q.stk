@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hofstadter Q sequence
+
+fn my_hofstadter_q($n) {
+    my @q = (0, 1, 1)
+    for my $i (3..$n) {
+        my $prev1 = $q[$i - 1]
+        my $prev2 = $q[$i - 2]
+        my $val = $q[$i - $prev1] + $q[$i - $prev2]
+        push @q, $val
+    }
+    @q[$n]
+}
+
+assert_eq my_hofstadter_q(1), 1, "Q(1)"
+assert_eq my_hofstadter_q(2), 1, "Q(2)"
+assert_eq my_hofstadter_q(3), 2, "Q(3)"
+assert_eq my_hofstadter_q(10), 6, "Q(10)"
+assert_eq my_hofstadter_q(1000), 502, "Q(1000)"
+
+test_run

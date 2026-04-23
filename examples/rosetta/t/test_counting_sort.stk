@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Counting Sort
+
+fn counting_sort {
+    my $list = $_[0]
+    my $min = $_[1]
+    my $max = $_[2]
+    my @arr = @$list
+    my @count = ()
+    
+    for my $x (@arr) {
+        $count[$x - $min]++
+    }
+    
+    my @res = ()
+    for my $i (0..scalar(@count)-1) {
+        my $c = $count[$i]
+        while ($c > 0) {
+            push @res, $i + $min
+            $c--
+        }
+    }
+    ([@res])
+}
+
+my $data = [4, 2, 2, 8, 3, 3, 1]
+my $sorted = counting_sort($data, 1, 8)
+assert_eq join(",", @$sorted), "1,2,2,3,3,4,8", "counting sort"
+
+test_run

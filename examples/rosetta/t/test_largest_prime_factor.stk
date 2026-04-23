@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Largest prime factor
+
+fn largest_prime_factor($n) {
+    my $res = -1
+    my $temp = $n
+    while ($temp % 2 == 0) {
+        $res = 2
+        $temp = int($temp / 2)
+    }
+    while ($temp % 3 == 0) {
+        $res = 3
+        $temp = int($temp / 3)
+    }
+    my $i = 5
+    while ($i * $i <= $temp) {
+        while ($temp % $i == 0) {
+            $res = $i
+            $temp = int($temp / $i)
+        }
+        while ($temp % ($i + 2) == 0) {
+            $res = $i + 2
+            $temp = int($temp / ($i + 2))
+        }
+        $i += 6
+    }
+    if ($temp > 4) {
+        $res = $temp
+    }
+    $res
+}
+
+assert_eq largest_prime_factor(13195), 29, "Largest prime factor of 13195"
+assert_eq largest_prime_factor(600851475143), 6857, "Largest prime factor of 600851475143"
+assert_eq largest_prime_factor(2), 2, "Factor of 2 is 2"
+
+test_run

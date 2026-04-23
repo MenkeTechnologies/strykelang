@@ -6,6 +6,8 @@
 
 use crate::lexer::ZshLexer;
 use crate::tokens::LexTok;
+use std::iter::Peekable;
+use std::str::Chars;
 
 /// AST node for a complete program (list of commands)
 #[derive(Debug, Clone)]
@@ -227,6 +229,227 @@ pub struct ZshTry {
     pub always: Box<ZshProgram>,
 }
 
+/// Zsh parameter expansion flags
+#[derive(Debug, Clone)]
+pub enum ZshParamFlag {
+    Lower,                 // L - lowercase
+    Upper,                 // U - uppercase
+    Capitalize,            // C - capitalize words
+    Join(String),          // j:sep: - join array with separator
+    JoinNewline,           // F - join with newlines
+    Split(String),         // s:sep: - split string into array
+    SplitLines,            // f - split on newlines
+    SplitWords,            // z - split into words (shell parsing)
+    Type,                  // t - type of variable
+    Words,                 // w - word splitting
+    Quote,                 // q - quote result
+    DoubleQuote,           // qq - double quote
+    QuoteBackslash,        // b - quote with backslashes for patterns
+    Unique,                // u - unique elements only
+    Reverse,               // O - reverse sort
+    Sort,                  // o - sort
+    NumericSort,           // n - numeric sort
+    IndexSort,             // a - sort in array index order
+    Keys,                  // k - associative array keys
+    Values,                // v - associative array values
+    Length,                // # - length (character codes)
+    CountChars,            // c - count total characters
+    Expand,                // e - perform shell expansions
+    PromptExpand,          // % - expand prompt escapes
+    PromptExpandFull,      // %% - full prompt expansion
+    Visible,               // V - make non-printable chars visible
+    Directory,             // D - substitute directory names
+    Head(usize),           // [1,n] - first n elements
+    Tail(usize),           // [-n,-1] - last n elements
+    PadLeft(usize, char),  // l:len:fill: - pad left
+    PadRight(usize, char), // r:len:fill: - pad right
+    Width(usize),          // m - use width for padding
+    Match,                 // M - include matched portion
+    Remove,                // R - include non-matched portion (complement of M)
+    Subscript,             // S - subscript scanning
+    Parameter,             // P - use value as parameter name (indirection)
+    Glob,                  // ~ - glob patterns in pattern
+}
+
+/// List operator (for shell command lists)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListOp {
+    And,     // &&
+    Or,      // ||
+    Semi,    // ;
+    Amp,     // &
+    Newline, // \n
+}
+
+/// Shell word - can be simple literal or complex expansion
+#[derive(Debug, Clone)]
+pub enum ShellWord {
+    Literal(String),
+    SingleQuoted(String),
+    DoubleQuoted(Vec<ShellWord>),
+    Variable(String),
+    VariableBraced(String, Option<Box<VarModifier>>),
+    ArrayVar(String, Box<ShellWord>),
+    CommandSub(Box<ShellCommand>),
+    ProcessSubIn(Box<ShellCommand>),
+    ProcessSubOut(Box<ShellCommand>),
+    ArithSub(String),
+    ArrayLiteral(Vec<ShellWord>),
+    Glob(String),
+    Tilde(Option<String>),
+    Concat(Vec<ShellWord>),
+}
+
+/// Variable modifier for parameter expansion
+#[derive(Debug, Clone)]
+pub enum VarModifier {
+    Default(ShellWord),
+    DefaultAssign(ShellWord),
+    Error(ShellWord),
+    Alternate(ShellWord),
+    Length,
+    ArrayLength,
+    ArrayIndex(String),
+    ArrayAll,
+    Substring(i64, Option<i64>),
+    RemovePrefix(ShellWord),
+    RemovePrefixLong(ShellWord),
+    RemoveSuffix(ShellWord),
+    RemoveSuffixLong(ShellWord),
+    Replace(ShellWord, ShellWord),
+    ReplaceAll(ShellWord, ShellWord),
+    Upper,
+    Lower,
+    ZshFlags(Vec<ZshParamFlag>),
+}
+
+/// Shell command - the old shell_ast compatible type
+#[derive(Debug, Clone)]
+pub enum ShellCommand {
+    Simple(SimpleCommand),
+    Pipeline(Vec<ShellCommand>, bool),
+    List(Vec<(ShellCommand, ListOp)>),
+    Compound(CompoundCommand),
+    FunctionDef(String, Box<ShellCommand>),
+}
+
+/// Simple command with assignments, words, and redirects
+#[derive(Debug, Clone)]
+pub struct SimpleCommand {
+    pub assignments: Vec<(String, ShellWord, bool)>,
+    pub words: Vec<ShellWord>,
+    pub redirects: Vec<Redirect>,
+}
+
+/// Redirect
+#[derive(Debug, Clone)]
+pub struct Redirect {
+    pub fd: Option<i32>,
+    pub op: RedirectOp,
+    pub target: ShellWord,
+    pub heredoc_content: Option<String>,
+    pub fd_var: Option<String>,
+}
+
+/// Redirect operator
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedirectOp {
+    Write,
+    Append,
+    Read,
+    ReadWrite,
+    Clobber,
+    DupRead,
+    DupWrite,
+    HereDoc,
+    HereString,
+    WriteBoth,
+    AppendBoth,
+}
+
+/// Compound command
+#[derive(Debug, Clone)]
+pub enum CompoundCommand {
+    BraceGroup(Vec<ShellCommand>),
+    Subshell(Vec<ShellCommand>),
+    If {
+        conditions: Vec<(Vec<ShellCommand>, Vec<ShellCommand>)>,
+        else_part: Option<Vec<ShellCommand>>,
+    },
+    For {
+        var: String,
+        words: Option<Vec<ShellWord>>,
+        body: Vec<ShellCommand>,
+    },
+    ForArith {
+        init: String,
+        cond: String,
+        step: String,
+        body: Vec<ShellCommand>,
+    },
+    While {
+        condition: Vec<ShellCommand>,
+        body: Vec<ShellCommand>,
+    },
+    Until {
+        condition: Vec<ShellCommand>,
+        body: Vec<ShellCommand>,
+    },
+    Case {
+        word: ShellWord,
+        cases: Vec<(Vec<ShellWord>, Vec<ShellCommand>, CaseTerminator)>,
+    },
+    Select {
+        var: String,
+        words: Option<Vec<ShellWord>>,
+        body: Vec<ShellCommand>,
+    },
+    Coproc {
+        name: Option<String>,
+        body: Box<ShellCommand>,
+    },
+    Cond(CondExpr),
+    Arith(String),
+    WithRedirects(Box<ShellCommand>, Vec<Redirect>),
+}
+
+/// Case terminator
+#[derive(Debug, Clone, Copy)]
+pub enum CaseTerminator {
+    Break,
+    Fallthrough,
+    Continue,
+}
+
+/// Conditional expression for [[ ]]
+#[derive(Debug, Clone)]
+pub enum CondExpr {
+    FileExists(ShellWord),
+    FileRegular(ShellWord),
+    FileDirectory(ShellWord),
+    FileSymlink(ShellWord),
+    FileReadable(ShellWord),
+    FileWritable(ShellWord),
+    FileExecutable(ShellWord),
+    FileNonEmpty(ShellWord),
+    StringEmpty(ShellWord),
+    StringNonEmpty(ShellWord),
+    StringEqual(ShellWord, ShellWord),
+    StringNotEqual(ShellWord, ShellWord),
+    StringMatch(ShellWord, ShellWord),
+    StringLess(ShellWord, ShellWord),
+    StringGreater(ShellWord, ShellWord),
+    NumEqual(ShellWord, ShellWord),
+    NumNotEqual(ShellWord, ShellWord),
+    NumLess(ShellWord, ShellWord),
+    NumLessEqual(ShellWord, ShellWord),
+    NumGreater(ShellWord, ShellWord),
+    NumGreaterEqual(ShellWord, ShellWord),
+    Not(Box<CondExpr>),
+    And(Box<CondExpr>, Box<CondExpr>),
+    Or(Box<CondExpr>, Box<CondExpr>),
+}
+
 /// Parse errors
 #[derive(Debug, Clone)]
 pub struct ParseError {
@@ -241,6 +464,1799 @@ impl std::fmt::Display for ParseError {
 }
 
 impl std::error::Error for ParseError {}
+
+// ============================================================================
+// ShellToken, ShellLexer, and ShellParser - compatibility layer for exec.rs
+// ============================================================================
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ShellToken {
+    Word(String),
+    SingleQuotedWord(String),
+    DoubleQuotedWord(String),
+    Number(i64),
+    Semi,
+    Newline,
+    Amp,
+    AmpAmp,
+    Pipe,
+    PipePipe,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    DoubleLBracket,
+    DoubleRBracket,
+    Less,
+    Greater,
+    GreaterGreater,
+    LessGreater,
+    GreaterAmp,
+    LessAmp,
+    GreaterPipe,
+    LessLess,
+    LessLessLess,
+    HereDoc(String, String),
+    AmpGreater,
+    AmpGreaterGreater,
+    DoubleLParen,
+    DoubleRParen,
+    If,
+    Then,
+    Else,
+    Elif,
+    Fi,
+    Case,
+    Esac,
+    For,
+    While,
+    Until,
+    Do,
+    Done,
+    In,
+    Function,
+    Select,
+    Time,
+    Coproc,
+    Typeset,
+    Bang,
+    DoubleSemi,
+    SemiAmp,
+    SemiSemiAmp,
+    Eof,
+}
+
+pub struct ShellLexer<'a> {
+    input: Peekable<Chars<'a>>,
+    line: usize,
+    col: usize,
+    at_line_start: bool,
+}
+
+impl<'a> ShellLexer<'a> {
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            input: input.chars().peekable(),
+            line: 1,
+            col: 1,
+            at_line_start: true,
+        }
+    }
+
+    fn peek(&mut self) -> Option<char> {
+        self.input.peek().copied()
+    }
+
+    fn next_char(&mut self) -> Option<char> {
+        let c = self.input.next();
+        if let Some(ch) = c {
+            if ch == '\n' {
+                self.line += 1;
+                self.col = 1;
+                self.at_line_start = true;
+            } else {
+                self.col += 1;
+                self.at_line_start = false;
+            }
+        }
+        c
+    }
+
+    fn skip_whitespace(&mut self) -> bool {
+        let mut had_whitespace = false;
+        while let Some(c) = self.peek() {
+            if c == ' ' || c == '\t' {
+                self.next_char();
+                had_whitespace = true;
+            } else if c == '\\' {
+                self.next_char();
+                if self.peek() == Some('\n') {
+                    self.next_char();
+                }
+                had_whitespace = true;
+            } else {
+                break;
+            }
+        }
+        had_whitespace
+    }
+
+    fn skip_comment(&mut self, after_whitespace: bool) {
+        if after_whitespace && self.peek() == Some('#') {
+            while let Some(c) = self.peek() {
+                if c == '\n' {
+                    break;
+                }
+                self.next_char();
+            }
+        }
+    }
+
+    pub fn next_token(&mut self) -> ShellToken {
+        let was_at_line_start = self.at_line_start;
+        let had_whitespace = self.skip_whitespace();
+        self.skip_comment(had_whitespace || was_at_line_start);
+
+        let c = match self.peek() {
+            Some(c) => c,
+            None => return ShellToken::Eof,
+        };
+
+        if c == '\n' {
+            self.next_char();
+            self.at_line_start = true;
+            return ShellToken::Newline;
+        }
+        
+        self.at_line_start = false;
+
+        if c == ';' {
+            self.next_char();
+            if self.peek() == Some(';') {
+                self.next_char();
+                if self.peek() == Some('&') {
+                    self.next_char();
+                    return ShellToken::SemiSemiAmp;
+                }
+                return ShellToken::DoubleSemi;
+            }
+            if self.peek() == Some('&') {
+                self.next_char();
+                return ShellToken::SemiAmp;
+            }
+            return ShellToken::Semi;
+        }
+
+        if c == '&' {
+            self.next_char();
+            match self.peek() {
+                Some('&') => {
+                    self.next_char();
+                    return ShellToken::AmpAmp;
+                }
+                Some('>') => {
+                    self.next_char();
+                    if self.peek() == Some('>') {
+                        self.next_char();
+                        return ShellToken::AmpGreaterGreater;
+                    }
+                    return ShellToken::AmpGreater;
+                }
+                _ => return ShellToken::Amp,
+            }
+        }
+
+        if c == '|' {
+            self.next_char();
+            if self.peek() == Some('|') {
+                self.next_char();
+                return ShellToken::PipePipe;
+            }
+            return ShellToken::Pipe;
+        }
+
+        if c == '<' {
+            self.next_char();
+            match self.peek() {
+                Some('(') => {
+                    self.next_char();
+                    let cmd = self.read_process_sub();
+                    return ShellToken::Word(format!("<({}", cmd));
+                }
+                Some('<') => {
+                    self.next_char();
+                    if self.peek() == Some('<') {
+                        self.next_char();
+                        return ShellToken::LessLessLess;
+                    }
+                    return self.read_heredoc();
+                }
+                Some('>') => {
+                    self.next_char();
+                    return ShellToken::LessGreater;
+                }
+                Some('&') => {
+                    self.next_char();
+                    return ShellToken::LessAmp;
+                }
+                _ => return ShellToken::Less,
+            }
+        }
+
+        if c == '>' {
+            self.next_char();
+            match self.peek() {
+                Some('(') => {
+                    self.next_char();
+                    let cmd = self.read_process_sub();
+                    return ShellToken::Word(format!(">({}", cmd));
+                }
+                Some('>') => {
+                    self.next_char();
+                    return ShellToken::GreaterGreater;
+                }
+                Some('&') => {
+                    self.next_char();
+                    return ShellToken::GreaterAmp;
+                }
+                Some('|') => {
+                    self.next_char();
+                    return ShellToken::GreaterPipe;
+                }
+                _ => return ShellToken::Greater,
+            }
+        }
+
+        if c == '(' {
+            self.next_char();
+            if self.peek() == Some('(') {
+                self.next_char();
+                return ShellToken::DoubleLParen;
+            }
+            return ShellToken::LParen;
+        }
+
+        if c == ')' {
+            self.next_char();
+            if self.peek() == Some(')') {
+                self.next_char();
+                return ShellToken::DoubleRParen;
+            }
+            return ShellToken::RParen;
+        }
+
+        if c == '[' {
+            self.next_char();
+            if self.peek() == Some('[') {
+                self.next_char();
+                return ShellToken::DoubleLBracket;
+            }
+            if let Some(next_ch) = self.peek() {
+                if !next_ch.is_whitespace() && next_ch != ']' {
+                    let mut pattern = String::from("[");
+                    while let Some(ch) = self.peek() {
+                        pattern.push(self.next_char().unwrap());
+                        if ch == ']' {
+                            while let Some(c2) = self.peek() {
+                                if c2.is_whitespace() || c2 == ';' || c2 == '&' || c2 == '|' 
+                                   || c2 == '<' || c2 == '>' || c2 == ')' || c2 == '\n' {
+                                    break;
+                                }
+                                pattern.push(self.next_char().unwrap());
+                            }
+                            return ShellToken::Word(pattern);
+                        }
+                        if ch.is_whitespace() {
+                            return ShellToken::Word(pattern);
+                        }
+                    }
+                    return ShellToken::Word(pattern);
+                }
+            }
+            return ShellToken::LBracket;
+        }
+
+        if c == ']' {
+            self.next_char();
+            if self.peek() == Some(']') {
+                self.next_char();
+                return ShellToken::DoubleRBracket;
+            }
+            return ShellToken::RBracket;
+        }
+
+        if c == '{' {
+            self.next_char();
+            match self.peek() {
+                Some(' ') | Some('\t') | Some('\n') | None => {
+                    return ShellToken::LBrace;
+                }
+                _ => {
+                    let mut word = String::from("{");
+                    let mut depth = 1;
+                    while let Some(ch) = self.peek() {
+                        if ch == '{' {
+                            depth += 1;
+                            word.push(self.next_char().unwrap());
+                        } else if ch == '}' {
+                            depth -= 1;
+                            word.push(self.next_char().unwrap());
+                            if depth == 0 {
+                                break;
+                            }
+                        } else if (ch == ' ' || ch == '\t' || ch == '\n') && depth == 1 {
+                            break;
+                        } else {
+                            word.push(self.next_char().unwrap());
+                        }
+                    }
+                    while let Some(ch) = self.peek() {
+                        if ch.is_whitespace() || ch == ';' || ch == '&' || ch == '|'
+                            || ch == '<' || ch == '>' || ch == '(' || ch == ')' {
+                            break;
+                        }
+                        word.push(self.next_char().unwrap());
+                    }
+                    return ShellToken::Word(word);
+                }
+            }
+        }
+
+        if c == '}' {
+            self.next_char();
+            return ShellToken::RBrace;
+        }
+
+        if c == '!' {
+            self.next_char();
+            if self.peek() == Some('=') {
+                self.next_char();
+                return ShellToken::Word("!=".to_string());
+            }
+            if self.peek() == Some('(') {
+                let mut word = String::from("!(");
+                self.next_char();
+                let mut depth = 1;
+                while let Some(ch) = self.peek() {
+                    word.push(self.next_char().unwrap());
+                    if ch == '(' {
+                        depth += 1;
+                    } else if ch == ')' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                }
+                while let Some(ch) = self.peek() {
+                    if ch.is_whitespace() || ch == ';' || ch == '&' || ch == '|' || ch == '<' || ch == '>' {
+                        break;
+                    }
+                    word.push(self.next_char().unwrap());
+                }
+                return ShellToken::Word(word);
+            }
+            return ShellToken::Bang;
+        }
+
+        if c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-'
+            || c == '$' || c == '\'' || c == '"' || c == '~' || c == '*'
+            || c == '?' || c == '%' || c == '+' || c == '@' || c == ':' || c == '=' {
+            return self.read_word();
+        }
+
+        self.next_char();
+        ShellToken::Word(c.to_string())
+    }
+
+    fn read_process_sub(&mut self) -> String {
+        let mut content = String::new();
+        let mut depth = 1;
+        while let Some(c) = self.next_char() {
+            if c == '(' {
+                depth += 1;
+                content.push(c);
+            } else if c == ')' {
+                depth -= 1;
+                if depth == 0 {
+                    content.push(')');
+                    break;
+                }
+                content.push(c);
+            } else {
+                content.push(c);
+            }
+        }
+        content
+    }
+
+    fn read_heredoc(&mut self) -> ShellToken {
+        while self.peek() == Some(' ') || self.peek() == Some('\t') {
+            self.next_char();
+        }
+        let quoted = self.peek() == Some('\'') || self.peek() == Some('"');
+        if quoted {
+            self.next_char();
+        }
+        let mut delimiter = String::new();
+        while let Some(c) = self.peek() {
+            if c == '\n' || c == ' ' || c == '\t' {
+                break;
+            }
+            if quoted && (c == '\'' || c == '"') {
+                self.next_char();
+                break;
+            }
+            delimiter.push(self.next_char().unwrap());
+        }
+        while let Some(c) = self.peek() {
+            if c == '\n' {
+                self.next_char();
+                break;
+            }
+            self.next_char();
+        }
+        let mut content = String::new();
+        let mut current_line = String::new();
+        while let Some(c) = self.next_char() {
+            if c == '\n' {
+                if current_line.trim() == delimiter {
+                    break;
+                }
+                content.push_str(&current_line);
+                content.push('\n');
+                current_line.clear();
+            } else {
+                current_line.push(c);
+            }
+        }
+        ShellToken::HereDoc(delimiter, content)
+    }
+
+    fn read_word(&mut self) -> ShellToken {
+        let mut word = String::new();
+        while let Some(c) = self.peek() {
+            match c {
+                ' ' | '\t' | '\n' | ';' | '&' | '<' | '>' => break,
+                '[' => {
+                    word.push(self.next_char().unwrap());
+                    let mut bracket_depth = 1;
+                    while let Some(ch) = self.peek() {
+                        word.push(self.next_char().unwrap());
+                        if ch == '[' {
+                            bracket_depth += 1;
+                        } else if ch == ']' {
+                            bracket_depth -= 1;
+                            if bracket_depth == 0 {
+                                break;
+                            }
+                        }
+                        if ch == ' ' || ch == '\t' || ch == '\n' {
+                            break;
+                        }
+                    }
+                }
+                ']' => {
+                    if word.is_empty() {
+                        break;
+                    }
+                    word.push(self.next_char().unwrap());
+                }
+                '|' | '(' | ')' => {
+                    if c == '(' && !word.is_empty() {
+                        let last_char = word.chars().last().unwrap();
+                        if matches!(last_char, '?' | '*' | '+' | '@' | '!') {
+                            word.push(self.next_char().unwrap());
+                            let mut depth = 1;
+                            while let Some(ch) = self.peek() {
+                                word.push(self.next_char().unwrap());
+                                if ch == '(' {
+                                    depth += 1;
+                                } else if ch == ')' {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        if last_char == '=' {
+                            word.push(self.next_char().unwrap());
+                            let mut depth = 1;
+                            let mut in_sq = false;
+                            let mut in_dq = false;
+                            while let Some(ch) = self.peek() {
+                                if in_sq {
+                                    if ch == '\'' {
+                                        in_sq = false;
+                                    }
+                                    word.push(self.next_char().unwrap());
+                                } else if in_dq {
+                                    if ch == '"' {
+                                        in_dq = false;
+                                    } else if ch == '\\' {
+                                        word.push(self.next_char().unwrap());
+                                        if self.peek().is_some() {
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        continue;
+                                    }
+                                    word.push(self.next_char().unwrap());
+                                } else {
+                                    match ch {
+                                        '\'' => {
+                                            in_sq = true;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        '"' => {
+                                            in_dq = true;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        '(' => {
+                                            depth += 1;
+                                            word.push(self.next_char().unwrap());
+                                        }
+                                        ')' => {
+                                            depth -= 1;
+                                            word.push(self.next_char().unwrap());
+                                            if depth == 0 {
+                                                break;
+                                            }
+                                        }
+                                        '\\' => {
+                                            word.push(self.next_char().unwrap());
+                                            if self.peek().is_some() {
+                                                word.push(self.next_char().unwrap());
+                                            }
+                                        }
+                                        _ => word.push(self.next_char().unwrap()),
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                '{' => {
+                    word.push(self.next_char().unwrap());
+                    let mut depth = 1;
+                    while let Some(ch) = self.peek() {
+                        if ch == '{' {
+                            depth += 1;
+                            word.push(self.next_char().unwrap());
+                        } else if ch == '}' {
+                            depth -= 1;
+                            word.push(self.next_char().unwrap());
+                            if depth == 0 {
+                                break;
+                            }
+                        } else if ch == ' ' || ch == '\t' || ch == '\n' {
+                            break;
+                        } else {
+                            word.push(self.next_char().unwrap());
+                        }
+                    }
+                }
+                '}' => break,
+                '$' => {
+                    word.push(self.next_char().unwrap());
+                    if self.peek() == Some('\'') {
+                        word.push(self.next_char().unwrap());
+                        while let Some(ch) = self.peek() {
+                            if ch == '\'' {
+                                word.push(self.next_char().unwrap());
+                                break;
+                            } else if ch == '\\' {
+                                word.push(self.next_char().unwrap());
+                                if self.peek().is_some() {
+                                    word.push(self.next_char().unwrap());
+                                }
+                            } else {
+                                word.push(self.next_char().unwrap());
+                            }
+                        }
+                    } else if self.peek() == Some('{') {
+                        word.push(self.next_char().unwrap());
+                        let mut depth = 1;
+                        while let Some(ch) = self.peek() {
+                            if ch == '{' {
+                                depth += 1;
+                            } else if ch == '}' {
+                                depth -= 1;
+                                if depth == 0 {
+                                    word.push(self.next_char().unwrap());
+                                    break;
+                                }
+                            }
+                            word.push(self.next_char().unwrap());
+                        }
+                    } else if self.peek() == Some('(') {
+                        word.push(self.next_char().unwrap());
+                        let mut depth = 1;
+                        while let Some(ch) = self.peek() {
+                            if ch == '(' {
+                                depth += 1;
+                            } else if ch == ')' {
+                                depth -= 1;
+                                if depth == 0 {
+                                    word.push(self.next_char().unwrap());
+                                    break;
+                                }
+                            }
+                            word.push(self.next_char().unwrap());
+                        }
+                    }
+                }
+                '=' => {
+                    word.push(self.next_char().unwrap());
+                    if self.peek() == Some('(') {
+                        word.push(self.next_char().unwrap());
+                        let mut depth = 1;
+                        while let Some(ch) = self.peek() {
+                            if ch == '(' {
+                                depth += 1;
+                            } else if ch == ')' {
+                                depth -= 1;
+                                if depth == 0 {
+                                    word.push(self.next_char().unwrap());
+                                    break;
+                                }
+                            }
+                            word.push(self.next_char().unwrap());
+                        }
+                    }
+                }
+                '\'' => {
+                    self.next_char();
+                    while let Some(ch) = self.peek() {
+                        if ch == '\'' {
+                            self.next_char();
+                            break;
+                        }
+                        let c = self.next_char().unwrap();
+                        if matches!(c, '`' | '$' | '(' | ')') {
+                            word.push('\x00');
+                        }
+                        word.push(c);
+                    }
+                }
+                '"' => {
+                    self.next_char();
+                    while let Some(ch) = self.peek() {
+                        if ch == '"' {
+                            self.next_char();
+                            break;
+                        }
+                        if ch == '\\' {
+                            self.next_char();
+                            if let Some(escaped) = self.peek() {
+                                match escaped {
+                                    '$' | '`' | '"' | '\\' | '\n' => {
+                                        word.push(self.next_char().unwrap());
+                                    }
+                                    _ => {
+                                        word.push('\\');
+                                        word.push(self.next_char().unwrap());
+                                    }
+                                }
+                            } else {
+                                word.push('\\');
+                            }
+                        } else {
+                            word.push(self.next_char().unwrap());
+                        }
+                    }
+                }
+                '\\' => {
+                    self.next_char();
+                    if let Some(escaped) = self.next_char() {
+                        word.push(escaped);
+                    }
+                }
+                _ => {
+                    word.push(self.next_char().unwrap());
+                }
+            }
+        }
+
+        match word.as_str() {
+            "if" => ShellToken::If,
+            "then" => ShellToken::Then,
+            "else" => ShellToken::Else,
+            "elif" => ShellToken::Elif,
+            "fi" => ShellToken::Fi,
+            "case" => ShellToken::Case,
+            "esac" => ShellToken::Esac,
+            "for" => ShellToken::For,
+            "while" => ShellToken::While,
+            "until" => ShellToken::Until,
+            "do" => ShellToken::Do,
+            "done" => ShellToken::Done,
+            "in" => ShellToken::In,
+            "function" => ShellToken::Function,
+            "select" => ShellToken::Select,
+            "time" => ShellToken::Time,
+            "coproc" => ShellToken::Coproc,
+            "typeset" | "local" | "declare" | "export" | "readonly" 
+                | "integer" | "float" => ShellToken::Typeset,
+            _ => ShellToken::Word(word),
+        }
+    }
+}
+
+pub struct ShellParser<'a> {
+    lexer: ShellLexer<'a>,
+    current: ShellToken,
+}
+
+impl<'a> ShellParser<'a> {
+    pub fn new(input: &'a str) -> Self {
+        let mut lexer = ShellLexer::new(input);
+        let current = lexer.next_token();
+        Self { lexer, current }
+    }
+
+    fn parse_array_elements(content: &str) -> Vec<ShellWord> {
+        let mut elements = Vec::new();
+        let mut current = String::new();
+        let mut chars = content.chars().peekable();
+        let mut in_single_quote = false;
+        let mut in_double_quote = false;
+
+        while let Some(c) = chars.next() {
+            if in_single_quote {
+                if c == '\'' {
+                    in_single_quote = false;
+                    let marked: String = current
+                        .chars()
+                        .flat_map(|ch| {
+                            if matches!(ch, '`' | '$' | '(' | ')') {
+                                vec!['\x00', ch]
+                            } else {
+                                vec![ch]
+                            }
+                        })
+                        .collect();
+                    elements.push(ShellWord::Literal(marked));
+                    current.clear();
+                } else {
+                    current.push(c);
+                }
+            } else if in_double_quote {
+                if c == '"' {
+                    in_double_quote = false;
+                    elements.push(ShellWord::Literal(current.clone()));
+                    current.clear();
+                } else if c == '\\' {
+                    if let Some(&next) = chars.peek() {
+                        if matches!(next, '$' | '`' | '"' | '\\') {
+                            chars.next();
+                            current.push(next);
+                        } else {
+                            current.push(c);
+                        }
+                    } else {
+                        current.push(c);
+                    }
+                } else {
+                    current.push(c);
+                }
+            } else {
+                match c {
+                    '\'' => in_single_quote = true,
+                    '"' => in_double_quote = true,
+                    ' ' | '\t' | '\n' => {
+                        if !current.is_empty() {
+                            elements.push(ShellWord::Literal(current.clone()));
+                            current.clear();
+                        }
+                    }
+                    '\\' => {
+                        if let Some(next) = chars.next() {
+                            current.push(next);
+                        }
+                    }
+                    _ => current.push(c),
+                }
+            }
+        }
+
+        if !current.is_empty() {
+            elements.push(ShellWord::Literal(current));
+        }
+
+        elements
+    }
+
+    fn advance(&mut self) -> ShellToken {
+        std::mem::replace(&mut self.current, self.lexer.next_token())
+    }
+
+    fn expect(&mut self, expected: ShellToken) -> Result<(), String> {
+        if self.current == expected {
+            self.advance();
+            Ok(())
+        } else {
+            Err(format!("Expected {:?}, got {:?}", expected, self.current))
+        }
+    }
+
+    fn skip_newlines(&mut self) {
+        while self.current == ShellToken::Newline {
+            self.advance();
+        }
+    }
+    
+    fn skip_separators(&mut self) {
+        while self.current == ShellToken::Newline || self.current == ShellToken::Semi {
+            self.advance();
+        }
+    }
+
+    pub fn parse_script(&mut self) -> Result<Vec<ShellCommand>, String> {
+        let mut commands = Vec::new();
+        self.skip_newlines();
+        while self.current != ShellToken::Eof {
+            if let Some(cmd) = self.parse_complete_command()? {
+                commands.push(cmd);
+            }
+            self.skip_newlines();
+        }
+        Ok(commands)
+    }
+
+    fn parse_complete_command(&mut self) -> Result<Option<ShellCommand>, String> {
+        self.skip_newlines();
+        if self.current == ShellToken::Eof {
+            return Ok(None);
+        }
+        let cmd = self.parse_list()?;
+        match &self.current {
+            ShellToken::Newline | ShellToken::Semi | ShellToken::Amp => {
+                self.advance();
+            }
+            _ => {}
+        }
+        Ok(Some(cmd))
+    }
+
+    fn parse_list(&mut self) -> Result<ShellCommand, String> {
+        let first = self.parse_pipeline()?;
+        let mut items = vec![(first, ListOp::Semi)];
+
+        loop {
+            let op = match &self.current {
+                ShellToken::AmpAmp => ListOp::And,
+                ShellToken::PipePipe => ListOp::Or,
+                ShellToken::Semi => ListOp::Semi,
+                ShellToken::Amp => ListOp::Amp,
+                ShellToken::Newline => break,
+                _ => break,
+            };
+
+            self.advance();
+            self.skip_newlines();
+
+            if let Some(last) = items.last_mut() {
+                last.1 = op;
+            }
+
+            if self.current == ShellToken::Eof
+                || self.current == ShellToken::Then
+                || self.current == ShellToken::Else
+                || self.current == ShellToken::Elif
+                || self.current == ShellToken::Fi
+                || self.current == ShellToken::Do
+                || self.current == ShellToken::Done
+                || self.current == ShellToken::Esac
+                || self.current == ShellToken::RBrace
+                || self.current == ShellToken::RParen
+            {
+                break;
+            }
+
+            let next = self.parse_pipeline()?;
+            items.push((next, ListOp::Semi));
+        }
+
+        if items.len() == 1 {
+            let (cmd, op) = items.pop().unwrap();
+            if matches!(op, ListOp::Amp) {
+                Ok(ShellCommand::List(vec![(cmd, op)]))
+            } else {
+                Ok(cmd)
+            }
+        } else {
+            Ok(ShellCommand::List(items))
+        }
+    }
+
+    fn parse_pipeline(&mut self) -> Result<ShellCommand, String> {
+        let negated = if self.current == ShellToken::Bang {
+            self.advance();
+            true
+        } else {
+            false
+        };
+
+        let first = self.parse_command()?;
+        let mut cmds = vec![first];
+
+        while self.current == ShellToken::Pipe {
+            self.advance();
+            self.skip_newlines();
+            cmds.push(self.parse_command()?);
+        }
+
+        if cmds.len() == 1 && !negated {
+            Ok(cmds.pop().unwrap())
+        } else {
+            Ok(ShellCommand::Pipeline(cmds, negated))
+        }
+    }
+
+    fn parse_command(&mut self) -> Result<ShellCommand, String> {
+        let cmd = match &self.current {
+            ShellToken::If => self.parse_if(),
+            ShellToken::For => self.parse_for(),
+            ShellToken::While => self.parse_while(),
+            ShellToken::Until => self.parse_until(),
+            ShellToken::Case => self.parse_case(),
+            ShellToken::LBrace => self.parse_brace_group(),
+            ShellToken::LParen => {
+                self.advance();
+                if self.current == ShellToken::RParen {
+                    self.advance();
+                    self.skip_newlines();
+                    if self.current == ShellToken::LBrace {
+                        let body = self.parse_brace_group()?;
+                        Ok(ShellCommand::FunctionDef(String::new(), Box::new(body)))
+                    } else {
+                        Ok(ShellCommand::Compound(CompoundCommand::Subshell(vec![])))
+                    }
+                } else {
+                    self.skip_newlines();
+                    let body = self.parse_compound_list()?;
+                    self.expect(ShellToken::RParen)?;
+                    Ok(ShellCommand::Compound(CompoundCommand::Subshell(body)))
+                }
+            },
+            ShellToken::DoubleLBracket => self.parse_cond_command(),
+            ShellToken::DoubleLParen => self.parse_arith_command(),
+            ShellToken::Function => self.parse_function(),
+            ShellToken::Coproc => self.parse_coproc(),
+            _ => self.parse_simple_command(),
+        }?;
+        
+        let mut redirects = Vec::new();
+        loop {
+            if let ShellToken::Word(w) = &self.current {
+                if w.chars().all(|c| c.is_ascii_digit()) {
+                    let fd_str = w.clone();
+                    self.advance();
+                    match &self.current {
+                        ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
+                        | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
+                        | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                            let fd = fd_str.parse::<i32>().ok();
+                            redirects.push(self.parse_redirect_with_fd(fd)?);
+                            continue;
+                        }
+                        _ => break,
+                    }
+                }
+            }
+            
+            match &self.current {
+                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
+                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
+                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe
+                | ShellToken::AmpGreater | ShellToken::AmpGreaterGreater => {
+                    redirects.push(self.parse_redirect_with_fd(None)?);
+                }
+                _ => break,
+            }
+        }
+        
+        if !redirects.is_empty() {
+            Ok(ShellCommand::Compound(CompoundCommand::WithRedirects(
+                Box::new(cmd),
+                redirects,
+            )))
+        } else {
+            Ok(cmd)
+        }
+    }
+
+    fn parse_simple_command(&mut self) -> Result<ShellCommand, String> {
+        let mut cmd = SimpleCommand {
+            assignments: Vec::new(),
+            words: Vec::new(),
+            redirects: Vec::new(),
+        };
+
+        loop {
+            match &self.current {
+                ShellToken::Word(w) => {
+                    if w.starts_with('{') && w.ends_with('}') && w.len() > 2 {
+                        let varname = w[1..w.len() - 1].to_string();
+                        if varname.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                            let saved_word = w.clone();
+                            self.advance();
+                            match &self.current {
+                                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
+                                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
+                                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                                    let mut redir = self.parse_redirect_with_fd(None)?;
+                                    redir.fd_var = Some(varname);
+                                    cmd.redirects.push(redir);
+                                    continue;
+                                }
+                                _ => {
+                                    cmd.words.push(ShellWord::Literal(saved_word));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if w.chars().all(|c| c.is_ascii_digit()) {
+                        let fd_str = w.clone();
+                        self.advance();
+                        match &self.current {
+                            ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
+                            | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
+                            | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                                let fd = fd_str.parse::<i32>().ok();
+                                cmd.redirects.push(self.parse_redirect_with_fd(fd)?);
+                                continue;
+                            }
+                            _ => {
+                                cmd.words.push(ShellWord::Literal(fd_str));
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    if cmd.words.is_empty() && w.contains('=') && !w.starts_with('=') {
+                        let (eq_pos, is_append) = if let Some(pos) = w.find("+=") {
+                            (pos, true)
+                        } else if let Some(pos) = w.find('=') {
+                            (pos, false)
+                        } else {
+                            (0, false)
+                        };
+                        
+                        if eq_pos > 0 {
+                            let var = w[..eq_pos].to_string();
+                            let val_start = if is_append { eq_pos + 2 } else { eq_pos + 1 };
+                            let val = w[val_start..].to_string();
+                            
+                            let is_valid_var = if let Some(bracket_pos) = var.find('[') {
+                                let name = &var[..bracket_pos];
+                                let rest = &var[bracket_pos..];
+                                name.chars().all(|c| c.is_alphanumeric() || c == '_')
+                                    && rest.ends_with(']')
+                            } else {
+                                var.chars().all(|c| c.is_alphanumeric() || c == '_')
+                            };
+                            if is_valid_var {
+                                if val.starts_with('(') && val.ends_with(')') {
+                                    let array_content = &val[1..val.len() - 1];
+                                    let elements = Self::parse_array_elements(array_content);
+                                    cmd.assignments.push((var, ShellWord::ArrayLiteral(elements), is_append));
+                                } else {
+                                    cmd.assignments.push((var, ShellWord::Literal(val), is_append));
+                                }
+                                self.advance();
+                                continue;
+                            }
+                        }
+                    }
+
+                    cmd.words.push(self.parse_word()?);
+                }
+
+                ShellToken::LBracket => {
+                    cmd.words.push(ShellWord::Literal("[".to_string()));
+                    self.advance();
+                }
+                ShellToken::RBracket => {
+                    if !cmd.words.is_empty() {
+                        cmd.words.push(ShellWord::Literal("]".to_string()));
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                ShellToken::If | ShellToken::Then | ShellToken::Else | ShellToken::Elif
+                | ShellToken::Fi | ShellToken::Case | ShellToken::Esac | ShellToken::For
+                | ShellToken::While | ShellToken::Until | ShellToken::Do | ShellToken::Done
+                | ShellToken::In | ShellToken::Function | ShellToken::Select
+                | ShellToken::Time | ShellToken::Coproc => {
+                    if !cmd.words.is_empty() {
+                        cmd.words.push(self.parse_word()?);
+                    } else {
+                        break;
+                    }
+                }
+
+                ShellToken::Typeset => {
+                    if cmd.words.is_empty() {
+                        cmd.words.push(ShellWord::Literal("typeset".to_string()));
+                        self.advance();
+                    } else {
+                        cmd.words.push(self.parse_word()?);
+                    }
+                }
+
+                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
+                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
+                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe
+                | ShellToken::AmpGreater | ShellToken::AmpGreaterGreater
+                | ShellToken::HereDoc(_, _) => {
+                    cmd.redirects.push(self.parse_redirect_with_fd(None)?);
+                }
+
+                _ => break,
+            }
+        }
+
+        if cmd.words.len() == 1 && self.current == ShellToken::LParen {
+            if let ShellWord::Literal(name) = &cmd.words[0] {
+                let name = name.clone();
+                self.advance();
+                self.expect(ShellToken::RParen)?;
+                self.skip_newlines();
+                let body = self.parse_command()?;
+                return Ok(ShellCommand::FunctionDef(name, Box::new(body)));
+            }
+        }
+
+        Ok(ShellCommand::Simple(cmd))
+    }
+
+    fn parse_word(&mut self) -> Result<ShellWord, String> {
+        let token = self.advance();
+        match token {
+            ShellToken::Word(w) => Ok(ShellWord::Literal(w)),
+            ShellToken::LBracket => Ok(ShellWord::Literal("[".to_string())),
+            ShellToken::If => Ok(ShellWord::Literal("if".to_string())),
+            ShellToken::Then => Ok(ShellWord::Literal("then".to_string())),
+            ShellToken::Else => Ok(ShellWord::Literal("else".to_string())),
+            ShellToken::Elif => Ok(ShellWord::Literal("elif".to_string())),
+            ShellToken::Fi => Ok(ShellWord::Literal("fi".to_string())),
+            ShellToken::Case => Ok(ShellWord::Literal("case".to_string())),
+            ShellToken::Esac => Ok(ShellWord::Literal("esac".to_string())),
+            ShellToken::For => Ok(ShellWord::Literal("for".to_string())),
+            ShellToken::While => Ok(ShellWord::Literal("while".to_string())),
+            ShellToken::Until => Ok(ShellWord::Literal("until".to_string())),
+            ShellToken::Do => Ok(ShellWord::Literal("do".to_string())),
+            ShellToken::Done => Ok(ShellWord::Literal("done".to_string())),
+            ShellToken::In => Ok(ShellWord::Literal("in".to_string())),
+            ShellToken::Function => Ok(ShellWord::Literal("function".to_string())),
+            ShellToken::Select => Ok(ShellWord::Literal("select".to_string())),
+            ShellToken::Time => Ok(ShellWord::Literal("time".to_string())),
+            ShellToken::Coproc => Ok(ShellWord::Literal("coproc".to_string())),
+            ShellToken::Typeset => Ok(ShellWord::Literal("typeset".to_string())),
+            _ => Err("Expected word".to_string()),
+        }
+    }
+
+    fn parse_redirect_with_fd(&mut self, fd: Option<i32>) -> Result<Redirect, String> {
+        if let ShellToken::HereDoc(delimiter, content) = &self.current {
+            let delimiter = delimiter.clone();
+            let content = content.clone();
+            self.advance();
+            return Ok(Redirect {
+                fd,
+                op: RedirectOp::HereDoc,
+                target: ShellWord::Literal(delimiter),
+                heredoc_content: Some(content),
+                fd_var: None,
+            });
+        }
+
+        let mut fd_var = None;
+        if let ShellToken::Word(w) = &self.current {
+            if w.starts_with('{') && w.ends_with('}') && w.len() > 2 {
+                let varname = w[1..w.len() - 1].to_string();
+                fd_var = Some(varname);
+                self.advance();
+            }
+        }
+
+        let op = match self.advance() {
+            ShellToken::Less => RedirectOp::Read,
+            ShellToken::Greater => RedirectOp::Write,
+            ShellToken::GreaterGreater => RedirectOp::Append,
+            ShellToken::LessAmp => RedirectOp::DupRead,
+            ShellToken::GreaterAmp => RedirectOp::DupWrite,
+            ShellToken::LessLess => RedirectOp::HereDoc,
+            ShellToken::LessLessLess => RedirectOp::HereString,
+            ShellToken::LessGreater => RedirectOp::ReadWrite,
+            ShellToken::GreaterPipe => RedirectOp::Clobber,
+            ShellToken::AmpGreater => RedirectOp::WriteBoth,
+            ShellToken::AmpGreaterGreater => RedirectOp::AppendBoth,
+            _ => return Err("Expected redirect operator".to_string()),
+        };
+
+        let target = self.parse_word()?;
+
+        Ok(Redirect {
+            fd,
+            op,
+            target,
+            heredoc_content: None,
+            fd_var,
+        })
+    }
+
+    fn parse_if(&mut self) -> Result<ShellCommand, String> {
+        let mut conditions = Vec::new();
+        let mut else_part = None;
+        let mut usebrace = false;
+        
+        let mut xtok = self.current.clone();
+        loop {
+            if xtok == ShellToken::Fi {
+                self.advance();
+                break;
+            }
+            
+            self.advance();
+            
+            if xtok == ShellToken::Else {
+                break;
+            }
+            
+            self.skip_separators();
+            
+            if xtok != ShellToken::If && xtok != ShellToken::Elif {
+                return Err(format!("Expected If or Elif, got {:?}", xtok));
+            }
+            
+            let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
+            self.skip_separators();
+            xtok = ShellToken::Fi;
+            
+            if self.current == ShellToken::Then {
+                usebrace = false;
+                self.advance();
+                let body = self.parse_compound_list()?;
+                conditions.push((cond, body));
+            } else if self.current == ShellToken::LBrace {
+                usebrace = true;
+                self.advance();
+                self.skip_separators();
+                let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+                if self.current != ShellToken::RBrace {
+                    return Err(format!("Expected RBrace, got {:?}", self.current));
+                }
+                conditions.push((cond, body));
+                self.advance();
+                if self.current == ShellToken::Newline || self.current == ShellToken::Semi {
+                    break;
+                }
+            } else {
+                return Err(format!("Expected Then or LBrace after condition, got {:?}", self.current));
+            }
+            
+            xtok = self.current.clone();
+            if xtok != ShellToken::Elif && xtok != ShellToken::Else && xtok != ShellToken::Fi {
+                break;
+            }
+        }
+        
+        if xtok == ShellToken::Else || self.current == ShellToken::Else {
+            if self.current == ShellToken::Else {
+                self.advance();
+            }
+            self.skip_separators();
+            
+            if self.current == ShellToken::LBrace && usebrace {
+                self.advance();
+                self.skip_separators();
+                let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+                if self.current != ShellToken::RBrace {
+                    return Err(format!("Expected RBrace in else, got {:?}", self.current));
+                }
+                self.advance();
+                else_part = Some(body);
+            } else {
+                let body = self.parse_compound_list()?;
+                if self.current != ShellToken::Fi {
+                    return Err(format!("Expected Fi, got {:?}", self.current));
+                }
+                self.advance();
+                else_part = Some(body);
+            }
+        }
+        
+        Ok(ShellCommand::Compound(CompoundCommand::If {
+            conditions,
+            else_part,
+        }))
+    }
+
+    fn parse_for(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::For)?;
+        self.skip_newlines();
+
+        if self.current == ShellToken::DoubleLParen {
+            return self.parse_for_arith();
+        }
+
+        let var = if let ShellToken::Word(w) = self.advance() {
+            w
+        } else {
+            return Err("Expected variable name after 'for'".to_string());
+        };
+
+        while self.current == ShellToken::Newline {
+            self.advance();
+        }
+
+        let words = if self.current == ShellToken::In {
+            self.advance();
+            let mut words = Vec::new();
+            while let ShellToken::Word(_) = &self.current {
+                words.push(self.parse_word()?);
+            }
+            Some(words)
+        } else if self.current == ShellToken::LParen {
+            self.advance();
+            let mut words = Vec::new();
+            while self.current != ShellToken::RParen && self.current != ShellToken::Eof {
+                if let ShellToken::Word(_) = &self.current {
+                    words.push(self.parse_word()?);
+                } else if self.current == ShellToken::Newline {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            self.expect(ShellToken::RParen)?;
+            Some(words)
+        } else {
+            None
+        };
+
+        self.skip_separators();
+
+        let body = if self.current == ShellToken::LBrace {
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
+
+        Ok(ShellCommand::Compound(CompoundCommand::For {
+            var,
+            words,
+            body,
+        }))
+    }
+
+    fn parse_for_arith(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::DoubleLParen)?;
+
+        let mut parts = Vec::new();
+        let mut current_part = String::new();
+        let mut depth = 0;
+
+        loop {
+            match &self.current {
+                ShellToken::DoubleRParen if depth == 0 => break,
+                ShellToken::DoubleLParen => {
+                    depth += 1;
+                    current_part.push_str("((");
+                    self.advance();
+                }
+                ShellToken::DoubleRParen => {
+                    depth -= 1;
+                    current_part.push_str("))");
+                    self.advance();
+                }
+                ShellToken::Semi => {
+                    parts.push(current_part.trim().to_string());
+                    current_part = String::new();
+                    self.advance();
+                }
+                ShellToken::Word(w) => {
+                    current_part.push_str(w);
+                    current_part.push(' ');
+                    self.advance();
+                }
+                ShellToken::Less => { current_part.push('<'); self.advance(); }
+                ShellToken::Greater => { current_part.push('>'); self.advance(); }
+                ShellToken::LessLess => { current_part.push_str("<<"); self.advance(); }
+                ShellToken::GreaterGreater => { current_part.push_str(">>"); self.advance(); }
+                _ => { self.advance(); }
+            }
+        }
+        parts.push(current_part.trim().to_string());
+
+        self.expect(ShellToken::DoubleRParen)?;
+        self.skip_newlines();
+
+        match &self.current {
+            ShellToken::Semi | ShellToken::Newline => { self.advance(); }
+            _ => {}
+        }
+        self.skip_newlines();
+
+        self.expect(ShellToken::Do)?;
+        self.skip_newlines();
+        let body = self.parse_compound_list()?;
+        self.expect(ShellToken::Done)?;
+
+        Ok(ShellCommand::Compound(CompoundCommand::ForArith {
+            init: parts.first().cloned().unwrap_or_default(),
+            cond: parts.get(1).cloned().unwrap_or_default(),
+            step: parts.get(2).cloned().unwrap_or_default(),
+            body,
+        }))
+    }
+
+    fn parse_while(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::While)?;
+        let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
+        self.skip_separators();
+        
+        let body = if self.current == ShellToken::LBrace {
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
+
+        Ok(ShellCommand::Compound(CompoundCommand::While {
+            condition,
+            body,
+        }))
+    }
+
+    fn parse_until(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::Until)?;
+        let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
+        self.skip_separators();
+        
+        let body = if self.current == ShellToken::LBrace {
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
+
+        Ok(ShellCommand::Compound(CompoundCommand::Until {
+            condition,
+            body,
+        }))
+    }
+
+    fn parse_case(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::Case)?;
+        self.skip_newlines();
+        let word = self.parse_word()?;
+        self.skip_newlines();
+        self.expect(ShellToken::In)?;
+        self.skip_newlines();
+
+        let mut cases = Vec::new();
+
+        while self.current != ShellToken::Esac {
+            let mut patterns = Vec::new();
+            if self.current == ShellToken::LParen {
+                self.advance();
+            }
+
+            loop {
+                patterns.push(self.parse_word()?);
+                if self.current == ShellToken::Pipe {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+
+            self.expect(ShellToken::RParen)?;
+            self.skip_newlines();
+
+            let body = self.parse_compound_list()?;
+
+            let term = match &self.current {
+                ShellToken::DoubleSemi => { self.advance(); CaseTerminator::Break }
+                ShellToken::SemiAmp => { self.advance(); CaseTerminator::Fallthrough }
+                ShellToken::SemiSemiAmp => { self.advance(); CaseTerminator::Continue }
+                _ => CaseTerminator::Break,
+            };
+
+            cases.push((patterns, body, term));
+            self.skip_newlines();
+        }
+
+        self.expect(ShellToken::Esac)?;
+
+        Ok(ShellCommand::Compound(CompoundCommand::Case {
+            word,
+            cases,
+        }))
+    }
+
+    fn parse_brace_group(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::LBrace)?;
+        self.skip_newlines();
+        let body = self.parse_compound_list()?;
+        self.expect(ShellToken::RBrace)?;
+
+        Ok(ShellCommand::Compound(CompoundCommand::BraceGroup(body)))
+    }
+
+    fn parse_cond_command(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::DoubleLBracket)?;
+
+        let mut tokens: Vec<String> = Vec::new();
+        while self.current != ShellToken::DoubleRBracket && self.current != ShellToken::Eof {
+            match &self.current {
+                ShellToken::Word(w) => tokens.push(w.clone()),
+                ShellToken::Bang => tokens.push("!".to_string()),
+                ShellToken::AmpAmp => tokens.push("&&".to_string()),
+                ShellToken::PipePipe => tokens.push("||".to_string()),
+                ShellToken::LParen => tokens.push("(".to_string()),
+                ShellToken::RParen => tokens.push(")".to_string()),
+                ShellToken::Less => tokens.push("<".to_string()),
+                ShellToken::Greater => tokens.push(">".to_string()),
+                _ => {}
+            }
+            self.advance();
+        }
+
+        self.expect(ShellToken::DoubleRBracket)?;
+
+        let expr = self.parse_cond_tokens(&tokens)?;
+        Ok(ShellCommand::Compound(CompoundCommand::Cond(expr)))
+    }
+
+    fn parse_cond_tokens(&self, tokens: &[String]) -> Result<CondExpr, String> {
+        if tokens.is_empty() {
+            return Ok(CondExpr::StringNonEmpty(ShellWord::Literal(String::new())));
+        }
+
+        if tokens[0] == "!" {
+            let inner = self.parse_cond_tokens(&tokens[1..])?;
+            return Ok(CondExpr::Not(Box::new(inner)));
+        }
+
+        for (i, tok) in tokens.iter().enumerate() {
+            match tok.as_str() {
+                "=" | "==" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::StringEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "!=" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::StringNotEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "=~" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::StringMatch(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-eq" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-ne" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumNotEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-lt" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumLess(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-le" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumLessEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-gt" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumGreater(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "-ge" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::NumGreaterEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "<" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::StringLess(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                ">" => {
+                    let left = tokens[..i].join(" ");
+                    let right = tokens[i + 1..].join(" ");
+                    return Ok(CondExpr::StringGreater(ShellWord::Literal(left), ShellWord::Literal(right)));
+                }
+                "&&" => {
+                    let left = self.parse_cond_tokens(&tokens[..i])?;
+                    let right = self.parse_cond_tokens(&tokens[i + 1..])?;
+                    return Ok(CondExpr::And(Box::new(left), Box::new(right)));
+                }
+                "||" => {
+                    let left = self.parse_cond_tokens(&tokens[..i])?;
+                    let right = self.parse_cond_tokens(&tokens[i + 1..])?;
+                    return Ok(CondExpr::Or(Box::new(left), Box::new(right)));
+                }
+                _ => {}
+            }
+        }
+
+        if tokens.len() >= 2 {
+            let op = &tokens[0];
+            let arg = tokens[1..].join(" ");
+            match op.as_str() {
+                "-e" => return Ok(CondExpr::FileExists(ShellWord::Literal(arg))),
+                "-f" => return Ok(CondExpr::FileRegular(ShellWord::Literal(arg))),
+                "-d" => return Ok(CondExpr::FileDirectory(ShellWord::Literal(arg))),
+                "-L" | "-h" => return Ok(CondExpr::FileSymlink(ShellWord::Literal(arg))),
+                "-r" => return Ok(CondExpr::FileReadable(ShellWord::Literal(arg))),
+                "-w" => return Ok(CondExpr::FileWritable(ShellWord::Literal(arg))),
+                "-x" => return Ok(CondExpr::FileExecutable(ShellWord::Literal(arg))),
+                "-s" => return Ok(CondExpr::FileNonEmpty(ShellWord::Literal(arg))),
+                "-z" => return Ok(CondExpr::StringEmpty(ShellWord::Literal(arg))),
+                "-n" => return Ok(CondExpr::StringNonEmpty(ShellWord::Literal(arg))),
+                _ => {}
+            }
+        }
+
+        let expr_str = tokens.join(" ");
+        Ok(CondExpr::StringNonEmpty(ShellWord::Literal(expr_str)))
+    }
+
+    fn parse_arith_command(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::DoubleLParen)?;
+
+        let mut expr = String::new();
+        let mut depth = 1;
+
+        while depth > 0 {
+            match &self.current {
+                ShellToken::DoubleLParen => { depth += 1; expr.push_str("(("); }
+                ShellToken::DoubleRParen => {
+                    depth -= 1;
+                    if depth > 0 { expr.push_str("))"); }
+                }
+                ShellToken::Word(w) => { expr.push_str(w); expr.push(' '); }
+                ShellToken::LParen => expr.push('('),
+                ShellToken::RParen => expr.push(')'),
+                ShellToken::LBracket => expr.push('['),
+                ShellToken::RBracket => expr.push(']'),
+                ShellToken::Less => expr.push('<'),
+                ShellToken::Greater => expr.push('>'),
+                ShellToken::LessLess => expr.push_str("<<"),
+                ShellToken::GreaterGreater => expr.push_str(">>"),
+                ShellToken::Bang => expr.push('!'),
+                ShellToken::Eof => break,
+                _ => {}
+            }
+            self.advance();
+        }
+
+        Ok(ShellCommand::Compound(CompoundCommand::Arith(expr.trim().to_string())))
+    }
+
+    fn parse_function(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::Function)?;
+        self.skip_newlines();
+        let name = if let ShellToken::Word(w) = self.advance() {
+            w
+        } else {
+            return Err("Expected function name".to_string());
+        };
+
+        self.skip_newlines();
+        if self.current == ShellToken::LParen {
+            self.advance();
+            self.expect(ShellToken::RParen)?;
+            self.skip_newlines();
+        }
+
+        let body = self.parse_command()?;
+        Ok(ShellCommand::FunctionDef(name, Box::new(body)))
+    }
+
+    fn parse_coproc(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::Coproc)?;
+        self.skip_newlines();
+
+        let name = if let ShellToken::Word(w) = &self.current {
+            let n = w.clone();
+            self.advance();
+            self.skip_newlines();
+            Some(n)
+        } else {
+            None
+        };
+
+        let body = self.parse_command()?;
+        Ok(ShellCommand::Compound(CompoundCommand::Coproc {
+            name,
+            body: Box::new(body),
+        }))
+    }
+
+    fn parse_compound_list(&mut self) -> Result<Vec<ShellCommand>, String> {
+        let mut commands = Vec::new();
+        self.skip_newlines();
+
+        while self.current != ShellToken::Eof
+            && self.current != ShellToken::RBrace
+            && self.current != ShellToken::RParen
+            && self.current != ShellToken::Fi
+            && self.current != ShellToken::Done
+            && self.current != ShellToken::Esac
+            && self.current != ShellToken::Elif
+            && self.current != ShellToken::Else
+            && self.current != ShellToken::DoubleSemi
+            && self.current != ShellToken::SemiAmp
+            && self.current != ShellToken::SemiSemiAmp
+        {
+            let cmd = self.parse_list()?;
+            commands.push(cmd);
+            match &self.current {
+                ShellToken::Newline | ShellToken::Semi => { self.advance(); }
+                _ => {}
+            }
+            self.skip_newlines();
+        }
+
+        Ok(commands)
+    }
+
+    fn parse_compound_list_until(&mut self, terminators: &[ShellToken]) -> Result<Vec<ShellCommand>, String> {
+        let mut commands = Vec::new();
+        self.skip_newlines();
+
+        while self.current != ShellToken::Eof && !terminators.contains(&self.current) {
+            let cmd = self.parse_list()?;
+            commands.push(cmd);
+            match &self.current {
+                ShellToken::Newline | ShellToken::Semi => { self.advance(); }
+                _ => {}
+            }
+            self.skip_newlines();
+        }
+
+        Ok(commands)
+    }
+}
 
 /// The Zsh Parser
 pub struct ZshParser<'a> {

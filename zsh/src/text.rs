@@ -9,9 +9,9 @@
 //! - History expansion
 //! - Debugging output
 
-use crate::shell_ast::{
+use crate::parser::{
     ShellCommand, SimpleCommand, CompoundCommand, ShellWord, Redirect, RedirectOp,
-    ListOp, CaseTerminator,
+    ListOp, CaseTerminator, CondExpr,
 };
 
 /// Binary operators in conditions (order matches COND_STREQ et seq.)
@@ -397,8 +397,7 @@ impl TextFormatter {
         }
     }
 
-    fn format_cond_expr(&mut self, expr: &crate::shell_ast::CondExpr) {
-        use crate::shell_ast::CondExpr;
+    fn format_cond_expr(&mut self, expr: &CondExpr) {
         match expr {
             CondExpr::Not(inner) => {
                 self.add_str("! ");

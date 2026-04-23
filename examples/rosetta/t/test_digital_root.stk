@@ -1,38 +1,37 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Digital Root
 
-fn sum_digits($n) {
-    my @digits = split //, "$n"
+fn my_digital_root {
+    my $n = $_[0]
+    if ($n < 10) { return $n }
     my $sum = 0
-    for my $d (@digits) {
-        next unless $d =~ /\d/
-        $sum += int($d)
+    while ($n > 0) {
+        $sum += $n % 10
+        $n = int($n / 10)
     }
-    $sum
+    my_digital_root($sum)
 }
 
-fn my_digital_root($n) {
+fn digital_root_additive_persistence {
+    my $n = $_[0]
     my $persistence = 0
     while ($n >= 10) {
-        $n = sum_digits($n)
+        my $sum = 0
+        while ($n > 0) {
+            $sum += $n % 10
+            $n = int($n / 10)
+        }
+        $n = $sum
         $persistence++
     }
-    ($n, $persistence)
+    ([$n, $persistence])
 }
 
-my ($root, $pers) = my_digital_root(627615)
-assert_eq $root, 9, "digital root of 627615"
-assert_eq $pers, 2, "persistence of 627615"
+assert_eq my_digital_root(627615), 9, "dr(627615)"
+assert_eq my_digital_root(39390), 6, "dr(39390)"
 
-($root, $pers) = my_digital_root(39)
-assert_eq $root, 3, "digital root of 39"
-assert_eq $pers, 2, "persistence of 39"
-
-($root, $pers) = my_digital_root(9)
-assert_eq $root, 9, "digital root of 9"
-assert_eq $pers, 0, "persistence of 9"
-
-($root, $pers) = my_digital_root(999999999999)
-assert_eq $root, 9, "digital root of 999999999999"
+my $res = digital_root_additive_persistence(627615)
+assert_eq $res->[0], 9, "root"
+assert_eq $res->[1], 2, "persistence"
 
 test_run

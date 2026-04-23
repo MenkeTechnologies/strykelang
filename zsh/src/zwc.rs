@@ -3,8 +3,9 @@
 //! Parses compiled zsh function files (.zwc) into function definitions
 //! that can be executed by zshrs.
 
-use crate::shell_ast::{
+use crate::parser::{
     CompoundCommand, ListOp, RedirectOp, ShellCommand, ShellWord, SimpleCommand,
+    Redirect, CaseTerminator,
 };
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

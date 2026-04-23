@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cocktail Sort
+
+fn cocktail_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $n = scalar(@arr)
+    my $swapped = 1
+    my $start = 0
+    my $end = $n - 1
+    
+    while ($swapped) {
+        $swapped = 0
+        for my $i ($start..$end - 1) {
+            if ($arr[$i] > $arr[$i + 1]) {
+                ($arr[$i], $arr[$i + 1]) = ($arr[$i + 1], $arr[$i])
+                $swapped = 1
+            }
+        }
+        
+        if ($swapped) {
+            $swapped = 0
+            $end--
+            for my $i (~> ($start..$end - 1) rev) {
+                if ($arr[$i] > $arr[$i + 1]) {
+                    ($arr[$i], $arr[$i + 1]) = ($arr[$i + 1], $arr[$i])
+                    $swapped = 1
+                }
+            }
+            $start++
+        }
+    }
+    ([@arr])
+}
+
+my $data = [5, 1, 4, 2, 8, 0, 2]
+my $sorted = cocktail_sort($data)
+assert_eq join(",", @$sorted), "0,1,2,2,4,5,8", "cocktail sort"
+
+test_run

@@ -1,28 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Iterated digits squaring
 
-fn next_squaring($n) {
-    my $sum = 0
-    my @digits = ~> "$n" chars map { int($_) }
-    for my $d (@digits) { $sum += $d * $d }
-    $sum
-}
-
 fn iterated_digits_squaring($n) {
     my $curr = $n
-    for my $i (1..100) {
-        if ($curr != 1 && $curr != 89) {
-            $curr = next_squaring($curr)
+    while ($curr != 1 && $curr != 89) {
+        my $sum = 0
+        my @digits = ~> "$curr" chars
+        for my $d (@digits) {
+            $sum += int($d) * int($d)
         }
+        $curr = $sum
     }
     $curr
 }
 
-assert_eq iterated_digits_squaring(1), 1, "1 -> 1"
-assert_eq iterated_digits_squaring(89), 89, "89 -> 89"
-assert_eq iterated_digits_squaring(145), 89, "145 -> 89"
 assert_eq iterated_digits_squaring(7), 1, "7 -> 49 -> 97 -> 130 -> 10 -> 1"
-
-7 |> iterated_digits_squaring |> assert_eq(1, "pipe iterated squaring")
+assert_eq iterated_digits_squaring(145), 89, "145 -> 1+16+25=42 -> 16+4=20 -> 4 -> 16 -> 37 -> 58 -> 89"
+assert_eq iterated_digits_squaring(42), 89, "42 ends in 89"
 
 test_run

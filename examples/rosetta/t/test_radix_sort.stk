@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Radix Sort
+
+fn radix_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $n = scalar(@arr)
+    if ($n < 2) { return ([@arr]) }
+    
+    my $max = $arr[0]
+    for my $x (@arr) {
+        if ($x > $max) { $max = $x }
+    }
+    
+    my $exp = 1
+    while (int($max / $exp) > 0) {
+        my @buckets = ([], [], [], [], [], [], [], [], [], [])
+        for my $x (@arr) {
+            my $digit = int($x / $exp) % 10
+            push @{$buckets[$digit]}, $x
+        }
+        @arr = ()
+        for my $i (0..9) {
+            push @arr, @{$buckets[$i]}
+        }
+        $exp *= 10
+    }
+    ([@arr])
+}
+
+my $data = [170, 45, 75, 90, 802, 24, 2, 66]
+my $sorted = radix_sort($data)
+assert_eq join(",", @$sorted), "2,24,45,66,75,90,170,802", "radix sort"
+
+test_run

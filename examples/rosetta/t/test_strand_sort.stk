@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Strand Sort
+
+fn strand_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my @result = ()
+    
+    while (scalar(@arr) > 0) {
+        my @sublist = (shift @arr)
+        my @remaining = ()
+        for my $val (@arr) {
+            if (scalar(@sublist) > 0 && $val > $sublist[-1]) {
+                push @sublist, $val
+            } else {
+                push @remaining, $val
+            }
+        }
+        @arr = @remaining
+        
+        # Merge sublist into result
+        my @merged = ()
+        while (scalar(@result) > 0 && scalar(@sublist) > 0) {
+            if ($result[0] < $sublist[0]) {
+                push @merged, (shift @result)
+            } else {
+                push @merged, (shift @sublist)
+            }
+        }
+        push @merged, @result
+        push @merged, @sublist
+        @result = @merged
+    }
+    ([@result])
+}
+
+my $data = [1, 6, 3, 2, 1, 7, 5, 22, 58, 0, 9, 3, 4]
+my $sorted = strand_sort($data)
+assert_eq join(",", @$sorted), "0,1,1,2,3,3,4,5,6,7,9,22,58", "strand sort"
+
+test_run

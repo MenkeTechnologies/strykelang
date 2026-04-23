@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gnome Sort
+
+fn gnome_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $i = 0
+    my $n = scalar(@arr)
+    while ($i < $n) {
+        if ($i == 0 || $arr[$i] >= $arr[$i-1]) {
+            $i++
+        } else {
+            ($arr[$i], $arr[$i-1]) = ($arr[$i-1], $arr[$i])
+            $i--
+        }
+    }
+    ([@arr])
+}
+
+my $data = [64, 34, 25, 12, 22, 11, 90]
+my $sorted = gnome_sort($data)
+assert_eq join(",", @$sorted), "11,12,22,25,34,64,90", "gnome sort"
+
+my $data2 = [1, 3, 2, 5, 4]
+$data2 |> gnome_sort |> map { join(",", @$_) } |> assert_eq("1,2,3,4,5", "pipe gnome sort")
+
+test_run

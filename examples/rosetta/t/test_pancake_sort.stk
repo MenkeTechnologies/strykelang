@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pancake Sort
+
+fn flip {
+    my $list = $_[0]
+    my $k = $_[1]
+    my @arr = @$list
+    my @sub = @arr[0..$k]
+    my @flipped = ~> @sub rev
+    for my $i (0..$k) {
+        $arr[$i] = $flipped[$i]
+    }
+    ([@arr])
+}
+
+fn pancake_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $n = scalar(@arr)
+    
+    if ($n < 2) {
+        return ([@arr])
+    }
+    
+    for my $curr (~> (1..$n) rev) {
+        # find index of max in 0..$curr-1
+        my $max_idx = 0
+        for my $i (1..$curr-1) {
+            if ($arr[$i] > $arr[$max_idx]) {
+                $max_idx = $i
+            }
+        }
+        
+        if ($max_idx != $curr - 1) {
+            if ($max_idx != 0) {
+                my $res = flip([@arr], $max_idx)
+                @arr = @$res
+            }
+            my $res2 = flip([@arr], $curr - 1)
+            @arr = @$res2
+        }
+    }
+    ([@arr])
+}
+
+my $data = [6, 7, 2, 1, 8, 9, 5, 3, 4]
+my $sorted = pancake_sort($data)
+assert_eq join(",", @$sorted), "1,2,3,4,5,6,7,8,9", "pancake sort"
+
+my $small = [3, 1, 2]
+my $sorted_small = pancake_sort($small)
+assert_eq join(",", @$sorted_small), "1,2,3", "pancake sort small"
+
+test_run

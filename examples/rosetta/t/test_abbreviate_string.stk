@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abbreviate a string
+
+fn abbreviate($s) {
+    $s |> split /\s+/ |> map { substr($_, 0, 1) } |> join "" |> uc
+}
+
+assert_eq abbreviate("Portable Network Graphics"), "PNG", "PNG"
+assert_eq abbreviate("First In First Out"), "FIFO", "FIFO"
+assert_eq abbreviate("GNU Image Manipulation Program"), "GIMP", "GIMP"
+
+test_run

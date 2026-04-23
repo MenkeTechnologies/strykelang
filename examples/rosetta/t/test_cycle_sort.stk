@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cycle Sort
+
+fn cycle_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $n = scalar(@arr)
+    
+    for my $cycle_start (0..$n-2) {
+        my $item = $arr[$cycle_start]
+        my $pos = $cycle_start
+        for my $i ($cycle_start+1..$n-1) {
+            if ($arr[$i] < $item) {
+                $pos++
+            }
+        }
+        
+        if ($pos == $cycle_start) {
+            next
+        }
+        
+        while ($item == $arr[$pos]) {
+            $pos++
+        }
+        ($arr[$pos], $item) = ($item, $arr[$pos])
+        
+        while ($pos != $cycle_start) {
+            $pos = $cycle_start
+            for my $i ($cycle_start+1..$n-1) {
+                if ($arr[$i] < $item) {
+                    $pos++
+                }
+            }
+            while ($item == $arr[$pos]) {
+                $pos++
+            }
+            ($arr[$pos], $item) = ($item, $arr[$pos])
+        }
+    }
+    ([@arr])
+}
+
+my $data = [0, 1, 2, 2, 2, 2, 1, 9, 3, 5]
+my $sorted = cycle_sort($data)
+assert_eq join(",", @$sorted), "0,1,1,2,2,2,2,3,5,9", "cycle sort"
+
+test_run
