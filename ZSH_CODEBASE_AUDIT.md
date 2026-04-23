@@ -880,6 +880,20 @@ P10K injects itself as the **first** precmd function, displays a cached prompt f
 
 This is the most popular zsh "feature" — and it's a monkey patch hiding a performance problem that exists because the shell scans 986 files from disk on every startup.
 
+### Lipstick on a Pig
+
+Zinit turbo mode. P10K instant prompt. gitstatus C daemon. compdef hijacking. Widget wrapping. Function body replacement. 702 monkey patches across the plugin ecosystem.
+
+All of it is lipstick on a pig. It's still a pig.
+
+The pig has 1,502-line functions with 18 gotos. The pig has 465 unsafe string operations. The pig has 174 memory leak points. The pig has zero unit tests. The pig scans 986 files from disk on every startup. The pig interprets 11,656 lines of shell script every time you press Tab.
+
+No amount of turbo mode, instant prompts, deferred loading, or compdef hijacking changes what's underneath. P10K's instant prompt hides the latency — it doesn't fix it. Zinit's turbo mode defers the pain — it doesn't eliminate it. gitstatus writes a C daemon to work around the shell's speed — because the shell is too slow to do its own job.
+
+The entire zsh plugin ecosystem is 702 monkey patches pretending the pig is not a pig.
+
+You don't put lipstick on a pig. You replace the pig.
+
 ### zshrs: A Real Extension Model
 
 In zshrs, plugins don't need to monkey patch:
