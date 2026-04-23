@@ -324,6 +324,27 @@ All blocking. All synchronous. All on the hot path between the user pressing Ent
 
 zshrs indexes functions at install time in SQLite. Function lookup is one indexed database query — no fpath scanning, no disk I/O on the hot path, no `.zwc` litter.
 
+## The Biggest Scandal in Shell History
+
+All of this ships as the default shell on hundreds of millions of Macs:
+
+- **147,233 lines of C** with **zero unit tests**
+- **Custom heap allocator** (1,882 lines) that hides leaks from tooling by never freeing individual allocations
+- **186 gotos**, including 18 in a single 1,502-line function
+- **1,940 global mutable statics** — the entire shell is shared mutable state
+- **174 memory leak points** where allocs are followed by early returns that skip cleanup
+- **508 unmatched allocations** (1,465 allocs vs 957 frees)
+- **11,656 lines of shell script interpreted per Tab press** on `git`
+- **986 files scanned from disk on every shell startup** by compinit
+- **Disk I/O blocking the user** on every first autoload invocation — scanning 43 directories synchronously on the hot path
+- **`.zwc` "compilation"** that doesn't actually compile anything — just skips re-parsing while still interpreting every line
+- **105,050 lines of completion "library" code** written as interpreted shell script instead of native code
+- **No way to run a single test in isolation** — integration tests depend on shared mutable state from prior tests
+
+And nobody noticed because nobody reads shell source code.
+
+Apple chose zsh as the macOS default in 2019 because the license changed from GPL to MIT. Not because anyone audited the code. Not because anyone ran the tests. Not because anyone profiled the completion system. Because of a license.
+
 ## Conclusion
 
 Read the code. That's all you need to know about why this port exists.
