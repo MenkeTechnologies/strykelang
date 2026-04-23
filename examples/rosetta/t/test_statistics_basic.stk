@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Statistics/Basic
+
+fn my_mean(@nums) {
+    if (scalar(@nums) == 0) {
+        0
+    } else {
+        my $sum = 0
+        for my $x (@nums) { $sum += $x }
+        $sum / scalar(@nums)
+    }
+}
+
+fn my_variance(@nums) {
+    if (scalar(@nums) < 1) {
+        0
+    } else {
+        my $m = my_mean(@nums)
+        my $sum_sq_diff = 0
+        for my $x (@nums) { 
+            my $diff = $x - $m
+            $sum_sq_diff += $diff * $diff
+        }
+        $sum_sq_diff / scalar(@nums)
+    }
+}
+
+fn my_std_dev(@nums) {
+    sqrt(my_variance(@nums))
+}
+
+my @data = (15, 12, 8, 8, 7, 7, 7, 6, 5, 3)
+assert_ok abs(my_mean(@data) - 7.8) < 0.0001, "mean is 7.8"
+assert_ok abs(my_variance(@data) - 10.56) < 0.0001, "variance is 10.56"
+assert_ok abs(my_std_dev(@data) - 3.2496) < 0.001, "std dev is 3.2496"
+
+@data |> my_mean |> map { abs($_ - 7.8) < 0.0001 } |> assert_ok("pipe mean")
+
+test_run

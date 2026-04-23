@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Brilliant numbers
+
+fn my_prime_factors($n) {
+    my @factors
+    my $d = 2
+    my $temp = $n
+    while ($d * $d <= $temp) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    push @factors, $temp if $temp > 1
+    @factors
+}
+
+fn is_brilliant($n) {
+    my @f = my_prime_factors($n)
+    if (scalar(@f) != 2) {
+        0
+    } else {
+        length("$f[0]") == length("$f[1]")
+    }
+}
+
+assert_ok is_brilliant(4), "4 is brilliant (2*2)"
+assert_ok is_brilliant(6), "6 is brilliant (2*3)"
+assert_ok is_brilliant(10), "10 is brilliant (2*5)"
+assert_ok is_brilliant(14), "14 is brilliant (2*7)"
+assert_ok is_brilliant(15), "15 is brilliant (3*5)"
+assert_ok is_brilliant(21), "21 is brilliant (3*7)"
+assert_ok is_brilliant(221), "221 is brilliant (13*17)"
+assert_ok !is_brilliant(22), "22 is not brilliant (2*11)"
+assert_ok !is_brilliant(33), "33 is not brilliant (3*11)"
+
+221 |> is_brilliant |> assert_ok("pipe brilliant")
+
+test_run

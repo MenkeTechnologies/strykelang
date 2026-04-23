@@ -789,9 +789,7 @@ mod tests {
 
     #[test]
     fn test_generate_completions_ls() {
-        let cache_path = dirs::cache_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-            .join("zshrs/compsys.db");
+        let cache_path = crate::cache::default_cache_path();
         
         if !cache_path.exists() {
             eprintln!("Skipping test: cache not found at {:?}", cache_path);

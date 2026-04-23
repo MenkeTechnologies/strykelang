@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Radix output
+
+fn to_radix($n, $base) {
+    if ($n == 0) {
+        "0"
+    } else {
+        my $res = ""
+        my @digits = ("0".."9", "A".."Z")
+        my $temp = $n
+        while ($temp > 0) {
+            my $rem = $temp % $base
+            $res = $digits[$rem] . $res
+            $temp = int($temp / $base)
+        }
+        $res
+    }
+}
+
+assert_eq to_radix(255, 16), "FF", "255 base 16"
+assert_eq to_radix(255, 2), "11111111", "255 base 2"
+assert_eq to_radix(255, 10), "255", "255 base 10"
+assert_eq to_radix(10, 2), "1010", "10 base 2"
+
+255 |> to_radix(16) |> assert_eq("FF", "pipe radix")
+
+test_run

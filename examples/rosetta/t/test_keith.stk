@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Keith numbers
+
+fn is_keith($n) {
+    my $s = "$n"
+    my @digits = ~> $s chars map { int($_) }
+    my $len = scalar(@digits)
+    if ($len < 2) {
+        0
+    } else {
+        my @seq = @digits
+        my $last = $seq[-1]
+        while ($last < $n) {
+            my $sum = 0
+            my $curr_len = scalar(@seq)
+            for my $i ($curr_len - $len .. $curr_len - 1) {
+                $sum += $seq[$i]
+            }
+            push @seq, $sum
+            $last = $sum
+        }
+        $last == $n
+    }
+}
+
+assert_ok is_keith(197), "197 is Keith"
+assert_ok is_keith(14), "14 is Keith (1, 4, 5, 9, 14)"
+assert_ok is_keith(1104), "1104 is Keith"
+assert_ok !is_keith(100), "100 is not"
+
+197 |> is_keith |> assert_ok("pipe keith")
+
+test_run

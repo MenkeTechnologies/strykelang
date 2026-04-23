@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jacobsthal numbers
+
+fn jacobsthal($n) {
+    if ($n == 0) {
+        0
+    } elsif ($n == 1) {
+        1
+    } else {
+        my $a = 0
+        my $b = 1
+        for my $i (2..$n) {
+            my $c = $b + 2 * $a
+            ($a, $b) = ($b, $c)
+        }
+        $b
+    }
+}
+
+assert_eq jacobsthal(0), 0, "J(0)"
+assert_eq jacobsthal(1), 1, "J(1)"
+assert_eq jacobsthal(2), 1, "J(2)"
+assert_eq jacobsthal(3), 3, "J(3)"
+assert_eq jacobsthal(4), 5, "J(4)"
+assert_eq jacobsthal(5), 11, "J(5)"
+assert_eq jacobsthal(10), 341, "J(10)"
+
+10 |> jacobsthal |> assert_eq(341, "pipe jacobsthal")
+
+test_run

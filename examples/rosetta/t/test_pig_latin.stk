@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pig Latin
+
+fn my_pig_latin($word) {
+    if ($word =~ /^[aeiou]/i) {
+        $word . "way"
+    } else {
+        my $res = $word
+        if ($word =~ /^([^aeiou]+)(.*)$/i) {
+            $res = $2 . $1 . "ay"
+        }
+        $res
+    }
+}
+
+assert_eq my_pig_latin("apple"), "appleway", "apple -> appleway"
+assert_eq my_pig_latin("pig"), "igpay", "pig -> igpay"
+assert_eq my_pig_latin("latin"), "atinlay", "latin -> latinay"
+assert_eq my_pig_latin("smile"), "ilesmay", "smile -> ilesmay"
+
+"hello" |> my_pig_latin |> assert_eq("ellohay", "pipe pig latin")
+
+test_run

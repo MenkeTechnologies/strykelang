@@ -2,6 +2,27 @@
 
 This document audits what zsh builtins/functions `_git` calls and maps them to compsys Rust implementations.
 
+## Completion System Architecture
+
+zshrs uses a hybrid completion system:
+
+### Default Mode (SQLite-backed)
+- **Database**: `~/.cache/zshrs/compsys.db` (55MB with 16,872 function bodies)
+- **compinit**: Parallel fpath scan with rayon, stores function bodies in SQLite
+- **autoload -Xz**: Instant lookup from SQLite `body` column (~2.7µs)
+- **No .zcompdump**: SQLite is the single source of truth
+
+### --zsh-compat Mode (Traditional)
+- **Database**: None
+- **compinit**: Sequential fpath scan, writes `.zcompdump`
+- **autoload -Xz**: Scans fpath/zwc files (~70µs)
+- **Full zsh compatibility**: For debugging or legacy workflows
+
+| Mode | SQLite DB | .zcompdump | autoload speed |
+|------|-----------|------------|----------------|
+| Default | ✅ 55MB | ❌ | 2.7µs |
+| --zsh-compat | ❌ | ✅ 761KB | 70µs |
+
 ## Core Completion Builtins
 
 | zsh Builtin | Count | compsys Rust | Status |
@@ -189,11 +210,24 @@ The core completion infrastructure is implemented in Rust:
 | `_describe` formatter | ✅ Native Rust |
 | `compadd` | ✅ Native Rust |
 | `compset` | ✅ Native Rust |
-| `zstyle` | ✅ Native Rust |
+| `zstyle` | ✅ Native Rust (SQLite-backed) |
 | `_files`/`_directories` | ✅ Native Rust |
 | Menu completion UI | ✅ Native Rust |
 | ZLE widget integration | ✅ Native Rust |
 | Shell runner bridge | ✅ Native Rust |
+| **compinit** | ✅ Native Rust (parallel scan) |
+| **SQLite cache** | ✅ 16,872 functions with bodies |
+| **autoload -Xz** | ✅ SQLite fast path (2.7µs) |
+
+### compinit Flags
+
+| Flag | Default Mode | --zsh-compat Mode |
+|------|-------------|-------------------|
+| `-C` | Use SQLite if valid | Check .zcompdump validity |
+| `-D` | N/A (no dump) | Don't create .zcompdump |
+| `-d file` | N/A | Custom dump file path |
+| `-q` | Quiet | Quiet |
+| `-u/-i` | Ignored | Ignored |
 
 What's missing is the **shell function interpreter** in `src/shell_exec.rs` that needs to:
 1. Parse and execute zsh function bodies

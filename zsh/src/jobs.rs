@@ -759,3 +759,256 @@ impl BgStatus {
         self.statuses.clear();
     }
 }
+
+/// Wait for a specific PID (from jobs.c waitforpid lines 1627-1663)
+pub fn waitforpid(pid: i32) -> Option<i32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        loop {
+            let mut status: i32 = 0;
+            let result = unsafe { libc::waitpid(pid, &mut status, 0) };
+            if result == pid {
+                if libc::WIFEXITED(status) {
+                    return Some(libc::WEXITSTATUS(status));
+                } else if libc::WIFSIGNALED(status) {
+                    return Some(128 + libc::WTERMSIG(status));
+                } else if libc::WIFSTOPPED(status) {
+                    return None;
+                }
+            } else if result == -1 {
+                return None;
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+/// Wait for job (from jobs.c zwaitjob lines 1673-1750)
+pub fn waitjob(job: &mut Job) -> Option<i32> {
+    if job.procs.is_empty() {
+        return Some(0);
+    }
+    
+    let mut last_status = 0;
+    for proc in &mut job.procs {
+        if proc.is_running() {
+            if let Some(status) = waitforpid(proc.pid) {
+                proc.status = make_status(status);
+                last_status = status;
+            }
+        } else {
+            last_status = proc.exit_status();
+        }
+    }
+    
+    job.stat |= stat::DONE;
+    Some(last_status)
+}
+
+/// Make status from exit code
+pub fn make_status(code: i32) -> i32 {
+    code << 8
+}
+
+/// Make status from signal
+pub fn make_signal_status(sig: i32) -> i32 {
+    sig
+}
+
+/// Check if job has pending children (from jobs.c havefiles lines 1604-1616)
+pub fn havefiles(job: &Job) -> bool {
+    !job.filelist.is_empty()
+}
+
+/// Delete job (from jobs.c deletejob lines 1511-1526)
+pub fn deletejob(job: &mut Job, disowning: bool) {
+    if !disowning {
+        job.filelist.clear();
+    }
+    job.procs.clear();
+    job.auxprocs.clear();
+    job.stat = 0;
+}
+
+/// Free job (from jobs.c freejob lines 1456-1508)
+pub fn freejob(job: &mut Job, notify: bool) {
+    let _ = notify;
+    job.procs.clear();
+    job.auxprocs.clear();
+    job.filelist.clear();
+    job.stat = 0;
+    job.gleader = 0;
+    job.text.clear();
+}
+
+/// Add process to job (from jobs.c addproc lines 1537-1597)
+pub fn addproc(job: &mut Job, pid: i32, text: &str, aux: bool) {
+    let proc = Process::new(pid);
+    let proc = Process {
+        pid,
+        status: SP_RUNNING,
+        text: text.to_string(),
+        ..proc
+    };
+    
+    if aux {
+        job.auxprocs.push(proc);
+    } else {
+        if job.gleader == 0 {
+            job.gleader = pid;
+        }
+        job.procs.push(proc);
+    }
+    
+    job.stat &= !stat::DONE;
+}
+
+/// Kill process group (from jobs.c killjob lines 2040-2085)
+pub fn killjob(job: &Job, sig: i32) -> bool {
+    #[cfg(unix)]
+    {
+        if job.gleader > 0 {
+            let result = unsafe { libc::killpg(job.gleader, sig) };
+            return result == 0;
+        }
+        
+        let mut success = true;
+        for proc in &job.procs {
+            if proc.is_running() {
+                let result = unsafe { libc::kill(proc.pid, sig) };
+                if result != 0 {
+                    success = false;
+                }
+            }
+        }
+        success
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (job, sig);
+        false
+    }
+}
+
+/// Continue job in foreground (from jobs.c fg)
+pub fn fg_job(job: &mut Job) -> Option<i32> {
+    #[cfg(unix)]
+    {
+        if (job.stat & stat::STOPPED) != 0 {
+            if job.gleader > 0 {
+                unsafe { libc::killpg(job.gleader, libc::SIGCONT) };
+            } else {
+                for proc in &job.procs {
+                    unsafe { libc::kill(proc.pid, libc::SIGCONT) };
+                }
+            }
+            job.stat &= !stat::STOPPED;
+        }
+        
+        waitjob(job)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = job;
+        None
+    }
+}
+
+/// Continue job in background (from jobs.c bg)
+pub fn bg_job(job: &mut Job) -> bool {
+    #[cfg(unix)]
+    {
+        if (job.stat & stat::STOPPED) != 0 {
+            if job.gleader > 0 {
+                unsafe { libc::killpg(job.gleader, libc::SIGCONT) };
+            } else {
+                for proc in &job.procs {
+                    unsafe { libc::kill(proc.pid, libc::SIGCONT) };
+                }
+            }
+            job.stat &= !stat::STOPPED;
+            return true;
+        }
+        false
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = job;
+        false
+    }
+}
+
+/// Disown job (from jobs.c disown)
+pub fn disown_job(job: &mut Job) {
+    job.stat |= stat::DISOWN;
+}
+
+/// Check if all processes in job are done
+pub fn job_is_done(job: &Job) -> bool {
+    (job.stat & stat::DONE) != 0 || job.procs.iter().all(|p| !p.is_running())
+}
+
+/// Check if job is stopped
+pub fn job_is_stopped(job: &Job) -> bool {
+    (job.stat & stat::STOPPED) != 0 || job.procs.iter().any(|p| p.is_stopped())
+}
+
+/// Get job text (combined process commands)
+pub fn get_job_text(job: &Job) -> String {
+    if !job.text.is_empty() {
+        return job.text.clone();
+    }
+    job.procs.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join(" | ")
+}
+
+/// Super job tracking (from jobs.c super_job lines 393-417)
+pub fn super_job(jobtab: &[Job], job_idx: usize) -> Option<usize> {
+    for (i, job) in jobtab.iter().enumerate() {
+        if (job.stat & stat::SUPERJOB) != 0 && job.other == job_idx {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Set current/previous job (from jobs.c setjobpwn lines 697-745)
+pub struct JobPointers {
+    pub cur_job: Option<usize>,
+    pub prev_job: Option<usize>,
+}
+
+impl JobPointers {
+    pub fn new() -> Self {
+        JobPointers {
+            cur_job: None,
+            prev_job: None,
+        }
+    }
+    
+    pub fn set_current(&mut self, job: usize) {
+        if Some(job) != self.cur_job {
+            self.prev_job = self.cur_job;
+            self.cur_job = Some(job);
+        }
+    }
+    
+    pub fn clear(&mut self, job: usize) {
+        if self.cur_job == Some(job) {
+            self.cur_job = self.prev_job;
+            self.prev_job = None;
+        } else if self.prev_job == Some(job) {
+            self.prev_job = None;
+        }
+    }
+}
+
+impl Default for JobPointers {
+    fn default() -> Self {
+        Self::new()
+    }
+}

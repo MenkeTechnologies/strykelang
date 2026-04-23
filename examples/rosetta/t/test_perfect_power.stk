@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perfect power
+
+fn is_perfect_power($n) {
+    if ($n < 4) {
+        $n == 1
+    } else {
+        my $found = 0
+        # Try a^b = n for b from 2 up to log2(n)
+        my $limit_b = int(log($n) / log(2) + 0.5)
+        for my $b (2..$limit_b) {
+            my $a = int($n**(1/$b) + 0.5)
+            if ($a**$b == $n) {
+                $found = 1
+                $b = $limit_b # break
+            }
+        }
+        $found
+    }
+}
+
+assert_ok is_perfect_power(1), "1 is perfect power"
+assert_ok is_perfect_power(4), "4 is perfect power (2^2)"
+assert_ok is_perfect_power(8), "8 is perfect power (2^3)"
+assert_ok is_perfect_power(9), "9 is perfect power (3^2)"
+assert_ok is_perfect_power(32), "32 is perfect power (2^5)"
+assert_ok is_perfect_power(36), "36 is perfect power (6^2)"
+assert_ok !is_perfect_power(6), "6 is not"
+assert_ok !is_perfect_power(10), "10 is not"
+
+36 |> is_perfect_power |> assert_ok("pipe perfect power")
+
+test_run

@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primes with non-decreasing digits
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn is_non_decreasing_digits($n) {
+    my @digits = ~> "$n" chars map { int($_) }
+    my $valid = 1
+    my $i = 1
+    while ($i < scalar(@digits)) {
+        if ($digits[$i] < $digits[$i-1]) {
+            $valid = 0
+            $i = scalar(@digits)
+        }
+        $i++
+    }
+    $valid
+}
+
+fn is_non_decreasing_prime($n) {
+    is_non_decreasing_digits($n) && my_is_prime($n)
+}
+
+assert_ok is_non_decreasing_prime(2), "2 is non-decreasing prime"
+assert_ok is_non_decreasing_prime(13), "13 is non-decreasing prime"
+assert_ok is_non_decreasing_prime(137), "137 is non-decreasing prime"
+assert_ok !is_non_decreasing_prime(31), "31 is not (decreasing)"
+assert_ok !is_non_decreasing_prime(9), "9 is not prime"
+
+137 |> is_non_decreasing_prime |> assert_ok("pipe non-decreasing prime")
+
+test_run

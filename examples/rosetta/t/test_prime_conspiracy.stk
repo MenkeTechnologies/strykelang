@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prime conspiracies
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn my_next_prime($n) {
+    my $p = $n + 1
+    while (1) {
+        if (my_is_prime($p)) { return $p }
+        $p++
+    }
+}
+
+fn last_digit($n) {
+    $n % 10
+}
+
+# The task asks to check frequencies of (last digit of p, last digit of next prime)
+# Let's just implement a function that checks this pair
+fn prime_conspiracy_pair($p) {
+    (last_digit($p), last_digit(my_next_prime($p)))
+}
+
+my ($d1, $d2) = prime_conspiracy_pair(3)
+assert_eq $d1, 3, "last digit of 3 is 3"
+assert_eq $d2, 5, "last digit of next prime (5) is 5"
+
+my ($d3, $d4) = prime_conspiracy_pair(7)
+assert_eq $d3, 7, "last digit of 7 is 7"
+assert_eq $d4, 1, "last digit of next prime (11) is 1"
+
+7 |> prime_conspiracy_pair |> { $_->[1] } |> assert_eq(1, "pipe conspiracy")
+
+test_run

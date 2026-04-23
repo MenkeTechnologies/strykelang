@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-decreasing digits
+
+fn is_non_decreasing($n) {
+    my @digits = ~> "$n" chars map { int($_) }
+    my $valid = 1
+    for my $i (1..scalar(@digits)-1) {
+        if ($digits[$i] < $digits[$i-1]) {
+            $valid = 0
+            $i = scalar(@digits) # break
+        }
+    }
+    $valid
+}
+
+assert_ok is_non_decreasing(123), "123 is non-decreasing"
+assert_ok is_non_decreasing(111), "111 is non-decreasing"
+assert_ok is_non_decreasing(13579), "13579 is non-decreasing"
+assert_ok !is_non_decreasing(121), "121 is not"
+assert_ok !is_non_decreasing(321), "321 is not"
+
+123 |> is_non_decreasing |> assert_ok("pipe non-decreasing")
+
+test_run

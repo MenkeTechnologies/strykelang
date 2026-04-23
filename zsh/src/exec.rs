@@ -388,6 +388,8 @@ pub struct ShellExecutor {
     pub zftp: Zftp,
     pub profiler: Profiler,
     pub style_table: StyleTable,
+    /// zsh compatibility mode - use .zcompdump, fpath scanning, etc.
+    pub zsh_compat: bool,
 }
 
 impl ShellExecutor {
@@ -452,7 +454,14 @@ impl ShellExecutor {
             profile_data: HashMap::new(),
             profiling_enabled: false,
             unix_sockets: HashMap::new(),
-            compsys_cache: CompsysCache::memory().ok(),
+            compsys_cache: {
+                let cache_path = compsys::cache::default_cache_path();
+                if cache_path.exists() {
+                    CompsysCache::open(&cache_path).ok()
+                } else {
+                    None
+                }
+            },
             deferred_compdefs: Vec::new(),
             command_hash: HashMap::new(),
             returning: None,
@@ -463,6 +472,7 @@ impl ShellExecutor {
             zftp: Zftp::new(),
             profiler: Profiler::new(),
             style_table: StyleTable::new(),
+            zsh_compat: false,
         }
     }
     
@@ -7243,7 +7253,39 @@ impl ShellExecutor {
 
     /// Load an autoloaded function from fpath - reads file and parses it
     fn load_autoload_function(&mut self, name: &str) -> Option<ShellCommand> {
-        // First try ZWC cache (but skip if we're reloading an existing function)
+        // FAST PATH: Try SQLite cache first (no filesystem access)
+        // Skip in zsh_compat mode - use traditional fpath scanning only
+        if !self.zsh_compat {
+            if let Some(ref cache) = self.compsys_cache {
+                if let Ok(Some(body)) = cache.get_autoload_body(name) {
+                    // Parse the cached function body
+                    let mut parser = crate::shell_ast::ShellParser::new(&body);
+                    if let Ok(commands) = parser.parse_script() {
+                        if !commands.is_empty() {
+                            // Check if it's a single function definition for this name (ksh style)
+                            if commands.len() == 1 {
+                                if let ShellCommand::FunctionDef(ref fn_name, _) = commands[0] {
+                                    if fn_name == name {
+                                        return Some(commands[0].clone());
+                                    }
+                                }
+                            }
+                            // Otherwise, wrap as function body (zsh style)
+                            let body = if commands.len() == 1 {
+                                commands.into_iter().next().unwrap()
+                            } else {
+                                let list_cmds: Vec<(ShellCommand, ListOp)> =
+                                    commands.into_iter().map(|c| (c, ListOp::Semi)).collect();
+                                ShellCommand::List(list_cmds)
+                            };
+                            return Some(ShellCommand::FunctionDef(name.to_string(), Box::new(body)));
+                        }
+                    }
+                }
+            }
+        }
+
+        // SLOW PATH: Try ZWC cache (but skip if we're reloading an existing function)
         if !self.functions.contains_key(name) {
             // Try to load from ZWC files
             for dir in &self.fpath.clone() {
@@ -7274,7 +7316,7 @@ impl ShellExecutor {
             }
         }
 
-        // Find the function file in fpath
+        // SLOWEST PATH: Find the function file in fpath
         let path = self.find_function_file(name)?;
 
         // Read the file
@@ -10157,40 +10199,129 @@ impl ShellExecutor {
     /// Scans fpath for completion functions and registers them
     fn builtin_compinit(&mut self, args: &[String]) -> i32 {
         // Parse options
+        // -C: use cache if valid (skip fpath scan)
+        // -D: don't dump (don't write .zcompdump)
+        // -d file: specify dump file
+        // -u/-i: ignore security checks (we always ignore)
+        // -q: quiet
         let mut quiet = false;
-        let mut dump = false;
-        let mut cache_dir: Option<String> = None;
+        let mut no_dump = false;
+        let mut dump_file: Option<String> = None;
+        let mut use_cache = false;
         
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
                 "-q" => quiet = true,
-                "-C" => {
-                    // Use cache if valid
-                    if let Some(cache) = &self.compsys_cache {
-                        if compsys::cache_is_valid(cache) {
-                            if !quiet {
-                                eprintln!("compinit: using cached completions");
-                            }
-                            return 0;
-                        }
-                    }
-                }
+                "-C" => use_cache = true,
+                "-D" => no_dump = true,
                 "-d" => {
                     i += 1;
                     if i < args.len() {
-                        cache_dir = Some(args[i].clone());
+                        dump_file = Some(args[i].clone());
                     }
-                    dump = true;
                 }
-                "-D" => dump = true,
-                "-u" | "-i" => {} // ignore security checks
+                "-u" | "-i" => {} // ignore security checks (we don't do them)
                 _ => {}
             }
             i += 1;
         }
         
-        // Run compinit on fpath
+        // ZSH COMPAT MODE: Use traditional zsh algorithm (fpath scan, .zcompdump, no SQLite)
+        if self.zsh_compat {
+            return self.compinit_compat(quiet, no_dump, dump_file, use_cache);
+        }
+        
+        // ZSHRS MODE: Use SQLite cache with function bodies
+        
+        // Try to use existing cache if -C and cache is valid
+        if use_cache {
+            if let Some(cache) = &self.compsys_cache {
+                if compsys::cache_is_valid(cache) {
+                    // Load from cache instead of rescanning
+                    if let Ok(result) = compsys::load_from_cache(cache) {
+                        if !quiet {
+                            eprintln!("compinit: using cached completions ({} comps)", result.comps.len());
+                        }
+                        self.assoc_arrays.insert("_comps".to_string(), result.comps);
+                        self.assoc_arrays.insert("_services".to_string(), result.services);
+                        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps);
+                        return 0;
+                    }
+                }
+            }
+        }
+        
+        // Create/recreate the cache database
+        let cache_path = compsys::cache::default_cache_path();
+        if let Some(parent) = cache_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        // Remove old DB to start fresh
+        let _ = std::fs::remove_file(&cache_path);
+        let _ = std::fs::remove_file(format!("{}-shm", cache_path.display()));
+        let _ = std::fs::remove_file(format!("{}-wal", cache_path.display()));
+        
+        // Open fresh cache
+        let mut cache = match compsys::cache::CompsysCache::open(&cache_path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("compinit: failed to create cache: {}", e);
+                return 1;
+            }
+        };
+        
+        // Build cache from fpath (parallelized, includes autoload bodies)
+        let result = match compsys::build_cache_from_fpath(&self.fpath, &mut cache) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("compinit: scan failed: {}", e);
+                return 1;
+            }
+        };
+        
+        if !quiet {
+            eprintln!(
+                "compinit: {} functions, {} comps in {} dirs ({} ms)",
+                result.files_scanned, result.comps.len(), result.dirs_scanned, result.scan_time_ms
+            );
+        }
+        
+        // Set up _comps associative array
+        self.assoc_arrays.insert("_comps".to_string(), result.comps.clone());
+        self.assoc_arrays.insert("_services".to_string(), result.services.clone());
+        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps.clone());
+        
+        // Update the shell's cache reference
+        self.compsys_cache = Some(cache);
+        
+        0
+    }
+    
+    /// Traditional zsh compinit (--zsh-compat mode)
+    /// Uses fpath scanning, .zcompdump files, no SQLite
+    fn compinit_compat(&mut self, quiet: bool, no_dump: bool, dump_file: Option<String>, use_cache: bool) -> i32 {
+        let zdotdir = self.variables.get("ZDOTDIR")
+            .cloned()
+            .or_else(|| std::env::var("ZDOTDIR").ok())
+            .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()));
+        
+        let dump_path = dump_file
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(&zdotdir).join(".zcompdump"));
+        
+        // -C: Try to use existing .zcompdump if valid
+        if use_cache && dump_path.exists() {
+            if compsys::check_dump(&dump_path, &self.fpath, "zshrs-0.1.0") {
+                // Valid dump - source it to load _comps
+                // For now, just rescan (proper impl would source the dump file)
+                if !quiet {
+                    eprintln!("compinit: .zcompdump valid, rescanning for compat");
+                }
+            }
+        }
+        
+        // Full fpath scan (traditional zsh algorithm)
         let result = compsys::compinit(&self.fpath);
         
         if !quiet {
@@ -10200,31 +10331,18 @@ impl ShellExecutor {
             );
         }
         
-        // Populate the cache
-        if let Some(cache) = &mut self.compsys_cache {
-            for (cmd, func) in &result.comps {
-                let _ = cache.set_comp(cmd, func);
-            }
-            for (cmd, service) in &result.services {
-                let _ = cache.set_service(cmd, service);
-            }
-            for (pat, func) in &result.patcomps {
-                let _ = cache.set_patcomp(pat, func);
-            }
-        }
-        
-        // Dump to file if requested
-        if dump {
-            if let Some(dir) = cache_dir {
-                let dump_path = PathBuf::from(dir).join(".zcompdump");
-                let _ = compsys::compdump(&result, &dump_path, "zshrs-0.1.0");
-            }
+        // Write .zcompdump unless -D
+        if !no_dump {
+            let _ = compsys::compdump(&result, &dump_path, "zshrs-0.1.0");
         }
         
         // Set up _comps associative array
         self.assoc_arrays.insert("_comps".to_string(), result.comps.clone());
         self.assoc_arrays.insert("_services".to_string(), result.services.clone());
         self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps.clone());
+        
+        // No SQLite cache in compat mode
+        self.compsys_cache = None;
         
         0
     }
@@ -10330,7 +10448,12 @@ impl ShellExecutor {
             let pattern = &args[0];
             let style = &args[1];
             let values: Vec<String> = args[2..].to_vec();
-            self.style_table.set(pattern, style, values, false);
+            self.style_table.set(pattern, style, values.clone(), false);
+            
+            // Write to SQLite cache for completion lookups
+            if let Some(cache) = &self.compsys_cache {
+                let _ = cache.set_zstyle(pattern, style, &values, false);
+            }
             
             // Also update legacy zstyles for backward compat
             let existing = self.zstyles.iter_mut()

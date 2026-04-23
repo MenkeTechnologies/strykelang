@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Largest int from concatenated ints
+
+fn largest_int_concat(@nums) {
+    # Sort strings by $b.$a cmp $a.$b
+    my @sorted = sort { ($b . $a) cmp ($a . $b) } @nums
+    join("", @sorted)
+}
+
+assert_eq largest_int_concat(1, 34, 3, 98, 9, 76, 45, 4), "998764543431", "largest concat 1"
+assert_eq largest_int_concat(54, 546, 548, 60), "6054854654", "largest concat 2"
+
+(1, 34, 3, 98, 9, 76, 45, 4) |> largest_int_concat |> assert_eq("998764543431", "pipe largest concat")
+
+test_run

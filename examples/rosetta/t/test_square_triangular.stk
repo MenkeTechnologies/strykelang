@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Square-triangular numbers
+
+fn my_is_triangular($n) {
+    my $val = 8 * $n + 1
+    my $root = int(sqrt($val))
+    $root * $root == $val
+}
+
+fn my_is_square($n) {
+    my $root = int(sqrt($n))
+    $root * $root == $n
+}
+
+fn is_square_triangular($n) {
+    my_is_square($n) && my_is_triangular($n)
+}
+
+assert_ok is_square_triangular(1), "1 is square and triangular"
+assert_ok is_square_triangular(36), "36 is square (6^2) and triangular (8*9/2)"
+assert_ok is_square_triangular(1225), "1225 is square (35^2) and triangular (49*50/2)"
+assert_ok !is_square_triangular(10), "10 is triangular but not square"
+assert_ok !is_square_triangular(16), "16 is square but not triangular"
+
+1225 |> is_square_triangular |> assert_ok("pipe square-triangular")
+
+test_run

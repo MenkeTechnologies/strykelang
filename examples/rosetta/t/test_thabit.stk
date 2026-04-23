@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Thabit numbers
+
+fn thabit($n) {
+    3 * (2**$n) - 1
+}
+
+fn is_thabit($n) {
+    my $m = $n + 1
+    if ($m % 3 != 0) {
+        0
+    } else {
+        my $p = $m / 3
+        # Check if p is power of 2
+        ($p > 0) && (($p & ($p - 1)) == 0)
+    }
+}
+
+assert_eq thabit(0), 2, "T0"
+assert_eq thabit(1), 5, "T1"
+assert_eq thabit(2), 11, "T2"
+assert_eq thabit(3), 23, "T3"
+assert_eq thabit(4), 47, "T4"
+
+assert_ok is_thabit(2), "2 is thabit"
+assert_ok is_thabit(5), "5 is thabit"
+assert_ok is_thabit(11), "11 is thabit"
+assert_ok !is_thabit(10), "10 is not"
+
+4 |> thabit |> assert_eq(47, "pipe thabit")
+
+test_run

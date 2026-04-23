@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Determine if a string is numeric
+
+fn my_is_numeric($s) {
+    # Simple check for integer or decimal
+    $s =~ /^-?\d+(\.\d+)?$/
+}
+
+assert_ok my_is_numeric("123"), "123 is numeric"
+assert_ok my_is_numeric("-123.456"), "-123.456 is numeric"
+assert_ok !my_is_numeric("abc"), "abc is not"
+assert_ok !my_is_numeric("12.34.56"), "12.34.56 is not"
+
+"42" |> my_is_numeric |> assert_ok("pipe numeric")
+
+test_run

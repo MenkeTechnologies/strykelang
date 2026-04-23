@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fubini numbers
+
+fn my_binomial($n, $k) {
+    if ($k < 0 || $k > $n) { 0 }
+    elsif ($k == 0 || $k == $n) { 1 }
+    else {
+        my $res = 1
+        my $kk = $k < $n - $k ? $k : $n - $k
+        for my $i (1..$kk) {
+            $res = $res * ($n - $i + 1) / $i
+        }
+        int($res + 0.5)
+    }
+}
+
+my %fubini_memo
+
+fn fubini($n) {
+    if ($n == 0) { 1 }
+    elsif (exists $fubini_memo{$n}) { $fubini_memo{$n} }
+    else {
+        my $sum = 0
+        for my $k (1..$n) {
+            my $b = my_binomial($n, $k)
+            my $f = fubini($n - $k)
+            $sum += $b * $f
+        }
+        $fubini_memo{$n} = $sum
+        $sum
+    }
+}
+
+assert_eq fubini(0), 1, "F0"
+assert_eq fubini(1), 1, "F1"
+assert_eq fubini(2), 3, "F2 (1 + 2*1)"
+assert_eq fubini(3), 13, "F3"
+assert_eq fubini(4), 75, "F4"
+
+4 |> fubini |> assert_eq(75, "pipe fubini")
+
+test_run

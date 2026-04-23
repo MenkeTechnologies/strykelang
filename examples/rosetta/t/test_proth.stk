@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Proth numbers
+
+fn is_proth($n) {
+    if ($n < 3 || $n % 2 == 0) {
+        0
+    } else {
+        my $m = $n - 1
+        my $k = 0
+        while ($m % 2 == 0) {
+            $m = int($m / 2)
+            $k++
+        }
+        # n-1 = m * 2^k
+        # Proth: m is odd and 2^k > m
+        $m % 2 != 0 && (2**$k > $m)
+    }
+}
+
+assert_ok is_proth(3), "3 is Proth (1 * 2^1 + 1)"
+assert_ok is_proth(5), "5 is Proth (1 * 2^2 + 1)"
+assert_ok is_proth(9), "9 is Proth (1 * 2^3 + 1)"
+assert_ok is_proth(13), "13 is Proth (3 * 2^2 + 1)"
+assert_ok is_proth(17), "17 is Proth (1 * 2^4 + 1)"
+assert_ok is_proth(25), "25 is Proth (3 * 2^3 + 1)"
+assert_ok !is_proth(7), "7 is not Proth (3 * 2^1 + 1, but 2 < 3)"
+
+13 |> is_proth |> assert_ok("pipe proth")
+
+test_run

@@ -190,3 +190,9 @@ regex = "1.11"
 
 [workspace]
 members = [".", "compsys", "zsh"]
+
+[workspace.package]
+version = "0.8.7"
+edition = "2021"
+license = "MIT"
+authors = ["MenkeTechnologies"]

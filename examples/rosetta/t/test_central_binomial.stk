@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Central binomial coefficients
+
+fn central_binomial($n) {
+    if ($n == 0) {
+        1
+    } else {
+        my $res = 1
+        for my $i (1..$n) {
+            $res = $res * ($n + $i) / $i
+        }
+        int($res + 0.5)
+    }
+}
+
+assert_eq central_binomial(0), 1, "C(0)"
+assert_eq central_binomial(1), 2, "C(1)"
+assert_eq central_binomial(2), 6, "C(2)"
+assert_eq central_binomial(3), 20, "C(3)"
+assert_eq central_binomial(4), 70, "C(4)"
+assert_eq central_binomial(10), 184756, "C(10)"
+
+10 |> central_binomial |> assert_eq(184756, "pipe central binomial")
+
+test_run
