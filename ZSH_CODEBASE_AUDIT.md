@@ -806,6 +806,80 @@ ZSH has no:
 
 The entire plugin ecosystem is a monument to zsh's failures. Every popular plugin exists because zsh can't do something that a shell should do natively. And every plugin works by monkey patching because zsh provides no other option.
 
+### The 6 Monkey-Patching Mechanisms
+
+Since zsh has no plugin API, every plugin uses a combination of these hacks:
+
+#### 1. Function Body Replacement
+```zsh
+functions[original_fn]='entirely new body'
+```
+Literally overwrites a function's source code at runtime. The `functions` associative array exposes every function's body as a mutable string. Any plugin can rewrite any function — including zsh's own internal functions. No access control. No versioning. No way to know what the original was.
+
+#### 2. compdef Hijacking
+Zinit intercepts `compdef` calls before `compinit` runs, stores them in an array, then replays them after `compinit` finishes. This is because `compinit` takes 0.49 seconds, so zinit defers it — but plugins call `compdef` during load, before `compinit` exists. So zinit fakes `compdef`, buffers the calls, and replays them later. A monkey patch to work around a performance problem that exists because the completion system scans 986 files from disk.
+
+#### 3. precmd/preexec Array Fighting
+```zsh
+precmd_functions=(_p9k_do_nothing _p9k_precmd_first $precmd_functions _p9k_precmd)
+preexec_functions=(_p9k_preexec1 $preexec_functions _p9k_preexec2)
+```
+P10K injects itself at **both ends** of the precmd and preexec arrays — before and after every other plugin. It removes its own entries first, then re-adds them at specific positions. This is because there's no priority system, no ordering guarantee, no event system. Plugins fight over array positions like it's 1995.
+
+#### 4. ZLE Widget Wrapping
+```zsh
+zle -A $widget ._p9k_orig_$widget    # save original
+zle -N $widget _p9k_widget_$widget    # replace with wrapper
+```
+To extend a ZLE widget, you have to: save the original under a different name, create a new function that does your thing then calls the saved original, register the new function as the widget. There's no `widget.before()` or `widget.after()`. You replace the entire widget and hope you call the original correctly.
+
+zsh-history-substring-search does the same thing — wraps widgets with `eval` to dynamically generate wrapper functions:
+```zsh
+eval "zle -N orig-$cur_widget ${widgets[$cur_widget]#*:}; \
+      zle -N $cur_widget _zsh_highlight_widget_$cur_widget"
+```
+`eval` generating `zle -N` calls. This is the plugin API.
+
+#### 5. Autoload Interception
+```zsh
+if ! [[ "$functions[$1]" == *"builtin autoload -X"* ]]; then
+```
+Plugins check if a function is an autoload stub by **string-matching the function body** for `builtin autoload -X`. Not an API call. Not a flag. String matching on function source code. If the stub text changes in a future zsh version, every plugin that does this breaks.
+
+#### 6. eval Injection
+```zsh
+eval "$__p9k_intro"
+eval "typeset -ga _${(q)2}=(${(@qq)v})"
+```
+P10K uses `eval` **extensively** — 170 `eval` calls across the plugin ecosystem. Not because developers want to use `eval`, but because zsh's parameter expansion, scope rules, and dynamic variable naming are so broken that `eval` is the only way to achieve certain operations. Every `eval` is a code injection risk and a debugging nightmare.
+
+### Zinit Turbo Mode: Monkey Patching as a Feature
+
+Zinit's "turbo mode" defers plugin loading until after the prompt appears. This exists entirely because zsh startup is so slow (compinit scanning 986 files, autoloading from disk, fpath iteration). Turbo mode:
+
+1. Fakes `compdef` before `compinit` exists
+2. Defers `source` calls until after first prompt
+3. Replays buffered `compdef` calls after `compinit` finally runs
+4. Re-triggers completions that were registered late
+
+This is not a feature. It's a workaround for a 0.49-second `compinit` that shouldn't take 0.49 seconds.
+
+### P10K Instant Prompt: Monkey Patching the Prompt
+
+P10K's "instant prompt" displays a cached prompt immediately on startup, then replaces it with the real prompt once all plugins finish loading. This exists because:
+
+1. Zsh startup is slow (compinit, autoloads, fpath scanning)
+2. Plugins make it slower (each one sources files, registers functions, manipulates state)
+3. P10K can't make zsh faster, so it fakes the prompt to hide the latency
+
+The mechanism:
+```zsh
+precmd_functions=(_p9k_instant_prompt_precmd_first $precmd_functions)
+```
+P10K injects itself as the **first** precmd function, displays a cached prompt from a file, then suppresses all output until the real prompt is ready. It literally lies to the user about the shell being ready.
+
+This is the most popular zsh "feature" — and it's a monkey patch hiding a performance problem that exists because the shell scans 986 files from disk on every startup.
+
 ### zshrs: A Real Extension Model
 
 In zshrs, plugins don't need to monkey patch:
