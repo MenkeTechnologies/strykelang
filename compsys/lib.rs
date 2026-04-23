@@ -20,6 +20,7 @@ pub mod computil;
 pub mod describe;
 pub mod files;
 pub mod functions;
+pub mod generate;
 pub mod library;
 pub mod matching;
 pub mod menu;
@@ -113,4 +114,9 @@ pub use zpwr_colors::{
 pub use zstyle::{
     ZStyle, ZStyleLookup, ZStyleStore,
     STANDARD_STYLES, STANDARD_TAGS, STANDARD_COMPLETERS,
+};
+pub use generate::{
+    generate_completions, detect_completion_context, CompContext,
+    complete_commands_from_cache, complete_shell_functions, complete_builtins,
+    complete_files, complete_parameters, complete_from_cache_function,
 };

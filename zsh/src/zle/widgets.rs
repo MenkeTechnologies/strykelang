@@ -291,6 +291,12 @@ pub enum BuiltinWidget {
     AutoSuffixRetain,
 
     // =========================================================================
+    // Delete-to-char (Emacs zap-to-char)
+    // =========================================================================
+    DeleteToChar,
+    ZapToChar,
+
+    // =========================================================================
     // Special hooks (user-defined but special names)
     // =========================================================================
     ZleLineInit,
@@ -722,7 +728,73 @@ pub fn execute_builtin(
             WidgetResult::Ok
         }
         
+        // Delete-to-char / Zap-to-char (Emacs style)
+        BuiltinWidget::DeleteToChar | BuiltinWidget::ZapToChar => {
+            // This widget needs a character argument - would be read from next key press
+            // For now, return Pending to indicate we need more input
+            WidgetResult::Pending
+        }
+
         // Unimplemented widgets return Ok to avoid breaking the editor
         _ => WidgetResult::Ok,
     }
+}
+
+/// Delete to a specified character (implementation for delete-to-char/zap-to-char)
+/// `zap` parameter: if true, don't include the target character in the deletion
+pub fn delete_to_char(state: &mut ZleState, target: char, count: i32, zap: bool) -> WidgetResult {
+    state.save_undo();
+    let chars: Vec<char> = state.buffer.chars().collect();
+    let mut dest = state.cursor;
+
+    if count > 0 {
+        let mut remaining = count;
+        while remaining > 0 && dest < chars.len() {
+            while dest < chars.len() && chars[dest] != target {
+                dest += 1;
+            }
+            if dest < chars.len() {
+                if !zap || remaining > 1 {
+                    dest += 1;
+                }
+                remaining -= 1;
+                if remaining == 0 {
+                    let killed: String = chars[state.cursor..dest].iter().collect();
+                    state.kill_add(&killed);
+                    let mut new_buffer: String = chars[..state.cursor].iter().collect();
+                    new_buffer.push_str(&chars[dest..].iter().collect::<String>());
+                    state.buffer = new_buffer;
+                    return WidgetResult::Ok;
+                }
+            }
+        }
+    } else {
+        if dest > 0 {
+            dest -= 1;
+        }
+        let mut remaining = -count;
+        while remaining > 0 && dest > 0 {
+            while dest > 0 && chars[dest] != target {
+                dest -= 1;
+            }
+            if chars[dest] == target {
+                remaining -= 1;
+                if remaining == 0 {
+                    let adjust = if zap { 1 } else { 0 };
+                    let killed: String = chars[dest + adjust..state.cursor].iter().collect();
+                    state.kill_add(&killed);
+                    let mut new_buffer: String = chars[..dest + adjust].iter().collect();
+                    new_buffer.push_str(&chars[state.cursor..].iter().collect::<String>());
+                    state.buffer = new_buffer;
+                    state.cursor = dest + adjust;
+                    return WidgetResult::Ok;
+                }
+                if dest > 0 {
+                    dest -= 1;
+                }
+            }
+        }
+    }
+
+    WidgetResult::Ok
 }

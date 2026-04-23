@@ -3,8 +3,11 @@
 //! Executes the parsed shell AST.
 
 use crate::history::HistoryEngine;
+use crate::math::MathEval;
+use crate::prompt::{expand_prompt, PromptContext};
 use compsys::cache::CompsysCache;
 use std::collections::HashSet;
+use std::io::Write;
 use std::sync::LazyLock;
 use parking_lot::Mutex;
 
@@ -368,6 +371,12 @@ pub struct ShellExecutor {
     pub compsys_cache: Option<CompsysCache>,
     // cdreplay - deferred compdef calls for zinit turbo mode
     pub deferred_compdefs: Vec<Vec<String>>,
+    // command hash table (hash builtin)
+    pub command_hash: HashMap<String, String>,
+    // Control flow signals
+    returning: Option<i32>,  // Set by return builtin, cleared after function returns
+    breaking: i32,           // break level (0 = not breaking, N = break N levels)
+    continuing: i32,         // continue level
 }
 
 impl ShellExecutor {
@@ -381,6 +390,15 @@ impl ShellExecutor {
             .collect();
 
         let history = HistoryEngine::new().ok();
+        
+        // Initialize standard zsh variables
+        let mut variables = HashMap::new();
+        variables.insert("ZSH_VERSION".to_string(), "5.9".to_string());
+        variables.insert("ZSH_PATCHLEVEL".to_string(), "zsh-5.9-0-g73d3173".to_string());
+        variables.insert("ZSH_NAME".to_string(), "zsh".to_string());
+        variables.insert("SHLVL".to_string(), env::var("SHLVL").map(|v| {
+            v.parse::<i32>().map(|n| (n + 1).to_string()).unwrap_or_else(|_| "1".to_string())
+        }).unwrap_or_else(|_| "1".to_string()));
 
         Self {
             functions: HashMap::new(),
@@ -388,7 +406,7 @@ impl ShellExecutor {
             global_aliases: HashMap::new(),
             suffix_aliases: HashMap::new(),
             last_status: 0,
-            variables: HashMap::new(),
+            variables,
             arrays: HashMap::new(),
             assoc_arrays: HashMap::new(),
             jobs: JobTable::new(),
@@ -425,6 +443,10 @@ impl ShellExecutor {
             unix_sockets: HashMap::new(),
             compsys_cache: CompsysCache::memory().ok(),
             deferred_compdefs: Vec::new(),
+            command_hash: HashMap::new(),
+            returning: None,
+            breaking: 0,
+            continuing: 0,
         }
     }
     
@@ -1062,7 +1084,13 @@ impl ShellExecutor {
             ShellCommand::FunctionDef(name, body) => {
                 if name.is_empty() {
                     // Anonymous function - execute immediately
-                    self.execute_command(body)
+                    let result = self.execute_command(body);
+                    // Clear returning flag since the anonymous function has completed
+                    if let Some(ret) = self.returning.take() {
+                        self.last_status = ret;
+                        return Ok(ret);
+                    }
+                    result
                 } else {
                     // Named function - just define it
                     self.functions.insert(name.clone(), (**body).clone());
@@ -1201,22 +1229,54 @@ impl ShellExecutor {
         
         let args = &words[1..];
 
+        // Check if this is `exec` with only redirects (no command args)
+        // For exec, redirects with {varname} allocate FDs; redirects are permanent
+        let is_exec_with_redirects_only = cmd_name == "exec" && args.is_empty() && !cmd.redirects.is_empty();
+        
         // Apply redirects for builtins
         let mut saved_fds: Vec<(i32, i32)> = Vec::new();
         for redirect in &cmd.redirects {
+            let target = self.expand_word(&redirect.target);
+            
+            // Handle {varname}>file syntax - allocate new FD and store in variable
+            if let Some(ref var_name) = redirect.fd_var {
+                use std::os::unix::io::IntoRawFd;
+                let file_result = match redirect.op {
+                    RedirectOp::Write | RedirectOp::Clobber => std::fs::File::create(&target),
+                    RedirectOp::Append => std::fs::OpenOptions::new().create(true).append(true).open(&target),
+                    RedirectOp::Read => std::fs::File::open(&target),
+                    _ => continue,
+                };
+                match file_result {
+                    Ok(file) => {
+                        let new_fd = file.into_raw_fd();
+                        self.variables.insert(var_name.clone(), new_fd.to_string());
+                        // Store allocated FD for potential cleanup (not for exec)
+                        if !is_exec_with_redirects_only {
+                            // For non-exec, we might want to track these
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}: {}", cmd_name, target, e);
+                        return Ok(1);
+                    }
+                }
+                continue;
+            }
+            
             let fd = redirect.fd.unwrap_or(match redirect.op {
                 RedirectOp::Read | RedirectOp::HereDoc | RedirectOp::HereString | RedirectOp::ReadWrite => 0,
                 _ => 1,
             });
             
-            let target = self.expand_word(&redirect.target);
-            
             match redirect.op {
                 RedirectOp::Write | RedirectOp::Clobber => {
                     use std::os::unix::io::IntoRawFd;
-                    let saved = unsafe { libc::dup(fd) };
-                    if saved >= 0 {
-                        saved_fds.push((fd, saved));
+                    if !is_exec_with_redirects_only {
+                        let saved = unsafe { libc::dup(fd) };
+                        if saved >= 0 {
+                            saved_fds.push((fd, saved));
+                        }
                     }
                     if let Ok(file) = std::fs::File::create(&target) {
                         let new_fd = file.into_raw_fd();
@@ -1226,9 +1286,11 @@ impl ShellExecutor {
                 }
                 RedirectOp::Append => {
                     use std::os::unix::io::IntoRawFd;
-                    let saved = unsafe { libc::dup(fd) };
-                    if saved >= 0 {
-                        saved_fds.push((fd, saved));
+                    if !is_exec_with_redirects_only {
+                        let saved = unsafe { libc::dup(fd) };
+                        if saved >= 0 {
+                            saved_fds.push((fd, saved));
+                        }
                     }
                     if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&target) {
                         let new_fd = file.into_raw_fd();
@@ -1238,9 +1300,11 @@ impl ShellExecutor {
                 }
                 RedirectOp::Read => {
                     use std::os::unix::io::IntoRawFd;
-                    let saved = unsafe { libc::dup(fd) };
-                    if saved >= 0 {
-                        saved_fds.push((fd, saved));
+                    if !is_exec_with_redirects_only {
+                        let saved = unsafe { libc::dup(fd) };
+                        if saved >= 0 {
+                            saved_fds.push((fd, saved));
+                        }
                     }
                     if let Ok(file) = std::fs::File::open(&target) {
                         let new_fd = file.into_raw_fd();
@@ -1250,15 +1314,23 @@ impl ShellExecutor {
                 }
                 RedirectOp::DupWrite | RedirectOp::DupRead => {
                     if let Ok(target_fd) = target.parse::<i32>() {
-                        let saved = unsafe { libc::dup(fd) };
-                        if saved >= 0 {
-                            saved_fds.push((fd, saved));
+                        if !is_exec_with_redirects_only {
+                            let saved = unsafe { libc::dup(fd) };
+                            if saved >= 0 {
+                                saved_fds.push((fd, saved));
+                            }
                         }
                         unsafe { libc::dup2(target_fd, fd); }
                     }
                 }
                 _ => {}
             }
+        }
+        
+        // For exec with only redirects, we're done - redirects are applied permanently
+        if is_exec_with_redirects_only {
+            self.last_status = 0;
+            return Ok(0);
         }
 
         // Check for shell builtins
@@ -1513,11 +1585,19 @@ impl ShellExecutor {
 
         // Execute the function
         let result = self.execute_command(func);
+        
+        // Handle return - clear the flag and use its value
+        let final_result = if let Some(ret) = self.returning.take() {
+            self.last_status = ret;
+            Ok(ret)
+        } else {
+            result
+        };
 
         // Restore positional params
         self.positional_params = saved_params;
 
-        result
+        final_result
     }
 
     fn execute_external(
@@ -1755,6 +1835,11 @@ impl ShellExecutor {
             } else {
                 self.execute_command(cmd)?
             };
+            
+            // Check for control flow
+            if self.returning.is_some() || self.breaking > 0 || self.continuing > 0 {
+                return Ok(status);
+            }
 
             match op {
                 ListOp::And => {
@@ -1799,6 +1884,9 @@ impl ShellExecutor {
             CompoundCommand::BraceGroup(cmds) | CompoundCommand::Subshell(cmds) => {
                 for cmd in cmds {
                     self.execute_command(cmd)?;
+                    if self.returning.is_some() {
+                        break;
+                    }
                 }
                 Ok(self.last_status)
             }
@@ -1849,6 +1937,24 @@ impl ShellExecutor {
 
                     for cmd in body {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.continuing > 0 || self.returning.is_some() {
+                            break;
+                        }
+                    }
+                    
+                    if self.continuing > 0 {
+                        self.continuing -= 1;
+                        if self.continuing > 0 {
+                            break;
+                        }
+                        continue;
+                    }
+                    if self.breaking > 0 {
+                        self.breaking -= 1;
+                        break;
+                    }
+                    if self.returning.is_some() {
+                        break;
                     }
                 }
 
@@ -1880,6 +1986,24 @@ impl ShellExecutor {
                     // Execute body
                     for cmd in body {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.continuing > 0 || self.returning.is_some() {
+                            break;
+                        }
+                    }
+                    
+                    if self.continuing > 0 {
+                        self.continuing -= 1;
+                        if self.continuing > 0 {
+                            break;
+                        }
+                        continue;
+                    }
+                    if self.breaking > 0 {
+                        self.breaking -= 1;
+                        break;
+                    }
+                    if self.returning.is_some() {
+                        break;
                     }
 
                     // Execute step (use evaluate_arithmetic_expr for assignment support like i++)
@@ -1894,14 +2018,32 @@ impl ShellExecutor {
                 loop {
                     for cmd in condition {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.returning.is_some() {
+                            break;
+                        }
                     }
 
-                    if self.last_status != 0 {
+                    if self.last_status != 0 || self.breaking > 0 || self.returning.is_some() {
                         break;
                     }
 
                     for cmd in body {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.continuing > 0 || self.returning.is_some() {
+                            break;
+                        }
+                    }
+                    
+                    if self.continuing > 0 {
+                        self.continuing -= 1;
+                        if self.continuing > 0 {
+                            break;
+                        }
+                        continue;
+                    }
+                    if self.breaking > 0 {
+                        self.breaking -= 1;
+                        break;
                     }
                 }
                 Ok(self.last_status)
@@ -1911,14 +2053,32 @@ impl ShellExecutor {
                 loop {
                     for cmd in condition {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.returning.is_some() {
+                            break;
+                        }
                     }
 
-                    if self.last_status == 0 {
+                    if self.last_status == 0 || self.breaking > 0 || self.returning.is_some() {
                         break;
                     }
 
                     for cmd in body {
                         self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.continuing > 0 || self.returning.is_some() {
+                            break;
+                        }
+                    }
+                    
+                    if self.continuing > 0 {
+                        self.continuing -= 1;
+                        if self.continuing > 0 {
+                            break;
+                        }
+                        continue;
+                    }
+                    if self.breaking > 0 {
+                        self.breaking -= 1;
+                        break;
                     }
                 }
                 Ok(self.last_status)
@@ -3327,6 +3487,54 @@ impl ShellExecutor {
     }
 
     fn expand_braced_variable(&mut self, content: &str) -> String {
+        // Handle nested expansion: ${${inner}[subscript]} or ${${inner}modifier}
+        if content.starts_with("${") {
+            // Find matching closing brace for inner expansion
+            let mut depth = 0;
+            let mut inner_end = 0;
+            for (i, c) in content.char_indices() {
+                match c {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            inner_end = i;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            
+            if inner_end > 0 {
+                // Expand the inner ${...}
+                let inner_content = &content[2..inner_end];
+                let inner_result = self.expand_braced_variable(inner_content);
+                
+                // Check for subscript or modifier after the inner expansion
+                let rest = &content[inner_end + 1..];
+                if rest.starts_with('[') {
+                    // Apply subscript to result: ${${...}[idx]}
+                    if let Some(bracket_end) = rest.find(']') {
+                        let index = &rest[1..bracket_end];
+                        if let Ok(idx) = index.parse::<i64>() {
+                            let chars: Vec<char> = inner_result.chars().collect();
+                            let actual_idx = if idx < 0 {
+                                (chars.len() as i64 + idx).max(0) as usize
+                            } else if idx > 0 {
+                                (idx - 1) as usize
+                            } else {
+                                0
+                            };
+                            return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                        }
+                    }
+                }
+                
+                return inner_result;
+            }
+        }
+        
         // Handle zsh-style parameter expansion flags ${(flags)var}
         if content.starts_with('(') {
             if let Some(close_paren) = content.find(')') {
@@ -3379,7 +3587,8 @@ impl ShellExecutor {
                 // Use default if variable is empty
                 if val.is_empty() {
                     if let Some(def) = default_val {
-                        val = def.to_string();
+                        // Expand the default value (handles $var and other expansions)
+                        val = self.expand_string(def);
                     }
                 }
 
@@ -3496,32 +3705,50 @@ impl ShellExecutor {
                         .get(var_name)
                         .map(|arr| arr.join(" "))
                         .unwrap_or_default();
-                } else if let Ok(idx) = index.parse::<i64>() {
-                    // ${arr[1]} - return element at index (1-indexed in zsh)
-                    return self
-                        .arrays
-                        .get(var_name)
-                        .and_then(|arr| {
-                            let actual_idx = if idx > 0 { (idx - 1) as usize } else { 0 };
-                            arr.get(actual_idx).cloned()
-                        })
-                        .unwrap_or_default();
+                }
+                
+                // Try to get index as a number (could be negative for reverse indexing)
+                let idx_result = if index.starts_with('-') || index.chars().all(|c| c.is_ascii_digit()) {
+                    index.parse::<i64>().ok()
                 } else {
                     // Index is a variable, expand it first
-                    let expanded_idx = self.get_variable(index);
-                    if let Ok(idx) = expanded_idx.parse::<i64>() {
-                        return self
-                            .arrays
-                            .get(var_name)
-                            .and_then(|arr| {
-                                let actual_idx = if idx > 0 { (idx - 1) as usize } else { 0 };
-                                arr.get(actual_idx).cloned()
-                            })
-                            .unwrap_or_default();
+                    let expanded_idx = self.expand_string(index);
+                    expanded_idx.parse::<i64>().ok()
+                };
+                
+                if let Some(idx) = idx_result {
+                    // Check if it's an array first
+                    if let Some(arr) = self.arrays.get(var_name) {
+                        let actual_idx = if idx < 0 {
+                            // Negative index: -1 is last element
+                            (arr.len() as i64 + idx).max(0) as usize
+                        } else if idx > 0 {
+                            (idx - 1) as usize // zsh is 1-indexed
+                        } else {
+                            0
+                        };
+                        return arr.get(actual_idx).cloned().unwrap_or_default();
                     }
-                    // If index is not numeric, return empty (not an array or invalid index)
+                    
+                    // Not an array - treat as string subscripting
+                    let val = self.get_variable(var_name);
+                    if !val.is_empty() {
+                        let chars: Vec<char> = val.chars().collect();
+                        let actual_idx = if idx < 0 {
+                            // Negative index: -1 is last char
+                            (chars.len() as i64 + idx).max(0) as usize
+                        } else if idx > 0 {
+                            (idx - 1) as usize // zsh is 1-indexed
+                        } else {
+                            0
+                        };
+                        return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                    }
                     return String::new();
                 }
+                
+                // Non-numeric index on non-assoc - return empty
+                return String::new();
             }
         }
 
@@ -4485,7 +4712,7 @@ impl ShellExecutor {
             "@" | "*" => self.positional_params.join(" "),
             "#" => self.positional_params.len().to_string(),
             "?" => self.last_status.to_string(),
-            "0" => env::args().next().unwrap_or_default(),
+            "0" => self.variables.get("0").cloned().unwrap_or_else(|| env::args().next().unwrap_or_default()),
             n if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
                 let idx: usize = n.parse().unwrap_or(0);
                 if idx == 0 {
@@ -5109,162 +5336,67 @@ impl ShellExecutor {
         }
     }
 
-    /// Expand prompt escape sequences
+    /// Expand prompt escape sequences using the full prompt module
     fn expand_prompt_string(&self, s: &str) -> String {
-        let mut result = String::new();
-        let mut chars = s.chars().peekable();
+        let ctx = self.build_prompt_context();
+        expand_prompt(s, &ctx)
+    }
 
-        while let Some(c) = chars.next() {
-            if c == '%' {
-                match chars.next() {
-                    Some('%') => result.push('%'),
-                    Some('~') => {
-                        // Current directory with ~ substitution
-                        let cwd = std::env::current_dir().unwrap_or_default();
-                        let cwd_str = cwd.to_string_lossy();
-                        if let Some(home) = dirs::home_dir() {
-                            let home_str = home.to_string_lossy();
-                            if cwd_str.starts_with(home_str.as_ref()) {
-                                result.push('~');
-                                result.push_str(&cwd_str[home_str.len()..]);
-                            } else {
-                                result.push_str(&cwd_str);
-                            }
-                        } else {
-                            result.push_str(&cwd_str);
-                        }
-                    }
-                    Some('/') | Some('d') => {
-                        // Current directory
-                        let cwd = std::env::current_dir().unwrap_or_default();
-                        result.push_str(&cwd.to_string_lossy());
-                    }
-                    Some('c') | Some('.') => {
-                        // Trailing component of cwd
-                        let cwd = std::env::current_dir().unwrap_or_default();
-                        if let Some(name) = cwd.file_name() {
-                            result.push_str(&name.to_string_lossy());
-                        }
-                    }
-                    Some('n') => {
-                        // Username
-                        result.push_str(
-                            &std::env::var("USER").unwrap_or_else(|_| "user".to_string()),
-                        );
-                    }
-                    Some('m') => {
-                        // Hostname up to first dot
-                        let host = hostname::get()
-                            .map(|h| h.to_string_lossy().to_string())
-                            .unwrap_or_else(|_| "localhost".to_string());
-                        if let Some(dot) = host.find('.') {
-                            result.push_str(&host[..dot]);
-                        } else {
-                            result.push_str(&host);
-                        }
-                    }
-                    Some('M') => {
-                        // Full hostname
-                        let host = hostname::get()
-                            .map(|h| h.to_string_lossy().to_string())
-                            .unwrap_or_else(|_| "localhost".to_string());
-                        result.push_str(&host);
-                    }
-                    Some('#') => {
-                        // # if root, % otherwise
-                        if unsafe { libc::geteuid() } == 0 {
-                            result.push('#');
-                        } else {
-                            result.push('%');
-                        }
-                    }
-                    Some('?') => {
-                        // Exit status of last command
-                        result.push_str(&self.last_status.to_string());
-                    }
-                    Some('!') => {
-                        // History event number
-                        result.push_str("1"); // Simplified
-                    }
-                    Some('i') | Some('l') => {
-                        // Line number
-                        result.push_str("1");
-                    }
-                    Some('j') => {
-                        // Number of jobs
-                        result.push_str(&self.jobs.list().len().to_string());
-                    }
-                    Some('D') => {
-                        // Date
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%y-%m-%d").to_string());
-                    }
-                    Some('T') => {
-                        // Time (24h)
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%H:%M").to_string());
-                    }
-                    Some('t') | Some('@') => {
-                        // Time (12h with am/pm)
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%I:%M%p").to_string());
-                    }
-                    Some('*') => {
-                        // Time (24h with seconds)
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%H:%M:%S").to_string());
-                    }
-                    Some('w') => {
-                        // Day of week
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%a").to_string());
-                    }
-                    Some('W') => {
-                        // Date in mm/dd/yy
-                        let now = chrono::Local::now();
-                        result.push_str(&now.format("%m/%d/%y").to_string());
-                    }
-                    Some('B') | Some('b') => {} // Bold on/off - ignore
-                    Some('U') | Some('u') => {} // Underline on/off - ignore
-                    Some('S') | Some('s') => {} // Standout on/off - ignore
-                    Some('F') | Some('f') | Some('K') | Some('k') => {
-                        // Foreground/background color - skip the color spec
-                        if chars.peek() == Some(&'{') {
-                            chars.next();
-                            while let Some(ch) = chars.next() {
-                                if ch == '}' {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    Some('{') => {
-                        // Literal escape sequence - skip to }
-                        while let Some(ch) = chars.next() {
-                            if ch == '%' && chars.peek() == Some(&'}') {
-                                chars.next();
-                                break;
-                            }
-                        }
-                    }
-                    Some(d) if d.is_ascii_digit() => {
-                        // Truncation - skip for now
-                        while chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                            chars.next();
-                        }
-                    }
-                    Some(other) => {
-                        result.push('%');
-                        result.push(other);
-                    }
-                    None => result.push('%'),
-                }
-            } else {
-                result.push(c);
-            }
+    /// Build a PromptContext from current executor state
+    fn build_prompt_context(&self) -> PromptContext {
+        let pwd = env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "/".to_string());
+
+        let home = env::var("HOME").unwrap_or_default();
+
+        let user = env::var("USER")
+            .or_else(|_| env::var("LOGNAME"))
+            .unwrap_or_else(|_| "user".to_string());
+
+        let host = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "localhost".to_string());
+
+        let host_short = host.split('.').next().unwrap_or(&host).to_string();
+
+        let shlvl = env::var("SHLVL")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
+
+        PromptContext {
+            pwd,
+            home,
+            user,
+            host,
+            host_short,
+            tty: String::new(),
+            lastval: self.last_status,
+            histnum: self.history.as_ref().and_then(|h| h.count().ok()).unwrap_or(1),
+            shlvl,
+            num_jobs: self.jobs.list().len() as i32,
+            is_root: unsafe { libc::geteuid() } == 0,
+            cmd_stack: Vec::new(),
+            psvar: self.get_psvar(),
+            term_width: self.get_term_width(),
+            lineno: 1,
         }
+    }
 
-        result
+    fn get_psvar(&self) -> Vec<String> {
+        if let Some(arr) = self.arrays.get("psvar") {
+            arr.clone()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn get_term_width(&self) -> usize {
+        env::var("COLUMNS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(80)
     }
 
     /// Execute a command and capture its output (command substitution)
@@ -5352,392 +5484,84 @@ impl ShellExecutor {
         }
     }
 
-    /// Evaluate arithmetic expression
+    /// Evaluate arithmetic expression using the full math module
     fn evaluate_arithmetic(&mut self, expr: &str) -> String {
-        // Simple arithmetic evaluator
         let expr = self.expand_string(expr);
+        let force_float = self.options.get("forcefloat").copied().unwrap_or(false);
+        let c_prec = self.options.get("cprecedences").copied().unwrap_or(false);
+        let octal = self.options.get("octalzeroes").copied().unwrap_or(false);
 
-        // Use float evaluation to preserve precision
-        let result = self.eval_arith_expr_float(&expr);
+        let mut evaluator = MathEval::new(&expr)
+            .with_string_variables(&self.variables)
+            .with_force_float(force_float)
+            .with_c_precedences(c_prec)
+            .with_octal_zeroes(octal);
 
-        // Format: if it's a whole number, show as int; otherwise show float
-        if result.fract() == 0.0 && result.abs() < i64::MAX as f64 {
-            format!("{}", result as i64)
-        } else {
-            format!("{}", result)
+        match evaluator.evaluate() {
+            Ok(result) => {
+                for (k, v) in evaluator.extract_string_variables() {
+                    self.variables.insert(k.clone(), v.clone());
+                    env::set_var(&k, &v);
+                }
+                match result {
+                    crate::math::MathNum::Integer(i) => i.to_string(),
+                    crate::math::MathNum::Float(f) => {
+                        if f.fract() == 0.0 && f.abs() < i64::MAX as f64 {
+                            (f as i64).to_string()
+                        } else {
+                            f.to_string()
+                        }
+                    }
+                    crate::math::MathNum::Unset => "0".to_string(),
+                }
+            }
+            Err(_) => "0".to_string(),
         }
     }
 
     fn eval_arith_expr(&mut self, expr: &str) -> i64 {
-        self.eval_arith_expr_float(expr) as i64
+        let expr_expanded = self.expand_string(expr);
+        let c_prec = self.options.get("cprecedences").copied().unwrap_or(false);
+        let octal = self.options.get("octalzeroes").copied().unwrap_or(false);
+
+        let mut evaluator = MathEval::new(&expr_expanded)
+            .with_string_variables(&self.variables)
+            .with_c_precedences(c_prec)
+            .with_octal_zeroes(octal);
+
+        match evaluator.evaluate() {
+            Ok(result) => {
+                for (k, v) in evaluator.extract_string_variables() {
+                    self.variables.insert(k.clone(), v.clone());
+                    env::set_var(&k, &v);
+                }
+                result.to_int()
+            }
+            Err(_) => 0,
+        }
     }
 
     fn eval_arith_expr_float(&mut self, expr: &str) -> f64 {
-        let expr = expr.trim();
+        let expr_expanded = self.expand_string(expr);
+        let force_float = self.options.get("forcefloat").copied().unwrap_or(false);
+        let c_prec = self.options.get("cprecedences").copied().unwrap_or(false);
+        let octal = self.options.get("octalzeroes").copied().unwrap_or(false);
 
-        // Handle assignment: var=expr (must check before other operators)
-        // But not ==, !=, <=, >=
-        if let Some(eq_pos) = expr.find('=') {
-            let chars: Vec<char> = expr.chars().collect();
-            let is_comparison = (eq_pos > 0
-                && (chars[eq_pos - 1] == '!'
-                    || chars[eq_pos - 1] == '<'
-                    || chars[eq_pos - 1] == '>'
-                    || chars[eq_pos - 1] == '='))
-                || chars.get(eq_pos + 1) == Some(&'=');
+        let mut evaluator = MathEval::new(&expr_expanded)
+            .with_string_variables(&self.variables)
+            .with_force_float(force_float)
+            .with_c_precedences(c_prec)
+            .with_octal_zeroes(octal);
 
-            if !is_comparison {
-                let var_part = &expr[..eq_pos];
-                if !var_part.contains(|c: char| "+-*/%<>!&|()".contains(c)) {
-                    let var_name = var_part.trim();
-                    if !var_name.is_empty()
-                        && var_name.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    {
-                        let value_expr = &expr[eq_pos + 1..];
-                        let value = self.eval_arith_expr_float(value_expr);
-                        self.variables
-                            .insert(var_name.to_string(), value.to_string());
-                        env::set_var(var_name, value.to_string());
-                        return value;
-                    }
+        match evaluator.evaluate() {
+            Ok(result) => {
+                for (k, v) in evaluator.extract_string_variables() {
+                    self.variables.insert(k.clone(), v.clone());
+                    env::set_var(&k, &v);
                 }
+                result.to_float()
             }
-        }
-
-        // Handle post-increment/decrement: var++ var--
-        if expr.ends_with("++") {
-            let var_name = expr[..expr.len() - 2].trim();
-            let current = self.get_variable(var_name).parse::<f64>().unwrap_or(0.0);
-            let new_val = current + 1.0;
-            self.variables
-                .insert(var_name.to_string(), new_val.to_string());
-            env::set_var(var_name, new_val.to_string());
-            return current;
-        }
-        if expr.ends_with("--") {
-            let var_name = expr[..expr.len() - 2].trim();
-            let current = self.get_variable(var_name).parse::<f64>().unwrap_or(0.0);
-            let new_val = current - 1.0;
-            self.variables
-                .insert(var_name.to_string(), new_val.to_string());
-            env::set_var(var_name, new_val.to_string());
-            return current;
-        }
-
-        // Handle pre-increment/decrement: ++var --var
-        if expr.starts_with("++") {
-            let var_name = expr[2..].trim();
-            let current = self.get_variable(var_name).parse::<f64>().unwrap_or(0.0);
-            let new_val = current + 1.0;
-            self.variables
-                .insert(var_name.to_string(), new_val.to_string());
-            env::set_var(var_name, new_val.to_string());
-            return new_val;
-        }
-        if expr.starts_with("--") {
-            let var_name = expr[2..].trim();
-            let current = self.get_variable(var_name).parse::<f64>().unwrap_or(0.0);
-            let new_val = current - 1.0;
-            self.variables
-                .insert(var_name.to_string(), new_val.to_string());
-            env::set_var(var_name, new_val.to_string());
-            return new_val;
-        }
-
-        // Handle math functions BEFORE parentheses: sin(x), cos(x), etc.
-        if let Some(paren_pos) = expr.find('(') {
-            if expr.ends_with(')') {
-                let func_name = expr[..paren_pos].trim();
-                if !func_name.is_empty()
-                    && func_name.chars().all(|c| c.is_alphanumeric() || c == '_')
-                {
-                    let args_str = &expr[paren_pos + 1..expr.len() - 1];
-
-                    let args: Vec<f64> = if args_str.is_empty() {
-                        Vec::new()
-                    } else {
-                        args_str
-                            .split(',')
-                            .map(|a| self.eval_arith_expr_float(a.trim()))
-                            .collect()
-                    };
-
-                    return self.eval_math_function(func_name, &args);
-                }
-            }
-        }
-
-        // Handle parentheses (grouping)
-        if expr.starts_with('(') && expr.ends_with(')') {
-            let mut depth = 0;
-            let mut is_simple_group = true;
-            for (i, c) in expr.chars().enumerate() {
-                match c {
-                    '(' => depth += 1,
-                    ')' => {
-                        depth -= 1;
-                        if depth == 0 && i < expr.len() - 1 {
-                            is_simple_group = false;
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            if is_simple_group {
-                return self.eval_arith_expr_float(&expr[1..expr.len() - 1]);
-            }
-        }
-
-        // Handle binary operators (lowest to highest precedence)
-        let mut depth = 0;
-        let chars: Vec<char> = expr.chars().collect();
-
-        // Comparison operators
-        for i in 0..chars.len() {
-            match chars[i] {
-                '(' => depth += 1,
-                ')' => depth -= 1,
-                '<' if depth == 0 => {
-                    if chars.get(i + 1) == Some(&'=') {
-                        let l = self.eval_arith_expr_float(&expr[..i]);
-                        let r = self.eval_arith_expr_float(&expr[i + 2..]);
-                        return if l <= r { 1.0 } else { 0.0 };
-                    } else if chars.get(i + 1) != Some(&'<') {
-                        let l = self.eval_arith_expr_float(&expr[..i]);
-                        let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                        return if l < r { 1.0 } else { 0.0 };
-                    }
-                }
-                '>' if depth == 0 => {
-                    if chars.get(i + 1) == Some(&'=') {
-                        let l = self.eval_arith_expr_float(&expr[..i]);
-                        let r = self.eval_arith_expr_float(&expr[i + 2..]);
-                        return if l >= r { 1.0 } else { 0.0 };
-                    } else if chars.get(i + 1) != Some(&'>') {
-                        let l = self.eval_arith_expr_float(&expr[..i]);
-                        let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                        return if l > r { 1.0 } else { 0.0 };
-                    }
-                }
-                '=' if depth == 0 && chars.get(i + 1) == Some(&'=') => {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 2..]);
-                    return if (l - r).abs() < f64::EPSILON {
-                        1.0
-                    } else {
-                        0.0
-                    };
-                }
-                '!' if depth == 0 && chars.get(i + 1) == Some(&'=') => {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 2..]);
-                    return if (l - r).abs() >= f64::EPSILON {
-                        1.0
-                    } else {
-                        0.0
-                    };
-                }
-                _ => {}
-            }
-        }
-
-        depth = 0;
-        // Addition and subtraction
-        for i in (0..chars.len()).rev() {
-            match chars[i] {
-                '(' => depth += 1,
-                ')' => depth -= 1,
-                '+' | '-' if depth == 0 && i > 0 => {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                    return if chars[i] == '+' { l + r } else { l - r };
-                }
-                _ => {}
-            }
-        }
-
-        // Exponentiation **
-        depth = 0;
-        let mut last_exp_pos = None;
-        for i in 0..chars.len().saturating_sub(1) {
-            match chars[i] {
-                '(' => depth += 1,
-                ')' => depth -= 1,
-                '*' if depth == 0 && chars.get(i + 1) == Some(&'*') => {
-                    last_exp_pos = Some(i);
-                }
-                _ => {}
-            }
-        }
-        if let Some(pos) = last_exp_pos {
-            let l = self.eval_arith_expr_float(&expr[..pos]);
-            let r = self.eval_arith_expr_float(&expr[pos + 2..]);
-            return l.powf(r);
-        }
-
-        // Multiplication, division, modulo
-        depth = 0;
-        for i in (0..chars.len()).rev() {
-            match chars[i] {
-                '(' => depth += 1,
-                ')' => depth -= 1,
-                '*' if depth == 0
-                    && chars.get(i + 1) != Some(&'*')
-                    && (i == 0 || chars[i - 1] != '*') =>
-                {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                    return l * r;
-                }
-                '/' if depth == 0 => {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                    return if r != 0.0 { l / r } else { 0.0 };
-                }
-                '%' if depth == 0 => {
-                    let l = self.eval_arith_expr_float(&expr[..i]);
-                    let r = self.eval_arith_expr_float(&expr[i + 1..]);
-                    return if r != 0.0 { l % r } else { 0.0 };
-                }
-                _ => {}
-            }
-        }
-
-        // Try to parse as number
-        if let Ok(f) = expr.parse::<f64>() {
-            return f;
-        }
-
-        // Try as variable
-        self.get_variable(expr).parse().unwrap_or(0.0)
-    }
-
-    /// Evaluate math functions (zsh/mathfunc module)
-    fn eval_math_function(&self, name: &str, args: &[f64]) -> f64 {
-        match name {
-            // Single argument trig functions
-            "sin" => args.first().map(|x| x.sin()).unwrap_or(0.0),
-            "cos" => args.first().map(|x| x.cos()).unwrap_or(0.0),
-            "tan" => args.first().map(|x| x.tan()).unwrap_or(0.0),
-            "asin" => args.first().map(|x| x.asin()).unwrap_or(0.0),
-            "acos" => args.first().map(|x| x.acos()).unwrap_or(0.0),
-            "atan" => {
-                if args.len() >= 2 {
-                    args[0].atan2(args[1])
-                } else {
-                    args.first().map(|x| x.atan()).unwrap_or(0.0)
-                }
-            }
-            "sinh" => args.first().map(|x| x.sinh()).unwrap_or(0.0),
-            "cosh" => args.first().map(|x| x.cosh()).unwrap_or(0.0),
-            "tanh" => args.first().map(|x| x.tanh()).unwrap_or(0.0),
-            "asinh" => args.first().map(|x| x.asinh()).unwrap_or(0.0),
-            "acosh" => args.first().map(|x| x.acosh()).unwrap_or(0.0),
-            "atanh" => args.first().map(|x| x.atanh()).unwrap_or(0.0),
-
-            // Exponential and logarithmic
-            "exp" => args.first().map(|x| x.exp()).unwrap_or(0.0),
-            "expm1" => args.first().map(|x| x.exp_m1()).unwrap_or(0.0),
-            "log" | "ln" => args.first().map(|x| x.ln()).unwrap_or(0.0),
-            "log10" => args.first().map(|x| x.log10()).unwrap_or(0.0),
-            "log2" => args.first().map(|x| x.log2()).unwrap_or(0.0),
-            "log1p" => args.first().map(|x| x.ln_1p()).unwrap_or(0.0),
-
-            // Power and roots
-            "sqrt" => args.first().map(|x| x.sqrt()).unwrap_or(0.0),
-            "cbrt" => args.first().map(|x| x.cbrt()).unwrap_or(0.0),
-            "pow" => {
-                if args.len() >= 2 {
-                    args[0].powf(args[1])
-                } else {
-                    0.0
-                }
-            }
-            "hypot" => {
-                if args.len() >= 2 {
-                    args[0].hypot(args[1])
-                } else {
-                    0.0
-                }
-            }
-
-            // Rounding
-            "ceil" => args.first().map(|x| x.ceil()).unwrap_or(0.0),
-            "floor" => args.first().map(|x| x.floor()).unwrap_or(0.0),
-            "round" => args.first().map(|x| x.round()).unwrap_or(0.0),
-            "trunc" | "int" => args.first().map(|x| x.trunc()).unwrap_or(0.0),
-
-            // Absolute value and sign
-            "abs" | "fabs" => args.first().map(|x| x.abs()).unwrap_or(0.0),
-            "copysign" => {
-                if args.len() >= 2 {
-                    args[0].copysign(args[1])
-                } else {
-                    0.0
-                }
-            }
-
-            // Misc
-            "fmod" => {
-                if args.len() >= 2 && args[1] != 0.0 {
-                    args[0] % args[1]
-                } else {
-                    0.0
-                }
-            }
-            "ldexp" => {
-                if args.len() >= 2 {
-                    args[0] * 2f64.powi(args[1] as i32)
-                } else {
-                    0.0
-                }
-            }
-            "frexp" => args
-                .first()
-                .map(|x| {
-                    let (mantissa, _exp) = libm::frexp(*x);
-                    mantissa
-                })
-                .unwrap_or(0.0),
-
-            // Min/max
-            "min" => args.iter().copied().reduce(f64::min).unwrap_or(0.0),
-            "max" => args.iter().copied().reduce(f64::max).unwrap_or(0.0),
-            "sum" => args.iter().sum(),
-
-            // Float conversion
-            "float" => args.first().copied().unwrap_or(0.0),
-
-            // Random
-            "rand" => rand::random::<f64>(),
-            "rand48" => rand::random::<f64>(),
-
-            // Special functions (using libm crate if available, else approximations)
-            "erf" => args.first().map(|x| libm::erf(*x)).unwrap_or(0.0),
-            "erfc" => args.first().map(|x| libm::erfc(*x)).unwrap_or(0.0),
-            "gamma" | "tgamma" => args.first().map(|x| libm::tgamma(*x)).unwrap_or(0.0),
-            "lgamma" => args.first().map(|x| libm::lgamma_r(*x).0).unwrap_or(0.0),
-            "j0" => args.first().map(|x| libm::j0(*x)).unwrap_or(0.0),
-            "j1" => args.first().map(|x| libm::j1(*x)).unwrap_or(0.0),
-            "jn" => {
-                if args.len() >= 2 {
-                    libm::jn(args[0] as i32, args[1])
-                } else {
-                    0.0
-                }
-            }
-            "y0" => args.first().map(|x| libm::y0(*x)).unwrap_or(0.0),
-            "y1" => args.first().map(|x| libm::y1(*x)).unwrap_or(0.0),
-            "yn" => {
-                if args.len() >= 2 {
-                    libm::yn(args[0] as i32, args[1])
-                } else {
-                    0.0
-                }
-            }
-
-            _ => 0.0,
+            Err(_) => 0.0,
         }
     }
 
@@ -5746,8 +5570,8 @@ impl ShellExecutor {
         if pattern == "*" {
             return true;
         }
-        if pattern.contains('*') || pattern.contains('?') {
-            // Use glob matching
+        if pattern.contains('*') || pattern.contains('?') || pattern.contains('[') {
+            // Use glob matching for wildcards and character classes
             glob::Pattern::new(pattern)
                 .map(|p| p.matches(value))
                 .unwrap_or(false)
@@ -6031,7 +5855,27 @@ impl ShellExecutor {
         }
 
         let path = &args[0];
-        match std::fs::read_to_string(path) {
+        
+        // Resolve to absolute path
+        let abs_path = if path.starts_with('/') {
+            path.clone()
+        } else if path.starts_with("~/") {
+            if let Some(home) = dirs::home_dir() {
+                home.join(&path[2..]).to_string_lossy().to_string()
+            } else {
+                path.clone()
+            }
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(path).to_string_lossy().to_string())
+                .unwrap_or_else(|_| path.clone())
+        };
+        
+        // Save current $0 and set to the sourced file path
+        let saved_zero = self.variables.get("0").cloned();
+        self.variables.insert("0".to_string(), abs_path.clone());
+        
+        let result = match std::fs::read_to_string(&abs_path) {
             Ok(content) => match self.execute_script(&content) {
                 Ok(status) => status,
                 Err(e) => {
@@ -6043,7 +5887,23 @@ impl ShellExecutor {
                 eprintln!("source: {}: {}", path, e);
                 1
             }
+        };
+        
+        // Handle return from sourced script - clear the flag and use its value
+        let final_result = if let Some(ret) = self.returning.take() {
+            ret
+        } else {
+            result
+        };
+        
+        // Restore $0
+        if let Some(z) = saved_zero {
+            self.variables.insert("0".to_string(), z);
+        } else {
+            self.variables.remove("0");
         }
+        
+        final_result
     }
 
     fn builtin_exit(&mut self, args: &[String]) -> i32 {
@@ -6055,9 +5915,11 @@ impl ShellExecutor {
     }
 
     fn builtin_return(&mut self, args: &[String]) -> i32 {
-        args.first()
+        let status = args.first()
             .and_then(|s| s.parse::<i32>().ok())
-            .unwrap_or(self.last_status)
+            .unwrap_or(self.last_status);
+        self.returning = Some(status);
+        status
     }
 
     fn builtin_test(&mut self, args: &[String]) -> i32 {
@@ -6815,17 +6677,209 @@ impl ShellExecutor {
     }
 
     fn builtin_read(&mut self, args: &[String]) -> i32 {
-        let var = args.first().map(|s| s.as_str()).unwrap_or("REPLY");
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
-                let input = input.trim_end();
-                env::set_var(var, input);
-                self.variables.insert(var.to_string(), input.to_string());
-                0
+        // read [ -rszpqAclneE ] [ -t timeout ] [ -d delim ] [ -k [ num ] ] [ -u fd ]
+        //      [ name[?prompt] ] [ name ... ]
+        use std::io::{BufRead, Read as IoRead};
+        
+        let mut raw_mode = false;      // -r: don't interpret backslash escapes
+        let mut silent = false;        // -s: don't echo input
+        let mut to_history = false;    // -z: read from history stack
+        let mut prompt_str: Option<String> = None; // -p prompt
+        let mut use_array = false;     // -A: read into array
+        let mut timeout: Option<u64> = None;  // -t timeout in seconds
+        let mut delimiter = '\n';      // -d delim
+        let mut nchars: Option<usize> = None; // -k num: read exactly num chars
+        let mut fd = 0;                // -u fd: read from fd
+        let mut quiet = false;         // -q: test only, don't assign
+        let mut var_names: Vec<String> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            
+            if arg == "--" {
+                i += 1;
+                while i < args.len() {
+                    var_names.push(args[i].clone());
+                    i += 1;
+                }
+                break;
             }
-            Err(_) => 1,
+            
+            if arg.starts_with('-') && arg.len() > 1 {
+                let mut chars = arg[1..].chars().peekable();
+                while let Some(ch) = chars.next() {
+                    match ch {
+                        'r' => raw_mode = true,
+                        's' => silent = true,
+                        'z' => to_history = true,
+                        'A' => use_array = true,
+                        'c' | 'l' | 'n' | 'e' | 'E' => {} // TODO
+                        'q' => quiet = true,
+                        't' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                timeout = rest.parse().ok();
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    timeout = args[i].parse().ok();
+                                }
+                            }
+                            break;
+                        }
+                        'd' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                delimiter = rest.chars().next().unwrap_or('\n');
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    delimiter = args[i].chars().next().unwrap_or('\n');
+                                }
+                            }
+                            break;
+                        }
+                        'k' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                nchars = Some(rest.parse().unwrap_or(1));
+                            } else if i + 1 < args.len() && args[i + 1].chars().all(|c| c.is_ascii_digit()) {
+                                i += 1;
+                                nchars = Some(args[i].parse().unwrap_or(1));
+                            } else {
+                                nchars = Some(1);
+                            }
+                            break;
+                        }
+                        'u' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                fd = rest.parse().unwrap_or(0);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    fd = args[i].parse().unwrap_or(0);
+                                }
+                            }
+                            break;
+                        }
+                        'p' => {
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                prompt_str = Some(rest);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    prompt_str = Some(args[i].clone());
+                                }
+                            }
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                if let Some(pos) = arg.find('?') {
+                    var_names.push(arg[..pos].to_string());
+                    prompt_str = Some(arg[pos + 1..].to_string());
+                } else {
+                    var_names.push(arg.clone());
+                }
+            }
+            i += 1;
         }
+
+        if var_names.is_empty() {
+            var_names.push("REPLY".to_string());
+        }
+
+        if let Some(ref p) = prompt_str {
+            eprint!("{}", p);
+            let _ = std::io::stderr().flush();
+        }
+
+        let _ = to_history;
+        let _ = fd;
+        let _ = silent;
+
+        let input = if let Some(n) = nchars {
+            let mut buf = vec![0u8; n];
+            let stdin = io::stdin();
+            if let Some(_t) = timeout {
+                // TODO: proper timeout
+            }
+            match stdin.lock().read_exact(&mut buf) {
+                Ok(_) => String::from_utf8_lossy(&buf).to_string(),
+                Err(_) => return 1,
+            }
+        } else {
+            let stdin = io::stdin();
+            let mut input = String::new();
+            if delimiter == '\n' {
+                match stdin.lock().read_line(&mut input) {
+                    Ok(0) => return 1,
+                    Ok(_) => {}
+                    Err(_) => return 1,
+                }
+            } else {
+                let mut byte = [0u8; 1];
+                loop {
+                    match stdin.lock().read_exact(&mut byte) {
+                        Ok(_) => {
+                            let c = byte[0] as char;
+                            if c == delimiter {
+                                break;
+                            }
+                            input.push(c);
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+            input.trim_end_matches('\n').trim_end_matches('\r').to_string()
+        };
+
+        let processed = if raw_mode {
+            input
+        } else {
+            input.replace("\\\n", "")
+        };
+
+        if quiet {
+            return if processed.is_empty() { 1 } else { 0 };
+        }
+
+        if use_array {
+            let var = &var_names[0];
+            let words: Vec<String> = processed.split_whitespace().map(String::from).collect();
+            self.arrays.insert(var.clone(), words);
+        } else if var_names.len() == 1 {
+            let var = &var_names[0];
+            env::set_var(var, &processed);
+            self.variables.insert(var.clone(), processed);
+        } else {
+            let ifs = self.variables.get("IFS").map(|s| s.as_str()).unwrap_or(" \t\n");
+            let words: Vec<&str> = processed.split(|c| ifs.contains(c)).filter(|s| !s.is_empty()).collect();
+            
+            for (j, var) in var_names.iter().enumerate() {
+                if j < words.len() {
+                    if j == var_names.len() - 1 && words.len() > var_names.len() {
+                        let remaining = words[j..].join(" ");
+                        env::set_var(var, &remaining);
+                        self.variables.insert(var.clone(), remaining);
+                    } else {
+                        env::set_var(var, words[j]);
+                        self.variables.insert(var.clone(), words[j].to_string());
+                    }
+                } else {
+                    env::set_var(var, "");
+                    self.variables.insert(var.clone(), String::new());
+                }
+            }
+        }
+
+        0
     }
 
     fn builtin_shift(&mut self, args: &[String]) -> i32 {
@@ -7563,7 +7617,7 @@ impl ShellExecutor {
                         continue;
                     }
                 };
-                if let Err(e) = send_signal(pid, sig) {
+                if let Err(e) = send_signal(pid as i32, sig) {
                     eprintln!("kill: {}", e);
                     status = 1;
                 }
@@ -7641,7 +7695,7 @@ impl ShellExecutor {
                         continue;
                     }
                 };
-                match wait_for_job(pid) {
+                match wait_for_job(pid as i32) {
                     Ok(s) => status = s,
                     Err(e) => {
                         eprintln!("wait: {}", e);
@@ -10831,34 +10885,7 @@ impl ShellExecutor {
     }
 
     fn evaluate_arithmetic_expr(&mut self, expr: &str) -> i64 {
-        // Handle simple assignment like x=5
-        // But not if it's a comparison like == or !=
-        if let Some(eq_pos) = expr.find('=') {
-            // Check it's not part of ==, !=, <=, >=
-            let chars: Vec<char> = expr.chars().collect();
-            let is_comparison = (eq_pos > 0
-                && (chars[eq_pos - 1] == '!'
-                    || chars[eq_pos - 1] == '<'
-                    || chars[eq_pos - 1] == '>'
-                    || chars[eq_pos - 1] == '='))
-                || chars.get(eq_pos + 1) == Some(&'=');
-
-            if !is_comparison && !expr[..eq_pos].contains(|c| "+-*/%<>!&|".contains(c)) {
-                let var_name = expr[..eq_pos].trim();
-                if !var_name.is_empty() {
-                    let value_expr = &expr[eq_pos + 1..];
-                    let value = self.evaluate_arithmetic_expr(value_expr);
-                    self.variables
-                        .insert(var_name.to_string(), value.to_string());
-                    env::set_var(var_name, value.to_string());
-                    return value;
-                }
-            }
-        }
-
-        // Use the existing arithmetic evaluator
-        let result_str = self.evaluate_arithmetic(expr);
-        result_str.parse().unwrap_or(0)
+        self.eval_arith_expr(expr)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -10866,16 +10893,16 @@ impl ShellExecutor {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// break - exit from for/while/until loop
-    fn builtin_break(&self, args: &[String]) -> i32 {
-        let _levels: i32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(1);
-        // Note: actual break handling is done in the loop execution code
-        // This just returns the level count for the executor to handle
+    fn builtin_break(&mut self, args: &[String]) -> i32 {
+        let levels: i32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(1);
+        self.breaking = levels.max(1);
         0
     }
 
     /// continue - skip to next iteration of loop
-    fn builtin_continue(&self, args: &[String]) -> i32 {
-        let _levels: i32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(1);
+    fn builtin_continue(&mut self, args: &[String]) -> i32 {
+        let levels: i32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(1);
+        self.continuing = levels.max(1);
         0
     }
 
@@ -12223,9 +12250,65 @@ impl ShellExecutor {
     }
 
     /// rehash - rebuild command hash table
-    fn builtin_rehash(&mut self, _args: &[String]) -> i32 {
-        // Clear any cached command paths
-        // In a full implementation, this would rebuild the hash table
+    fn builtin_rehash(&mut self, args: &[String]) -> i32 {
+        // rehash [ -d ] [ -f ] [ -v ]
+        // -d: rehash named directories
+        // -f: force rehash of all commands in PATH
+        // -v: verbose (print each command being hashed)
+        
+        let mut rehash_dirs = false;
+        let mut force = false;
+        let mut verbose = false;
+        
+        for arg in args {
+            if arg.starts_with('-') {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'd' => rehash_dirs = true,
+                        'f' => force = true,
+                        'v' => verbose = true,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        
+        if rehash_dirs {
+            // Rebuild named directories from special params like ~user
+            // For now just clear and rebuild from HOME
+            self.named_dirs.clear();
+            if let Ok(home) = env::var("HOME") {
+                self.named_dirs.insert(String::new(), PathBuf::from(&home)); // ~ without name
+            }
+            return 0;
+        }
+        
+        // Clear command hash table
+        self.command_hash.clear();
+        
+        if force {
+            // Rebuild entire hash table from PATH
+            if let Ok(path_var) = env::var("PATH") {
+                for dir in path_var.split(':') {
+                    if let Ok(entries) = std::fs::read_dir(dir) {
+                        for entry in entries.flatten() {
+                            if let Ok(ft) = entry.file_type() {
+                                if ft.is_file() || ft.is_symlink() {
+                                    if let Some(name) = entry.file_name().to_str() {
+                                        let path = entry.path().to_string_lossy().to_string();
+                                        if verbose {
+                                            println!("{}={}", name, path);
+                                        }
+                                        self.command_hash.insert(name.to_string(), path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         0
     }
 
