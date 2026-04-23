@@ -1210,7 +1210,7 @@ impl DecodedOp {
             }
 
             DecodedOp::Assign { name, value } => Some(ShellCommand::Simple(SimpleCommand {
-                assignments: vec![(name.clone(), ShellWord::Literal(value.clone()))],
+                assignments: vec![(name.clone(), ShellWord::Literal(value.clone()), false)],
                 words: vec![],
                 redirects: vec![],
             })),
@@ -1223,7 +1223,7 @@ impl DecodedOp {
                         .collect(),
                 );
                 Some(ShellCommand::Simple(SimpleCommand {
-                    assignments: vec![(name.clone(), array_word)],
+                    assignments: vec![(name.clone(), array_word, false)],
                     words: vec![],
                     redirects: vec![],
                 }))

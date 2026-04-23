@@ -177,7 +177,7 @@ pub enum ListOp {
 
 #[derive(Debug, Clone)]
 pub struct SimpleCommand {
-    pub assignments: Vec<(String, ShellWord)>,
+    pub assignments: Vec<(String, ShellWord, bool)>, // (name, value, is_append)
     pub words: Vec<ShellWord>,
     pub redirects: Vec<Redirect>,
 }
@@ -1399,11 +1399,22 @@ impl<'a> ShellParser<'a> {
                         }
                     }
                     
-                    // Check for assignment (VAR=value or arr=(a b c) or arr[idx]=value)
+                    // Check for assignment (VAR=value, VAR+=value, arr=(a b c), arr[idx]=value)
                     if cmd.words.is_empty() && w.contains('=') && !w.starts_with('=') {
-                        if let Some(eq_pos) = w.find('=') {
+                        // Check for += (append) or = (assign)
+                        let (eq_pos, is_append) = if let Some(pos) = w.find("+=") {
+                            (pos, true)
+                        } else if let Some(pos) = w.find('=') {
+                            (pos, false)
+                        } else {
+                            (0, false) // won't happen due to contains check above
+                        };
+                        
+                        if eq_pos > 0 {
                             let var = w[..eq_pos].to_string();
-                            let val = w[eq_pos + 1..].to_string();
+                            let val_start = if is_append { eq_pos + 2 } else { eq_pos + 1 };
+                            let val = w[val_start..].to_string();
+                            
                             // Check if var is valid: either simple name or name[subscript]
                             let is_valid_var = if let Some(bracket_pos) = var.find('[') {
                                 // Array element: name[subscript]
@@ -1421,9 +1432,9 @@ impl<'a> ShellParser<'a> {
                                     let array_content = &val[1..val.len() - 1];
                                     let elements = Self::parse_array_elements(array_content);
                                     cmd.assignments
-                                        .push((var, ShellWord::ArrayLiteral(elements)));
+                                        .push((var, ShellWord::ArrayLiteral(elements), is_append));
                                 } else {
-                                    cmd.assignments.push((var, ShellWord::Literal(val)));
+                                    cmd.assignments.push((var, ShellWord::Literal(val), is_append));
                                 }
                                 self.advance();
                                 continue;

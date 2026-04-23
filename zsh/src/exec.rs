@@ -1075,12 +1075,18 @@ impl ShellExecutor {
 
     fn execute_simple(&mut self, cmd: &SimpleCommand) -> Result<i32, String> {
         // Handle assignments
-        for (var, val) in &cmd.assignments {
+        for (var, val, is_append) in &cmd.assignments {
             match val {
                 ShellWord::ArrayLiteral(elements) => {
-                    // Array assignment: arr=(a b c)
-                    let array: Vec<String> = elements.iter().map(|e| self.expand_word(e)).collect();
-                    self.arrays.insert(var.clone(), array);
+                    // Array assignment: arr=(a b c) or arr+=(a b c)
+                    let new_elements: Vec<String> = elements.iter().map(|e| self.expand_word(e)).collect();
+                    if *is_append {
+                        // Append to existing array
+                        let arr = self.arrays.entry(var.clone()).or_insert_with(Vec::new);
+                        arr.extend(new_elements);
+                    } else {
+                        self.arrays.insert(var.clone(), new_elements);
+                    }
                 }
                 _ => {
                     let expanded = self.expand_word(val);
@@ -1094,10 +1100,13 @@ impl ShellExecutor {
                             
                             // Check if it's an associative array
                             if self.assoc_arrays.contains_key(array_name) {
-                                self.assoc_arrays
-                                    .get_mut(array_name)
-                                    .unwrap()
-                                    .insert(key, expanded);
+                                let assoc = self.assoc_arrays.get_mut(array_name).unwrap();
+                                if *is_append {
+                                    let existing = assoc.get(&key).cloned().unwrap_or_default();
+                                    assoc.insert(key, existing + &expanded);
+                                } else {
+                                    assoc.insert(key, expanded);
+                                }
                             } else if let Ok(idx) = key.parse::<i64>() {
                                 // Regular indexed array
                                 let idx = if idx < 0 { 0 } else { (idx - 1) as usize }; // zsh is 1-indexed
@@ -1105,22 +1114,39 @@ impl ShellExecutor {
                                 while arr.len() <= idx {
                                     arr.push(String::new());
                                 }
-                                arr[idx] = expanded;
+                                if *is_append {
+                                    arr[idx].push_str(&expanded);
+                                } else {
+                                    arr[idx] = expanded;
+                                }
                             } else {
                                 // Non-numeric key on non-assoc array - treat as assoc
                                 let assoc = self.assoc_arrays.entry(array_name.to_string())
                                     .or_insert_with(HashMap::new);
-                                assoc.insert(key, expanded);
+                                if *is_append {
+                                    let existing = assoc.get(&key).cloned().unwrap_or_default();
+                                    assoc.insert(key, existing + &expanded);
+                                } else {
+                                    assoc.insert(key, expanded);
+                                }
                             }
                             continue;
                         }
                     }
                     
+                    // Regular variable assignment or append
+                    let final_value = if *is_append {
+                        let existing = self.variables.get(var).cloned().unwrap_or_default();
+                        existing + &expanded
+                    } else {
+                        expanded
+                    };
+                    
                     if cmd.words.is_empty() {
                         // Just assignment, set in environment
-                        env::set_var(var, &expanded);
+                        env::set_var(var, &final_value);
                     }
-                    self.variables.insert(var.clone(), expanded);
+                    self.variables.insert(var.clone(), final_value);
                 }
             }
         }
@@ -1174,6 +1200,66 @@ impl ShellExecutor {
         }
         
         let args = &words[1..];
+
+        // Apply redirects for builtins
+        let mut saved_fds: Vec<(i32, i32)> = Vec::new();
+        for redirect in &cmd.redirects {
+            let fd = redirect.fd.unwrap_or(match redirect.op {
+                RedirectOp::Read | RedirectOp::HereDoc | RedirectOp::HereString | RedirectOp::ReadWrite => 0,
+                _ => 1,
+            });
+            
+            let target = self.expand_word(&redirect.target);
+            
+            match redirect.op {
+                RedirectOp::Write | RedirectOp::Clobber => {
+                    use std::os::unix::io::IntoRawFd;
+                    let saved = unsafe { libc::dup(fd) };
+                    if saved >= 0 {
+                        saved_fds.push((fd, saved));
+                    }
+                    if let Ok(file) = std::fs::File::create(&target) {
+                        let new_fd = file.into_raw_fd();
+                        unsafe { libc::dup2(new_fd, fd); }
+                        unsafe { libc::close(new_fd); }
+                    }
+                }
+                RedirectOp::Append => {
+                    use std::os::unix::io::IntoRawFd;
+                    let saved = unsafe { libc::dup(fd) };
+                    if saved >= 0 {
+                        saved_fds.push((fd, saved));
+                    }
+                    if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&target) {
+                        let new_fd = file.into_raw_fd();
+                        unsafe { libc::dup2(new_fd, fd); }
+                        unsafe { libc::close(new_fd); }
+                    }
+                }
+                RedirectOp::Read => {
+                    use std::os::unix::io::IntoRawFd;
+                    let saved = unsafe { libc::dup(fd) };
+                    if saved >= 0 {
+                        saved_fds.push((fd, saved));
+                    }
+                    if let Ok(file) = std::fs::File::open(&target) {
+                        let new_fd = file.into_raw_fd();
+                        unsafe { libc::dup2(new_fd, fd); }
+                        unsafe { libc::close(new_fd); }
+                    }
+                }
+                RedirectOp::DupWrite | RedirectOp::DupRead => {
+                    if let Ok(target_fd) = target.parse::<i32>() {
+                        let saved = unsafe { libc::dup(fd) };
+                        if saved >= 0 {
+                            saved_fds.push((fd, saved));
+                        }
+                        unsafe { libc::dup2(target_fd, fd); }
+                    }
+                }
+                _ => {}
+            }
+        }
 
         // Check for shell builtins
         let status = match cmd_name.as_str() {
@@ -1404,6 +1490,14 @@ impl ShellExecutor {
                 self.execute_external(cmd_name, args, &cmd.redirects)?
             }
         };
+
+        // Restore saved fds
+        for (fd, saved) in saved_fds.into_iter().rev() {
+            unsafe {
+                libc::dup2(saved, fd);
+                libc::close(saved);
+            }
+        }
 
         self.last_status = status;
         Ok(status)
@@ -3484,12 +3578,10 @@ impl ShellExecutor {
                 } else {
                     return val;
                 }
-            } else if rest == "l" {
-                // ${var:l} - lowercase (zsh history modifier style)
-                return val.to_lowercase();
-            } else if rest == "u" {
-                // ${var:u} - uppercase (zsh history modifier style)
-                return val.to_uppercase();
+            } else if self.is_history_modifier(rest) {
+                // Handle history-style modifiers: :A, :h, :t, :r, :e, :l, :u, :q, :Q
+                // These can be chained: ${var:A:h:h}
+                return self.apply_history_modifiers(&val, rest);
             } else if rest
                 .chars()
                 .next()
@@ -4571,6 +4663,97 @@ impl ShellExecutor {
         }
     }
 
+    /// Check if a string starts with history modifier characters
+    fn is_history_modifier(&self, s: &str) -> bool {
+        if s.is_empty() {
+            return false;
+        }
+        let first = s.chars().next().unwrap();
+        matches!(first, 'A' | 'a' | 'h' | 't' | 'r' | 'e' | 'l' | 'u' | 'q' | 'Q' | 'P')
+    }
+
+    /// Apply zsh history-style modifiers to a value
+    /// Modifiers can be chained: :A:h:h
+    fn apply_history_modifiers(&self, val: &str, modifiers: &str) -> String {
+        let mut result = val.to_string();
+        let mut chars = modifiers.chars().peekable();
+        
+        while let Some(c) = chars.next() {
+            match c {
+                ':' => continue,
+                'A' => {
+                    if let Ok(abs) = std::fs::canonicalize(&result) {
+                        result = abs.to_string_lossy().to_string();
+                    } else if !result.starts_with('/') {
+                        if let Ok(cwd) = std::env::current_dir() {
+                            result = cwd.join(&result).to_string_lossy().to_string();
+                        }
+                    }
+                }
+                'a' => {
+                    if !result.starts_with('/') {
+                        if let Ok(cwd) = std::env::current_dir() {
+                            result = cwd.join(&result).to_string_lossy().to_string();
+                        }
+                    }
+                }
+                'h' => {
+                    if let Some(pos) = result.rfind('/') {
+                        if pos == 0 {
+                            result = "/".to_string();
+                        } else {
+                            result = result[..pos].to_string();
+                        }
+                    } else {
+                        result = ".".to_string();
+                    }
+                }
+                't' => {
+                    if let Some(pos) = result.rfind('/') {
+                        result = result[pos + 1..].to_string();
+                    }
+                }
+                'r' => {
+                    if let Some(dot_pos) = result.rfind('.') {
+                        let slash_pos = result.rfind('/').map(|p| p + 1).unwrap_or(0);
+                        if dot_pos > slash_pos {
+                            result = result[..dot_pos].to_string();
+                        }
+                    }
+                }
+                'e' => {
+                    if let Some(dot_pos) = result.rfind('.') {
+                        let slash_pos = result.rfind('/').map(|p| p + 1).unwrap_or(0);
+                        if dot_pos > slash_pos {
+                            result = result[dot_pos + 1..].to_string();
+                        } else {
+                            result = String::new();
+                        }
+                    } else {
+                        result = String::new();
+                    }
+                }
+                'l' => result = result.to_lowercase(),
+                'u' => result = result.to_uppercase(),
+                'q' => result = format!("'{}'", result.replace('\'', "'\\''")),
+                'Q' => {
+                    if result.starts_with('\'') && result.ends_with('\'') && result.len() >= 2 {
+                        result = result[1..result.len()-1].to_string();
+                    } else if result.starts_with('"') && result.ends_with('"') && result.len() >= 2 {
+                        result = result[1..result.len()-1].to_string();
+                    }
+                }
+                'P' => {
+                    if let Ok(real) = std::fs::canonicalize(&result) {
+                        result = real.to_string_lossy().to_string();
+                    }
+                }
+                _ => break,
+            }
+        }
+        result
+    }
+
     /// Parse zsh parameter expansion flags from a string like "L", "U", "j:,:"
     fn parse_zsh_flags(&self, s: &str) -> Vec<ZshParamFlag> {
         use crate::shell_ast::ZshParamFlag;
@@ -5637,32 +5820,134 @@ impl ShellExecutor {
     // Builtins
 
     fn builtin_cd(&mut self, args: &[String]) -> i32 {
-        let path = args.first().map(|s| s.as_str()).unwrap_or("~");
-        let path = if path == "~" || path == "" {
+        // cd [ -qsLP ] [ arg ]
+        // cd [ -qsLP ] old new
+        // cd [ -qsLP ] {+|-}n
+        let mut quiet = false;
+        let mut use_cdpath = false;
+        let mut logical = true;  // -L is default
+        let mut positional_args: Vec<&str> = Vec::new();
+        
+        for arg in args {
+            if arg.starts_with('-') && arg.len() > 1 && !arg.starts_with("--") {
+                // Check if it's a stack index like -2
+                if arg[1..].chars().all(|c| c.is_ascii_digit()) {
+                    positional_args.push(arg);
+                    continue;
+                }
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'q' => quiet = true,
+                        's' => use_cdpath = true,
+                        'L' => logical = true,
+                        'P' => logical = false,
+                        _ => {
+                            eprintln!("cd: bad option: -{}", ch);
+                            return 1;
+                        }
+                    }
+                }
+            } else if arg.starts_with('+') && arg.len() > 1 && arg[1..].chars().all(|c| c.is_ascii_digit()) {
+                // Stack index like +2
+                positional_args.push(arg);
+            } else {
+                positional_args.push(arg);
+            }
+        }
+        
+        // Handle cd old new (substitution)
+        if positional_args.len() == 2 {
+            if let Ok(cwd) = env::current_dir() {
+                let cwd_str = cwd.to_string_lossy();
+                let old = positional_args[0];
+                let new = positional_args[1];
+                if cwd_str.contains(old) {
+                    let new_path = cwd_str.replace(old, new);
+                    if !quiet {
+                        println!("{}", new_path);
+                    }
+                    positional_args = vec![];
+                    return self.do_cd(&new_path, quiet, use_cdpath, logical);
+                }
+            }
+        }
+        
+        let path_arg = positional_args.first().map(|s| *s).unwrap_or("~");
+        
+        // Handle stack indices
+        if path_arg.starts_with('+') || path_arg.starts_with('-') {
+            if let Ok(n) = path_arg[1..].parse::<usize>() {
+                let idx = if path_arg.starts_with('+') { n } else { self.dir_stack.len().saturating_sub(n) };
+                if let Some(dir) = self.dir_stack.get(idx) {
+                    let dir_path = dir.to_string_lossy().to_string();
+                    return self.do_cd(&dir_path, quiet, use_cdpath, logical);
+                } else {
+                    eprintln!("cd: no such entry in dir stack");
+                    return 1;
+                }
+            }
+        }
+        
+        self.do_cd(path_arg, quiet, use_cdpath, logical)
+    }
+    
+    fn do_cd(&mut self, path_arg: &str, quiet: bool, use_cdpath: bool, physical: bool) -> i32 {
+        let path = if path_arg == "~" || path_arg.is_empty() {
             dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
-        } else if path.starts_with("~/") {
+        } else if path_arg.starts_with("~/") {
             dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join(&path[2..])
-        } else if path == "-" {
+                .join(&path_arg[2..])
+        } else if path_arg == "-" {
             if let Ok(oldpwd) = env::var("OLDPWD") {
+                if !quiet {
+                    println!("{}", oldpwd);
+                }
                 PathBuf::from(oldpwd)
             } else {
                 eprintln!("cd: OLDPWD not set");
                 return 1;
             }
+        } else if use_cdpath && !path_arg.starts_with('/') && !path_arg.starts_with('.') {
+            // Search CDPATH
+            let cdpath = env::var("CDPATH").unwrap_or_default();
+            let mut found = None;
+            for dir in cdpath.split(':') {
+                let candidate = if dir.is_empty() {
+                    PathBuf::from(path_arg)
+                } else {
+                    PathBuf::from(dir).join(path_arg)
+                };
+                if candidate.is_dir() {
+                    found = Some(candidate);
+                    break;
+                }
+            }
+            found.unwrap_or_else(|| PathBuf::from(path_arg))
         } else {
-            PathBuf::from(path)
+            PathBuf::from(path_arg)
         };
 
         if let Ok(cwd) = env::current_dir() {
-            env::set_var("OLDPWD", cwd);
+            env::set_var("OLDPWD", &cwd);
         }
 
-        match env::set_current_dir(&path) {
+        // Resolve symlinks if -P (physical)
+        let target = if !physical {
+            if let Ok(resolved) = path.canonicalize() {
+                resolved
+            } else {
+                path.clone()
+            }
+        } else {
+            path.clone()
+        };
+
+        match env::set_current_dir(&target) {
             Ok(_) => {
                 if let Ok(cwd) = env::current_dir() {
-                    env::set_var("PWD", cwd);
+                    env::set_var("PWD", &cwd);
+                    self.variables.insert("PWD".to_string(), cwd.to_string_lossy().to_string());
                 }
                 0
             }
@@ -6205,32 +6490,228 @@ impl ShellExecutor {
     }
 
     fn builtin_local(&mut self, args: &[String]) -> i32 {
-        let mut is_array = false;
-        let mut is_assoc = false;
-        let mut i = 0;
+        self.builtin_typeset(args)
+    }
 
-        // Parse options
+    fn builtin_declare(&mut self, args: &[String]) -> i32 {
+        self.builtin_typeset(args)
+    }
+    
+    fn builtin_typeset(&mut self, args: &[String]) -> i32 {
+        // typeset [ {+|-}AHUaghlmrtux ] [ {+|-}EFLRZip [ n ] ]
+        //         [ + ] [ name[=value] ... ]
+        // typeset -T [ {+|-}Urux ] [ {+|-}LRZp [ n ] ] SCALAR[=value] array
+        // typeset -f [ {+|-}TUkmtuz ] [ + ] [ name ... ]
+        
+        let mut is_array = false;      // -a
+        let mut is_assoc = false;      // -A
+        let mut is_export = false;     // -x
+        let mut is_integer = false;    // -i
+        let mut is_readonly = false;   // -r
+        let mut is_lower = false;      // -l
+        let mut is_upper = false;      // -u
+        let mut is_left_pad = false;   // -L
+        let mut is_right_pad = false;  // -R
+        let mut is_zero_pad = false;   // -Z
+        let mut is_float = false;      // -F
+        let mut is_float_exp = false;  // -E
+        let mut is_function = false;   // -f
+        let mut is_global = false;     // -g
+        let mut is_tied = false;       // -T
+        let mut is_hidden = false;     // -H
+        let mut is_hide_val = false;   // -h
+        let mut is_trace = false;      // -t
+        let mut print_mode = false;    // -p
+        let mut pattern_match = false; // -m
+        let mut list_mode = false;     // no args: list all
+        let mut plus_mode = false;     // +x etc: remove attribute
+        let mut width: Option<usize> = None;
+        let mut precision: Option<usize> = None;
+        let mut var_args: Vec<String> = Vec::new();
+        
+        let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            if arg.starts_with('-') {
+            
+            if arg == "--" {
+                i += 1;
+                while i < args.len() {
+                    var_args.push(args[i].clone());
+                    i += 1;
+                }
+                break;
+            }
+            
+            if arg == "+" {
+                plus_mode = true;
+                i += 1;
+                continue;
+            }
+            
+            if arg.starts_with('+') && arg.len() > 1 {
+                plus_mode = true;
                 for c in arg[1..].chars() {
                     match c {
-                        'a' => is_array = true,
-                        'A' => is_assoc = true,
-                        'i' | 'r' | 'x' | 'l' | 'u' => {} // ignore other flags
+                        'a' => is_array = false,
+                        'A' => is_assoc = false,
+                        'x' => is_export = false,
+                        'i' => is_integer = false,
+                        'r' => is_readonly = false,
+                        'l' => is_lower = false,
+                        'u' => is_upper = false,
+                        'L' => is_left_pad = false,
+                        'R' => is_right_pad = false,
+                        'Z' => is_zero_pad = false,
+                        'F' => is_float = false,
+                        'E' => is_float_exp = false,
+                        'f' => is_function = false,
+                        'g' => is_global = false,
+                        'T' => is_tied = false,
+                        'H' => is_hidden = false,
+                        'h' => is_hide_val = false,
+                        't' => is_trace = false,
+                        'p' => print_mode = false,
+                        'm' => pattern_match = false,
                         _ => {}
                     }
                 }
-                i += 1;
+            } else if arg.starts_with('-') && arg.len() > 1 {
+                let mut chars = arg[1..].chars().peekable();
+                while let Some(c) = chars.next() {
+                    match c {
+                        'a' => is_array = true,
+                        'A' => is_assoc = true,
+                        'x' => is_export = true,
+                        'i' => is_integer = true,
+                        'r' => is_readonly = true,
+                        'l' => is_lower = true,
+                        'u' => is_upper = true,
+                        'L' => {
+                            is_left_pad = true;
+                            // Check for width
+                            let rest: String = chars.clone().collect();
+                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                                width = num.parse().ok();
+                            }
+                        }
+                        'R' => {
+                            is_right_pad = true;
+                            let rest: String = chars.clone().collect();
+                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                                width = num.parse().ok();
+                            }
+                        }
+                        'Z' => {
+                            is_zero_pad = true;
+                            let rest: String = chars.clone().collect();
+                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                                width = num.parse().ok();
+                            }
+                        }
+                        'F' => {
+                            is_float = true;
+                            let rest: String = chars.clone().collect();
+                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                                precision = num.parse().ok();
+                            }
+                        }
+                        'E' => {
+                            is_float_exp = true;
+                            let rest: String = chars.clone().collect();
+                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                                precision = num.parse().ok();
+                            }
+                        }
+                        'f' => is_function = true,
+                        'g' => is_global = true,
+                        'T' => is_tied = true,
+                        'H' => is_hidden = true,
+                        'h' => is_hide_val = true,
+                        't' => is_trace = true,
+                        'p' => print_mode = true,
+                        'm' => pattern_match = true,
+                        _ => {}
+                    }
+                }
             } else {
-                break;
+                var_args.push(arg.clone());
             }
+            i += 1;
+        }
+        
+        let _ = is_global;
+        let _ = is_tied;
+        let _ = is_hidden;
+        let _ = is_hide_val;
+        let _ = is_trace;
+        let _ = pattern_match;
+        let _ = precision;
+        
+        // If -f (function mode) with no args, list functions
+        if is_function && var_args.is_empty() {
+            for (name, body) in &self.functions {
+                if print_mode {
+                    println!("typeset -f {}", name);
+                } else {
+                    println!("{} () {{\n{:?}\n}}", name, body);
+                }
+            }
+            return 0;
+        }
+        
+        // If -f with args, just show those functions
+        if is_function {
+            for name in &var_args {
+                if let Some(body) = self.functions.get(name) {
+                    if print_mode {
+                        println!("typeset -f {}", name);
+                    } else {
+                        println!("{} () {{\n{:?}\n}}", name, body);
+                    }
+                }
+            }
+            return 0;
+        }
+        
+        // No args: list all variables with attributes
+        if var_args.is_empty() {
+            list_mode = true;
+        }
+        
+        if list_mode {
+            for (name, val) in &self.variables {
+                let mut attrs = String::new();
+                if is_export || env::var(name).is_ok() {
+                    attrs.push('x');
+                }
+                if self.arrays.contains_key(name) {
+                    attrs.push('a');
+                }
+                if self.assoc_arrays.contains_key(name) {
+                    attrs.push('A');
+                }
+                if print_mode {
+                    if attrs.is_empty() {
+                        println!("typeset {}", name);
+                    } else {
+                        println!("typeset -{} {}", attrs, name);
+                    }
+                } else if is_hide_val {
+                    println!("{}={}", name, "*".repeat(val.len().min(8)));
+                } else {
+                    println!("{}={}", name, val);
+                }
+            }
+            return 0;
         }
 
-        // Process remaining args - might be "name=(elem1 elem2 ...)" split across multiple args
-        while i < args.len() {
-            let arg = &args[i];
-
+        // Process variable assignments
+        for arg in var_args {
             // Check if this starts an array assignment: "name=(" or "name=(value"
             if let Some(eq_pos) = arg.find('=') {
                 let name = &arg[..eq_pos];
@@ -6248,39 +6729,71 @@ impl ShellExecutor {
                             elements.extend(content.split_whitespace().map(|s| s.to_string()));
                         }
                     } else {
-                        // Add elements from current
+                        // Single arg with just elements
                         if !current.is_empty() {
-                            elements.push(current);
-                        }
-                        // Collect remaining args until )
-                        i += 1;
-                        while i < args.len() {
-                            let next = &args[i];
-                            if next.ends_with(')') {
-                                let content = &next[..next.len() - 1];
-                                if !content.is_empty() {
-                                    elements.push(content.to_string());
-                                }
-                                break;
-                            } else if let Some(close_pos) = next.find(')') {
-                                let content = &next[..close_pos];
-                                if !content.is_empty() {
-                                    elements.push(content.to_string());
-                                }
-                                break;
-                            } else {
-                                elements.push(next.clone());
-                            }
-                            i += 1;
+                            let trimmed = current.trim_end_matches(')');
+                            elements.extend(trimmed.split_whitespace().map(|s| s.to_string()));
                         }
                     }
 
                     // Set array variable
-                    self.arrays.insert(name.to_string(), elements);
+                    if is_assoc {
+                        let mut assoc = std::collections::HashMap::new();
+                        let mut iter = elements.iter();
+                        while let Some(key) = iter.next() {
+                            if let Some(val) = iter.next() {
+                                assoc.insert(key.clone(), val.clone());
+                            }
+                        }
+                        self.assoc_arrays.insert(name.to_string(), assoc);
+                    } else {
+                        self.arrays.insert(name.to_string(), elements);
+                    }
                     self.variables.insert(name.to_string(), String::new());
                 } else {
-                    // Regular assignment
-                    self.variables.insert(name.to_string(), rest.to_string());
+                    // Regular assignment - apply transformations
+                    let mut value = rest.to_string();
+                    
+                    if is_integer {
+                        // Force integer evaluation
+                        value = self.evaluate_arithmetic(&value).to_string();
+                    }
+                    if is_lower {
+                        value = value.to_lowercase();
+                    }
+                    if is_upper {
+                        value = value.to_uppercase();
+                    }
+                    if let Some(w) = width {
+                        if is_left_pad {
+                            value = format!("{:<width$}", value, width = w);
+                            value.truncate(w);
+                        } else if is_right_pad || is_zero_pad {
+                            let pad_char = if is_zero_pad { '0' } else { ' ' };
+                            if value.len() < w {
+                                value = format!("{}{}", pad_char.to_string().repeat(w - value.len()), value);
+                            }
+                            if value.len() > w {
+                                value = value[value.len() - w..].to_string();
+                            }
+                        }
+                    }
+                    if is_float || is_float_exp {
+                        if let Ok(f) = value.parse::<f64>() {
+                            let prec = precision.unwrap_or(10);
+                            value = if is_float_exp {
+                                format!("{:.prec$e}", f, prec = prec)
+                            } else {
+                                format!("{:.prec$}", f, prec = prec)
+                            };
+                        }
+                    }
+                    
+                    self.variables.insert(name.to_string(), value.clone());
+                    
+                    if is_export {
+                        env::set_var(name, &value);
+                    }
                 }
             } else if is_array || is_assoc {
                 // Just declaring the variable
@@ -6293,14 +6806,12 @@ impl ShellExecutor {
                 self.variables.insert(arg.clone(), String::new());
             } else {
                 self.variables.insert(arg.clone(), String::new());
+                if is_export {
+                    env::set_var(&arg, "");
+                }
             }
-            i += 1;
         }
         0
-    }
-
-    fn builtin_declare(&mut self, args: &[String]) -> i32 {
-        self.builtin_local(args)
     }
 
     fn builtin_read(&mut self, args: &[String]) -> i32 {
@@ -6317,8 +6828,67 @@ impl ShellExecutor {
         }
     }
 
-    fn builtin_shift(&mut self, _args: &[String]) -> i32 {
-        // Simplified: no-op for now
+    fn builtin_shift(&mut self, args: &[String]) -> i32 {
+        // shift [ -p ] [ n ] [ name ... ]
+        // -p: shift from end instead of beginning (pop)
+        // n: number of elements to shift (default 1)
+        // name: array names to shift (default: shift positional parameters)
+        
+        let mut from_end = false;
+        let mut count = 1usize;
+        let mut array_names: Vec<String> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-p" {
+                from_end = true;
+            } else if arg.chars().all(|c| c.is_ascii_digit()) {
+                count = arg.parse().unwrap_or(1);
+            } else {
+                array_names.push(arg.clone());
+            }
+            i += 1;
+        }
+        
+        if array_names.is_empty() {
+            // Shift positional parameters
+            if let Some(params) = self.arrays.get_mut("@") {
+                if from_end {
+                    for _ in 0..count {
+                        if !params.is_empty() {
+                            params.pop();
+                        }
+                    }
+                } else {
+                    for _ in 0..count {
+                        if !params.is_empty() {
+                            params.remove(0);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Shift specified arrays
+            for name in array_names {
+                if let Some(arr) = self.arrays.get_mut(&name) {
+                    if from_end {
+                        for _ in 0..count {
+                            if !arr.is_empty() {
+                                arr.pop();
+                            }
+                        }
+                    } else {
+                        for _ in 0..count {
+                            if !arr.is_empty() {
+                                arr.remove(0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         0
     }
 
@@ -6623,24 +7193,99 @@ impl ShellExecutor {
         false
     }
 
-    fn builtin_jobs(&mut self, _args: &[String]) -> i32 {
-        // Reap finished jobs first
-        for job in self.jobs.reap_finished() {
-            println!("[{}]  Done                    {}", job.id, job.command);
+    fn builtin_jobs(&mut self, args: &[String]) -> i32 {
+        // jobs [ -dlprsZ ] [ job ... ]
+        // -l: long format (show PID)
+        // -p: print process group IDs only
+        // -d: show directory from which job was started
+        // -r: show running jobs only
+        // -s: show stopped jobs only
+        // -Z: set process name (not relevant here)
+        
+        let mut long_format = false;
+        let mut pids_only = false;
+        let mut show_dir = false;
+        let mut running_only = false;
+        let mut stopped_only = false;
+        let mut job_ids: Vec<usize> = Vec::new();
+        
+        for arg in args {
+            if arg.starts_with('-') {
+                for c in arg[1..].chars() {
+                    match c {
+                        'l' => long_format = true,
+                        'p' => pids_only = true,
+                        'd' => show_dir = true,
+                        'r' => running_only = true,
+                        's' => stopped_only = true,
+                        'Z' => {} // ignore
+                        _ => {}
+                    }
+                }
+            } else if arg.starts_with('%') {
+                if let Ok(id) = arg[1..].parse::<usize>() {
+                    job_ids.push(id);
+                }
+            } else if let Ok(id) = arg.parse::<usize>() {
+                job_ids.push(id);
+            }
         }
 
-        // List remaining jobs
+        // Reap finished jobs first
+        for job in self.jobs.reap_finished() {
+            if !running_only && !stopped_only {
+                if pids_only {
+                    println!("{}", job.pid);
+                } else {
+                    println!("[{}]  Done                    {}", job.id, job.command);
+                }
+            }
+        }
+
+        // List jobs (optionally filtered)
         for job in self.jobs.list() {
+            // Filter by specific job IDs if provided
+            if !job_ids.is_empty() && !job_ids.contains(&job.id) {
+                continue;
+            }
+            
+            // Filter by state
+            if running_only && job.state != JobState::Running {
+                continue;
+            }
+            if stopped_only && job.state != JobState::Stopped {
+                continue;
+            }
+            
+            if pids_only {
+                println!("{}", job.pid);
+                continue;
+            }
+            
             let marker = if job.is_current { "+" } else { "-" };
             let state = match job.state {
-                JobState::Running => "Running",
-                JobState::Stopped => "Stopped",
-                JobState::Done => "Done",
+                JobState::Running => "running",
+                JobState::Stopped => "suspended",
+                JobState::Done => "done",
             };
-            println!(
-                "[{}]{} {}                    {}",
-                job.id, marker, state, job.command
-            );
+            
+            if long_format {
+                println!(
+                    "[{}]{} {:6} {}  {}",
+                    job.id, marker, job.pid, state, job.command
+                );
+            } else {
+                println!(
+                    "[{}]{} {}  {}",
+                    job.id, marker, state, job.command
+                );
+            }
+            
+            if show_dir {
+                if let Ok(cwd) = env::current_dir() {
+                    println!("    (pwd: {})", cwd.display());
+                }
+            }
         }
         0
     }
@@ -6731,40 +7376,164 @@ impl ShellExecutor {
     }
 
     fn builtin_kill(&mut self, args: &[String]) -> i32 {
+        // kill [ -s signal_name | -n signal_number | -sig ] job ...
+        // kill -l [ sig ... ]
         use crate::jobs::send_signal;
         use nix::sys::signal::Signal;
 
         if args.is_empty() {
-            eprintln!("kill: usage: kill [-signal] pid ...");
+            eprintln!("kill: usage: kill [-s signal | -n num | -sig] pid ...");
+            eprintln!("       kill -l [sig ...]");
             return 1;
         }
 
-        let mut sig = Signal::SIGTERM;
-        let mut start = 0;
+        // Signal name/number mapping
+        let signal_map: &[(&str, i32, Signal)] = &[
+            ("HUP", 1, Signal::SIGHUP),
+            ("INT", 2, Signal::SIGINT),
+            ("QUIT", 3, Signal::SIGQUIT),
+            ("ILL", 4, Signal::SIGILL),
+            ("TRAP", 5, Signal::SIGTRAP),
+            ("ABRT", 6, Signal::SIGABRT),
+            ("BUS", 7, Signal::SIGBUS),
+            ("FPE", 8, Signal::SIGFPE),
+            ("KILL", 9, Signal::SIGKILL),
+            ("USR1", 10, Signal::SIGUSR1),
+            ("SEGV", 11, Signal::SIGSEGV),
+            ("USR2", 12, Signal::SIGUSR2),
+            ("PIPE", 13, Signal::SIGPIPE),
+            ("ALRM", 14, Signal::SIGALRM),
+            ("TERM", 15, Signal::SIGTERM),
+            ("CHLD", 17, Signal::SIGCHLD),
+            ("CONT", 18, Signal::SIGCONT),
+            ("STOP", 19, Signal::SIGSTOP),
+            ("TSTP", 20, Signal::SIGTSTP),
+            ("TTIN", 21, Signal::SIGTTIN),
+            ("TTOU", 22, Signal::SIGTTOU),
+            ("URG", 23, Signal::SIGURG),
+            ("XCPU", 24, Signal::SIGXCPU),
+            ("XFSZ", 25, Signal::SIGXFSZ),
+            ("VTALRM", 26, Signal::SIGVTALRM),
+            ("PROF", 27, Signal::SIGPROF),
+            ("WINCH", 28, Signal::SIGWINCH),
+            ("IO", 29, Signal::SIGIO),
+            ("SYS", 31, Signal::SIGSYS),
+        ];
 
-        // Check for signal specification
-        if let Some(first) = args.first() {
-            if first.starts_with('-') {
-                let sig_str = first.trim_start_matches('-');
-                sig = match sig_str.to_uppercase().as_str() {
-                    "1" | "HUP" | "SIGHUP" => Signal::SIGHUP,
-                    "2" | "INT" | "SIGINT" => Signal::SIGINT,
-                    "3" | "QUIT" | "SIGQUIT" => Signal::SIGQUIT,
-                    "9" | "KILL" | "SIGKILL" => Signal::SIGKILL,
-                    "15" | "TERM" | "SIGTERM" => Signal::SIGTERM,
-                    "18" | "CONT" | "SIGCONT" => Signal::SIGCONT,
-                    "19" | "STOP" | "SIGSTOP" => Signal::SIGSTOP,
-                    _ => {
-                        eprintln!("kill: {}: invalid signal", first);
+        let mut sig = Signal::SIGTERM;
+        let mut pids: Vec<String> = Vec::new();
+        let mut list_mode = false;
+        let mut list_args: Vec<String> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            
+            if arg == "-l" || arg == "-L" {
+                list_mode = true;
+                // Remaining args are signal numbers to translate
+                list_args = args[i + 1..].to_vec();
+                break;
+            } else if arg == "-s" {
+                // -s signal_name
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("kill: -s requires an argument");
+                    return 1;
+                }
+                let sig_name = args[i].to_uppercase();
+                let sig_name = sig_name.strip_prefix("SIG").unwrap_or(&sig_name);
+                if let Some((_, _, s)) = signal_map.iter().find(|(name, _, _)| *name == sig_name) {
+                    sig = *s;
+                } else {
+                    eprintln!("kill: invalid signal: {}", args[i]);
+                    return 1;
+                }
+            } else if arg == "-n" {
+                // -n signal_number
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("kill: -n requires an argument");
+                    return 1;
+                }
+                let num: i32 = match args[i].parse() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        eprintln!("kill: invalid signal number: {}", args[i]);
                         return 1;
                     }
                 };
-                start = 1;
+                if let Some((_, _, s)) = signal_map.iter().find(|(_, n, _)| *n == num) {
+                    sig = *s;
+                } else {
+                    eprintln!("kill: invalid signal number: {}", num);
+                    return 1;
+                }
+            } else if arg.starts_with('-') && arg.len() > 1 {
+                // -SIGNAL or -NUM
+                let sig_str = &arg[1..];
+                let sig_upper = sig_str.to_uppercase();
+                let sig_name = sig_upper.strip_prefix("SIG").unwrap_or(&sig_upper);
+                
+                // Try as number first
+                if let Ok(num) = sig_str.parse::<i32>() {
+                    if let Some((_, _, s)) = signal_map.iter().find(|(_, n, _)| *n == num) {
+                        sig = *s;
+                    } else {
+                        eprintln!("kill: invalid signal: {}", arg);
+                        return 1;
+                    }
+                } else if let Some((_, _, s)) = signal_map.iter().find(|(name, _, _)| *name == sig_name) {
+                    sig = *s;
+                } else {
+                    eprintln!("kill: invalid signal: {}", arg);
+                    return 1;
+                }
+            } else {
+                pids.push(arg.clone());
             }
+            i += 1;
+        }
+
+        // Handle -l (list signals)
+        if list_mode {
+            if list_args.is_empty() {
+                // List all signals
+                for (name, num, _) in signal_map {
+                    println!("{:2}) SIG{}", num, name);
+                }
+            } else {
+                // Translate signal numbers to names or vice versa
+                for arg in &list_args {
+                    if let Ok(num) = arg.parse::<i32>() {
+                        // Number -> name
+                        if let Some((name, _, _)) = signal_map.iter().find(|(_, n, _)| *n == num) {
+                            println!("{}", name);
+                        } else {
+                            eprintln!("kill: unknown signal: {}", num);
+                        }
+                    } else {
+                        // Name -> number
+                        let sig_upper = arg.to_uppercase();
+                        let sig_name = sig_upper.strip_prefix("SIG").unwrap_or(&sig_upper);
+                        if let Some((_, num, _)) = signal_map.iter().find(|(name, _, _)| *name == sig_name) {
+                            println!("{}", num);
+                        } else {
+                            eprintln!("kill: unknown signal: {}", arg);
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+
+        if pids.is_empty() {
+            eprintln!("kill: usage: kill [-s signal | -n num | -sig] pid ...");
+            return 1;
         }
 
         let mut status = 0;
-        for arg in &args[start..] {
+        for arg in &pids {
             // Handle %job syntax
             if arg.starts_with('%') {
                 let id: usize = match arg[1..].parse() {
@@ -7243,22 +8012,45 @@ impl ShellExecutor {
     }
 
     fn builtin_alias(&mut self, args: &[String]) -> i32 {
-        // Parse flags: -g (global), -s (suffix), -L (list definition form)
+        // alias [ {+|-}gmrsL ] [ name[=value] ... ]
+        // -g: global alias (expanded anywhere in command line)
+        // -s: suffix alias (file.ext expands to "handler file.ext")
+        // -r: regular alias (default)
+        // -m: pattern match mode
+        // -L: list in form suitable for reinput
+        // +g/+s/+r: print aliases of that type
+        
         let mut is_global = false;
         let mut is_suffix = false;
         let mut list_form = false;
+        let mut pattern_match = false;
+        let mut print_global = false;
+        let mut print_suffix = false;
+        let mut print_regular = false;
         let mut positional_args = Vec::new();
 
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            if arg.starts_with('-') && arg != "-" {
+            if arg.starts_with('+') && arg.len() > 1 {
+                // +g, +s, +r: print aliases of that type
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'g' => print_global = true,
+                        's' => print_suffix = true,
+                        'r' => print_regular = true,
+                        'L' => list_form = true,
+                        'm' => pattern_match = true,
+                        _ => {}
+                    }
+                }
+            } else if arg.starts_with('-') && arg != "-" {
                 for ch in arg[1..].chars() {
                     match ch {
                         'g' => is_global = true,
                         's' => is_suffix = true,
                         'L' => list_form = true,
-                        'm' => {} // pattern match mode, ignore for now
+                        'm' => pattern_match = true,
                         'r' => {} // regular alias (default)
                         _ => {
                             eprintln!("zshrs: alias: bad option: -{}", ch);
@@ -7272,14 +8064,46 @@ impl ShellExecutor {
             i += 1;
         }
 
+        // If +g/+s/+r used, list those types
+        if print_global || print_suffix || print_regular {
+            if print_regular {
+                for (name, value) in &self.aliases {
+                    if list_form {
+                        println!("alias {}='{}'", name, value);
+                    } else {
+                        println!("{}='{}'", name, value);
+                    }
+                }
+            }
+            if print_global {
+                for (name, value) in &self.global_aliases {
+                    if list_form {
+                        println!("alias -g {}='{}'", name, value);
+                    } else {
+                        println!("{}='{}'", name, value);
+                    }
+                }
+            }
+            if print_suffix {
+                for (name, value) in &self.suffix_aliases {
+                    if list_form {
+                        println!("alias -s {}='{}'", name, value);
+                    } else {
+                        println!("{}='{}'", name, value);
+                    }
+                }
+            }
+            return 0;
+        }
+
         if positional_args.is_empty() {
             // List aliases
             let prefix = if is_suffix {
-                "alias -s"
+                "alias -s "
             } else if is_global {
-                "alias -g"
+                "alias -g "
             } else {
-                "alias"
+                "alias "
             };
             let alias_map: Vec<(String, String)> = if is_suffix {
                 self.suffix_aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
@@ -7309,6 +8133,41 @@ impl ShellExecutor {
                     self.global_aliases.insert(name.to_string(), value.to_string());
                 } else {
                     self.aliases.insert(name.to_string(), value.to_string());
+                }
+            } else if pattern_match {
+                // -m: pattern match mode - list matching aliases
+                let pattern = arg.replace("*", ".*").replace("?", ".");
+                let re = regex::Regex::new(&format!("^{}$", pattern));
+                
+                let alias_map: &HashMap<String, String> = if is_suffix {
+                    &self.suffix_aliases
+                } else if is_global {
+                    &self.global_aliases
+                } else {
+                    &self.aliases
+                };
+                
+                let prefix = if is_suffix {
+                    "alias -s "
+                } else if is_global {
+                    "alias -g "
+                } else {
+                    "alias "
+                };
+                
+                for (name, value) in alias_map {
+                    let matches = if let Ok(ref r) = re {
+                        r.is_match(name)
+                    } else {
+                        name.contains(arg.as_str())
+                    };
+                    if matches {
+                        if list_form {
+                            println!("{}{}='{}'", prefix, name, value);
+                        } else {
+                            println!("{}='{}'", name, value);
+                        }
+                    }
                 }
             } else {
                 // Print alias - look up directly without holding borrow
@@ -8361,27 +9220,68 @@ impl ShellExecutor {
     }
 
     fn builtin_hash(&mut self, args: &[String]) -> i32 {
-        // hash [-d] [-r] [name[=value] ...]
+        // hash [ -Ldfmrv ] [ name[=value] ] ...
+        // hash -r clears the hash table
+        // hash -d manages named directories
+        // hash -f fills the table with all PATH commands
+        // hash -m matches patterns
+        // hash -v verbose
+        // hash -L list in form suitable for reinput
+        
         let mut dir_mode = false;
         let mut rehash = false;
+        let mut fill_all = false;
+        let mut pattern_match = false;
+        let mut verbose = false;
+        let mut list_form = false;
         let mut names = Vec::new();
         
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            if arg == "-d" {
-                dir_mode = true;
-            } else if arg == "-r" {
-                rehash = true;
-            } else if arg == "-rd" || arg == "-dr" {
-                dir_mode = true;
-                rehash = true;
-            } else if arg.starts_with('-') {
-                // Other flags, skip for now
+            if arg.starts_with('-') && arg.len() > 1 {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'd' => dir_mode = true,
+                        'r' => rehash = true,
+                        'f' => fill_all = true,
+                        'm' => pattern_match = true,
+                        'v' => verbose = true,
+                        'L' => list_form = true,
+                        _ => {}
+                    }
+                }
             } else {
                 names.push(arg.clone());
             }
             i += 1;
+        }
+        
+        // -r: clear hash table
+        if rehash && !dir_mode && names.is_empty() {
+            self.command_hash.clear();
+            return 0;
+        }
+        
+        // -f: fill hash table with all commands in PATH
+        if fill_all {
+            if let Ok(path_var) = env::var("PATH") {
+                for dir in path_var.split(':') {
+                    if let Ok(entries) = std::fs::read_dir(dir) {
+                        for entry in entries.flatten() {
+                            if let Ok(ft) = entry.file_type() {
+                                if ft.is_file() || ft.is_symlink() {
+                                    if let Some(name) = entry.file_name().to_str() {
+                                        let path = entry.path().to_string_lossy().to_string();
+                                        self.command_hash.insert(name.to_string(), path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return 0;
         }
         
         if dir_mode {
@@ -8389,15 +9289,37 @@ impl ShellExecutor {
             if names.is_empty() {
                 // List named directories
                 for (name, path) in &self.named_dirs {
-                    println!("{}={}", name, path.display());
+                    if list_form {
+                        println!("hash -d {}={}", name, path.display());
+                    } else if verbose {
+                        println!("{}={}", name, path.display());
+                    } else {
+                        println!("{}={}", name, path.display());
+                    }
                 }
                 return 0;
             }
             
             if rehash {
                 // Remove named directories
-                for name in &names {
-                    self.named_dirs.remove(name);
+                if pattern_match {
+                    // -m: pattern matching
+                    let to_remove: Vec<String> = self.named_dirs.keys()
+                        .filter(|k| names.iter().any(|pat| {
+                            let pattern = pat.replace("*", ".*").replace("?", ".");
+                            regex::Regex::new(&format!("^{}$", pattern))
+                                .map(|r| r.is_match(k))
+                                .unwrap_or(false)
+                        }))
+                        .cloned()
+                        .collect();
+                    for name in to_remove {
+                        self.named_dirs.remove(&name);
+                    }
+                } else {
+                    for name in &names {
+                        self.named_dirs.remove(name);
+                    }
                 }
                 return 0;
             }
@@ -8416,18 +9338,33 @@ impl ShellExecutor {
         
         // Regular hash - command path lookup
         if names.is_empty() {
+            // List all hashed commands
+            for (name, path) in &self.command_hash {
+                if list_form {
+                    println!("hash {}={}", name, path);
+                } else {
+                    println!("{}={}", name, path);
+                }
+            }
             return 0;
         }
 
         for name in &names {
-            if let Ok(output) = std::process::Command::new("which").arg(name).output() {
-                if output.status.success() {
-                    let path = String::from_utf8_lossy(&output.stdout);
-                    println!("{}={}", name, path.trim());
-                } else {
-                    eprintln!("zshrs: hash: {}: not found", name);
-                    return 1;
+            if let Some((cmd, path)) = name.split_once('=') {
+                // Explicit assignment
+                self.command_hash.insert(cmd.to_string(), path.to_string());
+                if verbose {
+                    println!("{}={}", cmd, path);
                 }
+            } else if let Some(path) = self.find_in_path(name) {
+                // Look up in PATH and hash it
+                self.command_hash.insert(name.clone(), path.clone());
+                if verbose {
+                    println!("{}={}", name, path);
+                }
+            } else {
+                eprintln!("zshrs: hash: {}: not found", name);
+                return 1;
             }
         }
         0
@@ -8464,17 +9401,97 @@ impl ShellExecutor {
     }
 
     fn builtin_command(&mut self, args: &[String], redirects: &[Redirect]) -> i32 {
-        // Run command, bypassing functions and aliases
-        if args.is_empty() {
+        // command [ -pvV ] simple command
+        // -p: use default PATH
+        // -v: print path (like which)
+        // -V: verbose description (like type)
+        let mut use_default_path = false;
+        let mut print_path = false;
+        let mut verbose = false;
+        let mut positional_args: Vec<&str> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg.starts_with('-') && arg.len() > 1 && positional_args.is_empty() {
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'p' => use_default_path = true,
+                        'v' => print_path = true,
+                        'V' => verbose = true,
+                        '-' => {
+                            // -- ends options
+                            i += 1;
+                            break;
+                        }
+                        _ => {
+                            eprintln!("command: bad option: -{}", ch);
+                            return 1;
+                        }
+                    }
+                }
+            } else {
+                positional_args.push(arg);
+            }
+            i += 1;
+        }
+        
+        // Add remaining args after --
+        while i < args.len() {
+            positional_args.push(&args[i]);
+            i += 1;
+        }
+        
+        if positional_args.is_empty() {
             return 0;
         }
+        
+        let cmd = positional_args[0];
+        
+        // -v or -V: just print info about command
+        if print_path || verbose {
+            // Search PATH for command
+            let path_var = if use_default_path {
+                "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string()
+            } else {
+                env::var("PATH").unwrap_or_default()
+            };
+            
+            for dir in path_var.split(':') {
+                let full_path = PathBuf::from(dir).join(cmd);
+                if full_path.exists() && full_path.is_file() {
+                    if verbose {
+                        println!("{} is {}", cmd, full_path.display());
+                    } else {
+                        println!("{}", full_path.display());
+                    }
+                    return 0;
+                }
+            }
+            
+            if verbose {
+                eprintln!("{} not found", cmd);
+            }
+            return 1;
+        }
 
-        let cmd = &args[0];
-        let cmd_args = &args[1..];
-
-        // Execute as external command
-        self.execute_external(cmd, cmd_args, redirects)
-            .unwrap_or(127)
+        // Execute as external command (bypassing functions and aliases)
+        let cmd_args: Vec<String> = positional_args[1..].iter().map(|s| s.to_string()).collect();
+        
+        if use_default_path {
+            // Temporarily set PATH
+            let old_path = env::var("PATH").ok();
+            env::set_var("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+            let result = self.execute_external(cmd, &cmd_args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ").split_whitespace().map(String::from).collect::<Vec<_>>(), redirects)
+                .unwrap_or(127);
+            if let Some(p) = old_path {
+                env::set_var("PATH", p);
+            }
+            result
+        } else {
+            self.execute_external(cmd, &cmd_args, redirects)
+                .unwrap_or(127)
+        }
     }
 
     fn builtin_builtin(&mut self, args: &[String], redirects: &[Redirect]) -> i32 {
@@ -8981,6 +9998,41 @@ impl ShellExecutor {
 
     /// Push directory onto stack and cd to it
     fn builtin_pushd(&mut self, args: &[String]) -> i32 {
+        // pushd [ -qsLP ] [ arg ]
+        // pushd [ -qsLP ] old new
+        // pushd [ -qsLP ] {+|-}n
+        // -q: quiet (don't print stack)
+        // -s: no symlink resolution (use -L cd behavior)
+        // -L: logical directory (resolve .. before symlinks)
+        // -P: physical directory (resolve symlinks)
+        
+        let mut quiet = false;
+        let mut physical = false;
+        let mut positional_args: Vec<String> = Vec::new();
+        
+        for arg in args {
+            if arg.starts_with('-') && arg.len() > 1 {
+                // Check if it's a stack index
+                if arg[1..].chars().all(|c| c.is_ascii_digit()) {
+                    positional_args.push(arg.clone());
+                    continue;
+                }
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'q' => quiet = true,
+                        's' => physical = false,
+                        'L' => physical = false,
+                        'P' => physical = true,
+                        _ => {}
+                    }
+                }
+            } else if arg.starts_with('+') {
+                positional_args.push(arg.clone());
+            } else {
+                positional_args.push(arg.clone());
+            }
+        }
+        
         let current = match std::env::current_dir() {
             Ok(p) => p,
             Err(e) => {
@@ -8989,7 +10041,7 @@ impl ShellExecutor {
             }
         };
 
-        if args.is_empty() {
+        if positional_args.is_empty() {
             // Swap top two directories
             if self.dir_stack.is_empty() {
                 eprintln!("pushd: no other directory");
@@ -8997,17 +10049,26 @@ impl ShellExecutor {
             }
             let target = self.dir_stack.pop().unwrap();
             self.dir_stack.push(current.clone());
-            if let Err(e) = std::env::set_current_dir(&target) {
+            
+            let resolved = if physical {
+                target.canonicalize().unwrap_or(target.clone())
+            } else {
+                target.clone()
+            };
+            
+            if let Err(e) = std::env::set_current_dir(&resolved) {
                 eprintln!("pushd: {}: {}", target.display(), e);
                 self.dir_stack.pop();
                 self.dir_stack.push(target);
                 return 1;
             }
-            self.print_dir_stack();
+            if !quiet {
+                self.print_dir_stack();
+            }
             return 0;
         }
 
-        let arg = &args[0];
+        let arg = &positional_args[0];
 
         // Handle +N and -N for rotating the stack
         if arg.starts_with('+') || arg.starts_with('-') {
@@ -9025,38 +10086,84 @@ impl ShellExecutor {
 
                 let target = full_stack.remove(0);
                 self.dir_stack = full_stack;
+                
+                let resolved = if physical {
+                    target.canonicalize().unwrap_or(target.clone())
+                } else {
+                    target.clone()
+                };
 
-                if let Err(e) = std::env::set_current_dir(&target) {
+                if let Err(e) = std::env::set_current_dir(&resolved) {
                     eprintln!("pushd: {}: {}", target.display(), e);
                     return 1;
                 }
-                self.print_dir_stack();
+                if !quiet {
+                    self.print_dir_stack();
+                }
                 return 0;
             }
         }
 
         // Regular directory push
         let target = PathBuf::from(arg);
+        let resolved = if physical {
+            target.canonicalize().unwrap_or(target.clone())
+        } else {
+            target.clone()
+        };
+        
         self.dir_stack.push(current);
-        if let Err(e) = std::env::set_current_dir(&target) {
+        if let Err(e) = std::env::set_current_dir(&resolved) {
             eprintln!("pushd: {}: {}", arg, e);
             self.dir_stack.pop();
             return 1;
         }
-        self.print_dir_stack();
+        if !quiet {
+            self.print_dir_stack();
+        }
         0
     }
 
     /// Pop directory from stack and cd to it
     fn builtin_popd(&mut self, args: &[String]) -> i32 {
+        // popd [ -qsLP ] [ {+|-}n ]
+        // -q: quiet (don't print stack)
+        // -s: no symlink resolution
+        // -L: logical directory
+        // -P: physical directory
+        
+        let mut quiet = false;
+        let mut physical = false;
+        let mut stack_index: Option<String> = None;
+        
+        for arg in args {
+            if arg.starts_with('-') && arg.len() > 1 {
+                // Check if it's a stack index
+                if arg[1..].chars().all(|c| c.is_ascii_digit()) {
+                    stack_index = Some(arg.clone());
+                    continue;
+                }
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'q' => quiet = true,
+                        's' => physical = false,
+                        'L' => physical = false,
+                        'P' => physical = true,
+                        _ => {}
+                    }
+                }
+            } else if arg.starts_with('+') {
+                stack_index = Some(arg.clone());
+            }
+        }
+        
         if self.dir_stack.is_empty() {
             eprintln!("popd: directory stack empty");
             return 1;
         }
 
         // Handle +N and -N
-        if !args.is_empty() {
-            let arg = &args[0];
+        if let Some(arg) = stack_index {
             if arg.starts_with('+') || arg.starts_with('-') {
                 if let Ok(n) = arg[1..].parse::<usize>() {
                     let total = self.dir_stack.len() + 1;
@@ -9072,62 +10179,143 @@ impl ShellExecutor {
                     if remove_pos == 0 {
                         // Remove current and cd to next
                         let target = self.dir_stack.remove(0);
-                        if let Err(e) = std::env::set_current_dir(&target) {
+                        let resolved = if physical {
+                            target.canonicalize().unwrap_or(target.clone())
+                        } else {
+                            target.clone()
+                        };
+                        if let Err(e) = std::env::set_current_dir(&resolved) {
                             eprintln!("popd: {}: {}", target.display(), e);
                             return 1;
                         }
                     } else {
                         self.dir_stack.remove(remove_pos - 1);
                     }
-                    self.print_dir_stack();
+                    if !quiet {
+                        self.print_dir_stack();
+                    }
                     return 0;
                 }
             }
         }
 
         let target = self.dir_stack.pop().unwrap();
-        if let Err(e) = std::env::set_current_dir(&target) {
+        let resolved = if physical {
+            target.canonicalize().unwrap_or(target.clone())
+        } else {
+            target.clone()
+        };
+        if let Err(e) = std::env::set_current_dir(&resolved) {
             eprintln!("popd: {}: {}", target.display(), e);
             self.dir_stack.push(target);
             return 1;
         }
-        self.print_dir_stack();
+        if !quiet {
+            self.print_dir_stack();
+        }
         0
     }
 
     /// Display directory stack
-    fn builtin_dirs(&self, args: &[String]) -> i32 {
+    fn builtin_dirs(&mut self, args: &[String]) -> i32 {
+        // dirs [ -c ] [ -l ] [ -p ] [ -v ] [ arg ... ]
+        // -c: clear the directory stack
+        // -l: full pathnames (don't use ~)
+        // -p: print one entry per line
+        // -v: verbose (numbered list)
+        
         let mut clear = false;
-        let mut verbose = false;
+        let mut full_paths = false;
         let mut per_line = false;
+        let mut verbose = false;
+        let mut indices: Vec<i32> = Vec::new();
 
         for arg in args {
-            match arg.as_str() {
-                "-c" => clear = true,
-                "-v" => verbose = true,
-                "-p" => per_line = true,
-                "-l" => {} // Don't expand ~ (we don't expand it anyway)
-                _ => {}
+            if arg.starts_with('-') && arg.len() > 1 {
+                // Check if it's a negative index like -2
+                if arg[1..].chars().all(|c| c.is_ascii_digit()) {
+                    if let Ok(n) = arg.parse::<i32>() {
+                        indices.push(n);
+                        continue;
+                    }
+                }
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'c' => clear = true,
+                        'l' => full_paths = true,
+                        'p' => per_line = true,
+                        'v' => verbose = true,
+                        _ => {}
+                    }
+                }
+            } else if arg.starts_with('+') && arg.len() > 1 {
+                if let Ok(n) = arg[1..].parse::<i32>() {
+                    indices.push(n);
+                }
+            } else {
+                // Could be a number
+                if let Ok(n) = arg.parse::<i32>() {
+                    indices.push(n);
+                }
             }
         }
 
         if clear {
-            // Can't clear from &self, would need &mut self
-            // For now just print empty
+            self.dir_stack.clear();
             return 0;
         }
 
         let current = std::env::current_dir().unwrap_or_default();
+        let home = dirs::home_dir().unwrap_or_default();
+        
+        let format_path = |p: &std::path::Path| -> String {
+            let path_str = p.to_string_lossy().to_string();
+            if !full_paths {
+                let home_str = home.to_string_lossy();
+                if path_str.starts_with(home_str.as_ref()) {
+                    return format!("~{}", &path_str[home_str.len()..]);
+                }
+            }
+            path_str
+        };
 
-        if verbose || per_line {
-            println!(" 0  {}", current.display());
+        // If specific indices requested
+        if !indices.is_empty() {
+            let stack_len = self.dir_stack.len() + 1; // +1 for current dir
+            for idx in indices {
+                let actual_idx = if idx >= 0 {
+                    idx as usize
+                } else {
+                    stack_len.saturating_sub((-idx) as usize)
+                };
+                
+                if actual_idx == 0 {
+                    println!("{}", format_path(&current));
+                } else if actual_idx <= self.dir_stack.len() {
+                    // Stack is reversed, so index from end
+                    let stack_idx = self.dir_stack.len() - actual_idx;
+                    if let Some(dir) = self.dir_stack.get(stack_idx) {
+                        println!("{}", format_path(dir));
+                    }
+                }
+            }
+            return 0;
+        }
+
+        if verbose {
+            println!(" 0  {}", format_path(&current));
             for (i, dir) in self.dir_stack.iter().rev().enumerate() {
-                println!("{:2}  {}", i + 1, dir.display());
+                println!("{:2}  {}", i + 1, format_path(dir));
+            }
+        } else if per_line {
+            println!("{}", format_path(&current));
+            for dir in self.dir_stack.iter().rev() {
+                println!("{}", format_path(dir));
             }
         } else {
-            let mut parts = vec![current.to_string_lossy().to_string()];
+            let mut parts = vec![format_path(&current)];
             for dir in self.dir_stack.iter().rev() {
-                parts.push(dir.to_string_lossy().to_string());
+                parts.push(format_path(dir));
             }
             println!("{}", parts.join(" "));
         }
@@ -9741,113 +10929,313 @@ impl ShellExecutor {
 
     /// emulate - set up zsh emulation mode
     fn builtin_emulate(&mut self, args: &[String]) -> i32 {
-        // Parse flags: -L (local), -R (reset), -l (list), -c (command)
+        // emulate [ -lLR ] [ {zsh|sh|ksh|csh} [ flags ... ] ]
+        // flags can include: -c arg, -o opt, +o opt
         let mut local_mode = false;
         let mut reset_mode = false;
-        let mut mode: Option<&str> = None;
+        let mut list_mode = false;
+        let mut mode: Option<String> = None;
+        let mut command_arg: Option<String> = None;
+        let mut extra_set_opts: Vec<String> = Vec::new();
+        let mut extra_unset_opts: Vec<String> = Vec::new();
         
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            if arg.starts_with('-') && arg.len() > 1 {
+            
+            if arg == "-c" {
+                // -c arg: evaluate arg in emulation mode
+                i += 1;
+                if i < args.len() {
+                    command_arg = Some(args[i].clone());
+                } else {
+                    eprintln!("emulate: -c requires an argument");
+                    return 1;
+                }
+            } else if arg == "-o" {
+                // -o opt: set option
+                i += 1;
+                if i < args.len() {
+                    extra_set_opts.push(args[i].clone());
+                } else {
+                    eprintln!("emulate: -o requires an argument");
+                    return 1;
+                }
+            } else if arg == "+o" {
+                // +o opt: unset option
+                i += 1;
+                if i < args.len() {
+                    extra_unset_opts.push(args[i].clone());
+                } else {
+                    eprintln!("emulate: +o requires an argument");
+                    return 1;
+                }
+            } else if arg.starts_with('-') && arg.len() > 1 && !arg.starts_with("--") {
+                // Parse combined flags like -LR
                 for ch in arg[1..].chars() {
                     match ch {
-                        'L' => local_mode = true,  // Set options locally
-                        'R' => reset_mode = true,  // Reset to defaults first
-                        'l' => {
-                            // List available modes
-                            println!("zsh\nsh\nksh\ncsh\nbash");
-                            return 0;
-                        }
-                        'c' => {
-                            // -c cmd: run command in emulation mode
-                            // For now, just continue parsing
-                        }
+                        'L' => local_mode = true,
+                        'R' => reset_mode = true,
+                        'l' => list_mode = true,
                         _ => {
                             eprintln!("emulate: bad option: -{}", ch);
                             return 1;
                         }
                     }
                 }
-            } else {
-                mode = Some(arg.as_str());
+            } else if arg.starts_with('+') && arg.len() > 1 {
+                // +X flags (unset single-letter options)
+                for ch in arg[1..].chars() {
+                    // Map single-letter to option name if needed
+                    extra_unset_opts.push(ch.to_string());
+                }
+            } else if mode.is_none() {
+                mode = Some(arg.clone());
             }
             i += 1;
         }
         
-        let mode = mode.unwrap_or("zsh");
-        
-        // Reset options to defaults if -R
-        if reset_mode {
-            self.options = Self::default_options();
+        // -L and -c are mutually exclusive
+        if local_mode && command_arg.is_some() {
+            eprintln!("emulate: -L and -c are mutually exclusive");
+            return 1;
         }
         
+        // No argument: print current emulation mode
+        if mode.is_none() && !list_mode {
+            let current = self.variables.get("EMULATE").cloned().unwrap_or_else(|| "zsh".to_string());
+            println!("{}", current);
+            return 0;
+        }
+        
+        let mode = mode.unwrap_or_else(|| "zsh".to_string());
+        
+        // Get the options that would be set for this mode
+        let (set_opts, unset_opts) = Self::emulate_mode_options(&mode, reset_mode);
+        
+        // -l: just list the options, don't apply
+        if list_mode {
+            for opt in &set_opts {
+                println!("{}", opt);
+            }
+            for opt in &unset_opts {
+                println!("no{}", opt);
+            }
+            if local_mode {
+                println!("localoptions");
+                println!("localpatterns");
+                println!("localtraps");
+            }
+            return 0;
+        }
+        
+        // Save current state if -c is used
+        let saved_options = if command_arg.is_some() {
+            Some(self.options.clone())
+        } else {
+            None
+        };
+        let saved_emulate = if command_arg.is_some() {
+            self.variables.get("EMULATE").cloned()
+        } else {
+            None
+        };
+        
+        // Apply the emulation
+        self.variables.insert("EMULATE".to_string(), mode.clone());
+        
+        // Set options for this mode
+        for opt in &set_opts {
+            let opt_name = opt.to_lowercase().replace('_', "");
+            self.options.insert(opt_name, true);
+        }
+        for opt in &unset_opts {
+            let opt_name = opt.to_lowercase().replace('_', "");
+            self.options.insert(opt_name, false);
+        }
+        
+        // Apply extra -o / +o options
+        for opt in &extra_set_opts {
+            let opt_name = opt.to_lowercase().replace('_', "");
+            self.options.insert(opt_name, true);
+        }
+        for opt in &extra_unset_opts {
+            let opt_name = opt.to_lowercase().replace('_', "");
+            self.options.insert(opt_name, false);
+        }
+        
+        // -L: set local options/traps
+        if local_mode {
+            self.options.insert("localoptions".to_string(), true);
+            self.options.insert("localpatterns".to_string(), true);
+            self.options.insert("localtraps".to_string(), true);
+        }
+        
+        // -c arg: execute command then restore
+        let result = if let Some(cmd) = command_arg {
+            let status = self.execute_script(&cmd).unwrap_or(1);
+            
+            // Restore saved state
+            if let Some(opts) = saved_options {
+                self.options = opts;
+            }
+            if let Some(emu) = saved_emulate {
+                self.variables.insert("EMULATE".to_string(), emu);
+            } else {
+                self.variables.remove("EMULATE");
+            }
+            
+            status
+        } else {
+            0
+        };
+        
+        result
+    }
+    
+    /// Get options to set/unset for an emulation mode
+    fn emulate_mode_options(mode: &str, reset: bool) -> (Vec<&'static str>, Vec<&'static str>) {
         match mode {
             "zsh" => {
-                self.variables.insert("EMULATE".to_string(), "zsh".to_string());
-                // zsh defaults - most features enabled
-                if reset_mode || !local_mode {
-                    self.options.insert("aliases".to_string(), true);
-                    self.options.insert("functionargzero".to_string(), true);
-                    self.options.insert("ksharrays".to_string(), false);
-                    self.options.insert("shwordsplit".to_string(), false);
+                if reset {
+                    // Full reset: return to zsh defaults
+                    (vec![
+                        "aliases", "alwayslastprompt", "autolist", "automenu",
+                        "autoparamslash", "autoremoveslash", "banghist", "bareglobqual",
+                        "completeinword", "extendedhistory", "functionargzero", "glob",
+                        "hashcmds", "hashdirs", "histexpand", "histignoredups",
+                        "interactivecomments", "listambiguous", "listtypes", "multios",
+                        "nomatch", "notify", "promptpercent", "promptsubst",
+                    ], vec![
+                        "ksharrays", "kshglob", "shwordsplit", "shglob", "posixbuiltins",
+                        "posixidentifiers", "posixstrings", "bsdecho", "ignorebraces",
+                    ])
+                } else {
+                    // Minimal changes for portability
+                    (vec!["functionargzero"], vec!["ksharrays", "shwordsplit"])
                 }
             }
             "sh" => {
-                self.variables.insert("EMULATE".to_string(), "sh".to_string());
-                // POSIX sh mode
-                if reset_mode || !local_mode {
-                    self.options.insert("ksharrays".to_string(), true);
-                    self.options.insert("shwordsplit".to_string(), true);
-                    self.options.insert("posixbuiltins".to_string(), true);
-                }
+                let set = vec![
+                    "ksharrays", "shwordsplit", "posixbuiltins", "shglob",
+                    "shfileexpansion", "globsubst", "interactivecomments",
+                    "rmstarsilent", "bsdecho", "ignorebraces",
+                ];
+                let unset = vec![
+                    "badpattern", "banghist", "bgnice", "equals", "functionargzero",
+                    "globalexport", "multios", "nomatch", "notify", "promptpercent",
+                ];
+                (set, unset)
             }
             "ksh" => {
-                self.variables.insert("EMULATE".to_string(), "ksh".to_string());
-                // Korn shell mode
-                if reset_mode || !local_mode {
-                    self.options.insert("ksharrays".to_string(), true);
-                    self.options.insert("kshglob".to_string(), true);
-                    self.options.insert("shwordsplit".to_string(), true);
-                }
+                let set = vec![
+                    "ksharrays", "kshglob", "shwordsplit", "posixbuiltins",
+                    "kshoptionprint", "localoptions", "promptbang", "promptsubst",
+                    "singlelinezle", "interactivecomments",
+                ];
+                let unset = vec![
+                    "badpattern", "banghist", "bgnice", "equals", "functionargzero",
+                    "globalexport", "multios", "nomatch", "notify", "promptpercent",
+                ];
+                (set, unset)
             }
             "csh" => {
-                self.variables.insert("EMULATE".to_string(), "csh".to_string());
-                // C shell mode (limited support)
+                // C shell emulation (limited)
+                (vec!["cshnullglob", "cshjunkiequotes"], vec!["nomatch"])
             }
             "bash" => {
-                self.variables.insert("EMULATE".to_string(), "bash".to_string());
-                // Bash mode
-                if reset_mode || !local_mode {
-                    self.options.insert("ksharrays".to_string(), true);
-                    self.options.insert("shwordsplit".to_string(), true);
-                    self.options.insert("posixbuiltins".to_string(), false);
-                }
+                let set = vec![
+                    "ksharrays", "shwordsplit", "interactivecomments",
+                    "shfileexpansion", "globsubst",
+                ];
+                let unset = vec![
+                    "badpattern", "banghist", "functionargzero", "multios",
+                    "nomatch", "notify", "promptpercent",
+                ];
+                (set, unset)
             }
-            _ => {
-                eprintln!("emulate: unknown mode: {}", mode);
-                return 1;
-            }
+            _ => (vec![], vec![])
         }
-        
-        // Note: -L (local) would normally save/restore options on function exit
-        // For now we just set them; proper local scope would need function call tracking
-        let _ = local_mode; // Acknowledge the flag
-        
-        0
     }
 
     /// exec - replace the shell with a command
     fn builtin_exec(&mut self, args: &[String]) -> i32 {
-        if args.is_empty() {
+        // exec [ -c ] [ -l ] [ -a argv0 ] [ command [ arg ... ] ]
+        // -c: clear environment
+        // -l: place - at front of argv[0] (login shell)
+        // -a argv0: set argv[0] to specified name
+        
+        let mut clear_env = false;
+        let mut login_shell = false;
+        let mut argv0: Option<String> = None;
+        let mut cmd_args: Vec<String> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            
+            if arg == "-c" && cmd_args.is_empty() {
+                clear_env = true;
+            } else if arg == "-l" && cmd_args.is_empty() {
+                login_shell = true;
+            } else if arg == "-a" && cmd_args.is_empty() {
+                i += 1;
+                if i < args.len() {
+                    argv0 = Some(args[i].clone());
+                }
+            } else if arg.starts_with('-') && cmd_args.is_empty() {
+                // Combined flags like -cl
+                for ch in arg[1..].chars() {
+                    match ch {
+                        'c' => clear_env = true,
+                        'l' => login_shell = true,
+                        'a' => {
+                            i += 1;
+                            if i < args.len() {
+                                argv0 = Some(args[i].clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                cmd_args.push(arg.clone());
+            }
+            i += 1;
+        }
+        
+        if cmd_args.is_empty() {
+            // No command: just modify shell's environment
+            if clear_env {
+                for (key, _) in env::vars() {
+                    env::remove_var(&key);
+                }
+            }
             return 0;
         }
 
-        let cmd = &args[0];
-        let cmd_args: Vec<&str> = args[1..].iter().map(|s| s.as_str()).collect();
+        let cmd = &cmd_args[0];
+        let rest_args: Vec<&str> = cmd_args[1..].iter().map(|s| s.as_str()).collect();
+        
+        // Determine argv[0]
+        let effective_argv0 = if let Some(a0) = argv0 {
+            a0
+        } else if login_shell {
+            format!("-{}", cmd)
+        } else {
+            cmd.clone()
+        };
 
         use std::os::unix::process::CommandExt;
-        let err = std::process::Command::new(cmd).args(&cmd_args).exec();
+        let mut command = std::process::Command::new(cmd);
+        command.arg0(&effective_argv0);
+        command.args(&rest_args);
+        
+        if clear_env {
+            command.env_clear();
+        }
+        
+        let err = command.exec();
         eprintln!("exec: {}: {}", cmd, err);
         1
     }
@@ -9938,62 +11326,170 @@ impl ShellExecutor {
     }
 
     /// print - zsh print builtin with many options
-    fn builtin_print(&self, args: &[String]) -> i32 {
+    fn builtin_print(&mut self, args: &[String]) -> i32 {
+        // print [ -abcDilmnNoOpPrsSz ] [ -u n ] [ -f format ] [ -C cols ]
+        //       [ -v name ] [ -xX tabstop ] [ -R [ -en ]] [ arg ... ]
         let mut no_newline = false;
-        let mut interpret_escapes = false;
+        let mut one_per_line = false;
+        let mut interpret_escapes = true; // zsh default is to interpret
+        let mut raw_mode = false;
         let mut prompt_expand = false;
-        let mut to_stderr = false;
+        let mut fd: i32 = 1; // stdout
         let mut columns = 0usize;
         let mut null_terminate = false;
         let mut push_to_stack = false;
-        let mut output_args: Vec<&str> = Vec::new();
+        let mut add_to_history = false;
+        let mut sort_asc = false;
+        let mut sort_desc = false;
+        let mut named_dir_subst = false;
+        let mut store_var: Option<String> = None;
+        let mut format_string: Option<String> = None;
+        let mut output_args: Vec<String> = Vec::new();
 
-        let mut iter = args.iter().peekable();
-        while let Some(arg) = iter.next() {
-            match arg.as_str() {
-                "-n" => no_newline = true,
-                "-r" => interpret_escapes = false, // raw
-                "-e" => interpret_escapes = true,
-                "-E" => interpret_escapes = false,
-                "-P" => prompt_expand = true,
-                "-u" => to_stderr = true,
-                "-N" => null_terminate = true,
-                "-z" => push_to_stack = true,
-                "-C" => {
-                    if let Some(n) = iter.next() {
-                        columns = n.parse().unwrap_or(0);
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            
+            if arg == "--" {
+                i += 1;
+                while i < args.len() {
+                    output_args.push(args[i].clone());
+                    i += 1;
+                }
+                break;
+            }
+            
+            if arg.starts_with('-') && arg.len() > 1 && !arg.chars().nth(1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                let mut chars = arg[1..].chars().peekable();
+                while let Some(ch) = chars.next() {
+                    match ch {
+                        'n' => no_newline = true,
+                        'l' => one_per_line = true,
+                        'r' => { raw_mode = true; interpret_escapes = false; }
+                        'R' => { raw_mode = true; interpret_escapes = false; }
+                        'e' => interpret_escapes = true,
+                        'E' => interpret_escapes = false,
+                        'P' => prompt_expand = true,
+                        'N' => null_terminate = true,
+                        'z' => push_to_stack = true,
+                        's' => add_to_history = true,
+                        'o' => sort_asc = true,
+                        'O' => sort_desc = true,
+                        'D' => named_dir_subst = true,
+                        'c' => columns = 1,
+                        'a' | 'b' | 'i' | 'm' | 'p' | 'S' | 'x' | 'X' => {} // TODO
+                        'u' => {
+                            // -u n: output to fd n
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                fd = rest.parse().unwrap_or(1);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    fd = args[i].parse().unwrap_or(1);
+                                }
+                            }
+                            break;
+                        }
+                        'C' => {
+                            // -C n: n columns
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                columns = rest.parse().unwrap_or(0);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    columns = args[i].parse().unwrap_or(0);
+                                }
+                            }
+                            break;
+                        }
+                        'v' => {
+                            // -v name: store in variable
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                store_var = Some(rest);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    store_var = Some(args[i].clone());
+                                }
+                            }
+                            break;
+                        }
+                        'f' => {
+                            // -f format: printf-style format
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                format_string = Some(rest);
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    format_string = Some(args[i].clone());
+                                }
+                            }
+                            break;
+                        }
+                        _ => {}
                     }
                 }
-                "-c" => columns = 1,            // single column
-                "-l" => {}                      // one arg per line (default with -c)
-                "-a" | "-o" | "-O" | "-i" => {} // array/sort options (need array context)
-                "--" => {
-                    output_args.extend(iter.map(|s| s.as_str()));
-                    break;
-                }
-                _ if arg.starts_with('-') => {}
-                _ => output_args.push(arg),
+            } else {
+                output_args.push(arg.clone());
             }
+            i += 1;
         }
 
         let _ = push_to_stack; // TODO: implement push to buffer stack
+        let _ = fd; // TODO: implement fd selection
 
-        let output = if prompt_expand {
-            output_args
-                .iter()
-                .map(|s| self.expand_prompt_string(s))
-                .collect::<Vec<_>>()
-                .join(" ")
-        } else if interpret_escapes {
-            output_args
-                .iter()
-                .map(|s| self.expand_printf_escapes(s))
-                .collect::<Vec<_>>()
-                .join(" ")
-        } else {
-            output_args.join(" ")
-        };
+        // Sort if requested
+        if sort_asc {
+            output_args.sort();
+        } else if sort_desc {
+            output_args.sort_by(|a, b| b.cmp(a));
+        }
 
+        // Handle -f format
+        if let Some(fmt) = format_string {
+            let output = self.printf_format(&fmt, &output_args);
+            if let Some(var) = store_var {
+                self.variables.insert(var, output);
+            } else {
+                print!("{}", output);
+            }
+            return 0;
+        }
+
+        // Process output
+        let processed: Vec<String> = output_args.iter().map(|s| {
+            let mut result = s.clone();
+            if prompt_expand {
+                result = self.expand_prompt_string(&result);
+            }
+            if interpret_escapes && !raw_mode {
+                result = self.expand_printf_escapes(&result);
+            }
+            if named_dir_subst {
+                // Replace home dir with ~
+                if let Ok(home) = env::var("HOME") {
+                    if result.starts_with(&home) {
+                        result = format!("~{}", &result[home.len()..]);
+                    }
+                }
+                // Replace named dirs
+                for (name, path) in &self.named_dirs {
+                    let path_str = path.to_string_lossy();
+                    if result.starts_with(path_str.as_ref()) {
+                        result = format!("~{}{}", name, &result[path_str.len()..]);
+                        break;
+                    }
+                }
+            }
+            result
+        }).collect();
+
+        // Determine separator and terminator
+        let separator = if one_per_line { "\n" } else { " " };
         let terminator = if null_terminate {
             "\0"
         } else if no_newline {
@@ -10002,51 +11498,260 @@ impl ShellExecutor {
             "\n"
         };
 
-        if columns > 0 {
-            // Column output
-            let words: Vec<&str> = output.split_whitespace().collect();
-            for chunk in words.chunks(columns) {
-                if to_stderr {
-                    eprintln!("{}", chunk.join(" "));
-                } else {
-                    println!("{}", chunk.join(" "));
+        // Build output
+        let output = if one_per_line {
+            processed.join("\n")
+        } else if columns > 0 {
+            // Column output - calculate column widths
+            let mut result = String::new();
+            let num_items = processed.len();
+            let rows = (num_items + columns - 1) / columns;
+            for row in 0..rows {
+                let mut row_items = Vec::new();
+                for col in 0..columns {
+                    let idx = row + col * rows;
+                    if idx < num_items {
+                        row_items.push(processed[idx].as_str());
+                    }
+                }
+                result.push_str(&row_items.join("\t"));
+                if row < rows - 1 {
+                    result.push('\n');
                 }
             }
-        } else if to_stderr {
-            eprint!("{}{}", output, terminator);
+            result
+        } else {
+            processed.join(separator)
+        };
+
+        // Add to history if -s
+        if add_to_history {
+            if let Some(ref mut engine) = self.history {
+                let _ = engine.add(&output, None);
+            }
+        }
+
+        // Store in variable or print
+        if let Some(var) = store_var {
+            self.variables.insert(var, output);
         } else {
             print!("{}{}", output, terminator);
         }
+        
         0
+    }
+    
+    fn printf_format(&self, format: &str, args: &[String]) -> String {
+        let mut result = String::new();
+        let mut arg_idx = 0;
+        let mut chars = format.chars().peekable();
+        
+        while let Some(ch) = chars.next() {
+            if ch == '%' {
+                if chars.peek() == Some(&'%') {
+                    chars.next();
+                    result.push('%');
+                    continue;
+                }
+                
+                // Parse format specifier
+                let mut spec = String::from("%");
+                
+                // Flags
+                while let Some(&c) = chars.peek() {
+                    if c == '-' || c == '+' || c == ' ' || c == '#' || c == '0' {
+                        spec.push(c);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Width
+                while let Some(&c) = chars.peek() {
+                    if c.is_ascii_digit() {
+                        spec.push(c);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Precision
+                if chars.peek() == Some(&'.') {
+                    spec.push('.');
+                    chars.next();
+                    while let Some(&c) = chars.peek() {
+                        if c.is_ascii_digit() {
+                            spec.push(c);
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                
+                // Conversion specifier
+                if let Some(conv) = chars.next() {
+                    let arg = args.get(arg_idx).map(|s| s.as_str()).unwrap_or("");
+                    arg_idx += 1;
+                    
+                    match conv {
+                        's' => result.push_str(arg),
+                        'd' | 'i' => {
+                            let n: i64 = arg.parse().unwrap_or(0);
+                            result.push_str(&n.to_string());
+                        }
+                        'u' => {
+                            let n: u64 = arg.parse().unwrap_or(0);
+                            result.push_str(&n.to_string());
+                        }
+                        'x' => {
+                            let n: i64 = arg.parse().unwrap_or(0);
+                            result.push_str(&format!("{:x}", n));
+                        }
+                        'X' => {
+                            let n: i64 = arg.parse().unwrap_or(0);
+                            result.push_str(&format!("{:X}", n));
+                        }
+                        'o' => {
+                            let n: i64 = arg.parse().unwrap_or(0);
+                            result.push_str(&format!("{:o}", n));
+                        }
+                        'f' | 'F' | 'e' | 'E' | 'g' | 'G' => {
+                            let n: f64 = arg.parse().unwrap_or(0.0);
+                            result.push_str(&format!("{}", n));
+                        }
+                        'c' => {
+                            if let Some(c) = arg.chars().next() {
+                                result.push(c);
+                            }
+                        }
+                        'b' => {
+                            result.push_str(&self.expand_printf_escapes(arg));
+                        }
+                        'n' => result.push('\n'),
+                        _ => {
+                            result.push('%');
+                            result.push(conv);
+                        }
+                    }
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+        
+        result
     }
 
     /// whence - show how a command would be interpreted
     fn builtin_whence(&self, args: &[String]) -> i32 {
-        let mut show_path = false;
-        let mut show_all = false;
+        // whence [ -vcwfpamsS ] [ -x num ] name ...
+        // -v: verbose (like type)
+        // -c: csh-style output
+        // -w: print word type (alias, builtin, command, function, hashed, reserved, none)
+        // -f: skip functions
+        // -p: search path only
+        // -a: show all matches
+        // -m: pattern match with glob
+        // -s: show symlink resolution
+        // -S: show steps of symlink resolution
+        // -x num: expand tabs to num spaces
+        
         let mut verbose = false;
+        let mut csh_style = false;
+        let mut word_type = false;
+        let mut skip_functions = false;
+        let mut path_only = false;
+        let mut show_all = false;
+        let mut pattern_mode = false;
+        let mut show_symlink = false;
+        let mut show_symlink_steps = false;
+        let mut tab_expand: Option<usize> = None;
         let mut names: Vec<&str> = Vec::new();
 
-        for arg in args {
-            match arg.as_str() {
-                "-p" => show_path = true,
-                "-a" => show_all = true,
-                "-v" => verbose = true,
-                "-c" | "-f" | "-m" | "-s" | "-w" => {}
-                _ if arg.starts_with('-') => {}
-                _ => names.push(arg),
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            
+            if arg == "--" {
+                i += 1;
+                while i < args.len() {
+                    names.push(&args[i]);
+                    i += 1;
+                }
+                break;
             }
+            
+            if arg.starts_with('-') && arg.len() > 1 {
+                let mut chars = arg[1..].chars().peekable();
+                while let Some(ch) = chars.next() {
+                    match ch {
+                        'v' => verbose = true,
+                        'c' => csh_style = true,
+                        'w' => word_type = true,
+                        'f' => skip_functions = true,
+                        'p' => path_only = true,
+                        'a' => show_all = true,
+                        'm' => pattern_mode = true,
+                        's' => show_symlink = true,
+                        'S' => show_symlink_steps = true,
+                        'x' => {
+                            // -x num: tab expansion
+                            let rest: String = chars.collect();
+                            if !rest.is_empty() {
+                                tab_expand = rest.parse().ok();
+                            } else {
+                                i += 1;
+                                if i < args.len() {
+                                    tab_expand = args[i].parse().ok();
+                                }
+                            }
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                names.push(arg);
+            }
+            i += 1;
         }
+
+        let _ = csh_style; // TODO: implement csh-style output
+        let _ = pattern_mode; // TODO: implement glob pattern matching
+        let _ = tab_expand;
 
         let mut status = 0;
         for name in names {
             let mut found = false;
+            let mut word = "none";
 
-            if !show_path {
+            if !path_only {
+                // Check reserved words
+                if self.is_reserved_word(name) {
+                    found = true;
+                    word = "reserved";
+                    if word_type {
+                        println!("{}: {}", name, word);
+                    } else if verbose {
+                        println!("{} is a reserved word", name);
+                    } else {
+                        println!("{}", name);
+                    }
+                    if !show_all {
+                        continue;
+                    }
+                }
+                
                 // Check aliases
                 if let Some(alias_val) = self.aliases.get(name) {
                     found = true;
-                    if verbose {
+                    word = "alias";
+                    if word_type {
+                        println!("{}: {}", name, word);
+                    } else if verbose {
                         println!("{} is an alias for {}", name, alias_val);
                     } else {
                         println!("{}", alias_val);
@@ -10056,10 +11761,13 @@ impl ShellExecutor {
                     }
                 }
 
-                // Check functions
-                if self.functions.contains_key(name) {
+                // Check functions (unless -f)
+                if !skip_functions && self.functions.contains_key(name) {
                     found = true;
-                    if verbose {
+                    word = "function";
+                    if word_type {
+                        println!("{}: {}", name, word);
+                    } else if verbose {
                         println!("{} is a shell function", name);
                     } else {
                         println!("{}", name);
@@ -10072,10 +11780,30 @@ impl ShellExecutor {
                 // Check builtins
                 if self.is_builtin(name) {
                     found = true;
-                    if verbose {
+                    word = "builtin";
+                    if word_type {
+                        println!("{}: {}", name, word);
+                    } else if verbose {
                         println!("{} is a shell builtin", name);
                     } else {
                         println!("{}", name);
+                    }
+                    if !show_all {
+                        continue;
+                    }
+                }
+                
+                // Check hashed commands (named_dirs can serve as a command hash)
+                // The hash builtin adds to named_dirs for now
+                if let Some(path) = self.named_dirs.get(name) {
+                    found = true;
+                    word = "hashed";
+                    if word_type {
+                        println!("{}: {}", name, word);
+                    } else if verbose {
+                        println!("{} is hashed ({})", name, path.display());
+                    } else {
+                        println!("{}", path.display());
                     }
                     if !show_all {
                         continue;
@@ -10086,15 +11814,47 @@ impl ShellExecutor {
             // Check PATH
             if let Some(path) = self.find_in_path(name) {
                 found = true;
-                if verbose {
-                    println!("{} is {}", name, path);
+                word = "command";
+                
+                // Handle symlink resolution
+                let display_path = if show_symlink || show_symlink_steps {
+                    let p = std::path::Path::new(&path);
+                    if show_symlink_steps {
+                        let mut current = p.to_path_buf();
+                        let mut steps = vec![path.clone()];
+                        while let Ok(target) = std::fs::read_link(&current) {
+                            let resolved = if target.is_absolute() {
+                                target.clone()
+                            } else {
+                                current.parent().unwrap_or(std::path::Path::new("/")).join(&target)
+                            };
+                            steps.push(resolved.to_string_lossy().to_string());
+                            current = resolved;
+                        }
+                        steps.join(" -> ")
+                    } else {
+                        match p.canonicalize() {
+                            Ok(resolved) => format!("{} -> {}", path, resolved.display()),
+                            Err(_) => path.clone(),
+                        }
+                    }
                 } else {
-                    println!("{}", path);
+                    path.clone()
+                };
+                
+                if word_type {
+                    println!("{}: {}", name, word);
+                } else if verbose {
+                    println!("{} is {}", name, display_path);
+                } else {
+                    println!("{}", display_path);
                 }
             }
 
             if !found {
-                if verbose {
+                if word_type {
+                    println!("{}: none", name);
+                } else if verbose {
                     println!("{} not found", name);
                 }
                 status = 1;
@@ -10102,11 +11862,20 @@ impl ShellExecutor {
         }
         status
     }
+    
+    fn is_reserved_word(&self, name: &str) -> bool {
+        matches!(
+            name,
+            "if" | "then" | "else" | "elif" | "fi" | "case" | "esac" | "for" | "select" |
+            "while" | "until" | "do" | "done" | "in" | "function" | "time" | "coproc" |
+            "{" | "}" | "!" | "[[" | "]]" | "((" | "))"
+        )
+    }
 
     /// where - show all locations of a command
     fn builtin_where(&self, args: &[String]) -> i32 {
         // where is like whence -ca
-        let mut new_args = vec!["-a".to_string()];
+        let mut new_args = vec!["-a".to_string(), "-v".to_string()];
         new_args.extend(args.iter().cloned());
         self.builtin_whence(&new_args)
     }
@@ -10114,7 +11883,9 @@ impl ShellExecutor {
     /// which - show path of command
     fn builtin_which(&self, args: &[String]) -> i32 {
         // which is like whence -c
-        self.builtin_whence(args)
+        let mut new_args = vec!["-c".to_string()];
+        new_args.extend(args.iter().cloned());
+        self.builtin_whence(&new_args)
     }
 
     /// Helper to check if name is a builtin
