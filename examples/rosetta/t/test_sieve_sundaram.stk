@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sieve of Sundaram
+
+fn my_sieve_sundaram($n) {
+    my $k = int(($n - 1) / 2)
+    my %marked = ()
+    for my $i (1..$k) {
+        for my $j ($i..$k) {
+            my $val = $i + $j + 2 * $i * $j
+            if ($val <= $k) {
+                $marked{$val} = 1
+            } else {
+                last
+            }
+        }
+    }
+    my @primes = (2)
+    for my $i (1..$k) {
+        if (!exists $marked{$i}) {
+            push @primes, 2 * $i + 1
+        }
+    }
+    ([@primes])
+}
+
+my $res = my_sieve_sundaram(100)
+assert_eq join(",", @$res), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97", "Primes up to 100"
+
+test_run

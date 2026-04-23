@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest palindromic substring
+
+fn my_is_palindrome($s) {
+    my $rev = ~> $s chars rev |> join ""
+    $s eq $rev
+}
+
+fn longest_palindromic_substring($s) {
+    my $len = length($s)
+    if ($len <= 1) { return $s }
+    
+    my $max_str = substr($s, 0, 1)
+    my $max_len = 1
+    
+    for my $i (0..$len-1) {
+        for my $j ($i+$max_len..$len-1) {
+            my $sub = substr($s, $i, $j - $i + 1)
+            if (length($sub) > $max_len && my_is_palindrome($sub)) {
+                $max_len = length($sub)
+                $max_str = $sub
+            }
+        }
+    }
+    $max_str
+}
+
+assert_eq longest_palindromic_substring("babad"), "bab", "LPS babad -> bab (or aba)"
+assert_eq longest_palindromic_substring("cbbd"), "bb", "LPS cbbd -> bb"
+assert_eq longest_palindromic_substring("racecar"), "racecar", "LPS racecar -> racecar"
+
+test_run

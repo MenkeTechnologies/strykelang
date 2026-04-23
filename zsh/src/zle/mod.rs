@@ -10,6 +10,11 @@
 //! - History navigation
 //! - Multi-line editing
 
+// Core ZLE types (old API for exec.rs compatibility)
+pub mod keymaps;
+pub mod widgets;
+
+// New comprehensive ZLE port from C
 pub mod main;
 pub mod keymap;
 pub mod thingy;
@@ -25,7 +30,12 @@ pub mod params;
 pub mod bindings;
 pub mod textobjects;
 
-pub use main::*;
-pub use keymap::*;
-pub use thingy::*;
-pub use widget::*;
+// Re-export old API for compatibility with exec.rs
+pub use keymaps::{zle, Keymap as LegacyKeymap, KeymapName, ZleManager, ZleState};
+pub use widgets::{BuiltinWidget, Widget as LegacyWidget, WidgetResult};
+
+// Re-export new API
+pub use main::Zle;
+pub use keymap::{Keymap, KeymapManager};
+pub use thingy::Thingy;
+pub use widget::{Widget, WidgetFlags, WidgetFunc};

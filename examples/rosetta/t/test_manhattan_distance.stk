@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Manhattan distance
+
+fn my_manhattan_distance($v1, $v2) {
+    my $dist = 0
+    for my $i (0..scalar(@$v1)-1) {
+        $dist += abs($v1->[$i] - $v2->[$i])
+    }
+    $dist
+}
+
+assert_eq my_manhattan_distance([1, 1], [1, 1]), 0, "Same point"
+assert_eq my_manhattan_distance([1, 1], [4, 5]), 7, "dist [1,1] to [4,5]"
+assert_eq my_manhattan_distance([-1, -1], [1, 1]), 4, "dist [-1,-1] to [1,1]"
+
+test_run

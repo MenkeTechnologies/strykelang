@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest increasing subsequence
+
+fn lis($arr_ref) {
+    my @arr = @$arr_ref
+    my $n = scalar(@arr)
+    if ($n == 0) { return 0 }
+    my @tails = (0) x $n
+    my $size = 0
+    for my $x (@arr) {
+        my $i = 0
+        my $j = $size
+        while ($i != $j) {
+            my $m = int(($i + $j) / 2)
+            if ($tails[$m] < $x) {
+                $i = $m + 1
+            } else {
+                $j = $m
+            }
+        }
+        $tails[$i] = $x
+        if ($i == $size) { $size++ }
+    }
+    $size
+}
+
+assert_eq lis([0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]), 6, "LIS length is 6"
+assert_eq lis([1, 2, 3, 4, 5]), 5, "LIS of sorted"
+assert_eq lis([5, 4, 3, 2, 1]), 1, "LIS of reverse sorted"
+
+test_run

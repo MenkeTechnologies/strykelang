@@ -1,197 +1,210 @@
-//! Key binding types and parsing
+//! ZLE key bindings
+//!
+//! Direct port from zsh/Src/Zle/zle_bindings.c
 
-/// A key sequence (one or more keys)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct KeySequence(pub Vec<KeyBinding>);
+use super::keymap::KeymapManager;
+use super::thingy::Thingy;
 
-impl KeySequence {
-    pub fn parse(s: &str) -> Self {
-        // Parse key sequence string into individual key bindings
-        let mut bindings = Vec::new();
-        let mut chars = s.chars().peekable();
+/// Initialize default key bindings
+pub fn init_default_bindings(km: &mut KeymapManager) {
+    // The default bindings are set up in KeymapManager::create_default_keymaps
+    // This function is for additional runtime binding setup
+    let _ = km;
+}
 
-        while let Some(c) = chars.next() {
-            let binding = match c {
-                '^' => {
-                    if let Some(&next) = chars.peek() {
-                        chars.next();
-                        KeyBinding::Control(next)
+/// Parse a key sequence string
+/// Supports:
+/// - ^X for control characters
+/// - \e for escape
+/// - \M- for meta (escape prefix)
+/// - \C- for control
+/// - Literal characters
+pub fn parse_key_sequence(s: &str) -> Vec<u8> {
+    let mut result = Vec::new();
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '^' => {
+                // Control character
+                if let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next == '?' {
+                        result.push(0x7f); // DEL
+                    } else if next == '[' {
+                        result.push(0x1b); // ESC
                     } else {
-                        KeyBinding::Char(c)
+                        result.push((next.to_ascii_uppercase() as u8).wrapping_sub(b'@'));
                     }
                 }
-                '\\' => {
-                    if let Some(&next) = chars.peek() {
+            }
+            '\\' => {
+                // Escape sequence
+                match chars.peek() {
+                    Some(&'e') | Some(&'E') => {
                         chars.next();
-                        match next {
-                            'e' | 'E' => KeyBinding::Escape,
-                            'C' => {
-                                if chars.peek() == Some(&'-') {
-                                    chars.next();
-                                    if let Some(ctrl_char) = chars.next() {
-                                        KeyBinding::Control(ctrl_char)
-                                    } else {
-                                        KeyBinding::Char('C')
-                                    }
-                                } else {
-                                    KeyBinding::Char('C')
-                                }
+                        result.push(0x1b); // ESC
+                    }
+                    Some(&'n') => {
+                        chars.next();
+                        result.push(b'\n');
+                    }
+                    Some(&'t') => {
+                        chars.next();
+                        result.push(b'\t');
+                    }
+                    Some(&'r') => {
+                        chars.next();
+                        result.push(b'\r');
+                    }
+                    Some(&'M') => {
+                        chars.next();
+                        if chars.peek() == Some(&'-') {
+                            chars.next();
+                            // Meta prefix (escape + char)
+                            result.push(0x1b);
+                            if let Some(next) = chars.next() {
+                                result.push(next as u8);
                             }
-                            'M' => {
-                                if chars.peek() == Some(&'-') {
-                                    chars.next();
-                                    if let Some(meta_char) = chars.next() {
-                                        KeyBinding::Meta(meta_char)
-                                    } else {
-                                        KeyBinding::Char('M')
-                                    }
-                                } else {
-                                    KeyBinding::Char('M')
-                                }
-                            }
-                            'n' => KeyBinding::Char('\n'),
-                            't' => KeyBinding::Char('\t'),
-                            'r' => KeyBinding::Char('\r'),
-                            '\\' => KeyBinding::Char('\\'),
-                            _ => KeyBinding::Char(next),
                         }
-                    } else {
-                        KeyBinding::Char(c)
+                    }
+                    Some(&'C') => {
+                        chars.next();
+                        if chars.peek() == Some(&'-') {
+                            chars.next();
+                            // Control
+                            if let Some(next) = chars.next() {
+                                result.push((next.to_ascii_uppercase() as u8).wrapping_sub(b'@'));
+                            }
+                        }
+                    }
+                    Some(&'x') => {
+                        chars.next();
+                        // Hex escape
+                        let mut hex = String::new();
+                        for _ in 0..2 {
+                            if let Some(&c) = chars.peek() {
+                                if c.is_ascii_hexdigit() {
+                                    hex.push(c);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                        if let Ok(n) = u8::from_str_radix(&hex, 16) {
+                            result.push(n);
+                        }
+                    }
+                    Some(&c) => {
+                        chars.next();
+                        result.push(c as u8);
+                    }
+                    None => {
+                        result.push(b'\\');
                     }
                 }
-                _ => KeyBinding::Char(c),
-            };
-            bindings.push(binding);
+            }
+            _ => {
+                result.push(c as u8);
+            }
         }
-
-        KeySequence(bindings)
     }
 
-    pub fn to_string(&self) -> String {
-        self.0.iter().map(|b| b.to_display_string()).collect()
+    result
+}
+
+/// Format a key sequence for display
+pub fn format_key_sequence(seq: &[u8]) -> String {
+    let mut result = String::new();
+    let mut i = 0;
+
+    while i < seq.len() {
+        let b = seq[i];
+        match b {
+            0x1b => {
+                // Escape - check for sequences
+                if i + 1 < seq.len() {
+                    result.push_str("^[");
+                } else {
+                    result.push_str("^[");
+                }
+            }
+            0x00..=0x1f => {
+                // Control character
+                result.push('^');
+                result.push((b + b'@') as char);
+            }
+            0x7f => {
+                result.push_str("^?");
+            }
+            0x80..=0xff => {
+                // High byte
+                result.push_str(&format!("\\x{:02x}", b));
+            }
+            _ => {
+                result.push(b as char);
+            }
+        }
+        i += 1;
+    }
+
+    result
+}
+
+/// Bind a key in a keymap
+pub fn bind_key(km: &mut KeymapManager, keymap: &str, seq: &str, widget: &str) -> bool {
+    let seq_bytes = parse_key_sequence(seq);
+    
+    if let Some(map) = km.keymaps.get_mut(keymap) {
+        // We need to get mutable access - this is tricky with Arc
+        // For now, this is a no-op as we'd need interior mutability
+        let _ = (map, seq_bytes, widget);
+        // TODO: implement proper binding mutation
+        false
+    } else {
+        false
     }
 }
 
-/// A single key binding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeyBinding {
-    /// Plain character
-    Char(char),
-    /// Control + character
-    Control(char),
-    /// Meta/Alt + character
-    Meta(char),
-    /// Escape key
-    Escape,
-    /// Function key
-    Function(u8),
-    /// Arrow keys
-    Up,
-    Down,
-    Left,
-    Right,
-    /// Other special keys
-    Home,
-    End,
-    PageUp,
-    PageDown,
-    Insert,
-    Delete,
-    Backspace,
-    Tab,
-    Enter,
-}
-
-impl KeyBinding {
-    /// Convert to the actual character code(s) this key would produce
-    pub fn to_chars(&self) -> Vec<char> {
-        match self {
-            KeyBinding::Char(c) => vec![*c],
-            KeyBinding::Control(c) => {
-                let ctrl = ((*c).to_ascii_uppercase() as u8) & 0x1f;
-                vec![ctrl as char]
-            }
-            KeyBinding::Meta(c) => vec!['\x1b', *c],
-            KeyBinding::Escape => vec!['\x1b'],
-            KeyBinding::Function(n) => {
-                // Terminal-dependent - using common xterm sequences
-                vec!['\x1b', 'O', ('P' as u8 + n - 1) as char]
-            }
-            KeyBinding::Up => vec!['\x1b', '[', 'A'],
-            KeyBinding::Down => vec!['\x1b', '[', 'B'],
-            KeyBinding::Right => vec!['\x1b', '[', 'C'],
-            KeyBinding::Left => vec!['\x1b', '[', 'D'],
-            KeyBinding::Home => vec!['\x1b', '[', 'H'],
-            KeyBinding::End => vec!['\x1b', '[', 'F'],
-            KeyBinding::PageUp => vec!['\x1b', '[', '5', '~'],
-            KeyBinding::PageDown => vec!['\x1b', '[', '6', '~'],
-            KeyBinding::Insert => vec!['\x1b', '[', '2', '~'],
-            KeyBinding::Delete => vec!['\x1b', '[', '3', '~'],
-            KeyBinding::Backspace => vec!['\x7f'],
-            KeyBinding::Tab => vec!['\t'],
-            KeyBinding::Enter => vec!['\r'],
-        }
-    }
-
-    /// Display string representation
-    pub fn to_display_string(&self) -> String {
-        match self {
-            KeyBinding::Char(c) if c.is_control() => {
-                format!("^{}", ((*c as u8) + 64) as char)
-            }
-            KeyBinding::Char(c) => c.to_string(),
-            KeyBinding::Control(c) => format!("^{}", c.to_ascii_uppercase()),
-            KeyBinding::Meta(c) => format!("\\e{}", c),
-            KeyBinding::Escape => "\\e".to_string(),
-            KeyBinding::Function(n) => format!("F{}", n),
-            KeyBinding::Up => "\\e[A".to_string(),
-            KeyBinding::Down => "\\e[B".to_string(),
-            KeyBinding::Right => "\\e[C".to_string(),
-            KeyBinding::Left => "\\e[D".to_string(),
-            KeyBinding::Home => "\\e[H".to_string(),
-            KeyBinding::End => "\\e[F".to_string(),
-            KeyBinding::PageUp => "\\e[5~".to_string(),
-            KeyBinding::PageDown => "\\e[6~".to_string(),
-            KeyBinding::Insert => "\\e[2~".to_string(),
-            KeyBinding::Delete => "\\e[3~".to_string(),
-            KeyBinding::Backspace => "^?".to_string(),
-            KeyBinding::Tab => "^I".to_string(),
-            KeyBinding::Enter => "^M".to_string(),
-        }
-    }
-
-    /// Check if this matches a raw character input
-    pub fn matches_char(&self, c: char) -> bool {
-        match self {
-            KeyBinding::Char(ch) => *ch == c,
-            KeyBinding::Control(ch) => {
-                let ctrl = ((ch.to_ascii_uppercase() as u8) & 0x1f) as char;
-                ctrl == c
-            }
-            KeyBinding::Backspace => c == '\x7f' || c == '\x08',
-            KeyBinding::Tab => c == '\t',
-            KeyBinding::Enter => c == '\r' || c == '\n',
-            KeyBinding::Escape => c == '\x1b',
-            _ => false,
-        }
+/// Unbind a key in a keymap
+pub fn unbind_key(km: &mut KeymapManager, keymap: &str, seq: &str) -> bool {
+    let seq_bytes = parse_key_sequence(seq);
+    
+    if let Some(map) = km.keymaps.get_mut(keymap) {
+        let _ = (map, seq_bytes);
+        // TODO: implement proper binding removal
+        false
+    } else {
+        false
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// List bindings in a keymap
+pub fn list_bindings(km: &KeymapManager, keymap: &str) -> Vec<(String, String)> {
+    let mut bindings = Vec::new();
 
-    #[test]
-    fn test_key_sequence_parse() {
-        let seq = KeySequence::parse("^X^U");
-        assert_eq!(seq.0.len(), 2);
-        assert_eq!(seq.0[0], KeyBinding::Control('X'));
-        assert_eq!(seq.0[1], KeyBinding::Control('U'));
+    if let Some(map) = km.keymaps.get(keymap) {
+        // Single character bindings
+        for (i, thingy) in map.first.iter().enumerate() {
+            if let Some(t) = thingy {
+                let seq = format_key_sequence(&[i as u8]);
+                bindings.push((seq, t.name.clone()));
+            }
+        }
+
+        // Multi-character bindings
+        for (seq, binding) in &map.multi {
+            if let Some(t) = &binding.bind {
+                let seq_str = format_key_sequence(seq);
+                bindings.push((seq_str, t.name.clone()));
+            } else if let Some(s) = &binding.str {
+                let seq_str = format_key_sequence(seq);
+                bindings.push((seq_str, format!("send-string \"{}\"", s)));
+            }
+        }
     }
 
-    #[test]
-    fn test_key_binding_to_chars() {
-        assert_eq!(KeyBinding::Control('A').to_chars(), vec!['\x01']);
-        assert_eq!(KeyBinding::Meta('x').to_chars(), vec!['\x1b', 'x']);
-    }
+    bindings.sort_by(|a, b| a.0.cmp(&b.0));
+    bindings
 }

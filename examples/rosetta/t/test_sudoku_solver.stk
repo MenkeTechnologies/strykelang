@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sudoku solver (backtracking)
+
+fn is_valid($board, $row, $col, $num) {
+    # Check row
+    for my $i (0..3) {
+        if ($board->[$row][$i] == $num) { return 0 }
+    }
+    # Check col
+    for my $i (0..3) {
+        if ($board->[$i][$col] == $num) { return 0 }
+    }
+    # Check box
+    my $start_row = int($row / 2) * 2
+    my $start_col = int($col / 2) * 2
+    for my $i (0..1) {
+        for my $j (0..1) {
+            if ($board->[$start_row + $i][$start_col + $j] == $num) { return 0 }
+        }
+    }
+    1
+}
+
+fn solve_sudoku($board) {
+    for my $row (0..3) {
+        for my $col (0..3) {
+            if ($board->[$row][$col] == 0) {
+                for my $num (1..4) {
+                    if (is_valid($board, $row, $col, $num)) {
+                        $board->[$row][$col] = $num
+                        if (solve_sudoku($board)) { return 1 }
+                        $board->[$row][$col] = 0
+                    }
+                }
+                return 0
+            }
+        }
+    }
+    1
+}
+
+my $board = [
+    [1, 0, 0, 0],
+    [0, 0, 2, 0],
+    [0, 3, 0, 0],
+    [0, 0, 0, 4]
+]
+
+if (solve_sudoku($board)) {
+    assert_eq $board->[0][1], 2, "sol[0][1]"
+    assert_eq $board->[1][1], 4, "sol[1][1]"
+    assert_eq $board->[2][0], 4, "sol[2][0]"
+} else {
+    assert_ok 0, "Should solve 4x4 Sudoku"
+}
+
+test_run

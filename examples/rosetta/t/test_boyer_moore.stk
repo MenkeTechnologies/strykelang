@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Boyer-Moore string search (Simplified)
+
+fn my_boyer_moore($text, $pattern) {
+    my $n = length($text)
+    my $m = length($pattern)
+    if ($m == 0) { return 0 }
+    
+    # Precompute bad character shift
+    my %bad_char
+    my @p_chars = ~> $pattern chars
+    for my $i (0..$m-1) {
+        $bad_char{$p_chars[$i]} = $i
+    }
+    
+    my $s = 0
+    while ($s <= ($n - $m)) {
+        my $j = $m - 1
+        while ($j >= 0 && $p_chars[$j] eq substr($text, $s + $j, 1)) {
+            $j--
+        }
+        
+        if ($j < 0) {
+            return $s
+        } else {
+            my $char = substr($text, $s + $j, 1)
+            my $bc_idx = exists $bad_char{$char} ? $bad_char{$char} : -1
+            my $shift = $j - $bc_idx
+            $s += ($shift > 1 ? $shift : 1)
+        }
+    }
+    -1
+}
+
+assert_eq my_boyer_moore("abcabcabc", "abc"), 0, "Find abc at 0"
+assert_eq my_boyer_moore("abcabcabc", "bca"), 1, "Find bca at 1"
+assert_eq my_boyer_moore("GCAATGCCTAG", "TGC"), 4, "Find TGC at 4"
+assert_eq my_boyer_moore("hello world", "bye"), -1, "Not found"
+
+test_run

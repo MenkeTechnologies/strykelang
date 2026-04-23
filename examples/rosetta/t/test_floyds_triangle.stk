@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Floyd's triangle
+
+fn my_floyd_triangle($n) {
+    my @rows = ()
+    my $curr = 1
+    for my $i (1..$n) {
+        my @row = ()
+        for my $j (1..$i) {
+            push @row, $curr
+            $curr = $curr + 1
+        }
+        push @rows, [@row]
+    }
+    ([@rows])
+}
+
+my $res = my_floyd_triangle(5)
+assert_eq scalar(@$res), 5, "5 rows"
+assert_eq join(",", @{$res->[0]}), "1", "row 1"
+assert_eq join(",", @{$res->[1]}), "2,3", "row 2"
+assert_eq join(",", @{$res->[4]}), "11,12,13,14,15", "row 5"
+
+test_run

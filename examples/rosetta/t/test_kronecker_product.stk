@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kronecker product
+
+fn my_kronecker_product($a, $b) {
+    my $m = scalar(@$a)
+    my $n = scalar(@{$a->[0]})
+    my $p = scalar(@$b)
+    my $q = scalar(@{$b->[0]})
+    
+    my @res = ()
+    for my $i (0..$m*$p-1) { $res[$i] = [] }
+    
+    for my $i (0..$m-1) {
+        for my $j (0..$n-1) {
+            for my $k (0..$p-1) {
+                for my $l (0..$q-1) {
+                    $res[$i*$p + $k][$j*$q + $l] = $a->[$i][$j] * $b->[$k][$l]
+                }
+            }
+        }
+    }
+    ([@res])
+}
+
+my $a = [[1, 2], [3, 4]]
+my $b = [[0, 5], [6, 7]]
+my $res = my_kronecker_product($a, $b)
+
+# Res should be:
+# 1*0 1*5 2*0 2*5 -> 0 5 0 10
+# 1*6 1*7 2*6 2*7 -> 6 7 12 14
+# 3*0 3*5 4*0 4*5 -> 0 15 0 20
+# 3*6 3*7 4*6 4*7 -> 18 21 24 28
+
+assert_eq join(",", @{$res->[0]}), "0,5,0,10", "row 0"
+assert_eq join(",", @{$res->[3]}), "18,21,24,28", "row 3"
+
+test_run
