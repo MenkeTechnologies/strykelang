@@ -21,7 +21,8 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 
 ### Strykelang is under heavy development and will soon replace zsh/fish/bash and all other login shells
 
-### [`Read the Docs`](https://menketechnologies.github.io/strykelang/)
+### [`Read the Docs`](https://menketechnologies.github.io/strykelang/) &middot; [`Coverage Report`](https://menketechnologies.github.io/strykelang/report.html) &middot; [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html)
+
 ---
 
 ## Table of Contents
@@ -46,6 +47,7 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0x13\] zshrs Shell](#0x13-zshrs-shell)
+- [\[0x14\] Documentation](#0x14-documentation)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -2827,6 +2829,18 @@ $ @ cat /var/log/system.log |> lines |> pgrep { /error/i } |> cnt |> p
 # Mixed shell + stryke
 $ for f in *.json; do @ read_json("$f") |> keys |> cnt |> p; done
 ```
+
+---
+
+## [0x14] DOCUMENTATION
+
+All documentation is served via GitHub Pages at [`menketechnologies.github.io/strykelang/`](https://menketechnologies.github.io/strykelang/).
+
+| Document | Description |
+|----------|-------------|
+| [`Docs Home`](https://menketechnologies.github.io/strykelang/) | Stryke reference — quickstart, builtins, parallel primitives, pipe-forward syntax, reflection hashes |
+| [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html) | Complete language reference — every builtin, operator, special variable, and regex feature |
+| [`Coverage Report`](https://menketechnologies.github.io/strykelang/report.html) | Engineering report — zshrs C-to-Rust port (55,236 C lines → 47,954 Rust), compsys (19,822 lines), strykelang (166,139 lines), full function mapping for all 859 C functions across 14 source files, 145 shell builtins, 20 loadable modules, ZLE line editor, and workspace grand total (270,403 lines, 2,936 tests) |
 
 ---
 
