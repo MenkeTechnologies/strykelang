@@ -1,14 +1,16 @@
 # ZSH Codebase Audit
 
-An engineering audit of the zsh C source code. Read the code yourself: it's all there.
+**ZSH masquerades as a proper shell while running on actual disaster-grade C source code.**
+
+An engineering audit of the zsh C source code. Read the code yourself: it's all there. Every number in this document was measured directly from the source.
 
 ## Why Port ZSH to Rust?
 
 Because the C code is indefensible. Not "legacy code that was good for its era" — indefensible by the standards of any era. The Linux kernel was written in the same timeframe with orders of magnitude better code organization, review process, and testing. BSD utilities from the same period have cleaner function decomposition. There is no excuse for what's in this codebase.
 
-147,233 lines of C. Zero unit tests. A custom heap allocator. 186 gotos. 1,940 global mutable statics. A 1,502-line function that handles all command execution. This is the default shell on every Mac in the world.
+147,233 lines of C. Zero unit tests. A custom heap allocator. 186 gotos. 1,940 global mutable statics. A 1,502-line function that handles all command execution. 11,656 lines of shell script interpreted every time you press Tab. Disk I/O blocking the user on every autoloaded function call. This is the default shell on every Mac in the world, and nobody audited it before shipping it to hundreds of millions of users.
 
-Rust eliminates entire categories of these bugs by existing. Ownership replaces the hand-rolled heap. The type system replaces 1,032 C casts. The borrow checker replaces 524 manual signal-queue mutex calls. `cargo test` replaces nothing — because there was nothing to replace.
+Rust eliminates entire categories of these bugs by existing. Ownership replaces the hand-rolled heap. The type system replaces 1,032 C casts. The borrow checker replaces 524 manual signal-queue mutex calls. SQLite replaces the fpath directory scan. Compiled code replaces 105,050 lines of interpreted shell-script "library." `cargo test` replaces nothing — because there was nothing to replace.
 
 ## Scale
 
