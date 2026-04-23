@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs::{self, Metadata};
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::path::Path;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 /// Stat element types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

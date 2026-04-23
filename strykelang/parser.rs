@@ -164,9 +164,10 @@ impl Parser {
     }
 
     /// List-slurping builtin: the operand is entirely the LHS of `|>` (no following list tokens).
+    /// A newline after the builtin name also terminates the pipe stage (implicit semicolon).
     fn pipe_supplies_slurped_list_operand(&self) -> bool {
         self.in_pipe_rhs()
-            && matches!(
+            && (matches!(
                 self.peek(),
                 Token::Semicolon
                     | Token::RBrace
@@ -174,7 +175,7 @@ impl Parser {
                     | Token::Eof
                     | Token::Comma
                     | Token::PipeForward
-            )
+            ) || self.peek_line() > self.prev_line())
     }
 
     /// Empty placeholder list used as a stand-in for the list operand of

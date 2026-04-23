@@ -5,7 +5,6 @@
 
 use std::ffi::CString;
 use std::io;
-use std::path::Path;
 
 /// Options for xattr operations
 #[derive(Debug, Default, Clone)]

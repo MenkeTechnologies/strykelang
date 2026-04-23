@@ -3,9 +3,7 @@
 //! Provides sysread, syswrite, sysopen, sysseek, syserror, zsystem builtins.
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 
 const SYSREAD_BUFSIZE: usize = 8192;
@@ -99,7 +97,7 @@ pub fn sysread(options: &SysreadOptions) -> (SysreadResult, Option<Vec<u8>>, usi
 
 #[cfg(unix)]
 fn wait_for_read(fd: i32, timeout_secs: f64) -> bool {
-    use std::mem::MaybeUninit;
+    
 
     let timeout_ms = (timeout_secs * 1000.0) as i32;
 
@@ -447,7 +445,7 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
 
     let lock_type = if options.read_lock { libc::F_RDLCK } else { libc::F_WRLCK };
 
-    let mut lck = libc::flock {
+    let lck = libc::flock {
         l_type: lock_type as i16,
         l_whence: libc::SEEK_SET as i16,
         l_start: 0,
@@ -508,7 +506,7 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
 /// Unlock a file descriptor
 #[cfg(unix)]
 pub fn funlock(fd: i32) -> Result<(), String> {
-    let mut lck = libc::flock {
+    let lck = libc::flock {
         l_type: libc::F_UNLCK as i16,
         l_whence: libc::SEEK_SET as i16,
         l_start: 0,

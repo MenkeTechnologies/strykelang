@@ -10,7 +10,6 @@
 
 use std::env;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -86,7 +85,7 @@ pub fn difftime(t2: i64, t1: i64) -> f64 {
 pub fn zopenmax() -> i64 {
     #[cfg(unix)]
     {
-        use std::os::unix::io::RawFd;
+        
         
         // Try to get from system
         unsafe {

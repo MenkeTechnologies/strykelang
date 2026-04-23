@@ -2,10 +2,10 @@
 //!
 //! Provides mkdir, rmdir, ln, mv, rm, chmod, chown, chgrp, sync builtins.
 
-use std::fs::{self, Metadata, Permissions};
+use std::fs::{self};
 use std::io;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Options for mkdir
 #[derive(Debug, Default)]

@@ -338,7 +338,7 @@ impl<'a> MathEval<'a> {
 
     /// Lex a numeric constant
     fn lex_constant(&mut self) -> MathTok {
-        let start = self.pos;
+        let _start = self.pos;
         let mut is_neg = false;
 
         // Handle leading minus for unary context

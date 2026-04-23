@@ -198,7 +198,7 @@ impl StyleTable {
 }
 
 /// Format a string with specifications
-pub fn zformat(format: &str, specs: &HashMap<char, String>, presence: bool) -> String {
+pub fn zformat(format: &str, specs: &HashMap<char, String>, _presence: bool) -> String {
     let mut result = String::new();
     let mut chars = format.chars().peekable();
 

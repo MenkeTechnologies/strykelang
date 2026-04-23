@@ -3,7 +3,6 @@
 //! Provides access to terminal capabilities via terminfo database.
 
 use std::collections::HashMap;
-use std::ffi::CString;
 
 /// Terminfo capability types
 #[derive(Debug, Clone)]
@@ -44,7 +43,7 @@ impl Terminfo {
 
     fn load_basic_capabilities(&mut self, term: &str) {
         let is_xterm = term.contains("xterm") || term.contains("256color");
-        let is_vt100 = term.contains("vt100") || term.contains("vt220");
+        let _is_vt100 = term.contains("vt100") || term.contains("vt220");
 
         self.capabilities.insert("am".to_string(), TermCapability::Boolean(true));
         self.capabilities.insert("bce".to_string(), TermCapability::Boolean(is_xterm));

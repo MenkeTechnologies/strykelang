@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::io::{self, Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::process::{Child, Command, Stdio};
+use std::os::unix::io::RawFd;
 
 /// Maximum bytes to read at once
 pub const READ_MAX: usize = 1024 * 1024;
@@ -86,7 +85,7 @@ impl PtyCmds {
 /// Open a pseudo-terminal pair
 #[cfg(unix)]
 pub fn open_pty() -> io::Result<(RawFd, RawFd)> {
-    use std::ffi::CStr;
+    
 
     let master_fd = unsafe {
         let fd = libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY);

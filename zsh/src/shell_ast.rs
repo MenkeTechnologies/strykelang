@@ -917,7 +917,7 @@ impl<'a> ShellLexer<'a> {
                                 break;
                             } else if ch == '\\' {
                                 word.push(self.next_char().unwrap()); // \
-                                if let Some(escaped) = self.peek() {
+                                if let Some(_escaped) = self.peek() {
                                     word.push(self.next_char().unwrap());
                                 }
                             } else {

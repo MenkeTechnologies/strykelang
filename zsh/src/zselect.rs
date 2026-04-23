@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::os::unix::io::RawFd;
-use std::time::Duration;
 
 /// Which type of event to monitor
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

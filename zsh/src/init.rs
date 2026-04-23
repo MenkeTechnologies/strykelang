@@ -4,10 +4,8 @@
 //!
 //! Provides shell initialization, startup script sourcing, and main loop.
 
-use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 /// Shell initialization options
 #[derive(Clone, Debug, Default)]
