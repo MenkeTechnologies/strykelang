@@ -18,6 +18,9 @@ pub struct ZstyleColors {
     pub list_separator: String,
     /// Header formatting
     pub header: HeaderColors,
+    /// Follow symlinks for coloring (LC_FOLLOW_SYMLINKS behavior)
+    /// When true, symlinks are colored by their target type instead of symlink color
+    pub follow_symlinks: bool,
 }
 
 /// Header colors from ZPWR_DESC_* env vars
@@ -89,6 +92,11 @@ impl ZstyleColors {
         if let Ok(sep) = std::env::var("ZPWR_CHAR_LOGO") {
             colors.list_separator = sep;
         }
+        
+        // Check for LC_FOLLOW_SYMLINKS env var (non-empty = true)
+        colors.follow_symlinks = std::env::var("LC_FOLLOW_SYMLINKS")
+            .map(|v| !v.is_empty() && v != "0" && v.to_lowercase() != "false")
+            .unwrap_or(false);
         
         colors
     }

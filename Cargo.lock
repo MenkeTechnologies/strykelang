@@ -658,6 +658,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 name = "compsys"
 version = "0.1.0"
 dependencies = [
+ "dirs 5.0.1",
  "libc",
  "rayon",
  "regex-lite",
@@ -6274,6 +6275,7 @@ dependencies = [
  "rusqlite",
  "tempfile",
  "thiserror 2.0.18",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]

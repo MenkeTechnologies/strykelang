@@ -64,6 +64,7 @@ pub enum ShellToken {
     Select,
     Time,
     Coproc,
+    Typeset, // typeset, local, declare, export, readonly, integer, float
 
     // Special
     Bang,        // !
@@ -509,6 +510,34 @@ impl<'a> ShellLexer<'a> {
                 self.next_char();
                 return ShellToken::DoubleLBracket;
             }
+            // Check if this looks like a glob/character class [abc] vs test command
+            // If next char is alphanumeric and we can find a ] before whitespace, it's a glob
+            if let Some(next_ch) = self.peek() {
+                if !next_ch.is_whitespace() && next_ch != ']' {
+                    // Could be a glob pattern - consume until ]
+                    let mut pattern = String::from("[");
+                    while let Some(ch) = self.peek() {
+                        pattern.push(self.next_char().unwrap());
+                        if ch == ']' {
+                            // Check if more word characters follow
+                            while let Some(c2) = self.peek() {
+                                if c2.is_whitespace() || c2 == ';' || c2 == '&' || c2 == '|' 
+                                   || c2 == '<' || c2 == '>' || c2 == ')' || c2 == '\n' {
+                                    break;
+                                }
+                                pattern.push(self.next_char().unwrap());
+                            }
+                            return ShellToken::Word(pattern);
+                        }
+                        if ch.is_whitespace() {
+                            // Hit whitespace before ] - revert to returning [
+                            // We've already consumed some chars, so return what we have
+                            return ShellToken::Word(pattern);
+                        }
+                    }
+                    return ShellToken::Word(pattern);
+                }
+            }
             return ShellToken::LBracket;
         }
 
@@ -733,13 +762,10 @@ impl<'a> ShellLexer<'a> {
                 // Word terminators (note: { and } handled specially for brace expansion)
                 ' ' | '\t' | '\n' | ';' | '&' | '<' | '>' => break,
                 
-                // [ is a word terminator only at word start (for test command)
-                // When inside a word, [ starts array subscript or glob character class
+                // [ can be a test command at word start, or a glob character class
+                // If immediately followed by non-space, consume as glob pattern
                 '[' => {
-                    if word.is_empty() {
-                        break;
-                    }
-                    // Inside a word - consume the bracket expression
+                    // Always consume [ and look for matching ]
                     word.push(self.next_char().unwrap()); // [
                     let mut bracket_depth = 1;
                     while let Some(ch) = self.peek() {
@@ -751,6 +777,10 @@ impl<'a> ShellLexer<'a> {
                             if bracket_depth == 0 {
                                 break;
                             }
+                        }
+                        // If we hit whitespace before ], this wasn't a valid bracket expr
+                        if ch == ' ' || ch == '\t' || ch == '\n' {
+                            break;
                         }
                     }
                     continue;
@@ -1034,6 +1064,9 @@ impl<'a> ShellLexer<'a> {
             "select" => ShellToken::Select,
             "time" => ShellToken::Time,
             "coproc" => ShellToken::Coproc,
+            // Typeset-like reserved words (zsh/Src/hashtable.c lines 1083-1105)
+            "typeset" | "local" | "declare" | "export" | "readonly" 
+                | "integer" | "float" => ShellToken::Typeset,
             _ => ShellToken::Word(word),
         }
     }
@@ -1142,6 +1175,13 @@ impl<'a> ShellParser<'a> {
 
     fn skip_newlines(&mut self) {
         while self.current == ShellToken::Newline {
+            self.advance();
+        }
+    }
+    
+    /// Skip separators (newlines and semicolons) - matches zsh C's SEPER token
+    fn skip_separators(&mut self) {
+        while self.current == ShellToken::Newline || self.current == ShellToken::Semi {
             self.advance();
         }
     }
@@ -1279,17 +1319,17 @@ impl<'a> ShellParser<'a> {
                     if self.current == ShellToken::LBrace {
                         // This is an anonymous function () { ... }
                         let body = self.parse_brace_group()?;
-                        return Ok(ShellCommand::FunctionDef(String::new(), Box::new(body)));
+                        Ok(ShellCommand::FunctionDef(String::new(), Box::new(body)))
                     } else {
                         // Just () - empty subshell, return empty command
-                        return Ok(ShellCommand::Compound(CompoundCommand::Subshell(vec![])));
+                        Ok(ShellCommand::Compound(CompoundCommand::Subshell(vec![])))
                     }
                 } else {
                     // Regular subshell ( ... )
                     self.skip_newlines();
                     let body = self.parse_compound_list()?;
                     self.expect(ShellToken::RParen)?;
-                    return Ok(ShellCommand::Compound(CompoundCommand::Subshell(body)));
+                    Ok(ShellCommand::Compound(CompoundCommand::Subshell(body)))
                 }
             },
             ShellToken::DoubleLBracket => self.parse_cond_command(),
@@ -1372,6 +1412,38 @@ impl<'a> ShellParser<'a> {
         loop {
             match &self.current {
                 ShellToken::Word(w) => {
+                    // Check for {varname} followed by redirect (e.g., {fd}>/dev/null)
+                    // This is zsh's FD allocation syntax
+                    if w.starts_with('{') && w.ends_with('}') && w.len() > 2 {
+                        let varname = w[1..w.len() - 1].to_string();
+                        if varname.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                            let saved_word = w.clone();
+                            self.advance(); // consume the {varname}
+                            match &self.current {
+                                ShellToken::Less
+                                | ShellToken::Greater
+                                | ShellToken::GreaterGreater
+                                | ShellToken::LessAmp
+                                | ShellToken::GreaterAmp
+                                | ShellToken::LessLess
+                                | ShellToken::LessLessLess
+                                | ShellToken::LessGreater
+                                | ShellToken::GreaterPipe => {
+                                    // This is a redirect with fd variable allocation
+                                    let mut redir = self.parse_redirect_with_fd(None)?;
+                                    redir.fd_var = Some(varname);
+                                    cmd.redirects.push(redir);
+                                    continue;
+                                }
+                                _ => {
+                                    // Not a redirect, treat as a regular word
+                                    cmd.words.push(ShellWord::Literal(saved_word));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    
                     // Check for fd number followed by redirect (e.g., 2>/dev/null)
                     // Must check this BEFORE treating as a regular word
                     if w.chars().all(|c| c.is_ascii_digit()) {
@@ -1487,6 +1559,18 @@ impl<'a> ShellParser<'a> {
                     }
                 }
 
+                // Typeset is special - it's both a command and affects parsing
+                ShellToken::Typeset => {
+                    if cmd.words.is_empty() {
+                        // Typeset as command - parse it
+                        cmd.words.push(ShellWord::Literal("typeset".to_string()));
+                        self.advance();
+                    } else {
+                        // Typeset as argument 
+                        cmd.words.push(self.parse_word()?);
+                    }
+                }
+
                 // Redirections
                 ShellToken::Less
                 | ShellToken::Greater
@@ -1526,6 +1610,8 @@ impl<'a> ShellParser<'a> {
         let token = self.advance();
         match token {
             ShellToken::Word(w) => Ok(ShellWord::Literal(w)),
+            // [ at word position - handle as glob pattern or test command
+            ShellToken::LBracket => Ok(ShellWord::Literal("[".to_string())),
             // Keywords can be used as words in argument position
             ShellToken::If => Ok(ShellWord::Literal("if".to_string())),
             ShellToken::Then => Ok(ShellWord::Literal("then".to_string())),
@@ -1544,6 +1630,7 @@ impl<'a> ShellParser<'a> {
             ShellToken::Select => Ok(ShellWord::Literal("select".to_string())),
             ShellToken::Time => Ok(ShellWord::Literal("time".to_string())),
             ShellToken::Coproc => Ok(ShellWord::Literal("coproc".to_string())),
+            ShellToken::Typeset => Ok(ShellWord::Literal("typeset".to_string())),
             _ => Err("Expected word".to_string()),
         }
     }
@@ -1603,76 +1690,113 @@ impl<'a> ShellParser<'a> {
         })
     }
 
+    /// Parse if statement - ported from zsh parse.c par_if()
     fn parse_if(&mut self) -> Result<ShellCommand, String> {
-        self.expect(ShellToken::If)?;
-        self.skip_newlines();
-
+        // Port of par_if from zsh/Src/parse.c lines 1411-1511
         let mut conditions = Vec::new();
-
-        // if condition - parse until Then or LBrace
-        let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
-        
-        // zsh supports both `if cond; then body; fi` and `if cond { body }`
-        let use_brace = self.current == ShellToken::LBrace;
-        if self.current == ShellToken::Then {
-            self.advance();
-        } else if self.current == ShellToken::LBrace {
-            self.advance();
-        } else {
-            return Err(format!("Expected Then or LBrace, got {:?}", self.current));
-        }
-        self.skip_newlines();
-        
-        let body = if use_brace {
-            let b = self.parse_compound_list_until(&[ShellToken::RBrace])?;
-            if self.current == ShellToken::RBrace {
-                self.advance();
-            }
-            b
-        } else {
-            self.parse_compound_list()?
-        };
-        conditions.push((cond, body));
-
-        // elif/else parts only for then/fi syntax
         let mut else_part = None;
-        if !use_brace {
-            // elif parts
-            while self.current == ShellToken::Elif {
+        let mut usebrace = false;
+        
+        // Main loop handles if/elif chain (C: for(;;) at line 1419)
+        let mut xtok = self.current.clone();
+        loop {
+            // C line 1422-1425: if xtok == FI, break
+            if xtok == ShellToken::Fi {
                 self.advance();
-                self.skip_newlines();
-                let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
-                let elif_use_brace = self.current == ShellToken::LBrace;
-                if self.current == ShellToken::Then || self.current == ShellToken::LBrace {
-                    self.advance();
-                } else {
-                    return Err(format!("Expected Then or LBrace after elif, got {:?}", self.current));
-                }
-                self.skip_newlines();
-                let body = if elif_use_brace {
-                    let b = self.parse_compound_list_until(&[ShellToken::RBrace])?;
-                    if self.current == ShellToken::RBrace {
-                        self.advance();
-                    }
-                    b
-                } else {
-                    self.parse_compound_list()?
-                };
+                break;
+            }
+            
+            // C line 1427: zshlex() - advance past if/elif
+            self.advance();
+            
+            // C line 1428-1429: if xtok == ELSE, break to else handling
+            if xtok == ShellToken::Else {
+                break;
+            }
+            
+            // C line 1430-1431: skip separators (SEPER = newline or semi)
+            self.skip_separators();
+            
+            // C line 1432-1434: must be IF or ELIF
+            if xtok != ShellToken::If && xtok != ShellToken::Elif {
+                return Err(format!("Expected If or Elif, got {:?}", xtok));
+            }
+            
+            // C line 1438: par_save_list - parse condition
+            let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
+            
+            // C line 1444-1445: skip separators after condition  
+            self.skip_separators();
+            
+            // C line 1446: default expectation is FI
+            xtok = ShellToken::Fi;
+            
+            // C line 1448-1456: THEN case
+            if self.current == ShellToken::Then {
+                usebrace = false;
+                self.advance();
+                let body = self.parse_compound_list()?;
                 conditions.push((cond, body));
             }
-
-            // else part
-            else_part = if self.current == ShellToken::Else {
+            // C line 1457-1473: INBRACE case
+            else if self.current == ShellToken::LBrace {
+                usebrace = true;
                 self.advance();
-                self.skip_newlines();
-                Some(self.parse_compound_list()?)
-            } else {
-                None
-            };
-
-            self.expect(ShellToken::Fi)?;
+                self.skip_separators();
+                let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+                if self.current != ShellToken::RBrace {
+                    return Err(format!("Expected RBrace, got {:?}", self.current));
+                }
+                conditions.push((cond, body));
+                // C line 1469: zshlex() - advance past }
+                self.advance();
+                // C line 1471-1472: if SEPER follows }, break out
+                if self.current == ShellToken::Newline || self.current == ShellToken::Semi {
+                    break;
+                }
+            }
+            // C line 1477-1483: SHORTLOOPS - single command body (not implemented, error)
+            else {
+                return Err(format!("Expected Then or LBrace after condition, got {:?}", self.current));
+            }
+            
+            // Check for elif/else/fi to continue loop
+            xtok = self.current.clone();
+            if xtok != ShellToken::Elif && xtok != ShellToken::Else && xtok != ShellToken::Fi {
+                break;
+            }
         }
-
+        
+        // C line 1487-1509: handle else
+        if xtok == ShellToken::Else || self.current == ShellToken::Else {
+            if self.current == ShellToken::Else {
+                self.advance();
+            }
+            // C line 1490-1491: skip separators (SEPER)
+            self.skip_separators();
+            
+            // C line 1492-1498: brace-style else
+            if self.current == ShellToken::LBrace && usebrace {
+                self.advance();
+                self.skip_separators();
+                let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+                if self.current != ShellToken::RBrace {
+                    return Err(format!("Expected RBrace in else, got {:?}", self.current));
+                }
+                self.advance();
+                else_part = Some(body);
+            }
+            // C line 1499-1504: traditional else, expect FI
+            else {
+                let body = self.parse_compound_list()?;
+                if self.current != ShellToken::Fi {
+                    return Err(format!("Expected Fi, got {:?}", self.current));
+                }
+                self.advance();
+                else_part = Some(body);
+            }
+        }
+        
         Ok(ShellCommand::Compound(CompoundCommand::If {
             conditions,
             else_part,
@@ -1688,40 +1812,67 @@ impl<'a> ShellParser<'a> {
             return self.parse_for_arith();
         }
 
-        // Variable name
+        // Variable name - C line 1117-1118
         let var = if let ShellToken::Word(w) = self.advance() {
             w
         } else {
             return Err("Expected variable name after 'for'".to_string());
         };
 
-        self.skip_newlines();
+        // C line 1142-1143: skip newlines after variable name
+        while self.current == ShellToken::Newline {
+            self.advance();
+        }
 
-        // Optional 'in words...'
+        // zsh supports two syntaxes:
+        // for var in words; do body; done
+        // for var ( words ) { body }
+        
         let words = if self.current == ShellToken::In {
+            // Traditional syntax: for var in words (C line 1144-1152)
             self.advance();
             let mut words = Vec::new();
             while let ShellToken::Word(_) = &self.current {
                 words.push(self.parse_word()?);
             }
+            // C line 1149: expect SEPER after word list
+            Some(words)
+        } else if self.current == ShellToken::LParen {
+            // zsh syntax: for var ( words ) (C line 1153-1162)
+            self.advance();
+            let mut words = Vec::new();
+            while self.current != ShellToken::RParen && self.current != ShellToken::Eof {
+                if let ShellToken::Word(_) = &self.current {
+                    words.push(self.parse_word()?);
+                } else if self.current == ShellToken::Newline {
+                    self.advance(); // skip newlines inside ()
+                } else {
+                    break;
+                }
+            }
+            self.expect(ShellToken::RParen)?;
             Some(words)
         } else {
             None
         };
 
-        // Skip separator
-        match &self.current {
-            ShellToken::Semi | ShellToken::Newline => {
-                self.advance();
-            }
-            _ => {}
-        }
-        self.skip_newlines();
+        // C line 1167-1169: skip separators before body
+        self.skip_separators();
 
-        self.expect(ShellToken::Do)?;
-        self.skip_newlines();
-        let body = self.parse_compound_list()?;
-        self.expect(ShellToken::Done)?;
+        // Check for brace-style body { ... } or do-done style
+        let body = if self.current == ShellToken::LBrace {
+            // zsh { body } syntax (C line 1176-1183)
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            // Traditional do-done syntax (C line 1170-1175)
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
 
         Ok(ShellCommand::Compound(CompoundCommand::For {
             var,
@@ -1810,13 +1961,28 @@ impl<'a> ShellParser<'a> {
     }
 
     fn parse_while(&mut self) -> Result<ShellCommand, String> {
+        // Port of par_while from zsh/Src/parse.c lines 1521-1557
         self.expect(ShellToken::While)?;
-        self.skip_newlines();
-        let condition = self.parse_compound_list()?;
-        self.expect(ShellToken::Do)?;
-        self.skip_newlines();
-        let body = self.parse_compound_list()?;
-        self.expect(ShellToken::Done)?;
+        
+        // C line 1528: par_save_list - parse condition  
+        let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
+        
+        // C line 1530-1531: skip separators
+        self.skip_separators();
+        
+        let body = if self.current == ShellToken::LBrace {
+            // C line 1539-1545: INBRACE case
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            // C line 1532-1538: DOLOOP case
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
 
         Ok(ShellCommand::Compound(CompoundCommand::While {
             condition,
@@ -1825,13 +1991,24 @@ impl<'a> ShellParser<'a> {
     }
 
     fn parse_until(&mut self) -> Result<ShellCommand, String> {
+        // Same as parse_while but for until
         self.expect(ShellToken::Until)?;
-        self.skip_newlines();
-        let condition = self.parse_compound_list()?;
-        self.expect(ShellToken::Do)?;
-        self.skip_newlines();
-        let body = self.parse_compound_list()?;
-        self.expect(ShellToken::Done)?;
+        
+        let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
+        
+        self.skip_separators();
+        
+        let body = if self.current == ShellToken::LBrace {
+            self.advance();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
 
         Ok(ShellCommand::Compound(CompoundCommand::Until {
             condition,
@@ -1926,8 +2103,16 @@ impl<'a> ShellParser<'a> {
         // Collect tokens until ]]
         let mut tokens: Vec<String> = Vec::new();
         while self.current != ShellToken::DoubleRBracket && self.current != ShellToken::Eof {
-            if let ShellToken::Word(w) = &self.current {
-                tokens.push(w.clone());
+            match &self.current {
+                ShellToken::Word(w) => tokens.push(w.clone()),
+                ShellToken::Bang => tokens.push("!".to_string()),
+                ShellToken::AmpAmp => tokens.push("&&".to_string()),
+                ShellToken::PipePipe => tokens.push("||".to_string()),
+                ShellToken::LParen => tokens.push("(".to_string()),
+                ShellToken::RParen => tokens.push(")".to_string()),
+                ShellToken::Less => tokens.push("<".to_string()),
+                ShellToken::Greater => tokens.push(">".to_string()),
+                _ => {}
             }
             self.advance();
         }
@@ -2101,6 +2286,10 @@ impl<'a> ShellParser<'a> {
                     expr.push_str(w);
                     expr.push(' ');
                 }
+                ShellToken::LParen => expr.push('('),
+                ShellToken::RParen => expr.push(')'),
+                ShellToken::LBracket => expr.push('['),
+                ShellToken::RBracket => expr.push(']'),
                 ShellToken::Less => expr.push('<'),
                 ShellToken::Greater => expr.push('>'),
                 ShellToken::LessLess => expr.push_str("<<"),
@@ -2109,6 +2298,7 @@ impl<'a> ShellParser<'a> {
                 ShellToken::Pipe => expr.push('|'),
                 ShellToken::AmpAmp => expr.push_str("&&"),
                 ShellToken::PipePipe => expr.push_str("||"),
+                ShellToken::Semi => expr.push(';'),
                 ShellToken::Eof => break,
                 _ => {}
             }
