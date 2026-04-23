@@ -87,6 +87,10 @@ pub mod zutil;
 pub mod zwc;
 pub mod fish_features;
 pub mod db_gdbm;
+pub mod string_port;
+pub mod loop_port;
+pub mod module;
+pub mod modentry;
 
 pub use tokens::{char_tokens, LexTok};
 pub use lexer::ZshLexer;

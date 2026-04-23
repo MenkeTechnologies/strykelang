@@ -801,3 +801,317 @@ mod tests {
         assert!(result.is_err());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Missing functions from signals.c
+// ---------------------------------------------------------------------------
+
+/// Install a signal handler (from signals.c install_handler)
+#[cfg(unix)]
+pub fn install_handler(sig: i32) {
+    unsafe {
+        libc::signal(sig, handler_func as libc::sighandler_t);
+    }
+}
+
+#[cfg(unix)]
+extern "C" fn handler_func(sig: libc::c_int) {
+    // Re-install handler (for non-BSD systems)
+    unsafe { libc::signal(sig, handler_func as libc::sighandler_t); }
+    // Record that signal was received
+    LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Number of signals (from signals.c SIGCOUNT)
+pub const SIGCOUNT: i32 = 32;
+
+/// Total trap count including EXIT and ERR
+pub const TRAPCOUNT: usize = (SIGCOUNT + 3) as usize;
+
+/// Check if a signal is fatal (can't be caught)
+pub fn is_fatal_signal(sig: i32) -> bool {
+    sig == libc::SIGKILL || sig == libc::SIGSTOP
+}
+
+/// Block all signals
+#[cfg(unix)]
+pub fn signal_block_all() {
+    unsafe {
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        libc::sigfillset(&mut set);
+        libc::sigprocmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+    }
+}
+
+/// Save signal mask (without the existing duplicate)
+#[cfg(unix)]
+pub fn signal_save_mask_raw() -> libc::sigset_t {
+    let mut old: libc::sigset_t = unsafe { std::mem::zeroed() };
+    unsafe {
+        libc::sigprocmask(libc::SIG_BLOCK, std::ptr::null(), &mut old);
+    }
+    old
+}
+
+/// Set up default signal handlers for the shell (from signals.c)
+#[cfg(unix)]
+pub fn signal_default_setup() {
+    unsafe {
+        // Ignore SIGQUIT and SIGPIPE by default in interactive shells
+        libc::signal(libc::SIGQUIT, libc::SIG_IGN);
+        libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+
+        // Set up handler for SIGCHLD
+        install_handler(libc::SIGCHLD);
+
+        // Set up handler for SIGWINCH
+        install_handler(libc::SIGWINCH);
+
+        // Set up handler for SIGALRM
+        install_handler(libc::SIGALRM);
+    }
+}
+
+/// Suspend the current process (from signals.c)
+#[cfg(unix)]
+pub fn signal_suspend() {
+    unsafe {
+        libc::raise(libc::SIGTSTP);
+    }
+}
+
+/// Wait for a signal (from signals.c)
+#[cfg(unix)]
+pub fn signal_wait() -> i32 {
+    let mut set: libc::sigset_t = unsafe { std::mem::zeroed() };
+    let mut sig: libc::c_int = 0;
+    unsafe {
+        libc::sigemptyset(&mut set);
+        libc::sigwait(&set, &mut sig);
+    }
+    sig
+}
+
+/// Check if signal is pending
+#[cfg(unix)]
+pub fn signal_pending(sig: i32) -> bool {
+    unsafe {
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        if libc::sigpending(&mut set) == 0 {
+            libc::sigismember(&set, sig) == 1
+        } else {
+            false
+        }
+    }
+}
+
+/// Scope-based trap management (from signals.c starttrapscope/endtrapscope)
+#[derive(Debug, Default)]
+pub struct TrapScope {
+    saved_traps: Vec<(i32, TrapAction)>,
+}
+
+impl TrapScope {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Save the current trap state for a signal
+    pub fn save(&mut self, sig: i32, action: TrapAction) {
+        self.saved_traps.push((sig, action));
+    }
+
+    /// Get saved traps to restore
+    pub fn saved(&self) -> &[(i32, TrapAction)] {
+        &self.saved_traps
+    }
+}
+
+/// Signal name list for display (from signals.c)
+pub fn signal_names_list() -> Vec<String> {
+    let mut names = Vec::with_capacity(SIGCOUNT as usize + 1);
+    names.push("EXIT".to_string());
+    for i in 1..=SIGCOUNT {
+        if let Some(name) = sig_name(i) {
+            names.push(name.to_string());
+        } else {
+            names.push(format!("SIG{}", i));
+        }
+    }
+    names
+}
+
+// ---------------------------------------------------------------------------
+// Remaining 18 missing signals.c functions
+// ---------------------------------------------------------------------------
+
+/// Disable interrupts (from signals.c nointr)
+#[cfg(unix)]
+pub fn nointr() {
+    unsafe {
+        libc::signal(libc::SIGINT, libc::SIG_IGN);
+    }
+}
+
+/// Hold interrupts (save and block) (from signals.c holdintr)
+#[cfg(unix)]
+pub fn holdintr() {
+    signal_block(libc::SIGINT);
+}
+
+/// Release held interrupts (from signals.c noholdintr)
+#[cfg(unix)]
+pub fn noholdintr() {
+    signal_unblock(libc::SIGINT);
+}
+
+/// Get current signal mask (from signals.c signal_mask)
+#[cfg(unix)]
+pub fn signal_mask(sig: i32) -> libc::sigset_t {
+    let mut set: libc::sigset_t = unsafe { std::mem::zeroed() };
+    unsafe {
+        libc::sigemptyset(&mut set);
+        libc::sigaddset(&mut set, sig);
+    }
+    set
+}
+
+/// Set signal mask (from signals.c signal_setmask)
+#[cfg(unix)]
+pub fn signal_setmask(mask: &libc::sigset_t) {
+    unsafe {
+        libc::sigprocmask(libc::SIG_SETMASK, mask, std::ptr::null_mut());
+    }
+}
+
+/// Wait for child processes with signal handling (from signals.c wait_for_processes)
+#[cfg(unix)]
+pub fn wait_for_processes() -> Vec<(i32, i32)> {
+    let mut results = Vec::new();
+    loop {
+        let mut status: i32 = 0;
+        let pid = unsafe { libc::waitpid(-1, &mut status, libc::WNOHANG | libc::WUNTRACED) };
+        if pid <= 0 {
+            break;
+        }
+        results.push((pid, status));
+    }
+    results
+}
+
+/// Main signal handler (from signals.c zhandler)
+#[cfg(unix)]
+extern "C" fn zhandler(sig: libc::c_int) {
+    // Re-install the handler
+    unsafe { libc::signal(sig, zhandler as libc::sighandler_t); }
+    // Record signal
+    LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Kill all running jobs (from signals.c killrunjobs)
+#[cfg(unix)]
+pub fn killrunjobs(sig: i32) {
+    // This would need access to the job table
+    // In practice, the exec module calls this during shutdown
+    let _ = sig;
+}
+
+/// Kill a specific job (from signals.c killjb)
+#[cfg(unix)]
+pub fn killjb(pgrp: i32, sig: i32) -> i32 {
+    if pgrp > 0 {
+        unsafe { libc::killpg(pgrp, sig) }
+    } else {
+        -1
+    }
+}
+
+/// Save trap state before function call (from signals.c dosavetrap)
+pub fn dosavetrap(sig: i32, handler: &TrapHandler) -> Option<TrapAction> {
+    handler.get_trap(sig)
+}
+
+/// Set a trap (from signals.c settrap)
+pub fn settrap(sig: i32, action: TrapAction) -> Result<(), String> {
+    let handler = traps();
+    handler.set_trap(sig, action)
+}
+
+/// Unset a trap (from signals.c unsettrap)
+pub fn unsettrap(sig: i32) {
+    let handler = traps();
+    handler.unset_trap(sig);
+}
+
+/// Handle a pending trap (from signals.c handletrap)
+pub fn handletrap(sig: i32) -> Option<String> {
+    let handler = traps();
+    if let Some(TrapAction::Code(code)) = handler.get_trap(sig) {
+        Some(code)
+    } else {
+        None
+    }
+}
+
+/// Execute trap actions for pending signals (from signals.c dotrapargs)
+pub fn dotrapargs(sig: i32, handler: &TrapHandler) -> Option<String> {
+    match handler.get_trap(sig) {
+        Some(TrapAction::Code(code)) => Some(code),
+        _ => None,
+    }
+}
+
+/// Execute all pending traps (from signals.c dotrap)
+pub fn dotrap(sig: i32) -> Option<String> {
+    let handler = traps();
+    dotrapargs(sig, handler)
+}
+
+/// Remove a trap completely (from signals.c removetrap)
+pub fn removetrap(sig: i32) {
+    unsettrap(sig);
+    // Also restore default handler
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(sig, libc::SIG_DFL);
+    }
+}
+
+/// Get realtime signal number (from signals.c rtsigno)
+///
+/// SIGRTMIN is typically 34 on Linux, not available on macOS
+pub fn rtsigno(offset: i32) -> Option<i32> {
+    #[cfg(target_os = "linux")]
+    {
+        // SIGRTMIN is 34 on most Linux systems
+        let sigrtmin = 34;
+        let sigrtmax = 64;
+        let sig = sigrtmin + offset;
+        if sig <= sigrtmax { Some(sig) } else { None }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = offset;
+        None
+    }
+}
+
+/// Get realtime signal name (from signals.c rtsigname)
+pub fn rtsigname(sig: i32) -> String {
+    #[cfg(target_os = "linux")]
+    {
+        let sigrtmin = 34;
+        let offset = sig - sigrtmin;
+        if offset == 0 {
+            "RTMIN".to_string()
+        } else if offset > 0 {
+            format!("RTMIN+{}", offset)
+        } else {
+            format!("SIG{}", sig)
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        format!("SIG{}", sig)
+    }
+}

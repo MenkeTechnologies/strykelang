@@ -373,6 +373,167 @@ pub fn get_exe_path() -> Option<PathBuf> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Missing functions from init.c
+// ---------------------------------------------------------------------------
+
+/// Initialize terminal settings (from init.c init_term)
+pub fn init_term(state: &ShellState) -> bool {
+    let term = &state.term;
+    if term.is_empty() {
+        return false;
+    }
+    // Terminal initialization is handled by the terminfo/termcap modules
+    // This function mainly validates the TERM value
+    !term.is_empty() && term != "dumb"
+}
+
+/// Set up the PWD variable (from init.c set_pwd_env)
+pub fn set_pwd_env(state: &mut ShellState) {
+    if let Ok(cwd) = env::current_dir() {
+        state.pwd = cwd.to_string_lossy().to_string();
+    }
+    env::set_var("PWD", &state.pwd);
+    env::set_var("OLDPWD", &state.oldpwd);
+}
+
+/// Run logout scripts (from init.c run_exit_scripts counterpart)
+pub fn run_exit_scripts(state: &mut ShellState) {
+    if state.options.login {
+        if state.options.rcs && state.options.global_rcs {
+            source(state, "/etc/zlogout");
+        }
+        if state.options.rcs && !state.options.privileged {
+            sourcehome(state, ".zlogout");
+        }
+    }
+}
+
+/// Close the shell (from init.c zexit)
+pub fn zexit(val: i32, from_where: i32) -> ! {
+    // from_where: 0=normal, 1=signal, 2=exec
+    std::process::exit(val)
+}
+
+/// Set up the tty (from init.c init_tty)
+pub fn init_tty(state: &mut ShellState) {
+    #[cfg(unix)]
+    {
+        // Check if stdin is a tty
+        if unsafe { libc::isatty(0) } == 1 {
+            state.shtty = 0;
+            state.options.interactive = true;
+        } else {
+            state.shtty = -1;
+        }
+    }
+}
+
+/// Set up the hash tables (from init.c init_hashtable equivalent)
+pub fn init_hashtable() {
+    // In Rust, hash tables are managed by the exec module
+    // This is a placeholder for compatibility
+}
+
+/// Set up options from emulation mode (from init.c setupvals emulation portion)
+pub fn setup_emulation_opts(state: &mut ShellState) {
+    match state.emulation {
+        ShellEmulation::Sh => {
+            // POSIX sh compatibility
+            state.options.monitor = state.options.interactive;
+        }
+        ShellEmulation::Ksh => {
+            // ksh compatibility
+            state.options.monitor = state.options.interactive;
+        }
+        ShellEmulation::Csh => {
+            // csh compatibility
+        }
+        ShellEmulation::Zsh => {
+            // Default zsh behavior
+            state.options.monitor = state.options.interactive;
+            state.options.hash_dirs = true;
+        }
+    }
+}
+
+/// Find a command in PATH (from init.c pathprog equivalent)
+pub fn pathprog(prog: &str, path: &[String]) -> Option<PathBuf> {
+    if prog.contains('/') {
+        let p = PathBuf::from(prog);
+        if p.exists() {
+            return Some(p);
+        }
+        return None;
+    }
+    for dir in path {
+        let candidate = PathBuf::from(dir).join(prog);
+        if candidate.exists() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = std::fs::metadata(&candidate) {
+                    if meta.permissions().mode() & 0o111 != 0 {
+                        return Some(candidate);
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+/// Determine if shell is a login shell from argv[0]
+pub fn is_login_shell(argv0: &str) -> bool {
+    argv0.starts_with('-')
+}
+
+/// Get the ZDOTDIR
+pub fn get_zdotdir() -> String {
+    env::var("ZDOTDIR").unwrap_or_else(|_| {
+        env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    })
+}
+
+/// Full initialization sequence (from init.c init_main)
+pub fn init_main(args: &[String]) -> ShellState {
+    let (opts, cmd, positional) = parseargs(args);
+    let mut state = ShellState::new();
+    state.options = opts;
+
+    // Determine shell name from argv[0]
+    if let Some(arg0) = args.first() {
+        if is_login_shell(arg0) {
+            state.options.login = true;
+        }
+        state.emulate_from_name(arg0);
+        state.argv0 = arg0.clone();
+        state.argzero = arg0.clone();
+        state.posixzero = arg0.clone();
+    }
+
+    // Set up tty
+    init_tty(&mut state);
+
+    // Set up values
+    setupvals(&mut state);
+
+    // Set up emulation-specific options
+    setup_emulation_opts(&mut state);
+
+    // Set PWD
+    set_pwd_env(&mut state);
+
+    // Run init scripts
+    run_init_scripts(&mut state);
+
+    state
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

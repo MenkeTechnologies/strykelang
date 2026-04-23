@@ -172,6 +172,26 @@ fn shell_quote(s: &str) -> String {
     // Use single quotes, escaping single quotes as '\''
     format!("'{}'", s.replace('\'', "'\\''"))
 }
+
+/// Quote a value for typeset -p output (re-executable code)
+/// Uses single quoting only when the value contains special characters
+fn shell_quote_value(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    let needs_quotes = s.chars().any(|c| {
+        matches!(c,
+            ' ' | '\t' | '\n' | '\'' | '"' | '\\' | '$' | '`' | '!' |
+            '*' | '?' | '[' | ']' | '{' | '}' | '(' | ')' | '<' | '>' |
+            '|' | '&' | ';' | '#' | '~' | '^'
+        )
+    });
+    if !needs_quotes {
+        return s.to_string();
+    }
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 use crate::jobs::{continue_job, wait_for_child, wait_for_job, JobState, JobTable};
 use crate::parser::{
     ShellCommand, SimpleCommand, ShellWord, VarModifier, Redirect, RedirectOp,
@@ -6675,24 +6695,32 @@ impl ShellExecutor {
         
         // If -f (function mode) with no args, list functions
         if is_function && var_args.is_empty() {
-            for (name, body) in &self.functions {
-                if print_mode {
-                    println!("typeset -f {}", name);
-                } else {
-                    println!("{} () {{\n{:?}\n}}", name, body);
+            let mut func_names: Vec<_> = self.functions.keys().cloned().collect();
+            func_names.sort();
+            for name in &func_names {
+                if let Some(func) = self.functions.get(name) {
+                    if print_mode {
+                        let body = crate::text::getpermtext(func);
+                        println!("{} () {{\n\t{}\n}}", name, body.trim());
+                    } else {
+                        let body = crate::text::getpermtext(func);
+                        println!("{} () {{\n\t{}\n}}", name, body.trim());
+                    }
                 }
             }
             return 0;
         }
-        
+
         // If -f with args, just show those functions
         if is_function {
             for name in &var_args {
-                if let Some(body) = self.functions.get(name) {
+                if let Some(func) = self.functions.get(name) {
                     if print_mode {
-                        println!("typeset -f {}", name);
+                        let body = crate::text::getpermtext(func);
+                        println!("{} () {{\n\t{}\n}}", name, body.trim());
                     } else {
-                        println!("{} () {{\n{:?}\n}}", name, body);
+                        let body = crate::text::getpermtext(func);
+                        println!("{} () {{\n\t{}\n}}", name, body.trim());
                     }
                 }
             }
@@ -6705,22 +6733,47 @@ impl ShellExecutor {
         }
         
         if list_mode {
-            for (name, val) in &self.variables {
+            let mut sorted_names: Vec<_> = self.variables.keys().cloned().collect();
+            sorted_names.sort();
+            for name in &sorted_names {
+                let val = self.variables.get(name).cloned().unwrap_or_default();
                 let mut attrs = String::new();
                 if is_export || env::var(name).is_ok() {
                     attrs.push('x');
                 }
-                if self.arrays.contains_key(name) {
+                let is_arr = self.arrays.contains_key(name);
+                let is_hash = self.assoc_arrays.contains_key(name);
+                if is_arr {
                     attrs.push('a');
                 }
-                if self.assoc_arrays.contains_key(name) {
+                if is_hash {
                     attrs.push('A');
                 }
                 if print_mode {
-                    if attrs.is_empty() {
-                        println!("typeset {}", name);
+                    // typeset -p: output re-executable code with values
+                    let prefix = if attrs.is_empty() {
+                        "typeset".to_string()
                     } else {
-                        println!("typeset -{} {}", attrs, name);
+                        format!("typeset -{}", attrs)
+                    };
+                    if is_hash {
+                        if let Some(assoc) = self.assoc_arrays.get(name) {
+                            let mut pairs: Vec<_> = assoc.iter().collect();
+                            pairs.sort_by_key(|(k, _)| k.clone());
+                            let formatted: Vec<String> = pairs.iter()
+                                .map(|(k, v)| format!("[{}]={}", shell_quote_value(k), shell_quote_value(v)))
+                                .collect();
+                            println!("{} {}=( {} )", prefix, name, formatted.join(" "));
+                        }
+                    } else if is_arr {
+                        if let Some(arr) = self.arrays.get(name) {
+                            let formatted: Vec<String> = arr.iter()
+                                .map(|v| shell_quote_value(v))
+                                .collect();
+                            println!("{} {}=( {} )", prefix, name, formatted.join(" "));
+                        }
+                    } else {
+                        println!("{} {}={}", prefix, name, shell_quote_value(&val));
                     }
                 } else if is_hide_val {
                     println!("{}={}", name, "*".repeat(val.len().min(8)));
@@ -11933,18 +11986,20 @@ impl ShellExecutor {
             for name in func_names {
                 if list_only {
                     println!("{}", name);
-                } else {
-                    println!("{} () {{ ... }}", name);
+                } else if let Some(func) = self.functions.get(name) {
+                    let body = crate::text::getpermtext(func);
+                    println!("{} () {{\n\t{}\n}}", name, body.trim());
                 }
             }
         } else {
             // Show specific functions
             for name in names {
-                if let Some(_func) = self.functions.get(name) {
+                if let Some(func) = self.functions.get(name) {
                     if show_trace {
                         println!("functions -t {}", name);
                     } else {
-                        println!("{} () {{ ... }}", name);
+                        let body = crate::text::getpermtext(func);
+                        println!("{} () {{\n\t{}\n}}", name, body.trim());
                     }
                 } else {
                     eprintln!("functions: no such function: {}", name);

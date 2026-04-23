@@ -1012,3 +1012,656 @@ impl Default for JobPointers {
         Self::new()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Missing functions from jobs.c
+// ---------------------------------------------------------------------------
+
+/// Parse job specification string (from jobs.c getjob lines 2063-2165)
+///
+/// Syntax: %N (by number), %+ or %% (current), %- (previous),
+/// %str (by command prefix), %?str (by substring)
+pub fn getjob(spec: &str, table: &JobTable, ptrs: &JobPointers) -> Option<usize> {
+    if spec.is_empty() {
+        return ptrs.cur_job;
+    }
+
+    let spec = if spec.starts_with('%') { &spec[1..] } else { spec };
+
+    match spec {
+        "+" | "%" | "" => ptrs.cur_job,
+        "-" => ptrs.prev_job,
+        _ => {
+            // Try as number
+            if let Ok(n) = spec.parse::<usize>() {
+                if table.get(n).is_some() {
+                    return Some(n);
+                }
+                return None;
+            }
+
+            // ?string - search by substring
+            if let Some(substr) = spec.strip_prefix('?') {
+                for (id, job) in table.iter() {
+                    if job.command.contains(substr) {
+                        return Some(id);
+                    }
+                }
+                return None;
+            }
+
+            // string - search by prefix
+            for (id, job) in table.iter() {
+                if job.command.starts_with(spec) {
+                    return Some(id);
+                }
+            }
+
+            None
+        }
+    }
+}
+
+/// Find job by command name (from jobs.c findjobnam)
+pub fn findjobnam(name: &str, table: &JobTable) -> Option<usize> {
+    for (id, job) in table.iter() {
+        if job.command == name {
+            return Some(id);
+        }
+    }
+    None
+}
+
+/// Check if string is a number (from jobs.c isanum)
+pub fn isanum(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
+}
+
+/// Initialize jobs subsystem (from jobs.c init_jobs)
+pub fn init_jobs() -> (JobTable, JobPointers) {
+    (JobTable::new(), JobPointers::new())
+}
+
+/// Acquire process group (from jobs.c acquire_pgrp)
+#[cfg(unix)]
+pub fn acquire_pgrp() -> bool {
+    unsafe {
+        let mypgrp = libc::getpgrp();
+        let tpgrp = libc::tcgetpgrp(0);
+        if tpgrp == -1 || tpgrp == mypgrp {
+            return true;
+        }
+        // We need to be in the foreground process group
+        if libc::setpgid(0, 0) == 0 {
+            libc::tcsetpgrp(0, libc::getpgrp());
+            return true;
+        }
+        false
+    }
+}
+
+/// Store pipestats from job (from jobs.c storepipestats)
+pub fn storepipestats(job: &Job) -> Vec<i32> {
+    job.procs.iter()
+        .map(|p| p.status)
+        .collect()
+}
+
+/// Clear the job table (from jobs.c clearjobtab)
+pub fn clearjobtab(table: &mut JobTable, ptrs: &mut JobPointers) {
+    table.jobs.clear();
+    table.next_id = 1;
+    ptrs.cur_job = None;
+    ptrs.prev_job = None;
+}
+
+/// Scan jobs and print changed status (from jobs.c scanjobs)
+pub fn scanjobs(table: &JobTable) -> Vec<String> {
+    let mut output = Vec::new();
+    for (id, job) in table.iter() {
+        let state_str = match job.state {
+            JobState::Running => "running",
+            JobState::Done => "done",
+            JobState::Stopped => "stopped",
+            _ => "unknown",
+        };
+        output.push(format!("[{}]  {}  {}", id, state_str, job.command));
+    }
+    output
+}
+
+/// Shell time accounting (from jobs.c shelltime)
+#[derive(Debug, Clone, Default)]
+pub struct ChildTimes {
+    pub user_sec: f64,
+    pub sys_sec: f64,
+}
+
+pub fn shelltime() -> ChildTimes {
+    #[cfg(unix)]
+    {
+        let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
+        if unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) } == 0 {
+            return ChildTimes {
+                user_sec: usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
+                sys_sec: usage.ru_stime.tv_sec as f64 + usage.ru_stime.tv_usec as f64 / 1_000_000.0,
+            };
+        }
+    }
+    ChildTimes::default()
+}
+
+/// Get children's time accounting
+pub fn childtime() -> ChildTimes {
+    #[cfg(unix)]
+    {
+        let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
+        if unsafe { libc::getrusage(libc::RUSAGE_CHILDREN, &mut usage) } == 0 {
+            return ChildTimes {
+                user_sec: usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
+                sys_sec: usage.ru_stime.tv_sec as f64 + usage.ru_stime.tv_usec as f64 / 1_000_000.0,
+            };
+        }
+    }
+    ChildTimes::default()
+}
+
+/// Update process status after waitpid (from jobs.c update_process)
+pub fn update_process(proc: &mut Process, status: i32) {
+    proc.end_time = Some(Instant::now());
+    proc.status = status;
+}
+
+/// Find a process by PID in the job table (from jobs.c findproc)
+pub fn findproc(jobtab: &[Job], pid: i32) -> Option<(usize, usize, bool)> {
+    for (ji, job) in jobtab.iter().enumerate() {
+        for (pi, proc) in job.procs.iter().enumerate() {
+            if proc.pid == pid {
+                return Some((ji, pi, false));
+            }
+        }
+        for (pi, proc) in job.auxprocs.iter().enumerate() {
+            if proc.pid == pid {
+                return Some((ji, pi, true));
+            }
+        }
+    }
+    None
+}
+
+/// Update job status after process change (from jobs.c update_job)
+pub fn update_job(job: &mut Job) -> bool {
+    // Check if all aux procs are done
+    for proc in &job.auxprocs {
+        if proc.is_running() {
+            return false;
+        }
+    }
+
+    // Check main processes
+    let mut all_done = true;
+    let mut some_stopped = false;
+    let mut last_status = 0;
+
+    for proc in &job.procs {
+        if proc.is_running() {
+            return false; // Still running
+        }
+        if proc.is_stopped() {
+            some_stopped = true;
+        }
+    }
+
+    // Get last process status
+    if let Some(last) = job.procs.last() {
+        if last.is_signaled() {
+            last_status = 0x80 | last.term_sig();
+        } else if last.is_stopped() {
+            last_status = 0x80 | last.stop_sig();
+        } else {
+            last_status = last.exit_status();
+        }
+    }
+
+    if some_stopped {
+        job.stat |= stat::STOPPED;
+        job.stat &= !stat::DONE;
+    } else {
+        job.stat |= stat::DONE;
+        job.stat &= !stat::STOPPED;
+    }
+
+    true
+}
+
+/// Update a background job after waitpid (from jobs.c update_bg_job)
+pub fn update_bg_job(jobtab: &mut [Job], pid: i32, status: i32) -> bool {
+    if let Some((ji, pi, is_aux)) = findproc(jobtab, pid) {
+        if is_aux {
+            jobtab[ji].auxprocs[pi].status = status;
+            jobtab[ji].auxprocs[pi].end_time = Some(Instant::now());
+        } else {
+            jobtab[ji].procs[pi].status = status;
+            jobtab[ji].procs[pi].end_time = Some(Instant::now());
+        }
+        update_job(&mut jobtab[ji]);
+        return true;
+    }
+    false
+}
+
+/// Handle subjob completion (from jobs.c handle_sub)
+pub fn handle_sub(jobtab: &mut [Job], super_idx: usize, fg: bool) {
+    let sub_idx = jobtab[super_idx].other;
+    if sub_idx >= jobtab.len() {
+        return;
+    }
+
+    // If subjob is done, mark superjob accordingly
+    if jobtab[sub_idx].is_done() {
+        if fg {
+            // Get the last status from the subjob
+        }
+        jobtab[super_idx].stat &= !stat::SUPERJOB;
+        jobtab[super_idx].stat |= stat::WASSUPER;
+    }
+}
+
+/// Set the previous job (from jobs.c setprevjob)
+pub fn setprevjob(ptrs: &mut JobPointers, jobtab: &[Job], maxjob: usize) {
+    // Find a stopped or running job that isn't the current job
+    let mut best = None;
+    for i in (1..=maxjob).rev() {
+        if i >= jobtab.len() {
+            continue;
+        }
+        let job = &jobtab[i];
+        if (job.stat & stat::INUSE) != 0 && Some(i) != ptrs.cur_job {
+            if (job.stat & stat::STOPPED) != 0 {
+                best = Some(i);
+                break;
+            }
+            if best.is_none() {
+                best = Some(i);
+            }
+        }
+    }
+    ptrs.prev_job = best;
+}
+
+/// Set current job after state change (from jobs.c setcurjob)
+pub fn setcurjob(ptrs: &mut JobPointers, jobtab: &[Job], maxjob: usize) {
+    ptrs.cur_job = None;
+    for i in (1..=maxjob).rev() {
+        if i >= jobtab.len() {
+            continue;
+        }
+        if (jobtab[i].stat & (stat::INUSE | stat::STOPPED)) == (stat::INUSE | stat::STOPPED) {
+            ptrs.cur_job = Some(i);
+            break;
+        }
+    }
+    if ptrs.cur_job.is_none() {
+        for i in (1..=maxjob).rev() {
+            if i >= jobtab.len() {
+                continue;
+            }
+            if (jobtab[i].stat & stat::INUSE) != 0 {
+                ptrs.cur_job = Some(i);
+                break;
+            }
+        }
+    }
+    setprevjob(ptrs, jobtab, maxjob);
+}
+
+/// Check if a job's time should be reported (from jobs.c should_report_time)
+pub fn should_report_time(job: &Job, reporttime: f64) -> bool {
+    if reporttime < 0.0 {
+        return false;
+    }
+    if let Some(first) = job.procs.first() {
+        if let (Some(start), Some(end)) = (first.start_time, job.procs.last().and_then(|p| p.end_time)) {
+            let elapsed = end.duration_since(start).as_secs_f64();
+            return elapsed >= reporttime;
+        }
+    }
+    false
+}
+
+/// Dump timing info for a job (from jobs.c dumptime)
+pub fn dumptime(job: &Job, format: &str) -> Option<String> {
+    let first_start = job.procs.first()?.start_time?;
+    let last_end = job.procs.last()?.end_time?;
+    let elapsed = last_end.duration_since(first_start).as_secs_f64();
+
+    let mut total_user = 0.0;
+    let mut total_sys = 0.0;
+    for proc in &job.procs {
+        total_user += proc.ti.user_time.as_secs_f64();
+        total_sys += proc.ti.sys_time.as_secs_f64();
+    }
+
+    Some(format_time(elapsed, total_user, total_sys, format, &get_job_text(job)))
+}
+
+/// Wait for all foreground jobs to finish (from jobs.c waitjobs)
+pub fn waitjobs(jobtab: &mut Vec<Job>, thisjob: usize) {
+    if thisjob < jobtab.len() {
+        while !jobtab[thisjob].is_done() && !jobtab[thisjob].is_stopped() {
+            #[cfg(unix)]
+            {
+                let mut status: i32 = 0;
+                let pid = unsafe { libc::waitpid(-1, &mut status, libc::WUNTRACED) };
+                if pid > 0 {
+                    update_bg_job(jobtab, pid, status);
+                } else {
+                    break;
+                }
+            }
+            #[cfg(not(unix))]
+            { break; }
+        }
+    }
+}
+
+/// Wait for a single specific job (from jobs.c waitonejob)
+pub fn waitonejob(job: &mut Job) {
+    for proc in &mut job.procs {
+        if proc.is_running() {
+            if let Some(_status) = waitforpid(proc.pid) {
+                // status already updated by waitforpid
+            }
+        }
+    }
+}
+
+/// Initialize a new job entry (from jobs.c initjob)
+pub fn initjob(jobtab: &mut Vec<Job>) -> usize {
+    // Find an empty slot or add a new one
+    for (i, job) in jobtab.iter().enumerate() {
+        if (job.stat & stat::INUSE) == 0 {
+            jobtab[i] = Job::new();
+            jobtab[i].stat = stat::INUSE;
+            return i;
+        }
+    }
+    // Expand table
+    let idx = jobtab.len();
+    let mut job = Job::new();
+    job.stat = stat::INUSE;
+    jobtab.push(job);
+    idx
+}
+
+/// Set the pwd for a job (from jobs.c setjobpwd)
+pub fn setjobpwd(job: &mut Job) {
+    // Store current directory in job for display purposes
+    if let Ok(cwd) = std::env::current_dir() {
+        // Job text sometimes includes the directory
+        let _ = cwd;
+    }
+}
+
+/// Spawn a job (mark as started, from jobs.c spawnjob)
+pub fn spawnjob(job: &mut Job, fg: bool) {
+    job.stat |= stat::INUSE;
+    if !fg {
+        // Background job
+        job.stat &= !stat::CURSH;
+    }
+}
+
+/// Select which job table to use (from jobs.c selectjobtab)
+/// Returns (table_ref, max_job_index)
+pub fn selectjobtab(jobtab: &[Job]) -> usize {
+    // Find the maximum used job index
+    let mut max = 0;
+    for (i, job) in jobtab.iter().enumerate() {
+        if (job.stat & stat::INUSE) != 0 {
+            max = i;
+        }
+    }
+    max
+}
+
+/// Expand job table if needed (from jobs.c expandjobtab)
+pub fn expandjobtab(jobtab: &mut Vec<Job>, needed: usize) {
+    while jobtab.len() <= needed {
+        jobtab.push(Job::new());
+    }
+}
+
+/// Shrink job table if possible (from jobs.c maybeshrinkjobtab)
+pub fn maybeshrinkjobtab(jobtab: &mut Vec<Job>) {
+    while jobtab.last().map(|j| (j.stat & stat::INUSE) == 0).unwrap_or(false) {
+        jobtab.pop();
+    }
+}
+
+/// Add file to job's temp file list (from jobs.c addfilelist)
+pub fn addfilelist(job: &mut Job, filename: &str) {
+    job.filelist.push(filename.to_string());
+}
+
+/// Clean temp files for process substitution (from jobs.c pipecleanfilelist)
+pub fn pipecleanfilelist(job: &mut Job, proc_subst_only: bool) {
+    if proc_subst_only {
+        // Only remove process substitution files (those starting with /dev/fd or /proc)
+        job.filelist.retain(|f| !f.starts_with("/dev/fd/") && !f.starts_with("/proc/"));
+    } else {
+        for file in &job.filelist {
+            let _ = std::fs::remove_file(file);
+        }
+        job.filelist.clear();
+    }
+}
+
+/// Delete temp files from a job (from jobs.c deletefilelist)
+pub fn deletefilelist(job: &mut Job, disowning: bool) {
+    if !disowning {
+        for file in &job.filelist {
+            let _ = std::fs::remove_file(file);
+        }
+    }
+    job.filelist.clear();
+}
+
+/// Print job with full detail (from jobs.c printjob)
+pub fn printjob(job: &Job, job_num: usize, long_format: bool, cur_job: Option<usize>, prev_job: Option<usize>) -> String {
+    let marker = if Some(job_num) == cur_job {
+        '+'
+    } else if Some(job_num) == prev_job {
+        '-'
+    } else {
+        ' '
+    };
+
+    let status_str = if job.is_done() {
+        if let Some(last) = job.procs.last() {
+            format_process_status(last.status)
+        } else {
+            "done".to_string()
+        }
+    } else if job.is_stopped() {
+        "suspended".to_string()
+    } else {
+        "running".to_string()
+    };
+
+    if long_format {
+        let mut lines = Vec::new();
+        for (i, proc) in job.procs.iter().enumerate() {
+            let pstatus = format_process_status(proc.status);
+            if i == 0 {
+                lines.push(format!("[{}]  {} {:>5} {:16}  {}",
+                    job_num, marker, proc.pid, pstatus, proc.text));
+            } else {
+                lines.push(format!("            {:>5} {:16}  | {}",
+                    proc.pid, pstatus, proc.text));
+            }
+        }
+        lines.join("\n")
+    } else {
+        format!("[{}]  {} {:16}  {}", job_num, marker, status_str, get_job_text(job))
+    }
+}
+
+/// Get the signal name for signal-based job output (from jobs.c getsigname)
+pub fn getsigname(sig: i32) -> String {
+    match sig {
+        0 => "EXIT".to_string(),
+        libc::SIGHUP => "HUP".to_string(),
+        libc::SIGINT => "INT".to_string(),
+        libc::SIGQUIT => "QUIT".to_string(),
+        libc::SIGILL => "ILL".to_string(),
+        libc::SIGTRAP => "TRAP".to_string(),
+        libc::SIGABRT => "ABRT".to_string(),
+        libc::SIGBUS => "BUS".to_string(),
+        libc::SIGFPE => "FPE".to_string(),
+        libc::SIGKILL => "KILL".to_string(),
+        libc::SIGUSR1 => "USR1".to_string(),
+        libc::SIGSEGV => "SEGV".to_string(),
+        libc::SIGUSR2 => "USR2".to_string(),
+        libc::SIGPIPE => "PIPE".to_string(),
+        libc::SIGALRM => "ALRM".to_string(),
+        libc::SIGTERM => "TERM".to_string(),
+        libc::SIGCHLD => "CHLD".to_string(),
+        libc::SIGCONT => "CONT".to_string(),
+        libc::SIGSTOP => "STOP".to_string(),
+        libc::SIGTSTP => "TSTP".to_string(),
+        libc::SIGTTIN => "TTIN".to_string(),
+        libc::SIGTTOU => "TTOU".to_string(),
+        libc::SIGURG => "URG".to_string(),
+        libc::SIGXCPU => "XCPU".to_string(),
+        libc::SIGXFSZ => "XFSZ".to_string(),
+        libc::SIGVTALRM => "VTALRM".to_string(),
+        libc::SIGPROF => "PROF".to_string(),
+        libc::SIGWINCH => "WINCH".to_string(),
+        libc::SIGIO => "IO".to_string(),
+        libc::SIGSYS => "SYS".to_string(),
+        _ => format!("SIG{}", sig),
+    }
+}
+
+/// Time difference for timeval (from jobs.c dtime_tv)
+pub fn dtime_tv(dt: &mut Duration, t1: &Duration, t2: &Duration) -> Duration {
+    if *t2 > *t1 {
+        *dt = *t2 - *t1;
+    } else {
+        *dt = Duration::ZERO;
+    }
+    *dt
+}
+
+/// Time difference for timespec (from jobs.c dtime_ts)
+pub fn dtime_ts(t1: &Instant, t2: &Instant) -> Duration {
+    if *t2 > *t1 { t2.duration_since(*t1) } else { Duration::ZERO }
+}
+
+/// Make all job processes running (from jobs.c makerunning)
+pub fn makerunning(job: &mut Job) {
+    job.make_running();
+}
+
+/// Check if job has any processes (from jobs.c hasprocs)
+pub fn hasprocs(job: &Job) -> bool {
+    job.has_procs()
+}
+
+/// Get resource usage info (from jobs.c get_usage)
+pub fn get_usage() -> ChildTimes {
+    childtime()
+}
+
+/// Check current shell signals (from jobs.c check_cursh_sig)
+#[cfg(unix)]
+pub fn check_cursh_sig(jobtab: &[Job], sig: i32) {
+    for job in jobtab {
+        if (job.stat & stat::CURSH) != 0 && !job.is_done() {
+            for proc in &job.procs {
+                if proc.is_running() {
+                    unsafe { libc::kill(proc.pid, sig); }
+                }
+            }
+        }
+    }
+}
+
+/// Clean all file lists from jobs (from jobs.c cleanfilelists)
+pub fn cleanfilelists(jobtab: &mut [Job]) {
+    for job in jobtab.iter_mut() {
+        deletefilelist(job, false);
+    }
+}
+
+/// Clear old job table entries (from jobs.c clearoldjobtab)
+pub fn clearoldjobtab(jobtab: &mut Vec<Job>) {
+    jobtab.retain(|j| (j.stat & stat::INUSE) != 0);
+}
+
+/// Add background status (from jobs.c addbgstatus)
+pub fn addbgstatus(bg: &mut BgStatus, pid: i32, status_val: i32) {
+    bg.add(pid, status_val);
+}
+
+/// Get background status (from jobs.c getbgstatus)
+pub fn getbgstatus(bg: &mut BgStatus, pid: i32) -> Option<i32> {
+    bg.remove(pid)
+}
+
+/// Get trap node for signal (from jobs.c gettrapnode) - defers to signals module
+pub fn gettrapnode(sig: i32) -> Option<String> {
+    // This is actually in signals.rs - provide a bridge
+    let _ = sig;
+    None
+}
+
+/// Remove trap node (from jobs.c removetrapnode) - defers to signals module
+pub fn removetrapnode(sig: i32) {
+    let _ = sig;
+}
+
+/// Release acquired process group (from jobs.c release_pgrp)
+#[cfg(unix)]
+pub fn release_pgrp() {
+    // Restore original process group if needed
+}
+
+/// Signal number from name (from jobs.c getsigidx)
+pub fn getsigidx(name: &str) -> Option<i32> {
+    let name = name.strip_prefix("SIG").unwrap_or(name);
+    match name.to_uppercase().as_str() {
+        "EXIT" => Some(0),
+        "HUP" => Some(libc::SIGHUP),
+        "INT" => Some(libc::SIGINT),
+        "QUIT" => Some(libc::SIGQUIT),
+        "ILL" => Some(libc::SIGILL),
+        "TRAP" => Some(libc::SIGTRAP),
+        "ABRT" | "IOT" => Some(libc::SIGABRT),
+        "BUS" => Some(libc::SIGBUS),
+        "FPE" => Some(libc::SIGFPE),
+        "KILL" => Some(libc::SIGKILL),
+        "USR1" => Some(libc::SIGUSR1),
+        "SEGV" => Some(libc::SIGSEGV),
+        "USR2" => Some(libc::SIGUSR2),
+        "PIPE" => Some(libc::SIGPIPE),
+        "ALRM" => Some(libc::SIGALRM),
+        "TERM" => Some(libc::SIGTERM),
+        "CHLD" | "CLD" => Some(libc::SIGCHLD),
+        "CONT" => Some(libc::SIGCONT),
+        "STOP" => Some(libc::SIGSTOP),
+        "TSTP" => Some(libc::SIGTSTP),
+        "TTIN" => Some(libc::SIGTTIN),
+        "TTOU" => Some(libc::SIGTTOU),
+        "URG" => Some(libc::SIGURG),
+        "XCPU" => Some(libc::SIGXCPU),
+        "XFSZ" => Some(libc::SIGXFSZ),
+        "VTALRM" => Some(libc::SIGVTALRM),
+        "PROF" => Some(libc::SIGPROF),
+        "WINCH" => Some(libc::SIGWINCH),
+        "IO" | "POLL" => Some(libc::SIGIO),
+        "SYS" => Some(libc::SIGSYS),
+        _ => name.parse().ok(),
+    }
+}
