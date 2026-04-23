@@ -754,3 +754,11 @@ zshrs is a ground-up Rust port that fixes every single issue documented above. N
 ## Conclusion
 
 Read the zsh source code. Then read the zshrs source code. That's all you need to know about why this replacement exists and why it must ship.
+
+## The Bottom Line
+
+ZSH is a dead project maintained by shell script editors, not engineers. No real systems engineer has touched the core C engine in years. 13 core commits in 3 years — 11 of them signal tweaks. Zero parser improvements. Zero lexer improvements. Zero memory safety fixes. Zero refactoring. The 1,502-line function with 18 gotos, the 465 unsafe string operations, the 174 memory leak points, the 1,940 global mutable statics — all untouched. All shipping to hundreds of millions of machines.
+
+The project has no CI, no GitHub, no issue tracker, no code review, no unit tests, no onboarding documentation, and no path to improvement. Commit velocity has declined 83% in a decade. The lead developer has stopped contributing. The bus factor is 2. There is no ZSH 6 and there never will be.
+
+This is not a project that can be saved. It must be replaced — by engineers who write real code, real tests, and use real tools. That replacement is zshrs.
