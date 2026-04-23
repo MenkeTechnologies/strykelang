@@ -194,4 +194,80 @@ This is the default shell on every Mac sold since Catalina (2019). Every `brew i
 
 Apple chose zsh as the default because the license changed from GPL to MIT. Not because of code quality. Not because of testing. Not because of architecture. Because of a license.
 
+## Completion System (compsys): Library Code in Shell Scripts
+
+The zsh completion system runs core library code as **interpreted shell script**. Not compiled. Not bytecoded. Not cached. Interpreted line by line through the same evaluator that runs through the 1,502-line `execcmd()` with 18 gotos.
+
+### The Numbers
+
+- **986 completion functions** totaling **105,050 lines of shell script**
+- **5,397 lines** in the core "standard library" alone (Base/)
+- `_git` completion: **9,026 lines** of shell script — bigger than most entire programs
+
+### What Happens When You Press Tab on `git`
+
+11,656 lines of interpreted shell script execute:
+
+| Function | Lines | What it does |
+|----------|-------|-------------|
+| `_main_complete` | 418 | Entry point dispatch |
+| `_complete` | 144 | Completion strategy |
+| `_normal` | 40 | Normal completion |
+| `_dispatch` | 91 | Function lookup |
+| `_git` | 9,026 | Git-specific completions |
+| `_arguments` | 589 | Argument parser |
+| `_describe` | 140 | Description formatter |
+| `_path_files` | 895 | Filesystem walker |
+| `_files` | 153 | File completion |
+| `_values` | 160 | Value completion |
+| **TOTAL** | **11,656** | **Interpreted shell script per Tab press** |
+
+For comparison, the entire Lua interpreter is ~30,000 lines of C. A single `git <TAB>` interprets one-third of a Lua interpreter worth of code — in shell script.
+
+### The Startup Tax
+
+`compinit` runs on **every shell startup**:
+
+1. Iterates over every directory in `$fpath` (43 dirs in a typical setup)
+2. Globs every file starting with `_` — **986 files**
+3. Opens each file, reads the first line, parses `#compdef` or `#autoload` headers
+4. Registers each completion via `compdef` or `autoload`
+
+Cost: **0.49 seconds** even with the `-C` "fast" cached path. Without the cache, it opens and reads all 986 files from disk.
+
+The `-C` flag caches the result in `.zcompdump`, but still validates the cache by comparing file counts — which means it stats every directory in `$fpath` on every startup anyway.
+
+### Why Shell Script?
+
+The entire completion system is shell functions specifically so users can override any piece by putting a file earlier in `$fpath`. That's the design rationale: monkey-patching over performance. The cost is that every Tab press runs at shell-script speed instead of native speed.
+
+`_arguments` is a parser. `_path_files` is a filesystem walker. `_describe` is a formatter. These are operations you write in C or Rust — tight loops, string manipulation, data structure lookups. They wrote them in shell script and run them through an interpreter on every Tab press.
+
+### The zshrs Alternative
+
+zshrs uses SQLite-backed completion indexing. One database lookup instead of 11,656 lines of interpreted shell script. Completions are indexed once at install time, not scanned from disk on every shell startup.
+
+### The Biggest Completion Functions
+
+| Lines | File |
+|-------|------|
+| 9,026 | `_git` |
+| 3,162 | `_perforce` |
+| 2,292 | `_gcc` |
+| 1,948 | `_tmux` |
+| 1,449 | `_zfs` |
+| 1,148 | `_postgresql` |
+| 964 | `_cvs` |
+| 945 | `_mount` |
+| 895 | `_path_files` |
+| 850 | `_composer` |
+| 818 | `_ssh` |
+| 809 | `_perf` |
+| 801 | `_selinux` |
+| 796 | `_apt` |
+
+Every one of these is **interpreted shell script** that runs on every Tab press for that command. Not compiled. Not optimized. Interpreted.
+
+## Conclusion
+
 Read the code. That's all you need to know about why this port exists.
