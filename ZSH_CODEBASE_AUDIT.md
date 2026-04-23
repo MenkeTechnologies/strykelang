@@ -1,6 +1,14 @@
 # ZSH Codebase Audit
 
-An engineering audit of the zsh C source code at `~/forkedRepos/zsh/Src/`.
+An engineering audit of the zsh C source code. Read the code yourself: it's all there.
+
+## Why Port ZSH to Rust?
+
+Because the C code is indefensible. Not "legacy code that was good for its era" — indefensible by the standards of any era. The Linux kernel was written in the same timeframe with orders of magnitude better code organization, review process, and testing. BSD utilities from the same period have cleaner function decomposition. There is no excuse for what's in this codebase.
+
+147,233 lines of C. Zero unit tests. A custom heap allocator. 186 gotos. 1,940 global mutable statics. A 1,502-line function that handles all command execution. This is the default shell on every Mac in the world.
+
+Rust eliminates entire categories of these bugs by existing. Ownership replaces the hand-rolled heap. The type system replaces 1,032 C casts. The borrow checker replaces 524 manual signal-queue mutex calls. `cargo test` replaces nothing — because there was nothing to replace.
 
 ## Scale
 
@@ -81,8 +89,14 @@ Worst offenders:
 
 ## Memory Management
 
-- Custom heap allocator in mem.c (1,882 lines) reimplements what malloc already does
-- **1,465 alloc calls vs 957 frees** — 508 unmatched allocations by grep count
+### The Heap Trick
+
+macOS `leaks` tool reports 0 leaks on `zsh -f -c` commands. Sounds clean, right? It's not. The custom heap allocator in mem.c (1,882 lines) doesn't free individual allocations — it just blows away the entire heap when the process exits. The OS cleans up after them. It's not "no leaks," it's "we never bothered to free anything."
+
+### The Numbers
+
+- Custom heap allocator reimplements what malloc already does
+- **1,465 alloc calls vs 957 frees** — 508 unmatched allocations
 - Relies on custom heap to "just free everything later" — memory grows unbounded until a heap pop
 
 Per-file imbalance (allocs with no matching free):
@@ -99,7 +113,58 @@ Per-file imbalance (allocs with no matching free):
 | subst.c | 30 | 2 | **28** |
 | string.c | 13 | 0 | **13** |
 
-`string.c` allocates 13 times and never frees anything.
+`string.c` allocates 13 times and **never frees anything**.
+
+### Memory Leak Points
+
+**174 alloc-then-early-return leak points** — places where memory is allocated, then an error path returns without freeing it:
+
+| File | Leak Points |
+|------|-------------|
+| subst.c | 15 |
+| builtin.c | 15 |
+| computil.c | 14 |
+| utils.c | 12 |
+| compctl.c | 10 |
+| exec.c | 8 |
+| init.c | 8 |
+| glob.c | 8 |
+| zutil.c | 7 |
+| module.c | 7 |
+| curses.c | 7 |
+| params.c | 6 |
+
+### Heap Alloc Without Cleanup
+
+14 files call `zhalloc`/`hcalloc` (heap allocate) but never call `popheap` (heap free) — they allocate and walk away, relying on someone else to clean up:
+
+| File | Heap Allocs | popheap Calls |
+|------|-------------|---------------|
+| parameter.c | 39 | 0 |
+| compctl.c | 30 | 0 |
+| subst.c | 24 | 0 |
+| glob.c | 18 | 0 |
+| parse.c | 14 | 0 |
+| computil.c | 12 | 0 |
+| module.c | 9 | 0 |
+
+### String Duplication Leaks
+
+`ztrdup` copies a string. `zsfree` frees it. These files copy strings and never free them:
+
+| File | ztrdup | zsfree | Unfreed |
+|------|--------|--------|---------|
+| computil.c | 77 | 24 | **53** |
+| init.c | 58 | 16 | **42** |
+| builtin.c | 42 | 31 | **11** |
+| exec.c | 17 | 9 | **8** |
+| pcre.c | 8 | 1 | **7** |
+| zutil.c | 10 | 3 | **7** |
+| stat.c | 6 | 0 | **6** |
+| regex.c | 6 | 0 | **6** |
+| pattern.c | 6 | 0 | **6** |
+
+In an interactive session running for hours, every tab completion, every glob expansion, every parameter substitution that hits one of these 174 leak points adds unreclaimable memory. There are no tests for this because there are no tests for anything.
 
 ## Type Safety
 
@@ -116,15 +181,17 @@ Per-file imbalance (allocs with no matching free):
 
 ## Testing
 
-- Zero unit tests on 147,233 lines of C
+- **Zero unit tests** on 147,233 lines of C
 - Integration tests require shared mutable state across test blocks
 - No way to run a single test in isolation
 - No way to parallelize tests
-- Test harness (`ztst.zsh`) is itself 632 lines of zsh script with its own bugs
-- The test harness tests the shell by running inside the shell — circular dependency
+- Test harness (`ztst.zsh`) is 632 lines of zsh script that tests the shell by running inside the shell — circular dependency
+- Tests depend on ordering: test 47 silently requires state from test 12
 
 ## Why This Matters
 
 This is the default shell on every Mac sold since Catalina (2019). Every `brew install`, every developer's `.zshrc`, every CI pipeline on macOS runs through a 1,502-line function with 18 gotos, backed by a custom heap allocator with no unit tests, maintained by a handful of volunteers who never refactored it in 30 years.
 
 Apple chose zsh as the default because the license changed from GPL to MIT. Not because of code quality. Not because of testing. Not because of architecture. Because of a license.
+
+Read the code. That's all you need to know about why this port exists.
