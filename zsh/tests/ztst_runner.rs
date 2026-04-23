@@ -1,18 +1,26 @@
 //! ztst_runner — runs zsh's .ztst integration test files against zshrs
 //!
 //! Parses the %prep / %test / %clean sections from each .ztst file,
-//! executes code blocks via `zshrs -c`, and compares exit status +
-//! stdout + stderr against the expectations encoded in the file.
+//! generates a single script per file, runs it as one `zshrs -f` process,
+//! and compares exit status + stdout + stderr per test block.
 //!
-//! Run:  cargo test --test ztst_runner -- [filter]
-//!       ZTST_VERBOSE=1 cargo test --test ztst_runner -- --nocapture
+//! Run:  cargo test -p zsh --test ztst_runner -- [filter]
+//!       ZTST_VERBOSE=1 cargo test -p zsh --test ztst_runner -- --nocapture
+//!
+//! Env vars:
+//!   ZTST_TIMEOUT_MS=N — per-file timeout in milliseconds (default: 5000)
+//!   ZTST_VERBOSE=1  — print pass/skip results, not just failures
 
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
-use std::io::Write;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // Parsed representations
@@ -432,39 +440,6 @@ impl fmt::Display for TestResult {
     }
 }
 
-fn run_code(zshrs: &Path, code: &str, stdin_data: &str, workdir: &Path) -> (i32, String, String) {
-    let mut cmd = Command::new(zshrs);
-    cmd.arg("-f") // no rcs
-        .arg("-c")
-        .arg(code)
-        .current_dir(workdir)
-        .env("LANG", "C")
-        .env("LC_ALL", "C");
-
-    if !stdin_data.is_empty() {
-        cmd.stdin(std::process::Stdio::piped());
-    }
-
-    let mut child = cmd
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect("failed to spawn zshrs");
-
-    if !stdin_data.is_empty() {
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(stdin_data.as_bytes());
-        }
-    }
-
-    let output = child.wait_with_output().expect("failed to wait on zshrs");
-    let status = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-
-    (status, stdout, stderr)
-}
-
 /// Simple glob-style pattern match (supports * as wildcard sequence)
 fn pattern_match(pattern: &str, text: &str) -> bool {
     let pat_lines: Vec<&str> = pattern.lines().collect();
@@ -521,88 +496,162 @@ fn run_ztst_file(zshrs: &Path, ztst_path: &Path) -> (usize, usize, usize) {
         .unwrap_or(false);
     let ztst = parse_ztst(ztst_path);
 
-    // Create a temp workdir for this test file
+    if ztst.tests.is_empty() {
+        return (0, 0, 0);
+    }
+
     let tmpdir = tempfile::tempdir().expect("failed to create tempdir");
     let workdir = tmpdir.path();
+    let wd = workdir.display();
 
-    // Build the prep preamble — this gets prepended to every test so
-    // functions, variables, and files created in %prep are available.
-    let prep_preamble = ztst.prep.join("\n");
-
-    // Run prep once to create files/dirs in workdir
-    if !prep_preamble.is_empty() {
-        let (status, _stdout, stderr) = run_code(zshrs, &prep_preamble, "", workdir);
-        if status != 0 && verbose {
-            eprintln!(
-                "  prep failed (status {}):\n  stderr: {}",
-                status,
-                stderr.trim()
-            );
+    // Write stdin files for tests that need them
+    for (i, test) in ztst.tests.iter().enumerate() {
+        if !test.stdin_data.is_empty() {
+            fs::write(workdir.join(format!("_zt_in_{}", i)), &test.stdin_data).unwrap();
         }
     }
 
+    // Build ONE script: prep once, then each test with output capture
+    let mut script = String::new();
+
+    // Prep — runs once, state persists for all tests
+    for chunk in &ztst.prep {
+        script.push_str(chunk);
+        script.push('\n');
+    }
+
+    // Each test: run in { } with stdout/stderr redirected to files,
+    // then print sentinel with exit status to fd 3 (original stdout)
+    script.push_str("exec 3>&1\n");
+    for (i, test) in ztst.tests.iter().enumerate() {
+        if !test.stdin_data.is_empty() {
+            script.push_str(&format!(
+                "{{ {}\n}} < {wd}/_zt_in_{i} > {wd}/_zt_out_{i} 2> {wd}/_zt_err_{i}\n",
+                test.code, wd = wd, i = i
+            ));
+        } else {
+            script.push_str(&format!(
+                "{{ {}\n}} > {wd}/_zt_out_{i} 2> {wd}/_zt_err_{i}\n",
+                test.code, wd = wd, i = i
+            ));
+        }
+        script.push_str(&format!("echo \"ZTST_RC:$?:{}\" >&3\n", i));
+    }
+
+    // Clean
+    for chunk in &ztst.clean {
+        script.push_str(chunk);
+        script.push('\n');
+    }
+
+    // Write script and run it as a single process
+    let script_path = workdir.join("_zt_main.sh");
+    fs::write(&script_path, &script).unwrap();
+
+    let timeout_ms: u64 = env::var("ZTST_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5000);
+
+    let mut cmd = Command::new(zshrs);
+    cmd.arg("-f")
+        .arg(&script_path)
+        .current_dir(workdir)
+        .env("LANG", "C")
+        .env("LC_ALL", "C")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
+
+    let child = cmd.spawn().expect("failed to spawn zshrs");
+    let pgid = child.id() as i32;
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+
+    let stdout = match rx.recv_timeout(Duration::from_millis(timeout_ms)) {
+        Ok(Ok(output)) => String::from_utf8_lossy(&output.stdout).into_owned(),
+        Ok(Err(e)) => panic!("failed to wait on zshrs: {}", e),
+        Err(_) => {
+            unsafe { libc::kill(-pgid, libc::SIGKILL); }
+            let _ = handle.join();
+            eprintln!("  TIMEOUT: entire file exceeded {}ms", timeout_ms);
+            String::new()
+        }
+    };
+
+    // Parse RC sentinels from stdout (written to fd 3 → original stdout)
+    let mut statuses = std::collections::HashMap::new();
+    for line in stdout.lines() {
+        if let Some(rest) = line.strip_prefix("ZTST_RC:") {
+            let parts: Vec<&str> = rest.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                if let (Ok(rc), Ok(idx)) = (parts[0].parse::<i32>(), parts[1].parse::<usize>()) {
+                    statuses.insert(idx, rc);
+                }
+            }
+        }
+    }
+
+    // Compare results per test
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut skipped = 0usize;
 
     for (i, test) in ztst.tests.iter().enumerate() {
-        let result = run_single_test(zshrs, test, workdir, &prep_preamble);
+        let result = if let Some(&status) = statuses.get(&i) {
+            let actual_stdout = fs::read_to_string(workdir.join(format!("_zt_out_{}", i)))
+                .unwrap_or_default();
+            let actual_stderr = fs::read_to_string(workdir.join(format!("_zt_err_{}", i)))
+                .unwrap_or_default();
+            compare_test(test, status, &actual_stdout, &actual_stderr)
+        } else {
+            // No sentinel — test never completed (hang or prior exit)
+            TestResult {
+                message: test.message.clone(),
+                passed: test.flags.contains('f'),
+                skipped: false,
+                detail: "test did not complete (hang or prior exit)".into(),
+            }
+        };
+
         if result.skipped {
             skipped += 1;
-            if verbose {
-                eprintln!("  {}", result);
-            }
+            if verbose { eprintln!("  {}", result); }
         } else if result.passed {
             passed += 1;
-            if verbose {
-                eprintln!("  {}", result);
-            }
+            if verbose { eprintln!("  {}", result); }
         } else {
             failed += 1;
-            // Always print failures
             eprintln!("  [{}:{}] {}", ztst.name, i + 1, result);
         }
-    }
-
-    // Run clean chunks
-    let clean_code = ztst.clean.join("\n");
-    if !clean_code.is_empty() {
-        let _ = run_code(zshrs, &clean_code, "", workdir);
     }
 
     (passed, failed, skipped)
 }
 
-fn run_single_test(zshrs: &Path, test: &TestBlock, workdir: &Path, prep: &str) -> TestResult {
+fn compare_test(test: &TestBlock, status: i32, stdout: &str, stderr: &str) -> TestResult {
     let expected_fail = test.flags.contains('f');
-
-    // Prepend prep code so functions/variables/aliases are available,
-    // just like the real ztst.zsh harness which runs in one session.
-    let full_code = if prep.is_empty() {
-        test.code.clone()
-    } else {
-        format!("{}\n{}", prep, test.code)
-    };
-
-    let (status, stdout, stderr) = run_code(zshrs, &full_code, &test.stdin_data, workdir);
-
-    // Trim trailing newline from actual output for comparison
-    let actual_stdout = stdout.trim_end_matches('\n').to_string();
-    let actual_stderr = stderr.trim_end_matches('\n').to_string();
+    let actual_stdout = stdout.trim_end_matches('\n');
+    let actual_stderr = stderr.trim_end_matches('\n');
 
     // Check exit status
     if let Some(expected) = test.expected_status {
         if status != expected {
-            let passed = expected_fail;
             return TestResult {
                 message: test.message.clone(),
-                passed,
+                passed: expected_fail,
                 skipped: false,
                 detail: format!(
                     "exit status: expected {}, got {}\nstderr: {}",
-                    expected,
-                    status,
-                    actual_stderr
+                    expected, status, actual_stderr
                 ),
             };
         }
@@ -611,15 +660,14 @@ fn run_single_test(zshrs: &Path, test: &TestBlock, workdir: &Path, prep: &str) -
     // Check stdout (unless 'd' flag)
     if !test.flags.contains('d') && !test.expected_stdout.is_empty() {
         let matches = if test.stdout_pattern {
-            pattern_match(&test.expected_stdout, &actual_stdout)
+            pattern_match(&test.expected_stdout, actual_stdout)
         } else {
             test.expected_stdout == actual_stdout
         };
         if !matches {
-            let passed = expected_fail;
             return TestResult {
                 message: test.message.clone(),
-                passed,
+                passed: expected_fail,
                 skipped: false,
                 detail: format!(
                     "stdout mismatch\nexpected:\n{}\nactual:\n{}",
@@ -632,15 +680,14 @@ fn run_single_test(zshrs: &Path, test: &TestBlock, workdir: &Path, prep: &str) -
     // Check stderr (unless 'D' flag)
     if !test.flags.contains('D') && !test.expected_stderr.is_empty() {
         let matches = if test.stderr_pattern {
-            pattern_match(&test.expected_stderr, &actual_stderr)
+            pattern_match(&test.expected_stderr, actual_stderr)
         } else {
             test.expected_stderr == actual_stderr
         };
         if !matches {
-            let passed = expected_fail;
             return TestResult {
                 message: test.message.clone(),
-                passed,
+                passed: expected_fail,
                 skipped: false,
                 detail: format!(
                     "stderr mismatch\nexpected:\n{}\nactual:\n{}",
@@ -795,8 +842,12 @@ ztst_tests! {
     z03_run_help         => "Z03run-help.ztst",
 }
 
-/// Discovery test — finds all .ztst files and reports a summary
+/// Discovery test — finds all .ztst files and reports a summary.
+/// Ignored by default: runs ALL files sequentially which duplicates the
+/// individual per-file tests. Run explicitly with:
+///   cargo test -p zsh --test ztst_runner ztst_summary -- --ignored --nocapture
 #[test]
+#[ignore]
 fn ztst_summary() {
     let zshrs = find_zshrs();
     let corpus = find_test_corpus();

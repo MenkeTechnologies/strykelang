@@ -517,7 +517,203 @@ impl KeymapManager {
     }
 
     /// List all keymap names
+    /// Port of bin_bindkey_lsmaps() from zle_keymap.c
     pub fn list_names(&self) -> Vec<&String> {
         self.keymaps.keys().collect()
     }
+    
+    /// Create a new empty keymap
+    /// Port of newkeymap() from zle_keymap.c
+    pub fn new_keymap(&mut self, name: &str) -> bool {
+        if self.keymaps.contains_key(name) {
+            return false;
+        }
+        
+        let mut km = Keymap::new();
+        km.primary = Some(name.to_string());
+        self.keymaps.insert(name.to_string(), Arc::new(km));
+        true
+    }
+    
+    /// Copy a keymap to a new name
+    /// Port of copyto from bin_bindkey_new
+    pub fn copy_keymap(&mut self, src: &str, dst: &str) -> bool {
+        if let Some(src_km) = self.keymaps.get(src) {
+            let new_km = (**src_km).clone();
+            self.keymaps.insert(dst.to_string(), Arc::new(new_km));
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Set a local keymap (temporary override)
+    /// Port of selectlocalmap() from zle_keymap.c
+    pub fn select_local_map(&mut self, name: Option<&str>) {
+        self.local = name.and_then(|n| self.keymaps.get(n).cloned());
+    }
+    
+    /// Re-select keymap after a widget completes
+    /// Port of reselectkeymap() from zle_keymap.c
+    pub fn reselect_keymap(&mut self) {
+        self.local = None;
+    }
+    
+    /// Read a key command from the current keymap
+    /// Port of readcommand() from zle_keymap.c
+    pub fn read_command(&self, keys: &[u8]) -> Option<Thingy> {
+        let km = self.local.as_ref().or(self.current.as_ref())?;
+        
+        if keys.len() == 1 {
+            km.first[keys[0] as usize].clone()
+        } else {
+            km.lookup_seq(keys).and_then(|kb| kb.bind.clone())
+        }
+    }
+    
+    /// Get the key sequence from buffer
+    /// Port of getkeybuf() from zle_keymap.c
+    pub fn get_keybuf(&self) -> &[u8] {
+        &self.keybuf
+    }
+    
+    /// Add to key buffer
+    /// Port of addkeybuf() from zle_keymap.c
+    pub fn add_keybuf(&mut self, c: u8) {
+        self.keybuf.push(c);
+    }
+    
+    /// Clear key buffer
+    pub fn clear_keybuf(&mut self) {
+        self.keybuf.clear();
+    }
+    
+    /// Check if current keymap is emacs
+    pub fn is_emacs(&self) -> bool {
+        self.current_name == "emacs" || self.current_name == "main"
+    }
+    
+    /// Check if current keymap is vi insert
+    pub fn is_vi_insert(&self) -> bool {
+        self.current_name == "viins"
+    }
+    
+    /// Check if current keymap is vi command
+    pub fn is_vi_cmd(&self) -> bool {
+        self.current_name == "vicmd"
+    }
+    
+    /// Get keymap command for a key
+    /// Port of getkeymapcmd() from zle_keymap.c
+    pub fn get_keymap_cmd(&self, km: &Keymap, key: u8) -> Option<Thingy> {
+        km.first[key as usize].clone()
+    }
+    
+    /// Check if key is prefix in keymap
+    /// Port of keyisprefix() from zle_keymap.c
+    pub fn key_is_prefix(&self, km: &Keymap, key: u8) -> bool {
+        km.multi.keys().any(|k| k.len() > 1 && k[0] == key)
+    }
+    
+    /// Bind key in current keymap
+    /// Port of keybind() from zle_keymap.c  
+    pub fn keybind(&mut self, seq: &[u8], thingy: Thingy) -> bool {
+        if let Some(km) = self.keymaps.get_mut(&self.current_name) {
+            if let Some(km_mut) = Arc::get_mut(km) {
+                if seq.len() == 1 {
+                    km_mut.bind_char(seq[0], thingy);
+                } else {
+                    km_mut.bind_seq(seq, thingy);
+                }
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Unbind key in current keymap
+    pub fn keyunbind(&mut self, seq: &[u8]) -> bool {
+        if let Some(km) = self.keymaps.get_mut(&self.current_name) {
+            if let Some(km_mut) = Arc::get_mut(km) {
+                km_mut.unbind_seq(seq);
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Get bindings for listing
+    /// Port of scankeymap() / scanbindlist() from zle_keymap.c
+    pub fn scan_keymap(&self, name: &str) -> Vec<(Vec<u8>, String)> {
+        let mut bindings = Vec::new();
+        
+        if let Some(km) = self.keymaps.get(name) {
+            // Single char bindings
+            for (i, opt) in km.first.iter().enumerate() {
+                if let Some(t) = opt {
+                    bindings.push((vec![i as u8], t.name.clone()));
+                }
+            }
+            
+            // Multi-char bindings
+            for (seq, kb) in &km.multi {
+                if let Some(ref t) = kb.bind {
+                    bindings.push((seq.clone(), t.name.clone()));
+                } else if let Some(ref s) = kb.str {
+                    bindings.push((seq.clone(), format!("\"{}\"", s)));
+                }
+            }
+        }
+        
+        bindings.sort_by(|a, b| a.0.cmp(&b.0));
+        bindings
+    }
+    
+    /// Set keymap via ZLE (zle -K)
+    /// Port of zlesetkeymap() from zle_keymap.c
+    pub fn zle_set_keymap(&mut self, name: &str) -> bool {
+        self.select(name)
+    }
+    
+    /// Reference keymap by name
+    /// Port of refkeymap_by_name() from zle_keymap.c
+    pub fn ref_keymap_by_name(&self, name: &str) -> Option<Arc<Keymap>> {
+        self.keymaps.get(name).cloned()
+    }
+    
+    /// Initialize keymaps
+    /// Port of init_keymaps() from zle_keymap.c
+    pub fn init_keymaps(&mut self) {
+        self.create_default_keymaps();
+    }
+    
+    /// Cleanup keymaps
+    /// Port of cleanup_keymaps() from zle_keymap.c
+    pub fn cleanup_keymaps(&mut self) {
+        self.keymaps.clear();
+        self.current = None;
+        self.local = None;
+    }
+}
+
+/// Bindkey builtin implementation
+/// Port of bin_bindkey() from zle_keymap.c
+pub fn bin_bindkey(args: &[String], opts: BindkeyOpts) -> i32 {
+    // This would be called from the shell's builtin system
+    // For now, just a stub that documents the interface
+    let _ = (args, opts);
+    0
+}
+
+/// Bindkey options
+#[derive(Debug, Default)]
+pub struct BindkeyOpts {
+    pub list: bool,       // -l
+    pub list_all: bool,   // -L
+    pub delete: bool,     // -d
+    pub remove: bool,     // -r
+    pub meta: bool,       // -m
+    pub new_keymap: bool, // -N
+    pub keymap: Option<String>, // -M keymap
+    pub prefix: Option<String>, // -p prefix
 }

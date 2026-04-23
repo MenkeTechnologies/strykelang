@@ -29,6 +29,7 @@ pub mod utils;
 pub mod params;
 pub mod bindings;
 pub mod textobjects;
+pub mod tricky;
 
 // Re-export old API for compatibility with exec.rs
 pub use keymaps::{zle, Keymap as LegacyKeymap, KeymapName, ZleManager, ZleState};
