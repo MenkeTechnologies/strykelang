@@ -328,6 +328,71 @@ All blocking. All synchronous. All on the hot path between the user pressing Ent
 
 zshrs indexes functions at install time in SQLite. Function lookup is one indexed database query — no fpath scanning, no disk I/O on the hot path, no `.zwc` litter.
 
+## Development Process: No CI, No GitHub, No Issue Tracker, Dying Velocity
+
+### No Modern Infrastructure
+
+- **No CI/CD.** No `.github`, no `.travis.yml`, no `.circleci`. No automated testing on any push or PR. Nobody knows if a commit breaks anything until someone manually runs `make check`.
+- **No GitHub.** No pull requests. No code review UI. No issue tracker. No project board.
+- **No issue tracker.** Bugs are reported to a **mailing list** (`zsh-workers@zsh.org`). Bug reports get buried in email threads. There is no way to search, filter, assign, label, or track issues. No way to know how many open bugs exist.
+- **No code review.** Patches are emailed to the mailing list. Someone reads them (maybe). Someone commits them (maybe). There is no review gate, no approval requirement, no CI check.
+- **Mailing list archives** are the "bug tracker": https://www.zsh.org/mla/workers/
+
+This is how software was developed in 1995. It's how zsh is still developed in 2026.
+
+### Where's ZSH 6?
+
+Last release: **zsh 5.9 — May 2022.** Over 3 years ago. No zsh 6. No roadmap. No release timeline. No communication about when or if it will ship.
+
+| Release | Date | Gap |
+|---------|------|-----|
+| zsh 5.8 | May 2020 | — |
+| zsh 5.8.1 | Nov 2021 | 18 months |
+| zsh 5.9 | May 2022 | 6 months |
+| zsh 6.0 | ??? | **3+ years and counting** |
+
+### Commit Velocity: 83% Decline
+
+| Year | Commits | Change |
+|------|---------|--------|
+| 2015 | 951 | — |
+| 2016 | 692 | -27% |
+| 2017 | 425 | -39% |
+| 2018 | 461 | +8% |
+| 2019 | 267 | -42% |
+| 2020 | 338 | +27% |
+| 2021 | 305 | -10% |
+| 2022 | 244 | -20% |
+| 2023 | 239 | -2% |
+| 2024 | 159 | -33% |
+
+**From 951 commits in 2015 to 159 in 2024. 83% decline.** The project is dying.
+
+### Bus Factor: 2
+
+In the last 3 years, two developers account for 60% of all commits:
+
+| Developer | Commits (2023-2025) | Lifetime Commits |
+|-----------|-------------------|-----------------|
+| Bart Schaefer | 167 | 953 |
+| Oliver Kiddle | 144 | 1,157 |
+| Everyone else combined | ~250 | — |
+
+**Peter Stephenson** — the lead developer with **3,825 lifetime commits** (48% of all zsh history) — contributed **25 commits in the last 3 years**. The architect of the codebase has essentially stopped working on it.
+
+If Bart Schaefer and Oliver Kiddle stop contributing, zsh development effectively ends. The default shell on every Mac would be unmaintained.
+
+### No Onboarding
+
+- No `CONTRIBUTING.md`
+- No developer documentation
+- No architecture guide
+- No code style guide
+- Contributing requires subscribing to a mailing list and emailing patches
+- Build system is Autoconf — new contributors must learn 90s build tooling just to compile
+
+The barrier to entry ensures the bus factor stays at 2.
+
 ## Worst Engineering Principles Known to Man
 
 Every principle of software engineering — violated:
