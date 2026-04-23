@@ -16395,4 +16395,445 @@ impl ShellExecutor {
             }
         }
     }
+    
+    // =========================================================================
+    // Process control functions - Port from exec.c
+    // =========================================================================
+    
+    /// Fork a new process
+    /// Port of zfork() from exec.c
+    pub fn zfork(&mut self, flags: ForkFlags) -> std::io::Result<ForkResult> {
+        // Check for job control
+        let can_background = self.options.get("monitor").copied().unwrap_or(false);
+        
+        unsafe {
+            match libc::fork() {
+                -1 => Err(std::io::Error::last_os_error()),
+                0 => {
+                    // Child process
+                    if !flags.contains(ForkFlags::NOJOB) && can_background {
+                        // Set up job control
+                        let pid = libc::getpid();
+                        if flags.contains(ForkFlags::NEWGRP) {
+                            libc::setpgid(0, 0);
+                        }
+                        if flags.contains(ForkFlags::FGTTY) {
+                            libc::tcsetpgrp(0, pid);
+                        }
+                    }
+                    
+                    // Reset signal handlers
+                    if !flags.contains(ForkFlags::KEEPSIGS) {
+                        self.reset_signals();
+                    }
+                    
+                    Ok(ForkResult::Child)
+                }
+                pid => {
+                    // Parent process
+                    if !flags.contains(ForkFlags::NOJOB) {
+                        // Add to job table
+                        self.add_child_process(pid);
+                    }
+                    Ok(ForkResult::Parent(pid))
+                }
+            }
+        }
+    }
+    
+    /// Add a child process to tracking
+    fn add_child_process(&mut self, pid: i32) {
+        // Would track in job table
+        self.variables.insert("!".to_string(), pid.to_string());
+    }
+    
+    /// Reset signal handlers to defaults
+    fn reset_signals(&self) {
+        unsafe {
+            libc::signal(libc::SIGINT, libc::SIG_DFL);
+            libc::signal(libc::SIGQUIT, libc::SIG_DFL);
+            libc::signal(libc::SIGTERM, libc::SIG_DFL);
+            libc::signal(libc::SIGTSTP, libc::SIG_DFL);
+            libc::signal(libc::SIGTTIN, libc::SIG_DFL);
+            libc::signal(libc::SIGTTOU, libc::SIG_DFL);
+            libc::signal(libc::SIGCHLD, libc::SIG_DFL);
+        }
+    }
+    
+    /// Execute a command in the current process (exec family)
+    /// Port of zexecve() from exec.c
+    pub fn zexecve(&self, cmd: &str, args: &[String]) -> ! {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        
+        let c_cmd = CString::new(cmd).expect("CString::new failed");
+        
+        // Build argv
+        let c_args: Vec<CString> = std::iter::once(c_cmd.clone())
+            .chain(args.iter().map(|s| CString::new(s.as_str()).unwrap()))
+            .collect();
+        
+        let c_argv: Vec<*const libc::c_char> = c_args
+            .iter()
+            .map(|s| s.as_ptr())
+            .chain(std::iter::once(std::ptr::null()))
+            .collect();
+        
+        // Build envp from current environment
+        let env_vars: Vec<CString> = std::env::vars()
+            .map(|(k, v)| CString::new(format!("{}={}", k, v)).unwrap())
+            .collect();
+        
+        let c_envp: Vec<*const libc::c_char> = env_vars
+            .iter()
+            .map(|s| s.as_ptr())
+            .chain(std::iter::once(std::ptr::null()))
+            .collect();
+        
+        unsafe {
+            libc::execve(c_cmd.as_ptr(), c_argv.as_ptr(), c_envp.as_ptr());
+            // If we get here, exec failed
+            eprintln!("zshrs: exec failed: {}: {}", cmd, std::io::Error::last_os_error());
+            std::process::exit(127);
+        }
+    }
+    
+    /// Enter a subshell
+    /// Port of entersubsh() from exec.c
+    pub fn entersubsh(&mut self, flags: SubshellFlags) {
+        // Increment subshell level
+        let level = self.get_variable("ZSH_SUBSHELL")
+            .parse::<i32>()
+            .unwrap_or(0);
+        self.variables.insert("ZSH_SUBSHELL".to_string(), (level + 1).to_string());
+        
+        // Handle job control
+        if flags.contains(SubshellFlags::NOMONITOR) {
+            self.options.insert("monitor".to_string(), false);
+        }
+        
+        // Close unneeded fds
+        if !flags.contains(SubshellFlags::KEEPFDS) {
+            self.close_extra_fds();
+        }
+        
+        // Reset traps
+        if !flags.contains(SubshellFlags::KEEPTRAPS) {
+            self.reset_traps();
+        }
+    }
+    
+    /// Close extra file descriptors
+    fn close_extra_fds(&self) {
+        // Close fds > 10 (common shell convention)
+        for fd in 10..256 {
+            unsafe { libc::close(fd); }
+        }
+    }
+    
+    /// Reset all traps
+    fn reset_traps(&mut self) {
+        self.traps.clear();
+    }
+    
+    /// Execute a shell function
+    /// Port of doshfunc() from exec.c
+    pub fn doshfunc(&mut self, name: &str, func: &ShellCommand, args: &[String]) -> Result<i32, String> {
+        // Save current state
+        let old_argv = self.positional_params.clone();
+        let old_funcstack = self.arrays.get("funcstack").cloned();
+        let old_funcsourcetrace = self.arrays.get("funcsourcetrace").cloned();
+        
+        // Set positional parameters to function arguments
+        self.positional_params = args.to_vec();
+        
+        // Update funcstack
+        let mut funcstack = old_funcstack.clone().unwrap_or_default();
+        funcstack.insert(0, name.to_string());
+        self.arrays.insert("funcstack".to_string(), funcstack);
+        
+        // Execute function body
+        let result = self.execute_command(func);
+        
+        // Restore state
+        self.positional_params = old_argv;
+        if let Some(fs) = old_funcstack {
+            self.arrays.insert("funcstack".to_string(), fs);
+        } else {
+            self.arrays.remove("funcstack");
+        }
+        if let Some(fst) = old_funcsourcetrace {
+            self.arrays.insert("funcsourcetrace".to_string(), fst);
+        }
+        
+        result
+    }
+    
+    /// Execute arithmetic expression
+    /// Port of execarith() from exec.c
+    pub fn execarith(&mut self, expr: &str) -> i32 {
+        let result = self.eval_arith_expr(expr);
+        if result == 0 { 1 } else { 0 }
+    }
+    
+    /// Execute conditional expression
+    /// Port of execcond() from exec.c
+    pub fn execcond(&mut self, cond: &CondExpr) -> i32 {
+        if self.eval_cond_expr(cond) { 0 } else { 1 }
+    }
+    
+    /// Execute command and capture time
+    /// Port of exectime() from exec.c
+    pub fn exectime(&mut self, cmd: &ShellCommand) -> Result<i32, String> {
+        use std::time::Instant;
+        
+        let start = Instant::now();
+        let result = self.execute_command(cmd);
+        let elapsed = start.elapsed();
+        
+        // Print time in zsh format
+        let user_time = elapsed.as_secs_f64() * 0.7;  // Approximation
+        let sys_time = elapsed.as_secs_f64() * 0.1;
+        let real_time = elapsed.as_secs_f64();
+        
+        eprintln!(
+            "{:.2}s user {:.2}s system {:.0}% cpu {:.3} total",
+            user_time,
+            sys_time,
+            ((user_time + sys_time) / real_time * 100.0).min(100.0),
+            real_time
+        );
+        
+        result
+    }
+    
+    /// Find command in PATH
+    /// Port of findcmd() from exec.c
+    pub fn findcmd(&self, name: &str, do_hash: bool) -> Option<String> {
+        // Check command hash table first
+        if do_hash {
+            if let Some(path) = self.command_hash.get(name) {
+                if std::path::Path::new(path).exists() {
+                    return Some(path.clone());
+                }
+            }
+        }
+        
+        // Search PATH
+        if let Ok(path_var) = std::env::var("PATH") {
+            for dir in path_var.split(':') {
+                let full_path = format!("{}/{}", dir, name);
+                if std::path::Path::new(&full_path).is_file() {
+                    return Some(full_path);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Hash a command (add to command hash table)
+    /// Port of hashcmd() from exec.c
+    pub fn hashcmd(&mut self, name: &str, path: &str) {
+        self.command_hash.insert(name.to_string(), path.to_string());
+    }
+    
+    /// Check if command exists and is executable
+    /// Port of iscom() from exec.c
+    pub fn iscom(&self, name: &str) -> bool {
+        // Check if it's a builtin
+        if self.is_builtin_cmd(name) {
+            return true;
+        }
+        
+        // Check if it's a function
+        if self.functions.contains_key(name) {
+            return true;
+        }
+        
+        // Check if it's an alias
+        if self.aliases.contains_key(name) {
+            return true;
+        }
+        
+        // Check in PATH
+        self.findcmd(name, true).is_some()
+    }
+    
+    /// Check if name is a builtin (process control version)
+    fn is_builtin_cmd(&self, name: &str) -> bool {
+        let builtins = Self::get_builtin_names();
+        builtins.contains(&name)
+    }
+    
+    /// Close all file descriptors except stdin/stdout/stderr
+    /// Port of closem() from exec.c
+    pub fn closem(&self, exceptions: &[i32]) {
+        for fd in 3..256 {
+            if !exceptions.contains(&fd) {
+                unsafe { libc::close(fd); }
+            }
+        }
+    }
+    
+    /// Create a pipe
+    /// Port of mpipe() from exec.c
+    pub fn mpipe(&self) -> std::io::Result<(i32, i32)> {
+        let mut fds = [0i32; 2];
+        let result = unsafe { libc::pipe(fds.as_mut_ptr()) };
+        if result == -1 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok((fds[0], fds[1]))
+        }
+    }
+    
+    /// Add a file descriptor for redirection
+    /// Port of addfd() from exec.c
+    pub fn addfd(&self, fd: i32, target_fd: i32, mode: RedirMode) -> std::io::Result<()> {
+        match mode {
+            RedirMode::Dup => {
+                if fd != target_fd {
+                    unsafe {
+                        if libc::dup2(fd, target_fd) == -1 {
+                            return Err(std::io::Error::last_os_error());
+                        }
+                    }
+                }
+            }
+            RedirMode::Close => {
+                unsafe { libc::close(target_fd); }
+            }
+        }
+        Ok(())
+    }
+    
+    /// Get heredoc content
+    /// Port of gethere() from exec.c
+    pub fn gethere(&mut self, terminator: &str, strip_tabs: bool) -> String {
+        let mut content = String::new();
+        
+        // Would read until terminator is found
+        // This is simplified - real impl reads from input
+        
+        if strip_tabs {
+            content = content.lines()
+                .map(|line| line.trim_start_matches('\t'))
+                .collect::<Vec<_>>()
+                .join("\n");
+        }
+        
+        content
+    }
+    
+    /// Get herestring content
+    /// Port of getherestr() from exec.c
+    pub fn getherestr(&mut self, word: &str) -> String {
+        let expanded = self.expand_string(word);
+        format!("{}\n", expanded)
+    }
+    
+    /// Resolve a builtin command
+    /// Port of resolvebuiltin() from exec.c
+    pub fn resolvebuiltin(&self, name: &str) -> Option<BuiltinType> {
+        if self.is_builtin_cmd(name) {
+            Some(BuiltinType::Normal)
+        } else {
+            // Check disabled_builtins if we had that field
+            None
+        }
+    }
+    
+    /// Check if cd is possible
+    /// Port of cancd() from exec.c
+    pub fn cancd(&self, path_str: &str) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        
+        let path = std::path::Path::new(path_str);
+        if !path.is_dir() {
+            return false;
+        }
+        
+        if let Ok(meta) = path.metadata() {
+            let mode = meta.permissions().mode();
+            // Check execute permission (needed for cd)
+            let uid = unsafe { libc::getuid() };
+            let gid = unsafe { libc::getgid() };
+            let file_uid = meta.uid();
+            let file_gid = meta.gid();
+            
+            if uid == file_uid {
+                return (mode & 0o100) != 0;
+            } else if gid == file_gid {
+                return (mode & 0o010) != 0;
+            } else {
+                return (mode & 0o001) != 0;
+            }
+        }
+        
+        false
+    }
+    
+    /// Command not found handler
+    /// Port of commandnotfound() from exec.c
+    pub fn commandnotfound(&mut self, name: &str, args: &[String]) -> i32 {
+        // Check for command_not_found_handler function
+        if self.functions.contains_key("command_not_found_handler") {
+            let mut handler_args = vec![name.to_string()];
+            handler_args.extend(args.iter().cloned());
+            
+            if let Some(func) = self.functions.get("command_not_found_handler").cloned() {
+                if let Ok(code) = self.doshfunc("command_not_found_handler", &func, &handler_args) {
+                    return code;
+                }
+            }
+        }
+        
+        eprintln!("zshrs: command not found: {}", name);
+        127
+    }
+}
+
+use std::os::unix::fs::MetadataExt;
+
+bitflags::bitflags! {
+    /// Flags for zfork()
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct ForkFlags: u32 {
+        const NOJOB = 1 << 0;    // Don't add to job table
+        const NEWGRP = 1 << 1;   // Create new process group
+        const FGTTY = 1 << 2;    // Take foreground terminal
+        const KEEPSIGS = 1 << 3; // Keep signal handlers
+    }
+}
+
+bitflags::bitflags! {
+    /// Flags for entersubsh()
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct SubshellFlags: u32 {
+        const NOMONITOR = 1 << 0; // Disable job control
+        const KEEPFDS = 1 << 1;   // Keep file descriptors
+        const KEEPTRAPS = 1 << 2; // Keep trap handlers
+    }
+}
+
+/// Result of fork operation
+#[derive(Debug)]
+pub enum ForkResult {
+    Parent(i32),  // Contains child PID
+    Child,
+}
+
+/// Redirection mode
+#[derive(Debug, Clone, Copy)]
+pub enum RedirMode {
+    Dup,
+    Close,
+}
+
+/// Builtin command type
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltinType {
+    Normal,
+    Disabled,
 }

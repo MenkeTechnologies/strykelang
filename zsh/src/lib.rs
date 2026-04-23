@@ -53,6 +53,7 @@ pub mod ksh93;
 pub mod langinfo;
 pub mod mapfile;
 pub mod subst;
+pub mod subst_port;
 pub mod subscript;
 pub mod params;
 pub mod pcre;

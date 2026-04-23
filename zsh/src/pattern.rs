@@ -1045,6 +1045,240 @@ pub fn patmatch_captures<'a>(
     }
 }
 
+/// Try to match pattern against a length-limited string (from pattern.c pattrylen)
+pub fn pattrylen(prog: &PatProg, s: &str, len: usize) -> bool {
+    let truncated = if len < s.len() { &s[..len] } else { s };
+    pattry(prog, truncated)
+}
+
+/// Try to match with backreferences (from pattern.c pattryrefs)
+pub fn pattryrefs(prog: &PatProg, s: &str) -> Option<(bool, Vec<(usize, usize)>)> {
+    let mut matcher = PatMatcher::new(prog, s);
+    let matched = matcher.try_match();
+    if matched {
+        let refs: Vec<(usize, usize)> = (1..=prog.npar)
+            .map(|i| matcher.captures[i - 1])
+            .collect();
+        Some((true, refs))
+    } else {
+        Some((false, Vec::new()))
+    }
+}
+
+/// Get the length of the successful match (from pattern.c patmatchlen)
+pub fn patmatchlen(prog: &PatProg, s: &str) -> Option<usize> {
+    let mut matcher = PatMatcher::new(prog, s);
+    if matcher.try_match() {
+        Some(matcher.pos)
+    } else {
+        None
+    }
+}
+
+/// Parse glob flags from (#...) syntax (from pattern.c patgetglobflags)
+///
+/// Supports: (#i) case insensitive, (#l) lowercase matches upper,
+/// (#I) restore case, (#b)/(#B) backrefs, (#m)/(#M) match refs,
+/// (#a<n>) approximate matching, (#s) start assert, (#e) end assert,
+/// (#u)/(#U) multibyte, (#q) glob qualifiers (ignored)
+pub fn patgetglobflags(s: &str) -> Option<(GlobFlags, Option<PatOp>, usize)> {
+    if !s.starts_with("(#") {
+        return None;
+    }
+
+    let mut flags = GlobFlags::default();
+    let mut assert_op = None;
+    let mut pos = 2; // skip "(#"
+    let bytes = s.as_bytes();
+
+    while pos < bytes.len() && bytes[pos] != b')' {
+        match bytes[pos] {
+            b'q' => {
+                // Glob qualifiers - skip to end
+                while pos < bytes.len() && bytes[pos] != b')' {
+                    pos += 1;
+                }
+                break;
+            }
+            b'a' => {
+                // Approximate matching
+                pos += 1;
+                let mut num_str = String::new();
+                while pos < bytes.len() && bytes[pos].is_ascii_digit() {
+                    num_str.push(bytes[pos] as char);
+                    pos += 1;
+                }
+                flags.approx = num_str.parse().unwrap_or(1).min(254);
+                continue; // don't advance pos again
+            }
+            b'l' => {
+                flags.lcmatchuc = true;
+                flags.igncase = false;
+            }
+            b'i' => {
+                flags.igncase = true;
+                flags.lcmatchuc = false;
+            }
+            b'I' => {
+                flags.igncase = false;
+                flags.lcmatchuc = false;
+            }
+            b'b' => { flags.backref = true; }
+            b'B' => { flags.backref = false; }
+            b'm' => { flags.matchref = true; }
+            b'M' => { flags.matchref = false; }
+            b's' => { assert_op = Some(PatOp::IsStart); }
+            b'e' => { assert_op = Some(PatOp::IsEnd); }
+            b'u' => { flags.multibyte = true; }
+            b'U' => { flags.multibyte = false; }
+            _ => return None,
+        }
+        pos += 1;
+    }
+
+    if pos >= bytes.len() || bytes[pos] != b')' {
+        return None;
+    }
+    pos += 1; // skip ')'
+
+    // Start/end assertions must appear alone
+    if assert_op.is_some() && pos - 3 > 1 { // more than one flag char
+        return None;
+    }
+
+    Some((flags, assert_op, pos))
+}
+
+/// Check if character matches a character range element
+/// (from pattern.c patmatchrange)
+pub fn patmatchrange(range: &[char], ch: char, igncase: bool) -> bool {
+    let ch = if igncase { ch.to_ascii_lowercase() } else { ch };
+    for &rc in range {
+        let rc = if igncase { rc.to_ascii_lowercase() } else { rc };
+        if rc == ch {
+            return true;
+        }
+    }
+    false
+}
+
+/// Find index of character in range (from pattern.c patmatchindex)
+pub fn patmatchindex(range: &[char], idx: usize) -> Option<char> {
+    range.get(idx).copied()
+}
+
+/// Check if string contains pattern characters (from pattern.c haswilds)
+pub fn haswilds(s: &str) -> bool {
+    for c in s.chars() {
+        match c {
+            '*' | '?' | '[' | '#' | '^' | '~' | '<' | '>' => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Repeat match for the given pattern node (from pattern.c patrepeat)
+pub fn patrepeat(prog: &PatProg, s: &str, max: Option<usize>) -> usize {
+    let mut matcher = PatMatcher::new(prog, s);
+    let mut count = 0;
+    loop {
+        if let Some(m) = max {
+            if count >= m {
+                break;
+            }
+        }
+        let save = matcher.pos;
+        if !matcher.match_nodes_at(&prog.code, 0) {
+            matcher.pos = save;
+            break;
+        }
+        if matcher.pos == save {
+            break; // No progress
+        }
+        count += 1;
+    }
+    count
+}
+
+/// Pattern scope management - save disabled patterns
+#[derive(Debug, Default, Clone)]
+pub struct PatternScope {
+    pub disabled: Vec<String>,
+}
+
+static mut PATTERN_SCOPES: Vec<PatternScope> = Vec::new();
+
+/// Start a pattern scope (from pattern.c startpatternscope)
+pub fn startpatternscope() {
+    unsafe {
+        PATTERN_SCOPES.push(PatternScope::default());
+    }
+}
+
+/// End a pattern scope (from pattern.c endpatternscope)
+pub fn endpatternscope() {
+    unsafe {
+        PATTERN_SCOPES.pop();
+    }
+}
+
+/// Save pattern disables state
+pub fn savepatterndisables() -> Vec<String> {
+    unsafe {
+        PATTERN_SCOPES.last()
+            .map(|s| s.disabled.clone())
+            .unwrap_or_default()
+    }
+}
+
+/// Restore pattern disables state
+pub fn restorepatterndisables(disables: Vec<String>) {
+    unsafe {
+        if let Some(scope) = PATTERN_SCOPES.last_mut() {
+            scope.disabled = disables;
+        }
+    }
+}
+
+/// Clear pattern disables
+pub fn clearpatterndisables() {
+    unsafe {
+        if let Some(scope) = PATTERN_SCOPES.last_mut() {
+            scope.disabled.clear();
+        }
+    }
+}
+
+/// Free a compiled pattern (no-op in Rust, but provided for API compat)
+pub fn freepatprog(_prog: PatProg) {
+    // Rust handles this via Drop
+}
+
+/// Enable/disable pattern commands (from pattern.c pat_enables)
+pub fn pat_enables(cmd: &str, patterns: &[&str], enable: bool) -> i32 {
+    let _ = (cmd, patterns, enable);
+    // Pattern enable/disable is mainly for completion system
+    0
+}
+
+/// POSIX character class type names for [:stuff:]
+pub const COLON_CLASSES: &[&str] = &[
+    "alpha", "alnum", "ascii", "blank", "cntrl", "digit", "graph",
+    "lower", "print", "punct", "space", "upper", "xdigit",
+    "IDENT", "IFS", "IFSSPACE", "WORD", "INCOMPLETE", "INVALID",
+];
+
+/// Get the POSIX class type from name (from pattern.c range_type)
+pub fn range_type(name: &str) -> Option<usize> {
+    COLON_CLASSES.iter().position(|&c| c == name)
+}
+
+/// Convert a pattern range to a string for display (from pattern.c pattern_range_to_string)
+pub fn pattern_range_to_string(range_type_idx: usize) -> Option<String> {
+    COLON_CLASSES.get(range_type_idx).map(|s| format!("[:{}:]", s))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1167,5 +1401,68 @@ mod tests {
         // ?(pattern) = 0 or 1
         assert!(patmatch("?(ab)c", "c"));
         assert!(patmatch("?(ab)c", "abc"));
+    }
+
+    #[test]
+    fn test_pattrylen() {
+        let prog = patcompile("hello", PatFlags::default()).unwrap();
+        assert!(pattrylen(&prog, "hello world", 5));
+        assert!(!pattrylen(&prog, "hello world", 3));
+    }
+
+    #[test]
+    fn test_patmatchlen() {
+        let prog = patcompile("hel*", PatFlags { noanch: true, ..Default::default() }).unwrap();
+        let len = patmatchlen(&prog, "hello world");
+        assert!(len.is_some());
+    }
+
+    #[test]
+    fn test_patgetglobflags() {
+        let (flags, assert_op, consumed) = patgetglobflags("(#i)rest").unwrap();
+        assert!(flags.igncase);
+        assert!(assert_op.is_none());
+        assert_eq!(consumed, 4);
+
+        let (flags, _, _) = patgetglobflags("(#l)rest").unwrap();
+        assert!(flags.lcmatchuc);
+        assert!(!flags.igncase);
+
+        let (_, assert_op, _) = patgetglobflags("(#s)rest").unwrap();
+        assert_eq!(assert_op, Some(PatOp::IsStart));
+
+        let (flags, _, _) = patgetglobflags("(#bm)rest").unwrap();
+        assert!(flags.backref);
+        assert!(flags.matchref);
+    }
+
+    #[test]
+    fn test_haswilds() {
+        assert!(haswilds("*.txt"));
+        assert!(haswilds("file?"));
+        assert!(haswilds("[abc]"));
+        assert!(haswilds("foo#"));
+        assert!(!haswilds("plain"));
+    }
+
+    #[test]
+    fn test_patmatchrange() {
+        let range = vec!['a', 'b', 'c'];
+        assert!(patmatchrange(&range, 'a', false));
+        assert!(!patmatchrange(&range, 'd', false));
+        assert!(patmatchrange(&range, 'A', true));
+    }
+
+    #[test]
+    fn test_range_type() {
+        assert_eq!(range_type("alpha"), Some(0));
+        assert_eq!(range_type("digit"), Some(5));
+        assert_eq!(range_type("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_pattern_range_to_string() {
+        assert_eq!(pattern_range_to_string(0), Some("[:alpha:]".to_string()));
+        assert_eq!(pattern_range_to_string(5), Some("[:digit:]".to_string()));
     }
 }
