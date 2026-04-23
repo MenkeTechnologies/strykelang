@@ -1,6 +1,6 @@
 # ZSH Codebase Audit
 
-**ZSH masquerades as a proper shell while running on actual disaster-grade C source code.**
+**An engineering audit revealing critical deficiencies in the zsh C source code.**
 
 **ZSH hosts destructive commands (`rm -rf`, `chmod`, `chown`, `mkfs`, `dd`) on every dev machine and server in the world — with 7 CVEs, 465 unsafe string operations, 174 memory leak points, and blocking I/O on the hot path. Every command you type passes through a 1,502-line function with 18 gotos, backed by a custom heap allocator with no unit tests. This is the software trusted to parse and execute commands that can destroy filesystems, escalate privileges, and modify production infrastructure.**
 
@@ -178,7 +178,7 @@ In an interactive session running for hours, every tab completion, every glob ex
 ## Code Quality
 
 - **1,150 #ifdef/#ifndef blocks** — preprocessor spaghetti for 90s portability hacks still in the code
-- **385 TODO/FIXME/HACK/XXX/BUG markers** — acknowledged problems nobody fixed
+- **385 TODO/FIXME/HACK/XXX/BUG markers** — acknowledged but unresolved
 - **240 DPUTS calls** — printf debugging as the primary debugging strategy
 - `sprintf(tmpbuf, "foo %s", cc->str); /* KLUDGE! */` — their word, not mine
 - `SUNKEYBOARDHACK` — a shell option literally named "hack" that ships as a first-class feature
@@ -338,7 +338,7 @@ zshrs indexes functions at install time in SQLite. Function lookup is one indexe
 - **No code review.** Patches are emailed to the mailing list. Someone reads them (maybe). Someone commits them (maybe). There is no review gate, no approval requirement, no CI check.
 - **Mailing list archives** are the "bug tracker": https://www.zsh.org/mla/workers/
 
-This is how software was developed in 1995. It's how zsh is still developed in 2026.
+These development practices predate modern software engineering infrastructure by decades.
 
 ### Where's ZSH 6?
 
@@ -366,7 +366,7 @@ Last release: **zsh 5.9 — May 2022.** Over 3 years ago. No zsh 6. No roadmap. 
 | 2023 | 239 | -2% |
 | 2024 | 159 | -33% |
 
-**From 951 commits in 2015 to 159 in 2024. 83% decline.** The project is dying.
+**From 951 commits in 2015 to 159 in 2024. 83% decline.** Development velocity is unsustainable for a project of this scope.
 
 ### Bus Factor: 2
 
@@ -401,7 +401,7 @@ The core engine — the parser, lexer, parameter expansion, command execution, t
 
 **Zero improvements to the parser in 3 years. Zero improvements to the lexer. Zero improvements to parameter expansion. Zero improvements to command execution.** The 1,502-line `execcmd()` with 18 gotos hasn't been touched. The 186 gotos are still there. The 1,940 global statics are still there. The 174 memory leak points are still there.
 
-They're not fixing the engine. They're not refactoring. They're not adding tests. They're editing shell scripts and calling it development.
+The engine is not being improved. No refactoring. No new tests. Development activity is focused on shell script maintenance, not core engineering.
 
 Recent completion commits — this is what "zsh development" looks like:
 
@@ -415,7 +415,7 @@ update _pmap, _date, _pgrep, _sysctl
 fix _man for NetBSD
 ```
 
-This is not shell development. This is shell script maintenance. The underlying C engine rots while they polish the shell-script completions that run at interpreter speed.
+The underlying C engine remains unchanged while development focus stays on shell-script completions that run at interpreter speed.
 
 ### No Onboarding
 
@@ -438,17 +438,17 @@ ZSH will never be rewritten by its own team. Here's why:
 
 2. **No tests to validate a rewrite.** Fish had tests. ZSH has zero unit tests. How do you verify a rewrite is correct when you have no specification of correct behavior? The only "tests" are integration tests with ordering dependencies that can't run in isolation.
 
-3. **The team edits shell scripts, not systems code.** 32% of commits in the last 3 years are completion shell script edits. 1.5% touch core C. Adding `--verbose` to `_apt` is not the same skill set as rewriting a parser in Rust.
+3. **Development focus is shell scripts, not systems code.** 32% of commits in the last 3 years are completion shell script edits. 1.5% touch core C. The skill set required to rewrite a parser in Rust is different from maintaining completion scripts.
 
 4. **No infrastructure to support a rewrite.** No CI, no GitHub, no issue tracker. You can't coordinate a multi-month rewrite over a mailing list with emailed patches. Fish had GitHub, PRs, CI, code review. ZSH has email.
 
 5. **No urgency.** Apple ships it. Users don't complain. Nobody reads the source. The 465 unsafe string operations, 174 memory leak points, and 7 CVEs are invisible to users who just want tab completion to work. Why rewrite something nobody's looking at?
 
-6. **Bus factor of 2.** Two developers doing 60% of the work. They don't have bandwidth to maintain what exists, let alone rewrite it. And they're not systems programmers — they're shell script maintainers.
+6. **Bus factor of 2.** Two developers doing 60% of the work. They don't have bandwidth to maintain what exists, let alone rewrite it.
 
-7. **No one left who can.** The people who understood the C code (Paul Falstad, Peter Stephenson) are gone or inactive. The people who remain lack the expertise to rewrite 147,233 lines of C in any language, let alone Rust.
+7. **Original architects are gone.** The developers who understood the C code (Paul Falstad, Peter Stephenson) are inactive. Institutional knowledge of the engine has been lost.
 
-Fish got rewritten because fish developers are engineers. ZSH rots because the people left aren't equipped to do anything about it. That's why zshrs exists — because the zsh team can't do it and won't do it, so someone else has to.
+The fish team chose to rewrite because they recognized the technical debt and had the infrastructure (CI, tests, GitHub) to execute it. ZSH lacks all of these prerequisites. That's why zshrs exists — because the rewrite has to come from outside.
 
 ## Worst Engineering Principles Known to Man
 
@@ -459,11 +459,11 @@ Every principle of software engineering — violated:
 - **Information hiding:** 1,940 global mutable statics. Every file reaches into every other file's state.
 - **Memory safety:** Custom heap allocator that hides leaks. 174 alloc-without-free error paths. "The OS will clean up after us."
 - **Structured programming:** 186 gotos. 12 levels of nesting. 31 switch statements over 100 lines.
-- **Type safety:** 1,032 C casts. Void pointers everywhere. Trust the developer to get it right (they didn't).
+- **Type safety:** 1,032 C casts. Void pointers everywhere. No compile-time type checking.
 - **Readability:** 208 single-character variable declarations. `int c; char *s; int d;` — good luck debugging.
 - **Performance:** Library code written as interpreted shell script. 11,656 lines interpreted per Tab press. Disk I/O blocking the user on the hot path.
 - **Modularity:** Signal handling via manual queue/unqueue calls (524 of them). Miss one and the shell corrupts.
-- **Documentation:** 385 TODO/FIXME/HACK/XXX/BUG markers — acknowledged problems nobody fixed. A shell option literally named `SUNKEYBOARDHACK`.
+- **Documentation:** 385 TODO/FIXME/HACK/XXX/BUG markers — acknowledged but unresolved. A shell option literally named `SUNKEYBOARDHACK`.
 - **Build system:** Autoconf from the 90s. Custom `.mdh`/`.pro` file generation. Try building it on a new platform.
 - **Test isolation:** Tests depend on shared mutable state from prior tests. Can't run one test. Can't parallelize. Can't bisect.
 
@@ -486,7 +486,7 @@ All of this ships as the default shell on hundreds of millions of Macs:
 - **105,050 lines of completion "library" code** written as interpreted shell script instead of native code
 - **No way to run a single test in isolation** — integration tests depend on shared mutable state from prior tests
 
-And nobody noticed because nobody reads shell source code.
+These issues are invisible to end users who never read shell source code.
 
 Apple chose zsh as the macOS default in 2019 because the license changed from GPL to MIT. Not because anyone audited the code. Not because anyone ran the tests. Not because anyone profiled the completion system. Because of a license.
 
@@ -627,7 +627,7 @@ strcpy(tmp, lpre);
 strcpy(curvichg.buf, keybuf);
 ```
 
-These patterns have been in the code for decades. 7 CVEs have been found. With 465 unsafe string operations still in the source, more are waiting to be discovered. Nobody is auditing this code — there are no tests, no static analysis, no fuzzing pipeline.
+These patterns have been in the code for decades. 7 CVEs have been found. With 465 unsafe string operations still in the source, more are waiting to be discovered. There are no unit tests, no static analysis, and no fuzzing pipeline to catch these issues.
 
 ### Rust Eliminates This Entire Class
 
@@ -639,7 +639,7 @@ ZSH is not production-grade software. It never was.
 
 Production-grade means unit tests. ZSH has zero. Production-grade means memory safety guarantees. ZSH has a custom heap allocator with 174 leak points. Production-grade means code review standards. ZSH has 1,502-line functions with 18 gotos that nobody refactored in 30 years.
 
-Alpha-quality code in somebody's basement has more engineering discipline than this. Hobby projects on GitHub have CI pipelines, unit tests, and code review. ZSH has none of these and ships as the default shell on every developer machine Apple sells.
+Typical open-source projects on GitHub have CI pipelines, unit tests, and code review. ZSH has none of these and ships as the default shell on every developer machine Apple sells.
 
 This is not a matter of opinion. The numbers are measured directly from the source:
 
@@ -880,21 +880,19 @@ P10K injects itself as the **first** precmd function, displays a cached prompt f
 
 This is the most popular zsh "feature" — and it's a monkey patch hiding a performance problem that exists because the shell scans 986 files from disk on every startup.
 
-### Lipstick on a Pig
+### Workarounds Don't Fix Bad Code
 
 Zinit turbo mode. P10K instant prompt. gitstatus C daemon. compdef hijacking. Widget wrapping. Function body replacement. 702 monkey patches across the plugin ecosystem.
 
-All of it is lipstick on a pig. It's still a pig.
+None of it fixes the underlying code. The code still has 1,502-line functions with 18 gotos. The code still has 465 unsafe string operations. The code still has 174 memory leak points. The code still has zero unit tests. The code still scans 986 files from disk on every startup. The code still interprets 11,656 lines of shell script every time you press Tab.
 
-The pig has 1,502-line functions with 18 gotos. The pig has 465 unsafe string operations. The pig has 174 memory leak points. The pig has zero unit tests. The pig scans 986 files from disk on every startup. The pig interprets 11,656 lines of shell script every time you press Tab.
+P10K's instant prompt hides the latency — it doesn't fix the code that causes it. Zinit's turbo mode defers the slow startup — it doesn't fix the code that makes startup slow. gitstatus writes a C daemon — because the code is too slow to query git status natively.
 
-No amount of turbo mode, instant prompts, deferred loading, or compdef hijacking changes what's underneath. P10K's instant prompt hides the latency — it doesn't fix it. Zinit's turbo mode defers the pain — it doesn't eliminate it. gitstatus writes a C daemon to work around the shell's speed — because the shell is too slow to do its own job.
+702 monkey patches on top of bad code is still bad code.
 
-The entire zsh plugin ecosystem is 702 monkey patches pretending the pig is not a pig.
+ZSH's plugin ecosystem is the most elaborate workaround layer ever built for a shell. Hundreds of developers have spent thousands of hours writing sophisticated monkey patches — turbo loading, instant prompts, compiled daemons, deferred completions — all to compensate for fundamental deficiencies in the underlying code. The result looks impressive from the outside, but every "feature" is a patch hiding bad code that should have been fixed in the engine decades ago.
 
-ZSH's plugin ecosystem is the most elaborate workaround layer ever built for a shell. Hundreds of developers have spent thousands of hours writing sophisticated monkey patches — turbo loading, instant prompts, compiled daemons, deferred completions — all to compensate for fundamental architectural failures in the underlying shell. The result looks impressive from the outside, but every "feature" is a patch hiding a deficiency that should have been fixed in the engine decades ago.
-
-You don't fix a broken foundation by decorating the walls. You rebuild the foundation.
+Workarounds on top of bad code don't produce good code. They produce bad code with workarounds. You don't fix a broken foundation by decorating the walls. You rebuild the foundation.
 
 ### zshrs: A Real Extension Model
 
@@ -911,8 +909,8 @@ In zshrs, plugins don't need to monkey patch:
 
 ## The Bottom Line
 
-ZSH is a dead project maintained by shell script editors, not engineers. No real systems engineer has touched the core C engine in years. 13 core commits in 3 years — 11 of them signal tweaks. Zero parser improvements. Zero lexer improvements. Zero memory safety fixes. Zero refactoring. The 1,502-line function with 18 gotos, the 465 unsafe string operations, the 174 memory leak points, the 1,940 global mutable statics — all untouched. All shipping to hundreds of millions of machines.
+The core C engine has received 13 commits in 3 years — 11 of them signal tweaks. Zero parser improvements. Zero lexer improvements. Zero memory safety fixes. Zero refactoring. The 1,502-line function with 18 gotos, the 465 unsafe string operations, the 174 memory leak points, the 1,940 global mutable statics — all untouched. All shipping to hundreds of millions of machines.
 
-The project has no CI, no GitHub, no issue tracker, no code review, no unit tests, no onboarding documentation, and no path to improvement. Commit velocity has declined 83% in a decade. The lead developer has stopped contributing. The bus factor is 2. There is no ZSH 6 and there never will be.
+The project has no CI, no GitHub, no issue tracker, no code review, no unit tests, and no onboarding documentation. Commit velocity has declined 83% in a decade. The bus factor is 2. There is no ZSH 6 on the horizon.
 
-This is not a project that can be saved. It must be replaced — by engineers who write real code, real tests, and use real tools. That replacement is zshrs.
+The codebase has accumulated too much technical debt to be incrementally improved. It needs a ground-up replacement with modern engineering practices. That replacement is zshrs.
