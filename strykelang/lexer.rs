@@ -1193,7 +1193,7 @@ impl Lexer {
                     if self.peek() == Some('>') {
                         self.advance();
                         self.last_was_term = false;
-                        return Ok(Token::ThreadArrow);
+                        return Ok(Token::ThreadArrowLast);
                     }
                     self.last_was_term = false;
                     return Ok(Token::Arrow);
@@ -1451,6 +1451,11 @@ impl Lexer {
                 self.advance();
                 if self.peek() == Some('>') {
                     self.advance();
+                    if self.peek() == Some('>') {
+                        self.advance();
+                        self.last_was_term = false;
+                        return Ok(Token::ThreadArrowLast);
+                    }
                     self.last_was_term = false;
                     return Ok(Token::ThreadArrow);
                 }

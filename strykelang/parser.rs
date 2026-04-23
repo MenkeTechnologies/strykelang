@@ -123,6 +123,9 @@ pub struct Parser {
     /// Bumped while parsing the then-branch of a ternary `? :` so `a ? b : c` doesn't
     /// misparse `b : c` as a range.
     suppress_colon_range: u32,
+    /// When true, `pipe_forward_apply` uses thread-last semantics (append to args)
+    /// instead of thread-first (prepend). Set by `->>` thread macro.
+    thread_last_mode: bool,
 }
 
 impl Parser {
@@ -146,6 +149,7 @@ impl Parser {
             suppress_slash_as_div: 0,
             suppress_m_regex: 0,
             suppress_colon_range: 0,
+            thread_last_mode: false,
         }
     }
 
@@ -1713,6 +1717,8 @@ impl Parser {
     /// `thread EXPR stage1 stage2 ...` — Clojure-style threading macro.
     /// Desugars to `EXPR |> stage1 |> stage2 |> ...`
     ///
+    /// When `thread_last` is true (`->>` syntax), injects as last arg instead of first.
+    ///
     /// When invoked as the RHS of `|>` (e.g. `LHS |> t s1 s2 ...`), the init
     /// is not parsed from tokens — using `parse_unary()` there lets the first
     /// bareword greedily consume the next token as its arg, which misparses
@@ -1721,7 +1727,11 @@ impl Parser {
     /// token through the stage loop, and wrap the resulting chain in a
     /// `CodeRef`. The outer `pipe_forward_apply` then calls it with `lhs` as
     /// `$_[0]`, giving `LHS |> t s1 s2 s3` == `LHS |> s1 |> s2 |> s3`.
-    fn parse_thread_macro(&mut self, _line: usize) -> PerlResult<Expr> {
+    fn parse_thread_macro(&mut self, _line: usize, thread_last: bool) -> PerlResult<Expr> {
+        // Set thread-last mode for pipe_forward_apply calls within this macro
+        let saved_thread_last = self.thread_last_mode;
+        self.thread_last_mode = thread_last;
+
         let pipe_rhs_wrap = self.in_pipe_rhs();
         let mut result = if pipe_rhs_wrap {
             Expr {
@@ -2037,16 +2047,19 @@ impl Parser {
                                 }
                             }
                             self.expect(&Token::RParen)?;
-                            // If no `$_` placeholder, auto-inject threaded value as first arg.
-                            // `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
+                            // If no `$_` placeholder, auto-inject threaded value.
+                            // Thread-first: `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
+                            // Thread-last: `->> data to_file("/tmp/o.html")` → `to_file("/tmp/o.html", $_)`
                             if !call_args.iter().any(Self::expr_contains_topic_var) {
-                                call_args.insert(
-                                    0,
-                                    Expr {
-                                        kind: ExprKind::ScalarVar("_".to_string()),
-                                        line: stage_line,
-                                    },
-                                );
+                                let topic = Expr {
+                                    kind: ExprKind::ScalarVar("_".to_string()),
+                                    line: stage_line,
+                                };
+                                if self.thread_last_mode {
+                                    call_args.push(topic);
+                                } else {
+                                    call_args.insert(0, topic);
+                                }
                             }
                             let call_expr = Expr {
                                 kind: ExprKind::FuncCall {
@@ -2253,6 +2266,9 @@ impl Parser {
             };
             last_stage_end_line = self.prev_line();
         }
+
+        // Restore thread-last mode
+        self.thread_last_mode = saved_thread_last;
 
         if pipe_rhs_wrap {
             // Wrap as `fn { …stages threaded from $_[0]… }` so the outer
@@ -5688,7 +5704,11 @@ impl Parser {
                         args.insert(0, lhs);
                     }
                     _ => {
-                        args.insert(0, lhs);
+                        if self.thread_last_mode {
+                            args.push(lhs);
+                        } else {
+                            args.insert(0, lhs);
+                        }
                     }
                 }
                 ExprKind::FuncCall { name, args }
@@ -5699,7 +5719,11 @@ impl Parser {
                 mut args,
                 super_call,
             } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::MethodCall {
                     object,
                     method,
@@ -5713,7 +5737,11 @@ impl Parser {
                 ampersand,
                 pass_caller_arglist: _,
             } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::IndirectCall {
                     target,
                     args,
@@ -5726,23 +5754,23 @@ impl Parser {
 
             // ── Print-like / diagnostic ops (variadic) ─────────────────────────
             ExprKind::Print { handle, mut args } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Print { handle, args }
             }
             ExprKind::Say { handle, mut args } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Say { handle, args }
             }
             ExprKind::Printf { handle, mut args } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Printf { handle, args }
             }
             ExprKind::Die(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Die(args)
             }
             ExprKind::Warn(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Warn(args)
             }
 
@@ -5752,81 +5780,81 @@ impl Parser {
             //   to the values list gives `sprintf(format, lhs, ...args)` for
             //   the common `$n |> sprintf "count=%d"` case.
             ExprKind::Sprintf { format, mut args } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Sprintf { format, args }
             }
 
             // ── System / exec / globbing / filesystem variadics ────────────────
             ExprKind::System(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::System(args)
             }
             ExprKind::Exec(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Exec(args)
             }
             ExprKind::Unlink(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Unlink(args)
             }
             ExprKind::Chmod(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Chmod(args)
             }
             ExprKind::Chown(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Chown(args)
             }
             ExprKind::Glob(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Glob(args)
             }
             ExprKind::Files(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Files(args)
             }
             ExprKind::Filesf(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Filesf(args)
             }
             ExprKind::FilesfRecursive(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::FilesfRecursive(args)
             }
             ExprKind::Dirs(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Dirs(args)
             }
             ExprKind::DirsRecursive(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::DirsRecursive(args)
             }
             ExprKind::SymLinks(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::SymLinks(args)
             }
             ExprKind::Sockets(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Sockets(args)
             }
             ExprKind::Pipes(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::Pipes(args)
             }
             ExprKind::BlockDevices(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::BlockDevices(args)
             }
             ExprKind::CharDevices(mut args) => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::CharDevices(args)
             }
             ExprKind::GlobPar { mut args, progress } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::GlobPar { args, progress }
             }
             ExprKind::ParSed { mut args, progress } => {
-                args.insert(0, lhs);
+                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
                 ExprKind::ParSed { args, progress }
             }
 
@@ -7774,7 +7802,13 @@ impl Parser {
                         line,
                     });
                 }
-                let expr = self.parse_expression()?;
+                // Inside parens, pipe-forward is allowed even if we're in a
+                // paren-less arg context. Save and restore no_pipe_forward_depth.
+                let saved_no_pipe = self.no_pipe_forward_depth;
+                self.no_pipe_forward_depth = 0;
+                let expr = self.parse_expression();
+                self.no_pipe_forward_depth = saved_no_pipe;
+                let expr = expr?;
                 self.expect(&Token::RParen)?;
                 Ok(expr)
             }
@@ -7836,7 +7870,11 @@ impl Parser {
             // Named functions / builtins
             Token::ThreadArrow => {
                 self.advance();
-                self.parse_thread_macro(line)
+                self.parse_thread_macro(line, false)
+            }
+            Token::ThreadArrowLast => {
+                self.advance();
+                self.parse_thread_macro(line, true)
             }
             Token::Ident(ref name) => {
                 let name = name.clone();
@@ -9508,7 +9546,7 @@ impl Parser {
                 })
             }
             "thread" | "t" => {
-                // `thread EXPR stage1 stage2 ...` — threading macro (like Clojure's ->>)
+                // `thread EXPR stage1 stage2 ...` — threading macro (thread-first)
                 // `t` is a short alias for `thread`
                 // Each stage is either:
                 //   - `ident` — bare function call
@@ -9517,7 +9555,7 @@ impl Parser {
                 //   - `sub { block }` — standalone anonymous block
                 //   - `>{ block }` — shorthand for standalone anonymous block
                 // Desugars to: EXPR |> stage1 |> stage2 |> ...
-                self.parse_thread_macro(line)
+                self.parse_thread_macro(line, false)
             }
             "retry" => {
                 // `retry { BLOCK }` or `retry BAREWORD` — bareword becomes zero-arg call.
