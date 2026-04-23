@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Huffman coding
+
+fn huffman_tree($freqs) {
+    my @nodes = ()
+    for my $char (keys %$freqs) {
+        push @nodes, { char => $char, freq => $freqs->{$char} }
+    }
+    
+    while (scalar(@nodes) > 1) {
+        # Sort by freq
+        @nodes = sort { $a->{freq} <=> $b->{freq} } @nodes
+        my $left = shift @nodes
+        my $right = shift @nodes
+        my $parent = {
+            left => $left,
+            right => $right,
+            freq => $left->{freq} + $right->{freq}
+        }
+        push @nodes, $parent
+    }
+    $nodes[0]
+}
+
+fn get_codes($node, $prefix, $codes) {
+    if (exists $node->{char}) {
+        $codes->{$node->{char}} = $prefix
+    } else {
+        get_codes($node->{left}, $prefix . "0", $codes)
+        get_codes($node->{right}, $prefix . "1", $codes)
+    }
+}
+
+my $freqs = { "a" => 5, "b" => 9, "c" => 12, "d" => 13, "e" => 16, "f" => 45 }
+my $tree = huffman_tree($freqs)
+my $codes = {}
+get_codes($tree, "", $codes)
+
+assert_eq length($codes->{f}), 1, "f should have shortest code"
+assert_ok length($codes->{a}) > length($codes->{f}), "a should have longer code than f"
+
+test_run

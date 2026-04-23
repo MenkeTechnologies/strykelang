@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Floyd-Warshall algorithm
+
+fn my_floyd_warshall($n, $edges) {
+    my $dist = []
+    for my $i (0..$n-1) {
+        $dist->[$i] = []
+        for my $j (0..$n-1) {
+            $dist->[$i][$j] = ($i == $j ? 0 : 1000000)
+        }
+    }
+    
+    for my $e (@$edges) {
+        my $u = $e->[0]
+        my $v = $e->[1]
+        my $w = $e->[2]
+        $dist->[$u][$v] = $w
+    }
+    
+    for my $k (0..$n-1) {
+        for my $i (0..$n-1) {
+            for my $j (0..$n-1) {
+                if ($dist->[$i][$k] + $dist->[$k][$j] < $dist->[$i][$j]) {
+                    $dist->[$i][$j] = $dist->[$i][$k] + $dist->[$k][$j]
+                }
+            }
+        }
+    }
+    $dist
+}
+
+my $edges = [
+    [0, 2, -2],
+    [1, 0, 4],
+    [1, 2, 3],
+    [2, 3, 2],
+    [3, 1, -1]
+]
+my $res = my_floyd_warshall(4, $edges)
+
+# Shortest path from 0 to 3: 0->2->3 (weight -2 + 2 = 0)
+assert_eq $res->[0][3], 0, "dist 0 to 3"
+# Shortest path from 1 to 2: 1->0->2 (weight 4 + -2 = 2)
+assert_eq $res->[1][2], 2, "dist 1 to 2"
+
+test_run

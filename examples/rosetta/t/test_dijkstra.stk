@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Dijkstra's algorithm
+
+fn my_dijkstra($graph, $start) {
+    my $dist = {}
+    my $prev = {}
+    my @nodes = keys %$graph
+    for my $n (@nodes) {
+        $dist->{$n} = 1000000
+        $prev->{$n} = undef
+    }
+    $dist->{$start} = 0
+    
+    my @q = @nodes
+    while (scalar(@q) > 0) {
+        my $u_idx = 0
+        for my $i (1..scalar(@q)-1) {
+            if ($dist->{$q[$i]} < $dist->{$q[$u_idx]}) {
+                $u_idx = $i
+            }
+        }
+        my $u = splice @q, $u_idx, 1
+        
+        if ($dist->{$u} >= 1000000) { last }
+        
+        for my $v_ref (@{$graph->{$u}}) {
+            my $v = $v_ref->[0]
+            my $weight = $v_ref->[1]
+            my $alt = $dist->{$u} + $weight
+            if ($alt < $dist->{$v}) {
+                $dist->{$v} = $alt
+                $prev->{$v} = $u
+            }
+        }
+    }
+    ($dist, $prev)
+}
+
+my $graph = {
+    "a" => [["b", 7], ["c", 9], ["f", 14]],
+    "b" => [["a", 7], ["c", 10], ["d", 15]],
+    "c" => [["a", 9], ["b", 10], ["d", 11], ["f", 2]],
+    "d" => [["b", 15], ["c", 11], ["e", 6]],
+    "e" => [["d", 6], ["f", 9]],
+    "f" => [["a", 14], ["c", 2], ["e", 9]]
+}
+
+my ($dist, $prev) = my_dijkstra($graph, "a")
+assert_eq $dist->{a}, 0, "dist a"
+assert_eq $dist->{b}, 7, "dist b"
+assert_eq $dist->{c}, 9, "dist c"
+assert_eq $dist->{d}, 20, "dist d"
+assert_eq $dist->{e}, 20, "dist e"
+assert_eq $dist->{f}, 11, "dist f"
+
+test_run

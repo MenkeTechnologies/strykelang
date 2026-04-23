@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pascal matrix generation
+
+fn my_pascal_matrix($n) {
+    my @matrix = ()
+    for my $i (0..$n-1) {
+        $matrix[$i] = []
+        for my $j (0..$n-1) {
+            if ($i == 0 || $j == 0) {
+                $matrix[$i][$j] = 1
+            } else {
+                $matrix[$i][$j] = $matrix[$i-1][$j] + $matrix[$i][$j-1]
+            }
+        }
+    }
+    ([@matrix])
+}
+
+my $res = my_pascal_matrix(5)
+assert_eq $res->[0][0], 1, "m[0][0]"
+assert_eq $res->[1][1], 2, "m[1][1]"
+assert_eq $res->[2][2], 6, "m[2][2]"
+assert_eq $res->[4][4], 70, "m[4][4]"
+
+test_run

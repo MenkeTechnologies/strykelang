@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Quickselect
+
+fn my_partition($arr_ref, $left, $right, $pivot_idx) {
+    my $pivot_val = $arr_ref->[$pivot_idx]
+    ($arr_ref->[$pivot_idx], $arr_ref->[$right]) = ($arr_ref->[$right], $arr_ref->[$pivot_idx])
+    my $store_idx = $left
+    for my $i ($left..$right-1) {
+        if ($arr_ref->[$i] < $pivot_val) {
+            ($arr_ref->[$i], $arr_ref->[$store_idx]) = ($arr_ref->[$store_idx], $arr_ref->[$i])
+            $store_idx++
+        }
+    }
+    ($arr_ref->[$right], $arr_ref->[$store_idx]) = ($arr_ref->[$store_idx], $arr_ref->[$right])
+    $store_idx
+}
+
+fn my_quickselect($arr_ref, $left, $right, $k) {
+    if ($left == $right) { return $arr_ref->[$left] }
+    my $pivot_idx = $left + int(rand($right - $left + 1))
+    $pivot_idx = my_partition($arr_ref, $left, $right, $pivot_idx)
+    if ($k == $pivot_idx) {
+        return $arr_ref->[$k]
+    } elsif ($k < $pivot_idx) {
+        return my_quickselect($arr_ref, $left, $pivot_idx - 1, $k)
+    } else {
+        return my_quickselect($arr_ref, $pivot_idx + 1, $right, $k)
+    }
+}
+
+my $data = [9, 8, 7, 6, 5, 0, 1, 2, 3, 4]
+assert_eq my_quickselect($data, 0, 9, 0), 0, "0-th smallest"
+assert_eq my_quickselect($data, 0, 9, 5), 5, "5-th smallest"
+assert_eq my_quickselect($data, 0, 9, 9), 9, "9-th smallest"
+
+test_run

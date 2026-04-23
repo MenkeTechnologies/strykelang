@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stable marriage problem
+
+fn my_stable_marriage($guys_pref, $girls_pref) {
+    my $guys_match = {}
+    my $girls_match = {}
+    my @free_guys = keys %$guys_pref
+    
+    my $girls_rank = {}
+    for my $girl (keys %$girls_pref) {
+        $girls_rank->{$girl} = {}
+        my $rank = 0
+        for my $guy (@{$girls_pref->{$girl}}) {
+            $girls_rank->{$girl}{$guy} = $rank++
+        }
+    }
+    
+    my $proposals = {}
+    while (scalar(@free_guys) > 0) {
+        my $guy = shift @free_guys
+        my $pref_list = $guys_pref->{$guy}
+        my $idx = $proposals->{$guy} || 0
+        my $girl = $pref_list->[$idx]
+        $proposals->{$guy} = $idx + 1
+        
+        if (!exists $girls_match->{$girl}) {
+            $girls_match->{$girl} = $guy
+            $guys_match->{$guy} = $girl
+        } else {
+            my $current_guy = $girls_match->{$girl}
+            if ($girls_rank->{$girl}{$guy} < $girls_rank->{$girl}{$current_guy}) {
+                $girls_match->{$girl} = $guy
+                $guys_match->{$guy} = $girl
+                push @free_guys, $current_guy
+                # Clean up old match
+                delete $guys_match->{$current_guy}
+            } else {
+                push @free_guys, $guy
+            }
+        }
+    }
+    $guys_match
+}
+
+my $guys = {
+    "abe" => ["abi", "eve", "ivon"],
+    "bob" => ["eve", "abi", "ivon"],
+    "col" => ["abi", "eve", "ivon"]
+}
+my $girls = {
+    "abi" => ["bob", "abe", "col"],
+    "eve" => ["abe", "bob", "col"],
+    "ivon" => ["abe", "bob", "col"]
+}
+
+my $res = my_stable_marriage($guys, $girls)
+# Result depends on who proposes first. If guys propose:
+# abe -> abi (accepted)
+# bob -> eve (accepted)
+# col -> abi (rejected by abi, abi prefers abe)
+# col -> eve (rejected by eve, eve prefers bob)
+# col -> ivon (accepted)
+assert_eq $res->{abe}, "abi", "abe matched with abi"
+assert_eq $res->{bob}, "eve", "bob matched with eve"
+assert_eq $res->{col}, "ivon", "col matched with ivon"
+
+test_run

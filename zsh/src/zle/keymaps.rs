@@ -1,6 +1,384 @@
 //! ZLE Keymap management
 
 use std::collections::HashMap;
+use std::sync::Mutex;
+use parking_lot::ReentrantMutex;
+use std::cell::RefCell;
+use std::collections::VecDeque;
+
+/// ZLE state for widget execution
+#[derive(Debug)]
+pub struct ZleState {
+    /// Current line buffer
+    pub buffer: String,
+    /// Cursor position (in characters)
+    pub cursor: usize,
+    /// Mark position
+    pub mark: usize,
+    /// Numeric argument
+    pub numeric_arg: Option<i32>,
+    /// In insert mode (vs overwrite)
+    pub insert_mode: bool,
+    /// Last character for find commands
+    pub last_find_char: Option<char>,
+    /// Find direction (true = forward)
+    pub find_forward: bool,
+    /// Undo history
+    undo_history: Vec<(String, usize)>,
+    /// Redo stack
+    pub undo_stack: Vec<(String, usize)>,
+    /// Kill ring
+    kill_ring: VecDeque<String>,
+    /// Max kill ring size
+    kill_ring_max: usize,
+    /// Vi command mode flag
+    pub vi_cmd_mode: bool,
+    /// Current keymap
+    pub keymap: KeymapName,
+    /// Last yank position for yank-pop
+    last_yank_pos: Option<(usize, usize)>,
+    /// Region is active (for visual selection)
+    pub region_active: bool,
+}
+
+impl Default for ZleState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ZleState {
+    pub fn new() -> Self {
+        ZleState {
+            buffer: String::new(),
+            cursor: 0,
+            mark: 0,
+            numeric_arg: None,
+            insert_mode: true,
+            last_find_char: None,
+            find_forward: true,
+            undo_history: Vec::new(),
+            undo_stack: Vec::new(),
+            kill_ring: VecDeque::new(),
+            kill_ring_max: 8,
+            vi_cmd_mode: false,
+            keymap: KeymapName::Emacs,
+            last_yank_pos: None,
+            region_active: false,
+        }
+    }
+
+    /// Save current state for undo
+    pub fn save_undo(&mut self) {
+        self.undo_history.push((self.buffer.clone(), self.cursor));
+        if self.undo_history.len() > 100 {
+            self.undo_history.remove(0);
+        }
+    }
+
+    /// Undo last change
+    pub fn undo(&mut self) -> bool {
+        if let Some((buffer, cursor)) = self.undo_history.pop() {
+            self.undo_stack.push((self.buffer.clone(), self.cursor));
+            self.buffer = buffer;
+            self.cursor = cursor;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Redo last undone change
+    pub fn redo(&mut self) -> bool {
+        if let Some((buffer, cursor)) = self.undo_stack.pop() {
+            self.undo_history.push((self.buffer.clone(), self.cursor));
+            self.buffer = buffer;
+            self.cursor = cursor;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Add text to kill ring
+    pub fn kill_add(&mut self, text: &str) {
+        self.kill_ring.push_front(text.to_string());
+        if self.kill_ring.len() > self.kill_ring_max {
+            self.kill_ring.pop_back();
+        }
+    }
+
+    /// Yank from kill ring
+    pub fn yank(&mut self) -> Option<String> {
+        if let Some(text) = self.kill_ring.front().cloned() {
+            let start = self.cursor;
+            // Insert text at cursor
+            let chars: Vec<char> = self.buffer.chars().collect();
+            let mut new_buffer = String::new();
+            for (i, c) in chars.iter().enumerate() {
+                if i == self.cursor {
+                    new_buffer.push_str(&text);
+                }
+                new_buffer.push(*c);
+            }
+            if self.cursor >= chars.len() {
+                new_buffer.push_str(&text);
+            }
+            self.buffer = new_buffer;
+            self.cursor += text.chars().count();
+            self.last_yank_pos = Some((start, self.cursor));
+            Some(text)
+        } else {
+            None
+        }
+    }
+
+    /// Yank-pop: replace last yank with next kill ring entry
+    pub fn yank_pop(&mut self) -> Option<String> {
+        if let Some((start, end)) = self.last_yank_pos {
+            // Remove the previous yank
+            let chars: Vec<char> = self.buffer.chars().collect();
+            let mut new_buffer = String::new();
+            for (i, c) in chars.iter().enumerate() {
+                if i < start || i >= end {
+                    new_buffer.push(*c);
+                }
+            }
+            self.buffer = new_buffer;
+            self.cursor = start;
+            
+            // Rotate kill ring
+            if let Some(front) = self.kill_ring.pop_front() {
+                self.kill_ring.push_back(front);
+            }
+            
+            // Yank the new top
+            self.yank()
+        } else {
+            None
+        }
+    }
+
+    /// Get text from kill ring (without inserting)
+    pub fn kill_yank(&self) -> Option<&str> {
+        self.kill_ring.front().map(|s| s.as_str())
+    }
+
+    /// Rotate kill ring
+    pub fn kill_rotate(&mut self) {
+        if let Some(front) = self.kill_ring.pop_front() {
+            self.kill_ring.push_back(front);
+        }
+    }
+}
+
+/// Global ZLE manager (accessed via zle() function)
+pub struct ZleManager {
+    /// Keymaps
+    pub keymaps: HashMap<KeymapName, Keymap>,
+    /// User-defined widgets
+    user_widgets: HashMap<String, String>,
+}
+
+impl Default for ZleManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ZleManager {
+    pub fn new() -> Self {
+        let mut mgr = ZleManager {
+            keymaps: HashMap::new(),
+            user_widgets: HashMap::new(),
+        };
+        
+        mgr.keymaps.insert(KeymapName::Main, Keymap::emacs_default());
+        mgr.keymaps.insert(KeymapName::Emacs, Keymap::emacs_default());
+        mgr.keymaps.insert(KeymapName::ViInsert, Keymap::viins_default());
+        mgr.keymaps.insert(KeymapName::ViCommand, Keymap::vicmd_default());
+        mgr.keymaps.insert(KeymapName::Isearch, Keymap::new());
+        mgr.keymaps.insert(KeymapName::Command, Keymap::new());
+        mgr.keymaps.insert(KeymapName::MenuSelect, Keymap::new());
+        
+        mgr
+    }
+    
+    /// Define a user widget
+    pub fn define_widget(&mut self, name: &str, func: &str) {
+        self.user_widgets.insert(name.to_string(), func.to_string());
+    }
+    
+    /// Get a widget by name (returns the function name if user-defined)
+    pub fn get_widget<'a>(&'a self, name: &'a str) -> Option<&'a str> {
+        // Check user widgets first
+        if let Some(func) = self.user_widgets.get(name) {
+            return Some(func);
+        }
+        // Check builtin widgets
+        if BUILTIN_WIDGETS.contains(&name) {
+            return Some(name);
+        }
+        None
+    }
+    
+    /// Bind a key in a keymap
+    pub fn bind_key(&mut self, keymap: KeymapName, key: &str, widget: &str) {
+        if let Some(km) = self.keymaps.get_mut(&keymap) {
+            km.bind(key, widget);
+        }
+    }
+    
+    /// Unbind a key from a keymap
+    pub fn unbind_key(&mut self, keymap: KeymapName, key: &str) {
+        if let Some(km) = self.keymaps.get_mut(&keymap) {
+            km.unbind(key);
+        }
+    }
+    
+    /// Execute a widget (stub - actual execution handled elsewhere)
+    pub fn execute_widget(&mut self, name: &str, _key: Option<char>) -> super::widgets::WidgetResult {
+        if self.get_widget(name).is_some() {
+            super::widgets::WidgetResult::Ok
+        } else {
+            super::widgets::WidgetResult::Error(format!("Unknown widget: {}", name))
+        }
+    }
+    
+    /// List all widget names
+    pub fn list_widgets(&self) -> Vec<&str> {
+        let mut widgets: Vec<&str> = BUILTIN_WIDGETS.to_vec();
+        
+        for name in self.user_widgets.keys() {
+            widgets.push(name.as_str());
+        }
+        
+        widgets
+    }
+}
+
+/// All builtin widget names
+const BUILTIN_WIDGETS: &[&str] = &[
+    "accept-line",
+    "accept-and-hold",
+    "backward-char",
+    "backward-delete-char",
+    "backward-kill-line",
+    "backward-kill-word",
+    "backward-word",
+    "beep",
+    "beginning-of-history",
+    "beginning-of-line",
+    "capitalize-word",
+    "clear-screen",
+    "complete-word",
+    "copy-region-as-kill",
+    "delete-char",
+    "delete-char-or-list",
+    "down-case-word",
+    "down-history",
+    "down-line-or-history",
+    "down-line-or-search",
+    "end-of-history",
+    "end-of-line",
+    "exchange-point-and-mark",
+    "execute-named-cmd",
+    "expand-or-complete",
+    "forward-char",
+    "forward-word",
+    "history-incremental-search-backward",
+    "history-incremental-search-forward",
+    "kill-buffer",
+    "kill-line",
+    "kill-region",
+    "kill-whole-line",
+    "kill-word",
+    "overwrite-mode",
+    "quoted-insert",
+    "redisplay",
+    "redo",
+    "self-insert",
+    "send-break",
+    "set-mark-command",
+    "transpose-chars",
+    "transpose-words",
+    "undo",
+    "up-case-word",
+    "up-history",
+    "up-line-or-history",
+    "up-line-or-search",
+    "vi-add-eol",
+    "vi-add-next",
+    "vi-backward-blank-word",
+    "vi-backward-char",
+    "vi-backward-delete-char",
+    "vi-backward-word",
+    "vi-change",
+    "vi-change-eol",
+    "vi-change-whole-line",
+    "vi-cmd-mode",
+    "vi-delete",
+    "vi-delete-char",
+    "vi-end-of-line",
+    "vi-find-next-char",
+    "vi-find-next-char-skip",
+    "vi-find-prev-char",
+    "vi-find-prev-char-skip",
+    "vi-first-non-blank",
+    "vi-forward-blank-word",
+    "vi-forward-char",
+    "vi-forward-word",
+    "vi-forward-word-end",
+    "vi-insert",
+    "vi-insert-bol",
+    "vi-join",
+    "vi-kill-eol",
+    "vi-open-line-above",
+    "vi-open-line-below",
+    "vi-put-after",
+    "vi-put-before",
+    "vi-repeat-change",
+    "vi-repeat-find",
+    "vi-repeat-search",
+    "vi-replace",
+    "vi-replace-chars",
+    "vi-rev-repeat-find",
+    "vi-rev-repeat-search",
+    "vi-substitute",
+    "vi-yank",
+    "vi-yank-whole-line",
+    "which-command",
+    "yank",
+    "yank-pop",
+];
+
+thread_local! {
+    static ZLE_MANAGER: RefCell<ZleManager> = RefCell::new(ZleManager::new());
+}
+
+/// Guard type for accessing ZLE manager
+pub struct ZleGuard<'a>(std::cell::RefMut<'a, ZleManager>);
+
+impl<'a> std::ops::Deref for ZleGuard<'a> {
+    type Target = ZleManager;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> std::ops::DerefMut for ZleGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// Get the global ZLE manager
+pub fn zle() -> ZleGuard<'static> {
+    ZLE_MANAGER.with(|m| {
+        // SAFETY: The RefCell is thread-local so this is safe
+        ZleGuard(unsafe { std::mem::transmute(m.borrow_mut()) })
+    })
+}
 
 /// Keymap identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knuth-Morris-Pratt string search
+
+fn kmp_prefix($p) {
+    my @chars = ~> $p chars
+    my $m = scalar(@chars)
+    my @pi = (0)
+    my $k = 0
+    for my $q (1..$m-1) {
+        while ($k > 0 && $chars[$k] ne $chars[$q]) {
+            $k = $pi[$k-1]
+        }
+        if ($chars[$k] eq $chars[$q]) {
+            $k++
+        }
+        $pi[$q] = $k
+    }
+    ([@pi])
+}
+
+fn kmp_search($t, $p) {
+    my @t_chars = ~> $t chars
+    my @p_chars = ~> $p chars
+    my $n = scalar(@t_chars)
+    my $m = scalar(@p_chars)
+    if ($m == 0) { return 0 }
+    
+    my $pi_ref = kmp_prefix($p)
+    my @pi = @$pi_ref
+    my $q = 0
+    for my $i (0..$n-1) {
+        while ($q > 0 && @p_chars[$q] ne $t_chars[$i]) {
+            $q = $pi[$q-1]
+        }
+        if (@p_chars[$q] eq $t_chars[$i]) {
+            $q++
+        }
+        if ($q == $m) {
+            return $i - $m + 1
+        }
+    }
+    -1
+}
+
+assert_eq kmp_search("abcabcabc", "abc"), 0, "Find abc at 0"
+assert_eq kmp_search("abcabcabc", "bca"), 1, "Find bca at 1"
+assert_eq kmp_search("abcabcabc", "cab"), 2, "Find cab at 2"
+assert_eq kmp_search("ABC ABCDAB ABCDABCDABDE", "ABCDABD"), 15, "Complex match"
+assert_eq kmp_search("hello world", "bye"), -1, "Not found"
+
+test_run

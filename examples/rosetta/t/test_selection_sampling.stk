@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Selection sampling (Algorithm S)
+
+fn selection_sampling($n, $max) {
+    my @sample = ()
+    my $m = 0 # items selected so far
+    for my $i (1..$max) {
+        if (int(rand($max - $i + 1)) < ($n - $m)) {
+            push @sample, $i
+            $m++
+        }
+        if ($m == $n) { last }
+    }
+    ([@sample])
+}
+
+my $n = 3
+my $max = 10
+my $res = selection_sampling($n, $max)
+assert_eq scalar(@$res), 3, "Sample size is 3"
+# Verify elements are in range and unique
+my %seen
+for my $x (@$res) {
+    assert_ok $x >= 1 && $x <= 10, "$x in range"
+    assert_ok !exists $seen{$x}, "$x is unique"
+    $seen{$x} = 1
+}
+
+test_run

@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Topological sort
+
+fn my_topological_sort($graph) {
+    my $in_degree = {}
+    my @nodes = keys %$graph
+    for my $u (@nodes) {
+        $in_degree->{$u} = 0
+    }
+    for my $u (@nodes) {
+        for my $v (@{$graph->{$u}}) {
+            $in_degree->{$v} = ($in_degree->{$v} || 0) + 1
+        }
+    }
+    
+    my @queue = ()
+    for my $u (@nodes) {
+        if ($in_degree->{$u} == 0) { push @queue, $u }
+    }
+    
+    my @sorted = ()
+    while (scalar(@queue) > 0) {
+        my $u = shift @queue
+        push @sorted, $u
+        for my $v (@{$graph->{$u}}) {
+            $in_degree->{$v}--
+            if ($in_degree->{$v} == 0) { push @queue, $v }
+        }
+    }
+    
+    if (scalar(@sorted) != scalar(@nodes)) {
+        return undef # Cycle detected
+    }
+    ([@sorted])
+}
+
+my $graph = {
+    "A" => ["C"],
+    "B" => ["C", "D"],
+    "C" => ["E"],
+    "D" => ["F"],
+    "E" => ["F"],
+    "F" => []
+}
+
+my $res = my_topological_sort($graph)
+assert_ok defined($res), "Topological sort exists"
+
+# Verify order
+my %pos
+for my $i (0..scalar(@$res)-1) { $pos{$res->[$i]} = $i }
+assert_ok $pos{A} < $pos{C}, "A < C"
+assert_ok $pos{B} < $pos{C}, "B < C"
+assert_ok $pos{C} < $pos{E}, "C < E"
+assert_ok $pos{E} < $pos{F}, "E < F"
+
+test_run

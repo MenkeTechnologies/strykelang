@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polygonal numbers
+
+fn get_polygonal($s, $n) {
+    (($s - 2) * $n * $n - ($s - 4) * $n) / 2
+}
+
+# s=3: triangular, s=4: square, s=5: pentagonal
+assert_eq get_polygonal(3, 10), 55, "Tri(10) = 55"
+assert_eq get_polygonal(4, 10), 100, "Sq(10) = 100"
+assert_eq get_polygonal(5, 10), 145, "Pent(10) = 145"
+assert_eq get_polygonal(6, 10), 190, "Hex(10) = 190"
+
+test_run
