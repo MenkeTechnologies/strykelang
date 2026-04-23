@@ -2024,6 +2024,314 @@ enum CmdOrMath {
     Err,
 }
 
+// ============================================================================
+// Additional parsing functions ported from lex.c
+// ============================================================================
+
+/// Check whether we're looking at valid numeric globbing syntax
+/// (/\<[0-9]*-[0-9]*\>/). Call pointing just after the opening "<".
+/// Leaves the input in the same place, returning true or false.
+/// 
+/// Port of isnumglob() from lex.c
+pub fn isnumglob(input: &str, pos: usize) -> bool {
+    let chars: Vec<char> = input[pos..].chars().collect();
+    let mut i = 0;
+    let mut expect_close = false;
+    
+    // Look for digits, then -, then digits, then >
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_ascii_digit() {
+            i += 1;
+        } else if c == '-' && !expect_close {
+            expect_close = true;
+            i += 1;
+        } else if c == '>' && expect_close {
+            return true;
+        } else {
+            break;
+        }
+    }
+    false
+}
+
+/// Tokenize a string as if in double quotes.
+/// This is usually called before singsub().
+/// 
+/// Port of parsestr() / parsestrnoerr() from lex.c
+pub fn parsestr(s: &str) -> Result<String, String> {
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        match c {
+            '\\' => {
+                i += 1;
+                if i < chars.len() {
+                    let next = chars[i];
+                    match next {
+                        '$' | '\\' | '`' | '"' | '\n' => {
+                            result.push(char_tokens::BNULL);
+                            result.push(next);
+                        }
+                        _ => {
+                            result.push('\\');
+                            result.push(next);
+                        }
+                    }
+                } else {
+                    result.push('\\');
+                }
+            }
+            '$' => {
+                result.push(char_tokens::QSTRING);
+                if i + 1 < chars.len() {
+                    let next = chars[i + 1];
+                    if next == '{' {
+                        result.push(char_tokens::INBRACE);
+                        i += 1;
+                    } else if next == '(' {
+                        result.push(char_tokens::INPAR);
+                        i += 1;
+                    }
+                }
+            }
+            '`' => {
+                result.push(char_tokens::QTICK);
+            }
+            _ => {
+                result.push(c);
+            }
+        }
+        i += 1;
+    }
+    
+    Ok(result)
+}
+
+/// Parse a subscript in string s.
+/// Return the position after the closing bracket, or None on error.
+/// 
+/// Port of parse_subscript() from lex.c
+pub fn parse_subscript(s: &str, endchar: char) -> Option<usize> {
+    if s.is_empty() || s.starts_with(endchar) {
+        return None;
+    }
+    
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    let mut depth = 0;
+    let mut in_dquote = false;
+    let mut in_squote = false;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        
+        if in_squote {
+            if c == '\'' {
+                in_squote = false;
+            }
+            i += 1;
+            continue;
+        }
+        
+        if in_dquote {
+            if c == '"' {
+                in_dquote = false;
+            } else if c == '\\' && i + 1 < chars.len() {
+                i += 1; // skip escaped char
+            }
+            i += 1;
+            continue;
+        }
+        
+        match c {
+            '\\' => {
+                i += 1; // skip next char
+            }
+            '\'' => {
+                in_squote = true;
+            }
+            '"' => {
+                in_dquote = true;
+            }
+            '[' | '(' => {
+                depth += 1;
+            }
+            ']' | ')' => {
+                if depth > 0 {
+                    depth -= 1;
+                } else if c == endchar {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        
+        if c == endchar && depth == 0 {
+            return Some(i);
+        }
+        
+        i += 1;
+    }
+    
+    None
+}
+
+/// Tokenize a string as if it were a normal command-line argument
+/// but it may contain separators. Used for ${...%...} substitutions.
+/// 
+/// Port of parse_subst_string() from lex.c
+pub fn parse_subst_string(s: &str) -> Result<String, String> {
+    if s.is_empty() {
+        return Ok(String::new());
+    }
+    
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        match c {
+            '\\' => {
+                result.push(char_tokens::BNULL);
+                i += 1;
+                if i < chars.len() {
+                    result.push(chars[i]);
+                }
+            }
+            '\'' => {
+                result.push(char_tokens::SNULL);
+                i += 1;
+                while i < chars.len() && chars[i] != '\'' {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+                result.push(char_tokens::SNULL);
+            }
+            '"' => {
+                result.push(char_tokens::DNULL);
+                i += 1;
+                while i < chars.len() && chars[i] != '"' {
+                    if chars[i] == '\\' && i + 1 < chars.len() {
+                        result.push(char_tokens::BNULL);
+                        i += 1;
+                        result.push(chars[i]);
+                    } else if chars[i] == '$' {
+                        result.push(char_tokens::QSTRING);
+                    } else {
+                        result.push(chars[i]);
+                    }
+                    i += 1;
+                }
+                result.push(char_tokens::DNULL);
+            }
+            '$' => {
+                result.push(char_tokens::STRING);
+                if i + 1 < chars.len() {
+                    match chars[i + 1] {
+                        '{' => {
+                            result.push(char_tokens::INBRACE);
+                            i += 1;
+                        }
+                        '(' => {
+                            result.push(char_tokens::INPAR);
+                            i += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            '*' => result.push(char_tokens::STAR),
+            '?' => result.push(char_tokens::QUEST),
+            '[' => result.push(char_tokens::INBRACK),
+            ']' => result.push(char_tokens::OUTBRACK),
+            '{' => result.push(char_tokens::INBRACE),
+            '}' => result.push(char_tokens::OUTBRACE),
+            '~' => result.push(char_tokens::TILDE),
+            '#' => result.push(char_tokens::POUND),
+            '^' => result.push(char_tokens::HAT),
+            _ => result.push(c),
+        }
+        i += 1;
+    }
+    
+    Ok(result)
+}
+
+/// Untokenize a string - convert tokenized chars back to original
+/// 
+/// Port of untokenize() from exec.c (but used by lexer too)
+pub fn untokenize(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        // Check if it's a token character (in the special range)
+        if (c as u32) < 32 {
+            // Convert token back to original character
+            match c {
+                c if c == char_tokens::POUND => result.push('#'),
+                c if c == char_tokens::STRING => result.push('$'),
+                c if c == char_tokens::HAT => result.push('^'),
+                c if c == char_tokens::STAR => result.push('*'),
+                c if c == char_tokens::INPAR => result.push('('),
+                c if c == char_tokens::OUTPAR => result.push(')'),
+                c if c == char_tokens::INPARMATH => result.push('('),
+                c if c == char_tokens::OUTPARMATH => result.push(')'),
+                c if c == char_tokens::QSTRING => result.push('$'),
+                c if c == char_tokens::EQUALS => result.push('='),
+                c if c == char_tokens::BAR => result.push('|'),
+                c if c == char_tokens::INBRACE => result.push('{'),
+                c if c == char_tokens::OUTBRACE => result.push('}'),
+                c if c == char_tokens::INBRACK => result.push('['),
+                c if c == char_tokens::OUTBRACK => result.push(']'),
+                c if c == char_tokens::TICK => result.push('`'),
+                c if c == char_tokens::INANG => result.push('<'),
+                c if c == char_tokens::OUTANG => result.push('>'),
+                c if c == char_tokens::QUEST => result.push('?'),
+                c if c == char_tokens::TILDE => result.push('~'),
+                c if c == char_tokens::QTICK => result.push('`'),
+                c if c == char_tokens::COMMA => result.push(','),
+                c if c == char_tokens::DASH => result.push('-'),
+                c if c == char_tokens::BANG => result.push('!'),
+                c if c == char_tokens::SNULL || c == char_tokens::DNULL || c == char_tokens::BNULL => {
+                    // Null markers - skip
+                }
+                _ => {
+                    // Unknown token, try ztokens lookup
+                    let idx = c as usize;
+                    if idx < char_tokens::ZTOKENS.len() {
+                        result.push(char_tokens::ZTOKENS.chars().nth(idx).unwrap_or(c));
+                    } else {
+                        result.push(c);
+                    }
+                }
+            }
+        } else {
+            result.push(c);
+        }
+        i += 1;
+    }
+    
+    result
+}
+
+/// Check if a string contains any token characters
+pub fn has_token(s: &str) -> bool {
+    s.chars().any(|c| (c as u32) < 32)
+}
+
+/// Convert token characters to their printable form for display
+pub fn tokens_to_printable(s: &str) -> String {
+    untokenize(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

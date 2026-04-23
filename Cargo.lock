@@ -6267,6 +6267,7 @@ dependencies = [
  "libm",
  "nix 0.29.0",
  "nu-ansi-term",
+ "once_cell",
  "os_pipe",
  "parking_lot",
  "rand 0.8.6",

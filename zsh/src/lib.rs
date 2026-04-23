@@ -85,6 +85,7 @@ pub mod zselect;
 pub mod zutil;
 pub mod zwc;
 pub mod fish_features;
+pub mod db_gdbm;
 
 pub use tokens::{char_tokens, LexTok};
 pub use lexer::ZshLexer;
