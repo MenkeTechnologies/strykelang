@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Deadfish
+
+fn deadfish($cmd) {
+    my $v = 0
+    my @res
+    my @chars = chars($cmd)
+    for my $c (@chars) {
+        if ($c eq "i") { $v++ }
+        elsif ($c eq "d") { $v-- }
+        elsif ($c eq "s") { $v *= $v }
+        elsif ($c eq "o") { push @res, $v }
+        
+        if ($v == -1 || $v == 256) { $v = 0 }
+    }
+    ([@res])
+}
+
+assert_eq join(",", @{ deadfish("iissso") }), "0", "iissso"
+assert_eq join(",", @{ deadfish("diissisdo") }), "288", "diissisdo"
+# Wait, let's recheck Deadfish logic.
+# i: inc
+# d: dec
+# s: square
+# o: output
+# if v == -1 or v == 256, v = 0
+
+# Test 1: iissso
+# i: 1
+# i: 2
+# s: 4
+# s: 16
+# s: 256 -> v=0
+# o: output 0
+# Result: 0. Correct.
+
+# Test 2: diissisdo
+# d: -1 -> v=0
+# i: 1
+# i: 2
+# s: 4
+# s: 16
+# i: 17
+# s: 289
+# d: 288
+# o: output 288
+# Result: 288. Correct.
+
+"iissso" |> deadfish |> map { join(",", @$_) } |> assert_eq("0", "pipe deadfish")
+
+test_run

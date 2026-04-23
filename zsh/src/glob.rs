@@ -1499,6 +1499,279 @@ pub fn glob_with_options(pattern: &str, options: GlobOptions) -> Vec<String> {
     state.glob(pattern)
 }
 
+/// Add path component (from glob.c addpath lines 263-274)
+pub fn addpath(buf: &mut String, component: &str) {
+    buf.push_str(component);
+    if !buf.ends_with('/') {
+        buf.push('/');
+    }
+}
+
+/// Stat full path (from glob.c statfullpath lines 282-347)
+pub fn statfullpath(pathbuf: &str, name: &str, follow: bool) -> Option<std::fs::Metadata> {
+    let full = if name.is_empty() {
+        if pathbuf.is_empty() {
+            ".".to_string()
+        } else {
+            pathbuf.to_string()
+        }
+    } else {
+        format!("{}{}", pathbuf, name)
+    };
+    
+    if follow {
+        std::fs::metadata(&full).ok()
+    } else {
+        std::fs::symlink_metadata(&full).ok()
+    }
+}
+
+/// Check if path is a directory (from glob.c)
+pub fn is_directory(path: &str) -> bool {
+    std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+}
+
+/// Check if path is a symlink
+pub fn is_symlink(path: &str) -> bool {
+    std::fs::symlink_metadata(path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+/// Match minimum distance for spelling correction (from glob.c mindist lines 3523-3575)
+pub fn mindist(dir: &str, name: &str, best: &mut String, exact: bool) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return usize::MAX;
+    };
+    
+    let mut min_dist = usize::MAX;
+    
+    for entry in entries.flatten() {
+        let entry_name = entry.file_name().to_string_lossy().to_string();
+        if exact && entry_name == name {
+            *best = entry_name;
+            return 0;
+        }
+        
+        let dist = crate::utils::spdist(name, &entry_name, min_dist);
+        if dist < min_dist {
+            min_dist = dist;
+            *best = entry_name.clone();
+        }
+    }
+    
+    min_dist
+}
+
+/// Parse qualifier (from glob.c qgetnum)
+pub fn qgetnum(s: &str) -> Option<(i64, &str)> {
+    let end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
+    if end == 0 {
+        return None;
+    }
+    let num = s[..end].parse::<i64>().ok()?;
+    Some((num, &s[end..]))
+}
+
+/// Parse time modifier (from glob.c qualtime)
+pub fn qualtime(s: &str, units: char) -> Option<(i64, &str)> {
+    let (mut num, rest) = qgetnum(s)?;
+    
+    match units {
+        'h' => num *= 3600,
+        'd' => num *= 86400,
+        'w' => num *= 604800,
+        'M' => num *= 2592000,
+        _ => {}
+    }
+    
+    Some((num, rest))
+}
+
+/// Parse size modifier (from glob.c qualsize)
+pub fn qualsize(s: &str, units: char) -> Option<(i64, &str)> {
+    let (mut num, rest) = qgetnum(s)?;
+    
+    match units {
+        'k' | 'K' => num *= 1024,
+        'm' | 'M' => num *= 1024 * 1024,
+        'g' | 'G' => num *= 1024 * 1024 * 1024,
+        't' | 'T' => num *= 1024 * 1024 * 1024 * 1024,
+        'p' | 'P' => num *= 512,
+        _ => {}
+    }
+    
+    Some((num, rest))
+}
+
+/// Sort glob matches by type (from glob.c gmatchcmp lines 3595-3680)
+pub fn sort_matches_by_type(matches: &mut [String], sort_type: GlobSort, reverse: bool) {
+    match sort_type {
+        GlobSort::Name => {
+            matches.sort();
+        }
+        GlobSort::Size => {
+            matches.sort_by(|a, b| {
+                let size_a = std::fs::metadata(a).map(|m| m.len()).unwrap_or(0);
+                let size_b = std::fs::metadata(b).map(|m| m.len()).unwrap_or(0);
+                size_a.cmp(&size_b)
+            });
+        }
+        GlobSort::Mtime => {
+            matches.sort_by(|a, b| {
+                let time_a = std::fs::metadata(a)
+                    .and_then(|m| m.modified())
+                    .ok();
+                let time_b = std::fs::metadata(b)
+                    .and_then(|m| m.modified())
+                    .ok();
+                time_a.cmp(&time_b)
+            });
+        }
+        GlobSort::Atime => {
+            matches.sort_by(|a, b| {
+                let time_a = std::fs::metadata(a)
+                    .and_then(|m| m.accessed())
+                    .ok();
+                let time_b = std::fs::metadata(b)
+                    .and_then(|m| m.accessed())
+                    .ok();
+                time_a.cmp(&time_b)
+            });
+        }
+        GlobSort::Depth => {
+            matches.sort_by(|a, b| {
+                let depth_a = a.matches('/').count();
+                let depth_b = b.matches('/').count();
+                depth_a.cmp(&depth_b)
+            });
+        }
+        GlobSort::Links => {
+            matches.sort_by(|a, b| {
+                let links_a = std::fs::metadata(a).map(|m| m.nlink()).unwrap_or(0);
+                let links_b = std::fs::metadata(b).map(|m| m.nlink()).unwrap_or(0);
+                links_a.cmp(&links_b)
+            });
+        }
+        _ => {}
+    }
+    
+    if reverse {
+        matches.reverse();
+    }
+}
+
+/// File qualifier test functions (from glob.c qual* functions)
+pub mod qualifiers {
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::PermissionsExt;
+    
+    pub fn is_regular(path: &str) -> bool {
+        std::fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+    }
+    
+    pub fn is_directory(path: &str) -> bool {
+        std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+    }
+    
+    pub fn is_symlink(path: &str) -> bool {
+        std::fs::symlink_metadata(path)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false)
+    }
+    
+    pub fn is_fifo(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFIFO as u32)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_socket(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFSOCK as u32)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_block_device(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFBLK as u32)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_char_device(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFCHR as u32)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_setuid(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_ISUID as u32) != 0)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_setgid(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_ISGID as u32) != 0)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_sticky(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & libc::S_ISVTX as u32) != 0)
+            .unwrap_or(false)
+    }
+    
+    pub fn is_readable(path: &str) -> bool {
+        std::fs::metadata(path).is_ok() && 
+            std::fs::File::open(path).is_ok()
+    }
+    
+    pub fn is_writable(path: &str) -> bool {
+        std::fs::OpenOptions::new().write(true).open(path).is_ok()
+    }
+    
+    pub fn is_executable(path: &str) -> bool {
+        std::fs::metadata(path)
+            .map(|m| (m.mode() & 0o111) != 0)
+            .unwrap_or(false)
+    }
+    
+    pub fn size_matches(path: &str, size: u64, cmp: std::cmp::Ordering) -> bool {
+        std::fs::metadata(path)
+            .map(|m| m.len().cmp(&size) == cmp)
+            .unwrap_or(false)
+    }
+    
+    pub fn mtime_matches(path: &str, secs: i64, cmp: std::cmp::Ordering) -> bool {
+        std::fs::metadata(path)
+            .and_then(|m| m.modified())
+            .map(|t| {
+                let elapsed = t.elapsed().map(|d| d.as_secs() as i64).unwrap_or(0);
+                elapsed.cmp(&secs) == cmp
+            })
+            .unwrap_or(false)
+    }
+    
+    pub fn uid_matches(path: &str, uid: u32) -> bool {
+        std::fs::metadata(path)
+            .map(|m| m.uid() == uid)
+            .unwrap_or(false)
+    }
+    
+    pub fn gid_matches(path: &str, gid: u32) -> bool {
+        std::fs::metadata(path)
+            .map(|m| m.gid() == gid)
+            .unwrap_or(false)
+    }
+    
+    pub fn nlinks_matches(path: &str, nlinks: u64, cmp: std::cmp::Ordering) -> bool {
+        std::fs::metadata(path)
+            .map(|m| m.nlink().cmp(&nlinks) == cmp)
+            .unwrap_or(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

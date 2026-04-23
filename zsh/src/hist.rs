@@ -892,6 +892,143 @@ impl History {
 
         result
     }
+
+    /// Resize history entries to fit histsiz (from hist.c resizehistents lines 2620-2632)
+    pub fn resizehistents(&mut self) {
+        while self.histlinect > self.histsiz {
+            if let Some(oldest) = self.ring.pop() {
+                self.entries.remove(&oldest);
+                self.histlinect -= 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Read history file (from hist.c readhistfile lines 2675-2920)
+    pub fn readhistfile(&mut self, filename: &str, err: bool) -> io::Result<usize> {
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        let mut count = 0;
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.is_empty() {
+                continue;
+            }
+
+            // Check for extended history format: : <timestamp>:0;<command>
+            if line.starts_with(": ") {
+                let rest = &line[2..];
+                if let Some(semi) = rest.find(';') {
+                    let time_part = &rest[..semi];
+                    let cmd_part = &rest[semi + 1..];
+
+                    let stim = if let Some(colon) = time_part.find(':') {
+                        time_part[..colon].parse::<i64>().unwrap_or(0)
+                    } else {
+                        time_part.parse::<i64>().unwrap_or(0)
+                    };
+
+                    if !cmd_part.trim().is_empty() {
+                        self.curhist += 1;
+                        let mut entry = HistEntry::new(self.curhist, cmd_part.to_string());
+                        entry.stim = stim;
+                        entry.flags = hist_flags::OLD;
+                        self.add_entry(entry);
+                        count += 1;
+                    }
+                }
+            } else {
+                // Plain history line
+                if !line.trim().is_empty() {
+                    self.curhist += 1;
+                    let mut entry = HistEntry::new(self.curhist, line);
+                    entry.flags = hist_flags::OLD;
+                    self.add_entry(entry);
+                    count += 1;
+                }
+            }
+        }
+
+        if err && count == 0 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "No history entries"));
+        }
+
+        Ok(count)
+    }
+
+    /// Write history file (from hist.c savehistfile lines 2925-3155)
+    pub fn savehistfile(&self, filename: &str, mode: WriteMode) -> io::Result<usize> {
+        let file = match mode {
+            WriteMode::Overwrite => File::create(filename)?,
+            WriteMode::Append => OpenOptions::new().create(true).append(true).open(filename)?,
+        };
+        let mut writer = io::BufWriter::new(file);
+        let mut count = 0;
+
+        for num in self.ring.iter().rev() {
+            if let Some(entry) = self.entries.get(num) {
+                if (entry.flags & hist_flags::NOWRITE) != 0 {
+                    continue;
+                }
+
+                // Write in extended format
+                writeln!(writer, ": {}:0;{}", entry.stim, entry.text)?;
+                count += 1;
+            }
+        }
+
+        writer.flush()?;
+        Ok(count)
+    }
+
+    /// Lock history file (from hist.c lockhistfile lines 2961-2998)
+    pub fn lockhistfile(&self, filename: &str, _excl: bool) -> io::Result<()> {
+        let lockfile = format!("{}.lock", filename);
+        File::create(&lockfile)?;
+        Ok(())
+    }
+
+    /// Unlock history file (from hist.c unlockhistfile lines 3001-3018)
+    pub fn unlockhistfile(&self, filename: &str) -> io::Result<()> {
+        let lockfile = format!("{}.lock", filename);
+        std::fs::remove_file(&lockfile).ok();
+        Ok(())
+    }
+
+    /// Quote string for history (from hist.c quotestring lines 2483-2523)
+    pub fn quotestring(s: &str) -> String {
+        let mut result = String::with_capacity(s.len() + 10);
+        result.push('\'');
+
+        for c in s.chars() {
+            if c == '\'' {
+                result.push_str("'\\''");
+            } else {
+                result.push(c);
+            }
+        }
+
+        result.push('\'');
+        result
+    }
+
+    /// History word split (from hist.c get_history_word)
+    pub fn get_history_word(line: &str, idx: usize) -> Option<&str> {
+        line.split_whitespace().nth(idx)
+    }
+
+    /// Count words in history line
+    pub fn histword_count(line: &str) -> usize {
+        line.split_whitespace().count()
+    }
+}
+
+/// History file write mode
+pub enum WriteMode {
+    Overwrite,
+    Append,
 }
 
 #[cfg(test)]

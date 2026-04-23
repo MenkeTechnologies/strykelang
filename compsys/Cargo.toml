@@ -17,6 +17,10 @@ path = "main.rs"
 name = "menu-demo"
 path = "bin/menu_demo.rs"
 
+[[bin]]
+name = "bench-autoload"
+path = "bin/bench_autoload.rs"
+
 [dependencies]
 dirs = "5"
 libc = "0.2"

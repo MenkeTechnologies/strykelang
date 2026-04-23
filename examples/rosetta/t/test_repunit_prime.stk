@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Repunit primes
+
+fn my_is_prime($n) {
+    if ($n < 2) { 0 }
+    elsif ($n == 2) { 1 }
+    elsif ($n % 2 == 0) { 0 }
+    else {
+        my $limit = sqrt($n)
+        my $res = 1
+        my $i = 3
+        while ($i <= $limit) {
+            if ($n % $i == 0) {
+                $res = 0
+                $i = $n
+            }
+            $i += 2
+        }
+        $res
+    }
+}
+
+fn repunit($n) {
+    my $r = 0
+    my $i = 0
+    while ($i < $n) {
+        $r = $r * 10 + 1
+        $i++
+    }
+    $r
+}
+
+fn is_repunit_prime($n) {
+    if (!my_is_prime($n)) {
+        0
+    } else {
+        my $r = repunit($n)
+        my_is_prime($r)
+    }
+}
+
+assert_ok is_repunit_prime(2), "R2 = 11 is prime"
+assert_ok !is_repunit_prime(3), "R3 = 111 is not (3*37)"
+assert_ok !is_repunit_prime(5), "R5 = 11111 is not (41*271)"
+
+2 |> is_repunit_prime |> assert_ok("pipe repunit prime")
+
+test_run

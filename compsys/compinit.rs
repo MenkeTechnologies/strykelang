@@ -44,6 +44,8 @@ pub struct CompFile {
     pub name: String,
     /// What this file defines
     pub def: CompFileDef,
+    /// Full file body (read during scan for caching)
+    pub body: Option<String>,
 }
 
 /// What a completion file defines
@@ -197,7 +199,7 @@ fn is_context_entry(s: &str) -> bool {
     base.ends_with('-') || base.contains(',')
 }
 
-/// Scan a single completion file
+/// Scan a single completion file - reads full body for caching
 fn scan_file(path: &Path) -> Option<CompFile> {
     let name = path.file_name()?.to_string_lossy().to_string();
 
@@ -216,18 +218,18 @@ fn scan_file(path: &Path) -> Option<CompFile> {
         return None;
     }
 
-    // Read first line
-    let file = File::open(path).ok()?;
-    let mut reader = BufReader::new(file);
-    let mut first_line = String::new();
-    reader.read_line(&mut first_line).ok()?;
-
-    let def = parse_first_line(&first_line);
+    // Read entire file at once (will be cached in SQLite)
+    let body = fs::read_to_string(path).ok()?;
+    
+    // Parse first line for directive
+    let first_line = body.lines().next().unwrap_or("");
+    let def = parse_first_line(first_line);
 
     Some(CompFile {
         path: path.to_path_buf(),
         name,
         def,
+        body: Some(body),
     })
 }
 
@@ -477,7 +479,13 @@ pub fn build_cache_from_fpath(
     fpath: &[PathBuf], 
     cache: &mut crate::cache::CompsysCache
 ) -> std::io::Result<CompInitResult> {
+    use std::time::Instant;
+    
+    let t0 = Instant::now();
     let result = compinit(fpath);
+    let scan_time = t0.elapsed();
+    
+    let t1 = Instant::now();
     
     // Populate comps table (_comps hash)
     let comps: Vec<(String, String)> = result.comps
@@ -508,21 +516,30 @@ pub fn build_cache_from_fpath(
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     }
     
-    // Populate autoloads table with file offsets for lazy loading
-    let autoloads: Vec<(String, String, i64, i64)> = result.files
+    let comps_time = t1.elapsed();
+    let t2 = Instant::now();
+    
+    // Populate autoloads table with function bodies for instant loading
+    // Bodies were already read during parallel scan - no extra I/O here
+    let autoloads: Vec<(String, String, String)> = result.files
         .iter()
         .filter(|f| matches!(f.def, CompFileDef::CompDef(_) | CompFileDef::Autoload(_)))
-        .map(|f| {
+        .filter_map(|f| {
             let path_str = f.path.to_string_lossy().to_string();
-            // For now, offset=0 and size=file size (will be refined for .zwc archives)
-            let size = std::fs::metadata(&f.path)
-                .map(|m| m.len() as i64)
-                .unwrap_or(0);
-            (f.name.clone(), path_str, 0i64, size)
+            let body = f.body.as_ref()?.clone();
+            Some((f.name.clone(), path_str, body))
         })
         .collect();
-    cache.add_autoloads_bulk(&autoloads)
+    cache.add_autoloads_with_bodies_bulk(&autoloads)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    
+    let autoloads_time = t2.elapsed();
+    
+    eprintln!("  compinit timing: scan={}ms, comps={}ms, autoloads={}ms (total={}ms)",
+        scan_time.as_millis(),
+        comps_time.as_millis(),
+        autoloads_time.as_millis(),
+        (scan_time + comps_time + autoloads_time).as_millis());
     
     Ok(result)
 }

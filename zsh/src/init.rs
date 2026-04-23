@@ -168,7 +168,7 @@ pub fn parseargs(args: &[String]) -> (ShellOptions, Option<String>, Vec<String>)
         }
 
         if arg == "--version" {
-            println!("zshrs 0.1.0");
+            println!("zshrs {}", env!("CARGO_PKG_VERSION"));
             std::process::exit(0);
         }
 

@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Comma quibbler
+
+fn quibble(@list) {
+    my $len = scalar(@list)
+    if ($len == 0) {
+        "{}"
+    } elsif ($len == 1) {
+        "{" . $list[0] . "}"
+    } else {
+        my @init = @list[0..$len-2]
+        my $last = $list[-1]
+        "{" . join(", ", @init) . " and " . $last . "}"
+    }
+}
+
+assert_eq quibble(), "{}", "empty list"
+assert_eq quibble("ABC"), "{ABC}", "one element"
+assert_eq quibble("ABC", "DEF"), "{ABC and DEF}", "two elements"
+assert_eq quibble("ABC", "DEF", "GHI", "JKL"), "{ABC, DEF, GHI and JKL}", "four elements"
+
+qw(one two three) |> quibble |> assert_eq("{one, two and three}", "pipe quibble")
+
+test_run

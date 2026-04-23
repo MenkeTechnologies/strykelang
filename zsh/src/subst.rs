@@ -1031,6 +1031,253 @@ pub fn check_colon_subscript(s: &str) -> Option<(String, &str)> {
     Some((expr.to_string(), rest))
 }
 
+/// Apply offset and length to array (from subst.c ${PARAM:offset:length} handling)
+pub fn array_slice(arr: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+    let len = arr.len() as i64;
+    
+    let offset = if offset < 0 {
+        (len + offset).max(0) as usize
+    } else {
+        (offset as usize).min(arr.len())
+    };
+    
+    let length = match length {
+        Some(l) if l < 0 => (len - offset as i64 + l).max(0) as usize,
+        Some(l) => l.max(0) as usize,
+        None => arr.len().saturating_sub(offset),
+    };
+    
+    arr.iter()
+        .skip(offset)
+        .take(length)
+        .cloned()
+        .collect()
+}
+
+/// Apply offset and length to string (from subst.c ${PARAM:offset:length} handling)
+pub fn string_slice(s: &str, offset: i64, length: Option<i64>) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    
+    let offset = if offset < 0 {
+        (len + offset).max(0) as usize
+    } else {
+        (offset as usize).min(chars.len())
+    };
+    
+    let length = match length {
+        Some(l) if l < 0 => (len - offset as i64 + l).max(0) as usize,
+        Some(l) => l.max(0) as usize,
+        None => chars.len().saturating_sub(offset),
+    };
+    
+    chars.iter()
+        .skip(offset)
+        .take(length)
+        .collect()
+}
+
+/// Array union (from subst.c ${array|other})
+pub fn array_union(arr1: &[String], arr2: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    let set2: HashSet<_> = arr2.iter().collect();
+    
+    let mut result: Vec<String> = arr1.to_vec();
+    for item in arr2 {
+        if !result.contains(item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Array intersection (from subst.c ${array*other})
+pub fn array_intersection(arr1: &[String], arr2: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    let set2: HashSet<_> = arr2.iter().collect();
+    
+    arr1.iter()
+        .filter(|item| set2.contains(item))
+        .cloned()
+        .collect()
+}
+
+/// Array difference (from subst.c ${array|other} with negation)
+pub fn array_difference(arr1: &[String], arr2: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    let set2: HashSet<_> = arr2.iter().collect();
+    
+    arr1.iter()
+        .filter(|item| !set2.contains(item))
+        .cloned()
+        .collect()
+}
+
+/// Zip arrays together (from subst.c ${array:^other})
+pub fn array_zip(arr1: &[String], arr2: &[String], shortest: bool) -> Vec<String> {
+    let len = if shortest {
+        arr1.len().min(arr2.len())
+    } else {
+        arr1.len().max(arr2.len())
+    };
+    
+    let mut result = Vec::with_capacity(len * 2);
+    for i in 0..len {
+        let v1 = arr1.get(i % arr1.len()).cloned().unwrap_or_default();
+        let v2 = arr2.get(i % arr2.len()).cloned().unwrap_or_default();
+        result.push(v1);
+        result.push(v2);
+    }
+    result
+}
+
+/// Unique array elements (from subst.c (u) flag)
+pub fn array_unique(arr: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    arr.iter()
+        .filter(|item| seen.insert(item.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Reverse array (from subst.c (O) flag with 'a')
+pub fn array_reverse(arr: &[String]) -> Vec<String> {
+    arr.iter().rev().cloned().collect()
+}
+
+/// Sort array (from subst.c (o) flag)
+pub fn array_sort(arr: &[String], reverse: bool, numeric: bool) -> Vec<String> {
+    let mut result = arr.to_vec();
+    if numeric {
+        result.sort_by(|a, b| {
+            let na: f64 = a.parse().unwrap_or(0.0);
+            let nb: f64 = b.parse().unwrap_or(0.0);
+            na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal)
+        });
+    } else {
+        result.sort();
+    }
+    if reverse {
+        result.reverse();
+    }
+    result
+}
+
+/// Pattern filter (from subst.c ${array:#pattern})
+pub fn array_filter_pattern(arr: &[String], pattern: &str, invert: bool) -> Vec<String> {
+    arr.iter()
+        .filter(|item| {
+            let matches = crate::glob::pattern_match(pattern, item, false, true);
+            if invert { matches } else { !matches }
+        })
+        .cloned()
+        .collect()
+}
+
+/// Search and replace in array (from subst.c ${array/pat/repl})
+pub fn array_replace(arr: &[String], pattern: &str, replacement: &str, global: bool) -> Vec<String> {
+    arr.iter()
+        .map(|item| {
+            if global {
+                item.replace(pattern, replacement)
+            } else {
+                item.replacen(pattern, replacement, 1)
+            }
+        })
+        .collect()
+}
+
+/// Case modification (from subst.c (L), (U) flags)
+pub fn modify_case(s: &str, mode: CaseMode) -> String {
+    match mode {
+        CaseMode::Lower => s.to_lowercase(),
+        CaseMode::Upper => s.to_uppercase(),
+        CaseMode::Capitalize => {
+            let mut chars = s.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().chain(chars).collect(),
+            }
+        }
+        CaseMode::CapitalizeWords => {
+            s.split_whitespace()
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(c) => c.to_uppercase().chain(chars).collect(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum CaseMode {
+    Lower,
+    Upper,
+    Capitalize,
+    CapitalizeWords,
+}
+
+/// Type info for parameter (from subst.c (t) flag)
+pub fn param_type_info(value: &ParamValue) -> String {
+    use crate::params::{flags, ParamValue};
+    match value {
+        ParamValue::Scalar(_) => "scalar".to_string(),
+        ParamValue::Integer(_) => "integer".to_string(),
+        ParamValue::Float(_) => "float".to_string(),
+        ParamValue::Array(_) => "array".to_string(),
+        ParamValue::Assoc(_) => "association".to_string(),
+        ParamValue::Unset => "undefined".to_string(),
+    }
+}
+
+use crate::params::ParamValue;
+
+/// Subscript flags handling (from subst.c subscript parsing)
+#[derive(Default, Clone, Debug)]
+pub struct SubscriptFlags {
+    pub reverse: bool,      // (r) flag
+    pub words: bool,        // (w) flag
+    pub chars: bool,        // (c) flag
+    pub match_once: bool,   // default vs (R) flag
+}
+
+/// Apply subscript to string (from subst.c getstrvalue)
+pub fn apply_subscript_string(s: &str, start: i64, end: i64, flags: &SubscriptFlags) -> String {
+    if flags.words {
+        let words: Vec<&str> = s.split_whitespace().collect();
+        return apply_subscript_array(&words.iter().map(|s| s.to_string()).collect::<Vec<_>>(), start, end)
+            .join(" ");
+    }
+    
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len() as i64;
+    
+    let (start, end) = normalize_indices(start, end, len);
+    
+    chars[start..end].iter().collect()
+}
+
+/// Apply subscript to array (from subst.c getarrvalue)
+pub fn apply_subscript_array(arr: &[String], start: i64, end: i64) -> Vec<String> {
+    let len = arr.len() as i64;
+    let (start, end) = normalize_indices(start, end, len);
+    arr[start..end].to_vec()
+}
+
+fn normalize_indices(start: i64, end: i64, len: i64) -> (usize, usize) {
+    let start = if start < 0 { len + start + 1 } else { start };
+    let end = if end < 0 { len + end + 1 } else { end };
+    let start = ((start.max(1) - 1) as usize).min(len as usize);
+    let end = (end.max(0) as usize).min(len as usize);
+    (start, end.max(start))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

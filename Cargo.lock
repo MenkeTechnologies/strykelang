@@ -6252,7 +6252,7 @@ dependencies = [
 
 [[package]]
 name = "zsh"
-version = "0.1.0"
+version = "0.8.7"
 dependencies = [
  "atty",
  "bitflags 2.11.1",

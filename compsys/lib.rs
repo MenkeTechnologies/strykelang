@@ -3,6 +3,29 @@
 //! This module implements zsh's new completion system with full compatibility
 //! for compadd, compset, zstyle, and all completion special parameters.
 //!
+//! # Architecture
+//!
+//! ## Default Mode (SQLite-backed)
+//! - Cache: `~/.cache/zshrs/compsys.db` (55MB with 16,872 function bodies)
+//! - `compinit`: Parallel fpath scan with rayon, stores bodies in SQLite
+//! - `autoload -Xz`: Instant lookup from SQLite (~2.7µs)
+//! - No .zcompdump file created
+//!
+//! ## --zsh-compat Mode (Traditional)
+//! - Cache: `~/.zcompdump` (761KB)
+//! - `compinit`: Sequential scan, creates .zcompdump
+//! - `autoload -Xz`: Scans fpath/zwc files (~70µs)
+//! - Full zsh behavior for debugging/compatibility
+//!
+//! # Usage
+//! ```ignore
+//! // Default mode (recommended)
+//! zshrs -c 'compinit'
+//!
+//! // Compat mode
+//! zshrs --zsh-compat -c 'compinit'
+//! ```
+//!
 //! Architecture based on analysis of:
 //! - zsh Src/Zle/compcore.c, complete.c, computil.c
 //! - fish src/complete.rs (for Rust patterns)

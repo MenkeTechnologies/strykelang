@@ -762,6 +762,544 @@ pub fn assignaparam(table: &mut ParamTable, name: &str, val: Vec<String>) -> boo
     table.set_array(name, val)
 }
 
+/// Assign float parameter (from params.c assignnparam)
+pub fn assignfparam(table: &mut ParamTable, name: &str, val: f64) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        entry.value = ParamValue::Float(val);
+        true
+    } else {
+        table.params.insert(
+            name.to_string(),
+            Param::new_float(name, val),
+        );
+        true
+    }
+}
+
+/// Assign hash parameter (from params.c sethparam lines 3601-3654)
+pub fn assignhparam(table: &mut ParamTable, name: &str, val: HashMap<String, String>) -> bool {
+    table.set_assoc(name, val)
+}
+
+/// Unset parameter (from params.c unsetparam lines 4014-4059)
+pub fn unsetparam(table: &mut ParamTable, name: &str) -> bool {
+    table.unset(name)
+}
+
+/// Check if parameter is set (from params.c isset)
+pub fn isset_param(table: &ParamTable, name: &str) -> bool {
+    table.contains(name)
+}
+
+/// Get parameter type flags (from params.c paramtypes)
+pub fn paramtype(table: &ParamTable, name: &str) -> u32 {
+    if let Some(entry) = table.params.get(name) {
+        entry.flags
+    } else {
+        0
+    }
+}
+
+/// Get parameter as string with default (from params.c getsparam_u)
+pub fn getsparam_u(table: &ParamTable, name: &str, default: &str) -> String {
+    getsparam(table, name).unwrap_or_else(|| default.to_string())
+}
+
+/// Check if parameter is exported (from params.c)
+pub fn isexported(table: &ParamTable, name: &str) -> bool {
+    if let Some(entry) = table.params.get(name) {
+        (entry.flags & flags::EXPORT) != 0
+    } else {
+        false
+    }
+}
+
+/// Check if parameter is readonly (from params.c)
+pub fn isreadonly(table: &ParamTable, name: &str) -> bool {
+    if let Some(entry) = table.params.get(name) {
+        (entry.flags & flags::READONLY) != 0
+    } else {
+        false
+    }
+}
+
+/// Parse simple subscript - extract index from [n] or [m,n] syntax
+/// Port from params.c parse_subscript lines 1849-1929
+pub fn parse_simple_subscript(s: &str) -> Option<(i64, i64)> {
+    let s = s.trim();
+    if !s.starts_with('[') || !s.ends_with(']') {
+        return None;
+    }
+
+    let inner = &s[1..s.len() - 1];
+    if inner.contains(',') {
+        let parts: Vec<&str> = inner.splitn(2, ',').collect();
+        if parts.len() == 2 {
+            let start = parts[0].trim().parse::<i64>().ok()?;
+            let end = parts[1].trim().parse::<i64>().ok()?;
+            return Some((start, end));
+        }
+    } else {
+        let idx = inner.trim().parse::<i64>().ok()?;
+        return Some((idx, idx));
+    }
+    None
+}
+
+/// Get array element with subscript handling
+/// Port from params.c getarrvalue lines 2865-2950
+pub fn getarrvalue(arr: &[String], start: i64, end: i64) -> Vec<String> {
+    let len = arr.len() as i64;
+    if len == 0 {
+        return Vec::new();
+    }
+
+    let start = if start < 0 { len + start + 1 } else { start };
+    let end = if end < 0 { len + end + 1 } else { end };
+    let start = (start.max(1) - 1) as usize;
+    let end = end.min(len) as usize;
+
+    if start >= end || start >= arr.len() {
+        return Vec::new();
+    }
+    arr[start..end].to_vec()
+}
+
+/// Set array element with subscript handling
+/// Port from params.c setarrvalue lines 2955-3050
+pub fn setarrvalue(arr: &mut Vec<String>, start: i64, end: i64, val: Vec<String>) {
+    let len = arr.len() as i64;
+    let start = if start < 0 { (len + start + 1).max(0) } else { start };
+    let end = if end < 0 { (len + end + 1).max(0) } else { end };
+    let start = (start.max(1) - 1) as usize;
+    let end = end.max(0) as usize;
+
+    while arr.len() < start {
+        arr.push(String::new());
+    }
+
+    let end = end.min(arr.len());
+    if start <= end {
+        arr.splice(start..end, val);
+    } else {
+        for (i, v) in val.into_iter().enumerate() {
+            if start + i < arr.len() {
+                arr[start + i] = v;
+            } else {
+                arr.push(v);
+            }
+        }
+    }
+}
+
+/// String parameter with modifiers
+/// Port from params.c strgetfn
+pub fn strgetfn(table: &ParamTable, name: &str, lower: bool, upper: bool) -> Option<String> {
+    let val = getsparam(table, name)?;
+    Some(if lower {
+        val.to_lowercase()
+    } else if upper {
+        val.to_uppercase()
+    } else {
+        val
+    })
+}
+
+/// Integer parameter with base
+/// Port from params.c intgetfn
+pub fn intgetfn(table: &ParamTable, name: &str, base: u32) -> String {
+    let val = getiparam(table, name);
+    if base == 10 || base == 0 {
+        val.to_string()
+    } else {
+        crate::utils::convbase(val, base)
+    }
+}
+
+/// Scan parameters matching pattern
+/// Port from params.c scanmatchtable
+pub fn scanmatchtable<F>(table: &ParamTable, pattern: &str, flags: u32, mut callback: F)
+where
+    F: FnMut(&str, &ParamValue),
+{
+    for (name, entry) in &table.params {
+        if (entry.flags & flags) != 0 || flags == 0 {
+            if pattern.is_empty() || glob_match(pattern, name) {
+                callback(name, &entry.value);
+            }
+        }
+    }
+}
+
+fn glob_match(pattern: &str, name: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    if pattern.ends_with('*') {
+        let prefix = &pattern[..pattern.len() - 1];
+        return name.starts_with(prefix);
+    }
+    if pattern.starts_with('*') {
+        let suffix = &pattern[1..];
+        return name.ends_with(suffix);
+    }
+    pattern == name
+}
+
+/// Check if string is valid identifier (from params.c isident)
+pub fn isident(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if !first.is_alphabetic() && first != '_' {
+        return false;
+    }
+    for c in chars {
+        if !c.is_alphanumeric() && c != '_' {
+            return false;
+        }
+    }
+    true
+}
+
+/// Export parameter to environment (from params.c export_param)
+pub fn export_param(table: &mut ParamTable, name: &str) {
+    if let Some(entry) = table.params.get_mut(name) {
+        entry.flags |= flags::EXPORT;
+        let val = entry.value.as_string();
+        std::env::set_var(name, &val);
+    }
+}
+
+/// Unexport parameter (from params.c)
+pub fn unexport_param(table: &mut ParamTable, name: &str) {
+    if let Some(entry) = table.params.get_mut(name) {
+        entry.flags &= !flags::EXPORT;
+        std::env::remove_var(name);
+    }
+}
+
+/// Create parameter with type (from params.c createparam)
+pub fn createparam(table: &mut ParamTable, name: &str, pm_flags: u32) -> bool {
+    if !isident(name) {
+        return false;
+    }
+    
+    let value = if (pm_flags & flags::ARRAY) != 0 {
+        ParamValue::Array(Vec::new())
+    } else if (pm_flags & flags::ASSOC) != 0 {
+        ParamValue::Assoc(HashMap::new())
+    } else if (pm_flags & flags::INTEGER) != 0 {
+        ParamValue::Integer(0)
+    } else if (pm_flags & flags::FLOAT) != 0 {
+        ParamValue::Float(0.0)
+    } else {
+        ParamValue::Scalar(String::new())
+    };
+    
+    table.params.insert(name.to_string(), Param {
+        name: name.to_string(),
+        value,
+        flags: pm_flags,
+        base: 10,
+        width: 0,
+        level: 0,
+        ename: None,
+    });
+    true
+}
+
+/// Set integer value (from params.c setintvalue)
+pub fn setintvalue(table: &mut ParamTable, name: &str, val: i64) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        entry.value = ParamValue::Integer(val);
+        return true;
+    }
+    table.params.insert(name.to_string(), Param {
+        name: name.to_string(),
+        value: ParamValue::Integer(val),
+        flags: flags::INTEGER,
+        base: 10,
+        width: 0,
+        level: 0,
+        ename: None,
+    });
+    true
+}
+
+/// Set float value (from params.c setnumvalue)
+pub fn setnumvalue(table: &mut ParamTable, name: &str, val: f64) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        entry.value = ParamValue::Float(val);
+        return true;
+    }
+    table.params.insert(name.to_string(), Param {
+        name: name.to_string(),
+        value: ParamValue::Float(val),
+        flags: flags::FLOAT,
+        base: 10,
+        width: 0,
+        level: 0,
+        ename: None,
+    });
+    true
+}
+
+/// Get all parameter names matching pattern (from params.c)
+pub fn paramnames(table: &ParamTable, pattern: Option<&str>) -> Vec<String> {
+    let mut names: Vec<String> = table.params.keys()
+        .filter(|name| {
+            pattern.map_or(true, |p| glob_match(p, name))
+        })
+        .cloned()
+        .collect();
+    names.sort();
+    names
+}
+
+/// Get parameter count (from params.c)
+pub fn paramcount(table: &ParamTable) -> usize {
+    table.params.len()
+}
+
+/// Copy parameter value (from params.c copyparam)
+pub fn copyparam(table: &ParamTable, name: &str) -> Option<ParamValue> {
+    table.params.get(name).map(|p| p.value.clone())
+}
+
+/// Reset parameter to default value
+pub fn resetparam(table: &mut ParamTable, name: &str, new_type: u32) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        entry.flags = (entry.flags & (flags::EXPORT | flags::LOCAL)) | new_type;
+        entry.value = if (new_type & flags::ARRAY) != 0 {
+            ParamValue::Array(Vec::new())
+        } else if (new_type & flags::ASSOC) != 0 {
+            ParamValue::Assoc(HashMap::new())
+        } else if (new_type & flags::INTEGER) != 0 {
+            ParamValue::Integer(0)
+        } else if (new_type & flags::FLOAT) != 0 {
+            ParamValue::Float(0.0)
+        } else {
+            ParamValue::Scalar(String::new())
+        };
+        return true;
+    }
+    false
+}
+
+/// Unset parameter completely (from params.c unsetparam)
+pub fn unsetparam_complete(table: &mut ParamTable, name: &str) -> bool {
+    if let Some(entry) = table.params.get(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+    }
+    table.params.remove(name).is_some()
+}
+
+/// Get numeric value as mnumber-like result (from params.c getnumvalue)
+pub fn getnumvalue(table: &ParamTable, name: &str) -> MNumber {
+    if let Some(entry) = table.params.get(name) {
+        match &entry.value {
+            ParamValue::Integer(i) => MNumber::Integer(*i),
+            ParamValue::Float(f) => MNumber::Float(*f),
+            ParamValue::Scalar(s) => {
+                if let Ok(i) = s.parse::<i64>() {
+                    MNumber::Integer(i)
+                } else if let Ok(f) = s.parse::<f64>() {
+                    MNumber::Float(f)
+                } else {
+                    MNumber::Integer(0)
+                }
+            }
+            _ => MNumber::Integer(0),
+        }
+    } else {
+        MNumber::Integer(0)
+    }
+}
+
+/// Check if parameter is an array (from params.c)
+pub fn isarray(table: &ParamTable, name: &str) -> bool {
+    table.params.get(name)
+        .map(|p| matches!(p.value, ParamValue::Array(_)))
+        .unwrap_or(false)
+}
+
+/// Check if parameter is an associative array (from params.c)
+pub fn ishash(table: &ParamTable, name: &str) -> bool {
+    table.params.get(name)
+        .map(|p| matches!(p.value, ParamValue::Assoc(_)))
+        .unwrap_or(false)
+}
+
+/// Get array length (from params.c arrlen)
+pub fn arrlen(table: &ParamTable, name: &str) -> usize {
+    if let Some(entry) = table.params.get(name) {
+        match &entry.value {
+            ParamValue::Array(arr) => arr.len(),
+            ParamValue::Assoc(hash) => hash.len(),
+            ParamValue::Scalar(s) if s.is_empty() => 0,
+            ParamValue::Scalar(_) => 1,
+            _ => 1,
+        }
+    } else {
+        0
+    }
+}
+
+/// Set array element by index (1-based, zsh style)
+pub fn setarrelement(table: &mut ParamTable, name: &str, index: i64, value: &str) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        if let ParamValue::Array(ref mut arr) = entry.value {
+            let len = arr.len() as i64;
+            let idx = if index < 0 { len + index + 1 } else { index };
+            if idx < 1 {
+                return false;
+            }
+            let idx = (idx - 1) as usize;
+            while arr.len() <= idx {
+                arr.push(String::new());
+            }
+            arr[idx] = value.to_string();
+            return true;
+        }
+    }
+    false
+}
+
+/// Get array element by index (1-based, zsh style)
+pub fn getarrelement(table: &ParamTable, name: &str, index: i64) -> Option<String> {
+    if let Some(entry) = table.params.get(name) {
+        if let ParamValue::Array(ref arr) = entry.value {
+            let len = arr.len() as i64;
+            let idx = if index < 0 { len + index + 1 } else { index };
+            if idx < 1 || idx > len {
+                return None;
+            }
+            return Some(arr[(idx - 1) as usize].clone());
+        }
+    }
+    None
+}
+
+/// Set associative array element
+pub fn sethashelement(table: &mut ParamTable, name: &str, key: &str, value: &str) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        if let ParamValue::Assoc(ref mut hash) = entry.value {
+            hash.insert(key.to_string(), value.to_string());
+            return true;
+        }
+    }
+    false
+}
+
+/// Get associative array element
+pub fn gethashelement(table: &ParamTable, name: &str, key: &str) -> Option<String> {
+    if let Some(entry) = table.params.get(name) {
+        if let ParamValue::Assoc(ref hash) = entry.value {
+            return hash.get(key).cloned();
+        }
+    }
+    None
+}
+
+/// Get all keys from associative array
+pub fn gethashkeys(table: &ParamTable, name: &str) -> Vec<String> {
+    if let Some(entry) = table.params.get(name) {
+        if let ParamValue::Assoc(ref hash) = entry.value {
+            return hash.keys().cloned().collect();
+        }
+    }
+    Vec::new()
+}
+
+/// Get all values from associative array
+pub fn gethashvalues(table: &ParamTable, name: &str) -> Vec<String> {
+    if let Some(entry) = table.params.get(name) {
+        if let ParamValue::Assoc(ref hash) = entry.value {
+            return hash.values().cloned().collect();
+        }
+    }
+    Vec::new()
+}
+
+/// Delete associative array element
+pub fn unsethashelement(table: &mut ParamTable, name: &str, key: &str) -> bool {
+    if let Some(entry) = table.params.get_mut(name) {
+        if (entry.flags & flags::READONLY) != 0 {
+            return false;
+        }
+        if let ParamValue::Assoc(ref mut hash) = entry.value {
+            return hash.remove(key).is_some();
+        }
+    }
+    false
+}
+
+/// Tie scalar to array (like PATH/path) - from params.c
+pub fn tieparam(table: &mut ParamTable, scalar: &str, array: &str, sep: char) {
+    if let Some(entry) = table.params.get(scalar) {
+        let colonarr = entry.value.as_string();
+        let arr: Vec<String> = colonarr.split(sep)
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        table.params.insert(array.to_string(), Param {
+            name: array.to_string(),
+            value: ParamValue::Array(arr),
+            flags: flags::ARRAY | flags::TIED,
+            base: 10,
+            width: 0,
+            level: 0,
+            ename: Some(scalar.to_string()),
+        });
+    }
+    if let Some(entry) = table.params.get_mut(scalar) {
+        entry.flags |= flags::TIED;
+        entry.ename = Some(array.to_string());
+    }
+}
+
+/// Get parameter type string (from params.c getparamtype)
+pub fn getparamtype(table: &ParamTable, name: &str) -> &'static str {
+    if let Some(entry) = table.params.get(name) {
+        if (entry.flags & flags::ASSOC) != 0 {
+            "association"
+        } else if (entry.flags & flags::ARRAY) != 0 {
+            "array"
+        } else if (entry.flags & flags::INTEGER) != 0 {
+            "integer"
+        } else if (entry.flags & flags::FLOAT) != 0 {
+            "float"
+        } else {
+            "scalar"
+        }
+    } else {
+        ""
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

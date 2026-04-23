@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Newman-Conway sequence
+
+fn newman_conway($n) {
+    if ($n < 3) {
+        1
+    } else {
+        my @p = (0, 1, 1)
+        for my $i (3..$n) {
+            my $prev = $p[$i-1]
+            my $val = $p[$prev] + $p[$i - $prev]
+            push @p, $val
+        }
+        $p[$n]
+    }
+}
+
+assert_eq newman_conway(1), 1, "P(1)"
+assert_eq newman_conway(2), 1, "P(2)"
+assert_eq newman_conway(3), 2, "P(3)"
+assert_eq newman_conway(4), 2, "P(4)"
+assert_eq newman_conway(5), 3, "P(5)"
+assert_eq newman_conway(10), 6, "P(10)"
+assert_eq newman_conway(20), 12, "P(20)"
+
+20 |> newman_conway |> assert_eq(12, "pipe newman-conway")
+
+test_run

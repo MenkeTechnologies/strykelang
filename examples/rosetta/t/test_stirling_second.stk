@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stirling numbers of the second kind
+
+my %stirling_memo
+
+fn my_stirling_second($n, $k) {
+    if ($k == 1 || $k == $n) {
+        1
+    } elsif ($k == 0 || $k > $n) {
+        0
+    } elsif (exists $stirling_memo{"$n,$k"}) {
+        $stirling_memo{"$n,$k"}
+    } else {
+        my $v1 = my_stirling_second($n - 1, $k)
+        my $v2 = my_stirling_second($n - 1, $k - 1)
+        my $res = $k * $v1 + $v2
+        $stirling_memo{"$n,$k"} = $res
+        $res
+    }
+}
+
+assert_eq my_stirling_second(3, 2), 3, "S2(3, 2)"
+assert_eq my_stirling_second(4, 2), 7, "S2(4, 2)"
+assert_eq my_stirling_second(5, 2), 15, "S2(5, 2)"
+assert_eq my_stirling_second(5, 3), 25, "S2(5, 3)"
+assert_eq my_stirling_second(10, 5), 42525, "S2(10, 5)"
+
+(10, 5) |> my_stirling_second |> assert_eq(42525, "pipe stirling")
+
+test_run

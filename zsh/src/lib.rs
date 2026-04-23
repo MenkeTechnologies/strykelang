@@ -41,6 +41,7 @@ pub mod text;
 pub mod compat;
 pub mod input;
 pub mod signals;
+pub mod sort;
 pub mod stringsort;
 pub mod linklist;
 pub mod context;

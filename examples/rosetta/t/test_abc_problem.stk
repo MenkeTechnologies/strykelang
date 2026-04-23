@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: ABC Problem
+
+fn can_make_word($word, @blocks) {
+    my @chars = ~> $word lc chars
+    my @b_list = ~> @blocks map { lc($_) }
+    _can_make_word_rec(\@chars, \@b_list)
+}
+
+fn _can_make_word_rec($chars_ref, $blocks_ref) {
+    if (scalar(@$chars_ref) == 0) {
+        1
+    } else {
+        my @chars = @$chars_ref
+        my @blocks = @$blocks_ref
+        my $c = shift @chars
+        my $found = 0
+        for my $i (0..scalar(@blocks)-1) {
+            if (index($blocks[$i], $c) >= 0) {
+                my @rem = @blocks
+                splice(@remaining, 0, 0, @rem) # Copy array
+                splice(@rem, $i, 1)
+                if (_can_make_word_rec(\@chars, \@rem)) {
+                    $found = 1
+                    $i = scalar(@blocks)
+                }
+            }
+        }
+        $found
+    }
+}
+
+my @blocks = ("BO", "XK", "DQ", "CP", "NA", "GT", "RE", "TG", "QD", "FS", "JW", "HU", "VI", "AN", "OB", "ER", "FS", "LY", "PC", "ZM")
+
+assert_ok can_make_word("A", @blocks), "can make A"
+assert_ok can_make_word("BARK", @blocks), "can make BARK"
+assert_ok !can_make_word("BOOK", @blocks), "cannot make BOOK (needs two O blocks)"
+assert_ok can_make_word("TREAT", @blocks), "can make TREAT"
+assert_ok !can_make_word("COMMON", @blocks), "cannot make COMMON"
+assert_ok can_make_word("SQUAD", @blocks), "can make SQUAD"
+assert_ok can_make_word("CONFUSE", @blocks), "can make CONFUSE"
+
+"BARK" |> can_make_word(@blocks) |> assert_ok("pipe BARK")
+
+test_run

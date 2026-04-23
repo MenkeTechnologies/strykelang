@@ -3,7 +3,7 @@
 //! Run with: cargo run -p compsys
 
 use compsys::{
-    arguments_execute, cache::CompsysCache, compadd_execute, compinit, compset_execute,
+    arguments_execute, cache::{CompsysCache, default_cache_path}, compadd_execute, compinit, compset_execute,
     describe_execute, do_completion, functions, native_describe, ArgumentsSpec, CompDescribe,
     CompParams, CompTags, CompadOpts, Completion, CompletionReceiver, CompletionState, CompsetOp,
     DescribeItem, DescribeOpts, ZStyleStore, build_cache_from_fpath, get_system_fpath,
@@ -919,8 +919,15 @@ fn test_build_cache_from_fpath() {
         return;
     }
     
-    // Create in-memory cache
-    let mut cache = CompsysCache::memory().unwrap();
+    // Use standard cache path
+    let cache_path = default_cache_path();
+    std::fs::create_dir_all(cache_path.parent().unwrap()).ok();
+    // Remove old DB and WAL files to start fresh
+    let _ = std::fs::remove_file(&cache_path);
+    let _ = std::fs::remove_file(format!("{}-shm", cache_path.display()));
+    let _ = std::fs::remove_file(format!("{}-wal", cache_path.display()));
+    let mut cache = CompsysCache::open(&cache_path).unwrap();
+    println!("  Cache DB: {}", cache_path.display());
     
     // Build cache from fpath
     let start = std::time::Instant::now();
@@ -953,7 +960,25 @@ fn test_build_cache_from_fpath() {
     // Test autoload lookup
     if let Ok(Some(stub)) = cache.get_autoload("_git") {
         println!("  _git autoload: {} ({} bytes)", stub.source, stub.size);
+        if let Some(ref body) = stub.body {
+            println!("  _git body: {} chars (first 100: {}...)", body.len(), &body.chars().take(100).collect::<String>());
+        } else {
+            println!("  _git body: NOT CACHED");
+        }
     }
+    
+    // Benchmark autoload body lookup (this is the hot path for autoload -Xz)
+    println!("\n  Benchmarking autoload -Xz (body lookup):");
+    let iterations = 10000;
+    let funcs = ["_git", "_docker", "_cargo", "_ls", "_cd", "_cp", "_mv", "_rm", "_cat", "_grep"];
+    let start = std::time::Instant::now();
+    for i in 0..iterations {
+        let name = funcs[i % funcs.len()];
+        let _ = cache.get_autoload_body(name);
+    }
+    let total_us = start.elapsed().as_micros();
+    let avg_ns = (total_us * 1000) / iterations as u128;
+    println!("    {}x get_autoload_body: {}µs total, {}ns avg per lookup", iterations, total_us, avg_ns);
     
     // Test pattern completion
     if let Ok(Some(func)) = cache.find_patcomp("git-commit") {

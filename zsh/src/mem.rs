@@ -157,6 +157,165 @@ pub fn zheapptr<T>(_ptr: &T) -> bool {
     true
 }
 
+/// Reallocate heap memory (from mem.c hrealloc)
+pub fn hrealloc(old: Vec<u8>, new_size: usize) -> Vec<u8> {
+    let mut v = old;
+    v.resize(new_size, 0);
+    v
+}
+
+/// Duplicate array of strings (from mem.c zarrdup)
+pub fn zarrdup(arr: &[String]) -> Vec<String> {
+    arr.to_vec()
+}
+
+/// Duplicate array with maximum length (from mem.c arrdup_max)
+pub fn arrdup_max(arr: &[String], max: usize) -> Vec<String> {
+    arr.iter().take(max).cloned().collect()
+}
+
+/// Get array length (from mem.c arrlen)
+pub fn arrlen<T>(arr: &[T]) -> usize {
+    arr.len()
+}
+
+/// Check if array length is less than n (from mem.c arrlen_lt)
+pub fn arrlen_lt<T>(arr: &[T], n: usize) -> bool {
+    arr.len() < n
+}
+
+/// Check if array length is less than or equal to n (from mem.c arrlen_le)
+pub fn arrlen_le<T>(arr: &[T], n: usize) -> bool {
+    arr.len() <= n
+}
+
+/// Check if array length equals n (from mem.c arrlen_eq)
+pub fn arrlen_eq<T>(arr: &[T], n: usize) -> bool {
+    arr.len() == n
+}
+
+/// Check if array length is greater than n (from mem.c arrlen_gt)
+pub fn arrlen_gt<T>(arr: &[T], n: usize) -> bool {
+    arr.len() > n
+}
+
+/// Concatenate strings with separator (from mem.c sepjoin)
+pub fn sepjoin(arr: &[String], sep: Option<&str>) -> String {
+    arr.join(sep.unwrap_or(" "))
+}
+
+/// Split string by separator (from mem.c sepsplit)
+pub fn sepsplit(s: &str, sep: &str, allow_empty: bool) -> Vec<String> {
+    if allow_empty {
+        s.split(sep).map(|s| s.to_string()).collect()
+    } else {
+        s.split(sep).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect()
+    }
+}
+
+/// Allocate zeroed buffer (from mem.c zshcalloc)
+pub fn zshcalloc_buf(size: usize) -> Vec<u8> {
+    vec![0u8; size]
+}
+
+/// Allocate buffer with size (from mem.c zalloc)
+pub fn zalloc_buf(size: usize) -> Vec<u8> {
+    Vec::with_capacity(size)
+}
+
+/// Duplicate string to permanent storage (from mem.c ztrdup)
+pub fn ztrdup(s: &str) -> String {
+    s.to_string()
+}
+
+/// Duplicate n characters (from mem.c ztrncpy / ztrduppfx)
+pub fn ztrduppfx(s: &str, len: usize) -> String {
+    s.chars().take(len).collect()
+}
+
+/// Concatenate two strings (from mem.c bicat)
+pub fn bicat(s1: &str, s2: &str) -> String {
+    format!("{}{}", s1, s2)
+}
+
+/// Concatenate three strings (from mem.c tricat)
+pub fn tricat(s1: &str, s2: &str, s3: &str) -> String {
+    format!("{}{}{}", s1, s2, s3)
+}
+
+/// Dynamic concatenate on heap (from mem.c dyncat)
+pub fn dyncat(s1: &str, s2: &str) -> String {
+    format!("{}{}", s1, s2)
+}
+
+/// Get last character of string (from mem.c strend)
+pub fn strend(s: &str) -> Option<char> {
+    s.chars().last()
+}
+
+/// Append string (from mem.c appstr)
+pub fn appstr(base: &mut String, append: &str) {
+    base.push_str(append);
+}
+
+/// Memory statistics structure
+#[derive(Default, Debug, Clone)]
+pub struct MemStats {
+    pub heap_count: usize,
+    pub heap_total: usize,
+    pub heap_used: usize,
+    pub alloc_count: usize,
+    pub free_count: usize,
+}
+
+impl MemStats {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Get memory statistics (stub - Rust manages memory automatically)
+pub fn get_mem_stats() -> MemStats {
+    MemStats::new()
+}
+
+/// Context save/restore for memory (from mem.c zcontext_save/restore)
+pub struct MemContext {
+    heap_depth: usize,
+}
+
+impl MemContext {
+    pub fn save() -> Self {
+        let depth = HEAP.with(|h| h.borrow().depth());
+        MemContext { heap_depth: depth }
+    }
+
+    pub fn restore(self) {
+        HEAP.with(|h| {
+            let mut heap = h.borrow_mut();
+            while heap.depth() > self.heap_depth {
+                heap.pop();
+            }
+        });
+    }
+}
+
+/// Save memory context
+pub fn zcontext_save() -> MemContext {
+    MemContext::save()
+}
+
+/// Restore memory context
+pub fn zcontext_restore(ctx: MemContext) {
+    ctx.restore();
+}
+
+/// Queue signals during memory operations (stub in Rust - not needed)
+pub fn queue_signals() {}
+
+/// Unqueue signals after memory operations (stub in Rust - not needed)
+pub fn unqueue_signals() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

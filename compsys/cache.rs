@@ -10,11 +10,17 @@
 
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// SQLite cache for completion system
 pub struct CompsysCache {
     conn: Connection,
+}
+
+/// Returns the default cache path: ~/.cache/zshrs/compsys.db
+pub fn default_cache_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    PathBuf::from(home).join(".cache/zshrs/compsys.db")
 }
 
 impl CompsysCache {
@@ -54,11 +60,14 @@ impl CompsysCache {
         self.conn.execute_batch(
             r#"
             -- Autoloads: flat table, PRIMARY KEY = clustered index
+            -- body stores actual function definition - NO filesystem access on autoload -Xz
+            -- compinit reads from .zwc or plain files ONCE, stores body here
             CREATE TABLE IF NOT EXISTS autoloads (
                 name TEXT PRIMARY KEY,
                 source TEXT NOT NULL,
                 offset INTEGER NOT NULL,
-                size INTEGER NOT NULL
+                size INTEGER NOT NULL,
+                body TEXT
             ) WITHOUT ROWID;
 
             -- zstyle: flat lookup by pattern+style
@@ -156,7 +165,7 @@ impl CompsysCache {
     // Autoloads - function stubs
     // =========================================================================
 
-    /// Register an autoload stub
+    /// Register an autoload stub (without body)
     pub fn add_autoload(
         &self,
         name: &str,
@@ -165,8 +174,22 @@ impl CompsysCache {
         size: i64,
     ) -> rusqlite::Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO autoloads (name, source, offset, size) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO autoloads (name, source, offset, size, body) VALUES (?1, ?2, ?3, ?4, NULL)",
             params![name, source, offset, size],
+        )?;
+        Ok(())
+    }
+
+    /// Register an autoload with full function body (for instant loading)
+    pub fn add_autoload_with_body(
+        &self,
+        name: &str,
+        source: &str,
+        body: &str,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO autoloads (name, source, offset, size, body) VALUES (?1, ?2, 0, ?3, ?4)",
+            params![name, source, body.len() as i64, body],
         )?;
         Ok(())
     }
@@ -179,10 +202,28 @@ impl CompsysCache {
         let tx = self.conn.transaction()?;
         {
             let mut stmt = tx.prepare(
-                "INSERT OR REPLACE INTO autoloads (name, source, offset, size) VALUES (?1, ?2, ?3, ?4)"
+                "INSERT OR REPLACE INTO autoloads (name, source, offset, size, body) VALUES (?1, ?2, ?3, ?4, NULL)"
             )?;
             for (name, source, offset, size) in autoloads {
                 stmt.execute(params![name, source, offset, size])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Bulk insert autoloads with bodies (for compinit to cache function definitions)
+    pub fn add_autoloads_with_bodies_bulk(
+        &mut self,
+        autoloads: &[(String, String, String)], // (name, source, body)
+    ) -> rusqlite::Result<()> {
+        let tx = self.conn.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT OR REPLACE INTO autoloads (name, source, offset, size, body) VALUES (?1, ?2, 0, ?3, ?4)"
+            )?;
+            for (name, source, body) in autoloads {
+                stmt.execute(params![name, source, body.len() as i64, body])?;
             }
         }
         tx.commit()?;
@@ -193,7 +234,7 @@ impl CompsysCache {
     pub fn get_autoload(&self, name: &str) -> rusqlite::Result<Option<AutoloadStub>> {
         self.conn
             .query_row(
-                "SELECT source, offset, size FROM autoloads WHERE name = ?1",
+                "SELECT source, offset, size, body FROM autoloads WHERE name = ?1",
                 params![name],
                 |row| {
                     Ok(AutoloadStub {
@@ -201,10 +242,61 @@ impl CompsysCache {
                         source: row.get(0)?,
                         offset: row.get(1)?,
                         size: row.get(2)?,
+                        body: row.get(3)?,
                     })
                 },
             )
             .optional()
+    }
+
+    /// Get function body directly (fast path for autoload -Xz)
+    pub fn get_autoload_body(&self, name: &str) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT body FROM autoloads WHERE name = ?1",
+                params![name],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    /// Get function body with ZWC fallback
+    /// 1. If body column has content, return it (fast path)
+    /// 2. If body is NULL but source/offset/size exist, read from ZWC file
+    /// 3. Returns None if function not found or ZWC read fails
+    pub fn get_autoload_body_or_zwc(&self, name: &str) -> Option<String> {
+        let stub = self.get_autoload(name).ok()??;
+        
+        // Fast path: body is cached
+        if let Some(body) = stub.body {
+            return Some(body);
+        }
+        
+        // Fallback: read from ZWC file
+        if stub.size > 0 && !stub.source.is_empty() {
+            return Self::read_function_from_zwc(&stub.source, stub.offset, stub.size);
+        }
+        
+        None
+    }
+
+    /// Read function body from ZWC file at given offset/size
+    fn read_function_from_zwc(zwc_path: &str, offset: i64, size: i64) -> Option<String> {
+        use std::io::{Read, Seek, SeekFrom};
+        
+        let mut file = std::fs::File::open(zwc_path).ok()?;
+        file.seek(SeekFrom::Start(offset as u64)).ok()?;
+        
+        let mut buf = vec![0u8; size as usize];
+        file.read_exact(&mut buf).ok()?;
+        
+        // ZWC stores tokenized strings - need to untokenize
+        // For now, just try to interpret as UTF-8 (works for most cases)
+        // TODO: proper untokenization like zwc.rs does
+        match String::from_utf8(buf) {
+            Ok(s) => Some(s),
+            Err(e) => Some(String::from_utf8_lossy(e.as_bytes()).into_owned()),
+        }
     }
 
     /// Count autoloads
@@ -217,6 +309,13 @@ impl CompsysCache {
     pub fn list_autoloads(&self, limit: usize) -> rusqlite::Result<Vec<String>> {
         let mut stmt = self.conn.prepare("SELECT name FROM autoloads LIMIT ?1")?;
         let rows = stmt.query_map(params![limit as i64], |row| row.get(0))?;
+        rows.collect()
+    }
+
+    /// List all autoload names (no limit)
+    pub fn list_autoload_names(&self) -> rusqlite::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT name FROM autoloads")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
 
@@ -563,6 +662,8 @@ pub struct AutoloadStub {
     pub source: String,
     pub offset: i64,
     pub size: i64,
+    /// Cached function body - if present, no need to read from source file
+    pub body: Option<String>,
 }
 
 /// zstyle entry
@@ -1219,6 +1320,80 @@ mod tests {
 
         let stub = cache.get_autoload("_func500").unwrap().unwrap();
         assert_eq!(stub.offset, 50000);
+        assert!(stub.body.is_none()); // No body when bulk inserted without
+    }
+
+    #[test]
+    fn test_autoload_with_body() {
+        let cache = CompsysCache::memory().unwrap();
+
+        let body = r#"
+local -a opts
+opts=(--help --version --verbose)
+_arguments $opts
+"#;
+        cache.add_autoload_with_body("_mycommand", "/usr/share/zsh/functions/_mycommand", body).unwrap();
+
+        let stub = cache.get_autoload("_mycommand").unwrap().unwrap();
+        assert_eq!(stub.body.as_deref(), Some(body));
+        assert_eq!(stub.size, body.len() as i64);
+
+        // Fast path: get body directly
+        let direct_body = cache.get_autoload_body("_mycommand").unwrap();
+        assert_eq!(direct_body.as_deref(), Some(body));
+    }
+
+    #[test]
+    fn test_bulk_autoloads_with_bodies() {
+        let mut cache = CompsysCache::memory().unwrap();
+
+        let autoloads: Vec<(String, String, String)> = (0..100)
+            .map(|i| (
+                format!("_func{}", i),
+                format!("/path/to/_func{}", i),
+                format!("# Function {}\necho hello", i),
+            ))
+            .collect();
+
+        cache.add_autoloads_with_bodies_bulk(&autoloads).unwrap();
+        assert_eq!(cache.autoload_count().unwrap(), 100);
+
+        let stub = cache.get_autoload("_func50").unwrap().unwrap();
+        assert!(stub.body.is_some());
+        assert!(stub.body.unwrap().contains("Function 50"));
+    }
+
+    #[test]
+    fn test_get_autoload_body_or_zwc_with_body() {
+        let cache = CompsysCache::memory().unwrap();
+
+        let body = "echo from sqlite";
+        cache.add_autoload_with_body("_cached", "/some/path", body).unwrap();
+
+        // Should return body from SQLite (fast path)
+        let result = cache.get_autoload_body_or_zwc("_cached");
+        assert_eq!(result, Some(body.to_string()));
+    }
+
+    #[test]
+    fn test_get_autoload_body_or_zwc_no_body() {
+        let cache = CompsysCache::memory().unwrap();
+
+        // Add autoload without body (just ZWC reference)
+        cache.add_autoload("_nocache", "nonexistent.zwc", 0, 100).unwrap();
+
+        // Should return None since ZWC file doesn't exist
+        let result = cache.get_autoload_body_or_zwc("_nocache");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_autoload_body_or_zwc_not_found() {
+        let cache = CompsysCache::memory().unwrap();
+
+        // Function doesn't exist at all
+        let result = cache.get_autoload_body_or_zwc("_nonexistent");
+        assert!(result.is_none());
     }
 
     #[test]
