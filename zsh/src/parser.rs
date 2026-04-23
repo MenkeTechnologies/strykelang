@@ -531,6 +531,8 @@ pub enum ShellToken {
     Time,
     Coproc,
     Typeset,
+    Repeat,
+    Always,
     Bang,
     DoubleSemi,
     SemiAmp,
@@ -1191,6 +1193,8 @@ impl<'a> ShellLexer<'a> {
             "select" => ShellToken::Select,
             "time" => ShellToken::Time,
             "coproc" => ShellToken::Coproc,
+            "repeat" => ShellToken::Repeat,
+            "always" => ShellToken::Always,
             "typeset" | "local" | "declare" | "export" | "readonly" 
                 | "integer" | "float" => ShellToken::Typeset,
             _ => ShellToken::Word(word),
@@ -1416,7 +1420,8 @@ impl<'a> ShellParser<'a> {
             ShellToken::While => self.parse_while(),
             ShellToken::Until => self.parse_until(),
             ShellToken::Case => self.parse_case(),
-            ShellToken::LBrace => self.parse_brace_group(),
+            ShellToken::Repeat => self.parse_repeat(),
+            ShellToken::LBrace => self.parse_brace_group_or_try(),
             ShellToken::LParen => {
                 self.advance();
                 if self.current == ShellToken::RParen {
@@ -2011,6 +2016,61 @@ impl<'a> ShellParser<'a> {
             word,
             cases,
         }))
+    }
+
+    fn parse_repeat(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::Repeat)?;
+        
+        let count = match &self.current {
+            ShellToken::Word(w) => {
+                let c = w.clone();
+                self.advance();
+                c
+            }
+            _ => return Err("expected count after 'repeat'".to_string()),
+        };
+        
+        self.skip_separators();
+        
+        let body = if self.current == ShellToken::LBrace {
+            self.advance();
+            self.skip_newlines();
+            let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
+            self.expect(ShellToken::RBrace)?;
+            body
+        } else {
+            self.expect(ShellToken::Do)?;
+            let body = self.parse_compound_list()?;
+            self.expect(ShellToken::Done)?;
+            body
+        };
+        
+        Ok(ShellCommand::Compound(CompoundCommand::Repeat {
+            count,
+            body,
+        }))
+    }
+
+    fn parse_brace_group_or_try(&mut self) -> Result<ShellCommand, String> {
+        self.expect(ShellToken::LBrace)?;
+        self.skip_newlines();
+        let try_body = self.parse_compound_list()?;
+        self.expect(ShellToken::RBrace)?;
+        
+        if self.current == ShellToken::Always {
+            self.advance();
+            self.expect(ShellToken::LBrace)?;
+            self.skip_newlines();
+            let always_body = self.parse_compound_list()?;
+            self.expect(ShellToken::RBrace)?;
+            
+            Ok(ShellCommand::Compound(CompoundCommand::Try {
+                try_body,
+                always_body,
+            }))
+        } else {
+            Ok(ShellCommand::Compound(CompoundCommand::BraceGroup(try_body)))
+        }
     }
 
     fn parse_brace_group(&mut self) -> Result<ShellCommand, String> {

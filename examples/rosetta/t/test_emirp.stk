@@ -24,7 +24,7 @@ fn my_is_prime($n) {
 }
 
 fn my_rev_int($n) {
-    ~> $n >{split //, $_} rev |> join("") |> int
+    ~> $n >{split //, $_} rev join("") int
 }
 
 fn my_is_emirp($n) {

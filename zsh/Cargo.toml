@@ -33,6 +33,11 @@ hostname = "0.4"
 libm = "0.2"
 rand = "0.8"
 unicode-width = "0.2"
+once_cell = "1"
+
+[features]
+default = []
+gdbm = []
 
 [dev-dependencies]
 tempfile = "3"

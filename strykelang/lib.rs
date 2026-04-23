@@ -72,7 +72,7 @@ pub use zsh::exec as shell_exec;
 pub use zsh::fds as shell_fds;
 pub use zsh::history as shell_history;
 pub use zsh::jobs as shell_jobs;
-pub use zsh::shell_ast as shell_parse;
+pub use zsh::parser as shell_parse;
 pub use zsh::signals as shell_signal;
 pub use zsh::zle as shell_zle;
 pub use zsh::zwc as shell_zwc;

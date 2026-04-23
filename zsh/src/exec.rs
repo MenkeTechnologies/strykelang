@@ -1443,6 +1443,10 @@ impl ShellExecutor {
             "compinit" => self.builtin_compinit(args),
             "cdreplay" => self.builtin_cdreplay(args),
             "zstyle" => self.builtin_zstyle(args),
+            // GDBM database bindings
+            "ztie" => self.builtin_ztie(args),
+            "zuntie" => self.builtin_zuntie(args),
+            "zgdbmpath" => self.builtin_zgdbmpath(args),
             "pushd" => self.builtin_pushd(args),
             "popd" => self.builtin_popd(args),
             "dirs" => self.builtin_dirs(args),
@@ -2186,6 +2190,66 @@ impl ShellExecutor {
                         }
                     }
                 }
+                Ok(self.last_status)
+            }
+
+            CompoundCommand::Repeat { count, body } => {
+                let n: i64 = self.expand_word(&ShellWord::Literal(count.clone()))
+                    .parse()
+                    .unwrap_or(0);
+                
+                for _ in 0..n {
+                    for cmd in body {
+                        self.execute_command(cmd)?;
+                        if self.breaking > 0 || self.continuing > 0 || self.returning.is_some() {
+                            break;
+                        }
+                    }
+                    
+                    if self.continuing > 0 {
+                        self.continuing -= 1;
+                        if self.continuing > 0 {
+                            break;
+                        }
+                        continue;
+                    }
+                    if self.breaking > 0 {
+                        self.breaking -= 1;
+                        break;
+                    }
+                    if self.returning.is_some() {
+                        break;
+                    }
+                }
+                
+                Ok(self.last_status)
+            }
+
+            CompoundCommand::Try { try_body, always_body } => {
+                let saved_errflag = false;
+                
+                for cmd in try_body {
+                    if let Err(_e) = self.execute_command(cmd) {
+                        break;
+                    }
+                    if self.returning.is_some() {
+                        break;
+                    }
+                }
+                
+                let try_status = self.last_status;
+                let saved_returning = self.returning.take();
+                
+                for cmd in always_body {
+                    let _ = self.execute_command(cmd);
+                }
+                
+                self.returning = saved_returning;
+                
+                if !saved_errflag {
+                    self.last_status = try_status;
+                }
+                
                 Ok(self.last_status)
             }
 
@@ -10470,6 +10534,123 @@ impl ShellExecutor {
             }
         }
         0
+    }
+
+    /// Tie a parameter to a GDBM database
+    /// Usage: ztie -d db/gdbm -f /path/to/db.gdbm [-r] PARAM_NAME
+    fn builtin_ztie(&mut self, args: &[String]) -> i32 {
+        use crate::db_gdbm;
+        
+        let mut db_type: Option<String> = None;
+        let mut file_path: Option<String> = None;
+        let mut readonly = false;
+        let mut param_args: Vec<String> = Vec::new();
+        
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-d" => {
+                    if i + 1 < args.len() {
+                        db_type = Some(args[i + 1].clone());
+                        i += 2;
+                    } else {
+                        eprintln!("ztie: -d requires an argument");
+                        return 1;
+                    }
+                }
+                "-f" => {
+                    if i + 1 < args.len() {
+                        file_path = Some(args[i + 1].clone());
+                        i += 2;
+                    } else {
+                        eprintln!("ztie: -f requires an argument");
+                        return 1;
+                    }
+                }
+                "-r" => {
+                    readonly = true;
+                    i += 1;
+                }
+                arg if arg.starts_with('-') => {
+                    eprintln!("ztie: bad option: {}", arg);
+                    return 1;
+                }
+                _ => {
+                    param_args.push(args[i].clone());
+                    i += 1;
+                }
+            }
+        }
+        
+        match db_gdbm::ztie(
+            &param_args,
+            readonly,
+            db_type.as_deref(),
+            file_path.as_deref(),
+        ) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("ztie: {}", e);
+                1
+            }
+        }
+    }
+
+    /// Untie a parameter from its GDBM database
+    /// Usage: zuntie [-u] PARAM_NAME...
+    fn builtin_zuntie(&mut self, args: &[String]) -> i32 {
+        use crate::db_gdbm;
+        
+        let mut force_unset = false;
+        let mut param_args: Vec<String> = Vec::new();
+        
+        for arg in args {
+            match arg.as_str() {
+                "-u" => force_unset = true,
+                a if a.starts_with('-') => {
+                    eprintln!("zuntie: bad option: {}", a);
+                    return 1;
+                }
+                _ => param_args.push(arg.clone()),
+            }
+        }
+        
+        if param_args.is_empty() {
+            eprintln!("zuntie: not enough arguments");
+            return 1;
+        }
+        
+        match db_gdbm::zuntie(&param_args, force_unset) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("zuntie: {}", e);
+                1
+            }
+        }
+    }
+
+    /// Get the path of a tied GDBM database
+    /// Usage: zgdbmpath PARAM_NAME
+    /// Sets $REPLY to the path
+    fn builtin_zgdbmpath(&mut self, args: &[String]) -> i32 {
+        use crate::db_gdbm;
+        
+        if args.is_empty() {
+            eprintln!("zgdbmpath: parameter name (whose path is to be written to $REPLY) is required");
+            return 1;
+        }
+        
+        match db_gdbm::zgdbmpath(&args[0]) {
+            Ok(path) => {
+                self.variables.insert("REPLY".to_string(), path.clone());
+                std::env::set_var("REPLY", &path);
+                0
+            }
+            Err(e) => {
+                eprintln!("zgdbmpath: {}", e);
+                1
+            }
+        }
     }
 
     /// Push directory onto stack and cd to it

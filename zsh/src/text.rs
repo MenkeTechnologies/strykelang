@@ -372,6 +372,39 @@ impl TextFormatter {
             CompoundCommand::Select { var, words, body } => {
                 self.format_select(var, words, body);
             }
+            CompoundCommand::Repeat { count, body } => {
+                self.add_str("repeat ");
+                self.add_str(count);
+                self.add_newline(false);
+                self.add_str("do");
+                self.inc_indent();
+                self.add_newline(false);
+                for cmd in body {
+                    self.format_command(cmd);
+                    self.add_newline(false);
+                }
+                self.dec_indent();
+                self.add_str("done");
+            }
+            CompoundCommand::Try { try_body, always_body } => {
+                self.add_char('{');
+                self.inc_indent();
+                self.add_newline(false);
+                for cmd in try_body {
+                    self.format_command(cmd);
+                    self.add_newline(false);
+                }
+                self.dec_indent();
+                self.add_str("} always {");
+                self.inc_indent();
+                self.add_newline(false);
+                for cmd in always_body {
+                    self.format_command(cmd);
+                    self.add_newline(false);
+                }
+                self.dec_indent();
+                self.add_char('}');
+            }
             CompoundCommand::Coproc { name, body } => {
                 self.add_str("coproc ");
                 if let Some(n) = name {
