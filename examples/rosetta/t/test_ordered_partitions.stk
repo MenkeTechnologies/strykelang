@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ordered partitions
+
+fn get_ordered_partitions($n) {
+    my @res = ()
+    if ($n == 0) {
+        push @res, []
+        return ([@res])
+    }
+    for my $i (1..$n) {
+        my $sub = get_ordered_partitions($n - $i)
+        for my $p (@$sub) {
+            push @res, [$i, @$p]
+        }
+    }
+    ([@res])
+}
+
+my $p3 = get_ordered_partitions(3)
+# Partitions of 3: (3), (2,1), (1,2), (1,1,1)
+assert_eq scalar(@$p3), 4, "3 has 4 ordered partitions"
+
+my $joined = ~> @$p3 map { join("", @$_) } |> join(",")
+assert_eq $joined, "111,12,21,3", "partitions of 3"
+
+test_run

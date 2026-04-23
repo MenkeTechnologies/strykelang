@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ludic numbers
+
+fn get_ludic($n) {
+    my @ludics = (1)
+    my @nums = (2..$n)
+    while (scalar(@nums) > 0) {
+        my $skip = shift @nums
+        push @ludics, $skip
+        if (scalar(@nums) == 0) { last }
+        my @next_nums = ()
+        for my $i (0..scalar(@nums)-1) {
+            if (($i + 1) % $skip != 0) {
+                push @next_nums, $nums[$i]
+            }
+        }
+        @nums = @next_nums
+        if (scalar(@ludics) > 100) { last }
+    }
+    ([@ludics])
+}
+
+my $res = get_ludic(25)
+assert_eq join(",", @$res), "1,2,3,5,7,11,13,17,23,25", "Ludic up to 25"
+
+my $res2 = get_ludic(200)
+assert_eq $res2->[24], 107, "25th Ludic is 107"
+
+test_run

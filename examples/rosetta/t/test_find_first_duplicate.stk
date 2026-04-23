@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find first duplicate element in an array
+
+fn find_first_duplicate {
+    my $list = $_[0]
+    my %seen
+    for my $x (@$list) {
+        if (exists $seen{$x}) {
+            return $x
+        }
+        $seen{$x} = 1
+    }
+    undef
+}
+
+assert_eq find_first_duplicate([1, 2, 3, 1, 5, 3]), 1, "first dup is 1"
+assert_eq find_first_duplicate([1, 2, 3, 4, 5]), undef, "no dups"
+assert_eq find_first_duplicate(["a", "b", "a"]), "a", "first dup is a"
+
+test_run

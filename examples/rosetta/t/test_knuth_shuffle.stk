@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knuth Shuffle
+
+fn knuth_shuffle {
+    my $list = $_[0]
+    my @arr = @$list
+    my $n = scalar(@arr)
+    for my $i (~> (1..$n-1) rev) {
+        my $j = int(rand($i + 1))
+        ($arr[$i], $arr[$j]) = ($arr[$j], $arr[$i])
+    }
+    ([@arr])
+}
+
+my $data = [1, 2, 3, 4, 5]
+my $shuffled = knuth_shuffle($data)
+# We can't easily test randomness, but we can test length and content
+assert_eq scalar(@$shuffled), 5, "shuffled length"
+
+my %counts
+for my $x (@$shuffled) { $counts{$x}++ }
+for my $i (1..5) {
+    assert_eq $counts{$i}, 1, "contains $i"
+}
+
+test_run

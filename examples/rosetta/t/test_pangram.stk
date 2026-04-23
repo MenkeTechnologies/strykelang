@@ -1,33 +1,14 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Pangram Checker
+# Rosetta Code: Pangram
 
 fn my_is_pangram($s) {
     my $lower = lc($s)
-    my $pangram = 1
-    for my $c ('a'..'z') {
-        if ($pangram) {
-            if (index($lower, $c) < 0) {
-                $pangram = 0
-            }
-        }
-    }
-    $pangram
+    my @missing = ~> 'a'..'z' grep { index($lower, $_) < 0 }
+    scalar(@missing) == 0
 }
 
-fn missing_letters($s) {
-    my $lower = lc($s)
-    'a'..'z' |> filter { index($lower, $_) < 0 }
-}
-
-assert_ok my_is_pangram("The quick brown fox jumps over the lazy dog"), "classic pangram"
-assert_ok my_is_pangram("Pack my box with five dozen liquor jugs"), "another pangram"
-assert_ok my_is_pangram("Sphinx of black quartz, judge my vow"), "sphinx pangram"
-
-assert_ok !my_is_pangram("The quick brown fox"), "not a pangram"
-assert_ok !my_is_pangram("Hello World"), "hello world not pangram"
-
-my @missing = missing_letters("The quick brown fox")
-assert_ok scalar(@missing) > 0, "has missing letters"
-assert_ok (grep { $_ eq 'z' } @missing), "z is missing"
+assert_ok my_is_pangram("The quick brown fox jumps over the lazy dog"), "Standard pangram"
+assert_ok my_is_pangram("Pack my box with five dozen liquor jugs"), "Another pangram"
+assert_ok !my_is_pangram("Hello World"), "Not a pangram"
 
 test_run

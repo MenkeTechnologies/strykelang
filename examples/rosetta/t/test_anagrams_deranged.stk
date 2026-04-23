@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anagrams/Deranged anagrams
+
+fn is_derangement {
+    my $s1 = $_[0]
+    my $s2 = $_[1]
+    if (length($s1) != length($s2)) { return 0 }
+    my @a1 = ~> $s1 chars
+    my @a2 = ~> $s2 chars
+    for my $i (0..scalar(@a1)-1) {
+        if ($a1[$i] eq $a2[$i]) { return 0 }
+    }
+    1
+}
+
+fn sort_str {
+    ~> $_[0] chars sort |> join ""
+}
+
+fn find_deranged_anagrams {
+    my $words = $_[0]
+    my %groups
+    for my $w (@$words) {
+        my $key = sort_str($w)
+        if (!exists $groups{$key}) {
+            $groups{$key} = []
+        }
+        push @{$groups{$key}}, $w
+    }
+    
+    my $max_len = 0
+    my @best = ()
+    
+    for my $key (keys %groups) {
+        my @list = @{$groups{$key}}
+        if (scalar(@list) > 1) {
+            for my $i (0..scalar(@list)-2) {
+                for my $j ($i+1..scalar(@list)-1) {
+                    if (is_derangement($list[$i], $list[$j])) {
+                        my $len = length($list[$i])
+                        if ($len >= $max_len) {
+                            $max_len = $len
+                            @best = ($list[$i], $list[$j])
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ([@best])
+}
+
+my $words = [qw(dots stod stop pots tops post spot)]
+my $res = find_deranged_anagrams($words)
+# dots and stod are deranged anagrams (length 4)
+assert_eq length($res->[0]), 4, "max length deranged anagram"
+
+assert_ok is_derangement("dots", "stod"), "dots/stod is derangement"
+assert_ok !is_derangement("abc", "acb"), "abc/acb is not (a matches)"
+
+test_run

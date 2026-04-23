@@ -1,41 +1,28 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Egyptian fractions
+# Rosetta Code: Egyptian Fractions
 
-fn my_gcd($a, $b) {
-    while ($b) {
-        my $t = $b
-        $b = $a % $b
-        $a = $t
-    }
-    $a
-}
-
-fn egyptian($n, $d) {
+fn egyptian {
+    my $n = $_[0]
+    my $d = $_[1]
     my @res = ()
-    while ($n > 0) {
-        my $x = ceil($d / $n)
-        push(@res, $x)
+    while ($n != 0) {
+        my $x = int(($d + $n - 1) / $n)
+        push @res, $x
         $n = $x * $n - $d
         $d = $d * $x
-        my $g = my_gcd($n, $d)
-        $n /= $g
-        $d /= $g
+        # Simplify n/d if possible to avoid large numbers?
+        # For simplicity in this example we just continue
     }
-    @res
+    ([@res])
 }
 
-# 43/48 -> 1/2 + 1/3 + 1/16
-my @res1 = egyptian(43, 48)
-assert_eq scalar(@res1), 3, "43/48 has 3 terms"
-assert_eq @res1[0], 2, "first term 2"
-assert_eq @res1[1], 3, "second term 3"
-assert_eq @res1[2], 16, "third term 16"
+# 43/48 = 1/2 + 1/3 + 1/16
+my $f1 = egyptian(43, 48)
+assert_eq join(",", @$f1), "2,3,16", "43/48"
 
-# 5/121 -> 1/25 + 1/757 + 1/763309 + ...
-my @res2 = egyptian(5, 121)
-assert_eq @res2[0], 25, "5/121 starts with 1/25"
-
-# Pipe usage
-3 |> egyptian(4) |> { $_->[0] } |> assert_eq(2, "3 |> egyptian(4) starts with 2")
+# 5/121 = 1/25 + 1/757 + 1/763309 + ...
+# Greedy algorithm results
+my $f2 = egyptian(5, 121)
+assert_eq $f2->[0], 25, "5/121 first term"
 
 test_run

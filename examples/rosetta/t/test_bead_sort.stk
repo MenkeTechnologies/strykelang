@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bead Sort
+
+fn bead_sort {
+    my $list = $_[0]
+    my @arr = @$list
+    my $max = 0
+    for my $x (@arr) {
+        if ($x > $max) { $max = $x }
+    }
+    
+    my @beads = ()
+    for my $i (0..scalar(@arr)-1) {
+        $beads[$i] = []
+        for my $j (0..$arr[$i]-1) {
+            $beads[$i][$j] = 1
+        }
+    }
+    
+    for my $j (0..$max-1) {
+        my $sum = 0
+        for my $i (0..scalar(@arr)-1) {
+            if ($beads[$i][$j]) {
+                $sum++
+                $beads[$i][$j] = 0
+            }
+        }
+        if ($sum > 0) {
+            for my $i (scalar(@arr)-$sum .. scalar(@arr)-1) {
+                $beads[$i][$j] = 1
+            }
+        }
+    }
+    
+    my @res = ()
+    for my $i (0..scalar(@arr)-1) {
+        my $sum = 0
+        for my $j (0..$max-1) {
+            if ($beads[$i][$j]) { $sum++ }
+        }
+        push @res, $sum
+    }
+    ([@res])
+}
+
+my $data = [5, 3, 1, 7, 4, 1, 1]
+my $sorted = bead_sort($data)
+assert_eq join(",", @$sorted), "1,1,1,3,4,5,7", "bead sort"
+
+test_run

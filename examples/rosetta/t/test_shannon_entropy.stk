@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Entropy
+
+fn shannon_entropy($s) {
+    my $len = length($s)
+    if ($len == 0) { return 0 }
+    my $counts = {}
+    my @chars = ~> $s chars
+    for my $c (@chars) {
+        $counts->{$c} = ($counts->{$c} || 0) + 1
+    }
+    
+    my $entropy = 0
+    for my $char (keys %$counts) {
+        my $p = $counts->{$char} / $len
+        $entropy -= $p * (log($p) / log(2))
+    }
+    $entropy
+}
+
+assert_ok abs(shannon_entropy("1223334444") - 1.8464) < 0.0001, "Entropy of 1223334444"
+assert_eq shannon_entropy("aaaaa"), 0, "Entropy of aaaaa is 0"
+assert_eq shannon_entropy(""), 0, "Entropy of empty string"
+
+test_run

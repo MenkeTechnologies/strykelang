@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ethiopian multiplication
+
+fn my_is_even { $_[0] % 2 == 0 }
+
+fn ethiopian {
+    my $a = $_[0]
+    my $b = $_[1]
+    my $sum = 0
+    while ($a >= 1) {
+        if (!my_is_even($a)) {
+            $sum += $b
+        }
+        $a = int($a / 2)
+        $b *= 2
+    }
+    $sum
+}
+
+assert_eq ethiopian(17, 34), 578, "17 * 34"
+assert_eq ethiopian(25, 12), 300, "25 * 12"
+
+test_run

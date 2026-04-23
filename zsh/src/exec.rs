@@ -173,7 +173,10 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 use crate::jobs::{continue_job, wait_for_child, wait_for_job, JobState, JobTable};
-use crate::shell_ast::*;
+use crate::parser::{
+    ShellCommand, SimpleCommand, ShellWord, VarModifier, Redirect, RedirectOp,
+    CompoundCommand, ListOp, CondExpr, CaseTerminator, ZshParamFlag, ShellParser,
+};
 use crate::zwc::ZwcFile;
 use std::collections::HashMap;
 use std::env;
@@ -4297,7 +4300,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse the command
-        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
+        let mut parser = ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -4348,7 +4351,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse the command
-        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
+        let mut parser = ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -4399,7 +4402,7 @@ impl ShellExecutor {
         use std::process::Stdio;
 
         // Parse and execute the command
-        let mut parser = crate::shell_ast::ShellParser::new(cmd_str);
+        let mut parser = ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
             Err(_) => return String::new(),
@@ -5073,7 +5076,6 @@ impl ShellExecutor {
 
     /// Parse zsh parameter expansion flags from a string like "L", "U", "j:,:"
     fn parse_zsh_flags(&self, s: &str) -> Vec<ZshParamFlag> {
-        use crate::shell_ast::ZshParamFlag;
         let mut flags = Vec::new();
         let mut chars = s.chars().peekable();
 
@@ -5225,7 +5227,6 @@ impl ShellExecutor {
 
     /// Apply a single zsh parameter expansion flag
     fn apply_zsh_param_flag(&self, val: &str, name: &str, flag: &ZshParamFlag) -> String {
-        use crate::shell_ast::ZshParamFlag;
         match flag {
             ZshParamFlag::Lower => val.to_lowercase(),
             ZshParamFlag::Upper => val.to_uppercase(),
@@ -7259,7 +7260,7 @@ impl ShellExecutor {
             if let Some(ref cache) = self.compsys_cache {
                 if let Ok(Some(body)) = cache.get_autoload_body(name) {
                     // Parse the cached function body
-                    let mut parser = crate::shell_ast::ShellParser::new(&body);
+                    let mut parser = ShellParser::new(&body);
                     if let Ok(commands) = parser.parse_script() {
                         if !commands.is_empty() {
                             // Check if it's a single function definition for this name (ksh style)
@@ -7323,7 +7324,7 @@ impl ShellExecutor {
         let content = std::fs::read_to_string(&path).ok()?;
 
         // Parse the content
-        let mut parser = crate::shell_ast::ShellParser::new(&content);
+        let mut parser = ShellParser::new(&content);
 
         if let Ok(commands) = parser.parse_script() {
             if commands.is_empty() {

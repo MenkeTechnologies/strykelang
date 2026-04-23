@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word frequency
+
+fn word_frequency {
+    my $s = $_[0]
+    my $counts = {}
+    my $l = lc($s)
+    my @words = split(/[^a-z]+/, $l)
+    ~> @words grep { $_ ne "" } map { $counts->{$_} = $counts->{$_} + 1 }
+    $counts
+}
+
+my $text = "The quick brown fox jumps over the lazy dog. The dog was not amused."
+my $f = word_frequency($text)
+assert_eq $f->{the}, 3, "frequency of 'the'"
+assert_eq $f->{dog}, 2, "frequency of 'dog'"
+assert_eq $f->{fox}, 1, "frequency of 'fox'"
+
+test_run

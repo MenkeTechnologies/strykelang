@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bioinformatics/Base count
+
+fn base_count($dna) {
+    my $counts = {A => 0, C => 0, G => 0, T => 0}
+    my @bases = ~> $dna uc chars
+    for my $b (@bases) {
+        if (exists $counts->{$b}) {
+            $counts->{$b} = $counts->{$b} + 1
+        }
+    }
+    $counts
+}
+
+my $dna = "CGATATATGGGTTTTAGC"
+my $res = base_count($dna)
+assert_eq $res->{A}, 4, "Count of A"
+assert_eq $res->{C}, 2, "Count of C"
+assert_eq $res->{G}, 5, "Count of G"
+assert_eq $res->{T}, 7, "Count of T"
+
+test_run

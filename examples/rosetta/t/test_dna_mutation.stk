@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bioinformatics/Sequence mutator
+
+fn mutate_dna($dna, $prob) {
+    my @bases = ("A", "C", "G", "T")
+    my @seq = ~> $dna chars
+    for my $i (0..scalar(@seq)-1) {
+        if (rand() < $prob) {
+            my $new_base = $bases[int(rand(4))]
+            $seq[$i] = $new_base
+        }
+    }
+    join "", @seq
+}
+
+my $dna = "AAAAA"
+my $mutated = mutate_dna($dna, 0.5)
+assert_eq length($mutated), 5, "Length preserved"
+assert_ok $mutated =~ /^[ACGT]+$/, "Only valid bases"
+
+test_run
