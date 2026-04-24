@@ -1306,6 +1306,8 @@ pub enum ExprKind {
     BlockDevices(Vec<Expr>),
     /// `char_devices` / `char_devices DIR` — list character device names in a directory (default: `.`).
     CharDevices(Vec<Expr>),
+    /// `exe` / `exe DIR` — list executable file names in a directory (default: `.`).
+    Executables(Vec<Expr>),
     Glob(Vec<Expr>),
     /// Parallel recursive glob (rayon); same patterns as `glob`, different walk strategy.
     /// Optional `, progress => EXPR` — stderr progress bar (one tick per pattern).

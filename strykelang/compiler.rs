@@ -6212,6 +6212,16 @@ impl Compiler {
                     Some(root),
                 );
             }
+            ExprKind::Executables(args) => {
+                for a in args {
+                    self.compile_expr(a)?;
+                }
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Executables as u16, args.len() as u8),
+                    line,
+                    Some(root),
+                );
+            }
             ExprKind::Glob(args) => {
                 for a in args {
                     self.compile_expr(a)?;

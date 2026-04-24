@@ -1029,7 +1029,9 @@ every
 every_nth
 ew
 ewo
+exe
 exec
+executables
 exists
 exit
 exp

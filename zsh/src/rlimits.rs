@@ -212,7 +212,7 @@ impl ResourceLimits {
             rlim_max: 0,
         };
 
-        if unsafe { getrlimit(res, &mut rlim) } < 0 {
+        if unsafe { getrlimit(res as _, &mut rlim) } < 0 {
             return Err(format!(
                 "can't read limit: {}",
                 std::io::Error::last_os_error()
@@ -265,7 +265,7 @@ impl ResourceLimits {
             rlim_max: new_hard.to_rlim(),
         };
 
-        if unsafe { setrlimit(res, &rlim) } < 0 {
+        if unsafe { setrlimit(res as _, &rlim) } < 0 {
             return Err(format!(
                 "setrlimit failed: {}",
                 std::io::Error::last_os_error()

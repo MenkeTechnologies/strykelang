@@ -1493,6 +1493,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Pipes(args) => format!("pipes({})", format_expr_list(args)),
         ExprKind::BlockDevices(args) => format!("block_devices({})", format_expr_list(args)),
         ExprKind::CharDevices(args) => format!("char_devices({})", format_expr_list(args)),
+        ExprKind::Executables(args) => format!("exe({})", format_expr_list(args)),
         ExprKind::GlobPar { args, progress } => {
             let base = format!("glob_par({})", format_expr_list(args));
             match progress {
