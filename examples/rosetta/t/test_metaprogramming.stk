@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Metaprogramming (Runtime Fn)
+
+my $code = 'fn($a, $b) { $a * $b + 10 }'
+my $dynamic_fn = eval($code)
+assert_eq $dynamic_fn->(5, 2), 20, "dynamic fn (5*2+10)"
+
+my $name = "generated_fn"
+eval("fn $name { 42 }")
+# Since we cant shadow, we check if it exists in stdlib-like calls
+# but in Stryke we can call by name
+assert_eq generated_fn(), 42, "call named generated fn"
+test_run

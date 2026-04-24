@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Shoelace Formula
+
+fn algo_area($p) {
+    my $sum = 0.0
+    my $n = scalar(@$p)
+    for my $i (0..$n-1) {
+        my $j = ($i + 1) % $n
+        $sum = $sum + $p->[$i]->[0] * $p->[$j]->[1]
+        $sum = $sum - $p->[$j]->[0] * $p->[$i]->[1]
+    }
+    abs($sum) / 2.0
+}
+
+my $sq = [[0,0], [2,0], [2,2], [0,2]]
+assert_eq algo_area($sq), 4, "area square"
+test_run

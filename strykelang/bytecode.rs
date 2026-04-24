@@ -436,6 +436,10 @@ pub enum Op {
     GrepIntModEq(i64, i64),
     /// Parallel sort, same fast modes as [`Op::SortWithBlockFast`].
     PSortWithBlockFast(u8),
+    /// `read(FH, $buf, LEN [, OFFSET])` — reads into a named variable.
+    /// Stack: [filehandle, length] (offset optional via `ReadIntoVarOffset`).
+    /// Writes result into `$name[u16]`, pushes bytes-read count (or undef on error).
+    ReadIntoVar(u16),
     /// `chomp` on assignable expr: stack has value → chomped count; uses `chunk.lvalues[idx]`.
     ChompInPlace(u16),
     /// `chop` on assignable expr: stack has value → chopped char; uses `chunk.lvalues[idx]`.

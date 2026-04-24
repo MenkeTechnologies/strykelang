@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: N-body Problem (Simplified)
+
+fn my_step($b1, $b2, $dt) {
+    my $dx = $b2->{px} - $b1->{px}
+    my $dy = $b2->{py} - $b1->{py}
+    my $d2 = $dx*$dx + $dy*$dy
+    my $d = sqrt($d2)
+    
+    my $G = 1.0
+    my $f = $G * $b1->{m} * $b2->{m} / $d2
+    my $ax = $f * $dx / $d / $b1->{m}
+    my $ay = $f * $dy / $d / $b1->{m}
+    
+    $b1->{vx} = $b1->{vx} + $ax * $dt
+    $b1->{vy} = $b1->{vy} + $ay * $dt
+    $b1->{px} = $b1->{px} + $b1->{vx} * $dt
+    $b1->{py} = $b1->{py} + $b1->{vy} * $dt
+}
+
+# Two bodies in circular orbit
+# v = sqrt(G*M/r) = sqrt(1*1000/1) = 31.622
+my $b1 = { m => 1.0, px => 1.0, py => 0.0, vx => 0.0, vy => 31.622 }
+my $b2 = { m => 1000.0, px => 0.0, py => 0.0, vx => 0.0, vy => 0.0 }
+
+for my $i (1..1000) {
+    my_step($b1, $b2, 0.0001)
+}
+
+# Check if it stayed relatively close to radius 1.0
+my $r = sqrt($b1->{px}*$b1->{px} + $b1->{py}*$b1->{py})
+assert_ok abs($r - 1.0) < 0.2, "orbit radius remains stable"
+
+test_run

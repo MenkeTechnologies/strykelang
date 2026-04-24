@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: N-Queens (Manual)
+
+fn is_safe($queens, $r, $c) {
+    for my $i (0..$r-1) {
+        my $qc = $queens->[$i]
+        if ($qc == $c || abs($qc - $c) == abs($i - $r)) { return 0 }
+    }
+    1
+}
+
+fn solve_nq($n, $r, $queens, $count) {
+    if ($r == $n) {
+        $count = $count + 1
+        return $count
+    }
+    
+    for my $c (0..$n-1) {
+        if (is_safe($queens, $r, $c)) {
+            $queens->[$r] = $c
+            $count = solve_nq($n, $r + 1, $queens, $count)
+        }
+    }
+    $count
+}
+
+# n=8 should have 92 solutions
+my $q8 = []
+my $res8 = solve_nq(8, 0, $q8, 0)
+assert_eq $res8, 92, "8-queens solutions count"
+
+# n=4 should have 2 solutions
+my $q4 = []
+my $res4 = solve_nq(4, 0, $q4, 0)
+assert_eq $res4, 2, "4-queens solutions count"
+
+test_run

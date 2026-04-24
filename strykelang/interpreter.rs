@@ -5013,6 +5013,39 @@ impl Interpreter {
     }
 
     /// Shared `chomp` for tree-walker and VM (mutates `target`).
+    /// `read(FH, $buf, LEN)` — read from filehandle into named variable.
+    /// Returns bytes read count (or error). Called from VM's ReadIntoVar op.
+    pub(crate) fn builtin_read_into(
+        &mut self,
+        fh_val: PerlValue,
+        var_name: &str,
+        length: usize,
+        line: usize,
+    ) -> ExecResult {
+        use std::io::Read;
+        let fh = fh_val
+            .as_io_handle_name()
+            .unwrap_or_else(|| fh_val.to_string());
+        let mut buf = vec![0u8; length];
+        let n = if let Some(slot) = self.io_file_slots.get(&fh).cloned() {
+            slot.lock().read(&mut buf).unwrap_or(0)
+        } else if fh == "STDIN" {
+            std::io::stdin().read(&mut buf).unwrap_or(0)
+        } else {
+            return Err(PerlError::runtime(
+                format!("read: unopened handle {}", fh),
+                line,
+            )
+            .into());
+        };
+        buf.truncate(n);
+        let read_str = crate::perl_fs::decode_utf8_or_latin1(&buf);
+        let _ = self
+            .scope
+            .set_scalar(var_name, PerlValue::string(read_str));
+        Ok(PerlValue::integer(n as i64))
+    }
+
     pub(crate) fn chomp_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
         let mut s = val.to_string();
         let removed = if s.ends_with('\n') {

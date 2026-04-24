@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Vector Math (Magnitude and Angle)
+
+fn algo_mag($v) {
+    my $sum = 0.0
+    for my $x (@$v) { $sum = $sum + $x * $x }
+    sqrt($sum)
+}
+
+fn algo_dot($v1, $v2) {
+    my $sum = 0.0
+    for my $i (0..scalar(@$v1)-1) { $sum = $sum + $v1->[$i] * $v2->[$i] }
+    $sum
+}
+
+fn algo_angle($v1, $v2) {
+    acos(algo_dot($v1, $v2) / (algo_mag($v1) * algo_mag($v2)))
+}
+
+my $v1 = [1, 0]; my $v2 = [0, 1]
+assert_eq algo_mag($v1), 1, "mag [1,0]"
+assert_ok abs(algo_angle($v1, $v2) - 1.570796) < 0.0001, "angle 90 deg"
+test_run

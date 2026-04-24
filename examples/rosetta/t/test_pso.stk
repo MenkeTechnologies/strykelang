@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Particle Swarm Optimization
+
+fn solve_pso {
+    my $num_particles = 20
+    my @particles
+    my $g_best_pos = [100.0, 100.0]
+    my $g_best_val = 20000.0
+    
+    for my $i (1..$num_particles) {
+        my $px = rand(20) - 10
+        my $py = rand(20) - 10
+        my $p = {
+            pos => [$px, $py],
+            vel => [0.0, 0.0],
+            best_pos => [$px, $py],
+            best_val => $px*$px + $py*$py
+        }
+        if ($p->{best_val} < $g_best_val) {
+            $g_best_val = $p->{best_val}
+            $g_best_pos = [$px, $py]
+        }
+        push @particles, $p
+    }
+    
+    my $w = 0.5; my $c1 = 1.0; my $c2 = 1.0
+    for my $iter (1..50) {
+        for my $p (@particles) {
+            for my $d (0..1) {
+                my $r1 = rand(); my $r2 = rand()
+                $p->{vel}->[$d] = $w * $p->{vel}->[$d] + $c1 * $r1 * ($p->{best_pos}->[$d] - $p->{pos}->[$d]) + $c2 * $r2 * ($g_best_pos->[$d] - $p->{pos}->[$d])
+                $p->{pos}->[$d] = $p->{pos}->[$d] + $p->{vel}->[$d]
+            }
+            my $v = $p->{pos}->[0] * $p->{pos}->[0] + $p->{pos}->[1] * $p->{pos}->[1]
+            if ($v < $p->{best_val}) {
+                $p->{best_val} = $v
+                $p->{best_pos} = [$p->{pos}->[0], $p->{pos}->[1]]
+                if ($v < $g_best_val) {
+                    $g_best_val = $v
+                    $g_best_pos = [$p->{pos}->[0], $p->{pos}->[1]]
+                }
+            }
+        }
+    }
+    $g_best_val
+}
+
+my $best = solve_pso()
+assert_ok $best < 0.1, "PSO converged to approx 0"
+
+test_run

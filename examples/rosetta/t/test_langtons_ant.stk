@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Langton's Ant
+
+fn solve_ant($steps) {
+    my %grid # 0 is white, 1 is black
+    my $x = 0; my $y = 0; my $dir = 0 # 0:N, 1:E, 2:S, 3:W
+    
+    for my $i (1..$steps) {
+        my $k = "$x,$y"
+        my $color = $grid{$k} || 0
+        
+        if ($color == 0) {
+            $dir = ($dir + 1) % 4
+            $grid{$k} = 1
+        } else {
+            $dir = ($dir + 3) % 4
+            $grid{$k} = 0
+        }
+        
+        if ($dir == 0) { $y = $y + 1 }
+        elsif ($dir == 1) { $x = $x + 1 }
+        elsif ($dir == 2) { $y = $y - 1 }
+        elsif ($dir == 3) { $x = $x - 1 }
+    }
+    \%grid
+}
+
+# After 1 step: (0,0) is black, ant is at (1,0) facing East
+my $g1 = solve_ant(1)
+assert_eq $g1->{"0,0"}, 1, "0,0 is black after 1 step"
+
+# After 2 steps: (0,0) is black, (1,0) is black, ant is at (1,-1) facing South
+my $g2 = solve_ant(2)
+assert_eq $g2->{"1,0"}, 1, "1,0 is black after 2 steps"
+
+test_run

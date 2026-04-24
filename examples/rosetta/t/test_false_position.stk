@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Roots of a function (False Position Method)
+
+fn solve_false_pos($f, $a, $b, $tol) {
+    my $fa = $f->($a)
+    my $fb = $f->($b)
+    
+    for my $i (1..100) {
+        my $c = ($a * $fb - $b * $fa) / ($fb - $fa)
+        my $fc = $f->($c)
+        if (abs($fc) < $tol) { return $c }
+        
+        if ($fa * $fc < 0) {
+            $b = $c; $fb = $fc
+        } else {
+            $a = $c; $fa = $fc
+        }
+    }
+    undef
+}
+
+# x^2 - 2 = 0 in [1, 2]
+my $f = fn { $_ * $_ - 2 }
+my $root = solve_false_pos($f, 1.0, 2.0, 0.0001)
+assert_ok abs($root - sqrt(2)) < 0.001, "False position root of x^2-2"
+
+test_run

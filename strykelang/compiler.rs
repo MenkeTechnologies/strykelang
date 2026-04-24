@@ -4790,11 +4790,23 @@ impl Compiler {
 
             // ── Function calls ──
             ExprKind::FuncCall { name, args } => match name.as_str() {
-                // read() needs lvalue access to its 2nd arg; handled in tree-walker
+                // read(FH, $buf, LEN) — emit ReadIntoVar with the buffer variable's name index
                 "read" | "CORE::read" => {
-                    return Err(CompileError::Unsupported(
-                        "read() needs tree-walker for lvalue buffer arg".into(),
-                    ));
+                    if args.len() < 3 {
+                        return Err(CompileError::Unsupported("read() needs at least 3 args".into()));
+                    }
+                    // Extract buffer variable name from 2nd arg
+                    let buf_name = match &args[1].kind {
+                        ExprKind::ScalarVar(n) => n.clone(),
+                        _ => return Err(CompileError::Unsupported(
+                            "read() buffer must be a simple scalar variable for bytecode".into(),
+                        )),
+                    };
+                    let buf_idx = self.chunk.intern_name(&buf_name);
+                    // Stack: [filehandle, length]
+                    self.compile_expr(&args[0])?; // filehandle
+                    self.compile_expr(&args[2])?; // length
+                    self.emit_op(Op::ReadIntoVar(buf_idx), line, Some(root));
                 }
                 // `defer { BLOCK }` — desugared by parser to `defer__internal(fn { BLOCK })`
                 "defer__internal" => {
@@ -7285,12 +7297,34 @@ impl Compiler {
                     "retry/rate_limit/every/gen/yield (tree interpreter only)".into(),
                 ));
             }
-            ExprKind::MyExpr { .. } => {
-                // `my $x = …` used as an expression (e.g. `if (my $x = …)`).
-                // Tree interpreter handles via `Interpreter::exec_statement`.
-                return Err(CompileError::Unsupported(
-                    "my/our/state/local in expression context (tree interpreter only)".into(),
-                ));
+            ExprKind::MyExpr { keyword, decls } => {
+                // `my $x = EXPR` in expression context (e.g. `while (my $line = <$fh>)`)
+                // Compile the declaration, then leave the value on the stack for the caller.
+                if decls.len() == 1 && decls[0].sigil == Sigil::Scalar {
+                    let decl = &decls[0];
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr(init)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    // Dup so the value stays on stack after DeclareScalar consumes one copy
+                    self.emit_op(Op::Dup, line, Some(root));
+                    let name_idx = self.chunk.intern_name(&decl.name);
+                    match keyword.as_str() {
+                        "state" => {
+                            let name = self.chunk.names[name_idx as usize].clone();
+                            self.register_declare(Sigil::Scalar, &name, false);
+                            self.chunk.emit(Op::DeclareStateScalar(name_idx), line);
+                        }
+                        _ => {
+                            self.emit_declare_scalar(name_idx, line, false);
+                        }
+                    }
+                } else {
+                    return Err(CompileError::Unsupported(
+                        "my/our/state/local in expression context with multiple or non-scalar decls".into(),
+                    ));
+                }
             }
         }
         Ok(())

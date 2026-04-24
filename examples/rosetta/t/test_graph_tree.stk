@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Identify if a Graph is a Tree
+
+fn is_tree($adj) {
+    my @nodes = keys %$adj
+    return 1 if scalar(@nodes) == 0
+    
+    my %visited
+    my @q = ($nodes[0])
+    $visited{$nodes[0]} = 1
+    my $edges = 0
+    
+    while (scalar @q) {
+        my $u = shift @q
+        for my $v (@{$adj->{$u}}) {
+            $edges = $edges + 1
+            if (!$visited{$v}) {
+                $visited{$v} = 1
+                push @q, $v
+            }
+        }
+    }
+    
+    # Tree properties: connected and E = 2*(V-1) for undirected adj lists
+    # or just check if all nodes visited and edges/2 == V-1
+    scalar(keys %visited) == scalar(@nodes) && ($edges / 2) == (scalar(@nodes) - 1)
+}
+
+my $tree = { A => ["B", "C"], B => ["A"], C => ["A"] }
+assert_ok is_tree($tree), "simple tree"
+my $not_tree = { A => ["B", "C"], B => ["A", "C"], C => ["A", "B"] }
+assert_ok !is_tree($not_tree), "triangle not a tree"
+
+test_run

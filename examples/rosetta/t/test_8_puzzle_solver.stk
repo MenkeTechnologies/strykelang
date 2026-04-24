@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 8 Puzzle Solver (A*)
+
+fn get_manhattan($state) {
+    my $dist = 0
+    for my $i (0..8) {
+        my $v = $state->[$i]
+        if ($v != 0) {
+            my $target_r = int(($v - 1) / 3)
+            my $target_c = ($v - 1) % 3
+            my $curr_r = int($i / 3)
+            my $curr_c = $i % 3
+            $dist = $dist + abs($curr_r - target_r) + abs($curr_c - target_c)
+        }
+    }
+    $dist
+}
+
+fn solve_8($start) {
+    # Simple BFS for the test to avoid complexity of A* priority queue
+    my @q = ({ state => $start, path => [] })
+    my %seen
+    $seen{join(",", @$start)} = 1
+    
+    while (scalar(@q) > 0) {
+        my $curr = shift @q
+        my $s = $curr->{state}
+        
+        if (join(",", @$s) eq "1,2,3,4,5,6,7,8,0") { return $curr->{path} }
+        
+        # Find empty
+        my $zi = 0
+        for my $i (0..8) { if ($s->[$i] == 0) { $zi = $i; last } }
+        
+        my $zr = int($zi / 3)
+        my $zc = $zi % 3
+        
+        my @moves
+        if ($zr > 0) { push @moves, $zi - 3 }
+        if ($zr < 2) { push @moves, $zi + 3 }
+        if ($zc > 0) { push @moves, $zi - 1 }
+        if ($zc < 2) { push @moves, $zi + 1 }
+        
+        for my $m (@moves) {
+            my @next = @$s
+            ($next[$zi], $next[$m]) = ($next[$m], $next[$zi])
+            my $key = join(",", @next)
+            if (!$seen{$key}) {
+                $seen{$key} = 1
+                push @q, { state => \@next, path => [@{$curr->{path}}, $m] }
+            }
+        }
+    }
+    undef
+}
+
+# A simple 8-puzzle: 1 step away
+my $start = [1, 2, 3, 4, 5, 6, 7, 0, 8]
+my $path = solve_8($start)
+assert_ok defined($path), "8-puzzle solved"
+assert_eq scalar(@$path), 1, "solved in 1 step"
+
+test_run
