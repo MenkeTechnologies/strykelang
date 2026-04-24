@@ -552,6 +552,30 @@ fn run_ztst_file(zshrs: &Path, ztst_path: &Path) -> (usize, usize, usize) {
     // Make side-effect commands idempotent: mkdir → mkdir -p,
     // suppress errors from re-execution so they don't pollute stderr.
     let prep = ztst.prep.join("\n").replace("mkdir ", "mkdir -p ");
+
+    // Check if the prep sets ZTST_unimplemented — if so, skip all tests.
+    // Run the prep once with a probe for the variable.
+    if !prep.is_empty() && prep.contains("ZTST_unimplemented") {
+        let probe_code = format!(
+            "{{ {} ; }} 2>/dev/null; echo \"__ZTST_UNIMP=${{ZTST_unimplemented:-}}\"",
+            prep
+        );
+        let (_, probe_out, _) = run_code(zshrs, &probe_code, "", Path::new("/tmp"));
+        if let Some(line) = probe_out.lines().find(|l| l.starts_with("__ZTST_UNIMP=")) {
+            let val = &line["__ZTST_UNIMP=".len()..];
+            if !val.is_empty() {
+                if verbose {
+                    eprintln!(
+                        "  SKIP all {} tests: {}",
+                        ztst.tests.len(),
+                        val
+                    );
+                }
+                return (0, 0, ztst.tests.len());
+            }
+        }
+    }
+
     // Wrap prep so its stderr doesn't leak into test stderr
     let prep_wrapped = if prep.is_empty() {
         String::new()

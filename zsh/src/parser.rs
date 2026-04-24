@@ -530,7 +530,7 @@ pub enum ShellToken {
     Select,
     Time,
     Coproc,
-    Typeset,
+    Typeset(String),
     Repeat,
     Always,
     Bang,
@@ -889,6 +889,7 @@ impl<'a> ShellLexer<'a> {
             || c == '@'
             || c == ':'
             || c == '='
+            || c == '`'
         {
             return self.read_word();
         }
@@ -1156,6 +1157,18 @@ impl<'a> ShellLexer<'a> {
                         }
                     }
                 }
+                '`' => {
+                    // Backtick command substitution — keep backticks in the word
+                    // so expand_string can see and execute them.
+                    word.push(self.next_char().unwrap()); // opening `
+                    while let Some(ch) = self.peek() {
+                        if ch == '`' {
+                            word.push(self.next_char().unwrap()); // closing `
+                            break;
+                        }
+                        word.push(self.next_char().unwrap());
+                    }
+                }
                 '\'' => {
                     self.next_char();
                     while let Some(ch) = self.peek() {
@@ -1228,9 +1241,10 @@ impl<'a> ShellLexer<'a> {
             "time" => ShellToken::Time,
             "coproc" => ShellToken::Coproc,
             "repeat" => ShellToken::Repeat,
-            "always" => ShellToken::Always,
+            // "always" is NOT a keyword — it's context-dependent.
+            // Checked as a string in parse_brace_group_or_try per C zsh par_subsh().
             "typeset" | "local" | "declare" | "export" | "readonly" | "integer" | "float" => {
-                ShellToken::Typeset
+                ShellToken::Typeset(word)
             }
             _ => ShellToken::Word(word),
         }
@@ -1669,7 +1683,8 @@ impl<'a> ShellParser<'a> {
                 | ShellToken::Function
                 | ShellToken::Select
                 | ShellToken::Time
-                | ShellToken::Coproc => {
+                | ShellToken::Coproc
+                | ShellToken::Repeat => {
                     if !cmd.words.is_empty() {
                         cmd.words.push(self.parse_word()?);
                     } else {
@@ -1677,9 +1692,10 @@ impl<'a> ShellParser<'a> {
                     }
                 }
 
-                ShellToken::Typeset => {
+                ShellToken::Typeset(ref name) => {
                     if cmd.words.is_empty() {
-                        cmd.words.push(ShellWord::Literal("typeset".to_string()));
+                        let name = name.clone();
+                        cmd.words.push(ShellWord::Literal(name));
                         self.advance();
                     } else {
                         cmd.words.push(self.parse_word()?);
@@ -1741,7 +1757,8 @@ impl<'a> ShellParser<'a> {
             ShellToken::Select => Ok(ShellWord::Literal("select".to_string())),
             ShellToken::Time => Ok(ShellWord::Literal("time".to_string())),
             ShellToken::Coproc => Ok(ShellWord::Literal("coproc".to_string())),
-            ShellToken::Typeset => Ok(ShellWord::Literal("typeset".to_string())),
+            ShellToken::Typeset(name) => Ok(ShellWord::Literal(name)),
+            ShellToken::Repeat => Ok(ShellWord::Literal("repeat".to_string())),
             _ => Err("Expected word".to_string()),
         }
     }
@@ -2173,7 +2190,9 @@ impl<'a> ShellParser<'a> {
         let try_body = self.parse_compound_list()?;
         self.expect(ShellToken::RBrace)?;
 
-        if self.current == ShellToken::Always {
+        // C zsh: tok == STRING && !strcmp(tokstr, "always")
+        // "always" is context-dependent, only keyword after OUTBRACE.
+        if matches!(&self.current, ShellToken::Word(w) if w == "always") {
             self.advance();
             self.expect(ShellToken::LBrace)?;
             self.skip_newlines();
