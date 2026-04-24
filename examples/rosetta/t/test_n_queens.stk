@@ -1,41 +1,38 @@
 #!/usr/bin/env stryke
-# Rosetta Code: N-queens problem
+# Rosetta Code: N-Queens Problem (Bitmask implementation)
 
-fn is_safe($board, $row, $col) {
-    my $i = 0
-    while ($i < $row) {
-        my $prev_col = $board->[$i]
-        if ($prev_col == $col || 
-            $prev_col - $i == $col - $row || 
-            $prev_col + $i == $col + $row) {
-            return 0
-        }
-        $i++
+fn solve_n_queens_rec {
+    my $ld = $_[0]
+    my $cols = $_[1]
+    my $rd = $_[2]
+    my $all = $_[3]
+    
+    if ($cols == $all) {
+        return 1
     }
-    1
+    
+    my $count = 0
+    my $poss = $all & ~($ld | $cols | $rd)
+    
+    while ($poss > 0) {
+        my $bit = $poss & -$poss
+        $poss = $poss - $bit
+        $count = $count + solve_n_queens_rec(($ld | $bit) << 1, $cols | $bit, ($rd | $bit) >> 1, $all)
+    }
+    $count
 }
 
-fn solve_n_queens($n, $row, $board, $results) {
-    if ($row == $n) {
-        my @sol = @$board
-        push(@$results, \@sol)
-        return
-    }
-    my $col = 0
-    while ($col < $n) {
-        if (is_safe($board, $row, $col)) {
-            $board->[$row] = $col
-            solve_n_queens($n, $row + 1, $board, $results)
-        }
-        $col++
-    }
+fn n_queens {
+    my $n = $_[0]
+    if ($n == 0) { return 0 }
+    my $all = (1 << $n) - 1
+    solve_n_queens_rec(0, 0, 0, $all)
 }
 
-my $results = []
-solve_n_queens(4, 0, [], $results)
-assert_eq scalar(@$results), 2, "4-queens has 2 solutions"
-
-# pipe check
-4 |> { my $r = []; solve_n_queens($_, 0, [], $r); scalar(@$r) } |> assert_eq(2, "pipe 4-queens")
+assert_eq n_queens(1), 1, "N-Queens(1)"
+assert_eq n_queens(4), 2, "N-Queens(4)"
+assert_eq n_queens(5), 10, "N-Queens(5)"
+assert_eq n_queens(6), 4, "N-Queens(6)"
+assert_eq n_queens(8), 92, "N-Queens(8)"
 
 test_run

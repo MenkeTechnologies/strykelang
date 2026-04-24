@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute Brainfuck
+
+fn execute_brainfuck {
+    my $code = $_[0]
+    my @chars = split "", $code
+    my %jumps
+    my @stack
+
+    # Precompute jumps
+    for (my $i = 0; $i < scalar(@chars); $i++) {
+        if ($chars[$i] eq "[") {
+            push @stack, $i
+        } elsif ($chars[$i] eq "]") {
+            my $start = pop @stack
+            $jumps{$start} = $i
+            $jumps{$i} = $start
+        }
+    }
+
+    my @tape
+    for (my $i = 0; $i < 30000; $i++) {
+        push @tape, 0
+    }
+
+    my $ptr = 0
+    my $pc = 0
+    my $output = ""
+
+    while ($pc < scalar(@chars)) {
+        my $c = $chars[$pc]
+
+        if ($c eq ">") {
+            $ptr++
+        } elsif ($c eq "<") {
+            $ptr--
+        } elsif ($c eq "+") {
+            $tape[$ptr] = ($tape[$ptr] + 1) % 256
+        } elsif ($c eq "-") {
+            $tape[$ptr] = ($tape[$ptr] - 1) % 256
+            if ($tape[$ptr] < 0) {
+                $tape[$ptr] += 256
+            }
+        } elsif ($c eq ".") {
+            $output .= chr($tape[$ptr])
+        } elsif ($c eq ",") {
+            # Input not implemented
+        } elsif ($c eq "[") {
+            if ($tape[$ptr] == 0) {
+                $pc = $jumps{$pc}
+            }
+        } elsif ($c eq "]") {
+            if ($tape[$ptr] != 0) {
+                $pc = $jumps{$pc}
+            }
+        }
+        $pc++
+    }
+    $output
+}
+
+# Test 1: Simple Hello World
+my $hw_code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+assert_eq execute_brainfuck($hw_code), "Hello World!\n", "Brainfuck: Hello World"
+
+# Test 2: Simple arithmetic and output
+assert_eq execute_brainfuck("+++++ ."), chr(5), "Brainfuck: Simple Increment"
+
+# Test 3: Nested loops (Multiplication: 3 * 7 = 21)
+# 21 is ASCII Control Character NAK, but we check the value
+assert_eq execute_brainfuck("+++ [ > +++++++ < - ] > ."), chr(21), "Brainfuck: Multiplication"
+
+# Test 4: Cell wrapping (0 - 1 = 255)
+assert_eq execute_brainfuck("- ."), chr(255), "Brainfuck: Underflow Wrap"
+
+# Test 5: Complex Nested Loops (Print 'A')
+# 65 is 'A'
+assert_eq execute_brainfuck("++++++ [ > ++++++++++ < - ] > +++++ ."), "A", "Brainfuck: Nested Loop 'A'"
+
+test_run
