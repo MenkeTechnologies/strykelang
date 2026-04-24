@@ -46,6 +46,7 @@ pub mod ksh93;
 pub mod langinfo;
 pub mod lexer;
 pub mod linklist;
+pub mod log;
 pub mod loop_port;
 pub mod mapfile;
 pub mod math;
@@ -90,6 +91,7 @@ pub mod zle;
 pub mod zprof;
 pub mod zpty;
 pub mod zselect;
+pub mod worker;
 pub mod zutil;
 pub mod zwc;
 

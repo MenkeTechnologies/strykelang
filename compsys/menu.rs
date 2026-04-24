@@ -942,6 +942,11 @@ impl MenuState {
         self.items.len()
     }
 
+    /// Number of columns in layout (zsh: mcols)
+    pub fn cols(&self) -> usize {
+        self.mcols
+    }
+
     /// Start menu completion (select first item)
     pub fn start(&mut self) {
         if !self.items.is_empty() {
