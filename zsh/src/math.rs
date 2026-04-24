@@ -69,130 +69,163 @@ impl MathNum {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 enum MathTok {
-    InPar = 0,    // (
-    OutPar = 1,   // )
-    Not = 2,      // !
-    Comp = 3,     // ~
-    PostPlus = 4, // x++
-    PostMinus = 5,// x--
-    UPlus = 6,    // +x
-    UMinus = 7,   // -x
-    And = 8,      // &
-    Xor = 9,      // ^
-    Or = 10,      // |
-    Mul = 11,     // *
-    Div = 12,     // /
-    Mod = 13,     // %
-    Plus = 14,    // +
-    Minus = 15,   // -
-    ShLeft = 16,  // <<
-    ShRight = 17, // >>
-    Les = 18,     // <
-    Leq = 19,     // <=
-    Gre = 20,     // >
-    Geq = 21,     // >=
-    Deq = 22,     // ==
-    Neq = 23,     // !=
-    DAnd = 24,    // &&
-    DOr = 25,     // ||
-    DXor = 26,    // ^^
-    Quest = 27,   // ?
-    Colon = 28,   // :
-    Eq = 29,      // =
-    PlusEq = 30,  // +=
-    MinusEq = 31, // -=
-    MulEq = 32,   // *=
-    DivEq = 33,   // /=
-    ModEq = 34,   // %=
-    AndEq = 35,   // &=
-    XorEq = 36,   // ^=
-    OrEq = 37,    // |=
+    InPar = 0,      // (
+    OutPar = 1,     // )
+    Not = 2,        // !
+    Comp = 3,       // ~
+    PostPlus = 4,   // x++
+    PostMinus = 5,  // x--
+    UPlus = 6,      // +x
+    UMinus = 7,     // -x
+    And = 8,        // &
+    Xor = 9,        // ^
+    Or = 10,        // |
+    Mul = 11,       // *
+    Div = 12,       // /
+    Mod = 13,       // %
+    Plus = 14,      // +
+    Minus = 15,     // -
+    ShLeft = 16,    // <<
+    ShRight = 17,   // >>
+    Les = 18,       // <
+    Leq = 19,       // <=
+    Gre = 20,       // >
+    Geq = 21,       // >=
+    Deq = 22,       // ==
+    Neq = 23,       // !=
+    DAnd = 24,      // &&
+    DOr = 25,       // ||
+    DXor = 26,      // ^^
+    Quest = 27,     // ?
+    Colon = 28,     // :
+    Eq = 29,        // =
+    PlusEq = 30,    // +=
+    MinusEq = 31,   // -=
+    MulEq = 32,     // *=
+    DivEq = 33,     // /=
+    ModEq = 34,     // %=
+    AndEq = 35,     // &=
+    XorEq = 36,     // ^=
+    OrEq = 37,      // |=
     ShLeftEq = 38,  // <<=
     ShRightEq = 39, // >>=
-    DAndEq = 40,  // &&=
-    DOrEq = 41,   // ||=
-    DXorEq = 42,  // ^^=
-    Comma = 43,   // ,
-    Eoi = 44,     // end of input
-    PrePlus = 45, // ++x
-    PreMinus = 46,// --x
-    Num = 47,     // number literal
-    Id = 48,      // identifier
-    Power = 49,   // **
-    CId = 50,     // #identifier (char value)
-    PowerEq = 51, // **=
-    Func = 52,    // function call
+    DAndEq = 40,    // &&=
+    DOrEq = 41,     // ||=
+    DXorEq = 42,    // ^^=
+    Comma = 43,     // ,
+    Eoi = 44,       // end of input
+    PrePlus = 45,   // ++x
+    PreMinus = 46,  // --x
+    Num = 47,       // number literal
+    Id = 48,        // identifier
+    Power = 49,     // **
+    CId = 50,       // #identifier (char value)
+    PowerEq = 51,   // **=
+    Func = 52,      // function call
 }
 
 const TOKCOUNT: usize = 53;
 
 /// Operator associativity and type flags
-const LR: u16 = 0x0000;   // left-to-right
-const RL: u16 = 0x0001;   // right-to-left
+const LR: u16 = 0x0000; // left-to-right
+const RL: u16 = 0x0001; // right-to-left
 const BOOL: u16 = 0x0002; // short-circuit boolean
 
-const OP_A2: u16 = 0x0004;    // 2 arguments
-const OP_A2IR: u16 = 0x0008;  // 2 args, return int
-const OP_A2IO: u16 = 0x0010;  // 2 args, must be int
-const OP_E2: u16 = 0x0020;    // 2 args with assignment
-const OP_E2IO: u16 = 0x0040;  // 2 args assign, must be int
-const OP_OP: u16 = 0x0080;    // expecting operator position
-const OP_OPF: u16 = 0x0100;   // followed by operator (after this, next is operator)
+const OP_A2: u16 = 0x0004; // 2 arguments
+const OP_A2IR: u16 = 0x0008; // 2 args, return int
+const OP_A2IO: u16 = 0x0010; // 2 args, must be int
+const OP_E2: u16 = 0x0020; // 2 args with assignment
+const OP_E2IO: u16 = 0x0040; // 2 args assign, must be int
+const OP_OP: u16 = 0x0080; // expecting operator position
+const OP_OPF: u16 = 0x0100; // followed by operator (after this, next is operator)
 
 /// Zsh precedence table (default)
 static Z_PREC: [u8; TOKCOUNT] = [
-    1, 137, 2, 2, 2,      // InPar OutPar Not Comp PostPlus
-    2, 2, 2, 4, 5,        // PostMinus UPlus UMinus And Xor
-    6, 8, 8, 8, 9,        // Or Mul Div Mod Plus
-    9, 3, 3, 10, 10,      // Minus ShLeft ShRight Les Leq
-    10, 10, 11, 11, 12,   // Gre Geq Deq Neq DAnd
-    13, 13, 14, 15, 16,   // DOr DXor Quest Colon Eq
-    16, 16, 16, 16, 16,   // PlusEq MinusEq MulEq DivEq ModEq
-    16, 16, 16, 16, 16,   // AndEq XorEq OrEq ShLeftEq ShRightEq
-    16, 16, 16, 17, 200,  // DAndEq DOrEq DXorEq Comma Eoi
-    2, 2, 0, 0, 7,        // PrePlus PreMinus Num Id Power
-    0, 16, 0,             // CId PowerEq Func
+    1, 137, 2, 2, 2, // InPar OutPar Not Comp PostPlus
+    2, 2, 2, 4, 5, // PostMinus UPlus UMinus And Xor
+    6, 8, 8, 8, 9, // Or Mul Div Mod Plus
+    9, 3, 3, 10, 10, // Minus ShLeft ShRight Les Leq
+    10, 10, 11, 11, 12, // Gre Geq Deq Neq DAnd
+    13, 13, 14, 15, 16, // DOr DXor Quest Colon Eq
+    16, 16, 16, 16, 16, // PlusEq MinusEq MulEq DivEq ModEq
+    16, 16, 16, 16, 16, // AndEq XorEq OrEq ShLeftEq ShRightEq
+    16, 16, 16, 17, 200, // DAndEq DOrEq DXorEq Comma Eoi
+    2, 2, 0, 0, 7, // PrePlus PreMinus Num Id Power
+    0, 16, 0, // CId PowerEq Func
 ];
 
 /// C precedence table (used with C_PRECEDENCES option)
 static C_PREC: [u8; TOKCOUNT] = [
-    1, 137, 2, 2, 2,
-    2, 2, 2, 9, 10,
-    11, 4, 4, 4, 5,
-    5, 6, 6, 7, 7,
-    7, 7, 8, 8, 12,
-    14, 13, 15, 16, 17,
-    17, 17, 17, 17, 17,
-    17, 17, 17, 17, 17,
-    17, 17, 17, 18, 200,
-    2, 2, 0, 0, 3,
-    0, 17, 0,
+    1, 137, 2, 2, 2, 2, 2, 2, 9, 10, 11, 4, 4, 4, 5, 5, 6, 6, 7, 7, 7, 7, 8, 8, 12, 14, 13, 15, 16,
+    17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 200, 2, 2, 0, 0, 3, 0, 17, 0,
 ];
 
 /// Operator type table (matches C math.c type[] array)
 static OP_TYPE: [u16; TOKCOUNT] = [
     // InPar, OutPar, Not, Comp, PostPlus
-    LR, LR|OP_OP|OP_OPF, RL, RL, RL|OP_OP|OP_OPF,
+    LR,
+    LR | OP_OP | OP_OPF,
+    RL,
+    RL,
+    RL | OP_OP | OP_OPF,
     // PostMinus, UPlus, UMinus, And, Xor
-    RL|OP_OP|OP_OPF, RL, RL, LR|OP_A2IO, LR|OP_A2IO,
+    RL | OP_OP | OP_OPF,
+    RL,
+    RL,
+    LR | OP_A2IO,
+    LR | OP_A2IO,
     // Or, Mul, Div, Mod, Plus
-    LR|OP_A2IO, LR|OP_A2, LR|OP_A2, LR|OP_A2, LR|OP_A2,
+    LR | OP_A2IO,
+    LR | OP_A2,
+    LR | OP_A2,
+    LR | OP_A2,
+    LR | OP_A2,
     // Minus, ShLeft, ShRight, Les, Leq
-    LR|OP_A2, LR|OP_A2IO, LR|OP_A2IO, LR|OP_A2IR, LR|OP_A2IR,
+    LR | OP_A2,
+    LR | OP_A2IO,
+    LR | OP_A2IO,
+    LR | OP_A2IR,
+    LR | OP_A2IR,
     // Gre, Geq, Deq, Neq, DAnd
-    LR|OP_A2IR, LR|OP_A2IR, LR|OP_A2IR, LR|OP_A2IR, BOOL|OP_A2IO,
+    LR | OP_A2IR,
+    LR | OP_A2IR,
+    LR | OP_A2IR,
+    LR | OP_A2IR,
+    BOOL | OP_A2IO,
     // DOr, DXor, Quest, Colon, Eq
-    BOOL|OP_A2IO, LR|OP_A2IO, RL|OP_OP, RL|OP_OP, RL|OP_E2,
+    BOOL | OP_A2IO,
+    LR | OP_A2IO,
+    RL | OP_OP,
+    RL | OP_OP,
+    RL | OP_E2,
     // PlusEq, MinusEq, MulEq, DivEq, ModEq
-    RL|OP_E2, RL|OP_E2, RL|OP_E2, RL|OP_E2, RL|OP_E2,
+    RL | OP_E2,
+    RL | OP_E2,
+    RL | OP_E2,
+    RL | OP_E2,
+    RL | OP_E2,
     // AndEq, XorEq, OrEq, ShLeftEq, ShRightEq
-    RL|OP_E2IO, RL|OP_E2IO, RL|OP_E2IO, RL|OP_E2IO, RL|OP_E2IO,
+    RL | OP_E2IO,
+    RL | OP_E2IO,
+    RL | OP_E2IO,
+    RL | OP_E2IO,
+    RL | OP_E2IO,
     // DAndEq, DOrEq, DXorEq, Comma, Eoi
-    BOOL|OP_E2IO, BOOL|OP_E2IO, RL|OP_A2IO, RL|OP_A2, RL|OP_OP,
+    BOOL | OP_E2IO,
+    BOOL | OP_E2IO,
+    RL | OP_A2IO,
+    RL | OP_A2,
+    RL | OP_OP,
     // PrePlus, PreMinus, Num, Id, Power
-    RL, RL, LR|OP_OPF, LR|OP_OPF, RL|OP_A2,
+    RL,
+    RL,
+    LR | OP_OPF,
+    LR | OP_OPF,
+    RL | OP_A2,
     // CId, PowerEq, Func
-    LR|OP_OPF, RL|OP_E2, LR|OP_OPF,
+    LR | OP_OPF,
+    RL | OP_E2,
+    LR | OP_OPF,
 ];
 
 /// Stack value for the evaluator
@@ -546,19 +579,31 @@ impl<'a> MathEval<'a> {
                 '+' => {
                     if self.peek() == Some('+') {
                         self.advance();
-                        return if self.unary { MathTok::PrePlus } else { MathTok::PostPlus };
+                        return if self.unary {
+                            MathTok::PrePlus
+                        } else {
+                            MathTok::PostPlus
+                        };
                     }
                     if self.peek() == Some('=') {
                         self.advance();
                         return MathTok::PlusEq;
                     }
-                    return if self.unary { MathTok::UPlus } else { MathTok::Plus };
+                    return if self.unary {
+                        MathTok::UPlus
+                    } else {
+                        MathTok::Plus
+                    };
                 }
 
                 '-' => {
                     if self.peek() == Some('-') {
                         self.advance();
-                        return if self.unary { MathTok::PreMinus } else { MathTok::PostMinus };
+                        return if self.unary {
+                            MathTok::PreMinus
+                        } else {
+                            MathTok::PostMinus
+                        };
                     }
                     if self.peek() == Some('=') {
                         self.advance();
@@ -747,13 +792,14 @@ impl<'a> MathEval<'a> {
                         let base_str: String = self.input[base_start..self.pos].to_string();
                         let base: u32 = base_str.parse().unwrap_or(10);
                         self.advance(); // skip ]
-                        
-                        if !Self::is_digit(self.peek().unwrap_or('\0')) 
-                            && !Self::is_ident_start(self.peek().unwrap_or('\0')) {
+
+                        if !Self::is_digit(self.peek().unwrap_or('\0'))
+                            && !Self::is_ident_start(self.peek().unwrap_or('\0'))
+                        {
                             self.error = Some("bad base syntax".to_string());
                             return MathTok::Eoi;
                         }
-                        
+
                         let val_start = self.pos;
                         while let Some(c) = self.peek() {
                             if c.is_ascii_alphanumeric() {
@@ -809,7 +855,9 @@ impl<'a> MathEval<'a> {
                 }
 
                 _ => {
-                    if Self::is_digit(c) || (c == '.' && Self::is_digit(self.peek().unwrap_or('\0'))) {
+                    if Self::is_digit(c)
+                        || (c == '.' && Self::is_digit(self.peek().unwrap_or('\0')))
+                    {
                         self.pos -= c.len_utf8();
                         return self.lex_constant();
                     }
@@ -923,7 +971,10 @@ impl<'a> MathEval<'a> {
         } else {
             name
         };
-        self.variables.get(base_name).copied().unwrap_or(MathNum::Integer(0))
+        self.variables
+            .get(base_name)
+            .copied()
+            .unwrap_or(MathNum::Integer(0))
     }
 
     fn set_variable(&mut self, name: &str, val: MathNum) -> MathNum {
@@ -982,7 +1033,7 @@ impl<'a> MathEval<'a> {
                     MathTok::And | MathTok::AndEq => MathNum::Integer(a.to_int() & b.to_int()),
                     MathTok::Xor | MathTok::XorEq => MathNum::Integer(a.to_int() ^ b.to_int()),
                     MathTok::Or | MathTok::OrEq => MathNum::Integer(a.to_int() | b.to_int()),
-                    
+
                     MathTok::Mul | MathTok::MulEq => {
                         if is_float {
                             MathNum::Float(a.to_float() * b.to_float())
@@ -990,7 +1041,7 @@ impl<'a> MathEval<'a> {
                             MathNum::Integer(a.to_int().wrapping_mul(b.to_int()))
                         }
                     }
-                    
+
                     MathTok::Div | MathTok::DivEq => {
                         if b.is_zero() {
                             self.error = Some("division by zero".to_string());
@@ -1007,7 +1058,7 @@ impl<'a> MathEval<'a> {
                             }
                         }
                     }
-                    
+
                     MathTok::Mod | MathTok::ModEq => {
                         if b.is_zero() {
                             self.error = Some("division by zero".to_string());
@@ -1024,7 +1075,7 @@ impl<'a> MathEval<'a> {
                             }
                         }
                     }
-                    
+
                     MathTok::Plus | MathTok::PlusEq => {
                         if is_float {
                             MathNum::Float(a.to_float() + b.to_float())
@@ -1032,7 +1083,7 @@ impl<'a> MathEval<'a> {
                             MathNum::Integer(a.to_int().wrapping_add(b.to_int()))
                         }
                     }
-                    
+
                     MathTok::Minus | MathTok::MinusEq => {
                         if is_float {
                             MathNum::Float(a.to_float() - b.to_float())
@@ -1040,14 +1091,14 @@ impl<'a> MathEval<'a> {
                             MathNum::Integer(a.to_int().wrapping_sub(b.to_int()))
                         }
                     }
-                    
+
                     MathTok::ShLeft | MathTok::ShLeftEq => {
                         MathNum::Integer(a.to_int() << (b.to_int() as u32 & 63))
                     }
                     MathTok::ShRight | MathTok::ShRightEq => {
                         MathNum::Integer(a.to_int() >> (b.to_int() as u32 & 63))
                     }
-                    
+
                     MathTok::Les => MathNum::Integer(if is_float {
                         (a.to_float() < b.to_float()) as i64
                     } else {
@@ -1078,7 +1129,7 @@ impl<'a> MathEval<'a> {
                     } else {
                         (a.to_int() != b.to_int()) as i64
                     }),
-                    
+
                     MathTok::DAnd | MathTok::DAndEq => {
                         MathNum::Integer((a.to_int() != 0 && b.to_int() != 0) as i64)
                     }
@@ -1090,7 +1141,7 @@ impl<'a> MathEval<'a> {
                         let bi = b.to_int() != 0;
                         MathNum::Integer((ai != bi) as i64)
                     }
-                    
+
                     MathTok::Power | MathTok::PowerEq => {
                         let bi = b.to_int();
                         if !is_float && bi >= 0 {
@@ -1114,10 +1165,10 @@ impl<'a> MathEval<'a> {
                             MathNum::Float(af.powf(bf))
                         }
                     }
-                    
+
                     MathTok::Comma => b,
                     MathTok::Eq => b,
-                    
+
                     _ => MathNum::Integer(0),
                 }
             };
@@ -1627,7 +1678,7 @@ mod tests {
     #[test]
     fn test_unary() {
         assert_eq!(mathevali("-5").unwrap(), -5);
-        assert_eq!(mathevali("- -5").unwrap(), 5);  // space needed to avoid --
+        assert_eq!(mathevali("- -5").unwrap(), 5); // space needed to avoid --
         assert_eq!(mathevali("+5").unwrap(), 5);
         assert_eq!(mathevali("-(-5)").unwrap(), 5);
     }
@@ -1711,4 +1762,3 @@ mod tests {
         assert_eq!(mathevali("(x = 1, y = 2, x + y)").unwrap(), 3);
     }
 }
-

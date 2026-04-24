@@ -175,21 +175,21 @@ impl CompletionState {
         if order.is_empty() {
             return;
         }
-        
+
         let mut ordered: Vec<CompletionGroup> = Vec::with_capacity(self.groups.len());
         let mut remaining: Vec<CompletionGroup> = Vec::new();
-        
+
         // First, add groups in the specified order
         for name in order {
             if let Some(pos) = self.groups.iter().position(|g| &g.name == name) {
                 ordered.push(self.groups.remove(pos));
             }
         }
-        
+
         // Then add remaining groups
         remaining.append(&mut self.groups);
         ordered.append(&mut remaining);
-        
+
         self.groups = ordered;
     }
 
@@ -432,15 +432,15 @@ mod tests {
     #[test]
     fn test_apply_group_order() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("files", true);
         state.add_match(Completion::new("file1"), Some("files"));
         state.end_group();
-        
+
         state.begin_group("directories", true);
         state.add_match(Completion::new("dir1"), Some("directories"));
         state.end_group();
-        
+
         state.begin_group("commands", true);
         state.add_match(Completion::new("cmd1"), Some("commands"));
         state.end_group();
@@ -451,10 +451,7 @@ mod tests {
         assert_eq!(state.groups[2].name, "commands");
 
         // Apply custom order: commands first, then directories
-        state.apply_group_order(&[
-            "commands".to_string(),
-            "directories".to_string(),
-        ]);
+        state.apply_group_order(&["commands".to_string(), "directories".to_string()]);
 
         // New order: commands, directories, files (files at end since not in order list)
         assert_eq!(state.groups[0].name, "commands");
@@ -465,11 +462,11 @@ mod tests {
     #[test]
     fn test_apply_group_order_empty() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("files", true);
         state.add_match(Completion::new("file1"), Some("files"));
         state.end_group();
-        
+
         state.begin_group("commands", true);
         state.add_match(Completion::new("cmd1"), Some("commands"));
         state.end_group();
@@ -484,16 +481,13 @@ mod tests {
     #[test]
     fn test_apply_group_order_nonexistent_groups() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("files", true);
         state.add_match(Completion::new("file1"), Some("files"));
         state.end_group();
 
         // Order includes non-existent group
-        state.apply_group_order(&[
-            "nonexistent".to_string(),
-            "files".to_string(),
-        ]);
+        state.apply_group_order(&["nonexistent".to_string(), "files".to_string()]);
 
         // Should still work, just files at the start (from order)
         assert_eq!(state.groups.len(), 1);
@@ -503,12 +497,12 @@ mod tests {
     #[test]
     fn test_completion_state_multiple_groups() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("options", true);
         state.add_match(Completion::new("--help"), Some("options"));
         state.add_match(Completion::new("--version"), Some("options"));
         state.end_group();
-        
+
         state.begin_group("files", true);
         state.add_match(Completion::new("foo.txt"), Some("files"));
         state.end_group();
@@ -522,11 +516,11 @@ mod tests {
     #[test]
     fn test_completion_state_add_to_existing_group() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("files", true);
         state.add_match(Completion::new("a.txt"), Some("files"));
         state.end_group();
-        
+
         // Add more to the same group
         state.begin_group("files", true);
         state.add_match(Completion::new("b.txt"), Some("files"));
@@ -540,20 +534,22 @@ mod tests {
     #[test]
     fn test_completion_state_explanation() {
         let mut state = CompletionState::new();
-        
+
         state.begin_group("files", true);
         state.add_explanation("Select a file".to_string(), Some("files"));
         state.add_match(Completion::new("test.txt"), Some("files"));
         state.end_group();
 
         // add_explanation adds to explanations vec, not the explanation field
-        assert!(state.groups[0].explanations.contains(&"Select a file".to_string()));
+        assert!(state.groups[0]
+            .explanations
+            .contains(&"Select a file".to_string()));
     }
 
     #[test]
     fn test_do_completion() {
         let mut state = CompletionState::new();
-        
+
         let matches = do_completion("git ch", 6, &mut state, |s| {
             s.add_match(Completion::new("checkout"), None);
             s.add_match(Completion::new("cherry-pick"), None);
@@ -616,7 +612,7 @@ mod tests {
     fn test_unambiguous_no_matches() {
         let mut state = CompletionState::new();
         state.calculate_unambiguous();
-        
+
         assert_eq!(state.ainfo.prefix, "");
         assert!(!state.ainfo.exact);
     }
@@ -637,7 +633,7 @@ mod tests {
     fn test_compstate_context_string() {
         let mut state = CompletionState::new();
         state.params.compstate.context = crate::state::CompletionContext::Command;
-        
+
         let ctx = state.context_string();
         assert!(ctx.contains("completion"));
     }

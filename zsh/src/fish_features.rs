@@ -57,44 +57,43 @@ impl HighlightSpec {
 pub fn role_to_ansi(role: HighlightRole) -> &'static str {
     match role {
         HighlightRole::Normal => "\x1b[0m",
-        HighlightRole::Command => "\x1b[1;32m",      // Bold green
-        HighlightRole::Keyword => "\x1b[1;34m",      // Bold blue
-        HighlightRole::Statement => "\x1b[1;35m",    // Bold magenta
-        HighlightRole::Param => "\x1b[0m",           // Normal
-        HighlightRole::Option => "\x1b[36m",         // Cyan
-        HighlightRole::Comment => "\x1b[90m",        // Gray
-        HighlightRole::Error => "\x1b[1;31m",        // Bold red
-        HighlightRole::String => "\x1b[33m",         // Yellow
-        HighlightRole::Escape => "\x1b[1;33m",       // Bold yellow
-        HighlightRole::Operator => "\x1b[1;37m",     // Bold white
-        HighlightRole::Redirection => "\x1b[35m",    // Magenta
-        HighlightRole::Path => "\x1b[4m",            // Underline
-        HighlightRole::PathValid => "\x1b[4;32m",    // Underline green
+        HighlightRole::Command => "\x1b[1;32m", // Bold green
+        HighlightRole::Keyword => "\x1b[1;34m", // Bold blue
+        HighlightRole::Statement => "\x1b[1;35m", // Bold magenta
+        HighlightRole::Param => "\x1b[0m",      // Normal
+        HighlightRole::Option => "\x1b[36m",    // Cyan
+        HighlightRole::Comment => "\x1b[90m",   // Gray
+        HighlightRole::Error => "\x1b[1;31m",   // Bold red
+        HighlightRole::String => "\x1b[33m",    // Yellow
+        HighlightRole::Escape => "\x1b[1;33m",  // Bold yellow
+        HighlightRole::Operator => "\x1b[1;37m", // Bold white
+        HighlightRole::Redirection => "\x1b[35m", // Magenta
+        HighlightRole::Path => "\x1b[4m",       // Underline
+        HighlightRole::PathValid => "\x1b[4;32m", // Underline green
         HighlightRole::Autosuggestion => "\x1b[90m", // Gray
-        HighlightRole::Selection => "\x1b[7m",       // Reverse
-        HighlightRole::Search => "\x1b[1;43m",       // Bold yellow bg
-        HighlightRole::Variable => "\x1b[1;36m",     // Bold cyan
-        HighlightRole::Quote => "\x1b[33m",          // Yellow
+        HighlightRole::Selection => "\x1b[7m",  // Reverse
+        HighlightRole::Search => "\x1b[1;43m",  // Bold yellow bg
+        HighlightRole::Variable => "\x1b[1;36m", // Bold cyan
+        HighlightRole::Quote => "\x1b[33m",     // Yellow
     }
 }
 
 /// Shell keywords
 const KEYWORDS: &[&str] = &[
-    "if", "then", "else", "elif", "fi", "case", "esac", "for", "while", "until",
-    "do", "done", "in", "function", "select", "time", "coproc", "{", "}", "[[", "]]",
-    "!", "foreach", "end", "repeat", "always",
+    "if", "then", "else", "elif", "fi", "case", "esac", "for", "while", "until", "do", "done",
+    "in", "function", "select", "time", "coproc", "{", "}", "[[", "]]", "!", "foreach", "end",
+    "repeat", "always",
 ];
 
 /// Shell builtins (common ones)
 const BUILTINS: &[&str] = &[
-    "cd", "echo", "exit", "export", "alias", "unalias", "source", ".", "eval",
-    "exec", "set", "unset", "shift", "return", "break", "continue", "read",
-    "readonly", "declare", "local", "typeset", "let", "test", "[", "printf",
-    "kill", "wait", "jobs", "fg", "bg", "disown", "trap", "umask", "ulimit",
-    "hash", "type", "which", "builtin", "command", "enable", "help", "history",
-    "fc", "pushd", "popd", "dirs", "pwd", "true", "false", ":", "getopts",
-    "compgen", "complete", "compopt", "shopt", "bind", "autoload", "zmodload",
-    "zstyle", "zle", "bindkey", "setopt", "unsetopt", "emulate", "whence",
+    "cd", "echo", "exit", "export", "alias", "unalias", "source", ".", "eval", "exec", "set",
+    "unset", "shift", "return", "break", "continue", "read", "readonly", "declare", "local",
+    "typeset", "let", "test", "[", "printf", "kill", "wait", "jobs", "fg", "bg", "disown", "trap",
+    "umask", "ulimit", "hash", "type", "which", "builtin", "command", "enable", "help", "history",
+    "fc", "pushd", "popd", "dirs", "pwd", "true", "false", ":", "getopts", "compgen", "complete",
+    "compopt", "shopt", "bind", "autoload", "zmodload", "zstyle", "zle", "bindkey", "setopt",
+    "unsetopt", "emulate", "whence",
 ];
 
 /// Highlight a shell command line
@@ -222,7 +221,13 @@ pub fn highlight_shell(line: &str) -> Vec<HighlightSpec> {
                 // End of word - colorize it
                 let word_end = i;
                 let word: String = chars[start..word_end].iter().collect();
-                colorize_word(&word, start, &mut colors, line, is_first_word || after_pipe_or_semi);
+                colorize_word(
+                    &word,
+                    start,
+                    &mut colors,
+                    line,
+                    is_first_word || after_pipe_or_semi,
+                );
                 is_first_word = false;
                 after_pipe_or_semi = false;
             }
@@ -242,13 +247,25 @@ pub fn highlight_shell(line: &str) -> Vec<HighlightSpec> {
     // Handle last word
     if let Some(start) = word_start {
         let word: String = chars[start..].iter().collect();
-        colorize_word(&word, start, &mut colors, line, is_first_word || after_pipe_or_semi);
+        colorize_word(
+            &word,
+            start,
+            &mut colors,
+            line,
+            is_first_word || after_pipe_or_semi,
+        );
     }
 
     colors
 }
 
-fn colorize_word(word: &str, char_start: usize, colors: &mut [HighlightSpec], line: &str, is_command_position: bool) {
+fn colorize_word(
+    word: &str,
+    char_start: usize,
+    colors: &mut [HighlightSpec],
+    line: &str,
+    is_command_position: bool,
+) {
     let role = if is_command_position {
         if KEYWORDS.contains(&word) {
             HighlightRole::Keyword
@@ -310,8 +327,11 @@ pub fn colorize_line(line: &str, colors: &[HighlightSpec]) -> String {
 
     for (i, c) in line.chars().enumerate() {
         let byte_pos = line.char_indices().nth(i).map(|(p, _)| p).unwrap_or(i);
-        let role = colors.get(byte_pos).map(|s| s.foreground).unwrap_or(HighlightRole::Normal);
-        
+        let role = colors
+            .get(byte_pos)
+            .map(|s| s.foreground)
+            .unwrap_or(HighlightRole::Normal);
+
         if role != last_role {
             result.push_str(role_to_ansi(role));
             last_role = role;
@@ -366,7 +386,8 @@ impl Abbreviation {
 }
 
 /// Global abbreviation set
-static ABBRS: LazyLock<Mutex<AbbreviationSet>> = LazyLock::new(|| Mutex::new(AbbreviationSet::default()));
+static ABBRS: LazyLock<Mutex<AbbreviationSet>> =
+    LazyLock::new(|| Mutex::new(AbbreviationSet::default()));
 
 pub fn with_abbrs<R>(cb: impl FnOnce(&AbbreviationSet) -> R) -> R {
     let abbrs = ABBRS.lock().unwrap();
@@ -388,12 +409,17 @@ impl AbbreviationSet {
     /// Find matching abbreviation for a token
     pub fn find_match(&self, token: &str, is_command_position: bool) -> Option<&Abbreviation> {
         // Later abbreviations take precedence
-        self.abbrs.iter().rev().find(|a| a.matches(token, is_command_position))
+        self.abbrs
+            .iter()
+            .rev()
+            .find(|a| a.matches(token, is_command_position))
     }
 
     /// Check if any abbreviation matches
     pub fn has_match(&self, token: &str, is_command_position: bool) -> bool {
-        self.abbrs.iter().any(|a| a.matches(token, is_command_position))
+        self.abbrs
+            .iter()
+            .any(|a| a.matches(token, is_command_position))
     }
 
     /// Add an abbreviation
@@ -425,16 +451,21 @@ impl AbbreviationSet {
 pub fn expand_abbreviation(line: &str, cursor: usize) -> Option<(String, usize)> {
     // Find the word at cursor
     let before_cursor = &line[..cursor.min(line.len())];
-    let word_start = before_cursor.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
+    let word_start = before_cursor
+        .rfind(char::is_whitespace)
+        .map(|i| i + 1)
+        .unwrap_or(0);
     let word = &before_cursor[word_start..];
-    
+
     if word.is_empty() {
         return None;
     }
 
     // Check if we're in command position
-    let is_command_position = before_cursor[..word_start].trim().is_empty() 
-        || before_cursor[..word_start].trim().ends_with(|c| c == '|' || c == ';' || c == '&');
+    let is_command_position = before_cursor[..word_start].trim().is_empty()
+        || before_cursor[..word_start]
+            .trim()
+            .ends_with(|c| c == '|' || c == ';' || c == '&');
 
     with_abbrs(|set| {
         set.find_match(word, is_command_position).map(|abbr| {
@@ -513,13 +544,13 @@ pub fn validate_autosuggestion(suggestion: &str, current_line: &str) -> bool {
     // Get the full command that would result
     let full_line = format!("{}{}", current_line, suggestion);
     let words: Vec<&str> = full_line.split_whitespace().collect();
-    
+
     if words.is_empty() {
         return true;
     }
 
     let cmd = words[0];
-    
+
     // Check if command exists
     if !command_exists(cmd) && !BUILTINS.contains(&cmd) && !KEYWORDS.contains(&cmd) {
         // Check if it's a path
@@ -715,7 +746,12 @@ mod tests {
     fn test_abbreviation() {
         with_abbrs_mut(|set| {
             set.add(Abbreviation::new("g", "g", "git", AbbrPosition::Command));
-            set.add(Abbreviation::new("ga", "ga", "git add", AbbrPosition::Command));
+            set.add(Abbreviation::new(
+                "ga",
+                "ga",
+                "git add",
+                AbbrPosition::Command,
+            ));
         });
 
         let result = expand_abbreviation("g", 1);
@@ -741,7 +777,7 @@ mod tests {
     fn test_killring() {
         kill_add("first".to_string());
         kill_add("second".to_string());
-        
+
         assert_eq!(kill_yank(), Some("second".to_string()));
         assert_eq!(kill_yank_rotate(), Some("first".to_string()));
     }
@@ -749,7 +785,10 @@ mod tests {
     #[test]
     fn test_validation() {
         assert_eq!(validate_command("echo hello"), ValidationStatus::Valid);
-        assert_eq!(validate_command("echo \"unclosed"), ValidationStatus::Incomplete);
+        assert_eq!(
+            validate_command("echo \"unclosed"),
+            ValidationStatus::Incomplete
+        );
         assert_eq!(validate_command("ls |"), ValidationStatus::Incomplete);
     }
 }

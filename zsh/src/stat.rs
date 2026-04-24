@@ -174,7 +174,9 @@ impl FileStat {
         };
 
         let link_target = if meta.file_type().is_symlink() {
-            fs::read_link(path).ok().map(|p| p.to_string_lossy().to_string())
+            fs::read_link(path)
+                .ok()
+                .map(|p| p.to_string_lossy().to_string())
         } else {
             None
         };
@@ -183,13 +185,15 @@ impl FileStat {
     }
 
     pub fn from_metadata(meta: &Metadata, link_target: Option<String>) -> Self {
-        let atime = meta.accessed()
+        let atime = meta
+            .accessed()
             .ok()
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        let mtime = meta.modified()
+        let mtime = meta
+            .modified()
             .ok()
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_secs() as i64)
@@ -253,13 +257,22 @@ impl FileStat {
             let perms = [
                 (self.mode & 0o400 != 0, 'r'),
                 (self.mode & 0o200 != 0, 'w'),
-                (self.mode & 0o100 != 0, if self.mode & 0o4000 != 0 { 's' } else { 'x' }),
+                (
+                    self.mode & 0o100 != 0,
+                    if self.mode & 0o4000 != 0 { 's' } else { 'x' },
+                ),
                 (self.mode & 0o040 != 0, 'r'),
                 (self.mode & 0o020 != 0, 'w'),
-                (self.mode & 0o010 != 0, if self.mode & 0o2000 != 0 { 's' } else { 'x' }),
+                (
+                    self.mode & 0o010 != 0,
+                    if self.mode & 0o2000 != 0 { 's' } else { 'x' },
+                ),
                 (self.mode & 0o004 != 0, 'r'),
                 (self.mode & 0o002 != 0, 'w'),
-                (self.mode & 0o001 != 0, if self.mode & 0o1000 != 0 { 't' } else { 'x' }),
+                (
+                    self.mode & 0o001 != 0,
+                    if self.mode & 0o1000 != 0 { 't' } else { 'x' },
+                ),
             ];
 
             for (set, ch) in perms {
@@ -386,7 +399,8 @@ impl FileStat {
                     .single()
                     .map(|dt| dt.format("%a %b %e %k:%M:%S %Z %Y").to_string())
             } else {
-                Local.timestamp_opt(timestamp, 0)
+                Local
+                    .timestamp_opt(timestamp, 0)
                     .single()
                     .map(|dt| dt.format("%a %b %e %k:%M:%S %Z %Y").to_string())
             };

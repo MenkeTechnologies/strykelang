@@ -4,8 +4,8 @@
 //! and history. Uses Rust's HashMap internally but maintains zsh-compatible APIs.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Flags for hash nodes
 pub mod flags {
@@ -274,10 +274,8 @@ impl CmdNameTable {
             };
 
             if should_add {
-                self.table.insert(
-                    name.clone(),
-                    CmdName::with_dir_index(&name, dir_index),
-                );
+                self.table
+                    .insert(name.clone(), CmdName::with_dir_index(&name, dir_index));
             }
         }
     }

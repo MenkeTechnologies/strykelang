@@ -175,21 +175,20 @@ pub fn parse_time_spec(s: &str) -> Result<u64, &'static str> {
         let hours: i64 = s[..colon_pos].parse().map_err(|_| "bad time specifier")?;
         let after_hours = &s[colon_pos + 1..];
 
-        let (mut hours, minutes, seconds, pm) =
-            if let Some(second_colon) = after_hours.find(':') {
-                let m: i64 = after_hours[..second_colon]
-                    .parse()
-                    .map_err(|_| "bad time specifier")?;
-                let sec_str = &after_hours[second_colon + 1..];
+        let (mut hours, minutes, seconds, pm) = if let Some(second_colon) = after_hours.find(':') {
+            let m: i64 = after_hours[..second_colon]
+                .parse()
+                .map_err(|_| "bad time specifier")?;
+            let sec_str = &after_hours[second_colon + 1..];
 
-                let (s_str, pm) = extract_ampm(sec_str);
-                let s: i64 = s_str.parse().map_err(|_| "bad time specifier")?;
-                (hours, m, s, pm)
-            } else {
-                let (m_str, pm) = extract_ampm(after_hours);
-                let m: i64 = m_str.parse().map_err(|_| "bad time specifier")?;
-                (hours, m, 0, pm)
-            };
+            let (s_str, pm) = extract_ampm(sec_str);
+            let s: i64 = s_str.parse().map_err(|_| "bad time specifier")?;
+            (hours, m, s, pm)
+        } else {
+            let (m_str, pm) = extract_ampm(after_hours);
+            let m: i64 = m_str.parse().map_err(|_| "bad time specifier")?;
+            (hours, m, 0, pm)
+        };
 
         if pm == Some(true) && hours < 12 {
             hours += 12;
@@ -239,11 +238,7 @@ pub fn format_sched(index: usize, sch: &SchedCmd) -> String {
         .unwrap_or_else(|| format!("{}", sch.time));
 
     let flagstr = if sch.flags.trash_zle { "-o " } else { "" };
-    let endstr = if sch.cmd.starts_with('-') {
-        "-- "
-    } else {
-        ""
-    };
+    let endstr = if sch.cmd.starts_with('-') { "-- " } else { "" };
 
     format!("{:3} {} {}{}{}", index, dt, flagstr, endstr, sch.cmd)
 }
@@ -263,7 +258,12 @@ pub fn builtin_sched(args: &[&str], scheduler: &mut Scheduler) -> (i32, String) 
 
         let arg = &arg[1..];
 
-        if arg.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        if arg
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+        {
             let n: usize = match arg.parse() {
                 Ok(n) => n,
                 Err(_) => {
@@ -272,10 +272,7 @@ pub fn builtin_sched(args: &[&str], scheduler: &mut Scheduler) -> (i32, String) 
             };
 
             if n == 0 {
-                return (
-                    1,
-                    "sched: usage for delete: sched -<item#>.\n".to_string(),
-                );
+                return (1, "sched: usage for delete: sched -<item#>.\n".to_string());
             }
 
             if scheduler.remove(n).is_none() {
@@ -290,7 +287,10 @@ pub fn builtin_sched(args: &[&str], scheduler: &mut Scheduler) -> (i32, String) 
         } else if arg.is_empty() {
             return (1, "sched: option expected\n".to_string());
         } else {
-            return (1, format!("sched: bad option: -{}\n", arg.chars().next().unwrap()));
+            return (
+                1,
+                format!("sched: bad option: -{}\n", arg.chars().next().unwrap()),
+            );
         }
     }
 

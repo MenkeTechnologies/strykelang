@@ -339,7 +339,8 @@ pub fn format_watch(entry: &UtmpEntry, logged_in: bool, fmt: &str) -> String {
                     }
                     '%' => result.push('%'),
                     '(' => {
-                        if let Some(cond_result) = format_conditional(&mut chars, entry, logged_in) {
+                        if let Some(cond_result) = format_conditional(&mut chars, entry, logged_in)
+                        {
                             result.push_str(&cond_result);
                         }
                     }
@@ -428,11 +429,7 @@ fn format_time(timestamp: i64, fmt: &str) -> String {
 }
 
 /// Check a watch entry against the watch list
-pub fn check_watch_entry(
-    entry: &UtmpEntry,
-    watch_list: &[String],
-    current_user: &str,
-) -> bool {
+pub fn check_watch_entry(entry: &UtmpEntry, watch_list: &[String], current_user: &str) -> bool {
     if watch_list.is_empty() {
         return false;
     }
@@ -501,10 +498,7 @@ fn matches_watch_pattern(pattern: &str, entry: &UtmpEntry) -> bool {
 }
 
 /// Perform watch check and return login/logout events
-pub fn do_watch(
-    state: &mut WatchState,
-    current_user: &str,
-) -> Vec<(UtmpEntry, bool)> {
+pub fn do_watch(state: &mut WatchState, current_user: &str) -> Vec<(UtmpEntry, bool)> {
     let mut events = Vec::new();
     let new_entries = read_utmp();
 

@@ -36,7 +36,13 @@ pub enum CompResult {
 }
 
 /// Insert a match into the buffer (from compresult.c instmatch)
-pub fn instmatch(buffer: &str, cursor: usize, word_start: usize, word_end: usize, replacement: &str) -> (String, usize) {
+pub fn instmatch(
+    buffer: &str,
+    cursor: usize,
+    word_start: usize,
+    word_end: usize,
+    replacement: &str,
+) -> (String, usize) {
     let mut result = String::with_capacity(buffer.len() + replacement.len());
     result.push_str(&buffer[..word_start]);
     result.push_str(replacement);
@@ -58,13 +64,20 @@ pub fn unambig_data(matches: &[String]) -> String {
     let mut prefix_len = first.len();
 
     for m in &matches[1..] {
-        let common = first.chars().zip(m.chars())
+        let common = first
+            .chars()
+            .zip(m.chars())
             .take_while(|(a, b)| a == b)
             .count();
         prefix_len = prefix_len.min(common);
     }
 
-    first[..first.char_indices().nth(prefix_len).map(|(i, _)| i).unwrap_or(first.len())].to_string()
+    first[..first
+        .char_indices()
+        .nth(prefix_len)
+        .map(|(i, _)| i)
+        .unwrap_or(first.len())]
+        .to_string()
 }
 
 /// Case-insensitive unambiguous prefix
@@ -81,7 +94,9 @@ pub fn unambig_data_icase(matches: &[String]) -> String {
 
     for m in &matches[1..] {
         let lower = m.to_lowercase();
-        let common = first.chars().zip(lower.chars())
+        let common = first
+            .chars()
+            .zip(lower.chars())
             .take_while(|(a, b)| a == b)
             .count();
         prefix_len = prefix_len.min(common);
@@ -89,11 +104,23 @@ pub fn unambig_data_icase(matches: &[String]) -> String {
 
     // Return using the case from the first match
     let first = &matches[0];
-    first[..first.char_indices().nth(prefix_len).map(|(i, _)| i).unwrap_or(first.len())].to_string()
+    first[..first
+        .char_indices()
+        .nth(prefix_len)
+        .map(|(i, _)| i)
+        .unwrap_or(first.len())]
+        .to_string()
 }
 
 /// Handle a single unambiguous match (from compresult.c do_single)
-pub fn do_single(buffer: &str, cursor: usize, word_start: usize, word_end: usize, the_match: &str, add_space: bool) -> (String, usize) {
+pub fn do_single(
+    buffer: &str,
+    cursor: usize,
+    word_start: usize,
+    word_end: usize,
+    the_match: &str,
+    add_space: bool,
+) -> (String, usize) {
     let suffix = if add_space { " " } else { "" };
     let replacement = format!("{}{}", the_match, suffix);
     instmatch(buffer, cursor, word_start, word_end, &replacement)
@@ -113,7 +140,14 @@ pub fn do_ambiguous(matches: &[String]) -> CompResult {
 }
 
 /// Insert all matches (from compresult.c do_allmatches)
-pub fn do_allmatches(buffer: &str, cursor: usize, word_start: usize, word_end: usize, matches: &[String], separator: &str) -> (String, usize) {
+pub fn do_allmatches(
+    buffer: &str,
+    cursor: usize,
+    word_start: usize,
+    word_end: usize,
+    matches: &[String],
+    separator: &str,
+) -> (String, usize) {
     let all = matches.join(separator);
     instmatch(buffer, cursor, word_start, word_end, &all)
 }
@@ -126,13 +160,23 @@ pub fn do_menucmp(matches: &[String], current: usize, forward: bool) -> (usize, 
     let next = if forward {
         (current + 1) % matches.len()
     } else {
-        if current == 0 { matches.len() - 1 } else { current - 1 }
+        if current == 0 {
+            matches.len() - 1
+        } else {
+            current - 1
+        }
     };
     (next, &matches[next])
 }
 
 /// Accept current menu selection (from compresult.c accept_last)
-pub fn accept_last(buffer: &str, cursor: usize, word_start: usize, word_end: usize, selected: &str) -> (String, usize) {
+pub fn accept_last(
+    buffer: &str,
+    cursor: usize,
+    word_start: usize,
+    word_end: usize,
+    selected: &str,
+) -> (String, usize) {
     do_single(buffer, cursor, word_start, word_end, selected, true)
 }
 

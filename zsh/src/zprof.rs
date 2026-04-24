@@ -97,14 +97,16 @@ impl Profiler {
             return;
         }
 
-        let func = self.functions
+        let func = self
+            .functions
             .entry(name.to_string())
             .or_insert_with(|| ProfFunc::new(name));
         func.calls += 1;
 
         if let Some(caller) = self.stack.last() {
             let key = (caller.func_name.clone(), name.to_string());
-            let arc = self.arcs
+            let arc = self
+                .arcs
                 .entry(key)
                 .or_insert_with(|| ProfArc::new(&caller.func_name, name));
             arc.calls += 1;
@@ -206,8 +208,12 @@ impl Profiler {
             return "No profiling data collected.\n".to_string();
         }
 
-        output.push_str("num  calls                time                       self            name\n");
-        output.push_str("-----------------------------------------------------------------------------------\n");
+        output.push_str(
+            "num  calls                time                       self            name\n",
+        );
+        output.push_str(
+            "-----------------------------------------------------------------------------------\n",
+        );
 
         let mut funcs_by_self: Vec<_> = self.functions.values_mut().collect();
         funcs_by_self.sort_by(|a, b| b.self_time.partial_cmp(&a.self_time).unwrap());
@@ -231,7 +237,9 @@ impl Profiler {
             ));
         }
 
-        let func_nums: HashMap<String, usize> = self.functions.iter()
+        let func_nums: HashMap<String, usize> = self
+            .functions
+            .iter()
             .map(|(name, f)| (name.clone(), f.num))
             .collect();
 
@@ -241,9 +249,7 @@ impl Profiler {
         for func in funcs_by_total {
             output.push_str("\n-----------------------------------------------------------------------------------\n\n");
 
-            let arcs: Vec<_> = self.arcs.values()
-                .filter(|a| a.to == func.name)
-                .collect();
+            let arcs: Vec<_> = self.arcs.values().filter(|a| a.to == func.name).collect();
 
             for arc in &arcs {
                 let from_num = func_nums.get(&arc.from).copied().unwrap_or(0);
@@ -253,10 +259,18 @@ impl Profiler {
                     arc.calls,
                     func.calls,
                     arc.total_time,
-                    if arc.calls > 0 { arc.total_time / arc.calls as f64 } else { 0.0 },
+                    if arc.calls > 0 {
+                        arc.total_time / arc.calls as f64
+                    } else {
+                        0.0
+                    },
                     time_pct,
                     arc.self_time,
-                    if arc.calls > 0 { arc.self_time / arc.calls as f64 } else { 0.0 },
+                    if arc.calls > 0 {
+                        arc.self_time / arc.calls as f64
+                    } else {
+                        0.0
+                    },
                     arc.from,
                     from_num
                 ));
@@ -277,9 +291,7 @@ impl Profiler {
                 func.name
             ));
 
-            let callee_arcs: Vec<_> = self.arcs.values()
-                .filter(|a| a.from == func.name)
-                .collect();
+            let callee_arcs: Vec<_> = self.arcs.values().filter(|a| a.from == func.name).collect();
 
             for arc in callee_arcs.iter().rev() {
                 let to_num = func_nums.get(&arc.to).copied().unwrap_or(0);
@@ -290,10 +302,18 @@ impl Profiler {
                     arc.calls,
                     to_calls,
                     arc.total_time,
-                    if arc.calls > 0 { arc.total_time / arc.calls as f64 } else { 0.0 },
+                    if arc.calls > 0 {
+                        arc.total_time / arc.calls as f64
+                    } else {
+                        0.0
+                    },
                     time_pct,
                     arc.self_time,
-                    if arc.calls > 0 { arc.self_time / arc.calls as f64 } else { 0.0 },
+                    if arc.calls > 0 {
+                        arc.self_time / arc.calls as f64
+                    } else {
+                        0.0
+                    },
                     arc.to,
                     to_num
                 ));
@@ -389,7 +409,10 @@ mod tests {
         assert_eq!(p.functions.len(), 2);
         assert_eq!(p.arcs.len(), 1);
 
-        let arc = p.arcs.get(&("outer".to_string(), "inner".to_string())).unwrap();
+        let arc = p
+            .arcs
+            .get(&("outer".to_string(), "inner".to_string()))
+            .unwrap();
         assert_eq!(arc.calls, 1);
     }
 

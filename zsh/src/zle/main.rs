@@ -305,20 +305,20 @@ impl Zle {
     /// Set up terminal for ZLE
     pub fn zsetterm(&mut self) -> io::Result<()> {
         use std::os::unix::io::FromRawFd;
-        
+
         // Get current terminal settings
         let mut termios = termios::Termios::from_fd(self.ttyfd)?;
-        
+
         // Save original settings (would need to store for restore)
-        
+
         // Set raw mode
         termios.c_lflag &= !(termios::ICANON | termios::ECHO);
         termios.c_cc[termios::VMIN] = 1;
         termios.c_cc[termios::VTIME] = 0;
-        
+
         // Apply settings
         termios::tcsetattr(self.ttyfd, termios::TCSANOW, &termios)?;
-        
+
         Ok(())
     }
 
@@ -362,7 +362,7 @@ impl Zle {
         }
 
         let timeout = self.calc_timeout(do_keytmout);
-        
+
         let timeout_duration = if timeout.tp != TimeoutType::None {
             Some(Duration::from_millis(timeout.exp100ths * 10))
         } else {
@@ -371,7 +371,7 @@ impl Zle {
 
         // Use poll/select to wait for input with timeout
         let mut buf = [0u8; 1];
-        
+
         if let Some(dur) = timeout_duration {
             // Set up poll
             let start = Instant::now();
@@ -379,7 +379,7 @@ impl Zle {
                 if start.elapsed() >= dur {
                     return None; // Timeout
                 }
-                
+
                 // Try non-blocking read
                 match self.try_read_byte(&mut buf) {
                     Ok(true) => return Some(buf[0]),
@@ -402,15 +402,15 @@ impl Zle {
     /// Try to read a byte non-blocking
     fn try_read_byte(&self, buf: &mut [u8]) -> io::Result<bool> {
         use std::os::unix::io::AsRawFd;
-        
+
         let mut fds = [libc::pollfd {
             fd: io::stdin().as_raw_fd(),
             events: libc::POLLIN,
             revents: 0,
         }];
-        
+
         let ret = unsafe { libc::poll(fds.as_mut_ptr(), 1, 0) };
-        
+
         if ret > 0 && (fds[0].revents & libc::POLLIN) != 0 {
             match io::stdin().read(buf) {
                 Ok(1) => Ok(true),
@@ -425,11 +425,17 @@ impl Zle {
     /// Get a byte from input, handling timeout
     pub fn getbyte(&mut self, do_keytmout: bool) -> Option<u8> {
         let b = self.raw_getbyte(do_keytmout)?;
-        
+
         // Handle newline/carriage return translation
         // (The C code swaps \n and \r for typeahead handling)
-        let b = if b == b'\n' { b'\r' } else if b == b'\r' { b'\n' } else { b };
-        
+        let b = if b == b'\n' {
+            b'\r'
+        } else if b == b'\r' {
+            b'\n'
+        } else {
+            b
+        };
+
         self.lastchar = b as ZleInt;
         Some(b)
     }
@@ -437,7 +443,7 @@ impl Zle {
     /// Get a full (possibly wide) character - always returns char in Rust
     pub fn getfullchar(&mut self, do_keytmout: bool) -> Option<char> {
         let b = self.getbyte(do_keytmout)?;
-        
+
         // UTF-8 decoding
         if b < 0x80 {
             let c = b as char;
@@ -445,7 +451,7 @@ impl Zle {
             self.lastchar_wide_valid = true;
             return Some(c);
         }
-        
+
         // Multi-byte UTF-8
         let mut bytes = vec![b];
         let expected_len = if b < 0xE0 {
@@ -455,7 +461,7 @@ impl Zle {
         } else {
             4
         };
-        
+
         while bytes.len() < expected_len {
             if let Some(next) = self.getbyte(true) {
                 if (next & 0xC0) != 0x80 {
@@ -468,7 +474,7 @@ impl Zle {
                 break;
             }
         }
-        
+
         match std::str::from_utf8(&bytes) {
             Ok(s) => {
                 if let Some(c) = s.chars().next() {
@@ -479,7 +485,7 @@ impl Zle {
             }
             Err(_) => {}
         }
-        
+
         self.lastchar_wide_valid = false;
         None
     }
@@ -493,14 +499,14 @@ impl Zle {
     /// Core ZLE loop
     pub fn zlecore(&mut self) {
         self.done = false;
-        
+
         while !self.done {
             // Reset prefix flag
             if !self.prefixflag {
                 self.zmod = Modifier::default();
             }
             self.prefixflag = false;
-            
+
             // Get next key
             let c = match self.getfullchar(false) {
                 Some(c) => c,
@@ -509,14 +515,14 @@ impl Zle {
                     continue;
                 }
             };
-            
+
             // Look up binding
             let key = c;
-            
+
             if let Some(thingy) = self.keymaps.lookup_key(key) {
                 self.lbindk = self.bindk.take();
                 self.bindk = Some(thingy.clone());
-                
+
                 // Execute the widget
                 if let Some(widget) = &thingy.widget {
                     self.execute_widget(widget);
@@ -525,7 +531,7 @@ impl Zle {
                 // Self-insert
                 self.do_self_insert(key);
             }
-            
+
             // Refresh display if needed
             if self.resetneeded {
                 self.zrefresh();
@@ -537,7 +543,7 @@ impl Zle {
     /// Execute a widget
     fn execute_widget(&mut self, widget: &Widget) {
         self.lastcmd = widget.flags;
-        
+
         match &widget.func {
             super::widget::WidgetFunc::Internal(f) => {
                 f(self);
@@ -582,24 +588,24 @@ impl Zle {
         self.rprompt = rprompt.to_string();
         self.zlereadflags = flags;
         self.zlecontext = context;
-        
+
         // Initialize line
         self.zleline.clear();
         self.zlecs = 0;
         self.zlell = 0;
         self.mark = 0;
         self.done = false;
-        
+
         // Set up terminal
         self.zsetterm()?;
-        
+
         // Display prompt
         print!("{}", lprompt);
         io::stdout().flush()?;
-        
+
         // Enter core loop
         self.zlecore();
-        
+
         // Return the line
         Ok(self.zleline.iter().collect())
     }
@@ -644,15 +650,15 @@ impl Zle {
     /// Recursive edit
     pub fn recursive_edit(&mut self) -> i32 {
         self.zle_recursive += 1;
-        
+
         let old_done = self.done;
         self.done = false;
-        
+
         self.zlecore();
-        
+
         self.done = old_done;
         self.zle_recursive -= 1;
-        
+
         0
     }
 
@@ -679,14 +685,14 @@ impl Zle {
             local: self.keymaps.local.clone(),
         }
     }
-    
+
     /// Restore keymap state
     /// Port of restorekeymap() from zle_main.c
     pub fn restore_keymap(&mut self, saved: SavedKeymap) {
         self.keymaps.select(&saved.name);
         self.keymaps.local = saved.local;
     }
-    
+
     /// Describe key briefly
     /// Port of describekeybriefly() from zle_main.c
     pub fn describe_key_briefly(&mut self) {
@@ -698,12 +704,12 @@ impl Zle {
             }
         }
     }
-    
+
     /// Where is command
     /// Port of whereis() from zle_main.c
     pub fn whereis(&self, widget_name: &str) -> Vec<String> {
         let mut bindings = Vec::new();
-        
+
         for (name, km) in &self.keymaps.keymaps {
             // Check single char bindings
             for (i, opt) in km.first.iter().enumerate() {
@@ -713,7 +719,7 @@ impl Zle {
                     }
                 }
             }
-            
+
             // Check multi-char bindings
             for (seq, kb) in &km.multi {
                 if let Some(ref t) = kb.bind {
@@ -723,10 +729,10 @@ impl Zle {
                 }
             }
         }
-        
+
         bindings
     }
-    
+
     /// Execute an immortal (built-in) function
     /// Port of execimmortal() from zle_main.c
     pub fn exec_immortal(&mut self, name: &str) -> bool {
@@ -737,7 +743,7 @@ impl Zle {
             false
         }
     }
-    
+
     /// Execute a ZLE function by name
     /// Port of execzlefunc() from zle_main.c
     pub fn exec_zle_func(&mut self, name: &str, _args: &[String]) -> i32 {
@@ -749,37 +755,37 @@ impl Zle {
             1
         }
     }
-    
+
     /// Break read (for signals)
     /// Port of breakread() from zle_main.c
     pub fn break_read(&mut self) {
         self.done = true;
     }
-    
+
     /// Handle before trap
     /// Port of zlebeforetrap() from zle_main.c
     pub fn before_trap(&mut self) {
         // Save state before running trap
     }
-    
+
     /// Handle after trap
     /// Port of zleaftertrap() from zle_main.c
     pub fn after_trap(&mut self) {
         // Restore state after running trap
         self.resetneeded = true;
     }
-    
+
     /// ZLE reset prompt
     /// Port of zle_resetprompt() from zle_main.c  
     pub fn zle_reset_prompt(&mut self) {
         self.resetneeded = true;
     }
-    
+
     /// Display message to user (internal)
     fn display_msg(&self, msg: &str) {
         eprintln!("{}", msg);
     }
-    
+
     /// The prompt string
     pub fn prompt(&self) -> &str {
         &self.lprompt
@@ -790,7 +796,7 @@ impl Zle {
         self.lprompt = prompt.to_string();
         self.resetneeded = true;
     }
-    
+
     /// Get repeat count
     pub fn get_mult(&self) -> i32 {
         if self.zmod.flags.contains(ModifierFlags::MULT) {
@@ -799,32 +805,32 @@ impl Zle {
             1
         }
     }
-    
+
     /// Toggle negative argument flag
     pub fn toggle_neg_arg(&mut self) {
         self.zmod.flags.toggle(ModifierFlags::NEG);
     }
-    
+
     /// Check if negative argument
     pub fn is_neg(&self) -> bool {
         self.zmod.flags.contains(ModifierFlags::NEG)
     }
-    
+
     /// Vi command mode flag
     pub fn is_vicmd(&self) -> bool {
         self.keymaps.is_vi_cmd()
     }
-    
+
     /// Vi insert mode flag
     pub fn is_viins(&self) -> bool {
         self.keymaps.is_vi_insert()
     }
-    
+
     /// Emacs mode flag
     pub fn is_emacs(&self) -> bool {
         self.keymaps.is_emacs()
     }
-    
+
     /// Check if last command was yank
     pub fn was_yank(&self) -> bool {
         self.lastcmd.contains(WidgetFlags::YANK)
@@ -845,30 +851,29 @@ fn get_builtin_widget(name: &str) -> Option<Widget> {
 
 /// Vared builtin implementation
 /// Port of bin_vared() from zle_main.c
-pub fn bin_vared(
-    zle: &mut Zle,
-    varname: &str,
-    opts: VaredOpts,
-) -> io::Result<String> {
+pub fn bin_vared(zle: &mut Zle, varname: &str, opts: VaredOpts) -> io::Result<String> {
     // Get variable value
     let initial = std::env::var(varname).unwrap_or_default();
-    
+
     // Set up ZLE
     zle.zleline = initial.chars().collect();
     zle.zlell = zle.zleline.len();
     zle.zlecs = if opts.cursor_at_end { zle.zlell } else { 0 };
-    
+
     // Read with prompts
     let prompt = opts.prompt.as_deref().unwrap_or("");
     let rprompt = opts.rprompt.as_deref().unwrap_or("");
-    
+
     let result = zle.zleread(
         prompt,
         rprompt,
-        ZleReadFlags { vared: true, ..Default::default() },
+        ZleReadFlags {
+            vared: true,
+            ..Default::default()
+        },
         ZleContext::Vared,
     )?;
-    
+
     Ok(result)
 }
 
@@ -901,7 +906,7 @@ pub fn zle_main_entry(op: ZleOperation, data: ZleData) -> i32 {
             // Would reset ZLE
             0
         }
-        _ => 1
+        _ => 1,
     }
 }
 

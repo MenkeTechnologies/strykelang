@@ -2,7 +2,7 @@
 //!
 //! Direct port from zsh/Src/Zle/zle_vi.c
 
-use super::main::{Zle, ModifierFlags};
+use super::main::{ModifierFlags, Zle};
 
 /// Vi operation pending
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

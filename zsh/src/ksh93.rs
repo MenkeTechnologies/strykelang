@@ -118,9 +118,21 @@ impl Ksh93Params {
     pub fn to_hash(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         for name in &[
-            ".sh.file", ".sh.lineno", ".sh.fun", ".sh.level", ".sh.subshell",
-            ".sh.version", ".sh.name", ".sh.subscript", ".sh.edchar", ".sh.edmode",
-            ".sh.edcol", ".sh.edtext", ".sh.command", ".sh.value", ".sh.match",
+            ".sh.file",
+            ".sh.lineno",
+            ".sh.fun",
+            ".sh.level",
+            ".sh.subshell",
+            ".sh.version",
+            ".sh.name",
+            ".sh.subscript",
+            ".sh.edchar",
+            ".sh.edmode",
+            ".sh.edcol",
+            ".sh.edtext",
+            ".sh.command",
+            ".sh.value",
+            ".sh.match",
         ] {
             if let Some(v) = self.get(name) {
                 map.insert(name.to_string(), v);
@@ -164,7 +176,10 @@ pub fn builtin_nameref(args: &[&str], options: &NamerefOptions) -> (i32, String)
     let target = args[1];
 
     if !is_valid_identifier(target) {
-        return (1, format!("nameref: {}: invalid reference target\n", target));
+        return (
+            1,
+            format!("nameref: {}: invalid reference target\n", target),
+        );
     }
 
     (0, String::new())
@@ -233,7 +248,10 @@ mod tests {
     #[test]
     fn test_ksh93_params_set_match() {
         let mut params = Ksh93Params::new();
-        params.set_match(Some("hello"), &[Some("h".to_string()), Some("ello".to_string())]);
+        params.set_match(
+            Some("hello"),
+            &[Some("h".to_string()), Some("ello".to_string())],
+        );
         assert_eq!(params.match_arr.len(), 3);
     }
 

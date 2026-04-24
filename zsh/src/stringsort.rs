@@ -116,8 +116,20 @@ fn numeric_compare(a: &str, b: &str, signed: bool) -> Ordering {
                 // Check if we're at the start of a number
                 let a_is_digit = ac.is_ascii_digit();
                 let b_is_digit = bc.is_ascii_digit();
-                let a_is_neg = signed && ac == '-' && a_chars.clone().nth(1).map(|c| c.is_ascii_digit()).unwrap_or(false);
-                let b_is_neg = signed && bc == '-' && b_chars.clone().nth(1).map(|c| c.is_ascii_digit()).unwrap_or(false);
+                let a_is_neg = signed
+                    && ac == '-'
+                    && a_chars
+                        .clone()
+                        .nth(1)
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false);
+                let b_is_neg = signed
+                    && bc == '-'
+                    && b_chars
+                        .clone()
+                        .nth(1)
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false);
 
                 if a_is_digit || b_is_digit || a_is_neg || b_is_neg {
                     // Extract and compare numbers
@@ -143,7 +155,10 @@ fn numeric_compare(a: &str, b: &str, signed: bool) -> Ordering {
 }
 
 /// Extract a number from a character iterator
-fn extract_number<I: Iterator<Item = char>>(chars: &mut std::iter::Peekable<I>, signed: bool) -> i64 {
+fn extract_number<I: Iterator<Item = char>>(
+    chars: &mut std::iter::Peekable<I>,
+    signed: bool,
+) -> i64 {
     let mut negative = false;
     let mut num: i64 = 0;
     let mut has_digit = false;
@@ -168,7 +183,9 @@ fn extract_number<I: Iterator<Item = char>>(chars: &mut std::iter::Peekable<I>, 
     while let Some(&c) = chars.peek() {
         if c.is_ascii_digit() {
             has_digit = true;
-            num = num.saturating_mul(10).saturating_add((c as i64) - ('0' as i64));
+            num = num
+                .saturating_mul(10)
+                .saturating_add((c as i64) - ('0' as i64));
             chars.next();
         } else {
             break;

@@ -45,12 +45,18 @@ impl Terminfo {
         let is_xterm = term.contains("xterm") || term.contains("256color");
         let _is_vt100 = term.contains("vt100") || term.contains("vt220");
 
-        self.capabilities.insert("am".to_string(), TermCapability::Boolean(true));
-        self.capabilities.insert("bce".to_string(), TermCapability::Boolean(is_xterm));
-        self.capabilities.insert("km".to_string(), TermCapability::Boolean(true));
-        self.capabilities.insert("mir".to_string(), TermCapability::Boolean(true));
-        self.capabilities.insert("msgr".to_string(), TermCapability::Boolean(true));
-        self.capabilities.insert("xenl".to_string(), TermCapability::Boolean(true));
+        self.capabilities
+            .insert("am".to_string(), TermCapability::Boolean(true));
+        self.capabilities
+            .insert("bce".to_string(), TermCapability::Boolean(is_xterm));
+        self.capabilities
+            .insert("km".to_string(), TermCapability::Boolean(true));
+        self.capabilities
+            .insert("mir".to_string(), TermCapability::Boolean(true));
+        self.capabilities
+            .insert("msgr".to_string(), TermCapability::Boolean(true));
+        self.capabilities
+            .insert("xenl".to_string(), TermCapability::Boolean(true));
 
         let cols = std::env::var("COLUMNS")
             .ok()
@@ -60,33 +66,97 @@ impl Terminfo {
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(24);
-        let colors = if is_xterm && term.contains("256") { 256 } else if is_xterm { 8 } else { 2 };
+        let colors = if is_xterm && term.contains("256") {
+            256
+        } else if is_xterm {
+            8
+        } else {
+            2
+        };
 
-        self.capabilities.insert("cols".to_string(), TermCapability::Number(cols));
-        self.capabilities.insert("lines".to_string(), TermCapability::Number(lines));
-        self.capabilities.insert("colors".to_string(), TermCapability::Number(colors));
-        self.capabilities.insert("it".to_string(), TermCapability::Number(8));
+        self.capabilities
+            .insert("cols".to_string(), TermCapability::Number(cols));
+        self.capabilities
+            .insert("lines".to_string(), TermCapability::Number(lines));
+        self.capabilities
+            .insert("colors".to_string(), TermCapability::Number(colors));
+        self.capabilities
+            .insert("it".to_string(), TermCapability::Number(8));
 
-        self.capabilities.insert("clear".to_string(), TermCapability::String("\x1b[H\x1b[2J".to_string()));
-        self.capabilities.insert("cup".to_string(), TermCapability::String("\x1b[%i%p1%d;%p2%dH".to_string()));
-        self.capabilities.insert("cuu1".to_string(), TermCapability::String("\x1b[A".to_string()));
-        self.capabilities.insert("cud1".to_string(), TermCapability::String("\x1b[B".to_string()));
-        self.capabilities.insert("cuf1".to_string(), TermCapability::String("\x1b[C".to_string()));
-        self.capabilities.insert("cub1".to_string(), TermCapability::String("\x1b[D".to_string()));
-        self.capabilities.insert("home".to_string(), TermCapability::String("\x1b[H".to_string()));
-        self.capabilities.insert("el".to_string(), TermCapability::String("\x1b[K".to_string()));
-        self.capabilities.insert("ed".to_string(), TermCapability::String("\x1b[J".to_string()));
-        self.capabilities.insert("sgr0".to_string(), TermCapability::String("\x1b[m".to_string()));
-        self.capabilities.insert("bold".to_string(), TermCapability::String("\x1b[1m".to_string()));
-        self.capabilities.insert("rev".to_string(), TermCapability::String("\x1b[7m".to_string()));
-        self.capabilities.insert("smul".to_string(), TermCapability::String("\x1b[4m".to_string()));
-        self.capabilities.insert("rmul".to_string(), TermCapability::String("\x1b[24m".to_string()));
-        self.capabilities.insert("smso".to_string(), TermCapability::String("\x1b[7m".to_string()));
-        self.capabilities.insert("rmso".to_string(), TermCapability::String("\x1b[27m".to_string()));
+        self.capabilities.insert(
+            "clear".to_string(),
+            TermCapability::String("\x1b[H\x1b[2J".to_string()),
+        );
+        self.capabilities.insert(
+            "cup".to_string(),
+            TermCapability::String("\x1b[%i%p1%d;%p2%dH".to_string()),
+        );
+        self.capabilities.insert(
+            "cuu1".to_string(),
+            TermCapability::String("\x1b[A".to_string()),
+        );
+        self.capabilities.insert(
+            "cud1".to_string(),
+            TermCapability::String("\x1b[B".to_string()),
+        );
+        self.capabilities.insert(
+            "cuf1".to_string(),
+            TermCapability::String("\x1b[C".to_string()),
+        );
+        self.capabilities.insert(
+            "cub1".to_string(),
+            TermCapability::String("\x1b[D".to_string()),
+        );
+        self.capabilities.insert(
+            "home".to_string(),
+            TermCapability::String("\x1b[H".to_string()),
+        );
+        self.capabilities.insert(
+            "el".to_string(),
+            TermCapability::String("\x1b[K".to_string()),
+        );
+        self.capabilities.insert(
+            "ed".to_string(),
+            TermCapability::String("\x1b[J".to_string()),
+        );
+        self.capabilities.insert(
+            "sgr0".to_string(),
+            TermCapability::String("\x1b[m".to_string()),
+        );
+        self.capabilities.insert(
+            "bold".to_string(),
+            TermCapability::String("\x1b[1m".to_string()),
+        );
+        self.capabilities.insert(
+            "rev".to_string(),
+            TermCapability::String("\x1b[7m".to_string()),
+        );
+        self.capabilities.insert(
+            "smul".to_string(),
+            TermCapability::String("\x1b[4m".to_string()),
+        );
+        self.capabilities.insert(
+            "rmul".to_string(),
+            TermCapability::String("\x1b[24m".to_string()),
+        );
+        self.capabilities.insert(
+            "smso".to_string(),
+            TermCapability::String("\x1b[7m".to_string()),
+        );
+        self.capabilities.insert(
+            "rmso".to_string(),
+            TermCapability::String("\x1b[27m".to_string()),
+        );
 
         if is_xterm {
-            self.capabilities.insert("setaf".to_string(), TermCapability::String("\x1b[3%p1%dm".to_string()));
-            self.capabilities.insert("setab".to_string(), TermCapability::String("\x1b[4%p1%dm".to_string()));
+            self.capabilities.insert(
+                "setaf".to_string(),
+                TermCapability::String("\x1b[3%p1%dm".to_string()),
+            );
+            self.capabilities.insert(
+                "setab".to_string(),
+                TermCapability::String("\x1b[4%p1%dm".to_string()),
+            );
         }
     }
 
@@ -186,71 +256,54 @@ impl Terminfo {
 
 /// Boolean capability names
 pub static BOOL_NAMES: &[&str] = &[
-    "bw", "am", "bce", "ccc", "xhp", "xhpa", "cpix", "crxm", "xt", "xenl",
-    "eo", "gn", "hc", "chts", "km", "daisy", "hs", "hls", "in", "lpix",
-    "da", "db", "mir", "msgr", "nxon", "xsb", "npc", "ndscr", "nrrmc",
-    "os", "mc5i", "xvpa", "sam", "eslok", "hz", "ul", "xon",
+    "bw", "am", "bce", "ccc", "xhp", "xhpa", "cpix", "crxm", "xt", "xenl", "eo", "gn", "hc",
+    "chts", "km", "daisy", "hs", "hls", "in", "lpix", "da", "db", "mir", "msgr", "nxon", "xsb",
+    "npc", "ndscr", "nrrmc", "os", "mc5i", "xvpa", "sam", "eslok", "hz", "ul", "xon",
 ];
 
 /// Numeric capability names
 pub static NUM_NAMES: &[&str] = &[
-    "cols", "it", "lh", "lw", "lines", "lm", "xmc", "ma", "colors",
-    "pairs", "wnum", "ncv", "nlab", "pb", "vt", "wsl", "bitwin",
-    "bitype", "bufsz", "btns", "spinh", "spinv", "maddr", "mjump",
+    "cols", "it", "lh", "lw", "lines", "lm", "xmc", "ma", "colors", "pairs", "wnum", "ncv", "nlab",
+    "pb", "vt", "wsl", "bitwin", "bitype", "bufsz", "btns", "spinh", "spinv", "maddr", "mjump",
     "mcs", "mls", "npins", "orc", "orhi", "orl", "orvi", "cps", "widcs",
 ];
 
 /// String capability names
 pub static STR_NAMES: &[&str] = &[
-    "acsc", "cbt", "bel", "cr", "cpi", "lpi", "chr", "cvr", "csr", "rmp",
-    "tbc", "mgc", "clear", "el1", "el", "ed", "hpa", "cmdch", "cwin",
-    "cup", "cud1", "home", "civis", "cub1", "mrcup", "cnorm", "cuf1",
-    "ll", "cuu1", "cvvis", "defc", "dch1", "dl1", "dial", "dsl", "dclk",
-    "hd", "enacs", "smacs", "smam", "blink", "bold", "smcup", "smdc",
-    "dim", "swidm", "sdrfq", "smir", "sitm", "slm", "smicm", "snlq",
-    "snrmq", "prot", "rev", "invis", "sshm", "smso", "ssubm", "ssupm",
-    "smul", "sum", "smxon", "ech", "rmacs", "rmam", "sgr0", "rmcup",
-    "rmdc", "rwidm", "rmir", "ritm", "rlm", "rmicm", "rshm", "rmso",
-    "rsubm", "rsupm", "rmul", "rum", "rmxon", "pause", "hook", "flash",
-    "ff", "fsl", "wingo", "hup", "is1", "is2", "is3", "if", "iprog",
-    "initc", "initp", "ich1", "il1", "ip", "ka1", "ka3", "kb2", "kbs",
-    "kbeg", "kcbt", "kc1", "kc3", "kcan", "ktbc", "kclr", "kclo", "kcmd",
-    "kcpy", "kcrt", "kctab", "kdch1", "kdl1", "kcud1", "krmir", "kend",
-    "kent", "kel", "ked", "kext", "kf0", "kf1", "kf10", "kf11", "kf12",
-    "kf13", "kf14", "kf15", "kf16", "kf17", "kf18", "kf19", "kf2",
-    "kf20", "kf21", "kf22", "kf23", "kf24", "kf25", "kf26", "kf27",
-    "kf28", "kf29", "kf3", "kf30", "kf31", "kf32", "kf33", "kf34",
-    "kf35", "kf36", "kf37", "kf38", "kf39", "kf4", "kf40", "kf41",
-    "kf42", "kf43", "kf44", "kf45", "kf46", "kf47", "kf48", "kf49",
-    "kf5", "kf50", "kf51", "kf52", "kf53", "kf54", "kf55", "kf56",
-    "kf57", "kf58", "kf59", "kf6", "kf60", "kf61", "kf62", "kf63",
-    "kf7", "kf8", "kf9", "kfnd", "khlp", "khome", "kich1", "kil1",
-    "kcub1", "kll", "kmrk", "kmsg", "kmov", "knxt", "knp", "kopn",
-    "kopt", "kpp", "kprv", "kprt", "krdo", "kref", "krfr", "krpl",
-    "krst", "kres", "kcuf1", "ksav", "kBEG", "kCAN", "kCMD", "kCPY",
-    "kCRT", "kDC", "kDL", "kslt", "kEND", "kEOL", "kEXT", "kind",
-    "kFND", "kHLP", "kHOM", "kIC", "kLFT", "kMSG", "kMOV", "kNXT",
-    "kOPT", "kPRV", "kPRT", "kri", "kRDO", "kRPL", "kRIT", "kRES",
-    "kSAV", "kSPD", "khts", "kUND", "kspd", "kund", "kcuu1", "rmkx",
-    "smkx", "lf0", "lf1", "lf10", "lf2", "lf3", "lf4", "lf5", "lf6",
-    "lf7", "lf8", "lf9", "fln", "rmln", "smln", "rmm", "smm", "mhpa",
-    "mcud1", "mcub1", "mcuf1", "mvpa", "mcuu1", "nel", "porder", "oc",
-    "op", "pad", "dch", "dl", "cud", "mcud", "ich", "indn", "il", "cub",
-    "mcub", "cuf", "mcuf", "rin", "cuu", "mcuu", "pfkey", "pfloc",
-    "pfx", "pln", "mc0", "mc5p", "mc4", "mc5", "pulse", "qdial",
-    "rmclk", "rep", "rfi", "rs1", "rs2", "rs3", "rf", "rc", "vpa",
-    "sc", "ind", "ri", "scs", "sgr", "setb", "smgb", "smgbp", "sclk",
-    "scp", "setf", "smgl", "smglp", "smgr", "smgrp", "hts", "smgt",
-    "smgtp", "wind", "sbim", "scsd", "rbim", "rcsd", "subcs",
-    "supcs", "ht", "docr", "tsl", "tone", "uc", "hu", "u0", "u1",
-    "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9", "wait", "xoffc",
-    "xonc", "zerom", "scesa", "bicr", "binel", "birep", "csnm",
-    "csin", "colornm", "defbi", "devt", "dispc", "endbi", "smpch",
-    "smsc", "rmpch", "rmsc", "getm", "kmous", "minfo", "pctrm",
-    "pfxl", "reqmp", "scesc", "s0ds", "s1ds", "s2ds", "s3ds",
-    "setab", "setaf", "setcolor", "smglr", "slines", "smgtb",
-    "ehhlm", "elhlm", "elohlm", "erhlm", "ethlm", "evhlm", "sgr1",
-    "slength",
+    "acsc", "cbt", "bel", "cr", "cpi", "lpi", "chr", "cvr", "csr", "rmp", "tbc", "mgc", "clear",
+    "el1", "el", "ed", "hpa", "cmdch", "cwin", "cup", "cud1", "home", "civis", "cub1", "mrcup",
+    "cnorm", "cuf1", "ll", "cuu1", "cvvis", "defc", "dch1", "dl1", "dial", "dsl", "dclk", "hd",
+    "enacs", "smacs", "smam", "blink", "bold", "smcup", "smdc", "dim", "swidm", "sdrfq", "smir",
+    "sitm", "slm", "smicm", "snlq", "snrmq", "prot", "rev", "invis", "sshm", "smso", "ssubm",
+    "ssupm", "smul", "sum", "smxon", "ech", "rmacs", "rmam", "sgr0", "rmcup", "rmdc", "rwidm",
+    "rmir", "ritm", "rlm", "rmicm", "rshm", "rmso", "rsubm", "rsupm", "rmul", "rum", "rmxon",
+    "pause", "hook", "flash", "ff", "fsl", "wingo", "hup", "is1", "is2", "is3", "if", "iprog",
+    "initc", "initp", "ich1", "il1", "ip", "ka1", "ka3", "kb2", "kbs", "kbeg", "kcbt", "kc1",
+    "kc3", "kcan", "ktbc", "kclr", "kclo", "kcmd", "kcpy", "kcrt", "kctab", "kdch1", "kdl1",
+    "kcud1", "krmir", "kend", "kent", "kel", "ked", "kext", "kf0", "kf1", "kf10", "kf11", "kf12",
+    "kf13", "kf14", "kf15", "kf16", "kf17", "kf18", "kf19", "kf2", "kf20", "kf21", "kf22", "kf23",
+    "kf24", "kf25", "kf26", "kf27", "kf28", "kf29", "kf3", "kf30", "kf31", "kf32", "kf33", "kf34",
+    "kf35", "kf36", "kf37", "kf38", "kf39", "kf4", "kf40", "kf41", "kf42", "kf43", "kf44", "kf45",
+    "kf46", "kf47", "kf48", "kf49", "kf5", "kf50", "kf51", "kf52", "kf53", "kf54", "kf55", "kf56",
+    "kf57", "kf58", "kf59", "kf6", "kf60", "kf61", "kf62", "kf63", "kf7", "kf8", "kf9", "kfnd",
+    "khlp", "khome", "kich1", "kil1", "kcub1", "kll", "kmrk", "kmsg", "kmov", "knxt", "knp",
+    "kopn", "kopt", "kpp", "kprv", "kprt", "krdo", "kref", "krfr", "krpl", "krst", "kres", "kcuf1",
+    "ksav", "kBEG", "kCAN", "kCMD", "kCPY", "kCRT", "kDC", "kDL", "kslt", "kEND", "kEOL", "kEXT",
+    "kind", "kFND", "kHLP", "kHOM", "kIC", "kLFT", "kMSG", "kMOV", "kNXT", "kOPT", "kPRV", "kPRT",
+    "kri", "kRDO", "kRPL", "kRIT", "kRES", "kSAV", "kSPD", "khts", "kUND", "kspd", "kund", "kcuu1",
+    "rmkx", "smkx", "lf0", "lf1", "lf10", "lf2", "lf3", "lf4", "lf5", "lf6", "lf7", "lf8", "lf9",
+    "fln", "rmln", "smln", "rmm", "smm", "mhpa", "mcud1", "mcub1", "mcuf1", "mvpa", "mcuu1", "nel",
+    "porder", "oc", "op", "pad", "dch", "dl", "cud", "mcud", "ich", "indn", "il", "cub", "mcub",
+    "cuf", "mcuf", "rin", "cuu", "mcuu", "pfkey", "pfloc", "pfx", "pln", "mc0", "mc5p", "mc4",
+    "mc5", "pulse", "qdial", "rmclk", "rep", "rfi", "rs1", "rs2", "rs3", "rf", "rc", "vpa", "sc",
+    "ind", "ri", "scs", "sgr", "setb", "smgb", "smgbp", "sclk", "scp", "setf", "smgl", "smglp",
+    "smgr", "smgrp", "hts", "smgt", "smgtp", "wind", "sbim", "scsd", "rbim", "rcsd", "subcs",
+    "supcs", "ht", "docr", "tsl", "tone", "uc", "hu", "u0", "u1", "u2", "u3", "u4", "u5", "u6",
+    "u7", "u8", "u9", "wait", "xoffc", "xonc", "zerom", "scesa", "bicr", "binel", "birep", "csnm",
+    "csin", "colornm", "defbi", "devt", "dispc", "endbi", "smpch", "smsc", "rmpch", "rmsc", "getm",
+    "kmous", "minfo", "pctrm", "pfxl", "reqmp", "scesc", "s0ds", "s1ds", "s2ds", "s3ds", "setab",
+    "setaf", "setcolor", "smglr", "slines", "smgtb", "ehhlm", "elhlm", "elohlm", "erhlm", "ethlm",
+    "evhlm", "sgr1", "slength",
 ];
 
 /// Execute echoti builtin
@@ -280,7 +333,10 @@ pub fn builtin_echoti(args: &[&str]) -> (i32, String) {
         }
     }
 
-    (1, format!("echoti: no such terminfo capability: {}\n", cap_name))
+    (
+        1,
+        format!("echoti: no such terminfo capability: {}\n", cap_name),
+    )
 }
 
 #[cfg(test)]

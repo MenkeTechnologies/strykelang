@@ -23,7 +23,8 @@ fn main() {
     println!("cargo:rerun-if-changed=strykelang/lsp.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
-    let builtins_src = fs::read_to_string("strykelang/builtins.rs").expect("read strykelang/builtins.rs");
+    let builtins_src =
+        fs::read_to_string("strykelang/builtins.rs").expect("read strykelang/builtins.rs");
     let parser_src = fs::read_to_string("strykelang/parser.rs").expect("read strykelang/parser.rs");
     let lsp_src = fs::read_to_string("strykelang/lsp.rs").expect("read strykelang/lsp.rs");
 

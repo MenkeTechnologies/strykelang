@@ -11,9 +11,9 @@ use std::path::Path;
 /// Complete system users
 pub fn users(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("users", true);
-    
+
     let mut added = false;
-    
+
     // Try /etc/passwd first
     if let Ok(file) = File::open("/etc/passwd") {
         let reader = BufReader::new(file);
@@ -26,7 +26,7 @@ pub fn users(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     // On macOS, also check dscl
     #[cfg(target_os = "macos")]
     if !added {
@@ -46,16 +46,16 @@ pub fn users(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete system groups
 pub fn groups(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("groups", true);
-    
+
     let mut added = false;
-    
+
     // Try /etc/group first
     if let Ok(file) = File::open("/etc/group") {
         let reader = BufReader::new(file);
@@ -68,7 +68,7 @@ pub fn groups(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     // On macOS, also check dscl
     #[cfg(target_os = "macos")]
     if !added {
@@ -88,17 +88,17 @@ pub fn groups(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete hostnames from various sources
 pub fn hosts(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("hosts", true);
-    
+
     let mut seen = HashSet::new();
     let mut added = false;
-    
+
     // Common hosts
     for host in ["localhost", "127.0.0.1", "::1"] {
         if seen.insert(host.to_string()) {
@@ -106,7 +106,7 @@ pub fn hosts(receiver: &mut CompletionReceiver) -> bool {
             added = true;
         }
     }
-    
+
     // /etc/hosts
     if let Ok(file) = File::open("/etc/hosts") {
         let reader = BufReader::new(file);
@@ -127,7 +127,7 @@ pub fn hosts(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     // SSH known_hosts
     let home = std::env::var("HOME").unwrap_or_default();
     let known_hosts = Path::new(&home).join(".ssh/known_hosts");
@@ -159,7 +159,7 @@ pub fn hosts(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     // SSH config hosts
     let ssh_config = Path::new(&home).join(".ssh/config");
     if let Ok(file) = File::open(ssh_config) {
@@ -180,16 +180,16 @@ pub fn hosts(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete process IDs
 pub fn pids(receiver: &mut CompletionReceiver, pattern: Option<&str>) -> bool {
     receiver.begin_group("processes", true);
-    
+
     let mut added = false;
-    
+
     // Try /proc first (Linux)
     #[cfg(target_os = "linux")]
     if let Ok(entries) = std::fs::read_dir("/proc") {
@@ -201,13 +201,13 @@ pub fn pids(receiver: &mut CompletionReceiver, pattern: Option<&str>) -> bool {
                     let desc = std::fs::read_to_string(comm_path)
                         .ok()
                         .map(|s| s.trim().to_string());
-                    
+
                     if let Some(ref pat) = pattern {
                         if !desc.as_ref().map(|d| d.contains(pat)).unwrap_or(false) {
                             continue;
                         }
                     }
-                    
+
                     let mut comp = Completion::new(name);
                     if let Some(d) = desc {
                         comp = comp.with_description(&d);
@@ -218,14 +218,14 @@ pub fn pids(receiver: &mut CompletionReceiver, pattern: Option<&str>) -> bool {
             }
         }
     }
-    
+
     // Fall back to ps (macOS and others)
     #[cfg(not(target_os = "linux"))]
     {
         let output = std::process::Command::new("ps")
             .args(["-axo", "pid,comm"])
             .output();
-        
+
         if let Ok(output) = output {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -234,13 +234,13 @@ pub fn pids(receiver: &mut CompletionReceiver, pattern: Option<&str>) -> bool {
                     if parts.len() >= 2 {
                         let pid = parts[0];
                         let comm = parts[1..].join(" ");
-                        
+
                         if let Some(ref pat) = pattern {
                             if !comm.contains(pat) {
                                 continue;
                             }
                         }
-                        
+
                         receiver.add(Completion::new(pid).with_description(&comm));
                         added = true;
                     }
@@ -248,16 +248,16 @@ pub fn pids(receiver: &mut CompletionReceiver, pattern: Option<&str>) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete network ports from /etc/services
 pub fn ports(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("ports", true);
-    
+
     let mut added = false;
-    
+
     if let Ok(file) = File::open("/etc/services") {
         let reader = BufReader::new(file);
         for line in reader.lines().flatten() {
@@ -278,16 +278,16 @@ pub fn ports(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete network interfaces
 pub fn net_interfaces(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("interfaces", true);
-    
+
     let mut added = false;
-    
+
     // Try /sys/class/net (Linux)
     #[cfg(target_os = "linux")]
     if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
@@ -298,14 +298,14 @@ pub fn net_interfaces(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     // Fall back to ifconfig/ip
     if !added {
         // Try ip link (Linux)
         let output = std::process::Command::new("ip")
             .args(["link", "show"])
             .output();
-        
+
         if let Ok(output) = output {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -326,13 +326,11 @@ pub fn net_interfaces(receiver: &mut CompletionReceiver) -> bool {
                 }
             }
         }
-        
+
         // Try ifconfig (macOS/BSD)
         if !added {
-            let output = std::process::Command::new("ifconfig")
-                .args(["-l"])
-                .output();
-            
+            let output = std::process::Command::new("ifconfig").args(["-l"]).output();
+
             if let Ok(output) = output {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -344,16 +342,16 @@ pub fn net_interfaces(receiver: &mut CompletionReceiver) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete URLs from browser history/bookmarks (basic implementation)
 pub fn urls(receiver: &mut CompletionReceiver, prefix: &str) -> bool {
     receiver.begin_group("urls", true);
-    
+
     let mut added = false;
-    
+
     // Common URL schemes
     if prefix.is_empty() || "https://".starts_with(prefix) {
         receiver.add(Completion::new("https://"));
@@ -375,7 +373,7 @@ pub fn urls(receiver: &mut CompletionReceiver, prefix: &str) -> bool {
         receiver.add(Completion::new("ssh://"));
         added = true;
     }
-    
+
     // If we have a host prefix, complete with known hosts
     if prefix.starts_with("https://") || prefix.starts_with("http://") {
         let host_prefix = if prefix.starts_with("https://") {
@@ -383,7 +381,7 @@ pub fn urls(receiver: &mut CompletionReceiver, prefix: &str) -> bool {
         } else {
             &prefix[7..]
         };
-        
+
         // Get hosts and filter
         let home = std::env::var("HOME").unwrap_or_default();
         let known_hosts = Path::new(&home).join(".ssh/known_hosts");
@@ -396,8 +394,13 @@ pub fn urls(receiver: &mut CompletionReceiver, prefix: &str) -> bool {
                             continue;
                         }
                         if h.starts_with(host_prefix) {
-                            let url = format!("{}://{}", 
-                                if prefix.starts_with("https") { "https" } else { "http" },
+                            let url = format!(
+                                "{}://{}",
+                                if prefix.starts_with("https") {
+                                    "https"
+                                } else {
+                                    "http"
+                                },
                                 h
                             );
                             receiver.add(Completion::new(&url));
@@ -408,14 +411,14 @@ pub fn urls(receiver: &mut CompletionReceiver, prefix: &str) -> bool {
             }
         }
     }
-    
+
     added
 }
 
 /// Complete signals (for kill command)
 pub fn signals(receiver: &mut CompletionReceiver) -> bool {
     receiver.begin_group("signals", true);
-    
+
     let signals = [
         ("HUP", "1", "Hangup"),
         ("INT", "2", "Interrupt"),
@@ -449,12 +452,12 @@ pub fn signals(receiver: &mut CompletionReceiver) -> bool {
         ("USR1", "30", "User-defined signal 1"),
         ("USR2", "31", "User-defined signal 2"),
     ];
-    
+
     for (name, num, desc) in signals {
         receiver.add(Completion::new(name).with_description(desc));
         receiver.add(Completion::new(num).with_description(&format!("SIG{}", name)));
     }
-    
+
     true
 }
 

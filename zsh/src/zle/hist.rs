@@ -205,14 +205,14 @@ impl Zle {
     /// Search history for prefix
     pub fn history_search_prefix(&mut self, hist: &mut History) {
         let prefix: String = self.zleline[..self.zlecs].iter().collect();
-        
+
         if let Some(entry) = hist.search_backward(&prefix) {
             self.zleline = entry.line.chars().collect();
             self.zlell = self.zleline.len();
             self.resetneeded = true;
         }
     }
-    
+
     /// Beginning of history - go to first entry
     /// Port of beginningofhistory() from zle_hist.c
     pub fn beginning_of_history(&mut self, hist: &mut History) {
@@ -220,7 +220,7 @@ impl Zle {
             hist.saved_line = Some(self.zleline.clone());
             hist.saved_cs = self.zlecs;
         }
-        
+
         if !hist.entries.is_empty() {
             hist.cursor = 0;
             if let Some(entry) = hist.entries.first() {
@@ -231,12 +231,12 @@ impl Zle {
             }
         }
     }
-    
+
     /// End of history - go to last entry (current line)
     /// Port of endofhistory() from zle_hist.c
     pub fn end_of_history(&mut self, hist: &mut History) {
         hist.cursor = hist.entries.len();
-        
+
         if let Some(saved) = hist.saved_line.take() {
             self.zleline = saved;
             self.zlell = self.zleline.len();
@@ -244,33 +244,35 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Up line or history - move up in multi-line buffer or go to previous history
     /// Port of uplineorhistory() from zle_hist.c
     pub fn up_line_or_history(&mut self, hist: &mut History) {
         // For now, just do history (multi-line TODO)
         self.history_up(hist);
     }
-    
+
     /// Down line or history - move down in multi-line buffer or go to next history
     /// Port of downlineorhistory() from zle_hist.c
     pub fn down_line_or_history(&mut self, hist: &mut History) {
         self.history_down(hist);
     }
-    
+
     /// History search backward - search for entries starting with current prefix
     /// Port of historysearchbackward() from zle_hist.c
     pub fn history_search_backward(&mut self, hist: &mut History) {
-        let prefix: String = self.zleline[..self.zlecs.min(self.zleline.len())].iter().collect();
-        
+        let prefix: String = self.zleline[..self.zlecs.min(self.zleline.len())]
+            .iter()
+            .collect();
+
         if hist.saved_line.is_none() {
             hist.saved_line = Some(self.zleline.clone());
             hist.saved_cs = self.zlecs;
         }
-        
+
         hist.search_pattern = prefix.clone();
         hist.search_backward = true;
-        
+
         let start = hist.cursor.saturating_sub(1);
         for i in (0..=start).rev() {
             if hist.entries[i].line.starts_with(&prefix) {
@@ -283,13 +285,13 @@ impl Zle {
             }
         }
     }
-    
+
     /// History search forward - search for entries starting with current prefix
     /// Port of historysearchforward() from zle_hist.c
     pub fn history_search_forward(&mut self, hist: &mut History) {
         let prefix = &hist.search_pattern;
         hist.search_backward = false;
-        
+
         for i in (hist.cursor + 1)..hist.entries.len() {
             if hist.entries[i].line.starts_with(prefix) {
                 hist.cursor = i;
@@ -300,7 +302,7 @@ impl Zle {
                 return;
             }
         }
-        
+
         // Wrap to saved line
         if let Some(ref saved) = hist.saved_line {
             let saved_str: String = saved.iter().collect();
@@ -313,7 +315,7 @@ impl Zle {
             }
         }
     }
-    
+
     /// Insert last word from previous history entry
     /// Port of insertlastword() from zle_hist.c
     pub fn insert_last_word(&mut self, hist: &History) {
@@ -330,7 +332,7 @@ impl Zle {
             }
         }
     }
-    
+
     /// Push current line to buffer stack
     /// Port of pushline() from zle_hist.c
     pub fn push_line(&mut self) {
@@ -345,12 +347,12 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Accept line and go to next history (for walking through history executing each)
     /// Port of acceptlineanddownhistory() from zle_hist.c
     pub fn accept_line_and_down_history(&mut self, hist: &mut History) -> Option<String> {
         let line: String = self.zleline.iter().collect();
-        
+
         // Move to next history entry for next iteration
         if hist.cursor < hist.entries.len() {
             hist.cursor += 1;
@@ -360,10 +362,10 @@ impl Zle {
                 self.zlecs = self.zlell;
             }
         }
-        
+
         Some(line)
     }
-    
+
     /// Vi fetch history - go to specific history entry by number
     /// Port of vifetchhistory() from zle_hist.c
     pub fn vi_fetch_history(&mut self, hist: &mut History, num: usize) {
@@ -372,7 +374,7 @@ impl Zle {
                 hist.saved_line = Some(self.zleline.clone());
                 hist.saved_cs = self.zlecs;
             }
-            
+
             hist.cursor = num - 1;
             if let Some(entry) = hist.entries.get(hist.cursor) {
                 self.zleline = entry.line.chars().collect();
@@ -382,13 +384,13 @@ impl Zle {
             }
         }
     }
-    
+
     /// Vi history search backward
     /// Port of vihistorysearchbackward() from zle_hist.c
     pub fn vi_history_search_backward(&mut self, hist: &mut History, pattern: &str) {
         hist.search_pattern = pattern.to_string();
         hist.search_backward = true;
-        
+
         if let Some(entry) = hist.search_backward(pattern) {
             self.zleline = entry.line.chars().collect();
             self.zlell = self.zleline.len();
@@ -396,13 +398,13 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Vi history search forward
     /// Port of vihistorysearchforward() from zle_hist.c
     pub fn vi_history_search_forward(&mut self, hist: &mut History, pattern: &str) {
         hist.search_pattern = pattern.to_string();
         hist.search_backward = false;
-        
+
         if let Some(entry) = hist.search_forward(pattern) {
             self.zleline = entry.line.chars().collect();
             self.zlell = self.zleline.len();
@@ -410,7 +412,7 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Vi repeat search
     /// Port of virepeatsearch() from zle_hist.c
     pub fn vi_repeat_search(&mut self, hist: &mut History) {
@@ -421,7 +423,7 @@ impl Zle {
             self.vi_history_search_forward(hist, &pattern);
         }
     }
-    
+
     /// Vi reverse repeat search
     /// Port of virevrepeatsearch() from zle_hist.c
     pub fn vi_rev_repeat_search(&mut self, hist: &mut History) {
@@ -432,14 +434,14 @@ impl Zle {
             self.vi_history_search_backward(hist, &pattern);
         }
     }
-    
+
     /// Set local history mode
     /// Port of setlocalhistory() from zle_hist.c
     pub fn set_local_history(&mut self, _local: bool) {
         // Local history restricts to current session
         // TODO: implement session-based history filtering
     }
-    
+
     /// Remember current line edits for history navigation
     /// Port of remember_edits() from zle_hist.c
     pub fn remember_edits(&mut self, hist: &mut History) {
@@ -449,7 +451,7 @@ impl Zle {
             hist.entries[hist.cursor].line = line;
         }
     }
-    
+
     /// Forget remembered edits
     /// Port of forget_edits() from zle_hist.c
     pub fn forget_edits(&mut self, _hist: &mut History) {

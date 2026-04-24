@@ -11,10 +11,10 @@ use crate::zftp::Zftp;
 use crate::zprof::Profiler;
 use crate::zutil::StyleTable;
 use compsys::cache::CompsysCache;
+use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::io::Write;
 use std::sync::LazyLock;
-use parking_lot::Mutex;
 
 /// Cached compiled regexes for hot paths
 static REGEX_CACHE: LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
@@ -38,47 +38,202 @@ fn cached_regex(pattern: &str) -> Option<regex::Regex> {
 /// HashSet of all zsh options for O(1) lookup
 static ZSH_OPTIONS_SET: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "aliases", "allexport", "alwayslastprompt", "alwaystoend", "appendcreate",
-        "appendhistory", "autocd", "autocontinue", "autolist", "automenu",
-        "autonamedirs", "autoparamkeys", "autoparamslash", "autopushd",
-        "autoremoveslash", "autoresume", "badpattern", "banghist", "bareglobqual",
-        "bashautolist", "bashrematch", "beep", "bgnice", "braceccl", "bsdecho",
-        "caseglob", "casematch", "cbases", "cdablevars", "cdsilent", "chasedots",
-        "chaselinks", "checkjobs", "checkrunningjobs", "clobber", "combiningchars",
-        "completealiases", "completeinword", "continueonerror", "correct",
-        "correctall", "cprecedences", "cshjunkiehistory", "cshjunkieloops",
-        "cshjunkiequotes", "cshnullcmd", "cshnullglob", "debugbeforecmd", "dotglob",
-        "dvorak", "emacs", "equals", "errexit", "errreturn", "evallineno", "exec",
-        "extendedglob", "extendedhistory", "flowcontrol", "forcefloat",
-        "functionargzero", "glob", "globassign", "globcomplete", "globdots",
-        "globstarshort", "globsubst", "globalexport", "globalrcs", "hashall",
-        "hashcmds", "hashdirs", "hashexecutablesonly", "hashlistall",
-        "histallowclobber", "histappend", "histbeep", "histexpand",
-        "histexpiredupsfirst", "histfcntllock", "histfindnodups", "histignorealldups",
-        "histignoredups", "histignorespace", "histlexwords", "histnofunctions",
-        "histnostore", "histreduceblanks", "histsavebycopy", "histsavenodups",
-        "histsubstpattern", "histverify", "hup", "ignorebraces", "ignoreclosebraces",
-        "ignoreeof", "incappendhistory", "incappendhistorytime", "interactive",
-        "interactivecomments", "ksharrays", "kshautoload", "kshglob",
-        "kshoptionprint", "kshtypeset", "kshzerosubscript", "listambiguous",
-        "listbeep", "listpacked", "listrowsfirst", "listtypes", "localloops",
-        "localoptions", "localpatterns", "localtraps", "log", "login", "longlistjobs",
-        "magicequalsubst", "mailwarn", "mailwarning", "markdirs", "menucomplete",
-        "monitor", "multibyte", "multifuncdef", "multios", "nomatch", "notify",
-        "nullglob", "numericglobsort", "octalzeroes", "onecmd", "overstrike",
-        "pathdirs", "pathscript", "physical", "pipefail", "posixaliases",
-        "posixargzero", "posixbuiltins", "posixcd", "posixidentifiers", "posixjobs",
-        "posixstrings", "posixtraps", "printeightbit", "printexitvalue", "privileged",
-        "promptbang", "promptcr", "promptpercent", "promptsp", "promptsubst",
-        "promptvars", "pushdignoredups", "pushdminus", "pushdsilent", "pushdtohome",
-        "rcexpandparam", "rcquotes", "rcs", "recexact", "rematchpcre", "restricted",
-        "rmstarsilent", "rmstarwait", "sharehistory", "shfileexpansion", "shglob",
-        "shinstdin", "shnullcmd", "shoptionletters", "shortloops", "shortrepeat",
-        "shwordsplit", "singlecommand", "singlelinezle", "sourcetrace", "stdin",
-        "sunkeyboardhack", "trackall", "transientrprompt", "trapsasync",
-        "typesetsilent", "typesettounset", "unset", "verbose", "vi",
-        "warncreateglobal", "warnnestedvar", "xtrace", "zle",
-    ].into_iter().collect()
+        "aliases",
+        "allexport",
+        "alwayslastprompt",
+        "alwaystoend",
+        "appendcreate",
+        "appendhistory",
+        "autocd",
+        "autocontinue",
+        "autolist",
+        "automenu",
+        "autonamedirs",
+        "autoparamkeys",
+        "autoparamslash",
+        "autopushd",
+        "autoremoveslash",
+        "autoresume",
+        "badpattern",
+        "banghist",
+        "bareglobqual",
+        "bashautolist",
+        "bashrematch",
+        "beep",
+        "bgnice",
+        "braceccl",
+        "bsdecho",
+        "caseglob",
+        "casematch",
+        "cbases",
+        "cdablevars",
+        "cdsilent",
+        "chasedots",
+        "chaselinks",
+        "checkjobs",
+        "checkrunningjobs",
+        "clobber",
+        "combiningchars",
+        "completealiases",
+        "completeinword",
+        "continueonerror",
+        "correct",
+        "correctall",
+        "cprecedences",
+        "cshjunkiehistory",
+        "cshjunkieloops",
+        "cshjunkiequotes",
+        "cshnullcmd",
+        "cshnullglob",
+        "debugbeforecmd",
+        "dotglob",
+        "dvorak",
+        "emacs",
+        "equals",
+        "errexit",
+        "errreturn",
+        "evallineno",
+        "exec",
+        "extendedglob",
+        "extendedhistory",
+        "flowcontrol",
+        "forcefloat",
+        "functionargzero",
+        "glob",
+        "globassign",
+        "globcomplete",
+        "globdots",
+        "globstarshort",
+        "globsubst",
+        "globalexport",
+        "globalrcs",
+        "hashall",
+        "hashcmds",
+        "hashdirs",
+        "hashexecutablesonly",
+        "hashlistall",
+        "histallowclobber",
+        "histappend",
+        "histbeep",
+        "histexpand",
+        "histexpiredupsfirst",
+        "histfcntllock",
+        "histfindnodups",
+        "histignorealldups",
+        "histignoredups",
+        "histignorespace",
+        "histlexwords",
+        "histnofunctions",
+        "histnostore",
+        "histreduceblanks",
+        "histsavebycopy",
+        "histsavenodups",
+        "histsubstpattern",
+        "histverify",
+        "hup",
+        "ignorebraces",
+        "ignoreclosebraces",
+        "ignoreeof",
+        "incappendhistory",
+        "incappendhistorytime",
+        "interactive",
+        "interactivecomments",
+        "ksharrays",
+        "kshautoload",
+        "kshglob",
+        "kshoptionprint",
+        "kshtypeset",
+        "kshzerosubscript",
+        "listambiguous",
+        "listbeep",
+        "listpacked",
+        "listrowsfirst",
+        "listtypes",
+        "localloops",
+        "localoptions",
+        "localpatterns",
+        "localtraps",
+        "log",
+        "login",
+        "longlistjobs",
+        "magicequalsubst",
+        "mailwarn",
+        "mailwarning",
+        "markdirs",
+        "menucomplete",
+        "monitor",
+        "multibyte",
+        "multifuncdef",
+        "multios",
+        "nomatch",
+        "notify",
+        "nullglob",
+        "numericglobsort",
+        "octalzeroes",
+        "onecmd",
+        "overstrike",
+        "pathdirs",
+        "pathscript",
+        "physical",
+        "pipefail",
+        "posixaliases",
+        "posixargzero",
+        "posixbuiltins",
+        "posixcd",
+        "posixidentifiers",
+        "posixjobs",
+        "posixstrings",
+        "posixtraps",
+        "printeightbit",
+        "printexitvalue",
+        "privileged",
+        "promptbang",
+        "promptcr",
+        "promptpercent",
+        "promptsp",
+        "promptsubst",
+        "promptvars",
+        "pushdignoredups",
+        "pushdminus",
+        "pushdsilent",
+        "pushdtohome",
+        "rcexpandparam",
+        "rcquotes",
+        "rcs",
+        "recexact",
+        "rematchpcre",
+        "restricted",
+        "rmstarsilent",
+        "rmstarwait",
+        "sharehistory",
+        "shfileexpansion",
+        "shglob",
+        "shinstdin",
+        "shnullcmd",
+        "shoptionletters",
+        "shortloops",
+        "shortrepeat",
+        "shwordsplit",
+        "singlecommand",
+        "singlelinezle",
+        "sourcetrace",
+        "stdin",
+        "sunkeyboardhack",
+        "trackall",
+        "transientrprompt",
+        "trapsasync",
+        "typesetsilent",
+        "typesettounset",
+        "unset",
+        "verbose",
+        "vi",
+        "warncreateglobal",
+        "warnnestedvar",
+        "xtrace",
+        "zle",
+    ]
+    .into_iter()
+    .collect()
 });
 
 /// Convert float to hex representation (%a/%A format)
@@ -180,10 +335,32 @@ fn shell_quote_value(s: &str) -> String {
         return "''".to_string();
     }
     let needs_quotes = s.chars().any(|c| {
-        matches!(c,
-            ' ' | '\t' | '\n' | '\'' | '"' | '\\' | '$' | '`' | '!' |
-            '*' | '?' | '[' | ']' | '{' | '}' | '(' | ')' | '<' | '>' |
-            '|' | '&' | ';' | '#' | '~' | '^'
+        matches!(
+            c,
+            ' ' | '\t'
+                | '\n'
+                | '\''
+                | '"'
+                | '\\'
+                | '$'
+                | '`'
+                | '!'
+                | '*'
+                | '?'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | '('
+                | ')'
+                | '<'
+                | '>'
+                | '|'
+                | '&'
+                | ';'
+                | '#'
+                | '~'
+                | '^'
         )
     });
     if !needs_quotes {
@@ -194,8 +371,8 @@ fn shell_quote_value(s: &str) -> String {
 
 use crate::jobs::{continue_job, wait_for_child, wait_for_job, JobState, JobTable};
 use crate::parser::{
-    ShellCommand, SimpleCommand, ShellWord, VarModifier, Redirect, RedirectOp,
-    CompoundCommand, ListOp, CondExpr, CaseTerminator, ZshParamFlag, ShellParser,
+    CaseTerminator, CompoundCommand, CondExpr, ListOp, Redirect, RedirectOp, ShellCommand,
+    ShellParser, ShellWord, SimpleCommand, VarModifier, ZshParamFlag,
 };
 use crate::zwc::ZwcFile;
 use std::collections::HashMap;
@@ -350,8 +527,8 @@ pub struct UnixSocketState {
 pub struct ShellExecutor {
     pub functions: HashMap<String, ShellCommand>,
     pub aliases: HashMap<String, String>,
-    pub global_aliases: HashMap<String, String>,  // alias -g: expand anywhere
-    pub suffix_aliases: HashMap<String, String>,  // alias -s: expand by file extension
+    pub global_aliases: HashMap<String, String>, // alias -g: expand anywhere
+    pub suffix_aliases: HashMap<String, String>, // alias -s: expand by file extension
     pub last_status: i32,
     pub variables: HashMap<String, String>,
     pub arrays: HashMap<String, Vec<String>>,
@@ -385,7 +562,7 @@ pub struct ShellExecutor {
     pub named_dirs: HashMap<String, PathBuf>, // name -> path
     // zpty - pseudo-terminal management
     pub zptys: HashMap<String, ZptyState>,
-    // sysopen - file descriptor management  
+    // sysopen - file descriptor management
     pub open_fds: HashMap<i32, std::fs::File>,
     pub next_fd: i32,
     // sched - scheduled commands
@@ -402,9 +579,9 @@ pub struct ShellExecutor {
     // command hash table (hash builtin)
     pub command_hash: HashMap<String, String>,
     // Control flow signals
-    returning: Option<i32>,  // Set by return builtin, cleared after function returns
-    breaking: i32,           // break level (0 = not breaking, N = break N levels)
-    continuing: i32,         // continue level
+    returning: Option<i32>, // Set by return builtin, cleared after function returns
+    breaking: i32,          // break level (0 = not breaking, N = break N levels)
+    continuing: i32,        // continue level
     // New module state
     pub pcre_state: PcreState,
     pub tcp_sessions: TcpSessions,
@@ -426,15 +603,25 @@ impl ShellExecutor {
             .collect();
 
         let history = HistoryEngine::new().ok();
-        
+
         // Initialize standard zsh variables
         let mut variables = HashMap::new();
         variables.insert("ZSH_VERSION".to_string(), "5.9".to_string());
-        variables.insert("ZSH_PATCHLEVEL".to_string(), "zsh-5.9-0-g73d3173".to_string());
+        variables.insert(
+            "ZSH_PATCHLEVEL".to_string(),
+            "zsh-5.9-0-g73d3173".to_string(),
+        );
         variables.insert("ZSH_NAME".to_string(), "zsh".to_string());
-        variables.insert("SHLVL".to_string(), env::var("SHLVL").map(|v| {
-            v.parse::<i32>().map(|n| (n + 1).to_string()).unwrap_or_else(|_| "1".to_string())
-        }).unwrap_or_else(|_| "1".to_string()));
+        variables.insert(
+            "SHLVL".to_string(),
+            env::var("SHLVL")
+                .map(|v| {
+                    v.parse::<i32>()
+                        .map(|n| (n + 1).to_string())
+                        .unwrap_or_else(|_| "1".to_string())
+                })
+                .unwrap_or_else(|_| "1".to_string()),
+        );
 
         Self {
             functions: HashMap::new(),
@@ -498,7 +685,7 @@ impl ShellExecutor {
             zsh_compat: false,
         }
     }
-    
+
     /// Run hook functions (precmd, preexec, chpwd, etc.)
     pub fn run_hooks(&mut self, hook_name: &str) {
         if let Some(funcs) = self.hook_functions.get(hook_name).cloned() {
@@ -518,7 +705,7 @@ impl ShellExecutor {
             }
         }
     }
-    
+
     /// Add a function to a hook
     pub fn add_hook(&mut self, hook_name: &str, func_name: &str) {
         self.hook_functions
@@ -526,12 +713,13 @@ impl ShellExecutor {
             .or_default()
             .push(func_name.to_string());
     }
-    
+
     /// Add a named directory (hash -d name=path)
     pub fn add_named_dir(&mut self, name: &str, path: &str) {
-        self.named_dirs.insert(name.to_string(), PathBuf::from(path));
+        self.named_dirs
+            .insert(name.to_string(), PathBuf::from(path));
     }
-    
+
     /// Expand ~ with named directories
     pub fn expand_tilde_named(&self, path: &str) -> String {
         if path.starts_with('~') {
@@ -542,7 +730,7 @@ impl ShellExecutor {
             } else {
                 (rest, "")
             };
-            
+
             if name.is_empty() {
                 // Regular ~ expansion
                 if let Ok(home) = std::env::var("HOME") {
@@ -934,7 +1122,7 @@ impl ShellExecutor {
         // Convert shell glob to regex
         let mut regex_pattern = String::from("^");
         let mut chars = pattern.chars().peekable();
-        
+
         while let Some(c) = chars.next() {
             match c {
                 '*' => regex_pattern.push_str(".*"),
@@ -964,7 +1152,7 @@ impl ShellExecutor {
             }
         }
         regex_pattern.push('$');
-        
+
         regex::Regex::new(&regex_pattern)
             .map(|re| re.is_match(s))
             .unwrap_or(false)
@@ -1157,8 +1345,9 @@ impl ShellExecutor {
                 ShellWord::ArrayLiteral(elements) => {
                     // Array assignment: arr=(a b c) or arr+=(a b c)
                     // For associative arrays: assoc=(k1 v1 k2 v2)
-                    let new_elements: Vec<String> = elements.iter().map(|e| self.expand_word(e)).collect();
-                    
+                    let new_elements: Vec<String> =
+                        elements.iter().map(|e| self.expand_word(e)).collect();
+
                     // Check if this is an associative array
                     if self.assoc_arrays.contains_key(var) {
                         // Associative array: treat pairs as key-value
@@ -1190,14 +1379,14 @@ impl ShellExecutor {
                 }
                 _ => {
                     let expanded = self.expand_word(val);
-                    
+
                     // Check for array element assignment: arr[idx]=value or assoc[key]=value
                     if let Some(bracket_pos) = var.find('[') {
                         if var.ends_with(']') {
                             let array_name = &var[..bracket_pos];
                             let key = &var[bracket_pos + 1..var.len() - 1];
                             let key = self.expand_string(key); // Expand the key/index
-                            
+
                             // Check if it's an associative array
                             if self.assoc_arrays.contains_key(array_name) {
                                 let assoc = self.assoc_arrays.get_mut(array_name).unwrap();
@@ -1210,7 +1399,10 @@ impl ShellExecutor {
                             } else if let Ok(idx) = key.parse::<i64>() {
                                 // Regular indexed array
                                 let idx = if idx < 0 { 0 } else { (idx - 1) as usize }; // zsh is 1-indexed
-                                let arr = self.arrays.entry(array_name.to_string()).or_insert_with(Vec::new);
+                                let arr = self
+                                    .arrays
+                                    .entry(array_name.to_string())
+                                    .or_insert_with(Vec::new);
                                 while arr.len() <= idx {
                                     arr.push(String::new());
                                 }
@@ -1221,7 +1413,9 @@ impl ShellExecutor {
                                 }
                             } else {
                                 // Non-numeric key on non-assoc array - treat as assoc
-                                let assoc = self.assoc_arrays.entry(array_name.to_string())
+                                let assoc = self
+                                    .assoc_arrays
+                                    .entry(array_name.to_string())
                                     .or_insert_with(HashMap::new);
                                 if *is_append {
                                     let existing = assoc.get(&key).cloned().unwrap_or_default();
@@ -1233,7 +1427,7 @@ impl ShellExecutor {
                             continue;
                         }
                     }
-                    
+
                     // Regular variable assignment or append
                     let final_value = if *is_append {
                         let existing = self.variables.get(var).cloned().unwrap_or_default();
@@ -1241,7 +1435,7 @@ impl ShellExecutor {
                     } else {
                         expanded
                     };
-                    
+
                     if cmd.words.is_empty() {
                         // Just assignment, set in environment
                         env::set_var(var, &final_value);
@@ -1265,15 +1459,16 @@ impl ShellExecutor {
             self.last_status = 0;
             return Ok(0);
         }
-        
+
         // Expand global aliases (alias -g) in all word positions
         if !self.global_aliases.is_empty() {
             let global_aliases = self.global_aliases.clone();
-            words = words.into_iter().map(|w| {
-                global_aliases.get(&w).cloned().unwrap_or(w)
-            }).collect();
+            words = words
+                .into_iter()
+                .map(|w| global_aliases.get(&w).cloned().unwrap_or(w))
+                .collect();
         }
-        
+
         // Check for regular alias expansion (alias > builtin > function > command)
         let cmd_name = &words[0];
         if let Some(alias_value) = self.aliases.get(cmd_name).cloned() {
@@ -1286,7 +1481,7 @@ impl ShellExecutor {
             // Re-execute the expanded command
             return self.execute_script(&expanded_cmd);
         }
-        
+
         // Check for suffix alias expansion (alias -s) when command is a file path
         if !self.suffix_aliases.is_empty() {
             let cmd_path = std::path::Path::new(cmd_name);
@@ -1298,24 +1493,28 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         let args = &words[1..];
 
         // Check if this is `exec` with only redirects (no command args)
         // For exec, redirects with {varname} allocate FDs; redirects are permanent
-        let is_exec_with_redirects_only = cmd_name == "exec" && args.is_empty() && !cmd.redirects.is_empty();
-        
+        let is_exec_with_redirects_only =
+            cmd_name == "exec" && args.is_empty() && !cmd.redirects.is_empty();
+
         // Apply redirects for builtins
         let mut saved_fds: Vec<(i32, i32)> = Vec::new();
         for redirect in &cmd.redirects {
             let target = self.expand_word(&redirect.target);
-            
+
             // Handle {varname}>file syntax - allocate new FD and store in variable
             if let Some(ref var_name) = redirect.fd_var {
                 use std::os::unix::io::IntoRawFd;
                 let file_result = match redirect.op {
                     RedirectOp::Write | RedirectOp::Clobber => std::fs::File::create(&target),
-                    RedirectOp::Append => std::fs::OpenOptions::new().create(true).append(true).open(&target),
+                    RedirectOp::Append => std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&target),
                     RedirectOp::Read => std::fs::File::open(&target),
                     _ => continue,
                 };
@@ -1335,12 +1534,15 @@ impl ShellExecutor {
                 }
                 continue;
             }
-            
+
             let fd = redirect.fd.unwrap_or(match redirect.op {
-                RedirectOp::Read | RedirectOp::HereDoc | RedirectOp::HereString | RedirectOp::ReadWrite => 0,
+                RedirectOp::Read
+                | RedirectOp::HereDoc
+                | RedirectOp::HereString
+                | RedirectOp::ReadWrite => 0,
                 _ => 1,
             });
-            
+
             match redirect.op {
                 RedirectOp::Write | RedirectOp::Clobber => {
                     use std::os::unix::io::IntoRawFd;
@@ -1352,8 +1554,12 @@ impl ShellExecutor {
                     }
                     if let Ok(file) = std::fs::File::create(&target) {
                         let new_fd = file.into_raw_fd();
-                        unsafe { libc::dup2(new_fd, fd); }
-                        unsafe { libc::close(new_fd); }
+                        unsafe {
+                            libc::dup2(new_fd, fd);
+                        }
+                        unsafe {
+                            libc::close(new_fd);
+                        }
                     }
                 }
                 RedirectOp::Append => {
@@ -1364,10 +1570,18 @@ impl ShellExecutor {
                             saved_fds.push((fd, saved));
                         }
                     }
-                    if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&target) {
+                    if let Ok(file) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&target)
+                    {
                         let new_fd = file.into_raw_fd();
-                        unsafe { libc::dup2(new_fd, fd); }
-                        unsafe { libc::close(new_fd); }
+                        unsafe {
+                            libc::dup2(new_fd, fd);
+                        }
+                        unsafe {
+                            libc::close(new_fd);
+                        }
                     }
                 }
                 RedirectOp::Read => {
@@ -1380,8 +1594,12 @@ impl ShellExecutor {
                     }
                     if let Ok(file) = std::fs::File::open(&target) {
                         let new_fd = file.into_raw_fd();
-                        unsafe { libc::dup2(new_fd, fd); }
-                        unsafe { libc::close(new_fd); }
+                        unsafe {
+                            libc::dup2(new_fd, fd);
+                        }
+                        unsafe {
+                            libc::close(new_fd);
+                        }
                     }
                 }
                 RedirectOp::DupWrite | RedirectOp::DupRead => {
@@ -1392,13 +1610,15 @@ impl ShellExecutor {
                                 saved_fds.push((fd, saved));
                             }
                         }
-                        unsafe { libc::dup2(target_fd, fd); }
+                        unsafe {
+                            libc::dup2(target_fd, fd);
+                        }
                     }
                 }
                 _ => {}
             }
         }
-        
+
         // For exec with only redirects, we're done - redirects are applied permanently
         if is_exec_with_redirects_only {
             self.last_status = 0;
@@ -1672,7 +1892,7 @@ impl ShellExecutor {
 
         // Execute the function
         let result = self.execute_command(func);
-        
+
         // Handle return - clear the flag and use its value
         let final_result = if let Some(ret) = self.returning.take() {
             self.last_status = ret;
@@ -1922,7 +2142,7 @@ impl ShellExecutor {
             } else {
                 self.execute_command(cmd)?
             };
-            
+
             // Check for control flow
             if self.returning.is_some() || self.breaking > 0 || self.continuing > 0 {
                 return Ok(status);
@@ -2028,7 +2248,7 @@ impl ShellExecutor {
                             break;
                         }
                     }
-                    
+
                     if self.continuing > 0 {
                         self.continuing -= 1;
                         if self.continuing > 0 {
@@ -2077,7 +2297,7 @@ impl ShellExecutor {
                             break;
                         }
                     }
-                    
+
                     if self.continuing > 0 {
                         self.continuing -= 1;
                         if self.continuing > 0 {
@@ -2120,7 +2340,7 @@ impl ShellExecutor {
                             break;
                         }
                     }
-                    
+
                     if self.continuing > 0 {
                         self.continuing -= 1;
                         if self.continuing > 0 {
@@ -2155,7 +2375,7 @@ impl ShellExecutor {
                             break;
                         }
                     }
-                    
+
                     if self.continuing > 0 {
                         self.continuing -= 1;
                         if self.continuing > 0 {
@@ -2214,10 +2434,11 @@ impl ShellExecutor {
             }
 
             CompoundCommand::Repeat { count, body } => {
-                let n: i64 = self.expand_word(&ShellWord::Literal(count.clone()))
+                let n: i64 = self
+                    .expand_word(&ShellWord::Literal(count.clone()))
                     .parse()
                     .unwrap_or(0);
-                
+
                 for _ in 0..n {
                     for cmd in body {
                         self.execute_command(cmd)?;
@@ -2225,7 +2446,7 @@ impl ShellExecutor {
                             break;
                         }
                     }
-                    
+
                     if self.continuing > 0 {
                         self.continuing -= 1;
                         if self.continuing > 0 {
@@ -2241,13 +2462,16 @@ impl ShellExecutor {
                         break;
                     }
                 }
-                
+
                 Ok(self.last_status)
             }
 
-            CompoundCommand::Try { try_body, always_body } => {
+            CompoundCommand::Try {
+                try_body,
+                always_body,
+            } => {
                 let saved_errflag = false;
-                
+
                 for cmd in try_body {
                     if let Err(_e) = self.execute_command(cmd) {
                         break;
@@ -2256,20 +2480,20 @@ impl ShellExecutor {
                         break;
                     }
                 }
-                
+
                 let try_status = self.last_status;
                 let saved_returning = self.returning.take();
-                
+
                 for cmd in always_body {
                     let _ = self.execute_command(cmd);
                 }
-                
+
                 self.returning = saved_returning;
-                
+
                 if !saved_errflag {
                     self.last_status = try_status;
                 }
-                
+
                 Ok(self.last_status)
             }
 
@@ -2361,20 +2585,23 @@ impl ShellExecutor {
                     }
                 }
             }
-            
+
             CompoundCommand::WithRedirects(cmd, redirects) => {
                 // Execute the command with redirects applied
                 let mut saved_fds: Vec<(i32, i32)> = Vec::new();
-                
+
                 // Set up redirects
                 for redirect in redirects {
                     let fd = redirect.fd.unwrap_or(match redirect.op {
-                        RedirectOp::Read | RedirectOp::HereDoc | RedirectOp::HereString | RedirectOp::ReadWrite => 0,
+                        RedirectOp::Read
+                        | RedirectOp::HereDoc
+                        | RedirectOp::HereString
+                        | RedirectOp::ReadWrite => 0,
                         _ => 1,
                     });
-                    
+
                     let target = self.expand_word(&redirect.target);
-                    
+
                     match redirect.op {
                         RedirectOp::Write | RedirectOp::Clobber => {
                             use std::os::unix::io::IntoRawFd;
@@ -2384,8 +2611,12 @@ impl ShellExecutor {
                             }
                             if let Ok(file) = std::fs::File::create(&target) {
                                 let new_fd = file.into_raw_fd();
-                                unsafe { libc::dup2(new_fd, fd); }
-                                unsafe { libc::close(new_fd); }
+                                unsafe {
+                                    libc::dup2(new_fd, fd);
+                                }
+                                unsafe {
+                                    libc::close(new_fd);
+                                }
                             }
                         }
                         RedirectOp::Append => {
@@ -2394,10 +2625,18 @@ impl ShellExecutor {
                             if saved >= 0 {
                                 saved_fds.push((fd, saved));
                             }
-                            if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&target) {
+                            if let Ok(file) = std::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open(&target)
+                            {
                                 let new_fd = file.into_raw_fd();
-                                unsafe { libc::dup2(new_fd, fd); }
-                                unsafe { libc::close(new_fd); }
+                                unsafe {
+                                    libc::dup2(new_fd, fd);
+                                }
+                                unsafe {
+                                    libc::close(new_fd);
+                                }
                             }
                         }
                         RedirectOp::Read => {
@@ -2408,8 +2647,12 @@ impl ShellExecutor {
                             }
                             if let Ok(file) = std::fs::File::open(&target) {
                                 let new_fd = file.into_raw_fd();
-                                unsafe { libc::dup2(new_fd, fd); }
-                                unsafe { libc::close(new_fd); }
+                                unsafe {
+                                    libc::dup2(new_fd, fd);
+                                }
+                                unsafe {
+                                    libc::close(new_fd);
+                                }
                             }
                         }
                         RedirectOp::DupWrite | RedirectOp::DupRead => {
@@ -2418,16 +2661,18 @@ impl ShellExecutor {
                                 if saved >= 0 {
                                     saved_fds.push((fd, saved));
                                 }
-                                unsafe { libc::dup2(target_fd, fd); }
+                                unsafe {
+                                    libc::dup2(target_fd, fd);
+                                }
                             }
                         }
                         _ => {}
                     }
                 }
-                
+
                 // Execute the inner command
                 let result = self.execute_command(cmd);
-                
+
                 // Restore saved fds
                 for (fd, saved) in saved_fds.into_iter().rev() {
                     unsafe {
@@ -2435,7 +2680,7 @@ impl ShellExecutor {
                         libc::close(saved);
                     }
                 }
-                
+
                 result
             }
         }
@@ -3656,12 +3901,12 @@ impl ShellExecutor {
                     _ => {}
                 }
             }
-            
+
             if inner_end > 0 {
                 // Expand the inner ${...}
                 let inner_content = &content[2..inner_end];
                 let inner_result = self.expand_braced_variable(inner_content);
-                
+
                 // Check for subscript or modifier after the inner expansion
                 let rest = &content[inner_end + 1..];
                 if rest.starts_with('[') {
@@ -3677,22 +3922,25 @@ impl ShellExecutor {
                             } else {
                                 0
                             };
-                            return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                            return chars
+                                .get(actual_idx)
+                                .map(|c| c.to_string())
+                                .unwrap_or_default();
                         }
                     }
                 }
-                
+
                 return inner_result;
             }
         }
-        
+
         // Handle zsh-style parameter expansion flags ${(flags)var}
         if content.starts_with('(') {
             if let Some(close_paren) = content.find(')') {
                 let flags_str = &content[1..close_paren];
                 let rest = &content[close_paren + 1..];
                 let flags = self.parse_zsh_flags(flags_str);
-                
+
                 // Check for (M) match flag
                 let has_match_flag = flags.iter().any(|f| matches!(f, ZshParamFlag::Match));
 
@@ -3701,15 +3949,23 @@ impl ShellExecutor {
                     let var_name = &rest[..filter_pos];
                     let pattern = &rest[filter_pos + 2..];
                     let val = self.get_variable(var_name);
-                    
+
                     let matches = self.glob_match(&val, pattern);
-                    
+
                     return if has_match_flag {
                         // (M) - return value if matches, empty otherwise
-                        if matches { val } else { String::new() }
+                        if matches {
+                            val
+                        } else {
+                            String::new()
+                        }
                     } else {
                         // No (M) - return empty if matches, value otherwise
-                        if matches { String::new() } else { val }
+                        if matches {
+                            String::new()
+                        } else {
+                            val
+                        }
                     };
                 }
 
@@ -3734,7 +3990,7 @@ impl ShellExecutor {
                 };
 
                 let mut val = self.get_variable(var_name);
-                
+
                 // Use default if variable is empty
                 if val.is_empty() {
                     if let Some(def) = default_val {
@@ -3771,11 +4027,19 @@ impl ShellExecutor {
             }
             // ${#arr} - if rest is an array name, return array length
             if self.arrays.contains_key(rest) {
-                return self.arrays.get(rest).map(|arr| arr.len().to_string()).unwrap_or_else(|| "0".to_string());
+                return self
+                    .arrays
+                    .get(rest)
+                    .map(|arr| arr.len().to_string())
+                    .unwrap_or_else(|| "0".to_string());
             }
             // ${#assoc} - if rest is an assoc array name, return assoc length
             if self.assoc_arrays.contains_key(rest) {
-                return self.assoc_arrays.get(rest).map(|h| h.len().to_string()).unwrap_or_else(|| "0".to_string());
+                return self
+                    .assoc_arrays
+                    .get(rest)
+                    .map(|h| h.len().to_string())
+                    .unwrap_or_else(|| "0".to_string());
             }
             // ${#var} - string length
             let val = self.get_variable(rest);
@@ -3785,47 +4049,65 @@ impl ShellExecutor {
         // Handle ${+var} and ${+arr[key]} - test if variable/element is set (returns 1 if set, 0 if not)
         if content.starts_with('+') {
             let rest = &content[1..];
-            
+
             // Check for array/assoc access: ${+arr[key]}
             if let Some(bracket_start) = rest.find('[') {
                 let var_name = &rest[..bracket_start];
                 let bracket_content = &rest[bracket_start + 1..];
                 if let Some(bracket_end) = bracket_content.find(']') {
                     let key = &bracket_content[..bracket_end];
-                    
+
                     // Check special arrays first
                     if let Some(val) = self.get_special_array_value(var_name, key) {
-                        return if val.is_empty() { "0".to_string() } else { "1".to_string() };
+                        return if val.is_empty() {
+                            "0".to_string()
+                        } else {
+                            "1".to_string()
+                        };
                     }
-                    
+
                     // Check user assoc arrays
                     if self.assoc_arrays.contains_key(var_name) {
                         let expanded_key = self.expand_string(key);
-                        let has_key = self.assoc_arrays.get(var_name)
+                        let has_key = self
+                            .assoc_arrays
+                            .get(var_name)
                             .map(|a| a.contains_key(&expanded_key))
                             .unwrap_or(false);
-                        return if has_key { "1".to_string() } else { "0".to_string() };
+                        return if has_key {
+                            "1".to_string()
+                        } else {
+                            "0".to_string()
+                        };
                     }
-                    
+
                     // Check regular arrays
                     if let Some(arr) = self.arrays.get(var_name) {
                         if let Ok(idx) = key.parse::<usize>() {
                             let actual_idx = if idx > 0 { idx - 1 } else { 0 };
-                            return if arr.get(actual_idx).is_some() { "1".to_string() } else { "0".to_string() };
+                            return if arr.get(actual_idx).is_some() {
+                                "1".to_string()
+                            } else {
+                                "0".to_string()
+                            };
                         }
                     }
-                    
+
                     return "0".to_string();
                 }
             }
-            
+
             // Simple variable: ${+var}
-            let is_set = self.variables.contains_key(rest) 
+            let is_set = self.variables.contains_key(rest)
                 || self.arrays.contains_key(rest)
                 || self.assoc_arrays.contains_key(rest)
                 || std::env::var(rest).is_ok()
                 || self.functions.contains_key(rest);
-            return if is_set { "1".to_string() } else { "0".to_string() };
+            return if is_set {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            };
         }
 
         // Handle ${arr[idx]} or ${assoc[key]}
@@ -3844,13 +4126,17 @@ impl ShellExecutor {
                 if self.assoc_arrays.contains_key(var_name) {
                     if index == "@" || index == "*" {
                         // ${assoc[@]} - return all values
-                        return self.assoc_arrays.get(var_name)
+                        return self
+                            .assoc_arrays
+                            .get(var_name)
                             .map(|a| a.values().cloned().collect::<Vec<_>>().join(" "))
                             .unwrap_or_default();
                     } else {
                         // ${assoc[key]} - return value for key
                         let key = self.expand_string(index);
-                        return self.assoc_arrays.get(var_name)
+                        return self
+                            .assoc_arrays
+                            .get(var_name)
                             .and_then(|a| a.get(&key).cloned())
                             .unwrap_or_default();
                     }
@@ -3867,9 +4153,11 @@ impl ShellExecutor {
                 }
 
                 // Use the ported subscript module for comprehensive index parsing
-                use crate::subscript::{getindex, get_array_by_subscript, get_array_element_by_subscript};
+                use crate::subscript::{
+                    get_array_by_subscript, get_array_element_by_subscript, getindex,
+                };
                 let ksh_arrays = self.options.get("ksh_arrays").copied().unwrap_or(false);
-                
+
                 if let Ok(v) = getindex(index, false, ksh_arrays) {
                     // Check if it's an array first
                     if let Some(arr) = self.arrays.get(var_name) {
@@ -3889,7 +4177,7 @@ impl ShellExecutor {
                                 .unwrap_or_default();
                         }
                     }
-                    
+
                     // Not an array - treat as string subscripting
                     let val = self.get_variable(var_name);
                     if !val.is_empty() {
@@ -3902,7 +4190,7 @@ impl ShellExecutor {
                         } else {
                             0
                         };
-                        
+
                         if v.end > v.start + 1 {
                             // String range
                             let end_idx = if v.end < 0 {
@@ -3913,12 +4201,15 @@ impl ShellExecutor {
                             let end_idx = end_idx.min(chars.len());
                             return chars[actual_idx..end_idx].iter().collect();
                         } else {
-                            return chars.get(actual_idx).map(|c| c.to_string()).unwrap_or_default();
+                            return chars
+                                .get(actual_idx)
+                                .map(|c| c.to_string())
+                                .unwrap_or_default();
                         }
                     }
                     return String::new();
                 }
-                
+
                 // Non-numeric index on non-assoc - return empty
                 return String::new();
             }
@@ -4179,8 +4470,8 @@ impl ShellExecutor {
     }
 
     fn expand_array_access(&mut self, name: &str, index: &ShellWord) -> String {
-        use crate::subscript::{getindex, get_array_by_subscript, get_array_element_by_subscript};
-        
+        use crate::subscript::{get_array_by_subscript, get_array_element_by_subscript, getindex};
+
         let idx_str = self.expand_word(index);
         let ksh_arrays = self.options.get("ksh_arrays").copied().unwrap_or(false);
 
@@ -4192,8 +4483,7 @@ impl ShellExecutor {
                         arr.join(" ")
                     } else if v.start == v.end - 1 {
                         // Single element
-                        get_array_element_by_subscript(arr, &v, ksh_arrays)
-                            .unwrap_or_default()
+                        get_array_element_by_subscript(arr, &v, ksh_arrays).unwrap_or_default()
                     } else {
                         // Range
                         get_array_by_subscript(arr, &v, ksh_arrays).join(" ")
@@ -4565,14 +4855,20 @@ impl ShellExecutor {
             "options" => {
                 if key == "@" || key == "*" {
                     // Return all options as "name=on/off" pairs
-                    let opts: Vec<String> = self.options.iter()
+                    let opts: Vec<String> = self
+                        .options
+                        .iter()
                         .map(|(k, v)| format!("{}={}", k, if *v { "on" } else { "off" }))
                         .collect();
                     return Some(opts.join(" "));
                 }
                 let opt_name = key.to_lowercase().replace('_', "");
                 let is_on = self.options.get(&opt_name).copied().unwrap_or(false);
-                Some(if is_on { "on".to_string() } else { "off".to_string() })
+                Some(if is_on {
+                    "on".to_string()
+                } else {
+                    "off".to_string()
+                })
             }
 
             // === ALIASES ===
@@ -4664,14 +4960,19 @@ impl ShellExecutor {
             // === NAMED DIRECTORIES ===
             "nameddirs" => {
                 if key == "@" || key == "*" {
-                    let vals: Vec<String> = self.named_dirs.values()
+                    let vals: Vec<String> = self
+                        .named_dirs
+                        .values()
                         .map(|p| p.display().to_string())
                         .collect();
                     return Some(vals.join(" "));
                 }
-                Some(self.named_dirs.get(key)
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default())
+                Some(
+                    self.named_dirs
+                        .get(key)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default(),
+                )
             }
 
             // === USER DIRECTORIES ===
@@ -4720,15 +5021,20 @@ impl ShellExecutor {
             // === DIRECTORY STACK ===
             "dirstack" => {
                 if key == "@" || key == "*" {
-                    let dirs: Vec<String> = self.dir_stack.iter()
+                    let dirs: Vec<String> = self
+                        .dir_stack
+                        .iter()
                         .map(|p| p.display().to_string())
                         .collect();
                     return Some(dirs.join(" "));
                 }
                 if let Ok(idx) = key.parse::<usize>() {
-                    Some(self.dir_stack.get(idx)
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_default())
+                    Some(
+                        self.dir_stack
+                            .get(idx)
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_default(),
+                    )
                 } else {
                     Some(String::new())
                 }
@@ -4737,7 +5043,9 @@ impl ShellExecutor {
             // === JOBS ===
             "jobstates" => {
                 if key == "@" || key == "*" {
-                    let states: Vec<String> = self.jobs.iter()
+                    let states: Vec<String> = self
+                        .jobs
+                        .iter()
                         .map(|(id, job)| format!("{}:{:?}", id, job.state))
                         .collect();
                     return Some(states.join(" "));
@@ -4751,7 +5059,9 @@ impl ShellExecutor {
             }
             "jobtexts" => {
                 if key == "@" || key == "*" {
-                    let texts: Vec<String> = self.jobs.iter()
+                    let texts: Vec<String> = self
+                        .jobs
+                        .iter()
                         .map(|(_, job)| job.command.clone())
                         .collect();
                     return Some(texts.join(" "));
@@ -4777,7 +5087,8 @@ impl ShellExecutor {
                     // Return recent history
                     if let Some(ref engine) = self.history {
                         if let Ok(entries) = engine.recent(100) {
-                            let cmds: Vec<String> = entries.iter().map(|e| e.command.clone()).collect();
+                            let cmds: Vec<String> =
+                                entries.iter().map(|e| e.command.clone()).collect();
                             return Some(cmds.join("\n"));
                         }
                     }
@@ -4808,15 +5119,35 @@ impl ShellExecutor {
                     "zsh/parameter" | "zsh/zutil" | "zsh/complete" | "zsh/complist" => {
                         Some("loaded".to_string())
                     }
-                    _ => Some(String::new())
+                    _ => Some(String::new()),
                 }
             }
 
             // === RESERVED WORDS ===
             "reswords" => {
-                let reswords = ["do", "done", "esac", "then", "elif", "else", "fi", "for",
-                    "case", "if", "while", "function", "repeat", "time", "until",
-                    "select", "coproc", "nocorrect", "foreach", "end", "in"];
+                let reswords = [
+                    "do",
+                    "done",
+                    "esac",
+                    "then",
+                    "elif",
+                    "else",
+                    "fi",
+                    "for",
+                    "case",
+                    "if",
+                    "while",
+                    "function",
+                    "repeat",
+                    "time",
+                    "until",
+                    "select",
+                    "coproc",
+                    "nocorrect",
+                    "foreach",
+                    "end",
+                    "in",
+                ];
                 if key == "@" || key == "*" {
                     return Some(reswords.join(" "));
                 }
@@ -4847,38 +5178,152 @@ impl ShellExecutor {
             }
 
             // === DISABLED VARIANTS (dis_*) ===
-            "dis_aliases" | "dis_galiases" | "dis_saliases" |
-            "dis_functions" | "dis_functions_source" |
-            "dis_builtins" | "dis_reswords" | "dis_patchars" => {
+            "dis_aliases"
+            | "dis_galiases"
+            | "dis_saliases"
+            | "dis_functions"
+            | "dis_functions_source"
+            | "dis_builtins"
+            | "dis_reswords"
+            | "dis_patchars" => {
                 // We don't track disabled items - return empty
                 Some(String::new())
             }
 
             // Not a special array
-            _ => None
+            _ => None,
         }
     }
 
     /// Get list of all builtin command names
     fn get_builtin_names() -> Vec<&'static str> {
         vec![
-            ".", ":", "[", "alias", "autoload", "bg", "bind", "bindkey", "break",
-            "builtin", "bye", "caller", "cd", "cdreplay", "chdir", "clone", "command",
-            "compadd", "comparguments", "compcall", "compctl", "compdef", "compdescribe",
-            "compfiles", "compgen", "compgroups", "compinit", "complete", "compopt",
-            "compquote", "compset", "comptags", "comptry", "compvalues", "continue",
-            "coproc", "declare", "dirs", "disable", "disown", "echo", "echotc", "echoti",
-            "emulate", "enable", "eval", "exec", "exit", "export", "false", "fc", "fg",
-            "float", "functions", "getln", "getopts", "hash", "help", "history",
-            "integer", "jobs", "kill", "let", "limit", "local", "log", "logout",
-            "mapfile", "noglob", "popd", "print", "printf", "private", "prompt",
-            "promptinit", "pushd", "pushln", "pwd", "r", "read", "readarray", "readonly",
-            "rehash", "return", "sched", "set", "setopt", "shift", "shopt", "source",
-            "stat", "strftime", "suspend", "test", "times", "trap", "true", "ttyctl",
-            "type", "typeset", "ulimit", "umask", "unalias", "unfunction", "unhash",
-            "unlimit", "unset", "unsetopt", "vared", "wait", "whence", "where", "which",
-            "zcompile", "zcurses", "zformat", "zle", "zmodload", "zparseopts", "zprof",
-            "zpty", "zregexparse", "zsocket", "zstyle", "ztcp", "add-zsh-hook",
+            ".",
+            ":",
+            "[",
+            "alias",
+            "autoload",
+            "bg",
+            "bind",
+            "bindkey",
+            "break",
+            "builtin",
+            "bye",
+            "caller",
+            "cd",
+            "cdreplay",
+            "chdir",
+            "clone",
+            "command",
+            "compadd",
+            "comparguments",
+            "compcall",
+            "compctl",
+            "compdef",
+            "compdescribe",
+            "compfiles",
+            "compgen",
+            "compgroups",
+            "compinit",
+            "complete",
+            "compopt",
+            "compquote",
+            "compset",
+            "comptags",
+            "comptry",
+            "compvalues",
+            "continue",
+            "coproc",
+            "declare",
+            "dirs",
+            "disable",
+            "disown",
+            "echo",
+            "echotc",
+            "echoti",
+            "emulate",
+            "enable",
+            "eval",
+            "exec",
+            "exit",
+            "export",
+            "false",
+            "fc",
+            "fg",
+            "float",
+            "functions",
+            "getln",
+            "getopts",
+            "hash",
+            "help",
+            "history",
+            "integer",
+            "jobs",
+            "kill",
+            "let",
+            "limit",
+            "local",
+            "log",
+            "logout",
+            "mapfile",
+            "noglob",
+            "popd",
+            "print",
+            "printf",
+            "private",
+            "prompt",
+            "promptinit",
+            "pushd",
+            "pushln",
+            "pwd",
+            "r",
+            "read",
+            "readarray",
+            "readonly",
+            "rehash",
+            "return",
+            "sched",
+            "set",
+            "setopt",
+            "shift",
+            "shopt",
+            "source",
+            "stat",
+            "strftime",
+            "suspend",
+            "test",
+            "times",
+            "trap",
+            "true",
+            "ttyctl",
+            "type",
+            "typeset",
+            "ulimit",
+            "umask",
+            "unalias",
+            "unfunction",
+            "unhash",
+            "unlimit",
+            "unset",
+            "unsetopt",
+            "vared",
+            "wait",
+            "whence",
+            "where",
+            "which",
+            "zcompile",
+            "zcurses",
+            "zformat",
+            "zle",
+            "zmodload",
+            "zparseopts",
+            "zprof",
+            "zpty",
+            "zregexparse",
+            "zsocket",
+            "zstyle",
+            "ztcp",
+            "add-zsh-hook",
         ]
     }
 
@@ -4889,7 +5334,11 @@ impl ShellExecutor {
             "@" | "*" => self.positional_params.join(" "),
             "#" => self.positional_params.len().to_string(),
             "?" => self.last_status.to_string(),
-            "0" => self.variables.get("0").cloned().unwrap_or_else(|| env::args().next().unwrap_or_default()),
+            "0" => self
+                .variables
+                .get("0")
+                .cloned()
+                .unwrap_or_else(|| env::args().next().unwrap_or_default()),
             n if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => {
                 let idx: usize = n.parse().unwrap_or(0);
                 if idx == 0 {
@@ -5073,7 +5522,10 @@ impl ShellExecutor {
             return false;
         }
         let first = s.chars().next().unwrap();
-        matches!(first, 'A' | 'a' | 'h' | 't' | 'r' | 'e' | 'l' | 'u' | 'q' | 'Q' | 'P')
+        matches!(
+            first,
+            'A' | 'a' | 'h' | 't' | 'r' | 'e' | 'l' | 'u' | 'q' | 'Q' | 'P'
+        )
     }
 
     /// Apply zsh history-style modifiers to a value
@@ -5081,7 +5533,7 @@ impl ShellExecutor {
     fn apply_history_modifiers(&self, val: &str, modifiers: &str) -> String {
         let mut result = val.to_string();
         let mut chars = modifiers.chars().peekable();
-        
+
         while let Some(c) = chars.next() {
             match c {
                 ':' => continue,
@@ -5142,9 +5594,10 @@ impl ShellExecutor {
                 'q' => result = format!("'{}'", result.replace('\'', "'\\''")),
                 'Q' => {
                     if result.starts_with('\'') && result.ends_with('\'') && result.len() >= 2 {
-                        result = result[1..result.len()-1].to_string();
-                    } else if result.starts_with('"') && result.ends_with('"') && result.len() >= 2 {
-                        result = result[1..result.len()-1].to_string();
+                        result = result[1..result.len() - 1].to_string();
+                    } else if result.starts_with('"') && result.ends_with('"') && result.len() >= 2
+                    {
+                        result = result[1..result.len() - 1].to_string();
                     }
                 }
                 'P' => {
@@ -5548,7 +6001,11 @@ impl ShellExecutor {
             host_short,
             tty: String::new(),
             lastval: self.last_status,
-            histnum: self.history.as_ref().and_then(|h| h.count().ok()).unwrap_or(1),
+            histnum: self
+                .history
+                .as_ref()
+                .and_then(|h| h.count().ok())
+                .unwrap_or(1),
             shlvl,
             num_jobs: self.jobs.list().len() as i32,
             is_root: unsafe { libc::geteuid() } == 0,
@@ -5828,9 +6285,9 @@ impl ShellExecutor {
         // cd [ -qsLP ] {+|-}n
         let mut quiet = false;
         let mut use_cdpath = false;
-        let mut logical = true;  // -L is default
+        let mut logical = true; // -L is default
         let mut positional_args: Vec<&str> = Vec::new();
-        
+
         for arg in args {
             if arg.starts_with('-') && arg.len() > 1 && !arg.starts_with("--") {
                 // Check if it's a stack index like -2
@@ -5850,14 +6307,17 @@ impl ShellExecutor {
                         }
                     }
                 }
-            } else if arg.starts_with('+') && arg.len() > 1 && arg[1..].chars().all(|c| c.is_ascii_digit()) {
+            } else if arg.starts_with('+')
+                && arg.len() > 1
+                && arg[1..].chars().all(|c| c.is_ascii_digit())
+            {
                 // Stack index like +2
                 positional_args.push(arg);
             } else {
                 positional_args.push(arg);
             }
         }
-        
+
         // Handle cd old new (substitution)
         if positional_args.len() == 2 {
             if let Ok(cwd) = env::current_dir() {
@@ -5874,13 +6334,17 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         let path_arg = positional_args.first().map(|s| *s).unwrap_or("~");
-        
+
         // Handle stack indices
         if path_arg.starts_with('+') || path_arg.starts_with('-') {
             if let Ok(n) = path_arg[1..].parse::<usize>() {
-                let idx = if path_arg.starts_with('+') { n } else { self.dir_stack.len().saturating_sub(n) };
+                let idx = if path_arg.starts_with('+') {
+                    n
+                } else {
+                    self.dir_stack.len().saturating_sub(n)
+                };
                 if let Some(dir) = self.dir_stack.get(idx) {
                     let dir_path = dir.to_string_lossy().to_string();
                     return self.do_cd(&dir_path, quiet, use_cdpath, logical);
@@ -5890,10 +6354,10 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         self.do_cd(path_arg, quiet, use_cdpath, logical)
     }
-    
+
     fn do_cd(&mut self, path_arg: &str, quiet: bool, use_cdpath: bool, physical: bool) -> i32 {
         let path = if path_arg == "~" || path_arg.is_empty() {
             dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
@@ -5950,7 +6414,8 @@ impl ShellExecutor {
             Ok(_) => {
                 if let Ok(cwd) = env::current_dir() {
                     env::set_var("PWD", &cwd);
-                    self.variables.insert("PWD".to_string(), cwd.to_string_lossy().to_string());
+                    self.variables
+                        .insert("PWD".to_string(), cwd.to_string_lossy().to_string());
                 }
                 0
             }
@@ -6034,7 +6499,7 @@ impl ShellExecutor {
         }
 
         let path = &args[0];
-        
+
         // Resolve to absolute path
         let abs_path = if path.starts_with('/') {
             path.clone()
@@ -6049,11 +6514,11 @@ impl ShellExecutor {
                 .map(|cwd| cwd.join(path).to_string_lossy().to_string())
                 .unwrap_or_else(|_| path.clone())
         };
-        
+
         // Save current $0 and set to the sourced file path
         let saved_zero = self.variables.get("0").cloned();
         self.variables.insert("0".to_string(), abs_path.clone());
-        
+
         let result = match std::fs::read_to_string(&abs_path) {
             Ok(content) => match self.execute_script(&content) {
                 Ok(status) => status,
@@ -6067,21 +6532,21 @@ impl ShellExecutor {
                 1
             }
         };
-        
+
         // Handle return from sourced script - clear the flag and use its value
         let final_result = if let Some(ret) = self.returning.take() {
             ret
         } else {
             result
         };
-        
+
         // Restore $0
         if let Some(z) = saved_zero {
             self.variables.insert("0".to_string(), z);
         } else {
             self.variables.remove("0");
         }
-        
+
         final_result
     }
 
@@ -6094,7 +6559,8 @@ impl ShellExecutor {
     }
 
     fn builtin_return(&mut self, args: &[String]) -> i32 {
-        let status = args.first()
+        let status = args
+            .first()
             .and_then(|s| s.parse::<i32>().ok())
             .unwrap_or(self.last_status);
         self.returning = Some(status);
@@ -6537,43 +7003,43 @@ impl ShellExecutor {
     fn builtin_declare(&mut self, args: &[String]) -> i32 {
         self.builtin_typeset(args)
     }
-    
+
     fn builtin_typeset(&mut self, args: &[String]) -> i32 {
         // typeset [ {+|-}AHUaghlmrtux ] [ {+|-}EFLRZip [ n ] ]
         //         [ + ] [ name[=value] ... ]
         // typeset -T [ {+|-}Urux ] [ {+|-}LRZp [ n ] ] SCALAR[=value] array
         // typeset -f [ {+|-}TUkmtuz ] [ + ] [ name ... ]
-        
-        let mut is_array = false;      // -a
-        let mut is_assoc = false;      // -A
-        let mut is_export = false;     // -x
-        let mut is_integer = false;    // -i
-        let mut is_readonly = false;   // -r
-        let mut is_lower = false;      // -l
-        let mut is_upper = false;      // -u
-        let mut is_left_pad = false;   // -L
-        let mut is_right_pad = false;  // -R
-        let mut is_zero_pad = false;   // -Z
-        let mut is_float = false;      // -F
-        let mut is_float_exp = false;  // -E
-        let mut is_function = false;   // -f
-        let mut is_global = false;     // -g
-        let mut is_tied = false;       // -T
-        let mut is_hidden = false;     // -H
-        let mut is_hide_val = false;   // -h
-        let mut is_trace = false;      // -t
-        let mut print_mode = false;    // -p
+
+        let mut is_array = false; // -a
+        let mut is_assoc = false; // -A
+        let mut is_export = false; // -x
+        let mut is_integer = false; // -i
+        let mut is_readonly = false; // -r
+        let mut is_lower = false; // -l
+        let mut is_upper = false; // -u
+        let mut is_left_pad = false; // -L
+        let mut is_right_pad = false; // -R
+        let mut is_zero_pad = false; // -Z
+        let mut is_float = false; // -F
+        let mut is_float_exp = false; // -E
+        let mut is_function = false; // -f
+        let mut is_global = false; // -g
+        let mut is_tied = false; // -T
+        let mut is_hidden = false; // -H
+        let mut is_hide_val = false; // -h
+        let mut is_trace = false; // -t
+        let mut print_mode = false; // -p
         let mut pattern_match = false; // -m
-        let mut list_mode = false;     // no args: list all
-        let mut plus_mode = false;     // +x etc: remove attribute
+        let mut list_mode = false; // no args: list all
+        let mut plus_mode = false; // +x etc: remove attribute
         let mut width: Option<usize> = None;
         let mut precision: Option<usize> = None;
         let mut var_args: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "--" {
                 i += 1;
                 while i < args.len() {
@@ -6582,13 +7048,13 @@ impl ShellExecutor {
                 }
                 break;
             }
-            
+
             if arg == "+" {
                 plus_mode = true;
                 i += 1;
                 continue;
             }
-            
+
             if arg.starts_with('+') && arg.len() > 1 {
                 plus_mode = true;
                 for c in arg[1..].chars() {
@@ -6631,40 +7097,75 @@ impl ShellExecutor {
                             is_left_pad = true;
                             // Check for width
                             let rest: String = chars.clone().collect();
-                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                            if !rest.is_empty()
+                                && rest
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                            {
+                                let num: String =
+                                    chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                                 width = num.parse().ok();
                             }
                         }
                         'R' => {
                             is_right_pad = true;
                             let rest: String = chars.clone().collect();
-                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                            if !rest.is_empty()
+                                && rest
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                            {
+                                let num: String =
+                                    chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                                 width = num.parse().ok();
                             }
                         }
                         'Z' => {
                             is_zero_pad = true;
                             let rest: String = chars.clone().collect();
-                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                            if !rest.is_empty()
+                                && rest
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                            {
+                                let num: String =
+                                    chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                                 width = num.parse().ok();
                             }
                         }
                         'F' => {
                             is_float = true;
                             let rest: String = chars.clone().collect();
-                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                            if !rest.is_empty()
+                                && rest
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                            {
+                                let num: String =
+                                    chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                                 precision = num.parse().ok();
                             }
                         }
                         'E' => {
                             is_float_exp = true;
                             let rest: String = chars.clone().collect();
-                            if !rest.is_empty() && rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                                let num: String = chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                            if !rest.is_empty()
+                                && rest
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                            {
+                                let num: String =
+                                    chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                                 precision = num.parse().ok();
                             }
                         }
@@ -6684,7 +7185,7 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         let _ = is_global;
         let _ = is_tied;
         let _ = is_hidden;
@@ -6692,7 +7193,7 @@ impl ShellExecutor {
         let _ = is_trace;
         let _ = pattern_match;
         let _ = precision;
-        
+
         // If -f (function mode) with no args, list functions
         if is_function && var_args.is_empty() {
             let mut func_names: Vec<_> = self.functions.keys().cloned().collect();
@@ -6726,12 +7227,12 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         // No args: list all variables with attributes
         if var_args.is_empty() {
             list_mode = true;
         }
-        
+
         if list_mode {
             let mut sorted_names: Vec<_> = self.variables.keys().cloned().collect();
             sorted_names.sort();
@@ -6760,16 +7261,18 @@ impl ShellExecutor {
                         if let Some(assoc) = self.assoc_arrays.get(name) {
                             let mut pairs: Vec<_> = assoc.iter().collect();
                             pairs.sort_by_key(|(k, _)| k.clone());
-                            let formatted: Vec<String> = pairs.iter()
-                                .map(|(k, v)| format!("[{}]={}", shell_quote_value(k), shell_quote_value(v)))
+                            let formatted: Vec<String> = pairs
+                                .iter()
+                                .map(|(k, v)| {
+                                    format!("[{}]={}", shell_quote_value(k), shell_quote_value(v))
+                                })
                                 .collect();
                             println!("{} {}=( {} )", prefix, name, formatted.join(" "));
                         }
                     } else if is_arr {
                         if let Some(arr) = self.arrays.get(name) {
-                            let formatted: Vec<String> = arr.iter()
-                                .map(|v| shell_quote_value(v))
-                                .collect();
+                            let formatted: Vec<String> =
+                                arr.iter().map(|v| shell_quote_value(v)).collect();
                             println!("{} {}=( {} )", prefix, name, formatted.join(" "));
                         }
                     } else {
@@ -6827,7 +7330,7 @@ impl ShellExecutor {
                 } else {
                     // Regular assignment - apply transformations
                     let mut value = rest.to_string();
-                    
+
                     if is_integer {
                         // Force integer evaluation
                         value = self.evaluate_arithmetic(&value).to_string();
@@ -6845,7 +7348,11 @@ impl ShellExecutor {
                         } else if is_right_pad || is_zero_pad {
                             let pad_char = if is_zero_pad { '0' } else { ' ' };
                             if value.len() < w {
-                                value = format!("{}{}", pad_char.to_string().repeat(w - value.len()), value);
+                                value = format!(
+                                    "{}{}",
+                                    pad_char.to_string().repeat(w - value.len()),
+                                    value
+                                );
                             }
                             if value.len() > w {
                                 value = value[value.len() - w..].to_string();
@@ -6862,9 +7369,9 @@ impl ShellExecutor {
                             };
                         }
                     }
-                    
+
                     self.variables.insert(name.to_string(), value.clone());
-                    
+
                     if is_export {
                         env::set_var(name, &value);
                     }
@@ -6892,23 +7399,23 @@ impl ShellExecutor {
         // read [ -rszpqAclneE ] [ -t timeout ] [ -d delim ] [ -k [ num ] ] [ -u fd ]
         //      [ name[?prompt] ] [ name ... ]
         use std::io::{BufRead, Read as IoRead};
-        
-        let mut raw_mode = false;      // -r: don't interpret backslash escapes
-        let mut silent = false;        // -s: don't echo input
-        let mut to_history = false;    // -z: read from history stack
+
+        let mut raw_mode = false; // -r: don't interpret backslash escapes
+        let mut silent = false; // -s: don't echo input
+        let mut to_history = false; // -z: read from history stack
         let mut prompt_str: Option<String> = None; // -p prompt
-        let mut use_array = false;     // -A: read into array
-        let mut timeout: Option<u64> = None;  // -t timeout in seconds
-        let mut delimiter = '\n';      // -d delim
+        let mut use_array = false; // -A: read into array
+        let mut timeout: Option<u64> = None; // -t timeout in seconds
+        let mut delimiter = '\n'; // -d delim
         let mut nchars: Option<usize> = None; // -k num: read exactly num chars
-        let mut fd = 0;                // -u fd: read from fd
-        let mut quiet = false;         // -q: test only, don't assign
+        let mut fd = 0; // -u fd: read from fd
+        let mut quiet = false; // -q: test only, don't assign
         let mut var_names: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "--" {
                 i += 1;
                 while i < args.len() {
@@ -6917,7 +7424,7 @@ impl ShellExecutor {
                 }
                 break;
             }
-            
+
             if arg.starts_with('-') && arg.len() > 1 {
                 let mut chars = arg[1..].chars().peekable();
                 while let Some(ch) = chars.next() {
@@ -6956,7 +7463,9 @@ impl ShellExecutor {
                             let rest: String = chars.collect();
                             if !rest.is_empty() {
                                 nchars = Some(rest.parse().unwrap_or(1));
-                            } else if i + 1 < args.len() && args[i + 1].chars().all(|c| c.is_ascii_digit()) {
+                            } else if i + 1 < args.len()
+                                && args[i + 1].chars().all(|c| c.is_ascii_digit())
+                            {
                                 i += 1;
                                 nchars = Some(args[i].parse().unwrap_or(1));
                             } else {
@@ -7049,7 +7558,10 @@ impl ShellExecutor {
                     }
                 }
             }
-            input.trim_end_matches('\n').trim_end_matches('\r').to_string()
+            input
+                .trim_end_matches('\n')
+                .trim_end_matches('\r')
+                .to_string()
         };
 
         let processed = if raw_mode {
@@ -7071,9 +7583,16 @@ impl ShellExecutor {
             env::set_var(var, &processed);
             self.variables.insert(var.clone(), processed);
         } else {
-            let ifs = self.variables.get("IFS").map(|s| s.as_str()).unwrap_or(" \t\n");
-            let words: Vec<&str> = processed.split(|c| ifs.contains(c)).filter(|s| !s.is_empty()).collect();
-            
+            let ifs = self
+                .variables
+                .get("IFS")
+                .map(|s| s.as_str())
+                .unwrap_or(" \t\n");
+            let words: Vec<&str> = processed
+                .split(|c| ifs.contains(c))
+                .filter(|s| !s.is_empty())
+                .collect();
+
             for (j, var) in var_names.iter().enumerate() {
                 if j < words.len() {
                     if j == var_names.len() - 1 && words.len() > var_names.len() {
@@ -7099,11 +7618,11 @@ impl ShellExecutor {
         // -p: shift from end instead of beginning (pop)
         // n: number of elements to shift (default 1)
         // name: array names to shift (default: shift positional parameters)
-        
+
         let mut from_end = false;
         let mut count = 1usize;
         let mut array_names: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
@@ -7116,7 +7635,7 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         if array_names.is_empty() {
             // Shift positional parameters
             if let Some(params) = self.arrays.get_mut("@") {
@@ -7154,7 +7673,7 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         0
     }
 
@@ -7396,7 +7915,10 @@ impl ShellExecutor {
                                     commands.into_iter().map(|c| (c, ListOp::Semi)).collect();
                                 ShellCommand::List(list_cmds)
                             };
-                            return Some(ShellCommand::FunctionDef(name.to_string(), Box::new(body)));
+                            return Some(ShellCommand::FunctionDef(
+                                name.to_string(),
+                                Box::new(body),
+                            ));
                         }
                     }
                 }
@@ -7499,14 +8021,14 @@ impl ShellExecutor {
         // -r: show running jobs only
         // -s: show stopped jobs only
         // -Z: set process name (not relevant here)
-        
+
         let mut long_format = false;
         let mut pids_only = false;
         let mut show_dir = false;
         let mut running_only = false;
         let mut stopped_only = false;
         let mut job_ids: Vec<usize> = Vec::new();
-        
+
         for arg in args {
             if arg.starts_with('-') {
                 for c in arg[1..].chars() {
@@ -7546,7 +8068,7 @@ impl ShellExecutor {
             if !job_ids.is_empty() && !job_ids.contains(&job.id) {
                 continue;
             }
-            
+
             // Filter by state
             if running_only && job.state != JobState::Running {
                 continue;
@@ -7554,31 +8076,28 @@ impl ShellExecutor {
             if stopped_only && job.state != JobState::Stopped {
                 continue;
             }
-            
+
             if pids_only {
                 println!("{}", job.pid);
                 continue;
             }
-            
+
             let marker = if job.is_current { "+" } else { "-" };
             let state = match job.state {
                 JobState::Running => "running",
                 JobState::Stopped => "suspended",
                 JobState::Done => "done",
             };
-            
+
             if long_format {
                 println!(
                     "[{}]{} {:6} {}  {}",
                     job.id, marker, job.pid, state, job.command
                 );
             } else {
-                println!(
-                    "[{}]{} {}  {}",
-                    job.id, marker, state, job.command
-                );
+                println!("[{}]{} {}  {}", job.id, marker, state, job.command);
             }
-            
+
             if show_dir {
                 if let Ok(cwd) = env::current_dir() {
                     println!("    (pwd: {})", cwd.display());
@@ -7722,11 +8241,11 @@ impl ShellExecutor {
         let mut pids: Vec<String> = Vec::new();
         let mut list_mode = false;
         let mut list_args: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "-l" || arg == "-L" {
                 list_mode = true;
                 // Remaining args are signal numbers to translate
@@ -7772,7 +8291,7 @@ impl ShellExecutor {
                 let sig_str = &arg[1..];
                 let sig_upper = sig_str.to_uppercase();
                 let sig_name = sig_upper.strip_prefix("SIG").unwrap_or(&sig_upper);
-                
+
                 // Try as number first
                 if let Ok(num) = sig_str.parse::<i32>() {
                     if let Some((_, _, s)) = signal_map.iter().find(|(_, n, _)| *n == num) {
@@ -7781,7 +8300,9 @@ impl ShellExecutor {
                         eprintln!("kill: invalid signal: {}", arg);
                         return 1;
                     }
-                } else if let Some((_, _, s)) = signal_map.iter().find(|(name, _, _)| *name == sig_name) {
+                } else if let Some((_, _, s)) =
+                    signal_map.iter().find(|(name, _, _)| *name == sig_name)
+                {
                     sig = *s;
                 } else {
                     eprintln!("kill: invalid signal: {}", arg);
@@ -7814,7 +8335,9 @@ impl ShellExecutor {
                         // Name -> number
                         let sig_upper = arg.to_uppercase();
                         let sig_name = sig_upper.strip_prefix("SIG").unwrap_or(&sig_upper);
-                        if let Some((_, num, _)) = signal_map.iter().find(|(name, _, _)| *name == sig_name) {
+                        if let Some((_, num, _)) =
+                            signal_map.iter().find(|(name, _, _)| *name == sig_name)
+                        {
                             println!("{}", num);
                         } else {
                             eprintln!("kill: unknown signal: {}", arg);
@@ -8136,7 +8659,7 @@ impl ShellExecutor {
         let mut substitute_mode = false;
         let mut positional: Vec<&str> = Vec::new();
         let mut substitutions: Vec<(String, String)> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
@@ -8164,7 +8687,7 @@ impl ShellExecutor {
                         's' => substitute_mode = true,
                         'e' => {
                             if j + 1 < chars.len() {
-                                editor = Some(chars[j+1..].iter().collect());
+                                editor = Some(chars[j + 1..].iter().collect());
                                 break;
                             } else {
                                 i += 1;
@@ -8212,7 +8735,7 @@ impl ShellExecutor {
             } else {
                 std::path::PathBuf::from(filename)
             };
-            
+
             if read_file {
                 // Read plain text history file and import
                 if let Ok(contents) = std::fs::read_to_string(&path) {
@@ -8228,7 +8751,10 @@ impl ShellExecutor {
             } else if write_file || append_file {
                 // Export history to plain text file
                 let mode = if append_file {
-                    std::fs::OpenOptions::new().create(true).append(true).open(&path)
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&path)
                 } else {
                     std::fs::File::create(&path)
                 };
@@ -8264,7 +8790,7 @@ impl ShellExecutor {
                     (f, l)
                 }
             };
-            
+
             let count = if first < 0 { (-first) as usize } else { 16 };
             match engine.recent(count.max(100)) {
                 Ok(mut entries) => {
@@ -8275,9 +8801,17 @@ impl ShellExecutor {
                         if no_numbers {
                             println!("{}", entry.command);
                         } else if show_time {
-                            println!("{:>6}  {:>10}  {}", entry.id, entry.timestamp, entry.command);
+                            println!(
+                                "{:>6}  {:>10}  {}",
+                                entry.id, entry.timestamp, entry.command
+                            );
                         } else if show_duration {
-                            println!("{:>6}  {:>5}  {}", entry.id, entry.duration_ms.unwrap_or(0), entry.command);
+                            println!(
+                                "{:>6}  {:>5}  {}",
+                                entry.id,
+                                entry.duration_ms.unwrap_or(0),
+                                entry.command
+                            );
                         } else {
                             println!("{:>6}  {}", entry.id, entry.command);
                         }
@@ -8476,7 +9010,7 @@ impl ShellExecutor {
         // -m: pattern match mode
         // -L: list in form suitable for reinput
         // +g/+s/+r: print aliases of that type
-        
+
         let mut is_global = false;
         let mut is_suffix = false;
         let mut list_form = false;
@@ -8563,11 +9097,20 @@ impl ShellExecutor {
                 "alias "
             };
             let alias_map: Vec<(String, String)> = if is_suffix {
-                self.suffix_aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                self.suffix_aliases
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
             } else if is_global {
-                self.global_aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                self.global_aliases
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
             } else {
-                self.aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                self.aliases
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
             };
             for (name, value) in alias_map {
                 if list_form {
@@ -8585,9 +9128,11 @@ impl ShellExecutor {
                 let name = &arg[..eq_pos];
                 let value = &arg[eq_pos + 1..];
                 if is_suffix {
-                    self.suffix_aliases.insert(name.to_string(), value.to_string());
+                    self.suffix_aliases
+                        .insert(name.to_string(), value.to_string());
                 } else if is_global {
-                    self.global_aliases.insert(name.to_string(), value.to_string());
+                    self.global_aliases
+                        .insert(name.to_string(), value.to_string());
                 } else {
                     self.aliases.insert(name.to_string(), value.to_string());
                 }
@@ -8595,7 +9140,7 @@ impl ShellExecutor {
                 // -m: pattern match mode - list matching aliases
                 let pattern = arg.replace("*", ".*").replace("?", ".");
                 let re = regex::Regex::new(&format!("^{}$", pattern));
-                
+
                 let alias_map: &HashMap<String, String> = if is_suffix {
                     &self.suffix_aliases
                 } else if is_global {
@@ -8603,7 +9148,7 @@ impl ShellExecutor {
                 } else {
                     &self.aliases
                 };
-                
+
                 let prefix = if is_suffix {
                     "alias -s "
                 } else if is_global {
@@ -8611,7 +9156,7 @@ impl ShellExecutor {
                 } else {
                     "alias "
                 };
-                
+
                 for (name, value) in alias_map {
                     let matches = if let Ok(ref r) = re {
                         r.is_match(name)
@@ -9127,7 +9672,7 @@ impl ShellExecutor {
         }
         0
     }
-    
+
     /// help - display help for builtins (bash)
     fn builtin_help(&self, args: &[String]) -> i32 {
         if args.is_empty() {
@@ -9144,7 +9689,7 @@ impl ShellExecutor {
             println!("Type 'help name' for more information about 'name'.");
             return 0;
         }
-        
+
         let cmd = &args[0];
         match cmd.as_str() {
             "cd" => println!("cd: cd [-L|-P] [dir]\n    Change the shell working directory."),
@@ -9162,11 +9707,11 @@ impl ShellExecutor {
         }
         0
     }
-    
+
     /// readarray/mapfile - read lines into array (bash)
     fn builtin_readarray(&mut self, args: &[String]) -> i32 {
         use std::io::{BufRead, BufReader};
-        
+
         let mut array_name = "MAPFILE".to_string();
         let mut delimiter = '\n';
         let mut count = 0usize; // 0 = unlimited
@@ -9174,7 +9719,7 @@ impl ShellExecutor {
         let mut strip_trailing = false;
         let mut callback: Option<String> = None;
         let mut callback_quantum = 0usize;
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -9224,39 +9769,39 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         let stdin = std::io::stdin();
         let reader = BufReader::new(stdin.lock());
         let mut lines = Vec::new();
         let mut line_count = 0usize;
-        
+
         for line_result in reader.lines() {
             if let Ok(mut line) = line_result {
                 line_count += 1;
-                
+
                 if line_count <= skip {
                     continue;
                 }
-                
+
                 if strip_trailing {
                     while line.ends_with('\n') || line.ends_with('\r') {
                         line.pop();
                     }
                 }
-                
+
                 lines.push(line);
-                
+
                 if count > 0 && lines.len() >= count {
                     break;
                 }
             }
         }
-        
+
         self.arrays.insert(array_name, lines);
         let _ = (callback, callback_quantum);
         0
     }
-    
+
     fn builtin_shopt(&mut self, args: &[String]) -> i32 {
         if args.is_empty() {
             // List all shell options
@@ -9684,7 +10229,7 @@ impl ShellExecutor {
         // hash -m matches patterns
         // hash -v verbose
         // hash -L list in form suitable for reinput
-        
+
         let mut dir_mode = false;
         let mut rehash = false;
         let mut fill_all = false;
@@ -9692,7 +10237,7 @@ impl ShellExecutor {
         let mut verbose = false;
         let mut list_form = false;
         let mut names = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
@@ -9713,13 +10258,13 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         // -r: clear hash table
         if rehash && !dir_mode && names.is_empty() {
             self.command_hash.clear();
             return 0;
         }
-        
+
         // -f: fill hash table with all commands in PATH
         if fill_all {
             if let Ok(path_var) = env::var("PATH") {
@@ -9740,7 +10285,7 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         if dir_mode {
             // Named directories mode (hash -d)
             if names.is_empty() {
@@ -9756,18 +10301,22 @@ impl ShellExecutor {
                 }
                 return 0;
             }
-            
+
             if rehash {
                 // Remove named directories
                 if pattern_match {
                     // -m: pattern matching
-                    let to_remove: Vec<String> = self.named_dirs.keys()
-                        .filter(|k| names.iter().any(|pat| {
-                            let pattern = pat.replace("*", ".*").replace("?", ".");
-                            regex::Regex::new(&format!("^{}$", pattern))
-                                .map(|r| r.is_match(k))
-                                .unwrap_or(false)
-                        }))
+                    let to_remove: Vec<String> = self
+                        .named_dirs
+                        .keys()
+                        .filter(|k| {
+                            names.iter().any(|pat| {
+                                let pattern = pat.replace("*", ".*").replace("?", ".");
+                                regex::Regex::new(&format!("^{}$", pattern))
+                                    .map(|r| r.is_match(k))
+                                    .unwrap_or(false)
+                            })
+                        })
                         .cloned()
                         .collect();
                     for name in to_remove {
@@ -9780,7 +10329,7 @@ impl ShellExecutor {
                 }
                 return 0;
             }
-            
+
             // Add named directories
             for name in &names {
                 if let Some((n, p)) = name.split_once('=') {
@@ -9792,7 +10341,7 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         // Regular hash - command path lookup
         if names.is_empty() {
             // List all hashed commands
@@ -9826,7 +10375,7 @@ impl ShellExecutor {
         }
         0
     }
-    
+
     /// add-zsh-hook builtin - add function to hook
     fn builtin_add_zsh_hook(&mut self, args: &[String]) -> i32 {
         // add-zsh-hook [-d] hook function
@@ -9834,7 +10383,7 @@ impl ShellExecutor {
             eprintln!("usage: add-zsh-hook [-d] hook function");
             return 1;
         }
-        
+
         let (delete, hook, func) = if args[0] == "-d" {
             if args.len() < 3 {
                 eprintln!("usage: add-zsh-hook -d hook function");
@@ -9844,7 +10393,7 @@ impl ShellExecutor {
         } else {
             (false, &args[0], &args[1])
         };
-        
+
         if delete {
             // Remove function from hook
             if let Some(funcs) = self.hook_functions.get_mut(hook.as_str()) {
@@ -9866,7 +10415,7 @@ impl ShellExecutor {
         let mut print_path = false;
         let mut verbose = false;
         let mut positional_args: Vec<&str> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
@@ -9892,19 +10441,19 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         // Add remaining args after --
         while i < args.len() {
             positional_args.push(&args[i]);
             i += 1;
         }
-        
+
         if positional_args.is_empty() {
             return 0;
         }
-        
+
         let cmd = positional_args[0];
-        
+
         // -v or -V: just print info about command
         if print_path || verbose {
             // Search PATH for command
@@ -9913,7 +10462,7 @@ impl ShellExecutor {
             } else {
                 env::var("PATH").unwrap_or_default()
             };
-            
+
             for dir in path_var.split(':') {
                 let full_path = PathBuf::from(dir).join(cmd);
                 if full_path.exists() && full_path.is_file() {
@@ -9925,7 +10474,7 @@ impl ShellExecutor {
                     return 0;
                 }
             }
-            
+
             if verbose {
                 eprintln!("{} not found", cmd);
             }
@@ -9934,12 +10483,24 @@ impl ShellExecutor {
 
         // Execute as external command (bypassing functions and aliases)
         let cmd_args: Vec<String> = positional_args[1..].iter().map(|s| s.to_string()).collect();
-        
+
         if use_default_path {
             // Temporarily set PATH
             let old_path = env::var("PATH").ok();
             env::set_var("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
-            let result = self.execute_external(cmd, &cmd_args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ").split_whitespace().map(String::from).collect::<Vec<_>>(), redirects)
+            let result = self
+                .execute_external(
+                    cmd,
+                    &cmd_args
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .split_whitespace()
+                        .map(String::from)
+                        .collect::<Vec<_>>(),
+                    redirects,
+                )
                 .unwrap_or(127);
             if let Some(p) = old_path {
                 env::set_var("PATH", p);
@@ -10326,7 +10887,7 @@ impl ShellExecutor {
         let mut no_dump = false;
         let mut dump_file: Option<String> = None;
         let mut use_cache = false;
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -10344,14 +10905,14 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         // ZSH COMPAT MODE: Use traditional zsh algorithm (fpath scan, .zcompdump, no SQLite)
         if self.zsh_compat {
             return self.compinit_compat(quiet, no_dump, dump_file, use_cache);
         }
-        
+
         // ZSHRS MODE: Use SQLite cache with function bodies
-        
+
         // Try to use existing cache if -C and cache is valid
         if use_cache {
             if let Some(cache) = &self.compsys_cache {
@@ -10359,17 +10920,22 @@ impl ShellExecutor {
                     // Load from cache instead of rescanning
                     if let Ok(result) = compsys::load_from_cache(cache) {
                         if !quiet {
-                            eprintln!("compinit: using cached completions ({} comps)", result.comps.len());
+                            eprintln!(
+                                "compinit: using cached completions ({} comps)",
+                                result.comps.len()
+                            );
                         }
                         self.assoc_arrays.insert("_comps".to_string(), result.comps);
-                        self.assoc_arrays.insert("_services".to_string(), result.services);
-                        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps);
+                        self.assoc_arrays
+                            .insert("_services".to_string(), result.services);
+                        self.assoc_arrays
+                            .insert("_patcomps".to_string(), result.patcomps);
                         return 0;
                     }
                 }
             }
         }
-        
+
         // Create/recreate the cache database
         let cache_path = compsys::cache::default_cache_path();
         if let Some(parent) = cache_path.parent() {
@@ -10379,7 +10945,7 @@ impl ShellExecutor {
         let _ = std::fs::remove_file(&cache_path);
         let _ = std::fs::remove_file(format!("{}-shm", cache_path.display()));
         let _ = std::fs::remove_file(format!("{}-wal", cache_path.display()));
-        
+
         // Open fresh cache
         let mut cache = match compsys::cache::CompsysCache::open(&cache_path) {
             Ok(c) => c,
@@ -10388,7 +10954,7 @@ impl ShellExecutor {
                 return 1;
             }
         };
-        
+
         // Build cache from fpath (parallelized, includes autoload bodies)
         let result = match compsys::build_cache_from_fpath(&self.fpath, &mut cache) {
             Ok(r) => r,
@@ -10397,37 +10963,51 @@ impl ShellExecutor {
                 return 1;
             }
         };
-        
+
         if !quiet {
             eprintln!(
                 "compinit: {} functions, {} comps in {} dirs ({} ms)",
-                result.files_scanned, result.comps.len(), result.dirs_scanned, result.scan_time_ms
+                result.files_scanned,
+                result.comps.len(),
+                result.dirs_scanned,
+                result.scan_time_ms
             );
         }
-        
+
         // Set up _comps associative array
-        self.assoc_arrays.insert("_comps".to_string(), result.comps.clone());
-        self.assoc_arrays.insert("_services".to_string(), result.services.clone());
-        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps.clone());
-        
+        self.assoc_arrays
+            .insert("_comps".to_string(), result.comps.clone());
+        self.assoc_arrays
+            .insert("_services".to_string(), result.services.clone());
+        self.assoc_arrays
+            .insert("_patcomps".to_string(), result.patcomps.clone());
+
         // Update the shell's cache reference
         self.compsys_cache = Some(cache);
-        
+
         0
     }
-    
+
     /// Traditional zsh compinit (--zsh-compat mode)
     /// Uses fpath scanning, .zcompdump files, no SQLite
-    fn compinit_compat(&mut self, quiet: bool, no_dump: bool, dump_file: Option<String>, use_cache: bool) -> i32 {
-        let zdotdir = self.variables.get("ZDOTDIR")
+    fn compinit_compat(
+        &mut self,
+        quiet: bool,
+        no_dump: bool,
+        dump_file: Option<String>,
+        use_cache: bool,
+    ) -> i32 {
+        let zdotdir = self
+            .variables
+            .get("ZDOTDIR")
             .cloned()
             .or_else(|| std::env::var("ZDOTDIR").ok())
             .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()));
-        
+
         let dump_path = dump_file
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(&zdotdir).join(".zcompdump"));
-        
+
         // -C: Try to use existing .zcompdump if valid
         if use_cache && dump_path.exists() {
             if compsys::check_dump(&dump_path, &self.fpath, "zshrs-0.1.0") {
@@ -10438,30 +11018,36 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         // Full fpath scan (traditional zsh algorithm)
         let result = compsys::compinit(&self.fpath);
-        
+
         if !quiet {
             eprintln!(
                 "compinit: {} functions, {} comps in {} dirs ({} ms)",
-                result.files_scanned, result.comps.len(), result.dirs_scanned, result.scan_time_ms
+                result.files_scanned,
+                result.comps.len(),
+                result.dirs_scanned,
+                result.scan_time_ms
             );
         }
-        
+
         // Write .zcompdump unless -D
         if !no_dump {
             let _ = compsys::compdump(&result, &dump_path, "zshrs-0.1.0");
         }
-        
+
         // Set up _comps associative array
-        self.assoc_arrays.insert("_comps".to_string(), result.comps.clone());
-        self.assoc_arrays.insert("_services".to_string(), result.services.clone());
-        self.assoc_arrays.insert("_patcomps".to_string(), result.patcomps.clone());
-        
+        self.assoc_arrays
+            .insert("_comps".to_string(), result.comps.clone());
+        self.assoc_arrays
+            .insert("_services".to_string(), result.services.clone());
+        self.assoc_arrays
+            .insert("_patcomps".to_string(), result.patcomps.clone());
+
         // No SQLite cache in compat mode
         self.compsys_cache = None;
-        
+
         0
     }
 
@@ -10469,31 +11055,31 @@ impl ShellExecutor {
     /// Usage: cdreplay [-q]
     fn builtin_cdreplay(&mut self, args: &[String]) -> i32 {
         let quiet = args.contains(&"-q".to_string());
-        
+
         if self.deferred_compdefs.is_empty() {
             return 0;
         }
-        
+
         let deferred = std::mem::take(&mut self.deferred_compdefs);
         let count = deferred.len();
-        
+
         if let Some(cache) = &mut self.compsys_cache {
             for compdef_args in deferred {
                 compsys::compdef::compdef_execute(cache, &compdef_args);
             }
         }
-        
+
         if !quiet {
             eprintln!("cdreplay: replayed {} compdef calls", count);
         }
-        
+
         0
     }
 
     /// zsh zstyle - configure styles for completion
     fn builtin_zstyle(&mut self, args: &[String]) -> i32 {
         if args.is_empty() {
-            // List all styles  
+            // List all styles
             for (pattern, style, values) in self.style_table.list(None) {
                 println!("zstyle '{}' {} {}", pattern, style, values.join(" "));
             }
@@ -10542,14 +11128,19 @@ impl ShellExecutor {
                     if args.len() >= 3 {
                         let context = &args[1];
                         let style = &args[2];
-                        return if self.style_table.test_bool(context, style).unwrap_or(false) { 0 } else { 1 };
+                        return if self.style_table.test_bool(context, style).unwrap_or(false) {
+                            0
+                        } else {
+                            1
+                        };
                     }
                     return 1;
                 }
                 "-L" => {
                     // List in re-usable format
                     for (pattern, style, values) in self.style_table.list(None) {
-                        let values_str = values.iter()
+                        let values_str = values
+                            .iter()
                             .map(|v| format!("'{}'", v.replace('\'', "'\\''")))
                             .collect::<Vec<_>>()
                             .join(" ");
@@ -10567,14 +11158,16 @@ impl ShellExecutor {
             let style = &args[1];
             let values: Vec<String> = args[2..].to_vec();
             self.style_table.set(pattern, style, values.clone(), false);
-            
+
             // Write to SQLite cache for completion lookups
             if let Some(cache) = &self.compsys_cache {
                 let _ = cache.set_zstyle(pattern, style, &values, false);
             }
-            
+
             // Also update legacy zstyles for backward compat
-            let existing = self.zstyles.iter_mut()
+            let existing = self
+                .zstyles
+                .iter_mut()
                 .find(|s| s.pattern == *pattern && s.style == *style);
             if let Some(s) = existing {
                 s.values = args[2..].to_vec();
@@ -10593,12 +11186,12 @@ impl ShellExecutor {
     /// Usage: ztie -d db/gdbm -f /path/to/db.gdbm [-r] PARAM_NAME
     fn builtin_ztie(&mut self, args: &[String]) -> i32 {
         use crate::db_gdbm;
-        
+
         let mut db_type: Option<String> = None;
         let mut file_path: Option<String> = None;
         let mut readonly = false;
         let mut param_args: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -10634,7 +11227,7 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         match db_gdbm::ztie(
             &param_args,
             readonly,
@@ -10653,10 +11246,10 @@ impl ShellExecutor {
     /// Usage: zuntie [-u] PARAM_NAME...
     fn builtin_zuntie(&mut self, args: &[String]) -> i32 {
         use crate::db_gdbm;
-        
+
         let mut force_unset = false;
         let mut param_args: Vec<String> = Vec::new();
-        
+
         for arg in args {
             match arg.as_str() {
                 "-u" => force_unset = true,
@@ -10667,12 +11260,12 @@ impl ShellExecutor {
                 _ => param_args.push(arg.clone()),
             }
         }
-        
+
         if param_args.is_empty() {
             eprintln!("zuntie: not enough arguments");
             return 1;
         }
-        
+
         match db_gdbm::zuntie(&param_args, force_unset) {
             Ok(()) => 0,
             Err(e) => {
@@ -10687,12 +11280,14 @@ impl ShellExecutor {
     /// Sets $REPLY to the path
     fn builtin_zgdbmpath(&mut self, args: &[String]) -> i32 {
         use crate::db_gdbm;
-        
+
         if args.is_empty() {
-            eprintln!("zgdbmpath: parameter name (whose path is to be written to $REPLY) is required");
+            eprintln!(
+                "zgdbmpath: parameter name (whose path is to be written to $REPLY) is required"
+            );
             return 1;
         }
-        
+
         match db_gdbm::zgdbmpath(&args[0]) {
             Ok(path) => {
                 self.variables.insert("REPLY".to_string(), path.clone());
@@ -10715,11 +11310,11 @@ impl ShellExecutor {
         // -s: no symlink resolution (use -L cd behavior)
         // -L: logical directory (resolve .. before symlinks)
         // -P: physical directory (resolve symlinks)
-        
+
         let mut quiet = false;
         let mut physical = false;
         let mut positional_args: Vec<String> = Vec::new();
-        
+
         for arg in args {
             if arg.starts_with('-') && arg.len() > 1 {
                 // Check if it's a stack index
@@ -10742,7 +11337,7 @@ impl ShellExecutor {
                 positional_args.push(arg.clone());
             }
         }
-        
+
         let current = match std::env::current_dir() {
             Ok(p) => p,
             Err(e) => {
@@ -10759,13 +11354,13 @@ impl ShellExecutor {
             }
             let target = self.dir_stack.pop().unwrap();
             self.dir_stack.push(current.clone());
-            
+
             let resolved = if physical {
                 target.canonicalize().unwrap_or(target.clone())
             } else {
                 target.clone()
             };
-            
+
             if let Err(e) = std::env::set_current_dir(&resolved) {
                 eprintln!("pushd: {}: {}", target.display(), e);
                 self.dir_stack.pop();
@@ -10796,7 +11391,7 @@ impl ShellExecutor {
 
                 let target = full_stack.remove(0);
                 self.dir_stack = full_stack;
-                
+
                 let resolved = if physical {
                     target.canonicalize().unwrap_or(target.clone())
                 } else {
@@ -10821,7 +11416,7 @@ impl ShellExecutor {
         } else {
             target.clone()
         };
-        
+
         self.dir_stack.push(current);
         if let Err(e) = std::env::set_current_dir(&resolved) {
             eprintln!("pushd: {}: {}", arg, e);
@@ -10841,11 +11436,11 @@ impl ShellExecutor {
         // -s: no symlink resolution
         // -L: logical directory
         // -P: physical directory
-        
+
         let mut quiet = false;
         let mut physical = false;
         let mut stack_index: Option<String> = None;
-        
+
         for arg in args {
             if arg.starts_with('-') && arg.len() > 1 {
                 // Check if it's a stack index
@@ -10866,7 +11461,7 @@ impl ShellExecutor {
                 stack_index = Some(arg.clone());
             }
         }
-        
+
         if self.dir_stack.is_empty() {
             eprintln!("popd: directory stack empty");
             return 1;
@@ -10933,7 +11528,7 @@ impl ShellExecutor {
         // -l: full pathnames (don't use ~)
         // -p: print one entry per line
         // -v: verbose (numbered list)
-        
+
         let mut clear = false;
         let mut full_paths = false;
         let mut per_line = false;
@@ -10977,7 +11572,7 @@ impl ShellExecutor {
 
         let current = std::env::current_dir().unwrap_or_default();
         let home = dirs::home_dir().unwrap_or_default();
-        
+
         let format_path = |p: &std::path::Path| -> String {
             let path_str = p.to_string_lossy().to_string();
             if !full_paths {
@@ -10998,7 +11593,7 @@ impl ShellExecutor {
                 } else {
                     stack_len.saturating_sub((-idx) as usize)
                 };
-                
+
                 if actual_idx == 0 {
                     println!("{}", format_path(&current));
                 } else if actual_idx <= self.dir_stack.len() {
@@ -11621,11 +12216,11 @@ impl ShellExecutor {
         let mut command_arg: Option<String> = None;
         let mut extra_set_opts: Vec<String> = Vec::new();
         let mut extra_unset_opts: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "-c" {
                 // -c arg: evaluate arg in emulation mode
                 i += 1;
@@ -11677,25 +12272,29 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         // -L and -c are mutually exclusive
         if local_mode && command_arg.is_some() {
             eprintln!("emulate: -L and -c are mutually exclusive");
             return 1;
         }
-        
+
         // No argument: print current emulation mode
         if mode.is_none() && !list_mode {
-            let current = self.variables.get("EMULATE").cloned().unwrap_or_else(|| "zsh".to_string());
+            let current = self
+                .variables
+                .get("EMULATE")
+                .cloned()
+                .unwrap_or_else(|| "zsh".to_string());
             println!("{}", current);
             return 0;
         }
-        
+
         let mode = mode.unwrap_or_else(|| "zsh".to_string());
-        
+
         // Get the options that would be set for this mode
         let (set_opts, unset_opts) = Self::emulate_mode_options(&mode, reset_mode);
-        
+
         // -l: just list the options, don't apply
         if list_mode {
             for opt in &set_opts {
@@ -11711,7 +12310,7 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         // Save current state if -c is used
         let saved_options = if command_arg.is_some() {
             Some(self.options.clone())
@@ -11723,10 +12322,10 @@ impl ShellExecutor {
         } else {
             None
         };
-        
+
         // Apply the emulation
         self.variables.insert("EMULATE".to_string(), mode.clone());
-        
+
         // Set options for this mode
         for opt in &set_opts {
             let opt_name = opt.to_lowercase().replace('_', "");
@@ -11736,7 +12335,7 @@ impl ShellExecutor {
             let opt_name = opt.to_lowercase().replace('_', "");
             self.options.insert(opt_name, false);
         }
-        
+
         // Apply extra -o / +o options
         for opt in &extra_set_opts {
             let opt_name = opt.to_lowercase().replace('_', "");
@@ -11746,18 +12345,18 @@ impl ShellExecutor {
             let opt_name = opt.to_lowercase().replace('_', "");
             self.options.insert(opt_name, false);
         }
-        
+
         // -L: set local options/traps
         if local_mode {
             self.options.insert("localoptions".to_string(), true);
             self.options.insert("localpatterns".to_string(), true);
             self.options.insert("localtraps".to_string(), true);
         }
-        
+
         // -c arg: execute command then restore
         let result = if let Some(cmd) = command_arg {
             let status = self.execute_script(&cmd).unwrap_or(1);
-            
+
             // Restore saved state
             if let Some(opts) = saved_options {
                 self.options = opts;
@@ -11767,32 +12366,60 @@ impl ShellExecutor {
             } else {
                 self.variables.remove("EMULATE");
             }
-            
+
             status
         } else {
             0
         };
-        
+
         result
     }
-    
+
     /// Get options to set/unset for an emulation mode
     fn emulate_mode_options(mode: &str, reset: bool) -> (Vec<&'static str>, Vec<&'static str>) {
         match mode {
             "zsh" => {
                 if reset {
                     // Full reset: return to zsh defaults
-                    (vec![
-                        "aliases", "alwayslastprompt", "autolist", "automenu",
-                        "autoparamslash", "autoremoveslash", "banghist", "bareglobqual",
-                        "completeinword", "extendedhistory", "functionargzero", "glob",
-                        "hashcmds", "hashdirs", "histexpand", "histignoredups",
-                        "interactivecomments", "listambiguous", "listtypes", "multios",
-                        "nomatch", "notify", "promptpercent", "promptsubst",
-                    ], vec![
-                        "ksharrays", "kshglob", "shwordsplit", "shglob", "posixbuiltins",
-                        "posixidentifiers", "posixstrings", "bsdecho", "ignorebraces",
-                    ])
+                    (
+                        vec![
+                            "aliases",
+                            "alwayslastprompt",
+                            "autolist",
+                            "automenu",
+                            "autoparamslash",
+                            "autoremoveslash",
+                            "banghist",
+                            "bareglobqual",
+                            "completeinword",
+                            "extendedhistory",
+                            "functionargzero",
+                            "glob",
+                            "hashcmds",
+                            "hashdirs",
+                            "histexpand",
+                            "histignoredups",
+                            "interactivecomments",
+                            "listambiguous",
+                            "listtypes",
+                            "multios",
+                            "nomatch",
+                            "notify",
+                            "promptpercent",
+                            "promptsubst",
+                        ],
+                        vec![
+                            "ksharrays",
+                            "kshglob",
+                            "shwordsplit",
+                            "shglob",
+                            "posixbuiltins",
+                            "posixidentifiers",
+                            "posixstrings",
+                            "bsdecho",
+                            "ignorebraces",
+                        ],
+                    )
                 } else {
                     // Minimal changes for portability
                     (vec!["functionargzero"], vec!["ksharrays", "shwordsplit"])
@@ -11800,25 +12427,55 @@ impl ShellExecutor {
             }
             "sh" => {
                 let set = vec![
-                    "ksharrays", "shwordsplit", "posixbuiltins", "shglob",
-                    "shfileexpansion", "globsubst", "interactivecomments",
-                    "rmstarsilent", "bsdecho", "ignorebraces",
+                    "ksharrays",
+                    "shwordsplit",
+                    "posixbuiltins",
+                    "shglob",
+                    "shfileexpansion",
+                    "globsubst",
+                    "interactivecomments",
+                    "rmstarsilent",
+                    "bsdecho",
+                    "ignorebraces",
                 ];
                 let unset = vec![
-                    "badpattern", "banghist", "bgnice", "equals", "functionargzero",
-                    "globalexport", "multios", "nomatch", "notify", "promptpercent",
+                    "badpattern",
+                    "banghist",
+                    "bgnice",
+                    "equals",
+                    "functionargzero",
+                    "globalexport",
+                    "multios",
+                    "nomatch",
+                    "notify",
+                    "promptpercent",
                 ];
                 (set, unset)
             }
             "ksh" => {
                 let set = vec![
-                    "ksharrays", "kshglob", "shwordsplit", "posixbuiltins",
-                    "kshoptionprint", "localoptions", "promptbang", "promptsubst",
-                    "singlelinezle", "interactivecomments",
+                    "ksharrays",
+                    "kshglob",
+                    "shwordsplit",
+                    "posixbuiltins",
+                    "kshoptionprint",
+                    "localoptions",
+                    "promptbang",
+                    "promptsubst",
+                    "singlelinezle",
+                    "interactivecomments",
                 ];
                 let unset = vec![
-                    "badpattern", "banghist", "bgnice", "equals", "functionargzero",
-                    "globalexport", "multios", "nomatch", "notify", "promptpercent",
+                    "badpattern",
+                    "banghist",
+                    "bgnice",
+                    "equals",
+                    "functionargzero",
+                    "globalexport",
+                    "multios",
+                    "nomatch",
+                    "notify",
+                    "promptpercent",
                 ];
                 (set, unset)
             }
@@ -11828,16 +12485,24 @@ impl ShellExecutor {
             }
             "bash" => {
                 let set = vec![
-                    "ksharrays", "shwordsplit", "interactivecomments",
-                    "shfileexpansion", "globsubst",
+                    "ksharrays",
+                    "shwordsplit",
+                    "interactivecomments",
+                    "shfileexpansion",
+                    "globsubst",
                 ];
                 let unset = vec![
-                    "badpattern", "banghist", "functionargzero", "multios",
-                    "nomatch", "notify", "promptpercent",
+                    "badpattern",
+                    "banghist",
+                    "functionargzero",
+                    "multios",
+                    "nomatch",
+                    "notify",
+                    "promptpercent",
                 ];
                 (set, unset)
             }
-            _ => (vec![], vec![])
+            _ => (vec![], vec![]),
         }
     }
 
@@ -11847,16 +12512,16 @@ impl ShellExecutor {
         // -c: clear environment
         // -l: place - at front of argv[0] (login shell)
         // -a argv0: set argv[0] to specified name
-        
+
         let mut clear_env = false;
         let mut login_shell = false;
         let mut argv0: Option<String> = None;
         let mut cmd_args: Vec<String> = Vec::new();
-        
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "-c" && cmd_args.is_empty() {
                 clear_env = true;
             } else if arg == "-l" && cmd_args.is_empty() {
@@ -11886,7 +12551,7 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         if cmd_args.is_empty() {
             // No command: just modify shell's environment
             if clear_env {
@@ -11899,7 +12564,7 @@ impl ShellExecutor {
 
         let cmd = &cmd_args[0];
         let rest_args: Vec<&str> = cmd_args[1..].iter().map(|s| s.as_str()).collect();
-        
+
         // Determine argv[0]
         let effective_argv0 = if let Some(a0) = argv0 {
             a0
@@ -11913,11 +12578,11 @@ impl ShellExecutor {
         let mut command = std::process::Command::new(cmd);
         command.arg0(&effective_argv0);
         command.args(&rest_args);
-        
+
         if clear_env {
             command.env_clear();
         }
-        
+
         let err = command.exec();
         eprintln!("exec: {}: {}", cmd, err);
         1
@@ -12034,7 +12699,7 @@ impl ShellExecutor {
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "--" {
                 i += 1;
                 while i < args.len() {
@@ -12043,15 +12708,28 @@ impl ShellExecutor {
                 }
                 break;
             }
-            
-            if arg.starts_with('-') && arg.len() > 1 && !arg.chars().nth(1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+
+            if arg.starts_with('-')
+                && arg.len() > 1
+                && !arg
+                    .chars()
+                    .nth(1)
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            {
                 let mut chars = arg[1..].chars().peekable();
                 while let Some(ch) = chars.next() {
                     match ch {
                         'n' => no_newline = true,
                         'l' => one_per_line = true,
-                        'r' => { raw_mode = true; interpret_escapes = false; }
-                        'R' => { raw_mode = true; interpret_escapes = false; }
+                        'r' => {
+                            raw_mode = true;
+                            interpret_escapes = false;
+                        }
+                        'R' => {
+                            raw_mode = true;
+                            interpret_escapes = false;
+                        }
                         'e' => interpret_escapes = true,
                         'E' => interpret_escapes = false,
                         'P' => prompt_expand = true,
@@ -12146,32 +12824,35 @@ impl ShellExecutor {
         }
 
         // Process output
-        let processed: Vec<String> = output_args.iter().map(|s| {
-            let mut result = s.clone();
-            if prompt_expand {
-                result = self.expand_prompt_string(&result);
-            }
-            if interpret_escapes && !raw_mode {
-                result = self.expand_printf_escapes(&result);
-            }
-            if named_dir_subst {
-                // Replace home dir with ~
-                if let Ok(home) = env::var("HOME") {
-                    if result.starts_with(&home) {
-                        result = format!("~{}", &result[home.len()..]);
+        let processed: Vec<String> = output_args
+            .iter()
+            .map(|s| {
+                let mut result = s.clone();
+                if prompt_expand {
+                    result = self.expand_prompt_string(&result);
+                }
+                if interpret_escapes && !raw_mode {
+                    result = self.expand_printf_escapes(&result);
+                }
+                if named_dir_subst {
+                    // Replace home dir with ~
+                    if let Ok(home) = env::var("HOME") {
+                        if result.starts_with(&home) {
+                            result = format!("~{}", &result[home.len()..]);
+                        }
+                    }
+                    // Replace named dirs
+                    for (name, path) in &self.named_dirs {
+                        let path_str = path.to_string_lossy();
+                        if result.starts_with(path_str.as_ref()) {
+                            result = format!("~{}{}", name, &result[path_str.len()..]);
+                            break;
+                        }
                     }
                 }
-                // Replace named dirs
-                for (name, path) in &self.named_dirs {
-                    let path_str = path.to_string_lossy();
-                    if result.starts_with(path_str.as_ref()) {
-                        result = format!("~{}{}", name, &result[path_str.len()..]);
-                        break;
-                    }
-                }
-            }
-            result
-        }).collect();
+                result
+            })
+            .collect();
 
         // Determine separator and terminator
         let separator = if one_per_line { "\n" } else { " " };
@@ -12222,15 +12903,15 @@ impl ShellExecutor {
         } else {
             print!("{}{}", output, terminator);
         }
-        
+
         0
     }
-    
+
     fn printf_format(&self, format: &str, args: &[String]) -> String {
         let mut result = String::new();
         let mut arg_idx = 0;
         let mut chars = format.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
             if ch == '%' {
                 if chars.peek() == Some(&'%') {
@@ -12238,10 +12919,10 @@ impl ShellExecutor {
                     result.push('%');
                     continue;
                 }
-                
+
                 // Parse format specifier
                 let mut spec = String::from("%");
-                
+
                 // Flags
                 while let Some(&c) = chars.peek() {
                     if c == '-' || c == '+' || c == ' ' || c == '#' || c == '0' {
@@ -12251,7 +12932,7 @@ impl ShellExecutor {
                         break;
                     }
                 }
-                
+
                 // Width
                 while let Some(&c) = chars.peek() {
                     if c.is_ascii_digit() {
@@ -12261,7 +12942,7 @@ impl ShellExecutor {
                         break;
                     }
                 }
-                
+
                 // Precision
                 if chars.peek() == Some(&'.') {
                     spec.push('.');
@@ -12275,12 +12956,12 @@ impl ShellExecutor {
                         }
                     }
                 }
-                
+
                 // Conversion specifier
                 if let Some(conv) = chars.next() {
                     let arg = args.get(arg_idx).map(|s| s.as_str()).unwrap_or("");
                     arg_idx += 1;
-                    
+
                     match conv {
                         's' => result.push_str(arg),
                         'd' | 'i' => {
@@ -12326,7 +13007,7 @@ impl ShellExecutor {
                 result.push(ch);
             }
         }
-        
+
         result
     }
 
@@ -12343,7 +13024,7 @@ impl ShellExecutor {
         // -s: show symlink resolution
         // -S: show steps of symlink resolution
         // -x num: expand tabs to num spaces
-        
+
         let mut verbose = false;
         let mut csh_style = false;
         let mut word_type = false;
@@ -12359,7 +13040,7 @@ impl ShellExecutor {
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
-            
+
             if arg == "--" {
                 i += 1;
                 while i < args.len() {
@@ -12368,7 +13049,7 @@ impl ShellExecutor {
                 }
                 break;
             }
-            
+
             if arg.starts_with('-') && arg.len() > 1 {
                 let mut chars = arg[1..].chars().peekable();
                 while let Some(ch) = chars.next() {
@@ -12429,7 +13110,7 @@ impl ShellExecutor {
                         continue;
                     }
                 }
-                
+
                 // Check aliases
                 if let Some(alias_val) = self.aliases.get(name) {
                     found = true;
@@ -12477,7 +13158,7 @@ impl ShellExecutor {
                         continue;
                     }
                 }
-                
+
                 // Check hashed commands (named_dirs can serve as a command hash)
                 // The hash builtin adds to named_dirs for now
                 if let Some(path) = self.named_dirs.get(name) {
@@ -12500,7 +13181,7 @@ impl ShellExecutor {
             if let Some(path) = self.find_in_path(name) {
                 found = true;
                 word = "command";
-                
+
                 // Handle symlink resolution
                 let display_path = if show_symlink || show_symlink_steps {
                     let p = std::path::Path::new(&path);
@@ -12511,7 +13192,10 @@ impl ShellExecutor {
                             let resolved = if target.is_absolute() {
                                 target.clone()
                             } else {
-                                current.parent().unwrap_or(std::path::Path::new("/")).join(&target)
+                                current
+                                    .parent()
+                                    .unwrap_or(std::path::Path::new("/"))
+                                    .join(&target)
                             };
                             steps.push(resolved.to_string_lossy().to_string());
                             current = resolved;
@@ -12526,7 +13210,7 @@ impl ShellExecutor {
                 } else {
                     path.clone()
                 };
-                
+
                 if word_type {
                     println!("{}: {}", name, word);
                 } else if verbose {
@@ -12547,13 +13231,33 @@ impl ShellExecutor {
         }
         status
     }
-    
+
     fn is_reserved_word(&self, name: &str) -> bool {
         matches!(
             name,
-            "if" | "then" | "else" | "elif" | "fi" | "case" | "esac" | "for" | "select" |
-            "while" | "until" | "do" | "done" | "in" | "function" | "time" | "coproc" |
-            "{" | "}" | "!" | "[[" | "]]" | "((" | "))"
+            "if" | "then"
+                | "else"
+                | "elif"
+                | "fi"
+                | "case"
+                | "esac"
+                | "for"
+                | "select"
+                | "while"
+                | "until"
+                | "do"
+                | "done"
+                | "in"
+                | "function"
+                | "time"
+                | "coproc"
+                | "{"
+                | "}"
+                | "!"
+                | "[["
+                | "]]"
+                | "(("
+                | "))"
         )
     }
 
@@ -12913,11 +13617,11 @@ impl ShellExecutor {
         // -d: rehash named directories
         // -f: force rehash of all commands in PATH
         // -v: verbose (print each command being hashed)
-        
+
         let mut rehash_dirs = false;
         let mut force = false;
         let mut verbose = false;
-        
+
         for arg in args {
             if arg.starts_with('-') {
                 for ch in arg[1..].chars() {
@@ -12930,7 +13634,7 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         if rehash_dirs {
             // Rebuild named directories from special params like ~user
             // For now just clear and rebuild from HOME
@@ -12940,10 +13644,10 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         // Clear command hash table
         self.command_hash.clear();
-        
+
         if force {
             // Rebuild entire hash table from PATH
             if let Ok(path_var) = env::var("PATH") {
@@ -12966,7 +13670,7 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         0
     }
 
@@ -13428,7 +14132,9 @@ impl ShellExecutor {
                                 if i < args.len() {
                                     args[i].clone()
                                 } else {
-                                    eprintln!("zsystem: flock: option t requires a numeric timeout");
+                                    eprintln!(
+                                        "zsystem: flock: option t requires a numeric timeout"
+                                    );
                                     return 1;
                                 }
                             };
@@ -13498,7 +14204,11 @@ impl ShellExecutor {
                 l_pid: 0,
             };
 
-            let cmd = if timeout.is_some() { libc::F_SETLK } else { libc::F_SETLKW };
+            let cmd = if timeout.is_some() {
+                libc::F_SETLK
+            } else {
+                libc::F_SETLKW
+            };
             let start = std::time::Instant::now();
             let timeout_duration = timeout.map(|t| std::time::Duration::from_secs_f64(t));
 
@@ -13517,7 +14227,11 @@ impl ShellExecutor {
                 }
                 let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
                 if errno != libc::EACCES && errno != libc::EAGAIN {
-                    eprintln!("zsystem: flock: {}: {}", filepath, std::io::Error::last_os_error());
+                    eprintln!(
+                        "zsystem: flock: {}: {}",
+                        filepath,
+                        std::io::Error::last_os_error()
+                    );
                     return 1;
                 }
                 if let Some(td) = timeout_duration {
@@ -13526,7 +14240,11 @@ impl ShellExecutor {
                     }
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 } else {
-                    eprintln!("zsystem: flock: {}: {}", filepath, std::io::Error::last_os_error());
+                    eprintln!(
+                        "zsystem: flock: {}: {}",
+                        filepath,
+                        std::io::Error::last_os_error()
+                    );
                     return 1;
                 }
             }
@@ -13845,10 +14563,7 @@ impl ShellExecutor {
         0
     }
 
-    fn copy_dir_recursive(
-        src: &std::path::Path,
-        dest: &std::path::Path,
-    ) -> std::io::Result<()> {
+    fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
         if !dest.exists() {
             std::fs::create_dir_all(dest)?;
         }
@@ -14081,7 +14796,8 @@ impl ShellExecutor {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+                if let Err(e) =
+                    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
                 {
                     eprintln!("chmod: changing permissions of '{}': {}", path.display(), e);
                     return 1;
@@ -14716,7 +15432,7 @@ impl ShellExecutor {
     /// sched - scheduled command execution (stub)
     fn builtin_sched(&mut self, args: &[String]) -> i32 {
         use std::time::{Duration, SystemTime};
-        
+
         if args.is_empty() {
             // List scheduled commands
             if self.scheduled_commands.is_empty() {
@@ -14729,7 +15445,7 @@ impl ShellExecutor {
             }
             return 0;
         }
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -14758,7 +15474,7 @@ impl ShellExecutor {
                     let secs: u64 = args[i].parse().unwrap_or(0);
                     i += 1;
                     let command = args[i..].join(" ");
-                    
+
                     let id = self.scheduled_commands.len() as u32 + 1;
                     self.scheduled_commands.push(ScheduledCommand {
                         id,
@@ -14774,18 +15490,18 @@ impl ShellExecutor {
                         let hour: u32 = parts[0].parse().unwrap_or(0);
                         let min: u32 = parts[1].parse().unwrap_or(0);
                         let sec: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
-                        
+
                         // Calculate duration until that time today/tomorrow
                         let now = SystemTime::now();
                         let target_secs = (hour * 3600 + min * 60 + sec) as u64;
                         let _day_secs = 86400u64;
-                        
+
                         // Simplified: just add as seconds from now
                         let run_at = now + Duration::from_secs(target_secs);
-                        
+
                         i += 1;
                         let command = args[i..].join(" ");
-                        
+
                         let id = self.scheduled_commands.len() as u32 + 1;
                         self.scheduled_commands.push(ScheduledCommand {
                             id,
@@ -15028,7 +15744,7 @@ impl ShellExecutor {
                 }
                 let _array_name = &args[1];
                 let sep = &args[2];
-                
+
                 let mut results = Vec::new();
                 for spec in &args[3..] {
                     let parts: Vec<&str> = spec.splitn(3, ':').collect();
@@ -15036,20 +15752,20 @@ impl ShellExecutor {
                         let text = parts[0];
                         let value = parts[1];
                         let cond = parts.get(2).copied();
-                        
+
                         // If condition exists and is empty/false, skip
                         if let Some(c) = cond {
                             if c.is_empty() || c == "0" {
                                 continue;
                             }
                         }
-                        
+
                         if !value.is_empty() {
                             results.push(format!("{}{}{}", text, sep, value));
                         }
                     }
                 }
-                
+
                 for r in results {
                     println!("{}", r);
                 }
@@ -15223,7 +15939,7 @@ impl ShellExecutor {
     fn builtin_zpty(&mut self, args: &[String]) -> i32 {
         use std::io::{Read, Write};
         use std::process::{Command, Stdio};
-        
+
         if args.is_empty() {
             // List all ptys
             if self.zptys.is_empty() {
@@ -15266,7 +15982,7 @@ impl ShellExecutor {
                     let name = args[i].clone();
                     i += 1;
                     let data = args[i..].join(" ") + "\n";
-                    
+
                     if let Some(state) = self.zptys.get_mut(&name) {
                         if let Some(ref mut stdin) = state.stdin {
                             if stdin.write_all(data.as_bytes()).is_ok() {
@@ -15295,7 +16011,7 @@ impl ShellExecutor {
                     } else {
                         "REPLY".to_string()
                     };
-                    
+
                     if let Some(state) = self.zptys.get_mut(&name) {
                         if let Some(ref mut stdout) = state.stdout {
                             let mut buf = vec![0u8; 4096];
@@ -15346,7 +16062,7 @@ impl ShellExecutor {
                         return 1;
                     }
                     let cmd_str = args[i..].join(" ");
-                    
+
                     match Command::new("sh")
                         .arg("-c")
                         .arg(&cmd_str)
@@ -15359,14 +16075,17 @@ impl ShellExecutor {
                             let pid = child.id();
                             let stdin = child.stdin.take();
                             let stdout = child.stdout.take();
-                            
-                            self.zptys.insert(name.to_string(), ZptyState {
-                                pid,
-                                cmd: cmd_str,
-                                stdin,
-                                stdout,
-                                child: Some(child),
-                            });
+
+                            self.zptys.insert(
+                                name.to_string(),
+                                ZptyState {
+                                    pid,
+                                    cmd: cmd_str,
+                                    stdin,
+                                    stdout,
+                                    child: Some(child),
+                                },
+                            );
                             return 0;
                         }
                         Err(e) => {
@@ -15387,11 +16106,11 @@ impl ShellExecutor {
     /// zprof - profiling support
     fn builtin_zprof(&mut self, args: &[String]) -> i32 {
         use crate::zprof::ZprofOptions;
-        
+
         let options = ZprofOptions {
             clear: args.iter().any(|a| a == "-c"),
         };
-        
+
         let (status, output) = crate::zprof::builtin_zprof(&mut self.profiler, &options);
         if !output.is_empty() {
             print!("{}", output);
@@ -15402,15 +16121,23 @@ impl ShellExecutor {
     /// zsocket - create/manage sockets
     fn builtin_zsocket(&mut self, args: &[String]) -> i32 {
         use std::os::unix::net::{UnixListener, UnixStream};
-        
+
         if args.is_empty() {
             // List open sockets
             if self.unix_sockets.is_empty() {
                 return 0;
             }
             for (fd, state) in &self.unix_sockets {
-                let path = state.path.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
-                let status = if state.listening { "listening" } else { "connected" };
+                let path = state
+                    .path
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default();
+                let status = if state.listening {
+                    "listening"
+                } else {
+                    "connected"
+                };
                 println!("{}: {} ({})", fd, path, status);
             }
             return 0;
@@ -15419,7 +16146,7 @@ impl ShellExecutor {
         let mut i = 0;
         let mut verbose = false;
         let mut var_name = "REPLY".to_string();
-        
+
         while i < args.len() {
             match args[i].as_str() {
                 "-v" => {
@@ -15437,22 +16164,25 @@ impl ShellExecutor {
                         return 1;
                     }
                     let path = PathBuf::from(&args[i]);
-                    
+
                     // Remove existing socket file
                     let _ = std::fs::remove_file(&path);
-                    
+
                     match UnixListener::bind(&path) {
                         Ok(listener) => {
                             let fd = self.next_fd;
                             self.next_fd += 1;
-                            
-                            self.unix_sockets.insert(fd, UnixSocketState {
-                                path: Some(path),
-                                listening: true,
-                                stream: None,
-                                listener: Some(listener),
-                            });
-                            
+
+                            self.unix_sockets.insert(
+                                fd,
+                                UnixSocketState {
+                                    path: Some(path),
+                                    listening: true,
+                                    stream: None,
+                                    listener: Some(listener),
+                                },
+                            );
+
                             if verbose {
                                 self.variables.insert(var_name.clone(), fd.to_string());
                             }
@@ -15473,21 +16203,24 @@ impl ShellExecutor {
                         return 1;
                     }
                     let listen_fd: i32 = args[i].parse().unwrap_or(-1);
-                    
+
                     if let Some(state) = self.unix_sockets.get(&listen_fd) {
                         if let Some(ref listener) = state.listener {
                             match listener.accept() {
                                 Ok((stream, _addr)) => {
                                     let new_fd = self.next_fd;
                                     self.next_fd += 1;
-                                    
-                                    self.unix_sockets.insert(new_fd, UnixSocketState {
-                                        path: None,
-                                        listening: false,
-                                        stream: Some(stream),
-                                        listener: None,
-                                    });
-                                    
+
+                                    self.unix_sockets.insert(
+                                        new_fd,
+                                        UnixSocketState {
+                                            path: None,
+                                            listening: false,
+                                            stream: Some(stream),
+                                            listener: None,
+                                        },
+                                    );
+
                                     if verbose {
                                         self.variables.insert(var_name.clone(), new_fd.to_string());
                                     }
@@ -15512,7 +16245,7 @@ impl ShellExecutor {
                         return 1;
                     }
                     let fd: i32 = args[i].parse().unwrap_or(-1);
-                    
+
                     if let Some(state) = self.unix_sockets.remove(&fd) {
                         if let Some(path) = state.path {
                             let _ = std::fs::remove_file(path);
@@ -15528,14 +16261,17 @@ impl ShellExecutor {
                         Ok(stream) => {
                             let fd = self.next_fd;
                             self.next_fd += 1;
-                            
-                            self.unix_sockets.insert(fd, UnixSocketState {
-                                path: Some(PathBuf::from(path)),
-                                listening: false,
-                                stream: Some(stream),
-                                listener: None,
-                            });
-                            
+
+                            self.unix_sockets.insert(
+                                fd,
+                                UnixSocketState {
+                                    path: Some(PathBuf::from(path)),
+                                    listening: false,
+                                    stream: Some(stream),
+                                    listener: None,
+                                },
+                            );
+
                             if verbose {
                                 self.variables.insert(var_name.clone(), fd.to_string());
                             }
@@ -15581,32 +16317,36 @@ impl ShellExecutor {
                 if let Some(captures) = re.captures(&string) {
                     // Store full match in var
                     if let Some(m) = captures.get(0) {
-                        self.variables.insert(var_name.clone(), m.as_str().to_string());
+                        self.variables
+                            .insert(var_name.clone(), m.as_str().to_string());
                     }
-                    
+
                     // Store capture groups in MATCH array
                     let mut match_array = Vec::new();
                     let mut mbegin_array = Vec::new();
                     let mut mend_array = Vec::new();
-                    
+
                     for (i, cap) in captures.iter().enumerate() {
                         if let Some(c) = cap {
                             match_array.push(c.as_str().to_string());
                             mbegin_array.push((c.start() + 1).to_string());
                             mend_array.push(c.end().to_string());
-                            self.variables.insert(format!("match[{}]", i), c.as_str().to_string());
+                            self.variables
+                                .insert(format!("match[{}]", i), c.as_str().to_string());
                         }
                     }
                     self.arrays.insert("match".to_string(), match_array);
                     self.arrays.insert("mbegin".to_string(), mbegin_array);
                     self.arrays.insert("mend".to_string(), mend_array);
-                    
+
                     // Store match positions
                     if let Some(m) = captures.get(0) {
-                        self.variables.insert("MBEGIN".to_string(), (m.start() + 1).to_string());
-                        self.variables.insert("MEND".to_string(), m.end().to_string());
+                        self.variables
+                            .insert("MBEGIN".to_string(), (m.start() + 1).to_string());
+                        self.variables
+                            .insert("MEND".to_string(), m.end().to_string());
                     }
-                    
+
                     0
                 } else {
                     1
@@ -15622,28 +16362,27 @@ impl ShellExecutor {
     /// clone - create a subshell with forked state
     fn builtin_clone(&mut self, args: &[String]) -> i32 {
         use std::process::Command;
-        
+
         // clone creates a subshell that shares the parent's state
         // We simulate this by spawning a new zshrs process
-        let mut cmd = Command::new(std::env::current_exe().unwrap_or_else(|_| PathBuf::from("zshrs")));
-        
+        let mut cmd =
+            Command::new(std::env::current_exe().unwrap_or_else(|_| PathBuf::from("zshrs")));
+
         if !args.is_empty() {
             // If args provided, run them in the subshell
             cmd.arg("-c").arg(args.join(" "));
         }
-        
+
         // Export current variables to child
         for (k, v) in &self.variables {
             cmd.env(k, v);
         }
-        
+
         match cmd.spawn() {
-            Ok(mut child) => {
-                match child.wait() {
-                    Ok(status) => status.code().unwrap_or(0),
-                    Err(_) => 1,
-                }
-            }
+            Ok(mut child) => match child.wait() {
+                Ok(status) => status.code().unwrap_or(0),
+                Err(_) => 1,
+            },
             Err(e) => {
                 eprintln!("clone: failed to spawn subshell: {}", e);
                 1
@@ -15951,7 +16690,7 @@ impl ShellExecutor {
     /// sysopen - open file descriptor (zsh/system module)
     fn builtin_sysopen(&mut self, args: &[String]) -> i32 {
         use std::fs::OpenOptions;
-        
+
         let mut filename = String::new();
         let mut var_name = "REPLY".to_string();
         let mut read = false;
@@ -15959,7 +16698,7 @@ impl ShellExecutor {
         let mut append = false;
         let mut create = false;
         let mut truncate = false;
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -15985,17 +16724,17 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         if filename.is_empty() {
             eprintln!("sysopen: need filename");
             return 1;
         }
-        
+
         // Default to read if nothing specified
         if !read && !write && !append {
             read = true;
         }
-        
+
         let file = OpenOptions::new()
             .read(read)
             .write(write || append || truncate)
@@ -16003,7 +16742,7 @@ impl ShellExecutor {
             .create(create || write)
             .truncate(truncate)
             .open(&filename);
-        
+
         match file {
             Ok(f) => {
                 let fd = self.next_fd;
@@ -16022,11 +16761,11 @@ impl ShellExecutor {
     /// sysseek - seek on file descriptor (zsh/system module)
     fn builtin_sysseek(&mut self, args: &[String]) -> i32 {
         use std::io::{Seek, SeekFrom};
-        
+
         let mut fd = -1i32;
         let mut offset = 0i64;
         let mut whence = SeekFrom::Start(0);
-        
+
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -16054,19 +16793,19 @@ impl ShellExecutor {
             }
             i += 1;
         }
-        
+
         if fd < 0 {
             eprintln!("sysseek: need fd (-u)");
             return 1;
         }
-        
+
         // Update whence with actual offset
         whence = match whence {
             SeekFrom::Start(_) => SeekFrom::Start(offset as u64),
             SeekFrom::Current(_) => SeekFrom::Current(offset),
             SeekFrom::End(_) => SeekFrom::End(offset),
         };
-        
+
         if let Some(file) = self.open_fds.get_mut(&fd) {
             match file.seek(whence) {
                 Ok(pos) => {
@@ -16289,23 +17028,43 @@ impl ShellExecutor {
 
     /// promptinit - initialize prompt theme system
     fn builtin_promptinit(&mut self, _args: &[String]) -> i32 {
-        self.arrays.insert("prompt_themes".to_string(), vec![
-            "adam1".to_string(), "adam2".to_string(), "bart".to_string(),
-            "bigfade".to_string(), "clint".to_string(), "default".to_string(),
-            "elite".to_string(), "elite2".to_string(), "fade".to_string(),
-            "fire".to_string(), "minimal".to_string(), "off".to_string(),
-            "oliver".to_string(), "pws".to_string(), "redhat".to_string(),
-            "restore".to_string(), "suse".to_string(), "walters".to_string(),
-            "zefram".to_string(),
-        ]);
-        self.variables.insert("prompt_theme".to_string(), "default".to_string());
+        self.arrays.insert(
+            "prompt_themes".to_string(),
+            vec![
+                "adam1".to_string(),
+                "adam2".to_string(),
+                "bart".to_string(),
+                "bigfade".to_string(),
+                "clint".to_string(),
+                "default".to_string(),
+                "elite".to_string(),
+                "elite2".to_string(),
+                "fade".to_string(),
+                "fire".to_string(),
+                "minimal".to_string(),
+                "off".to_string(),
+                "oliver".to_string(),
+                "pws".to_string(),
+                "redhat".to_string(),
+                "restore".to_string(),
+                "suse".to_string(),
+                "walters".to_string(),
+                "zefram".to_string(),
+            ],
+        );
+        self.variables
+            .insert("prompt_theme".to_string(), "default".to_string());
         0
     }
 
     /// prompt - set or list prompt themes
     fn builtin_prompt(&mut self, args: &[String]) -> i32 {
         if args.is_empty() {
-            let theme = self.variables.get("prompt_theme").cloned().unwrap_or_else(|| "default".to_string());
+            let theme = self
+                .variables
+                .get("prompt_theme")
+                .cloned()
+                .unwrap_or_else(|| "default".to_string());
             println!("Current prompt theme: {}", theme);
             return 0;
         }
@@ -16344,7 +17103,10 @@ impl ShellExecutor {
         let (ps1, rps1) = match theme {
             "minimal" => ("%# ", ""),
             "off" => ("$ ", ""),
-            "adam1" => ("%B%F{cyan}%n@%m %F{blue}%~%f%b %# ", "%F{yellow}%D{%H:%M}%f"),
+            "adam1" => (
+                "%B%F{cyan}%n@%m %F{blue}%~%f%b %# ",
+                "%F{yellow}%D{%H:%M}%f",
+            ),
             "redhat" => ("[%n@%m %~]$ ", ""),
             _ => ("%n@%m %~ %# ", ""),
         };
@@ -16354,17 +17116,18 @@ impl ShellExecutor {
         } else {
             self.variables.insert("PS1".to_string(), ps1.to_string());
             self.variables.insert("RPS1".to_string(), rps1.to_string());
-            self.variables.insert("prompt_theme".to_string(), theme.to_string());
+            self.variables
+                .insert("prompt_theme".to_string(), theme.to_string());
         }
     }
 
     /// pcre_compile - compile a PCRE pattern
     fn builtin_pcre_compile(&mut self, args: &[String]) -> i32 {
         use crate::pcre::{pcre_compile, PcreCompileOptions};
-        
+
         let mut pattern = String::new();
         let mut options = PcreCompileOptions::default();
-        
+
         for arg in args {
             match arg.as_str() {
                 "-a" => options.anchored = true,
@@ -16376,12 +17139,12 @@ impl ShellExecutor {
                 _ => {}
             }
         }
-        
+
         if pattern.is_empty() {
             eprintln!("pcre_compile: no pattern specified");
             return 1;
         }
-        
+
         match pcre_compile(&pattern, &options, &mut self.pcre_state) {
             Ok(()) => 0,
             Err(e) => {
@@ -16394,37 +17157,46 @@ impl ShellExecutor {
     /// pcre_match - match string against compiled PCRE
     fn builtin_pcre_match(&mut self, args: &[String]) -> i32 {
         use crate::pcre::{pcre_match, PcreMatchOptions};
-        
+
         let mut var_name = "MATCH".to_string();
         let mut array_name = "match".to_string();
         let mut string = String::new();
         let mut i = 0;
-        
+
         while i < args.len() {
             match args[i].as_str() {
-                "-v" => { i += 1; if i < args.len() { var_name = args[i].clone(); } }
-                "-a" => { i += 1; if i < args.len() { array_name = args[i].clone(); } }
+                "-v" => {
+                    i += 1;
+                    if i < args.len() {
+                        var_name = args[i].clone();
+                    }
+                }
+                "-a" => {
+                    i += 1;
+                    if i < args.len() {
+                        array_name = args[i].clone();
+                    }
+                }
                 s if !s.starts_with('-') => string = s.to_string(),
                 _ => {}
             }
             i += 1;
         }
-        
+
         let options = PcreMatchOptions {
             match_var: Some(var_name.clone()),
             array_var: Some(array_name.clone()),
             ..Default::default()
         };
-        
+
         match pcre_match(&string, &options, &self.pcre_state) {
             Ok(result) => {
                 if result.matched {
                     if let Some(m) = result.full_match {
                         self.variables.insert(var_name, m);
                     }
-                    let matches: Vec<String> = result.captures.into_iter()
-                        .filter_map(|c| c)
-                        .collect();
+                    let matches: Vec<String> =
+                        result.captures.into_iter().filter_map(|c| c).collect();
                     self.arrays.insert(array_name, matches);
                     0
                 } else {
@@ -16441,7 +17213,7 @@ impl ShellExecutor {
     /// pcre_study - optimize compiled PCRE (no-op in Rust regex)
     fn builtin_pcre_study(&mut self, _args: &[String]) -> i32 {
         use crate::pcre::pcre_study;
-        
+
         match pcre_study(&self.pcre_state) {
             Ok(()) => 0,
             Err(e) => {
@@ -16450,17 +17222,17 @@ impl ShellExecutor {
             }
         }
     }
-    
+
     // =========================================================================
     // Process control functions - Port from exec.c
     // =========================================================================
-    
+
     /// Fork a new process
     /// Port of zfork() from exec.c
     pub fn zfork(&mut self, flags: ForkFlags) -> std::io::Result<ForkResult> {
         // Check for job control
         let can_background = self.options.get("monitor").copied().unwrap_or(false);
-        
+
         unsafe {
             match libc::fork() {
                 -1 => Err(std::io::Error::last_os_error()),
@@ -16476,12 +17248,12 @@ impl ShellExecutor {
                             libc::tcsetpgrp(0, pid);
                         }
                     }
-                    
+
                     // Reset signal handlers
                     if !flags.contains(ForkFlags::KEEPSIGS) {
                         self.reset_signals();
                     }
-                    
+
                     Ok(ForkResult::Child)
                 }
                 pid => {
@@ -16495,13 +17267,13 @@ impl ShellExecutor {
             }
         }
     }
-    
+
     /// Add a child process to tracking
     fn add_child_process(&mut self, pid: i32) {
         // Would track in job table
         self.variables.insert("!".to_string(), pid.to_string());
     }
-    
+
     /// Reset signal handlers to defaults
     fn reset_signals(&self) {
         unsafe {
@@ -16514,102 +17286,115 @@ impl ShellExecutor {
             libc::signal(libc::SIGCHLD, libc::SIG_DFL);
         }
     }
-    
+
     /// Execute a command in the current process (exec family)
     /// Port of zexecve() from exec.c
     pub fn zexecve(&self, cmd: &str, args: &[String]) -> ! {
         use std::ffi::CString;
         use std::os::unix::ffi::OsStrExt;
-        
+
         let c_cmd = CString::new(cmd).expect("CString::new failed");
-        
+
         // Build argv
         let c_args: Vec<CString> = std::iter::once(c_cmd.clone())
             .chain(args.iter().map(|s| CString::new(s.as_str()).unwrap()))
             .collect();
-        
+
         let c_argv: Vec<*const libc::c_char> = c_args
             .iter()
             .map(|s| s.as_ptr())
             .chain(std::iter::once(std::ptr::null()))
             .collect();
-        
+
         // Build envp from current environment
         let env_vars: Vec<CString> = std::env::vars()
             .map(|(k, v)| CString::new(format!("{}={}", k, v)).unwrap())
             .collect();
-        
+
         let c_envp: Vec<*const libc::c_char> = env_vars
             .iter()
             .map(|s| s.as_ptr())
             .chain(std::iter::once(std::ptr::null()))
             .collect();
-        
+
         unsafe {
             libc::execve(c_cmd.as_ptr(), c_argv.as_ptr(), c_envp.as_ptr());
             // If we get here, exec failed
-            eprintln!("zshrs: exec failed: {}: {}", cmd, std::io::Error::last_os_error());
+            eprintln!(
+                "zshrs: exec failed: {}: {}",
+                cmd,
+                std::io::Error::last_os_error()
+            );
             std::process::exit(127);
         }
     }
-    
+
     /// Enter a subshell
     /// Port of entersubsh() from exec.c
     pub fn entersubsh(&mut self, flags: SubshellFlags) {
         // Increment subshell level
-        let level = self.get_variable("ZSH_SUBSHELL")
+        let level = self
+            .get_variable("ZSH_SUBSHELL")
             .parse::<i32>()
             .unwrap_or(0);
-        self.variables.insert("ZSH_SUBSHELL".to_string(), (level + 1).to_string());
-        
+        self.variables
+            .insert("ZSH_SUBSHELL".to_string(), (level + 1).to_string());
+
         // Handle job control
         if flags.contains(SubshellFlags::NOMONITOR) {
             self.options.insert("monitor".to_string(), false);
         }
-        
+
         // Close unneeded fds
         if !flags.contains(SubshellFlags::KEEPFDS) {
             self.close_extra_fds();
         }
-        
+
         // Reset traps
         if !flags.contains(SubshellFlags::KEEPTRAPS) {
             self.reset_traps();
         }
     }
-    
+
     /// Close extra file descriptors
     fn close_extra_fds(&self) {
         // Close fds > 10 (common shell convention)
         for fd in 10..256 {
-            unsafe { libc::close(fd); }
+            unsafe {
+                libc::close(fd);
+            }
         }
     }
-    
+
     /// Reset all traps
     fn reset_traps(&mut self) {
         self.traps.clear();
     }
-    
+
     /// Execute a shell function
     /// Port of doshfunc() from exec.c
-    pub fn doshfunc(&mut self, name: &str, func: &ShellCommand, args: &[String]) -> Result<i32, String> {
+    pub fn doshfunc(
+        &mut self,
+        name: &str,
+        func: &ShellCommand,
+        args: &[String],
+    ) -> Result<i32, String> {
         // Save current state
         let old_argv = self.positional_params.clone();
         let old_funcstack = self.arrays.get("funcstack").cloned();
         let old_funcsourcetrace = self.arrays.get("funcsourcetrace").cloned();
-        
+
         // Set positional parameters to function arguments
         self.positional_params = args.to_vec();
-        
+
         // Update funcstack
         let mut funcstack = old_funcstack.clone().unwrap_or_default();
         funcstack.insert(0, name.to_string());
         self.arrays.insert("funcstack".to_string(), funcstack);
-        
+
         // Execute function body
         let result = self.execute_command(func);
-        
+
         // Restore state
         self.positional_params = old_argv;
         if let Some(fs) = old_funcstack {
@@ -16620,37 +17405,45 @@ impl ShellExecutor {
         if let Some(fst) = old_funcsourcetrace {
             self.arrays.insert("funcsourcetrace".to_string(), fst);
         }
-        
+
         result
     }
-    
+
     /// Execute arithmetic expression
     /// Port of execarith() from exec.c
     pub fn execarith(&mut self, expr: &str) -> i32 {
         let result = self.eval_arith_expr(expr);
-        if result == 0 { 1 } else { 0 }
+        if result == 0 {
+            1
+        } else {
+            0
+        }
     }
-    
+
     /// Execute conditional expression
     /// Port of execcond() from exec.c
     pub fn execcond(&mut self, cond: &CondExpr) -> i32 {
-        if self.eval_cond_expr(cond) { 0 } else { 1 }
+        if self.eval_cond_expr(cond) {
+            0
+        } else {
+            1
+        }
     }
-    
+
     /// Execute command and capture time
     /// Port of exectime() from exec.c
     pub fn exectime(&mut self, cmd: &ShellCommand) -> Result<i32, String> {
         use std::time::Instant;
-        
+
         let start = Instant::now();
         let result = self.execute_command(cmd);
         let elapsed = start.elapsed();
-        
+
         // Print time in zsh format
-        let user_time = elapsed.as_secs_f64() * 0.7;  // Approximation
+        let user_time = elapsed.as_secs_f64() * 0.7; // Approximation
         let sys_time = elapsed.as_secs_f64() * 0.1;
         let real_time = elapsed.as_secs_f64();
-        
+
         eprintln!(
             "{:.2}s user {:.2}s system {:.0}% cpu {:.3} total",
             user_time,
@@ -16658,10 +17451,10 @@ impl ShellExecutor {
             ((user_time + sys_time) / real_time * 100.0).min(100.0),
             real_time
         );
-        
+
         result
     }
-    
+
     /// Find command in PATH
     /// Port of findcmd() from exec.c
     pub fn findcmd(&self, name: &str, do_hash: bool) -> Option<String> {
@@ -16673,7 +17466,7 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         // Search PATH
         if let Ok(path_var) = std::env::var("PATH") {
             for dir in path_var.split(':') {
@@ -16683,16 +17476,16 @@ impl ShellExecutor {
                 }
             }
         }
-        
+
         None
     }
-    
+
     /// Hash a command (add to command hash table)
     /// Port of hashcmd() from exec.c
     pub fn hashcmd(&mut self, name: &str, path: &str) {
         self.command_hash.insert(name.to_string(), path.to_string());
     }
-    
+
     /// Check if command exists and is executable
     /// Port of iscom() from exec.c
     pub fn iscom(&self, name: &str) -> bool {
@@ -16700,37 +17493,39 @@ impl ShellExecutor {
         if self.is_builtin_cmd(name) {
             return true;
         }
-        
+
         // Check if it's a function
         if self.functions.contains_key(name) {
             return true;
         }
-        
+
         // Check if it's an alias
         if self.aliases.contains_key(name) {
             return true;
         }
-        
+
         // Check in PATH
         self.findcmd(name, true).is_some()
     }
-    
+
     /// Check if name is a builtin (process control version)
     fn is_builtin_cmd(&self, name: &str) -> bool {
         let builtins = Self::get_builtin_names();
         builtins.contains(&name)
     }
-    
+
     /// Close all file descriptors except stdin/stdout/stderr
     /// Port of closem() from exec.c
     pub fn closem(&self, exceptions: &[i32]) {
         for fd in 3..256 {
             if !exceptions.contains(&fd) {
-                unsafe { libc::close(fd); }
+                unsafe {
+                    libc::close(fd);
+                }
             }
         }
     }
-    
+
     /// Create a pipe
     /// Port of mpipe() from exec.c
     pub fn mpipe(&self) -> std::io::Result<(i32, i32)> {
@@ -16742,7 +17537,7 @@ impl ShellExecutor {
             Ok((fds[0], fds[1]))
         }
     }
-    
+
     /// Add a file descriptor for redirection
     /// Port of addfd() from exec.c
     pub fn addfd(&self, fd: i32, target_fd: i32, mode: RedirMode) -> std::io::Result<()> {
@@ -16756,38 +17551,39 @@ impl ShellExecutor {
                     }
                 }
             }
-            RedirMode::Close => {
-                unsafe { libc::close(target_fd); }
-            }
+            RedirMode::Close => unsafe {
+                libc::close(target_fd);
+            },
         }
         Ok(())
     }
-    
+
     /// Get heredoc content
     /// Port of gethere() from exec.c
     pub fn gethere(&mut self, terminator: &str, strip_tabs: bool) -> String {
         let mut content = String::new();
-        
+
         // Would read until terminator is found
         // This is simplified - real impl reads from input
-        
+
         if strip_tabs {
-            content = content.lines()
+            content = content
+                .lines()
                 .map(|line| line.trim_start_matches('\t'))
                 .collect::<Vec<_>>()
                 .join("\n");
         }
-        
+
         content
     }
-    
+
     /// Get herestring content
     /// Port of getherestr() from exec.c
     pub fn getherestr(&mut self, word: &str) -> String {
         let expanded = self.expand_string(word);
         format!("{}\n", expanded)
     }
-    
+
     /// Resolve a builtin command
     /// Port of resolvebuiltin() from exec.c
     pub fn resolvebuiltin(&self, name: &str) -> Option<BuiltinType> {
@@ -16798,17 +17594,17 @@ impl ShellExecutor {
             None
         }
     }
-    
+
     /// Check if cd is possible
     /// Port of cancd() from exec.c
     pub fn cancd(&self, path_str: &str) -> bool {
         use std::os::unix::fs::PermissionsExt;
-        
+
         let path = std::path::Path::new(path_str);
         if !path.is_dir() {
             return false;
         }
-        
+
         if let Ok(meta) = path.metadata() {
             let mode = meta.permissions().mode();
             // Check execute permission (needed for cd)
@@ -16816,7 +17612,7 @@ impl ShellExecutor {
             let gid = unsafe { libc::getgid() };
             let file_uid = meta.uid();
             let file_gid = meta.gid();
-            
+
             if uid == file_uid {
                 return (mode & 0o100) != 0;
             } else if gid == file_gid {
@@ -16825,10 +17621,10 @@ impl ShellExecutor {
                 return (mode & 0o001) != 0;
             }
         }
-        
+
         false
     }
-    
+
     /// Command not found handler
     /// Port of commandnotfound() from exec.c
     pub fn commandnotfound(&mut self, name: &str, args: &[String]) -> i32 {
@@ -16836,14 +17632,14 @@ impl ShellExecutor {
         if self.functions.contains_key("command_not_found_handler") {
             let mut handler_args = vec![name.to_string()];
             handler_args.extend(args.iter().cloned());
-            
+
             if let Some(func) = self.functions.get("command_not_found_handler").cloned() {
                 if let Ok(code) = self.doshfunc("command_not_found_handler", &func, &handler_args) {
                     return code;
                 }
             }
         }
-        
+
         eprintln!("zshrs: command not found: {}", name);
         127
     }
@@ -16875,7 +17671,7 @@ bitflags::bitflags! {
 /// Result of fork operation
 #[derive(Debug)]
 pub enum ForkResult {
-    Parent(i32),  // Contains child PID
+    Parent(i32), // Contains child PID
     Child,
 }
 

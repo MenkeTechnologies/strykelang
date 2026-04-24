@@ -125,10 +125,7 @@ pub fn truecolor_to_256(r: u8, g: u8, b: u8) -> u8 {
     let color_idx = rgb_to_256(r, g, b);
 
     let (cr, cg, cb) = color_256_to_rgb(color_idx);
-    let color_dist = color_distance_sq(
-        &ColorEntry::new(r, g, b),
-        &ColorEntry::new(cr, cg, cb),
-    );
+    let color_dist = color_distance_sq(&ColorEntry::new(r, g, b), &ColorEntry::new(cr, cg, cb));
 
     let avg = ((r as u32 + g as u32 + b as u32) / 3) as u8;
     let gray_idx = if avg < 8 {
@@ -140,10 +137,7 @@ pub fn truecolor_to_256(r: u8, g: u8, b: u8) -> u8 {
     };
 
     let (gr, gg, gb) = color_256_to_rgb(gray_idx);
-    let gray_dist = color_distance_sq(
-        &ColorEntry::new(r, g, b),
-        &ColorEntry::new(gr, gg, gb),
-    );
+    let gray_dist = color_distance_sq(&ColorEntry::new(r, g, b), &ColorEntry::new(gr, gg, gb));
 
     if gray_dist < color_dist {
         gray_idx

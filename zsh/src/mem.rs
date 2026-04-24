@@ -9,7 +9,7 @@
 use std::cell::RefCell;
 
 /// A memory arena for temporary allocations
-/// 
+///
 /// This provides push/pop semantics similar to zsh's heap management,
 /// but uses Rust's standard memory management under the hood.
 pub struct HeapArena {
@@ -119,7 +119,7 @@ pub fn zshcalloc<T: Default>() -> Box<T> {
 }
 
 /// Reallocate memory (Rust handles this automatically with Vec)
-pub fn zrealloc<T>(v: &mut Vec<T>, new_size: usize) 
+pub fn zrealloc<T>(v: &mut Vec<T>, new_size: usize)
 where
     T: Default + Clone,
 {
@@ -209,7 +209,10 @@ pub fn sepsplit(s: &str, sep: &str, allow_empty: bool) -> Vec<String> {
     if allow_empty {
         s.split(sep).map(|s| s.to_string()).collect()
     } else {
-        s.split(sep).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect()
+        s.split(sep)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
@@ -324,12 +327,12 @@ mod tests {
     fn test_heap_push_pop() {
         let mut arena = HeapArena::new();
         assert_eq!(arena.depth(), 1);
-        
+
         arena.push();
         assert_eq!(arena.depth(), 2);
-        
+
         arena.alloc_string("test".to_string());
-        
+
         arena.pop();
         assert_eq!(arena.depth(), 1);
     }
@@ -337,10 +340,10 @@ mod tests {
     #[test]
     fn test_heap_free_current() {
         let mut arena = HeapArena::new();
-        
+
         arena.alloc_string("test1".to_string());
         arena.alloc_bytes(vec![1, 2, 3]);
-        
+
         arena.free_current();
         // Arena still at depth 1
         assert_eq!(arena.depth(), 1);
@@ -349,20 +352,20 @@ mod tests {
     #[test]
     fn test_nested_generations() {
         let mut arena = HeapArena::new();
-        
+
         arena.alloc_string("level1".to_string());
-        
+
         arena.push();
         arena.alloc_string("level2".to_string());
-        
+
         arena.push();
         arena.alloc_string("level3".to_string());
-        
+
         assert_eq!(arena.depth(), 3);
-        
+
         arena.pop();
         assert_eq!(arena.depth(), 2);
-        
+
         arena.pop();
         assert_eq!(arena.depth(), 1);
     }

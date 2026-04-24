@@ -110,7 +110,6 @@ impl FilesOpts {
     }
 }
 
-
 /// Check if filename matches a glob pattern
 fn matches_glob(name: &str, pattern: &str) -> bool {
     // Simple glob matching - supports * and ?

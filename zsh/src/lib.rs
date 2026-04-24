@@ -22,61 +22,68 @@
 pub mod attr;
 pub mod cap;
 pub mod clone;
-pub mod tokens;
-pub mod lexer;
-pub mod parser;
-pub mod exec;
-pub mod completion;
-pub mod fds;
-pub mod history;
-pub mod jobs;
-pub mod cond;
-pub mod glob;
-pub mod math;
-pub mod options;
-pub mod pattern;
-pub mod prompt;pub mod text;
 pub mod compat;
-pub mod input;
-pub mod signals;
-pub mod sort;
-pub mod stringsort;
-pub mod linklist;
+pub mod completion;
+pub mod cond;
 pub mod context;
 pub mod curses;
+pub mod datetime;
+pub mod db_gdbm;
+pub mod exec;
+pub mod fds;
+pub mod files;
+pub mod fish_features;
+pub mod glob;
 pub mod hashnameddir;
-pub mod mem;
-pub mod init;
+pub mod hashtable;
 pub mod hist;
+pub mod history;
 pub mod hlgroup;
+pub mod init;
+pub mod input;
+pub mod jobs;
 pub mod ksh93;
 pub mod langinfo;
+pub mod lexer;
+pub mod linklist;
+pub mod loop_port;
 pub mod mapfile;
-pub mod subst;
-pub mod subst_port;
-pub mod subscript;
-pub mod params;
-pub mod pcre;
-pub mod utils;
-pub mod hashtable;
-pub mod sched;
-pub mod rlimits;
-pub mod socket;
-pub mod datetime;
-pub mod files;
+pub mod math;
 pub mod mathfunc;
+pub mod mem;
+pub mod modentry;
+pub mod module;
 pub mod nearcolor;
 pub mod newuser;
+pub mod options;
 pub mod param_private;
 pub mod parameter;
+pub mod params;
+pub mod parser;
+pub mod pattern;
+pub mod pcre;
+pub mod prompt;
 pub mod random;
 pub mod random_real;
 pub mod regex_mod;
+pub mod rlimits;
+pub mod sched;
+pub mod signals;
+pub mod socket;
+pub mod sort;
 pub mod stat;
+pub mod string_port;
+pub mod stringsort;
+pub mod subscript;
+pub mod subst;
+pub mod subst_port;
 pub mod system;
 pub mod tcp;
 pub mod termcap;
 pub mod terminfo;
+pub mod text;
+pub mod tokens;
+pub mod utils;
 pub mod watch;
 pub mod zftp;
 pub mod zle;
@@ -85,28 +92,38 @@ pub mod zpty;
 pub mod zselect;
 pub mod zutil;
 pub mod zwc;
-pub mod fish_features;
-pub mod db_gdbm;
-pub mod string_port;
-pub mod loop_port;
-pub mod module;
-pub mod modentry;
 
-pub use tokens::{char_tokens, LexTok};
-pub use lexer::ZshLexer;
-pub use parser::ZshParser;
 pub use exec::ShellExecutor;
 pub use fish_features::{
+    autosuggest_from_history,
+    colorize_line,
+    expand_abbreviation,
     // Syntax highlighting
-    highlight_shell, colorize_line, HighlightRole, HighlightSpec,
-    // Abbreviations
-    Abbreviation, AbbrPosition, AbbreviationSet, with_abbrs, with_abbrs_mut, expand_abbreviation,
-    // Autosuggestions
-    Autosuggestion, autosuggest_from_history, validate_autosuggestion,
-    // Killring
-    kill_add, kill_replace, kill_yank, kill_yank_rotate, KillRing,
-    // Validation
-    validate_command, ValidationStatus,
+    highlight_shell,
     // Private mode
-    is_private_mode, set_private_mode,
+    is_private_mode,
+    // Killring
+    kill_add,
+    kill_replace,
+    kill_yank,
+    kill_yank_rotate,
+    set_private_mode,
+    validate_autosuggestion,
+    // Validation
+    validate_command,
+    with_abbrs,
+    with_abbrs_mut,
+    AbbrPosition,
+    // Abbreviations
+    Abbreviation,
+    AbbreviationSet,
+    // Autosuggestions
+    Autosuggestion,
+    HighlightRole,
+    HighlightSpec,
+    KillRing,
+    ValidationStatus,
 };
+pub use lexer::ZshLexer;
+pub use parser::ZshParser;
+pub use tokens::{char_tokens, LexTok};

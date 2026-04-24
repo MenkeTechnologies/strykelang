@@ -621,7 +621,7 @@ impl<'a> ShellLexer<'a> {
             self.at_line_start = true;
             return ShellToken::Newline;
         }
-        
+
         self.at_line_start = false;
 
         if c == ';' {
@@ -752,8 +752,15 @@ impl<'a> ShellLexer<'a> {
                         pattern.push(self.next_char().unwrap());
                         if ch == ']' {
                             while let Some(c2) = self.peek() {
-                                if c2.is_whitespace() || c2 == ';' || c2 == '&' || c2 == '|' 
-                                   || c2 == '<' || c2 == '>' || c2 == ')' || c2 == '\n' {
+                                if c2.is_whitespace()
+                                    || c2 == ';'
+                                    || c2 == '&'
+                                    || c2 == '|'
+                                    || c2 == '<'
+                                    || c2 == '>'
+                                    || c2 == ')'
+                                    || c2 == '\n'
+                                {
                                     break;
                                 }
                                 pattern.push(self.next_char().unwrap());
@@ -805,8 +812,15 @@ impl<'a> ShellLexer<'a> {
                         }
                     }
                     while let Some(ch) = self.peek() {
-                        if ch.is_whitespace() || ch == ';' || ch == '&' || ch == '|'
-                            || ch == '<' || ch == '>' || ch == '(' || ch == ')' {
+                        if ch.is_whitespace()
+                            || ch == ';'
+                            || ch == '&'
+                            || ch == '|'
+                            || ch == '<'
+                            || ch == '>'
+                            || ch == '('
+                            || ch == ')'
+                        {
                             break;
                         }
                         word.push(self.next_char().unwrap());
@@ -843,7 +857,13 @@ impl<'a> ShellLexer<'a> {
                     }
                 }
                 while let Some(ch) = self.peek() {
-                    if ch.is_whitespace() || ch == ';' || ch == '&' || ch == '|' || ch == '<' || ch == '>' {
+                    if ch.is_whitespace()
+                        || ch == ';'
+                        || ch == '&'
+                        || ch == '|'
+                        || ch == '<'
+                        || ch == '>'
+                    {
                         break;
                     }
                     word.push(self.next_char().unwrap());
@@ -853,9 +873,23 @@ impl<'a> ShellLexer<'a> {
             return ShellToken::Bang;
         }
 
-        if c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-'
-            || c == '$' || c == '\'' || c == '"' || c == '~' || c == '*'
-            || c == '?' || c == '%' || c == '+' || c == '@' || c == ':' || c == '=' {
+        if c.is_alphanumeric()
+            || c == '_'
+            || c == '/'
+            || c == '.'
+            || c == '-'
+            || c == '$'
+            || c == '\''
+            || c == '"'
+            || c == '~'
+            || c == '*'
+            || c == '?'
+            || c == '%'
+            || c == '+'
+            || c == '@'
+            || c == ':'
+            || c == '='
+        {
             return self.read_word();
         }
 
@@ -1195,8 +1229,9 @@ impl<'a> ShellLexer<'a> {
             "coproc" => ShellToken::Coproc,
             "repeat" => ShellToken::Repeat,
             "always" => ShellToken::Always,
-            "typeset" | "local" | "declare" | "export" | "readonly" 
-                | "integer" | "float" => ShellToken::Typeset,
+            "typeset" | "local" | "declare" | "export" | "readonly" | "integer" | "float" => {
+                ShellToken::Typeset
+            }
             _ => ShellToken::Word(word),
         }
     }
@@ -1304,7 +1339,7 @@ impl<'a> ShellParser<'a> {
             self.advance();
         }
     }
-    
+
     fn skip_separators(&mut self) {
         while self.current == ShellToken::Newline || self.current == ShellToken::Semi {
             self.advance();
@@ -1439,14 +1474,14 @@ impl<'a> ShellParser<'a> {
                     self.expect(ShellToken::RParen)?;
                     Ok(ShellCommand::Compound(CompoundCommand::Subshell(body)))
                 }
-            },
+            }
             ShellToken::DoubleLBracket => self.parse_cond_command(),
             ShellToken::DoubleLParen => self.parse_arith_command(),
             ShellToken::Function => self.parse_function(),
             ShellToken::Coproc => self.parse_coproc(),
             _ => self.parse_simple_command(),
         }?;
-        
+
         let mut redirects = Vec::new();
         loop {
             if let ShellToken::Word(w) = &self.current {
@@ -1454,9 +1489,15 @@ impl<'a> ShellParser<'a> {
                     let fd_str = w.clone();
                     self.advance();
                     match &self.current {
-                        ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
-                        | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
-                        | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                        ShellToken::Less
+                        | ShellToken::Greater
+                        | ShellToken::GreaterGreater
+                        | ShellToken::LessAmp
+                        | ShellToken::GreaterAmp
+                        | ShellToken::LessLess
+                        | ShellToken::LessLessLess
+                        | ShellToken::LessGreater
+                        | ShellToken::GreaterPipe => {
                             let fd = fd_str.parse::<i32>().ok();
                             redirects.push(self.parse_redirect_with_fd(fd)?);
                             continue;
@@ -1465,18 +1506,25 @@ impl<'a> ShellParser<'a> {
                     }
                 }
             }
-            
+
             match &self.current {
-                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
-                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
-                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe
-                | ShellToken::AmpGreater | ShellToken::AmpGreaterGreater => {
+                ShellToken::Less
+                | ShellToken::Greater
+                | ShellToken::GreaterGreater
+                | ShellToken::LessAmp
+                | ShellToken::GreaterAmp
+                | ShellToken::LessLess
+                | ShellToken::LessLessLess
+                | ShellToken::LessGreater
+                | ShellToken::GreaterPipe
+                | ShellToken::AmpGreater
+                | ShellToken::AmpGreaterGreater => {
                     redirects.push(self.parse_redirect_with_fd(None)?);
                 }
                 _ => break,
             }
         }
-        
+
         if !redirects.is_empty() {
             Ok(ShellCommand::Compound(CompoundCommand::WithRedirects(
                 Box::new(cmd),
@@ -1503,9 +1551,15 @@ impl<'a> ShellParser<'a> {
                             let saved_word = w.clone();
                             self.advance();
                             match &self.current {
-                                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
-                                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
-                                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                                ShellToken::Less
+                                | ShellToken::Greater
+                                | ShellToken::GreaterGreater
+                                | ShellToken::LessAmp
+                                | ShellToken::GreaterAmp
+                                | ShellToken::LessLess
+                                | ShellToken::LessLessLess
+                                | ShellToken::LessGreater
+                                | ShellToken::GreaterPipe => {
                                     let mut redir = self.parse_redirect_with_fd(None)?;
                                     redir.fd_var = Some(varname);
                                     cmd.redirects.push(redir);
@@ -1518,14 +1572,20 @@ impl<'a> ShellParser<'a> {
                             }
                         }
                     }
-                    
+
                     if w.chars().all(|c| c.is_ascii_digit()) {
                         let fd_str = w.clone();
                         self.advance();
                         match &self.current {
-                            ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
-                            | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
-                            | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe => {
+                            ShellToken::Less
+                            | ShellToken::Greater
+                            | ShellToken::GreaterGreater
+                            | ShellToken::LessAmp
+                            | ShellToken::GreaterAmp
+                            | ShellToken::LessLess
+                            | ShellToken::LessLessLess
+                            | ShellToken::LessGreater
+                            | ShellToken::GreaterPipe => {
                                 let fd = fd_str.parse::<i32>().ok();
                                 cmd.redirects.push(self.parse_redirect_with_fd(fd)?);
                                 continue;
@@ -1536,7 +1596,7 @@ impl<'a> ShellParser<'a> {
                             }
                         }
                     }
-                    
+
                     if cmd.words.is_empty() && w.contains('=') && !w.starts_with('=') {
                         let (eq_pos, is_append) = if let Some(pos) = w.find("+=") {
                             (pos, true)
@@ -1545,12 +1605,12 @@ impl<'a> ShellParser<'a> {
                         } else {
                             (0, false)
                         };
-                        
+
                         if eq_pos > 0 {
                             let var = w[..eq_pos].to_string();
                             let val_start = if is_append { eq_pos + 2 } else { eq_pos + 1 };
                             let val = w[val_start..].to_string();
-                            
+
                             let is_valid_var = if let Some(bracket_pos) = var.find('[') {
                                 let name = &var[..bracket_pos];
                                 let rest = &var[bracket_pos..];
@@ -1563,9 +1623,14 @@ impl<'a> ShellParser<'a> {
                                 if val.starts_with('(') && val.ends_with(')') {
                                     let array_content = &val[1..val.len() - 1];
                                     let elements = Self::parse_array_elements(array_content);
-                                    cmd.assignments.push((var, ShellWord::ArrayLiteral(elements), is_append));
+                                    cmd.assignments.push((
+                                        var,
+                                        ShellWord::ArrayLiteral(elements),
+                                        is_append,
+                                    ));
                                 } else {
-                                    cmd.assignments.push((var, ShellWord::Literal(val), is_append));
+                                    cmd.assignments
+                                        .push((var, ShellWord::Literal(val), is_append));
                                 }
                                 self.advance();
                                 continue;
@@ -1588,11 +1653,23 @@ impl<'a> ShellParser<'a> {
                         break;
                     }
                 }
-                ShellToken::If | ShellToken::Then | ShellToken::Else | ShellToken::Elif
-                | ShellToken::Fi | ShellToken::Case | ShellToken::Esac | ShellToken::For
-                | ShellToken::While | ShellToken::Until | ShellToken::Do | ShellToken::Done
-                | ShellToken::In | ShellToken::Function | ShellToken::Select
-                | ShellToken::Time | ShellToken::Coproc => {
+                ShellToken::If
+                | ShellToken::Then
+                | ShellToken::Else
+                | ShellToken::Elif
+                | ShellToken::Fi
+                | ShellToken::Case
+                | ShellToken::Esac
+                | ShellToken::For
+                | ShellToken::While
+                | ShellToken::Until
+                | ShellToken::Do
+                | ShellToken::Done
+                | ShellToken::In
+                | ShellToken::Function
+                | ShellToken::Select
+                | ShellToken::Time
+                | ShellToken::Coproc => {
                     if !cmd.words.is_empty() {
                         cmd.words.push(self.parse_word()?);
                     } else {
@@ -1609,10 +1686,17 @@ impl<'a> ShellParser<'a> {
                     }
                 }
 
-                ShellToken::Less | ShellToken::Greater | ShellToken::GreaterGreater
-                | ShellToken::LessAmp | ShellToken::GreaterAmp | ShellToken::LessLess
-                | ShellToken::LessLessLess | ShellToken::LessGreater | ShellToken::GreaterPipe
-                | ShellToken::AmpGreater | ShellToken::AmpGreaterGreater
+                ShellToken::Less
+                | ShellToken::Greater
+                | ShellToken::GreaterGreater
+                | ShellToken::LessAmp
+                | ShellToken::GreaterAmp
+                | ShellToken::LessLess
+                | ShellToken::LessLessLess
+                | ShellToken::LessGreater
+                | ShellToken::GreaterPipe
+                | ShellToken::AmpGreater
+                | ShellToken::AmpGreaterGreater
                 | ShellToken::HereDoc(_, _) => {
                     cmd.redirects.push(self.parse_redirect_with_fd(None)?);
                 }
@@ -1715,30 +1799,30 @@ impl<'a> ShellParser<'a> {
         let mut conditions = Vec::new();
         let mut else_part = None;
         let mut usebrace = false;
-        
+
         let mut xtok = self.current.clone();
         loop {
             if xtok == ShellToken::Fi {
                 self.advance();
                 break;
             }
-            
+
             self.advance();
-            
+
             if xtok == ShellToken::Else {
                 break;
             }
-            
+
             self.skip_separators();
-            
+
             if xtok != ShellToken::If && xtok != ShellToken::Elif {
                 return Err(format!("Expected If or Elif, got {:?}", xtok));
             }
-            
+
             let cond = self.parse_compound_list_until(&[ShellToken::Then, ShellToken::LBrace])?;
             self.skip_separators();
             xtok = ShellToken::Fi;
-            
+
             if self.current == ShellToken::Then {
                 usebrace = false;
                 self.advance();
@@ -1758,21 +1842,24 @@ impl<'a> ShellParser<'a> {
                     break;
                 }
             } else {
-                return Err(format!("Expected Then or LBrace after condition, got {:?}", self.current));
+                return Err(format!(
+                    "Expected Then or LBrace after condition, got {:?}",
+                    self.current
+                ));
             }
-            
+
             xtok = self.current.clone();
             if xtok != ShellToken::Elif && xtok != ShellToken::Else && xtok != ShellToken::Fi {
                 break;
             }
         }
-        
+
         if xtok == ShellToken::Else || self.current == ShellToken::Else {
             if self.current == ShellToken::Else {
                 self.advance();
             }
             self.skip_separators();
-            
+
             if self.current == ShellToken::LBrace && usebrace {
                 self.advance();
                 self.skip_separators();
@@ -1791,7 +1878,7 @@ impl<'a> ShellParser<'a> {
                 else_part = Some(body);
             }
         }
-        
+
         Ok(ShellCommand::Compound(CompoundCommand::If {
             conditions,
             else_part,
@@ -1892,11 +1979,25 @@ impl<'a> ShellParser<'a> {
                     current_part.push(' ');
                     self.advance();
                 }
-                ShellToken::Less => { current_part.push('<'); self.advance(); }
-                ShellToken::Greater => { current_part.push('>'); self.advance(); }
-                ShellToken::LessLess => { current_part.push_str("<<"); self.advance(); }
-                ShellToken::GreaterGreater => { current_part.push_str(">>"); self.advance(); }
-                _ => { self.advance(); }
+                ShellToken::Less => {
+                    current_part.push('<');
+                    self.advance();
+                }
+                ShellToken::Greater => {
+                    current_part.push('>');
+                    self.advance();
+                }
+                ShellToken::LessLess => {
+                    current_part.push_str("<<");
+                    self.advance();
+                }
+                ShellToken::GreaterGreater => {
+                    current_part.push_str(">>");
+                    self.advance();
+                }
+                _ => {
+                    self.advance();
+                }
             }
         }
         parts.push(current_part.trim().to_string());
@@ -1905,7 +2006,9 @@ impl<'a> ShellParser<'a> {
         self.skip_newlines();
 
         match &self.current {
-            ShellToken::Semi | ShellToken::Newline => { self.advance(); }
+            ShellToken::Semi | ShellToken::Newline => {
+                self.advance();
+            }
             _ => {}
         }
         self.skip_newlines();
@@ -1927,7 +2030,7 @@ impl<'a> ShellParser<'a> {
         self.expect(ShellToken::While)?;
         let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
         self.skip_separators();
-        
+
         let body = if self.current == ShellToken::LBrace {
             self.advance();
             let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
@@ -1950,7 +2053,7 @@ impl<'a> ShellParser<'a> {
         self.expect(ShellToken::Until)?;
         let condition = self.parse_compound_list_until(&[ShellToken::Do, ShellToken::LBrace])?;
         self.skip_separators();
-        
+
         let body = if self.current == ShellToken::LBrace {
             self.advance();
             let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
@@ -2000,9 +2103,18 @@ impl<'a> ShellParser<'a> {
             let body = self.parse_compound_list()?;
 
             let term = match &self.current {
-                ShellToken::DoubleSemi => { self.advance(); CaseTerminator::Break }
-                ShellToken::SemiAmp => { self.advance(); CaseTerminator::Fallthrough }
-                ShellToken::SemiSemiAmp => { self.advance(); CaseTerminator::Continue }
+                ShellToken::DoubleSemi => {
+                    self.advance();
+                    CaseTerminator::Break
+                }
+                ShellToken::SemiAmp => {
+                    self.advance();
+                    CaseTerminator::Fallthrough
+                }
+                ShellToken::SemiSemiAmp => {
+                    self.advance();
+                    CaseTerminator::Continue
+                }
                 _ => CaseTerminator::Break,
             };
 
@@ -2020,7 +2132,7 @@ impl<'a> ShellParser<'a> {
 
     fn parse_repeat(&mut self) -> Result<ShellCommand, String> {
         self.expect(ShellToken::Repeat)?;
-        
+
         let count = match &self.current {
             ShellToken::Word(w) => {
                 let c = w.clone();
@@ -2029,9 +2141,9 @@ impl<'a> ShellParser<'a> {
             }
             _ => return Err("expected count after 'repeat'".to_string()),
         };
-        
+
         self.skip_separators();
-        
+
         let body = if self.current == ShellToken::LBrace {
             self.advance();
             self.skip_newlines();
@@ -2044,7 +2156,7 @@ impl<'a> ShellParser<'a> {
             self.expect(ShellToken::Done)?;
             body
         };
-        
+
         Ok(ShellCommand::Compound(CompoundCommand::Repeat {
             count,
             body,
@@ -2056,20 +2168,22 @@ impl<'a> ShellParser<'a> {
         self.skip_newlines();
         let try_body = self.parse_compound_list()?;
         self.expect(ShellToken::RBrace)?;
-        
+
         if self.current == ShellToken::Always {
             self.advance();
             self.expect(ShellToken::LBrace)?;
             self.skip_newlines();
             let always_body = self.parse_compound_list()?;
             self.expect(ShellToken::RBrace)?;
-            
+
             Ok(ShellCommand::Compound(CompoundCommand::Try {
                 try_body,
                 always_body,
             }))
         } else {
-            Ok(ShellCommand::Compound(CompoundCommand::BraceGroup(try_body)))
+            Ok(ShellCommand::Compound(CompoundCommand::BraceGroup(
+                try_body,
+            )))
         }
     }
 
@@ -2122,57 +2236,90 @@ impl<'a> ShellParser<'a> {
                 "=" | "==" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::StringEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::StringEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "!=" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::StringNotEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::StringNotEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "=~" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::StringMatch(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::StringMatch(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-eq" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-ne" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumNotEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumNotEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-lt" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumLess(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumLess(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-le" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumLessEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumLessEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-gt" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumGreater(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumGreater(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "-ge" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::NumGreaterEqual(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::NumGreaterEqual(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "<" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::StringLess(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::StringLess(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 ">" => {
                     let left = tokens[..i].join(" ");
                     let right = tokens[i + 1..].join(" ");
-                    return Ok(CondExpr::StringGreater(ShellWord::Literal(left), ShellWord::Literal(right)));
+                    return Ok(CondExpr::StringGreater(
+                        ShellWord::Literal(left),
+                        ShellWord::Literal(right),
+                    ));
                 }
                 "&&" => {
                     let left = self.parse_cond_tokens(&tokens[..i])?;
@@ -2218,12 +2365,20 @@ impl<'a> ShellParser<'a> {
 
         while depth > 0 {
             match &self.current {
-                ShellToken::DoubleLParen => { depth += 1; expr.push_str("(("); }
+                ShellToken::DoubleLParen => {
+                    depth += 1;
+                    expr.push_str("((");
+                }
                 ShellToken::DoubleRParen => {
                     depth -= 1;
-                    if depth > 0 { expr.push_str("))"); }
+                    if depth > 0 {
+                        expr.push_str("))");
+                    }
                 }
-                ShellToken::Word(w) => { expr.push_str(w); expr.push(' '); }
+                ShellToken::Word(w) => {
+                    expr.push_str(w);
+                    expr.push(' ');
+                }
                 ShellToken::LParen => expr.push('('),
                 ShellToken::RParen => expr.push(')'),
                 ShellToken::LBracket => expr.push('['),
@@ -2239,7 +2394,9 @@ impl<'a> ShellParser<'a> {
             self.advance();
         }
 
-        Ok(ShellCommand::Compound(CompoundCommand::Arith(expr.trim().to_string())))
+        Ok(ShellCommand::Compound(CompoundCommand::Arith(
+            expr.trim().to_string(),
+        )))
     }
 
     fn parse_function(&mut self) -> Result<ShellCommand, String> {
@@ -2301,7 +2458,9 @@ impl<'a> ShellParser<'a> {
             let cmd = self.parse_list()?;
             commands.push(cmd);
             match &self.current {
-                ShellToken::Newline | ShellToken::Semi => { self.advance(); }
+                ShellToken::Newline | ShellToken::Semi => {
+                    self.advance();
+                }
                 _ => {}
             }
             self.skip_newlines();
@@ -2310,7 +2469,10 @@ impl<'a> ShellParser<'a> {
         Ok(commands)
     }
 
-    fn parse_compound_list_until(&mut self, terminators: &[ShellToken]) -> Result<Vec<ShellCommand>, String> {
+    fn parse_compound_list_until(
+        &mut self,
+        terminators: &[ShellToken],
+    ) -> Result<Vec<ShellCommand>, String> {
         let mut commands = Vec::new();
         self.skip_newlines();
 
@@ -2318,7 +2480,9 @@ impl<'a> ShellParser<'a> {
             let cmd = self.parse_list()?;
             commands.push(cmd);
             match &self.current {
-                ShellToken::Newline | ShellToken::Semi => { self.advance(); }
+                ShellToken::Newline | ShellToken::Semi => {
+                    self.advance();
+                }
                 _ => {}
             }
             self.skip_newlines();
@@ -2350,14 +2514,14 @@ impl<'a> ZshParser<'a> {
             recursion_depth: 0,
         }
     }
-    
+
     /// Check iteration limit; returns true if exceeded
     #[inline]
     fn check_limit(&mut self) -> bool {
         self.global_iterations += 1;
         self.global_iterations > 10_000
     }
-    
+
     /// Check recursion depth; returns true if exceeded
     #[inline]
     fn check_recursion(&mut self) -> bool {
@@ -2473,7 +2637,7 @@ impl<'a> ZshParser<'a> {
             self.recursion_depth -= 1;
             return None;
         }
-        
+
         let mut flags = SublistFlags::default();
 
         // Handle coproc and !
@@ -2520,7 +2684,7 @@ impl<'a> ZshParser<'a> {
             self.recursion_depth -= 1;
             return None;
         }
-        
+
         let lineno = self.lexer.toklineno;
         let cmd = match self.parse_cmd() {
             Some(c) => c,
@@ -2686,10 +2850,13 @@ impl<'a> ZshParser<'a> {
             // Array assignment: name=(...)
             let mut elements = Vec::new();
             self.lexer.zshlex(); // skip past token
-            
+
             let mut arr_iters = 0;
             const MAX_ARRAY_ELEMENTS: usize = 10_000;
-            while matches!(self.lexer.tok, LexTok::String | LexTok::Seper | LexTok::Newlin) {
+            while matches!(
+                self.lexer.tok,
+                LexTok::String | LexTok::Seper | LexTok::Newlin
+            ) {
                 arr_iters += 1;
                 if arr_iters > MAX_ARRAY_ELEMENTS {
                     self.error("array assignment exceeded maximum elements");
@@ -2881,25 +3048,25 @@ impl<'a> ZshParser<'a> {
         // Lexer returns:
         //   Dinpar None     - opening ((
         //   Dinpar "init"   - init expression, semicolon consumed
-        //   Dinpar "cond"   - cond expression, semicolon consumed  
+        //   Dinpar "cond"   - cond expression, semicolon consumed
         //   Doutpar "step"  - step expression, closing )) consumed
-        
+
         self.lexer.zshlex(); // Get init: Dinpar "i=0"
-        
+
         if self.lexer.tok != LexTok::Dinpar {
             self.error("expected init expression in for ((");
             return None;
         }
         let init = self.lexer.tokstr.clone().unwrap_or_default();
-        
+
         self.lexer.zshlex(); // Get cond: Dinpar "i<10"
-        
+
         if self.lexer.tok != LexTok::Dinpar {
             self.error("expected condition in for ((");
             return None;
         }
         let cond = self.lexer.tokstr.clone().unwrap_or_default();
-        
+
         self.lexer.zshlex(); // Get step: Doutpar "i++"
 
         if self.lexer.tok != LexTok::Doutpar {
@@ -2907,7 +3074,7 @@ impl<'a> ZshParser<'a> {
             return None;
         }
         let step = self.lexer.tokstr.clone().unwrap_or_default();
-        
+
         self.lexer.zshlex(); // Move past ))
 
         self.skip_separators();
@@ -2976,7 +3143,12 @@ impl<'a> ZshParser<'a> {
             // Note: 'esac' might be String "esac" if incasepat > 0 prevents reserved word recognition
             let is_esac = self.lexer.tok == LexTok::Esac
                 || (self.lexer.tok == LexTok::String
-                    && self.lexer.tokstr.as_ref().map(|s| s == "esac").unwrap_or(false));
+                    && self
+                        .lexer
+                        .tokstr
+                        .as_ref()
+                        .map(|s| s == "esac")
+                        .unwrap_or(false));
             if (use_brace && self.lexer.tok == LexTok::Outbrace) || (!use_brace && is_esac) {
                 self.lexer.incasepat = 0;
                 self.lexer.zshlex();
@@ -3107,7 +3279,8 @@ impl<'a> ZshParser<'a> {
                     LexTok::Elif => {
                         self.lexer.zshlex();
                         // elif condition stops at 'then' or '{'
-                        let econd = self.parse_program_until(Some(&[LexTok::Then, LexTok::Inbrace]));
+                        let econd =
+                            self.parse_program_until(Some(&[LexTok::Then, LexTok::Inbrace]));
                         self.skip_separators();
 
                         let elif_use_brace = self.lexer.tok == LexTok::Inbrace;
@@ -3125,7 +3298,11 @@ impl<'a> ZshParser<'a> {
                             }
                             body
                         } else {
-                            self.parse_program_until(Some(&[LexTok::Else, LexTok::Elif, LexTok::Fi]))
+                            self.parse_program_until(Some(&[
+                                LexTok::Else,
+                                LexTok::Elif,
+                                LexTok::Fi,
+                            ]))
                         };
 
                         elif.push((econd, ebody));
@@ -3420,7 +3597,7 @@ impl<'a> ZshParser<'a> {
             self.recursion_depth -= 1;
             return None;
         }
-        
+
         let left = match self.parse_cond_and() {
             Some(l) => l,
             None => {
@@ -3441,7 +3618,7 @@ impl<'a> ZshParser<'a> {
         } else {
             Some(left)
         };
-        
+
         self.recursion_depth -= 1;
         result
     }
@@ -3453,7 +3630,7 @@ impl<'a> ZshParser<'a> {
             self.recursion_depth -= 1;
             return None;
         }
-        
+
         let left = match self.parse_cond_not() {
             Some(l) => l,
             None => {
@@ -3474,7 +3651,7 @@ impl<'a> ZshParser<'a> {
         } else {
             Some(left)
         };
-        
+
         self.recursion_depth -= 1;
         result
     }
@@ -3486,13 +3663,18 @@ impl<'a> ZshParser<'a> {
             self.recursion_depth -= 1;
             return None;
         }
-        
+
         self.skip_cond_separators();
 
         // ! can be either LexTok::Bang or String "!"
         let is_not = self.lexer.tok == LexTok::Bang
             || (self.lexer.tok == LexTok::String
-                && self.lexer.tokstr.as_ref().map(|s| s == "!").unwrap_or(false));
+                && self
+                    .lexer
+                    .tokstr
+                    .as_ref()
+                    .map(|s| s == "!")
+                    .unwrap_or(false));
         if is_not {
             self.lexer.zshlex();
             let inner = match self.parse_cond_not() {

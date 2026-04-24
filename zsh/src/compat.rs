@@ -22,7 +22,10 @@ pub struct TimeSpec {
 
 impl TimeSpec {
     pub fn new(sec: i64, nsec: i64) -> Self {
-        TimeSpec { tv_sec: sec, tv_nsec: nsec }
+        TimeSpec {
+            tv_sec: sec,
+            tv_nsec: nsec,
+        }
     }
 
     pub fn now() -> Self {
@@ -54,7 +57,10 @@ impl std::ops::Sub for TimeSpec {
             sec -= 1;
             nsec += 1_000_000_000;
         }
-        TimeSpec { tv_sec: sec, tv_nsec: nsec }
+        TimeSpec {
+            tv_sec: sec,
+            tv_nsec: nsec,
+        }
     }
 }
 
@@ -85,8 +91,6 @@ pub fn difftime(t2: i64, t1: i64) -> f64 {
 pub fn zopenmax() -> i64 {
     #[cfg(unix)]
     {
-        
-        
         // Try to get from system
         unsafe {
             let max = libc::sysconf(libc::_SC_OPEN_MAX);
@@ -96,7 +100,7 @@ pub fn zopenmax() -> i64 {
             }
         }
     }
-    
+
     // Fallback
     1024
 }
@@ -143,7 +147,7 @@ pub fn zgetdir(d: Option<&mut DirSav>) -> Option<String> {
         }
         dirsav.dirname = Some(cwd_str.clone());
     }
-    
+
     #[cfg(not(unix))]
     if let Some(dirsav) = d {
         dirsav.dirname = Some(cwd_str.clone());
@@ -254,9 +258,7 @@ pub fn convbaseu(val: u64, base: u32) -> String {
 
 /// Get hostname
 pub fn gethostname() -> Option<String> {
-    hostname::get()
-        .ok()
-        .and_then(|h| h.into_string().ok())
+    hostname::get().ok().and_then(|h| h.into_string().ok())
 }
 
 /// Check if a character is printable (ASCII safe version)
@@ -301,7 +303,7 @@ pub fn metafy(s: &str) -> String {
 pub fn unmetafy(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\u{83}' {
             if let Some(&next) = chars.peek() {

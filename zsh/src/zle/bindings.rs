@@ -155,7 +155,7 @@ pub fn format_key_sequence(seq: &[u8]) -> String {
 /// Bind a key in a keymap
 pub fn bind_key(km: &mut KeymapManager, keymap: &str, seq: &str, widget: &str) -> bool {
     let seq_bytes = parse_key_sequence(seq);
-    
+
     if let Some(map) = km.keymaps.get_mut(keymap) {
         // We need to get mutable access - this is tricky with Arc
         // For now, this is a no-op as we'd need interior mutability
@@ -170,7 +170,7 @@ pub fn bind_key(km: &mut KeymapManager, keymap: &str, seq: &str, widget: &str) -
 /// Unbind a key in a keymap
 pub fn unbind_key(km: &mut KeymapManager, keymap: &str, seq: &str) -> bool {
     let seq_bytes = parse_key_sequence(seq);
-    
+
     if let Some(map) = km.keymaps.get_mut(keymap) {
         let _ = (map, seq_bytes);
         // TODO: implement proper binding removal

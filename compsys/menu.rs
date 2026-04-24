@@ -137,31 +137,35 @@ impl MenuColors {
         }
         colors
     }
-    
+
     /// Parse full ZLS_COLORS string (colon-separated)
     /// Supports: basic keys, extension patterns (*.ext), glob patterns, file type codes
     pub fn parse_zls_colors(zls_string: &str) -> (Self, ZlsColorPatterns) {
         let mut colors = Self::default();
         let mut patterns = ZlsColorPatterns::default();
-        
+
         for spec in zls_string.split(':') {
             if spec.is_empty() {
                 continue;
             }
-            
+
             if let Some((key, color)) = spec.split_once('=') {
                 // Check if it's an extension pattern
                 if key.starts_with('*') {
-                    patterns.extensions.push((key[1..].to_string(), color.to_string()));
+                    patterns
+                        .extensions
+                        .push((key[1..].to_string(), color.to_string()));
                     continue;
                 }
-                
+
                 // Check if it's a glob pattern (starts with = for completion match)
                 if key.starts_with('=') {
-                    patterns.patterns.push((key[1..].to_string(), color.to_string()));
+                    patterns
+                        .patterns
+                        .push((key[1..].to_string(), color.to_string()));
                     continue;
                 }
-                
+
                 // Check for special file type codes (2-char LS_COLORS codes)
                 match key {
                     // Basic colors
@@ -171,23 +175,43 @@ impl MenuColors {
                     "tc" => colors.completion = color.to_string(),
                     "dc" => colors.description = color.to_string(),
                     "so" => colors.header = color.to_string(),
-                    
+
                     // File types (LS_COLORS compatible)
                     "fi" => colors.file = color.to_string(),
                     "di" => colors.directory = color.to_string(),
                     "ex" => colors.executable = color.to_string(),
                     "ln" => colors.symlink = color.to_string(),
-                    "bd" => patterns.file_types.push(("block".to_string(), color.to_string())),
-                    "cd" => patterns.file_types.push(("char".to_string(), color.to_string())),
-                    "pi" | "p" => patterns.file_types.push(("pipe".to_string(), color.to_string())),
-                    "su" => patterns.file_types.push(("setuid".to_string(), color.to_string())),
-                    "sg" => patterns.file_types.push(("setgid".to_string(), color.to_string())),
-                    "tw" => patterns.file_types.push(("sticky_world".to_string(), color.to_string())),
-                    "ow" => patterns.file_types.push(("world_write".to_string(), color.to_string())),
-                    "st" => patterns.file_types.push(("sticky".to_string(), color.to_string())),
-                    "or" => patterns.file_types.push(("orphan".to_string(), color.to_string())),
-                    "mi" => patterns.file_types.push(("missing".to_string(), color.to_string())),
-                    
+                    "bd" => patterns
+                        .file_types
+                        .push(("block".to_string(), color.to_string())),
+                    "cd" => patterns
+                        .file_types
+                        .push(("char".to_string(), color.to_string())),
+                    "pi" | "p" => patterns
+                        .file_types
+                        .push(("pipe".to_string(), color.to_string())),
+                    "su" => patterns
+                        .file_types
+                        .push(("setuid".to_string(), color.to_string())),
+                    "sg" => patterns
+                        .file_types
+                        .push(("setgid".to_string(), color.to_string())),
+                    "tw" => patterns
+                        .file_types
+                        .push(("sticky_world".to_string(), color.to_string())),
+                    "ow" => patterns
+                        .file_types
+                        .push(("world_write".to_string(), color.to_string())),
+                    "st" => patterns
+                        .file_types
+                        .push(("sticky".to_string(), color.to_string())),
+                    "or" => patterns
+                        .file_types
+                        .push(("orphan".to_string(), color.to_string())),
+                    "mi" => patterns
+                        .file_types
+                        .push(("missing".to_string(), color.to_string())),
+
                     _ => {
                         // Unknown key - treat as pattern if it contains glob chars
                         if key.contains('*') || key.contains('?') || key.contains('[') {
@@ -197,10 +221,10 @@ impl MenuColors {
                 }
             }
         }
-        
+
         (colors, patterns)
     }
-    
+
     /// Match filename against patterns and return color if found
     pub fn match_filename(filename: &str, patterns: &ZlsColorPatterns) -> Option<String> {
         // Check extension patterns first (most common)
@@ -209,18 +233,18 @@ impl MenuColors {
                 return Some(color.clone());
             }
         }
-        
+
         // Check glob patterns
         for (pattern, color) in &patterns.patterns {
             if Self::glob_match(pattern, filename) {
                 return Some(color.clone());
             }
         }
-        
+
         None
     }
-    
-    /// Simple glob matching (*, ?, []) 
+
+    /// Simple glob matching (*, ?, [])
     fn glob_match(pattern: &str, text: &str) -> bool {
         // Handle case-insensitive flag (#i) at start
         let (pattern, case_insensitive) = if pattern.starts_with("(#i)") {
@@ -228,7 +252,7 @@ impl MenuColors {
         } else {
             (pattern, false)
         };
-        
+
         let pattern: Vec<char> = if case_insensitive {
             pattern.to_lowercase().chars().collect()
         } else {
@@ -239,16 +263,16 @@ impl MenuColors {
         } else {
             text.chars().collect()
         };
-        
+
         Self::glob_match_impl(&pattern, &text)
     }
-    
+
     fn glob_match_impl(pattern: &[char], text: &[char]) -> bool {
         let mut p = 0;
         let mut t = 0;
         let mut star_p = None;
         let mut star_t = 0;
-        
+
         while t < text.len() {
             if p < pattern.len() && (pattern[p] == '?' || pattern[p] == text[t]) {
                 p += 1;
@@ -265,11 +289,11 @@ impl MenuColors {
                 return false;
             }
         }
-        
+
         while p < pattern.len() && pattern[p] == '*' {
             p += 1;
         }
-        
+
         p == pattern.len()
     }
 
@@ -287,33 +311,33 @@ pub enum MenuMotion {
     Down,
     Left,
     Right,
-    
+
     // Page movement
     PageUp,
     PageDown,
-    
+
     // Sequential navigation
     Next,
     Prev,
-    
+
     // Absolute positions
     First,           // beginning-of-history
     Last,            // end-of-history
     BeginningOfLine, // vi-beginning-of-line
     EndOfLine,       // vi-end-of-line
-    
+
     // Word/group movement (zsh viforwardblankword etc.)
-    ForwardWord,     // forward-word
-    BackwardWord,    // backward-word
+    ForwardWord,       // forward-word
+    BackwardWord,      // backward-word
     ForwardBlankWord,  // vi-forward-blank-word (next group)
     BackwardBlankWord, // vi-backward-blank-word (prev group)
-    
+
     // Selection control
     Deselect,
-    Accept,          // accept-line
-    AcceptAndHold,   // accept-and-hold
+    Accept,                // accept-line
+    AcceptAndHold,         // accept-and-hold
     AcceptAndMenuComplete, // accept-and-menu-complete
-    
+
     // Undo
     Undo,
 }
@@ -585,14 +609,14 @@ pub struct MenuState {
     groups: Vec<GroupLayout>,
     /// Unfiltered items (for search restore)
     unfiltered_items: Vec<MenuItem>,
-    
+
     // === Position grid (zsh mtab/mgtab) ===
     /// Match table: maps screen position to item index (zsh: mtab)
     /// Size is mcols * mlines, indexed as [line * mcols + col]
     mtab: Vec<Option<usize>>,
     /// Group table: maps screen position to group index (zsh: mgtab)
     mgtab: Vec<usize>,
-    
+
     // === Selection state (zsh mselect, mcol, mline) ===
     /// Current selection index (None = not in menu mode)
     selected_idx: Option<usize>,
@@ -604,7 +628,7 @@ pub struct MenuState {
     mline: usize,
     /// Column memory for vertical navigation (zsh: wishcol)
     wish_col: usize,
-    
+
     // === Viewport (zsh mlbeg, mlend) ===
     /// First visible line (zsh: mlbeg, -1 forces redraw)
     viewport_start: usize,
@@ -616,7 +640,7 @@ pub struct MenuState {
     prev_mcol: usize,
     /// Previous mline (zsh: moline)
     prev_mline: usize,
-    
+
     // === Layout dimensions ===
     /// Terminal width (zsh: zterm_columns)
     term_width: usize,
@@ -628,7 +652,7 @@ pub struct MenuState {
     mcols: usize,
     /// Number of lines in layout (zsh: mlines)
     mlines: usize,
-    
+
     // === Menu mode ===
     /// Current menu mode
     mode: MenuMode,
@@ -636,7 +660,7 @@ pub struct MenuState {
     undo_stack: Vec<MenuStackEntry>,
     /// Search stack for incremental search
     search_stack: Vec<SearchStackEntry>,
-    
+
     // === Search/filter state ===
     /// Prefix being completed
     prefix: String,
@@ -646,7 +670,7 @@ pub struct MenuState {
     search_state: SearchState,
     /// Last successful search string (zsh: lastsearch)
     last_search: String,
-    
+
     // === Display options ===
     /// Show group headers
     show_headers: bool,
@@ -656,7 +680,7 @@ pub struct MenuState {
     status_printed: bool,
     /// Scroll step size (zsh: step from MENUSCROLL)
     scroll_step: usize,
-    
+
     // === Colors ===
     colors: MenuColors,
     /// Custom colors for groups by name (from zstyle list-colors)
@@ -670,7 +694,7 @@ pub struct MenuState {
     list_separator: String,
     /// Follow symlinks for coloring (LC_FOLLOW_SYMLINKS behavior)
     follow_symlinks: bool,
-    
+
     // === Legacy fields for compatibility ===
     #[allow(dead_code)]
     search_active: bool,
@@ -694,55 +718,55 @@ impl MenuState {
     pub fn new() -> Self {
         // Load config from zpwr zstyle files
         let config = crate::zpwr_colors::load_zpwr_config();
-        
+
         Self {
             // Core match data
             items: Vec::new(),
             groups: Vec::new(),
             unfiltered_items: Vec::new(),
-            
+
             // Position grid (zsh mtab/mgtab)
             mtab: Vec::new(),
             mgtab: Vec::new(),
-            
+
             // Selection state
             selected_idx: None,
             marked_indices: std::collections::HashSet::new(),
             mcol: 0,
             mline: 0,
             wish_col: 0,
-            
+
             // Viewport
             viewport_start: 0,
             viewport_end: 9999999,
             prev_viewport_start: None,
             prev_mcol: 0,
             prev_mline: 0,
-            
+
             // Layout dimensions
             term_width: 80,
             term_height: 24,
             available_rows: 20,
             mcols: 1,
             mlines: 0,
-            
+
             // Menu mode
             mode: MenuMode::Normal,
             undo_stack: Vec::new(),
             search_stack: Vec::new(),
-            
+
             // Search/filter
             prefix: String::new(),
             search: String::new(),
             search_state: SearchState::default(),
             last_search: String::new(),
-            
+
             // Display options
             show_headers: true,
             has_status: true,
             status_printed: false,
             scroll_step: 0, // 0 = use default (half screen)
-            
+
             // Colors
             colors: MenuColors::default(),
             group_colors: config.tag_colors,
@@ -762,7 +786,7 @@ impl MenuState {
                 config.list_separator
             },
             follow_symlinks: config.follow_symlinks,
-            
+
             // Legacy compatibility
             search_active: false,
             search_direction: SearchDirection::Forward,
@@ -862,10 +886,11 @@ impl MenuState {
                 .unwrap_or_else(|| GROUP_COLORS[group_idx % GROUP_COLORS.len()].to_string());
 
             // Check if any items in this group have descriptions
-            let has_descs = group.matches.iter().any(|m| {
-                m.desc.is_some() || m.exp.is_some()
-            });
-            
+            let has_descs = group
+                .matches
+                .iter()
+                .any(|m| m.desc.is_some() || m.exp.is_some());
+
             self.groups.push(GroupLayout {
                 name: group.name.clone(),
                 explanation: group
@@ -936,12 +961,12 @@ impl MenuState {
     }
 
     // === Mode switching (zsh MM_INTER, MM_FSEARCH, MM_BSEARCH) ===
-    
+
     /// Get current menu mode
     pub fn get_mode(&self) -> MenuMode {
         self.mode
     }
-    
+
     /// Toggle interactive mode (zsh vi-insert in menu)
     pub fn toggle_interactive(&mut self) {
         if self.mode == MenuMode::Interactive {
@@ -960,7 +985,7 @@ impl MenuState {
             }
         }
     }
-    
+
     /// Start forward incremental search (Ctrl+S in zsh)
     pub fn start_forward_search(&mut self) {
         self.mode = MenuMode::ForwardSearch;
@@ -968,7 +993,7 @@ impl MenuState {
         self.search_state = SearchState::default();
         self.search_stack.clear();
     }
-    
+
     /// Start backward incremental search (Ctrl+R in zsh)  
     pub fn start_backward_search(&mut self) {
         self.mode = MenuMode::BackwardSearch;
@@ -976,14 +1001,14 @@ impl MenuState {
         self.search_state = SearchState::default();
         self.search_stack.clear();
     }
-    
+
     /// Cancel search mode
     pub fn cancel_search(&mut self) {
         self.mode = MenuMode::Normal;
         self.search.clear();
         self.search_state = SearchState::default();
     }
-    
+
     /// Add character to search string (for interactive/search modes)
     pub fn search_input(&mut self, c: char) {
         // Save current state for backspace
@@ -994,9 +1019,9 @@ impl MenuState {
             back: self.mode == MenuMode::BackwardSearch,
             state: self.search_state,
         });
-        
+
         self.search.push(c);
-        
+
         match self.mode {
             MenuMode::Interactive => {
                 self.filter_by_search();
@@ -1007,7 +1032,7 @@ impl MenuState {
             _ => {}
         }
     }
-    
+
     /// Backspace in search mode
     pub fn search_backspace(&mut self) {
         if let Some(prev) = self.search_stack.pop() {
@@ -1015,7 +1040,7 @@ impl MenuState {
             self.mline = prev.line;
             self.mcol = prev.col;
             self.search_state = prev.state;
-            
+
             if self.mode == MenuMode::Interactive {
                 if self.search.is_empty() {
                     self.items = self.unfiltered_items.clone();
@@ -1026,40 +1051,40 @@ impl MenuState {
             }
         }
     }
-    
+
     /// Get search string for display
     pub fn get_search_string(&self) -> &str {
         &self.search
     }
-    
+
     /// Get search state for display
     pub fn get_search_state(&self) -> SearchState {
         self.search_state
     }
-    
+
     /// Do incremental search (zsh msearch)
     fn do_incremental_search(&mut self) {
         if self.search.is_empty() {
             return;
         }
-        
+
         let back = self.mode == MenuMode::BackwardSearch;
         let search_lower = self.search.to_lowercase();
-        
+
         // Start from current position
         let start_idx = self.selected_idx.unwrap_or(0);
         let n = self.items.len();
-        
+
         if n == 0 {
             self.search_state.failed = true;
             return;
         }
-        
+
         // Search in specified direction
         let mut checked = 0;
         let mut idx = start_idx;
         let mut wrapped = false;
-        
+
         loop {
             // Move to next position
             if back {
@@ -1075,14 +1100,14 @@ impl MenuState {
                     wrapped = true;
                 }
             }
-            
+
             checked += 1;
             if checked > n {
                 // Searched everything, no match
                 self.search_state.failed = true;
                 break;
             }
-            
+
             // Check if this item matches
             if let Some(item) = self.items.get(idx) {
                 let display_lower = item.display.to_lowercase();
@@ -1091,20 +1116,20 @@ impl MenuState {
                     self.selected_idx = Some(idx);
                     self.search_state.failed = false;
                     self.search_state.wrapped = wrapped;
-                    
+
                     // Update mline/mcol from the new selection
                     let (row, col) = self.idx_to_visual_row_col(idx);
                     self.mline = row;
                     self.mcol = col;
-                    
+
                     self.ensure_selection_visible();
-                    
+
                     // Save for next search
                     self.last_search = self.search.clone();
                     return;
                 }
             }
-            
+
             // Back at start?
             if idx == start_idx {
                 self.search_state.failed = true;
@@ -1112,27 +1137,27 @@ impl MenuState {
             }
         }
     }
-    
+
     /// Continue search with last pattern
     pub fn search_again(&mut self, reverse: bool) {
         if self.last_search.is_empty() {
             return;
         }
-        
+
         // Use last search string
         self.search = self.last_search.clone();
-        
+
         if reverse {
             self.mode = MenuMode::BackwardSearch;
         } else {
             self.mode = MenuMode::ForwardSearch;
         }
-        
+
         self.do_incremental_search();
     }
-    
+
     // === Undo stack (zsh Menustack) ===
-    
+
     /// Push current state to undo stack
     pub fn push_undo(&mut self, line: &str, cursor: usize) {
         self.undo_stack.push(MenuStackEntry {
@@ -1146,7 +1171,7 @@ impl MenuState {
             mode: self.mode,
         });
     }
-    
+
     /// Pop from undo stack
     pub fn pop_undo(&mut self) -> Option<MenuStackEntry> {
         if let Some(entry) = self.undo_stack.pop() {
@@ -1161,14 +1186,14 @@ impl MenuState {
             None
         }
     }
-    
+
     /// Check if undo is available
     pub fn can_undo(&self) -> bool {
         !self.undo_stack.is_empty()
     }
-    
+
     // === Multi-select (zsh CMF_MULT, accept-and-hold) ===
-    
+
     /// Mark current selection (like zsh accept-and-hold / Ctrl+Space)
     pub fn mark_current(&mut self) {
         if let Some(idx) = self.selected_idx {
@@ -1179,18 +1204,18 @@ impl MenuState {
             }
         }
     }
-    
+
     /// Mark current and move to next (accept-and-menu-complete)
     pub fn mark_and_next(&mut self) {
         self.mark_current();
         self.navigate(MenuMotion::Next);
     }
-    
+
     /// Check if an index is marked
     pub fn is_marked(&self, idx: usize) -> bool {
         self.marked_indices.contains(&idx)
     }
-    
+
     /// Get all marked completions
     pub fn marked_completions(&self) -> Vec<&Completion> {
         self.marked_indices
@@ -1198,7 +1223,7 @@ impl MenuState {
             .filter_map(|&idx| self.items.get(idx).map(|m| &m.completion))
             .collect()
     }
-    
+
     /// Get all marked insert strings
     pub fn marked_insert_strings(&self) -> Vec<String> {
         self.marked_indices
@@ -1206,24 +1231,24 @@ impl MenuState {
             .filter_map(|&idx| self.items.get(idx).map(|m| m.completion.insert_str()))
             .collect()
     }
-    
+
     /// Clear all marks
     pub fn clear_marks(&mut self) {
         self.marked_indices.clear();
     }
-    
+
     /// Get number of marked items
     pub fn mark_count(&self) -> usize {
         self.marked_indices.len()
     }
-    
+
     /// Check if multi-select is active (any marks)
     pub fn has_marks(&self) -> bool {
         !self.marked_indices.is_empty()
     }
 
     // === mtab-based navigation (zsh complist.c style) ===
-    
+
     /// Get match at screen position (line, col) using mtab
     /// Returns (item_index, group_index) or None if no match at that position
     fn mtab_get(&self, line: usize, col: usize) -> Option<(usize, usize)> {
@@ -1236,7 +1261,7 @@ impl MenuState {
         }
         self.mtab[pos].map(|idx| (idx, self.mgtab[pos]))
     }
-    
+
     /// Find the leftmost column of a match at the given position
     /// (matches can span multiple columns due to width)
     fn mtab_find_match_start(&self, line: usize, col: usize) -> usize {
@@ -1246,7 +1271,7 @@ impl MenuState {
         }
         let target = self.mtab[pos];
         let row_start = line * self.mcols;
-        
+
         let mut c = col;
         while c > 0 {
             let prev_pos = row_start + c - 1;
@@ -1257,16 +1282,16 @@ impl MenuState {
         }
         c
     }
-    
+
     /// Adjust column to find nearest valid match (zsh: adjust_mcol)
     /// Returns the adjusted column, or None if no valid match on this line
     fn adjust_mcol(&self, line: usize, wish_col: usize) -> Option<usize> {
         if line >= self.mlines {
             return None;
         }
-        
+
         let row_start = line * self.mcols;
-        
+
         // Check if wish_col has a valid match
         if wish_col < self.mcols {
             let pos = row_start + wish_col;
@@ -1274,11 +1299,11 @@ impl MenuState {
                 return Some(self.mtab_find_match_start(line, wish_col));
             }
         }
-        
+
         // Search left and right for nearest match
         let mut left = wish_col.saturating_sub(1);
         let mut right = (wish_col + 1).min(self.mcols.saturating_sub(1));
-        
+
         loop {
             // Check left
             if left < self.mcols {
@@ -1287,7 +1312,7 @@ impl MenuState {
                     return Some(self.mtab_find_match_start(line, left));
                 }
             }
-            
+
             // Check right
             if right < self.mcols {
                 let pos = row_start + right;
@@ -1295,7 +1320,7 @@ impl MenuState {
                     return Some(self.mtab_find_match_start(line, right));
                 }
             }
-            
+
             // Move further out
             if left == 0 && right >= self.mcols.saturating_sub(1) {
                 break;
@@ -1303,7 +1328,7 @@ impl MenuState {
             left = left.saturating_sub(1);
             right = (right + 1).min(self.mcols.saturating_sub(1));
         }
-        
+
         None
     }
 
@@ -1323,7 +1348,7 @@ impl MenuState {
             MenuMotion::Deselect => {
                 self.selected_idx = None;
             }
-            
+
             // Absolute positions
             MenuMotion::First => {
                 self.selected_idx = Some(0);
@@ -1360,7 +1385,7 @@ impl MenuState {
                     }
                 }
             }
-            
+
             // Sequential navigation
             MenuMotion::Next => match self.selected_idx {
                 None => self.selected_idx = Some(0),
@@ -1373,7 +1398,7 @@ impl MenuState {
                 Some(0) => self.selected_idx = Some(self.items.len() - 1),
                 Some(idx) => self.selected_idx = Some(idx - 1),
             },
-            
+
             // Group navigation (zsh viforwardblankword/vibackwardblankword)
             MenuMotion::ForwardBlankWord => {
                 if let Some(idx) = self.selected_idx {
@@ -1409,7 +1434,7 @@ impl MenuState {
                     }
                 }
             }
-            
+
             // Word movement (page-like within visible area)
             MenuMotion::ForwardWord => {
                 let page = self.available_rows.saturating_sub(2);
@@ -1427,17 +1452,17 @@ impl MenuState {
                     self.try_select_row(new_row);
                 }
             }
-            
+
             // Accept actions (handled by caller)
             MenuMotion::Accept | MenuMotion::AcceptAndHold | MenuMotion::AcceptAndMenuComplete => {
                 // These are handled by the caller
             }
-            
+
             // Undo
             MenuMotion::Undo => {
                 // Handled by pop_undo
             }
-            
+
             // Directional movement
             MenuMotion::Up
             | MenuMotion::Down
@@ -1449,7 +1474,7 @@ impl MenuState {
                     // Use group-aware row/col calculation
                     let (row, col) = self.idx_to_visual_row_col(idx);
                     let total_rows = rows;
-                    
+
                     let (new_row, new_col) = match motion {
                         MenuMotion::Up => {
                             if row > 0 {
@@ -1476,7 +1501,9 @@ impl MenuState {
                                 if row > 0 {
                                     // Get column count for previous row's group
                                     if let Some(prev_idx) = self.visual_row_col_to_idx(row - 1, 0) {
-                                        if let Some((_, group, _)) = self.find_group_for_idx(prev_idx) {
+                                        if let Some((_, group, _)) =
+                                            self.find_group_for_idx(prev_idx)
+                                        {
                                             let last_col = group.cols.saturating_sub(1);
                                             self.wish_col = last_col;
                                             (row - 1, last_col)
@@ -1493,12 +1520,13 @@ impl MenuState {
                         }
                         MenuMotion::Right => {
                             // Get current group's column count
-                            let max_col = if let Some((_, group, _)) = self.find_group_for_idx(idx) {
+                            let max_col = if let Some((_, group, _)) = self.find_group_for_idx(idx)
+                            {
                                 group.cols.saturating_sub(1)
                             } else {
                                 cols.saturating_sub(1)
                             };
-                            
+
                             if col < max_col {
                                 self.wish_col = col + 1;
                                 (row, col + 1)
@@ -1518,7 +1546,10 @@ impl MenuState {
                         }
                         MenuMotion::PageDown => {
                             let page = self.scroll_step();
-                            ((row + page).min(total_rows.saturating_sub(1)), self.wish_col)
+                            (
+                                (row + page).min(total_rows.saturating_sub(1)),
+                                self.wish_col,
+                            )
                         }
                         _ => (row, col),
                     };
@@ -1537,7 +1568,7 @@ impl MenuState {
         self.ensure_selection_visible();
         self.selected_idx != old_idx
     }
-    
+
     /// Try to select any valid item in the given row
     fn try_select_row(&mut self, row: usize) {
         // Try wish_col first
@@ -1560,7 +1591,7 @@ impl MenuState {
             }
         }
     }
-    
+
     /// Get scroll step size (zsh: MENUSCROLL)
     fn scroll_step(&self) -> usize {
         if self.scroll_step > 0 {
@@ -1570,7 +1601,7 @@ impl MenuState {
             self.available_rows.saturating_sub(1) / 2
         }
     }
-    
+
     /// Set scroll step size (from MENUSCROLL parameter)
     pub fn set_scroll_step(&mut self, step: usize) {
         self.scroll_step = step;
@@ -1581,7 +1612,7 @@ impl MenuState {
         // Sum up rows from all groups
         self.groups.iter().map(|g| g.row_count).sum()
     }
-    
+
     /// Find which group an item index belongs to, and its local index within that group
     fn find_group_for_idx(&self, idx: usize) -> Option<(usize, &GroupLayout, usize)> {
         let mut offset = 0;
@@ -1593,12 +1624,12 @@ impl MenuState {
         }
         None
     }
-    
+
     /// Convert global item index to (visual_row, col) accounting for per-group column counts
     fn idx_to_visual_row_col(&self, idx: usize) -> (usize, usize) {
         let mut row_offset = 0;
         let mut item_offset = 0;
-        
+
         for group in &self.groups {
             if idx < item_offset + group.count {
                 let local_idx = idx - item_offset;
@@ -1612,12 +1643,12 @@ impl MenuState {
         }
         (0, 0)
     }
-    
+
     /// Convert (visual_row, col) back to global item index
     fn visual_row_col_to_idx(&self, target_row: usize, target_col: usize) -> Option<usize> {
         let mut row_offset = 0;
         let mut item_offset = 0;
-        
+
         for group in &self.groups {
             let group_end_row = row_offset + group.row_count;
             if target_row < group_end_row {
@@ -1657,9 +1688,9 @@ impl MenuState {
         if self.groups.is_empty() || self.items.is_empty() {
             return;
         }
-        
+
         let current_idx = self.selected_idx.unwrap_or(0);
-        
+
         // Find which group current selection is in
         let mut current_group = 0;
         let mut offset = 0;
@@ -1670,7 +1701,7 @@ impl MenuState {
             }
             offset += g.count;
         }
-        
+
         // Move to next group (wrap around)
         let next_group = (current_group + 1) % self.groups.len();
         let mut new_idx = 0;
@@ -1680,19 +1711,19 @@ impl MenuState {
             }
             new_idx += g.count;
         }
-        
+
         self.selected_idx = Some(new_idx);
         self.ensure_selection_visible();
     }
-    
+
     /// Navigate to first item of previous group
     fn navigate_to_prev_group(&mut self) {
         if self.groups.is_empty() || self.items.is_empty() {
             return;
         }
-        
+
         let current_idx = self.selected_idx.unwrap_or(0);
-        
+
         // Find which group current selection is in
         let mut current_group = 0;
         let mut offset = 0;
@@ -1703,14 +1734,14 @@ impl MenuState {
             }
             offset += g.count;
         }
-        
+
         // Move to previous group (wrap around)
         let prev_group = if current_group == 0 {
             self.groups.len() - 1
         } else {
             current_group - 1
         };
-        
+
         let mut new_idx = 0;
         for (i, g) in self.groups.iter().enumerate() {
             if i == prev_group {
@@ -1718,7 +1749,7 @@ impl MenuState {
             }
             new_idx += g.count;
         }
-        
+
         self.selected_idx = Some(new_idx);
         self.ensure_selection_visible();
     }
@@ -1729,10 +1760,10 @@ impl MenuState {
             return;
         }
         self.ensure_layout();
-        
+
         if let Some(idx) = self.selected_idx {
             let (row, _col) = self.idx_to_visual_row_col(idx);
-            
+
             // Find first valid item in this row (column 0)
             if let Some(new_idx) = self.visual_row_col_to_idx(row, 0) {
                 self.selected_idx = Some(new_idx);
@@ -1747,17 +1778,17 @@ impl MenuState {
             return;
         }
         self.ensure_layout();
-        
+
         if let Some(idx) = self.selected_idx {
             let (row, _col) = self.idx_to_visual_row_col(idx);
-            
+
             // Get the group's column count for this row
             let max_col = if let Some((_, group, _)) = self.find_group_for_idx(idx) {
                 group.cols.saturating_sub(1)
             } else {
                 0
             };
-            
+
             // Find last valid item in this row
             for try_col in (0..=max_col).rev() {
                 if let Some(new_idx) = self.visual_row_col_to_idx(row, try_col) {
@@ -1768,7 +1799,7 @@ impl MenuState {
             }
         }
     }
-    
+
     #[allow(dead_code)]
     /// Old function kept for compatibility - use idx_to_visual_row_col instead
     fn idx_to_row_col(&self, idx: usize, _rows: usize, cols: usize) -> (usize, usize) {
@@ -1859,20 +1890,20 @@ impl MenuState {
             // Check if any items have descriptions
             let has_descriptions = items.iter().any(|item| !item.description.is_empty());
             group.has_descriptions = has_descriptions;
-            
+
             if has_descriptions {
                 // Multi-column layout WITH descriptions (like zsh - pack tightly!)
                 // Each "column" = completion + separator + description
                 let max_comp_width = items.iter().map(|i| i.comp_width).max().unwrap_or(10);
                 let max_desc_width = items.iter().map(|i| i.desc_width).max().unwrap_or(10);
                 let separator_width = 11; // " ///////// "
-                
+
                 // Width of one complete entry (comp + sep + desc + small padding)
                 let entry_width = max_comp_width + separator_width + max_desc_width + 2;
-                
+
                 // How many columns fit? Pack tightly!
                 let cols = (tw / entry_width).max(1).min(n);
-                
+
                 // Use actual entry width, not distributed width - no dead space!
                 group.comp_col_width = max_comp_width + 2;
                 group.cols = cols;
@@ -1911,7 +1942,7 @@ impl MenuState {
                 group.row_count = (n + best_cols - 1) / best_cols;
                 group.comp_col_width = 0;
             }
-            
+
             group.start_row = total_rows;
             total_rows += group.row_count;
             item_offset += group.count;
@@ -1920,25 +1951,25 @@ impl MenuState {
         self.cached_cols = self.groups.first().map(|g| g.cols).unwrap_or(1);
         self.cached_col_width = tw / self.cached_cols.max(1);
         self.cached_total_rows = total_rows;
-        
+
         // Build mtab/mgtab grid (like zsh complist.c lines 2084-2098)
         // This maps each screen position to a match/group
-        self.mcols = tw;  // zsh uses full terminal width
+        self.mcols = tw; // zsh uses full terminal width
         self.mlines = total_rows;
-        
+
         let grid_size = self.mcols * self.mlines;
         self.mtab = vec![None; grid_size];
         self.mgtab = vec![0; grid_size];
-        
+
         // Fill the grid by iterating through groups and their items
         let mut display_row = 0;
         let mut global_idx = 0;
-        
+
         for (group_idx, group) in self.groups.iter().enumerate() {
             if group.count == 0 {
                 continue;
             }
-            
+
             // Header row - mark as explanation (no match)
             if self.show_headers && group.explanation.is_some() {
                 let row_start = display_row * self.mcols;
@@ -1950,18 +1981,18 @@ impl MenuState {
                 }
                 display_row += 1;
             }
-            
+
             // Item rows
             let cols = group.cols.max(1);
             for row in 0..group.row_count {
                 let row_start = display_row * self.mcols;
                 let mut x = 0usize;
-                
+
                 for col in 0..cols {
                     let local_idx = row * cols + col;
                     let idx = global_idx + local_idx;
                     let cw = group.col_widths.get(col).copied().unwrap_or(tw / cols);
-                    
+
                     // Fill all character positions in this column with the same match
                     for cx in 0..cw {
                         let pos = row_start + x + cx;
@@ -1978,13 +2009,13 @@ impl MenuState {
                 }
                 display_row += 1;
             }
-            
+
             global_idx += group.count;
         }
-        
+
         self.layout_valid = true;
     }
-    
+
     /// Check if only selection changed (can use singledraw optimization)
     /// Returns Some((old_idx, new_idx)) if only selection changed, None otherwise
     pub fn selection_changed_only(&self) -> Option<(Option<usize>, Option<usize>)> {
@@ -1992,10 +2023,10 @@ impl MenuState {
         if self.prev_viewport_start != Some(self.viewport_start) {
             return None;
         }
-        
+
         // If mline/mcol significantly changed, need full redraw
         // (This is a simplification - zsh has more complex logic)
-        
+
         // For now, just track if we have a previous position
         let old_idx = if self.prev_mline < self.mlines && self.prev_mcol < self.mcols {
             let pos = self.prev_mline * self.mcols + self.prev_mcol;
@@ -2007,22 +2038,26 @@ impl MenuState {
         } else {
             None
         };
-        
+
         Some((old_idx, self.selected_idx))
     }
-    
+
     /// Record current state for next singledraw check
     pub fn record_render_state(&mut self) {
         self.prev_viewport_start = Some(self.viewport_start);
         self.prev_mline = self.mline;
         self.prev_mcol = self.mcol;
     }
-    
+
     /// Render just the changed cells (zsh singledraw)
     /// Returns cursor movement commands and the two lines to redraw
-    pub fn render_singledraw(&mut self, old_idx: Option<usize>, new_idx: Option<usize>) -> Option<SingleDrawResult> {
+    pub fn render_singledraw(
+        &mut self,
+        old_idx: Option<usize>,
+        new_idx: Option<usize>,
+    ) -> Option<SingleDrawResult> {
         self.ensure_layout();
-        
+
         // Need to find screen positions of old and new selection
         let old_pos = old_idx.and_then(|idx| {
             let (row, col) = self.idx_to_visual_row_col(idx);
@@ -2032,7 +2067,7 @@ impl MenuState {
                 None
             }
         });
-        
+
         let new_pos = new_idx.and_then(|idx| {
             let (row, col) = self.idx_to_visual_row_col(idx);
             if row >= self.viewport_start && row < self.viewport_start + self.available_rows {
@@ -2041,57 +2076,65 @@ impl MenuState {
                 None
             }
         });
-        
+
         // Render the specific items
         let old_rendered = old_pos.map(|(screen_row, col, idx)| {
             if let Some(item) = self.items.get(idx) {
-                let group_color = self.groups.get(item.group_idx)
+                let group_color = self
+                    .groups
+                    .get(item.group_idx)
                     .map(|g| g.color.as_str())
                     .unwrap_or("0");
-                let col_width = self.groups.get(item.group_idx)
+                let col_width = self
+                    .groups
+                    .get(item.group_idx)
                     .and_then(|g| g.col_widths.first().copied())
                     .unwrap_or(20);
-                    
+
                 let mut line = MenuLine::new();
                 // Render without selection (old position)
                 let saved_sel = self.selected_idx;
                 self.selected_idx = None; // Temporarily clear to render unselected
                 self.render_item(&mut line, item, idx, col, col_width, false, group_color);
                 self.selected_idx = saved_sel;
-                
+
                 (screen_row, col, line)
             } else {
                 (screen_row, col, MenuLine::new())
             }
         });
-        
+
         let new_rendered = new_pos.map(|(screen_row, col, idx)| {
             if let Some(item) = self.items.get(idx) {
-                let group_color = self.groups.get(item.group_idx)
+                let group_color = self
+                    .groups
+                    .get(item.group_idx)
                     .map(|g| g.color.as_str())
                     .unwrap_or("0");
-                let col_width = self.groups.get(item.group_idx)
+                let col_width = self
+                    .groups
+                    .get(item.group_idx)
                     .and_then(|g| g.col_widths.first().copied())
                     .unwrap_or(20);
-                    
+
                 let mut line = MenuLine::new();
                 self.render_item(&mut line, item, idx, col, col_width, false, group_color);
-                
+
                 (screen_row, col, line)
             } else {
                 (screen_row, col, MenuLine::new())
             }
         });
-        
+
         // Update mline/mcol from new selection
         if let Some(idx) = new_idx {
             let (row, col) = self.idx_to_visual_row_col(idx);
             self.mline = row;
             self.mcol = col;
         }
-        
+
         self.record_render_state();
-        
+
         Some(SingleDrawResult {
             old_cell: old_rendered,
             new_cell: new_rendered,
@@ -2150,10 +2193,11 @@ impl MenuState {
             for row in 0..group.row_count {
                 if display_row >= self.viewport_start && display_row < rendering.row_end {
                     let mut line = MenuLine::new();
-                    
+
                     if group.has_descriptions {
                         // Multi-column with descriptions - each entry padded to same width
-                        let entry_width = group.col_widths.first().copied().unwrap_or(self.term_width);
+                        let entry_width =
+                            group.col_widths.first().copied().unwrap_or(self.term_width);
                         for col in 0..group.cols {
                             let local_idx = row * group.cols + col;
                             let idx = global_idx + local_idx;
@@ -2217,7 +2261,7 @@ impl MenuState {
 
         rendering
     }
-    
+
     /// Format status line with zsh MENUPROMPT escapes
     /// %n - number of matches in current group
     /// %m - selected match number / total matches (e.g. "5/47")
@@ -2233,7 +2277,7 @@ impl MenuState {
         let total_matches = self.items.len();
         let total_lines = self.cached_total_rows;
         let sel_num = self.selected_idx.map(|i| i + 1).unwrap_or(0);
-        
+
         // Position indicator
         let position = if current_line >= total_lines {
             "Bottom".to_string()
@@ -2242,14 +2286,18 @@ impl MenuState {
         } else {
             format!("{}%", (current_line * 100) / total_lines.max(1))
         };
-        
+
         // Check mode for special status
         match self.mode {
             MenuMode::Interactive => {
                 format!("interactive: [{}] ({} matches)", self.search, total_matches)
             }
             MenuMode::ForwardSearch | MenuMode::BackwardSearch => {
-                let dir = if self.mode == MenuMode::BackwardSearch { " backward" } else { "" };
+                let dir = if self.mode == MenuMode::BackwardSearch {
+                    " backward"
+                } else {
+                    ""
+                };
                 let state = if self.search_state.failed {
                     "failed "
                 } else if self.search_state.wrapped {
@@ -2257,9 +2305,17 @@ impl MenuState {
                 } else {
                     ""
                 };
-                format!("{}{}isearch{}: {}", state, dir, 
-                    if self.mode == MenuMode::BackwardSearch { "" } else { "" },
-                    self.search)
+                format!(
+                    "{}{}isearch{}: {}",
+                    state,
+                    dir,
+                    if self.mode == MenuMode::BackwardSearch {
+                        ""
+                    } else {
+                        ""
+                    },
+                    self.search
+                )
             }
             MenuMode::Normal => {
                 if self.cached_total_rows > self.available_rows {
@@ -2268,7 +2324,10 @@ impl MenuState {
                         position, sel_num, total_matches, current_line, total_lines)
                 } else {
                     // Not scrolling, just show match info
-                    format!("{}/{}  line {}/{}", sel_num, total_matches, current_line, total_lines)
+                    format!(
+                        "{}/{}  line {}/{}",
+                        sel_num, total_matches, current_line, total_lines
+                    )
                 }
             }
         }
@@ -2320,14 +2379,15 @@ impl MenuState {
         } else {
             ("", display.as_str())
         };
-        
+
         // Determine effective color - use LS_COLORS for file completions
         let effective_color = self.get_item_color(item, group_color);
 
         // Marked items get special color (zsh COL_DU - "duplicate/multi")
         // Selected highlight - use parsed ma= color from zstyle
         if is_selected {
-            line.content.push_str(&ansi::from_codes(&self.selection_color));
+            line.content
+                .push_str(&ansi::from_codes(&self.selection_color));
             line.content.push_str(prefix_part);
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
@@ -2351,7 +2411,7 @@ impl MenuState {
         }
 
         let disp_width = display_width(&display);
-        
+
         // Pad to column width (like zsh clprintm lines 1890-1896)
         let pad = col_width.saturating_sub(disp_width);
         for _ in 0..pad {
@@ -2359,7 +2419,7 @@ impl MenuState {
         }
         line.width += col_width;
     }
-    
+
     /// Get the color for an item, using LS_COLORS for file completions
     /// Supports LC_FOLLOW_SYMLINKS behavior: color symlinks by target type
     fn get_item_color(&self, item: &MenuItem, group_color: &str) -> String {
@@ -2368,14 +2428,26 @@ impl MenuState {
         let is_dir = display.ends_with('/') || item.completion.modec == '/';
         let is_link = item.completion.modec == '@';
         let is_exec = item.completion.modec == '*';
-        
+
         // Check if this is a file-related group (use LS_COLORS for all items)
-        let group_name = self.groups.get(item.group_idx).map(|g| g.name.as_str()).unwrap_or("");
-        let is_file_group = matches!(group_name, 
-            "files" | "file" | "all-files" | "globbed-files" | 
-            "local-directories" | "directories" | "directory" | "path" | "paths"
+        let group_name = self
+            .groups
+            .get(item.group_idx)
+            .map(|g| g.name.as_str())
+            .unwrap_or("");
+        let is_file_group = matches!(
+            group_name,
+            "files"
+                | "file"
+                | "all-files"
+                | "globbed-files"
+                | "local-directories"
+                | "directories"
+                | "directory"
+                | "path"
+                | "paths"
         );
-        
+
         // Use LS_COLORS for file groups or items with file mode set
         if is_file_group || is_dir || is_link || is_exec {
             // For symlinks with LC_FOLLOW_SYMLINKS: resolve target and color by target type
@@ -2386,17 +2458,17 @@ impl MenuState {
                 }
                 // Fall through to normal symlink color
             }
-            
+
             let color = crate::zpwr_colors::ls_color_for_file(display, is_dir, is_exec, is_link);
             if !color.is_empty() {
                 return color;
             }
         }
-        
+
         // Fall back to group color
         group_color.to_string()
     }
-    
+
     /// Get color for symlink based on its target (LC_FOLLOW_SYMLINKS behavior)
     /// Returns None if symlink resolution fails or we should use default symlink color
     fn get_symlink_target_color(&self, path: &str) -> Option<String> {
@@ -2404,10 +2476,10 @@ impl MenuState {
         if !self.follow_symlinks {
             return None;
         }
-        
+
         // Try to resolve the symlink target
         let path = std::path::Path::new(path);
-        
+
         // Use fs::metadata which follows symlinks (vs symlink_metadata which doesn't)
         match std::fs::metadata(path) {
             Ok(meta) => {
@@ -2423,21 +2495,21 @@ impl MenuState {
                         false
                     }
                 };
-                
+
                 // Color by target type
-                let filename = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
-                    
-                Some(crate::zpwr_colors::ls_color_for_file(filename, is_dir, is_exec, false))
+                let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+                Some(crate::zpwr_colors::ls_color_for_file(
+                    filename, is_dir, is_exec, false,
+                ))
             }
             Err(_) => {
                 // Broken symlink - use orphan color (typically red)
-                Some("1;31".to_string())  // Bold red for broken symlinks
+                Some("1;31".to_string()) // Bold red for broken symlinks
             }
         }
     }
-    
+
     /// Render item with properly aligned description column (zsh-style)
     fn render_item_with_desc_column(
         &self,
@@ -2473,10 +2545,11 @@ impl MenuState {
 
         // Determine effective color - use LS_COLORS for file completions
         let effective_color = self.get_item_color(item, group_color);
-        
+
         // Render completion with color
         if is_selected {
-            line.content.push_str(&ansi::from_codes(&self.selection_color));
+            line.content
+                .push_str(&ansi::from_codes(&self.selection_color));
             line.content.push_str(prefix_part);
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
@@ -2492,15 +2565,15 @@ impl MenuState {
             line.content.push_str(rest_part);
             line.content.push_str(ansi::RESET);
         }
-        
+
         // Pad completion to computed column width (aligned columns!)
         let comp_width = display_width(display);
         for _ in comp_width..comp_col_width {
             line.content.push(' ');
         }
-        
+
         line.width = comp_col_width;
-        
+
         // Separator from zstyle (ZPWR_CHAR_LOGO)
         let separator = &self.list_separator;
         line.content.push_str("\x1b[2m");
@@ -2508,15 +2581,16 @@ impl MenuState {
         line.content.push_str(ansi::RESET);
         line.content.push(' ');
         line.width += UnicodeWidthStr::width(separator.as_str()) + 1;
-        
+
         // Description column (cyan)
         if !item.description.is_empty() {
-            line.content.push_str(&ansi::from_codes(&self.colors.description));
+            line.content
+                .push_str(&ansi::from_codes(&self.colors.description));
             line.content.push_str(&item.description);
             line.content.push_str(ansi::RESET);
             line.width += item.desc_width;
         }
-        
+
         // Pad to entry width for aligned multi-column layout
         for _ in line.width..entry_width {
             line.content.push(' ');
@@ -2895,7 +2969,10 @@ mod tests {
         // Long descriptions force single-column layout, so Down = next item
         for i in 0..20 {
             let mut comp = Completion::new(format!("item{:02}", i));
-            comp.desc = Some(format!("A long description for item {} that takes up most of the line width", i));
+            comp.desc = Some(format!(
+                "A long description for item {} that takes up most of the line width",
+                i
+            ));
             group.matches.push(comp);
         }
 
@@ -2937,43 +3014,49 @@ mod tests {
 
         menu.set_completions(&[group]);
         menu.start();
-        
+
         // Debug: print layout info
         eprintln!("Groups: {:?}", menu.groups);
         eprintln!("Initial selected_idx: {:?}", menu.selected_index());
-        
+
         let cols = menu.groups[0].cols;
         let rows = menu.groups[0].row_count;
         eprintln!("Layout: {} cols x {} rows", cols, rows);
-        
+
         // With 80-width and ~15 char items, we should get ~4-5 columns
         // So 20 items / 5 cols = 4 rows
         // Row 0: items 0-4
         // Row 1: items 5-9
         // etc.
-        
+
         let initial_idx = menu.selected_index().unwrap();
         let (initial_row, initial_col) = menu.idx_to_visual_row_col(initial_idx);
-        eprintln!("Initial: idx={}, row={}, col={}", initial_idx, initial_row, initial_col);
-        
+        eprintln!(
+            "Initial: idx={}, row={}, col={}",
+            initial_idx, initial_row, initial_col
+        );
+
         // Only test if we actually have multiple rows
         if rows > 1 {
             menu.navigate(MenuMotion::Down);
-            
+
             let after_idx = menu.selected_index().unwrap();
             let (after_row, after_col) = menu.idx_to_visual_row_col(after_idx);
-            eprintln!("After Down: idx={}, row={}, col={}", after_idx, after_row, after_col);
-            
+            eprintln!(
+                "After Down: idx={}, row={}, col={}",
+                after_idx, after_row, after_col
+            );
+
             // Down should move exactly one row
             assert_eq!(after_row, initial_row + 1, "Down should move exactly 1 row");
             assert_eq!(after_col, initial_col, "Down should keep same column");
-            
+
             // Expected: if we have 5 cols, item 0 -> item 5
             let expected_idx = cols;
             assert_eq!(after_idx, expected_idx, "Should move by number of columns");
         }
     }
-    
+
     #[test]
     fn test_multi_group_navigation() {
         // Test navigation across multiple groups
@@ -2987,7 +3070,7 @@ mod tests {
             let comp = Completion::new(format!("file_{:02}.txt", i));
             group1.matches.push(comp);
         }
-        
+
         // Group 2: directories (short names)
         let mut group2 = CompletionGroup::new("directories");
         for i in 0..8 {
@@ -2997,36 +3080,45 @@ mod tests {
 
         menu.set_completions(&[group1, group2]);
         menu.start();
-        
+
         eprintln!("Groups: {:?}", menu.groups);
-        
+
         // Navigate through first group
         let initial_idx = menu.selected_index().unwrap();
         let (r0, c0) = menu.idx_to_visual_row_col(initial_idx);
         eprintln!("Start: idx={}, row={}, col={}", initial_idx, r0, c0);
-        
+
         menu.navigate(MenuMotion::Down);
         let (r1, c1) = menu.idx_to_visual_row_col(menu.selected_index().unwrap());
-        eprintln!("After Down: idx={}, row={}, col={}", menu.selected_index().unwrap(), r1, c1);
+        eprintln!(
+            "After Down: idx={}, row={}, col={}",
+            menu.selected_index().unwrap(),
+            r1,
+            c1
+        );
         assert_eq!(r1, r0 + 1, "Down should move 1 row");
-        
+
         // Move to first group's last row, then down into second group
         let rows_g1 = menu.groups[0].row_count;
         eprintln!("Group 1 rows: {}", rows_g1);
-        
+
         // Keep going down to reach group boundary
         for _ in 0..(rows_g1 - r1) {
             menu.navigate(MenuMotion::Down);
         }
         let (row_after, _col_after) = menu.idx_to_visual_row_col(menu.selected_index().unwrap());
-        eprintln!("After reaching group boundary: idx={}, row={}", menu.selected_index().unwrap(), row_after);
+        eprintln!(
+            "After reaching group boundary: idx={}, row={}",
+            menu.selected_index().unwrap(),
+            row_after
+        );
     }
-    
+
     #[test]
     fn test_varied_column_groups() {
         // Reproduce user's 'a<TAB>' scenario with varied column counts
         let mut menu = MenuState::new();
-        menu.set_term_size(200, 24);  // Wide terminal
+        menu.set_term_size(200, 24); // Wide terminal
         menu.set_available_rows(20);
 
         // Group 1: external commands - 20 items, ~4 columns = 5 rows
@@ -3035,20 +3127,30 @@ mod tests {
             let comp = Completion::new(format!("ext_cmd_{:02}_longish_name", i));
             group1.matches.push(comp);
         }
-        
+
         // Group 2: alias - 1 item with description = 1 row, 1 column
         let mut group2 = CompletionGroup::new("alias");
         let mut alias = Completion::new("ai");
         alias.desc = Some("forDirZipRar.zsh && mountInstall.zsh".to_string());
         group2.matches.push(alias);
-        
+
         // Group 3: shell functions - 9 short items = 1 row, ~9 columns
         let mut group3 = CompletionGroup::new("shell function");
-        for name in ["a", "add-zle-hook", "add-zsh-hook", "after", "age", "allopt", "apz", "asg", "aws_comp"] {
+        for name in [
+            "a",
+            "add-zle-hook",
+            "add-zsh-hook",
+            "after",
+            "age",
+            "allopt",
+            "apz",
+            "asg",
+            "aws_comp",
+        ] {
             let comp = Completion::new(name);
             group3.matches.push(comp);
         }
-        
+
         // Group 4: builtins - 2 items = 1 row, 2 columns
         let mut group4 = CompletionGroup::new("builtin command");
         group4.matches.push(Completion::new("alias"));
@@ -3056,15 +3158,17 @@ mod tests {
 
         menu.set_completions(&[group1, group2, group3, group4]);
         menu.start();
-        
+
         eprintln!("\nGroups layout:");
         for (i, g) in menu.groups.iter().enumerate() {
-            eprintln!("  Group {}: '{}' - {} items, {} cols, {} rows, start_row={}",
-                i, g.name, g.count, g.cols, g.row_count, g.start_row);
+            eprintln!(
+                "  Group {}: '{}' - {} items, {} cols, {} rows, start_row={}",
+                i, g.name, g.count, g.cols, g.row_count, g.start_row
+            );
         }
-        
+
         let total_rows: usize = menu.groups.iter().map(|g| g.row_count).sum();
-        
+
         // Test: Starting at first item, navigate down multiple times
         // Each Down should move exactly 1 visual row
         eprintln!("\n=== Testing Down navigation ===");
@@ -3073,17 +3177,21 @@ mod tests {
             let idx = menu.selected_index().unwrap();
             let (row, col) = menu.idx_to_visual_row_col(idx);
             eprintln!("Step {}: idx={}, row={}, col={}", step, idx, row, col);
-            
+
             if step > 0 {
                 // Should have moved exactly 1 row (or wrapped from last to first)
                 let expected = (prev_row + 1) % total_rows;
-                assert_eq!(row, expected, "Down should move exactly 1 row (step {})", step);
+                assert_eq!(
+                    row, expected,
+                    "Down should move exactly 1 row (step {})",
+                    step
+                );
             }
             prev_row = row;
-            
+
             menu.navigate(MenuMotion::Down);
         }
-        
+
         // Test Up navigation too
         eprintln!("\n=== Testing Up navigation ===");
         // Reset to start
@@ -3093,14 +3201,22 @@ mod tests {
             let idx = menu.selected_index().unwrap();
             let (row, col) = menu.idx_to_visual_row_col(idx);
             eprintln!("Step {}: idx={}, row={}, col={}", step, idx, row, col);
-            
+
             if step > 0 {
                 // Up should move exactly 1 row back (or wrap from 0 to last)
-                let expected = if prev_row == 0 { total_rows - 1 } else { prev_row - 1 };
-                assert_eq!(row, expected, "Up should move exactly 1 row back (step {})", step);
+                let expected = if prev_row == 0 {
+                    total_rows - 1
+                } else {
+                    prev_row - 1
+                };
+                assert_eq!(
+                    row, expected,
+                    "Up should move exactly 1 row back (step {})",
+                    step
+                );
             }
             prev_row = row;
-            
+
             menu.navigate(MenuMotion::Up);
         }
     }
@@ -3258,8 +3374,14 @@ pub fn default_menuselect_bindings() -> Vec<(&'static str, MenuAction)> {
         ("send-break", MenuAction::Cancel),
         // Accept + recompute (NOT advance to next item!)
         ("accept-and-hold", MenuAction::AcceptAndMenuComplete),
-        ("accept-and-menu-complete", MenuAction::AcceptAndMenuComplete),
-        ("accept-and-infer-next-history", MenuAction::AcceptAndInferNextHistory),
+        (
+            "accept-and-menu-complete",
+            MenuAction::AcceptAndMenuComplete,
+        ),
+        (
+            "accept-and-infer-next-history",
+            MenuAction::AcceptAndInferNextHistory,
+        ),
         // Vertical navigation
         ("down-history", MenuAction::Down),
         ("down-line-or-history", MenuAction::Down),
@@ -3306,8 +3428,14 @@ pub fn default_menuselect_bindings() -> Vec<(&'static str, MenuAction)> {
         // Interactive mode (MM_INTER)
         ("vi-insert", MenuAction::ToggleInteractive),
         // Incremental search (MM_FSEARCH/MM_BSEARCH)
-        ("history-incremental-search-forward", MenuAction::SearchForward),
-        ("history-incremental-search-backward", MenuAction::SearchBackward),
+        (
+            "history-incremental-search-forward",
+            MenuAction::SearchForward,
+        ),
+        (
+            "history-incremental-search-backward",
+            MenuAction::SearchBackward,
+        ),
         // Undo (pops from menu stack)
         ("undo", MenuAction::Undo),
         ("backward-delete-char", MenuAction::Backspace),
@@ -3427,17 +3555,17 @@ impl MenuState {
     pub fn is_interactive(&self) -> bool {
         self.interactive_mode
     }
-    
+
     /// Check if incremental search is active (MM_FSEARCH or MM_BSEARCH)
     pub fn is_search_active(&self) -> bool {
         self.search_active
     }
-    
+
     /// Get current search/filter string
     pub fn search_string(&self) -> &str {
         &self.search
     }
-    
+
     /// Get search direction
     pub fn search_direction(&self) -> SearchDirection {
         self.search_direction

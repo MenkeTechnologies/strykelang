@@ -199,7 +199,7 @@ impl<'a> ZshLexer<'a> {
             recursion_depth: 0,
         }
     }
-    
+
     /// Check recursion depth; returns true if exceeded
     #[inline]
     fn check_recursion(&mut self) -> bool {
@@ -211,7 +211,7 @@ impl<'a> ZshLexer<'a> {
             false
         }
     }
-    
+
     /// Check and increment global iteration counter; returns true if limit exceeded
     #[inline]
     fn check_iterations(&mut self) -> bool {
@@ -231,7 +231,7 @@ impl<'a> ZshLexer<'a> {
         if self.check_iterations() {
             return None;
         }
-        
+
         if let Some(c) = self.unget_buf.pop_front() {
             return Some(c);
         }
@@ -300,7 +300,7 @@ impl<'a> ZshLexer<'a> {
         if self.tok == LexTok::Lexerr {
             return;
         }
-        
+
         // Note: Do NOT reset global_iterations here - it must accumulate across all
         // zshlex calls in a parse to prevent infinite loops in the parser
 
@@ -350,13 +350,15 @@ impl<'a> ZshLexer<'a> {
                 }
             }
         }
-        
+
         // If we were expecting a heredoc terminator, register it now
         if self.heredoc_pending > 0 && self.tok == LexTok::String {
             if let Some(ref terminator) = self.tokstr {
                 let strip_tabs = self.heredoc_pending == 2;
                 // Handle quoted terminators (e.g., 'EOF' or "EOF")
-                let term = terminator.trim_matches(|c| c == '\'' || c == '"').to_string();
+                let term = terminator
+                    .trim_matches(|c| c == '\'' || c == '"')
+                    .to_string();
                 self.heredocs.push(HereDoc {
                     terminator: term,
                     strip_tabs,
@@ -365,15 +367,22 @@ impl<'a> ZshLexer<'a> {
             }
             self.heredoc_pending = 0;
         }
-        
+
         // Track pattern context inside [[ ... ]] - after = == != =~ the RHS is a pattern
         if self.incond > 0 {
             if let Some(ref s) = self.tokstr {
                 // Check if this token is a comparison operator
                 // Note: single = is also a comparison operator in [[ ]]
                 // The internal marker \u{8d} is used for =
-                if s == "=" || s == "==" || s == "!=" || s == "=~" 
-                    || s == "\u{8d}" || s == "\u{8d}\u{8d}" || s == "!\u{8d}" || s == "\u{8d}~" {
+                if s == "="
+                    || s == "=="
+                    || s == "!="
+                    || s == "=~"
+                    || s == "\u{8d}"
+                    || s == "\u{8d}\u{8d}"
+                    || s == "!\u{8d}"
+                    || s == "\u{8d}~"
+                {
                     self.incondpat = true;
                 } else if self.incondpat {
                     // We were in pattern context, now we've consumed the pattern
@@ -432,14 +441,14 @@ impl<'a> ZshLexer<'a> {
             }
             _ => {}
         }
-        
+
         // Track 'for' keyword for C-style for loop: for (( init; cond; step ))
         // When we see 'for', set infor=2 to expect the init and cond parts
         // Each Dinpar (after semicolon in arithmetic) decrements it
         if self.tok != LexTok::Dinpar {
             self.infor = if self.tok == LexTok::For { 2 } else { 0 };
         }
-        
+
         // Handle redirection context
         let oldpos = self.incmdpos;
         if self.tok.is_redirop()
@@ -470,7 +479,7 @@ impl<'a> ZshLexer<'a> {
                     self.tok = LexTok::Lexerr;
                     return;
                 }
-                
+
                 let line = self.read_line();
                 if line.is_none() {
                     self.error = Some("here document too large or unterminated".to_string());
@@ -1483,12 +1492,12 @@ impl<'a> ZshLexer<'a> {
             self.recursion_depth -= 1;
             return Err(());
         }
-        
+
         let result = self.dquote_parse_inner(endchar, sub);
         self.recursion_depth -= 1;
         result
     }
-    
+
     fn dquote_parse_inner(&mut self, endchar: char, sub: bool) -> Result<(), ()> {
         let mut pct = 0; // parenthesis count
         let mut brct = 0; // bracket count
@@ -1721,7 +1730,7 @@ impl<'a> ZshLexer<'a> {
     fn cmd_or_math_sub(&mut self) -> CmdOrMath {
         const MAX_CONTINUATIONS: usize = 10_000;
         let mut continuations = 0;
-        
+
         loop {
             continuations += 1;
             if continuations > MAX_CONTINUATIONS {
@@ -2031,13 +2040,13 @@ enum CmdOrMath {
 /// Check whether we're looking at valid numeric globbing syntax
 /// (/\<[0-9]*-[0-9]*\>/). Call pointing just after the opening "<".
 /// Leaves the input in the same place, returning true or false.
-/// 
+///
 /// Port of isnumglob() from lex.c
 pub fn isnumglob(input: &str, pos: usize) -> bool {
     let chars: Vec<char> = input[pos..].chars().collect();
     let mut i = 0;
     let mut expect_close = false;
-    
+
     // Look for digits, then -, then digits, then >
     while i < chars.len() {
         let c = chars[i];
@@ -2057,13 +2066,13 @@ pub fn isnumglob(input: &str, pos: usize) -> bool {
 
 /// Tokenize a string as if in double quotes.
 /// This is usually called before singsub().
-/// 
+///
 /// Port of parsestr() / parsestrnoerr() from lex.c
 pub fn parsestr(s: &str) -> Result<String, String> {
     let mut result = String::with_capacity(s.len());
     let chars: Vec<char> = s.chars().collect();
     let mut i = 0;
-    
+
     while i < chars.len() {
         let c = chars[i];
         match c {
@@ -2107,28 +2116,28 @@ pub fn parsestr(s: &str) -> Result<String, String> {
         }
         i += 1;
     }
-    
+
     Ok(result)
 }
 
 /// Parse a subscript in string s.
 /// Return the position after the closing bracket, or None on error.
-/// 
+///
 /// Port of parse_subscript() from lex.c
 pub fn parse_subscript(s: &str, endchar: char) -> Option<usize> {
     if s.is_empty() || s.starts_with(endchar) {
         return None;
     }
-    
+
     let chars: Vec<char> = s.chars().collect();
     let mut i = 0;
     let mut depth = 0;
     let mut in_dquote = false;
     let mut in_squote = false;
-    
+
     while i < chars.len() {
         let c = chars[i];
-        
+
         if in_squote {
             if c == '\'' {
                 in_squote = false;
@@ -2136,7 +2145,7 @@ pub fn parse_subscript(s: &str, endchar: char) -> Option<usize> {
             i += 1;
             continue;
         }
-        
+
         if in_dquote {
             if c == '"' {
                 in_dquote = false;
@@ -2146,7 +2155,7 @@ pub fn parse_subscript(s: &str, endchar: char) -> Option<usize> {
             i += 1;
             continue;
         }
-        
+
         match c {
             '\\' => {
                 i += 1; // skip next char
@@ -2169,30 +2178,30 @@ pub fn parse_subscript(s: &str, endchar: char) -> Option<usize> {
             }
             _ => {}
         }
-        
+
         if c == endchar && depth == 0 {
             return Some(i);
         }
-        
+
         i += 1;
     }
-    
+
     None
 }
 
 /// Tokenize a string as if it were a normal command-line argument
 /// but it may contain separators. Used for ${...%...} substitutions.
-/// 
+///
 /// Port of parse_subst_string() from lex.c
 pub fn parse_subst_string(s: &str) -> Result<String, String> {
     if s.is_empty() {
         return Ok(String::new());
     }
-    
+
     let mut result = String::with_capacity(s.len());
     let chars: Vec<char> = s.chars().collect();
     let mut i = 0;
-    
+
     while i < chars.len() {
         let c = chars[i];
         match c {
@@ -2258,18 +2267,18 @@ pub fn parse_subst_string(s: &str) -> Result<String, String> {
         }
         i += 1;
     }
-    
+
     Ok(result)
 }
 
 /// Untokenize a string - convert tokenized chars back to original
-/// 
+///
 /// Port of untokenize() from exec.c (but used by lexer too)
 pub fn untokenize(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let chars: Vec<char> = s.chars().collect();
     let mut i = 0;
-    
+
     while i < chars.len() {
         let c = chars[i];
         // Check if it's a token character (in the special range)
@@ -2300,7 +2309,10 @@ pub fn untokenize(s: &str) -> String {
                 c if c == char_tokens::COMMA => result.push(','),
                 c if c == char_tokens::DASH => result.push('-'),
                 c if c == char_tokens::BANG => result.push('!'),
-                c if c == char_tokens::SNULL || c == char_tokens::DNULL || c == char_tokens::BNULL => {
+                c if c == char_tokens::SNULL
+                    || c == char_tokens::DNULL
+                    || c == char_tokens::BNULL =>
+                {
                     // Null markers - skip
                 }
                 _ => {
@@ -2318,7 +2330,7 @@ pub fn untokenize(s: &str) -> String {
         }
         i += 1;
     }
-    
+
     result
 }
 

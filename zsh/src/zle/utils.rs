@@ -200,7 +200,7 @@ impl UndoState {
             ..Default::default()
         }
     }
-    
+
     /// Initialize undo system
     /// Port of initundo() from zle_utils.c
     pub fn init(&mut self) {
@@ -209,24 +209,24 @@ impl UndoState {
         self.limit = 0;
         self.recording = true;
     }
-    
+
     /// Free undo history
     /// Port of freeundo() from zle_utils.c
     pub fn free(&mut self) {
         self.history.clear();
         self.current = 0;
     }
-    
+
     /// Create an undo entry
     /// Port of mkundoent() from zle_utils.c
     pub fn make_entry(&mut self, start: usize, end: usize, text: ZleString, cursor: usize) {
         if !self.recording {
             return;
         }
-        
+
         // Remove any entries after current position (redo history)
         self.history.truncate(self.current);
-        
+
         let entry = UndoEntry {
             start,
             end,
@@ -234,11 +234,11 @@ impl UndoState {
             cursor,
             group_start: false,
         };
-        
+
         self.history.push(entry);
         self.current = self.history.len();
     }
-    
+
     /// Split undo (start a new undo group)
     /// Port of splitundo() from zle_utils.c
     pub fn split(&mut self) {
@@ -246,7 +246,7 @@ impl UndoState {
             entry.group_start = true;
         }
     }
-    
+
     /// Merge with previous undo entry
     /// Port of mergeundo() from zle_utils.c
     pub fn merge(&mut self) {
@@ -254,18 +254,19 @@ impl UndoState {
         if self.history.len() >= 2 {
             let last = self.history.len() - 1;
             let prev = last - 1;
-            
+
             // Check if mergeable (consecutive inserts at same position)
-            if self.history[prev].end == self.history[last].start 
-               && self.history[prev].text.is_empty()
-               && self.history[last].text.is_empty() {
+            if self.history[prev].end == self.history[last].start
+                && self.history[prev].text.is_empty()
+                && self.history[last].text.is_empty()
+            {
                 self.history[prev].end = self.history[last].end;
                 self.history.pop();
                 self.current = self.history.len();
             }
         }
     }
-    
+
     /// Get current change
     /// Port of get_undo_current_change() from zle_utils.c
     pub fn get_current(&self) -> Option<&UndoEntry> {
@@ -275,13 +276,13 @@ impl UndoState {
             None
         }
     }
-    
+
     /// Set undo limit
     /// Port of set_undo_limit_change() from zle_utils.c
     pub fn set_limit(&mut self) {
         self.limit = self.current;
     }
-    
+
     /// Get undo limit
     /// Port of get_undo_limit_change() from zle_utils.c
     pub fn get_limit(&self) -> usize {
@@ -301,7 +302,7 @@ impl Zle {
             }
             self.zlell = self.zleline.len();
             self.zlecs = entry.cursor;
-            
+
             // Store for undo
             let _ = removed;
         } else {
@@ -316,7 +317,7 @@ impl Zle {
         }
         self.resetneeded = true;
     }
-    
+
     /// Find beginning of line from position
     /// Port of findbol() from zle_utils.c
     pub fn find_bol(&self, pos: usize) -> usize {
@@ -326,7 +327,7 @@ impl Zle {
         }
         p
     }
-    
+
     /// Find end of line from position
     /// Port of findeol() from zle_utils.c
     pub fn find_eol(&self, pos: usize) -> usize {
@@ -336,13 +337,13 @@ impl Zle {
         }
         p
     }
-    
+
     /// Find line number for position
     /// Port of findline() from zle_utils.c
     pub fn find_line(&self, pos: usize) -> usize {
         self.zleline[..pos].iter().filter(|&&c| c == '\n').count()
     }
-    
+
     /// Ensure line has enough space
     /// Port of sizeline() from zle_utils.c
     pub fn size_line(&mut self, needed: usize) {
@@ -350,7 +351,7 @@ impl Zle {
             self.zleline.reserve(needed - self.zleline.len());
         }
     }
-    
+
     /// Make space in line at position
     /// Port of spaceinline() from zle_utils.c
     pub fn space_in_line(&mut self, pos: usize, count: usize) {
@@ -362,7 +363,7 @@ impl Zle {
             self.zlecs += count;
         }
     }
-    
+
     /// Shift characters in line
     /// Port of shiftchars() from zle_utils.c
     pub fn shift_chars(&mut self, from: usize, count: i32) {
@@ -379,7 +380,7 @@ impl Zle {
             self.zlell = self.zleline.len();
         }
     }
-    
+
     /// Delete forward
     /// Port of foredel() from zle_utils.c
     pub fn fore_del(&mut self, count: usize, flags: CutFlags) {
@@ -387,7 +388,7 @@ impl Zle {
         if count == 0 {
             return;
         }
-        
+
         // Save to kill ring if requested
         if flags.contains(CutFlags::KILL) {
             let text: ZleString = self.zleline[self.zlecs..self.zlecs + count].to_vec();
@@ -396,7 +397,7 @@ impl Zle {
                 self.killring.pop_back();
             }
         }
-        
+
         // Delete
         for _ in 0..count {
             self.zleline.remove(self.zlecs);
@@ -404,7 +405,7 @@ impl Zle {
         self.zlell -= count;
         self.resetneeded = true;
     }
-    
+
     /// Delete backward
     /// Port of backdel() from zle_utils.c
     pub fn back_del(&mut self, count: usize, flags: CutFlags) {
@@ -412,7 +413,7 @@ impl Zle {
         if count == 0 {
             return;
         }
-        
+
         // Save to kill ring if requested
         if flags.contains(CutFlags::KILL) {
             let text: ZleString = self.zleline[self.zlecs - count..self.zlecs].to_vec();
@@ -421,7 +422,7 @@ impl Zle {
                 self.killring.pop_back();
             }
         }
-        
+
         // Delete
         self.zlecs -= count;
         for _ in 0..count {
@@ -430,7 +431,7 @@ impl Zle {
         self.zlell -= count;
         self.resetneeded = true;
     }
-    
+
     /// Kill forward
     /// Port of forekill() from zle_utils.c
     pub fn fore_kill(&mut self, count: usize, append: bool) {
@@ -438,9 +439,9 @@ impl Zle {
         if count == 0 {
             return;
         }
-        
+
         let text: ZleString = self.zleline[self.zlecs..self.zlecs + count].to_vec();
-        
+
         if append {
             if let Some(front) = self.killring.front_mut() {
                 front.extend(text);
@@ -450,18 +451,18 @@ impl Zle {
         } else {
             self.killring.push_front(text);
         }
-        
+
         if self.killring.len() > self.killringmax {
             self.killring.pop_back();
         }
-        
+
         for _ in 0..count {
             self.zleline.remove(self.zlecs);
         }
         self.zlell -= count;
         self.resetneeded = true;
     }
-    
+
     /// Kill backward
     /// Port of backkill() from zle_utils.c
     pub fn back_kill(&mut self, count: usize, append: bool) {
@@ -469,9 +470,9 @@ impl Zle {
         if count == 0 {
             return;
         }
-        
+
         let text: ZleString = self.zleline[self.zlecs - count..self.zlecs].to_vec();
-        
+
         if append {
             if let Some(front) = self.killring.front_mut() {
                 let mut new_text = text;
@@ -483,11 +484,11 @@ impl Zle {
         } else {
             self.killring.push_front(text);
         }
-        
+
         if self.killring.len() > self.killringmax {
             self.killring.pop_back();
         }
-        
+
         self.zlecs -= count;
         for _ in 0..count {
             self.zleline.remove(self.zlecs);
@@ -495,16 +496,16 @@ impl Zle {
         self.zlell -= count;
         self.resetneeded = true;
     }
-    
+
     /// Cut text to buffer
     /// Port of cut() / cuttext() from zle_utils.c
     pub fn cut_text(&mut self, start: usize, end: usize, dir: CutDirection) {
         if start >= end || end > self.zlell {
             return;
         }
-        
+
         let text: ZleString = self.zleline[start..end].to_vec();
-        
+
         match dir {
             CutDirection::Front => {
                 self.killring.push_front(text);
@@ -517,30 +518,30 @@ impl Zle {
                 }
             }
         }
-        
+
         if self.killring.len() > self.killringmax {
             self.killring.pop_back();
         }
     }
-    
+
     /// Set the last line (for history)
     /// Port of setlastline() from zle_utils.c
     pub fn set_last_line(&mut self) {
         // Would store current line as last line
     }
-    
+
     /// Show a message
     /// Port of showmsg() from zle_utils.c
     pub fn show_msg(&self, msg: &str) {
         eprintln!("{}", msg);
     }
-    
+
     /// Handle a feep (beep/error)
     /// Port of handlefeep() from zle_utils.c
     pub fn handle_feep(&self) {
         print!("\x07"); // Bell
     }
-    
+
     /// Add text to line at position
     /// Port of zleaddtoline() from zle_utils.c
     pub fn add_to_line(&mut self, pos: usize, text: &str) {
@@ -553,13 +554,13 @@ impl Zle {
         }
         self.resetneeded = true;
     }
-    
+
     /// Get line as string
     /// Port of zlelineasstring() from zle_utils.c
     pub fn line_as_string(&self) -> String {
         self.zleline.iter().collect()
     }
-    
+
     /// Set line from string
     /// Port of stringaszleline() from zle_utils.c
     pub fn string_as_line(&mut self, s: &str) {
@@ -570,20 +571,20 @@ impl Zle {
         }
         self.resetneeded = true;
     }
-    
+
     /// Get ZLE line
     /// Port of zlegetline() from zle_utils.c
     pub fn get_zle_line(&self) -> &[ZleChar] {
         &self.zleline
     }
-    
+
     /// Get ZLE query (for menu selection etc)
     /// Port of getzlequery() from zle_utils.c
     pub fn get_zle_query(&self) -> Option<String> {
         // Would prompt for input
         None
     }
-    
+
     /// Handle suffix (for completion)
     /// Port of handlesuffix() from zle_utils.c
     pub fn handle_suffix(&mut self) {
@@ -609,7 +610,7 @@ impl Zle {
             mark: self.mark,
         }
     }
-    
+
     pub fn restore_positions(&mut self, saved: &SavedPositions) {
         self.zlecs = saved.zlecs.min(self.zlell);
         self.mark = saved.mark.min(self.zlell);
@@ -637,7 +638,7 @@ pub enum CutDirection {
 /// Port of printbind() from zle_utils.c
 pub fn print_bind(seq: &[u8]) -> String {
     let mut result = String::new();
-    
+
     for &b in seq {
         match b {
             0x1b => result.push_str("^["),
@@ -653,7 +654,7 @@ pub fn print_bind(seq: &[u8]) -> String {
             _ => result.push(b as char),
         }
     }
-    
+
     result
 }
 

@@ -31,7 +31,10 @@ pub fn get_proc_caps() -> io::Result<String> {
 
 #[cfg(not(target_os = "linux"))]
 pub fn get_proc_caps() -> io::Result<String> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "capabilities not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "capabilities not supported",
+    ))
 }
 
 /// Set process capabilities
@@ -45,7 +48,10 @@ pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
     unsafe {
         let caps = libc::cap_from_text(cap_c.as_ptr());
         if caps.is_null() {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid capability string"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid capability string",
+            ));
         }
 
         let result = libc::cap_set_proc(caps);
@@ -61,7 +67,10 @@ pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
 
 #[cfg(not(target_os = "linux"))]
 pub fn set_proc_caps(_cap_string: &str) -> io::Result<()> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "capabilities not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "capabilities not supported",
+    ))
 }
 
 /// Get file capabilities
@@ -94,7 +103,10 @@ pub fn get_file_caps(path: &str) -> io::Result<String> {
 
 #[cfg(not(target_os = "linux"))]
 pub fn get_file_caps(_path: &str) -> io::Result<String> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "capabilities not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "capabilities not supported",
+    ))
 }
 
 /// Set file capabilities
@@ -110,7 +122,10 @@ pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
     unsafe {
         let caps = libc::cap_from_text(cap_c.as_ptr());
         if caps.is_null() {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid capability string"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid capability string",
+            ));
         }
 
         let result = libc::cap_set_file(path_c.as_ptr(), caps);
@@ -126,7 +141,10 @@ pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
 
 #[cfg(not(target_os = "linux"))]
 pub fn set_file_caps(_cap_string: &str, _path: &str) -> io::Result<()> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "capabilities not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "capabilities not supported",
+    ))
 }
 
 /// Execute cap builtin
@@ -169,7 +187,10 @@ pub fn builtin_getcap(args: &[&str]) -> (i32, String) {
 /// Execute setcap builtin
 pub fn builtin_setcap(args: &[&str]) -> (i32, String) {
     if args.len() < 2 {
-        return (1, "setcap: capability string and file required\n".to_string());
+        return (
+            1,
+            "setcap: capability string and file required\n".to_string(),
+        );
     }
 
     let cap_string = args[0];

@@ -17,7 +17,7 @@
 //! - menu-expand-or-complete
 //! - end-of-list
 
-use crate::{CompletionGroup, MenuState, MenuAction, MenuResult};
+use crate::{CompletionGroup, MenuAction, MenuResult, MenuState};
 
 /// ZLE completion state - tracks menu completion across widget calls
 #[derive(Debug, Clone)]
@@ -114,21 +114,21 @@ impl ZleWidgets {
         let word = Self::word_at_cursor(buffer, cursor);
         state.original_word = word.clone();
         state.completions = completions;
-        
+
         let total_matches: usize = state.completions.iter().map(|g| g.matches.len()).sum();
-        
+
         if total_matches == 0 {
             state.last_action = Some(ZleAction::NoMatch);
             return (ZleAction::NoMatch, None);
         }
-        
+
         if total_matches == 1 {
             let completion = &state.completions[0].matches[0];
             let insert = completion.insert_str();
             state.last_action = Some(ZleAction::SingleMatch(insert.clone()));
             return (ZleAction::SingleMatch(insert.clone()), Some(insert));
         }
-        
+
         // Multiple matches - find common prefix
         let common = Self::find_common_prefix(&state.completions);
         if common.len() > word.len() {
@@ -136,7 +136,7 @@ impl ZleWidgets {
             state.last_action = Some(ZleAction::Expanded(common.clone()));
             return (ZleAction::Expanded(common.clone()), Some(common));
         }
-        
+
         // Ambiguous - start menu or list
         state.menu.set_prefix(&word);
         state.menu.set_completions(&state.completions);
@@ -158,7 +158,7 @@ impl ZleWidgets {
         try_expand: impl FnOnce(&str) -> Option<String>,
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
-        
+
         // First try expansion (glob, brace, tilde, etc.)
         if let Some(expanded) = try_expand(&word) {
             if expanded != word {
@@ -166,7 +166,7 @@ impl ZleWidgets {
                 return (ZleAction::Expanded(expanded.clone()), Some(expanded));
             }
         }
-        
+
         // Fall back to completion
         Self::complete_word(state, buffer, cursor, completions)
     }
@@ -184,14 +184,14 @@ impl ZleWidgets {
     ) -> (ZleAction, Option<String>) {
         // Get word up to cursor only (not including suffix after cursor)
         let word = Self::word_before_cursor(buffer, cursor);
-        
+
         if let Some(expanded) = try_expand(&word) {
             if expanded != word {
                 state.last_action = Some(ZleAction::Expanded(expanded.clone()));
                 return (ZleAction::Expanded(expanded.clone()), Some(expanded));
             }
         }
-        
+
         Self::complete_word(state, buffer, cursor, completions)
     }
 
@@ -210,12 +210,12 @@ impl ZleWidgets {
             let word = Self::word_at_cursor(buffer, cursor);
             state.original_word = word.clone();
             state.completions = completions;
-            
+
             let total: usize = state.completions.iter().map(|g| g.matches.len()).sum();
             if total == 0 {
                 return (ZleAction::NoMatch, None);
             }
-            
+
             state.menu.set_prefix(&word);
             state.menu.set_completions(&state.completions);
             state.menu.start();
@@ -224,7 +224,7 @@ impl ZleWidgets {
             // Cycle to next
             state.menu.process_action(MenuAction::Next);
         }
-        
+
         // Get current selection
         if let Some(insert) = state.menu.selected_insert_string() {
             state.last_action = Some(ZleAction::MenuCycle);
@@ -249,12 +249,12 @@ impl ZleWidgets {
             let word = Self::word_at_cursor(buffer, cursor);
             state.original_word = word.clone();
             state.completions = completions;
-            
+
             let total: usize = state.completions.iter().map(|g| g.matches.len()).sum();
             if total == 0 {
                 return (ZleAction::NoMatch, None);
             }
-            
+
             state.menu.set_prefix(&word);
             state.menu.set_completions(&state.completions);
             state.menu.start();
@@ -264,7 +264,7 @@ impl ZleWidgets {
             // Cycle to previous
             state.menu.process_action(MenuAction::Prev);
         }
-        
+
         if let Some(insert) = state.menu.selected_insert_string() {
             state.last_action = Some(ZleAction::MenuCycle);
             (ZleAction::MenuCycle, Some(insert))
@@ -277,13 +277,11 @@ impl ZleWidgets {
     // accept-and-menu-complete
     // In a menu completion, insert the current completion and advance to next.
     // =========================================================================
-    pub fn accept_and_menu_complete(
-        state: &mut ZleCompletionState,
-    ) -> (ZleAction, Option<String>) {
+    pub fn accept_and_menu_complete(state: &mut ZleCompletionState) -> (ZleAction, Option<String>) {
         if !state.menu_active {
             return (ZleAction::NoMatch, None);
         }
-        
+
         match state.menu.process_action(MenuAction::AcceptAndMenuComplete) {
             MenuResult::AcceptAndHold(s) => {
                 state.last_action = Some(ZleAction::MenuAccept(s.clone()));
@@ -325,13 +323,13 @@ impl ZleWidgets {
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
         state.completions = completions;
-        
+
         let total: usize = state.completions.iter().map(|g| g.matches.len()).sum();
         if total == 0 {
             state.last_action = Some(ZleAction::NoMatch);
             return (ZleAction::NoMatch, None);
         }
-        
+
         state.menu.set_prefix(&word);
         state.menu.set_completions(&state.completions);
         state.menu.set_show_headers(true);
@@ -352,18 +350,18 @@ impl ZleWidgets {
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
         let expansions = try_expand(&word);
-        
+
         if expansions.is_empty() {
             return (ZleAction::NoMatch, None);
         }
-        
+
         // Convert expansions to completion group
         let mut group = CompletionGroup::new("expansions");
         group.explanation = Some("expansions".to_string());
         for exp in expansions {
             group.matches.push(crate::Completion::new(exp));
         }
-        
+
         state.completions = vec![group];
         state.menu.set_prefix(&word);
         state.menu.set_completions(&state.completions);
@@ -382,13 +380,13 @@ impl ZleWidgets {
         try_expand: impl FnOnce(&str) -> Option<String>,
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
-        
+
         if let Some(expanded) = try_expand(&word) {
             if expanded != word {
                 return (ZleAction::Expanded(expanded.clone()), Some(expanded));
             }
         }
-        
+
         (ZleAction::NoMatch, None)
     }
 
@@ -402,13 +400,13 @@ impl ZleWidgets {
         find_command: impl FnOnce(&str) -> Option<String>,
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
-        
+
         if let Some(path) = find_command(&word) {
             if path != word {
                 return (ZleAction::Expanded(path.clone()), Some(path));
             }
         }
-        
+
         (ZleAction::NoMatch, None)
     }
 
@@ -456,14 +454,14 @@ impl ZleWidgets {
         try_expand: impl FnOnce(&str) -> Option<String>,
     ) -> (ZleAction, Option<String>) {
         let word = Self::word_at_cursor(buffer, cursor);
-        
+
         // First try expansion
         if let Some(expanded) = try_expand(&word) {
             if expanded != word {
                 return (ZleAction::Expanded(expanded.clone()), Some(expanded));
             }
         }
-        
+
         // Fall back to menu completion
         Self::menu_complete(state, buffer, cursor, completions)
     }
@@ -489,31 +487,31 @@ impl ZleWidgets {
     /// Extract word at cursor position
     fn word_at_cursor(buffer: &str, cursor: usize) -> String {
         let cursor = cursor.min(buffer.len());
-        
+
         // Find word start
         let start = buffer[..cursor]
             .rfind(|c: char| c.is_whitespace())
             .map(|i| i + 1)
             .unwrap_or(0);
-        
+
         // Find word end
         let end = buffer[cursor..]
             .find(|c: char| c.is_whitespace())
             .map(|i| cursor + i)
             .unwrap_or(buffer.len());
-        
+
         buffer[start..end].to_string()
     }
 
     /// Extract word before cursor (for prefix expansion)
     fn word_before_cursor(buffer: &str, cursor: usize) -> String {
         let cursor = cursor.min(buffer.len());
-        
+
         let start = buffer[..cursor]
             .rfind(|c: char| c.is_whitespace())
             .map(|i| i + 1)
             .unwrap_or(0);
-        
+
         buffer[start..cursor].to_string()
     }
 
@@ -523,18 +521,18 @@ impl ZleWidgets {
             .iter()
             .flat_map(|g| g.matches.iter().map(|m| m.str_.as_str()))
             .collect();
-        
+
         if all_matches.is_empty() {
             return String::new();
         }
-        
+
         if all_matches.len() == 1 {
             return all_matches[0].to_string();
         }
-        
+
         let first = all_matches[0];
         let mut prefix_len = first.len();
-        
+
         for s in &all_matches[1..] {
             let common = first
                 .chars()
@@ -543,7 +541,7 @@ impl ZleWidgets {
                 .count();
             prefix_len = prefix_len.min(common);
         }
-        
+
         first[..prefix_len].to_string()
     }
 }
@@ -555,7 +553,7 @@ impl ZleCompletionState {
         if !self.menu_active {
             return None;
         }
-        
+
         match self.menu.process_action(action) {
             MenuResult::Accept(s) => {
                 self.menu_active = false;
@@ -628,7 +626,7 @@ mod tests {
         g.matches.push(crate::Completion::new("hello"));
         g.matches.push(crate::Completion::new("help"));
         g.matches.push(crate::Completion::new("helicopter"));
-        
+
         assert_eq!(ZleWidgets::find_common_prefix(&[g]), "hel");
     }
 
@@ -645,7 +643,7 @@ mod tests {
         let mut state = ZleCompletionState::new();
         let mut g = CompletionGroup::new("test");
         g.matches.push(crate::Completion::new("hello"));
-        
+
         let (action, insert) = ZleWidgets::complete_word(&mut state, "hel", 3, vec![g]);
         assert!(matches!(action, ZleAction::SingleMatch(_)));
         assert_eq!(insert, Some("hello".into()));
@@ -658,16 +656,16 @@ mod tests {
         g.matches.push(crate::Completion::new("aaa"));
         g.matches.push(crate::Completion::new("aab"));
         g.matches.push(crate::Completion::new("aac"));
-        
+
         // First call starts menu
         let (_, insert1) = ZleWidgets::menu_complete(&mut state, "aa", 2, vec![g.clone()]);
         assert!(state.menu_active);
         assert_eq!(insert1, Some("aaa".into()));
-        
+
         // Second call cycles
         let (_, insert2) = ZleWidgets::menu_complete(&mut state, "aa", 2, vec![g.clone()]);
         assert_eq!(insert2, Some("aab".into()));
-        
+
         // Third call cycles
         let (_, insert3) = ZleWidgets::menu_complete(&mut state, "aa", 2, vec![g]);
         assert_eq!(insert3, Some("aac".into()));

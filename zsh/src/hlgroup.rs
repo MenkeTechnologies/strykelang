@@ -110,7 +110,13 @@ fn color_to_code(color: &str, fg: bool) -> Option<String> {
             let r = u8::from_str_radix(&s[1..3], 16).ok()?;
             let g = u8::from_str_radix(&s[3..5], 16).ok()?;
             let b = u8::from_str_radix(&s[5..7], 16).ok()?;
-            Some(format!("\x1b[{};2;{};{};{}m", if fg { 38 } else { 48 }, r, g, b))
+            Some(format!(
+                "\x1b[{};2;{};{};{}m",
+                if fg { 38 } else { 48 },
+                r,
+                g,
+                b
+            ))
         }
         _ => None,
     }
@@ -178,13 +184,15 @@ impl HlGroups {
     }
 
     pub fn get_esc(&self, name: &str) -> String {
-        self.groups.get(name)
+        self.groups
+            .get(name)
             .map(|attr| attr_to_escape(attr))
             .unwrap_or_default()
     }
 
     pub fn get_sgr(&self, name: &str) -> String {
-        self.groups.get(name)
+        self.groups
+            .get(name)
             .map(|attr| attr_to_sgr(attr))
             .unwrap_or_else(|| "0".to_string())
     }
@@ -198,13 +206,15 @@ impl HlGroups {
     }
 
     pub fn to_hash_esc(&self) -> HashMap<String, String> {
-        self.groups.iter()
+        self.groups
+            .iter()
             .map(|(k, v)| (k.clone(), attr_to_escape(v)))
             .collect()
     }
 
     pub fn to_hash_sgr(&self) -> HashMap<String, String> {
-        self.groups.iter()
+        self.groups
+            .iter()
             .map(|(k, v)| (k.clone(), attr_to_sgr(v)))
             .collect()
     }

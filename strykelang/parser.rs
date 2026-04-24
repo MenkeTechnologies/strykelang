@@ -5754,23 +5754,43 @@ impl Parser {
 
             // ── Print-like / diagnostic ops (variadic) ─────────────────────────
             ExprKind::Print { handle, mut args } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Print { handle, args }
             }
             ExprKind::Say { handle, mut args } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Say { handle, args }
             }
             ExprKind::Printf { handle, mut args } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Printf { handle, args }
             }
             ExprKind::Die(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Die(args)
             }
             ExprKind::Warn(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Warn(args)
             }
 
@@ -5780,81 +5800,157 @@ impl Parser {
             //   to the values list gives `sprintf(format, lhs, ...args)` for
             //   the common `$n |> sprintf "count=%d"` case.
             ExprKind::Sprintf { format, mut args } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Sprintf { format, args }
             }
 
             // ── System / exec / globbing / filesystem variadics ────────────────
             ExprKind::System(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::System(args)
             }
             ExprKind::Exec(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Exec(args)
             }
             ExprKind::Unlink(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Unlink(args)
             }
             ExprKind::Chmod(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Chmod(args)
             }
             ExprKind::Chown(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Chown(args)
             }
             ExprKind::Glob(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Glob(args)
             }
             ExprKind::Files(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Files(args)
             }
             ExprKind::Filesf(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Filesf(args)
             }
             ExprKind::FilesfRecursive(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::FilesfRecursive(args)
             }
             ExprKind::Dirs(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Dirs(args)
             }
             ExprKind::DirsRecursive(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::DirsRecursive(args)
             }
             ExprKind::SymLinks(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::SymLinks(args)
             }
             ExprKind::Sockets(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Sockets(args)
             }
             ExprKind::Pipes(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::Pipes(args)
             }
             ExprKind::BlockDevices(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::BlockDevices(args)
             }
             ExprKind::CharDevices(mut args) => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::CharDevices(args)
             }
             ExprKind::GlobPar { mut args, progress } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::GlobPar { args, progress }
             }
             ExprKind::ParSed { mut args, progress } => {
-                if self.thread_last_mode { args.push(lhs); } else { args.insert(0, lhs); }
+                if self.thread_last_mode {
+                    args.push(lhs);
+                } else {
+                    args.insert(0, lhs);
+                }
                 ExprKind::ParSed { args, progress }
             }
 
@@ -11019,6 +11115,14 @@ impl Parser {
                         line,
                     });
                 }
+                // Bare `_` in expression position → topic variable `$_`.
+                // Allows concise blocks: `map { _ * 2 }`, `fi { _ > 5 }`.
+                if name == "_" {
+                    return Ok(Expr {
+                        kind: ExprKind::ScalarVar("_".to_string()),
+                        line,
+                    });
+                }
                 // Function call with optional parens
                 if matches!(self.peek(), Token::LParen) {
                     self.advance();
@@ -12708,25 +12812,26 @@ impl Parser {
                     self.syntax_err("cannot assign undef to hash — use %h = () to empty", line)
                 );
             }
-            ExprKind::List(items) if items.len() % 2 != 0 => {
-                if !items.iter().any(|e| {
-                    matches!(
-                        e.kind,
-                        ExprKind::ArrayVar(_)
-                            | ExprKind::HashVar(_)
-                            | ExprKind::FuncCall { .. }
-                            | ExprKind::Deref { .. }
-                            | ExprKind::ScalarVar(_)
-                    )
-                }) {
-                    return Err(self.syntax_err(
+            ExprKind::List(items)
+                if items.len() % 2 != 0
+                    && !items.iter().any(|e| {
+                        matches!(
+                            e.kind,
+                            ExprKind::ArrayVar(_)
+                                | ExprKind::HashVar(_)
+                                | ExprKind::FuncCall { .. }
+                                | ExprKind::Deref { .. }
+                                | ExprKind::ScalarVar(_)
+                        )
+                    }) =>
+            {
+                return Err(self.syntax_err(
                         format!(
                             "odd-length list ({} elements) in hash assignment — missing value for last key",
                             items.len()
                         ),
                         line,
                     ));
-                }
             }
             _ => {}
         }

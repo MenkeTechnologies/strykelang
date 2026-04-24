@@ -108,20 +108,59 @@ impl MathFunctions {
     /// List all available functions
     pub fn list() -> Vec<&'static str> {
         vec![
-            "abs", "acos", "acosh", "asin", "asinh", "atan", "atanh",
-            "cbrt", "ceil", "copysign", "cos", "cosh",
-            "erf", "erfc", "exp", "expm1",
-            "fabs", "float", "floor", "fmod",
-            "gamma", "hypot",
-            "ilogb", "int", "isinf", "isnan",
-            "j0", "j1", "jn",
-            "ldexp", "lgamma", "log", "log10", "log1p", "log2", "logb",
-            "max", "min",
-            "nextafter", "pow",
-            "rint", "round",
-            "scalb", "scalbn", "sin", "sinh", "sqrt",
-            "tan", "tanh", "trunc",
-            "y0", "y1", "yn",
+            "abs",
+            "acos",
+            "acosh",
+            "asin",
+            "asinh",
+            "atan",
+            "atanh",
+            "cbrt",
+            "ceil",
+            "copysign",
+            "cos",
+            "cosh",
+            "erf",
+            "erfc",
+            "exp",
+            "expm1",
+            "fabs",
+            "float",
+            "floor",
+            "fmod",
+            "gamma",
+            "hypot",
+            "ilogb",
+            "int",
+            "isinf",
+            "isnan",
+            "j0",
+            "j1",
+            "jn",
+            "ldexp",
+            "lgamma",
+            "log",
+            "log10",
+            "log1p",
+            "log2",
+            "logb",
+            "max",
+            "min",
+            "nextafter",
+            "pow",
+            "rint",
+            "round",
+            "scalb",
+            "scalbn",
+            "sin",
+            "sinh",
+            "sqrt",
+            "tan",
+            "tanh",
+            "trunc",
+            "y0",
+            "y1",
+            "yn",
         ]
     }
 
@@ -160,7 +199,9 @@ impl MathFunctions {
     fn atan(args: &[MathNumber]) -> Result<MathNumber, String> {
         Self::check_args(args, 1, 2, "atan")?;
         if args.len() == 2 {
-            Ok(MathNumber::Float(args[0].as_float().atan2(args[1].as_float())))
+            Ok(MathNumber::Float(
+                args[0].as_float().atan2(args[1].as_float()),
+            ))
         } else {
             Ok(MathNumber::Float(args[0].as_float().atan()))
         }
@@ -393,12 +434,10 @@ fn bessel_j0(x: f64) -> f64 {
         let y = x * x;
         let ans1 = 57568490574.0
             + y * (-13362590354.0
-                + y * (651619640.7
-                    + y * (-11214424.18 + y * (77392.33017 + y * (-184.9052456)))));
+                + y * (651619640.7 + y * (-11214424.18 + y * (77392.33017 + y * (-184.9052456)))));
         let ans2 = 57568490411.0
             + y * (1029532985.0
-                + y * (9494680.718
-                    + y * (59272.64853 + y * (267.8532712 + y * 1.0))));
+                + y * (9494680.718 + y * (59272.64853 + y * (267.8532712 + y * 1.0))));
         ans1 / ans2
     } else {
         let z = 8.0 / x;
@@ -406,12 +445,10 @@ fn bessel_j0(x: f64) -> f64 {
         let xx = x - 0.785398164;
         let ans1 = 1.0
             + y * (-0.1098628627e-2
-                + y * (0.2734510407e-4
-                    + y * (-0.2073370639e-5 + y * 0.2093887211e-6)));
+                + y * (0.2734510407e-4 + y * (-0.2073370639e-5 + y * 0.2093887211e-6)));
         let ans2 = -0.1562499995e-1
             + y * (0.1430488765e-3
-                + y * (-0.6911147651e-5
-                    + y * (0.7621095161e-6 - y * 0.934945152e-7)));
+                + y * (-0.6911147651e-5 + y * (0.7621095161e-6 - y * 0.934945152e-7)));
         (0.636619772 / x).sqrt() * (xx.cos() * ans1 - z * xx.sin() * ans2)
     }
 }
@@ -427,8 +464,7 @@ fn bessel_j1(x: f64) -> f64 {
                         + y * (-2972611.439 + y * (15704.48260 + y * (-30.16036606))))));
         let ans2 = 144725228442.0
             + y * (2300535178.0
-                + y * (18583304.74
-                    + y * (99447.43394 + y * (376.9991397 + y * 1.0))));
+                + y * (18583304.74 + y * (99447.43394 + y * (376.9991397 + y * 1.0))));
         ans1 / ans2
     } else {
         let z = 8.0 / ax;
@@ -436,14 +472,16 @@ fn bessel_j1(x: f64) -> f64 {
         let xx = ax - 2.356194491;
         let ans1 = 1.0
             + y * (0.183105e-2
-                + y * (-0.3516396496e-4
-                    + y * (0.2457520174e-5 + y * (-0.240337019e-6))));
+                + y * (-0.3516396496e-4 + y * (0.2457520174e-5 + y * (-0.240337019e-6))));
         let ans2 = 0.04687499995
             + y * (-0.2002690873e-3
-                + y * (0.8449199096e-5
-                    + y * (-0.88228987e-6 + y * 0.105787412e-6)));
+                + y * (0.8449199096e-5 + y * (-0.88228987e-6 + y * 0.105787412e-6)));
         let ans = (0.636619772 / ax).sqrt() * (xx.cos() * ans1 - z * xx.sin() * ans2);
-        if x < 0.0 { -ans } else { ans }
+        if x < 0.0 {
+            -ans
+        } else {
+            ans
+        }
     }
 }
 
@@ -493,7 +531,11 @@ fn bessel_jn(n: i32, x: f64) -> f64 {
                 }
                 sum = 2.0 * sum - bj;
                 ans /= sum;
-                if x < 0.0 && n % 2 != 0 { -ans } else { ans }
+                if x < 0.0 && n % 2 != 0 {
+                    -ans
+                } else {
+                    ans
+                }
             }
         }
     }
@@ -504,12 +546,10 @@ fn bessel_y0(x: f64) -> f64 {
         let y = x * x;
         let ans1 = -2957821389.0
             + y * (7062834065.0
-                + y * (-512359803.6
-                    + y * (10879881.29 + y * (-86327.92757 + y * 228.4622733))));
+                + y * (-512359803.6 + y * (10879881.29 + y * (-86327.92757 + y * 228.4622733))));
         let ans2 = 40076544269.0
             + y * (745249964.8
-                + y * (7189466.438
-                    + y * (47447.26470 + y * (226.1030244 + y * 1.0))));
+                + y * (7189466.438 + y * (47447.26470 + y * (226.1030244 + y * 1.0))));
         ans1 / ans2 + 0.636619772 * bessel_j0(x) * x.ln()
     } else {
         let z = 8.0 / x;
@@ -517,12 +557,10 @@ fn bessel_y0(x: f64) -> f64 {
         let xx = x - 0.785398164;
         let ans1 = 1.0
             + y * (-0.1098628627e-2
-                + y * (0.2734510407e-4
-                    + y * (-0.2073370639e-5 + y * 0.2093887211e-6)));
+                + y * (0.2734510407e-4 + y * (-0.2073370639e-5 + y * 0.2093887211e-6)));
         let ans2 = -0.1562499995e-1
             + y * (0.1430488765e-3
-                + y * (-0.6911147651e-5
-                    + y * (0.7621095161e-6 + y * (-0.934945152e-7))));
+                + y * (-0.6911147651e-5 + y * (0.7621095161e-6 + y * (-0.934945152e-7))));
         (0.636619772 / x).sqrt() * (xx.sin() * ans1 + z * xx.cos() * ans2)
     }
 }
@@ -534,8 +572,7 @@ fn bessel_y1(x: f64) -> f64 {
             * (-0.4900604943e13
                 + y * (0.1275274390e13
                     + y * (-0.5153438139e11
-                        + y * (0.7349264551e9
-                            + y * (-0.4237922726e7 + y * 0.8511937935e4)))));
+                        + y * (0.7349264551e9 + y * (-0.4237922726e7 + y * 0.8511937935e4)))));
         let ans2 = 0.2499580570e14
             + y * (0.4244419664e12
                 + y * (0.3733650367e10
@@ -547,12 +584,10 @@ fn bessel_y1(x: f64) -> f64 {
         let xx = x - 2.356194491;
         let ans1 = 1.0
             + y * (0.183105e-2
-                + y * (-0.3516396496e-4
-                    + y * (0.2457520174e-5 + y * (-0.240337019e-6))));
+                + y * (-0.3516396496e-4 + y * (0.2457520174e-5 + y * (-0.240337019e-6))));
         let ans2 = 0.04687499995
             + y * (-0.2002690873e-3
-                + y * (0.8449199096e-5
-                    + y * (-0.88228987e-6 + y * 0.105787412e-6)));
+                + y * (0.8449199096e-5 + y * (-0.88228987e-6 + y * 0.105787412e-6)));
         (0.636619772 / x).sqrt() * (xx.sin() * ans1 + z * xx.cos() * ans2)
     }
 }
@@ -666,10 +701,8 @@ mod tests {
 
     #[test]
     fn test_pow() {
-        let result = MathFunctions::call(
-            "pow",
-            &[MathNumber::Float(2.0), MathNumber::Float(3.0)],
-        ).unwrap();
+        let result =
+            MathFunctions::call("pow", &[MathNumber::Float(2.0), MathNumber::Float(3.0)]).unwrap();
         if let MathNumber::Float(f) = result {
             assert!((f - 8.0).abs() < 1e-10);
         }
@@ -677,10 +710,8 @@ mod tests {
 
     #[test]
     fn test_atan2() {
-        let result = MathFunctions::call(
-            "atan",
-            &[MathNumber::Float(1.0), MathNumber::Float(1.0)],
-        ).unwrap();
+        let result =
+            MathFunctions::call("atan", &[MathNumber::Float(1.0), MathNumber::Float(1.0)]).unwrap();
         if let MathNumber::Float(f) = result {
             assert!((f - PI / 4.0).abs() < 1e-10);
         }
@@ -688,10 +719,9 @@ mod tests {
 
     #[test]
     fn test_hypot() {
-        let result = MathFunctions::call(
-            "hypot",
-            &[MathNumber::Float(3.0), MathNumber::Float(4.0)],
-        ).unwrap();
+        let result =
+            MathFunctions::call("hypot", &[MathNumber::Float(3.0), MathNumber::Float(4.0)])
+                .unwrap();
         if let MathNumber::Float(f) = result {
             assert!((f - 5.0).abs() < 1e-10);
         }
@@ -701,14 +731,24 @@ mod tests {
     fn test_min_max() {
         let result = MathFunctions::call(
             "max",
-            &[MathNumber::Integer(1), MathNumber::Integer(5), MathNumber::Integer(3)],
-        ).unwrap();
+            &[
+                MathNumber::Integer(1),
+                MathNumber::Integer(5),
+                MathNumber::Integer(3),
+            ],
+        )
+        .unwrap();
         assert!(matches!(result, MathNumber::Integer(5)));
 
         let result = MathFunctions::call(
             "min",
-            &[MathNumber::Float(1.5), MathNumber::Float(0.5), MathNumber::Float(2.5)],
-        ).unwrap();
+            &[
+                MathNumber::Float(1.5),
+                MathNumber::Float(0.5),
+                MathNumber::Float(2.5),
+            ],
+        )
+        .unwrap();
         if let MathNumber::Float(f) = result {
             assert!((f - 0.5).abs() < 1e-10);
         }

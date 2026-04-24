@@ -71,9 +71,15 @@ pub fn zselect(options: &ZselectOptions) -> Result<SelectResult, String> {
     for (fd, mode) in &options.fds {
         max_fd = max_fd.max(*fd);
         match mode {
-            SelectMode::Read => { read_fds.insert(*fd); }
-            SelectMode::Write => { write_fds.insert(*fd); }
-            SelectMode::Error => { error_fds.insert(*fd); }
+            SelectMode::Read => {
+                read_fds.insert(*fd);
+            }
+            SelectMode::Write => {
+                write_fds.insert(*fd);
+            }
+            SelectMode::Error => {
+                error_fds.insert(*fd);
+            }
         }
     }
 
@@ -97,13 +103,18 @@ pub fn zselect(options: &ZselectOptions) -> Result<SelectResult, String> {
         }
     }
 
-    let timeout_ms = options.timeout_hundredths
+    let timeout_ms = options
+        .timeout_hundredths
         .map(|t| (t * 10) as libc::c_int)
         .unwrap_or(-1);
 
     let result = loop {
         let ret = unsafe {
-            libc::poll(poll_fds.as_mut_ptr(), poll_fds.len() as libc::nfds_t, timeout_ms)
+            libc::poll(
+                poll_fds.as_mut_ptr(),
+                poll_fds.len() as libc::nfds_t,
+                timeout_ms,
+            )
         };
 
         if ret < 0 {
@@ -132,21 +143,15 @@ pub fn zselect(options: &ZselectOptions) -> Result<SelectResult, String> {
         if pfd.revents != 0 {
             if pfd.revents & libc::POLLIN != 0 && read_fds.contains(&pfd.fd) {
                 ready_fds.push((pfd.fd, SelectMode::Read));
-                fd_modes.entry(pfd.fd)
-                    .or_insert_with(String::new)
-                    .push('r');
+                fd_modes.entry(pfd.fd).or_insert_with(String::new).push('r');
             }
             if pfd.revents & libc::POLLOUT != 0 && write_fds.contains(&pfd.fd) {
                 ready_fds.push((pfd.fd, SelectMode::Write));
-                fd_modes.entry(pfd.fd)
-                    .or_insert_with(String::new)
-                    .push('w');
+                fd_modes.entry(pfd.fd).or_insert_with(String::new).push('w');
             }
             if (pfd.revents & (libc::POLLERR | libc::POLLPRI) != 0) && error_fds.contains(&pfd.fd) {
                 ready_fds.push((pfd.fd, SelectMode::Error));
-                fd_modes.entry(pfd.fd)
-                    .or_insert_with(String::new)
-                    .push('e');
+                fd_modes.entry(pfd.fd).or_insert_with(String::new).push('e');
             }
         }
     }
@@ -196,7 +201,7 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                 match chars[j] {
                     'a' => {
                         let name = if j + 1 < chars.len() {
-                            chars[j+1..].iter().collect::<String>()
+                            chars[j + 1..].iter().collect::<String>()
                         } else if i + 1 < args.len() {
                             i += 1;
                             args[i].to_string()
@@ -204,7 +209,12 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                             return Err("argument expected after -a".to_string());
                         };
 
-                        if name.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        if name
+                            .chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false)
+                        {
                             return Err(format!("invalid array name: {}", name));
                         }
                         options.array_name = Some(name);
@@ -212,7 +222,7 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                     }
                     'A' => {
                         let name = if j + 1 < chars.len() {
-                            chars[j+1..].iter().collect::<String>()
+                            chars[j + 1..].iter().collect::<String>()
                         } else if i + 1 < args.len() {
                             i += 1;
                             args[i].to_string()
@@ -220,7 +230,12 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                             return Err("argument expected after -A".to_string());
                         };
 
-                        if name.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        if name
+                            .chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false)
+                        {
                             return Err(format!("invalid array name: {}", name));
                         }
                         options.hash_name = Some(name);
@@ -231,7 +246,7 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                     'e' => current_mode = SelectMode::Error,
                     't' => {
                         let timeout_str = if j + 1 < chars.len() {
-                            chars[j+1..].iter().collect::<String>()
+                            chars[j + 1..].iter().collect::<String>()
                         } else if i + 1 < args.len() {
                             i += 1;
                             args[i].to_string()
@@ -239,14 +254,16 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                             return Err("argument expected after -t".to_string());
                         };
 
-                        let timeout: i64 = timeout_str.parse()
+                        let timeout: i64 = timeout_str
+                            .parse()
                             .map_err(|_| format!("number expected after -t: {}", timeout_str))?;
                         options.timeout_hundredths = Some(timeout);
                         break;
                     }
                     c if c.is_ascii_digit() => {
                         let fd_str: String = chars[j..].iter().collect();
-                        let fd: RawFd = fd_str.parse()
+                        let fd: RawFd = fd_str
+                            .parse()
                             .map_err(|_| format!("expecting file descriptor: {}", fd_str))?;
                         options.fds.push((fd, current_mode));
                         break;
@@ -258,7 +275,8 @@ pub fn parse_zselect_args(args: &[&str]) -> Result<ZselectOptions, String> {
                 j += 1;
             }
         } else if arg.chars().all(|c| c.is_ascii_digit()) {
-            let fd: RawFd = arg.parse()
+            let fd: RawFd = arg
+                .parse()
                 .map_err(|_| format!("expecting file descriptor: {}", arg))?;
             options.fds.push((fd, current_mode));
         } else {

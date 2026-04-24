@@ -496,7 +496,7 @@ mod tests {
         let mut group = CompletionGroup::new("test");
         group.add_match(Completion::new("foo"));
         group.add_match(Completion::new("bar"));
-        
+
         assert_eq!(group.matches.len(), 2);
         assert_eq!(group.matches[0].str_, "foo");
         assert_eq!(group.matches[1].str_, "bar");
@@ -506,7 +506,7 @@ mod tests {
     fn test_completion_group_add_explanation() {
         let mut group = CompletionGroup::new("test");
         group.add_explanation("Select an option");
-        
+
         // add_explanation adds to the explanations vec
         assert!(group.explanations.contains(&"Select an option".to_string()));
     }
@@ -532,7 +532,7 @@ mod tests {
         let mut receiver = CompletionReceiver::unlimited();
         receiver.begin_group("files", true);
         receiver.add(Completion::new("test.txt"));
-        
+
         assert_eq!(receiver.total_count(), 1);
         assert!(receiver.groups().contains_key("files"));
     }
@@ -540,14 +540,14 @@ mod tests {
     #[test]
     fn test_completion_receiver_multiple_groups() {
         let mut receiver = CompletionReceiver::unlimited();
-        
+
         receiver.begin_group("files", true);
         receiver.add(Completion::new("file1.txt"));
         receiver.add(Completion::new("file2.txt"));
-        
+
         receiver.begin_group("directories", true);
         receiver.add(Completion::new("dir1/"));
-        
+
         assert_eq!(receiver.total_count(), 3);
         // 3 groups: default + files + directories
         assert_eq!(receiver.groups().len(), 3);
@@ -556,13 +556,13 @@ mod tests {
     #[test]
     fn test_completion_receiver_all_matches() {
         let mut receiver = CompletionReceiver::unlimited();
-        
+
         receiver.begin_group("a", true);
         receiver.add(Completion::new("alpha"));
-        
+
         receiver.begin_group("b", true);
         receiver.add(Completion::new("beta"));
-        
+
         let matches = receiver.all_matches();
         assert_eq!(matches.len(), 2);
     }
@@ -572,7 +572,7 @@ mod tests {
         let mut receiver = CompletionReceiver::unlimited();
         receiver.begin_group("test", true);
         receiver.add(Completion::new("item"));
-        
+
         let groups = receiver.take();
         // default group + test group
         assert!(groups.len() >= 1);
@@ -590,7 +590,7 @@ mod tests {
         comp.rnum = 5;
         comp.gnum = 10;
         comp.modec = '/';
-        
+
         assert_eq!(comp.orig, "original");
         assert_eq!(comp.modec, '/');
         assert!(comp.flags.contains(CompletionFlags::FILE));
@@ -617,11 +617,17 @@ mod tests {
             CompletionFlags::DELETE,
             CompletionFlags::NOQUOTE,
         ];
-        
+
         for (i, flag1) in all_flags.iter().enumerate() {
             for (j, flag2) in all_flags.iter().enumerate() {
                 if i != j {
-                    assert_ne!(flag1.bits(), flag2.bits(), "Flags at {} and {} have same bits", i, j);
+                    assert_ne!(
+                        flag1.bits(),
+                        flag2.bits(),
+                        "Flags at {} and {} have same bits",
+                        i,
+                        j
+                    );
                 }
             }
         }

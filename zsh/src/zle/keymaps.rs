@@ -1,10 +1,10 @@
 //! ZLE Keymap management
 
-use std::collections::HashMap;
-use std::sync::Mutex;
 use parking_lot::ReentrantMutex;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::sync::Mutex;
 
 /// ZLE state for widget execution
 #[derive(Debug)]
@@ -146,12 +146,12 @@ impl ZleState {
             }
             self.buffer = new_buffer;
             self.cursor = start;
-            
+
             // Rotate kill ring
             if let Some(front) = self.kill_ring.pop_front() {
                 self.kill_ring.push_back(front);
             }
-            
+
             // Yank the new top
             self.yank()
         } else {
@@ -192,23 +192,27 @@ impl ZleManager {
             keymaps: HashMap::new(),
             user_widgets: HashMap::new(),
         };
-        
-        mgr.keymaps.insert(KeymapName::Main, Keymap::emacs_default());
-        mgr.keymaps.insert(KeymapName::Emacs, Keymap::emacs_default());
-        mgr.keymaps.insert(KeymapName::ViInsert, Keymap::viins_default());
-        mgr.keymaps.insert(KeymapName::ViCommand, Keymap::vicmd_default());
+
+        mgr.keymaps
+            .insert(KeymapName::Main, Keymap::emacs_default());
+        mgr.keymaps
+            .insert(KeymapName::Emacs, Keymap::emacs_default());
+        mgr.keymaps
+            .insert(KeymapName::ViInsert, Keymap::viins_default());
+        mgr.keymaps
+            .insert(KeymapName::ViCommand, Keymap::vicmd_default());
         mgr.keymaps.insert(KeymapName::Isearch, Keymap::new());
         mgr.keymaps.insert(KeymapName::Command, Keymap::new());
         mgr.keymaps.insert(KeymapName::MenuSelect, Keymap::new());
-        
+
         mgr
     }
-    
+
     /// Define a user widget
     pub fn define_widget(&mut self, name: &str, func: &str) {
         self.user_widgets.insert(name.to_string(), func.to_string());
     }
-    
+
     /// Get a widget by name (returns the function name if user-defined)
     pub fn get_widget<'a>(&'a self, name: &'a str) -> Option<&'a str> {
         // Check user widgets first
@@ -221,38 +225,42 @@ impl ZleManager {
         }
         None
     }
-    
+
     /// Bind a key in a keymap
     pub fn bind_key(&mut self, keymap: KeymapName, key: &str, widget: &str) {
         if let Some(km) = self.keymaps.get_mut(&keymap) {
             km.bind(key, widget);
         }
     }
-    
+
     /// Unbind a key from a keymap
     pub fn unbind_key(&mut self, keymap: KeymapName, key: &str) {
         if let Some(km) = self.keymaps.get_mut(&keymap) {
             km.unbind(key);
         }
     }
-    
+
     /// Execute a widget (stub - actual execution handled elsewhere)
-    pub fn execute_widget(&mut self, name: &str, _key: Option<char>) -> super::widgets::WidgetResult {
+    pub fn execute_widget(
+        &mut self,
+        name: &str,
+        _key: Option<char>,
+    ) -> super::widgets::WidgetResult {
         if self.get_widget(name).is_some() {
             super::widgets::WidgetResult::Ok
         } else {
             super::widgets::WidgetResult::Error(format!("Unknown widget: {}", name))
         }
     }
-    
+
     /// List all widget names
     pub fn list_widgets(&self) -> Vec<&str> {
         let mut widgets: Vec<&str> = BUILTIN_WIDGETS.to_vec();
-        
+
         for name in self.user_widgets.keys() {
             widgets.push(name.as_str());
         }
-        
+
         widgets
     }
 }

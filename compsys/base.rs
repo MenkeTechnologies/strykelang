@@ -65,23 +65,23 @@ impl TagManager {
     /// Example: "files directories" "arguments" "-"
     pub fn configure_from_style(&mut self, tag_order: &[String]) {
         self.try_sets.clear();
-        
+
         for group in tag_order {
             if group == "-" {
                 break;
             }
-            
+
             let tags: Vec<String> = group
                 .split_whitespace()
                 .filter(|t| self.offered.contains(&t.to_string()))
                 .map(|s| s.to_string())
                 .collect();
-            
+
             if !tags.is_empty() {
                 self.try_sets.push(tags);
             }
         }
-        
+
         // If no tag-order or all filtered, use default (all offered at once)
         if self.try_sets.is_empty() {
             self.try_sets.push(self.offered.clone());
@@ -777,10 +777,8 @@ pub fn description(
         .unwrap_or_else(|| "%d".to_string());
 
     // zformat -F substitution: %d = description, plus additional escapes
-    let result = format
-        .replace("%d", description)
-        .replace("%%", "%");
-    
+    let result = format.replace("%d", description).replace("%%", "%");
+
     Some(result)
 }
 
@@ -807,12 +805,12 @@ pub fn is_ignored(s: &str, patterns: &[String]) -> bool {
 fn glob_match(pattern: &str, s: &str) -> bool {
     let pattern = pattern.as_bytes();
     let s = s.as_bytes();
-    
+
     let mut pi = 0;
     let mut si = 0;
     let mut star_pi = None;
     let mut star_si = None;
-    
+
     while si < s.len() {
         if pi < pattern.len() && (pattern[pi] == b'?' || pattern[pi] == s[si]) {
             pi += 1;
@@ -829,11 +827,11 @@ fn glob_match(pattern: &str, s: &str) -> bool {
             return false;
         }
     }
-    
+
     while pi < pattern.len() && pattern[pi] == b'*' {
         pi += 1;
     }
-    
+
     pi == pattern.len()
 }
 
@@ -1085,7 +1083,7 @@ mod tests {
             "__pycache__".to_string(),
             ".git*".to_string(),
         ];
-        
+
         assert!(is_ignored("file.pyc", &patterns));
         assert!(is_ignored("__pycache__", &patterns));
         assert!(is_ignored(".git", &patterns));
@@ -1104,7 +1102,7 @@ mod tests {
     fn test_description_basic() {
         let mut state = CompletionState::new();
         let styles = ZStyleStore::new();
-        
+
         let result = description(&mut state, &styles, ":completion:", "files", "file");
         assert_eq!(result, Some("file".to_string())); // Default format is %d
     }
@@ -1113,8 +1111,13 @@ mod tests {
     fn test_description_with_format() {
         let mut state = CompletionState::new();
         let mut styles = ZStyleStore::new();
-        styles.set(":completion::files", "format", vec!["-- %d --".to_string()], false);
-        
+        styles.set(
+            ":completion::files",
+            "format",
+            vec!["-- %d --".to_string()],
+            false,
+        );
+
         let result = description(&mut state, &styles, ":completion:", "files", "file");
         assert_eq!(result, Some("-- file --".to_string()));
     }
@@ -1123,8 +1126,13 @@ mod tests {
     fn test_description_with_hidden_all() {
         let mut state = CompletionState::new();
         let mut styles = ZStyleStore::new();
-        styles.set(":completion::files", "hidden", vec!["all".to_string()], false);
-        
+        styles.set(
+            ":completion::files",
+            "hidden",
+            vec!["all".to_string()],
+            false,
+        );
+
         let result = description(&mut state, &styles, ":completion:", "files", "file");
         assert_eq!(result, None);
     }
@@ -1133,8 +1141,13 @@ mod tests {
     fn test_description_percent_escape() {
         let mut state = CompletionState::new();
         let mut styles = ZStyleStore::new();
-        styles.set(":completion::files", "format", vec!["100%% %d".to_string()], false);
-        
+        styles.set(
+            ":completion::files",
+            "format",
+            vec!["100%% %d".to_string()],
+            false,
+        );
+
         let result = description(&mut state, &styles, ":completion:", "files", "complete");
         assert_eq!(result, Some("100% complete".to_string()));
     }
@@ -1144,7 +1157,7 @@ mod tests {
         let matched = CompleterResult::Matched;
         let no_match = CompleterResult::NoMatch;
         let skip = CompleterResult::Skip;
-        
+
         // Just verify they're distinct (for match arms)
         assert!(matches!(matched, CompleterResult::Matched));
         assert!(matches!(no_match, CompleterResult::NoMatch));

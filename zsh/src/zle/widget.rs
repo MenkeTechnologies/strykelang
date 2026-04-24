@@ -111,7 +111,9 @@ fn get_builtin_widget(name: &str) -> (fn(&mut Zle), WidgetFlags) {
         // Accept/execute
         "accept-line" => (widget_accept_line, WidgetFlags::empty()),
         "accept-and-hold" => (widget_accept_and_hold, WidgetFlags::empty()),
-        "accept-line-and-down-history" => (widget_accept_line_and_down_history, WidgetFlags::empty()),
+        "accept-line-and-down-history" => {
+            (widget_accept_line_and_down_history, WidgetFlags::empty())
+        }
 
         // Self-insert
         "self-insert" => (widget_self_insert, WidgetFlags::empty()),
@@ -154,9 +156,15 @@ fn get_builtin_widget(name: &str) -> (fn(&mut Zle), WidgetFlags) {
         "down-line-or-history" => (widget_down_line_or_history, WidgetFlags::LINEMOVE),
         "up-history" => (widget_up_history, WidgetFlags::LINEMOVE),
         "down-history" => (widget_down_history, WidgetFlags::LINEMOVE),
-        "history-incremental-search-backward" => (widget_history_isearch_backward, WidgetFlags::empty()),
-        "history-incremental-search-forward" => (widget_history_isearch_forward, WidgetFlags::empty()),
-        "beginning-of-buffer-or-history" => (widget_beginning_of_buffer_or_history, WidgetFlags::LINEMOVE),
+        "history-incremental-search-backward" => {
+            (widget_history_isearch_backward, WidgetFlags::empty())
+        }
+        "history-incremental-search-forward" => {
+            (widget_history_isearch_forward, WidgetFlags::empty())
+        }
+        "beginning-of-buffer-or-history" => {
+            (widget_beginning_of_buffer_or_history, WidgetFlags::LINEMOVE)
+        }
         "end-of-buffer-or-history" => (widget_end_of_buffer_or_history, WidgetFlags::LINEMOVE),
 
         // Misc
@@ -204,7 +212,9 @@ fn get_builtin_widget(name: &str) -> (fn(&mut Zle), WidgetFlags) {
         "vi-change-whole-line" => (widget_vi_change_whole_line, WidgetFlags::KILL),
         "vi-first-non-blank" => (widget_vi_first_non_blank, WidgetFlags::empty()),
         "vi-end-of-line" => (widget_vi_end_of_line, WidgetFlags::empty()),
-        "vi-digit-or-beginning-of-line" => (widget_vi_digit_or_beginning_of_line, WidgetFlags::empty()),
+        "vi-digit-or-beginning-of-line" => {
+            (widget_vi_digit_or_beginning_of_line, WidgetFlags::empty())
+        }
         "vi-open-line-below" => (widget_vi_open_line_below, WidgetFlags::empty()),
         "vi-open-line-above" => (widget_vi_open_line_above, WidgetFlags::empty()),
         "vi-join" => (widget_vi_join, WidgetFlags::empty()),
@@ -391,7 +401,7 @@ fn widget_kill_word(zle: &mut Zle) {
     }
     let end = zle.zlecs;
     zle.zlecs = start;
-    
+
     if end > start {
         let killed: Vec<char> = zle.zleline.drain(start..end).collect();
         zle.zlell -= end - start;
@@ -414,7 +424,7 @@ fn widget_backward_kill_word(zle: &mut Zle) {
         zle.zlecs -= 1;
     }
     let start = zle.zlecs;
-    
+
     if end > start {
         let killed: Vec<char> = zle.zleline.drain(start..end).collect();
         zle.zlell -= end - start;
@@ -878,14 +888,14 @@ fn widget_vi_backward_kill_word(zle: &mut Zle) {
 
 fn widget_digit_argument(zle: &mut Zle) {
     let digit = (zle.lastchar as u8).saturating_sub(b'0') as i32;
-    
+
     if zle.zmod.flags.contains(super::main::ModifierFlags::TMULT) {
         zle.zmod.tmult = zle.zmod.tmult * zle.zmod.base + digit;
     } else {
         zle.zmod.flags.insert(super::main::ModifierFlags::TMULT);
         zle.zmod.tmult = digit;
     }
-    
+
     zle.prefixflag = true;
 }
 

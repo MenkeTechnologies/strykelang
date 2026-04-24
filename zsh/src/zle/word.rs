@@ -21,7 +21,7 @@ impl Zle {
     /// Find the start of the current/previous word
     pub fn find_word_start(&self, style: WordStyle) -> usize {
         let mut pos = self.zlecs;
-        
+
         match style {
             WordStyle::Emacs => {
                 // Skip non-word characters
@@ -67,14 +67,14 @@ impl Zle {
                 }
             }
         }
-        
+
         pos
     }
-    
+
     /// Find the end of the current/next word
     pub fn find_word_end(&self, style: WordStyle) -> usize {
         let mut pos = self.zlecs;
-        
+
         match style {
             WordStyle::Emacs => {
                 // Skip non-word characters
@@ -123,10 +123,10 @@ impl Zle {
                 }
             }
         }
-        
+
         pos
     }
-    
+
     /// Get the current word
     pub fn get_current_word(&self, style: WordStyle) -> &[ZleChar] {
         let start = self.find_word_start(style);

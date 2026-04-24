@@ -75,9 +75,9 @@ pub fn cpatterns_same(a: &[CompMatcher], b: &[CompMatcher]) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    a.iter().zip(b.iter()).all(|(ma, mb)| {
-        ma.line_pattern == mb.line_pattern && ma.word_pattern == mb.word_pattern
-    })
+    a.iter()
+        .zip(b.iter())
+        .all(|(ma, mb)| ma.line_pattern == mb.line_pattern && ma.word_pattern == mb.word_pattern)
 }
 
 /// Check if two matcher lists are the same (from compmatch.c cmatchers_same)
@@ -154,8 +154,16 @@ fn try_matcher(line: &str, word: &str, matcher: &CompMatcher) -> bool {
 /// Match parts of a completion (from compmatch.c match_parts)
 pub fn match_parts(line: &str, word: &str, flags: &MatchFlags) -> Vec<(usize, usize)> {
     let mut parts = Vec::new();
-    let line_lower = if flags.case_insensitive { line.to_lowercase() } else { line.to_string() };
-    let word_lower = if flags.case_insensitive { word.to_lowercase() } else { word.to_string() };
+    let line_lower = if flags.case_insensitive {
+        line.to_lowercase()
+    } else {
+        line.to_string()
+    };
+    let word_lower = if flags.case_insensitive {
+        word.to_lowercase()
+    } else {
+        word.to_string()
+    };
 
     let mut pos = 0;
     for wc in word_lower.chars() {
@@ -255,7 +263,10 @@ mod tests {
 
     #[test]
     fn test_match_str_case_insensitive() {
-        let flags = MatchFlags { case_insensitive: true, ..Default::default() };
+        let flags = MatchFlags {
+            case_insensitive: true,
+            ..Default::default()
+        };
         assert!(match_str("FooBar", "foo", &[], &flags).is_some());
     }
 

@@ -64,7 +64,13 @@ impl ContextManager {
     }
 
     /// Save some or all of current context
-    pub fn save_partial(&mut self, parts: u32, hist: &HistStack, lex: &LexStack, parse: &ParseStack) {
+    pub fn save_partial(
+        &mut self,
+        parts: u32,
+        hist: &HistStack,
+        lex: &LexStack,
+        parse: &ParseStack,
+    ) {
         let mut ctx = ContextStack::default();
 
         if (parts & ZCONTEXT_HIST) != 0 {
@@ -93,7 +99,7 @@ impl ContextManager {
     /// Restore some or all of context
     pub fn restore_partial(&mut self, parts: u32) -> Option<ContextStack> {
         let ctx = self.stack.pop()?;
-        
+
         let mut result = ContextStack::default();
         if (parts & ZCONTEXT_HIST) != 0 {
             result.hist_stack = ctx.hist_stack;
@@ -159,10 +165,21 @@ mod tests {
     #[test]
     fn test_context_save_restore() {
         let mut mgr = ContextManager::new();
-        
-        let hist = HistStack { curhist: 100, histsiz: 1000, savehistsiz: 500 };
-        let lex = LexStack { tok: 42, tokstr: Some("test".to_string()), zsession: None };
-        let parse = ParseStack { ecused: 10, ecnpats: 5 };
+
+        let hist = HistStack {
+            curhist: 100,
+            histsiz: 1000,
+            savehistsiz: 500,
+        };
+        let lex = LexStack {
+            tok: 42,
+            tokstr: Some("test".to_string()),
+            zsession: None,
+        };
+        let parse = ParseStack {
+            ecused: 10,
+            ecnpats: 5,
+        };
 
         mgr.save(&hist, &lex, &parse);
         assert_eq!(mgr.depth(), 1);
@@ -177,13 +194,17 @@ mod tests {
     #[test]
     fn test_context_partial_save() {
         let mut mgr = ContextManager::new();
-        
-        let hist = HistStack { curhist: 50, histsiz: 500, savehistsiz: 250 };
+
+        let hist = HistStack {
+            curhist: 50,
+            histsiz: 500,
+            savehistsiz: 250,
+        };
         let lex = LexStack::default();
         let parse = ParseStack::default();
 
         mgr.save_partial(ZCONTEXT_HIST, &hist, &lex, &parse);
-        
+
         let restored = mgr.restore_partial(ZCONTEXT_HIST).unwrap();
         assert_eq!(restored.hist_stack.curhist, 50);
     }
@@ -191,15 +212,23 @@ mod tests {
     #[test]
     fn test_nested_contexts() {
         let mut mgr = ContextManager::new();
-        
-        let hist1 = HistStack { curhist: 1, histsiz: 100, savehistsiz: 50 };
-        let hist2 = HistStack { curhist: 2, histsiz: 200, savehistsiz: 100 };
+
+        let hist1 = HistStack {
+            curhist: 1,
+            histsiz: 100,
+            savehistsiz: 50,
+        };
+        let hist2 = HistStack {
+            curhist: 2,
+            histsiz: 200,
+            savehistsiz: 100,
+        };
         let lex = LexStack::default();
         let parse = ParseStack::default();
 
         mgr.save(&hist1, &lex, &parse);
         mgr.save(&hist2, &lex, &parse);
-        
+
         assert_eq!(mgr.depth(), 2);
 
         let restored2 = mgr.restore().unwrap();

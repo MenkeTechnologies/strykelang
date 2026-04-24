@@ -166,7 +166,10 @@ pub fn addmatch(state: &mut CompState, m: CompMatch) {
 }
 
 /// Get user variable for completion (from compcore.c get_user_var)
-pub fn get_user_var(name: &str, vars: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn get_user_var(
+    name: &str,
+    vars: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     vars.get(name).cloned()
 }
 

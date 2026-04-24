@@ -83,7 +83,7 @@ pub struct CompInitResult {
 }
 
 /// Parse the first line of a completion file
-/// 
+///
 /// Handles all #compdef variants:
 /// - `#compdef cmd1 cmd2` - regular commands
 /// - `#compdef - cmd1 cmd2` - bare hyphen + commands (hyphen maps to '-')
@@ -150,7 +150,7 @@ fn parse_first_line(line: &str) -> CompFileDef {
                 // - bare "-" (maps to '-' in _comps)
                 // - context entries like "-default-", "-redirect-", "-value-,VAR,-default-"
                 // - regular commands
-                // 
+                //
                 // Skip actual option flags like "-n" but keep context entries
                 let cmds: Vec<String> = parts
                     .iter()
@@ -187,15 +187,15 @@ fn is_context_entry(s: &str) -> bool {
     }
     // Strip service suffix for checking
     let base = s.split('=').next().unwrap_or(s);
-    
+
     // Check if it's a known context pattern:
     // 1. Ends with '-' like -default-, -redirect-
     // 2. Contains comma (context specifiers like -redirect-,<,bunzip2 or -value-,VAR,-default-)
     // 3. But NOT single letter options like -p, -P, -k, -K, -n
     if base.len() <= 2 {
-        return base == "-";  // bare hyphen is a context entry
+        return base == "-"; // bare hyphen is a context entry
     }
-    
+
     base.ends_with('-') || base.contains(',')
 }
 
@@ -220,7 +220,7 @@ fn scan_file(path: &Path) -> Option<CompFile> {
 
     // Read entire file at once (will be cached in SQLite)
     let body = fs::read_to_string(path).ok()?;
-    
+
     // Parse first line for directive
     let first_line = body.lines().next().unwrap_or("");
     let def = parse_first_line(first_line);
@@ -471,57 +471,64 @@ fn escape_zsh_string(s: &str) -> String {
 }
 
 /// Build SQLite cache from fpath scan
-/// 
+///
 /// This is the main entry point for initializing the completion system.
 /// It scans fpath directories, parses #compdef directives, and populates
 /// the SQLite cache for fast lookups.
 pub fn build_cache_from_fpath(
-    fpath: &[PathBuf], 
-    cache: &mut crate::cache::CompsysCache
+    fpath: &[PathBuf],
+    cache: &mut crate::cache::CompsysCache,
 ) -> std::io::Result<CompInitResult> {
     use std::time::Instant;
-    
+
     let t0 = Instant::now();
     let result = compinit(fpath);
     let scan_time = t0.elapsed();
-    
+
     let t1 = Instant::now();
-    
+
     // Populate comps table (_comps hash)
-    let comps: Vec<(String, String)> = result.comps
+    let comps: Vec<(String, String)> = result
+        .comps
         .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    cache.set_comps_bulk(&comps)
+    cache
+        .set_comps_bulk(&comps)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-    
+
     // Populate services table (_services hash)
-    let services: Vec<(String, String)> = result.services
+    let services: Vec<(String, String)> = result
+        .services
         .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    cache.set_services_bulk(&services)
+    cache
+        .set_services_bulk(&services)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-    
+
     // Populate patcomps table (_patcomps hash)
     for (pattern, function) in &result.patcomps {
-        cache.set_patcomp(pattern, function)
+        cache
+            .set_patcomp(pattern, function)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     }
-    
+
     // Populate postpatcomps (stored in patcomps with a marker, or separate table if needed)
     // For now, we'll merge them into patcomps
     for (pattern, function) in &result.postpatcomps {
-        cache.set_patcomp(pattern, function)
+        cache
+            .set_patcomp(pattern, function)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     }
-    
+
     let comps_time = t1.elapsed();
     let t2 = Instant::now();
-    
+
     // Populate autoloads table with function bodies for instant loading
     // Bodies were already read during parallel scan - no extra I/O here
-    let autoloads: Vec<(String, String, String)> = result.files
+    let autoloads: Vec<(String, String, String)> = result
+        .files
         .iter()
         .filter(|f| matches!(f.def, CompFileDef::CompDef(_) | CompFileDef::Autoload(_)))
         .filter_map(|f| {
@@ -530,55 +537,60 @@ pub fn build_cache_from_fpath(
             Some((f.name.clone(), path_str, body))
         })
         .collect();
-    cache.add_autoloads_with_bodies_bulk(&autoloads)
+    cache
+        .add_autoloads_with_bodies_bulk(&autoloads)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-    
+
     let autoloads_time = t2.elapsed();
-    
-    eprintln!("  compinit timing: scan={}ms, comps={}ms, autoloads={}ms (total={}ms)",
+
+    eprintln!(
+        "  compinit timing: scan={}ms, comps={}ms, autoloads={}ms (total={}ms)",
         scan_time.as_millis(),
         comps_time.as_millis(),
         autoloads_time.as_millis(),
-        (scan_time + comps_time + autoloads_time).as_millis());
-    
+        (scan_time + comps_time + autoloads_time).as_millis()
+    );
+
     Ok(result)
 }
 
 /// Load _comps from existing cache (instantaneous)
-/// 
+///
 /// Returns a CompInitResult populated from the SQLite cache without rescanning fpath.
 /// Use this after the cache has been built with `build_cache_from_fpath`.
-/// 
+///
 /// This is the equivalent of `compinit -C` with a valid zcompdump - it skips
 /// the fpath scan entirely and just loads from cache.
 pub fn load_from_cache(cache: &crate::cache::CompsysCache) -> std::io::Result<CompInitResult> {
     use std::time::Instant;
     let start = Instant::now();
-    
+
     let mut result = CompInitResult::default();
-    
+
     // Load comps - single query
-    result.comps = cache.get_all_comps()
+    result.comps = cache
+        .get_all_comps()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-    
-    // Load patcomps - single query  
-    for (pat, func) in cache.patcomps_kv()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))? 
+
+    // Load patcomps - single query
+    for (pat, func) in cache
+        .patcomps_kv()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?
     {
         result.patcomps.insert(pat, func);
     }
-    
+
     // Services are loaded on-demand via cache.get_service() - no need to preload
     // This matches zsh behavior where $_services is lazily populated
-    
+
     result.scan_time_ms = start.elapsed().as_millis() as u64;
     result.files_scanned = result.comps.len();
-    
+
     Ok(result)
 }
 
 /// Fast check if compinit is needed
-/// 
+///
 /// Returns the number of completion entries in cache, or 0 if cache is empty/invalid.
 /// Use this to decide whether to run full compinit or load_from_cache.
 pub fn cache_entry_count(cache: &crate::cache::CompsysCache) -> usize {
@@ -586,10 +598,10 @@ pub fn cache_entry_count(cache: &crate::cache::CompsysCache) -> usize {
 }
 
 /// Lazy compinit - validates cache exists but doesn't load into memory
-/// 
+///
 /// This is the fastest option for shell startup. It just verifies the cache
 /// is valid and returns immediately. Actual lookups happen via cache.get_comp().
-/// 
+///
 /// Returns (is_valid, entry_count) in microseconds.
 pub fn compinit_lazy(cache: &crate::cache::CompsysCache) -> (bool, usize) {
     let count = cache.comp_count().unwrap_or(0) as usize;
@@ -597,7 +609,7 @@ pub fn compinit_lazy(cache: &crate::cache::CompsysCache) -> (bool, usize) {
 }
 
 /// Check if cache is valid and up-to-date
-/// 
+///
 /// Returns true if cache exists and has entries, false if cache needs to be rebuilt.
 pub fn cache_is_valid(cache: &crate::cache::CompsysCache) -> bool {
     cache.comp_count().unwrap_or(0) > 0
@@ -611,30 +623,36 @@ pub fn get_system_fpath() -> Vec<PathBuf> {
             return fpath_str.split(':').map(PathBuf::from).collect();
         }
     }
-    
+
     // Default paths for common systems
     let mut paths = Vec::new();
-    
+
     // macOS Homebrew
     for base in &["/opt/homebrew", "/usr/local"] {
         paths.push(PathBuf::from(format!("{}/share/zsh/site-functions", base)));
         paths.push(PathBuf::from(format!("{}/share/zsh/functions", base)));
     }
-    
+
     // System zsh
     for version in &["5.9", "5.8", "5.7"] {
-        paths.push(PathBuf::from(format!("/usr/share/zsh/{}/functions", version)));
+        paths.push(PathBuf::from(format!(
+            "/usr/share/zsh/{}/functions",
+            version
+        )));
     }
     paths.push(PathBuf::from("/usr/share/zsh/functions"));
     paths.push(PathBuf::from("/usr/share/zsh/site-functions"));
-    
+
     // Zinit/zplugin common paths
     if let Ok(home) = std::env::var("HOME") {
         paths.push(PathBuf::from(format!("{}/.zinit/completions", home)));
         paths.push(PathBuf::from(format!("{}/.zplugin/completions", home)));
-        paths.push(PathBuf::from(format!("{}/.local/share/zsh/site-functions", home)));
+        paths.push(PathBuf::from(format!(
+            "{}/.local/share/zsh/site-functions",
+            home
+        )));
     }
-    
+
     // Filter to existing directories
     paths.into_iter().filter(|p| p.exists()).collect()
 }
@@ -745,11 +763,26 @@ mod tests {
                 // Should contain all entries
                 assert!(cmds.contains(&"bzip2".to_string()), "missing bzip2");
                 assert!(cmds.contains(&"bunzip2".to_string()), "missing bunzip2");
-                assert!(cmds.contains(&"bzcat=bunzip2".to_string()), "missing bzcat=bunzip2");
-                assert!(cmds.contains(&"bzip2recover".to_string()), "missing bzip2recover");
-                assert!(cmds.contains(&"-redirect-,<,bunzip2=bunzip2".to_string()), "missing redirect bunzip2");
-                assert!(cmds.contains(&"-redirect-,>,bzip2=bunzip2".to_string()), "missing redirect >,bzip2");
-                assert!(cmds.contains(&"-redirect-,<,bzip2=bzip2".to_string()), "missing redirect <,bzip2");
+                assert!(
+                    cmds.contains(&"bzcat=bunzip2".to_string()),
+                    "missing bzcat=bunzip2"
+                );
+                assert!(
+                    cmds.contains(&"bzip2recover".to_string()),
+                    "missing bzip2recover"
+                );
+                assert!(
+                    cmds.contains(&"-redirect-,<,bunzip2=bunzip2".to_string()),
+                    "missing redirect bunzip2"
+                );
+                assert!(
+                    cmds.contains(&"-redirect-,>,bzip2=bunzip2".to_string()),
+                    "missing redirect >,bzip2"
+                );
+                assert!(
+                    cmds.contains(&"-redirect-,<,bzip2=bzip2".to_string()),
+                    "missing redirect <,bzip2"
+                );
                 assert_eq!(cmds.len(), 7, "cmds: {:?}", cmds);
             }
             other => panic!("Expected Commands, got {:?}", other),
@@ -798,8 +831,8 @@ mod tests {
         assert!(is_context_entry("-value-,DISPLAY,-default-"));
         assert!(is_context_entry("-redirect-,<,bunzip2=bunzip2"));
         assert!(is_context_entry("-redirect-,>,bzip2"));
-        assert!(!is_context_entry("-p"));  // option flag, not context
-        assert!(!is_context_entry("-P"));  // option flag
+        assert!(!is_context_entry("-p")); // option flag, not context
+        assert!(!is_context_entry("-P")); // option flag
         assert!(!is_context_entry("git")); // regular command
     }
 }

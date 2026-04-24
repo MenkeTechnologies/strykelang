@@ -266,30 +266,30 @@ impl CompsysCache {
     /// 3. Returns None if function not found or ZWC read fails
     pub fn get_autoload_body_or_zwc(&self, name: &str) -> Option<String> {
         let stub = self.get_autoload(name).ok()??;
-        
+
         // Fast path: body is cached
         if let Some(body) = stub.body {
             return Some(body);
         }
-        
+
         // Fallback: read from ZWC file
         if stub.size > 0 && !stub.source.is_empty() {
             return Self::read_function_from_zwc(&stub.source, stub.offset, stub.size);
         }
-        
+
         None
     }
 
     /// Read function body from ZWC file at given offset/size
     fn read_function_from_zwc(zwc_path: &str, offset: i64, size: i64) -> Option<String> {
         use std::io::{Read, Seek, SeekFrom};
-        
+
         let mut file = std::fs::File::open(zwc_path).ok()?;
         file.seek(SeekFrom::Start(offset as u64)).ok()?;
-        
+
         let mut buf = vec![0u8; size as usize];
         file.read_exact(&mut buf).ok()?;
-        
+
         // ZWC stores tokenized strings - need to untokenize
         // For now, just try to interpret as UTF-8 (works for most cases)
         // TODO: proper untokenization like zwc.rs does
@@ -446,10 +446,8 @@ impl CompsysCache {
         tx.execute("DELETE FROM comps", [])?;
         tx.execute("DELETE FROM fts_comps", [])?;
         {
-            let mut stmt =
-                tx.prepare("INSERT INTO comps (command, function) VALUES (?1, ?2)")?;
-            let mut fts_stmt =
-                tx.prepare("INSERT INTO fts_comps (command) VALUES (?1)")?;
+            let mut stmt = tx.prepare("INSERT INTO comps (command, function) VALUES (?1, ?2)")?;
+            let mut fts_stmt = tx.prepare("INSERT INTO fts_comps (command) VALUES (?1)")?;
             for (command, function) in comps {
                 stmt.execute(params![command, function])?;
                 fts_stmt.execute(params![command])?;
@@ -479,7 +477,7 @@ impl CompsysCache {
         }
         let pattern = format!("{}%", prefix);
         let mut stmt = self.conn.prepare(
-            "SELECT command, function FROM comps WHERE command LIKE ?1 ORDER BY command"
+            "SELECT command, function FROM comps WHERE command LIKE ?1 ORDER BY command",
         )?;
         let rows = stmt.query_map(params![pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
         rows.collect()
@@ -851,9 +849,7 @@ impl CompsysCache {
 
     /// Get all _patcomps keys
     pub fn patcomps_keys(&self) -> rusqlite::Result<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT pattern FROM patcomps")?;
+        let mut stmt = self.conn.prepare("SELECT pattern FROM patcomps")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -897,9 +893,7 @@ impl CompsysCache {
 
     /// Get all _services keys
     pub fn services_keys(&self) -> rusqlite::Result<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT command FROM services")?;
+        let mut stmt = self.conn.prepare("SELECT command FROM services")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -927,9 +921,7 @@ impl CompsysCache {
 
     /// Get all autoload names (for ${(k)_compautos})
     pub fn compautos_keys(&self) -> rusqlite::Result<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name FROM autoloads")?;
+        let mut stmt = self.conn.prepare("SELECT name FROM autoloads")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         rows.collect()
     }
@@ -947,13 +939,18 @@ impl CompsysCache {
     }
 
     /// Store executables in bulk + populate FTS5 index
-    pub fn set_executables_bulk(&mut self, executables: &[(String, String)]) -> rusqlite::Result<()> {
+    pub fn set_executables_bulk(
+        &mut self,
+        executables: &[(String, String)],
+    ) -> rusqlite::Result<()> {
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM executables", [])?;
         tx.execute("DELETE FROM fts_executables", [])?;
         {
-            let mut stmt = tx.prepare("INSERT OR IGNORE INTO executables (name, path) VALUES (?1, ?2)")?;
-            let mut fts_stmt = tx.prepare("INSERT OR IGNORE INTO fts_executables (name) VALUES (?1)")?;
+            let mut stmt =
+                tx.prepare("INSERT OR IGNORE INTO executables (name, path) VALUES (?1, ?2)")?;
+            let mut fts_stmt =
+                tx.prepare("INSERT OR IGNORE INTO fts_executables (name) VALUES (?1)")?;
             for (name, path) in executables {
                 stmt.execute(params![name, path])?;
                 fts_stmt.execute(params![name])?;
@@ -992,7 +989,10 @@ impl CompsysCache {
     }
 
     /// Fast prefix search using FTS5
-    pub fn get_executables_prefix_fts(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
+    pub fn get_executables_prefix_fts(
+        &self,
+        prefix: &str,
+    ) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             let mut stmt = self.conn.prepare("SELECT name, path FROM executables")?;
             let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
@@ -1009,7 +1009,9 @@ impl CompsysCache {
     /// Get executables matching prefix (LIKE with index, ORDER BY free on PRIMARY KEY)
     pub fn get_executables_prefix(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
-            let mut stmt = self.conn.prepare("SELECT name, path FROM executables ORDER BY name")?;
+            let mut stmt = self
+                .conn
+                .prepare("SELECT name, path FROM executables ORDER BY name")?;
             let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
             return rows.collect();
         }
@@ -1086,9 +1088,9 @@ impl CompsysCache {
 
     /// Check if shell_functions cache is populated
     pub fn has_shell_functions(&self) -> rusqlite::Result<bool> {
-        let count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM shell_functions", [], |row| row.get(0))?;
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM shell_functions", [], |row| row.get(0))?;
         Ok(count > 0)
     }
 
@@ -1129,7 +1131,10 @@ impl CompsysCache {
     }
 
     /// Fast prefix search using FTS5 (note: FTS5 doesn't preserve order, needs post-sort)
-    pub fn get_shell_functions_prefix_fts(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
+    pub fn get_shell_functions_prefix_fts(
+        &self,
+        prefix: &str,
+    ) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             return self.get_shell_functions();
         }
@@ -1142,7 +1147,10 @@ impl CompsysCache {
     }
 
     /// Get shell functions matching prefix (LIKE with index, ORDER BY free)
-    pub fn get_shell_functions_prefix(&self, prefix: &str) -> rusqlite::Result<Vec<(String, String)>> {
+    pub fn get_shell_functions_prefix(
+        &self,
+        prefix: &str,
+    ) -> rusqlite::Result<Vec<(String, String)>> {
         if prefix.is_empty() {
             return self.get_shell_functions();
         }
@@ -1332,7 +1340,9 @@ local -a opts
 opts=(--help --version --verbose)
 _arguments $opts
 "#;
-        cache.add_autoload_with_body("_mycommand", "/usr/share/zsh/functions/_mycommand", body).unwrap();
+        cache
+            .add_autoload_with_body("_mycommand", "/usr/share/zsh/functions/_mycommand", body)
+            .unwrap();
 
         let stub = cache.get_autoload("_mycommand").unwrap().unwrap();
         assert_eq!(stub.body.as_deref(), Some(body));
@@ -1348,11 +1358,13 @@ _arguments $opts
         let mut cache = CompsysCache::memory().unwrap();
 
         let autoloads: Vec<(String, String, String)> = (0..100)
-            .map(|i| (
-                format!("_func{}", i),
-                format!("/path/to/_func{}", i),
-                format!("# Function {}\necho hello", i),
-            ))
+            .map(|i| {
+                (
+                    format!("_func{}", i),
+                    format!("/path/to/_func{}", i),
+                    format!("# Function {}\necho hello", i),
+                )
+            })
             .collect();
 
         cache.add_autoloads_with_bodies_bulk(&autoloads).unwrap();
@@ -1368,7 +1380,9 @@ _arguments $opts
         let cache = CompsysCache::memory().unwrap();
 
         let body = "echo from sqlite";
-        cache.add_autoload_with_body("_cached", "/some/path", body).unwrap();
+        cache
+            .add_autoload_with_body("_cached", "/some/path", body)
+            .unwrap();
 
         // Should return body from SQLite (fast path)
         let result = cache.get_autoload_body_or_zwc("_cached");
@@ -1380,7 +1394,9 @@ _arguments $opts
         let cache = CompsysCache::memory().unwrap();
 
         // Add autoload without body (just ZWC reference)
-        cache.add_autoload("_nocache", "nonexistent.zwc", 0, 100).unwrap();
+        cache
+            .add_autoload("_nocache", "nonexistent.zwc", 0, 100)
+            .unwrap();
 
         // Should return None since ZWC file doesn't exist
         let result = cache.get_autoload_body_or_zwc("_nocache");
@@ -1481,27 +1497,30 @@ _arguments $opts
     #[test]
     fn test_executables_cache() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let executables = vec![
             ("ls".to_string(), "/bin/ls".to_string()),
             ("cat".to_string(), "/bin/cat".to_string()),
             ("git".to_string(), "/usr/bin/git".to_string()),
         ];
         cache.set_executables_bulk(&executables).unwrap();
-        
+
         assert!(cache.has_executables().unwrap());
         assert!(cache.has_executable("ls").unwrap());
         assert!(cache.has_executable("git").unwrap());
         assert!(!cache.has_executable("nonexistent").unwrap());
-        
-        assert_eq!(cache.get_executable_path("ls").unwrap(), Some("/bin/ls".to_string()));
+
+        assert_eq!(
+            cache.get_executable_path("ls").unwrap(),
+            Some("/bin/ls".to_string())
+        );
         assert_eq!(cache.executables_count().unwrap(), 3);
     }
 
     #[test]
     fn test_executables_prefix_search() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let executables = vec![
             ("git".to_string(), "/usr/bin/git".to_string()),
             ("gitk".to_string(), "/usr/bin/gitk".to_string()),
@@ -1509,13 +1528,13 @@ _arguments $opts
             ("gzip".to_string(), "/bin/gzip".to_string()),
         ];
         cache.set_executables_bulk(&executables).unwrap();
-        
+
         // FTS prefix search returns (name, path) tuples
         let git_cmds = cache.get_executables_prefix_fts("git").unwrap();
         assert_eq!(git_cmds.len(), 2);
         assert!(git_cmds.iter().any(|(name, _)| name == "git"));
         assert!(git_cmds.iter().any(|(name, _)| name == "gitk"));
-        
+
         let g_cmds = cache.get_executables_prefix_fts("g").unwrap();
         assert_eq!(g_cmds.len(), 4);
     }
@@ -1523,18 +1542,18 @@ _arguments $opts
     #[test]
     fn test_named_dirs_cache() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let dirs = vec![
             ("proj".to_string(), "/home/user/projects".to_string()),
             ("docs".to_string(), "/home/user/documents".to_string()),
         ];
         cache.set_named_dirs_bulk(&dirs).unwrap();
-        
+
         assert!(cache.has_named_dirs().unwrap());
-        
+
         let all = cache.get_named_dirs().unwrap();
         assert_eq!(all.len(), 2);
-        
+
         let p_dirs = cache.get_named_dirs_prefix("p").unwrap();
         assert_eq!(p_dirs.len(), 1);
         assert_eq!(p_dirs[0].0, "proj");
@@ -1543,17 +1562,23 @@ _arguments $opts
     #[test]
     fn test_shell_functions_cache() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let functions = vec![
             ("myFunc".to_string(), "/home/user/.zshrc".to_string()),
-            ("zpwrClearList".to_string(), "/home/user/.zpwr/autoload".to_string()),
-            ("zpwrTop".to_string(), "/home/user/.zpwr/autoload".to_string()),
+            (
+                "zpwrClearList".to_string(),
+                "/home/user/.zpwr/autoload".to_string(),
+            ),
+            (
+                "zpwrTop".to_string(),
+                "/home/user/.zpwr/autoload".to_string(),
+            ),
         ];
         cache.set_shell_functions_bulk(&functions).unwrap();
-        
+
         assert!(cache.has_shell_functions().unwrap());
         assert_eq!(cache.shell_functions_count().unwrap(), 3);
-        
+
         let zpwr = cache.get_shell_functions_prefix("zpwr").unwrap();
         assert_eq!(zpwr.len(), 2);
         // Results are tuples (name, source)
@@ -1564,25 +1589,31 @@ _arguments $opts
     #[test]
     fn test_metadata() {
         let cache = CompsysCache::memory().unwrap();
-        
+
         cache.set_metadata("version", "1.0.0").unwrap();
         cache.set_metadata("build_time", "2026-04-22").unwrap();
-        
-        assert_eq!(cache.get_metadata("version").unwrap(), Some("1.0.0".to_string()));
-        assert_eq!(cache.get_metadata("build_time").unwrap(), Some("2026-04-22".to_string()));
+
+        assert_eq!(
+            cache.get_metadata("version").unwrap(),
+            Some("1.0.0".to_string())
+        );
+        assert_eq!(
+            cache.get_metadata("build_time").unwrap(),
+            Some("2026-04-22".to_string())
+        );
         assert_eq!(cache.get_metadata("nonexistent").unwrap(), None);
     }
 
     #[test]
     fn test_comps_keys() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let comps = vec![
             ("git".to_string(), "_git".to_string()),
             ("docker".to_string(), "_docker".to_string()),
         ];
         cache.set_comps_bulk(&comps).unwrap();
-        
+
         let keys = cache.comps_keys().unwrap();
         assert_eq!(keys.len(), 2);
         assert!(keys.contains(&"docker".to_string()));
@@ -1592,14 +1623,14 @@ _arguments $opts
     #[test]
     fn test_comps_prefix() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let comps = vec![
             ("git".to_string(), "_git".to_string()),
             ("gitk".to_string(), "_gitk".to_string()),
             ("docker".to_string(), "_docker".to_string()),
         ];
         cache.set_comps_bulk(&comps).unwrap();
-        
+
         let git_comps = cache.comps_prefix("git").unwrap();
         assert_eq!(git_comps.len(), 2);
     }
@@ -1607,14 +1638,29 @@ _arguments $opts
     #[test]
     fn test_zstyles_bulk() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let styles = vec![
-            (":completion:*".to_string(), "menu".to_string(), vec!["select".to_string()], false),
-            (":completion:*".to_string(), "verbose".to_string(), vec!["yes".to_string()], false),
-            (":completion:*:descriptions".to_string(), "format".to_string(), vec!["%d".to_string()], false),
+            (
+                ":completion:*".to_string(),
+                "menu".to_string(),
+                vec!["select".to_string()],
+                false,
+            ),
+            (
+                ":completion:*".to_string(),
+                "verbose".to_string(),
+                vec!["yes".to_string()],
+                false,
+            ),
+            (
+                ":completion:*:descriptions".to_string(),
+                "format".to_string(),
+                vec!["%d".to_string()],
+                false,
+            ),
         ];
         cache.set_zstyles_bulk(&styles).unwrap();
-        
+
         assert!(cache.has_zstyles().unwrap());
         assert_eq!(cache.zstyles_count().unwrap(), 3);
     }
@@ -1622,10 +1668,10 @@ _arguments $opts
     #[test]
     fn test_services() {
         let cache = CompsysCache::memory().unwrap();
-        
+
         cache.set_service("git", "scm").unwrap();
         cache.set_service("hg", "scm").unwrap();
-        
+
         assert_eq!(cache.get_service("git").unwrap(), Some("scm".to_string()));
         assert_eq!(cache.get_service("unknown").unwrap(), None);
     }
@@ -1633,10 +1679,10 @@ _arguments $opts
     #[test]
     fn test_cache_overwrite() {
         let cache = CompsysCache::memory().unwrap();
-        
+
         cache.set_comp("git", "_git_old").unwrap();
         assert_eq!(cache.get_comp("git").unwrap(), Some("_git_old".to_string()));
-        
+
         cache.set_comp("git", "_git_new").unwrap();
         assert_eq!(cache.get_comp("git").unwrap(), Some("_git_new".to_string()));
     }
@@ -1644,14 +1690,14 @@ _arguments $opts
     #[test]
     fn test_executable_names() {
         let mut cache = CompsysCache::memory().unwrap();
-        
+
         let executables = vec![
             ("alpha".to_string(), "/bin/alpha".to_string()),
             ("beta".to_string(), "/bin/beta".to_string()),
             ("gamma".to_string(), "/bin/gamma".to_string()),
         ];
         cache.set_executables_bulk(&executables).unwrap();
-        
+
         let names = cache.get_executable_names().unwrap();
         assert_eq!(names.len(), 3);
         // Returns a HashSet, so check contains

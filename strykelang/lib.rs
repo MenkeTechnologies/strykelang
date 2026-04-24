@@ -72,13 +72,13 @@ pub use zsh::exec as shell_exec;
 pub use zsh::fds as shell_fds;
 pub use zsh::history as shell_history;
 pub use zsh::jobs as shell_jobs;
+pub use zsh::lexer as zsh_lex;
 pub use zsh::parser as shell_parse;
+pub use zsh::parser as zsh_parse;
 pub use zsh::signals as shell_signal;
+pub use zsh::tokens as zsh_tokens;
 pub use zsh::zle as shell_zle;
 pub use zsh::zwc as shell_zwc;
-pub use zsh::lexer as zsh_lex;
-pub use zsh::parser as zsh_parse;
-pub use zsh::tokens as zsh_tokens;
 
 pub use interpreter::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,

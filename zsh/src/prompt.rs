@@ -458,7 +458,11 @@ impl<'a> PromptExpander<'a> {
                 // Directory depth test
                 let path = self.path_with_tilde(&self.ctx.pwd);
                 let depth = path.matches('/').count() as i32;
-                if arg == 0 { depth > 0 } else { depth >= arg }
+                if arg == 0 {
+                    depth > 0
+                } else {
+                    depth >= arg
+                }
             }
             '?' => self.ctx.lastval == arg,
             '#' => {
@@ -587,12 +591,20 @@ impl<'a> PromptExpander<'a> {
                 self.output.push_str(&path);
             }
             'c' | '.' => {
-                let n = if arg == 0 { 1 } else { arg.unsigned_abs() as usize };
+                let n = if arg == 0 {
+                    1
+                } else {
+                    arg.unsigned_abs() as usize
+                };
                 let path = self.trailing_path(&self.ctx.pwd, n, true);
                 self.output.push_str(&path);
             }
             'C' => {
-                let n = if arg == 0 { 1 } else { arg.unsigned_abs() as usize };
+                let n = if arg == 0 {
+                    1
+                } else {
+                    arg.unsigned_abs() as usize
+                };
                 let path = self.trailing_path(&self.ctx.pwd, n, false);
                 self.output.push_str(&path);
             }
@@ -774,9 +786,20 @@ impl<'a> PromptExpander<'a> {
                     };
 
                     let names: Vec<&str> = if arg >= 0 {
-                        self.ctx.cmd_stack.iter().rev().take(n).map(|s| s.name()).collect()
+                        self.ctx
+                            .cmd_stack
+                            .iter()
+                            .rev()
+                            .take(n)
+                            .map(|s| s.name())
+                            .collect()
                     } else {
-                        self.ctx.cmd_stack.iter().take(n).map(|s| s.name()).collect()
+                        self.ctx
+                            .cmd_stack
+                            .iter()
+                            .take(n)
+                            .map(|s| s.name())
+                            .collect()
                     };
                     self.output.push_str(&names.join(" "));
                 }
@@ -820,8 +843,11 @@ impl<'a> PromptExpander<'a> {
         }
 
         // Reset attributes at end
-        if self.attrs.bold || self.attrs.underline || self.attrs.standout
-            || self.attrs.fg_color.is_some() || self.attrs.bg_color.is_some()
+        if self.attrs.bold
+            || self.attrs.underline
+            || self.attrs.standout
+            || self.attrs.fg_color.is_some()
+            || self.attrs.bg_color.is_some()
         {
             self.start_escape();
             self.output.push_str("\x1b[0m");
@@ -840,34 +866,34 @@ fn convert_zsh_time_format(fmt: &str) -> String {
     while let Some(c) = chars.next() {
         if c == '%' {
             match chars.next() {
-                Some('a') => result.push_str("%a"), // weekday abbrev
-                Some('A') => result.push_str("%A"), // weekday full
+                Some('a') => result.push_str("%a"),             // weekday abbrev
+                Some('A') => result.push_str("%A"),             // weekday full
                 Some('b') | Some('h') => result.push_str("%b"), // month abbrev
-                Some('B') => result.push_str("%B"), // month full
-                Some('c') => result.push_str("%c"), // locale datetime
-                Some('C') => result.push_str("%y"), // century (use year for simplicity)
-                Some('d') => result.push_str("%d"), // day of month
-                Some('D') => result.push_str("%m/%d/%y"), // date
-                Some('e') => result.push_str("%e"), // day of month, space padded
-                Some('f') => result.push_str("%e"), // zsh: day of month, no padding
-                Some('F') => result.push_str("%Y-%m-%d"), // ISO date
-                Some('H') => result.push_str("%H"), // hour 24
-                Some('I') => result.push_str("%I"), // hour 12
-                Some('j') => result.push_str("%j"), // day of year
-                Some('k') => result.push_str("%k"), // hour 24, space padded
-                Some('K') => result.push_str("%H"), // zsh: hour 24
-                Some('l') => result.push_str("%l"), // hour 12, space padded
-                Some('L') => result.push_str("%3f"),// zsh: milliseconds (approx)
-                Some('m') => result.push_str("%m"), // month
-                Some('M') => result.push_str("%M"), // minute
+                Some('B') => result.push_str("%B"),             // month full
+                Some('c') => result.push_str("%c"),             // locale datetime
+                Some('C') => result.push_str("%y"),             // century (use year for simplicity)
+                Some('d') => result.push_str("%d"),             // day of month
+                Some('D') => result.push_str("%m/%d/%y"),       // date
+                Some('e') => result.push_str("%e"),             // day of month, space padded
+                Some('f') => result.push_str("%e"),             // zsh: day of month, no padding
+                Some('F') => result.push_str("%Y-%m-%d"),       // ISO date
+                Some('H') => result.push_str("%H"),             // hour 24
+                Some('I') => result.push_str("%I"),             // hour 12
+                Some('j') => result.push_str("%j"),             // day of year
+                Some('k') => result.push_str("%k"),             // hour 24, space padded
+                Some('K') => result.push_str("%H"),             // zsh: hour 24
+                Some('l') => result.push_str("%l"),             // hour 12, space padded
+                Some('L') => result.push_str("%3f"),            // zsh: milliseconds (approx)
+                Some('m') => result.push_str("%m"),             // month
+                Some('M') => result.push_str("%M"),             // minute
                 Some('n') => result.push('\n'),
-                Some('N') => result.push_str("%9f"),// zsh: nanoseconds (approx)
-                Some('p') => result.push_str("%p"), // AM/PM
-                Some('P') => result.push_str("%P"), // am/pm
-                Some('r') => result.push_str("%r"), // 12-hour time
-                Some('R') => result.push_str("%R"), // 24-hour time
-                Some('s') => result.push_str("%s"), // epoch seconds
-                Some('S') => result.push_str("%S"), // seconds
+                Some('N') => result.push_str("%9f"), // zsh: nanoseconds (approx)
+                Some('p') => result.push_str("%p"),  // AM/PM
+                Some('P') => result.push_str("%P"),  // am/pm
+                Some('r') => result.push_str("%r"),  // 12-hour time
+                Some('R') => result.push_str("%R"),  // 24-hour time
+                Some('s') => result.push_str("%s"),  // epoch seconds
+                Some('S') => result.push_str("%S"),  // seconds
                 Some('t') => result.push('\t'),
                 Some('T') => result.push_str("%T"), // time
                 Some('u') => result.push_str("%u"), // weekday 1-7
@@ -1082,7 +1108,9 @@ pub fn parsehighlight(spec: &str) -> TextAttrs {
             "bold" => attrs.bold = true,
             "underline" => attrs.underline = true,
             "standout" => attrs.standout = true,
-            "none" => { attrs = TextAttrs::default(); }
+            "none" => {
+                attrs = TextAttrs::default();
+            }
             s if s.starts_with("fg=") => {
                 let color_name = &s[3..];
                 if let Some(code) = match_named_colour(color_name) {
@@ -1104,9 +1132,15 @@ pub fn parsehighlight(spec: &str) -> TextAttrs {
 /// Apply text attributes as ANSI escape sequences (from prompt.c applytextattributes)
 pub fn apply_text_attributes(attrs: &TextAttrs) -> String {
     let mut codes = Vec::new();
-    if attrs.bold { codes.push("1"); }
-    if attrs.underline { codes.push("4"); }
-    if attrs.standout { codes.push("7"); }
+    if attrs.bold {
+        codes.push("1");
+    }
+    if attrs.underline {
+        codes.push("4");
+    }
+    if attrs.standout {
+        codes.push("7");
+    }
     let fg_code;
     if let Some(ref color) = attrs.fg_color {
         fg_code = color.to_ansi_fg();
@@ -1136,7 +1170,12 @@ pub fn set_default_colour_sequences() -> (String, String) {
 }
 
 /// Right prompt handling - compute padding for RPROMPT
-pub fn right_prompt_padding(left_width: usize, right_prompt: &str, term_width: usize, indent: usize) -> Option<String> {
+pub fn right_prompt_padding(
+    left_width: usize,
+    right_prompt: &str,
+    term_width: usize,
+    indent: usize,
+) -> Option<String> {
     let right_width = prompt_width(right_prompt);
     let total = left_width + right_width + indent;
     if total >= term_width {
@@ -1274,21 +1313,33 @@ pub fn treplaceattrs(old: &TextAttrs, new: &TextAttrs) -> String {
     let mut result = String::new();
 
     // Reset if removing attributes
-    let need_reset = (old.bold && !new.bold) ||
-        (old.underline && !new.underline) ||
-        (old.standout && !new.standout);
+    let need_reset = (old.bold && !new.bold)
+        || (old.underline && !new.underline)
+        || (old.standout && !new.standout);
 
     if need_reset {
         result.push_str("\x1b[0m");
         // Re-apply what's still on
-        if new.bold { result.push_str("\x1b[1m"); }
-        if new.underline { result.push_str("\x1b[4m"); }
-        if new.standout { result.push_str("\x1b[7m"); }
+        if new.bold {
+            result.push_str("\x1b[1m");
+        }
+        if new.underline {
+            result.push_str("\x1b[4m");
+        }
+        if new.standout {
+            result.push_str("\x1b[7m");
+        }
     } else {
         // Just add new attributes
-        if !old.bold && new.bold { result.push_str("\x1b[1m"); }
-        if !old.underline && new.underline { result.push_str("\x1b[4m"); }
-        if !old.standout && new.standout { result.push_str("\x1b[7m"); }
+        if !old.bold && new.bold {
+            result.push_str("\x1b[1m");
+        }
+        if !old.underline && new.underline {
+            result.push_str("\x1b[4m");
+        }
+        if !old.standout && new.standout {
+            result.push_str("\x1b[7m");
+        }
     }
 
     // Handle color changes
@@ -1318,11 +1369,21 @@ pub fn tsetattrs(attrs: &TextAttrs) -> String {
 /// Unset text attributes (from prompt.c tunsetattrs)
 pub fn tunsetattrs(attrs: &TextAttrs) -> String {
     let mut result = String::new();
-    if attrs.bold { result.push_str("\x1b[22m"); }
-    if attrs.underline { result.push_str("\x1b[24m"); }
-    if attrs.standout { result.push_str("\x1b[27m"); }
-    if attrs.fg_color.is_some() { result.push_str("\x1b[39m"); }
-    if attrs.bg_color.is_some() { result.push_str("\x1b[49m"); }
+    if attrs.bold {
+        result.push_str("\x1b[22m");
+    }
+    if attrs.underline {
+        result.push_str("\x1b[24m");
+    }
+    if attrs.standout {
+        result.push_str("\x1b[27m");
+    }
+    if attrs.fg_color.is_some() {
+        result.push_str("\x1b[39m");
+    }
+    if attrs.bg_color.is_some() {
+        result.push_str("\x1b[49m");
+    }
     result
 }
 
@@ -1353,8 +1414,16 @@ pub fn match_highlight(spec: &str) -> (TextAttrs, TextAttrs) {
         bold: attrs.bold,
         underline: attrs.underline,
         standout: attrs.standout,
-        fg_color: if attrs.fg_color.is_some() { Some(Color::Default) } else { None },
-        bg_color: if attrs.bg_color.is_some() { Some(Color::Default) } else { None },
+        fg_color: if attrs.fg_color.is_some() {
+            Some(Color::Default)
+        } else {
+            None
+        },
+        bg_color: if attrs.bg_color.is_some() {
+            Some(Color::Default)
+        } else {
+            None
+        },
     };
     (attrs, mask)
 }
@@ -1494,9 +1563,21 @@ pub fn putpromptchar(c: char, ctx: &PromptContext, buf: &mut String) {
 /// Attributes set in primary take precedence; unset ones fall through to secondary.
 pub fn mixattrs(primary: &TextAttrs, mask: &TextAttrs, secondary: &TextAttrs) -> TextAttrs {
     TextAttrs {
-        bold: if mask.bold { primary.bold } else { secondary.bold },
-        underline: if mask.underline { primary.underline } else { secondary.underline },
-        standout: if mask.standout { primary.standout } else { secondary.standout },
+        bold: if mask.bold {
+            primary.bold
+        } else {
+            secondary.bold
+        },
+        underline: if mask.underline {
+            primary.underline
+        } else {
+            secondary.underline
+        },
+        standout: if mask.standout {
+            primary.standout
+        } else {
+            secondary.standout
+        },
         fg_color: if mask.fg_color.is_some() {
             primary.fg_color.clone()
         } else {

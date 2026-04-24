@@ -111,14 +111,36 @@ pub enum Qualifier {
     OwnedByGid(u32),
 
     /// Numeric qualifiers with range
-    Size { value: u64, unit: SizeUnit, op: RangeOp },
-    Links { value: u64, op: RangeOp },
-    Atime { value: i64, unit: TimeUnit, op: RangeOp },
-    Mtime { value: i64, unit: TimeUnit, op: RangeOp },
-    Ctime { value: i64, unit: TimeUnit, op: RangeOp },
+    Size {
+        value: u64,
+        unit: SizeUnit,
+        op: RangeOp,
+    },
+    Links {
+        value: u64,
+        op: RangeOp,
+    },
+    Atime {
+        value: i64,
+        unit: TimeUnit,
+        op: RangeOp,
+    },
+    Mtime {
+        value: i64,
+        unit: TimeUnit,
+        op: RangeOp,
+    },
+    Ctime {
+        value: i64,
+        unit: TimeUnit,
+        op: RangeOp,
+    },
 
     /// Mode specification
-    Mode { yes: u32, no: u32 },
+    Mode {
+        yes: u32,
+        no: u32,
+    },
 
     /// Device number
     Device(u64),
@@ -171,10 +193,22 @@ impl GlobMatch {
                         target_meta.nlink(),
                     )
                 } else {
-                    (meta.size(), meta.atime(), meta.mtime(), meta.ctime(), meta.nlink())
+                    (
+                        meta.size(),
+                        meta.atime(),
+                        meta.mtime(),
+                        meta.ctime(),
+                        meta.nlink(),
+                    )
                 }
             } else {
-                (meta.size(), meta.atime(), meta.mtime(), meta.ctime(), meta.nlink())
+                (
+                    meta.size(),
+                    meta.atime(),
+                    meta.mtime(),
+                    meta.ctime(),
+                    meta.nlink(),
+                )
             };
 
         Some(GlobMatch {
@@ -252,7 +286,11 @@ impl GlobMatch {
                 GlobSort::None => Ordering::Equal,
                 GlobSort::Exec(idx) => {
                     let a = self.sort_strings.get(idx).map(|s| s.as_str()).unwrap_or("");
-                    let b = other.sort_strings.get(idx).map(|s| s.as_str()).unwrap_or("");
+                    let b = other
+                        .sort_strings
+                        .get(idx)
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
                     if numeric_sort {
                         numeric_string_cmp(a, b)
                     } else {
@@ -408,18 +446,22 @@ impl GlobState {
         self.apply_selection();
 
         // Extract filenames
-        let mut results: Vec<String> = self.matches.iter().map(|m| {
-            let mut s = m.path.to_string_lossy().to_string();
-            if self.options.mark_dirs || self.options.list_types {
-                if let Ok(meta) = fs::symlink_metadata(&m.path) {
-                    let ch = file_type_char(meta.mode());
-                    if self.options.list_types || (self.options.mark_dirs && ch == '/') {
-                        s.push(ch);
+        let mut results: Vec<String> = self
+            .matches
+            .iter()
+            .map(|m| {
+                let mut s = m.path.to_string_lossy().to_string();
+                if self.options.mark_dirs || self.options.list_types {
+                    if let Ok(meta) = fs::symlink_metadata(&m.path) {
+                        let ch = file_type_char(meta.mode());
+                        if self.options.list_types || (self.options.mark_dirs && ch == '/') {
+                            s.push(ch);
+                        }
                     }
                 }
-            }
-            s
-        }).collect();
+                s
+            })
+            .collect();
 
         // Handle no matches
         if results.is_empty() && !self.options.null_glob {
@@ -508,13 +550,17 @@ impl GlobState {
                 '@' => qs.qualifiers.push(Qualifier::IsSymlink),
                 '=' => qs.qualifiers.push(Qualifier::IsSocket),
                 'p' => qs.qualifiers.push(Qualifier::IsFifo),
-                '%' => {
-                    match chars.peek() {
-                        Some('b') => { chars.next(); qs.qualifiers.push(Qualifier::IsBlockDev); }
-                        Some('c') => { chars.next(); qs.qualifiers.push(Qualifier::IsCharDev); }
-                        _ => qs.qualifiers.push(Qualifier::IsDevice),
+                '%' => match chars.peek() {
+                    Some('b') => {
+                        chars.next();
+                        qs.qualifiers.push(Qualifier::IsBlockDev);
                     }
-                }
+                    Some('c') => {
+                        chars.next();
+                        qs.qualifiers.push(Qualifier::IsCharDev);
+                    }
+                    _ => qs.qualifiers.push(Qualifier::IsDevice),
+                },
                 '*' => qs.qualifiers.push(Qualifier::IsExecutable),
                 // Permission qualifiers
                 'r' => qs.qualifiers.push(Qualifier::Readable),
@@ -543,7 +589,11 @@ impl GlobState {
                 // Size
                 'L' => {
                     let (unit, op, val) = self.parse_size_spec(&mut chars);
-                    qs.qualifiers.push(Qualifier::Size { value: val, unit, op });
+                    qs.qualifiers.push(Qualifier::Size {
+                        value: val,
+                        unit,
+                        op,
+                    });
                 }
                 // Link count
                 'l' => {
@@ -553,34 +603,74 @@ impl GlobState {
                 // Times
                 'a' => {
                     let (unit, op, val) = self.parse_time_spec(&mut chars);
-                    qs.qualifiers.push(Qualifier::Atime { value: val as i64, unit, op });
+                    qs.qualifiers.push(Qualifier::Atime {
+                        value: val as i64,
+                        unit,
+                        op,
+                    });
                 }
                 'm' => {
                     let (unit, op, val) = self.parse_time_spec(&mut chars);
-                    qs.qualifiers.push(Qualifier::Mtime { value: val as i64, unit, op });
+                    qs.qualifiers.push(Qualifier::Mtime {
+                        value: val as i64,
+                        unit,
+                        op,
+                    });
                 }
                 'c' => {
                     let (unit, op, val) = self.parse_time_spec(&mut chars);
-                    qs.qualifiers.push(Qualifier::Ctime { value: val as i64, unit, op });
+                    qs.qualifiers.push(Qualifier::Ctime {
+                        value: val as i64,
+                        unit,
+                        op,
+                    });
                 }
                 // Sort
                 'o' | 'O' => {
                     let desc = c == 'O';
                     if let Some(&sc) = chars.peek() {
                         let sort_type = match sc {
-                            'n' => { chars.next(); GlobSort::Name }
-                            'L' => { chars.next(); GlobSort::Size }
-                            'l' => { chars.next(); GlobSort::Links }
-                            'a' => { chars.next(); GlobSort::Atime }
-                            'm' => { chars.next(); GlobSort::Mtime }
-                            'c' => { chars.next(); GlobSort::Ctime }
-                            'd' => { chars.next(); GlobSort::Depth }
-                            'N' => { chars.next(); GlobSort::None }
+                            'n' => {
+                                chars.next();
+                                GlobSort::Name
+                            }
+                            'L' => {
+                                chars.next();
+                                GlobSort::Size
+                            }
+                            'l' => {
+                                chars.next();
+                                GlobSort::Links
+                            }
+                            'a' => {
+                                chars.next();
+                                GlobSort::Atime
+                            }
+                            'm' => {
+                                chars.next();
+                                GlobSort::Mtime
+                            }
+                            'c' => {
+                                chars.next();
+                                GlobSort::Ctime
+                            }
+                            'd' => {
+                                chars.next();
+                                GlobSort::Depth
+                            }
+                            'N' => {
+                                chars.next();
+                                GlobSort::None
+                            }
                             _ => GlobSort::Name,
                         };
                         qs.sorts.push(SortSpec {
                             sort_type,
-                            order: if desc { SortOrder::Descending } else { SortOrder::Ascending },
+                            order: if desc {
+                                SortOrder::Descending
+                            } else {
+                                SortOrder::Ascending
+                            },
                             follow_links: follow,
                         });
                     }
@@ -630,27 +720,66 @@ impl GlobState {
         }
     }
 
-    fn parse_size_spec(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> (SizeUnit, RangeOp, u64) {
+    fn parse_size_spec(
+        &self,
+        chars: &mut std::iter::Peekable<std::str::Chars>,
+    ) -> (SizeUnit, RangeOp, u64) {
         let unit = match chars.peek() {
-            Some('p') | Some('P') => { chars.next(); SizeUnit::PosixBlocks }
-            Some('k') | Some('K') => { chars.next(); SizeUnit::Kilobytes }
-            Some('m') | Some('M') => { chars.next(); SizeUnit::Megabytes }
-            Some('g') | Some('G') => { chars.next(); SizeUnit::Gigabytes }
-            Some('t') | Some('T') => { chars.next(); SizeUnit::Terabytes }
+            Some('p') | Some('P') => {
+                chars.next();
+                SizeUnit::PosixBlocks
+            }
+            Some('k') | Some('K') => {
+                chars.next();
+                SizeUnit::Kilobytes
+            }
+            Some('m') | Some('M') => {
+                chars.next();
+                SizeUnit::Megabytes
+            }
+            Some('g') | Some('G') => {
+                chars.next();
+                SizeUnit::Gigabytes
+            }
+            Some('t') | Some('T') => {
+                chars.next();
+                SizeUnit::Terabytes
+            }
             _ => SizeUnit::Bytes,
         };
         let (op, val) = self.parse_range_spec(chars);
         (unit, op, val)
     }
 
-    fn parse_time_spec(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> (TimeUnit, RangeOp, u64) {
+    fn parse_time_spec(
+        &self,
+        chars: &mut std::iter::Peekable<std::str::Chars>,
+    ) -> (TimeUnit, RangeOp, u64) {
         let unit = match chars.peek() {
-            Some('s') => { chars.next(); TimeUnit::Seconds }
-            Some('m') => { chars.next(); TimeUnit::Minutes }
-            Some('h') => { chars.next(); TimeUnit::Hours }
-            Some('d') => { chars.next(); TimeUnit::Days }
-            Some('w') => { chars.next(); TimeUnit::Weeks }
-            Some('M') => { chars.next(); TimeUnit::Months }
+            Some('s') => {
+                chars.next();
+                TimeUnit::Seconds
+            }
+            Some('m') => {
+                chars.next();
+                TimeUnit::Minutes
+            }
+            Some('h') => {
+                chars.next();
+                TimeUnit::Hours
+            }
+            Some('d') => {
+                chars.next();
+                TimeUnit::Days
+            }
+            Some('w') => {
+                chars.next();
+                TimeUnit::Weeks
+            }
+            Some('M') => {
+                chars.next();
+                TimeUnit::Months
+            }
             _ => TimeUnit::Days,
         };
         let (op, val) = self.parse_range_spec(chars);
@@ -659,8 +788,14 @@ impl GlobState {
 
     fn parse_range_spec(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> (RangeOp, u64) {
         let op = match chars.peek() {
-            Some('+') => { chars.next(); RangeOp::Greater }
-            Some('-') => { chars.next(); RangeOp::Less }
+            Some('+') => {
+                chars.next();
+                RangeOp::Greater
+            }
+            Some('-') => {
+                chars.next();
+                RangeOp::Less
+            }
             _ => RangeOp::Equal,
         };
         let mut num = String::new();
@@ -676,7 +811,10 @@ impl GlobState {
         (op, val)
     }
 
-    fn parse_subscript(&self, chars: &mut std::iter::Peekable<std::str::Chars>) -> (Option<i32>, Option<i32>) {
+    fn parse_subscript(
+        &self,
+        chars: &mut std::iter::Peekable<std::str::Chars>,
+    ) -> (Option<i32>, Option<i32>) {
         let mut first_str = String::new();
         let mut last_str = String::new();
         let mut in_last = false;
@@ -695,7 +833,11 @@ impl GlobState {
         }
 
         let first = first_str.parse().ok();
-        let last = if in_last { last_str.parse().ok() } else { first };
+        let last = if in_last {
+            last_str.parse().ok()
+        } else {
+            first
+        };
         (first, last)
     }
 
@@ -741,7 +883,9 @@ impl GlobState {
                         components.push(PatternComponent::Pattern(current.clone()));
                         current.clear();
                     }
-                    components.push(PatternComponent::Recursive { follow_links: follow });
+                    components.push(PatternComponent::Recursive {
+                        follow_links: follow,
+                    });
                 }
                 _ => current.push(c),
             }
@@ -796,7 +940,12 @@ impl GlobState {
                 continue;
             }
 
-            if pattern_match(pattern, &name, self.options.extended_glob, self.options.case_glob) {
+            if pattern_match(
+                pattern,
+                &name,
+                self.options.extended_glob,
+                self.options.case_glob,
+            ) {
                 let path = entry.path();
 
                 if rest.is_empty() {
@@ -822,7 +971,13 @@ impl GlobState {
         }
     }
 
-    fn scan_recursive(&mut self, base: &str, rest: &[PatternComponent], follow_links: bool, depth: usize) {
+    fn scan_recursive(
+        &mut self,
+        base: &str,
+        rest: &[PatternComponent],
+        follow_links: bool,
+        depth: usize,
+    ) {
         let dir = match fs::read_dir(base) {
             Ok(d) => d,
             Err(_) => return,
@@ -937,23 +1092,30 @@ impl GlobState {
                 let scaled = scale_size(size, *unit);
                 compare_range(scaled, *value, *op)
             }
-            Qualifier::Links { value, op } => {
-                compare_range(meta.nlink(), *value, *op)
-            }
+            Qualifier::Links { value, op } => compare_range(meta.nlink(), *value, *op),
             Qualifier::Atime { value, unit, op } => {
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
                 let diff = now - meta.atime();
                 let scaled = scale_time(diff, *unit);
                 compare_range(scaled as u64, *value as u64, *op)
             }
             Qualifier::Mtime { value, unit, op } => {
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
                 let diff = now - meta.mtime();
                 let scaled = scale_time(diff, *unit);
                 compare_range(scaled as u64, *value as u64, *op)
             }
             Qualifier::Ctime { value, unit, op } => {
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
                 let diff = now - meta.ctime();
                 let scaled = scale_time(diff, *unit);
                 compare_range(scaled as u64, *value as u64, *op)
@@ -969,10 +1131,12 @@ impl GlobState {
                 }
                 if let Ok(mut entries) = fs::read_dir(path) {
                     entries.any(|e| {
-                        e.ok().map(|e| {
-                            let name = e.file_name();
-                            name != "." && name != ".."
-                        }).unwrap_or(false)
+                        e.ok()
+                            .map(|e| {
+                                let name = e.file_name();
+                                name != "." && name != ".."
+                            })
+                            .unwrap_or(false)
                     })
                 } else {
                     false
@@ -983,13 +1147,17 @@ impl GlobState {
     }
 
     fn sort_matches(&mut self) {
-        let specs = self.qualifiers.as_ref()
+        let specs = self
+            .qualifiers
+            .as_ref()
             .map(|q| q.sorts.clone())
-            .unwrap_or_else(|| vec![SortSpec {
-                sort_type: GlobSort::Name,
-                order: SortOrder::Ascending,
-                follow_links: false,
-            }]);
+            .unwrap_or_else(|| {
+                vec![SortSpec {
+                    sort_type: GlobSort::Name,
+                    order: SortOrder::Ascending,
+                    follow_links: false,
+                }]
+            });
 
         if specs.iter().any(|s| s.sort_type == GlobSort::None) {
             return;
@@ -1064,8 +1232,16 @@ pub fn has_wildcards(s: &str) -> bool {
 
 /// Simple glob pattern matching
 pub fn pattern_match(pattern: &str, text: &str, extended: bool, case_sensitive: bool) -> bool {
-    let pat = if case_sensitive { pattern.to_string() } else { pattern.to_lowercase() };
-    let txt = if case_sensitive { text.to_string() } else { text.to_lowercase() };
+    let pat = if case_sensitive {
+        pattern.to_string()
+    } else {
+        pattern.to_lowercase()
+    };
+    let txt = if case_sensitive {
+        text.to_string()
+    } else {
+        text.to_lowercase()
+    };
 
     glob_match_impl(&pat, &txt, extended)
 }
@@ -1084,7 +1260,10 @@ fn glob_match_impl(pattern: &str, text: &str, extended: bool) -> bool {
                 // Try matching rest of pattern from each position
                 let rest: String = pi.collect();
                 let mut pos = 0;
-                for (i, _) in text.char_indices().skip(ti.clone().count().saturating_sub(text.len())) {
+                for (i, _) in text
+                    .char_indices()
+                    .skip(ti.clone().count().saturating_sub(text.len()))
+                {
                     if i >= pos {
                         if glob_match_impl(&rest, &text[i..], extended) {
                             return true;
@@ -1177,7 +1356,11 @@ fn match_bracket_expr(pi: &mut std::iter::Peekable<std::str::Chars>, tc: char) -
     }
 
     let matched = chars_in_class.contains(&tc);
-    if negate { !matched } else { matched }
+    if negate {
+        !matched
+    } else {
+        matched
+    }
 }
 
 /// File type character for -F style listing
@@ -1194,7 +1377,11 @@ pub fn file_type_char(mode: u32) -> char {
     } else if fmt == libc::S_IFLNK as u32 {
         '@'
     } else if fmt == libc::S_IFREG as u32 {
-        if mode & 0o111 != 0 { '*' } else { ' ' }
+        if mode & 0o111 != 0 {
+            '*'
+        } else {
+            ' '
+        }
     } else if fmt == libc::S_IFSOCK as u32 {
         '='
     } else {
@@ -1364,7 +1551,12 @@ fn expand_single_brace(s: &str, brace_ccl: bool) -> Option<Vec<String>> {
     None
 }
 
-fn expand_range(prefix: &str, content: &str, dotdot_pos: usize, suffix: &str) -> Option<Vec<String>> {
+fn expand_range(
+    prefix: &str,
+    content: &str,
+    dotdot_pos: usize,
+    suffix: &str,
+) -> Option<Vec<String>> {
     let left = &content[..dotdot_pos];
     let right_start = dotdot_pos + 2;
 
@@ -1431,7 +1623,12 @@ fn expand_range(prefix: &str, content: &str, dotdot_pos: usize, suffix: &str) ->
     None
 }
 
-fn expand_comma(prefix: &str, content: &str, positions: &[usize], suffix: &str) -> Option<Vec<String>> {
+fn expand_comma(
+    prefix: &str,
+    content: &str,
+    positions: &[usize],
+    suffix: &str,
+) -> Option<Vec<String>> {
     let mut results = Vec::new();
     let mut last = 0;
 
@@ -1464,7 +1661,8 @@ fn expand_ccl(prefix: &str, content: &str, suffix: &str) -> Option<Vec<String>> 
         }
     }
 
-    let mut results: Vec<String> = chars_set.iter()
+    let mut results: Vec<String> = chars_set
+        .iter()
         .map(|c| format!("{}{}{}", prefix, c, suffix))
         .collect();
     results.sort();
@@ -1518,7 +1716,7 @@ pub fn statfullpath(pathbuf: &str, name: &str, follow: bool) -> Option<std::fs::
     } else {
         format!("{}{}", pathbuf, name)
     };
-    
+
     if follow {
         std::fs::metadata(&full).ok()
     } else {
@@ -1543,23 +1741,23 @@ pub fn mindist(dir: &str, name: &str, best: &mut String, exact: bool) -> usize {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return usize::MAX;
     };
-    
+
     let mut min_dist = usize::MAX;
-    
+
     for entry in entries.flatten() {
         let entry_name = entry.file_name().to_string_lossy().to_string();
         if exact && entry_name == name {
             *best = entry_name;
             return 0;
         }
-        
+
         let dist = crate::utils::spdist(name, &entry_name, min_dist);
         if dist < min_dist {
             min_dist = dist;
             *best = entry_name.clone();
         }
     }
-    
+
     min_dist
 }
 
@@ -1576,7 +1774,7 @@ pub fn qgetnum(s: &str) -> Option<(i64, &str)> {
 /// Parse time modifier (from glob.c qualtime)
 pub fn qualtime(s: &str, units: char) -> Option<(i64, &str)> {
     let (mut num, rest) = qgetnum(s)?;
-    
+
     match units {
         'h' => num *= 3600,
         'd' => num *= 86400,
@@ -1584,14 +1782,14 @@ pub fn qualtime(s: &str, units: char) -> Option<(i64, &str)> {
         'M' => num *= 2592000,
         _ => {}
     }
-    
+
     Some((num, rest))
 }
 
 /// Parse size modifier (from glob.c qualsize)
 pub fn qualsize(s: &str, units: char) -> Option<(i64, &str)> {
     let (mut num, rest) = qgetnum(s)?;
-    
+
     match units {
         'k' | 'K' => num *= 1024,
         'm' | 'M' => num *= 1024 * 1024,
@@ -1600,7 +1798,7 @@ pub fn qualsize(s: &str, units: char) -> Option<(i64, &str)> {
         'p' | 'P' => num *= 512,
         _ => {}
     }
-    
+
     Some((num, rest))
 }
 
@@ -1619,23 +1817,15 @@ pub fn sort_matches_by_type(matches: &mut [String], sort_type: GlobSort, reverse
         }
         GlobSort::Mtime => {
             matches.sort_by(|a, b| {
-                let time_a = std::fs::metadata(a)
-                    .and_then(|m| m.modified())
-                    .ok();
-                let time_b = std::fs::metadata(b)
-                    .and_then(|m| m.modified())
-                    .ok();
+                let time_a = std::fs::metadata(a).and_then(|m| m.modified()).ok();
+                let time_b = std::fs::metadata(b).and_then(|m| m.modified()).ok();
                 time_a.cmp(&time_b)
             });
         }
         GlobSort::Atime => {
             matches.sort_by(|a, b| {
-                let time_a = std::fs::metadata(a)
-                    .and_then(|m| m.accessed())
-                    .ok();
-                let time_b = std::fs::metadata(b)
-                    .and_then(|m| m.accessed())
-                    .ok();
+                let time_a = std::fs::metadata(a).and_then(|m| m.accessed()).ok();
+                let time_b = std::fs::metadata(b).and_then(|m| m.accessed()).ok();
                 time_a.cmp(&time_b)
             });
         }
@@ -1655,7 +1845,7 @@ pub fn sort_matches_by_type(matches: &mut [String], sort_type: GlobSort, reverse
         }
         _ => {}
     }
-    
+
     if reverse {
         matches.reverse();
     }
@@ -1665,84 +1855,85 @@ pub fn sort_matches_by_type(matches: &mut [String], sort_type: GlobSort, reverse
 pub mod qualifiers {
     use std::os::unix::fs::MetadataExt;
     use std::os::unix::fs::PermissionsExt;
-    
+
     pub fn is_regular(path: &str) -> bool {
-        std::fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+        std::fs::metadata(path)
+            .map(|m| m.is_file())
+            .unwrap_or(false)
     }
-    
+
     pub fn is_directory(path: &str) -> bool {
         std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
     }
-    
+
     pub fn is_symlink(path: &str) -> bool {
         std::fs::symlink_metadata(path)
             .map(|m| m.file_type().is_symlink())
             .unwrap_or(false)
     }
-    
+
     pub fn is_fifo(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFIFO as u32)
             .unwrap_or(false)
     }
-    
+
     pub fn is_socket(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFSOCK as u32)
             .unwrap_or(false)
     }
-    
+
     pub fn is_block_device(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFBLK as u32)
             .unwrap_or(false)
     }
-    
+
     pub fn is_char_device(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_IFMT as u32) == libc::S_IFCHR as u32)
             .unwrap_or(false)
     }
-    
+
     pub fn is_setuid(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_ISUID as u32) != 0)
             .unwrap_or(false)
     }
-    
+
     pub fn is_setgid(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_ISGID as u32) != 0)
             .unwrap_or(false)
     }
-    
+
     pub fn is_sticky(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & libc::S_ISVTX as u32) != 0)
             .unwrap_or(false)
     }
-    
+
     pub fn is_readable(path: &str) -> bool {
-        std::fs::metadata(path).is_ok() && 
-            std::fs::File::open(path).is_ok()
+        std::fs::metadata(path).is_ok() && std::fs::File::open(path).is_ok()
     }
-    
+
     pub fn is_writable(path: &str) -> bool {
         std::fs::OpenOptions::new().write(true).open(path).is_ok()
     }
-    
+
     pub fn is_executable(path: &str) -> bool {
         std::fs::metadata(path)
             .map(|m| (m.mode() & 0o111) != 0)
             .unwrap_or(false)
     }
-    
+
     pub fn size_matches(path: &str, size: u64, cmp: std::cmp::Ordering) -> bool {
         std::fs::metadata(path)
             .map(|m| m.len().cmp(&size) == cmp)
             .unwrap_or(false)
     }
-    
+
     pub fn mtime_matches(path: &str, secs: i64, cmp: std::cmp::Ordering) -> bool {
         std::fs::metadata(path)
             .and_then(|m| m.modified())
@@ -1752,42 +1943,42 @@ pub mod qualifiers {
             })
             .unwrap_or(false)
     }
-    
+
     pub fn uid_matches(path: &str, uid: u32) -> bool {
         std::fs::metadata(path)
             .map(|m| m.uid() == uid)
             .unwrap_or(false)
     }
-    
+
     pub fn gid_matches(path: &str, gid: u32) -> bool {
         std::fs::metadata(path)
             .map(|m| m.gid() == gid)
             .unwrap_or(false)
     }
-    
+
     pub fn nlinks_matches(path: &str, nlinks: u64, cmp: std::cmp::Ordering) -> bool {
         std::fs::metadata(path)
             .map(|m| m.nlink().cmp(&nlinks) == cmp)
             .unwrap_or(false)
     }
-    
+
     /// Check if file is an executable command (from glob.c qualiscom)
     pub fn is_command(path: &str) -> bool {
         let meta = match std::fs::metadata(path) {
             Ok(m) => m,
             Err(_) => return false,
         };
-        
+
         if !meta.is_file() {
             return false;
         }
-        
+
         // Check if executable
         let mode = meta.mode();
         if mode & 0o111 == 0 {
             return false;
         }
-        
+
         // Check if in PATH would make it a command
         // For now just check executable bit
         true
@@ -1837,7 +2028,7 @@ pub fn get_match_ret(data: &MatchData, start: usize, end: usize) -> String {
     if start >= end || start >= data.str.len() {
         return String::new();
     }
-    
+
     let end = end.min(data.str.len());
     data.str[start..end].to_string()
 }
@@ -1846,7 +2037,7 @@ pub fn get_match_ret(data: &MatchData, start: usize, end: usize) -> String {
 pub fn compgetmatch(pat: &str) -> Option<(String, MatchFlags)> {
     let mut flags = MatchFlags::default();
     let mut pattern = pat.to_string();
-    
+
     // Check for anchors
     if pattern.starts_with('#') {
         flags.anchored_start = true;
@@ -1866,22 +2057,22 @@ pub fn compgetmatch(pat: &str) -> Option<(String, MatchFlags)> {
         flags.shortest = false;
         pattern.truncate(pattern.len().saturating_sub(2));
     }
-    
+
     Some((pattern, flags))
 }
 
 /// Get pattern match with optional replacement (from glob.c getmatch lines 2520-2680)
-/// 
+///
 /// This implements ${var#pat}, ${var##pat}, ${var%pat}, ${var%%pat},
 /// ${var/pat/repl}, ${var//pat/repl}
 pub fn getmatch(s: &str, pat: &str, flags: MatchFlags, n: i32, replstr: Option<&str>) -> String {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len();
-    
+
     if len == 0 {
         return s.to_string();
     }
-    
+
     // Find match
     let (match_start, match_end) = if flags.anchored_start && flags.anchored_end {
         // Full match
@@ -1947,11 +2138,11 @@ pub fn getmatch(s: &str, pat: &str, flags: MatchFlags, n: i32, replstr: Option<&
         }
         return s.to_string();
     };
-    
+
     // Apply replacement
     let prefix: String = chars[..match_start].iter().collect();
     let suffix: String = chars[match_end..].iter().collect();
-    
+
     match replstr {
         Some(r) => format!("{}{}{}", prefix, r, suffix),
         None => format!("{}{}", prefix, suffix),
@@ -1959,7 +2150,13 @@ pub fn getmatch(s: &str, pat: &str, flags: MatchFlags, n: i32, replstr: Option<&
 }
 
 /// Get match for array elements (from glob.c getmatcharr lines 2690-2750)
-pub fn getmatcharr(arr: &[String], pat: &str, flags: MatchFlags, n: i32, replstr: Option<&str>) -> Vec<String> {
+pub fn getmatcharr(
+    arr: &[String],
+    pat: &str,
+    flags: MatchFlags,
+    n: i32,
+    replstr: Option<&str>,
+) -> Vec<String> {
     arr.iter()
         .map(|s| getmatch(s, pat, flags, n, replstr))
         .collect()
@@ -1970,7 +2167,7 @@ pub fn getmatchlist(s: &str, pat: &str) -> Vec<(usize, usize)> {
     let mut matches = Vec::new();
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len();
-    
+
     let mut pos = 0;
     while pos < len {
         for end in (pos + 1)..=len {
@@ -1985,7 +2182,7 @@ pub fn getmatchlist(s: &str, pat: &str) -> Vec<(usize, usize)> {
             pos += 1;
         }
     }
-    
+
     matches
 }
 
@@ -2013,27 +2210,27 @@ pub fn set_pat_end(pattern: &str, end: usize) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlobToken {
     Literal(char),
-    Star,           // *
-    Question,       // ?
-    BracketOpen,    // [
-    BracketClose,   // ]
-    ParenOpen,      // (
-    ParenClose,     // )
-    Pipe,           // |
-    Hash,           // # (extended)
-    Tilde,          // ~ (extended)
-    Caret,          // ^ (extended)
-    BraceOpen,      // {
-    BraceClose,     // }
-    Comma,          // , (in braces)
-    Range,          // .. (in braces)
+    Star,         // *
+    Question,     // ?
+    BracketOpen,  // [
+    BracketClose, // ]
+    ParenOpen,    // (
+    ParenClose,   // )
+    Pipe,         // |
+    Hash,         // # (extended)
+    Tilde,        // ~ (extended)
+    Caret,        // ^ (extended)
+    BraceOpen,    // {
+    BraceClose,   // }
+    Comma,        // , (in braces)
+    Range,        // .. (in braces)
 }
 
 /// Tokenize a glob pattern (from glob.c tokenize lines 3100-3180)
 pub fn tokenize(s: &str) -> Vec<GlobToken> {
     let mut tokens = Vec::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         let token = match c {
             '\\' => {
@@ -2065,7 +2262,7 @@ pub fn tokenize(s: &str) -> Vec<GlobToken> {
         };
         tokens.push(token);
     }
-    
+
     tokens
 }
 
@@ -2076,7 +2273,7 @@ pub fn shtokenize(s: &str) -> Vec<GlobToken> {
     let mut chars = s.chars().peekable();
     let mut in_single_quote = false;
     let mut in_double_quote = false;
-    
+
     while let Some(c) = chars.next() {
         if in_single_quote {
             if c == '\'' {
@@ -2086,7 +2283,7 @@ pub fn shtokenize(s: &str) -> Vec<GlobToken> {
             }
             continue;
         }
-        
+
         if in_double_quote {
             if c == '"' {
                 in_double_quote = false;
@@ -2099,7 +2296,7 @@ pub fn shtokenize(s: &str) -> Vec<GlobToken> {
             }
             continue;
         }
-        
+
         match c {
             '\'' => in_single_quote = true,
             '"' => in_double_quote = true,
@@ -2115,7 +2312,7 @@ pub fn shtokenize(s: &str) -> Vec<GlobToken> {
             _ => tokens.push(GlobToken::Literal(c)),
         }
     }
-    
+
     tokens
 }
 
@@ -2123,7 +2320,7 @@ pub fn shtokenize(s: &str) -> Vec<GlobToken> {
 pub fn zshtokenize(s: &str, extended_glob: bool, sh_glob: bool) -> Vec<GlobToken> {
     let mut tokens = Vec::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         let token = match c {
             '\\' => {
@@ -2150,7 +2347,7 @@ pub fn zshtokenize(s: &str, extended_glob: bool, sh_glob: bool) -> Vec<GlobToken
         };
         tokens.push(token);
     }
-    
+
     tokens
 }
 
@@ -2172,9 +2369,9 @@ pub fn remnulargs(tokens: &mut Vec<GlobToken>) {
 /// Parsed mode specification
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ModeSpec {
-    pub who: u32,   // u, g, o, a masks
-    pub op: char,   // +, -, =
-    pub perm: u32,  // r, w, x, s, t masks
+    pub who: u32,  // u, g, o, a masks
+    pub op: char,  // +, -, =
+    pub perm: u32, // r, w, x, s, t masks
 }
 
 /// Parse mode specification like chmod (from glob.c qgetmodespec lines 790-920)
@@ -2182,7 +2379,7 @@ pub struct ModeSpec {
 pub fn qgetmodespec(s: &str) -> Option<(ModeSpec, &str)> {
     let mut chars = s.chars().peekable();
     let mut spec = ModeSpec::default();
-    
+
     // Check for octal mode
     if chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
         let mut mode_str = String::new();
@@ -2203,16 +2400,28 @@ pub fn qgetmodespec(s: &str) -> Option<(ModeSpec, &str)> {
         }
         return None;
     }
-    
+
     // Parse symbolic mode
     // Who: u, g, o, a
     let mut who = 0u32;
     while let Some(&c) = chars.peek() {
         match c {
-            'u' => { who |= 0o4700; chars.next(); }
-            'g' => { who |= 0o2070; chars.next(); }
-            'o' => { who |= 0o1007; chars.next(); }
-            'a' => { who |= 0o7777; chars.next(); }
+            'u' => {
+                who |= 0o4700;
+                chars.next();
+            }
+            'g' => {
+                who |= 0o2070;
+                chars.next();
+            }
+            'o' => {
+                who |= 0o1007;
+                chars.next();
+            }
+            'a' => {
+                who |= 0o7777;
+                chars.next();
+            }
             _ => break,
         }
     }
@@ -2220,7 +2429,7 @@ pub fn qgetmodespec(s: &str) -> Option<(ModeSpec, &str)> {
         who = 0o7777; // Default to all
     }
     spec.who = who;
-    
+
     // Op: +, -, =
     spec.op = match chars.next() {
         Some('+') => '+',
@@ -2228,22 +2437,40 @@ pub fn qgetmodespec(s: &str) -> Option<(ModeSpec, &str)> {
         Some('=') => '=',
         _ => return None,
     };
-    
+
     // Perm: r, w, x, X, s, t
     let mut perm = 0u32;
     while let Some(&c) = chars.peek() {
         match c {
-            'r' => { perm |= 0o444; chars.next(); }
-            'w' => { perm |= 0o222; chars.next(); }
-            'x' => { perm |= 0o111; chars.next(); }
-            'X' => { perm |= 0o111; chars.next(); } // Conditional execute
-            's' => { perm |= 0o6000; chars.next(); }
-            't' => { perm |= 0o1000; chars.next(); }
+            'r' => {
+                perm |= 0o444;
+                chars.next();
+            }
+            'w' => {
+                perm |= 0o222;
+                chars.next();
+            }
+            'x' => {
+                perm |= 0o111;
+                chars.next();
+            }
+            'X' => {
+                perm |= 0o111;
+                chars.next();
+            } // Conditional execute
+            's' => {
+                perm |= 0o6000;
+                chars.next();
+            }
+            't' => {
+                perm |= 0o1000;
+                chars.next();
+            }
             _ => break,
         }
     }
     spec.perm = perm & who;
-    
+
     let rest_pos = s.len() - chars.collect::<String>().len();
     Some((spec, &s[rest_pos..]))
 }
@@ -2265,21 +2492,21 @@ pub fn apply_modespec(mode: u32, spec: &ModeSpec) -> u32 {
 /// Parse character range in braces like {a..z} (from glob.c bracechardots lines 1780-1850)
 pub fn bracechardots(s: &str) -> Option<(char, char, i32)> {
     let chars: Vec<char> = s.chars().collect();
-    
+
     // Must be at least "a..b"
     if chars.len() < 4 {
         return None;
     }
-    
+
     // Find ..
     let dotdot_pos = s.find("..")?;
     if dotdot_pos == 0 {
         return None;
     }
-    
+
     let left = &s[..dotdot_pos];
     let right = &s[dotdot_pos + 2..];
-    
+
     // Check for increment
     let (end_str, incr) = if let Some(pos) = right.find("..") {
         let end = &right[..pos];
@@ -2288,14 +2515,14 @@ pub fn bracechardots(s: &str) -> Option<(char, char, i32)> {
     } else {
         (right, 1)
     };
-    
+
     // Single character range
     if left.chars().count() == 1 && end_str.chars().count() == 1 {
         let c1 = left.chars().next()?;
         let c2 = end_str.chars().next()?;
         return Some((c1, c2, incr));
     }
-    
+
     None
 }
 
@@ -2313,15 +2540,15 @@ pub struct Redirect {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RedirectType {
-    Read,       // <
-    Write,      // >
-    Append,     // >>
-    ReadWrite,  // <>
-    Clobber,    // >|
-    Here,       // <<
-    HereStr,    // <<<
-    Dup,        // >&, <&
-    Pipe,       // |
+    Read,      // <
+    Write,     // >
+    Append,    // >>
+    ReadWrite, // <>
+    Clobber,   // >|
+    Here,      // <<
+    HereStr,   // <<<
+    Dup,       // >&, <&
+    Pipe,      // |
 }
 
 /// Expand redirections with glob patterns (from glob.c xpandredir lines 1690-1770)
@@ -2330,21 +2557,21 @@ pub fn xpandredir(redir: &Redirect, options: &GlobOptions) -> Vec<Redirect> {
     if !has_wildcards(&redir.target) {
         return vec![redir.clone()];
     }
-    
+
     // Glob expand the target
     let mut state = GlobState::new(options.clone());
     let matches = state.glob(&redir.target);
-    
+
     if matches.is_empty() {
         return vec![redir.clone()];
     }
-    
+
     // For redirections, we usually only want one match
     if matches.len() > 1 {
         // Ambiguous redirect - return original
         return vec![redir.clone()];
     }
-    
+
     vec![Redirect {
         fd: redir.fd,
         target: matches[0].clone(),
@@ -2360,16 +2587,12 @@ pub fn xpandredir(redir: &Redirect, options: &GlobOptions) -> Vec<Redirect> {
 /// This is used for the `e` glob qualifier: *(e:'cmd':)
 pub fn glob_exec_string(cmd: &str, filename: &str) -> Option<String> {
     use std::process::Command;
-    
+
     // Replace $REPLY or {} with filename
     let cmd = cmd.replace("$REPLY", filename).replace("{}", filename);
-    
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
-        .output()
-        .ok()?;
-    
+
+    let output = Command::new("sh").arg("-c").arg(&cmd).output().ok()?;
+
     if output.status.success() {
         Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
@@ -2380,10 +2603,10 @@ pub fn glob_exec_string(cmd: &str, filename: &str) -> Option<String> {
 /// Execute a qualifier expression (from glob.c qualsheval full impl)
 pub fn qualsheval(filename: &str, expr: &str) -> bool {
     use std::process::Command;
-    
+
     // Set REPLY to filename and evaluate expression
     let script = format!("REPLY='{}'; {}", filename.replace("'", "'\\''"), expr);
-    
+
     Command::new("sh")
         .arg("-c")
         .arg(&script)

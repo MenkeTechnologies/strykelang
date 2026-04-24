@@ -83,7 +83,11 @@ impl PcreMatchResult {
 }
 
 /// Compile a PCRE pattern
-pub fn pcre_compile(pattern: &str, options: &PcreCompileOptions, state: &mut PcreState) -> Result<(), String> {
+pub fn pcre_compile(
+    pattern: &str,
+    options: &PcreCompileOptions,
+    state: &mut PcreState,
+) -> Result<(), String> {
     state.clear();
 
     let mut pattern_str = String::new();
@@ -125,8 +129,14 @@ pub fn pcre_study(state: &PcreState) -> Result<(), String> {
 }
 
 /// Match a string against the compiled pattern
-pub fn pcre_match(text: &str, options: &PcreMatchOptions, state: &PcreState) -> Result<PcreMatchResult, String> {
-    let re = state.pattern.as_ref()
+pub fn pcre_match(
+    text: &str,
+    options: &PcreMatchOptions,
+    state: &PcreState,
+) -> Result<PcreMatchResult, String> {
+    let re = state
+        .pattern
+        .as_ref()
         .ok_or_else(|| "no pattern has been compiled".to_string())?;
 
     let search_text = if options.offset > 0 && options.offset < text.len() {
@@ -190,7 +200,11 @@ pub fn cond_pcre_match(lhs: &str, rhs: &str, caseless: bool) -> (bool, PcreMatch
 }
 
 /// Execute pcre_compile builtin
-pub fn builtin_pcre_compile(args: &[&str], options: &PcreCompileOptions, state: &mut PcreState) -> (i32, String) {
+pub fn builtin_pcre_compile(
+    args: &[&str],
+    options: &PcreCompileOptions,
+    state: &mut PcreState,
+) -> (i32, String) {
     if args.is_empty() {
         return (1, "pcre_compile: pattern required\n".to_string());
     }
@@ -339,8 +353,14 @@ mod tests {
         let match_opts = PcreMatchOptions::default();
         let result = pcre_match("hello world", &match_opts, &state).unwrap();
         assert!(result.matched);
-        assert_eq!(result.named_captures.get("first"), Some(&"hello".to_string()));
-        assert_eq!(result.named_captures.get("second"), Some(&"world".to_string()));
+        assert_eq!(
+            result.named_captures.get("first"),
+            Some(&"hello".to_string())
+        );
+        assert_eq!(
+            result.named_captures.get("second"),
+            Some(&"world".to_string())
+        );
     }
 
     #[test]

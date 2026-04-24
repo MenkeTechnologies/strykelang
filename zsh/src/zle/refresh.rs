@@ -20,10 +20,18 @@ pub struct TextAttr {
 impl TextAttr {
     pub fn to_ansi(&self) -> String {
         let mut codes = Vec::new();
-        if self.bold { codes.push("1".to_string()); }
-        if self.underline { codes.push("4".to_string()); }
-        if self.standout { codes.push("7".to_string()); }
-        if self.blink { codes.push("5".to_string()); }
+        if self.bold {
+            codes.push("1".to_string());
+        }
+        if self.underline {
+            codes.push("4".to_string());
+        }
+        if self.standout {
+            codes.push("7".to_string());
+        }
+        if self.blink {
+            codes.push("5".to_string());
+        }
         if let Some(fg) = self.fg_color {
             codes.push(format!("38;5;{}", fg));
         }
@@ -49,9 +57,13 @@ pub struct RefreshElement {
 impl RefreshElement {
     pub fn new(chr: char) -> Self {
         let width = unicode_width::UnicodeWidthChar::width(chr).unwrap_or(1) as u8;
-        RefreshElement { chr, atr: TextAttr::default(), width }
+        RefreshElement {
+            chr,
+            atr: TextAttr::default(),
+            width,
+        }
     }
-    
+
     pub fn with_attr(chr: char, atr: TextAttr) -> Self {
         let width = unicode_width::UnicodeWidthChar::width(chr).unwrap_or(1) as u8;
         RefreshElement { chr, atr, width }
@@ -74,7 +86,7 @@ impl VideoBuffer {
         let lines = vec![vec![RefreshElement::new(' '); cols]; rows];
         VideoBuffer { lines, cols, rows }
     }
-    
+
     pub fn clear(&mut self) {
         for line in &mut self.lines {
             for elem in line.iter_mut() {
@@ -82,22 +94,23 @@ impl VideoBuffer {
             }
         }
     }
-    
+
     pub fn resize(&mut self, cols: usize, rows: usize) {
         self.cols = cols;
         self.rows = rows;
-        self.lines.resize(rows, vec![RefreshElement::new(' '); cols]);
+        self.lines
+            .resize(rows, vec![RefreshElement::new(' '); cols]);
         for line in &mut self.lines {
             line.resize(cols, RefreshElement::new(' '));
         }
     }
-    
+
     pub fn set(&mut self, row: usize, col: usize, elem: RefreshElement) {
         if row < self.rows && col < self.cols {
             self.lines[row][col] = elem;
         }
     }
-    
+
     pub fn get(&self, row: usize, col: usize) -> Option<&RefreshElement> {
         self.lines.get(row).and_then(|line| line.get(col))
     }
@@ -152,7 +165,7 @@ impl RefreshState {
             ..Default::default()
         }
     }
-    
+
     pub fn reset_video(&mut self) {
         let (cols, rows) = get_terminal_size();
         self.columns = cols;
@@ -161,12 +174,12 @@ impl RefreshState {
         self.new_video = Some(VideoBuffer::new(cols, rows));
         self.need_full_redraw = true;
     }
-    
+
     pub fn free_video(&mut self) {
         self.old_video = None;
         self.new_video = None;
     }
-    
+
     pub fn swap_buffers(&mut self) {
         std::mem::swap(&mut self.old_video, &mut self.new_video);
         if let Some(ref mut new) = self.new_video {
@@ -181,65 +194,70 @@ impl Zle {
     pub fn zrefresh(&mut self) {
         let stdout = io::stdout();
         let mut handle = stdout.lock();
-        
+
         // Get terminal size
         let (cols, _rows) = get_terminal_size();
-        
+
         // Build the display line
         let prompt = self.prompt();
         let buffer: String = self.zleline.iter().collect();
         let cursor = self.zlecs;
-        
+
         // Calculate display positions
         let prompt_width = visible_width(prompt);
-        let buffer_before_cursor: String = self.zleline[..cursor.min(self.zleline.len())].iter().collect();
+        let buffer_before_cursor: String = self.zleline[..cursor.min(self.zleline.len())]
+            .iter()
+            .collect();
         let cursor_col = prompt_width + visible_width(&buffer_before_cursor);
-        
+
         // Handle horizontal scrolling if line is too long
         let scroll_margin = 8;
         let effective_cols = cols.saturating_sub(1);
-        
+
         let scroll_offset = if cursor_col >= effective_cols.saturating_sub(scroll_margin) {
             cursor_col.saturating_sub(effective_cols / 2)
         } else {
             0
         };
-        
+
         // Move to start of line and clear
         let _ = write!(handle, "\r\x1b[K");
-        
+
         // Draw prompt (if not scrolled past)
         if scroll_offset < prompt_width {
             let visible_prompt = skip_chars(prompt, scroll_offset);
             let _ = write!(handle, "{}", visible_prompt);
         }
-        
+
         // Draw buffer content
         let buffer_start = scroll_offset.saturating_sub(prompt_width);
         let visible_buffer = skip_chars(&buffer, buffer_start);
-        let truncated = truncate_to_width(&visible_buffer, effective_cols.saturating_sub(prompt_width.saturating_sub(scroll_offset)));
+        let truncated = truncate_to_width(
+            &visible_buffer,
+            effective_cols.saturating_sub(prompt_width.saturating_sub(scroll_offset)),
+        );
         let _ = write!(handle, "{}", truncated);
-        
+
         // Position cursor
         let display_cursor_col = cursor_col.saturating_sub(scroll_offset);
         let _ = write!(handle, "\r\x1b[{}C", display_cursor_col);
-        
+
         let _ = handle.flush();
     }
-    
+
     /// Full screen refresh - clears and redraws everything
     pub fn full_refresh(&mut self) -> io::Result<()> {
         print!("\x1b[2J\x1b[H");
         self.zrefresh();
         io::stdout().flush()
     }
-    
+
     /// Partial refresh (optimize for minimal updates)
     pub fn partial_refresh(&mut self) -> io::Result<()> {
         self.zrefresh();
         io::stdout().flush()
     }
-    
+
     /// Clear the screen
     /// Port of clearscreen() from zle_refresh.c
     pub fn clearscreen(&mut self) {
@@ -247,13 +265,13 @@ impl Zle {
         let _ = io::stdout().flush();
         self.zrefresh();
     }
-    
+
     /// Redisplay the current line
     /// Port of redisplay() from zle_refresh.c
     pub fn redisplay(&mut self) {
         self.zrefresh();
     }
-    
+
     /// Move cursor to position
     /// Port of moveto() from zle_refresh.c
     pub fn moveto(&mut self, row: usize, col: usize) {
@@ -261,7 +279,7 @@ impl Zle {
         print!("\x1b[{};{}H", row + 1, col + 1);
         let _ = io::stdout().flush();
     }
-    
+
     /// Move cursor down
     /// Port of tc_downcurs() from zle_refresh.c  
     pub fn tc_downcurs(&mut self, count: usize) {
@@ -270,7 +288,7 @@ impl Zle {
             let _ = io::stdout().flush();
         }
     }
-    
+
     /// Move cursor right
     /// Port of tc_rightcurs() from zle_refresh.c
     pub fn tc_rightcurs(&mut self, count: usize) {
@@ -279,7 +297,7 @@ impl Zle {
             let _ = io::stdout().flush();
         }
     }
-    
+
     /// Scroll window up
     /// Port of scrollwindow() from zle_refresh.c
     pub fn scrollwindow(&mut self, lines: i32) {
@@ -292,25 +310,25 @@ impl Zle {
         }
         let _ = io::stdout().flush();
     }
-    
+
     /// Single line refresh
     /// Port of singlerefresh() from zle_refresh.c
     pub fn singlerefresh(&mut self) {
         self.zrefresh();
     }
-    
+
     /// Refresh a single line
     /// Port of refreshline() from zle_refresh.c
     pub fn refreshline(&mut self, _line: usize) {
         self.zrefresh();
     }
-    
+
     /// Write a wide character
     /// Port of zwcputc() from zle_refresh.c
     pub fn zwcputc(&self, c: char) {
         print!("{}", c);
     }
-    
+
     /// Write a string of wide characters
     /// Port of zwcwrite() from zle_refresh.c
     pub fn zwcwrite(&self, s: &str) {
@@ -334,7 +352,7 @@ pub fn get_terminal_size() -> (usize, usize) {
 fn visible_width(s: &str) -> usize {
     let mut width = 0;
     let mut in_escape = false;
-    
+
     for c in s.chars() {
         if in_escape {
             if c.is_ascii_alphabetic() {
@@ -346,7 +364,7 @@ fn visible_width(s: &str) -> usize {
             width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
         }
     }
-    
+
     width
 }
 
@@ -355,13 +373,13 @@ fn skip_chars(s: &str, n: usize) -> &str {
     let mut width = 0;
     let mut byte_idx = 0;
     let mut in_escape = false;
-    
+
     for (i, c) in s.char_indices() {
         if width >= n {
             byte_idx = i;
             break;
         }
-        
+
         if in_escape {
             if c.is_ascii_alphabetic() {
                 in_escape = false;
@@ -373,7 +391,7 @@ fn skip_chars(s: &str, n: usize) -> &str {
         }
         byte_idx = i + c.len_utf8();
     }
-    
+
     &s[byte_idx..]
 }
 
@@ -382,7 +400,7 @@ fn truncate_to_width(s: &str, max_width: usize) -> &str {
     let mut width = 0;
     let mut byte_idx = s.len();
     let mut in_escape = false;
-    
+
     for (i, c) in s.char_indices() {
         if in_escape {
             if c.is_ascii_alphabetic() {
@@ -399,7 +417,7 @@ fn truncate_to_width(s: &str, max_width: usize) -> &str {
             width += char_width;
         }
     }
-    
+
     &s[..byte_idx]
 }
 
@@ -420,27 +438,34 @@ pub struct HighlightManager {
 
 impl HighlightManager {
     pub fn new() -> Self {
-        HighlightManager { regions: Vec::new() }
+        HighlightManager {
+            regions: Vec::new(),
+        }
     }
-    
+
     /// Set region highlight
     /// Port of set_region_highlight() from zle_refresh.c
     pub fn set_region_highlight(&mut self, start: usize, end: usize, attr: TextAttr) {
-        self.regions.push(RegionHighlight { start, end, attr, memo: None });
+        self.regions.push(RegionHighlight {
+            start,
+            end,
+            attr,
+            memo: None,
+        });
     }
-    
+
     /// Get region highlight for position
     /// Port of get_region_highlight() from zle_refresh.c  
     pub fn get_region_highlight(&self, pos: usize) -> Option<&RegionHighlight> {
         self.regions.iter().find(|r| pos >= r.start && pos < r.end)
     }
-    
+
     /// Unset region highlight
     /// Port of unset_region_highlight() from zle_refresh.c
     pub fn unset_region_highlight(&mut self) {
         self.regions.clear();
     }
-    
+
     /// Free highlight resources
     /// Port of zle_free_highlight() from zle_refresh.c
     pub fn free(&mut self) {
@@ -497,33 +522,33 @@ pub fn zle_set_highlight(_highlight: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_visible_width() {
         assert_eq!(visible_width("hello"), 5);
         assert_eq!(visible_width("\x1b[31mhello\x1b[0m"), 5);
         assert_eq!(visible_width("日本語"), 6); // 3 chars, 2 width each
     }
-    
+
     #[test]
     fn test_video_buffer() {
         let mut buf = VideoBuffer::new(80, 24);
         assert_eq!(buf.cols, 80);
         assert_eq!(buf.rows, 24);
-        
+
         buf.set(0, 0, RefreshElement::new('A'));
         assert_eq!(buf.get(0, 0).map(|e| e.chr), Some('A'));
-        
+
         buf.clear();
         assert_eq!(buf.get(0, 0).map(|e| e.chr), Some(' '));
     }
-    
+
     #[test]
     fn test_refresh_state() {
         let mut state = RefreshState::new();
         assert!(state.old_video.is_some());
         assert!(state.new_video.is_some());
-        
+
         state.swap_buffers();
         state.free_video();
         assert!(state.old_video.is_none());
