@@ -21,7 +21,7 @@ fn comb_sort {
         }
     }
     
-    ([@arr])
+    \@arr
 }
 
 my $data = [9, 8, 3, 7, 5, 6, 4, 1]

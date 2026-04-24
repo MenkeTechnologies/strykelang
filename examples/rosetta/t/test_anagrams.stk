@@ -22,7 +22,7 @@ fn find_anagrams {
         my $sc = sorted_chars($_)
         $sc eq $key && $_ ne $word
     }
-    ([@res])
+    \@res
 }
 
 assert_ok are_anagrams("listen", "silent"), "listen/silent"

@@ -37,7 +37,7 @@ fn cycle_sort {
             ($arr[$pos], $item) = ($item, $arr[$pos])
         }
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [0, 1, 2, 2, 2, 2, 1, 9, 3, 5]

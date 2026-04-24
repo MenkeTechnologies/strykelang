@@ -17,7 +17,7 @@ fn get_ludic($n) {
         @nums = @next_nums
         if (scalar(@ludics) > 100) { last }
     }
-    ([@ludics])
+    \@ludics
 }
 
 my $res = get_ludic(25)

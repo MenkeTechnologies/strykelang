@@ -29,7 +29,7 @@ fn mian_chowla($n) {
             }
         }
     }
-    ([@a])
+    \@a
 }
 
 my $res = mian_chowla(5)

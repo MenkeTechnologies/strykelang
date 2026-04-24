@@ -317,7 +317,6 @@ my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5)  # $i == -1 on timeout
 
 # barrier — N workers rendezvous
 my $sync = barrier(3)
-# p is alias to say
 fan 3 { $sync->wait; p "all arrived" }
 
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
@@ -528,7 +527,7 @@ class Animal {
 class Dog extends Animal {
     breed: Str = "Mixed"
     fn bark { p "Woof! I am " . $self->name }
-    fn speak { say $self->name . " barks!" }  # override
+    fn speak { p $self->name . " barks!" }  # override
 }
 
 # Construction: named or positional
@@ -618,7 +617,7 @@ class Logger {
 
 # DESTROY destructor — explicit via $obj->destroy(), child first
 class Resource {
-    fn DESTROY { say "cleanup" }
+    fn DESTROY { p "cleanup" }
 }
 my $r = Resource()
 $r->destroy()  # prints "cleanup"
@@ -832,7 +831,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
-| I/O | `print`, `p`, `say`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->say/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
+| I/O | `print`, `p`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->p/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
 | System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `glob_match`, `which_all`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
@@ -864,7 +863,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`use overload`** — `'op' => 'method'` or `\&handler`; binary dispatch with `(invocant, other)`, `nomethod`, unary `neg`/`bool`/`abs`, `""` for stringification, `fallback => 1`.
 - **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
 - **`$.`** — undef until first successful read, then last-read line count.
-- **`print`/`say`/`p`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
+- **`print`/`p`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
 - **Bareword statement** — `name;` calls a sub with `@_ = ($_)`.
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.
 - **`%SIG` (Unix)** — `SIGINT`/`SIGTERM`/`SIGALRM`/`SIGCHLD` as code refs; handlers run between statements/opcodes via `perl_signal::poll`. `IGNORE` and `DEFAULT` honored.
@@ -926,7 +925,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   ```
 - **Bare `_` as topic shorthand** — in any expression position, bare `_` is equivalent to `$_`. Inspired by Raku's WhateverCode and Scala's placeholder syntax. Enables ultra-concise blocks: `map{_*2}` instead of `map{$_ * 2}`. The sigil-free form compresses better — no spaces needed around `_` when adjacent to operators.
 - **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 4 levels (`$_<` through `$_<<<<`). See [\[0x03\]](#0x03-parallel-primitives).
-- **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e say`. Use for print/log/accumulator loops.
+- **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e p`. Use for print/log/accumulator loops.
 - **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `e` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
 
   ```perl
@@ -1368,7 +1367,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   |-------|----------|-------|----------|-------|----------|
   | **Thread/Pipe** | | **String** | | **Case** | |
   | `~>` | `thread` | `tm` | `trim` | `sc` | `snake_case` |
-  | `p` | `say` | `len` | `length` | `cc` | `camel_case` |
+  | `p` | `len` | `length` | `cc` | `camel_case` |
   | `pr` | `print` | `ufc` | `ucfirst` | `kc` | `kebab_case` |
   | | | `lfc` | `lcfirst` | `qm` | `quotemeta` |
   | **List** | | `rev` | |

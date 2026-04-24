@@ -19,13 +19,13 @@ fn sift_down {
             $swap = $child + 1
         }
         if ($swap == $root) {
-            return ([@arr])
+            return \@arr
         } else {
             ($arr[$root], $arr[$swap]) = ($arr[$swap], $arr[$root])
             $root = $swap
         }
     }
-    ([@arr])
+    \@arr
 }
 
 fn heapify {
@@ -38,14 +38,14 @@ fn heapify {
         @arr = @$res
         $start--
     }
-    ([@arr])
+    \@arr
 }
 
 fn heap_sort {
     my $list = $_[0]
     my @arr = @$list
     my $count = scalar(@arr)
-    if ($count < 2) { return ([@arr]) }
+    if ($count < 2) { return \@arr }
     
     my $res_h = heapify([@arr])
     @arr = @$res_h
@@ -57,7 +57,7 @@ fn heap_sort {
         my $res = sift_down([@arr], 0, $end)
         @arr = @$res
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [4, 10, 3, 5, 1]

@@ -13,7 +13,7 @@ fn egyptian {
         # Simplify n/d if possible to avoid large numbers?
         # For simplicity in this example we just continue
     }
-    ([@res])
+    \@res
 }
 
 # 43/48 = 1/2 + 1/3 + 1/16

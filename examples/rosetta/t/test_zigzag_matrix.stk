@@ -29,7 +29,7 @@ fn zigzag_matrix($n) {
             }
         }
     }
-    ([@matrix])
+    \@matrix
 }
 
 my $m3 = zigzag_matrix(3)

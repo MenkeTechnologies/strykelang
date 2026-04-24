@@ -35,7 +35,7 @@ fn aliquot_sequence($start, $max_len) {
             else { $curr = $next }
         }
     }
-    ([@res])
+    \@res
 }
 
 my $res10 = aliquot_sequence(10, 10)

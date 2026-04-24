@@ -11,7 +11,7 @@ fn selection_sampling($n, $max) {
         }
         if ($m == $n) { last }
     }
-    ([@sample])
+    \@sample
 }
 
 my $n = 3

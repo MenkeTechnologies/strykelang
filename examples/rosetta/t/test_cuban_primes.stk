@@ -34,7 +34,7 @@ fn list_cuban_primes($count) {
         }
         $y++
     }
-    ([@res])
+    \@res
 }
 
 assert_eq join(",", @{ list_cuban_primes(5) }), "7,19,37,61,127", "first 5 cuban primes"

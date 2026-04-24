@@ -47,7 +47,7 @@ fn find_deranged_anagrams {
             }
         }
     }
-    ([@best])
+    \@best
 }
 
 my $words = [qw(dots stod stop pots tops post spot)]

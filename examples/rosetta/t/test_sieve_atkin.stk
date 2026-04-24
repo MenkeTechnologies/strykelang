@@ -41,7 +41,7 @@ fn my_sieve_atkin($limit) {
             push @primes, $n
         }
     }
-    ([@primes])
+    \@primes
 }
 
 my $res = my_sieve_atkin(100)

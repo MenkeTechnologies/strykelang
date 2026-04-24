@@ -16,7 +16,7 @@ fn juggler_sequence($start) {
         $curr = juggler_step($curr)
         push @res, $curr
     }
-    ([@res])
+    \@res
 }
 
 assert_eq join(",", @{ juggler_sequence(3) }), "3,5,11,36,6,2,1", "juggler 3"

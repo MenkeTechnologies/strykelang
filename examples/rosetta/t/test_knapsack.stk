@@ -16,7 +16,7 @@ fn knapsack($w, $weights, $values, $n) {
     
     my $excl = knapsack($w, $weights, $values, $n-1)
     
-    return $incl > $excl ? $incl : $excl
+    $incl > $excl ? $incl : $excl
 }
 
 my $weights = [1, 2, 3]

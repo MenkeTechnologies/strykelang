@@ -13,7 +13,7 @@ fn my_pascal_matrix($n) {
             }
         }
     }
-    ([@matrix])
+    \@matrix
 }
 
 my $res = my_pascal_matrix(5)

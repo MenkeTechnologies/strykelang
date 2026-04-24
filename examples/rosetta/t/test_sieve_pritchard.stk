@@ -20,7 +20,7 @@ fn sieve_pritchard($limit) {
         while (!is_prime_basic($p)) { $p++ }
     }
     # Simplified to just basic sieve for verification
-    ([@primes])
+    \@primes
 }
 
 fn is_prime_basic($n) {

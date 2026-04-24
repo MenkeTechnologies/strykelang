@@ -15,7 +15,7 @@ fn perfect_shuffle {
         push @shuffled, $right[$i]
     }
     
-    ([@shuffled])
+    \@shuffled
 }
 
 my $deck = [1..8]

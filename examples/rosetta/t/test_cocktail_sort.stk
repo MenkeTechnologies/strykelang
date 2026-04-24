@@ -30,7 +30,7 @@ fn cocktail_sort {
             $start++
         }
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [5, 1, 4, 2, 8, 0, 2]

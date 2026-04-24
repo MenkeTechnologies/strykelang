@@ -27,7 +27,7 @@ fn boustrophedon($arr_ref) {
         @prev_row = @curr_row
         push @res, ($i % 2 == 1 ? $curr_row[$i] : $curr_row[0])
     }
-    ([@res])
+    \@res
 }
 
 # e.g. for (1, 0, 0, 0, ...) it should give Euler numbers (1, 1, 1, 2, 5, 16, 61, ...)

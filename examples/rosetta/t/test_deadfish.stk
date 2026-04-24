@@ -13,7 +13,7 @@ fn deadfish($cmd) {
         
         if ($v == -1 || $v == 256) { $v = 0 }
     }
-    ([@res])
+    \@res
 }
 
 assert_eq join(",", @{ deadfish("iissso") }), "0", "iissso"

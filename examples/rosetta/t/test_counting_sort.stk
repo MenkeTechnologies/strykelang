@@ -20,7 +20,7 @@ fn counting_sort {
             $c--
         }
     }
-    ([@res])
+    \@res
 }
 
 my $data = [4, 2, 2, 8, 3, 3, 1]

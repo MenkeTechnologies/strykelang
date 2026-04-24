@@ -42,7 +42,7 @@ fn my_kruskal($n, $edges) {
             union_sets($parent, $rank, $root_u, $root_v)
         }
     }
-    ([@mst])
+    \@mst
 }
 
 my $edges = [
