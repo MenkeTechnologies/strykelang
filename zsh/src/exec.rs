@@ -797,7 +797,11 @@ impl ShellExecutor {
             style_table: StyleTable::new(),
             zsh_compat: false,
             posix_mode: false,
-            worker_pool: std::sync::Arc::new(crate::worker::WorkerPool::default_size()),
+            worker_pool: {
+                let config = crate::config::load();
+                let pool_size = crate::config::resolve_pool_size(&config.worker_pool);
+                std::sync::Arc::new(crate::worker::WorkerPool::new(pool_size))
+            },
         }
     }
 
@@ -2392,6 +2396,7 @@ impl ShellExecutor {
             "bind" => self.builtin_bindkey(args),
             "caller" => self.builtin_caller(args),
             "help" => self.builtin_help(args),
+            "doctor" => self.builtin_doctor(args),
             "readarray" | "mapfile" => self.builtin_readarray(args),
             "setopt" => self.builtin_setopt(args),
             "unsetopt" => self.builtin_unsetopt(args),
@@ -9440,31 +9445,27 @@ impl ShellExecutor {
         // Skip in zsh_compat mode - use traditional fpath scanning only
         if !self.zsh_compat {
             if let Some(ref cache) = self.compsys_cache {
+                // FASTEST: try pre-parsed AST blob (skip lex+parse entirely)
+                if let Ok(Some(ast_blob)) = cache.get_autoload_ast(name) {
+                    if let Ok(commands) = bincode::deserialize::<Vec<ShellCommand>>(&ast_blob) {
+                        if !commands.is_empty() {
+                            tracing::trace!(name, bytes = ast_blob.len(), "autoload: AST cache hit");
+                            return Some(self.wrap_autoload_commands(name, commands));
+                        }
+                    }
+                }
+
+                // FAST: cached source text — parse it (still no filesystem access)
                 if let Ok(Some(body)) = cache.get_autoload_body(name) {
-                    // Parse the cached function body
                     let mut parser = ShellParser::new(&body);
                     if let Ok(commands) = parser.parse_script() {
                         if !commands.is_empty() {
-                            // Check if it's a single function definition for this name (ksh style)
-                            if commands.len() == 1 {
-                                if let ShellCommand::FunctionDef(ref fn_name, _) = commands[0] {
-                                    if fn_name == name {
-                                        return Some(commands[0].clone());
-                                    }
-                                }
+                            // Cache the AST blob for next time
+                            if let Ok(blob) = bincode::serialize(&commands) {
+                                let _ = cache.set_autoload_ast(name, &blob);
+                                tracing::trace!(name, bytes = blob.len(), "autoload: AST cached on first parse");
                             }
-                            // Otherwise, wrap as function body (zsh style)
-                            let body = if commands.len() == 1 {
-                                commands.into_iter().next().unwrap()
-                            } else {
-                                let list_cmds: Vec<(ShellCommand, ListOp)> =
-                                    commands.into_iter().map(|c| (c, ListOp::Semi)).collect();
-                                ShellCommand::List(list_cmds)
-                            };
-                            return Some(ShellCommand::FunctionDef(
-                                name.to_string(),
-                                Box::new(body),
-                            ));
+                            return Some(self.wrap_autoload_commands(name, commands));
                         }
                     }
                 }
@@ -9540,6 +9541,27 @@ impl ShellExecutor {
         }
 
         None
+    }
+
+    /// Convert parsed commands into a FunctionDef, handling ksh vs zsh style.
+    fn wrap_autoload_commands(&self, name: &str, commands: Vec<ShellCommand>) -> ShellCommand {
+        // ksh style: file contains a single function definition for this name
+        if commands.len() == 1 {
+            if let ShellCommand::FunctionDef(ref fn_name, _) = commands[0] {
+                if fn_name == name {
+                    return commands.into_iter().next().unwrap();
+                }
+            }
+        }
+        // zsh style: file body IS the function body
+        let body = if commands.len() == 1 {
+            commands.into_iter().next().unwrap()
+        } else {
+            let list_cmds: Vec<(ShellCommand, ListOp)> =
+                commands.into_iter().map(|c| (c, ListOp::Semi)).collect();
+            ShellCommand::List(list_cmds)
+        };
+        ShellCommand::FunctionDef(name.to_string(), Box::new(body))
     }
 
     /// Check if a function is autoload pending and load it if so
@@ -11219,6 +11241,135 @@ impl ShellExecutor {
         0
     }
 
+    /// doctor - diagnostic report of shell health, caches, and performance
+    fn builtin_doctor(&self, _args: &[String]) -> i32 {
+        let green = |s: &str| format!("\x1b[32m{}\x1b[0m", s);
+        let red = |s: &str| format!("\x1b[31m{}\x1b[0m", s);
+        let yellow = |s: &str| format!("\x1b[33m{}\x1b[0m", s);
+        let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+        let dim = |s: &str| format!("\x1b[2m{}\x1b[0m", s);
+
+        println!("{}", bold("zshrs doctor"));
+        println!("{}", dim(&"=".repeat(60)));
+        println!();
+
+        // --- Environment ---
+        println!("{}", bold("Environment"));
+        println!("  version:    zshrs {}", env!("CARGO_PKG_VERSION"));
+        println!("  pid:        {}", std::process::id());
+        let cwd = env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "?".to_string());
+        println!("  cwd:        {}", cwd);
+        println!("  shell:      {}", env::var("SHELL").unwrap_or_else(|_| "?".to_string()));
+        println!("  pool size:  {}", self.worker_pool.size());
+        println!("  pool done:  {} tasks completed", self.worker_pool.completed());
+        println!("  pool queue: {} pending", self.worker_pool.queue_depth());
+        println!();
+
+        // --- Config ---
+        println!("{}", bold("Config"));
+        let config_path = crate::config::config_path();
+        if config_path.exists() {
+            println!("  {}  {}", green("*"), config_path.display());
+        } else {
+            println!("  {}  {} {}", dim("-"), config_path.display(), dim("(using defaults)"));
+        }
+        println!();
+
+        // --- PATH ---
+        println!("{}", bold("PATH"));
+        let path_var = env::var("PATH").unwrap_or_default();
+        let path_dirs: Vec<&str> = path_var.split(':').filter(|s| !s.is_empty()).collect();
+        let path_ok = path_dirs.iter().filter(|d| std::path::Path::new(d).is_dir()).count();
+        let path_missing = path_dirs.len() - path_ok;
+        println!("  directories: {} total, {} {}, {} {}",
+            path_dirs.len(),
+            path_ok, green("valid"),
+            path_missing, if path_missing > 0 { red("missing") } else { green("missing") },
+        );
+        println!("  hash table:  {} entries", self.command_hash.len());
+        println!();
+
+        // --- FPATH ---
+        println!("{}", bold("FPATH"));
+        println!("  directories: {}", self.fpath.len());
+        let fpath_ok = self.fpath.iter().filter(|d| d.is_dir()).count();
+        let fpath_missing = self.fpath.len() - fpath_ok;
+        if fpath_missing > 0 {
+            println!("  {} {} missing fpath directories", red("!"), fpath_missing);
+        }
+        println!("  functions:   {} loaded", self.functions.len());
+        println!("  autoload:    {} pending", self.autoload_pending.len());
+        println!();
+
+        // --- SQLite Caches ---
+        println!("{}", bold("SQLite Caches"));
+        if let Some(ref engine) = self.history {
+            let count = engine.count().unwrap_or(0);
+            println!("  history:     {} entries  {}", count, green("OK"));
+        } else {
+            println!("  history:     {}", yellow("not initialized"));
+        }
+
+        if let Some(ref cache) = self.compsys_cache {
+            let count = compsys::cache_entry_count(cache);
+            println!("  compsys:     {} completions  {}", count, green("OK"));
+
+            // Check AST blob coverage
+            if let Ok(missing) = cache.get_autoloads_missing_ast() {
+                if missing.is_empty() {
+                    println!("  ast cache:   {}", green("all functions pre-parsed"));
+                } else {
+                    println!("  ast cache:   {} functions {}", missing.len(), yellow("missing AST blobs"));
+                }
+            }
+        } else {
+            println!("  compsys:     {}", yellow("no cache"));
+        }
+
+        if let Some(ref cache) = self.plugin_cache {
+            let (plugins, functions) = cache.stats();
+            println!("  plugins:     {} plugins, {} cached functions  {}", plugins, functions, green("OK"));
+        } else {
+            println!("  plugins:     {}", yellow("no cache"));
+        }
+        println!();
+
+        // --- Shell State ---
+        println!("{}", bold("Shell State"));
+        println!("  aliases:     {}", self.aliases.len());
+        println!("  global:      {} aliases", self.global_aliases.len());
+        println!("  suffix:      {} aliases", self.suffix_aliases.len());
+        println!("  variables:   {}", self.variables.len());
+        println!("  arrays:      {}", self.arrays.len());
+        println!("  assoc:       {}", self.assoc_arrays.len());
+        println!("  options:     {} set", self.options.iter().filter(|(_, v)| **v).count());
+        println!("  traps:       {} active", self.traps.len());
+        println!("  hooks:       {} registered", self.hook_functions.values().map(|v| v.len()).sum::<usize>());
+        println!();
+
+        // --- Log ---
+        println!("{}", bold("Log"));
+        let log_path = crate::log::log_path();
+        if log_path.exists() {
+            let size = std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0);
+            println!("  {}  {} bytes", log_path.display(), size);
+        } else {
+            println!("  {}", dim("no log file yet"));
+        }
+        println!();
+
+        // --- Profiling ---
+        println!("{}", bold("Profiling"));
+        println!("  chrome tracing: {}", if crate::log::profiling_enabled() { green("enabled") } else { dim("disabled") });
+        println!("  flamegraph:     {}", if crate::log::flamegraph_enabled() { green("enabled") } else { dim("disabled") });
+        println!("  prometheus:     {}", if crate::log::prometheus_enabled() { green("enabled") } else { dim("disabled") });
+        println!();
+
+        0
+    }
+
     /// help - display help for builtins (bash)
     fn builtin_help(&self, args: &[String]) -> i32 {
         if args.is_empty() {
@@ -12487,9 +12638,9 @@ impl ShellExecutor {
                     // Load from cache instead of rescanning
                     if let Ok(result) = compsys::load_from_cache(cache) {
                         if !quiet {
-                            eprintln!(
-                                "compinit: using cached completions ({} comps)",
-                                result.comps.len()
+                            tracing::info!(
+                                comps = result.comps.len(),
+                                "compinit: using cached completions"
                             );
                         }
                         self.assoc_arrays.insert("_comps".to_string(), result.comps);
@@ -12497,6 +12648,48 @@ impl ShellExecutor {
                             .insert("_services".to_string(), result.services);
                         self.assoc_arrays
                             .insert("_patcomps".to_string(), result.patcomps);
+
+                        // Background: fill AST blobs for any autoloads that have body but no ast.
+                        // This populates the cache so subsequent autoload calls skip parsing.
+                        if let Some(ref cache) = self.compsys_cache {
+                            if let Ok(stubs) = cache.get_autoloads_missing_ast() {
+                                if !stubs.is_empty() {
+                                    tracing::info!(
+                                        count = stubs.len(),
+                                        "compinit: backfilling AST blobs on worker pool"
+                                    );
+                                    let cache_path = compsys::cache::default_cache_path();
+                                    self.worker_pool.submit(move || {
+                                        let mut cache = match compsys::cache::CompsysCache::open(&cache_path) {
+                                            Ok(c) => c,
+                                            Err(_) => return,
+                                        };
+                                        let mut ast_entries: Vec<(String, Vec<u8>)> = Vec::new();
+                                        for (name, body) in &stubs {
+                                            let mut parser = crate::parser::ShellParser::new(body);
+                                            if let Ok(commands) = parser.parse_script() {
+                                                if !commands.is_empty() {
+                                                    if let Ok(blob) = bincode::serialize(&commands) {
+                                                        ast_entries.push((name.clone(), blob));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        let count = ast_entries.len();
+                                        if let Err(e) = cache.set_autoload_asts_bulk(&mut ast_entries) {
+                                            tracing::warn!(error = %e, "compinit: AST backfill failed");
+                                        } else {
+                                            tracing::info!(
+                                                cached = count,
+                                                total = stubs.len(),
+                                                "compinit: AST backfill complete"
+                                            );
+                                        }
+                                    });
+                                }
+                            }
+                        }
+
                         return 0;
                     }
                 }
@@ -12550,6 +12743,45 @@ impl ShellExecutor {
                     ms = result.scan_time_ms,
                     "compinit: background scan complete"
                 );
+
+                // Pre-parse all function bodies and cache AST blobs.
+                // On subsequent autoload calls, we deserialize instead of re-parsing.
+                let parse_start = std::time::Instant::now();
+                let mut ast_entries: Vec<(String, Vec<u8>)> = Vec::new();
+                let mut parse_ok = 0usize;
+                let mut parse_fail = 0usize;
+                let mut no_body = 0usize;
+                for file in &result.files {
+                    if let Some(ref body) = file.body {
+                        let mut parser = crate::parser::ShellParser::new(body);
+                        match parser.parse_script() {
+                            Ok(commands) if !commands.is_empty() => {
+                                if let Ok(blob) = bincode::serialize(&commands) {
+                                    ast_entries.push((file.name.clone(), blob));
+                                    parse_ok += 1;
+                                }
+                            }
+                            Ok(_) => { parse_fail += 1; } // empty parse
+                            Err(_) => { parse_fail += 1; }
+                        }
+                    } else {
+                        no_body += 1;
+                    }
+                }
+                let parsed_count = ast_entries.len();
+                if let Err(e) = cache.set_autoload_asts_bulk(&mut ast_entries) {
+                    tracing::warn!(error = %e, "compinit: failed to cache AST blobs");
+                } else {
+                    tracing::info!(
+                        cached = parsed_count,
+                        parsed = parse_ok,
+                        failed = parse_fail,
+                        no_body = no_body,
+                        total = result.files.len(),
+                        ms = parse_start.elapsed().as_millis() as u64,
+                        "compinit: AST blobs cached"
+                    );
+                }
 
                 let _ = tx.send(CompInitBgResult { result, cache });
             });
@@ -12616,7 +12848,7 @@ impl ShellExecutor {
                 // Valid dump - source it to load _comps
                 // For now, just rescan (proper impl would source the dump file)
                 if !quiet {
-                    eprintln!("compinit: .zcompdump valid, rescanning for compat");
+                    tracing::info!("compinit: .zcompdump valid, rescanning for compat");
                 }
             }
         }
@@ -12625,12 +12857,12 @@ impl ShellExecutor {
         let result = compsys::compinit(&self.fpath);
 
         if !quiet {
-            eprintln!(
-                "compinit: {} functions, {} comps in {} dirs ({} ms)",
-                result.files_scanned,
-                result.comps.len(),
-                result.dirs_scanned,
-                result.scan_time_ms
+            tracing::info!(
+                functions = result.files_scanned,
+                comps = result.comps.len(),
+                dirs = result.dirs_scanned,
+                ms = result.scan_time_ms,
+                "compinit: fpath scan complete"
             );
         }
 

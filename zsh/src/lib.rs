@@ -26,6 +26,7 @@ pub mod compiler;
 pub mod clone;
 pub mod compat;
 pub mod completion;
+pub mod config;
 pub mod cond;
 pub mod context;
 pub mod curses;

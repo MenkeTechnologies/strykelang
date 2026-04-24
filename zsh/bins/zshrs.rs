@@ -48,10 +48,18 @@ fn print_help() {
 Special options:
   --help       show this message, then exit
   --version    show zsh version number, then exit
+  --doctor     full diagnostic report of shell health, caches, and performance
   --zsh-compat enable zsh compatibility mode (use .zcompdump, fpath scanning)
+  --posix      POSIX strict mode (no SQLite, no worker pool, no zsh extensions)
   -b           end option processing, like --
   -c           take first argument as a command to execute
+  -f           equivalent to --no-rcs (don't source startup files)
+  -i           force interactive mode
+  -l           force login shell mode
+  -s           read commands from stdin
   -o OPTION    set an option by name (see below)
+  -v           verbose (equivalent to --verbose)
+  -x           xtrace (equivalent to --xtrace)
 
 Normal options are named.  An option may be turned on by
 `-o OPTION', `--OPTION', `+o no_OPTION' or `+-no-OPTION'.  An
@@ -1475,7 +1483,7 @@ fn run_interactive() {
             Ok(engine) => {
                 let count = engine.count().unwrap_or(0);
                 if count > 0 {
-                    eprintln!("Loaded {} history entries", count);
+                    tracing::info!(entries = count, "history loaded");
                 }
                 Some(std::sync::Arc::new(std::sync::Mutex::new(engine)))
             }

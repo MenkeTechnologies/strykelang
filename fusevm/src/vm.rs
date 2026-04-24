@@ -816,13 +816,6 @@ impl VM {
                     // TODO: builtin registry
                 }
 
-                // ── Remaining ops — no-op stubs ──
-                Op::LogAnd | Op::LogOr => {
-                    // Non-short-circuit versions — use JumpIfTrueKeep/FalseKeep instead
-                    let b = self.pop();
-                    let a = self.pop();
-                    self.push(Value::Bool(a.is_truthy() && b.is_truthy()));
-                }
             }
         }
 
