@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reverse bits (Manual)
+
+fn my_reverse_bits($n, $bits) {
+    my $res = 0
+    for my $i (1..$bits) {
+        $res = ($res << 1) | ($n & 1)
+        $n = $n >> 1
+    }
+    $res
+}
+
+assert_eq my_reverse_bits(1, 8), 128, "reverse 1 (8 bits) is 128"
+assert_eq my_reverse_bits(170, 8), 85, "reverse 170 (10101010) is 85 (01010101)"
+
+test_run

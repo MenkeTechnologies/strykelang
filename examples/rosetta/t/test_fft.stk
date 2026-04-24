@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fast Fourier Transform
+
+fn c_add($a, $b) { [$a->[0] + $b->[0], $a->[1] + $b->[1]] }
+fn c_sub($a, $b) { [$a->[0] - $b->[0], $a->[1] - $b->[1]] }
+fn c_mul($a, $b) { [$a->[0] * $b->[0] - $a->[1] * $b->[1], $a->[0] * $b->[1] + $a->[1] * $b->[0]] }
+
+fn fft($x) {
+    my $n = scalar(@$x)
+    if ($n <= 1) { return $x }
+    
+    my @even; my @odd
+    for my $i (0..$n/2-1) {
+        push @even, $x->[2*$i]
+        push @odd, $x->[2*$i+1]
+    }
+    
+    my $e = fft(\@even)
+    my $o = fft(\@odd)
+    
+    my @res
+    for my $k (0..$n/2-1) {
+        my $t_angle = -2 * 3.1415926535 * $k / $n
+        my $twiddle = [cos($t_angle), sin($t_angle)]
+        my $t = c_mul($twiddle, $o->[$k])
+        $res[$k] = c_add($e->[$k], $t)
+        $res[$k + $n/2] = c_sub($e->[$k], $t)
+    }
+    \@res
+}
+
+# Unit impulse [1, 0, 0, 0] should result in [1, 1, 1, 1] (all re=1, im=0)
+my $input = [[1,0], [0,0], [0,0], [0,0]]
+my $res = fft($input)
+
+assert_ok abs($res->[0]->[0] - 1.0) < 0.0001, "fft[0] re is 1"
+assert_ok abs($res->[1]->[0] - 1.0) < 0.0001, "fft[1] re is 1"
+assert_ok abs($res->[2]->[0] - 1.0) < 0.0001, "fft[2] re is 1"
+assert_ok abs($res->[3]->[0] - 1.0) < 0.0001, "fft[3] re is 1"
+
+test_run

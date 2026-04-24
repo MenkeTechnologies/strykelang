@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Permutations by swapping (Steinhaus-Johnson-Trotter)
+
+fn perms_swapping($n) {
+    my @p = (0..$n-1)
+    my @dir
+    for my $i (0..$n-1) { push @dir, -1 } # -1 is left, 1 is right
+    
+    my @res
+    push @res, [@p]
+    
+    while (1) {
+        my $mi = -1
+        my $mv = -1
+        for my $i (0..$n-1) {
+            my $ni = $i + $dir[$i]
+            if ($ni >= 0 && $ni < $n && $p[$i] > $p[$ni]) {
+                if ($p[$i] > $mv) {
+                    $mi = $i
+                    $mv = $p[$i]
+                }
+            }
+        }
+        
+        if ($mi == -1) { last }
+        
+        my $ni = $mi + $dir[$mi]
+        ($p[$mi], $p[$ni]) = ($p[$ni], $p[$mi])
+        ($dir[$mi], $dir[$ni]) = ($dir[$ni], $dir[$mi])
+        
+        for my $i (0..$n-1) {
+            if ($p[$i] > $mv) { $dir[$i] = 0 - $dir[$i] }
+        }
+        
+        push @res, [@p]
+    }
+    \@res
+}
+
+my $p3 = perms_swapping(3)
+assert_eq scalar(@$p3), 6, "3! = 6 perms"
+
+# Steinhaus-Johnson-Trotter properties:
+# Each permutation differs from previous by 1 swap.
+for my $i (1..scalar(@$p3)-1) {
+    my $prev = $p3->[$i-1]
+    my $curr = $p3->[$i]
+    my $diff = 0
+    for my $j (0..2) { if ($prev->[$j] != $curr->[$j]) { $diff = $diff + 1 } }
+    assert_eq $diff, 2, "perm $i differs by exactly 1 swap"
+}
+
+test_run

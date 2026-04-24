@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Markov Chain Text Generator
+
+fn build_markov($text) {
+    my @words = split(" ", $text)
+    my %chain
+    for my $i (0..scalar(@words)-2) {
+        my $w1 = $words[$i]
+        my $w2 = $words[$i+1]
+        if (!exists $chain{$w1}) { $chain{$w1} = [] }
+        push @{$chain{$w1}}, $w2
+    }
+    \%chain
+}
+
+fn gen_text($chain, $start, $len) {
+    my $curr = $start
+    my @res = ($curr)
+    for my $i (1..$len-1) {
+        if (!exists $chain->{$curr}) { last }
+        my $opts = $chain->{$curr}
+        $curr = $opts->[int(rand(scalar(@$opts)))]
+        push @res, $curr
+    }
+    join(" ", @res)
+}
+
+my $input = "the quick brown fox jumps over the lazy dog and the quick cat"
+my $chain = build_markov($input)
+
+my $gen = gen_text($chain, "the", 5)
+assert_eq scalar(split(" ", $gen)), 5, "generated 5 words"
+assert_ok $gen =~ /^the/, "starts with the"
+
+test_run

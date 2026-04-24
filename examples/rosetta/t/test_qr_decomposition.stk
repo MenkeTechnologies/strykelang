@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: QR Decomposition
+
+fn dot($v1, $v2) {
+    my $sum = 0.0
+    for my $i (0..scalar(@$v1)-1) { $sum = $sum + $v1->[$i] * $v2->[$i] }
+    $sum
+}
+
+fn my_qr($A) {
+    my $rows = scalar(@$A)
+    my $cols = scalar(@{$A->[0]})
+    my @Q; my @R
+    
+    # Initialize R
+    for my $i (0..$cols-1) {
+        my @row
+        for my $j (0..$cols-1) { push @row, 0.0 }
+        push @R, \@row
+    }
+    
+    # Orthogonalization
+    my @u
+    for my $j (0..$cols-1) {
+        my @v
+        for my $i (0..$rows-1) { push @v, $A->[$i]->[$j] }
+        
+        for my $i (0..$j-1) {
+            my $ui = $u[$i]
+            $R[$i]->[$j] = dot($ui, \@v)
+            for my $k (0..$rows-1) { $v[$k] = $v[$k] - $R[$i]->[$j] * $ui->[$k] }
+        }
+        
+        $R[$j]->[$j] = sqrt(dot(\@v, \@v))
+        my @q_col
+        for my $k (0..$rows-1) { push @q_col, $v[$k] / $R[$j]->[$j] }
+        push @u, \@q_col
+    }
+    
+    # Q is built from u columns
+    for my $i (0..$rows-1) {
+        my @row
+        for my $j (0..$cols-1) { push @row, $u[$j]->[$i] }
+        push @Q, \@row
+    }
+    
+    (\@Q, \@R)
+}
+
+my $A = [[12, -51, 4], [6, 167, -68], [-4, 24, -41]]
+my ($Q, $R) = my_qr($A)
+
+# Check R diagonal
+assert_ok abs($R->[0]->[0] - 14.0) < 0.0001, "R[0][0] is 14"
+assert_ok abs($R->[1]->[1] - 175.0) < 0.0001, "R[1][1] is 175"
+
+test_run

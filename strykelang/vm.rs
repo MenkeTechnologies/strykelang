@@ -5318,6 +5318,18 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
 
+                    Op::ReadIntoVar(name_idx) => {
+                        let length = self.pop().to_int() as usize;
+                        let fh_val = self.pop();
+                        let name = &names[*name_idx as usize];
+                        let line = self.line();
+                        let result = vm_interp_result(
+                            self.interp.builtin_read_into(fh_val, name, length, line),
+                            line,
+                        )?;
+                        self.push(result);
+                        Ok(())
+                    }
                     Op::ChompInPlace(lvalue_idx) => {
                         let val = self.pop();
                         let target = &self.lvalues[*lvalue_idx as usize];
@@ -5516,22 +5528,17 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::MakeArrayBindingRef(name_idx) => {
-                        let name = &names[*name_idx as usize];
-                        // Snapshot the array data so the ref survives scope pop.
-                        // Binding refs by name break when the scope-local array is destroyed.
-                        let data = self.interp.scope.get_array(name);
-                        self.push(PerlValue::array_ref(Arc::new(
-                            parking_lot::RwLock::new(data),
-                        )));
+                        let name = names[*name_idx as usize].clone();
+                        // Use a name-based binding ref so mutations through the ref
+                        // (push, store) hit the live scope binding, not a snapshot.
+                        // resolve_binding_ref snapshots at ReturnValue when the scope
+                        // is about to be destroyed.
+                        self.push(PerlValue::array_binding_ref(name));
                         Ok(())
                     }
                     Op::MakeHashBindingRef(name_idx) => {
-                        let name = &names[*name_idx as usize];
-                        // Snapshot hash data so the ref survives scope pop.
-                        let data = self.interp.scope.get_hash(name);
-                        self.push(PerlValue::hash_ref(Arc::new(
-                            parking_lot::RwLock::new(data),
-                        )));
+                        let name = names[*name_idx as usize].clone();
+                        self.push(PerlValue::hash_binding_ref(name));
                         Ok(())
                     }
                     Op::MakeArrayRefAlias => {

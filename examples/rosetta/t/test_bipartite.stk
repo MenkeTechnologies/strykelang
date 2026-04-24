@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bipartite Graph Check
+
+fn is_bipartite($adj) {
+    my %color
+    for my $start (keys %$adj) {
+        next if exists $color{$start}
+        my @q = ([$start, 0])
+        $color{$start} = 0
+        while (scalar @q) {
+            my $curr = shift @q
+            my ($u, $c) = @$curr
+            for my $v (@{$adj->{$u}}) {
+                if (!exists $color{$v}) {
+                    $color{$v} = 1 - $c
+                    push @q, [$v, 1 - $c]
+                } elsif ($color{$v} == $c) { return 0 }
+            }
+        }
+    }
+    1
+}
+
+my $g1 = { A => ["B"], B => ["A", "C"], C => ["B"] }
+assert_ok is_bipartite($g1), "path is bipartite"
+my $g2 = { A => ["B", "C"], B => ["A", "C"], C => ["A", "B"] }
+assert_ok !is_bipartite($g2), "triangle not bipartite"
+test_run

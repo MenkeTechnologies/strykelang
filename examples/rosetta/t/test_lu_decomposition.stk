@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: LU Decomposition
+
+fn my_lu($A) {
+    my $n = scalar(@$A)
+    my @L; my @U
+    for my $i (0..$n-1) {
+        my @l_row; my @u_row
+        for my $j (0..$n-1) {
+            push @l_row, ($i == $j ? 1.0 : 0.0)
+            push @u_row, 0.0
+        }
+        push @L, \@l_row
+        push @U, \@u_row
+    }
+    
+    for my $j (0..$n-1) {
+        for my $i (0..$j) {
+            my $sum = 0.0
+            for my $k (0..$i-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
+            $U[$i]->[$j] = $A->[$i]->[$j] - $sum
+        }
+        for my $i ($j+1..$n-1) {
+            my $sum = 0.0
+            for my $k (0..$j-1) { $sum = $sum + $L[$i]->[$k] * $U[$k]->[$j] }
+            $L[$i]->[$j] = ($A->[$i]->[$j] - $sum) / $U[$j]->[$j]
+        }
+    }
+    (\@L, \@U)
+}
+
+my $A = [[1, 3, 5], [2, 4, 7], [1, 1, 0]]
+my ($L, $U) = my_lu($A)
+
+# A = LU =>
+# L[1][0] should be 2.0
+# U[0][0] should be 1.0
+assert_eq $L->[1]->[0], 2, "L[1][0] is 2"
+assert_eq $U->[0]->[0], 1, "U[0][0] is 1"
+assert_eq $U->[1]->[1], -2, "U[1][1] is -2"
+
+test_run

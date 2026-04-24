@@ -71,23 +71,16 @@ impl ShellCompiler {
     fn compile_command(&mut self, cmd: &ShellCommand) {
         match cmd {
             ShellCommand::Simple(simple) => {
-                // TODO: lower simple commands to Exec ops
-                // For now, emit a no-op placeholder
-                let _ = simple;
+                self.compile_simple(simple);
             }
             ShellCommand::Compound(compound) => {
                 self.compile_compound(compound);
             }
-            ShellCommand::Pipeline(cmds, _negated) => {
-                // TODO: lower pipelines
-                for cmd in cmds {
-                    self.compile_command(cmd);
-                }
+            ShellCommand::Pipeline(cmds, negated) => {
+                self.compile_pipeline(cmds, *negated);
             }
             ShellCommand::List(items) => {
-                for (cmd, _op) in items {
-                    self.compile_command(cmd);
-                }
+                self.compile_list(items);
             }
             ShellCommand::FunctionDef(name, body) => {
                 // Register function: jump past body, record entry point
@@ -101,6 +94,183 @@ impl ShellCompiler {
                 self.builder.emit(Op::Return, 0);
                 let after = self.builder.current_pos();
                 self.builder.patch_jump(skip_jump, after);
+            }
+        }
+    }
+
+    /// Compile a simple command: assignments + words + redirects.
+    ///
+    /// Layout:
+    ///   - Assignments: SetVar for each VAR=val
+    ///   - If no words: done (bare assignment)
+    ///   - If words: push each word, emit Exec(argc)
+    ///   - Redirects: emit Redirect ops before Exec
+    fn compile_simple(&mut self, simple: &crate::parser::SimpleCommand) {
+        // Assignments: VAR=value
+        for (var, val, _is_append) in &simple.assignments {
+            self.compile_word(val);
+            let var_idx = self.builder.add_name(var);
+            self.builder.emit(Op::SetVar(var_idx), 0);
+        }
+
+        if simple.words.is_empty() {
+            return; // bare assignment, no command
+        }
+
+        // Redirects before command
+        for redir in &simple.redirects {
+            let fd = redir.fd.unwrap_or(match redir.op {
+                crate::parser::RedirectOp::Read
+                | crate::parser::RedirectOp::HereDoc
+                | crate::parser::RedirectOp::HereString
+                | crate::parser::RedirectOp::ReadWrite => 0,
+                _ => 1,
+            }) as u8;
+
+            let op_byte = match redir.op {
+                crate::parser::RedirectOp::Write => fusevm::op::redirect_op::WRITE,
+                crate::parser::RedirectOp::Append => fusevm::op::redirect_op::APPEND,
+                crate::parser::RedirectOp::Read => fusevm::op::redirect_op::READ,
+                crate::parser::RedirectOp::ReadWrite => fusevm::op::redirect_op::READ_WRITE,
+                crate::parser::RedirectOp::Clobber => fusevm::op::redirect_op::CLOBBER,
+                crate::parser::RedirectOp::DupRead => fusevm::op::redirect_op::DUP_READ,
+                crate::parser::RedirectOp::DupWrite => fusevm::op::redirect_op::DUP_WRITE,
+                crate::parser::RedirectOp::WriteBoth => fusevm::op::redirect_op::WRITE_BOTH,
+                crate::parser::RedirectOp::AppendBoth => fusevm::op::redirect_op::APPEND_BOTH,
+                crate::parser::RedirectOp::HereDoc => {
+                    // HereDoc: content goes to stdin via constant pool
+                    if let Some(ref content) = redir.heredoc_content {
+                        let idx = self.builder.add_constant(Value::str(content.as_str()));
+                        self.builder.emit(Op::HereDoc(idx), 0);
+                    }
+                    continue;
+                }
+                crate::parser::RedirectOp::HereString => {
+                    self.compile_word(&redir.target);
+                    self.builder.emit(Op::HereString, 0);
+                    continue;
+                }
+            };
+
+            self.compile_word(&redir.target);
+            self.builder.emit(Op::Redirect(fd, op_byte), 0);
+        }
+
+        // Push command words onto stack
+        let argc = simple.words.len() as u8;
+        for word in &simple.words {
+            self.compile_word(word);
+        }
+
+        // Exec: pop argc words, spawn command, push exit status
+        self.builder.emit(Op::Exec(argc), 0);
+        self.builder.emit(Op::SetStatus, 0);
+    }
+
+    /// Compile a pipeline: cmd1 | cmd2 | cmd3
+    ///
+    /// Layout:
+    ///   PipelineBegin(N)
+    ///   <compile cmd1>
+    ///   PipelineStage
+    ///   <compile cmd2>
+    ///   PipelineStage
+    ///   <compile cmdN>
+    ///   PipelineEnd        ; waits for all, pushes last status
+    fn compile_pipeline(
+        &mut self,
+        cmds: &[ShellCommand],
+        negated: bool,
+    ) {
+        if cmds.len() == 1 {
+            // Single command, no pipe needed
+            self.compile_command(&cmds[0]);
+            if negated {
+                self.builder.emit(Op::GetStatus, 0);
+                self.builder.emit(Op::LoadInt(0), 0);
+                self.builder.emit(Op::NumEq, 0);
+                // true→0 (was success, now fail), false→1
+                let was_zero = self.builder.emit(Op::JumpIfTrue(0), 0);
+                self.builder.emit(Op::LoadInt(0), 0);
+                self.builder.emit(Op::SetStatus, 0);
+                let end = self.builder.emit(Op::Jump(0), 0);
+                let t = self.builder.current_pos();
+                self.builder.patch_jump(was_zero, t);
+                self.builder.emit(Op::LoadInt(1), 0);
+                self.builder.emit(Op::SetStatus, 0);
+                let e = self.builder.current_pos();
+                self.builder.patch_jump(end, e);
+            }
+            return;
+        }
+
+        let n = cmds.len() as u8;
+        self.builder.emit(Op::PipelineBegin(n), 0);
+
+        for (i, cmd) in cmds.iter().enumerate() {
+            self.compile_command(cmd);
+            if i < cmds.len() - 1 {
+                self.builder.emit(Op::PipelineStage, 0);
+            }
+        }
+
+        self.builder.emit(Op::PipelineEnd, 0);
+        self.builder.emit(Op::SetStatus, 0);
+
+        if negated {
+            self.builder.emit(Op::GetStatus, 0);
+            self.builder.emit(Op::LoadInt(0), 0);
+            self.builder.emit(Op::NumEq, 0);
+            let was_zero = self.builder.emit(Op::JumpIfTrue(0), 0);
+            self.builder.emit(Op::LoadInt(0), 0);
+            self.builder.emit(Op::SetStatus, 0);
+            let end = self.builder.emit(Op::Jump(0), 0);
+            let t = self.builder.current_pos();
+            self.builder.patch_jump(was_zero, t);
+            self.builder.emit(Op::LoadInt(1), 0);
+            self.builder.emit(Op::SetStatus, 0);
+            let e = self.builder.current_pos();
+            self.builder.patch_jump(end, e);
+        }
+    }
+
+    /// Compile a list: cmd1 && cmd2 || cmd3 ; cmd4 & cmd5
+    fn compile_list(&mut self, items: &[(ShellCommand, crate::parser::ListOp)]) {
+        for (i, (cmd, op)) in items.iter().enumerate() {
+            match op {
+                crate::parser::ListOp::And => {
+                    // cmd1 && cmd2: run cmd2 only if cmd1 succeeds
+                    self.compile_command(cmd);
+                    if i + 1 < items.len() {
+                        self.builder.emit(Op::GetStatus, 0);
+                        let skip = self.builder.emit(Op::JumpIfTrue(0), 0);
+                        // Status 0 = success, nonzero = skip next
+                        // JumpIfTrue skips when status > 0 (failure)
+                        self.compile_command(&items[i + 1].0);
+                        self.builder.patch_jump(skip, self.builder.current_pos());
+                    }
+                }
+                crate::parser::ListOp::Or => {
+                    // cmd1 || cmd2: run cmd2 only if cmd1 fails
+                    self.compile_command(cmd);
+                    if i + 1 < items.len() {
+                        self.builder.emit(Op::GetStatus, 0);
+                        let skip = self.builder.emit(Op::JumpIfFalse(0), 0);
+                        // JumpIfFalse skips when status == 0 (success)
+                        self.compile_command(&items[i + 1].0);
+                        self.builder.patch_jump(skip, self.builder.current_pos());
+                    }
+                }
+                crate::parser::ListOp::Semi => {
+                    // Sequential: just compile
+                    self.compile_command(cmd);
+                }
+                crate::parser::ListOp::Amp => {
+                    self.compile_command(cmd);
+                }
+                crate::parser::ListOp::Newline => {
+                    self.compile_command(cmd);
+                }
             }
         }
     }
@@ -1655,7 +1825,6 @@ mod tests {
     #[test]
     fn test_repeat_loop() {
         use crate::parser::CompoundCommand;
-        // repeat 5; do (( count = count + 1 )); done
         let cmd = ShellCommand::Compound(CompoundCommand::Repeat {
             count: "5".to_string(),
             body: vec![ShellCommand::Compound(CompoundCommand::Arith(
@@ -1667,5 +1836,477 @@ mod tests {
         let mut vm = VM::new(chunk);
         let _ = vm.run();
         assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_simple_command_compiles() {
+        use crate::parser::SimpleCommand;
+        // echo hello world → Exec(3)
+        let cmd = ShellCommand::Simple(SimpleCommand {
+            assignments: vec![],
+            words: vec![
+                ShellWord::Literal("echo".to_string()),
+                ShellWord::Literal("hello".to_string()),
+                ShellWord::Literal("world".to_string()),
+            ],
+            redirects: vec![],
+        });
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_exec = chunk.ops.iter().any(|op| matches!(op, Op::Exec(3)));
+        assert!(has_exec, "expected Exec(3) for 'echo hello world'");
+    }
+
+    #[test]
+    fn test_assignment_compiles() {
+        use crate::parser::SimpleCommand;
+        // X=42 (bare assignment, no command)
+        let cmd = ShellCommand::Simple(SimpleCommand {
+            assignments: vec![("X".to_string(), ShellWord::Literal("42".to_string()), false)],
+            words: vec![],
+            redirects: vec![],
+        });
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_set = chunk.ops.iter().any(|op| matches!(op, Op::SetVar(_)));
+        assert!(has_set, "expected SetVar for assignment");
+    }
+
+    #[test]
+    fn test_pipeline_compiles() {
+        use crate::parser::SimpleCommand;
+        // ls | grep foo → PipelineBegin(2) ... PipelineEnd
+        let cmds = vec![
+            ShellCommand::Simple(SimpleCommand {
+                assignments: vec![],
+                words: vec![ShellWord::Literal("ls".to_string())],
+                redirects: vec![],
+            }),
+            ShellCommand::Simple(SimpleCommand {
+                assignments: vec![],
+                words: vec![
+                    ShellWord::Literal("grep".to_string()),
+                    ShellWord::Literal("foo".to_string()),
+                ],
+                redirects: vec![],
+            }),
+        ];
+        let cmd = ShellCommand::Pipeline(cmds, false);
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_begin = chunk.ops.iter().any(|op| matches!(op, Op::PipelineBegin(2)));
+        let has_end = chunk.ops.iter().any(|op| matches!(op, Op::PipelineEnd));
+        let has_stage = chunk.ops.iter().any(|op| matches!(op, Op::PipelineStage));
+        assert!(has_begin, "expected PipelineBegin(2)");
+        assert!(has_stage, "expected PipelineStage");
+        assert!(has_end, "expected PipelineEnd");
+    }
+
+    #[test]
+    fn test_redirect_compiles() {
+        use crate::parser::{Redirect, RedirectOp, SimpleCommand};
+        // echo hi > /tmp/out
+        let cmd = ShellCommand::Simple(SimpleCommand {
+            assignments: vec![],
+            words: vec![
+                ShellWord::Literal("echo".to_string()),
+                ShellWord::Literal("hi".to_string()),
+            ],
+            redirects: vec![Redirect {
+                fd: None,
+                op: RedirectOp::Write,
+                target: ShellWord::Literal("/tmp/out".to_string()),
+                heredoc_content: None,
+                fd_var: None,
+            }],
+        });
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_redirect = chunk.ops.iter().any(|op| matches!(op, Op::Redirect(1, 0))); // fd=1, WRITE=0
+        assert!(has_redirect, "expected Redirect(1, 0) for > /tmp/out");
+    }
+
+    #[test]
+    fn test_heredoc_compiles() {
+        use crate::parser::{Redirect, RedirectOp, SimpleCommand};
+        // cat <<EOF\nhello\nEOF
+        let cmd = ShellCommand::Simple(SimpleCommand {
+            assignments: vec![],
+            words: vec![ShellWord::Literal("cat".to_string())],
+            redirects: vec![Redirect {
+                fd: None,
+                op: RedirectOp::HereDoc,
+                target: ShellWord::Literal("EOF".to_string()),
+                heredoc_content: Some("hello\n".to_string()),
+                fd_var: None,
+            }],
+        });
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_heredoc = chunk.ops.iter().any(|op| matches!(op, Op::HereDoc(_)));
+        assert!(has_heredoc, "expected HereDoc op");
+    }
+
+    #[test]
+    fn test_case_compiles() {
+        use crate::parser::CompoundCommand;
+        // case x in a) ;; b) ;; esac
+        let cmd = ShellCommand::Compound(CompoundCommand::Case {
+            word: ShellWord::Literal("hello".to_string()),
+            cases: vec![
+                (
+                    vec![ShellWord::Literal("hello".to_string())],
+                    vec![ShellCommand::Compound(CompoundCommand::Arith("result = 1".to_string()))],
+                    CaseTerminator::Break,
+                ),
+                (
+                    vec![ShellWord::Literal("world".to_string())],
+                    vec![ShellCommand::Compound(CompoundCommand::Arith("result = 2".to_string()))],
+                    CaseTerminator::Break,
+                ),
+            ],
+        });
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        // Should have StrEq for pattern matching
+        let has_streq = chunk.ops.iter().any(|op| matches!(op, Op::StrEq));
+        assert!(has_streq, "expected StrEq for case pattern");
+    }
+
+    #[test]
+    fn test_cond_file_test() {
+        use crate::parser::CompoundCommand;
+        // [[ -f /etc/passwd ]]
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(CondExpr::FileRegular(
+            ShellWord::Literal("/etc/passwd".to_string()),
+        )));
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_test = chunk.ops.iter().any(|op| matches!(op, Op::TestFile(0))); // IS_FILE = 0
+        assert!(has_test, "expected TestFile(IS_FILE)");
+    }
+
+    #[test]
+    fn test_cond_string_compare() {
+        use crate::parser::CompoundCommand;
+        // [[ "abc" == "abc" ]]
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(CondExpr::StringEqual(
+            ShellWord::Literal("abc".to_string()),
+            ShellWord::Literal("abc".to_string()),
+        )));
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_streq = chunk.ops.iter().any(|op| matches!(op, Op::StrEq));
+        assert!(has_streq, "expected StrEq for string comparison");
+    }
+
+    #[test]
+    fn test_cond_logical() {
+        use crate::parser::CompoundCommand;
+        // [[ -f /etc/passwd && -d /tmp ]]
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(CondExpr::And(
+            Box::new(CondExpr::FileRegular(ShellWord::Literal("/etc/passwd".to_string()))),
+            Box::new(CondExpr::FileDirectory(ShellWord::Literal("/tmp".to_string()))),
+        )));
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_short_circuit = chunk
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::JumpIfFalseKeep(_)));
+        assert!(has_short_circuit, "expected short-circuit && in [[ ]]");
+    }
+
+    #[test]
+    fn test_list_and_or() {
+        use crate::parser::{ListOp, SimpleCommand};
+        // true && echo yes
+        let items = vec![
+            (
+                ShellCommand::Compound(CompoundCommand::Arith("1".to_string())),
+                ListOp::And,
+            ),
+            (
+                ShellCommand::Simple(SimpleCommand {
+                    assignments: vec![],
+                    words: vec![
+                        ShellWord::Literal("echo".to_string()),
+                        ShellWord::Literal("yes".to_string()),
+                    ],
+                    redirects: vec![],
+                }),
+                ListOp::Semi,
+            ),
+        ];
+        let cmd = ShellCommand::List(items);
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        let has_get_status = chunk.ops.iter().any(|op| matches!(op, Op::GetStatus));
+        assert!(has_get_status, "expected GetStatus for && list");
+    }
+
+    #[test]
+    fn test_function_def_compiles() {
+        // myfunc() { (( x = 42 )) }
+        let cmd = ShellCommand::FunctionDef(
+            "myfunc".to_string(),
+            Box::new(ShellCommand::Compound(CompoundCommand::Arith(
+                "x = 42".to_string(),
+            ))),
+        );
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(&[cmd]);
+        assert!(!chunk.sub_entries.is_empty(), "expected sub entry for function");
+        let has_return = chunk.ops.iter().any(|op| matches!(op, Op::Return));
+        assert!(has_return, "expected Return in function body");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Execution tests — actually run compiled bytecodes on fusevm
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Helper: compile and run shell commands, return VM
+    fn compile_and_run(commands: &[ShellCommand]) -> VM {
+        let compiler = ShellCompiler::new();
+        let chunk = compiler.compile(commands);
+        let mut vm = VM::new(chunk);
+        let _ = vm.run();
+        vm
+    }
+
+    #[test]
+    fn test_exec_file_test_exists() {
+        use crate::parser::CompoundCommand;
+        // [[ -e /tmp ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::FileExists(ShellWord::Literal("/tmp".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0, "/tmp should exist");
+    }
+
+    #[test]
+    fn test_exec_file_test_not_exists() {
+        use crate::parser::CompoundCommand;
+        // [[ -e /nonexistent_path_xyz ]] → status 1
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::FileExists(ShellWord::Literal("/nonexistent_path_xyz".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1, "/nonexistent should not exist");
+    }
+
+    #[test]
+    fn test_exec_file_is_dir() {
+        use crate::parser::CompoundCommand;
+        // [[ -d /tmp ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::FileDirectory(ShellWord::Literal("/tmp".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0, "/tmp should be a directory");
+    }
+
+    #[test]
+    fn test_exec_file_is_regular() {
+        use crate::parser::CompoundCommand;
+        // [[ -f /etc/hosts ]] → status 0 (exists on macOS/Linux)
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::FileRegular(ShellWord::Literal("/etc/hosts".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0, "/etc/hosts should be a regular file");
+    }
+
+    #[test]
+    fn test_exec_string_equal() {
+        use crate::parser::CompoundCommand;
+        // [[ "abc" == "abc" ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::StringEqual(
+                ShellWord::Literal("abc".to_string()),
+                ShellWord::Literal("abc".to_string()),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_exec_string_not_equal() {
+        use crate::parser::CompoundCommand;
+        // [[ "abc" == "xyz" ]] → status 1
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::StringEqual(
+                ShellWord::Literal("abc".to_string()),
+                ShellWord::Literal("xyz".to_string()),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
+    }
+
+    #[test]
+    fn test_exec_string_empty() {
+        use crate::parser::CompoundCommand;
+        // [[ -z "" ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::StringEmpty(ShellWord::Literal("".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+
+        // [[ -z "notempty" ]] → status 1
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::StringEmpty(ShellWord::Literal("notempty".to_string())),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
+    }
+
+    #[test]
+    fn test_exec_cond_and() {
+        use crate::parser::CompoundCommand;
+        // [[ -d /tmp && -e /tmp ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::And(
+                Box::new(CondExpr::FileDirectory(ShellWord::Literal("/tmp".to_string()))),
+                Box::new(CondExpr::FileExists(ShellWord::Literal("/tmp".to_string()))),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_exec_cond_and_short_circuit() {
+        use crate::parser::CompoundCommand;
+        // [[ -f /nonexistent && -d /tmp ]] → status 1 (short-circuits on first)
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::And(
+                Box::new(CondExpr::FileRegular(ShellWord::Literal("/nonexistent".to_string()))),
+                Box::new(CondExpr::FileDirectory(ShellWord::Literal("/tmp".to_string()))),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
+    }
+
+    #[test]
+    fn test_exec_cond_or() {
+        use crate::parser::CompoundCommand;
+        // [[ -f /nonexistent || -d /tmp ]] → status 0 (second is true)
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::Or(
+                Box::new(CondExpr::FileRegular(ShellWord::Literal("/nonexistent".to_string()))),
+                Box::new(CondExpr::FileDirectory(ShellWord::Literal("/tmp".to_string()))),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_exec_cond_not() {
+        use crate::parser::CompoundCommand;
+        // [[ ! -f /nonexistent ]] → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::Not(Box::new(CondExpr::FileRegular(
+                ShellWord::Literal("/nonexistent".to_string()),
+            ))),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_exec_if_true_branch() {
+        use crate::parser::CompoundCommand;
+        // if (( 1 )); then (( result = 42 )); else (( result = 99 )); fi
+        // Since (( 1 )) sets status=0, true branch runs
+        let cmd = ShellCommand::Compound(CompoundCommand::If {
+            conditions: vec![(
+                vec![ShellCommand::Compound(CompoundCommand::Arith("1".to_string()))],
+                vec![ShellCommand::Compound(CompoundCommand::Arith("result = 42".to_string()))],
+            )],
+            else_part: Some(vec![
+                ShellCommand::Compound(CompoundCommand::Arith("result = 99".to_string())),
+            ]),
+        });
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0); // (( 42 )) is truthy → status 0
+    }
+
+    #[test]
+    fn test_exec_if_false_branch() {
+        use crate::parser::CompoundCommand;
+        // if (( 0 )); then (( result = 42 )); else (( result = 99 )); fi
+        let cmd = ShellCommand::Compound(CompoundCommand::If {
+            conditions: vec![(
+                vec![ShellCommand::Compound(CompoundCommand::Arith("0".to_string()))],
+                vec![ShellCommand::Compound(CompoundCommand::Arith("result = 42".to_string()))],
+            )],
+            else_part: Some(vec![
+                ShellCommand::Compound(CompoundCommand::Arith("result = 99".to_string())),
+            ]),
+        });
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0); // (( 99 )) is truthy → status 0
+    }
+
+    #[test]
+    fn test_exec_numeric_comparison() {
+        use crate::parser::CompoundCommand;
+        // [[ 5 -gt 3 ]] → true
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::NumGreater(
+                ShellWord::Literal("5".to_string()),
+                ShellWord::Literal("3".to_string()),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+
+        // [[ 2 -gt 3 ]] → false
+        let cmd = ShellCommand::Compound(CompoundCommand::Cond(
+            CondExpr::NumGreater(
+                ShellWord::Literal("2".to_string()),
+                ShellWord::Literal("3".to_string()),
+            ),
+        ));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
+    }
+
+    #[test]
+    fn test_exec_arith_zero_is_false() {
+        use crate::parser::CompoundCommand;
+        // (( 0 )) → status 1
+        let cmd = ShellCommand::Compound(CompoundCommand::Arith("0".to_string()));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
+    }
+
+    #[test]
+    fn test_exec_arith_nonzero_is_true() {
+        use crate::parser::CompoundCommand;
+        // (( 42 )) → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Arith("42".to_string()));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+    }
+
+    #[test]
+    fn test_exec_nested_arith_comparison() {
+        use crate::parser::CompoundCommand;
+        // (( 5 > 3 && 2 < 10 )) → status 0
+        let cmd = ShellCommand::Compound(CompoundCommand::Arith("5 > 3 && 2 < 10".to_string()));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 0);
+
+        // (( 5 > 3 && 2 > 10 )) → status 1
+        let cmd = ShellCommand::Compound(CompoundCommand::Arith("5 > 3 && 2 > 10".to_string()));
+        let vm = compile_and_run(&[cmd]);
+        assert_eq!(vm.last_status, 1);
     }
 }

@@ -427,11 +427,401 @@ impl VM {
                     }
                 }
 
-                // ── Shell ops, arrays, hashes, collections, etc. ──
-                // These will be filled in as we wire up frontends.
-                // For now, unimplemented ops are no-ops with a trace.
-                _ => {
-                    tracing::trace!(op = ?op, ip = self.ip - 1, "unimplemented op");
+                // ── Arrays ──
+                Op::GetArray(idx) => {
+                    let val = self.get_var(idx);
+                    self.push(val);
+                }
+                Op::SetArray(idx) => {
+                    let val = self.pop();
+                    self.set_var(idx, val);
+                }
+                Op::DeclareArray(idx) => {
+                    self.set_var(idx, Value::Array(Vec::new()));
+                }
+                Op::ArrayGet(arr_idx) => {
+                    let index = self.pop().to_int() as usize;
+                    if let Value::Array(ref arr) = self.get_var(arr_idx) {
+                        self.push(arr.get(index).cloned().unwrap_or(Value::Undef));
+                    } else {
+                        self.push(Value::Undef);
+                    }
+                }
+                Op::ArraySet(arr_idx) => {
+                    let index = self.pop().to_int() as usize;
+                    let val = self.pop();
+                    let arr = self.get_var(arr_idx);
+                    if let Value::Array(mut vec) = arr {
+                        if index >= vec.len() {
+                            vec.resize(index + 1, Value::Undef);
+                        }
+                        vec[index] = val;
+                        self.set_var(arr_idx, Value::Array(vec));
+                    }
+                }
+                Op::ArrayPush(arr_idx) => {
+                    let val = self.pop();
+                    let arr = self.get_var(arr_idx);
+                    if let Value::Array(mut vec) = arr {
+                        vec.push(val);
+                        self.set_var(arr_idx, Value::Array(vec));
+                    }
+                }
+                Op::ArrayPop(arr_idx) => {
+                    let arr = self.get_var(arr_idx);
+                    if let Value::Array(mut vec) = arr {
+                        let val = vec.pop().unwrap_or(Value::Undef);
+                        self.set_var(arr_idx, Value::Array(vec));
+                        self.push(val);
+                    } else {
+                        self.push(Value::Undef);
+                    }
+                }
+                Op::ArrayShift(arr_idx) => {
+                    let arr = self.get_var(arr_idx);
+                    if let Value::Array(mut vec) = arr {
+                        let val = if vec.is_empty() { Value::Undef } else { vec.remove(0) };
+                        self.set_var(arr_idx, Value::Array(vec));
+                        self.push(val);
+                    } else {
+                        self.push(Value::Undef);
+                    }
+                }
+                Op::ArrayLen(arr_idx) => {
+                    let arr = self.get_var(arr_idx);
+                    if let Value::Array(ref vec) = arr {
+                        self.push(Value::Int(vec.len() as i64));
+                    } else {
+                        self.push(Value::Int(0));
+                    }
+                }
+                Op::MakeArray(n) => {
+                    let start = self.stack.len().saturating_sub(n as usize);
+                    let elements: Vec<Value> = self.stack.drain(start..).collect();
+                    self.push(Value::Array(elements));
+                }
+
+                // ── Hashes ──
+                Op::GetHash(idx) => {
+                    let val = self.get_var(idx);
+                    self.push(val);
+                }
+                Op::SetHash(idx) => {
+                    let val = self.pop();
+                    self.set_var(idx, val);
+                }
+                Op::DeclareHash(idx) => {
+                    self.set_var(idx, Value::Hash(std::collections::HashMap::new()));
+                }
+                Op::HashGet(hash_idx) => {
+                    let key = self.pop().to_str();
+                    if let Value::Hash(ref map) = self.get_var(hash_idx) {
+                        self.push(map.get(&key).cloned().unwrap_or(Value::Undef));
+                    } else {
+                        self.push(Value::Undef);
+                    }
+                }
+                Op::HashSet(hash_idx) => {
+                    let key = self.pop().to_str();
+                    let val = self.pop();
+                    let h = self.get_var(hash_idx);
+                    if let Value::Hash(mut map) = h {
+                        map.insert(key, val);
+                        self.set_var(hash_idx, Value::Hash(map));
+                    }
+                }
+                Op::HashDelete(hash_idx) => {
+                    let key = self.pop().to_str();
+                    let h = self.get_var(hash_idx);
+                    if let Value::Hash(mut map) = h {
+                        let val = map.remove(&key).unwrap_or(Value::Undef);
+                        self.set_var(hash_idx, Value::Hash(map));
+                        self.push(val);
+                    } else {
+                        self.push(Value::Undef);
+                    }
+                }
+                Op::HashExists(hash_idx) => {
+                    let key = self.pop().to_str();
+                    if let Value::Hash(ref map) = self.get_var(hash_idx) {
+                        self.push(Value::Bool(map.contains_key(&key)));
+                    } else {
+                        self.push(Value::Bool(false));
+                    }
+                }
+                Op::HashKeys(hash_idx) => {
+                    if let Value::Hash(ref map) = self.get_var(hash_idx) {
+                        let keys: Vec<Value> = map.keys().map(|k| Value::str(k.as_str())).collect();
+                        self.push(Value::Array(keys));
+                    } else {
+                        self.push(Value::Array(Vec::new()));
+                    }
+                }
+                Op::HashValues(hash_idx) => {
+                    if let Value::Hash(ref map) = self.get_var(hash_idx) {
+                        let vals: Vec<Value> = map.values().cloned().collect();
+                        self.push(Value::Array(vals));
+                    } else {
+                        self.push(Value::Array(Vec::new()));
+                    }
+                }
+                Op::MakeHash(n) => {
+                    let start = self.stack.len().saturating_sub(n as usize);
+                    let pairs: Vec<Value> = self.stack.drain(start..).collect();
+                    let mut map = std::collections::HashMap::new();
+                    let mut iter = pairs.into_iter();
+                    while let Some(key) = iter.next() {
+                        if let Some(val) = iter.next() {
+                            map.insert(key.to_str(), val);
+                        }
+                    }
+                    self.push(Value::Hash(map));
+                }
+
+                // ── Range ──
+                Op::Range => {
+                    let to = self.pop().to_int();
+                    let from = self.pop().to_int();
+                    let arr: Vec<Value> = (from..=to).map(Value::Int).collect();
+                    self.push(Value::Array(arr));
+                }
+                Op::RangeStep => {
+                    let step = self.pop().to_int();
+                    let to = self.pop().to_int();
+                    let from = self.pop().to_int();
+                    let mut arr = Vec::new();
+                    if step > 0 {
+                        let mut i = from;
+                        while i <= to { arr.push(Value::Int(i)); i += step; }
+                    } else if step < 0 {
+                        let mut i = from;
+                        while i >= to { arr.push(Value::Int(i)); i += step; }
+                    }
+                    self.push(Value::Array(arr));
+                }
+
+                // ── Shell: file tests ──
+                Op::TestFile(test_type) => {
+                    let path = self.pop().to_str();
+                    let result = match test_type {
+                        crate::op::file_test::EXISTS => std::path::Path::new(&path).exists(),
+                        crate::op::file_test::IS_FILE => std::path::Path::new(&path).is_file(),
+                        crate::op::file_test::IS_DIR => std::path::Path::new(&path).is_dir(),
+                        crate::op::file_test::IS_SYMLINK => std::path::Path::new(&path).is_symlink(),
+                        crate::op::file_test::IS_READABLE => std::path::Path::new(&path).exists(), // simplified
+                        crate::op::file_test::IS_WRITABLE => std::path::Path::new(&path).exists(), // simplified
+                        crate::op::file_test::IS_EXECUTABLE => {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::PermissionsExt;
+                                std::fs::metadata(&path)
+                                    .map(|m| m.permissions().mode() & 0o111 != 0)
+                                    .unwrap_or(false)
+                            }
+                            #[cfg(not(unix))]
+                            { std::path::Path::new(&path).exists() }
+                        }
+                        crate::op::file_test::IS_NONEMPTY => {
+                            std::fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false)
+                        }
+                        crate::op::file_test::IS_SOCKET => {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::FileTypeExt;
+                                std::fs::symlink_metadata(&path)
+                                    .map(|m| m.file_type().is_socket())
+                                    .unwrap_or(false)
+                            }
+                            #[cfg(not(unix))]
+                            { false }
+                        }
+                        crate::op::file_test::IS_FIFO => {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::FileTypeExt;
+                                std::fs::symlink_metadata(&path)
+                                    .map(|m| m.file_type().is_fifo())
+                                    .unwrap_or(false)
+                            }
+                            #[cfg(not(unix))]
+                            { false }
+                        }
+                        crate::op::file_test::IS_BLOCK_DEV => {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::FileTypeExt;
+                                std::fs::symlink_metadata(&path)
+                                    .map(|m| m.file_type().is_block_device())
+                                    .unwrap_or(false)
+                            }
+                            #[cfg(not(unix))]
+                            { false }
+                        }
+                        crate::op::file_test::IS_CHAR_DEV => {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::FileTypeExt;
+                                std::fs::symlink_metadata(&path)
+                                    .map(|m| m.file_type().is_char_device())
+                                    .unwrap_or(false)
+                            }
+                            #[cfg(not(unix))]
+                            { false }
+                        }
+                        _ => false,
+                    };
+                    self.push(Value::Bool(result));
+                }
+
+                // ── Shell: exec (simplified — actual process spawn needs OS layer) ──
+                Op::Exec(argc) => {
+                    let start = self.stack.len().saturating_sub(argc as usize);
+                    let args: Vec<String> = self.stack.drain(start..).map(|v| v.to_str()).collect();
+                    if let Some(cmd) = args.first() {
+                        match cmd.as_str() {
+                            "true" => self.push(Value::Status(0)),
+                            "false" => self.push(Value::Status(1)),
+                            "echo" => {
+                                println!("{}", args[1..].join(" "));
+                                self.push(Value::Status(0));
+                            }
+                            "test" | "[" => {
+                                // Minimal test builtin
+                                self.push(Value::Status(0));
+                            }
+                            _ => {
+                                // External command via std::process
+                                use std::process::{Command, Stdio};
+                                match Command::new(cmd)
+                                    .args(&args[1..])
+                                    .stdout(Stdio::inherit())
+                                    .stderr(Stdio::inherit())
+                                    .status()
+                                {
+                                    Ok(status) => {
+                                        self.push(Value::Status(status.code().unwrap_or(1)));
+                                    }
+                                    Err(_) => {
+                                        self.push(Value::Status(127));
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        self.push(Value::Status(0));
+                    }
+                }
+                Op::ExecBg(argc) => {
+                    let start = self.stack.len().saturating_sub(argc as usize);
+                    let args: Vec<String> = self.stack.drain(start..).map(|v| v.to_str()).collect();
+                    if let Some(cmd) = args.first() {
+                        use std::process::{Command, Stdio};
+                        let _ = Command::new(cmd)
+                            .args(&args[1..])
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null())
+                            .spawn();
+                    }
+                    self.push(Value::Status(0));
+                }
+
+                // ── Shell: pipeline (simplified) ──
+                Op::PipelineBegin(_n) => {
+                    // Pipeline setup — in full impl, set up pipe fds
+                }
+                Op::PipelineStage => {
+                    // Wire next stage — in full impl, connect pipe
+                }
+                Op::PipelineEnd => {
+                    // Wait for all stages — push last status
+                    self.push(Value::Status(self.last_status));
+                }
+
+                // ── Shell: redirects (stubs — need OS fd layer) ──
+                Op::Redirect(_fd, _op) => {
+                    let _target = self.pop(); // consume target path
+                }
+                Op::HereDoc(_idx) => {}
+                Op::HereString => {
+                    let _word = self.pop();
+                }
+                Op::CmdSubst(_range) => {
+                    self.push(Value::str(""));
+                }
+                Op::SubshellBegin => {}
+                Op::SubshellEnd => {}
+                Op::ProcessSubIn(_) => { self.push(Value::str("")); }
+                Op::ProcessSubOut(_) => { self.push(Value::str("")); }
+                Op::Glob => {
+                    let pattern = self.pop().to_str();
+                    let matches: Vec<Value> = glob::glob(&pattern)
+                        .into_iter()
+                        .flat_map(|paths| paths.filter_map(|p| p.ok()))
+                        .map(|p| Value::str(p.to_string_lossy()))
+                        .collect();
+                    self.push(Value::Array(matches));
+                }
+                Op::GlobRecursive => {
+                    let pattern = self.pop().to_str();
+                    let matches: Vec<Value> = glob::glob(&pattern)
+                        .into_iter()
+                        .flat_map(|paths| paths.filter_map(|p| p.ok()))
+                        .map(|p| Value::str(p.to_string_lossy()))
+                        .collect();
+                    self.push(Value::Array(matches));
+                }
+                Op::TrapSet(_) => {}
+                Op::TrapCheck => {}
+                Op::ExpandParam(_) => { self.push(Value::str("")); }
+                Op::WordSplit => {}
+                Op::BraceExpand => {}
+                Op::TildeExpand => {}
+
+                // ── Remaining fused ops ──
+                Op::ConcatConstLoop(const_idx, s_slot, i_slot, limit) => {
+                    let c = self.chunk.constants.get(const_idx as usize)
+                        .cloned().unwrap_or(Value::str(""));
+                    let c_str = c.to_str();
+                    let mut s = self.get_slot(s_slot).to_str();
+                    let mut i = self.get_slot(i_slot).to_int();
+                    let lim = limit as i64;
+                    while i < lim {
+                        s.push_str(&c_str);
+                        i += 1;
+                    }
+                    self.set_slot(s_slot, Value::str(s));
+                    self.set_slot(i_slot, Value::Int(i));
+                }
+                Op::PushIntRangeLoop(arr_idx, i_slot, limit) => {
+                    let mut i = self.get_slot(i_slot).to_int();
+                    let lim = limit as i64;
+                    let arr = self.get_var(arr_idx);
+                    let mut vec = if let Value::Array(v) = arr { v } else { Vec::new() };
+                    vec.reserve((lim - i).max(0) as usize);
+                    while i < lim {
+                        vec.push(Value::Int(i));
+                        i += 1;
+                    }
+                    self.set_var(arr_idx, Value::Array(vec));
+                    self.set_slot(i_slot, Value::Int(i));
+                }
+
+                // ── Higher-order (stubs) ──
+                Op::MapBlock(_) | Op::GrepBlock(_) | Op::SortBlock(_)
+                | Op::SortDefault | Op::ForEachBlock(_) => {}
+
+                // ── Builtins ──
+                Op::CallBuiltin(_id, _argc) => {
+                    // Dispatch through extension handler
+                    // TODO: builtin registry
+                }
+
+                // ── Remaining ops — no-op stubs ──
+                Op::LogAnd | Op::LogOr => {
+                    // Non-short-circuit versions — use JumpIfTrueKeep/FalseKeep instead
+                    let b = self.pop();
+                    let a = self.pop();
+                    self.push(Value::Bool(a.is_truthy() && b.is_truthy()));
                 }
             }
         }

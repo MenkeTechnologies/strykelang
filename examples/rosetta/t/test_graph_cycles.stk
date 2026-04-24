@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cycles in a Graph
+
+fn backtrack($curr, $path, $visited, $adj, $cycles) {
+    push @$path, $curr
+    $visited->{$curr} = 1
+    for my $next (@{$adj->{$curr}}) {
+        if (scalar(@$path) >= 3 && $next eq $path->[0]) {
+            push @$cycles, [@$path]
+        } elsif (!$visited->{$next}) {
+            backtrack($next, [@$path], { %$visited }, $adj, $cycles)
+        }
+    }
+}
+
+fn find_cycles($adj) {
+    my @cycles
+    my $c = \@cycles
+    for my $node (keys %$adj) {
+        backtrack($node, [], {}, $adj, $c)
+    }
+    $c
+}
+
+my $g = { A => ["B"], B => ["C"], C => ["A"] }
+my $c = find_cycles($g)
+assert_ok scalar(@$c) > 0, "found cycle in triangle"
+test_run

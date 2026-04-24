@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 2048 Game Logic
+
+fn slide_row($row) {
+    my @non_zero
+    for my $v (@$row) { if ($v != 0) { push @non_zero, $v } }
+    
+    my @res
+    my $i = 0
+    my $len = scalar(@non_zero)
+    while ($i < $len) {
+        if ($i + 1 < $len && $non_zero[$i] == $non_zero[$i+1]) {
+            push @res, $non_zero[$i] * 2
+            $i = $i + 2
+        } else {
+            push @res, $non_zero[$i]
+            $i = $i + 1
+        }
+    }
+    while (scalar(@res) < 4) { push @res, 0 }
+    \@res
+}
+
+fn move_left($grid) {
+    my @new_grid
+    for my $row (@$grid) {
+        push @new_grid, slide_row($row)
+    }
+    \@new_grid
+}
+
+my $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
+my $res = move_left($g1)
+
+assert_eq join(",", @{$res->[0]}), "4,0,0,0", "row 2,2,0,0 -> 4,0,0,0"
+assert_eq join(",", @{$res->[1]}), "4,0,0,0", "row 2,0,2,0 -> 4,0,0,0"
+assert_eq join(",", @{$res->[2]}), "4,4,0,0", "row 2,2,2,2 -> 4,4,0,0"
+assert_eq join(",", @{$res->[3]}), "8,16,0,0", "row 4,4,8,8 -> 8,16,0,0"
+
+test_run

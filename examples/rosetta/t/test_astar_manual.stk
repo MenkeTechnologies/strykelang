@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: A* search algorithm (Manual)
+
+fn my_dist($a, $b) {
+    abs($a->[0] - $b->[0]) + abs($a->[1] - $b->[1])
+}
+
+fn solve_astar($start, $goal, $grid) {
+    my @open = ($start)
+    my %g_score; my %f_score; my %parent
+    my $sk = join(",", @$start)
+    $g_score{$sk} = 0
+    $f_score{$sk} = my_dist($start, $goal)
+    
+    while (scalar(@open) > 0) {
+        # Find node in open with lowest f_score
+        my $mi = 0
+        for my $i (1..scalar(@open)-1) {
+            if ($f_score{join(",", @{$open[$i]})} < $f_score{join(",", @{$open[$mi]})}) { $mi = $i }
+        }
+        my $curr = splice(@open, $mi, 1)
+        my $ck = join(",", @$curr)
+        
+        if ($ck eq join(",", @$goal)) {
+            my @path = ($curr)
+            while (exists $parent{join(",", @$curr)}) {
+                $curr = $parent{join(",", @$curr)}
+                unshift @path, $curr
+            }
+            return \@path
+        }
+        
+        my ($r, $c) = @$curr
+        for my $move ([-1,0], [1,0], [0,-1], [0,1]) {
+            my $nr = $r + $move->[0]
+            my $nc = $c + $move->[1]
+            if ($nr >= 0 && $nr < 5 && $nc >= 0 && $nc < 5 && $grid->[$nr]->[$nc] == 0) {
+                my $neighbor = [$nr, $nc]
+                my $nk = join(",", @$neighbor)
+                my $tg = $g_score{$ck} + 1
+                if (!exists $g_score{$nk} || $tg < $g_score{$nk}) {
+                    $parent{$nk} = $curr
+                    $g_score{$nk} = $tg
+                    $f_score{$nk} = $tg + my_dist($neighbor, $goal)
+                    push @open, $neighbor
+                }
+            }
+        }
+    }
+    undef
+}
+
+# 0 is clear, 1 is wall
+my $grid = [
+    [0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 1, 0],
+    [0, 1, 0, 0, 0],
+    [0, 0, 0, 1, 0]
+]
+
+my $path = solve_astar([0,0], [4,4], $grid)
+assert_ok defined($path), "A* path found"
+assert_eq scalar(@$path), 9, "A* path length is 9"
+
+test_run

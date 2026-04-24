@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count set bits (Manual)
+
+fn my_count_bits($n) {
+    my $count = 0
+    while ($n > 0) {
+        $n = $n & ($n - 1)
+        $count = $count + 1
+    }
+    $count
+}
+
+assert_eq my_count_bits(0), 0, "bits in 0"
+assert_eq my_count_bits(7), 3, "bits in 7 (111)"
+assert_eq my_count_bits(255), 8, "bits in 255"
+
+test_run
