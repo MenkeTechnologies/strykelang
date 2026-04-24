@@ -7260,7 +7260,7 @@ impl ShellExecutor {
                     if is_hash {
                         if let Some(assoc) = self.assoc_arrays.get(name) {
                             let mut pairs: Vec<_> = assoc.iter().collect();
-                            pairs.sort_by_key(|(k, _)| k.clone());
+                            pairs.sort_by_key(|(k, _)| (*k).clone());
                             let formatted: Vec<String> = pairs
                                 .iter()
                                 .map(|(k, v)| {

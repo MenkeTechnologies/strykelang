@@ -1248,7 +1248,7 @@ pub fn update_job(job: &mut Job) -> bool {
     }
 
     // Check main processes
-    let mut all_done = true;
+    let all_done = true;
     let mut some_stopped = false;
     let mut last_status = 0;
 

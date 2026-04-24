@@ -1,6 +1,6 @@
 [package]
 name = "compsys"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 description = "Zsh-compatible completion system for zshrs"
 license = "MIT"
@@ -15,11 +15,11 @@ path = "main.rs"
 
 [[bin]]
 name = "menu-demo"
-path = "bin/menu_demo.rs"
+path = "bins/menu_demo.rs"
 
 [[bin]]
 name = "bench-autoload"
-path = "bin/bench_autoload.rs"
+path = "bins/bench_autoload.rs"
 
 [dependencies]
 dirs = "5"

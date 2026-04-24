@@ -200,7 +200,7 @@ pub fn system_clipput(data: &str) -> String {
     use std::io::Write;
     let mut buf = Vec::new();
     {
-        let mut encoder = base64_encode(data.as_bytes());
+        let encoder = base64_encode(data.as_bytes());
         buf.extend_from_slice(b"\x1b]52;c;");
         buf.extend_from_slice(encoder.as_bytes());
         buf.extend_from_slice(b"\x1b\\");

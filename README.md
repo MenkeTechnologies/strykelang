@@ -145,7 +145,7 @@ GolfScript, Pyth, 05AB1E, Jelly — these are shorter but are write-only puzzles
 | SHA256 of file | `s 'p s256"f"'` **13c** | `perl -MDigest::SHA=sha256_hex -e '...'` 70c+ | — | `python3 -c 'import hashlib;...'` 80c+ | `shasum -a 256 f` 15c |
 | Fetch JSON API | `s 'fetch_json(URL) \|> dd'` **25c** | needs `LWP` + `JSON` modules | needs `net/http` + `json` | needs `urllib` + `json` | `curl -s URL \| jq .` ~40c |
 | CSV → JSON | `s 'csv_read("f") \|> tj \|> p'` **28c** | needs `Text::CSV` + `JSON` | needs `csv` + `json` | needs `csv` + `json` imports | — |
-| Parallel map | `s '1..1e6 \|> pmap { $_ * 2 }'` **29c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
+| Parallel map | `s '1:1e6 \|> pmap { $_ * 2 }'` **29c** | not built in | not built in | not built in | `xargs -P8` 50c+ |
 | Streaming parallel | `s 'range(0,1e9) \|> pmaps { $_ * 2 } \|> take 10'` **42c** | not built in | not built in | not built in | not built in |
 | Sparkline | `s '(3,7,1,9) \|> spark \|> p'` **27c** | not built in | not built in | not built in | not built in |
 | In-place sed (parallel) | `s -i -pe 's/foo/bar/g' *.txt` **28c** | `perl -i -pe 's/foo/bar/g' *.txt` 33c (sequential) | `ruby -i -pe '$_.gsub!(...)'` 35c+ | — | `sed -i '' 's/foo/bar/g' *.txt` 31c (sequential) |
