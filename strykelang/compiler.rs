@@ -7870,7 +7870,7 @@ mod tests {
 
     #[test]
     fn compile_sub_postfix_inc_emits_post_inc_slot() {
-        let chunk = compile_snippet("sub foo { my $x = 0; $x++; return $x; }").expect("compile");
+        let chunk = compile_snippet("fn foo { my $x = 0; $x++; return $x; }").expect("compile");
         assert!(
             chunk.ops.iter().any(|o| matches!(o, Op::PostIncSlot(_))),
             "expected PostIncSlot in compiled sub body, ops={:?}",
@@ -7959,7 +7959,7 @@ mod tests {
 
     #[test]
     fn compile_sub_registers_name_and_entry() {
-        let chunk = compile_snippet("sub foo { return 1; }").expect("compile");
+        let chunk = compile_snippet("fn foo { return 1; }").expect("compile");
         assert!(chunk.names.iter().any(|n| n == "foo"));
         assert!(chunk
             .sub_entries

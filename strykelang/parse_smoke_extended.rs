@@ -75,8 +75,8 @@ parse_smoke_cases! {
     parse_smoke_065 => "no warnings;";
     parse_smoke_066 => "package P;";
     parse_smoke_067 => "package Q::R;";
-    parse_smoke_068 => "sub foo { }";
-    parse_smoke_069 => "sub bar { }";
+    parse_smoke_068 => "fn foo { }";
+    parse_smoke_069 => "fn bar { }";
     parse_smoke_070 => "return;";
     parse_smoke_071 => "return 1;";
     parse_smoke_072 => "last;";

@@ -3,7 +3,7 @@ use stryke::error::ErrorKind;
 
 #[test]
 fn parse_unclosed_brace_is_syntax_error() {
-    let err = stryke::parse("sub f {").unwrap_err();
+    let err = stryke::parse("fn f {").unwrap_err();
     assert_eq!(err.kind, ErrorKind::Syntax);
 }
 

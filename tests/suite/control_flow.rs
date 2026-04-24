@@ -65,7 +65,7 @@ fn foreach_uses_default_dollar_underscore() {
 #[test]
 fn foreach_bareword_stmt_calls_sub_with_topic() {
     assert_eq!(
-        eval_int("my $acc = 0; sub add { $acc = $acc + shift } for (1, 2, 3) { add } $acc"),
+        eval_int("my $acc = 0; fn add { $acc = $acc + shift } for (1, 2, 3) { add } $acc"),
         6
     );
 }

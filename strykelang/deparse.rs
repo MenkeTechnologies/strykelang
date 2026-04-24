@@ -2055,7 +2055,7 @@ mod tests {
 
     #[test]
     fn deparse_sub_decl() {
-        let s = roundtrip("sub foo { 42 }");
+        let s = roundtrip("fn foo { 42 }");
         assert!(s.contains("sub foo"));
         assert!(s.contains("42"));
     }
@@ -2063,7 +2063,7 @@ mod tests {
     #[test]
     fn deparse_anon_fn() {
         let s = roundtrip("my $f = fn { $_ + 1 };");
-        assert!(s.contains("sub {") || s.contains("fn {"));
+        assert!(s.contains("fn {") || s.contains("fn {"));
         assert!(s.contains("$_ + 1"));
     }
 }

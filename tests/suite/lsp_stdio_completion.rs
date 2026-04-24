@@ -370,7 +370,7 @@ impl LspHarness {
 
 #[test]
 fn lsp_stdio_completion_lists_sub_in_buffer() {
-    let mut h = LspHarness::new("sub yellow_minion { }\nyell");
+    let mut h = LspHarness::new("fn yellow_minion { }\nyell");
     let labels = h.completion(1, 4);
     h.finish();
     assert!(
@@ -394,7 +394,7 @@ fn lsp_stdio_completion_scalar_after_sigil() {
 
 #[test]
 fn lsp_stdio_completion_qualified_sub() {
-    let mut h = LspHarness::new("package Foo;\nsub barbaz { }\npackage main;\nFoo::bar");
+    let mut h = LspHarness::new("package Foo;\nfn barbaz { }\npackage main;\nFoo::bar");
     let labels = h.completion(3, 8);
     h.finish();
     assert!(
@@ -421,7 +421,7 @@ fn lsp_stdio_hover_builtin_say() {
 
 #[test]
 fn lsp_stdio_hover_sub_decl_line() {
-    let mut h = LspHarness::new("sub yellow_minion { }\nyellow_minion();\n");
+    let mut h = LspHarness::new("fn yellow_minion { }\nyellow_minion();\n");
     let result = h.hover(1, 3);
     h.finish();
     let contents = result.get("contents").expect("hover contents");
@@ -437,7 +437,7 @@ fn lsp_stdio_hover_sub_decl_line() {
 
 #[test]
 fn lsp_stdio_goto_definition_sub() {
-    let mut h = LspHarness::new("sub yellow_minion { }\nyellow_minion();\n");
+    let mut h = LspHarness::new("fn yellow_minion { }\nyellow_minion();\n");
     let result = h.definition(1, 3);
     h.finish();
     let line = result
@@ -451,7 +451,7 @@ fn lsp_stdio_goto_definition_sub() {
 
 #[test]
 fn lsp_stdio_document_symbol_lists_sub() {
-    let mut h = LspHarness::new("sub yellow_minion { }\n1;\n");
+    let mut h = LspHarness::new("fn yellow_minion { }\n1;\n");
     let result = h.document_symbols();
     h.finish();
     let arr = result.as_array().expect("documentSymbol array");
@@ -468,7 +468,7 @@ fn lsp_stdio_document_symbol_lists_sub() {
 
 #[test]
 fn lsp_stdio_resolve_completion_adds_function_doc() {
-    let mut h = LspHarness::new("sub x { }\n");
+    let mut h = LspHarness::new("fn x { }\n");
     let resolved = h.resolve_completion(json!({
         "label": "totally_unknown_sub",
         "kind": 3
@@ -486,7 +486,7 @@ fn lsp_stdio_resolve_completion_adds_function_doc() {
 
 #[test]
 fn lsp_stdio_document_highlight_finds_occurrences() {
-    let src = "sub yellow_minion { }\nyellow_minion();\nyellow_minion();\n";
+    let src = "fn yellow_minion { }\nyellow_minion();\nyellow_minion();\n";
     let mut h = LspHarness::new(src);
     let result = h.document_highlight(1, 3);
     h.finish();
@@ -500,7 +500,7 @@ fn lsp_stdio_document_highlight_finds_occurrences() {
 
 #[test]
 fn lsp_stdio_references_lists_occurrences() {
-    let src = "sub yellow_minion { }\nyellow_minion();\nyellow_minion();\n";
+    let src = "fn yellow_minion { }\nyellow_minion();\nyellow_minion();\n";
     let mut h = LspHarness::new(src);
     let result = h.references(1, 3, false);
     h.finish();
@@ -510,7 +510,7 @@ fn lsp_stdio_references_lists_occurrences() {
 
 #[test]
 fn lsp_stdio_declaration_same_as_definition_for_sub() {
-    let src = "sub yellow_minion { }\nyellow_minion();\n";
+    let src = "fn yellow_minion { }\nyellow_minion();\n";
     let mut h = LspHarness::new(src);
     let def = h.definition(1, 3);
     let decl = h.declaration(1, 3);
@@ -524,7 +524,7 @@ fn lsp_stdio_declaration_same_as_definition_for_sub() {
 
 #[test]
 fn lsp_stdio_prepare_rename_sub_placeholder() {
-    let mut h = LspHarness::new("sub yellow_minion { }\nyellow_minion();\n");
+    let mut h = LspHarness::new("fn yellow_minion { }\nyellow_minion();\n");
     let r = h.prepare_rename(1, 3);
     h.finish();
     assert_eq!(
@@ -536,7 +536,7 @@ fn lsp_stdio_prepare_rename_sub_placeholder() {
 
 #[test]
 fn lsp_stdio_rename_sub_returns_workspace_edits() {
-    let mut h = LspHarness::new("sub yellow_minion { }\nyellow_minion();\n");
+    let mut h = LspHarness::new("fn yellow_minion { }\nyellow_minion();\n");
     let r = h.rename(1, 3, "banana");
     h.finish();
     let changes = r

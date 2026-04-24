@@ -1251,7 +1251,7 @@ fn perl_compat_scalar_braced_aref_is_length() {
 fn perl_compat_scalar_braced_sub_return_aref_count() {
     assert_eq!(
         ri(r#"no strict 'vars';
-        sub row { [0, 0, 0, 0, 0, 0] }
+        fn row { [0, 0, 0, 0, 0, 0] }
         scalar @{row()};"#,),
         6
     );
@@ -1410,7 +1410,7 @@ fn perl_compat_lstat_symlink_st_size_not_followed() {
 #[test]
 fn perl_compat_wantarray_rename_lc_uc() {
     assert_eq!(
-        ri(r#"sub ctx { wantarray ? 2 : 8 }
+        ri(r#"fn ctx { wantarray ? 2 : 8 }
         my $x = ctx();
         my @y = ctx();
         $x * 10 + $y[0];"#),
@@ -1726,7 +1726,7 @@ fn pipeline_chaining_rejects_ops_after_preduce() {
 #[test]
 fn pipeline_user_sub_in_chain() {
     let s = r#"
-        sub times2 { $_ * 2 }
+        fn times2 { $_ * 2 }
         my @r = pipeline(1, 2, 3)->times2->collect();
         $r[0] + $r[1] + $r[2];
     "#;
@@ -1746,7 +1746,7 @@ fn pipeline_grep_alias_matches_filter() {
 fn pipeline_qualified_sub_chain() {
     let s = r#"
         package P;
-        sub tripl { $_ * 3 }
+        fn tripl { $_ * 3 }
         package main;
         my @r = pipeline(1, 2)->P::tripl->collect();
         $r[0] + $r[1];
@@ -1804,7 +1804,7 @@ fn typed_sub_params_runtime_checks() {
         7
     );
     assert_eq!(
-        rs(r#"sub greet ($name: Str) { "hello $name" } greet("world")"#),
+        rs(r#"fn greet ($name: Str) { "hello $name" } greet("world")"#),
         "hello world"
     );
     assert_eq!(rf(r#"my $f = fn ($x: Float) { $x * 2.0 }; $f->(1.5)"#), 3.0);
@@ -1865,7 +1865,7 @@ fn open_write_pipe_two_arg_leading_pipe() {
 fn autoload_sets_missing_sub_name() {
     assert_eq!(
         rs(r#"
-        sub AUTOLOAD { $AUTOLOAD }
+        fn AUTOLOAD { $AUTOLOAD }
         not_defined_yet();
     "#,),
         "main::not_defined_yet"
@@ -1877,7 +1877,7 @@ fn autoload_method_sets_package_method_in_autoload() {
     assert_eq!(
         rs(r#"
         package D;
-        sub AUTOLOAD { $AUTOLOAD }
+        fn AUTOLOAD { $AUTOLOAD }
         package main;
         bless({}, "D")->missing_meth();
     "#),
@@ -1905,7 +1905,7 @@ fn runtime_push_isa_updates_method_resolution() {
     assert_eq!(
         ri(r#"
         package P;
-        sub pong { 42 }
+        fn pong { 42 }
         package C;
         our @ISA;
         push @C::ISA, "P";
@@ -1922,7 +1922,7 @@ fn typeglob_assign_scalar_ref_to_coderef_aliases_sub() {
     assert_eq!(
         ri(r#"
         package P;
-        sub orig { 7 }
+        fn orig { 7 }
         *alias = \&orig;
         package main;
         P::alias()
@@ -1959,7 +1959,7 @@ fn our_isa_populates_package_stash() {
 #[test]
 fn qualified_sub_call_across_packages() {
     assert_eq!(
-        ri(r#"package P; sub meth { 10 } package main; P::meth()"#),
+        ri(r#"package P; fn meth { 10 } package main; P::meth()"#),
         10
     );
 }
@@ -1969,7 +1969,7 @@ fn isa_visible_from_main_after_package_blocks() {
     assert_eq!(
         ri(r#"
         package P;
-        sub meth { 10 }
+        fn meth { 10 }
         package C;
         our @ISA = ("P");
         package main;
@@ -1984,10 +1984,10 @@ fn perl_compat_super_calls_parent_method() {
     assert_eq!(
         ri(r#"
         package P;
-        sub meth { 10 }
+        fn meth { 10 }
         package C;
         our @ISA = ("P");
-        sub meth { my $s = shift; $s->SUPER::meth + 5 }
+        fn meth { my $s = shift; $s->SUPER::meth + 5 }
         package main;
         my $o = bless {}, "C";
         $o->meth();
@@ -2002,7 +2002,7 @@ fn perl_compat_use_overload_dispatches_add() {
         ri(r#"
         package O;
         use overload '+' => 'add';
-        sub add { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        fn add { my ($a, $b) = @_; $a->{n} + $b->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -2018,7 +2018,7 @@ fn perl_compat_use_overload_coderef_handler() {
         ri(r#"
         package O;
         use overload '+' => \&add;
-        sub add { my ($a, $b) = @_; $a->{n} * $b->{n} }
+        fn add { my ($a, $b) = @_; $a->{n} * $b->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -2034,7 +2034,7 @@ fn perl_compat_use_overload_stringify() {
         rs(r#"
         package O;
         use overload '""' => 'as_string';
-        sub as_string { "x7" }
+        fn as_string { "x7" }
         package main;
         my $o = bless { n => 7 }, "O";
         "$o"
@@ -2050,8 +2050,8 @@ fn perl_compat_use_overload_combined_coderef() {
         ri(r#"
         package O;
         use overload '+' => \&add_op, '""' => \&to_str;
-        sub add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub to_str { "v" . $_0->{n} }
+        fn add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        fn to_str { "v" . $_0->{n} }
         package main;
         my $a = O->new(n => 2);
         my $b = O->new(n => 3);
@@ -2063,8 +2063,8 @@ fn perl_compat_use_overload_combined_coderef() {
         rs(r#"
         package O;
         use overload '+' => \&add_op, '""' => \&to_str;
-        sub add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
-        sub to_str { "v" . $_0->{n} }
+        fn add_op { my ($a, $b) = @_; $a->{n} + $b->{n} }
+        fn to_str { "v" . $_0->{n} }
         package main;
         my $o = bless { n => 7 }, "O";
         "$o"
@@ -2079,7 +2079,7 @@ fn perl_compat_sprintf_percent_s_uses_overload_stringify() {
         rs(r#"
         package O;
         use overload '""' => 'as_string';
-        sub as_string { "Z" }
+        fn as_string { "Z" }
         package main;
         my $o = bless {}, "O";
         sprintf "%s", $o;
@@ -2104,11 +2104,11 @@ fn perl_compat_tie_hash_exists_delete() {
     assert_eq!(
         ri(r#"
         package T;
-        sub TIEHASH { bless { h => {} }, shift }
-        sub FETCH { $_0->{h}->{$_1} }
-        sub STORE { $_0->{h}->{$_1} = $_2 }
-        sub EXISTS { 7 }
-        sub DELETE { 8 }
+        fn TIEHASH { bless { h => {} }, shift }
+        fn FETCH { $_0->{h}->{$_1} }
+        fn STORE { $_0->{h}->{$_1} = $_2 }
+        fn EXISTS { 7 }
+        fn DELETE { 8 }
         package main;
         my %t;
         tie %t, "T";
@@ -2120,11 +2120,11 @@ fn perl_compat_tie_hash_exists_delete() {
     assert_eq!(
         ri(r#"
         package T;
-        sub TIEHASH { bless { h => {} }, shift }
-        sub FETCH { $_0->{h}->{$_1} }
-        sub STORE { $_0->{h}->{$_1} = $_2 }
-        sub EXISTS { 1 }
-        sub DELETE { 8 }
+        fn TIEHASH { bless { h => {} }, shift }
+        fn FETCH { $_0->{h}->{$_1} }
+        fn STORE { $_0->{h}->{$_1} = $_2 }
+        fn EXISTS { 1 }
+        fn DELETE { 8 }
         package main;
         my %t;
         tie %t, "T";
@@ -2141,7 +2141,7 @@ fn perl_compat_use_overload_nomethod_binop() {
         ri(r#"
         package O;
         use overload nomethod => 'catch_all', fallback => 1;
-        sub catch_all { my ($a, $b, $op) = @_; 99 }
+        fn catch_all { my ($a, $b, $op) = @_; 99 }
         package main;
         my $a = O->new(n => 1);
         my $b = O->new(n => 2);
@@ -2157,7 +2157,7 @@ fn perl_compat_use_overload_unary_neg() {
         ri(r#"
         package O;
         use overload 'neg' => 'negate_op';
-        sub negate_op { my ($x) = @_; 42 }
+        fn negate_op { my ($x) = @_; 42 }
         package main;
         my $o = bless {}, "O";
         -$o;
@@ -2173,7 +2173,7 @@ fn perl_compat_use_overload_bool_for_logical_not() {
         ri(r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_0->{t} }
+        fn as_bool { $_0->{t} }
         package main;
         my $f = bless { t => 0 }, "O";
         my $t = bless { t => 1 }, "O";
@@ -2190,7 +2190,7 @@ fn perl_compat_use_overload_bool_for_not_keyword() {
         ri(r#"
         package O;
         use overload 'bool' => 'as_bool';
-        sub as_bool { $_0->{t} }
+        fn as_bool { $_0->{t} }
         package main;
         my $f = bless { t => 0 }, "O";
         my $t = bless { t => 1 }, "O";
@@ -2207,7 +2207,7 @@ fn perl_compat_join_stringifies_overloaded_objects() {
         rs(r#"
         package O;
         use overload '""' => 'as_str';
-        sub as_str { "@" . $_0->{n} }
+        fn as_str { "@" . $_0->{n} }
         package main;
         my $a = bless { n => 1 }, "O";
         my $b = bless { n => 2 }, "O";
@@ -2223,7 +2223,7 @@ fn perl_compat_use_overload_empty_list_runs() {
     assert_eq!(
         ri(r#"
         package O;
-        sub add { 1 }
+        fn add { 1 }
         use overload ();
         package main;
         9;
@@ -2238,11 +2238,11 @@ fn perl_compat_use_overload_dispatches_sub_mul_cmp_ops() {
         ri(r#"
         package O;
         use overload '-' => 'osub', '*' => 'omul', '==' => 'onumeq', 'eq' => 'ostreq', cmp => 'ocmp';
-        sub osub { my ($a, $b) = @_; $a->{n} - $b->{n} }
-        sub omul { my ($a, $b) = @_; $a->{n} * $b->{n} }
-        sub onumeq { my ($a, $b) = @_; $a->{n} == $b ? 1 : 0 }
-        sub ostreq { my ($a, $b) = @_; $b eq "rhs" ? 1 : 0 }
-        sub ocmp { my ($a, $b) = @_; $a->{n} <=> $b }
+        fn osub { my ($a, $b) = @_; $a->{n} - $b->{n} }
+        fn omul { my ($a, $b) = @_; $a->{n} * $b->{n} }
+        fn onumeq { my ($a, $b) = @_; $a->{n} == $b ? 1 : 0 }
+        fn ostreq { my ($a, $b) = @_; $b eq "rhs" ? 1 : 0 }
+        fn ocmp { my ($a, $b) = @_; $a->{n} <=> $b }
         package main;
         my $x = O->new(n => 10);
         my $y = O->new(n => 4);
@@ -2263,7 +2263,7 @@ fn perl_compat_use_overload_dispatches_concat_op() {
         rs(r#"
         package O;
         use overload '.' => 'odot';
-        sub odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
+        fn odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
         package main;
         my $a = O->new(n => "x");
         $a . "z";
@@ -2279,7 +2279,7 @@ fn perl_compat_use_overload_dispatches_concat_op_string_on_lhs() {
         rs(r#"
         package O;
         use overload '.' => 'odot';
-        sub odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
+        fn odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
         package main;
         my $a = O->new(n => "x");
         "z" . $a;
@@ -2317,9 +2317,9 @@ fn perl_compat_use_overload_dispatches_div_mod_pow() {
         ri(r#"
         package O;
         use overload '/' => 'odiv', '%' => 'omod', '**' => 'opow';
-        sub odiv { my ($a, $b) = @_; $a->{n} / $b }
-        sub omod { my ($a, $b) = @_; $a->{n} % $b }
-        sub opow { my ($a, $b) = @_; $a->{n} ** $b }
+        fn odiv { my ($a, $b) = @_; $a->{n} / $b }
+        fn omod { my ($a, $b) = @_; $a->{n} % $b }
+        fn opow { my ($a, $b) = @_; $a->{n} ** $b }
         package main;
         my $a = O->new(n => 20);
         my $c = O->new(n => 2);
@@ -2335,7 +2335,7 @@ fn perl_compat_use_overload_nomethod_dispatches_concat() {
         ri(r#"
         package O;
         use overload nomethod => 'nm', fallback => 1;
-        sub nm { my ($a, $b, $op) = @_; $op eq "." ? 777 : 0 }
+        fn nm { my ($a, $b, $op) = @_; $op eq "." ? 777 : 0 }
         package main;
         my $a = O->new(n => 1);
         $a . "tail";
@@ -2350,7 +2350,7 @@ fn perl_compat_use_overload_dispatches_add_blessed_on_rhs() {
         ri(r#"
         package O;
         use overload '+' => 'add';
-        sub add { my ($a, $b) = @_; $a->{n} + $b }
+        fn add { my ($a, $b) = @_; $a->{n} + $b }
         package main;
         my $x = O->new(n => 7);
         5 + $x;
@@ -2365,8 +2365,8 @@ fn perl_compat_use_overload_dispatches_ne_and_spaceship() {
         ri(r#"
         package O;
         use overload 'ne' => 'cmp_ne', '<=>' => 'osp';
-        sub cmp_ne { my ($a, $b) = @_; 1 }
-        sub osp { my ($a, $b) = @_; $a->{n} <=> $b }
+        fn cmp_ne { my ($a, $b) = @_; 1 }
+        fn osp { my ($a, $b) = @_; $a->{n} <=> $b }
         package main;
         my $o = O->new(n => 9);
         ($o <=> 4) * 10 + ($o ne "x");
@@ -2393,8 +2393,8 @@ fn perl_compat_use_overload_dispatches_str_lt_and_num_gt() {
         ri(r#"
         package O;
         use overload 'lt' => 'olt', '>' => 'ogt';
-        sub olt { my ($a, $b) = @_; $a->{"s"} lt $b ? 1 : 0 }
-        sub ogt { my ($a, $b) = @_; $a->{"n"} > $b ? 1 : 0 }
+        fn olt { my ($a, $b) = @_; $a->{"s"} lt $b ? 1 : 0 }
+        fn ogt { my ($a, $b) = @_; $a->{"n"} > $b ? 1 : 0 }
         package main;
         my $o = bless { "n" => 5, "s" => "a" }, "O";
         ($o lt "b") * 10 + ($o > 3);
@@ -2409,7 +2409,7 @@ fn perl_compat_use_overload_sub_blessed_on_rhs() {
         ri(r#"
         package O;
         use overload '-' => 'osub';
-        sub osub { my ($a, $b) = @_; $b - $a->{n} }
+        fn osub { my ($a, $b) = @_; $b - $a->{n} }
         package main;
         my $o = O->new(n => 7);
         10 - $o;
@@ -2424,8 +2424,8 @@ fn perl_compat_use_overload_mul_and_pow_blessed_on_rhs() {
         ri(r#"
         package O;
         use overload '*' => 'omul', '**' => 'opow';
-        sub omul { my ($a, $b) = @_; $a->{n} * $b }
-        sub opow { my ($a, $b) = @_; $b ** $a->{n} }
+        fn omul { my ($a, $b) = @_; $a->{n} * $b }
+        fn opow { my ($a, $b) = @_; $b ** $a->{n} }
         package main;
         my $a = O->new(n => 6);
         my $b = O->new(n => 3);
@@ -2441,8 +2441,8 @@ fn perl_compat_use_overload_num_ne_and_num_le() {
         ri(r#"
         package O;
         use overload '!=' => 'oine', '<=' => 'ole';
-        sub oine { my ($a, $b) = @_; $a->{n} != $b ? 1 : 0 }
-        sub ole { my ($a, $b) = @_; $a->{n} <= $b ? 1 : 0 }
+        fn oine { my ($a, $b) = @_; $a->{n} != $b ? 1 : 0 }
+        fn ole { my ($a, $b) = @_; $a->{n} <= $b ? 1 : 0 }
         package main;
         my $o = O->new(n => 7);
         ($o != 10) * 10 + ($o <= 7);
@@ -2457,8 +2457,8 @@ fn perl_compat_use_overload_str_le_and_str_ge() {
         ri(r#"
         package O;
         use overload 'le' => 'ole', 'ge' => 'oge';
-        sub ole { my ($a, $b) = @_; $a->{"t"} le $b ? 1 : 0 }
-        sub oge { my ($a, $b) = @_; $a->{"t"} ge $b ? 1 : 0 }
+        fn ole { my ($a, $b) = @_; $a->{"t"} le $b ? 1 : 0 }
+        fn oge { my ($a, $b) = @_; $a->{"t"} ge $b ? 1 : 0 }
         package main;
         my $o = bless { "t" => "m" }, "O";
         ($o le "n") * 10 + ($o ge "a");
@@ -2473,8 +2473,8 @@ fn perl_compat_use_overload_div_and_mod_blessed_on_rhs() {
         ri(r#"
         package O;
         use overload '/' => 'odiv', '%' => 'omod';
-        sub odiv { my ($a, $b) = @_; $b / $a->{n} }
-        sub omod { my ($a, $b) = @_; $b % $a->{n} }
+        fn odiv { my ($a, $b) = @_; $b / $a->{n} }
+        fn omod { my ($a, $b) = @_; $b % $a->{n} }
         package main;
         my $a = O->new(n => 4);
         my $b = O->new(n => 3);
@@ -2490,8 +2490,8 @@ fn perl_compat_use_overload_num_ge_and_num_lt() {
         ri(r#"
         package O;
         use overload '>=' => 'oge', '<' => 'olt';
-        sub oge { my ($a, $b) = @_; $a->{n} >= $b ? 1 : 0 }
-        sub olt { my ($a, $b) = @_; $a->{n} < $b ? 1 : 0 }
+        fn oge { my ($a, $b) = @_; $a->{n} >= $b ? 1 : 0 }
+        fn olt { my ($a, $b) = @_; $a->{n} < $b ? 1 : 0 }
         package main;
         my $o = O->new(n => 7);
         ($o >= 6) * 10 + ($o < 8);
@@ -2506,7 +2506,7 @@ fn perl_compat_use_overload_str_cmp_op() {
         ri(r#"
         package O;
         use overload 'cmp' => 'ocmp';
-        sub ocmp { my ($a, $b) = @_; $a->{"t"} cmp $b }
+        fn ocmp { my ($a, $b) = @_; $a->{"t"} cmp $b }
         package main;
         my $o = bless { "t" => "b" }, "O";
         $o cmp "c";
@@ -2521,7 +2521,7 @@ fn perl_compat_qq_stringify_blessed_hash_value() {
         rs(r#"
         package O;
         use overload '""' => 'as_str';
-        sub as_str { "Zy" }
+        fn as_str { "Zy" }
         package main;
         no strict 'vars';
         my %h = ("k" => bless {}, "O");
@@ -2637,9 +2637,9 @@ fn perl_compat_tie_scalar_fetch_store() {
     assert_eq!(
         ri(r#"
         package T;
-        sub TIESCALAR { bless { v => 0 }, shift }
-        sub FETCH { $_[0]->{v} }
-        sub STORE { $_[0]->{v} = $_1 }
+        fn TIESCALAR { bless { v => 0 }, shift }
+        fn FETCH { $_[0]->{v} }
+        fn STORE { $_[0]->{v} = $_1 }
         package main;
         my $x;
         tie $x, "T";
@@ -3316,7 +3316,7 @@ fn local_in_foreach_loop_variable() {
 fn local_with_typeglob_filehandle_alias() {
     assert_eq!(
         rs(r#"
-            sub read_it {
+            fn read_it {
                 local *FH;
                 open FH, "<", "strykelang/lib.rs" or return "fail";
                 my $line = <FH>;
@@ -3368,8 +3368,8 @@ fn local_in_subroutine() {
     assert_eq!(
         rs(r#"
             our $x = 10;
-            sub wrap { local $x = 20; inner_fn() }
-            sub inner_fn { $x }
+            fn wrap { local $x = 20; inner_fn() }
+            fn inner_fn { $x }
             wrap() . "|" . $x
         "#),
         "20|10"
@@ -3916,7 +3916,7 @@ fn struct_nested() {
 #[test]
 fn struct_complex_defaults() {
     let s = r#"
-        sub get_default { 42 }
+        fn get_default { 42 }
         struct S { x => Int = get_default() };
         my $inst = S();
         $inst->x;
@@ -4557,14 +4557,14 @@ fn core_builtins_stats_entropy_zscore() {
 #[test]
 fn thread_first_injects_as_first_arg() {
     // ~> 10 div(2) → div(10, 2) = 5
-    assert_eq!(ri("sub div { $_0 / $_1 }; ~> 10 div(2)"), 5);
+    assert_eq!(ri("fn div { $_0 / $_1 }; ~> 10 div(2)"), 5);
 }
 
 #[test]
 fn thread_last_injects_as_last_arg() {
     // ->> 10 div(2) → div(2, 10) = 0.2
     assert_eq!(
-        run("sub div { $_0 / $_1 }; ->> 10 div(2)")
+        run("fn div { $_0 / $_1 }; ->> 10 div(2)")
             .expect("run")
             .to_number(),
         0.2
@@ -4575,7 +4575,7 @@ fn thread_last_injects_as_last_arg() {
 fn thread_first_explicit_topic_overrides() {
     // ~> 10 div(2, $_) → div(2, 10) = 0.2 (explicit $_ placement)
     assert_eq!(
-        run("sub div { $_0 / $_1 }; ~> 10 div(2, $_)")
+        run("fn div { $_0 / $_1 }; ~> 10 div(2, $_)")
             .expect("run")
             .to_number(),
         0.2
@@ -4585,32 +4585,32 @@ fn thread_first_explicit_topic_overrides() {
 #[test]
 fn thread_last_explicit_topic_overrides() {
     // ->> 10 div($_, 2) → div(10, 2) = 5 (explicit $_ placement)
-    assert_eq!(ri("sub div { $_0 / $_1 }; ->> 10 div($_, 2)"), 5);
+    assert_eq!(ri("fn div { $_0 / $_1 }; ->> 10 div($_, 2)"), 5);
 }
 
 #[test]
 fn thread_keyword_is_thread_first() {
     // `thread` keyword should be thread-first like ~>
-    assert_eq!(ri("sub div { $_0 / $_1 }; thread 10 div(2)"), 5);
+    assert_eq!(ri("fn div { $_0 / $_1 }; thread 10 div(2)"), 5);
 }
 
 #[test]
 fn thread_t_alias_is_thread_first() {
     // `t` alias should be thread-first like ~>
-    assert_eq!(ri("sub div { $_0 / $_1 }; t 10 div(2)"), 5);
+    assert_eq!(ri("fn div { $_0 / $_1 }; t 10 div(2)"), 5);
 }
 
 #[test]
 fn thread_first_chains_correctly() {
     // ~> 100 div(2) div(5) → div(div(100, 2), 5) = div(50, 5) = 10
-    assert_eq!(ri("sub div { $_0 / $_1 }; ~> 100 div(2) div(5)"), 10);
+    assert_eq!(ri("fn div { $_0 / $_1 }; ~> 100 div(2) div(5)"), 10);
 }
 
 #[test]
 fn thread_last_chains_correctly() {
     // ->> 10 div(100) div(2) → div(2, div(100, 10)) = div(2, 10) = 0.2
     assert_eq!(
-        run("sub div { $_0 / $_1 }; ->> 10 div(100) div(2)")
+        run("fn div { $_0 / $_1 }; ->> 10 div(100) div(2)")
             .expect("run")
             .to_number(),
         0.2
@@ -4626,16 +4626,16 @@ fn thread_first_with_builtins() {
 #[test]
 fn thread_last_with_multi_arg_func() {
     // ->> 3 sub_from(10) → sub_from(10, 3) = 10 - 3 = 7
-    assert_eq!(ri("sub sub_from { $_0 - $_1 }; ->> 3 sub_from(10)"), 7);
+    assert_eq!(ri("fn sub_from { $_0 - $_1 }; ->> 3 sub_from(10)"), 7);
     // vs thread-first: ~> 3 sub_from(10) → sub_from(3, 10) = 3 - 10 = -7
-    assert_eq!(ri("sub sub_from { $_0 - $_1 }; ~> 3 sub_from(10)"), -7);
+    assert_eq!(ri("fn sub_from { $_0 - $_1 }; ~> 3 sub_from(10)"), -7);
 }
 
 #[test]
 fn thread_last_tilde_spelling() {
     // ~>> is symmetric with ~> and behaves as thread-last
     assert_eq!(
-        run("sub div { $_0 / $_1 }; ~>> 10 div(2)")
+        run("fn div { $_0 / $_1 }; ~>> 10 div(2)")
             .expect("run")
             .to_number(),
         0.2

@@ -113,12 +113,12 @@ fn run_conditional_expression() {
 
 #[test]
 fn run_simple_subroutine() {
-    assert_eq!(run_int("sub add2 { return $_0 + $_1; } add2(30, 12)"), 42);
+    assert_eq!(run_int("fn add2 { return $_0 + $_1; } add2(30, 12)"), 42);
 }
 
 #[test]
 fn parse_with_file_includes_path_in_syntax_error_display() {
-    let e = parse_with_file("sub f {", "/tmp/parity_syntax_path.pm").expect_err("unclosed brace");
+    let e = parse_with_file("fn f {", "/tmp/parity_syntax_path.pm").expect_err("unclosed brace");
     let s = e.to_string();
     assert!(
         s.contains("/tmp/parity_syntax_path.pm"),
@@ -704,7 +704,7 @@ fn try_vm_execute_qx_scalar_reads_stdout() {
 #[test]
 fn try_vm_execute_prototype_coderef() {
     let p = parse(
-        r#"sub demo ($) { $_0 * 2 }
+        r#"fn demo ($) { $_0 * 2 }
         prototype \&demo"#,
     )
     .expect("parse");
@@ -1124,7 +1124,7 @@ fn try_vm_execute_unlink_removes_file() {
 #[test]
 fn try_vm_execute_wantarray_scalar_vs_list_in_sub() {
     let p = parse(
-        r#"sub wa { wantarray ? 5 : 9 }
+        r#"fn wa { wantarray ? 5 : 9 }
         my $s = wa()
         my @L = wa()
         $s * 100 + $L[0]"#,
@@ -1220,8 +1220,8 @@ fn try_vm_execute_use_overload_add_and_qq_stringify() {
         r#"
         package O
         use overload '+' => 'add_op', '""' => 'to_str'
-        sub add_op { my ($a, $b) = @_; $a->{n} + $b }
-        sub to_str { "" . $_0->{n} }
+        fn add_op { my ($a, $b) = @_; $a->{n} + $b }
+        fn to_str { "" . $_0->{n} }
         package main
         my $x = O->new(n => 3)
         "$x" . ":" . ($x + 1)
@@ -1244,7 +1244,7 @@ fn try_vm_execute_use_overload_unary_neg() {
         r#"
         package O
         use overload 'neg' => 'negate_op'
-        sub negate_op { 77 }
+        fn negate_op { 77 }
         package main
         my $o = bless {}, "O"
         -$o
@@ -1264,7 +1264,7 @@ fn try_vm_execute_use_overload_concat_string_on_lhs() {
         r#"
         package O
         use overload '.' => 'odot'
-        sub odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
+        fn odot { my ($a, $b) = @_; "[" . $a->{n} . "+" . $b . "]" }
         package main
         my $a = O->new(n => "x")
         "z" . $a
@@ -1287,7 +1287,7 @@ fn try_vm_execute_sprintf_percent_s_overload_stringify() {
         r#"
         package O
         use overload '""' => 'as_string'
-        sub as_string { "QQ" }
+        fn as_string { "QQ" }
         package main
         my $o = bless {}, "O"
         sprintf "%s:%s", $o, "ok"
@@ -1310,7 +1310,7 @@ fn try_vm_execute_join_overload_stringify() {
         r#"
         package O
         use overload '""' => 'as_str'
-        sub as_str { "[" . $_0->{k} . "]" }
+        fn as_str { "[" . $_0->{k} . "]" }
         package main
         my $o = bless { k => 9 }, "O"
         join "-", $o, "z"
@@ -1330,7 +1330,7 @@ fn try_vm_execute_use_overload_bool_unary_not() {
         r#"
         package O
         use overload 'bool' => 'as_bool'
-        sub as_bool { $_0->{f} }
+        fn as_bool { $_0->{f} }
         package main
         my $o = bless { f => 0 }, "O"
         !$o
@@ -1349,7 +1349,7 @@ fn try_vm_execute_use_overload_not_keyword_with_bool() {
         r#"
         package O
         use overload 'bool' => 'as_bool'
-        sub as_bool { $_0->{f} }
+        fn as_bool { $_0->{f} }
         package main
         my $o = bless { f => 1 }, "O"
         not $o
@@ -1372,7 +1372,7 @@ fn try_vm_execute_use_overload_nomethod_binop() {
         r#"
         package O
         use overload nomethod => 'catch_all', fallback => 1
-        sub catch_all { my ($a, $b, $op) = @_; $op eq "+" ? 88 : 0 }
+        fn catch_all { my ($a, $b, $op) = @_; $op eq "+" ? 88 : 0 }
         package main
         my $x = bless { n => 1 }, "O"
         my $y = bless { n => 2 }, "O"
@@ -2685,7 +2685,7 @@ fn try_vm_execute_scalar_braced_aref_is_length() {
 fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
     let p = parse(
         r#"no strict 'vars'
-        sub mk { [1, 2, 3, 4] }
+        fn mk { [1, 2, 3, 4] }
         scalar @{mk()}"#,
     )
     .expect("parse");
@@ -4576,15 +4576,7 @@ fn try_vm_execute_strict_vars_rejects_undeclared_scalar() {
 #[test]
 fn try_vm_execute_strict_vars_allows_underscore_and_foreach_var() {
     let p = parse(
-        r#"use strict
-        sub sum {
-            my $s = 0
-            for my $x (@_) {
-                $s += $x
-            }
-            return $s
-        }
-        sum(1, 2, 3, 4, 5)"#,
+        r#"use strict; fn sum() { my $s = 0; for my $x (@_) { $s += $x }; $s }; sum(1, 2, 3, 4, 5)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -4632,7 +4624,7 @@ fn try_vm_execute_strict_refs_via_transitive_helper() {
 fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
         r#"no strict 'vars'
-        sub foo {
+        fn foo {
             my $s = 0
             $s += 5
             $s *= 2
@@ -4656,7 +4648,7 @@ fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
 fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
     let p = parse(
         r#"no strict 'vars'
-        sub foo {
+        fn foo {
             my $s = ""
             $s .= "ab"
             $s .= "cd"
@@ -4700,13 +4692,13 @@ fn try_vm_execute_top_level_goto_forward() {
     );
 }
 
-/// `goto` inside a subroutine body resolves to a label in the same sub (separate scope from
+/// `goto` inside a subroutine body resolves to a label in the same fn (separate scope from
 /// main-program labels).
 #[test]
 fn try_vm_execute_sub_body_goto_forward() {
     let p = parse(
         r#"no strict 'vars'
-        sub foo {
+        fn foo {
             my $r = 10
             goto SKIP
             $r = 20

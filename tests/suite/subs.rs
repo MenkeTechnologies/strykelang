@@ -3,7 +3,7 @@ use crate::common::*;
 #[test]
 fn basic_sub() {
     assert_eq!(
-        eval_int("sub add { my $a = shift @_; my $b = shift @_; return $a + $b; } add(3, 4)"),
+        eval_int("fn add { my $a = shift @_; my $b = shift @_; return $a + $b; } add(3, 4)"),
         7
     );
 }
@@ -11,7 +11,7 @@ fn basic_sub() {
 #[test]
 fn recursive_fibonacci() {
     assert_eq!(
-        eval_int("sub fib_n { my $n = shift @_; return $n if $n <= 1; return fib_n($n-1) + fib_n($n-2); } fib_n(10)"),
+        eval_int("fn fib_n { my $n = shift @_; return $n if $n <= 1; return fib_n($n-1) + fib_n($n-2); } fib_n(10)"),
         55
     );
 }
@@ -20,7 +20,7 @@ fn recursive_fibonacci() {
 fn return_exits_sub_before_following_statement() {
     assert_eq!(
         eval_int(
-            "sub foo { \
+            "fn foo { \
                  if (1) { return 3; } \
                  9 \
              } \
@@ -33,11 +33,11 @@ fn return_exits_sub_before_following_statement() {
 #[test]
 fn return_with_postfix_if() {
     assert_eq!(
-        eval_int("sub foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(5)"),
+        eval_int("fn foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(5)"),
         5
     );
     assert_eq!(
-        eval_int("sub foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(-1)"),
+        eval_int("fn foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(-1)"),
         0
     );
 }
@@ -45,7 +45,7 @@ fn return_with_postfix_if() {
 #[test]
 fn sub_with_prototype_two_scalars_uses_at_underscore() {
     assert_eq!(
-        eval_int("sub add2 ($$) { return $_0 + $_1; } add2(40, 2)"),
+        eval_int("fn add2 ($$) { return $_0 + $_1; } add2(40, 2)"),
         42
     );
 }
@@ -54,14 +54,14 @@ fn sub_with_prototype_two_scalars_uses_at_underscore() {
 fn sub_stryke_signature_scalar_and_hash_destruct() {
     assert_eq!(
         eval_int(
-            r#"sub move_to ($self, { x => $x, y => $y }) { $x + $y }
+            r#"fn move_to ($self, { x => $x, y => $y }) { $x + $y }
  move_to(0, { x => 10, y => 32 })"#
         ),
         42
     );
     assert_eq!(
         eval_int(
-            r#"sub move_to ($self, { x => $x, y => $y }) { $x + $y }
+            r#"fn move_to ($self, { x => $x, y => $y }) { $x + $y }
                my $h = { x => 3, y => 4 }; move_to(bless({}, "P"), $h)"#
         ),
         7
@@ -72,14 +72,14 @@ fn sub_stryke_signature_scalar_and_hash_destruct() {
 fn sub_stryke_signature_array_destruct() {
     assert_eq!(
         eval_int(
-            r#"sub pair_sum ([ $x, $y ]) { $x + $y }
+            r#"fn pair_sum ([ $x, $y ]) { $x + $y }
  pair_sum([10, 32])"#
         ),
         42
     );
     assert_eq!(
         eval_int(
-            r#"sub head3 ([ $a, $b, @rest ]) { $a + $b + scalar(@rest) }
+            r#"fn head3 ([ $a, $b, @rest ]) { $a + $b + scalar(@rest) }
                head3([1, 2, 30, 40])"#
         ),
         5
@@ -127,14 +127,14 @@ fn my_destructure_arrayref_length_mismatch_dies() {
 
 #[test]
 fn sub_stryke_signature_only_scalars() {
-    assert_eq!(eval_int(r#"sub add ($a, $b) { $a + $b } add(8, 34)"#), 42);
+    assert_eq!(eval_int(r#"fn add ($a, $b) { $a + $b } add(8, 34)"#), 42);
 }
 
 #[test]
 fn sub_stryke_signature_prototype_builtin_undef() {
     assert_eq!(
         eval_int(
-            r#"sub sig ($a) { $a }
+            r#"fn sig ($a) { $a }
                defined(prototype \&sig) ? 1 : 0"#
         ),
         0
@@ -149,7 +149,7 @@ fn anon_sub_stryke_signature() {
 #[test]
 fn coderef_invocation_with_arrow() {
     assert_eq!(
-        eval_int(r#"sub dbl { $_0 * 2 } my $r = \&dbl; $r->(21)"#),
+        eval_int(r#"fn dbl { $_0 * 2 } my $r = \&dbl; $r->(21)"#),
         42,
     );
 }

@@ -968,7 +968,7 @@ mod tests {
 
     #[test]
     fn defined_sub_ok() {
-        assert!(lint("sub foo { 1 } foo()").is_ok());
+        assert!(lint("fn foo { 1 } foo()").is_ok());
     }
 
     #[test]
@@ -992,7 +992,7 @@ mod tests {
 
     #[test]
     fn sub_params_in_scope() {
-        assert!(lint("sub foo($x) { p $x; } foo(1)").is_ok());
+        assert!(lint("fn foo($x) { p $x; } foo(1)").is_ok());
     }
 
     #[test]
@@ -1054,7 +1054,7 @@ mod tests {
 
     #[test]
     fn nested_sub_scope() {
-        assert!(lint("sub wrap { my $x = 1; sub inner { p $x; } }").is_ok());
+        assert!(lint("fn wrap { my $x = 1; fn inner { p $x; } }").is_ok());
     }
 
     #[test]
@@ -1179,7 +1179,7 @@ mod tests {
 
     #[test]
     fn state_var_ok() {
-        assert!(lint("sub my_counter { state $n = 0; $n++; }").is_ok());
+        assert!(lint("fn my_counter { state $n = 0; $n++; }").is_ok());
     }
 
     #[test]

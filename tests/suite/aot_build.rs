@@ -106,7 +106,7 @@ fn aot_build_rejects_syntax_error_at_build_time() {
     let exe = env!("CARGO_BIN_EXE_st");
     let script = tmp_path("bad.pl");
     let bin = tmp_path("bad_bin");
-    fs::write(&script, "sub oops {\n").unwrap();
+    fs::write(&script, "fn oops {\n").unwrap();
 
     let build = Command::new(exe)
         .arg("build")

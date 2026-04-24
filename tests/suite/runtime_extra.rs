@@ -341,7 +341,7 @@ fn anon_sub_returns_from_block() {
 fn sub_returns_first_arg_shift_with_extra_args() {
     // Explicit `return` — bare trailing `$a` after `my` is not the block result in this engine.
     assert_eq!(
-        eval_int("sub add { my $a = shift @_; return $a; } add(1, 2, 3)"),
+        eval_int("fn add { my $a = shift @_; return $a; } add(1, 2, 3)"),
         1
     );
 }

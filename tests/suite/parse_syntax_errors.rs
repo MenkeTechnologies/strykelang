@@ -5,7 +5,7 @@ use stryke::error::ErrorKind;
 
 #[test]
 fn rejects_unclosed_sub_brace() {
-    assert_eq!(parse_err_kind("sub f {"), ErrorKind::Syntax);
+    assert_eq!(parse_err_kind("fn f {"), ErrorKind::Syntax);
 }
 
 #[test]

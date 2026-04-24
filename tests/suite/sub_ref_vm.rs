@@ -8,7 +8,7 @@ fn ampersand_sub_invokes_named_sub() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub count_up { 40 }
+            fn count_up { 40 }
             count_up() + &count_up"#,
         ),
         80
@@ -20,7 +20,7 @@ fn backslash_ampersand_yields_coderef_and_call() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub n { 11 }
+            fn n { 11 }
             my $c = \&n;
             $c->() * 2"#,
         ),
@@ -31,7 +31,7 @@ fn backslash_ampersand_yields_coderef_and_call() {
 #[test]
 fn vm_program_compiles_subroutine_code_ref() {
     let code = r#"no strict 'vars';
-        sub foo { 1 }
+        fn foo { 1 }
         \&foo"#;
     let program = stryke::parse(code).expect("parse");
     let mut interp = Interpreter::new();
@@ -44,7 +44,7 @@ fn vm_program_compiles_subroutine_code_ref() {
 #[test]
 fn vm_program_compiles_dynamic_subroutine_coderef() {
     let code = r#"no strict 'vars';
-        sub g { 7 }
+        fn g { 7 }
         \&{"g"}"#;
     let program = stryke::parse(code).expect("parse");
     let mut interp = Interpreter::new();

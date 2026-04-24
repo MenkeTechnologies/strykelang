@@ -99,7 +99,7 @@ fn state_scalar_initializer_runs_once_across_calls() {
     assert_eq!(
         eval_int(
             r#"use feature 'state';
-               sub tick {
+               fn tick {
                    state $n = 0;
                    $n++;
                }
@@ -114,7 +114,7 @@ fn state_preserves_nonzero_initializer() {
     assert_eq!(
         eval_int(
             r#"use feature 'state';
-               sub base {
+               fn base {
                    state $n = 100;
                    $n++;
                }
@@ -334,21 +334,21 @@ fn division_by_zero_is_runtime_error() {
 #[test]
 fn sub_prototype_ignored_at_runtime_one_arg() {
     assert_eq!(
-        eval_int(r#"sub foo ($) { my $x = shift @_; $x + 1 } foo(41)"#),
+        eval_int(r#"fn foo ($) { my $x = shift @_; $x + 1 } foo(41)"#),
         42
     );
 }
 
 #[test]
 fn return_in_sub_exits_before_following_statement() {
-    assert_eq!(eval_int(r#"sub early { return 7; 99 } early()"#), 7);
+    assert_eq!(eval_int(r#"fn early { return 7; 99 } early()"#), 7);
 }
 
 #[test]
 fn wantarray_false_in_scalar_sub_call() {
     assert_eq!(
         eval_int(
-            r#"sub ctx { wantarray ? 1 : 2 }
+            r#"fn ctx { wantarray ? 1 : 2 }
                ctx()"#,
         ),
         2
@@ -435,7 +435,7 @@ fn scalar_deref_roundtrip() {
 fn wantarray_true_in_list_assignment() {
     assert_eq!(
         eval_int(
-            r#"sub L { wantarray ? 7 : 0 }
+            r#"fn L { wantarray ? 7 : 0 }
                my @x = L();
                scalar @x"#,
         ),

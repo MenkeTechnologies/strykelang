@@ -216,7 +216,7 @@ my @hashes = pmap sha256 @blobs, progress =&gt; 1
 
 # Bare-fn form (works for builtins and user-defined subs)
 my @hashes = pmap sha256, @blobs, progress =&gt; 1
-sub double { $_0 * 2 }
+fn double { $_0 * 2 }
 my @r = pmap double, (1..1_000_000)
 </code></pre>
       </article>
@@ -246,7 +246,7 @@ my @primes = pgrep { is_prime } 2..1_000_000
 @files |&gt; pgrep { -s $_ &gt; 1024 } |&gt; e p
 
 # Bare-fn form
-sub even { $_0 % 2 == 0 }
+fn even { $_0 % 2 == 0 }
 my @e = pgrep even, 1..10        # (2,4,6,8,10)
 </code></pre>
       </article>
@@ -268,7 +268,7 @@ pfor { compress_file } glob(&quot;*.log&quot;)
     p &quot;done: $_&quot; }
 
 # Bare-fn form
-sub work { print &quot;did $_0\n&quot; }
+fn work { print &quot;did $_0\n&quot; }
 pfor work, (1, 2, 3)
 </code></pre>
       </article>
@@ -332,7 +332,7 @@ my $product = preduce { $a * $b } 1..100
 my @out = pflat_map expand @list
 
 # Bare-fn form
-sub expand { ($_0, $_0 * 10) }
+fn expand { ($_0, $_0 * 10) }
 my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
 </code></pre>
       </article>
@@ -351,7 +351,7 @@ fan 8 { work($_) }
 fan { work($_) } progress =&gt; 1
 
 # Bare-fn form
-sub work { print &quot;tick $_0\n&quot; }
+fn work { print &quot;tick $_0\n&quot; }
 fan 8, work
 fan work, progress =&gt; 1   # uses pool size
 </code></pre>
@@ -363,7 +363,7 @@ fan work, progress =&gt; 1   # uses pool size
 my @results = fan_cap 8 { compute($_) }
 
 # Bare-fn form
-sub compute { $_0 * $_0 }
+fn compute { $_0 * $_0 }
 my @squares = fan_cap 8, compute
 </code></pre>
       </article>
@@ -520,7 +520,7 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
         <p>Thread-first macro — chain stages where the threaded value is injected as the **first** argument (like Clojure&#39;s <code>-&gt;</code>).</p>
         <pre><code class="lang-perl">~&gt; @data grep { $_ &gt; 5 } map { $_ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-sub div { $_0 / $_1 }
+fn div { $_0 / $_1 }
 ~&gt; 10 div(2) p                               # div(10, 2) = 5
 ~&gt; 10 div($_, 2) p                           # explicit $_ position: div(10, 2) = 5
 </code></pre>
@@ -534,7 +534,7 @@ sub div { $_0 / $_1 }
 -&gt;&gt; 10 div($_, 2) p                          # explicit $_ overrides: div(10, 2) = 5
 
 # Thread-last is useful for list-consuming functions:
-sub take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
+fn take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
 ~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
 </code></pre>
         <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>$_</code> placeholder always takes precedence.</p>

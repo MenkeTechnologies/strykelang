@@ -1542,7 +1542,7 @@ mod tests {
 
     #[test]
     fn fn_body_indented() {
-        let out = convert("sub foo { return uc(lc($x)); }");
+        let out = convert("fn foo { return uc(lc($x)); }");
         assert!(out.contains("fn foo"));
         // 2-stage: direct call
         assert!(out.contains("lc uc $x"));
@@ -1572,7 +1572,7 @@ mod tests {
 
     #[test]
     fn user_func_call_direct() {
-        let out = convert("sub my_trim { } my_trim(uc($x))");
+        let out = convert("fn my_trim { } my_trim(uc($x))");
         assert!(out.contains("fn my_trim"));
         // 2-stage: direct call (inner-to-outer)
         assert!(out.contains("uc my_trim $x"));
@@ -1580,7 +1580,7 @@ mod tests {
 
     #[test]
     fn user_func_extra_args_direct() {
-        let out = convert("sub process { } process(uc($x), 42)");
+        let out = convert("fn process { } process(uc($x), 42)");
         assert!(out.contains("fn process"));
         // Direct call (inner-to-outer): uc process 42 $x
         assert!(out.contains("uc process 42 $x"));
