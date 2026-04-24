@@ -100,13 +100,30 @@ impl ModuleTable {
     /// Register all statically-compiled modules (replaces dlopen)
     fn register_builtin_modules(&mut self) {
         let builtin_modules = [
-            ("zsh/complete", &["compctl", "compcall", "comparguments",
-                "compdescribe", "compfiles", "compgroups", "compquote",
-                "comptags", "comptry", "compvalues"][..]),
+            (
+                "zsh/complete",
+                &[
+                    "compctl",
+                    "compcall",
+                    "comparguments",
+                    "compdescribe",
+                    "compfiles",
+                    "compgroups",
+                    "compquote",
+                    "comptags",
+                    "comptry",
+                    "compvalues",
+                ][..],
+            ),
             ("zsh/complist", &["complist"][..]),
             ("zsh/computil", &["compadd", "compset"][..]),
             ("zsh/datetime", &["strftime"][..]),
-            ("zsh/files", &["mkdir", "rmdir", "ln", "mv", "cp", "rm", "chmod", "chown", "sync"][..]),
+            (
+                "zsh/files",
+                &[
+                    "mkdir", "rmdir", "ln", "mv", "cp", "rm", "chmod", "chown", "sync",
+                ][..],
+            ),
             ("zsh/langinfo", &[][..]),
             ("zsh/mapfile", &[][..]),
             ("zsh/mathfunc", &[][..]),
@@ -114,11 +131,19 @@ impl ModuleTable {
             ("zsh/net/socket", &["zsocket"][..]),
             ("zsh/net/tcp", &["ztcp"][..]),
             ("zsh/parameter", &[][..]),
-            ("zsh/pcre", &["pcre_compile", "pcre_match", "pcre_study"][..]),
+            (
+                "zsh/pcre",
+                &["pcre_compile", "pcre_match", "pcre_study"][..],
+            ),
             ("zsh/regex", &[][..]),
             ("zsh/sched", &["sched"][..]),
             ("zsh/stat", &["zstat"][..]),
-            ("zsh/system", &["sysread", "syswrite", "sysopen", "sysseek", "syserror", "zsystem"][..]),
+            (
+                "zsh/system",
+                &[
+                    "sysread", "syswrite", "sysopen", "sysseek", "syserror", "zsystem",
+                ][..],
+            ),
             ("zsh/termcap", &["echotc"][..]),
             ("zsh/terminfo", &["echoti"][..]),
             ("zsh/watch", &["log"][..]),
@@ -127,8 +152,14 @@ impl ModuleTable {
             ("zsh/zprof", &["zprof"][..]),
             ("zsh/zpty", &["zpty"][..]),
             ("zsh/zselect", &["zselect"][..]),
-            ("zsh/zutil", &["zstyle", "zformat", "zparseopts", "zregexparse"][..]),
-            ("zsh/attr", &["zgetattr", "zsetattr", "zdelattr", "zlistattr"][..]),
+            (
+                "zsh/zutil",
+                &["zstyle", "zformat", "zparseopts", "zregexparse"][..],
+            ),
+            (
+                "zsh/attr",
+                &["zgetattr", "zsetattr", "zdelattr", "zlistattr"][..],
+            ),
             ("zsh/cap", &["cap", "getcap", "setcap"][..]),
             ("zsh/clone", &["clone"][..]),
             ("zsh/curses", &["zcurses"][..]),
@@ -172,12 +203,16 @@ impl ModuleTable {
 
     /// Check if module is loaded
     pub fn is_loaded(&self, name: &str) -> bool {
-        self.modules.get(name).map(|m| m.is_loaded()).unwrap_or(false)
+        self.modules
+            .get(name)
+            .map(|m| m.is_loaded())
+            .unwrap_or(false)
     }
 
     /// List all loaded modules
     pub fn list_loaded(&self) -> Vec<&str> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .filter(|(_, m)| m.is_loaded())
             .map(|(name, _)| name.as_str())
             .collect()
@@ -185,7 +220,8 @@ impl ModuleTable {
 
     /// List all modules (including unloaded)
     pub fn list_all(&self) -> Vec<(&str, &ModuleState)> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .map(|(name, m)| (name.as_str(), &m.state))
             .collect()
     }
@@ -206,13 +242,15 @@ impl ModuleTable {
     /// Unregister a builtin (from module.c deletebuiltin)
     pub fn deletebuiltin(&mut self, name: &str, module: &str) {
         if let Some(m) = self.modules.get_mut(module) {
-            m.features.retain(|f| f.name != name || f.feature_type != FeatureType::Builtin);
+            m.features
+                .retain(|f| f.name != name || f.feature_type != FeatureType::Builtin);
         }
     }
 
     /// Register autoloading builtin (from module.c add_autobin)
     pub fn add_autobin(&mut self, name: &str, module: &str) {
-        self.autoload_builtins.insert(name.to_string(), module.to_string());
+        self.autoload_builtins
+            .insert(name.to_string(), module.to_string());
     }
 
     /// Remove autoloading builtin (from module.c del_autobin)
@@ -243,7 +281,8 @@ impl ModuleTable {
     /// Unregister a condition (from module.c deleteconddef)
     pub fn deleteconddef(&mut self, name: &str, module: &str) {
         if let Some(m) = self.modules.get_mut(module) {
-            m.features.retain(|f| f.name != name || f.feature_type != FeatureType::Condition);
+            m.features
+                .retain(|f| f.name != name || f.feature_type != FeatureType::Condition);
         }
     }
 
@@ -261,7 +300,8 @@ impl ModuleTable {
 
     /// Register autoloading condition (from module.c add_autocond)
     pub fn add_autocond(&mut self, name: &str, module: &str) {
-        self.autoload_conditions.insert(name.to_string(), module.to_string());
+        self.autoload_conditions
+            .insert(name.to_string(), module.to_string());
     }
 
     /// Remove autoloading condition (from module.c del_autocond)
@@ -297,7 +337,10 @@ impl ModuleTable {
 
     /// Add function to hook (from module.c addhookdeffunc/addhookfunc)
     pub fn addhookfunc(&mut self, hook: &str, func: &str) {
-        self.hooks.entry(hook.to_string()).or_default().push(func.to_string());
+        self.hooks
+            .entry(hook.to_string())
+            .or_default()
+            .push(func.to_string());
     }
 
     /// Remove function from hook (from module.c deletehookdeffunc/deletehookfunc)
@@ -333,7 +376,8 @@ impl ModuleTable {
     /// Unregister a parameter (from module.c deleteparamdef)
     pub fn deleteparamdef(&mut self, name: &str, module: &str) {
         if let Some(m) = self.modules.get_mut(module) {
-            m.features.retain(|f| f.name != name || f.feature_type != FeatureType::Parameter);
+            m.features
+                .retain(|f| f.name != name || f.feature_type != FeatureType::Parameter);
         }
     }
 
@@ -346,7 +390,8 @@ impl ModuleTable {
 
     /// Register autoloading parameter (from module.c add_autoparam)
     pub fn add_autoparam(&mut self, name: &str, module: &str) {
-        self.autoload_params.insert(name.to_string(), module.to_string());
+        self.autoload_params
+            .insert(name.to_string(), module.to_string());
     }
 
     /// Remove autoloading parameter (from module.c del_autoparam)
@@ -367,7 +412,8 @@ impl ModuleTable {
 
     /// Remove wrapper (from module.c deletewrapper)
     pub fn deletewrapper(&mut self, module: &str, name: &str) {
-        self.wrappers.retain(|w| w.module != module || w.name != name);
+        self.wrappers
+            .retain(|w| w.module != module || w.name != name);
     }
 
     // ------- Feature enable/disable (from module.c features_/enables_) -------
@@ -400,7 +446,8 @@ impl ModuleTable {
 
     /// List features of a module (from module.c features_)
     pub fn list_features(&self, module: &str) -> Vec<&ModuleFeature> {
-        self.modules.get(module)
+        self.modules
+            .get(module)
             .map(|m| m.features.iter().collect())
             .unwrap_or_default()
     }
@@ -431,10 +478,18 @@ impl ModuleTable {
 
 /// Module lifecycle callbacks (from module.c setup_/boot_/cleanup_/finish_)
 pub trait ModuleLifecycle {
-    fn setup(&mut self) -> i32 { 0 }
-    fn boot(&mut self) -> i32 { 0 }
-    fn cleanup(&mut self) -> i32 { 0 }
-    fn finish(&mut self) -> i32 { 0 }
+    fn setup(&mut self) -> i32 {
+        0
+    }
+    fn boot(&mut self) -> i32 {
+        0
+    }
+    fn cleanup(&mut self) -> i32 {
+        0
+    }
+    fn finish(&mut self) -> i32 {
+        0
+    }
 }
 
 /// Free module node (from module.c freemodulenode)
@@ -518,7 +573,10 @@ mod tests {
     fn test_autoload() {
         let mut table = ModuleTable::new();
         table.add_autobin("my_cmd", "zsh/mymodule");
-        assert_eq!(table.resolve_autoload_builtin("my_cmd"), Some("zsh/mymodule"));
+        assert_eq!(
+            table.resolve_autoload_builtin("my_cmd"),
+            Some("zsh/mymodule")
+        );
         assert_eq!(table.resolve_autoload_builtin("nonexistent"), None);
     }
 

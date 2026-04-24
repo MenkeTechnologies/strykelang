@@ -99,14 +99,19 @@ pub fn cd_calc(items: &[CompDescItem], separator: &str) -> (usize, usize) {
 /// Format items for display (from computil.c cd_prep)
 pub fn cd_prep(items: &[CompDescItem], separator: &str) -> Vec<String> {
     let (max_word, _) = cd_calc(items, separator);
-    items.iter()
+    items
+        .iter()
         .map(|item| {
             if item.description.is_empty() {
                 item.word.clone()
             } else {
-                format!("{:<width$}{}{}",
-                    item.word, separator, item.description,
-                    width = max_word)
+                format!(
+                    "{:<width$}{}{}",
+                    item.word,
+                    separator,
+                    item.description,
+                    width = max_word
+                )
             }
         })
         .collect()
@@ -119,7 +124,9 @@ pub fn cd_groups_want_sorting(sets: &[CompDescSet]) -> bool {
 
 /// Concatenate arrays from description sets (from computil.c cd_arrcat)
 pub fn cd_arrcat(sets: &[CompDescSet]) -> Vec<String> {
-    sets.iter().flat_map(|s| s.items.iter().map(|i| i.word.clone())).collect()
+    sets.iter()
+        .flat_map(|s| s.items.iter().map(|i| i.word.clone()))
+        .collect()
 }
 
 /// Duplicate description set arrays (from computil.c cd_arrdup)
@@ -154,8 +161,8 @@ pub fn arrcmp(a: &[String], b: &[String]) -> bool {
 /// Completion argument definition (from computil.c Caarg)
 #[derive(Debug, Clone)]
 pub struct CompArgDef {
-    pub num: i32,           // Argument position (1-based, -1 for rest)
-    pub action: String,     // Action to take
+    pub num: i32,       // Argument position (1-based, -1 for rest)
+    pub action: String, // Action to take
     pub description: String,
     pub optional: bool,
     pub repeated: bool,
@@ -164,10 +171,10 @@ pub struct CompArgDef {
 /// Completion option definition (from computil.c Caopt)
 #[derive(Debug, Clone)]
 pub struct CompOptDef {
-    pub name: String,       // Option name (e.g., "-v", "--verbose")
+    pub name: String, // Option name (e.g., "-v", "--verbose")
     pub description: String,
-    pub has_arg: bool,      // Whether option takes an argument
-    pub arg_desc: String,   // Argument description
+    pub has_arg: bool,          // Whether option takes an argument
+    pub arg_desc: String,       // Argument description
     pub exclusive: Vec<String>, // Mutually exclusive options
 }
 
@@ -217,7 +224,10 @@ pub fn parse_caopt(spec: &str) -> Option<CompOptDef> {
     // Extract exclusions
     let (exclusive, rest) = if spec.starts_with('(') {
         if let Some(close) = spec.find(')') {
-            let excl: Vec<String> = spec[1..close].split_whitespace().map(String::from).collect();
+            let excl: Vec<String> = spec[1..close]
+                .split_whitespace()
+                .map(String::from)
+                .collect();
             (excl, spec[close + 1..].trim())
         } else {
             (Vec::new(), spec)
@@ -228,13 +238,16 @@ pub fn parse_caopt(spec: &str) -> Option<CompOptDef> {
 
     // Extract option name
     let (name, after_name) = if rest.starts_with("--") {
-        let end = rest.find('[').unwrap_or(rest.find(':').unwrap_or(rest.len()));
+        let end = rest
+            .find('[')
+            .unwrap_or(rest.find(':').unwrap_or(rest.len()));
         (&rest[..end], &rest[end..])
     } else if rest.starts_with('-') {
         let end = if rest.len() > 2 { 2 } else { rest.len() };
-        let end = rest[end..].find('[').map(|i| i + end).unwrap_or(
-            rest[end..].find(':').map(|i| i + end).unwrap_or(rest.len())
-        );
+        let end = rest[end..]
+            .find('[')
+            .map(|i| i + end)
+            .unwrap_or(rest[end..].find(':').map(|i| i + end).unwrap_or(rest.len()));
         (&rest[..end], &rest[end..])
     } else {
         return None;
@@ -312,7 +325,11 @@ mod tests {
 
     #[test]
     fn test_cd_sort() {
-        let mut set = cd_init(&vec!["c:third".into(), "a:first".into(), "b:second".into()], "", "");
+        let mut set = cd_init(
+            &vec!["c:third".into(), "a:first".into(), "b:second".into()],
+            "",
+            "",
+        );
         cd_sort(&mut set);
         assert_eq!(set.items[0].word, "a");
         assert_eq!(set.items[2].word, "c");
@@ -321,8 +338,16 @@ mod tests {
     #[test]
     fn test_cd_prep() {
         let items = vec![
-            CompDescItem { word: "short".into(), description: "A short one".into(), hidden: false },
-            CompDescItem { word: "longer".into(), description: "A longer one".into(), hidden: false },
+            CompDescItem {
+                word: "short".into(),
+                description: "A short one".into(),
+                hidden: false,
+            },
+            CompDescItem {
+                word: "longer".into(),
+                description: "A longer one".into(),
+                hidden: false,
+            },
         ];
         let formatted = cd_prep(&items, " -- ");
         assert!(formatted[0].contains(" -- "));
@@ -366,9 +391,21 @@ mod tests {
     #[test]
     fn test_cd_group() {
         let items = vec![
-            CompDescItem { word: "a".into(), description: "group1".into(), hidden: false },
-            CompDescItem { word: "b".into(), description: "group1".into(), hidden: false },
-            CompDescItem { word: "c".into(), description: "group2".into(), hidden: false },
+            CompDescItem {
+                word: "a".into(),
+                description: "group1".into(),
+                hidden: false,
+            },
+            CompDescItem {
+                word: "b".into(),
+                description: "group1".into(),
+                hidden: false,
+            },
+            CompDescItem {
+                word: "c".into(),
+                description: "group2".into(),
+                hidden: false,
+            },
         ];
         let groups = cd_group(&items);
         assert_eq!(groups.len(), 2);

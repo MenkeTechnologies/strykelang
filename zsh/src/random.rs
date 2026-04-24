@@ -146,7 +146,10 @@ pub fn zrand_int(upper: Option<i64>, lower: Option<i64>, inclusive: bool) -> Res
     let upper = upper.unwrap_or(u32::MAX as i64);
 
     if lower < 0 || lower > u32::MAX as i64 {
-        return Err(format!("Lower bound ({}) out of range: 0-4294967295", lower));
+        return Err(format!(
+            "Lower bound ({}) out of range: 0-4294967295",
+            lower
+        ));
     }
 
     if upper < lower {
@@ -157,7 +160,10 @@ pub fn zrand_int(upper: Option<i64>, lower: Option<i64>, inclusive: bool) -> Res
     }
 
     if upper < 0 || upper > u32::MAX as i64 {
-        return Err(format!("Upper bound ({}) out of range: 0-4294967295", upper));
+        return Err(format!(
+            "Upper bound ({}) out of range: 0-4294967295",
+            upper
+        ));
     }
 
     let incl = if inclusive { 1 } else { 0 };

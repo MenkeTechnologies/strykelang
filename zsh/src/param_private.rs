@@ -60,12 +60,15 @@ impl PrivateScope {
             }
         }
 
-        self.params.insert(name.to_string(), PrivateParam {
-            name: name.to_string(),
-            value,
-            level: self.level,
-            readonly,
-        });
+        self.params.insert(
+            name.to_string(),
+            PrivateParam {
+                name: name.to_string(),
+                value,
+                level: self.level,
+                readonly,
+            },
+        );
 
         true
     }
@@ -86,7 +89,8 @@ impl PrivateScope {
 
     /// Check if a parameter is private at current scope
     pub fn is_private(&self, name: &str) -> bool {
-        self.params.get(name)
+        self.params
+            .get(name)
             .map(|p| p.level == self.level)
             .unwrap_or(false)
     }
@@ -115,7 +119,8 @@ impl PrivateScope {
 
     /// List all private parameters at current level
     pub fn list_current(&self) -> Vec<&PrivateParam> {
-        self.params.values()
+        self.params
+            .values()
             .filter(|p| p.level == self.level)
             .collect()
     }
@@ -174,12 +179,8 @@ pub fn builtin_private(args: &[&str], scope: &mut PrivateScope) -> (i32, String)
         if let Some((name, value)) = arg.split_once('=') {
             let val = match &param_type {
                 ParamValue::Scalar(_) => ParamValue::Scalar(value.to_string()),
-                ParamValue::Integer(_) => {
-                    ParamValue::Integer(value.parse().unwrap_or(0))
-                }
-                ParamValue::Float(_) => {
-                    ParamValue::Float(value.parse().unwrap_or(0.0))
-                }
+                ParamValue::Integer(_) => ParamValue::Integer(value.parse().unwrap_or(0)),
+                ParamValue::Float(_) => ParamValue::Float(value.parse().unwrap_or(0.0)),
                 ParamValue::Array(_) => {
                     ParamValue::Array(value.split_whitespace().map(|s| s.to_string()).collect())
                 }

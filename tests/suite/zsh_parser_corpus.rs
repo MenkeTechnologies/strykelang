@@ -42,7 +42,7 @@ fn test_parse_all_zsh_functions() {
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
         .collect();
-    
+
     // Sort for deterministic order
     entries.sort_by_key(|e| e.path());
 
@@ -112,12 +112,7 @@ fn test_specific_zsh_functions() {
         return;
     }
 
-    let important_functions = [
-        "add-zsh-hook",
-        "colors",
-        "compinit",
-        "promptinit",
-    ];
+    let important_functions = ["add-zsh-hook", "colors", "compinit", "promptinit"];
 
     for func_name in important_functions {
         let path = functions_dir.join(func_name);

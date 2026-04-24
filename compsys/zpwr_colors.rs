@@ -68,53 +68,61 @@ impl ZstyleColors {
     /// Parse zstyle colors from zpwr config files
     pub fn from_zpwr() -> Self {
         let mut colors = Self::default();
-        
+
         // Add default colors for common file-related tags (green, like zsh default)
         // These can be overridden by zpwr config
         colors.add_default_file_colors();
-        
+
         // Parse ZPWR env file for header colors and separator
         if let Some(home) = std::env::var("HOME").ok() {
             let env_file = PathBuf::from(&home).join(".zpwr/env/.zpwr_env.sh");
             if let Ok(content) = std::fs::read_to_string(&env_file) {
                 colors.parse_env_file(&content);
             }
-            
+
             // Parse zstyle file for list-colors
             let zstyle_file = PathBuf::from(&home).join(".zpwr/autoload/common/zpwrBindZstyle");
             if let Ok(content) = std::fs::read_to_string(&zstyle_file) {
                 colors.parse_zstyle_file(&content);
             }
         }
-        
+
         // Also check current env vars (they override file parsing)
         colors.header = HeaderColors::from_env();
         if let Ok(sep) = std::env::var("ZPWR_CHAR_LOGO") {
             colors.list_separator = sep;
         }
-        
+
         // Check for LC_FOLLOW_SYMLINKS env var (non-empty = true)
         colors.follow_symlinks = std::env::var("LC_FOLLOW_SYMLINKS")
             .map(|v| !v.is_empty() && v != "0" && v.to_lowercase() != "false")
             .unwrap_or(false);
-        
+
         colors
     }
-    
+
     /// Add default colors for file-related completion tags
     /// Uses green (32) to match standard zsh/terminal file coloring
     fn add_default_file_colors(&mut self) {
         let file_color = "32".to_string(); // green
-        
+
         // Various file-related tag names
         for tag in &[
-            "file", "files", "all-files", "globbed-files", "local-directories",
-            "directories", "directory", "path", "paths",
+            "file",
+            "files",
+            "all-files",
+            "globbed-files",
+            "local-directories",
+            "directories",
+            "directory",
+            "path",
+            "paths",
         ] {
-            self.tag_colors.insert((*tag).to_string(), file_color.clone());
+            self.tag_colors
+                .insert((*tag).to_string(), file_color.clone());
         }
     }
-    
+
     fn parse_env_file(&mut self, content: &str) {
         for line in content.lines() {
             let line = line.trim();
@@ -135,46 +143,46 @@ impl ZstyleColors {
             }
         }
     }
-    
+
     fn parse_zstyle_file(&mut self, content: &str) {
         for line in content.lines() {
             let line = line.trim();
-            
+
             // Skip comments and empty lines
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            
+
             // Parse: zstyle ':completion:*...' list-colors '...'
             if !line.starts_with("zstyle ") {
                 continue;
             }
-            
+
             // Extract pattern and value - handle quoted strings properly
             // Format: zstyle 'PATTERN' list-colors 'VALUE'
             let rest = &line[7..]; // Skip "zstyle "
-            
+
             // Find pattern (first quoted string)
             let (pattern, rest) = Self::extract_quoted(rest);
             if pattern.is_none() {
                 continue;
             }
             let pattern = pattern.unwrap();
-            
+
             // Skip whitespace and find style name
             let rest = rest.trim_start();
             if !rest.starts_with("list-colors") {
                 continue;
             }
             let rest = rest[11..].trim_start(); // Skip "list-colors"
-            
+
             // Extract value
             let (value, _) = Self::extract_quoted(rest);
             if value.is_none() {
                 continue;
             }
             let value = value.unwrap();
-            
+
             // Extract tag from pattern like ':completion:*:*:*:*:aliases'
             if let Some(tag) = Self::extract_tag(&pattern) {
                 if tag.is_empty() {
@@ -187,17 +195,20 @@ impl ZstyleColors {
                     if let Some(color) = Self::parse_list_color_value(&value) {
                         // Insert both the raw tag and friendly aliases
                         self.tag_colors.insert(tag.to_string(), color.1.clone());
-                        
+
                         // Add friendly name mappings
                         match tag {
                             "executables" => {
-                                self.tag_colors.insert("external command".into(), color.1.clone());
+                                self.tag_colors
+                                    .insert("external command".into(), color.1.clone());
                             }
                             "functions" => {
-                                self.tag_colors.insert("shell function".into(), color.1.clone());
+                                self.tag_colors
+                                    .insert("shell function".into(), color.1.clone());
                             }
                             "builtins" => {
-                                self.tag_colors.insert("builtin command".into(), color.1.clone());
+                                self.tag_colors
+                                    .insert("builtin command".into(), color.1.clone());
                             }
                             "parameters" => {
                                 self.tag_colors.insert("parameter".into(), color.1.clone());
@@ -208,7 +219,7 @@ impl ZstyleColors {
                             }
                             _ => {}
                         }
-                        
+
                         if self.prefix_color.is_empty() {
                             self.prefix_color = color.0;
                         }
@@ -217,22 +228,22 @@ impl ZstyleColors {
             }
         }
     }
-    
+
     /// Extract a quoted string from input, returns (content, rest)
     fn extract_quoted(s: &str) -> (Option<String>, &str) {
         let s = s.trim_start();
         if s.starts_with('\'') {
             if let Some(end) = s[1..].find('\'') {
-                return (Some(s[1..end+1].to_string()), &s[end+2..]);
+                return (Some(s[1..end + 1].to_string()), &s[end + 2..]);
             }
         } else if s.starts_with('"') {
             if let Some(end) = s[1..].find('"') {
-                return (Some(s[1..end+1].to_string()), &s[end+2..]);
+                return (Some(s[1..end + 1].to_string()), &s[end + 2..]);
             }
         }
         (None, s)
     }
-    
+
     /// Extract tag name from zstyle pattern
     /// ':completion:*:*:*:*:aliases' -> "aliases"
     /// ':completion:*:functions' -> "functions"  
@@ -241,12 +252,12 @@ impl ZstyleColors {
         if !pattern.starts_with(":completion:") {
             return None;
         }
-        
+
         // Split by colon, get last non-* segment
         let parts: Vec<&str> = pattern.split(':').collect();
         // parts for ":completion:*" = ["", "completion", "*"]
         // parts for ":completion:*:aliases" = ["", "completion", "*", "aliases"]
-        
+
         // Skip empty, "completion", and "*" - find real tag at end
         for part in parts.iter().rev() {
             if part.is_empty() || *part == "completion" || part.contains('*') {
@@ -254,16 +265,16 @@ impl ZstyleColors {
             }
             return Some(*part);
         }
-        
+
         Some("") // Global pattern (no specific tag)
     }
-    
+
     /// Parse list-colors value like '=(#b)(*)=1;30=34;42;4'
     /// Returns (prefix_color, completion_color)
     fn parse_list_color_value(value: &str) -> Option<(String, String)> {
         // Format: =(#b)(*)=PREFIX_COLOR=COMPLETION_COLOR
         // or just: ma=COLOR for menu selection
-        
+
         if value.starts_with("=(#b)(*)=") {
             let rest = &value[9..]; // Skip "=(#b)(*)="
             let parts: Vec<&str> = rest.splitn(2, '=').collect();
@@ -273,7 +284,7 @@ impl ZstyleColors {
                 return Some(("1;30".to_string(), parts[0].to_string()));
             }
         }
-        
+
         None
     }
 }
@@ -298,10 +309,10 @@ pub const MENU_SELECTION_COLOR: &str = "37;1;4;44";
 /// Parsed LS_COLORS for file type coloring
 #[derive(Clone, Debug, Default)]
 pub struct LsColors {
-    pub directory: String,      // di=
-    pub symlink: String,        // ln=
-    pub executable: String,     // ex=
-    pub file: String,           // fi= (regular file)
+    pub directory: String,                   // di=
+    pub symlink: String,                     // ln=
+    pub executable: String,                  // ex=
+    pub file: String,                        // fi= (regular file)
     pub extensions: HashMap<String, String>, // *.ext=color
 }
 
@@ -309,7 +320,7 @@ impl LsColors {
     /// Parse from LS_COLORS environment variable
     pub fn from_env() -> Self {
         let mut colors = Self::default();
-        
+
         if let Ok(ls_colors) = std::env::var("LS_COLORS") {
             for entry in ls_colors.split(':') {
                 if let Some((key, color)) = entry.split_once('=') {
@@ -327,7 +338,7 @@ impl LsColors {
                 }
             }
         }
-        
+
         // Defaults if not set (match common terminal defaults)
         if colors.directory.is_empty() {
             colors.directory = "1;34".to_string(); // bold blue
@@ -339,10 +350,10 @@ impl LsColors {
             colors.executable = "1;32".to_string(); // bold green
         }
         // Regular files have no color by default (use terminal default)
-        
+
         colors
     }
-    
+
     /// Get color for a specific file
     pub fn color_for(&self, filename: &str, is_dir: bool, is_exec: bool, is_link: bool) -> &str {
         if is_link {
@@ -354,14 +365,14 @@ impl LsColors {
         if is_exec {
             return &self.executable;
         }
-        
+
         // Check extension
         if let Some(ext) = filename.rsplit('.').next() {
             if let Some(color) = self.extensions.get(&ext.to_lowercase()) {
                 return color;
             }
         }
-        
+
         // Default file color (empty = terminal default)
         &self.file
     }
@@ -373,7 +384,9 @@ static LS_COLORS: std::sync::OnceLock<LsColors> = std::sync::OnceLock::new();
 /// Get color for a file based on LS_COLORS
 pub fn ls_color_for_file(filename: &str, is_dir: bool, is_exec: bool, is_link: bool) -> String {
     let colors = LS_COLORS.get_or_init(LsColors::from_env);
-    colors.color_for(filename, is_dir, is_exec, is_link).to_string()
+    colors
+        .color_for(filename, is_dir, is_exec, is_link)
+        .to_string()
 }
 
 #[cfg(test)]
@@ -382,10 +395,19 @@ mod tests {
 
     #[test]
     fn test_extract_tag() {
-        assert_eq!(ZstyleColors::extract_tag(":completion:*:*:*:*:aliases"), Some("aliases"));
-        assert_eq!(ZstyleColors::extract_tag(":completion:*:functions"), Some("functions"));
+        assert_eq!(
+            ZstyleColors::extract_tag(":completion:*:*:*:*:aliases"),
+            Some("aliases")
+        );
+        assert_eq!(
+            ZstyleColors::extract_tag(":completion:*:functions"),
+            Some("functions")
+        );
         assert_eq!(ZstyleColors::extract_tag(":completion:*"), Some(""));
-        assert_eq!(ZstyleColors::extract_tag(":completion:*:zpwr-vim"), Some("zpwr-vim"));
+        assert_eq!(
+            ZstyleColors::extract_tag(":completion:*:zpwr-vim"),
+            Some("zpwr-vim")
+        );
         assert_eq!(ZstyleColors::extract_tag("not-completion"), None);
     }
 
@@ -426,12 +448,12 @@ zstyle ':completion:*:descriptions' format '%d'
 "#;
         let styles = parse_zstyles_from_content(content);
         assert_eq!(styles.len(), 2);
-        
+
         assert_eq!(styles[0].pattern, ":completion:*");
         assert_eq!(styles[0].style, "menu");
         assert_eq!(styles[0].values, vec!["select"]);
         assert!(!styles[0].eval);
-        
+
         assert_eq!(styles[1].pattern, ":completion:*:descriptions");
         assert_eq!(styles[1].style, "format");
         assert_eq!(styles[1].values, vec!["%d"]);
@@ -466,7 +488,10 @@ zstyle ':completion:*' completer _complete _approximate _correct
 "#;
         let styles = parse_zstyles_from_content(content);
         assert_eq!(styles.len(), 1);
-        assert_eq!(styles[0].values, vec!["_complete", "_approximate", "_correct"]);
+        assert_eq!(
+            styles[0].values,
+            vec!["_complete", "_approximate", "_correct"]
+        );
     }
 
     #[test]
@@ -545,7 +570,7 @@ zstyle ':completion:*' verbose yes
             values: vec!["select".to_string()],
             eval: false,
         };
-        
+
         assert_eq!(zstyle.pattern, ":completion:*");
         assert_eq!(zstyle.style, "menu");
         assert!(!zstyle.eval);
@@ -568,73 +593,73 @@ pub struct ParsedZstyle {
 /// Parse all zstyles from shell config files
 pub fn parse_zstyles_from_config() -> Vec<ParsedZstyle> {
     let mut styles = Vec::new();
-    
+
     if let Ok(home) = std::env::var("HOME") {
         // Parse main .zshrc
         let zshrc = format!("{}/.zshrc", home);
         if let Ok(content) = std::fs::read_to_string(&zshrc) {
             styles.extend(parse_zstyles_from_content(&content));
         }
-        
+
         // Parse ZPWR .zshrc
         let zpwr_zshrc = format!("{}/.zpwr/install/.zshrc", home);
         if let Ok(content) = std::fs::read_to_string(&zpwr_zshrc) {
             styles.extend(parse_zstyles_from_content(&content));
         }
-        
+
         // Parse zpwrBindZstyle
         let zstyle_file = format!("{}/.zpwr/autoload/common/zpwrBindZstyle", home);
         if let Ok(content) = std::fs::read_to_string(&zstyle_file) {
             styles.extend(parse_zstyles_from_content(&content));
         }
-        
+
         // Parse zpwrBindMenu (where completer is set)
         let menu_file = format!("{}/.zpwr/autoload/common/zpwrBindMenu", home);
         if let Ok(content) = std::fs::read_to_string(&menu_file) {
             styles.extend(parse_zstyles_from_content(&content));
         }
     }
-    
+
     styles
 }
 
 /// Parse zstyle commands from shell script content
 pub fn parse_zstyles_from_content(content: &str) -> Vec<ParsedZstyle> {
     let mut styles = Vec::new();
-    
+
     for line in content.lines() {
         let line = line.trim();
-        
+
         // Skip comments and empty lines
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        
+
         // Handle: zstyle 'pattern' style value...
         // Also: builtin zstyle 'pattern' style value...
         // Also: zstyle -e 'pattern' style 'eval-code'
         let line = line.strip_prefix("builtin ").unwrap_or(line);
-        
+
         if !line.starts_with("zstyle ") {
             continue;
         }
-        
+
         let rest = &line[7..].trim_start(); // Skip "zstyle "
-        
+
         // Check for -e (eval) flag
         let (eval, rest) = if rest.starts_with("-e ") {
             (true, rest[3..].trim_start())
         } else {
             (false, *rest)
         };
-        
+
         // Extract pattern (first quoted or unquoted string)
         let (pattern, rest) = extract_zstyle_arg(rest);
         if pattern.is_none() {
             continue;
         }
         let pattern = pattern.unwrap();
-        
+
         // Extract style name
         let rest = rest.trim_start();
         let (style, rest) = extract_zstyle_arg(rest);
@@ -642,7 +667,7 @@ pub fn parse_zstyles_from_content(content: &str) -> Vec<ParsedZstyle> {
             continue;
         }
         let style = style.unwrap();
-        
+
         // Extract values (remaining arguments)
         let mut values = Vec::new();
         let mut remaining = rest.trim_start();
@@ -655,7 +680,7 @@ pub fn parse_zstyles_from_content(content: &str) -> Vec<ParsedZstyle> {
                 break;
             }
         }
-        
+
         styles.push(ParsedZstyle {
             pattern,
             style,
@@ -663,7 +688,7 @@ pub fn parse_zstyles_from_content(content: &str) -> Vec<ParsedZstyle> {
             eval,
         });
     }
-    
+
     styles
 }
 
@@ -673,7 +698,7 @@ fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
     if s.is_empty() {
         return (None, s);
     }
-    
+
     // Single quoted string
     if s.starts_with('\'') {
         let mut i = 1;
@@ -694,7 +719,7 @@ fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
         }
         return (None, s);
     }
-    
+
     // Double quoted string
     if s.starts_with('"') {
         let mut i = 1;
@@ -708,7 +733,7 @@ fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
         }
         return (None, s);
     }
-    
+
     // $'...' ANSI-C quoting
     if s.starts_with("$'") {
         if let Some(end) = s[2..].find('\'') {
@@ -719,7 +744,7 @@ fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
         }
         return (None, s);
     }
-    
+
     // Unquoted word (until whitespace)
     let end = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
     if end == 0 {
@@ -732,7 +757,7 @@ fn extract_zstyle_arg(s: &str) -> (Option<String>, &str) {
 fn parse_ansi_c_string(s: &str) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\\' {
             match chars.next() {
@@ -763,6 +788,6 @@ fn parse_ansi_c_string(s: &str) -> String {
             result.push(c);
         }
     }
-    
+
     result
 }

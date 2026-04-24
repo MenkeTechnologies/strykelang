@@ -1,5 +1,5 @@
-use std::fs;
 use std::env;
+use std::fs;
 use stryke::zsh_parse::ZshParser;
 
 fn main() {
@@ -9,9 +9,9 @@ fn main() {
     } else {
         "echo hello".to_string()
     };
-    
+
     eprintln!("Parsing {} bytes...", content.len());
-    
+
     let mut parser = ZshParser::new(&content);
     match parser.parse() {
         Ok(prog) => eprintln!("OK: {} lists", prog.lists.len()),

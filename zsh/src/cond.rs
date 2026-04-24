@@ -25,32 +25,32 @@ use crate::glob::pattern_match;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CondType {
     // Logical operators
-    Not,       // !
-    And,       // &&
-    Or,        // ||
+    Not, // !
+    And, // &&
+    Or,  // ||
 
     // String comparisons
-    StrEq,     // = or ==
-    StrDeq,    // == (double equals)
-    StrNeq,    // !=
-    StrLt,     // <
-    StrGt,     // >
+    StrEq,  // = or ==
+    StrDeq, // == (double equals)
+    StrNeq, // !=
+    StrLt,  // <
+    StrGt,  // >
 
     // File comparisons
-    Nt,        // -nt (newer than)
-    Ot,        // -ot (older than)
-    Ef,        // -ef (same file)
+    Nt, // -nt (newer than)
+    Ot, // -ot (older than)
+    Ef, // -ef (same file)
 
     // Numeric comparisons
-    Eq,        // -eq
-    Ne,        // -ne
-    Lt,        // -lt
-    Gt,        // -gt
-    Le,        // -le
-    Ge,        // -ge
+    Eq, // -eq
+    Ne, // -ne
+    Lt, // -lt
+    Gt, // -gt
+    Le, // -le
+    Ge, // -ge
 
     // Regex
-    Regex,     // =~
+    Regex, // =~
 
     // Unary file tests (single character codes)
     FileTest(char),
@@ -80,7 +80,11 @@ impl CondResult {
     }
 
     pub fn from_bool(b: bool) -> Self {
-        if b { CondResult::True } else { CondResult::False }
+        if b {
+            CondResult::True
+        } else {
+            CondResult::False
+        }
     }
 
     pub fn negate(self) -> Self {
@@ -105,10 +109,7 @@ pub struct CondEval<'a> {
 }
 
 impl<'a> CondEval<'a> {
-    pub fn new(
-        options: &'a HashMap<String, bool>,
-        variables: &'a HashMap<String, String>,
-    ) -> Self {
+    pub fn new(options: &'a HashMap<String, bool>, variables: &'a HashMap<String, String>) -> Self {
         CondEval {
             options,
             variables,
@@ -344,7 +345,9 @@ impl<'a> CondEval<'a> {
         if let Ok(c_path) = CString::new(path) {
             unsafe { libc::access(c_path.as_ptr(), libc::W_OK) == 0 }
         } else {
-            self.get_metadata(path).map(|m| m.mode() & 0o200 != 0).unwrap_or(false)
+            self.get_metadata(path)
+                .map(|m| m.mode() & 0o200 != 0)
+                .unwrap_or(false)
         }
     }
 
@@ -450,7 +453,7 @@ impl<'a> CondEval<'a> {
         };
 
         CondResult::from_bool(
-            left_meta.dev() == right_meta.dev() && left_meta.ino() == right_meta.ino()
+            left_meta.dev() == right_meta.dev() && left_meta.ino() == right_meta.ino(),
         )
     }
 
@@ -629,7 +632,11 @@ impl<'a> CondParser<'a> {
             if let Some(cond_type) = parse_binary_op(op) {
                 self.advance();
                 let right = self.expect_arg()?;
-                return Ok(CondExpr::Binary(cond_type, left.to_string(), right.to_string()));
+                return Ok(CondExpr::Binary(
+                    cond_type,
+                    left.to_string(),
+                    right.to_string(),
+                ));
             }
         }
 
@@ -657,15 +664,38 @@ impl<'a> CondParser<'a> {
     }
 
     fn expect_arg(&mut self) -> Result<&'a str, String> {
-        self.advance().ok_or_else(|| "expected argument".to_string())
+        self.advance()
+            .ok_or_else(|| "expected argument".to_string())
     }
 }
 
 fn is_unary_op(c: char) -> bool {
-    matches!(c,
-        'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'k' | 'L' |
-        'n' | 'o' | 'p' | 'r' | 's' | 'S' | 't' | 'u' | 'v' | 'w' |
-        'x' | 'z' | 'G' | 'N' | 'O'
+    matches!(
+        c,
+        'a' | 'b'
+            | 'c'
+            | 'd'
+            | 'e'
+            | 'f'
+            | 'g'
+            | 'h'
+            | 'k'
+            | 'L'
+            | 'n'
+            | 'o'
+            | 'p'
+            | 'r'
+            | 's'
+            | 'S'
+            | 't'
+            | 'u'
+            | 'v'
+            | 'w'
+            | 'x'
+            | 'z'
+            | 'G'
+            | 'N'
+            | 'O'
     )
 }
 
@@ -702,7 +732,8 @@ pub fn eval_test(
     }
 
     // Filter out [ and ] if present
-    let args: Vec<&str> = args.iter()
+    let args: Vec<&str> = args
+        .iter()
         .filter(|&s| *s != "[" && *s != "]" && *s != "[[" && *s != "]]")
         .copied()
         .collect();
@@ -714,8 +745,7 @@ pub fn eval_test(
     let mut parser = CondParser::new(args, posix_mode);
     match parser.parse() {
         Ok(expr) => {
-            let evaluator = CondEval::new(options, variables)
-                .with_posix_mode(posix_mode);
+            let evaluator = CondEval::new(options, variables).with_posix_mode(posix_mode);
             evaluator.eval(&expr).to_exit_code()
         }
         Err(_) => 2, // syntax error
@@ -795,15 +825,27 @@ mod tests {
     #[test]
     fn test_logical_and() {
         let (opts, vars) = empty_maps();
-        assert_eq!(eval_test(&["-n", "a", "-a", "-n", "b"], &opts, &vars, true), 0);
-        assert_eq!(eval_test(&["-n", "a", "-a", "-z", "b"], &opts, &vars, true), 1);
+        assert_eq!(
+            eval_test(&["-n", "a", "-a", "-n", "b"], &opts, &vars, true),
+            0
+        );
+        assert_eq!(
+            eval_test(&["-n", "a", "-a", "-z", "b"], &opts, &vars, true),
+            1
+        );
     }
 
     #[test]
     fn test_logical_or() {
         let (opts, vars) = empty_maps();
-        assert_eq!(eval_test(&["-z", "a", "-o", "-n", "b"], &opts, &vars, true), 0);
-        assert_eq!(eval_test(&["-z", "a", "-o", "-z", "b"], &opts, &vars, true), 1);
+        assert_eq!(
+            eval_test(&["-z", "a", "-o", "-n", "b"], &opts, &vars, true),
+            0
+        );
+        assert_eq!(
+            eval_test(&["-z", "a", "-o", "-z", "b"], &opts, &vars, true),
+            1
+        );
     }
 
     #[test]

@@ -13,21 +13,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// History entry
 #[derive(Clone, Debug)]
 pub struct HistEntry {
-    pub histnum: i64,           // History event number
-    pub text: String,           // Command text
+    pub histnum: i64,               // History event number
+    pub text: String,               // Command text
     pub words: Vec<(usize, usize)>, // Word boundaries
-    pub stim: i64,              // Start time
-    pub ftim: i64,              // Finish time
-    pub flags: u32,             // Entry flags
+    pub stim: i64,                  // Start time
+    pub ftim: i64,                  // Finish time
+    pub flags: u32,                 // Entry flags
 }
 
 /// History entry flags
 pub mod hist_flags {
-    pub const OLD: u32 = 1;        // From history file
-    pub const DUP: u32 = 2;        // Duplicate
-    pub const FOREIGN: u32 = 4;    // From other session
-    pub const TMPSTORE: u32 = 8;   // Temporary storage
-    pub const NOWRITE: u32 = 16;   // Don't save to file
+    pub const OLD: u32 = 1; // From history file
+    pub const DUP: u32 = 2; // Duplicate
+    pub const FOREIGN: u32 = 4; // From other session
+    pub const TMPSTORE: u32 = 8; // Temporary storage
+    pub const NOWRITE: u32 = 16; // Don't save to file
 }
 
 impl HistEntry {
@@ -49,7 +49,9 @@ impl HistEntry {
 
     /// Get a specific word from the entry
     pub fn get_word(&self, index: usize) -> Option<&str> {
-        self.words.get(index).map(|(start, end)| &self.text[*start..*end])
+        self.words
+            .get(index)
+            .map(|(start, end)| &self.text[*start..*end])
     }
 
     /// Get number of words
@@ -59,9 +61,9 @@ impl HistEntry {
 }
 
 /// History active bits
-pub const HA_ACTIVE: u32 = 1;     // History mechanism is active
-pub const HA_NOINC: u32 = 2;      // Don't store, curhist not incremented
-pub const HA_INWORD: u32 = 4;     // We're inside a word
+pub const HA_ACTIVE: u32 = 1; // History mechanism is active
+pub const HA_NOINC: u32 = 2; // Don't store, curhist not incremented
+pub const HA_INWORD: u32 = 4; // We're inside a word
 
 /// History state
 pub struct History {
@@ -186,7 +188,7 @@ impl History {
     /// Add an entry to history
     fn add_entry(&mut self, entry: HistEntry) {
         let num = entry.histnum;
-        
+
         // Remove old entry if at capacity
         while self.histlinect >= self.histsiz && !self.ring.is_empty() {
             let oldest = self.ring.pop().unwrap();
@@ -276,11 +278,7 @@ impl History {
                             }
                         }
                         if let Ok(n) = numstr.parse::<i64>() {
-                            let target = if n < 0 {
-                                self.curhist + n
-                            } else {
-                                n
-                            };
+                            let target = if n < 0 { self.curhist + n } else { n };
                             if let Some(entry) = self.get(target) {
                                 result.push_str(&entry.text);
                             } else {
@@ -338,7 +336,9 @@ impl History {
                             }
                         }
                         let found = self.ring.iter().find_map(|num| {
-                            self.entries.get(num).filter(|e| e.text.starts_with(&pattern))
+                            self.entries
+                                .get(num)
+                                .filter(|e| e.text.starts_with(&pattern))
                         });
                         if let Some(entry) = found {
                             result.push_str(&entry.text);
@@ -389,7 +389,7 @@ impl History {
 
         for line in reader.lines() {
             let line = line?;
-            
+
             // Parse extended history format
             if line.starts_with(':') {
                 // Extended format: : timestamp:0;command
@@ -397,7 +397,7 @@ impl History {
                 if parts.len() == 2 {
                     let text = parts[1].to_string();
                     let mut entry = HistEntry::new(self.curhist + 1, text);
-                    
+
                     // Parse timestamp
                     if let Some(ts_part) = parts[0].strip_prefix(": ") {
                         if let Some(ts_str) = ts_part.split(':').next() {
@@ -407,7 +407,7 @@ impl History {
                             }
                         }
                     }
-                    
+
                     entry.flags |= hist_flags::OLD;
                     self.curhist += 1;
                     self.add_entry(entry);
@@ -455,7 +455,10 @@ impl History {
 
     /// Get all entries in order
     pub fn all_entries(&self) -> Vec<&HistEntry> {
-        self.ring.iter().filter_map(|n| self.entries.get(n)).collect()
+        self.ring
+            .iter()
+            .filter_map(|n| self.entries.get(n))
+            .collect()
     }
 
     /// Number of entries
@@ -543,7 +546,7 @@ pub fn casemodify(s: &str, how: CaseMod) -> String {
 /// Remove trailing path component (from hist.c remtpath lines 2056-2117)
 pub fn remtpath(s: &str, count: i32) -> String {
     let s = s.trim_end_matches('/');
-    
+
     if s.is_empty() {
         return "/".to_string();
     }
@@ -564,7 +567,8 @@ pub fn remtpath(s: &str, count: i32) -> String {
     }
 
     let leading_slash = s.starts_with('/');
-    let result: String = parts.iter()
+    let result: String = parts
+        .iter()
         .take(count as usize)
         .map(|s| *s)
         .collect::<Vec<&str>>()
@@ -580,13 +584,13 @@ pub fn remtpath(s: &str, count: i32) -> String {
 /// Remove leading path components (from hist.c remlpaths lines 2151-2186)
 pub fn remlpaths(s: &str, count: i32) -> String {
     let s = s.trim_end_matches('/');
-    
+
     if s.is_empty() {
         return String::new();
     }
 
     let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
-    
+
     if count == 0 {
         if let Some(last) = parts.last() {
             return last.to_string();
@@ -598,7 +602,8 @@ pub fn remlpaths(s: &str, count: i32) -> String {
         return s.to_string();
     }
 
-    parts.iter()
+    parts
+        .iter()
         .rev()
         .take(count as usize)
         .rev()
@@ -878,7 +883,7 @@ impl History {
 
         let mut result = String::new();
         let chars: Vec<char> = line.chars().collect();
-        
+
         for (i, (start, end)) in words.iter().enumerate() {
             if i > 0 {
                 result.push(' ');
@@ -952,7 +957,10 @@ impl History {
         }
 
         if err && count == 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "No history entries"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "No history entries",
+            ));
         }
 
         Ok(count)
@@ -962,7 +970,10 @@ impl History {
     pub fn savehistfile(&self, filename: &str, mode: WriteMode) -> io::Result<usize> {
         let file = match mode {
             WriteMode::Overwrite => File::create(filename)?,
-            WriteMode::Append => OpenOptions::new().create(true).append(true).open(filename)?,
+            WriteMode::Append => OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(filename)?,
         };
         let mut writer = io::BufWriter::new(file);
         let mut count = 0;
@@ -1066,7 +1077,11 @@ pub fn apply_word_designator(text: &str, designator: &str) -> Option<String> {
         }
         s if s.contains('-') => {
             let parts: Vec<&str> = s.splitn(2, '-').collect();
-            let start: usize = if parts[0].is_empty() { 0 } else { parts[0].parse().ok()? };
+            let start: usize = if parts[0].is_empty() {
+                0
+            } else {
+                parts[0].parse().ok()?
+            };
             let end: usize = if parts[1].is_empty() {
                 words.len() - 2 // n- means up to but not including last
             } else {
@@ -1079,7 +1094,7 @@ pub fn apply_word_designator(text: &str, designator: &str) -> Option<String> {
             }
         }
         s if s.ends_with('*') => {
-            let start: usize = s[..s.len()-1].parse().ok()?;
+            let start: usize = s[..s.len() - 1].parse().ok()?;
             if start < words.len() {
                 Some(words[start..].join(" "))
             } else {
@@ -1094,12 +1109,21 @@ pub fn apply_word_designator(text: &str, designator: &str) -> Option<String> {
 }
 
 /// Apply a single history modifier to text
-pub fn apply_hist_modifier(text: &str, modifier: char, global: bool, subst_state: &mut (String, String)) -> String {
+pub fn apply_hist_modifier(
+    text: &str,
+    modifier: char,
+    global: bool,
+    subst_state: &mut (String, String),
+) -> String {
     match modifier {
         'h' => {
             // Head (dirname) - remove trailing path component
             if let Some(pos) = text.rfind('/') {
-                if pos == 0 { "/".to_string() } else { text[..pos].to_string() }
+                if pos == 0 {
+                    "/".to_string()
+                } else {
+                    text[..pos].to_string()
+                }
             } else {
                 ".".to_string()
             }
@@ -1231,7 +1255,12 @@ pub fn addhistnum(base: i64, n: i64) -> i64 {
 }
 
 /// Check if history line should be ignored (starts with space, duplicate, etc.)
-pub fn should_ignore_line(text: &str, ignorespace: bool, ignoredups: bool, last: Option<&str>) -> bool {
+pub fn should_ignore_line(
+    text: &str,
+    ignorespace: bool,
+    ignoredups: bool,
+    last: Option<&str>,
+) -> bool {
     if ignorespace && text.starts_with(' ') {
         return true;
     }
@@ -1282,13 +1311,13 @@ mod tests {
     #[test]
     fn test_history_search() {
         let mut hist = History::new();
-        
+
         hist.hbegin(true);
         hist.hend(Some("cd /tmp".to_string()));
-        
+
         hist.hbegin(true);
         hist.hend(Some("echo hello".to_string()));
-        
+
         hist.hbegin(true);
         hist.hend(Some("ls -la".to_string()));
 
@@ -1675,7 +1704,10 @@ pub fn readhistline(line: &str) -> Option<HistEntry> {
             let meta = &rest[..semi];
             let cmd = &rest[semi + 1..];
             let parts: Vec<&str> = meta.splitn(2, ':').collect();
-            let timestamp = parts.first().and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+            let timestamp = parts
+                .first()
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(0);
             let mut entry = HistEntry::new(0, cmd.to_string());
             entry.stim = timestamp;
             return Some(entry);
@@ -1689,7 +1721,11 @@ pub fn flockhistfile(path: &str) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::io::AsRawFd;
-        if let Ok(file) = std::fs::OpenOptions::new().write(true).create(true).open(format!("{}.lock", path)) {
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(format!("{}.lock", path))
+        {
             let fd = file.as_raw_fd();
             unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) == 0 }
         } else {
@@ -1697,7 +1733,9 @@ pub fn flockhistfile(path: &str) -> bool {
         }
     }
     #[cfg(not(unix))]
-    { true }
+    {
+        true
+    }
 }
 
 /// Check age of lock file (from hist.c checklocktime)
@@ -1801,7 +1839,9 @@ impl HistStackManager {
 
 /// Resolve path to real path (from hist.c chrealpath)
 pub fn chrealpath(path: &str) -> Option<String> {
-    std::fs::canonicalize(path).ok().map(|p| p.to_string_lossy().to_string())
+    std::fs::canonicalize(path)
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// Get all words from current edit buffer (from hist.c bufferwords)

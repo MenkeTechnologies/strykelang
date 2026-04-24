@@ -170,10 +170,7 @@ impl Zle {
 
         // Find paragraph start (blank line)
         while start > 0 {
-            if start >= 2
-                && self.zleline[start - 1] == '\n'
-                && self.zleline[start - 2] == '\n'
-            {
+            if start >= 2 && self.zleline[start - 1] == '\n' && self.zleline[start - 2] == '\n' {
                 break;
             }
             start -= 1;
@@ -181,10 +178,7 @@ impl Zle {
 
         // Find paragraph end
         while end < self.zlell {
-            if end + 1 < self.zlell
-                && self.zleline[end] == '\n'
-                && self.zleline[end + 1] == '\n'
-            {
+            if end + 1 < self.zlell && self.zleline[end] == '\n' && self.zleline[end + 1] == '\n' {
                 if obj_type == TextObjectType::A {
                     end += 2;
                 }

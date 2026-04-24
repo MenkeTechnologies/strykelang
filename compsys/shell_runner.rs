@@ -10,8 +10,8 @@
 //! 4. Generated completions are collected and returned
 
 use crate::{
-    CompParams, CompState, Completion, CompletionGroup, CompletionReceiver, ZStyleStore,
-    state::CompletionContext as StateContext,
+    state::CompletionContext as StateContext, CompParams, CompState, Completion, CompletionGroup,
+    CompletionReceiver, ZStyleStore,
 };
 use std::collections::HashMap;
 
@@ -52,18 +52,18 @@ impl ShellCompletionContext {
     /// Create context from command line
     pub fn from_command_line(line: &str, cursor_pos: usize) -> Self {
         let words: Vec<String> = line.split_whitespace().map(String::from).collect();
-        
+
         // Find which word the cursor is in
         let mut current: i32 = (words.len() + 1) as i32; // Default to new word
         let mut prefix = String::new();
         let mut suffix = String::new();
         let mut found = false;
         let mut pos = 0;
-        
+
         for (i, word) in words.iter().enumerate() {
             let word_start = line[pos..].find(word).map(|p| pos + p).unwrap_or(pos);
             let word_end = word_start + word.len();
-            
+
             if cursor_pos >= word_start && cursor_pos <= word_end {
                 current = (i + 1) as i32;
                 prefix = word[..cursor_pos.saturating_sub(word_start)].to_string();
@@ -73,7 +73,7 @@ impl ShellCompletionContext {
             }
             pos = word_end;
         }
-        
+
         // If cursor is in a gap between words but before the end, it's completing a new word
         // at that position (not at the end)
         if !found && !words.is_empty() {
@@ -88,10 +88,10 @@ impl ShellCompletionContext {
                 pos = word_start + word.len();
             }
         }
-        
+
         let service = words.first().cloned().unwrap_or_default();
         let curcontext = format!(":completion::complete:{}:", service);
-        
+
         Self {
             words,
             current,
@@ -102,7 +102,7 @@ impl ShellCompletionContext {
             compstate: Self::default_compstate(),
         }
     }
-    
+
     fn default_compstate() -> HashMap<String, String> {
         let mut state = HashMap::new();
         state.insert("context".to_string(), "command".to_string());
@@ -110,7 +110,7 @@ impl ShellCompletionContext {
         state.insert("list".to_string(), "list".to_string());
         state
     }
-    
+
     /// Convert to CompParams for native functions
     pub fn to_comp_params(&self) -> CompParams {
         CompParams {
@@ -125,7 +125,7 @@ impl ShellCompletionContext {
             compstate: self.to_comp_state(),
         }
     }
-    
+
     /// Convert to CompState
     pub fn to_comp_state(&self) -> CompState {
         CompState {
@@ -181,10 +181,10 @@ pub trait CompletionRunner {
         context: &ShellCompletionContext,
         zstyle: &ZStyleStore,
     ) -> CompletionResult;
-    
+
     /// Check if a completion function exists
     fn has_completion_function(&self, name: &str) -> bool;
-    
+
     /// Get the completion function for a command
     fn get_completer(&self, command: &str) -> Option<String>;
 }
@@ -213,7 +213,7 @@ impl BuiltinDispatcher {
             zstyle: ZStyleStore::new(),
         }
     }
-    
+
     pub fn with_zstyle(zstyle: ZStyleStore) -> Self {
         Self {
             receiver: CompletionReceiver::unlimited(),
@@ -221,32 +221,32 @@ impl BuiltinDispatcher {
             zstyle,
         }
     }
-    
+
     /// Dispatch _message
     pub fn message(&mut self, msg: &str) {
         self.messages.push(msg.to_string());
     }
-    
+
     /// Dispatch zstyle lookup
     pub fn zstyle_lookup(&self, context: &str, style: &str) -> Option<String> {
         self.zstyle.lookup_str(context, style).map(String::from)
     }
-    
+
     /// Begin a new completion group
     pub fn begin_group(&mut self, name: &str, sorted: bool) {
         self.receiver.begin_group(name, sorted);
     }
-    
+
     /// End current group (switch back to default)
     pub fn end_group(&mut self) {
         self.receiver.begin_group("default", true);
     }
-    
+
     /// Add a completion
     pub fn add_completion(&mut self, comp: Completion) {
         self.receiver.add(comp);
     }
-    
+
     /// Add completions with descriptions
     pub fn add_described(
         &mut self,
@@ -256,7 +256,7 @@ impl BuiltinDispatcher {
     ) {
         self.receiver.begin_group(tag, true);
         self.receiver.add_explanation(description);
-        
+
         for (value, desc) in items {
             let mut comp = Completion::new(value);
             if let Some(d) = desc {
@@ -264,14 +264,14 @@ impl BuiltinDispatcher {
             }
             self.receiver.add(comp);
         }
-        
+
         self.receiver.begin_group("default", true);
     }
-    
+
     /// Add file completions
     pub fn add_files(&mut self, prefix: &str, dirs_only: bool) {
         use std::path::Path;
-        
+
         let dir = if prefix.is_empty() {
             Path::new(".")
         } else if prefix.ends_with('/') {
@@ -279,29 +279,29 @@ impl BuiltinDispatcher {
         } else {
             Path::new(prefix).parent().unwrap_or(Path::new("."))
         };
-        
+
         let file_prefix = if prefix.contains('/') {
             prefix.rsplit('/').next().unwrap_or("")
         } else {
             prefix
         };
-        
+
         if let Ok(entries) = std::fs::read_dir(dir) {
             let tag = if dirs_only { "directories" } else { "files" };
             self.receiver.begin_group(tag, true);
-            
+
             for entry in entries.flatten() {
                 if let Some(name) = entry.file_name().to_str() {
                     if !name.starts_with(file_prefix) && !file_prefix.is_empty() {
                         continue;
                     }
-                    
+
                     let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-                    
+
                     if dirs_only && !is_dir {
                         continue;
                     }
-                    
+
                     let comp = if is_dir {
                         Completion::new(name).with_suffix("/")
                     } else {
@@ -310,16 +310,16 @@ impl BuiltinDispatcher {
                     self.receiver.add(comp);
                 }
             }
-            
+
             self.receiver.begin_group("default", true);
         }
     }
-    
+
     /// Finalize and get results
     pub fn finish(self) -> CompletionResult {
         let groups = self.receiver.take();
         let success = groups.iter().any(|g| !g.matches.is_empty()) || !self.messages.is_empty();
-        
+
         CompletionResult {
             groups,
             messages: self.messages,
@@ -336,16 +336,16 @@ pub fn call_program(
     args: &[&str],
 ) -> Result<Vec<String>, std::io::Error> {
     use std::process::Command;
-    
+
     let output = Command::new(command).args(args).output()?;
-    
+
     if !output.status.success() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("{} failed with status {}", command, output.status),
         ));
     }
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     Ok(stdout.lines().map(String::from).collect())
 }
@@ -377,17 +377,17 @@ mod tests {
     #[test]
     fn test_builtin_dispatcher() {
         let mut dispatcher = BuiltinDispatcher::new();
-        
+
         dispatcher.begin_group("commands", true);
         dispatcher.add_completion(Completion::new("add"));
         dispatcher.add_completion(Completion::new("commit"));
         dispatcher.end_group();
-        
+
         let result = dispatcher.finish();
         assert!(result.success);
         assert!(!result.groups.is_empty());
     }
-    
+
     #[test]
     fn test_call_program() {
         // Test with a simple command that should exist

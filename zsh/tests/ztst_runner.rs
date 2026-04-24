@@ -1,7 +1,7 @@
 //! ztst_runner — runs zsh's .ztst integration test files against zshrs
 //!
 //! Parses the %prep / %test / %clean sections from each .ztst file,
-//! generates a single script per file, runs it as one `zshrs -f` process,
+//! runs each test as `zshrs -f -c` with prep prepended (idempotent),
 //! and compares exit status + stdout + stderr per test block.
 //!
 //! Run:  cargo test -p zsh --test ztst_runner -- [filter]
@@ -11,10 +11,10 @@
 //!   ZTST_TIMEOUT_MS=N — per-file timeout in milliseconds (default: 5000)
 //!   ZTST_VERBOSE=1  — print pass/skip results, not just failures
 
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
+use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -65,11 +65,7 @@ fn parse_ztst(path: &Path) -> ZtstFile {
         panic!("failed to read {}: {}", path.display(), e);
     });
     let content = String::from_utf8_lossy(&raw).into_owned();
-    let name = path
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
+    let name = path.file_name().unwrap().to_string_lossy().into_owned();
 
     let lines: Vec<&str> = content.lines().collect();
     let mut idx = 0;
@@ -200,8 +196,7 @@ fn read_code_chunk(lines: &[&str], idx: &mut usize) -> Option<String> {
             while peek < lines.len() && lines[peek].trim().is_empty() {
                 peek += 1;
             }
-            if peek < lines.len()
-                && (lines[peek].starts_with(' ') || lines[peek].starts_with('\t'))
+            if peek < lines.len() && (lines[peek].starts_with(' ') || lines[peek].starts_with('\t'))
             {
                 // Blank line inside a code chunk — keep going but don't add to chunk yet
                 // Actually in ztst format, blank line ends the chunk
@@ -407,11 +402,7 @@ fn find_zshrs() -> PathBuf {
 }
 
 fn find_test_corpus() -> PathBuf {
-    let candidates = [
-        "zsh/test_corpus",
-        "test_corpus",
-        "../test_corpus",
-    ];
+    let candidates = ["zsh/test_corpus", "test_corpus", "../test_corpus"];
     for c in &candidates {
         let p = PathBuf::from(c);
         if p.is_dir() {
@@ -490,72 +481,16 @@ fn glob_match_inner(pat: &[char], pi: usize, txt: &[char], ti: usize) -> bool {
     }
 }
 
-fn run_ztst_file(zshrs: &Path, ztst_path: &Path) -> (usize, usize, usize) {
-    let verbose = env::var("ZTST_VERBOSE")
-        .map(|v| v != "0")
-        .unwrap_or(false);
-    let ztst = parse_ztst(ztst_path);
-
-    if ztst.tests.is_empty() {
-        return (0, 0, 0);
-    }
-
-    let tmpdir = tempfile::tempdir().expect("failed to create tempdir");
-    let workdir = tmpdir.path();
-    let wd = workdir.display();
-
-    // Write stdin files for tests that need them
-    for (i, test) in ztst.tests.iter().enumerate() {
-        if !test.stdin_data.is_empty() {
-            fs::write(workdir.join(format!("_zt_in_{}", i)), &test.stdin_data).unwrap();
-        }
-    }
-
-    // Build ONE script: prep once, then each test with output capture
-    let mut script = String::new();
-
-    // Prep — runs once, state persists for all tests
-    for chunk in &ztst.prep {
-        script.push_str(chunk);
-        script.push('\n');
-    }
-
-    // Each test: run in { } with stdout/stderr redirected to files,
-    // then print sentinel with exit status to fd 3 (original stdout)
-    script.push_str("exec 3>&1\n");
-    for (i, test) in ztst.tests.iter().enumerate() {
-        if !test.stdin_data.is_empty() {
-            script.push_str(&format!(
-                "{{ {}\n}} < {wd}/_zt_in_{i} > {wd}/_zt_out_{i} 2> {wd}/_zt_err_{i}\n",
-                test.code, wd = wd, i = i
-            ));
-        } else {
-            script.push_str(&format!(
-                "{{ {}\n}} > {wd}/_zt_out_{i} 2> {wd}/_zt_err_{i}\n",
-                test.code, wd = wd, i = i
-            ));
-        }
-        script.push_str(&format!("echo \"ZTST_RC:$?:{}\" >&3\n", i));
-    }
-
-    // Clean
-    for chunk in &ztst.clean {
-        script.push_str(chunk);
-        script.push('\n');
-    }
-
-    // Write script and run it as a single process
-    let script_path = workdir.join("_zt_main.sh");
-    fs::write(&script_path, &script).unwrap();
-
+fn run_code(zshrs: &Path, code: &str, stdin_data: &str, workdir: &Path) -> (i32, String, String) {
     let timeout_ms: u64 = env::var("ZTST_TIMEOUT_MS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(5000);
+        .unwrap_or(200);
 
     let mut cmd = Command::new(zshrs);
     cmd.arg("-f")
-        .arg(&script_path)
+        .arg("-c")
+        .arg(code)
         .current_dir(workdir)
         .env("LANG", "C")
         .env("LC_ALL", "C")
@@ -569,65 +504,81 @@ fn run_ztst_file(zshrs: &Path, ztst_path: &Path) -> (usize, usize, usize) {
         });
     }
 
-    let child = cmd.spawn().expect("failed to spawn zshrs");
+    if !stdin_data.is_empty() {
+        cmd.stdin(std::process::Stdio::piped());
+    }
+
+    let mut child = cmd.spawn().expect("failed to spawn zshrs");
+
+    if !stdin_data.is_empty() {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(stdin_data.as_bytes());
+        }
+    }
+
     let pgid = child.id() as i32;
     let (tx, rx) = mpsc::channel();
     let handle = thread::spawn(move || {
         let _ = tx.send(child.wait_with_output());
     });
 
-    let stdout = match rx.recv_timeout(Duration::from_millis(timeout_ms)) {
-        Ok(Ok(output)) => String::from_utf8_lossy(&output.stdout).into_owned(),
+    match rx.recv_timeout(Duration::from_millis(timeout_ms)) {
+        Ok(Ok(output)) => {
+            let status = output.status.code().unwrap_or(-1);
+            let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+            let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+            (status, stdout, stderr)
+        }
         Ok(Err(e)) => panic!("failed to wait on zshrs: {}", e),
         Err(_) => {
-            unsafe { libc::kill(-pgid, libc::SIGKILL); }
-            let _ = handle.join();
-            eprintln!("  TIMEOUT: entire file exceeded {}ms", timeout_ms);
-            String::new()
-        }
-    };
-
-    // Parse RC sentinels from stdout (written to fd 3 → original stdout)
-    let mut statuses = std::collections::HashMap::new();
-    for line in stdout.lines() {
-        if let Some(rest) = line.strip_prefix("ZTST_RC:") {
-            let parts: Vec<&str> = rest.splitn(2, ':').collect();
-            if parts.len() == 2 {
-                if let (Ok(rc), Ok(idx)) = (parts[0].parse::<i32>(), parts[1].parse::<usize>()) {
-                    statuses.insert(idx, rc);
-                }
+            unsafe {
+                libc::kill(-pgid, libc::SIGKILL);
             }
+            let _ = handle.join();
+            (-1, String::new(), format!("TIMEOUT after {}ms", timeout_ms))
         }
     }
+}
 
-    // Compare results per test
+fn run_ztst_file(zshrs: &Path, ztst_path: &Path) -> (usize, usize, usize) {
+    let verbose = env::var("ZTST_VERBOSE").map(|v| v != "0").unwrap_or(false);
+    let ztst = parse_ztst(ztst_path);
+
+    if ztst.tests.is_empty() {
+        return (0, 0, 0);
+    }
+
+    // Prep runs in every test process since each is isolated.
+    // Make side-effect commands idempotent: mkdir → mkdir -p,
+    // suppress errors from re-execution so they don't pollute stderr.
+    let prep = ztst.prep.join("\n").replace("mkdir ", "mkdir -p ");
+    // Wrap prep so its stderr doesn't leak into test stderr
+    let prep_wrapped = if prep.is_empty() {
+        String::new()
+    } else {
+        format!("{{ {} ; }} 2>/dev/null\n", prep)
+    };
+
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut skipped = 0usize;
 
     for (i, test) in ztst.tests.iter().enumerate() {
-        let result = if let Some(&status) = statuses.get(&i) {
-            let actual_stdout = fs::read_to_string(workdir.join(format!("_zt_out_{}", i)))
-                .unwrap_or_default();
-            let actual_stderr = fs::read_to_string(workdir.join(format!("_zt_err_{}", i)))
-                .unwrap_or_default();
-            compare_test(test, status, &actual_stdout, &actual_stderr)
-        } else {
-            // No sentinel — test never completed (hang or prior exit)
-            TestResult {
-                message: test.message.clone(),
-                passed: test.flags.contains('f'),
-                skipped: false,
-                detail: "test did not complete (hang or prior exit)".into(),
-            }
-        };
+        let code = format!("{}{}", prep_wrapped, test.code);
+
+        let (status, stdout, stderr) = run_code(zshrs, &code, &test.stdin_data, Path::new("/tmp"));
+        let result = compare_test(test, status, &stdout, &stderr);
 
         if result.skipped {
             skipped += 1;
-            if verbose { eprintln!("  {}", result); }
+            if verbose {
+                eprintln!("  {}", result);
+            }
         } else if result.passed {
             passed += 1;
-            if verbose { eprintln!("  {}", result); }
+            if verbose {
+                eprintln!("  {}", result);
+            }
         } else {
             failed += 1;
             eprintln!("  [{}:{}] {}", ztst.name, i + 1, result);
@@ -880,8 +831,16 @@ fn ztst_summary() {
     }
 
     let total = total_passed + total_failed + total_skipped;
-    eprintln!("\n  TOTAL: {} tests — {} passed, {} failed, {} skipped",
-        total, total_passed, total_failed, total_skipped);
-    eprintln!("  pass rate: {:.1}%\n",
-        if total > 0 { total_passed as f64 / (total_passed + total_failed) as f64 * 100.0 } else { 0.0 });
+    eprintln!(
+        "\n  TOTAL: {} tests — {} passed, {} failed, {} skipped",
+        total, total_passed, total_failed, total_skipped
+    );
+    eprintln!(
+        "  pass rate: {:.1}%\n",
+        if total > 0 {
+            total_passed as f64 / (total_passed + total_failed) as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
 }

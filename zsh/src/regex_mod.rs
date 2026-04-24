@@ -40,12 +40,17 @@ pub struct RegexOptions {
 }
 
 /// Perform a regex match
-pub fn regex_match(text: &str, pattern: &str, options: &RegexOptions) -> Result<RegexMatch, String> {
+pub fn regex_match(
+    text: &str,
+    pattern: &str,
+    options: &RegexOptions,
+) -> Result<RegexMatch, String> {
     let re = if options.case_insensitive {
         Regex::new(&format!("(?i){}", pattern))
     } else {
         Regex::new(pattern)
-    }.map_err(|e| format!("failed to compile regex: {}", e))?;
+    }
+    .map_err(|e| format!("failed to compile regex: {}", e))?;
 
     let caps = match re.captures(text) {
         Some(c) => c,
@@ -89,7 +94,11 @@ fn byte_to_char_offset(s: &str, byte_offset: usize) -> usize {
 }
 
 /// Get match variables in zsh format
-pub fn get_match_variables(result: &RegexMatch, text: &str, options: &RegexOptions) -> HashMap<String, String> {
+pub fn get_match_variables(
+    result: &RegexMatch,
+    text: &str,
+    options: &RegexOptions,
+) -> HashMap<String, String> {
     let mut vars = HashMap::new();
 
     if !result.matched {
@@ -131,7 +140,10 @@ pub fn get_match_variables(result: &RegexMatch, text: &str, options: &RegexOptio
         for (i, start) in result.capture_starts.iter().enumerate() {
             if let Some(s) = start {
                 let char_start = byte_to_char_offset(text, *s);
-                vars.insert(format!("mbegin[{}]", i + base), (char_start + base).to_string());
+                vars.insert(
+                    format!("mbegin[{}]", i + base),
+                    (char_start + base).to_string(),
+                );
             } else {
                 vars.insert(format!("mbegin[{}]", i + base), "-1".to_string());
             }
@@ -140,7 +152,10 @@ pub fn get_match_variables(result: &RegexMatch, text: &str, options: &RegexOptio
         for (i, end) in result.capture_ends.iter().enumerate() {
             if let Some(e) = end {
                 let char_end = byte_to_char_offset(text, *e);
-                vars.insert(format!("mend[{}]", i + base), (char_end + base - 1).to_string());
+                vars.insert(
+                    format!("mend[{}]", i + base),
+                    (char_end + base - 1).to_string(),
+                );
             } else {
                 vars.insert(format!("mend[{}]", i + base), "-1".to_string());
             }
@@ -241,7 +256,10 @@ mod tests {
         let result = regex_match("hello world", "(hello) (world)", &opts).unwrap();
         let vars = get_match_variables(&result, "hello world", &opts);
 
-        assert_eq!(vars.get("BASH_REMATCH[0]"), Some(&"hello world".to_string()));
+        assert_eq!(
+            vars.get("BASH_REMATCH[0]"),
+            Some(&"hello world".to_string())
+        );
         assert_eq!(vars.get("BASH_REMATCH[1]"), Some(&"hello".to_string()));
         assert_eq!(vars.get("BASH_REMATCH[2]"), Some(&"world".to_string()));
     }

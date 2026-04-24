@@ -10,14 +10,13 @@
 //! - Debugging output
 
 use crate::parser::{
-    ShellCommand, SimpleCommand, CompoundCommand, ShellWord, Redirect, RedirectOp,
-    ListOp, CaseTerminator, CondExpr,
+    CaseTerminator, CompoundCommand, CondExpr, ListOp, Redirect, RedirectOp, ShellCommand,
+    ShellWord, SimpleCommand,
 };
 
 /// Binary operators in conditions (order matches COND_STREQ et seq.)
 pub static COND_BINARY_OPS: &[&str] = &[
-    "=", "==", "!=", "<", ">", "-nt", "-ot", "-ef", "-eq",
-    "-ne", "-lt", "-gt", "-le", "-ge", "=~",
+    "=", "==", "!=", "<", ">", "-nt", "-ot", "-ef", "-eq", "-ne", "-lt", "-gt", "-le", "-ge", "=~",
 ];
 
 /// Check if a string is a condition binary operator
@@ -131,7 +130,7 @@ impl TextFormatter {
                 return;
             }
         }
-        
+
         if self.config.newlines {
             self.buffer.push_str(s);
         } else {
@@ -336,7 +335,7 @@ impl TextFormatter {
                 }
             }
             self.format_command(cmd);
-            
+
             // Handle trailing operator for last command
             if i == list.len() - 1 {
                 match op {
@@ -351,13 +350,21 @@ impl TextFormatter {
         match compound {
             CompoundCommand::BraceGroup(cmds) => self.format_brace_group(cmds),
             CompoundCommand::Subshell(cmds) => self.format_subshell(cmds),
-            CompoundCommand::If { conditions, else_part } => {
+            CompoundCommand::If {
+                conditions,
+                else_part,
+            } => {
                 self.format_if(conditions, else_part);
             }
             CompoundCommand::For { var, words, body } => {
                 self.format_for(var, words, body);
             }
-            CompoundCommand::ForArith { init, cond, step, body } => {
+            CompoundCommand::ForArith {
+                init,
+                cond,
+                step,
+                body,
+            } => {
                 self.format_for_arith(init, cond, step, body);
             }
             CompoundCommand::While { condition, body } => {
@@ -386,7 +393,10 @@ impl TextFormatter {
                 self.dec_indent();
                 self.add_str("done");
             }
-            CompoundCommand::Try { try_body, always_body } => {
+            CompoundCommand::Try {
+                try_body,
+                always_body,
+            } => {
                 self.add_char('{');
                 self.inc_indent();
                 self.add_newline(false);
@@ -447,50 +457,102 @@ impl TextFormatter {
                 self.format_cond_expr(right);
             }
             // File tests
-            CondExpr::FileExists(w) => { self.add_str("-e "); self.format_word(w); }
-            CondExpr::FileRegular(w) => { self.add_str("-f "); self.format_word(w); }
-            CondExpr::FileDirectory(w) => { self.add_str("-d "); self.format_word(w); }
-            CondExpr::FileSymlink(w) => { self.add_str("-L "); self.format_word(w); }
-            CondExpr::FileReadable(w) => { self.add_str("-r "); self.format_word(w); }
-            CondExpr::FileWritable(w) => { self.add_str("-w "); self.format_word(w); }
-            CondExpr::FileExecutable(w) => { self.add_str("-x "); self.format_word(w); }
-            CondExpr::FileNonEmpty(w) => { self.add_str("-s "); self.format_word(w); }
+            CondExpr::FileExists(w) => {
+                self.add_str("-e ");
+                self.format_word(w);
+            }
+            CondExpr::FileRegular(w) => {
+                self.add_str("-f ");
+                self.format_word(w);
+            }
+            CondExpr::FileDirectory(w) => {
+                self.add_str("-d ");
+                self.format_word(w);
+            }
+            CondExpr::FileSymlink(w) => {
+                self.add_str("-L ");
+                self.format_word(w);
+            }
+            CondExpr::FileReadable(w) => {
+                self.add_str("-r ");
+                self.format_word(w);
+            }
+            CondExpr::FileWritable(w) => {
+                self.add_str("-w ");
+                self.format_word(w);
+            }
+            CondExpr::FileExecutable(w) => {
+                self.add_str("-x ");
+                self.format_word(w);
+            }
+            CondExpr::FileNonEmpty(w) => {
+                self.add_str("-s ");
+                self.format_word(w);
+            }
             // String tests
-            CondExpr::StringEmpty(w) => { self.add_str("-z "); self.format_word(w); }
-            CondExpr::StringNonEmpty(w) => { self.add_str("-n "); self.format_word(w); }
+            CondExpr::StringEmpty(w) => {
+                self.add_str("-z ");
+                self.format_word(w);
+            }
+            CondExpr::StringNonEmpty(w) => {
+                self.add_str("-n ");
+                self.format_word(w);
+            }
             CondExpr::StringEqual(l, r) => {
-                self.format_word(l); self.add_str(" == "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" == ");
+                self.format_word(r);
             }
             CondExpr::StringNotEqual(l, r) => {
-                self.format_word(l); self.add_str(" != "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" != ");
+                self.format_word(r);
             }
             CondExpr::StringMatch(l, r) => {
-                self.format_word(l); self.add_str(" =~ "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" =~ ");
+                self.format_word(r);
             }
             CondExpr::StringLess(l, r) => {
-                self.format_word(l); self.add_str(" < "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" < ");
+                self.format_word(r);
             }
             CondExpr::StringGreater(l, r) => {
-                self.format_word(l); self.add_str(" > "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" > ");
+                self.format_word(r);
             }
             // Numeric tests
             CondExpr::NumEqual(l, r) => {
-                self.format_word(l); self.add_str(" -eq "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -eq ");
+                self.format_word(r);
             }
             CondExpr::NumNotEqual(l, r) => {
-                self.format_word(l); self.add_str(" -ne "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -ne ");
+                self.format_word(r);
             }
             CondExpr::NumLess(l, r) => {
-                self.format_word(l); self.add_str(" -lt "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -lt ");
+                self.format_word(r);
             }
             CondExpr::NumLessEqual(l, r) => {
-                self.format_word(l); self.add_str(" -le "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -le ");
+                self.format_word(r);
             }
             CondExpr::NumGreater(l, r) => {
-                self.format_word(l); self.add_str(" -gt "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -gt ");
+                self.format_word(r);
             }
             CondExpr::NumGreaterEqual(l, r) => {
-                self.format_word(l); self.add_str(" -ge "); self.format_word(r);
+                self.format_word(l);
+                self.add_str(" -ge ");
+                self.format_word(r);
             }
         }
     }
@@ -498,7 +560,7 @@ impl TextFormatter {
     fn format_for(&mut self, var: &str, words: &Option<Vec<ShellWord>>, body: &[ShellCommand]) {
         self.add_str("for ");
         self.add_str(var);
-        
+
         if let Some(word_list) = words {
             self.add_str(" in ");
             for (i, w) in word_list.iter().enumerate() {
@@ -508,17 +570,17 @@ impl TextFormatter {
                 self.format_word(w);
             }
         }
-        
+
         self.add_newline(false);
         self.add_str("do");
         self.inc_indent();
         self.add_newline(false);
-        
+
         for cmd in body {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("done");
@@ -534,12 +596,12 @@ impl TextFormatter {
         self.add_str(")) do");
         self.inc_indent();
         self.add_newline(false);
-        
+
         for cmd in body {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("done");
@@ -548,22 +610,22 @@ impl TextFormatter {
     fn format_while(&mut self, condition: &[ShellCommand], body: &[ShellCommand]) {
         self.add_str("while ");
         self.inc_indent();
-        
+
         for cmd in condition {
             self.format_command(cmd);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("do");
         self.inc_indent();
         self.add_newline(false);
-        
+
         for cmd in body {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("done");
@@ -572,32 +634,36 @@ impl TextFormatter {
     fn format_until(&mut self, condition: &[ShellCommand], body: &[ShellCommand]) {
         self.add_str("until ");
         self.inc_indent();
-        
+
         for cmd in condition {
             self.format_command(cmd);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("do");
         self.inc_indent();
         self.add_newline(false);
-        
+
         for cmd in body {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("done");
     }
 
-    fn format_case(&mut self, word: &ShellWord, cases: &[(Vec<ShellWord>, Vec<ShellCommand>, CaseTerminator)]) {
+    fn format_case(
+        &mut self,
+        word: &ShellWord,
+        cases: &[(Vec<ShellWord>, Vec<ShellCommand>, CaseTerminator)],
+    ) {
         self.add_str("case ");
         self.format_word(word);
         self.add_str(" in");
-        
+
         if cases.is_empty() {
             if self.config.newlines {
                 self.add_newline(false);
@@ -609,14 +675,14 @@ impl TextFormatter {
         }
 
         self.inc_indent();
-        
+
         for (patterns, body, terminator) in cases {
             if self.config.newlines {
                 self.add_newline(false);
             } else {
                 self.add_char(' ');
             }
-            
+
             self.add_str("(");
             for (i, pat) in patterns.iter().enumerate() {
                 if i > 0 {
@@ -625,20 +691,20 @@ impl TextFormatter {
                 self.format_word(pat);
             }
             self.add_str(") ");
-            
+
             self.inc_indent();
             for cmd in body {
                 self.format_command(cmd);
             }
             self.dec_indent();
-            
+
             match terminator {
                 CaseTerminator::Break => self.add_str(" ;;"),
                 CaseTerminator::Fallthrough => self.add_str(" ;&"),
                 CaseTerminator::Continue => self.add_str(" ;|"),
             }
         }
-        
+
         self.dec_indent();
         if self.config.newlines {
             self.add_newline(false);
@@ -648,7 +714,11 @@ impl TextFormatter {
         self.add_str("esac");
     }
 
-    fn format_if(&mut self, conditions: &[(Vec<ShellCommand>, Vec<ShellCommand>)], else_part: &Option<Vec<ShellCommand>>) {
+    fn format_if(
+        &mut self,
+        conditions: &[(Vec<ShellCommand>, Vec<ShellCommand>)],
+        else_part: &Option<Vec<ShellCommand>>,
+    ) {
         for (i, (cond, body)) in conditions.iter().enumerate() {
             if i == 0 {
                 self.add_str("if ");
@@ -657,37 +727,37 @@ impl TextFormatter {
                 self.add_newline(false);
                 self.add_str("elif ");
             }
-            
+
             self.inc_indent();
             for cmd in cond {
                 self.format_command(cmd);
             }
             self.dec_indent();
-            
+
             self.add_newline(false);
             self.add_str("then");
             self.inc_indent();
             self.add_newline(false);
-            
+
             for cmd in body {
                 self.format_command(cmd);
                 self.add_newline(false);
             }
         }
-        
+
         if let Some(else_body) = else_part {
             self.dec_indent();
             self.add_newline(false);
             self.add_str("else");
             self.inc_indent();
             self.add_newline(false);
-            
+
             for cmd in else_body {
                 self.format_command(cmd);
                 self.add_newline(false);
             }
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("fi");
@@ -696,7 +766,7 @@ impl TextFormatter {
     fn format_select(&mut self, var: &str, words: &Option<Vec<ShellWord>>, body: &[ShellCommand]) {
         self.add_str("select ");
         self.add_str(var);
-        
+
         if let Some(word_list) = words {
             self.add_str(" in ");
             for (i, w) in word_list.iter().enumerate() {
@@ -706,17 +776,17 @@ impl TextFormatter {
                 self.format_word(w);
             }
         }
-        
+
         self.add_newline(false);
         self.add_str("do");
         self.add_newline(false);
         self.inc_indent();
-        
+
         for cmd in body {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("done");
@@ -734,9 +804,9 @@ impl TextFormatter {
         self.add_str("{");
         self.inc_indent();
         self.add_newline(true);
-        
+
         self.format_command(body);
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("}");
@@ -746,12 +816,12 @@ impl TextFormatter {
         self.add_str("(");
         self.inc_indent();
         self.add_newline(true);
-        
+
         for cmd in cmds {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str(")");
@@ -761,12 +831,12 @@ impl TextFormatter {
         self.add_str("{");
         self.inc_indent();
         self.add_newline(true);
-        
+
         for cmd in cmds {
             self.format_command(cmd);
             self.add_newline(false);
         }
-        
+
         self.dec_indent();
         self.add_newline(false);
         self.add_str("}");
@@ -778,12 +848,12 @@ impl TextFormatter {
         }
 
         self.add_char(' ');
-        
+
         for redir in redirects {
             self.format_redirect(redir);
             self.add_char(' ');
         }
-        
+
         // Remove trailing space
         if self.buffer.ends_with(' ') {
             self.buffer.pop();
@@ -798,9 +868,11 @@ impl TextFormatter {
             self.add_char('}');
         } else if let Some(fd) = redir.fd {
             let default_fd = match redir.op {
-                RedirectOp::Read | RedirectOp::ReadWrite | 
-                RedirectOp::HereDoc | RedirectOp::HereString |
-                RedirectOp::DupRead => 0,
+                RedirectOp::Read
+                | RedirectOp::ReadWrite
+                | RedirectOp::HereDoc
+                | RedirectOp::HereString
+                | RedirectOp::DupRead => 0,
                 _ => 1,
             };
             if fd != default_fd {
@@ -865,7 +937,10 @@ mod tests {
 
     fn simple_cmd(words: &[&str]) -> ShellCommand {
         ShellCommand::Simple(SimpleCommand {
-            words: words.iter().map(|s| ShellWord::Literal(s.to_string())).collect(),
+            words: words
+                .iter()
+                .map(|s| ShellWord::Literal(s.to_string()))
+                .collect(),
             assignments: vec![],
             redirects: vec![],
         })
@@ -879,18 +954,19 @@ mod tests {
 
     #[test]
     fn test_pipeline() {
-        let pipeline = ShellCommand::Pipeline(vec![
-            simple_cmd(&["cat", "file"]),
-            simple_cmd(&["grep", "pattern"]),
-        ], false);
+        let pipeline = ShellCommand::Pipeline(
+            vec![
+                simple_cmd(&["cat", "file"]),
+                simple_cmd(&["grep", "pattern"]),
+            ],
+            false,
+        );
         assert_eq!(getpermtext(&pipeline), "cat file | grep pattern");
     }
 
     #[test]
     fn test_negated_pipeline() {
-        let pipeline = ShellCommand::Pipeline(vec![
-            simple_cmd(&["test", "-f", "file"]),
-        ], true);
+        let pipeline = ShellCommand::Pipeline(vec![simple_cmd(&["test", "-f", "file"])], true);
         assert_eq!(getpermtext(&pipeline), "! test -f file");
     }
 
@@ -916,7 +992,8 @@ mod tests {
 
     #[test]
     fn test_subshell() {
-        let cmd = ShellCommand::Compound(CompoundCommand::Subshell(vec![simple_cmd(&["echo", "hi"])]));
+        let cmd =
+            ShellCommand::Compound(CompoundCommand::Subshell(vec![simple_cmd(&["echo", "hi"])]));
         let text = getpermtext(&cmd);
         assert!(text.contains("("));
         assert!(text.contains(")"));
@@ -925,7 +1002,9 @@ mod tests {
 
     #[test]
     fn test_brace_group() {
-        let cmd = ShellCommand::Compound(CompoundCommand::BraceGroup(vec![simple_cmd(&["echo", "hi"])]));
+        let cmd = ShellCommand::Compound(CompoundCommand::BraceGroup(vec![simple_cmd(&[
+            "echo", "hi",
+        ])]));
         let text = getpermtext(&cmd);
         assert!(text.contains("{"));
         assert!(text.contains("}"));

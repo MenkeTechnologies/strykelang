@@ -2,8 +2,8 @@
 //!
 //! Provides zstyle, zformat, zparseopts builtins.
 
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 
 /// Style pattern with associated values
 #[derive(Debug, Clone)]
@@ -37,8 +37,15 @@ impl StylePattern {
             }
             first = false;
 
-            if ch == '(' || ch == '|' || ch == '*' || ch == '[' ||
-               ch == '<' || ch == '?' || ch == '#' || ch == '^' {
+            if ch == '('
+                || ch == '|'
+                || ch == '*'
+                || ch == '['
+                || ch == '<'
+                || ch == '?'
+                || ch == '#'
+                || ch == '^'
+            {
                 tmp = 1;
             }
 
@@ -103,14 +110,18 @@ impl StyleTable {
         } else {
             let sp = StylePattern::new(pattern, values, eval);
             let weight = sp.weight;
-            let pos = style_patterns.iter().position(|p| p.weight < weight).unwrap_or(style_patterns.len());
+            let pos = style_patterns
+                .iter()
+                .position(|p| p.weight < weight)
+                .unwrap_or(style_patterns.len());
             style_patterns.insert(pos, sp);
         }
     }
 
     pub fn get(&self, context: &str, style: &str) -> Option<&[String]> {
         self.styles.get(style).and_then(|patterns| {
-            patterns.iter()
+            patterns
+                .iter()
                 .find(|p| p.matches(context))
                 .map(|p| p.values.as_slice())
         })
@@ -175,7 +186,10 @@ impl StyleTable {
             if let Some(test_vals) = values {
                 test_vals.iter().any(|v| found.contains(&v.to_string()))
             } else {
-                matches!(found.first().map(|s| s.as_str()), Some("true" | "yes" | "on" | "1"))
+                matches!(
+                    found.first().map(|s| s.as_str()),
+                    Some("true" | "yes" | "on" | "1")
+                )
             }
         } else {
             false
@@ -231,7 +245,7 @@ pub fn zformat(format: &str, specs: &HashMap<char, String>, _presence: bool) -> 
                 if !is_ternary {
                     chars.next();
                 }
-                
+
                 let mut max_str = String::new();
                 while let Some(&c) = chars.peek() {
                     if c.is_ascii_digit() {
@@ -248,14 +262,14 @@ pub fn zformat(format: &str, specs: &HashMap<char, String>, _presence: bool) -> 
 
             if let Some(&spec_char) = chars.peek() {
                 chars.next();
-                
+
                 if spec_char == '(' {
                     continue;
                 }
 
                 if let Some(spec_val) = specs.get(&spec_char) {
                     let mut val = spec_val.clone();
-                    
+
                     if let Some(m) = max {
                         if val.len() > m {
                             val.truncate(m);
@@ -263,7 +277,7 @@ pub fn zformat(format: &str, specs: &HashMap<char, String>, _presence: bool) -> 
                     }
 
                     let out_len = min.map(|m| m.max(val.len())).unwrap_or(val.len());
-                    
+
                     if val.len() >= out_len {
                         result.push_str(&val[..out_len]);
                     } else {
@@ -459,7 +473,7 @@ pub fn zparseopts(
         } else {
             let mut j = 0;
             let chars: Vec<char> = opt_str.chars().collect();
-            
+
             while j < chars.len() {
                 let ch = chars[j];
                 if let Some(desc) = short_opts.get(&ch) {
@@ -468,7 +482,7 @@ pub fn zparseopts(
 
                     if desc.takes_arg {
                         if j + 1 < chars.len() {
-                            entry.push(chars[j+1..].iter().collect());
+                            entry.push(chars[j + 1..].iter().collect());
                             break;
                         } else if i + 1 < args.len() && !desc.optional_arg {
                             i += 1;
@@ -484,7 +498,7 @@ pub fn zparseopts(
                 } else {
                     if !extract {
                         remaining.push(arg.clone());
-                        remaining.extend(args[i+1..].iter().cloned());
+                        remaining.extend(args[i + 1..].iter().cloned());
                         return Ok((results, remaining));
                     }
                     break;
@@ -519,15 +533,19 @@ pub fn zformat_align(sep: &str, values: &[&str]) -> Vec<String> {
     for value in values {
         if let Some(pos) = value.find(':') {
             let pre = &value[..pos];
-            let post = &value[pos+1..];
+            let post = &value[pos + 1..];
             let pre_len = pre.chars().filter(|c| *c != '\\').count();
             let padding = max_pre - pre_len;
-            
-            let clean_pre: String = pre.chars()
-                .filter(|c| *c != '\\')
-                .collect();
-            
-            result.push(format!("{}{}{}{}", clean_pre, " ".repeat(padding), sep, post));
+
+            let clean_pre: String = pre.chars().filter(|c| *c != '\\').collect();
+
+            result.push(format!(
+                "{}{}{}{}",
+                clean_pre,
+                " ".repeat(padding),
+                sep,
+                post
+            ));
         } else {
             result.push(value.to_string());
         }
@@ -545,7 +563,7 @@ mod tests {
         let p1 = StylePattern::new("*", vec![], false);
         let p2 = StylePattern::new(":completion:*", vec![], false);
         let p3 = StylePattern::new(":completion:zsh:*", vec![], false);
-        
+
         assert!(p3.weight > p2.weight);
         assert!(p2.weight > p1.weight);
     }
@@ -564,10 +582,10 @@ mod tests {
     fn test_style_table_set_get() {
         let mut table = StyleTable::new();
         table.set(":completion:*", "verbose", vec!["yes".to_string()], false);
-        
+
         let result = table.get(":completion:zsh", "verbose");
         assert_eq!(result, Some(&["yes".to_string()][..]));
-        
+
         let result = table.get(":other", "verbose");
         assert!(result.is_none());
     }
@@ -577,7 +595,7 @@ mod tests {
         let mut table = StyleTable::new();
         table.set("*", "menu", vec!["no".to_string()], false);
         table.set(":completion:*", "menu", vec!["yes".to_string()], false);
-        
+
         let result = table.get(":completion:zsh", "menu");
         assert_eq!(result, Some(&["yes".to_string()][..]));
     }
@@ -587,7 +605,7 @@ mod tests {
         let mut table = StyleTable::new();
         table.set("*", "style1", vec!["val".to_string()], false);
         table.set("*", "style2", vec!["val".to_string()], false);
-        
+
         table.delete(None, Some("style1"));
         assert!(table.get("test", "style1").is_none());
         assert!(table.get("test", "style2").is_some());
@@ -598,8 +616,13 @@ mod tests {
         let mut table = StyleTable::new();
         table.set("*", "enabled", vec!["yes".to_string()], false);
         table.set("*", "disabled", vec!["no".to_string()], false);
-        table.set("*", "multiple", vec!["a".to_string(), "b".to_string()], false);
-        
+        table.set(
+            "*",
+            "multiple",
+            vec!["a".to_string(), "b".to_string()],
+            false,
+        );
+
         assert_eq!(table.test_bool("ctx", "enabled"), Some(true));
         assert_eq!(table.test_bool("ctx", "disabled"), Some(false));
         assert_eq!(table.test_bool("ctx", "multiple"), None);
@@ -610,7 +633,7 @@ mod tests {
         let mut specs = HashMap::new();
         specs.insert('n', "test".to_string());
         specs.insert('v', "42".to_string());
-        
+
         let result = zformat("Name: %n, Value: %v", &specs, false);
         assert_eq!(result, "Name: test, Value: 42");
     }
@@ -619,10 +642,10 @@ mod tests {
     fn test_zformat_padding() {
         let mut specs = HashMap::new();
         specs.insert('n', "hi".to_string());
-        
+
         let result = zformat("[%10n]", &specs, false);
         assert_eq!(result, "[hi        ]");
-        
+
         let result = zformat("[%-10n]", &specs, false);
         assert_eq!(result, "[        hi]");
     }
@@ -631,7 +654,7 @@ mod tests {
     fn test_zformat_truncate() {
         let mut specs = HashMap::new();
         specs.insert('n', "hello world".to_string());
-        
+
         let result = zformat("[%.5n]", &specs, false);
         assert_eq!(result, "[hello]");
     }
@@ -648,34 +671,33 @@ mod tests {
         let desc = OptDesc::parse("v").unwrap();
         assert_eq!(desc.name, "v");
         assert!(!desc.takes_arg);
-        
+
         let desc = OptDesc::parse("o:").unwrap();
         assert_eq!(desc.name, "o");
         assert!(desc.takes_arg);
         assert!(!desc.optional_arg);
-        
+
         let desc = OptDesc::parse("o::").unwrap();
         assert!(desc.optional_arg);
-        
+
         let desc = OptDesc::parse("v+").unwrap();
         assert!(desc.multiple);
-        
+
         let desc = OptDesc::parse("a:=myarray").unwrap();
         assert_eq!(desc.array_name, Some("myarray".to_string()));
     }
 
     #[test]
     fn test_zparseopts_basic() {
-        let specs = vec![
-            OptDesc::parse("v").unwrap(),
-            OptDesc::parse("o:").unwrap(),
-        ];
-        
+        let specs = vec![OptDesc::parse("v").unwrap(), OptDesc::parse("o:").unwrap()];
+
         let args: Vec<String> = vec!["-v", "-o", "value", "rest"]
-            .into_iter().map(String::from).collect();
-        
+            .into_iter()
+            .map(String::from)
+            .collect();
+
         let (opts, remaining) = zparseopts(&args, &specs, false, false).unwrap();
-        
+
         assert!(opts.contains_key("-v"));
         assert_eq!(opts.get("-o"), Some(&vec!["value".to_string()]));
         assert_eq!(remaining, vec!["rest"]);
@@ -688,12 +710,11 @@ mod tests {
             OptDesc::parse("b").unwrap(),
             OptDesc::parse("c:").unwrap(),
         ];
-        
-        let args: Vec<String> = vec!["-abc", "val"]
-            .into_iter().map(String::from).collect();
-        
+
+        let args: Vec<String> = vec!["-abc", "val"].into_iter().map(String::from).collect();
+
         let (opts, _) = zparseopts(&args, &specs, false, false).unwrap();
-        
+
         assert!(opts.contains_key("-a"));
         assert!(opts.contains_key("-b"));
         assert_eq!(opts.get("-c"), Some(&vec!["val".to_string()]));
@@ -705,12 +726,14 @@ mod tests {
             OptDesc::parse("verbose").unwrap(),
             OptDesc::parse("output:").unwrap(),
         ];
-        
+
         let args: Vec<String> = vec!["--verbose", "--output", "file.txt"]
-            .into_iter().map(String::from).collect();
-        
+            .into_iter()
+            .map(String::from)
+            .collect();
+
         let (opts, _) = zparseopts(&args, &specs, false, false).unwrap();
-        
+
         assert!(opts.contains_key("-verbose"));
         assert_eq!(opts.get("-output"), Some(&vec!["file.txt".to_string()]));
     }
@@ -719,7 +742,7 @@ mod tests {
     fn test_zformat_align() {
         let values = vec!["short:desc1", "verylongname:desc2", "med:desc3"];
         let result = zformat_align(" -- ", &values);
-        
+
         assert_eq!(result[0], "short        -- desc1");
         assert_eq!(result[1], "verylongname -- desc2");
         assert_eq!(result[2], "med          -- desc3");

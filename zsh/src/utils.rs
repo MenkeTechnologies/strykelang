@@ -188,7 +188,10 @@ pub fn is_number(s: &str) -> bool {
     if s.is_empty() {
         return false;
     }
-    let s = s.strip_prefix('-').or_else(|| s.strip_prefix('+')).unwrap_or(s);
+    let s = s
+        .strip_prefix('-')
+        .or_else(|| s.strip_prefix('+'))
+        .unwrap_or(s);
     if s.is_empty() {
         return false;
     }
@@ -339,16 +342,43 @@ impl QuoteType {
 /// Check if character is special for shell
 /// Port from ispecial() macro in zsh.h
 fn is_special(c: char) -> bool {
-    matches!(c,
-        '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' | '"' | '\'' | '\\' |
-        ' ' | '\t' | '\n' | '=' | '[' | ']' | '*' | '?' | '#' | '~' | '{' | '}' | '!' | '^'
+    matches!(
+        c,
+        '|' | '&'
+            | ';'
+            | '<'
+            | '>'
+            | '('
+            | ')'
+            | '$'
+            | '`'
+            | '"'
+            | '\''
+            | '\\'
+            | ' '
+            | '\t'
+            | '\n'
+            | '='
+            | '['
+            | ']'
+            | '*'
+            | '?'
+            | '#'
+            | '~'
+            | '{'
+            | '}'
+            | '!'
+            | '^'
     )
 }
 
 /// Check if character is a pattern character
 /// Port from ipattern() macro in zsh.h
 fn is_pattern(c: char) -> bool {
-    matches!(c, '*' | '?' | '[' | ']' | '<' | '>' | '(' | ')' | '|' | '#' | '^' | '~')
+    matches!(
+        c,
+        '*' | '?' | '[' | ']' | '<' | '>' | '(' | ')' | '|' | '#' | '^' | '~'
+    )
 }
 
 /// Quote a string according to the specified type
@@ -504,7 +534,7 @@ pub fn quote_string(s: &str) -> String {
     if s.is_empty() {
         return "''".to_string();
     }
-    
+
     let needs_quotes = s.chars().any(is_special);
 
     if !needs_quotes {
@@ -521,14 +551,14 @@ pub fn split_quoted(s: &str) -> Vec<String> {
     let mut in_single_quote = false;
     let mut in_double_quote = false;
     let mut escape_next = false;
-    
+
     for c in s.chars() {
         if escape_next {
             current.push(c);
             escape_next = false;
             continue;
         }
-        
+
         match c {
             '\\' if !in_single_quote => escape_next = true,
             '\'' if !in_double_quote => in_single_quote = !in_single_quote,
@@ -541,11 +571,11 @@ pub fn split_quoted(s: &str) -> Vec<String> {
             _ => current.push(c),
         }
     }
-    
+
     if !current.is_empty() {
         result.push(current);
     }
-    
+
     result
 }
 
@@ -664,7 +694,7 @@ pub fn zstrtoul_underscore(s: &str) -> Option<u64> {
 }
 
 /// Convert integer to string with specified base
-/// Port from zsh/Src/utils.c convbase() 
+/// Port from zsh/Src/utils.c convbase()
 pub fn convbase(val: i64, base: u32) -> String {
     match base {
         2 => format!("0b{:b}", val),
@@ -767,7 +797,11 @@ pub fn spdist(s: &str, t: &str, max_dist: usize) -> usize {
     for i in 1..=m {
         curr[0] = i;
         for j in 1..=n {
-            let cost = if s_chars[i - 1] == t_chars[j - 1] { 0 } else { 1 };
+            let cost = if s_chars[i - 1] == t_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
@@ -1013,7 +1047,7 @@ pub fn is_word_char_simple(c: char) -> bool {
 pub fn next_word_boundary(s: &str, pos: usize) -> usize {
     let chars: Vec<char> = s.chars().collect();
     let mut i = pos;
-    
+
     while i < chars.len() && is_word_char_simple(chars[i]) {
         i += 1;
     }
@@ -1027,7 +1061,7 @@ pub fn next_word_boundary(s: &str, pos: usize) -> usize {
 pub fn prev_word_boundary(s: &str, pos: usize) -> usize {
     let chars: Vec<char> = s.chars().collect();
     let mut i = pos.min(chars.len());
-    
+
     while i > 0 && !is_word_char_simple(chars[i - 1]) {
         i -= 1;
     }
@@ -1041,7 +1075,7 @@ pub fn prev_word_boundary(s: &str, pos: usize) -> usize {
 pub fn normalize_path(path: &str) -> String {
     let mut components: Vec<&str> = Vec::new();
     let absolute = path.starts_with('/');
-    
+
     for part in path.split('/') {
         match part {
             "" | "." => continue,
@@ -1055,7 +1089,7 @@ pub fn normalize_path(path: &str) -> String {
             _ => components.push(part),
         }
     }
-    
+
     let result = components.join("/");
     if absolute {
         format!("/{}", result)
@@ -1148,17 +1182,17 @@ pub fn nicechar_ctrl(c: char) -> String {
 /// Format time struct (from utils.c ztrftime)
 pub fn ztrftime(fmt: &str, time: std::time::SystemTime) -> String {
     use std::time::UNIX_EPOCH;
-    
+
     let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = duration.as_secs() as i64;
-    
+
     #[cfg(unix)]
     unsafe {
         let tm = libc::localtime(&secs);
         if tm.is_null() {
             return String::new();
         }
-        
+
         let mut buf = vec![0u8; 256];
         let c_fmt = std::ffi::CString::new(fmt).unwrap_or_default();
         let len = libc::strftime(
@@ -1167,7 +1201,7 @@ pub fn ztrftime(fmt: &str, time: std::time::SystemTime) -> String {
             c_fmt.as_ptr(),
             tm,
         );
-        
+
         if len > 0 {
             buf.truncate(len);
             String::from_utf8_lossy(&buf).to_string()
@@ -1175,7 +1209,7 @@ pub fn ztrftime(fmt: &str, time: std::time::SystemTime) -> String {
             String::new()
         }
     }
-    
+
     #[cfg(not(unix))]
     {
         let _ = (fmt, secs);
@@ -1211,10 +1245,12 @@ pub fn printsafe(s: &str) -> String {
 
 /// Escape string for shell
 pub fn shescape(s: &str) -> String {
-    if s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-') {
+    if s.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-')
+    {
         return s.to_string();
     }
-    
+
     let mut result = String::with_capacity(s.len() + 2);
     result.push('\'');
     for c in s.chars() {
@@ -1232,7 +1268,7 @@ pub fn shescape(s: &str) -> String {
 pub fn unescape(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\\' {
             match chars.next() {
@@ -1293,7 +1329,10 @@ pub fn term_columns() -> usize {
             }
         }
     }
-    std::env::var("COLUMNS").ok().and_then(|s| s.parse().ok()).unwrap_or(80)
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(80)
 }
 
 /// Get terminal lines (fallback to 24)
@@ -1311,7 +1350,10 @@ pub fn term_lines() -> usize {
             }
         }
     }
-    std::env::var("LINES").ok().and_then(|s| s.parse().ok()).unwrap_or(24)
+    std::env::var("LINES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(24)
 }
 
 /// Sleep for milliseconds
@@ -1336,7 +1378,9 @@ pub fn gethostname() -> String {
 
 /// Get current working directory
 pub fn zgetcwd() -> Option<String> {
-    std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string())
+    std::env::current_dir()
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// Set current working directory
@@ -1363,7 +1407,9 @@ pub fn makeabspath(path: &str) -> String {
 
 /// Get real (canonical) path
 pub fn realpath(path: &str) -> Option<String> {
-    std::fs::canonicalize(path).ok().map(|p| p.to_string_lossy().to_string())
+    std::fs::canonicalize(path)
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// Check if file exists
@@ -1409,7 +1455,9 @@ pub fn read_file(path: &str) -> Option<String> {
 
 /// Read file lines
 pub fn read_lines(path: &str) -> Option<Vec<String>> {
-    std::fs::read_to_string(path).ok().map(|s| s.lines().map(|l| l.to_string()).collect())
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|s| s.lines().map(|l| l.to_string()).collect())
 }
 
 /// Write string to file
@@ -1488,7 +1536,9 @@ pub fn symlink(src: &str, dst: &str) -> bool {
 
 /// Read symlink target
 pub fn readlink(path: &str) -> Option<String> {
-    std::fs::read_link(path).ok().map(|p| p.to_string_lossy().to_string())
+    std::fs::read_link(path)
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// Get environment variable
@@ -1514,7 +1564,9 @@ pub fn environ() -> Vec<(String, String)> {
 /// Get current user ID
 pub fn getuid() -> u32 {
     #[cfg(unix)]
-    unsafe { libc::getuid() }
+    unsafe {
+        libc::getuid()
+    }
     #[cfg(not(unix))]
     0
 }
@@ -1522,7 +1574,9 @@ pub fn getuid() -> u32 {
 /// Get effective user ID
 pub fn geteuid() -> u32 {
     #[cfg(unix)]
-    unsafe { libc::geteuid() }
+    unsafe {
+        libc::geteuid()
+    }
     #[cfg(not(unix))]
     0
 }
@@ -1530,7 +1584,9 @@ pub fn geteuid() -> u32 {
 /// Get current group ID
 pub fn getgid() -> u32 {
     #[cfg(unix)]
-    unsafe { libc::getgid() }
+    unsafe {
+        libc::getgid()
+    }
     #[cfg(not(unix))]
     0
 }
@@ -1538,7 +1594,9 @@ pub fn getgid() -> u32 {
 /// Get effective group ID
 pub fn getegid() -> u32 {
     #[cfg(unix)]
-    unsafe { libc::getegid() }
+    unsafe {
+        libc::getegid()
+    }
     #[cfg(not(unix))]
     0
 }
@@ -1551,7 +1609,9 @@ pub fn getpid() -> i32 {
 /// Get parent process ID
 pub fn getppid() -> i32 {
     #[cfg(unix)]
-    unsafe { libc::getppid() }
+    unsafe {
+        libc::getppid()
+    }
     #[cfg(not(unix))]
     0
 }
@@ -1643,7 +1703,11 @@ pub fn random_int() -> u32 {
 
 /// Generate random integer in range [0, max)
 pub fn random_range(max: u32) -> u32 {
-    if max == 0 { 0 } else { random_int() % max }
+    if max == 0 {
+        0
+    } else {
+        random_int() % max
+    }
 }
 
 /// Hash a string (simple djb2)
@@ -1789,7 +1853,7 @@ pub fn read1char() -> Option<char> {
 pub fn checkrmall(path: &str) -> bool {
     if let Some(c) = getquery(
         &format!("zsh: sure you want to delete all of {}? [yn] ", path),
-        "yn"
+        "yn",
     ) {
         c == 'y' || c == 'Y'
     } else {
@@ -1812,7 +1876,9 @@ pub fn privasserted() -> bool {
         unsafe { libc::getuid() != libc::geteuid() || libc::getgid() != libc::getegid() }
     }
     #[cfg(not(unix))]
-    { false }
+    {
+        false
+    }
 }
 
 /// Get the current working directory (port of findpwd/set_pwd_env)
@@ -1859,7 +1925,11 @@ pub fn read_loop(fd: i32, buf: &mut [u8]) -> io::Result<usize> {
         let mut total = 0;
         while total < buf.len() {
             let n = unsafe {
-                libc::read(fd, buf[total..].as_mut_ptr() as *mut libc::c_void, buf.len() - total)
+                libc::read(
+                    fd,
+                    buf[total..].as_mut_ptr() as *mut libc::c_void,
+                    buf.len() - total,
+                )
             };
             if n <= 0 {
                 if n < 0 {
@@ -1888,7 +1958,11 @@ pub fn write_loop(fd: i32, buf: &[u8]) -> io::Result<usize> {
         let mut total = 0;
         while total < buf.len() {
             let n = unsafe {
-                libc::write(fd, buf[total..].as_ptr() as *const libc::c_void, buf.len() - total)
+                libc::write(
+                    fd,
+                    buf[total..].as_ptr() as *const libc::c_void,
+                    buf.len() - total,
+                )
             };
             if n <= 0 {
                 if n < 0 {
@@ -1976,12 +2050,8 @@ pub fn skipwsep_ifs<'a>(s: &'a str, ifs: &str) -> &'a str {
 /// Find a separator in string (from utils.c findsep)
 pub fn findsep(s: &str, sep: Option<&str>) -> Option<usize> {
     match sep {
-        Some(sep) if sep.len() == 1 => {
-            s.find(sep.chars().next().unwrap())
-        }
-        Some(sep) => {
-            s.find(sep)
-        }
+        Some(sep) if sep.len() == 1 => s.find(sep.chars().next().unwrap()),
+        Some(sep) => s.find(sep),
         None => {
             // Default: split on whitespace
             s.find(|c: char| c.is_ascii_whitespace())
@@ -2035,17 +2105,50 @@ pub fn getkeystring(s: &str) -> (String, usize) {
             continue;
         }
         match chars.next() {
-            Some('n') => { result.push('\n'); consumed += 1; }
-            Some('t') => { result.push('\t'); consumed += 1; }
-            Some('r') => { result.push('\r'); consumed += 1; }
-            Some('e') | Some('E') => { result.push('\x1b'); consumed += 1; }
-            Some('a') => { result.push('\x07'); consumed += 1; }
-            Some('b') => { result.push('\x08'); consumed += 1; }
-            Some('f') => { result.push('\x0c'); consumed += 1; }
-            Some('v') => { result.push('\x0b'); consumed += 1; }
-            Some('\\') => { result.push('\\'); consumed += 1; }
-            Some('\'') => { result.push('\''); consumed += 1; }
-            Some('"') => { result.push('"'); consumed += 1; }
+            Some('n') => {
+                result.push('\n');
+                consumed += 1;
+            }
+            Some('t') => {
+                result.push('\t');
+                consumed += 1;
+            }
+            Some('r') => {
+                result.push('\r');
+                consumed += 1;
+            }
+            Some('e') | Some('E') => {
+                result.push('\x1b');
+                consumed += 1;
+            }
+            Some('a') => {
+                result.push('\x07');
+                consumed += 1;
+            }
+            Some('b') => {
+                result.push('\x08');
+                consumed += 1;
+            }
+            Some('f') => {
+                result.push('\x0c');
+                consumed += 1;
+            }
+            Some('v') => {
+                result.push('\x0b');
+                consumed += 1;
+            }
+            Some('\\') => {
+                result.push('\\');
+                consumed += 1;
+            }
+            Some('\'') => {
+                result.push('\'');
+                consumed += 1;
+            }
+            Some('"') => {
+                result.push('"');
+                consumed += 1;
+            }
             Some('x') => {
                 consumed += 1;
                 let mut hex = String::new();
@@ -2194,7 +2297,13 @@ pub fn printhhmmss(secs: f64) -> String {
     let s = total_secs % 60;
     let frac = secs - total_secs as f64;
     if hours > 0 {
-        format!("{}:{:02}:{:02}.{:03}", hours, mins, s, (frac * 1000.0) as u64)
+        format!(
+            "{}:{:02}:{:02}.{:03}",
+            hours,
+            mins,
+            s,
+            (frac * 1000.0) as u64
+        )
     } else {
         format!("{}:{:02}.{:03}", mins, s, (frac * 1000.0) as u64)
     }
@@ -2209,7 +2318,9 @@ pub fn getumask_value() -> u32 {
         mask as u32
     }
     #[cfg(not(unix))]
-    { 0o022 }
+    {
+        0o022
+    }
 }
 
 /// Attach to the controlling tty's process group (from utils.c attachtty)
@@ -2312,7 +2423,11 @@ pub fn print_if_link(path: &str) -> Option<String> {
 }
 
 /// Substitute named directory in path (from utils.c substnamedir)
-pub fn substnamedir(path: &str, home: &str, named_dirs: &std::collections::HashMap<String, String>) -> String {
+pub fn substnamedir(
+    path: &str,
+    home: &str,
+    named_dirs: &std::collections::HashMap<String, String>,
+) -> String {
     // Try home first
     if !home.is_empty() && path.starts_with(home) {
         let rest = &path[home.len()..];
@@ -2340,7 +2455,10 @@ pub fn substnamedir(path: &str, home: &str, named_dirs: &std::collections::HashM
 }
 
 /// Scan for named directory matches (from utils.c finddir_scan)
-pub fn finddir_scan(path: &str, named_dirs: &std::collections::HashMap<String, String>) -> Option<(String, String)> {
+pub fn finddir_scan(
+    path: &str,
+    named_dirs: &std::collections::HashMap<String, String>,
+) -> Option<(String, String)> {
     let mut best = None;
     let mut best_len = 0;
     for (name, dir) in named_dirs {
@@ -2356,7 +2474,11 @@ pub fn finddir_scan(path: &str, named_dirs: &std::collections::HashMap<String, S
 }
 
 /// Find named directory for path (from utils.c finddir)
-pub fn finddir(path: &str, home: &str, named_dirs: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn finddir(
+    path: &str,
+    home: &str,
+    named_dirs: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     if !home.is_empty() && path.starts_with(home) {
         let rest = &path[home.len()..];
         if rest.is_empty() || rest.starts_with('/') {
@@ -2367,12 +2489,19 @@ pub fn finddir(path: &str, home: &str, named_dirs: &std::collections::HashMap<St
 }
 
 /// Add user directory (from utils.c adduserdir)
-pub fn adduserdir(named_dirs: &mut std::collections::HashMap<String, String>, name: &str, dir: &str) {
+pub fn adduserdir(
+    named_dirs: &mut std::collections::HashMap<String, String>,
+    name: &str,
+    dir: &str,
+) {
     named_dirs.insert(name.to_string(), dir.to_string());
 }
 
 /// Get named directory (from utils.c getnameddir)
-pub fn getnameddir(name: &str, named_dirs: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn getnameddir(
+    name: &str,
+    named_dirs: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     named_dirs.get(name).cloned()
 }
 
@@ -2405,7 +2534,10 @@ impl HookManager {
     }
 
     pub fn add(&mut self, name: &str, func: &str) {
-        self.hooks.entry(name.to_string()).or_default().push(func.to_string());
+        self.hooks
+            .entry(name.to_string())
+            .or_default()
+            .push(func.to_string());
     }
 
     pub fn remove(&mut self, name: &str, func: &str) {
@@ -2526,7 +2658,9 @@ pub fn movefd(fd: i32) -> i32 {
         fd
     }
     #[cfg(not(unix))]
-    { fd }
+    {
+        fd
+    }
 }
 
 /// Add module file descriptor (from utils.c addmodulefd)
@@ -2537,7 +2671,9 @@ pub fn addmodulefd(fd: i32) {
         unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
     }
     #[cfg(not(unix))]
-    { let _ = fd; }
+    {
+        let _ = fd;
+    }
 }
 
 /// Add lock file descriptor (from utils.c addlockfd)
@@ -2549,7 +2685,9 @@ pub fn addlockfd(fd: i32, cloexec: bool) {
         }
     }
     #[cfg(not(unix))]
-    { let _ = (fd, cloexec); }
+    {
+        let _ = (fd, cloexec);
+    }
 }
 
 /// Close lock file descriptor (from utils.c zcloselockfd)
@@ -2607,7 +2745,10 @@ pub fn spscan(name: &str, candidates: &[String], threshold: usize) -> Option<Str
 }
 
 /// Get shell function by name (from utils.c getshfunc)
-pub fn getshfunc(name: &str, functions: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn getshfunc(
+    name: &str,
+    functions: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     functions.get(name).cloned()
 }
 
@@ -2671,7 +2812,8 @@ pub fn unmetafy(s: &str) -> String {
     let mut result = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == 0x83 && i + 1 < bytes.len() { // Meta character
+        if bytes[i] == 0x83 && i + 1 < bytes.len() {
+            // Meta character
             result.push(bytes[i + 1] ^ 32);
             i += 2;
         } else {
@@ -2759,7 +2901,10 @@ mod tests {
 
     #[test]
     fn test_sepjoin() {
-        assert_eq!(sepjoin(&["a".into(), "b".into(), "c".into()], Some(":")), "a:b:c");
+        assert_eq!(
+            sepjoin(&["a".into(), "b".into(), "c".into()], Some(":")),
+            "a:b:c"
+        );
         assert_eq!(sepjoin(&["a".into(), "b".into()], None), "a b");
     }
 
@@ -2798,7 +2943,10 @@ mod tests {
     #[test]
     fn test_quotestring_backslash() {
         assert_eq!(quotestring("hello", QuoteType::Backslash), "hello");
-        assert_eq!(quotestring("has space", QuoteType::Backslash), "has\\ space");
+        assert_eq!(
+            quotestring("has space", QuoteType::Backslash),
+            "has\\ space"
+        );
         assert_eq!(quotestring("$var", QuoteType::Backslash), "\\$var");
     }
 
@@ -2811,20 +2959,32 @@ mod tests {
     #[test]
     fn test_quotestring_double() {
         assert_eq!(quotestring("hello", QuoteType::Double), "\"hello\"");
-        assert_eq!(quotestring("say \"hi\"", QuoteType::Double), "\"say \\\"hi\\\"\"");
+        assert_eq!(
+            quotestring("say \"hi\"", QuoteType::Double),
+            "\"say \\\"hi\\\"\""
+        );
     }
 
     #[test]
     fn test_quotestring_dollars() {
         assert_eq!(quotestring("hello", QuoteType::Dollars), "$'hello'");
-        assert_eq!(quotestring("line\nbreak", QuoteType::Dollars), "$'line\\nbreak'");
-        assert_eq!(quotestring("tab\there", QuoteType::Dollars), "$'tab\\there'");
+        assert_eq!(
+            quotestring("line\nbreak", QuoteType::Dollars),
+            "$'line\\nbreak'"
+        );
+        assert_eq!(
+            quotestring("tab\there", QuoteType::Dollars),
+            "$'tab\\there'"
+        );
     }
 
     #[test]
     fn test_quotestring_pattern() {
         assert_eq!(quotestring("*.txt", QuoteType::BackslashPattern), "\\*.txt");
-        assert_eq!(quotestring("file[1]", QuoteType::BackslashPattern), "file\\[1\\]");
+        assert_eq!(
+            quotestring("file[1]", QuoteType::BackslashPattern),
+            "file\\[1\\]"
+        );
     }
 
     #[test]
@@ -2839,10 +2999,10 @@ mod tests {
     fn test_split_quoted() {
         let result = split_quoted("foo bar baz");
         assert_eq!(result, vec!["foo", "bar", "baz"]);
-        
+
         let result = split_quoted("'hello world' test");
         assert_eq!(result, vec!["hello world", "test"]);
-        
+
         let result = split_quoted("\"double quoted\" value");
         assert_eq!(result, vec!["double quoted", "value"]);
     }
@@ -2904,13 +3064,21 @@ pub fn gettempfile(prefix: &str, suffix: &str) -> Option<String> {
 
 /// Copy string with upper/lower case (from utils.c strucpy)
 pub fn strucpy(s: &str, upper: bool) -> String {
-    if upper { s.to_uppercase() } else { s.to_string() }
+    if upper {
+        s.to_uppercase()
+    } else {
+        s.to_string()
+    }
 }
 
 /// Copy n chars with upper/lower case (from utils.c struncpy)
 pub fn struncpy(s: &str, n: usize, upper: bool) -> String {
     let s: String = s.chars().take(n).collect();
-    if upper { s.to_uppercase() } else { s }
+    if upper {
+        s.to_uppercase()
+    } else {
+        s
+    }
 }
 
 /// Check if array length >= n (from utils.c arrlen_ge)
@@ -2996,7 +3164,9 @@ pub fn setcbreak() -> bool {
 }
 
 #[cfg(not(unix))]
-pub fn setcbreak() -> bool { false }
+pub fn setcbreak() -> bool {
+    false
+}
 
 /// Metafy and duplicate string (from utils.c ztrdup_metafy)
 pub fn ztrdup_metafy(s: &str) -> String {
@@ -3033,7 +3203,8 @@ pub fn mb_metacharlenconv_r(s: &str, pos: usize) -> (usize, Option<char>) {
 /// Multibyte metastring length to end (from utils.c mb_metastrlenend)
 pub fn mb_metastrlenend(s: &str, width: bool, end: usize) -> usize {
     if width {
-        s[..end.min(s.len())].chars()
+        s[..end.min(s.len())]
+            .chars()
             .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(1))
             .sum()
     } else {
@@ -3128,7 +3299,9 @@ pub struct DirSav {
 pub fn init_dirsav() -> DirSav {
     DirSav {
         dirfd: -1,
-        dirname: std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string()),
+        dirname: std::env::current_dir()
+            .ok()
+            .map(|p| p.to_string_lossy().to_string()),
         level: 0,
     }
 }
@@ -3140,7 +3313,9 @@ pub fn dputs(msg: &str) {
         eprintln!("BUG: {}", msg);
     }
     #[cfg(not(debug_assertions))]
-    { let _ = msg; }
+    {
+        let _ = msg;
+    }
 }
 
 /// Remove character from string (from utils.c chuck)

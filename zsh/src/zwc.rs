@@ -4,8 +4,8 @@
 //! that can be executed by zshrs.
 
 use crate::parser::{
-    CompoundCommand, ListOp, RedirectOp, ShellCommand, ShellWord, SimpleCommand,
-    Redirect, CaseTerminator,
+    CaseTerminator, CompoundCommand, ListOp, Redirect, RedirectOp, ShellCommand, ShellWord,
+    SimpleCommand,
 };
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

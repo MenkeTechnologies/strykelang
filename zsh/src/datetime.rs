@@ -30,7 +30,11 @@ pub fn epoch_time() -> (i64, i64) {
 }
 
 /// Format time using strftime-style format
-pub fn strftime(format: &str, timestamp: Option<i64>, nanoseconds: Option<i64>) -> Result<String, String> {
+pub fn strftime(
+    format: &str,
+    timestamp: Option<i64>,
+    nanoseconds: Option<i64>,
+) -> Result<String, String> {
     let (secs, nanos) = if let Some(ts) = timestamp {
         (ts, nanoseconds.unwrap_or(0))
     } else {
@@ -111,10 +115,7 @@ pub struct StrftimeOptions {
 }
 
 /// Execute the strftime builtin
-pub fn builtin_strftime(
-    args: &[&str],
-    options: &StrftimeOptions,
-) -> (i32, String) {
+pub fn builtin_strftime(args: &[&str], options: &StrftimeOptions) -> (i32, String) {
     if args.is_empty() {
         return (1, "strftime: format expected\n".to_string());
     }
@@ -146,7 +147,12 @@ pub fn builtin_strftime(
         let timestamp = if args.len() > 1 {
             match args[1].parse::<i64>() {
                 Ok(ts) => Some(ts),
-                Err(_) => return (1, format!("strftime: {}: invalid decimal number\n", args[1])),
+                Err(_) => {
+                    return (
+                        1,
+                        format!("strftime: {}: invalid decimal number\n", args[1]),
+                    )
+                }
             }
         } else {
             None
@@ -155,8 +161,18 @@ pub fn builtin_strftime(
         let nanoseconds = if args.len() > 2 {
             match args[2].parse::<i64>() {
                 Ok(ns) if ns >= 0 && ns <= 999_999_999 => Some(ns),
-                Ok(_) => return (1, format!("strftime: {}: invalid nanosecond value\n", args[2])),
-                Err(_) => return (1, format!("strftime: {}: invalid decimal number\n", args[2])),
+                Ok(_) => {
+                    return (
+                        1,
+                        format!("strftime: {}: invalid nanosecond value\n", args[2]),
+                    )
+                }
+                Err(_) => {
+                    return (
+                        1,
+                        format!("strftime: {}: invalid decimal number\n", args[2]),
+                    )
+                }
             }
         } else {
             None
@@ -210,7 +226,10 @@ pub fn get_datetime_info() -> std::collections::HashMap<String, String> {
     info.insert("timezone".to_string(), now.format("%Z").to_string());
     info.insert("offset".to_string(), now.format("%z").to_string());
     info.insert("epoch".to_string(), now.timestamp().to_string());
-    info.insert("iso8601".to_string(), now.format("%Y-%m-%dT%H:%M:%S%z").to_string());
+    info.insert(
+        "iso8601".to_string(),
+        now.format("%Y-%m-%dT%H:%M:%S%z").to_string(),
+    );
 
     info
 }
@@ -218,12 +237,14 @@ pub fn get_datetime_info() -> std::collections::HashMap<String, String> {
 /// Convert between timezones
 pub fn convert_timezone(timestamp: i64, to_utc: bool) -> i64 {
     if to_utc {
-        let dt: DateTime<Local> = Local.timestamp_opt(timestamp, 0)
+        let dt: DateTime<Local> = Local
+            .timestamp_opt(timestamp, 0)
             .single()
             .unwrap_or_else(|| Local::now());
         dt.with_timezone(&Utc).timestamp()
     } else {
-        let dt: DateTime<Utc> = Utc.timestamp_opt(timestamp, 0)
+        let dt: DateTime<Utc> = Utc
+            .timestamp_opt(timestamp, 0)
             .single()
             .unwrap_or_else(Utc::now);
         dt.with_timezone(&Local).timestamp()
@@ -290,26 +311,17 @@ mod tests {
 
     #[test]
     fn test_builtin_strftime() {
-        let (status, output) = builtin_strftime(
-            &["%s"],
-            &StrftimeOptions::default(),
-        );
+        let (status, output) = builtin_strftime(&["%s"], &StrftimeOptions::default());
         assert_eq!(status, 0);
         assert!(!output.is_empty());
 
-        let (status, _) = builtin_strftime(
-            &[],
-            &StrftimeOptions::default(),
-        );
+        let (status, _) = builtin_strftime(&[], &StrftimeOptions::default());
         assert_eq!(status, 1);
     }
 
     #[test]
     fn test_builtin_strftime_with_timestamp() {
-        let (status, output) = builtin_strftime(
-            &["%s", "1700000000"],
-            &StrftimeOptions::default(),
-        );
+        let (status, output) = builtin_strftime(&["%s", "1700000000"], &StrftimeOptions::default());
         assert_eq!(status, 0);
         assert!(output.contains("1700000000"));
     }

@@ -1,16 +1,15 @@
 //! Comprehensive integration tests for zshrs shell features
 //! Testing 100% feature parity with zsh/bash/fish
 
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
-use std::path::PathBuf;
 
 static ZSHRS_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn get_zshrs_path() -> &'static PathBuf {
     ZSHRS_PATH.get_or_init(|| {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-            .unwrap_or_else(|_| ".".to_string());
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
         // Prefer debug build for testing (release may be stale)
         let path = PathBuf::from(&manifest_dir).join("target/debug/zshrs");
         if path.exists() {
@@ -87,7 +86,10 @@ fn test_printf_basic() {
 
 #[test]
 fn test_printf_format() {
-    assert_eq!(run_zshrs(r#"printf "%d + %d = %d\n" 2 3 5"#).trim(), "2 + 3 = 5");
+    assert_eq!(
+        run_zshrs(r#"printf "%d + %d = %d\n" 2 3 5"#).trim(),
+        "2 + 3 = 5"
+    );
 }
 
 #[test]
@@ -139,7 +141,10 @@ fn test_variable_assignment() {
 
 #[test]
 fn test_variable_with_spaces() {
-    assert_eq!(run_zshrs(r#"x="hello world"; echo "$x""#).trim(), "hello world");
+    assert_eq!(
+        run_zshrs(r#"x="hello world"; echo "$x""#).trim(),
+        "hello world"
+    );
 }
 
 #[test]
@@ -150,7 +155,10 @@ fn test_export_variable() {
 
 #[test]
 fn test_unset_variable() {
-    assert_eq!(run_zshrs("x=hello; unset x; echo ${x:-unset}").trim(), "unset");
+    assert_eq!(
+        run_zshrs("x=hello; unset x; echo ${x:-unset}").trim(),
+        "unset"
+    );
 }
 
 #[test]
@@ -176,7 +184,10 @@ fn test_array_length() {
 
 #[test]
 fn test_array_append() {
-    assert_eq!(run_zshrs("arr=(a b); arr+=(c); echo ${arr[@]}").trim(), "a b c");
+    assert_eq!(
+        run_zshrs("arr=(a b); arr+=(c); echo ${arr[@]}").trim(),
+        "a b c"
+    );
 }
 
 #[test]
@@ -196,7 +207,10 @@ fn test_param_default_value() {
 
 #[test]
 fn test_param_default_assign() {
-    assert_eq!(run_zshrs("echo ${x:=assigned}; echo $x").trim(), "assigned\nassigned");
+    assert_eq!(
+        run_zshrs("echo ${x:=assigned}; echo $x").trim(),
+        "assigned\nassigned"
+    );
 }
 
 #[test]
@@ -271,12 +285,16 @@ fn test_if_then_fi() {
 
 #[test]
 fn test_if_else() {
-    assert_eq!(run_zshrs("if false; then echo yes; else echo no; fi").trim(), "no");
+    assert_eq!(
+        run_zshrs("if false; then echo yes; else echo no; fi").trim(),
+        "no"
+    );
 }
 
 #[test]
 fn test_if_elif() {
-    let output = run_zshrs("x=2; if [[ $x -eq 1 ]]; then echo one; elif [[ $x -eq 2 ]]; then echo two; fi");
+    let output =
+        run_zshrs("x=2; if [[ $x -eq 1 ]]; then echo one; elif [[ $x -eq 2 ]]; then echo two; fi");
     assert_eq!(output.trim(), "two");
 }
 
@@ -526,7 +544,10 @@ fn test_brace_expansion_alpha() {
 
 #[test]
 fn test_brace_expansion_combined() {
-    assert_eq!(run_zshrs("echo file{1,2}.{txt,md}").trim(), "file1.txt file1.md file2.txt file2.md");
+    assert_eq!(
+        run_zshrs("echo file{1,2}.{txt,md}").trim(),
+        "file1.txt file1.md file2.txt file2.md"
+    );
 }
 
 #[test]
@@ -989,13 +1010,15 @@ fn test_zparseopts() {
 }
 
 // ============================================================================
-// PROMPT SYSTEM  
+// PROMPT SYSTEM
 // ============================================================================
 
 #[test]
 fn test_promptinit() {
     let output = run_zshrs("promptinit");
-    assert!(output.contains("initialized") || output.is_empty() || run_zshrs_status("promptinit") == 0);
+    assert!(
+        output.contains("initialized") || output.is_empty() || run_zshrs_status("promptinit") == 0
+    );
 }
 
 #[test]
@@ -1103,8 +1126,10 @@ fn test_escape_in_double_quotes() {
 
 #[test]
 fn test_multiline_string() {
-    let output = run_zshrs(r#"echo "line1
-line2""#);
+    let output = run_zshrs(
+        r#"echo "line1
+line2""#,
+    );
     assert!(output.contains("line1") && output.contains("line2"));
 }
 
@@ -1200,13 +1225,15 @@ fn test_glob_null() {
 
 #[test]
 fn test_glob_dotfiles() {
-    let output = run_zshrs("setopt dotglob; builtin cd /tmp && ls -d .[a-z]* 2>/dev/null | head -1");
+    let output =
+        run_zshrs("setopt dotglob; builtin cd /tmp && ls -d .[a-z]* 2>/dev/null | head -1");
     assert!(output.is_empty() || !output.contains("error"));
 }
 
 #[test]
 fn test_glob_numeric_sort() {
-    let output = run_zshrs("touch /tmp/f{1,10,2}.txt; echo /tmp/f*.txt(n); command rm /tmp/f{1,10,2}.txt");
+    let output =
+        run_zshrs("touch /tmp/f{1,10,2}.txt; echo /tmp/f*.txt(n); command rm /tmp/f{1,10,2}.txt");
     assert!(!output.is_empty());
 }
 
@@ -1222,7 +1249,10 @@ fn test_glob_case_insensitive() {
 
 #[test]
 fn test_array_slice() {
-    assert_eq!(run_zshrs("arr=(a b c d e); echo ${arr[2,4]}").trim(), "b c d");
+    assert_eq!(
+        run_zshrs("arr=(a b c d e); echo ${arr[2,4]}").trim(),
+        "b c d"
+    );
 }
 
 #[test]
@@ -1233,7 +1263,10 @@ fn test_array_negative_index() {
 
 #[test]
 fn test_array_element_assignment() {
-    assert_eq!(run_zshrs("arr=(a b c); arr[2]=X; echo ${arr[@]}").trim(), "a X c");
+    assert_eq!(
+        run_zshrs("arr=(a b c); arr[2]=X; echo ${arr[@]}").trim(),
+        "a X c"
+    );
 }
 
 #[test]
@@ -1244,7 +1277,10 @@ fn test_array_from_command() {
 
 #[test]
 fn test_array_append_multiple() {
-    assert_eq!(run_zshrs("arr=(a); arr+=(b c d); echo ${#arr[@]}").trim(), "4");
+    assert_eq!(
+        run_zshrs("arr=(a); arr+=(b c d); echo ${#arr[@]}").trim(),
+        "4"
+    );
 }
 
 #[test]
@@ -1427,7 +1463,9 @@ fn test_redirect_stderr() {
 
 #[test]
 fn test_redirect_both() {
-    let output = run_zshrs("echo test &>/tmp/zshrs_both.txt; cat /tmp/zshrs_both.txt; command rm /tmp/zshrs_both.txt");
+    let output = run_zshrs(
+        "echo test &>/tmp/zshrs_both.txt; cat /tmp/zshrs_both.txt; command rm /tmp/zshrs_both.txt",
+    );
     assert!(output.contains("test"));
 }
 
@@ -1528,7 +1566,8 @@ fn test_alias_global() {
 
 #[test]
 fn test_alias_suffix() {
-    let output = run_zshrs("alias -s txt=cat; echo test > /tmp/t.txt; /tmp/t.txt; command rm /tmp/t.txt");
+    let output =
+        run_zshrs("alias -s txt=cat; echo test > /tmp/t.txt; /tmp/t.txt; command rm /tmp/t.txt");
     assert!(output.contains("test") || output.is_empty());
 }
 
@@ -1803,12 +1842,18 @@ fn test_unhash() {
 
 #[test]
 fn test_string_concat() {
-    assert_eq!(run_zshrs("a=hello; b=world; echo $a$b").trim(), "helloworld");
+    assert_eq!(
+        run_zshrs("a=hello; b=world; echo $a$b").trim(),
+        "helloworld"
+    );
 }
 
 #[test]
 fn test_string_in_quotes() {
-    assert_eq!(run_zshrs(r#"a=hello; echo "$a world""#).trim(), "hello world");
+    assert_eq!(
+        run_zshrs(r#"a=hello; echo "$a world""#).trim(),
+        "hello world"
+    );
 }
 
 #[test]
@@ -1930,7 +1975,7 @@ fn test_subshell_vars() {
 fn test_subshell_cd() {
     let output = run_zshrs("(builtin cd /tmp; pwd); pwd");
     let lines: Vec<&str> = output.trim().lines().collect();
-    assert!(lines.len() >= 1);
+    assert!(!lines.is_empty());
 }
 
 // ============================================================================
@@ -2154,13 +2199,15 @@ fn test_cdreplay_with_deferred() {
 #[test]
 fn test_zinit_pattern() {
     // Test typical zinit initialization pattern
-    let output = run_zshrs(r#"
+    let output = run_zshrs(
+        r#"
         autoload -Uz compinit
         compinit -q
         compdef _git git
         cdreplay -q
         echo done
-    "#);
+    "#,
+    );
     assert!(output.contains("done"));
 }
 
@@ -2186,14 +2233,14 @@ fn test_startup_zshenv_sourced() {
     let tmpdir = std::env::temp_dir().join("zshrs_test_startup_env");
     let _ = std::fs::create_dir_all(&tmpdir);
     std::fs::write(tmpdir.join(".zshenv"), "export ZSHENV_LOADED=yes\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
         .args(["-c", "echo $ZSHENV_LOADED"])
         .env("ZDOTDIR", &tmpdir)
         .env("HOME", &tmpdir)
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("yes") || stdout.trim().is_empty());
@@ -2205,14 +2252,14 @@ fn test_startup_zshrc_sourced() {
     let tmpdir = std::env::temp_dir().join("zshrs_test_startup_rc");
     let _ = std::fs::create_dir_all(&tmpdir);
     std::fs::write(tmpdir.join(".zshrc"), "export ZSHRC_LOADED=yes\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
         .args(["-c", "echo $ZSHRC_LOADED"])
         .env("ZDOTDIR", &tmpdir)
         .env("HOME", &tmpdir)
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("yes") || stdout.trim().is_empty());
@@ -2225,7 +2272,7 @@ fn test_startup_order_env_before_rc() {
     let _ = std::fs::create_dir_all(&tmpdir);
     std::fs::write(tmpdir.join(".zshenv"), "export ORDER=\"$ORDER env\"\n").unwrap();
     std::fs::write(tmpdir.join(".zshrc"), "export ORDER=\"$ORDER rc\"\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
         .args(["-c", "echo $ORDER"])
         .env("ZDOTDIR", &tmpdir)
@@ -2233,7 +2280,7 @@ fn test_startup_order_env_before_rc() {
         .env("ORDER", "start")
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Order should be: start env rc
@@ -2250,14 +2297,14 @@ fn test_no_rcs_flag() {
     let tmpdir = std::env::temp_dir().join("zshrs_test_no_rcs");
     let _ = std::fs::create_dir_all(&tmpdir);
     std::fs::write(tmpdir.join(".zshrc"), "export SHOULD_NOT_LOAD=yes\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
         .args(["-f", "-c", "echo ${SHOULD_NOT_LOAD:-no}"])
         .env("ZDOTDIR", &tmpdir)
         .env("HOME", &tmpdir)
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout.trim(), "no");
@@ -2268,16 +2315,20 @@ fn test_rcs_option_controls_startup() {
     // unsetopt rcs in .zshenv should stop further startup files
     let tmpdir = std::env::temp_dir().join("zshrs_test_rcs_option");
     let _ = std::fs::create_dir_all(&tmpdir);
-    std::fs::write(tmpdir.join(".zshenv"), "unsetopt rcs\nexport ENV_LOADED=yes\n").unwrap();
+    std::fs::write(
+        tmpdir.join(".zshenv"),
+        "unsetopt rcs\nexport ENV_LOADED=yes\n",
+    )
+    .unwrap();
     std::fs::write(tmpdir.join(".zshrc"), "export RC_LOADED=yes\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
         .args(["-c", "echo env=$ENV_LOADED rc=${RC_LOADED:-no}"])
         .env("ZDOTDIR", &tmpdir)
         .env("HOME", &tmpdir)
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     // .zshenv loaded but .zshrc should be skipped due to unsetopt rcs
@@ -2314,13 +2365,16 @@ fn test_zcompile_creates_zwc() {
     let _ = std::fs::create_dir_all(&tmpdir);
     let src = tmpdir.join("test.zsh");
     std::fs::write(&src, "echo hello\n").unwrap();
-    
+
     let output = Command::new(get_zshrs_path())
-        .args(["-c", &format!("zcompile {}; ls {}.zwc", src.display(), src.display())])
+        .args([
+            "-c",
+            &format!("zcompile {}; ls {}.zwc", src.display(), src.display()),
+        ])
         .env("ZDOTDIR", "/nonexistent")
         .output()
         .expect("Failed to run zshrs");
-    
+
     let _ = std::fs::remove_dir_all(&tmpdir);
     let stdout = String::from_utf8_lossy(&output.stdout);
     // zcompile should create .zwc file
@@ -2336,7 +2390,7 @@ fn test_special_array_options() {
     // ${options[extendedglob]} should return 'on' or 'off'
     let output = run_zshrs("setopt extendedglob; echo ${options[extendedglob]}");
     assert_eq!(output.trim(), "on");
-    
+
     let output = run_zshrs("unsetopt extendedglob; echo ${options[extendedglob]}");
     assert_eq!(output.trim(), "off");
 }
@@ -2371,7 +2425,7 @@ fn test_special_array_builtins() {
     // ${builtins[cd]} should return 'defined'
     let output = run_zshrs("echo ${builtins[cd]}");
     assert_eq!(output.trim(), "defined");
-    
+
     // Unknown builtin should be empty
     let output = run_zshrs("echo \"x${builtins[notabuiltin]}x\"");
     assert_eq!(output.trim(), "xx");
@@ -2389,10 +2443,10 @@ fn test_special_array_parameters() {
     // ${parameters[var]} should return type
     let output = run_zshrs("foo=bar; echo ${parameters[foo]}");
     assert_eq!(output.trim(), "scalar");
-    
+
     let output = run_zshrs("arr=(a b c); echo ${parameters[arr]}");
     assert_eq!(output.trim(), "array");
-    
+
     let output = run_zshrs("declare -A hash; echo ${parameters[hash]}");
     assert_eq!(output.trim(), "association");
 }
@@ -2407,7 +2461,7 @@ fn test_special_array_nameddirs() {
 fn test_special_array_dirstack() {
     let output = run_zshrs("pushd /tmp >/dev/null; echo ${dirstack[1]}");
     // Should have something in dirstack after pushd
-    assert!(output.trim().len() > 0 || output.trim().is_empty());
+    assert!(!output.trim().is_empty() || output.trim().is_empty());
 }
 
 #[test]
@@ -2427,23 +2481,27 @@ fn test_special_array_modules() {
 #[test]
 fn test_special_array_option_check_pattern() {
     // Common plugin pattern: check if option is set
-    let output = run_zshrs(r#"
+    let output = run_zshrs(
+        r#"
 setopt extendedglob
 if [[ ${options[extendedglob]} == on ]]; then
     echo "extended glob enabled"
 fi
-"#);
+"#,
+    );
     assert!(output.contains("extended glob enabled"));
 }
 
 #[test]
 fn test_special_array_function_exists_pattern() {
     // Common plugin pattern: check if function exists
-    let output = run_zshrs(r#"
+    let output = run_zshrs(
+        r#"
 myfunc() { :; }
 if (( ${+functions[myfunc]} )); then
     echo "function exists"
 fi
-"#);
+"#,
+    );
     assert!(output.contains("function exists"));
 }

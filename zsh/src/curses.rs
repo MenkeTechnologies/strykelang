@@ -253,9 +253,12 @@ impl Window {
             write!(stdout, "{}", line)?;
         }
 
-        write!(stdout, "\x1b[{};{}H", 
-               self.y + self.cursor_y + 1, 
-               self.x + self.cursor_x + 1)?;
+        write!(
+            stdout,
+            "\x1b[{};{}H",
+            self.y + self.cursor_y + 1,
+            self.x + self.cursor_x + 1
+        )?;
 
         stdout.flush()
     }
@@ -387,7 +390,8 @@ pub fn terminal_size() -> Option<(usize, usize)> {
         }
     }
 
-    std::env::var("LINES").ok()
+    std::env::var("LINES")
+        .ok()
         .and_then(|l| l.parse().ok())
         .zip(std::env::var("COLUMNS").ok().and_then(|c| c.parse().ok()))
 }
@@ -468,7 +472,10 @@ pub fn builtin_zcurses(args: &[&str], curses: &mut Curses) -> (i32, String) {
         }
         "addwin" => {
             if args.len() < 6 {
-                return (1, "zcurses addwin: name rows cols y x required\n".to_string());
+                return (
+                    1,
+                    "zcurses addwin: name rows cols y x required\n".to_string(),
+                );
             }
             let name = args[1];
             let rows: usize = args[2].parse().unwrap_or(1);

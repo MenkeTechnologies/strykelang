@@ -11,18 +11,22 @@ use std::process::{Command, Stdio};
 
 /// Prefork flags
 pub mod prefork {
-    pub const SINGLE: u32 = 1;       // Single word expected
-    pub const SPLIT: u32 = 2;        // Force word splitting
-    pub const SHWORDSPLIT: u32 = 4;  // sh-style word splitting
+    pub const SINGLE: u32 = 1; // Single word expected
+    pub const SPLIT: u32 = 2; // Force word splitting
+    pub const SHWORDSPLIT: u32 = 4; // sh-style word splitting
     pub const NOSHWORDSPLIT: u32 = 8; // Disable word splitting
-    pub const ASSIGN: u32 = 16;      // Assignment context
-    pub const TYPESET: u32 = 32;     // Typeset context
-    pub const SUBEXP: u32 = 64;      // Subexpression
-    pub const KEY_VALUE: u32 = 128;  // Key-value pair found
+    pub const ASSIGN: u32 = 16; // Assignment context
+    pub const TYPESET: u32 = 32; // Typeset context
+    pub const SUBEXP: u32 = 64; // Subexpression
+    pub const KEY_VALUE: u32 = 128; // Key-value pair found
 }
 
 /// Perform all substitutions on a word
-pub fn subst_string(s: &str, params: &HashMap<String, String>, opts: &SubstOptions) -> Result<String, String> {
+pub fn subst_string(
+    s: &str,
+    params: &HashMap<String, String>,
+    opts: &SubstOptions,
+) -> Result<String, String> {
     let mut result = s.to_string();
 
     // Tilde expansion
@@ -57,7 +61,7 @@ pub fn tilde_expand(s: &str, _opts: &SubstOptions) -> Result<String, String> {
     }
 
     let rest = &s[1..];
-    
+
     // Find end of username
     let (user, suffix) = match rest.find('/') {
         Some(pos) => (&rest[..pos], &rest[pos..]),
@@ -103,7 +107,11 @@ fn get_user_home(user: &str) -> Option<String> {
 }
 
 /// Parameter expansion
-pub fn param_expand(s: &str, params: &HashMap<String, String>, opts: &SubstOptions) -> Result<String, String> {
+pub fn param_expand(
+    s: &str,
+    params: &HashMap<String, String>,
+    opts: &SubstOptions,
+) -> Result<String, String> {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
 
@@ -142,7 +150,7 @@ pub fn param_expand(s: &str, params: &HashMap<String, String>, opts: &SubstOptio
                     chars.next();
                     let name = collect_varname(&mut chars);
                     let full_name = format!("{}{}", c, name);
-                    
+
                     if let Some(value) = params.get(&full_name) {
                         result.push_str(value);
                     } else if let Ok(value) = env::var(&full_name) {
@@ -189,13 +197,15 @@ pub fn param_expand(s: &str, params: &HashMap<String, String>, opts: &SubstOptio
     Ok(result)
 }
 
-fn parse_brace_param(chars: &mut std::iter::Peekable<std::str::Chars>, 
-                     params: &HashMap<String, String>,
-                     _opts: &SubstOptions) -> Result<String, String> {
+fn parse_brace_param(
+    chars: &mut std::iter::Peekable<std::str::Chars>,
+    params: &HashMap<String, String>,
+    _opts: &SubstOptions,
+) -> Result<String, String> {
     let mut name = String::new();
     let mut operator = None;
     let mut operand = String::new();
-    
+
     // Check for special prefix operators
     let prefix = match chars.peek() {
         Some(&'#') => {
@@ -228,22 +238,61 @@ fn parse_brace_param(chars: &mut std::iter::Peekable<std::str::Chars>,
         Some(&':') => {
             chars.next();
             match chars.peek() {
-                Some(&'-') => { chars.next(); operator = Some(":-"); }
-                Some(&'=') => { chars.next(); operator = Some(":="); }
-                Some(&'+') => { chars.next(); operator = Some(":+"); }
-                Some(&'?') => { chars.next(); operator = Some(":?"); }
+                Some(&'-') => {
+                    chars.next();
+                    operator = Some(":-");
+                }
+                Some(&'=') => {
+                    chars.next();
+                    operator = Some(":=");
+                }
+                Some(&'+') => {
+                    chars.next();
+                    operator = Some(":+");
+                }
+                Some(&'?') => {
+                    chars.next();
+                    operator = Some(":?");
+                }
                 _ => operator = Some(":"),
             }
         }
-        Some(&'-') => { chars.next(); operator = Some("-"); }
-        Some(&'=') => { chars.next(); operator = Some("="); }
-        Some(&'+') => { chars.next(); operator = Some("+"); }
-        Some(&'?') => { chars.next(); operator = Some("?"); }
-        Some(&'#') => { chars.next(); operator = Some("#"); }
-        Some(&'%') => { chars.next(); operator = Some("%"); }
-        Some(&'/') => { chars.next(); operator = Some("/"); }
-        Some(&'^') => { chars.next(); operator = Some("^"); }
-        Some(&',') => { chars.next(); operator = Some(","); }
+        Some(&'-') => {
+            chars.next();
+            operator = Some("-");
+        }
+        Some(&'=') => {
+            chars.next();
+            operator = Some("=");
+        }
+        Some(&'+') => {
+            chars.next();
+            operator = Some("+");
+        }
+        Some(&'?') => {
+            chars.next();
+            operator = Some("?");
+        }
+        Some(&'#') => {
+            chars.next();
+            operator = Some("#");
+        }
+        Some(&'%') => {
+            chars.next();
+            operator = Some("%");
+        }
+        Some(&'/') => {
+            chars.next();
+            operator = Some("/");
+        }
+        Some(&'^') => {
+            chars.next();
+            operator = Some("^");
+        }
+        Some(&',') => {
+            chars.next();
+            operator = Some(",");
+        }
         _ => {}
     }
 
@@ -260,9 +309,7 @@ fn parse_brace_param(chars: &mut std::iter::Peekable<std::str::Chars>,
     }
 
     // Get the value
-    let value = params.get(&name)
-        .cloned()
-        .or_else(|| env::var(&name).ok());
+    let value = params.get(&name).cloned().or_else(|| env::var(&name).ok());
 
     // Handle prefix operators
     if let Some('#') = prefix {
@@ -450,11 +497,14 @@ fn collect_until(chars: &mut std::iter::Peekable<std::str::Chars>, end: char) ->
     result
 }
 
-fn collect_balanced(chars: &mut std::iter::Peekable<std::str::Chars>, 
-                   open: char, close: char) -> String {
+fn collect_balanced(
+    chars: &mut std::iter::Peekable<std::str::Chars>,
+    open: char,
+    close: char,
+) -> String {
     let mut result = String::new();
     let mut depth = 1;
-    
+
     while depth > 0 {
         match chars.next() {
             Some(c) if c == open => {
@@ -471,7 +521,7 @@ fn collect_balanced(chars: &mut std::iter::Peekable<std::str::Chars>,
             None => break,
         }
     }
-    
+
     result
 }
 
@@ -483,7 +533,7 @@ pub fn command_subst(s: &str, opts: &SubstOptions) -> Result<String, String> {
 
     let mut result = String::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '`' {
             // Backtick form
@@ -509,22 +559,25 @@ fn run_command(cmd: &str) -> Result<String, String> {
         .output()
         .map_err(|e| e.to_string())?;
 
-    String::from_utf8(output.stdout)
-        .map_err(|e| e.to_string())
+    String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
 
 /// Arithmetic expansion
-pub fn arith_expand(s: &str, params: &HashMap<String, String>, opts: &SubstOptions) -> Result<String, String> {
+pub fn arith_expand(
+    s: &str,
+    params: &HashMap<String, String>,
+    opts: &SubstOptions,
+) -> Result<String, String> {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '$' && chars.peek() == Some(&'[') {
             // $[...] form
             chars.next();
             let expr = collect_until(&mut chars, ']');
             chars.next(); // consume ]
-            
+
             if !opts.noexec {
                 let value = eval_arith(&expr, params)?;
                 result.push_str(&value.to_string());
@@ -541,7 +594,7 @@ fn eval_arith(expr: &str, _params: &HashMap<String, String>) -> Result<i64, Stri
     // Simple arithmetic evaluation
     // This would use the math module in practice
     let expr = expr.trim();
-    
+
     // Handle simple integers
     if let Ok(n) = expr.parse::<i64>() {
         return Ok(n);
@@ -549,25 +602,49 @@ fn eval_arith(expr: &str, _params: &HashMap<String, String>) -> Result<i64, Stri
 
     // Try simple expression
     if let Some(pos) = expr.find('+') {
-        let left = expr[..pos].trim().parse::<i64>().map_err(|e| e.to_string())?;
-        let right = expr[pos+1..].trim().parse::<i64>().map_err(|e| e.to_string())?;
+        let left = expr[..pos]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
+        let right = expr[pos + 1..]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
         return Ok(left + right);
     }
     if let Some(pos) = expr.rfind('-') {
         if pos > 0 {
-            let left = expr[..pos].trim().parse::<i64>().map_err(|e| e.to_string())?;
-            let right = expr[pos+1..].trim().parse::<i64>().map_err(|e| e.to_string())?;
+            let left = expr[..pos]
+                .trim()
+                .parse::<i64>()
+                .map_err(|e| e.to_string())?;
+            let right = expr[pos + 1..]
+                .trim()
+                .parse::<i64>()
+                .map_err(|e| e.to_string())?;
             return Ok(left - right);
         }
     }
     if let Some(pos) = expr.find('*') {
-        let left = expr[..pos].trim().parse::<i64>().map_err(|e| e.to_string())?;
-        let right = expr[pos+1..].trim().parse::<i64>().map_err(|e| e.to_string())?;
+        let left = expr[..pos]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
+        let right = expr[pos + 1..]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
         return Ok(left * right);
     }
     if let Some(pos) = expr.find('/') {
-        let left = expr[..pos].trim().parse::<i64>().map_err(|e| e.to_string())?;
-        let right = expr[pos+1..].trim().parse::<i64>().map_err(|e| e.to_string())?;
+        let left = expr[..pos]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
+        let right = expr[pos + 1..]
+            .trim()
+            .parse::<i64>()
+            .map_err(|e| e.to_string())?;
         if right == 0 {
             return Err("division by zero".to_string());
         }
@@ -585,22 +662,25 @@ pub fn brace_expand(s: &str) -> Vec<String> {
 
     let mut results = vec![String::new()];
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '{' {
             let content = collect_balanced(&mut chars, '{', '}');
             let alternatives: Vec<&str> = content.split(',').collect();
-            
+
             if alternatives.len() > 1 {
-                results = results.iter()
+                results = results
+                    .iter()
                     .flat_map(|prefix| {
-                        alternatives.iter()
+                        alternatives
+                            .iter()
                             .map(|alt| format!("{}{}", prefix, alt))
                             .collect::<Vec<_>>()
                     })
                     .collect();
             } else if let Some((start, end)) = parse_range(&content) {
-                results = results.iter()
+                results = results
+                    .iter()
                     .flat_map(|prefix| {
                         (start..=end)
                             .map(|n| format!("{}{}", prefix, n))
@@ -696,7 +776,7 @@ pub fn rembutext(path: &str) -> String {
     } else {
         path
     };
-    
+
     if let Some(dot_pos) = filename.rfind('.') {
         if dot_pos > 0 && dot_pos < filename.len() - 1 {
             return filename[dot_pos + 1..].to_string();
@@ -763,18 +843,18 @@ pub fn chabspath(path: &str) -> String {
     if path.starts_with('/') {
         return clean_path(path);
     }
-    
+
     let cwd = env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "/".to_string());
-    
+
     clean_path(&format!("{}/{}", cwd, path))
 }
 
 /// Clean up path by removing redundant components
 fn clean_path(path: &str) -> String {
     let mut components: Vec<&str> = Vec::new();
-    
+
     for part in path.split('/') {
         match part {
             "" | "." => continue,
@@ -788,7 +868,7 @@ fn clean_path(path: &str) -> String {
             p => components.push(p),
         }
     }
-    
+
     if path.starts_with('/') {
         format!("/{}", components.join("/"))
     } else if components.is_empty() {
@@ -810,15 +890,14 @@ pub fn singsub(s: &str, params: &HashMap<String, String>) -> Result<String, Stri
 pub fn multsub(s: &str, params: &HashMap<String, String>) -> Result<Vec<String>, String> {
     let mut opts = SubstOptions::default();
     opts.word_split = true;
-    
+
     let expanded = subst_string(s, params, &opts)?;
-    
+
     // Split on IFS
-    let ifs = params.get("IFS")
-        .map(|s| s.as_str())
-        .unwrap_or(" \t\n");
-    
-    Ok(expanded.split(|c: char| ifs.contains(c))
+    let ifs = params.get("IFS").map(|s| s.as_str()).unwrap_or(" \t\n");
+
+    Ok(expanded
+        .split(|c: char| ifs.contains(c))
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect())
@@ -849,17 +928,25 @@ pub fn dopadding(
     let default_pad = " ";
     let preone = preone.unwrap_or("");
     let postone = postone.unwrap_or("");
-    let premul = if premul.map(|s| s.is_empty()).unwrap_or(true) { default_pad } else { premul.unwrap() };
-    let postmul = if postmul.map(|s| s.is_empty()).unwrap_or(true) { default_pad } else { postmul.unwrap() };
-    
+    let premul = if premul.map(|s| s.is_empty()).unwrap_or(true) {
+        default_pad
+    } else {
+        premul.unwrap()
+    };
+    let postmul = if postmul.map(|s| s.is_empty()).unwrap_or(true) {
+        default_pad
+    } else {
+        postmul.unwrap()
+    };
+
     let slen = s.chars().count();
-    
+
     if prenum + postnum == slen {
         return s.to_string();
     }
-    
+
     let mut result = String::new();
-    
+
     if prenum > 0 {
         let f = prenum.saturating_sub(slen);
         if f == 0 {
@@ -869,7 +956,7 @@ pub fn dopadding(
         } else {
             // Need to pad on left
             let mut pad_needed = f.saturating_sub(preone.chars().count());
-            
+
             // Add repeated premul padding
             while pad_needed > 0 {
                 let plen = premul.chars().count();
@@ -882,7 +969,7 @@ pub fn dopadding(
                     pad_needed = 0;
                 }
             }
-            
+
             // Add preone
             if !preone.is_empty() && f >= preone.chars().count() {
                 result.push_str(preone);
@@ -891,7 +978,7 @@ pub fn dopadding(
                 let skip = preone.chars().count() - f;
                 result.extend(preone.chars().skip(skip));
             }
-            
+
             // Add the string
             result.push_str(s);
         }
@@ -903,7 +990,7 @@ pub fn dopadding(
         } else {
             // Add the string
             result.push_str(s);
-            
+
             // Add postone
             if !postone.is_empty() {
                 if f >= postone.chars().count() {
@@ -912,7 +999,7 @@ pub fn dopadding(
                     result.extend(postone.chars().take(f));
                 }
             }
-            
+
             // Add repeated postmul padding
             let mut pad_needed = f.saturating_sub(postone.chars().count());
             while pad_needed > 0 {
@@ -929,7 +1016,7 @@ pub fn dopadding(
     } else {
         result.push_str(s);
     }
-    
+
     result
 }
 
@@ -937,7 +1024,7 @@ pub fn dopadding(
 pub fn get_strarg(s: &str) -> Option<(&str, char)> {
     let mut chars = s.chars();
     let delim = chars.next()?;
-    
+
     let end_delim = match delim {
         '(' => ')',
         '[' => ']',
@@ -945,10 +1032,10 @@ pub fn get_strarg(s: &str) -> Option<(&str, char)> {
         '<' => '>',
         _ => delim,
     };
-    
+
     let rest: String = chars.collect();
     if let Some(pos) = rest.find(end_delim) {
-        Some((&s[1..pos+1], end_delim))
+        Some((&s[1..pos + 1], end_delim))
     } else {
         None
     }
@@ -963,31 +1050,31 @@ pub fn equalsubstr(cmd: &str) -> Option<String> {
 pub fn filesubstr(name: &str, assign: bool) -> Option<String> {
     if name.starts_with('~') {
         let rest = &name[1..];
-        
+
         // ~ alone
         if rest.is_empty() || rest.starts_with('/') {
             let home = std::env::var("HOME").unwrap_or_default();
             return Some(format!("{}{}", home, rest));
         }
-        
+
         // ~+
         if rest.starts_with('+') && (rest.len() == 1 || rest.chars().nth(1) == Some('/')) {
             let pwd = std::env::var("PWD").unwrap_or_else(|_| ".".to_string());
             return Some(format!("{}{}", pwd, &rest[1..]));
         }
-        
+
         // ~-
         if rest.starts_with('-') && (rest.len() == 1 || rest.chars().nth(1) == Some('/')) {
             let oldpwd = std::env::var("OLDPWD").unwrap_or_else(|_| ".".to_string());
             return Some(format!("{}{}", oldpwd, &rest[1..]));
         }
-        
+
         // ~user
         let (user, suffix) = match rest.find('/') {
             Some(pos) => (&rest[..pos], &rest[pos..]),
             None => (rest, ""),
         };
-        
+
         #[cfg(unix)]
         {
             if let Some(home) = crate::subst::get_user_home(user) {
@@ -1000,7 +1087,7 @@ pub fn filesubstr(name: &str, assign: bool) -> Option<String> {
             return Some(path);
         }
     }
-    
+
     None
 }
 
@@ -1018,70 +1105,63 @@ pub fn check_colon_subscript(s: &str) -> Option<(String, &str)> {
     if s.is_empty() || s.starts_with(|c: char| c.is_alphabetic()) || s.starts_with('&') {
         return None;
     }
-    
+
     if s.starts_with(':') {
         return Some(("0".to_string(), s));
     }
-    
+
     // Find the end of the subscript expression
     let end = s.find(':').unwrap_or(s.len());
     let expr = &s[..end];
     let rest = &s[end..];
-    
+
     Some((expr.to_string(), rest))
 }
 
 /// Apply offset and length to array (from subst.c ${PARAM:offset:length} handling)
 pub fn array_slice(arr: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
     let len = arr.len() as i64;
-    
+
     let offset = if offset < 0 {
         (len + offset).max(0) as usize
     } else {
         (offset as usize).min(arr.len())
     };
-    
+
     let length = match length {
         Some(l) if l < 0 => (len - offset as i64 + l).max(0) as usize,
         Some(l) => l.max(0) as usize,
         None => arr.len().saturating_sub(offset),
     };
-    
-    arr.iter()
-        .skip(offset)
-        .take(length)
-        .cloned()
-        .collect()
+
+    arr.iter().skip(offset).take(length).cloned().collect()
 }
 
 /// Apply offset and length to string (from subst.c ${PARAM:offset:length} handling)
 pub fn string_slice(s: &str, offset: i64, length: Option<i64>) -> String {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    
+
     let offset = if offset < 0 {
         (len + offset).max(0) as usize
     } else {
         (offset as usize).min(chars.len())
     };
-    
+
     let length = match length {
         Some(l) if l < 0 => (len - offset as i64 + l).max(0) as usize,
         Some(l) => l.max(0) as usize,
         None => chars.len().saturating_sub(offset),
     };
-    
-    chars.iter()
-        .skip(offset)
-        .take(length)
-        .collect()
+
+    chars.iter().skip(offset).take(length).collect()
 }
 
 /// Array union (from subst.c ${array|other})
 pub fn array_union(arr1: &[String], arr2: &[String]) -> Vec<String> {
     use std::collections::HashSet;
     let set2: HashSet<_> = arr2.iter().collect();
-    
+
     let mut result: Vec<String> = arr1.to_vec();
     for item in arr2 {
         if !result.contains(item) {
@@ -1095,7 +1175,7 @@ pub fn array_union(arr1: &[String], arr2: &[String]) -> Vec<String> {
 pub fn array_intersection(arr1: &[String], arr2: &[String]) -> Vec<String> {
     use std::collections::HashSet;
     let set2: HashSet<_> = arr2.iter().collect();
-    
+
     arr1.iter()
         .filter(|item| set2.contains(item))
         .cloned()
@@ -1106,7 +1186,7 @@ pub fn array_intersection(arr1: &[String], arr2: &[String]) -> Vec<String> {
 pub fn array_difference(arr1: &[String], arr2: &[String]) -> Vec<String> {
     use std::collections::HashSet;
     let set2: HashSet<_> = arr2.iter().collect();
-    
+
     arr1.iter()
         .filter(|item| !set2.contains(item))
         .cloned()
@@ -1120,7 +1200,7 @@ pub fn array_zip(arr1: &[String], arr2: &[String], shortest: bool) -> Vec<String
     } else {
         arr1.len().max(arr2.len())
     };
-    
+
     let mut result = Vec::with_capacity(len * 2);
     for i in 0..len {
         let v1 = arr1.get(i % arr1.len()).cloned().unwrap_or_default();
@@ -1169,14 +1249,23 @@ pub fn array_filter_pattern(arr: &[String], pattern: &str, invert: bool) -> Vec<
     arr.iter()
         .filter(|item| {
             let matches = crate::glob::pattern_match(pattern, item, false, true);
-            if invert { matches } else { !matches }
+            if invert {
+                matches
+            } else {
+                !matches
+            }
         })
         .cloned()
         .collect()
 }
 
 /// Search and replace in array (from subst.c ${array/pat/repl})
-pub fn array_replace(arr: &[String], pattern: &str, replacement: &str, global: bool) -> Vec<String> {
+pub fn array_replace(
+    arr: &[String],
+    pattern: &str,
+    replacement: &str,
+    global: bool,
+) -> Vec<String> {
     arr.iter()
         .map(|item| {
             if global {
@@ -1200,18 +1289,17 @@ pub fn modify_case(s: &str, mode: CaseMode) -> String {
                 Some(c) => c.to_uppercase().chain(chars).collect(),
             }
         }
-        CaseMode::CapitalizeWords => {
-            s.split_whitespace()
-                .map(|word| {
-                    let mut chars = word.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(c) => c.to_uppercase().chain(chars).collect(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
+        CaseMode::CapitalizeWords => s
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => c.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
     }
 }
 
@@ -1241,25 +1329,29 @@ use crate::params::ParamValue;
 /// Subscript flags handling (from subst.c subscript parsing)
 #[derive(Default, Clone, Debug)]
 pub struct SubscriptFlags {
-    pub reverse: bool,      // (r) flag
-    pub words: bool,        // (w) flag
-    pub chars: bool,        // (c) flag
-    pub match_once: bool,   // default vs (R) flag
+    pub reverse: bool,    // (r) flag
+    pub words: bool,      // (w) flag
+    pub chars: bool,      // (c) flag
+    pub match_once: bool, // default vs (R) flag
 }
 
 /// Apply subscript to string (from subst.c getstrvalue)
 pub fn apply_subscript_string(s: &str, start: i64, end: i64, flags: &SubscriptFlags) -> String {
     if flags.words {
         let words: Vec<&str> = s.split_whitespace().collect();
-        return apply_subscript_array(&words.iter().map(|s| s.to_string()).collect::<Vec<_>>(), start, end)
-            .join(" ");
+        return apply_subscript_array(
+            &words.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            start,
+            end,
+        )
+        .join(" ");
     }
-    
+
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len() as i64;
-    
+
     let (start, end) = normalize_indices(start, end, len);
-    
+
     chars[start..end].iter().collect()
 }
 
@@ -1293,7 +1385,7 @@ mod tests {
     fn test_param_expand_simple() {
         let mut params = HashMap::new();
         params.insert("FOO".to_string(), "bar".to_string());
-        
+
         let opts = SubstOptions::default();
         let result = param_expand("$FOO", &params, &opts).unwrap();
         assert_eq!(result, "bar");
@@ -1303,7 +1395,7 @@ mod tests {
     fn test_param_expand_default() {
         let params = HashMap::new();
         let opts = SubstOptions::default();
-        
+
         let result = param_expand("${UNDEFINED:-default}", &params, &opts).unwrap();
         assert_eq!(result, "default");
     }

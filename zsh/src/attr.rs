@@ -15,10 +15,16 @@ pub struct XattrOptions {
 /// Get an extended attribute value
 #[cfg(target_os = "macos")]
 pub fn getxattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<Vec<u8>> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
-    let flags = if options.no_dereference { libc::XATTR_NOFOLLOW } else { 0 };
+    let flags = if options.no_dereference {
+        libc::XATTR_NOFOLLOW
+    } else {
+        0
+    };
 
     let size = unsafe {
         libc::getxattr(
@@ -62,8 +68,10 @@ pub fn getxattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<Ve
 
 #[cfg(target_os = "linux")]
 pub fn getxattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<Vec<u8>> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
     let size = if options.no_dereference {
         unsafe { libc::lgetxattr(path_c.as_ptr(), name_c.as_ptr(), std::ptr::null_mut(), 0) }
@@ -111,16 +119,25 @@ pub fn getxattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<Ve
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn getxattr(_path: &str, _name: &str, _options: &XattrOptions) -> io::Result<Vec<u8>> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "xattr not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "xattr not supported",
+    ))
 }
 
 /// Set an extended attribute value
 #[cfg(target_os = "macos")]
 pub fn setxattr(path: &str, name: &str, value: &[u8], options: &XattrOptions) -> io::Result<()> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
-    let flags = if options.no_dereference { libc::XATTR_NOFOLLOW } else { 0 };
+    let flags = if options.no_dereference {
+        libc::XATTR_NOFOLLOW
+    } else {
+        0
+    };
 
     let result = unsafe {
         libc::setxattr(
@@ -142,8 +159,10 @@ pub fn setxattr(path: &str, name: &str, value: &[u8], options: &XattrOptions) ->
 
 #[cfg(target_os = "linux")]
 pub fn setxattr(path: &str, name: &str, value: &[u8], options: &XattrOptions) -> io::Result<()> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
     let result = if options.no_dereference {
         unsafe {
@@ -175,17 +194,31 @@ pub fn setxattr(path: &str, name: &str, value: &[u8], options: &XattrOptions) ->
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-pub fn setxattr(_path: &str, _name: &str, _value: &[u8], _options: &XattrOptions) -> io::Result<()> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "xattr not supported"))
+pub fn setxattr(
+    _path: &str,
+    _name: &str,
+    _value: &[u8],
+    _options: &XattrOptions,
+) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "xattr not supported",
+    ))
 }
 
 /// Remove an extended attribute
 #[cfg(target_os = "macos")]
 pub fn removexattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<()> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
-    let flags = if options.no_dereference { libc::XATTR_NOFOLLOW } else { 0 };
+    let flags = if options.no_dereference {
+        libc::XATTR_NOFOLLOW
+    } else {
+        0
+    };
 
     let result = unsafe { libc::removexattr(path_c.as_ptr(), name_c.as_ptr(), flags) };
 
@@ -198,8 +231,10 @@ pub fn removexattr(path: &str, name: &str, options: &XattrOptions) -> io::Result
 
 #[cfg(target_os = "linux")]
 pub fn removexattr(path: &str, name: &str, options: &XattrOptions) -> io::Result<()> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
-    let name_c = CString::new(name).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let name_c = CString::new(name)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid attr name"))?;
 
     let result = if options.no_dereference {
         unsafe { libc::lremovexattr(path_c.as_ptr(), name_c.as_ptr()) }
@@ -216,15 +251,23 @@ pub fn removexattr(path: &str, name: &str, options: &XattrOptions) -> io::Result
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn removexattr(_path: &str, _name: &str, _options: &XattrOptions) -> io::Result<()> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "xattr not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "xattr not supported",
+    ))
 }
 
 /// List extended attributes
 #[cfg(target_os = "macos")]
 pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
 
-    let flags = if options.no_dereference { libc::XATTR_NOFOLLOW } else { 0 };
+    let flags = if options.no_dereference {
+        libc::XATTR_NOFOLLOW
+    } else {
+        0
+    };
 
     let size = unsafe { libc::listxattr(path_c.as_ptr(), std::ptr::null_mut(), 0, flags) };
 
@@ -239,7 +282,12 @@ pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> 
     let mut buf = vec![0u8; size as usize];
 
     let result = unsafe {
-        libc::listxattr(path_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, size as usize, flags)
+        libc::listxattr(
+            path_c.as_ptr(),
+            buf.as_mut_ptr() as *mut libc::c_char,
+            size as usize,
+            flags,
+        )
     };
 
     if result < 0 {
@@ -252,7 +300,8 @@ pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> 
 
 #[cfg(target_os = "linux")]
 pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> {
-    let path_c = CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
+    let path_c = CString::new(path)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
 
     let size = if options.no_dereference {
         unsafe { libc::llistxattr(path_c.as_ptr(), std::ptr::null_mut(), 0) }
@@ -271,9 +320,21 @@ pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> 
     let mut buf = vec![0u8; size as usize];
 
     let result = if options.no_dereference {
-        unsafe { libc::llistxattr(path_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, size as usize) }
+        unsafe {
+            libc::llistxattr(
+                path_c.as_ptr(),
+                buf.as_mut_ptr() as *mut libc::c_char,
+                size as usize,
+            )
+        }
     } else {
-        unsafe { libc::listxattr(path_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, size as usize) }
+        unsafe {
+            libc::listxattr(
+                path_c.as_ptr(),
+                buf.as_mut_ptr() as *mut libc::c_char,
+                size as usize,
+            )
+        }
     };
 
     if result < 0 {
@@ -286,7 +347,10 @@ pub fn listxattr(path: &str, options: &XattrOptions) -> io::Result<Vec<String>> 
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn listxattr(_path: &str, _options: &XattrOptions) -> io::Result<Vec<String>> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "xattr not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "xattr not supported",
+    ))
 }
 
 fn parse_xattr_list(buf: &[u8]) -> io::Result<Vec<String>> {
@@ -318,7 +382,12 @@ pub fn builtin_zgetattr(file: &str, attr: &str, options: &XattrOptions) -> (i32,
 }
 
 /// Execute zsetattr builtin
-pub fn builtin_zsetattr(file: &str, attr: &str, value: &str, options: &XattrOptions) -> (i32, String) {
+pub fn builtin_zsetattr(
+    file: &str,
+    attr: &str,
+    value: &str,
+    options: &XattrOptions,
+) -> (i32, String) {
     match setxattr(file, attr, value.as_bytes(), options) {
         Ok(()) => (0, String::new()),
         Err(e) => (1, format!("zsetattr: {}: {}\n", file, e)),

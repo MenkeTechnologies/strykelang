@@ -392,26 +392,59 @@ impl ZStyleLookup for ZStyleStore {
 /// These are the style names that can be used with zstyle ':completion:*' STYLE VALUE
 pub const STANDARD_STYLES: &[(&str, &str)] = &[
     // Boolean styles
-    ("accept-exact", "Accept exact match immediately without further completion"),
-    ("accept-exact-dirs", "Accept exact directory match without completing further"),
-    ("add-space", "Add space after completed word (used by _expand)"),
-    ("ambiguous", "Leave cursor after first ambiguous component in paths"),
-    ("call-command", "Whether to call external command to generate matches"),
-    ("complete", "Used by _expand_alias for completing vs expanding"),
+    (
+        "accept-exact",
+        "Accept exact match immediately without further completion",
+    ),
+    (
+        "accept-exact-dirs",
+        "Accept exact directory match without completing further",
+    ),
+    (
+        "add-space",
+        "Add space after completed word (used by _expand)",
+    ),
+    (
+        "ambiguous",
+        "Leave cursor after first ambiguous component in paths",
+    ),
+    (
+        "call-command",
+        "Whether to call external command to generate matches",
+    ),
+    (
+        "complete",
+        "Used by _expand_alias for completing vs expanding",
+    ),
     ("complete-options", "Complete options for cd/pushd after -"),
     ("disabled", "Include disabled aliases in completion"),
     ("expand", "Control glob expansion in _expand completer"),
-    ("extra-verbose", "Show even more verbose completion information"),
-    ("fake-always", "Always add fake entries even with real matches"),
-    ("gain-privileges", "Attempt privilege escalation for completion"),
+    (
+        "extra-verbose",
+        "Show even more verbose completion information",
+    ),
+    (
+        "fake-always",
+        "Always add fake entries even with real matches",
+    ),
+    (
+        "gain-privileges",
+        "Attempt privilege escalation for completion",
+    ),
     ("glob", "Enable glob expansion in _expand"),
     ("global", "Include global aliases in _expand_alias"),
     ("hidden", "Hide matches for this context from listing"),
-    ("ignore-line", "Ignore words already on line (true/current/other)"),
+    (
+        "ignore-line",
+        "Ignore words already on line (true/current/other)",
+    ),
     ("insert", "Insert all-matches string unconditionally"),
     ("insert-tab", "Insert tab when nothing to complete"),
     ("insert-unambiguous", "Only menu if no unambiguous prefix"),
-    ("last-prompt", "Return cursor to prompt after completion list"),
+    (
+        "last-prompt",
+        "Return cursor to prompt after completion list",
+    ),
     ("list", "Control listing behavior"),
     ("list-dirs-first", "List directories before files"),
     ("list-grouped", "Group matches in listing"),
@@ -423,7 +456,10 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("old-matches", "Reuse previous matches"),
     ("old-menu", "Reuse previous menu state"),
     ("original", "Include original string in corrections"),
-    ("path-completion", "Enable path completion (set false to disable)"),
+    (
+        "path-completion",
+        "Enable path completion (set false to disable)",
+    ),
     ("prefix-hidden", "Hide common prefix in listing"),
     ("prefix-needed", "Require prefix before completing"),
     ("preserve-prefix", "Keep prefix when expanding"),
@@ -437,14 +473,19 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("special-dirs", "Complete . and .. directories"),
     ("squeeze-slashes", "Remove duplicate slashes in paths"),
     ("strip-comments", "Strip comments from completion"),
-    ("subst-globs-only", "Only substitute globs, not other expansions"),
+    (
+        "subst-globs-only",
+        "Only substitute globs, not other expansions",
+    ),
     ("substitute", "Enable substitution in _expand"),
     ("use-cache", "Enable completion caching"),
     ("use-compctl", "Use old compctl system as fallback"),
     ("verbose", "Show verbose completion information"),
-    
     // String styles
-    ("auto-description", "Format for auto-generated descriptions (%d = desc)"),
+    (
+        "auto-description",
+        "Format for auto-generated descriptions (%d = desc)",
+    ),
     ("cache-path", "Directory for completion cache files"),
     ("cache-policy", "Function to check cache validity"),
     ("command", "Override command for generating matches"),
@@ -453,7 +494,10 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("format", "Format string for completion headers"),
     ("group-name", "Name for grouping matches (empty = by tag)"),
     ("list-prompt", "Prompt shown when paging through list"),
-    ("list-separator", "Separator between completion and description"),
+    (
+        "list-separator",
+        "Separator between completion and description",
+    ),
     ("local", "Local part of URL for completion"),
     ("mail-directory", "Directory containing mail folders"),
     ("max-matches-width", "Maximum width for matches in listing"),
@@ -461,16 +505,20 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("pine-directory", "Pine mail directory"),
     ("select-prompt", "Prompt shown during menu selection"),
     ("select-scroll", "Scroll behavior in menu selection"),
-    
-    // Integer styles  
-    ("file-sort", "Sort order for files (name/size/time/links/access/inode/modification)"),
+    // Integer styles
+    (
+        "file-sort",
+        "Sort order for files (name/size/time/links/access/inode/modification)",
+    ),
     ("force-list", "Force listing when >= N matches"),
     ("insert-ids", "Insert process IDs (menu/single)"),
     ("insert-sections", "Insert man page section numbers"),
     ("max-errors", "Maximum errors for approximate matching"),
-    
     // Array styles
-    ("assign-list", "Patterns for colon-separated assignment values"),
+    (
+        "assign-list",
+        "Patterns for colon-separated assignment values",
+    ),
     ("avoid-completer", "Completers to skip for all-matches"),
     ("commands", "Default subcommands for init scripts"),
     ("completer", "List of completer functions to use"),
@@ -481,7 +529,10 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("fake-files", "Fake files to add in directory completion"),
     ("fake-parameters", "Fake parameters to add"),
     ("file-patterns", "Patterns for file completion grouping"),
-    ("file-split-chars", "Characters that split filename completion"),
+    (
+        "file-split-chars",
+        "Characters that split filename completion",
+    ),
     ("filter", "Filter for LDAP completion"),
     ("group-order", "Order of completion groups"),
     ("groups", "UNIX groups for completion"),
@@ -489,11 +540,17 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
     ("hosts-ports", "host:port pairs for completion"),
     ("ignored-patterns", "Patterns to ignore in completion"),
     ("known-hosts-files", "SSH known_hosts files to read"),
-    ("list-colors", "Colors for completion listing (ZLS_COLORS format)"),
+    (
+        "list-colors",
+        "Colors for completion listing (ZLS_COLORS format)",
+    ),
     ("matcher", "Matcher specification for current context"),
     ("matcher-list", "List of matcher specs to try in order"),
     ("packageset", "Package sets for completion"),
-    ("remote-access", "Whether to access remote systems for completion"),
+    (
+        "remote-access",
+        "Whether to access remote systems for completion",
+    ),
     ("tag-order", "Order in which tags are tried"),
     ("urls", "URLs for completion"),
     ("users", "Usernames for completion"),
@@ -504,7 +561,10 @@ pub const STANDARD_STYLES: &[(&str, &str)] = &[
 /// Standard completion tags documented in zshcompsys(1)
 pub const STANDARD_TAGS: &[(&str, &str)] = &[
     ("accounts", "User accounts (for users-hosts style)"),
-    ("all-expansions", "All expansions from _expand as single string"),
+    (
+        "all-expansions",
+        "All expansions from _expand as single string",
+    ),
     ("all-files", "All files (vs specific subset)"),
     ("arguments", "Command arguments"),
     ("arrays", "Array parameter names"),
@@ -706,14 +766,17 @@ mod tests {
 
     #[test]
     fn test_zstyle_with_eval() {
-        let style = ZStyle::new(":completion:*", "hosts", vec!["$myhosts".to_string()])
-            .with_eval();
+        let style = ZStyle::new(":completion:*", "hosts", vec!["$myhosts".to_string()]).with_eval();
         assert!(style.eval);
     }
 
     #[test]
     fn test_zstyle_value() {
-        let style = ZStyle::new(":completion:*", "menu", vec!["select".to_string(), "interactive".to_string()]);
+        let style = ZStyle::new(
+            ":completion:*",
+            "menu",
+            vec!["select".to_string(), "interactive".to_string()],
+        );
         assert_eq!(style.value(), Some("select"));
     }
 
@@ -744,15 +807,23 @@ mod tests {
         let style = ZStyle::new(":completion:*", "max-errors", vec!["3".to_string()]);
         assert_eq!(style.as_int(), Some(3));
 
-        let style2 = ZStyle::new(":completion:*", "max-errors", vec!["not-a-number".to_string()]);
+        let style2 = ZStyle::new(
+            ":completion:*",
+            "max-errors",
+            vec!["not-a-number".to_string()],
+        );
         assert_eq!(style2.as_int(), None);
     }
 
     #[test]
     fn test_lookup_values() {
         let mut store = ZStyleStore::new();
-        store.set(":completion:*", "completer", 
-            vec!["_complete".to_string(), "_approximate".to_string()], false);
+        store.set(
+            ":completion:*",
+            "completer",
+            vec!["_complete".to_string(), "_approximate".to_string()],
+            false,
+        );
 
         let values = store.lookup_values(":completion:foo", "completer");
         assert!(values.is_some());
@@ -780,14 +851,26 @@ mod tests {
 
     #[test]
     fn test_pattern_matches_wildcard_middle() {
-        assert!(pattern_matches(":completion:*:default", ":completion:complete:default"));
-        assert!(pattern_matches(":completion:*:*:default", ":completion:complete:git:default"));
+        assert!(pattern_matches(
+            ":completion:*:default",
+            ":completion:complete:default"
+        ));
+        assert!(pattern_matches(
+            ":completion:*:*:default",
+            ":completion:complete:git:default"
+        ));
     }
 
     #[test]
     fn test_pattern_matches_exact() {
-        assert!(pattern_matches(":completion:complete:git", ":completion:complete:git"));
-        assert!(!pattern_matches(":completion:complete:git", ":completion:complete:docker"));
+        assert!(pattern_matches(
+            ":completion:complete:git",
+            ":completion:complete:git"
+        ));
+        assert!(!pattern_matches(
+            ":completion:complete:git",
+            ":completion:complete:docker"
+        ));
     }
 
     #[test]
@@ -813,7 +896,7 @@ mod tests {
     fn test_standard_styles_not_empty() {
         assert!(!STANDARD_STYLES.is_empty());
         assert!(STANDARD_STYLES.len() > 50);
-        
+
         // Check a few known styles exist
         assert!(STANDARD_STYLES.iter().any(|(name, _)| *name == "menu"));
         assert!(STANDARD_STYLES.iter().any(|(name, _)| *name == "completer"));
@@ -824,7 +907,7 @@ mod tests {
     fn test_standard_tags_not_empty() {
         assert!(!STANDARD_TAGS.is_empty());
         assert!(STANDARD_TAGS.len() > 50);
-        
+
         // Check a few known tags exist
         assert!(STANDARD_TAGS.iter().any(|(name, _)| *name == "files"));
         assert!(STANDARD_TAGS.iter().any(|(name, _)| *name == "commands"));
@@ -834,20 +917,26 @@ mod tests {
     #[test]
     fn test_standard_completers_not_empty() {
         assert!(!STANDARD_COMPLETERS.is_empty());
-        
+
         // Check known completers exist
-        assert!(STANDARD_COMPLETERS.iter().any(|(name, _)| *name == "_complete"));
-        assert!(STANDARD_COMPLETERS.iter().any(|(name, _)| *name == "_approximate"));
-        assert!(STANDARD_COMPLETERS.iter().any(|(name, _)| *name == "_expand"));
+        assert!(STANDARD_COMPLETERS
+            .iter()
+            .any(|(name, _)| *name == "_complete"));
+        assert!(STANDARD_COMPLETERS
+            .iter()
+            .any(|(name, _)| *name == "_approximate"));
+        assert!(STANDARD_COMPLETERS
+            .iter()
+            .any(|(name, _)| *name == "_expand"));
     }
 
     #[test]
     fn test_style_override() {
         let mut store = ZStyleStore::new();
-        
+
         store.set(":completion:*", "menu", vec!["no".to_string()], false);
         assert_eq!(store.lookup_str(":completion:foo", "menu"), Some("no"));
-        
+
         // Override with same pattern
         store.set(":completion:*", "menu", vec!["yes".to_string()], false);
         assert_eq!(store.lookup_str(":completion:foo", "menu"), Some("yes"));
@@ -856,7 +945,7 @@ mod tests {
     #[test]
     fn test_multiple_styles_same_pattern() {
         let mut store = ZStyleStore::new();
-        
+
         store.set(":completion:*", "menu", vec!["select".to_string()], false);
         store.set(":completion:*", "verbose", vec!["yes".to_string()], false);
         store.set(":completion:*", "format", vec!["%d".to_string()], false);

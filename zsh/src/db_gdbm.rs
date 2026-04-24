@@ -60,7 +60,11 @@ impl Datum {
         } else {
             let mut result = vec![0u8; self.dsize as usize];
             unsafe {
-                ptr::copy_nonoverlapping(self.dptr as *const u8, result.as_mut_ptr(), self.dsize as usize);
+                ptr::copy_nonoverlapping(
+                    self.dptr as *const u8,
+                    result.as_mut_ptr(),
+                    self.dsize as usize,
+                );
             }
             Some(result)
         }
@@ -112,15 +116,12 @@ pub struct GdbmDatabase {
 impl GdbmDatabase {
     #[cfg(feature = "gdbm")]
     pub fn open(path: &Path, readonly: bool) -> Result<Self, String> {
-        let c_path = CString::new(path.to_string_lossy().as_bytes())
-            .map_err(|_| "Invalid path")?;
-        
+        let c_path = CString::new(path.to_string_lossy().as_bytes()).map_err(|_| "Invalid path")?;
+
         let flags = GDBM_SYNC | if readonly { GDBM_READER } else { GDBM_WRCREAT };
-        
-        let dbf = unsafe {
-            gdbm_open(c_path.as_ptr(), 0, flags, 0o666, None)
-        };
-        
+
+        let dbf = unsafe { gdbm_open(c_path.as_ptr(), 0, flags, 0o666, None) };
+
         if dbf.is_null() {
             let err = unsafe {
                 let err_ptr = gdbm_strerror(gdbm_errno);
@@ -130,9 +131,13 @@ impl GdbmDatabase {
                     CStr::from_ptr(err_ptr).to_string_lossy().to_string()
                 }
             };
-            return Err(format!("error opening database file {} ({})", path.display(), err));
+            return Err(format!(
+                "error opening database file {} ({})",
+                path.display(),
+                err
+            ));
         }
-        
+
         Ok(GdbmDatabase {
             dbf,
             path: path.to_path_buf(),
@@ -149,28 +154,38 @@ impl GdbmDatabase {
     pub fn get(&self, key: &str) -> Option<String> {
         let key_bytes = key.as_bytes();
         let key_datum = Datum::from_bytes(key_bytes);
-        
-        let exists = unsafe { gdbm_exists(self.dbf, Datum { 
-            dptr: key_datum.dptr, 
-            dsize: key_datum.dsize 
-        }) };
-        
+
+        let exists = unsafe {
+            gdbm_exists(
+                self.dbf,
+                Datum {
+                    dptr: key_datum.dptr,
+                    dsize: key_datum.dsize,
+                },
+            )
+        };
+
         if exists == 0 {
             unsafe { libc::free(key_datum.dptr as *mut c_void) };
             return None;
         }
-        
-        let mut content = unsafe { gdbm_fetch(self.dbf, Datum {
-            dptr: key_datum.dptr,
-            dsize: key_datum.dsize,
-        }) };
-        
+
+        let mut content = unsafe {
+            gdbm_fetch(
+                self.dbf,
+                Datum {
+                    dptr: key_datum.dptr,
+                    dsize: key_datum.dsize,
+                },
+            )
+        };
+
         unsafe { libc::free(key_datum.dptr as *mut c_void) };
-        
-        let result = content.to_bytes().map(|bytes| {
-            String::from_utf8_lossy(&bytes).to_string()
-        });
-        
+
+        let result = content
+            .to_bytes()
+            .map(|bytes| String::from_utf8_lossy(&bytes).to_string());
+
         content.free();
         result
     }
@@ -185,22 +200,30 @@ impl GdbmDatabase {
         if self.readonly {
             return Err("Database is read-only".to_string());
         }
-        
+
         let key_datum = Datum::from_bytes(key.as_bytes());
         let content_datum = Datum::from_bytes(value.as_bytes());
-        
+
         let ret = unsafe {
-            gdbm_store(self.dbf, 
-                Datum { dptr: key_datum.dptr, dsize: key_datum.dsize },
-                Datum { dptr: content_datum.dptr, dsize: content_datum.dsize },
-                GDBM_REPLACE)
+            gdbm_store(
+                self.dbf,
+                Datum {
+                    dptr: key_datum.dptr,
+                    dsize: key_datum.dsize,
+                },
+                Datum {
+                    dptr: content_datum.dptr,
+                    dsize: content_datum.dsize,
+                },
+                GDBM_REPLACE,
+            )
         };
-        
+
         unsafe {
             libc::free(key_datum.dptr as *mut c_void);
             libc::free(content_datum.dptr as *mut c_void);
         }
-        
+
         if ret != 0 {
             Err("Failed to store value".to_string())
         } else {
@@ -218,15 +241,21 @@ impl GdbmDatabase {
         if self.readonly {
             return Err("Database is read-only".to_string());
         }
-        
+
         let key_datum = Datum::from_bytes(key.as_bytes());
-        
+
         let ret = unsafe {
-            gdbm_delete(self.dbf, Datum { dptr: key_datum.dptr, dsize: key_datum.dsize })
+            gdbm_delete(
+                self.dbf,
+                Datum {
+                    dptr: key_datum.dptr,
+                    dsize: key_datum.dsize,
+                },
+            )
         };
-        
+
         unsafe { libc::free(key_datum.dptr as *mut c_void) };
-        
+
         if ret != 0 {
             Err("Key not found".to_string())
         } else {
@@ -242,19 +271,27 @@ impl GdbmDatabase {
     #[cfg(feature = "gdbm")]
     pub fn keys(&self) -> Vec<String> {
         let mut keys = Vec::new();
-        
+
         let mut key = unsafe { gdbm_firstkey(self.dbf) };
-        
+
         while !key.dptr.is_null() {
             if let Some(bytes) = key.to_bytes() {
                 keys.push(String::from_utf8_lossy(&bytes).to_string());
             }
-            
+
             let prev_key = key;
-            key = unsafe { gdbm_nextkey(self.dbf, Datum { dptr: prev_key.dptr, dsize: prev_key.dsize }) };
+            key = unsafe {
+                gdbm_nextkey(
+                    self.dbf,
+                    Datum {
+                        dptr: prev_key.dptr,
+                        dsize: prev_key.dsize,
+                    },
+                )
+            };
             unsafe { libc::free(prev_key.dptr as *mut c_void) };
         }
-        
+
         keys
     }
 
@@ -268,12 +305,12 @@ impl GdbmDatabase {
         if self.readonly {
             return Err("Database is read-only".to_string());
         }
-        
+
         let keys = self.keys();
         for key in keys {
             let _ = self.delete(&key);
         }
-        
+
         unsafe { gdbm_reorganize(self.dbf) };
         Ok(())
     }
@@ -338,7 +375,7 @@ impl TiedGdbmParam {
                 return Some(val.clone());
             }
         }
-        
+
         if let Some(val) = self.db.get(key) {
             if let Ok(mut cache) = self.cache.write() {
                 cache.insert(key.to_string(), val.clone());
@@ -392,7 +429,7 @@ impl TiedGdbmParam {
 }
 
 /// Global registry of tied GDBM parameters
-static TIED_PARAMS: Lazy<Mutex<HashMap<String, Arc<TiedGdbmParam>>>> = 
+static TIED_PARAMS: Lazy<Mutex<HashMap<String, Arc<TiedGdbmParam>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Get list of tied parameter names
@@ -405,18 +442,23 @@ pub fn zgdbm_tied() -> Vec<String> {
 }
 
 /// Tie a parameter to a GDBM database
-/// 
+///
 /// Usage: ztie -d db/gdbm -f /path/to/db.gdbm [-r] PARAM_NAME
-pub fn ztie(args: &[String], readonly: bool, db_type: Option<&str>, file_path: Option<&str>) -> Result<(), String> {
+pub fn ztie(
+    args: &[String],
+    readonly: bool,
+    db_type: Option<&str>,
+    file_path: Option<&str>,
+) -> Result<(), String> {
     let db_type = db_type.ok_or("you must pass `-d db/gdbm'")?;
     let file_path = file_path.ok_or("you must pass `-f' with a filename")?;
-    
+
     if db_type != BACKTYPE {
         return Err(format!("unsupported backend type `{}'", db_type));
     }
-    
+
     let param_name = args.first().ok_or("parameter name required")?;
-    
+
     // Resolve path
     let path = if file_path.starts_with('/') {
         PathBuf::from(file_path)
@@ -425,7 +467,7 @@ pub fn ztie(args: &[String], readonly: bool, db_type: Option<&str>, file_path: O
             .map_err(|e| e.to_string())?
             .join(file_path)
     };
-    
+
     // Check if already tied
     {
         let params = TIED_PARAMS.lock().map_err(|_| "lock error")?;
@@ -433,20 +475,20 @@ pub fn ztie(args: &[String], readonly: bool, db_type: Option<&str>, file_path: O
             return Err(format!("parameter {} is already tied", param_name));
         }
     }
-    
+
     // Open database
     let db = GdbmDatabase::open(&path, readonly)?;
     let db = Arc::new(db);
-    
+
     // Create tied parameter
     let tied = Arc::new(TiedGdbmParam::new(param_name.clone(), db));
-    
+
     // Register
     {
         let mut params = TIED_PARAMS.lock().map_err(|_| "lock error")?;
         params.insert(param_name.clone(), tied);
     }
-    
+
     Ok(())
 }
 
@@ -455,7 +497,7 @@ pub fn ztie(args: &[String], readonly: bool, db_type: Option<&str>, file_path: O
 /// Usage: zuntie [-u] PARAM_NAME...
 pub fn zuntie(args: &[String], force_unset: bool) -> Result<(), String> {
     let mut errors = Vec::new();
-    
+
     for param_name in args {
         let mut params = match TIED_PARAMS.lock() {
             Ok(p) => p,
@@ -464,15 +506,15 @@ pub fn zuntie(args: &[String], force_unset: bool) -> Result<(), String> {
                 continue;
             }
         };
-        
+
         if !params.contains_key(param_name) {
             errors.push(format!("cannot untie {}", param_name));
             continue;
         }
-        
+
         params.remove(param_name);
     }
-    
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -486,10 +528,11 @@ pub fn zuntie(args: &[String], force_unset: bool) -> Result<(), String> {
 /// Sets $REPLY to the path
 pub fn zgdbmpath(param_name: &str) -> Result<String, String> {
     let params = TIED_PARAMS.lock().map_err(|_| "lock error")?;
-    
-    let tied = params.get(param_name)
+
+    let tied = params
+        .get(param_name)
         .ok_or_else(|| format!("no such parameter: {}", param_name))?;
-    
+
     Ok(tied.db.path().to_string_lossy().to_string())
 }
 
@@ -546,32 +589,32 @@ mod tests {
     fn test_gdbm_basic_operations() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.gdbm");
-        
+
         // Open database
         let db = GdbmDatabase::open(&db_path, false).unwrap();
-        
+
         // Set and get
         db.set("key1", "value1").unwrap();
         assert_eq!(db.get("key1"), Some("value1".to_string()));
-        
+
         // Non-existent key
         assert_eq!(db.get("nonexistent"), None);
-        
+
         // Delete
         db.delete("key1").unwrap();
         assert_eq!(db.get("key1"), None);
-        
+
         // Multiple keys
         db.set("a", "1").unwrap();
         db.set("b", "2").unwrap();
         db.set("c", "3").unwrap();
-        
+
         let keys = db.keys();
         assert_eq!(keys.len(), 3);
         assert!(keys.contains(&"a".to_string()));
         assert!(keys.contains(&"b".to_string()));
         assert!(keys.contains(&"c".to_string()));
-        
+
         // Clear
         db.clear().unwrap();
         assert_eq!(db.keys().len(), 0);
@@ -582,13 +625,13 @@ mod tests {
     fn test_tied_param() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("tied.gdbm");
-        
+
         let db = Arc::new(GdbmDatabase::open(&db_path, false).unwrap());
         let tied = TiedGdbmParam::new("mydb".to_string(), db);
-        
+
         tied.set("foo", "bar").unwrap();
         assert_eq!(tied.get("foo"), Some("bar".to_string()));
-        
+
         let hash = tied.to_hash();
         assert_eq!(hash.get("foo"), Some(&"bar".to_string()));
     }

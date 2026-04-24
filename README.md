@@ -87,7 +87,7 @@ autoload -Uz compinit && compinit
 
 ## [0x01b] CONCISENESS — STRYKE VS THE WORLD
 
-stryke is the **most concise ASCII-only general-purpose scripting language** — shorter than Perl, Ruby, Python, and AWK for real-world tasks.
+stryke is the **most concise yet readable ASCII-only general-purpose scripting language** — shorter than Perl, Ruby, Python, and AWK for real-world tasks.
 
 ### vs mainstream languages
 
@@ -95,7 +95,7 @@ stryke is the **most concise ASCII-only general-purpose scripting language** —
 |------|--------|-------|------|-------|------|-------|--------|-------|
 | hello world | `p"hello"` | **8** | `print"hello"` | 12 | `puts"hello"` | 10 | `print("hello")` | 14 |
 | sum 1-100 | `p sum 1:100` | **11** | `use List::Util'sum';say sum 1..100` | 38 | `p (1..100).sum` | 15 | `print(sum(range(1,101)))` | 24 |
-| double+filter+sum | `~>1:10map{$_*2}grep{$_>5}sum p` | **32** | `say for grep{$_>5}map{$_*2}1..10` | 36 | `p (1..10).map{...}.select{...}.sum` | 42 | `print(sum(x for x in[...]))` | 56 |
+| double+filter+sum | `~>1:10map{_*2}fi{_>5}sum p` | **28** | `say for grep{$_>5}map{$_*2}1..10` | 36 | `p (1..10).map{...}.select{...}.sum` | 42 | `print(sum(x for x in[...]))` | 56 |
 | max of list | `p max 3,1,4,1,5` | **15** | `use List::Util'max';say max(...)` | 38 | `p [3,1,4,1,5].max` | 17 | `print(max([3,1,4,1,5]))` | 23 |
 | reverse string | `p rev"hello"` | **12** | `say reverse"hello"` | 18 | `puts"hello".reverse` | 18 | `print("hello"[::-1])` | 20 |
 | count array | `p cnt 1:10` | **10** | `say scalar 1..10` | 17 | `p (1..10).count` | 16 | `print(len(range(1,11)))` | 23 |
@@ -924,6 +924,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   deep_equal([1,2,{x=>3}], [1,2,{x=>3}])  # 1 (structural eq)
   my $t = tally("a","b","a")  # {a => 2, b => 1}
   ```
+- **Bare `_` as topic shorthand** — in any expression position, bare `_` is equivalent to `$_`. Inspired by Raku's WhateverCode and Scala's placeholder syntax. Enables ultra-concise blocks: `map{_*2}` instead of `map{$_ * 2}`. The sigil-free form compresses better — no spaces needed around `_` when adjacent to operators.
 - **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 4 levels (`$_<` through `$_<<<<`). See [\[0x03\]](#0x03-parallel-primitives).
 - **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e say`. Use for print/log/accumulator loops.
 - **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `e` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
@@ -1141,43 +1142,46 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   Precedence: `|>` binds **looser** than `||` but **tighter** than `?:` / `and`/`or`/`not` — the slot sits between `parse_ternary` and `parse_or_word` in the parser stack. So `$x + 1 |> f` parses as `f($x + 1)`, and `0 || 1 |> yes` parses as `yes(0 || 1)`. The RHS must be a call, builtin, method invocation, bareword, or coderef expression; bare binary expressions / literals on the right are a parse error (`42 |> 1 + 2` is rejected).
 
-- **`~>` macro** (`thread`, `t`, `->>`) — Clojure-inspired threading macro for clean multi-stage pipelines without repeating `|>`. Stages are bare function names, functions with blocks, parenthesized calls `name(args)` where `$_` is the threaded-value placeholder (must appear at least once in args, can sit in any position — first, last, middle, nested), or anonymous blocks (`>{}` / `fn {}` / `sub {}`). Use `|>` after `~>` to continue piping.
+- **`~>` macro** (`thread`, `t`, `->>`) — Clojure-inspired threading macro for clean multi-stage pipelines without repeating `|>`. Stages are bare function names, functions with blocks, parenthesized calls `name(args)` where `$_` (or bare `_`) is the threaded-value placeholder (must appear at least once in args, can sit in any position — first, last, middle, nested), or anonymous blocks (`>{}` / `fn {}` / `sub {}`). Use `|>` after `~>` to continue piping. Blocks can use bare `_` for maximum conciseness — `map{_*2}` is equivalent to `map{$_ * 2}`.
 
   ```perl
+  # ultra-concise — bare _ eliminates sigil noise
+  ~>1:10map{_*2}fi{_>5}sum p                          # 104
+
   # ~> shines with multiple block-taking functions — no |> repetition
   @data = 1..20
-  ~> @data grep { $_ % 2 == 0 } map { $_ * $_ } sort { $_1 <=> $_0 } |> join "," |> p
+  ~> @data grep{_ % 2 == 0} map{_ * _} sort{$_1 <=> $_0} |> join "," |> p
   # 400,324,256,196,144,100,64,36,16,4
 
   # Compare: same pipeline with |> requires more syntax
-  @data |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sort { $_1 <=> $_0 } |> join "," |> p
+  @data |> grep{_ % 2 == 0} |> map{_ * _} |> sort{$_1 <=> $_0} |> join "," |> p
 
   # Long data processing pipeline
   @nums = 1..100
-  ~> @nums grep { $_ % 3 == 0 } map { $_ * 2 } grep { $_ > 50 } sort { $_1 <=> $_0 } |> head 5 |> join "," |> p
+  ~> @nums grep{_ % 3 == 0} map{_ * 2} grep{_ > 50} sort{$_1 <=> $_0} |> head 5 |> join "," |> p
   # 198,192,186,180,174
 
   # Anonymous blocks for custom transforms
-  ~> 100 >{ $_ / 2 } >{ $_ + 10 } >{ $_ * 3 } p  # 180
+  ~> 100 >{_ / 2} >{_ + 10} >{_ * 3} p  # 180
 
   # Process list of hashes
   @users = ({name=>"alice",age=>30}, {name=>"bob",age=>25}, {name=>"carol",age=>35})
-  ~> @users sort { $_0->{age} <=> $_1->{age} } map { $_->{name} } |> join "," |> p
+  ~> @users sort{$_0->{age} <=> $_1->{age}} map{_->{name}} |> join "," |> p
   # bob,alice,carol
 
   # String processing with unary builtins
   ~> "  hello world  " trim uc p                 # HELLO WORLD
 
-  # Parenthesized call stages — `$_` is the threaded-value placeholder
+  # Parenthesized call stages — `_` or `$_` is the threaded-value placeholder
   fn add2 { $_0 + $_1 }
-  ~> 10 add2($_, 5) p                            # add2(10, 5)        => 15
-  ~> 10 add2(5, $_) p                            # add2(5, 10)        => 15  (any position)
-  ~> 10 add2($_, 5) add2($_, 100) p              # chains: 15 then 115
+  ~> 10 add2(_, 5) p                              # add2(10, 5)        => 15
+  ~> 10 add2(5, _) p                              # add2(5, 10)        => 15  (any position)
+  ~> 10 add2(_, 5) add2(_, 100) p                 # chains: 15 then 115
   fn add3 { $_0 + $_1 + $_2 }
-  ~> 10 add3(5, $_, 10) p                        # add3(5, 10, 10)    => 25
-  # `$_` works inside nested expressions too:
+  ~> 10 add3(5, _, 10) p                          # add3(5, 10, 10)    => 25
+  # `_` works inside nested expressions too:
   fn mul { $_0 * $_1 }
-  ~> 10 mul($_ + 1, 2) p                         # mul(11, 2)         => 22
+  ~> 10 mul(_ + 1, 2) p                           # mul(11, 2)         => 22
 
   # Reduce with $_0/$_1
   ~> (1..10) reduce { $_0 + $_1 } p              # 55
@@ -1202,8 +1206,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   **Stage types:**
   - **Bare function**: `~> "hello" uc trim` — applies unary builtins in sequence
-  - **Function with block**: `~> @data map { $_ * 2 } grep { $_ > 5 }` — block-taking functions
-  - **Anonymous block**: `~> 5 >{ $_ * 2 }` or `fn { }` or `sub { }` — custom transforms
+  - **Function with block**: `~> @data map{_ * 2} grep{_ > 5}` — block-taking functions (bare `_` or `$_`)
+  - **Anonymous block**: `~> 5 >{_ * 2}` or `fn { }` — custom transforms
 
   **Termination:** `|>` ends the `~>` macro: `~> @l f1 f2 f3 |> f4` parses as `(~> @l f1 f2 f3) |> f4`.
 
@@ -1211,16 +1215,16 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   # Sum of squares of even numbers 1-10
-  ~> (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p       # 220
+  ~> (1..10) grep{_ % 2 == 0} map{_ * _} sum p                # 220
 
   # Mean of squares
-  ~> (1..10) map { $_ * $_ } mean p                           # 38.5
+  ~> (1..10) map{_ * _} mean p                                 # 38.5
 
   # Multiples of 7 up to 100, doubled, summed
-  ~> (1..100) grep { $_ % 7 == 0 } map { $_ * 2 } sum p       # 1470
+  ~> (1..100) grep{_ % 7 == 0} map{_ * 2} sum p               # 1470
 
   # Sum of odd squares, sqrt, truncate
-  ~> (1..50) grep { $_ % 2 == 1 } map { $_ ** 2 } sum sqrt int p  # 144
+  ~> (1..50) grep{_ % 2 == 1} map{_ ** 2} sum sqrt int p      # 144
 
   # Factorial via product
   ~> (1..10) product p                                        # 3628800
@@ -1264,11 +1268,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   **Compare with `|>` syntax (same result, more typing):**
 
   ```perl
-  # ~> version
-  ~> (1..10) grep { $_ % 2 == 0 } map { $_ * $_ } sum p
+  # ~> version (bare _)
+  ~> (1..10) grep{_ % 2 == 0} map{_ * _} sum p
 
   # |> version
-  (1..10) |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum |> p
+  (1..10) |> grep{_ % 2 == 0} |> map{_ * _} |> sum |> p
   ```
 
   **Language comparison — the same 10-stage pipeline:**
@@ -1414,11 +1418,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   fn double($x) { $x * 2 }
   p double(21)                    # 42
 
-  my $f = fn { $_ * 2 }
+  my $f = fn { _ * 2 }
   p $f->(21)                      # 42
   ```
 
-- **Closure arguments `$_0`, `$_1`, ... `$_N`** — numeric closure arguments inspired by Swift. All arguments passed to any sub (named or anonymous) are available as `$_0` (first), `$_1` (second), `$_2` (third), up to `$_N` for any number of arguments. These work alongside or instead of Perl's `@_`, `$_`, `$a`, `$b`. Both `$_` and `$_0` refer to the first argument, so `$_ * 2` and `$_0 * 2` are equivalent — use whichever reads better in context.
+- **Closure arguments `$_0`, `$_1`, ... `$_N`** — numeric closure arguments inspired by Swift. All arguments passed to any sub (named or anonymous) are available as `$_0` (first), `$_1` (second), `$_2` (third), up to `$_N` for any number of arguments. These work alongside or instead of Perl's `@_`, `$_`, `$a`, `$b`. Both `$_`, bare `_`, and `$_0` refer to the first argument — `_ * 2`, `$_ * 2`, and `$_0 * 2` are all equivalent. Use bare `_` for maximum conciseness in blocks.
 
   ```perl
   # $_0 in |> pipes (single-arg: $_0 == $_)
@@ -1493,9 +1497,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # User-defined functions inside blocks
   fn is_even { $_0 % 2 == 0 }
-  ~> (1..10) grep { is_even($_) } sum p  # 30
+  ~> (1..10) grep{is_even(_)} sum p  # 30
 
-  ~> (1..5) map { square($_) } sum p     # 55
+  ~> (1..5) map{square(_)} sum p     # 55
 
   # Multi-arg user-defined functions
   fn add  { $_0 + $_1 }
@@ -1504,8 +1508,8 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p mul3(2, 3, 4)                            # 24
 
   # Inline transforms with >{ } (arrow block)
-  ~> 5 >{ $_ * 2 } >{ $_ + 10 } p        # 20
-  ~> 100 >{ $_0 / 2 } >{ $_0 + 10 } >{ $_0 * 3 } p  # 180
+  ~> 5 >{_ * 2} >{_ + 10} p               # 20
+  ~> 100 >{_ / 2} >{_ + 10} >{_ * 3} p    # 180
   ```
 
 - **Block params `{ |$var| body }`** — name the block's implicit arguments with Ruby-style `|$params|` at the start of a block. For single-param blocks (`map`, `grep`, `each`), the param aliases `$_`. For two-param blocks (`sort`, `reduce`), they alias `$a`/`$b`. For N≥3 params, they alias `$_`, `$_1`, `$_2`, etc.

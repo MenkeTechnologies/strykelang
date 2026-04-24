@@ -7,8 +7,8 @@ use std::cmp::Ordering;
 
 /// Sort flags from sort.c
 pub mod flags {
-    pub const NUMERIC: u32 = 1 << 0;     // -n: numeric sort
-    pub const REVERSE: u32 = 1 << 1;     // -O: reverse order
+    pub const NUMERIC: u32 = 1 << 0; // -n: numeric sort
+    pub const REVERSE: u32 = 1 << 1; // -O: reverse order
     pub const CASE_INSENSITIVE: u32 = 1 << 2; // -i: case insensitive
     pub const NO_BACKSLASH: u32 = 1 << 3; // ignore backslashes
     pub const NUMERIC_SIGNED: u32 = 1 << 4; // handle negative numbers
@@ -48,7 +48,14 @@ pub fn zstrcmp(a: &str, b: &str, sort_flags: u32) -> Ordering {
     let no_backslash = (sort_flags & flags::NO_BACKSLASH) != 0;
     let case_insensitive = (sort_flags & flags::CASE_INSENSITIVE) != 0;
 
-    let mut result = compare_strings(a, b, numeric, numeric_signed, no_backslash, case_insensitive);
+    let mut result = compare_strings(
+        a,
+        b,
+        numeric,
+        numeric_signed,
+        no_backslash,
+        case_insensitive,
+    );
 
     if reverse {
         result = result.reverse();
@@ -112,16 +119,16 @@ fn compare_numeric(a: &str, b: &str, signed_mode: bool) -> Ordering {
             // Both are non-numeric at this point, do string comparison
             let (a_head, a_tail) = split_at_number(a);
             let (b_head, b_tail) = split_at_number(b);
-            
+
             let head_cmp = a_head.cmp(&b_head);
             if head_cmp != Ordering::Equal {
                 return head_cmp;
             }
-            
+
             if a_tail.is_empty() && b_tail.is_empty() {
                 return Ordering::Equal;
             }
-            
+
             compare_numeric(a_tail, b_tail, signed_mode)
         }
     }
@@ -200,10 +207,11 @@ fn skip_number(s: &str, signed_mode: bool) -> &str {
 }
 
 fn split_at_number(s: &str) -> (&str, &str) {
-    let idx = s.chars()
+    let idx = s
+        .chars()
         .position(|c| c.is_ascii_digit())
         .unwrap_or(s.len());
-    
+
     let byte_idx = s.chars().take(idx).map(|c| c.len_utf8()).sum::<usize>();
     (&s[..byte_idx], &s[byte_idx..])
 }
@@ -238,7 +246,12 @@ pub fn sort_elts(elts: &mut [SortElt], sort_flags: u32) {
 
     elts.sort_by(|a, b| {
         let mut result = compare_strings(
-            &a.cmp, &b.cmp, numeric, numeric_signed, no_backslash, case_insensitive
+            &a.cmp,
+            &b.cmp,
+            numeric,
+            numeric_signed,
+            no_backslash,
+            case_insensitive,
         );
         if reverse {
             result = result.reverse();
@@ -275,14 +288,23 @@ mod tests {
 
     #[test]
     fn test_zstrcmp_case_insensitive() {
-        assert_eq!(zstrcmp("ABC", "abc", flags::CASE_INSENSITIVE), Ordering::Equal);
-        assert_eq!(zstrcmp("ABC", "def", flags::CASE_INSENSITIVE), Ordering::Less);
+        assert_eq!(
+            zstrcmp("ABC", "abc", flags::CASE_INSENSITIVE),
+            Ordering::Equal
+        );
+        assert_eq!(
+            zstrcmp("ABC", "def", flags::CASE_INSENSITIVE),
+            Ordering::Less
+        );
     }
 
     #[test]
     fn test_zstrcmp_numeric() {
         assert_eq!(zstrcmp("file2", "file10", flags::NUMERIC), Ordering::Less);
-        assert_eq!(zstrcmp("file10", "file2", flags::NUMERIC), Ordering::Greater);
+        assert_eq!(
+            zstrcmp("file10", "file2", flags::NUMERIC),
+            Ordering::Greater
+        );
         assert_eq!(zstrcmp("100", "20", flags::NUMERIC), Ordering::Greater);
     }
 
@@ -337,7 +359,10 @@ mod tests {
 
     #[test]
     fn test_no_backslash() {
-        assert_eq!(zstrcmp("a\\bc", "abc", flags::NO_BACKSLASH), Ordering::Equal);
+        assert_eq!(
+            zstrcmp("a\\bc", "abc", flags::NO_BACKSLASH),
+            Ordering::Equal
+        );
     }
 
     #[test]

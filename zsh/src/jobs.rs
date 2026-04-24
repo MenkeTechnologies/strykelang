@@ -9,17 +9,17 @@ use std::time::{Duration, Instant};
 
 /// Job status flags
 pub mod stat {
-    pub const STOPPED: u32 = 1 << 0;      // Job is stopped
-    pub const DONE: u32 = 1 << 1;         // Job is finished
-    pub const SUBJOB: u32 = 1 << 2;       // Job is a subjob
-    pub const CURSH: u32 = 1 << 3;        // Last pipeline elem in current shell
-    pub const SUPERJOB: u32 = 1 << 4;     // Job is a superjob
-    pub const WASSUPER: u32 = 1 << 5;     // Was a superjob
-    pub const INUSE: u32 = 1 << 6;        // Entry in use
-    pub const BUILTIN: u32 = 1 << 7;      // Job has builtin
-    pub const DISOWN: u32 = 1 << 8;       // Disowned
-    pub const NOTIFY: u32 = 1 << 9;       // Notify when done
-    pub const ATTACH: u32 = 1 << 10;      // Attached to tty
+    pub const STOPPED: u32 = 1 << 0; // Job is stopped
+    pub const DONE: u32 = 1 << 1; // Job is finished
+    pub const SUBJOB: u32 = 1 << 2; // Job is a subjob
+    pub const CURSH: u32 = 1 << 3; // Last pipeline elem in current shell
+    pub const SUPERJOB: u32 = 1 << 4; // Job is a superjob
+    pub const WASSUPER: u32 = 1 << 5; // Was a superjob
+    pub const INUSE: u32 = 1 << 6; // Entry in use
+    pub const BUILTIN: u32 = 1 << 7; // Job has builtin
+    pub const DISOWN: u32 = 1 << 8; // Disowned
+    pub const NOTIFY: u32 = 1 << 9; // Notify when done
+    pub const ATTACH: u32 = 1 << 10; // Attached to tty
 }
 
 /// Special process status values
@@ -68,7 +68,7 @@ impl Process {
     }
 
     pub fn is_signaled(&self) -> bool {
-        // WIFSIGNALED equivalent  
+        // WIFSIGNALED equivalent
         (self.status & 0x7f) > 0 && (self.status & 0x7f) < 0x7f
     }
 
@@ -190,7 +190,7 @@ impl JobTable {
     pub fn add_job(&mut self, child: Child, command: String, state: JobState) -> usize {
         let id = self.next_id;
         self.next_id += 1;
-        
+
         let pid = child.id() as i32;
         let job = JobInfo {
             id,
@@ -215,7 +215,7 @@ impl JobTable {
         }
         self.jobs[slot] = Some(job);
         self.current_id = Some(id);
-        
+
         id
     }
 
@@ -273,7 +273,9 @@ impl JobTable {
 
     /// Iterate over jobs with their IDs (for compatibility)
     pub fn iter(&self) -> impl Iterator<Item = (usize, &JobInfo)> {
-        self.jobs.iter().filter_map(|j| j.as_ref().map(|job| (job.id, job)))
+        self.jobs
+            .iter()
+            .filter_map(|j| j.as_ref().map(|job| (job.id, job)))
     }
 
     /// Count number of active jobs
@@ -294,7 +296,7 @@ impl JobTable {
     /// Reap finished jobs (check for completed processes)
     pub fn reap_finished(&mut self) -> Vec<JobInfo> {
         let mut finished = Vec::new();
-        
+
         for slot in self.jobs.iter_mut() {
             if let Some(job) = slot {
                 if let Some(ref mut child) = job.child {
@@ -318,7 +320,11 @@ impl JobTable {
 
         // Remove done jobs
         for slot in self.jobs.iter_mut() {
-            if slot.as_ref().map(|j| j.state == JobState::Done).unwrap_or(false) {
+            if slot
+                .as_ref()
+                .map(|j| j.state == JobState::Done)
+                .unwrap_or(false)
+            {
                 if let Some(job) = slot.take() {
                     finished.push(job);
                 }
@@ -330,7 +336,12 @@ impl JobTable {
 }
 
 /// Format a job for display
-pub fn format_job(job: &Job, job_num: usize, cur_job: Option<usize>, prev_job: Option<usize>) -> String {
+pub fn format_job(
+    job: &Job,
+    job_num: usize,
+    cur_job: Option<usize>,
+    prev_job: Option<usize>,
+) -> String {
     let marker = if Some(job_num) == cur_job {
         '+'
     } else if Some(job_num) == prev_job {
@@ -384,7 +395,10 @@ mod tests {
     fn test_job_make_running() {
         let mut job = Job::new();
         job.stat |= stat::STOPPED;
-        job.procs.push(Process { status: 0x007f, ..Process::new(1234) }); // Stopped
+        job.procs.push(Process {
+            status: 0x007f,
+            ..Process::new(1234)
+        }); // Stopped
 
         job.make_running();
         assert!(!job.is_stopped());
@@ -435,7 +449,7 @@ pub struct JobEntry {
 pub fn send_signal(pid: i32, sig: nix::sys::signal::Signal) -> Result<(), String> {
     use nix::sys::signal::kill;
     use nix::unistd::Pid;
-    
+
     kill(Pid::from_raw(pid), sig).map_err(|e| e.to_string())
 }
 
@@ -449,7 +463,7 @@ pub fn send_signal(_pid: i32, _sig: i32) -> Result<(), String> {
 pub fn continue_job(pid: i32) -> Result<(), String> {
     use nix::sys::signal::{kill, Signal};
     use nix::unistd::Pid;
-    
+
     kill(Pid::from_raw(pid), Signal::SIGCONT).map_err(|e| e.to_string())
 }
 
@@ -463,7 +477,7 @@ pub fn continue_job(_pid: i32) -> Result<(), String> {
 pub fn wait_for_job(pid: i32) -> Result<i32, String> {
     use nix::sys::wait::{waitpid, WaitStatus};
     use nix::unistd::Pid;
-    
+
     loop {
         match waitpid(Pid::from_raw(pid), None) {
             Ok(WaitStatus::Exited(_, code)) => return Ok(code),
@@ -520,7 +534,13 @@ pub fn format_hhmmss(secs: f64) -> String {
 }
 
 /// Time format specifiers (from jobs.c printtime lines 768-949)
-pub fn format_time(elapsed_secs: f64, user_secs: f64, system_secs: f64, format: &str, job_name: &str) -> String {
+pub fn format_time(
+    elapsed_secs: f64,
+    user_secs: f64,
+    system_secs: f64,
+    format: &str,
+    job_name: &str,
+) -> String {
     let mut result = String::new();
     let total_time = user_secs + system_secs;
     let percent = if elapsed_secs > 0.0 {
@@ -551,9 +571,13 @@ pub fn format_time(elapsed_secs: f64, user_secs: f64, system_secs: f64, format: 
                     _ => result.push_str("%u"),
                 },
                 Some('n') => match chars.next() {
-                    Some('E') => result.push_str(&format!("{:.0}ns", elapsed_secs * 1_000_000_000.0)),
+                    Some('E') => {
+                        result.push_str(&format!("{:.0}ns", elapsed_secs * 1_000_000_000.0))
+                    }
                     Some('U') => result.push_str(&format!("{:.0}ns", user_secs * 1_000_000_000.0)),
-                    Some('S') => result.push_str(&format!("{:.0}ns", system_secs * 1_000_000_000.0)),
+                    Some('S') => {
+                        result.push_str(&format!("{:.0}ns", system_secs * 1_000_000_000.0))
+                    }
                     _ => result.push_str("%n"),
                 },
                 Some('*') => match chars.next() {
@@ -597,12 +621,23 @@ impl CommandTimer {
         self.start.elapsed()
     }
 
-    pub fn format(&self, user_time: Duration, sys_time: Duration, format_str: Option<&str>) -> String {
+    pub fn format(
+        &self,
+        user_time: Duration,
+        sys_time: Duration,
+        format_str: Option<&str>,
+    ) -> String {
         let elapsed = self.start.elapsed().as_secs_f64();
         let user = user_time.as_secs_f64();
         let sys = sys_time.as_secs_f64();
-        
-        format_time(elapsed, user, sys, format_str.unwrap_or(DEFAULT_TIMEFMT), &self.job_name)
+
+        format_time(
+            elapsed,
+            user,
+            sys,
+            format_str.unwrap_or(DEFAULT_TIMEFMT),
+            &self.job_name,
+        )
     }
 }
 
@@ -714,7 +749,13 @@ pub fn format_process_status(status: i32) -> String {
 }
 
 /// Print job in long format (from jobs.c printjob)
-pub fn format_job_long(job_num: usize, current: bool, pid: i32, status: &str, text: &str) -> String {
+pub fn format_job_long(
+    job_num: usize,
+    current: bool,
+    pid: i32,
+    status: &str,
+    text: &str,
+) -> String {
     let marker = if current { '+' } else { '-' };
     format!("[{}]  {} {:>5} {}  {}", job_num, marker, pid, status, text)
 }
@@ -793,7 +834,7 @@ pub fn waitjob(job: &mut Job) -> Option<i32> {
     if job.procs.is_empty() {
         return Some(0);
     }
-    
+
     let mut last_status = 0;
     for proc in &mut job.procs {
         if proc.is_running() {
@@ -805,7 +846,7 @@ pub fn waitjob(job: &mut Job) -> Option<i32> {
             last_status = proc.exit_status();
         }
     }
-    
+
     job.stat |= stat::DONE;
     Some(last_status)
 }
@@ -855,7 +896,7 @@ pub fn addproc(job: &mut Job, pid: i32, text: &str, aux: bool) {
         text: text.to_string(),
         ..proc
     };
-    
+
     if aux {
         job.auxprocs.push(proc);
     } else {
@@ -864,7 +905,7 @@ pub fn addproc(job: &mut Job, pid: i32, text: &str, aux: bool) {
         }
         job.procs.push(proc);
     }
-    
+
     job.stat &= !stat::DONE;
 }
 
@@ -876,7 +917,7 @@ pub fn killjob(job: &Job, sig: i32) -> bool {
             let result = unsafe { libc::killpg(job.gleader, sig) };
             return result == 0;
         }
-        
+
         let mut success = true;
         for proc in &job.procs {
             if proc.is_running() {
@@ -909,7 +950,7 @@ pub fn fg_job(job: &mut Job) -> Option<i32> {
             }
             job.stat &= !stat::STOPPED;
         }
-        
+
         waitjob(job)
     }
     #[cfg(not(unix))]
@@ -963,7 +1004,11 @@ pub fn get_job_text(job: &Job) -> String {
     if !job.text.is_empty() {
         return job.text.clone();
     }
-    job.procs.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join(" | ")
+    job.procs
+        .iter()
+        .map(|p| p.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" | ")
 }
 
 /// Super job tracking (from jobs.c super_job lines 393-417)
@@ -989,14 +1034,14 @@ impl JobPointers {
             prev_job: None,
         }
     }
-    
+
     pub fn set_current(&mut self, job: usize) {
         if Some(job) != self.cur_job {
             self.prev_job = self.cur_job;
             self.cur_job = Some(job);
         }
     }
-    
+
     pub fn clear(&mut self, job: usize) {
         if self.cur_job == Some(job) {
             self.cur_job = self.prev_job;
@@ -1026,7 +1071,11 @@ pub fn getjob(spec: &str, table: &JobTable, ptrs: &JobPointers) -> Option<usize>
         return ptrs.cur_job;
     }
 
-    let spec = if spec.starts_with('%') { &spec[1..] } else { spec };
+    let spec = if spec.starts_with('%') {
+        &spec[1..]
+    } else {
+        spec
+    };
 
     match spec {
         "+" | "%" | "" => ptrs.cur_job,
@@ -1102,9 +1151,7 @@ pub fn acquire_pgrp() -> bool {
 
 /// Store pipestats from job (from jobs.c storepipestats)
 pub fn storepipestats(job: &Job) -> Vec<i32> {
-    job.procs.iter()
-        .map(|p| p.status)
-        .collect()
+    job.procs.iter().map(|p| p.status).collect()
 }
 
 /// Clear the job table (from jobs.c clearjobtab)
@@ -1143,7 +1190,8 @@ pub fn shelltime() -> ChildTimes {
         let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
         if unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) } == 0 {
             return ChildTimes {
-                user_sec: usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
+                user_sec: usage.ru_utime.tv_sec as f64
+                    + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
                 sys_sec: usage.ru_stime.tv_sec as f64 + usage.ru_stime.tv_usec as f64 / 1_000_000.0,
             };
         }
@@ -1158,7 +1206,8 @@ pub fn childtime() -> ChildTimes {
         let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
         if unsafe { libc::getrusage(libc::RUSAGE_CHILDREN, &mut usage) } == 0 {
             return ChildTimes {
-                user_sec: usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
+                user_sec: usage.ru_utime.tv_sec as f64
+                    + usage.ru_utime.tv_usec as f64 / 1_000_000.0,
                 sys_sec: usage.ru_stime.tv_sec as f64 + usage.ru_stime.tv_usec as f64 / 1_000_000.0,
             };
         }
@@ -1321,7 +1370,9 @@ pub fn should_report_time(job: &Job, reporttime: f64) -> bool {
         return false;
     }
     if let Some(first) = job.procs.first() {
-        if let (Some(start), Some(end)) = (first.start_time, job.procs.last().and_then(|p| p.end_time)) {
+        if let (Some(start), Some(end)) =
+            (first.start_time, job.procs.last().and_then(|p| p.end_time))
+        {
             let elapsed = end.duration_since(start).as_secs_f64();
             return elapsed >= reporttime;
         }
@@ -1342,7 +1393,13 @@ pub fn dumptime(job: &Job, format: &str) -> Option<String> {
         total_sys += proc.ti.sys_time.as_secs_f64();
     }
 
-    Some(format_time(elapsed, total_user, total_sys, format, &get_job_text(job)))
+    Some(format_time(
+        elapsed,
+        total_user,
+        total_sys,
+        format,
+        &get_job_text(job),
+    ))
 }
 
 /// Wait for all foreground jobs to finish (from jobs.c waitjobs)
@@ -1360,7 +1417,9 @@ pub fn waitjobs(jobtab: &mut Vec<Job>, thisjob: usize) {
                 }
             }
             #[cfg(not(unix))]
-            { break; }
+            {
+                break;
+            }
         }
     }
 }
@@ -1434,7 +1493,11 @@ pub fn expandjobtab(jobtab: &mut Vec<Job>, needed: usize) {
 
 /// Shrink job table if possible (from jobs.c maybeshrinkjobtab)
 pub fn maybeshrinkjobtab(jobtab: &mut Vec<Job>) {
-    while jobtab.last().map(|j| (j.stat & stat::INUSE) == 0).unwrap_or(false) {
+    while jobtab
+        .last()
+        .map(|j| (j.stat & stat::INUSE) == 0)
+        .unwrap_or(false)
+    {
         jobtab.pop();
     }
 }
@@ -1448,7 +1511,8 @@ pub fn addfilelist(job: &mut Job, filename: &str) {
 pub fn pipecleanfilelist(job: &mut Job, proc_subst_only: bool) {
     if proc_subst_only {
         // Only remove process substitution files (those starting with /dev/fd or /proc)
-        job.filelist.retain(|f| !f.starts_with("/dev/fd/") && !f.starts_with("/proc/"));
+        job.filelist
+            .retain(|f| !f.starts_with("/dev/fd/") && !f.starts_with("/proc/"));
     } else {
         for file in &job.filelist {
             let _ = std::fs::remove_file(file);
@@ -1468,7 +1532,13 @@ pub fn deletefilelist(job: &mut Job, disowning: bool) {
 }
 
 /// Print job with full detail (from jobs.c printjob)
-pub fn printjob(job: &Job, job_num: usize, long_format: bool, cur_job: Option<usize>, prev_job: Option<usize>) -> String {
+pub fn printjob(
+    job: &Job,
+    job_num: usize,
+    long_format: bool,
+    cur_job: Option<usize>,
+    prev_job: Option<usize>,
+) -> String {
     let marker = if Some(job_num) == cur_job {
         '+'
     } else if Some(job_num) == prev_job {
@@ -1494,16 +1564,26 @@ pub fn printjob(job: &Job, job_num: usize, long_format: bool, cur_job: Option<us
         for (i, proc) in job.procs.iter().enumerate() {
             let pstatus = format_process_status(proc.status);
             if i == 0 {
-                lines.push(format!("[{}]  {} {:>5} {:16}  {}",
-                    job_num, marker, proc.pid, pstatus, proc.text));
+                lines.push(format!(
+                    "[{}]  {} {:>5} {:16}  {}",
+                    job_num, marker, proc.pid, pstatus, proc.text
+                ));
             } else {
-                lines.push(format!("            {:>5} {:16}  | {}",
-                    proc.pid, pstatus, proc.text));
+                lines.push(format!(
+                    "            {:>5} {:16}  | {}",
+                    proc.pid, pstatus, proc.text
+                ));
             }
         }
         lines.join("\n")
     } else {
-        format!("[{}]  {} {:16}  {}", job_num, marker, status_str, get_job_text(job))
+        format!(
+            "[{}]  {} {:16}  {}",
+            job_num,
+            marker,
+            status_str,
+            get_job_text(job)
+        )
     }
 }
 
@@ -1556,7 +1636,11 @@ pub fn dtime_tv(dt: &mut Duration, t1: &Duration, t2: &Duration) -> Duration {
 
 /// Time difference for timespec (from jobs.c dtime_ts)
 pub fn dtime_ts(t1: &Instant, t2: &Instant) -> Duration {
-    if *t2 > *t1 { t2.duration_since(*t1) } else { Duration::ZERO }
+    if *t2 > *t1 {
+        t2.duration_since(*t1)
+    } else {
+        Duration::ZERO
+    }
 }
 
 /// Make all job processes running (from jobs.c makerunning)
@@ -1581,7 +1665,9 @@ pub fn check_cursh_sig(jobtab: &[Job], sig: i32) {
         if (job.stat & stat::CURSH) != 0 && !job.is_done() {
             for proc in &job.procs {
                 if proc.is_running() {
-                    unsafe { libc::kill(proc.pid, sig); }
+                    unsafe {
+                        libc::kill(proc.pid, sig);
+                    }
                 }
             }
         }

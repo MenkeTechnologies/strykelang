@@ -101,8 +101,12 @@ fn send_query(query: &str, timeout_ms: u64) -> io::Result<String> {
                 Ok(1) => {
                     response.push(buf[0]);
                     // Check for terminal response ending characters
-                    if buf[0] == b'c' || buf[0] == b'n' || buf[0] == b't' ||
-                       buf[0] == b'\\' || buf[0] == 0x07 {
+                    if buf[0] == b'c'
+                        || buf[0] == b'n'
+                        || buf[0] == b't'
+                        || buf[0] == b'\\'
+                        || buf[0] == 0x07
+                    {
                         break;
                     }
                 }
@@ -232,16 +236,12 @@ fn base64_encode(data: &[u8]) -> String {
 pub fn extension_enabled(name: &str) -> bool {
     match name {
         "bracketed-paste" => probe_bracketed_paste(),
-        "truecolor" => {
-            std::env::var("COLORTERM")
-                .map(|v| v == "truecolor" || v == "24bit")
-                .unwrap_or(false)
-        }
-        "osc7" | "osc133" => {
-            std::env::var("TERM_PROGRAM")
-                .map(|v| matches!(v.as_str(), "iTerm.app" | "WezTerm" | "kitty"))
-                .unwrap_or(false)
-        }
+        "truecolor" => std::env::var("COLORTERM")
+            .map(|v| v == "truecolor" || v == "24bit")
+            .unwrap_or(false),
+        "osc7" | "osc133" => std::env::var("TERM_PROGRAM")
+            .map(|v| matches!(v.as_str(), "iTerm.app" | "WezTerm" | "kitty"))
+            .unwrap_or(false),
         _ => false,
     }
 }

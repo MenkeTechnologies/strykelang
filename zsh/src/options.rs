@@ -31,9 +31,9 @@ const OPT_NONBOURNE: u8 = OPT_ALL & !OPT_BOURNE;
 const OPT_NONZSH: u8 = OPT_ALL & !OPT_ZSH;
 
 /// Option flags
-const OPT_EMULATE: u16 = 0x100;  // Relevant to emulation
-const OPT_SPECIAL: u16 = 0x200;  // Never set by emulate()
-const OPT_ALIAS: u16 = 0x400;    // Alias to another option
+const OPT_EMULATE: u16 = 0x100; // Relevant to emulation
+const OPT_SPECIAL: u16 = 0x200; // Never set by emulate()
+const OPT_ALIAS: u16 = 0x400; // Alias to another option
 
 /// All shell option names
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -442,18 +442,18 @@ impl ShellOption {
 
 /// Option aliases for bash/ksh compatibility
 pub static OPTION_ALIASES: &[(&str, &str, bool)] = &[
-    ("braceexpand", "ignorebraces", true),    // ksh/bash, negated
-    ("dotglob", "globdots", false),            // bash
-    ("hashall", "hashcmds", false),            // bash
-    ("histappend", "appendhistory", false),    // bash
-    ("histexpand", "banghist", false),         // bash
-    ("log", "histnofunctions", true),          // ksh, negated
-    ("mailwarn", "mailwarning", false),        // bash
-    ("onecmd", "singlecommand", false),        // bash
-    ("physical", "chaselinks", false),         // ksh/bash
-    ("promptvars", "promptsubst", false),      // bash
-    ("stdin", "shinstdin", false),             // ksh
-    ("trackall", "hashcmds", false),           // ksh
+    ("braceexpand", "ignorebraces", true),  // ksh/bash, negated
+    ("dotglob", "globdots", false),         // bash
+    ("hashall", "hashcmds", false),         // bash
+    ("histappend", "appendhistory", false), // bash
+    ("histexpand", "banghist", false),      // bash
+    ("log", "histnofunctions", true),       // ksh, negated
+    ("mailwarn", "mailwarning", false),     // bash
+    ("onecmd", "singlecommand", false),     // bash
+    ("physical", "chaselinks", false),      // ksh/bash
+    ("promptvars", "promptsubst", false),   // bash
+    ("stdin", "shinstdin", false),          // ksh
+    ("trackall", "hashcmds", false),        // ksh
 ];
 
 /// Zsh single-letter options (zshletters in C)
@@ -568,16 +568,52 @@ impl ShellOptions {
     pub fn set_zsh_defaults(&mut self) {
         // Options that default to ON in zsh
         let default_on = [
-            "aliases", "alwayslastprompt", "appendhistory", "autolist",
-            "automenu", "autoparamkeys", "autoparamslash", "autoremoveslash",
-            "bareglobqual", "beep", "bgnice", "caseglob", "casematch",
-            "checkjobs", "checkrunningjobs", "clobber", "debugbeforecmd",
-            "equals", "evallineno", "exec", "flowcontrol", "functionargzero",
-            "glob", "globalexport", "globalrcs", "hashcmds", "hashdirs",
-            "hashlistall", "histbeep", "histsavebycopy", "hup", "interactive",
-            "listambiguous", "listbeep", "listtypes", "multifuncdef", "multios",
-            "nomatch", "notify", "promptcr", "promptpercent", "promptsp", "rcs",
-            "shortloops", "unset", "zle",
+            "aliases",
+            "alwayslastprompt",
+            "appendhistory",
+            "autolist",
+            "automenu",
+            "autoparamkeys",
+            "autoparamslash",
+            "autoremoveslash",
+            "bareglobqual",
+            "beep",
+            "bgnice",
+            "caseglob",
+            "casematch",
+            "checkjobs",
+            "checkrunningjobs",
+            "clobber",
+            "debugbeforecmd",
+            "equals",
+            "evallineno",
+            "exec",
+            "flowcontrol",
+            "functionargzero",
+            "glob",
+            "globalexport",
+            "globalrcs",
+            "hashcmds",
+            "hashdirs",
+            "hashlistall",
+            "histbeep",
+            "histsavebycopy",
+            "hup",
+            "interactive",
+            "listambiguous",
+            "listbeep",
+            "listtypes",
+            "multifuncdef",
+            "multios",
+            "nomatch",
+            "notify",
+            "promptcr",
+            "promptpercent",
+            "promptsp",
+            "rcs",
+            "shortloops",
+            "unset",
+            "zle",
         ];
 
         for opt in default_on {
@@ -588,7 +624,7 @@ impl ShellOptions {
     /// Look up an option by name (case insensitive, underscores ignored)
     pub fn lookup(&self, name: &str) -> Option<bool> {
         let normalized = normalize_option_name(name);
-        
+
         // Check for "no" prefix
         if let Some(stripped) = normalized.strip_prefix("no") {
             self.options.get(stripped).map(|v| !v)
@@ -605,7 +641,7 @@ impl ShellOptions {
     /// Set an option value
     pub fn set(&mut self, name: &str, value: bool) -> Result<(), String> {
         let normalized = normalize_option_name(name);
-        
+
         // Handle "no" prefix
         let (actual_name, actual_value) = if let Some(stripped) = normalized.strip_prefix("no") {
             (stripped.to_string(), !value)
@@ -616,7 +652,11 @@ impl ShellOptions {
         // Check for aliases
         for (alias, target, negated) in OPTION_ALIASES {
             if actual_name == *alias {
-                let target_value = if *negated { !actual_value } else { actual_value };
+                let target_value = if *negated {
+                    !actual_value
+                } else {
+                    actual_value
+                };
                 self.options.insert(target.to_string(), target_value);
                 return Ok(());
             }
@@ -669,7 +709,11 @@ impl ShellOptions {
     /// Set emulation mode
     pub fn emulate(&mut self, mode: &str, fully: bool) {
         let ch = mode.chars().next().unwrap_or('z');
-        let ch = if ch == 'r' { mode.chars().nth(1).unwrap_or('z') } else { ch };
+        let ch = if ch == 'r' {
+            mode.chars().nth(1).unwrap_or('z')
+        } else {
+            ch
+        };
 
         self.emulation = match ch {
             'c' => Emulation::Csh,
@@ -727,9 +771,7 @@ impl ShellOptions {
 
     /// List all options and their current state
     pub fn list(&self) -> Vec<(String, bool)> {
-        let mut result: Vec<_> = self.options.iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
+        let mut result: Vec<_> = self.options.iter().map(|(k, v)| (k.clone(), *v)).collect();
         result.sort_by(|a, b| a.0.cmp(&b.0));
         result
     }
@@ -805,7 +847,7 @@ mod tests {
         let mut opts = ShellOptions::new();
         opts.set("noglob", true).unwrap();
         assert!(!opts.is_set("glob"));
-        
+
         assert!(opts.lookup("noglob") == Some(true));
     }
 
@@ -826,7 +868,7 @@ mod tests {
     #[test]
     fn test_option_alias() {
         let mut opts = ShellOptions::new();
-        
+
         // braceexpand is alias for noignorebraces
         opts.set("braceexpand", true).unwrap();
         assert!(!opts.is_set("ignorebraces"));
@@ -835,11 +877,11 @@ mod tests {
     #[test]
     fn test_single_letter() {
         let mut opts = ShellOptions::new();
-        
+
         // -x is xtrace
         opts.set_by_letter('x', true).unwrap();
         assert!(opts.is_set("xtrace"));
-        
+
         // -n is noexec (negated)
         opts.set_by_letter('n', true).unwrap();
         assert!(!opts.is_set("exec"));
@@ -848,11 +890,11 @@ mod tests {
     #[test]
     fn test_emulation() {
         let mut opts = ShellOptions::new();
-        
+
         opts.emulate("sh", true);
         assert_eq!(opts.emulation, Emulation::Sh);
         assert!(opts.is_set("shwordsplit"));
-        
+
         opts.emulate("zsh", true);
         assert_eq!(opts.emulation, Emulation::Zsh);
     }
@@ -862,7 +904,7 @@ mod tests {
         let mut opts = ShellOptions::new();
         opts.set("interactive", true).unwrap();
         opts.set("monitor", true).unwrap();
-        
+
         let dash = opts.dash_string();
         assert!(dash.contains('i'));
         assert!(dash.contains('m'));

@@ -36,11 +36,20 @@ impl ListColors {
                 colors.insert(pattern.to_string(), code.to_string());
             }
         }
-        ListColors { colors, use_ls_colors: true }
+        ListColors {
+            colors,
+            use_ls_colors: true,
+        }
     }
 
     /// Get ANSI color code for a file pattern
-    pub fn get_color(&self, name: &str, is_dir: bool, is_link: bool, is_exec: bool) -> Option<String> {
+    pub fn get_color(
+        &self,
+        name: &str,
+        is_dir: bool,
+        is_link: bool,
+        is_exec: bool,
+    ) -> Option<String> {
         if is_dir {
             if let Some(c) = self.colors.get("di") {
                 return Some(format!("\x1b[{}m", c));
@@ -81,11 +90,17 @@ pub struct ListLayout {
 }
 
 /// Calculate optimal column layout for matches (from complist.c calclist)
-pub fn calclist(matches: &[String], term_width: usize, descriptions: &[Option<String>]) -> ListLayout {
-    let max_len = matches.iter()
+pub fn calclist(
+    matches: &[String],
+    term_width: usize,
+    descriptions: &[Option<String>],
+) -> ListLayout {
+    let max_len = matches
+        .iter()
         .enumerate()
         .map(|(i, m)| {
-            let desc_len = descriptions.get(i)
+            let desc_len = descriptions
+                .get(i)
                 .and_then(|d| d.as_ref())
                 .map(|d| d.len() + 4) // " -- description"
                 .unwrap_or(0);
@@ -106,7 +121,12 @@ pub fn calclist(matches: &[String], term_width: usize, descriptions: &[Option<St
 
     let total_width = col_widths.iter().sum();
 
-    ListLayout { columns, rows, col_widths, total_width }
+    ListLayout {
+        columns,
+        rows,
+        col_widths,
+        total_width,
+    }
 }
 
 /// Format completion list for display (from complist.c compprintlist)
@@ -150,16 +170,19 @@ pub fn compprintlist(
                 m.clone()
             };
 
-            let desc = descriptions.get(idx)
+            let desc = descriptions
+                .get(idx)
                 .and_then(|d| d.as_ref())
                 .map(|d| format!(" \x1b[2m-- {}\x1b[0m", d))
                 .unwrap_or_default();
 
             let entry = format!("{}{}", colored, desc);
-            let visible_len = m.len() + descriptions.get(idx)
-                .and_then(|d| d.as_ref())
-                .map(|d| d.len() + 4)
-                .unwrap_or(0);
+            let visible_len = m.len()
+                + descriptions
+                    .get(idx)
+                    .and_then(|d| d.as_ref())
+                    .map(|d| d.len() + 4)
+                    .unwrap_or(0);
 
             line.push_str(&entry);
 

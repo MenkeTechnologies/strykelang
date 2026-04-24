@@ -48,9 +48,14 @@ pub fn modentry(op: ModOp, module: &mut dyn ModuleLifecycle) -> i32 {
 mod tests {
     use super::*;
 
-    struct TestModule { booted: bool }
+    struct TestModule {
+        booted: bool,
+    }
     impl ModuleLifecycle for TestModule {
-        fn boot(&mut self) -> i32 { self.booted = true; 0 }
+        fn boot(&mut self) -> i32 {
+            self.booted = true;
+            0
+        }
     }
 
     #[test]

@@ -273,7 +273,7 @@ fn parse_delimited_number(ctx: &mut GetArgContext) -> Option<i64> {
     }
 
     let num_str = &ctx.s[start..ctx.pos];
-    
+
     // Skip closing ':'
     if ctx.current() == Some(':') {
         ctx.advance();
@@ -299,7 +299,7 @@ fn parse_delimited_string(ctx: &mut GetArgContext) -> Option<String> {
     }
 
     let s = ctx.s[start..ctx.pos].to_string();
-    
+
     // Skip closing ':'
     if ctx.current() == Some(':') {
         ctx.advance();
@@ -336,7 +336,7 @@ fn find_subscript_end(s: &str) -> Option<usize> {
 /// Port from mathevalarg() call in getarg()
 fn eval_subscript_expr(expr: &str, ksh_arrays: bool) -> i64 {
     let expr = expr.trim();
-    
+
     // Try simple integer parse first
     if let Ok(n) = expr.parse::<i64>() {
         // KSH_ARRAYS adjusts positive indices
@@ -356,7 +356,11 @@ fn eval_subscript_expr(expr: &str, ksh_arrays: bool) -> i64 {
 ///
 /// Takes a subscript string like "1", "1,5", "@", "(r)pattern"
 /// Returns SubscriptValue with start/end positions
-pub fn getindex(subscript: &str, is_hash: bool, ksh_arrays: bool) -> Result<SubscriptValue, String> {
+pub fn getindex(
+    subscript: &str,
+    is_hash: bool,
+    ksh_arrays: bool,
+) -> Result<SubscriptValue, String> {
     let s = subscript.trim();
 
     // Handle @ and * for all elements (lines 2027-2032)
@@ -489,7 +493,11 @@ pub fn get_array_by_subscript(arr: &[String], v: &SubscriptValue, ksh_arrays: bo
 }
 
 /// Get single array element by subscript
-pub fn get_array_element_by_subscript(arr: &[String], v: &SubscriptValue, ksh_arrays: bool) -> Option<String> {
+pub fn get_array_element_by_subscript(
+    arr: &[String],
+    v: &SubscriptValue,
+    ksh_arrays: bool,
+) -> Option<String> {
     if v.is_all() || arr.is_empty() {
         return None;
     }
@@ -560,7 +568,12 @@ mod tests {
 
     #[test]
     fn test_array_slice() {
-        let arr = vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()];
+        let arr = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ];
 
         let v = getindex("1,2", false, false).unwrap();
         let result = get_array_by_subscript(&arr, &v, false);

@@ -6,37 +6,31 @@ use std::collections::HashMap;
 
 /// Termcap boolean capability codes
 pub static BOOL_CODES: &[&str] = &[
-    "bw", "am", "ut", "cc", "xs", "YA", "YF", "YB", "xt", "xn", "eo",
-    "gn", "hc", "HC", "km", "YC", "hs", "hl", "in", "YG", "da", "db",
-    "mi", "ms", "nx", "xb", "NP", "ND", "NR", "os", "5i", "YD", "YE",
-    "es", "hz", "ul", "xo",
+    "bw", "am", "ut", "cc", "xs", "YA", "YF", "YB", "xt", "xn", "eo", "gn", "hc", "HC", "km", "YC",
+    "hs", "hl", "in", "YG", "da", "db", "mi", "ms", "nx", "xb", "NP", "ND", "NR", "os", "5i", "YD",
+    "YE", "es", "hz", "ul", "xo",
 ];
 
 /// Termcap numeric capability codes
 pub static NUM_CODES: &[&str] = &[
-    "co", "it", "lh", "lw", "li", "lm", "sg", "ma", "Co", "pa", "MW",
-    "NC", "Nl", "pb", "vt", "ws", "Yo", "Yp", "Ya", "BT", "Yc", "Yb",
-    "Yd", "Ye", "Yf", "Yg", "Yh", "Yi", "Yk", "Yj", "Yl", "Ym", "Yn",
+    "co", "it", "lh", "lw", "li", "lm", "sg", "ma", "Co", "pa", "MW", "NC", "Nl", "pb", "vt", "ws",
+    "Yo", "Yp", "Ya", "BT", "Yc", "Yb", "Yd", "Ye", "Yf", "Yg", "Yh", "Yi", "Yk", "Yj", "Yl", "Ym",
+    "Yn",
 ];
 
 /// Termcap string capability codes
 pub static STR_CODES: &[&str] = &[
-    "ac", "bt", "bl", "cr", "ZA", "ZB", "ZC", "ZD", "cs", "rP", "ct",
-    "MC", "cl", "cb", "ce", "cd", "ch", "CC", "CW", "cm", "do", "ho",
-    "vi", "le", "CM", "ve", "nd", "ll", "up", "vs", "ZE", "dc", "dl",
-    "DI", "ds", "DK", "hd", "eA", "as", "SA", "mb", "md", "ti", "dm",
-    "mh", "ZF", "ZG", "im", "ZH", "ZI", "ZJ", "ZK", "ZL", "mp", "mr",
-    "mk", "ZM", "so", "ZN", "ZO", "us", "ZP", "SX", "ec", "ae", "RA",
-    "me", "te", "ed", "ZQ", "ei", "ZR", "ZS", "ZT", "ZU", "se", "ZV",
-    "ZW", "ue", "ZX", "RX", "PA", "fh", "vb", "ff", "fs", "WG", "HU",
-    "i1", "is", "i3", "if", "iP", "Ic", "Ip", "ic", "al", "ip", "K1",
-    "K3", "K2", "kb", "kB", "K4", "K5", "ka", "kC", "kt", "kD", "kL",
-    "kd", "kM", "kE", "kS", "k0", "k1", "k2", "k3", "k4", "k5", "k6",
-    "k7", "k8", "k9", "kh", "kI", "kA", "kl", "kH", "kN", "kP", "kr",
-    "kF", "kR", "kT", "ku", "ke", "ks", "l0", "l1", "l2", "l3", "l4",
-    "l5", "l6", "l7", "l8", "l9", "nw", "oc", "op", "pc", "DC", "DL",
-    "DO", "IC", "SF", "AL", "LE", "RI", "SR", "UP", "pk", "pl", "px",
-    "pn", "ps", "pO", "pf", "po", "rc", "cv", "sc", "sf", "sr", "sa",
+    "ac", "bt", "bl", "cr", "ZA", "ZB", "ZC", "ZD", "cs", "rP", "ct", "MC", "cl", "cb", "ce", "cd",
+    "ch", "CC", "CW", "cm", "do", "ho", "vi", "le", "CM", "ve", "nd", "ll", "up", "vs", "ZE", "dc",
+    "dl", "DI", "ds", "DK", "hd", "eA", "as", "SA", "mb", "md", "ti", "dm", "mh", "ZF", "ZG", "im",
+    "ZH", "ZI", "ZJ", "ZK", "ZL", "mp", "mr", "mk", "ZM", "so", "ZN", "ZO", "us", "ZP", "SX", "ec",
+    "ae", "RA", "me", "te", "ed", "ZQ", "ei", "ZR", "ZS", "ZT", "ZU", "se", "ZV", "ZW", "ue", "ZX",
+    "RX", "PA", "fh", "vb", "ff", "fs", "WG", "HU", "i1", "is", "i3", "if", "iP", "Ic", "Ip", "ic",
+    "al", "ip", "K1", "K3", "K2", "kb", "kB", "K4", "K5", "ka", "kC", "kt", "kD", "kL", "kd", "kM",
+    "kE", "kS", "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9", "kh", "kI", "kA", "kl",
+    "kH", "kN", "kP", "kr", "kF", "kR", "kT", "ku", "ke", "ks", "l0", "l1", "l2", "l3", "l4", "l5",
+    "l6", "l7", "l8", "l9", "nw", "oc", "op", "pc", "DC", "DL", "DO", "IC", "SF", "AL", "LE", "RI",
+    "SR", "UP", "pk", "pl", "px", "pn", "ps", "pO", "pf", "po", "rc", "cv", "sc", "sf", "sr", "sa",
     "st", "ta", "ts", "uc", "hu",
 ];
 
@@ -78,15 +72,22 @@ impl Termcap {
     }
 
     fn load_capabilities(&mut self, term: &str) {
-        let is_xterm = term.contains("xterm") || term.contains("256color") || term.contains("screen");
+        let is_xterm =
+            term.contains("xterm") || term.contains("256color") || term.contains("screen");
         let is_ansi = is_xterm || term.contains("ansi") || term.contains("vt100");
 
-        self.capabilities.insert("am".to_string(), TermcapValue::Boolean(true));
-        self.capabilities.insert("km".to_string(), TermcapValue::Boolean(true));
-        self.capabilities.insert("mi".to_string(), TermcapValue::Boolean(true));
-        self.capabilities.insert("ms".to_string(), TermcapValue::Boolean(true));
-        self.capabilities.insert("xn".to_string(), TermcapValue::Boolean(true));
-        self.capabilities.insert("ut".to_string(), TermcapValue::Boolean(is_xterm));
+        self.capabilities
+            .insert("am".to_string(), TermcapValue::Boolean(true));
+        self.capabilities
+            .insert("km".to_string(), TermcapValue::Boolean(true));
+        self.capabilities
+            .insert("mi".to_string(), TermcapValue::Boolean(true));
+        self.capabilities
+            .insert("ms".to_string(), TermcapValue::Boolean(true));
+        self.capabilities
+            .insert("xn".to_string(), TermcapValue::Boolean(true));
+        self.capabilities
+            .insert("ut".to_string(), TermcapValue::Boolean(is_xterm));
 
         let cols = std::env::var("COLUMNS")
             .ok()
@@ -96,36 +97,92 @@ impl Termcap {
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(24);
-        let colors = if term.contains("256") { 256 } else if is_xterm { 8 } else { 2 };
+        let colors = if term.contains("256") {
+            256
+        } else if is_xterm {
+            8
+        } else {
+            2
+        };
 
-        self.capabilities.insert("co".to_string(), TermcapValue::Number(cols));
-        self.capabilities.insert("li".to_string(), TermcapValue::Number(lines));
-        self.capabilities.insert("Co".to_string(), TermcapValue::Number(colors));
-        self.capabilities.insert("it".to_string(), TermcapValue::Number(8));
+        self.capabilities
+            .insert("co".to_string(), TermcapValue::Number(cols));
+        self.capabilities
+            .insert("li".to_string(), TermcapValue::Number(lines));
+        self.capabilities
+            .insert("Co".to_string(), TermcapValue::Number(colors));
+        self.capabilities
+            .insert("it".to_string(), TermcapValue::Number(8));
 
         if is_ansi {
-            self.capabilities.insert("cl".to_string(), TermcapValue::String("\x1b[H\x1b[2J".to_string()));
-            self.capabilities.insert("cm".to_string(), TermcapValue::String("\x1b[%i%d;%dH".to_string()));
-            self.capabilities.insert("up".to_string(), TermcapValue::String("\x1b[A".to_string()));
-            self.capabilities.insert("do".to_string(), TermcapValue::String("\x1b[B".to_string()));
-            self.capabilities.insert("nd".to_string(), TermcapValue::String("\x1b[C".to_string()));
-            self.capabilities.insert("le".to_string(), TermcapValue::String("\x1b[D".to_string()));
-            self.capabilities.insert("ho".to_string(), TermcapValue::String("\x1b[H".to_string()));
-            self.capabilities.insert("ce".to_string(), TermcapValue::String("\x1b[K".to_string()));
-            self.capabilities.insert("cd".to_string(), TermcapValue::String("\x1b[J".to_string()));
-            self.capabilities.insert("me".to_string(), TermcapValue::String("\x1b[m".to_string()));
-            self.capabilities.insert("md".to_string(), TermcapValue::String("\x1b[1m".to_string()));
-            self.capabilities.insert("mr".to_string(), TermcapValue::String("\x1b[7m".to_string()));
-            self.capabilities.insert("us".to_string(), TermcapValue::String("\x1b[4m".to_string()));
-            self.capabilities.insert("ue".to_string(), TermcapValue::String("\x1b[24m".to_string()));
-            self.capabilities.insert("so".to_string(), TermcapValue::String("\x1b[7m".to_string()));
-            self.capabilities.insert("se".to_string(), TermcapValue::String("\x1b[27m".to_string()));
-            self.capabilities.insert("vi".to_string(), TermcapValue::String("\x1b[?25l".to_string()));
-            self.capabilities.insert("ve".to_string(), TermcapValue::String("\x1b[?25h".to_string()));
-            self.capabilities.insert("ti".to_string(), TermcapValue::String("\x1b[?1049h".to_string()));
-            self.capabilities.insert("te".to_string(), TermcapValue::String("\x1b[?1049l".to_string()));
-            self.capabilities.insert("bl".to_string(), TermcapValue::String("\x07".to_string()));
-            self.capabilities.insert("cr".to_string(), TermcapValue::String("\r".to_string()));
+            self.capabilities.insert(
+                "cl".to_string(),
+                TermcapValue::String("\x1b[H\x1b[2J".to_string()),
+            );
+            self.capabilities.insert(
+                "cm".to_string(),
+                TermcapValue::String("\x1b[%i%d;%dH".to_string()),
+            );
+            self.capabilities
+                .insert("up".to_string(), TermcapValue::String("\x1b[A".to_string()));
+            self.capabilities
+                .insert("do".to_string(), TermcapValue::String("\x1b[B".to_string()));
+            self.capabilities
+                .insert("nd".to_string(), TermcapValue::String("\x1b[C".to_string()));
+            self.capabilities
+                .insert("le".to_string(), TermcapValue::String("\x1b[D".to_string()));
+            self.capabilities
+                .insert("ho".to_string(), TermcapValue::String("\x1b[H".to_string()));
+            self.capabilities
+                .insert("ce".to_string(), TermcapValue::String("\x1b[K".to_string()));
+            self.capabilities
+                .insert("cd".to_string(), TermcapValue::String("\x1b[J".to_string()));
+            self.capabilities
+                .insert("me".to_string(), TermcapValue::String("\x1b[m".to_string()));
+            self.capabilities.insert(
+                "md".to_string(),
+                TermcapValue::String("\x1b[1m".to_string()),
+            );
+            self.capabilities.insert(
+                "mr".to_string(),
+                TermcapValue::String("\x1b[7m".to_string()),
+            );
+            self.capabilities.insert(
+                "us".to_string(),
+                TermcapValue::String("\x1b[4m".to_string()),
+            );
+            self.capabilities.insert(
+                "ue".to_string(),
+                TermcapValue::String("\x1b[24m".to_string()),
+            );
+            self.capabilities.insert(
+                "so".to_string(),
+                TermcapValue::String("\x1b[7m".to_string()),
+            );
+            self.capabilities.insert(
+                "se".to_string(),
+                TermcapValue::String("\x1b[27m".to_string()),
+            );
+            self.capabilities.insert(
+                "vi".to_string(),
+                TermcapValue::String("\x1b[?25l".to_string()),
+            );
+            self.capabilities.insert(
+                "ve".to_string(),
+                TermcapValue::String("\x1b[?25h".to_string()),
+            );
+            self.capabilities.insert(
+                "ti".to_string(),
+                TermcapValue::String("\x1b[?1049h".to_string()),
+            );
+            self.capabilities.insert(
+                "te".to_string(),
+                TermcapValue::String("\x1b[?1049l".to_string()),
+            );
+            self.capabilities
+                .insert("bl".to_string(), TermcapValue::String("\x07".to_string()));
+            self.capabilities
+                .insert("cr".to_string(), TermcapValue::String("\r".to_string()));
         }
     }
 
@@ -165,7 +222,8 @@ impl Termcap {
 
     /// Get all boolean capabilities
     pub fn booleans(&self) -> HashMap<String, bool> {
-        self.capabilities.iter()
+        self.capabilities
+            .iter()
             .filter_map(|(k, v)| {
                 if let TermcapValue::Boolean(b) = v {
                     Some((k.clone(), *b))
@@ -178,7 +236,8 @@ impl Termcap {
 
     /// Get all numeric capabilities
     pub fn numbers(&self) -> HashMap<String, i32> {
-        self.capabilities.iter()
+        self.capabilities
+            .iter()
             .filter_map(|(k, v)| {
                 if let TermcapValue::Number(n) = v {
                     Some((k.clone(), *n))
@@ -191,7 +250,8 @@ impl Termcap {
 
     /// Get all string capabilities
     pub fn strings(&self) -> HashMap<String, String> {
-        self.capabilities.iter()
+        self.capabilities
+            .iter()
             .filter_map(|(k, v)| {
                 if let TermcapValue::String(s) = v {
                     Some((k.clone(), s.clone()))
@@ -241,8 +301,7 @@ pub fn tgoto(cap: &str, col: i32, row: i32) -> String {
                             use_row = false;
                         }
                     }
-                    'i' => {
-                    }
+                    'i' => {}
                     '%' => {
                         result.push('%');
                     }

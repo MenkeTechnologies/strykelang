@@ -12,11 +12,11 @@ pub fn needs_newuser_setup(home: &Path) -> bool {
     let zlogin = home.join(".zlogin");
     let zlogout = home.join(".zlogout");
 
-    !zshrc.exists() && 
-    !zshenv.exists() && 
-    !zprofile.exists() && 
-    !zlogin.exists() && 
-    !zlogout.exists()
+    !zshrc.exists()
+        && !zshenv.exists()
+        && !zprofile.exists()
+        && !zlogin.exists()
+        && !zlogout.exists()
 }
 
 /// Generate default .zshrc content
@@ -50,7 +50,8 @@ promptinit
 prompt adam1
 
 # End of lines configured by zsh-newuser-install
-"#.to_string()
+"#
+    .to_string()
 }
 
 /// Generate minimal .zshrc content
@@ -60,7 +61,8 @@ HISTFILE=~/.zsh_history
 HISTSIZE=1000
 SAVEHIST=1000
 bindkey -e
-"#.to_string()
+"#
+    .to_string()
 }
 
 /// First-run setup options
@@ -83,8 +85,7 @@ pub fn run_newuser_setup(home: &Path, choice: SetupChoice) -> std::io::Result<()
         SetupChoice::Minimal => {
             std::fs::write(&zshrc, minimal_zshrc())?;
         }
-        SetupChoice::Exit | SetupChoice::Manual => {
-        }
+        SetupChoice::Exit | SetupChoice::Manual => {}
     }
 
     Ok(())

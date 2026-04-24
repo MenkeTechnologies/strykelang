@@ -19,13 +19,13 @@ const INSTACK_INITIAL: usize = 4;
 
 /// Input flags
 pub mod flags {
-    pub const INP_FREE: u32 = 0x01;     // Free input string when done
-    pub const INP_CONT: u32 = 0x02;     // Continue to next stack element
-    pub const INP_ALIAS: u32 = 0x04;    // Input is alias expansion
-    pub const INP_HIST: u32 = 0x08;     // Input is history expansion
-    pub const INP_LINENO: u32 = 0x10;   // Increment line number on newline
-    pub const INP_APPEND: u32 = 0x20;   // Append to existing input
-    pub const INP_ALCONT: u32 = 0x40;   // Alias continuation marker
+    pub const INP_FREE: u32 = 0x01; // Free input string when done
+    pub const INP_CONT: u32 = 0x02; // Continue to next stack element
+    pub const INP_ALIAS: u32 = 0x04; // Input is alias expansion
+    pub const INP_HIST: u32 = 0x08; // Input is history expansion
+    pub const INP_LINENO: u32 = 0x10; // Increment line number on newline
+    pub const INP_APPEND: u32 = 0x20; // Append to existing input
+    pub const INP_ALCONT: u32 = 0x40; // Alias continuation marker
     pub const INP_HISTCONT: u32 = 0x80; // History continuation marker
     pub const INP_RAW_KEEP: u32 = 0x100; // Keep raw input for history
 }
@@ -123,10 +123,8 @@ impl InputBuffer {
 
     /// Save current SHIN buffer state
     pub fn shin_buf_save(&mut self) {
-        self.shin_save_stack.push((
-            std::mem::take(&mut self.shin_buffer),
-            self.shin_pos,
-        ));
+        self.shin_save_stack
+            .push((std::mem::take(&mut self.shin_buffer), self.shin_pos));
         self.shin_buf_alloc();
     }
 

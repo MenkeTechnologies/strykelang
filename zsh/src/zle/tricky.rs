@@ -49,7 +49,7 @@ impl Zle {
     pub fn complete_word(&mut self, state: &mut CompletionState) {
         self.do_complete(state, false, false);
     }
-    
+
     /// Menu complete - cycle through completions
     /// Port of menucomplete() from zle_tricky.c
     pub fn menu_complete(&mut self, state: &mut CompletionState) {
@@ -61,7 +61,7 @@ impl Zle {
             self.do_complete(state, true, false);
         }
     }
-    
+
     /// Reverse menu complete - cycle backwards
     /// Port of reversemenucomplete() from zle_tricky.c
     pub fn reverse_menu_complete(&mut self, state: &mut CompletionState) {
@@ -74,7 +74,7 @@ impl Zle {
             self.apply_completion(state);
         }
     }
-    
+
     /// Expand or complete - try expansion first, then completion
     /// Port of expandorcomplete() from zle_tricky.c
     pub fn expand_or_complete(&mut self, state: &mut CompletionState) {
@@ -84,19 +84,19 @@ impl Zle {
             self.do_complete(state, false, false);
         }
     }
-    
+
     /// Expand or complete prefix - expand/complete keeping suffix
     /// Port of expandorcompleteprefix() from zle_tricky.c
     pub fn expand_or_complete_prefix(&mut self, state: &mut CompletionState) {
         state.suffix = self.zleline[self.zlecs..].iter().collect();
         self.expand_or_complete(state);
     }
-    
+
     /// List choices - show available completions
     /// Port of listchoices() from zle_tricky.c
     pub fn list_choices(&mut self, state: &mut CompletionState) {
         self.do_complete(state, false, true);
-        
+
         if !state.completions.is_empty() {
             println!();
             for (i, c) in state.completions.iter().enumerate() {
@@ -109,13 +109,13 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// List expand - list possible expansions
     /// Port of listexpand() from zle_tricky.c
     pub fn list_expand(&mut self) {
         let word = self.get_word_at_cursor();
         let expansions = self.do_expansion(&word);
-        
+
         if !expansions.is_empty() {
             println!();
             for exp in &expansions {
@@ -124,21 +124,21 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Expand word - expand current word (glob, history, etc)
     /// Port of expandword() from zle_tricky.c
     pub fn expand_word(&mut self) {
         let _ = self.try_expand();
     }
-    
+
     /// Expand history - expand history references
     /// Port of expandhistory() / doexpandhist() from zle_tricky.c
     pub fn expand_history(&mut self) {
         let line: String = self.zleline.iter().collect();
-        
+
         // Look for history references like !!, !$, !*, etc.
         let expanded = self.do_expand_hist(&line);
-        
+
         if expanded != line {
             self.zleline = expanded.chars().collect();
             self.zlell = self.zleline.len();
@@ -148,14 +148,14 @@ impl Zle {
             self.resetneeded = true;
         }
     }
-    
+
     /// Magic space - expand history then insert space
     /// Port of magicspace() from zle_tricky.c
     pub fn magic_space(&mut self) {
         self.expand_history();
         self.self_insert(' ');
     }
-    
+
     /// Delete char or list - delete if there's text, else list completions
     /// Port of deletecharorlist() from zle_tricky.c
     pub fn delete_char_or_list(&mut self, state: &mut CompletionState) {
@@ -165,7 +165,7 @@ impl Zle {
             self.list_choices(state);
         }
     }
-    
+
     /// Accept and menu complete
     /// Port of acceptandmenucomplete() from zle_tricky.c  
     pub fn accept_and_menu_complete(&mut self, state: &mut CompletionState) -> Option<String> {
@@ -173,7 +173,7 @@ impl Zle {
         state.in_menu = false;
         Some(line)
     }
-    
+
     /// Spell word - check spelling
     /// Port of spellword() from zle_tricky.c
     pub fn spell_word(&mut self) {
@@ -182,28 +182,28 @@ impl Zle {
         // Would integrate with aspell/hunspell in full implementation
         let _ = word;
     }
-    
+
     /// Internal: perform completion
     fn do_complete(&mut self, state: &mut CompletionState, menu_mode: bool, list_only: bool) {
         // Get word at cursor
         let (word_start, word_end) = self.get_word_bounds();
         let word: String = self.zleline[word_start..word_end].iter().collect();
-        
+
         state.word_start = word_start;
         state.word_end = word_end;
         state.prefix = word.clone();
-        
+
         // Get completions (simplified - real impl would call compsys)
         state.completions = self.get_completions(&word);
-        
+
         if state.completions.is_empty() {
             return;
         }
-        
+
         if list_only {
             return;
         }
-        
+
         if menu_mode || state.completions.len() > 1 {
             state.in_menu = true;
             state.menu_index = 0;
@@ -215,20 +215,20 @@ impl Zle {
             state.in_menu = false;
         }
     }
-    
+
     /// Apply current completion from state
     fn apply_completion(&mut self, state: &CompletionState) {
         if state.completions.is_empty() {
             return;
         }
-        
+
         let completion = &state.completions[state.menu_index];
-        
+
         // Remove old word
         self.zleline.drain(state.word_start..state.word_end);
         self.zlell = self.zleline.len();
         self.zlecs = state.word_start;
-        
+
         // Insert completion
         for c in completion.chars() {
             self.zleline.insert(self.zlecs, c);
@@ -237,51 +237,51 @@ impl Zle {
         self.zlell = self.zleline.len();
         self.resetneeded = true;
     }
-    
+
     /// Get word at cursor position
     fn get_word_at_cursor(&self) -> String {
         let (start, end) = self.get_word_bounds();
         self.zleline[start..end].iter().collect()
     }
-    
+
     /// Get bounds of word at cursor
     fn get_word_bounds(&self) -> (usize, usize) {
         let mut start = self.zlecs;
         let mut end = self.zlecs;
-        
+
         // Find word start
         while start > 0 && !self.zleline[start - 1].is_whitespace() {
             start -= 1;
         }
-        
+
         // Find word end
         while end < self.zlell && !self.zleline[end].is_whitespace() {
             end += 1;
         }
-        
+
         (start, end)
     }
-    
+
     /// Try to expand the word at cursor
     fn try_expand(&mut self) -> bool {
         let word = self.get_word_at_cursor();
-        
+
         if word.is_empty() {
             return false;
         }
-        
+
         let expansions = self.do_expansion(&word);
-        
+
         if expansions.is_empty() || (expansions.len() == 1 && expansions[0] == word) {
             return false;
         }
-        
+
         let (start, end) = self.get_word_bounds();
-        
+
         // Remove old word
         self.zleline.drain(start..end);
         self.zlecs = start;
-        
+
         // Insert expansions
         let expanded = expansions.join(" ");
         for c in expanded.chars() {
@@ -290,14 +290,14 @@ impl Zle {
         }
         self.zlell = self.zleline.len();
         self.resetneeded = true;
-        
+
         true
     }
-    
+
     /// Do expansion on a word
     fn do_expansion(&self, word: &str) -> Vec<String> {
         let mut results = Vec::new();
-        
+
         // Check for glob patterns
         if word.contains('*') || word.contains('?') || word.contains('[') {
             // Would call glob expansion
@@ -307,7 +307,7 @@ impl Zle {
                 }
             }
         }
-        
+
         // Check for tilde expansion
         if word.starts_with('~') {
             if let Some(home) = std::env::var_os("HOME") {
@@ -315,7 +315,7 @@ impl Zle {
                 results.push(expanded);
             }
         }
-        
+
         // Check for variable expansion
         if word.starts_with('$') {
             let var_name = &word[1..];
@@ -323,35 +323,35 @@ impl Zle {
                 results.push(val);
             }
         }
-        
+
         if results.is_empty() {
             results.push(word.to_string());
         }
-        
+
         results
     }
-    
+
     /// Do history expansion
     fn do_expand_hist(&self, line: &str) -> String {
         let mut result = line.to_string();
-        
+
         // !! -> last command (simplified)
         if result.contains("!!") {
             result = result.replace("!!", "[last-command]");
         }
-        
+
         // !$ -> last argument of last command (simplified)
         if result.contains("!$") {
             result = result.replace("!$", "[last-arg]");
         }
-        
+
         result
     }
-    
+
     /// Get completions for a prefix (simplified)
     fn get_completions(&self, prefix: &str) -> Vec<String> {
         let mut completions = Vec::new();
-        
+
         // Check if it looks like a path
         if prefix.contains('/') || prefix.starts_with('.') {
             // Path completion
@@ -365,7 +365,7 @@ impl Zle {
             } else {
                 prefix
             };
-            
+
             if let Ok(entries) = std::fs::read_dir(dir) {
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
@@ -396,7 +396,7 @@ impl Zle {
                 }
             }
         }
-        
+
         completions.sort();
         completions
     }
@@ -425,7 +425,7 @@ pub fn metafy_line(s: &str) -> String {
 pub fn unmetafy_line(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == META {
             if let Some(&next) = chars.peek() {
@@ -436,7 +436,7 @@ pub fn unmetafy_line(s: &str) -> String {
             result.push(c);
         }
     }
-    
+
     result
 }
 
@@ -445,25 +445,25 @@ pub fn unmetafy_line(s: &str) -> String {
 pub fn get_cur_cmd(line: &[char], cursor: usize) -> Option<String> {
     // Find start of current simple command
     let mut cmd_start = 0;
-    
+
     for i in 0..cursor {
         let c = line[i];
         if c == ';' || c == '|' || c == '&' || c == '(' || c == ')' || c == '`' {
             cmd_start = i + 1;
         }
     }
-    
+
     // Skip whitespace
     while cmd_start < cursor && line[cmd_start].is_whitespace() {
         cmd_start += 1;
     }
-    
+
     // Find end of command word
     let mut cmd_end = cmd_start;
     while cmd_end < cursor && !line[cmd_end].is_whitespace() {
         cmd_end += 1;
     }
-    
+
     if cmd_start < cmd_end {
         Some(line[cmd_start..cmd_end].iter().collect())
     } else {
@@ -475,7 +475,7 @@ pub fn get_cur_cmd(line: &[char], cursor: usize) -> Option<String> {
 /// Port of has_real_token() from zle_tricky.c
 pub fn has_real_token(s: &str) -> bool {
     let special = ['$', '`', '"', '\'', '\\', '{', '}', '[', ']', '*', '?', '~'];
-    
+
     let mut escaped = false;
     for c in s.chars() {
         if escaped {
@@ -490,7 +490,7 @@ pub fn has_real_token(s: &str) -> bool {
             return true;
         }
     }
-    
+
     false
 }
 
@@ -544,27 +544,27 @@ pub enum QuoteStyle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pfx_len() {
         assert_eq!(pfx_len("hello", "help"), 3);
         assert_eq!(pfx_len("abc", "xyz"), 0);
         assert_eq!(pfx_len("test", "test"), 4);
     }
-    
+
     #[test]
     fn test_sfx_len() {
         assert_eq!(sfx_len("testing", "running"), 3);
         assert_eq!(sfx_len("abc", "xyz"), 0);
     }
-    
+
     #[test]
     fn test_quote_string() {
         assert_eq!(quote_string("hello", QuoteStyle::Single), "'hello'");
         assert_eq!(quote_string("it's", QuoteStyle::Single), "'it'\\''s'");
         assert_eq!(quote_string("hello", QuoteStyle::Double), "\"hello\"");
     }
-    
+
     #[test]
     fn test_has_real_token() {
         assert!(has_real_token("$HOME"));

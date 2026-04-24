@@ -367,7 +367,8 @@ impl DirStack {
     }
 
     pub fn to_array(&self) -> Vec<String> {
-        self.stack.iter()
+        self.stack
+            .iter()
             .map(|p| p.to_string_lossy().to_string())
             .collect()
     }
@@ -393,7 +394,10 @@ impl OptionsTable {
     }
 
     pub fn is_set(&self, name: &str) -> bool {
-        self.options.get(&name.to_lowercase()).copied().unwrap_or(false)
+        self.options
+            .get(&name.to_lowercase())
+            .copied()
+            .unwrap_or(false)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &bool)> {
@@ -401,8 +405,18 @@ impl OptionsTable {
     }
 
     pub fn to_hash(&self) -> HashMap<String, String> {
-        self.options.iter()
-            .map(|(k, v)| (k.clone(), if *v { "on".to_string() } else { "off".to_string() }))
+        self.options
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    if *v {
+                        "on".to_string()
+                    } else {
+                        "off".to_string()
+                    },
+                )
+            })
             .collect()
     }
 }
@@ -431,7 +445,8 @@ impl NamedDirsTable {
     }
 
     pub fn find_name(&self, path: &PathBuf) -> Option<&str> {
-        self.dirs.iter()
+        self.dirs
+            .iter()
             .find(|(_, p)| *p == path)
             .map(|(n, _)| n.as_str())
     }
@@ -491,13 +506,15 @@ impl JobsTable {
     }
 
     pub fn states(&self) -> HashMap<String, String> {
-        self.jobs.iter()
+        self.jobs
+            .iter()
             .map(|(id, (state, _))| (id.to_string(), state.as_str().to_string()))
             .collect()
     }
 
     pub fn texts(&self) -> HashMap<String, String> {
-        self.jobs.iter()
+        self.jobs
+            .iter()
             .map(|(id, (_, text))| (id.to_string(), text.clone()))
             .collect()
     }
@@ -537,7 +554,8 @@ impl ModulesTable {
     }
 
     pub fn to_hash(&self) -> HashMap<String, String> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .map(|(k, v)| {
                 let status = if v.loaded {
                     "loaded"
@@ -566,17 +584,20 @@ mod tests {
             exported: true,
             ..Default::default()
         };
-        assert_eq!(param_type_str(ParamType::Array, &flags), "array-local-export");
+        assert_eq!(
+            param_type_str(ParamType::Array, &flags),
+            "array-local-export"
+        );
     }
 
     #[test]
     fn test_commands_table() {
         let mut table = CommandsTable::new();
         table.set("ls", PathBuf::from("/bin/ls"));
-        
+
         assert_eq!(table.get("ls"), Some(&PathBuf::from("/bin/ls")));
         assert!(table.get("nonexistent").is_none());
-        
+
         table.unset("ls");
         assert!(table.get("ls").is_none());
     }
@@ -584,18 +605,21 @@ mod tests {
     #[test]
     fn test_functions_table() {
         let mut table = FunctionsTable::new();
-        table.set("myfunc", FunctionDef {
-            body: "echo hello".to_string(),
-            flags: 0,
-            autoload: false,
-        });
-        
+        table.set(
+            "myfunc",
+            FunctionDef {
+                body: "echo hello".to_string(),
+                flags: 0,
+                autoload: false,
+            },
+        );
+
         assert!(table.get("myfunc").is_some());
-        
+
         table.disable("myfunc");
         assert!(table.get("myfunc").is_none());
         assert!(table.get_disabled("myfunc").is_some());
-        
+
         table.enable("myfunc");
         assert!(table.get("myfunc").is_some());
     }
@@ -603,12 +627,15 @@ mod tests {
     #[test]
     fn test_aliases_table() {
         let mut table = AliasesTable::new();
-        table.set("ll", AliasDef {
-            value: "ls -l".to_string(),
-            global: false,
-            suffix: false,
-        });
-        
+        table.set(
+            "ll",
+            AliasDef {
+                value: "ls -l".to_string(),
+                global: false,
+                suffix: false,
+            },
+        );
+
         assert!(table.get("ll").is_some());
         assert_eq!(table.get("ll").unwrap().value, "ls -l");
     }
@@ -618,10 +645,10 @@ mod tests {
         let mut table = BuiltinsTable::new();
         table.register("echo");
         table.register("cd");
-        
+
         assert!(table.is_builtin("echo"));
         assert!(!table.is_builtin("nonexistent"));
-        
+
         table.disable("echo");
         assert!(!table.is_builtin("echo"));
     }
@@ -631,7 +658,7 @@ mod tests {
         let mut stack = DirStack::new();
         stack.push(PathBuf::from("/home"));
         stack.push(PathBuf::from("/tmp"));
-        
+
         assert_eq!(stack.len(), 2);
         assert_eq!(stack.pop(), Some(PathBuf::from("/tmp")));
         assert_eq!(stack.len(), 1);
@@ -642,7 +669,7 @@ mod tests {
         let mut table = OptionsTable::new();
         table.set("autocd", true);
         table.set("EXTENDEDGLOB", true);
-        
+
         assert!(table.is_set("autocd"));
         assert!(table.is_set("extendedglob")); // case insensitive
     }
@@ -651,16 +678,30 @@ mod tests {
     fn test_named_dirs() {
         let mut table = NamedDirsTable::new();
         table.set("proj", PathBuf::from("/home/user/projects"));
-        
-        assert_eq!(table.get("proj"), Some(&PathBuf::from("/home/user/projects")));
-        assert_eq!(table.find_name(&PathBuf::from("/home/user/projects")), Some("proj"));
+
+        assert_eq!(
+            table.get("proj"),
+            Some(&PathBuf::from("/home/user/projects"))
+        );
+        assert_eq!(
+            table.find_name(&PathBuf::from("/home/user/projects")),
+            Some("proj")
+        );
     }
 
     #[test]
     fn test_jobs_table() {
         let mut table = JobsTable::new();
-        table.add(1, JobState { running: true, suspended: false, done: false }, "vim file.txt".to_string());
-        
+        table.add(
+            1,
+            JobState {
+                running: true,
+                suspended: false,
+                done: false,
+            },
+            "vim file.txt".to_string(),
+        );
+
         assert_eq!(table.get_state(1).unwrap().as_str(), "running");
         assert_eq!(table.get_text(1), Some("vim file.txt"));
     }
@@ -668,8 +709,14 @@ mod tests {
     #[test]
     fn test_modules_table() {
         let mut table = ModulesTable::new();
-        table.register("zsh/datetime", ModuleInfo { loaded: true, autoload: false });
-        
+        table.register(
+            "zsh/datetime",
+            ModuleInfo {
+                loaded: true,
+                autoload: false,
+            },
+        );
+
         assert!(table.is_loaded("zsh/datetime"));
         assert!(!table.is_loaded("nonexistent"));
     }

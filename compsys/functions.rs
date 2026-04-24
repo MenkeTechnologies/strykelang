@@ -861,19 +861,19 @@ pub fn user_expand(state: &mut CompletionState, expansions: &HashMap<String, Str
 // =============================================================================
 
 /// _bash_completions - Compatibility with bash completion specs
-/// 
+///
 /// This function provides interoperability with bash's programmable completion.
 /// It parses bash compspec strings and generates completions accordingly.
-/// 
+///
 /// Compspec format: -F function | -C command | -G globpat | -W wordlist | -X filterpat
 pub fn bash_completions(state: &mut MainCompleteState, compspec: &str) -> CompleterResult {
     let prefix = &state.comp.params.prefix.clone();
     let mut matches = Vec::new();
-    
+
     // Parse compspec arguments
     let args: Vec<&str> = compspec.split_whitespace().collect();
     let mut i = 0;
-    
+
     while i < args.len() {
         match args[i] {
             "-W" if i + 1 < args.len() => {
@@ -893,8 +893,9 @@ pub fn bash_completions(state: &mut MainCompleteState, compspec: &str) -> Comple
                 if let Ok(entries) = std::fs::read_dir(".") {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            if glob_match_simple(pattern, name) && 
-                               name.to_lowercase().starts_with(&prefix.to_lowercase()) {
+                            if glob_match_simple(pattern, name)
+                                && name.to_lowercase().starts_with(&prefix.to_lowercase())
+                            {
                                 matches.push(crate::Completion::new(name));
                             }
                         }
@@ -973,13 +974,18 @@ pub fn bash_completions(state: &mut MainCompleteState, compspec: &str) -> Comple
         }
         i += 1;
     }
-    
+
     if !matches.is_empty() {
         // Add matches to a group
         let mut group = crate::CompletionGroup::new("bash-completion");
         group.matches = matches;
         state.comp.groups.push(group);
-        state.comp.nmatches += state.comp.groups.last().map(|g| g.matches.len()).unwrap_or(0);
+        state.comp.nmatches += state
+            .comp
+            .groups
+            .last()
+            .map(|g| g.matches.len())
+            .unwrap_or(0);
         CompleterResult::Matched
     } else {
         CompleterResult::NoMatch
@@ -990,19 +996,17 @@ pub fn bash_completions(state: &mut MainCompleteState, compspec: &str) -> Comple
 fn glob_match_simple(pattern: &str, text: &str) -> bool {
     let pattern = pattern.as_bytes();
     let text = text.as_bytes();
-    
+
     fn match_impl(p: &[u8], t: &[u8]) -> bool {
         match (p.first(), t.first()) {
             (None, None) => true,
-            (Some(b'*'), _) => {
-                match_impl(&p[1..], t) || (!t.is_empty() && match_impl(p, &t[1..]))
-            }
+            (Some(b'*'), _) => match_impl(&p[1..], t) || (!t.is_empty() && match_impl(p, &t[1..])),
             (Some(b'?'), Some(_)) => match_impl(&p[1..], &t[1..]),
             (Some(a), Some(b)) if a == b => match_impl(&p[1..], &t[1..]),
             _ => false,
         }
     }
-    
+
     match_impl(pattern, text)
 }
 

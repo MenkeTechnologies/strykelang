@@ -4,8 +4,8 @@
 //!
 //! Provides a doubly-linked list with operations matching zsh's LinkList API.
 
-use std::ptr::NonNull;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 
 /// A node in the linked list
 pub struct LinkNode<T> {

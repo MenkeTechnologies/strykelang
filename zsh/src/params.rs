@@ -18,32 +18,32 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 pub mod flags {
     pub const SCALAR: u32 = 1 << 0;
     pub const INTEGER: u32 = 1 << 1;
-    pub const EFLOAT: u32 = 1 << 2;     // %e float format
-    pub const FFLOAT: u32 = 1 << 3;     // %f float format
+    pub const EFLOAT: u32 = 1 << 2; // %e float format
+    pub const FFLOAT: u32 = 1 << 3; // %f float format
     pub const ARRAY: u32 = 1 << 4;
-    pub const HASHED: u32 = 1 << 5;     // Associative array (PM_HASHED)
+    pub const HASHED: u32 = 1 << 5; // Associative array (PM_HASHED)
     pub const READONLY: u32 = 1 << 6;
     pub const SPECIAL: u32 = 1 << 7;
     pub const LOCAL: u32 = 1 << 8;
-    pub const EXPORT: u32 = 1 << 9;     // Exported to environment
+    pub const EXPORT: u32 = 1 << 9; // Exported to environment
     pub const UNSET: u32 = 1 << 10;
     pub const TIED: u32 = 1 << 11;
-    pub const UNIQUE: u32 = 1 << 12;    // Array elements unique
-    pub const LOWER: u32 = 1 << 13;     // Lowercase value
-    pub const UPPER: u32 = 1 << 14;     // Uppercase value
-    pub const TAG: u32 = 1 << 15;       // Tagged parameter
+    pub const UNIQUE: u32 = 1 << 12; // Array elements unique
+    pub const LOWER: u32 = 1 << 13; // Lowercase value
+    pub const UPPER: u32 = 1 << 14; // Uppercase value
+    pub const TAG: u32 = 1 << 15; // Tagged parameter
     pub const HIDE: u32 = 1 << 16;
     pub const HIDEVAL: u32 = 1 << 17;
     pub const NORESTORE: u32 = 1 << 18;
-    pub const NAMEREF: u32 = 1 << 19;   // Named reference
-    pub const LEFT: u32 = 1 << 20;      // Left justified
-    pub const RIGHT_B: u32 = 1 << 21;   // Right justified with blanks
-    pub const RIGHT_Z: u32 = 1 << 22;   // Right justified with zeros
-    pub const AUTOLOAD: u32 = 1 << 23;  // Autoloaded parameter
-    pub const DECLARED: u32 = 1 << 24;  // Explicitly declared
+    pub const NAMEREF: u32 = 1 << 19; // Named reference
+    pub const LEFT: u32 = 1 << 20; // Left justified
+    pub const RIGHT_B: u32 = 1 << 21; // Right justified with blanks
+    pub const RIGHT_Z: u32 = 1 << 22; // Right justified with zeros
+    pub const AUTOLOAD: u32 = 1 << 23; // Autoloaded parameter
+    pub const DECLARED: u32 = 1 << 24; // Explicitly declared
     pub const REMOVABLE: u32 = 1 << 25; // Can be removed from table
-    pub const HASHELEM: u32 = 1 << 26;  // Element of hash
-    pub const NAMEDDIR: u32 = 1 << 27;  // Named directory
+    pub const HASHELEM: u32 = 1 << 26; // Element of hash
+    pub const NAMEDDIR: u32 = 1 << 27; // Named directory
     pub const DONTIMPORT: u32 = 1 << 28;
     pub const DEFAULTED: u32 = 1 << 29;
     pub const DONTIMPORT_SUID: u32 = 1 << 30;
@@ -92,10 +92,10 @@ pub mod scan_flags {
 // ---------------------------------------------------------------------------
 
 pub mod assign_flags {
-    pub const AUGMENT: u32 = 1 << 0;     // += assignment
-    pub const WARN: u32 = 1 << 1;        // Warn about global creation
-    pub const ENV_IMPORT: u32 = 1 << 2;  // Importing from environment
-    pub const KEY_VALUE: u32 = 1 << 3;   // key=value assignment syntax
+    pub const AUGMENT: u32 = 1 << 0; // += assignment
+    pub const WARN: u32 = 1 << 1; // Warn about global creation
+    pub const ENV_IMPORT: u32 = 1 << 2; // Importing from environment
+    pub const KEY_VALUE: u32 = 1 << 3; // key=value assignment syntax
 }
 
 // ---------------------------------------------------------------------------
@@ -103,9 +103,9 @@ pub mod assign_flags {
 // ---------------------------------------------------------------------------
 
 pub mod val_flags {
-    pub const INV: u32 = 1 << 0;      // Inverse subscript
-    pub const EMPTY: u32 = 1 << 1;    // Empty subscript range
-    pub const SUBST: u32 = 1 << 2;    // Apply formatting
+    pub const INV: u32 = 1 << 0; // Inverse subscript
+    pub const EMPTY: u32 = 1 << 1; // Empty subscript range
+    pub const SUBST: u32 = 1 << 2; // Apply formatting
     pub const REFSLICE: u32 = 1 << 3; // Nameref with subscript
 }
 
@@ -291,10 +291,10 @@ pub struct Param {
     pub name: String,
     pub value: ParamValue,
     pub flags: u32,
-    pub base: i32,           // Output base for integers
-    pub width: i32,          // Output field width
-    pub level: i32,          // Scope level
-    pub ename: Option<String>, // Environment/tied name
+    pub base: i32,               // Output base for integers
+    pub width: i32,              // Output field width
+    pub level: i32,              // Scope level
+    pub ename: Option<String>,   // Environment/tied name
     pub old: Option<Box<Param>>, // Previous parameter at higher scope
 }
 
@@ -470,16 +470,16 @@ pub struct TiedData {
 
 #[derive(Clone, Debug, Default)]
 pub struct SubscriptFlags {
-    pub reverse: bool,     // (r) or (R) - reverse search
-    pub down: bool,        // (R), (K), (I) - search from end
-    pub index: bool,       // (i) or (I) - return index
-    pub key_match: bool,   // (k) or (K) - match keys in hash
-    pub word: bool,        // (w) - word subscript
-    pub num: i64,          // (n) - occurrence count
-    pub begin: i64,        // (b) - begin offset
+    pub reverse: bool,   // (r) or (R) - reverse search
+    pub down: bool,      // (R), (K), (I) - search from end
+    pub index: bool,     // (i) or (I) - return index
+    pub key_match: bool, // (k) or (K) - match keys in hash
+    pub word: bool,      // (w) - word subscript
+    pub num: i64,        // (n) - occurrence count
+    pub begin: i64,      // (b) - begin offset
     pub has_begin: bool,
     pub separator: Option<String>, // (s) - word separator
-    pub quote_arg: bool,   // (e) - exact/escape
+    pub quote_arg: bool,           // (e) - exact/escape
 }
 
 // ---------------------------------------------------------------------------
@@ -495,15 +495,27 @@ pub struct SubscriptIndex {
 
 impl SubscriptIndex {
     pub fn single(idx: i64) -> Self {
-        SubscriptIndex { start: idx, end: idx + 1, is_all: false }
+        SubscriptIndex {
+            start: idx,
+            end: idx + 1,
+            is_all: false,
+        }
     }
 
     pub fn range(start: i64, end: i64) -> Self {
-        SubscriptIndex { start, end, is_all: false }
+        SubscriptIndex {
+            start,
+            end,
+            is_all: false,
+        }
     }
 
     pub fn all() -> Self {
-        SubscriptIndex { start: 0, end: -1, is_all: true }
+        SubscriptIndex {
+            start: 0,
+            end: -1,
+            is_all: true,
+        }
     }
 }
 
@@ -521,25 +533,158 @@ pub struct ParamTypeInfo {
 }
 
 pub const PM_TYPES: &[ParamTypeInfo] = &[
-    ParamTypeInfo { bin_flag: flags::AUTOLOAD, string: "undefined", type_flag: '\0', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::INTEGER, string: "integer", type_flag: 'i', use_base: true, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::EFLOAT, string: "float", type_flag: 'E', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::FFLOAT, string: "float", type_flag: 'F', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::ARRAY, string: "array", type_flag: 'a', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::HASHED, string: "association", type_flag: 'A', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: 0, string: "local", type_flag: '\0', use_base: false, use_width: false, test_level: true },
-    ParamTypeInfo { bin_flag: flags::HIDE, string: "hide", type_flag: 'h', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::LEFT, string: "left justified", type_flag: 'L', use_base: false, use_width: true, test_level: false },
-    ParamTypeInfo { bin_flag: flags::RIGHT_B, string: "right justified", type_flag: 'R', use_base: false, use_width: true, test_level: false },
-    ParamTypeInfo { bin_flag: flags::RIGHT_Z, string: "zero filled", type_flag: 'Z', use_base: false, use_width: true, test_level: false },
-    ParamTypeInfo { bin_flag: flags::LOWER, string: "lowercase", type_flag: 'l', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::UPPER, string: "uppercase", type_flag: 'u', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::READONLY, string: "readonly", type_flag: 'r', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::TAG, string: "tagged", type_flag: 't', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::EXPORT, string: "exported", type_flag: 'x', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::UNIQUE, string: "unique", type_flag: 'U', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::TIED, string: "tied", type_flag: 'T', use_base: false, use_width: false, test_level: false },
-    ParamTypeInfo { bin_flag: flags::NAMEREF, string: "nameref", type_flag: 'n', use_base: false, use_width: false, test_level: false },
+    ParamTypeInfo {
+        bin_flag: flags::AUTOLOAD,
+        string: "undefined",
+        type_flag: '\0',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::INTEGER,
+        string: "integer",
+        type_flag: 'i',
+        use_base: true,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::EFLOAT,
+        string: "float",
+        type_flag: 'E',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::FFLOAT,
+        string: "float",
+        type_flag: 'F',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::ARRAY,
+        string: "array",
+        type_flag: 'a',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::HASHED,
+        string: "association",
+        type_flag: 'A',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: 0,
+        string: "local",
+        type_flag: '\0',
+        use_base: false,
+        use_width: false,
+        test_level: true,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::HIDE,
+        string: "hide",
+        type_flag: 'h',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::LEFT,
+        string: "left justified",
+        type_flag: 'L',
+        use_base: false,
+        use_width: true,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::RIGHT_B,
+        string: "right justified",
+        type_flag: 'R',
+        use_base: false,
+        use_width: true,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::RIGHT_Z,
+        string: "zero filled",
+        type_flag: 'Z',
+        use_base: false,
+        use_width: true,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::LOWER,
+        string: "lowercase",
+        type_flag: 'l',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::UPPER,
+        string: "uppercase",
+        type_flag: 'u',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::READONLY,
+        string: "readonly",
+        type_flag: 'r',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::TAG,
+        string: "tagged",
+        type_flag: 't',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::EXPORT,
+        string: "exported",
+        type_flag: 'x',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::UNIQUE,
+        string: "unique",
+        type_flag: 'U',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::TIED,
+        string: "tied",
+        type_flag: 'T',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
+    ParamTypeInfo {
+        bin_flag: flags::NAMEREF,
+        string: "nameref",
+        type_flag: 'n',
+        use_base: false,
+        use_width: false,
+        test_level: false,
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -549,111 +694,497 @@ pub const PM_TYPES: &[ParamTypeInfo] = &[
 #[derive(Clone, Debug)]
 pub struct SpecialParamDef {
     pub name: &'static str,
-    pub pm_type: u32,        // PM_INTEGER | PM_SCALAR | PM_ARRAY
-    pub pm_flags: u32,       // PM_READONLY_SPECIAL, PM_DONTIMPORT, etc.
+    pub pm_type: u32,  // PM_INTEGER | PM_SCALAR | PM_ARRAY
+    pub pm_flags: u32, // PM_READONLY_SPECIAL, PM_DONTIMPORT, etc.
     pub tied_name: Option<&'static str>,
 }
 
 /// All special parameters from params.c special_params[]
 pub const SPECIAL_PARAMS: &[SpecialParamDef] = &[
     // Integer specials with custom GSU
-    SpecialParamDef { name: "#", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "ERRNO", pm_type: flags::INTEGER, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "GID", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "EGID", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "HISTSIZE", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "RANDOM", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "SAVEHIST", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "SECONDS", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "UID", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "EUID", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "TTYIDLE", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-
+    SpecialParamDef {
+        name: "#",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "ERRNO",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "GID",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "EGID",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "HISTSIZE",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "RANDOM",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "SAVEHIST",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "SECONDS",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "UID",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "EUID",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TTYIDLE",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
     // Scalar specials with custom GSU
-    SpecialParamDef { name: "USERNAME", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "-", pm_type: flags::SCALAR, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "histchars", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "HOME", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "TERM", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "TERMINFO", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "TERMINFO_DIRS", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "WORDCHARS", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "IFS", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "_", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "KEYBOARD_HACK", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "0", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-
+    SpecialParamDef {
+        name: "USERNAME",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "-",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "histchars",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "HOME",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TERM",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TERMINFO",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TERMINFO_DIRS",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "WORDCHARS",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "IFS",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "_",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "KEYBOARD_HACK",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "0",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
     // Readonly integer variables bound to C globals
-    SpecialParamDef { name: "!", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "$", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "?", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "HISTCMD", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "LINENO", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "PPID", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "ZSH_SUBSHELL", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-
+    SpecialParamDef {
+        name: "!",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "$",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "?",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "HISTCMD",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LINENO",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PPID",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "ZSH_SUBSHELL",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
     // Settable integer variables
-    SpecialParamDef { name: "COLUMNS", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "LINES", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "ZLE_RPROMPT_INDENT", pm_type: flags::INTEGER, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "SHLVL", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "FUNCNEST", pm_type: flags::INTEGER, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "OPTIND", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "TRY_BLOCK_ERROR", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "TRY_BLOCK_INTERRUPT", pm_type: flags::INTEGER, pm_flags: flags::DONTIMPORT, tied_name: None },
-
+    SpecialParamDef {
+        name: "COLUMNS",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LINES",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "ZLE_RPROMPT_INDENT",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "SHLVL",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "FUNCNEST",
+        pm_type: flags::INTEGER,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "OPTIND",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TRY_BLOCK_ERROR",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "TRY_BLOCK_INTERRUPT",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
     // Scalar variables bound to C globals
-    SpecialParamDef { name: "OPTARG", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "NULLCMD", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "POSTEDIT", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "READNULLCMD", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PS1", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "RPS1", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "RPROMPT", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "PS2", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "RPS2", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "RPROMPT2", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "PS3", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PS4", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT_SUID, tied_name: None },
-    SpecialParamDef { name: "SPROMPT", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-
+    SpecialParamDef {
+        name: "OPTARG",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "NULLCMD",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "POSTEDIT",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "READNULLCMD",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PS1",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "RPS1",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "RPROMPT",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PS2",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "RPS2",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "RPROMPT2",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PS3",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PS4",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT_SUID,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "SPROMPT",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
     // Readonly arrays
-    SpecialParamDef { name: "*", pm_type: flags::ARRAY, pm_flags: flags::READONLY | flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "@", pm_type: flags::ARRAY, pm_flags: flags::READONLY | flags::DONTIMPORT, tied_name: None },
-
+    SpecialParamDef {
+        name: "*",
+        pm_type: flags::ARRAY,
+        pm_flags: flags::READONLY | flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "@",
+        pm_type: flags::ARRAY,
+        pm_flags: flags::READONLY | flags::DONTIMPORT,
+        tied_name: None,
+    },
     // Tied colon-separated/array pairs
-    SpecialParamDef { name: "CDPATH", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("cdpath") },
-    SpecialParamDef { name: "FIGNORE", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("fignore") },
-    SpecialParamDef { name: "FPATH", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("fpath") },
-    SpecialParamDef { name: "MAILPATH", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("mailpath") },
-    SpecialParamDef { name: "PATH", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("path") },
-    SpecialParamDef { name: "PSVAR", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("psvar") },
-    SpecialParamDef { name: "ZSH_EVAL_CONTEXT", pm_type: flags::SCALAR, pm_flags: flags::READONLY | flags::TIED, tied_name: Some("zsh_eval_context") },
-    SpecialParamDef { name: "MODULE_PATH", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT | flags::TIED, tied_name: Some("module_path") },
-    SpecialParamDef { name: "MANPATH", pm_type: flags::SCALAR, pm_flags: flags::TIED, tied_name: Some("manpath") },
-
+    SpecialParamDef {
+        name: "CDPATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("cdpath"),
+    },
+    SpecialParamDef {
+        name: "FIGNORE",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("fignore"),
+    },
+    SpecialParamDef {
+        name: "FPATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("fpath"),
+    },
+    SpecialParamDef {
+        name: "MAILPATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("mailpath"),
+    },
+    SpecialParamDef {
+        name: "PATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("path"),
+    },
+    SpecialParamDef {
+        name: "PSVAR",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("psvar"),
+    },
+    SpecialParamDef {
+        name: "ZSH_EVAL_CONTEXT",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::READONLY | flags::TIED,
+        tied_name: Some("zsh_eval_context"),
+    },
+    SpecialParamDef {
+        name: "MODULE_PATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT | flags::TIED,
+        tied_name: Some("module_path"),
+    },
+    SpecialParamDef {
+        name: "MANPATH",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::TIED,
+        tied_name: Some("manpath"),
+    },
     // Locale
-    SpecialParamDef { name: "LANG", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_ALL", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_COLLATE", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_CTYPE", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_MESSAGES", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_NUMERIC", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-    SpecialParamDef { name: "LC_TIME", pm_type: flags::SCALAR, pm_flags: flags::UNSET, tied_name: None },
-
+    SpecialParamDef {
+        name: "LANG",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_ALL",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_COLLATE",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_CTYPE",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_MESSAGES",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_NUMERIC",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "LC_TIME",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::UNSET,
+        tied_name: None,
+    },
     // Zsh-only aliases
-    SpecialParamDef { name: "ARGC", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "HISTCHARS", pm_type: flags::SCALAR, pm_flags: flags::DONTIMPORT, tied_name: None },
-    SpecialParamDef { name: "status", pm_type: flags::INTEGER, pm_flags: flags::READONLY, tied_name: None },
-    SpecialParamDef { name: "prompt", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PROMPT", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PROMPT2", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PROMPT3", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "PROMPT4", pm_type: flags::SCALAR, pm_flags: 0, tied_name: None },
-    SpecialParamDef { name: "argv", pm_type: flags::ARRAY, pm_flags: 0, tied_name: None },
-
+    SpecialParamDef {
+        name: "ARGC",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "HISTCHARS",
+        pm_type: flags::SCALAR,
+        pm_flags: flags::DONTIMPORT,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "status",
+        pm_type: flags::INTEGER,
+        pm_flags: flags::READONLY,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "prompt",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PROMPT",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PROMPT2",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PROMPT3",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "PROMPT4",
+        pm_type: flags::SCALAR,
+        pm_flags: 0,
+        tied_name: None,
+    },
+    SpecialParamDef {
+        name: "argv",
+        pm_type: flags::ARRAY,
+        pm_flags: 0,
+        tied_name: None,
+    },
     // pipestatus array
-    SpecialParamDef { name: "pipestatus", pm_type: flags::ARRAY, pm_flags: 0, tied_name: None },
+    SpecialParamDef {
+        name: "pipestatus",
+        pm_type: flags::ARRAY,
+        pm_flags: 0,
+        tied_name: None,
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -910,27 +1441,43 @@ impl ParamTable {
             "TTYIDLE" => ParamValue::Integer(-1),
             "UID" => {
                 #[cfg(unix)]
-                { ParamValue::Integer(unsafe { libc::getuid() } as i64) }
+                {
+                    ParamValue::Integer(unsafe { libc::getuid() } as i64)
+                }
                 #[cfg(not(unix))]
-                { ParamValue::Integer(0) }
+                {
+                    ParamValue::Integer(0)
+                }
             }
             "EUID" => {
                 #[cfg(unix)]
-                { ParamValue::Integer(unsafe { libc::geteuid() } as i64) }
+                {
+                    ParamValue::Integer(unsafe { libc::geteuid() } as i64)
+                }
                 #[cfg(not(unix))]
-                { ParamValue::Integer(0) }
+                {
+                    ParamValue::Integer(0)
+                }
             }
             "GID" => {
                 #[cfg(unix)]
-                { ParamValue::Integer(unsafe { libc::getgid() } as i64) }
+                {
+                    ParamValue::Integer(unsafe { libc::getgid() } as i64)
+                }
                 #[cfg(not(unix))]
-                { ParamValue::Integer(0) }
+                {
+                    ParamValue::Integer(0)
+                }
             }
             "EGID" => {
                 #[cfg(unix)]
-                { ParamValue::Integer(unsafe { libc::getegid() } as i64) }
+                {
+                    ParamValue::Integer(unsafe { libc::getegid() } as i64)
+                }
                 #[cfg(not(unix))]
-                { ParamValue::Integer(0) }
+                {
+                    ParamValue::Integer(0)
+                }
             }
             "USERNAME" => {
                 let name = env::var("USER")
@@ -938,7 +1485,7 @@ impl ParamTable {
                     .unwrap_or_else(|_| "unknown".to_string());
                 ParamValue::Scalar(name)
             }
-            "-" => ParamValue::Scalar(String::new()),  // dash: current option flags
+            "-" => ParamValue::Scalar(String::new()), // dash: current option flags
             "histchars" | "HISTCHARS" => {
                 let s = String::from_utf8_lossy(&self.histchars).to_string();
                 ParamValue::Scalar(s)
@@ -968,14 +1515,14 @@ impl ParamTable {
                 ParamValue::Array(self.pipestats.iter().map(|s| s.to_string()).collect())
             }
             // Tied colon-separated paths
-            "CDPATH" | "FIGNORE" | "FPATH" | "MAILPATH" | "PATH" | "PSVAR"
-            | "ZSH_EVAL_CONTEXT" | "MODULE_PATH" | "MANPATH" => {
+            "CDPATH" | "FIGNORE" | "FPATH" | "MAILPATH" | "PATH" | "PSVAR" | "ZSH_EVAL_CONTEXT"
+            | "MODULE_PATH" | "MANPATH" => {
                 let env_val = env::var(name).unwrap_or_default();
                 ParamValue::Scalar(env_val)
             }
             // Locale
-            "LANG" | "LC_ALL" | "LC_COLLATE" | "LC_CTYPE" | "LC_MESSAGES"
-            | "LC_NUMERIC" | "LC_TIME" => {
+            "LANG" | "LC_ALL" | "LC_COLLATE" | "LC_CTYPE" | "LC_MESSAGES" | "LC_NUMERIC"
+            | "LC_TIME" => {
                 let env_val = env::var(name).unwrap_or_default();
                 ParamValue::Scalar(env_val)
             }
@@ -1007,7 +1554,8 @@ impl ParamTable {
 
         for (scalar, array) in pairs {
             let val = env::var(scalar).unwrap_or_default();
-            let arr: Vec<String> = val.split(':')
+            let arr: Vec<String> = val
+                .split(':')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
                 .collect();
@@ -1032,11 +1580,14 @@ impl ParamTable {
                 p.ename = Some(array.to_string());
             }
 
-            self.tied.insert(scalar.to_string(), TiedData {
-                join_char: ':',
-                scalar_name: scalar.to_string(),
-                array_name: array.to_string(),
-            });
+            self.tied.insert(
+                scalar.to_string(),
+                TiedData {
+                    join_char: ':',
+                    scalar_name: scalar.to_string(),
+                    array_name: array.to_string(),
+                },
+            );
         }
     }
 
@@ -1065,7 +1616,9 @@ impl ParamTable {
                 }
             }
             #[cfg(not(unix))]
-            { "unknown".to_string() }
+            {
+                "unknown".to_string()
+            }
         };
         self.set_scalar_internal("HOST", &hostname, 0);
 
@@ -1109,10 +1662,10 @@ impl ParamTable {
         #[cfg(unix)]
         {
             let sigs = vec![
-                "EXIT", "HUP", "INT", "QUIT", "ILL", "TRAP", "ABRT", "EMT",
-                "FPE", "KILL", "BUS", "SEGV", "SYS", "PIPE", "ALRM", "TERM",
-                "URG", "STOP", "TSTP", "CONT", "CHLD", "TTIN", "TTOU", "IO",
-                "XCPU", "XFSZ", "VTALRM", "PROF", "WINCH", "INFO", "USR1", "USR2",
+                "EXIT", "HUP", "INT", "QUIT", "ILL", "TRAP", "ABRT", "EMT", "FPE", "KILL", "BUS",
+                "SEGV", "SYS", "PIPE", "ALRM", "TERM", "URG", "STOP", "TSTP", "CONT", "CHLD",
+                "TTIN", "TTOU", "IO", "XCPU", "XFSZ", "VTALRM", "PROF", "WINCH", "INFO", "USR1",
+                "USR2",
             ];
             let sig_arr: Vec<String> = sigs.iter().map(|s| format!("SIG{}", s)).collect();
             self.set_array_internal("signals", sig_arr, flags::READONLY);
@@ -1181,36 +1734,54 @@ impl ParamTable {
                 #[cfg(unix)]
                 {
                     Some(ParamValue::Integer(
-                        std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as i64
+                        std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as i64,
                     ))
                 }
                 #[cfg(not(unix))]
-                { Some(ParamValue::Integer(0)) }
+                {
+                    Some(ParamValue::Integer(0))
+                }
             }
             "TTYIDLE" => Some(ParamValue::Integer(self.get_tty_idle())),
             "UID" => {
                 #[cfg(unix)]
-                { Some(ParamValue::Integer(unsafe { libc::getuid() } as i64)) }
+                {
+                    Some(ParamValue::Integer(unsafe { libc::getuid() } as i64))
+                }
                 #[cfg(not(unix))]
-                { Some(ParamValue::Integer(0)) }
+                {
+                    Some(ParamValue::Integer(0))
+                }
             }
             "EUID" => {
                 #[cfg(unix)]
-                { Some(ParamValue::Integer(unsafe { libc::geteuid() } as i64)) }
+                {
+                    Some(ParamValue::Integer(unsafe { libc::geteuid() } as i64))
+                }
                 #[cfg(not(unix))]
-                { Some(ParamValue::Integer(0)) }
+                {
+                    Some(ParamValue::Integer(0))
+                }
             }
             "GID" => {
                 #[cfg(unix)]
-                { Some(ParamValue::Integer(unsafe { libc::getgid() } as i64)) }
+                {
+                    Some(ParamValue::Integer(unsafe { libc::getgid() } as i64))
+                }
                 #[cfg(not(unix))]
-                { Some(ParamValue::Integer(0)) }
+                {
+                    Some(ParamValue::Integer(0))
+                }
             }
             "EGID" => {
                 #[cfg(unix)]
-                { Some(ParamValue::Integer(unsafe { libc::getegid() } as i64)) }
+                {
+                    Some(ParamValue::Integer(unsafe { libc::getegid() } as i64))
+                }
                 #[cfg(not(unix))]
-                { Some(ParamValue::Integer(0)) }
+                {
+                    Some(ParamValue::Integer(0))
+                }
             }
             "USERNAME" => {
                 let name = env::var("USER")
@@ -1260,9 +1831,9 @@ impl ParamTable {
             "RPS2" | "RPROMPT2" => Some(ParamValue::Scalar(self.rprompt2.clone())),
             "SPROMPT" => Some(ParamValue::Scalar(self.sprompt.clone())),
             "*" | "@" | "argv" => Some(ParamValue::Array(self.pparams.clone())),
-            "pipestatus" => {
-                Some(ParamValue::Array(self.pipestats.iter().map(|s| s.to_string()).collect()))
-            }
+            "pipestatus" => Some(ParamValue::Array(
+                self.pipestats.iter().map(|s| s.to_string()).collect(),
+            )),
             _ => None,
         }
     }
@@ -1276,21 +1847,19 @@ impl ParamTable {
                     // Re-seed
                 }
             }
-            "SECONDS" => {
-                match value {
-                    ParamValue::Integer(x) => {
-                        let now = Instant::now();
-                        self.shtimer_instant = now - std::time::Duration::from_secs(*x as u64);
-                        self.seconds_is_float = false;
-                    }
-                    ParamValue::Float(x) => {
-                        let now = Instant::now();
-                        self.shtimer_instant = now - std::time::Duration::from_secs_f64(*x);
-                        self.seconds_is_float = true;
-                    }
-                    _ => {}
+            "SECONDS" => match value {
+                ParamValue::Integer(x) => {
+                    let now = Instant::now();
+                    self.shtimer_instant = now - std::time::Duration::from_secs(*x as u64);
+                    self.seconds_is_float = false;
                 }
-            }
+                ParamValue::Float(x) => {
+                    let now = Instant::now();
+                    self.shtimer_instant = now - std::time::Duration::from_secs_f64(*x);
+                    self.seconds_is_float = true;
+                }
+                _ => {}
+            },
             "HISTSIZE" => {
                 if let ParamValue::Integer(v) = value {
                     self.histsize = (*v).max(1);
@@ -1410,33 +1979,39 @@ impl ParamTable {
             }
             "pipestatus" => {
                 if let ParamValue::Array(arr) = value {
-                    self.pipestats = arr.iter()
-                        .map(|s| s.parse::<i32>().unwrap_or(0))
-                        .collect();
+                    self.pipestats = arr.iter().map(|s| s.parse::<i32>().unwrap_or(0)).collect();
                 }
             }
             #[cfg(unix)]
             "UID" => {
                 if let ParamValue::Integer(v) = value {
-                    unsafe { libc::setuid(*v as libc::uid_t); }
+                    unsafe {
+                        libc::setuid(*v as libc::uid_t);
+                    }
                 }
             }
             #[cfg(unix)]
             "EUID" => {
                 if let ParamValue::Integer(v) = value {
-                    unsafe { libc::seteuid(*v as libc::uid_t); }
+                    unsafe {
+                        libc::seteuid(*v as libc::uid_t);
+                    }
                 }
             }
             #[cfg(unix)]
             "GID" => {
                 if let ParamValue::Integer(v) = value {
-                    unsafe { libc::setgid(*v as libc::gid_t); }
+                    unsafe {
+                        libc::setgid(*v as libc::gid_t);
+                    }
                 }
             }
             #[cfg(unix)]
             "EGID" => {
                 if let ParamValue::Integer(v) = value {
-                    unsafe { libc::setegid(*v as libc::gid_t); }
+                    unsafe {
+                        libc::setegid(*v as libc::gid_t);
+                    }
                 }
             }
             _ => {}
@@ -1446,7 +2021,8 @@ impl ParamTable {
         if let Some(tied) = self.tied.get(name).cloned() {
             if name == tied.scalar_name {
                 // Scalar changed -> update array
-                let arr: Vec<String> = value.as_string()
+                let arr: Vec<String> = value
+                    .as_string()
                     .split(tied.join_char)
                     .filter(|s| !s.is_empty())
                     .map(String::from)
@@ -1480,7 +2056,11 @@ impl ParamTable {
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let seed = self.random_seed as i64;
         // Linear congruential generator
-        let val = (seed.wrapping_mul(1103515245).wrapping_add(12345).wrapping_add(n)) & 0x7fffffff;
+        let val = (seed
+            .wrapping_mul(1103515245)
+            .wrapping_add(12345)
+            .wrapping_add(n))
+            & 0x7fffffff;
         (val >> 16) & 0x7fff
     }
 
@@ -1594,7 +2174,9 @@ impl ParamTable {
 
     /// Set a scalar parameter
     pub fn set_scalar(&mut self, name: &str, value: &str) -> bool {
-        let resolved = self.resolve_nameref_name(name).unwrap_or_else(|| name.to_string());
+        let resolved = self
+            .resolve_nameref_name(name)
+            .unwrap_or_else(|| name.to_string());
         let name = &resolved;
 
         if let Some(param) = self.params.get_mut(name) {
@@ -1629,7 +2211,9 @@ impl ParamTable {
 
     /// Set an integer parameter
     pub fn set_integer(&mut self, name: &str, value: i64) -> bool {
-        let resolved = self.resolve_nameref_name(name).unwrap_or_else(|| name.to_string());
+        let resolved = self
+            .resolve_nameref_name(name)
+            .unwrap_or_else(|| name.to_string());
         let name = &resolved;
 
         if let Some(param) = self.params.get_mut(name) {
@@ -1655,7 +2239,9 @@ impl ParamTable {
 
     /// Set a float parameter
     pub fn set_float(&mut self, name: &str, value: f64) -> bool {
-        let resolved = self.resolve_nameref_name(name).unwrap_or_else(|| name.to_string());
+        let resolved = self
+            .resolve_nameref_name(name)
+            .unwrap_or_else(|| name.to_string());
         let name = &resolved;
 
         if let Some(param) = self.params.get_mut(name) {
@@ -1678,7 +2264,9 @@ impl ParamTable {
 
     /// Set an array parameter
     pub fn set_array(&mut self, name: &str, value: Vec<String>) -> bool {
-        let resolved = self.resolve_nameref_name(name).unwrap_or_else(|| name.to_string());
+        let resolved = self
+            .resolve_nameref_name(name)
+            .unwrap_or_else(|| name.to_string());
         let name = &resolved;
 
         if let Some(param) = self.params.get_mut(name) {
@@ -1706,7 +2294,9 @@ impl ParamTable {
 
     /// Set an associative array parameter
     pub fn set_assoc(&mut self, name: &str, value: HashMap<String, String>) -> bool {
-        let resolved = self.resolve_nameref_name(name).unwrap_or_else(|| name.to_string());
+        let resolved = self
+            .resolve_nameref_name(name)
+            .unwrap_or_else(|| name.to_string());
         let name = &resolved;
 
         if let Some(param) = self.params.get_mut(name) {
@@ -1754,9 +2344,7 @@ impl ParamTable {
 
     /// Augmented assignment for integers (+=)
     pub fn augment_integer(&mut self, name: &str, value: i64) -> bool {
-        let current = self.get_value(name)
-            .map(|v| v.as_integer())
-            .unwrap_or(0);
+        let current = self.get_value(name).map(|v| v.as_integer()).unwrap_or(0);
         self.set_integer(name, current + value)
     }
 
@@ -1874,7 +2462,9 @@ impl ParamTable {
             };
 
             if should_remove {
-                let is_special = self.params.get(&name)
+                let is_special = self
+                    .params
+                    .get(&name)
                     .map(|p| p.is_special())
                     .unwrap_or(false);
 
@@ -1964,7 +2554,8 @@ impl ParamTable {
         self.make_local(name);
         if let Some(param) = self.params.get_mut(name) {
             // Set type, preserve LOCAL
-            param.flags = (param.flags & (flags::LOCAL | flags::SPECIAL | flags::EXPORT)) | pm_flags;
+            param.flags =
+                (param.flags & (flags::LOCAL | flags::SPECIAL | flags::EXPORT)) | pm_flags;
             // Set appropriate default value
             param.value = match flags::pm_type(pm_flags) {
                 flags::INTEGER => ParamValue::Integer(0),
@@ -2015,7 +2606,11 @@ impl ParamTable {
             flags: pm_flags & !flags::LOCAL,
             base: 10,
             width: 0,
-            level: if (pm_flags & flags::LOCAL) != 0 { self.local_level } else { 0 },
+            level: if (pm_flags & flags::LOCAL) != 0 {
+                self.local_level
+            } else {
+                0
+            },
             ename: None,
             old,
         };
@@ -2031,7 +2626,9 @@ impl ParamTable {
             }
         }
         // Unset and recreate
-        let exported = self.params.get(name)
+        let exported = self
+            .params
+            .get(name)
             .map(|p| p.flags & flags::EXPORT)
             .unwrap_or(0);
         self.unset(name);
@@ -2103,11 +2700,13 @@ impl ParamTable {
     /// Tie scalar to array with separator (from typeset -T)
     pub fn tie_param(&mut self, scalar: &str, array: &str, sep: char) {
         // Get current value from scalar
-        let current = self.get_value(scalar)
+        let current = self
+            .get_value(scalar)
             .map(|v| v.as_string())
             .unwrap_or_default();
 
-        let arr: Vec<String> = current.split(sep)
+        let arr: Vec<String> = current
+            .split(sep)
             .filter(|s| !s.is_empty())
             .map(String::from)
             .collect();
@@ -2136,16 +2735,22 @@ impl ParamTable {
         };
         self.params.insert(array.to_string(), arr_param);
 
-        self.tied.insert(scalar.to_string(), TiedData {
-            join_char: sep,
-            scalar_name: scalar.to_string(),
-            array_name: array.to_string(),
-        });
-        self.tied.insert(array.to_string(), TiedData {
-            join_char: sep,
-            scalar_name: scalar.to_string(),
-            array_name: array.to_string(),
-        });
+        self.tied.insert(
+            scalar.to_string(),
+            TiedData {
+                join_char: sep,
+                scalar_name: scalar.to_string(),
+                array_name: array.to_string(),
+            },
+        );
+        self.tied.insert(
+            array.to_string(),
+            TiedData {
+                join_char: sep,
+                scalar_name: scalar.to_string(),
+                array_name: array.to_string(),
+            },
+        );
     }
 
     /// Untie a parameter pair
@@ -2302,11 +2907,22 @@ impl ParamTable {
 
     /// Get string slice
     pub fn get_str_slice(&self, name: &str, start: i64, end: i64) -> String {
-        let val = self.get_value(name).map(|v| v.as_string()).unwrap_or_default();
+        let val = self
+            .get_value(name)
+            .map(|v| v.as_string())
+            .unwrap_or_default();
         let len = val.len() as i64;
 
-        let start = if start < 0 { (len + start).max(0) as usize } else { start.max(0) as usize };
-        let end = if end < 0 { (len + end + 1).max(0) as usize } else { end.min(len) as usize };
+        let start = if start < 0 {
+            (len + start).max(0) as usize
+        } else {
+            start.max(0) as usize
+        };
+        let end = if end < 0 {
+            (len + end + 1).max(0) as usize
+        } else {
+            end.min(len) as usize
+        };
 
         if start >= val.len() || start >= end {
             return String::new();
@@ -2316,11 +2932,22 @@ impl ParamTable {
 
     /// Set string slice
     pub fn set_str_slice(&mut self, name: &str, start: i64, end: i64, val: &str) -> bool {
-        let current = self.get_value(name).map(|v| v.as_string()).unwrap_or_default();
+        let current = self
+            .get_value(name)
+            .map(|v| v.as_string())
+            .unwrap_or_default();
         let len = current.len() as i64;
 
-        let s = if start < 0 { (len + start).max(0) as usize } else { start as usize };
-        let e = if end < 0 { (len + end + 1).max(0) as usize } else { end as usize };
+        let s = if start < 0 {
+            (len + start).max(0) as usize
+        } else {
+            start as usize
+        };
+        let e = if end < 0 {
+            (len + end + 1).max(0) as usize
+        } else {
+            end as usize
+        };
         let s = s.min(current.len());
         let e = e.min(current.len());
 
@@ -2343,9 +2970,7 @@ impl ParamTable {
             param.flags |= flags::EXPORT;
             let val = match flags::pm_type(param.flags) {
                 flags::ARRAY | flags::HASHED => return, // Can't export arrays
-                flags::INTEGER => {
-                    convbase(param.value.as_integer(), param.base as u32)
-                }
+                flags::INTEGER => convbase(param.value.as_integer(), param.base as u32),
                 flags::EFLOAT | flags::FFLOAT => {
                     format_float(param.value.as_float(), param.base, param.flags)
                 }
@@ -2359,7 +2984,9 @@ impl ParamTable {
     pub fn arr_fix_env(&mut self, name: &str) {
         if let Some(tied) = self.tied.get(name).cloned() {
             if name == tied.array_name {
-                let arr = self.params.get(name)
+                let arr = self
+                    .params
+                    .get(name)
                     .map(|p| p.value.as_array())
                     .unwrap_or_default();
                 let joined = arr.join(&tied.join_char.to_string());
@@ -2383,7 +3010,8 @@ impl ParamTable {
 
     /// Check if a parameter exists (and is set)
     pub fn contains(&self, name: &str) -> bool {
-        self.params.get(name)
+        self.params
+            .get(name)
             .map(|p| !p.is_unset())
             .unwrap_or(false)
     }
@@ -2417,11 +3045,11 @@ impl ParamTable {
 
     /// Get all parameter names matching pattern
     pub fn paramnames(&self, pattern: Option<&str>) -> Vec<String> {
-        let mut names: Vec<String> = self.params.iter()
+        let mut names: Vec<String> = self
+            .params
+            .iter()
             .filter(|(_, p)| !p.is_unset())
-            .filter(|(name, _)| {
-                pattern.map_or(true, |p| glob_match(p, name))
-            })
+            .filter(|(name, _)| pattern.map_or(true, |p| glob_match(p, name)))
             .map(|(name, _)| name.clone())
             .collect();
         names.sort();
@@ -2435,7 +3063,8 @@ impl ParamTable {
     /// Format a parameter for display (typeset -p output)
     pub fn format_param(&self, name: &str, pf: u32) -> Option<String> {
         let param = self.params.get(name)?;
-        if param.is_unset() && (pf & print_flags::POSIX_READONLY) == 0
+        if param.is_unset()
+            && (pf & print_flags::POSIX_READONLY) == 0
             && (pf & print_flags::POSIX_EXPORT) == 0
         {
             return None;
@@ -2443,7 +3072,9 @@ impl ParamTable {
 
         let mut out = String::new();
 
-        if (pf & (print_flags::TYPESET | print_flags::POSIX_READONLY | print_flags::POSIX_EXPORT)) != 0 {
+        if (pf & (print_flags::TYPESET | print_flags::POSIX_READONLY | print_flags::POSIX_EXPORT))
+            != 0
+        {
             if (pf & print_flags::POSIX_EXPORT) != 0 {
                 if (param.flags & flags::EXPORT) == 0 {
                     return None;
@@ -2556,7 +3187,8 @@ impl ParamTable {
 
     /// Check if parameter is set (from issetvar)
     pub fn issetvar(&self, name: &str) -> bool {
-        self.params.get(name)
+        self.params
+            .get(name)
             .map(|p| !p.is_unset())
             .unwrap_or(false)
     }
@@ -2579,16 +3211,12 @@ impl ParamTable {
 
     /// Check if parameter is an array
     pub fn isarray(&self, name: &str) -> bool {
-        self.params.get(name)
-            .map(|p| p.is_array())
-            .unwrap_or(false)
+        self.params.get(name).map(|p| p.is_array()).unwrap_or(false)
     }
 
     /// Check if parameter is a hash
     pub fn ishash(&self, name: &str) -> bool {
-        self.params.get(name)
-            .map(|p| p.is_assoc())
-            .unwrap_or(false)
+        self.params.get(name).map(|p| p.is_assoc()).unwrap_or(false)
     }
 
     /// Copy a parameter value
@@ -2700,14 +3328,18 @@ pub fn paramtype(table: &ParamTable, name: &str) -> u32 {
 
 /// Check if parameter is exported
 pub fn isexported(table: &ParamTable, name: &str) -> bool {
-    table.params.get(name)
+    table
+        .params
+        .get(name)
         .map(|p| p.is_exported())
         .unwrap_or(false)
 }
 
 /// Check if parameter is readonly
 pub fn isreadonly(table: &ParamTable, name: &str) -> bool {
-    table.params.get(name)
+    table
+        .params
+        .get(name)
         .map(|p| p.is_readonly())
         .unwrap_or(false)
 }
@@ -2824,9 +3456,7 @@ pub fn array_to_colonarr(arr: &[String]) -> String {
 /// Remove duplicate elements from array while preserving order
 pub fn uniq_array(arr: Vec<String>) -> Vec<String> {
     let mut seen = HashSet::new();
-    arr.into_iter()
-        .filter(|s| seen.insert(s.clone()))
-        .collect()
+    arr.into_iter().filter(|s| seen.insert(s.clone())).collect()
 }
 
 /// Parse a subscript expression like "[1]", "[1,5]", "[@]", "[*]"
@@ -2893,7 +3523,11 @@ pub fn getarrvalue(arr: &[String], start: i64, end: i64) -> Vec<String> {
 /// Set array element with subscript handling (from params.c setarrvalue)
 pub fn setarrvalue(arr: &mut Vec<String>, start: i64, end: i64, val: Vec<String>) {
     let len = arr.len() as i64;
-    let start = if start < 0 { (len + start + 1).max(0) } else { start };
+    let start = if start < 0 {
+        (len + start + 1).max(0)
+    } else {
+        start
+    };
     let end = if end < 0 { (len + end + 1).max(0) } else { end };
     let start = (start.max(1) - 1) as usize;
     let end = end.max(0) as usize;
@@ -2921,12 +3555,18 @@ pub fn get_array_element(arr: &[String], idx: i64, ksh_arrays: bool) -> Option<S
     let len = arr.len() as i64;
     let actual_idx = if idx < 0 {
         let adj = len + idx;
-        if adj < 0 { return None; }
+        if adj < 0 {
+            return None;
+        }
         adj as usize
     } else if ksh_arrays {
         idx as usize
     } else {
-        if idx > 0 { (idx - 1) as usize } else { return None; }
+        if idx > 0 {
+            (idx - 1) as usize
+        } else {
+            return None;
+        }
     };
     arr.get(actual_idx).cloned()
 }
@@ -2942,7 +3582,11 @@ pub fn get_array_slice(arr: &[String], idx: &SubscriptIndex, ksh_arrays: bool) -
     } else if ksh_arrays {
         idx.start as usize
     } else {
-        if idx.start > 0 { (idx.start - 1) as usize } else { 0 }
+        if idx.start > 0 {
+            (idx.start - 1) as usize
+        } else {
+            0
+        }
     };
     let end = if idx.end < 0 {
         ((len + idx.end + 1).max(0) as usize).min(arr.len())
@@ -2962,7 +3606,7 @@ fn glob_match(pattern: &str, name: &str) -> bool {
     if pattern == "*" {
         return true;
     }
-    if pattern.ends_with('*') && !pattern[..pattern.len()-1].contains('*') {
+    if pattern.ends_with('*') && !pattern[..pattern.len() - 1].contains('*') {
         return name.starts_with(&pattern[..pattern.len() - 1]);
     }
     if pattern.starts_with('*') && !pattern[1..].contains('*') {
@@ -2970,7 +3614,7 @@ fn glob_match(pattern: &str, name: &str) -> bool {
     }
     // Simple two-star case: *foo*
     if pattern.starts_with('*') && pattern.ends_with('*') && pattern.len() > 2 {
-        let inner = &pattern[1..pattern.len()-1];
+        let inner = &pattern[1..pattern.len() - 1];
         if !inner.contains('*') {
             return name.contains(inner);
         }
@@ -2984,7 +3628,9 @@ fn shell_quote(s: &str) -> String {
         return "''".to_string();
     }
     // Check if quoting is needed
-    if s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-' || c == ':') {
+    if s.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-' || c == ':')
+    {
         return s.to_string();
     }
     let mut out = String::with_capacity(s.len() + 2);
@@ -3024,7 +3670,11 @@ pub fn convbase(val: i64, base: u32) -> String {
     let mut digits = Vec::new();
     while v > 0 {
         let dig = (v % base as u64) as u8;
-        digits.push(if dig < 10 { b'0' + dig } else { b'A' + dig - 10 });
+        digits.push(if dig < 10 {
+            b'0' + dig
+        } else {
+            b'A' + dig - 10
+        });
         v /= base as u64;
     }
     digits.reverse();
@@ -3043,7 +3693,12 @@ pub fn convbase(val: i64, base: u32) -> String {
     };
 
     let sign = if negative { "-" } else { "" };
-    format!("{}{}{}", sign, base_prefix, String::from_utf8_lossy(&digits))
+    format!(
+        "{}{}{}",
+        sign,
+        base_prefix,
+        String::from_utf8_lossy(&digits)
+    )
 }
 
 /// Convert integer to string with underscores for readability
@@ -3056,10 +3711,14 @@ pub fn convbase_underscore(val: i64, base: u32, underscore: i32) -> String {
     // Find the digits portion
     let (prefix, digits) = if s.starts_with('-') {
         let rest = &s[1..];
-        let digit_start = rest.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase()).unwrap_or(0);
+        let digit_start = rest
+            .find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase())
+            .unwrap_or(0);
         (&s[..1 + digit_start], &rest[digit_start..])
     } else {
-        let digit_start = s.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase()).unwrap_or(0);
+        let digit_start = s
+            .find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase())
+            .unwrap_or(0);
         (&s[..digit_start], &s[digit_start..])
     };
 
@@ -3089,7 +3748,11 @@ pub fn convbase_underscore(val: i64, base: u32, underscore: i32) -> String {
 /// Format a float value for output (from params.c convfloat)
 pub fn format_float(dval: f64, digits: i32, pm_flags: u32) -> String {
     if dval.is_infinite() {
-        return if dval < 0.0 { "-Inf".to_string() } else { "Inf".to_string() };
+        return if dval < 0.0 {
+            "-Inf".to_string()
+        } else {
+            "Inf".to_string()
+        };
     }
     if dval.is_nan() {
         return "NaN".to_string();
@@ -3251,12 +3914,16 @@ pub fn parse_subscription_flags(s: &str) -> (SubscriptFlags, &str) {
                 flags.down = true;
                 flags.key_match = false;
             }
-            'w' => { flags.word = true; }
+            'w' => {
+                flags.word = true;
+            }
             'f' => {
                 flags.word = true;
                 flags.separator = Some("\n".to_string());
             }
-            'e' => { flags.quote_arg = true; }
+            'e' => {
+                flags.quote_arg = true;
+            }
             _ => {}
         }
     }
@@ -3304,7 +3971,10 @@ mod tests {
     fn test_param_array() {
         let mut table = ParamTable::new();
         table.set_array("arr", vec!["a".into(), "b".into(), "c".into()]);
-        assert_eq!(table.get_value("arr").unwrap().as_array(), vec!["a", "b", "c"]);
+        assert_eq!(
+            table.get_value("arr").unwrap().as_array(),
+            vec!["a", "b", "c"]
+        );
     }
 
     #[test]
@@ -3435,7 +4105,10 @@ mod tests {
         let mut table = ParamTable::new();
         table.set_array("arr", vec!["a".into(), "b".into()]);
         table.augment_array("arr", vec!["c".into(), "d".into()]);
-        assert_eq!(table.get_value("arr").unwrap().as_array(), vec!["a", "b", "c", "d"]);
+        assert_eq!(
+            table.get_value("arr").unwrap().as_array(),
+            vec!["a", "b", "c", "d"]
+        );
     }
 
     #[test]
@@ -3478,7 +4151,10 @@ mod tests {
         assert_eq!(table.get_value("SHLVL").unwrap().as_integer(), 99);
 
         table.pop_scope();
-        assert_eq!(table.get_value("SHLVL").unwrap().as_integer(), initial_shlvl);
+        assert_eq!(
+            table.get_value("SHLVL").unwrap().as_integer(),
+            initial_shlvl
+        );
     }
 
     #[test]

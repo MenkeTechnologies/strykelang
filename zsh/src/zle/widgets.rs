@@ -727,7 +727,7 @@ pub fn execute_builtin(
             }
             WidgetResult::Ok
         }
-        
+
         // Delete-to-char / Zap-to-char (Emacs style)
         BuiltinWidget::DeleteToChar | BuiltinWidget::ZapToChar => {
             // This widget needs a character argument - would be read from next key press

@@ -9,7 +9,13 @@
 /// If `inclusive` is true (zap-to-char), the target character is also deleted.
 /// If `inclusive` is false (delete-to-char), stop before the target character.
 /// If `direction` is positive, search forward; negative, search backward.
-pub fn deltochar(buffer: &str, cursor: usize, target: char, direction: i32, inclusive: bool) -> Option<(usize, usize)> {
+pub fn deltochar(
+    buffer: &str,
+    cursor: usize,
+    target: char,
+    direction: i32,
+    inclusive: bool,
+) -> Option<(usize, usize)> {
     if direction >= 0 {
         // Search forward
         let search_area = &buffer[cursor..];
@@ -23,7 +29,11 @@ pub fn deltochar(buffer: &str, cursor: usize, target: char, direction: i32, incl
         // Search backward
         let search_area = &buffer[..cursor];
         if let Some(pos) = search_area.rfind(target) {
-            let start = if inclusive { pos } else { pos + target.len_utf8() };
+            let start = if inclusive {
+                pos
+            } else {
+                pos + target.len_utf8()
+            };
             Some((start, cursor))
         } else {
             None
@@ -32,7 +42,13 @@ pub fn deltochar(buffer: &str, cursor: usize, target: char, direction: i32, incl
 }
 
 /// Apply delete-to-char: returns the new buffer with the range removed
-pub fn apply_deltochar(buffer: &str, cursor: usize, target: char, direction: i32, inclusive: bool) -> Option<(String, usize)> {
+pub fn apply_deltochar(
+    buffer: &str,
+    cursor: usize,
+    target: char,
+    direction: i32,
+    inclusive: bool,
+) -> Option<(String, usize)> {
     let (start, end) = deltochar(buffer, cursor, target, direction, inclusive)?;
     let mut result = String::with_capacity(buffer.len());
     result.push_str(&buffer[..start]);

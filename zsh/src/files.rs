@@ -31,12 +31,15 @@ fn mkdir_single(path: &Path, mode: u32) -> Result<(), String> {
         use std::ffi::CString;
 
         let path_str = path.to_string_lossy();
-        let path_c = CString::new(path_str.as_bytes())
-            .map_err(|e| e.to_string())?;
+        let path_c = CString::new(path_str.as_bytes()).map_err(|e| e.to_string())?;
 
         let result = unsafe { libc::mkdir(path_c.as_ptr(), mode as libc::mode_t) };
         if result < 0 {
-            Err(format!("cannot make directory '{}': {}", path.display(), io::Error::last_os_error()))
+            Err(format!(
+                "cannot make directory '{}': {}",
+                path.display(),
+                io::Error::last_os_error()
+            ))
         } else {
             Ok(())
         }
@@ -54,7 +57,10 @@ fn mkdir_parents(path: &Path, mode: u32) -> Result<(), String> {
         if path.is_dir() {
             return Ok(());
         }
-        return Err(format!("'{}' exists but is not a directory", path.display()));
+        return Err(format!(
+            "'{}' exists but is not a directory",
+            path.display()
+        ));
     }
 
     if let Some(parent) = path.parent() {
@@ -68,8 +74,7 @@ fn mkdir_parents(path: &Path, mode: u32) -> Result<(), String> {
 
 /// Remove a directory
 pub fn rmdir(path: &Path) -> Result<(), String> {
-    fs::remove_dir(path)
-        .map_err(|e| format!("cannot remove directory '{}': {}", path.display(), e))
+    fs::remove_dir(path).map_err(|e| format!("cannot remove directory '{}': {}", path.display(), e))
 }
 
 /// Options for link operations
@@ -85,7 +90,8 @@ pub struct LinkOptions {
 /// Create a link (hard or symbolic)
 pub fn link(source: &Path, target: &Path, options: &LinkOptions) -> Result<(), String> {
     let target_path = if target.is_dir() && !options.no_dereference {
-        let filename = source.file_name()
+        let filename = source
+            .file_name()
             .ok_or_else(|| "invalid source path".to_string())?;
         target.join(filename)
     } else {
@@ -104,7 +110,10 @@ pub fn link(source: &Path, target: &Path, options: &LinkOptions) -> Result<(), S
     #[cfg(unix)]
     {
         if !options.allow_dir && source.is_dir() && !options.symbolic {
-            return Err(format!("'{}': hard link not allowed for directory", source.display()));
+            return Err(format!(
+                "'{}': hard link not allowed for directory",
+                source.display()
+            ));
         }
 
         if options.symbolic {
@@ -133,7 +142,8 @@ pub struct MoveOptions {
 /// Move/rename a file
 pub fn mv(source: &Path, target: &Path, options: &MoveOptions) -> Result<(), String> {
     let target_path = if target.is_dir() {
-        let filename = source.file_name()
+        let filename = source
+            .file_name()
             .ok_or_else(|| "invalid source path".to_string())?;
         target.join(filename)
     } else {
@@ -142,12 +152,21 @@ pub fn mv(source: &Path, target: &Path, options: &MoveOptions) -> Result<(), Str
 
     if target_path.exists() && !options.force && !options.interactive {
         if target_path.is_dir() {
-            return Err(format!("'{}': cannot overwrite directory", target_path.display()));
+            return Err(format!(
+                "'{}': cannot overwrite directory",
+                target_path.display()
+            ));
         }
     }
 
-    fs::rename(source, &target_path)
-        .map_err(|e| format!("cannot move '{}' to '{}': {}", source.display(), target_path.display(), e))
+    fs::rename(source, &target_path).map_err(|e| {
+        format!(
+            "cannot move '{}' to '{}': {}",
+            source.display(),
+            target_path.display(),
+            e
+        )
+    })
 }
 
 /// Options for remove
@@ -165,39 +184,41 @@ pub fn rm(path: &Path, options: &RemoveOptions) -> Result<(), String> {
         if options.force {
             return Ok(());
         }
-        return Err(format!("cannot remove '{}': No such file or directory", path.display()));
+        return Err(format!(
+            "cannot remove '{}': No such file or directory",
+            path.display()
+        ));
     }
 
     if path.is_dir() {
         if options.recursive {
             rm_recursive(path, options)
         } else if options.dir {
-            fs::remove_dir(path)
-                .map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
+            fs::remove_dir(path).map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
         } else if !options.force {
-            Err(format!("cannot remove '{}': Is a directory", path.display()))
+            Err(format!(
+                "cannot remove '{}': Is a directory",
+                path.display()
+            ))
         } else {
             Ok(())
         }
     } else {
-        fs::remove_file(path)
-            .map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
+        fs::remove_file(path).map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
     }
 }
 
 fn rm_recursive(path: &Path, options: &RemoveOptions) -> Result<(), String> {
     if path.is_dir() {
         for entry in fs::read_dir(path)
-            .map_err(|e| format!("cannot read directory '{}': {}", path.display(), e))? 
+            .map_err(|e| format!("cannot read directory '{}': {}", path.display(), e))?
         {
             let entry = entry.map_err(|e| e.to_string())?;
             rm_recursive(&entry.path(), options)?;
         }
-        fs::remove_dir(path)
-            .map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
+        fs::remove_dir(path).map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
     } else {
-        fs::remove_file(path)
-            .map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
+        fs::remove_file(path).map_err(|e| format!("cannot remove '{}': {}", path.display(), e))
     }
 }
 
@@ -208,12 +229,15 @@ pub fn chmod(path: &Path, mode: u32, recursive: bool) -> Result<(), String> {
         use std::ffi::CString;
 
         let path_str = path.to_string_lossy();
-        let path_c = CString::new(path_str.as_bytes())
-            .map_err(|e| e.to_string())?;
+        let path_c = CString::new(path_str.as_bytes()).map_err(|e| e.to_string())?;
 
         let result = unsafe { libc::chmod(path_c.as_ptr(), mode as libc::mode_t) };
         if result < 0 {
-            return Err(format!("cannot change mode of '{}': {}", path.display(), io::Error::last_os_error()));
+            return Err(format!(
+                "cannot change mode of '{}': {}",
+                path.display(),
+                io::Error::last_os_error()
+            ));
         }
 
         if recursive && path.is_dir() {
@@ -236,15 +260,24 @@ pub fn chmod(path: &Path, mode: u32, recursive: bool) -> Result<(), String> {
 
 /// Change file owner/group
 #[cfg(unix)]
-pub fn chown(path: &Path, uid: Option<u32>, gid: Option<u32>, recursive: bool, no_dereference: bool) -> Result<(), String> {
+pub fn chown(
+    path: &Path,
+    uid: Option<u32>,
+    gid: Option<u32>,
+    recursive: bool,
+    no_dereference: bool,
+) -> Result<(), String> {
     use std::ffi::CString;
 
     let path_str = path.to_string_lossy();
-    let path_c = CString::new(path_str.as_bytes())
-        .map_err(|e| e.to_string())?;
+    let path_c = CString::new(path_str.as_bytes()).map_err(|e| e.to_string())?;
 
-    let uid = uid.map(|u| u as libc::uid_t).unwrap_or(u32::MAX as libc::uid_t);
-    let gid = gid.map(|g| g as libc::gid_t).unwrap_or(u32::MAX as libc::gid_t);
+    let uid = uid
+        .map(|u| u as libc::uid_t)
+        .unwrap_or(u32::MAX as libc::uid_t);
+    let gid = gid
+        .map(|g| g as libc::gid_t)
+        .unwrap_or(u32::MAX as libc::gid_t);
 
     let result = if no_dereference {
         unsafe { libc::lchown(path_c.as_ptr(), uid, gid) }
@@ -253,7 +286,11 @@ pub fn chown(path: &Path, uid: Option<u32>, gid: Option<u32>, recursive: bool, n
     };
 
     if result < 0 {
-        return Err(format!("cannot change owner of '{}': {}", path.display(), io::Error::last_os_error()));
+        return Err(format!(
+            "cannot change owner of '{}': {}",
+            path.display(),
+            io::Error::last_os_error()
+        ));
     }
 
     if recursive && path.is_dir() {
@@ -375,13 +412,22 @@ pub fn mode_to_string(mode: u32) -> String {
     let perms = [
         (mode & 0o400 != 0, 'r'),
         (mode & 0o200 != 0, 'w'),
-        (mode & 0o100 != 0, if mode & 0o4000 != 0 { 's' } else { 'x' }),
+        (
+            mode & 0o100 != 0,
+            if mode & 0o4000 != 0 { 's' } else { 'x' },
+        ),
         (mode & 0o040 != 0, 'r'),
         (mode & 0o020 != 0, 'w'),
-        (mode & 0o010 != 0, if mode & 0o2000 != 0 { 's' } else { 'x' }),
+        (
+            mode & 0o010 != 0,
+            if mode & 0o2000 != 0 { 's' } else { 'x' },
+        ),
         (mode & 0o004 != 0, 'r'),
         (mode & 0o002 != 0, 'w'),
-        (mode & 0o001 != 0, if mode & 0o1000 != 0 { 't' } else { 'x' }),
+        (
+            mode & 0o001 != 0,
+            if mode & 0o1000 != 0 { 't' } else { 'x' },
+        ),
     ];
 
     for (set, ch) in perms {
@@ -519,7 +565,10 @@ mod tests {
         link(&src, &dst, &options).unwrap();
 
         assert!(dst.exists());
-        assert_eq!(fs::metadata(&src).unwrap().ino(), fs::metadata(&dst).unwrap().ino());
+        assert_eq!(
+            fs::metadata(&src).unwrap().ino(),
+            fs::metadata(&dst).unwrap().ino()
+        );
     }
 
     #[test]

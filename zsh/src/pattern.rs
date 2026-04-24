@@ -11,38 +11,37 @@
 //! - Approximate matching (error tolerance)
 //! - Numeric ranges: <n-m>
 
-
 /// Pattern opcodes - matching zsh's P_* constants
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PatOp {
-    End = 0x00,       // End of program
-    ExcSync = 0x01,   // Test if following exclude already failed
-    ExcEnd = 0x02,    // Test if exclude matched original branch
-    Back = 0x03,      // Match "", "next" ptr points backward
-    Exactly = 0x04,   // Match literal string
-    Nothing = 0x05,   // Match empty string
-    OneHash = 0x06,   // Match 0+ times (simple thing)
-    TwoHash = 0x07,   // Match 1+ times (simple thing)
-    GFlags = 0x08,    // Set globbing flags
-    IsStart = 0x09,   // Match start of string
-    IsEnd = 0x0a,     // Match end of string
+    End = 0x00,        // End of program
+    ExcSync = 0x01,    // Test if following exclude already failed
+    ExcEnd = 0x02,     // Test if exclude matched original branch
+    Back = 0x03,       // Match "", "next" ptr points backward
+    Exactly = 0x04,    // Match literal string
+    Nothing = 0x05,    // Match empty string
+    OneHash = 0x06,    // Match 0+ times (simple thing)
+    TwoHash = 0x07,    // Match 1+ times (simple thing)
+    GFlags = 0x08,     // Set globbing flags
+    IsStart = 0x09,    // Match start of string
+    IsEnd = 0x0a,      // Match end of string
     CountStart = 0x0b, // Initialize P_COUNT
-    Count = 0x0c,     // Match counted repetitions
-    Branch = 0x20,    // Match alternative
-    WBranch = 0x21,   // Branch, but match at least 1 char
-    Exclude = 0x30,   // Exclude from previous branch
-    ExcludP = 0x31,   // Exclude using full path
-    Any = 0x40,       // Match any one character
-    AnyOf = 0x41,     // Match any char in set
-    AnyBut = 0x42,    // Match any char not in set
-    Star = 0x43,      // Match any characters
-    NumRng = 0x44,    // Match numeric range
-    NumFrom = 0x45,   // Match number >= X
-    NumTo = 0x46,     // Match number <= X
-    NumAny = 0x47,    // Match any decimal digits
-    Open = 0x80,      // Start of capture group (+ group number)
-    Close = 0x90,     // End of capture group (+ group number)
+    Count = 0x0c,      // Match counted repetitions
+    Branch = 0x20,     // Match alternative
+    WBranch = 0x21,    // Branch, but match at least 1 char
+    Exclude = 0x30,    // Exclude from previous branch
+    ExcludP = 0x31,    // Exclude using full path
+    Any = 0x40,        // Match any one character
+    AnyOf = 0x41,      // Match any char in set
+    AnyBut = 0x42,     // Match any char not in set
+    Star = 0x43,       // Match any characters
+    NumRng = 0x44,     // Match numeric range
+    NumFrom = 0x45,    // Match number >= X
+    NumTo = 0x46,      // Match number <= X
+    NumAny = 0x47,     // Match any decimal digits
+    Open = 0x80,       // Start of capture group (+ group number)
+    Close = 0x90,      // End of capture group (+ group number)
 }
 
 /// Maximum number of backreferences
@@ -51,24 +50,24 @@ const NSUBEXP: usize = 9;
 /// Pattern flags
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PatFlags {
-    pub file: bool,        // File globbing mode
-    pub any: bool,         // Match any string
-    pub noanch: bool,      // Not anchored at end
-    pub nogld: bool,       // Don't match leading dot
-    pub pures: bool,       // Pure string (no pattern chars)
-    pub scan: bool,        // Scanning for match
-    pub lcmatchuc: bool,   // Lowercase pattern matches uppercase
+    pub file: bool,      // File globbing mode
+    pub any: bool,       // Match any string
+    pub noanch: bool,    // Not anchored at end
+    pub nogld: bool,     // Don't match leading dot
+    pub pures: bool,     // Pure string (no pattern chars)
+    pub scan: bool,      // Scanning for match
+    pub lcmatchuc: bool, // Lowercase pattern matches uppercase
 }
 
 /// Globbing flags
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GlobFlags {
-    pub igncase: bool,     // Case insensitive
-    pub lcmatchuc: bool,   // Lowercase matches uppercase
-    pub matchref: bool,    // Set MATCH, MBEGIN, MEND
-    pub backref: bool,     // Enable backreferences
-    pub multibyte: bool,   // Multibyte support
-    pub approx: u8,        // Approximation level (error tolerance)
+    pub igncase: bool,   // Case insensitive
+    pub lcmatchuc: bool, // Lowercase matches uppercase
+    pub matchref: bool,  // Set MATCH, MBEGIN, MEND
+    pub backref: bool,   // Enable backreferences
+    pub multibyte: bool, // Multibyte support
+    pub approx: u8,      // Approximation level (error tolerance)
 }
 
 /// Compiled pattern program
@@ -96,31 +95,35 @@ pub enum PatNode {
     End,
     ExcSync,
     ExcEnd,
-    Back(usize),               // Offset to jump back
-    Exactly(String),           // Literal string
+    Back(usize),     // Offset to jump back
+    Exactly(String), // Literal string
     Nothing,
-    OneHash(Box<PatNode>),     // 0 or more
-    TwoHash(Box<PatNode>),     // 1 or more
+    OneHash(Box<PatNode>), // 0 or more
+    TwoHash(Box<PatNode>), // 1 or more
     GFlags(GlobFlags),
     IsStart,
     IsEnd,
     CountStart,
-    Count { min: u32, max: Option<u32>, node: Box<PatNode> },
+    Count {
+        min: u32,
+        max: Option<u32>,
+        node: Box<PatNode>,
+    },
     Branch(Vec<PatNode>, usize), // Alternatives, next offset
     WBranch(Vec<PatNode>),
     Exclude(Vec<PatNode>),
     ExcludP(Vec<PatNode>),
-    Any,                       // Match any single char
-    AnyOf(Vec<char>),          // Character class
-    AnyBut(Vec<char>),         // Negated character class
-    Star,                      // Match any string
-    NumRng(i64, i64),          // Numeric range
-    NumFrom(i64),              // >= number
-    NumTo(i64),                // <= number
-    NumAny,                    // Any digits
-    Open(usize),               // Start capture group
-    Close(usize),              // End capture group
-    Sequence(Vec<PatNode>),    // Sequence of nodes
+    Any,                    // Match any single char
+    AnyOf(Vec<char>),       // Character class
+    AnyBut(Vec<char>),      // Negated character class
+    Star,                   // Match any string
+    NumRng(i64, i64),       // Numeric range
+    NumFrom(i64),           // >= number
+    NumTo(i64),             // <= number
+    NumAny,                 // Any digits
+    Open(usize),            // Start capture group
+    Close(usize),           // End capture group
+    Sequence(Vec<PatNode>), // Sequence of nodes
 }
 
 /// Pattern compiler state
@@ -181,7 +184,10 @@ impl<'a> PatCompiler<'a> {
         if !self.has_pattern_chars() {
             return Ok(PatProg {
                 code: vec![PatNode::Exactly(self.input.to_string()), PatNode::End],
-                flags: PatFlags { pures: true, ..self.flags },
+                flags: PatFlags {
+                    pures: true,
+                    ..self.flags
+                },
                 glob_start: self.glob_flags,
                 glob_end: self.glob_flags,
                 npar: 0,
@@ -306,10 +312,7 @@ impl<'a> PatCompiler<'a> {
                     }
                     self.advance();
                     // 0 or 1 match
-                    PatNode::Branch(vec![
-                        PatNode::Sequence(inner),
-                        PatNode::Nothing,
-                    ], 0)
+                    PatNode::Branch(vec![PatNode::Sequence(inner), PatNode::Nothing], 0)
                 } else {
                     PatNode::Any
                 }
@@ -444,7 +447,7 @@ impl<'a> PatCompiler<'a> {
 
     fn compile_bracket(&mut self) -> Result<PatNode, String> {
         self.advance(); // consume '['
-        
+
         let negated = matches!(self.peek(), Some('!' | '^'));
         if negated {
             self.advance();
@@ -534,9 +537,16 @@ impl<'a> PatCompiler<'a> {
             "punct" => "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".chars().collect(),
             "xdigit" => ('0'..='9').chain('a'..='f').chain('A'..='F').collect(),
             "blank" => vec![' ', '\t'],
-            "cntrl" => (0u8..=31).map(|b| b as char).chain(std::iter::once(127 as char)).collect(),
+            "cntrl" => (0u8..=31)
+                .map(|b| b as char)
+                .chain(std::iter::once(127 as char))
+                .collect(),
             "graph" | "print" => (33u8..=126).map(|b| b as char).collect(),
-            "word" => ('a'..='z').chain('A'..='Z').chain('0'..='9').chain(std::iter::once('_')).collect(),
+            "word" => ('a'..='z')
+                .chain('A'..='Z')
+                .chain('0'..='9')
+                .chain(std::iter::once('_'))
+                .collect(),
             _ => return None,
         };
 
@@ -572,8 +582,16 @@ impl<'a> PatCompiler<'a> {
             }
         }
 
-        let from: Option<i64> = if from_str.is_empty() { None } else { from_str.parse().ok() };
-        let to: Option<i64> = if to_str.is_empty() { None } else { to_str.parse().ok() };
+        let from: Option<i64> = if from_str.is_empty() {
+            None
+        } else {
+            from_str.parse().ok()
+        };
+        let to: Option<i64> = if to_str.is_empty() {
+            None
+        } else {
+            to_str.parse().ok()
+        };
 
         match (from, to) {
             (Some(f), Some(t)) => Ok(PatNode::NumRng(f, t)),
@@ -632,7 +650,7 @@ impl<'a> PatMatcher<'a> {
         let mut idx = start_idx;
         while idx < nodes.len() {
             let node = &nodes[idx];
-            
+
             // Special handling for Star - needs to try all possible positions
             if matches!(node, PatNode::Star) {
                 // If this is the last node, consume rest of input
@@ -640,15 +658,18 @@ impl<'a> PatMatcher<'a> {
                     self.pos = self.input.len();
                     return true;
                 }
-                
+
                 // Try matching rest of pattern at each position
                 let save_pos = self.pos;
                 let end_pos = if self.prog.flags.file {
-                    self.input[self.pos..].find('/').map(|i| self.pos + i).unwrap_or(self.input.len())
+                    self.input[self.pos..]
+                        .find('/')
+                        .map(|i| self.pos + i)
+                        .unwrap_or(self.input.len())
                 } else {
                     self.input.len()
                 };
-                
+
                 // Try from current position to end
                 for try_pos in save_pos..=end_pos {
                     self.pos = try_pos;
@@ -659,7 +680,7 @@ impl<'a> PatMatcher<'a> {
                 self.pos = save_pos;
                 return false;
             }
-            
+
             if !self.match_node(node) {
                 return false;
             }
@@ -679,9 +700,7 @@ impl<'a> PatMatcher<'a> {
             PatNode::Exactly(s) => {
                 let remaining = &self.input[self.pos..];
                 if self.glob_flags.igncase {
-                    if remaining.len() >= s.len()
-                        && remaining[..s.len()].eq_ignore_ascii_case(s)
-                    {
+                    if remaining.len() >= s.len() && remaining[..s.len()].eq_ignore_ascii_case(s) {
                         self.pos += s.len();
                         true
                     } else {
@@ -848,21 +867,13 @@ impl<'a> PatMatcher<'a> {
                 true
             }
 
-            PatNode::NumRng(from, to) => {
-                self.match_number(Some(*from), Some(*to))
-            }
+            PatNode::NumRng(from, to) => self.match_number(Some(*from), Some(*to)),
 
-            PatNode::NumFrom(from) => {
-                self.match_number(Some(*from), None)
-            }
+            PatNode::NumFrom(from) => self.match_number(Some(*from), None),
 
-            PatNode::NumTo(to) => {
-                self.match_number(None, Some(*to))
-            }
+            PatNode::NumTo(to) => self.match_number(None, Some(*to)),
 
-            PatNode::NumAny => {
-                self.match_number(None, None)
-            }
+            PatNode::NumAny => self.match_number(None, None),
 
             PatNode::IsStart => self.pos == 0,
 
@@ -1022,17 +1033,20 @@ pub fn patmatch_opts(
     ksh_glob: bool,
     igncase: bool,
 ) -> bool {
-    match patcompile_opts(pattern, PatFlags::default(), extended_glob, ksh_glob, igncase) {
+    match patcompile_opts(
+        pattern,
+        PatFlags::default(),
+        extended_glob,
+        ksh_glob,
+        igncase,
+    ) {
         Ok(prog) => pattry(&prog, text),
         Err(_) => false,
     }
 }
 
 /// Match with captures - returns capture groups if matched
-pub fn patmatch_captures<'a>(
-    prog: &'a PatProg,
-    text: &'a str,
-) -> Option<Vec<Option<&'a str>>> {
+pub fn patmatch_captures<'a>(prog: &'a PatProg, text: &'a str) -> Option<Vec<Option<&'a str>>> {
     let mut matcher = PatMatcher::new(prog, text);
     if matcher.try_match() {
         let mut captures = Vec::with_capacity(prog.npar);
@@ -1056,9 +1070,7 @@ pub fn pattryrefs(prog: &PatProg, s: &str) -> Option<(bool, Vec<(usize, usize)>)
     let mut matcher = PatMatcher::new(prog, s);
     let matched = matcher.try_match();
     if matched {
-        let refs: Vec<(usize, usize)> = (1..=prog.npar)
-            .map(|i| matcher.captures[i - 1])
-            .collect();
+        let refs: Vec<(usize, usize)> = (1..=prog.npar).map(|i| matcher.captures[i - 1]).collect();
         Some((true, refs))
     } else {
         Some((false, Vec::new()))
@@ -1123,14 +1135,30 @@ pub fn patgetglobflags(s: &str) -> Option<(GlobFlags, Option<PatOp>, usize)> {
                 flags.igncase = false;
                 flags.lcmatchuc = false;
             }
-            b'b' => { flags.backref = true; }
-            b'B' => { flags.backref = false; }
-            b'm' => { flags.matchref = true; }
-            b'M' => { flags.matchref = false; }
-            b's' => { assert_op = Some(PatOp::IsStart); }
-            b'e' => { assert_op = Some(PatOp::IsEnd); }
-            b'u' => { flags.multibyte = true; }
-            b'U' => { flags.multibyte = false; }
+            b'b' => {
+                flags.backref = true;
+            }
+            b'B' => {
+                flags.backref = false;
+            }
+            b'm' => {
+                flags.matchref = true;
+            }
+            b'M' => {
+                flags.matchref = false;
+            }
+            b's' => {
+                assert_op = Some(PatOp::IsStart);
+            }
+            b'e' => {
+                assert_op = Some(PatOp::IsEnd);
+            }
+            b'u' => {
+                flags.multibyte = true;
+            }
+            b'U' => {
+                flags.multibyte = false;
+            }
             _ => return None,
         }
         pos += 1;
@@ -1142,7 +1170,8 @@ pub fn patgetglobflags(s: &str) -> Option<(GlobFlags, Option<PatOp>, usize)> {
     pos += 1; // skip ')'
 
     // Start/end assertions must appear alone
-    if assert_op.is_some() && pos - 3 > 1 { // more than one flag char
+    if assert_op.is_some() && pos - 3 > 1 {
+        // more than one flag char
         return None;
     }
 
@@ -1226,7 +1255,8 @@ pub fn endpatternscope() {
 /// Save pattern disables state
 pub fn savepatterndisables() -> Vec<String> {
     unsafe {
-        PATTERN_SCOPES.last()
+        PATTERN_SCOPES
+            .last()
             .map(|s| s.disabled.clone())
             .unwrap_or_default()
     }
@@ -1264,9 +1294,25 @@ pub fn pat_enables(cmd: &str, patterns: &[&str], enable: bool) -> i32 {
 
 /// POSIX character class type names for [:stuff:]
 pub const COLON_CLASSES: &[&str] = &[
-    "alpha", "alnum", "ascii", "blank", "cntrl", "digit", "graph",
-    "lower", "print", "punct", "space", "upper", "xdigit",
-    "IDENT", "IFS", "IFSSPACE", "WORD", "INCOMPLETE", "INVALID",
+    "alpha",
+    "alnum",
+    "ascii",
+    "blank",
+    "cntrl",
+    "digit",
+    "graph",
+    "lower",
+    "print",
+    "punct",
+    "space",
+    "upper",
+    "xdigit",
+    "IDENT",
+    "IFS",
+    "IFSSPACE",
+    "WORD",
+    "INCOMPLETE",
+    "INVALID",
 ];
 
 /// Get the POSIX class type from name (from pattern.c range_type)
@@ -1276,7 +1322,9 @@ pub fn range_type(name: &str) -> Option<usize> {
 
 /// Convert a pattern range to a string for display (from pattern.c pattern_range_to_string)
 pub fn pattern_range_to_string(range_type_idx: usize) -> Option<String> {
-    COLON_CLASSES.get(range_type_idx).map(|s| format!("[:{}:]", s))
+    COLON_CLASSES
+        .get(range_type_idx)
+        .map(|s| format!("[:{}:]", s))
 }
 
 // ---------------------------------------------------------------------------
@@ -1364,8 +1412,14 @@ pub fn charrefinc(s: &str, pos: &mut usize) -> Option<char> {
 
 /// Get previous char width (from pattern.c charsub) - Rust native char
 pub fn charsub(s: &str, pos: usize) -> usize {
-    if pos == 0 { return 0; }
-    let prev = s[..pos].chars().next_back().map(|c| c.len_utf8()).unwrap_or(1);
+    if pos == 0 {
+        return 0;
+    }
+    let prev = s[..pos]
+        .chars()
+        .next_back()
+        .map(|c| c.len_utf8())
+        .unwrap_or(1);
     pos - prev
 }
 
@@ -1525,7 +1579,14 @@ mod tests {
 
     #[test]
     fn test_patmatchlen() {
-        let prog = patcompile("hel*", PatFlags { noanch: true, ..Default::default() }).unwrap();
+        let prog = patcompile(
+            "hel*",
+            PatFlags {
+                noanch: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let len = patmatchlen(&prog, "hello world");
         assert!(len.is_some());
     }

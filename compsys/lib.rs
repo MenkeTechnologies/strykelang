@@ -50,8 +50,8 @@ pub mod generate;
 pub mod library;
 pub mod matching;
 pub mod menu;
-pub mod state;
 pub mod shell_runner;
+pub mod state;
 pub mod system;
 pub mod zle;
 pub mod zpwr_colors;
@@ -104,45 +104,42 @@ pub use compcore::{
     CompletionState, MenuInfo,
 };
 pub use compinit::{
-    build_cache_from_fpath, cache_entry_count, cache_is_valid, check_dump, compdump, 
-    compinit, compinit_lazy, get_system_fpath, load_from_cache,
-    CompDef, CompFile, CompFileDef, CompInitOpts, CompInitResult,
+    build_cache_from_fpath, cache_entry_count, cache_is_valid, check_dump, compdump, compinit,
+    compinit_lazy, get_system_fpath, load_from_cache, CompDef, CompFile, CompFileDef, CompInitOpts,
+    CompInitResult,
 };
 pub use completion::{
     Completion, CompletionFlags, CompletionGroup, CompletionReceiver, GroupFlags,
 };
 pub use compset::{
-    compset_execute, compquote_execute, compcall_execute,
-    CompsetOp, CompquoteOpts, CompcallOpts,
+    compcall_execute, compquote_execute, compset_execute, CompcallOpts, CompquoteOpts, CompsetOp,
 };
 pub use computil::{
-    describe_execute, ArgSpec as UtilArgSpec, CompArguments, CompDescribe, CompTags, CompValues,
-    ValueSpec, CompFiles, CompGroups, CompGroupConfig,
+    describe_execute, ArgSpec as UtilArgSpec, CompArguments, CompDescribe, CompFiles,
+    CompGroupConfig, CompGroups, CompTags, CompValues, ValueSpec,
 };
 pub use describe::{describe_execute as native_describe, parse_items, DescribeItem, DescribeOpts};
 pub use files::{directories_execute, files_execute, FilesOpts};
+pub use generate::{
+    complete_builtins, complete_commands_from_cache, complete_files, complete_from_cache_function,
+    complete_parameters, complete_shell_functions, detect_completion_context, generate_completions,
+    CompContext,
+};
 pub use menu::{
     default_menuselect_bindings, parse_bindkey_output, GroupLayout, KeySequence, MenuAction,
     MenuColors, MenuItem, MenuKeymap, MenuLine, MenuMotion, MenuRendering, MenuResult, MenuState,
     SearchDirection, GROUP_COLORS,
 };
-pub use state::{CompParams, CompState, CompletionContext};
 pub use shell_runner::{
-    BuiltinDispatcher, ShellCompletionContext, CompletionResult, CompletionRunner, call_program,
+    call_program, BuiltinDispatcher, CompletionResult, CompletionRunner, ShellCompletionContext,
 };
-pub use system::{users, groups, hosts, pids, ports, net_interfaces, urls, signals};
-pub use zle::{ZleCompletionState, ZleWidgets, ZleAction};
+pub use state::{CompParams, CompState, CompletionContext};
+pub use system::{groups, hosts, net_interfaces, pids, ports, signals, urls, users};
+pub use zle::{ZleAction, ZleCompletionState, ZleWidgets};
 pub use zpwr_colors::{
-    zpwr_list_colors, load_zpwr_config, ZstyleColors, HeaderColors,
-    DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR,
-    parse_zstyles_from_config, parse_zstyles_from_content, ParsedZstyle,
+    load_zpwr_config, parse_zstyles_from_config, parse_zstyles_from_content, zpwr_list_colors,
+    HeaderColors, ParsedZstyle, ZstyleColors, DEFAULT_PREFIX_COLOR, MENU_SELECTION_COLOR,
 };
 pub use zstyle::{
-    ZStyle, ZStyleLookup, ZStyleStore,
-    STANDARD_STYLES, STANDARD_TAGS, STANDARD_COMPLETERS,
-};
-pub use generate::{
-    generate_completions, detect_completion_context, CompContext,
-    complete_commands_from_cache, complete_shell_functions, complete_builtins,
-    complete_files, complete_parameters, complete_from_cache_function,
+    ZStyle, ZStyleLookup, ZStyleStore, STANDARD_COMPLETERS, STANDARD_STYLES, STANDARD_TAGS,
 };

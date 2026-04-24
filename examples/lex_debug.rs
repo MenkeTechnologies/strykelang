@@ -8,9 +8,9 @@ fn main() {
     } else {
         "args=( 'foo' )".to_string()
     };
-    
+
     let mut lexer = ZshLexer::new(&input);
-    
+
     for _ in 0..50 {
         lexer.zshlex();
         println!("{:?} {:?}", lexer.tok, lexer.tokstr);

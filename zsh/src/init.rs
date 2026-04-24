@@ -63,7 +63,7 @@ impl ShellState {
         let pwd = env::current_dir()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| home.clone());
-        
+
         ShellState {
             options: ShellOptions {
                 rcs: true,
@@ -103,9 +103,9 @@ impl ShellState {
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or(name);
-        
+
         let basename = basename.trim_start_matches('-');
-        
+
         self.emulation = match basename {
             "sh" => ShellEmulation::Sh,
             "ksh" | "ksh93" => ShellEmulation::Ksh,
@@ -270,13 +270,13 @@ pub fn setupvals(state: &mut ShellState) {
 /// Source a file
 pub fn source(state: &mut ShellState, path: &str) -> SourceReturn {
     let path = Path::new(path);
-    
+
     if !path.exists() {
         return SourceReturn::NotFound;
     }
 
     state.sourcelevel += 1;
-    
+
     // In a full implementation, we would:
     // 1. Open the file
     // 2. Parse and execute commands
@@ -351,7 +351,7 @@ pub fn get_exe_path() -> Option<PathBuf> {
     {
         std::fs::read_link("/proc/self/exe").ok()
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         use std::ffi::CStr;
@@ -366,7 +366,7 @@ pub fn get_exe_path() -> Option<PathBuf> {
             }
         }
     }
-    
+
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         None
@@ -494,9 +494,7 @@ pub fn is_login_shell(argv0: &str) -> bool {
 
 /// Get the ZDOTDIR
 pub fn get_zdotdir() -> String {
-    env::var("ZDOTDIR").unwrap_or_else(|_| {
-        env::var("HOME").unwrap_or_else(|_| ".".to_string())
-    })
+    env::var("ZDOTDIR").unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string()))
 }
 
 /// Full initialization sequence (from init.c init_main)
@@ -548,13 +546,13 @@ mod tests {
     #[test]
     fn test_emulate_from_name() {
         let mut state = ShellState::new();
-        
+
         state.emulate_from_name("zsh");
         assert_eq!(state.emulation, ShellEmulation::Zsh);
-        
+
         state.emulate_from_name("/bin/sh");
         assert_eq!(state.emulation, ShellEmulation::Sh);
-        
+
         state.emulate_from_name("-ksh");
         assert_eq!(state.emulation, ShellEmulation::Ksh);
     }
@@ -569,7 +567,11 @@ mod tests {
 
     #[test]
     fn test_parseargs_command() {
-        let args = vec!["zsh".to_string(), "-c".to_string(), "echo hello".to_string()];
+        let args = vec![
+            "zsh".to_string(),
+            "-c".to_string(),
+            "echo hello".to_string(),
+        ];
         let (opts, cmd, _) = parseargs(&args);
         assert_eq!(cmd, Some("echo hello".to_string()));
         assert!(!opts.interactive);
@@ -585,13 +587,13 @@ mod tests {
     #[test]
     fn test_is_posix_emulation() {
         let mut state = ShellState::new();
-        
+
         state.emulation = ShellEmulation::Zsh;
         assert!(!state.is_posix_emulation());
-        
+
         state.emulation = ShellEmulation::Sh;
         assert!(state.is_posix_emulation());
-        
+
         state.emulation = ShellEmulation::Ksh;
         assert!(state.is_posix_emulation());
     }

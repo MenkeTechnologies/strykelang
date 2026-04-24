@@ -519,7 +519,7 @@ mod tests {
 // =============================================================================
 
 /// compfiles - File completion helper builtin
-/// 
+///
 /// This builtin helps with file path completion by providing:
 /// - Path reduction and expansion
 /// - Pattern matching on file names
@@ -537,7 +537,7 @@ impl CompFiles {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// compfiles -p: Path reduction (reduce array to prefix)
     /// Returns common prefix of all paths
     pub fn reduce_paths(paths: &[String]) -> String {
@@ -547,10 +547,10 @@ impl CompFiles {
         if paths.len() == 1 {
             return paths[0].clone();
         }
-        
+
         let first = &paths[0];
         let mut common_len = first.len();
-        
+
         for path in &paths[1..] {
             let shared = first
                 .chars()
@@ -559,7 +559,7 @@ impl CompFiles {
                 .count();
             common_len = common_len.min(shared);
         }
-        
+
         // Cut at last /
         let prefix = &first[..common_len];
         if let Some(pos) = prefix.rfind('/') {
@@ -568,7 +568,7 @@ impl CompFiles {
             String::new()
         }
     }
-    
+
     /// compfiles -P: Pattern matching on paths
     /// Filter paths matching pattern
     pub fn match_paths(paths: &[String], pattern: &str) -> Vec<String> {
@@ -581,7 +581,7 @@ impl CompFiles {
             .cloned()
             .collect()
     }
-    
+
     /// compfiles -i: Check if any path matches
     pub fn has_match(paths: &[String], pattern: &str) -> bool {
         paths.iter().any(|p| {
@@ -592,7 +592,7 @@ impl CompFiles {
 }
 
 // =============================================================================
-// compgroups builtin  
+// compgroups builtin
 // =============================================================================
 
 /// compgroups - Manage completion groups
@@ -618,12 +618,12 @@ impl CompGroups {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Create standard group set for a name (as zsh does)
     /// Creates 6 groups with different options for flexibility
     pub fn create_groups(names: &[&str]) -> Vec<CompGroupConfig> {
         let mut groups = Vec::new();
-        
+
         for name in names {
             // CGF_NOSORT|CGF_UNIQCON
             groups.push(CompGroupConfig {
@@ -668,7 +668,7 @@ impl CompGroups {
                 unique_all: false,
             });
         }
-        
+
         groups
     }
 }

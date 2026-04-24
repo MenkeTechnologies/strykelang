@@ -45,13 +45,8 @@ pub fn sysread(options: &SysreadOptions) -> (SysreadResult, Option<Vec<u8>>, usi
             }
         }
 
-        let count = unsafe {
-            libc::read(
-                input_fd,
-                buffer.as_mut_ptr() as *mut libc::c_void,
-                bufsize,
-            )
-        };
+        let count =
+            unsafe { libc::read(input_fd, buffer.as_mut_ptr() as *mut libc::c_void, bufsize) };
 
         if count < 0 {
             return (SysreadResult::ReadError, None, 0);
@@ -75,7 +70,11 @@ pub fn sysread(options: &SysreadOptions) -> (SysreadResult, Option<Vec<u8>>, usi
                     )
                 };
                 if ret < 0 {
-                    return (SysreadResult::WriteError, Some(buffer[written..].to_vec()), written);
+                    return (
+                        SysreadResult::WriteError,
+                        Some(buffer[written..].to_vec()),
+                        written,
+                    );
                 }
                 written += ret as usize;
             }
@@ -97,8 +96,6 @@ pub fn sysread(options: &SysreadOptions) -> (SysreadResult, Option<Vec<u8>>, usi
 
 #[cfg(unix)]
 fn wait_for_read(fd: i32, timeout_secs: f64) -> bool {
-    
-
     let timeout_ms = (timeout_secs * 1000.0) as i32;
 
     unsafe {
@@ -251,12 +248,18 @@ pub fn sysopen(path: &str, options: &SysopenOptions) -> Result<i32, String> {
         };
 
         if fd < 0 {
-            return Err(format!("can't open file {}: {}", path, io::Error::last_os_error()));
+            return Err(format!(
+                "can't open file {}: {}",
+                path,
+                io::Error::last_os_error()
+            ));
         }
 
         if let Some(explicit) = options.explicit_fd {
             let new_fd = unsafe { libc::dup2(fd, explicit) };
-            unsafe { libc::close(fd); }
+            unsafe {
+                libc::close(fd);
+            }
             if new_fd < 0 {
                 return Err(format!("can't dup fd to {}", explicit));
             }
@@ -431,7 +434,11 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
     let fd = unsafe { libc::open(path_c.as_ptr(), flags) };
 
     if fd < 0 {
-        return Err(format!("failed to open {}: {}", path, io::Error::last_os_error()));
+        return Err(format!(
+            "failed to open {}: {}",
+            path,
+            io::Error::last_os_error()
+        ));
     }
 
     if options.cloexec {
@@ -443,7 +450,11 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
         }
     }
 
-    let lock_type = if options.read_lock { libc::F_RDLCK } else { libc::F_WRLCK };
+    let lock_type = if options.read_lock {
+        libc::F_RDLCK
+    } else {
+        libc::F_WRLCK
+    };
 
     let lck = libc::flock {
         l_type: lock_type as i16,
@@ -467,12 +478,20 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
 
                 let errno = io::Error::last_os_error().raw_os_error().unwrap_or(0);
                 if errno != libc::EINTR && errno != libc::EACCES && errno != libc::EAGAIN {
-                    unsafe { libc::close(fd); }
-                    return Err(format!("failed to lock {}: {}", path, io::Error::last_os_error()));
+                    unsafe {
+                        libc::close(fd);
+                    }
+                    return Err(format!(
+                        "failed to lock {}: {}",
+                        path,
+                        io::Error::last_os_error()
+                    ));
                 }
 
                 if start.elapsed() >= timeout_duration {
-                    unsafe { libc::close(fd); }
+                    unsafe {
+                        libc::close(fd);
+                    }
                     return Err("timeout waiting for lock".to_string());
                 }
 
@@ -498,8 +517,14 @@ pub fn flock(path: &str, options: &FlockOptions) -> Result<i32, String> {
             continue;
         }
 
-        unsafe { libc::close(fd); }
-        return Err(format!("failed to lock {}: {}", path, io::Error::last_os_error()));
+        unsafe {
+            libc::close(fd);
+        }
+        return Err(format!(
+            "failed to lock {}: {}",
+            path,
+            io::Error::last_os_error()
+        ));
     }
 }
 
@@ -518,7 +543,9 @@ pub fn funlock(fd: i32) -> Result<(), String> {
     if result < 0 {
         Err(io::Error::last_os_error().to_string())
     } else {
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
         Ok(())
     }
 }
@@ -638,7 +665,9 @@ mod tests {
         let fd = sysopen(file_path.to_str().unwrap(), &options).unwrap();
         assert!(fd >= 0);
 
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
     }
 
     #[test]
@@ -665,7 +694,9 @@ mod tests {
         };
 
         let (result, data, count) = sysread(&options);
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
 
         assert_eq!(result, SysreadResult::Success);
         assert_eq!(count, 11);
@@ -700,6 +731,8 @@ mod tests {
         let current = systell(fd).unwrap();
         assert_eq!(current, 5);
 
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
     }
 }

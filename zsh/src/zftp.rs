@@ -108,7 +108,9 @@ impl FtpSession {
     }
 
     fn read_response(&mut self) -> io::Result<FtpResponse> {
-        let stream = self.stream.as_mut()
+        let stream = self
+            .stream
+            .as_mut()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "not connected"))?;
 
         let mut reader = BufReader::new(stream.try_clone()?);
@@ -129,7 +131,7 @@ impl FtpSession {
             if code == 0 {
                 first_code = line[..3].to_string();
                 code = first_code.parse().unwrap_or(0);
-                
+
                 if line.len() > 3 && line.chars().nth(3) == Some('-') {
                     multiline = true;
                 }
@@ -139,9 +141,10 @@ impl FtpSession {
             full_message.push('\n');
 
             if multiline {
-                if line.starts_with(&first_code) && 
-                   line.len() > 3 && 
-                   line.chars().nth(3) == Some(' ') {
+                if line.starts_with(&first_code)
+                    && line.len() > 3
+                    && line.chars().nth(3) == Some(' ')
+                {
                     break;
                 }
             } else {
@@ -161,9 +164,11 @@ impl FtpSession {
         let addr = format!("{}:{}", host, port);
 
         let stream = TcpStream::connect_timeout(
-            &addr.to_socket_addrs()?.next()
+            &addr
+                .to_socket_addrs()?
+                .next()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid address"))?,
-            Duration::from_secs(30)
+            Duration::from_secs(30),
         )?;
 
         stream.set_read_timeout(Some(Duration::from_secs(60)))?;
@@ -231,8 +236,8 @@ impl FtpSession {
 
         let pwd = if resp.is_positive_completion() {
             if let Some(start) = resp.message.find('"') {
-                if let Some(end) = resp.message[start+1..].find('"') {
-                    Some(resp.message[start+1..start+1+end].to_string())
+                if let Some(end) = resp.message[start + 1..].find('"') {
+                    Some(resp.message[start + 1..start + 1 + end].to_string())
                 } else {
                     None
                 }
@@ -314,9 +319,10 @@ impl FtpSession {
         let addr = format!("{}:{}", ip, port);
 
         TcpStream::connect_timeout(
-            &addr.to_socket_addrs()?.next()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid PASV address"))?,
-            Duration::from_secs(30)
+            &addr.to_socket_addrs()?.next().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "invalid PASV address")
+            })?,
+            Duration::from_secs(30),
         )
     }
 
@@ -406,7 +412,8 @@ impl FtpSession {
         let resp = self.read_response()?;
 
         let size = if resp.is_positive_completion() {
-            resp.message.split_whitespace()
+            resp.message
+                .split_whitespace()
                 .last()
                 .and_then(|s| s.parse().ok())
         } else {
@@ -455,18 +462,23 @@ impl FtpSession {
 }
 
 fn parse_pasv_response(msg: &str) -> io::Result<(String, u16)> {
-    let start = msg.find('(')
+    let start = msg
+        .find('(')
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid PASV response"))?;
-    let end = msg.find(')')
+    let end = msg
+        .find(')')
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid PASV response"))?;
 
-    let nums: Vec<u16> = msg[start+1..end]
+    let nums: Vec<u16> = msg[start + 1..end]
         .split(',')
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
     if nums.len() != 6 {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid PASV numbers"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid PASV numbers",
+        ));
     }
 
     let ip = format!("{}.{}.{}.{}", nums[0], nums[1], nums[2], nums[3]);
@@ -488,19 +500,22 @@ impl Zftp {
     }
 
     pub fn get_session(&self, name: Option<&str>) -> Option<&FtpSession> {
-        let key = name.map(|s| s.to_string())
+        let key = name
+            .map(|s| s.to_string())
             .or_else(|| self.current.clone())?;
         self.sessions.get(&key)
     }
 
     pub fn get_session_mut(&mut self, name: Option<&str>) -> Option<&mut FtpSession> {
-        let key = name.map(|s| s.to_string())
+        let key = name
+            .map(|s| s.to_string())
             .or_else(|| self.current.clone())?;
         self.sessions.get_mut(&key)
     }
 
     pub fn create_session(&mut self, name: &str) -> &mut FtpSession {
-        self.sessions.entry(name.to_string())
+        self.sessions
+            .entry(name.to_string())
             .or_insert_with(|| FtpSession::new(name))
     }
 
@@ -545,9 +560,7 @@ pub fn builtin_zftp(args: &[&str], zftp: &mut Zftp) -> (i32, String) {
             let host = args[1];
             let port: Option<u16> = args.get(2).and_then(|s| s.parse().ok());
 
-            let session_name = zftp.current_name()
-                .unwrap_or("default")
-                .to_string();
+            let session_name = zftp.current_name().unwrap_or("default").to_string();
 
             let sess = zftp.create_session(&session_name);
 
@@ -822,9 +835,17 @@ pub fn builtin_zftp(args: &[&str], zftp: &mut Zftp) -> (i32, String) {
                             Some(s) => s,
                             None => return (1, "zftp type: not connected\n".to_string()),
                         };
-                        return (0, format!("{}\n", 
-                            if sess.transfer_type == TransferType::Ascii { "ascii" } else { "binary" }
-                        ));
+                        return (
+                            0,
+                            format!(
+                                "{}\n",
+                                if sess.transfer_type == TransferType::Ascii {
+                                    "ascii"
+                                } else {
+                                    "binary"
+                                }
+                            ),
+                        );
                     }
                     match args[1].to_lowercase().as_str() {
                         "a" | "ascii" => TransferType::Ascii,
@@ -912,7 +933,10 @@ pub fn builtin_zftp(args: &[&str], zftp: &mut Zftp) -> (i32, String) {
             if zftp.remove_session(args[1]).is_some() {
                 (0, String::new())
             } else {
-                (1, format!("zftp rmsession: session {} not found\n", args[1]))
+                (
+                    1,
+                    format!("zftp rmsession: session {} not found\n", args[1]),
+                )
             }
         }
 
@@ -947,7 +971,10 @@ mod tests {
 
     #[test]
     fn test_ftp_response_positive() {
-        let resp = FtpResponse { code: 200, message: "OK".to_string() };
+        let resp = FtpResponse {
+            code: 200,
+            message: "OK".to_string(),
+        };
         assert!(resp.is_positive());
         assert!(resp.is_positive_completion());
         assert!(!resp.is_negative());
@@ -955,7 +982,10 @@ mod tests {
 
     #[test]
     fn test_ftp_response_intermediate() {
-        let resp = FtpResponse { code: 331, message: "Password required".to_string() };
+        let resp = FtpResponse {
+            code: 331,
+            message: "Password required".to_string(),
+        };
         assert!(resp.is_positive());
         assert!(resp.is_positive_intermediate());
         assert!(!resp.is_positive_completion());
@@ -963,7 +993,10 @@ mod tests {
 
     #[test]
     fn test_ftp_response_negative() {
-        let resp = FtpResponse { code: 550, message: "File not found".to_string() };
+        let resp = FtpResponse {
+            code: 550,
+            message: "File not found".to_string(),
+        };
         assert!(resp.is_negative());
         assert!(!resp.is_positive());
     }

@@ -213,7 +213,10 @@ impl ResourceLimits {
         };
 
         if unsafe { getrlimit(res, &mut rlim) } < 0 {
-            return Err(format!("can't read limit: {}", std::io::Error::last_os_error()));
+            return Err(format!(
+                "can't read limit: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         Ok((
@@ -286,7 +289,11 @@ impl ResourceLimits {
     /// Remove a limit (set to unlimited)
     pub fn unlimit(&mut self, res: i32, hard: bool) -> Result<(), String> {
         if hard {
-            self.set(res, Some(LimitValue::Unlimited), Some(LimitValue::Unlimited))
+            self.set(
+                res,
+                Some(LimitValue::Unlimited),
+                Some(LimitValue::Unlimited),
+            )
         } else {
             let (_, cur_hard) = self.get(res)?;
             self.set(res, Some(cur_hard), None)
@@ -576,11 +583,7 @@ pub fn builtin_ulimit(
 }
 
 /// Execute the unlimit builtin
-pub fn builtin_unlimit(
-    args: &[&str],
-    limits: &mut ResourceLimits,
-    hard: bool,
-) -> (i32, String) {
+pub fn builtin_unlimit(args: &[&str], limits: &mut ResourceLimits, hard: bool) -> (i32, String) {
     if args.is_empty() {
         for info in KNOWN_RESOURCES {
             if let Err(e) = limits.unlimit(info.res, hard) {
@@ -640,7 +643,10 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_limit_time() {
-        let info = KNOWN_RESOURCES.iter().find(|i| i.limit_type == LimitType::Time).unwrap();
+        let info = KNOWN_RESOURCES
+            .iter()
+            .find(|i| i.limit_type == LimitType::Time)
+            .unwrap();
 
         assert_eq!(
             parse_limit_value("60", Some(info)).unwrap(),
@@ -667,7 +673,10 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_limit_memory() {
-        let info = KNOWN_RESOURCES.iter().find(|i| i.limit_type == LimitType::Memory).unwrap();
+        let info = KNOWN_RESOURCES
+            .iter()
+            .find(|i| i.limit_type == LimitType::Memory)
+            .unwrap();
 
         assert_eq!(
             parse_limit_value("100", Some(info)).unwrap(),

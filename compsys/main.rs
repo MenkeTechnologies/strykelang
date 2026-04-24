@@ -3,11 +3,12 @@
 //! Run with: cargo run -p compsys
 
 use compsys::{
-    arguments_execute, cache::{CompsysCache, default_cache_path}, compadd_execute, compinit, compset_execute,
-    describe_execute, do_completion, functions, native_describe, ArgumentsSpec, CompDescribe,
-    CompParams, CompTags, CompadOpts, Completion, CompletionReceiver, CompletionState, CompsetOp,
-    DescribeItem, DescribeOpts, ZStyleStore, build_cache_from_fpath, get_system_fpath,
-    load_from_cache, cache_is_valid, compinit_lazy,
+    arguments_execute, build_cache_from_fpath,
+    cache::{default_cache_path, CompsysCache},
+    cache_is_valid, compadd_execute, compinit, compinit_lazy, compset_execute, describe_execute,
+    do_completion, functions, get_system_fpath, load_from_cache, native_describe, ArgumentsSpec,
+    CompDescribe, CompParams, CompTags, CompadOpts, Completion, CompletionReceiver,
+    CompletionState, CompsetOp, DescribeItem, DescribeOpts, ZStyleStore,
 };
 use std::path::PathBuf;
 
@@ -909,16 +910,16 @@ fn test_shell_arrays() {
 
 fn test_build_cache_from_fpath() {
     println!("\n--- Testing build_cache_from_fpath ---");
-    
+
     // Get system fpath
     let fpath = get_system_fpath();
     println!("  Found {} fpath directories", fpath.len());
-    
+
     if fpath.is_empty() {
         println!("  SKIPPED: no fpath directories found");
         return;
     }
-    
+
     // Use standard cache path
     let cache_path = default_cache_path();
     std::fs::create_dir_all(cache_path.parent().unwrap()).ok();
@@ -928,16 +929,16 @@ fn test_build_cache_from_fpath() {
     let _ = std::fs::remove_file(format!("{}-wal", cache_path.display()));
     let mut cache = CompsysCache::open(&cache_path).unwrap();
     println!("  Cache DB: {}", cache_path.display());
-    
+
     // Build cache from fpath
     let start = std::time::Instant::now();
     let result = build_cache_from_fpath(&fpath, &mut cache).unwrap();
     let elapsed = start.elapsed();
-    
+
     println!("  Scan + cache build: {}ms", elapsed.as_millis());
     println!("  Scanned {} directories", result.dirs_scanned);
     println!("  Found {} completion files", result.files_scanned);
-    
+
     // Check cache stats
     let stats = cache.stats().unwrap();
     println!("  Cache stats:");
@@ -945,7 +946,7 @@ fn test_build_cache_from_fpath() {
     println!("    autoloads: {}", stats.autoloads);
     println!("    patcomps: {}", stats.patcomps);
     println!("    services: {}", stats.services);
-    
+
     // Test lookups
     if let Ok(Some(func)) = cache.get_comp("git") {
         println!("  _comps[git] = {}", func);
@@ -956,21 +957,27 @@ fn test_build_cache_from_fpath() {
     if let Ok(Some(func)) = cache.get_comp("cargo") {
         println!("  _comps[cargo] = {}", func);
     }
-    
+
     // Test autoload lookup
     if let Ok(Some(stub)) = cache.get_autoload("_git") {
         println!("  _git autoload: {} ({} bytes)", stub.source, stub.size);
         if let Some(ref body) = stub.body {
-            println!("  _git body: {} chars (first 100: {}...)", body.len(), &body.chars().take(100).collect::<String>());
+            println!(
+                "  _git body: {} chars (first 100: {}...)",
+                body.len(),
+                &body.chars().take(100).collect::<String>()
+            );
         } else {
             println!("  _git body: NOT CACHED");
         }
     }
-    
+
     // Benchmark autoload body lookup (this is the hot path for autoload -Xz)
     println!("\n  Benchmarking autoload -Xz (body lookup):");
     let iterations = 10000;
-    let funcs = ["_git", "_docker", "_cargo", "_ls", "_cd", "_cp", "_mv", "_rm", "_cat", "_grep"];
+    let funcs = [
+        "_git", "_docker", "_cargo", "_ls", "_cd", "_cp", "_mv", "_rm", "_cat", "_grep",
+    ];
     let start = std::time::Instant::now();
     for i in 0..iterations {
         let name = funcs[i % funcs.len()];
@@ -978,27 +985,38 @@ fn test_build_cache_from_fpath() {
     }
     let total_us = start.elapsed().as_micros();
     let avg_ns = (total_us * 1000) / iterations as u128;
-    println!("    {}x get_autoload_body: {}µs total, {}ns avg per lookup", iterations, total_us, avg_ns);
-    
+    println!(
+        "    {}x get_autoload_body: {}µs total, {}ns avg per lookup",
+        iterations, total_us, avg_ns
+    );
+
     // Test pattern completion
     if let Ok(Some(func)) = cache.find_patcomp("git-commit") {
         println!("  patcomp for git-commit: {}", func);
     }
-    
+
     // Test special context entries (should match zsh exactly)
     println!("  Special context entries:");
-    for key in &["-", "-default-", "-redirect-", "-command-", "-value-", "-first-", "-condition-"] {
+    for key in &[
+        "-",
+        "-default-",
+        "-redirect-",
+        "-command-",
+        "-value-",
+        "-first-",
+        "-condition-",
+    ] {
         if let Ok(Some(func)) = cache.get_comp(key) {
             println!("    _comps[{}] = {}", key, func);
         }
     }
-    
+
     // Dump all keys to file for comparison with zsh
     let keys = cache.comps_keys().unwrap();
     let keys_path = "/tmp/rust_comps_keys.txt";
     std::fs::write(keys_path, keys.join("\n")).unwrap();
     println!("  Wrote {} keys to {}", keys.len(), keys_path);
-    
+
     // Test lazy compinit (instantaneous - just validates cache)
     println!("\n  Testing compinit_lazy (truly instant):");
     let iterations = 10000;
@@ -1008,12 +1026,15 @@ fn test_build_cache_from_fpath() {
     }
     let total_us = start.elapsed().as_micros();
     let avg_ns = (total_us * 1000) / iterations as u128;
-    println!("    {}x compinit_lazy: {}µs total, {}ns avg", iterations, total_us, avg_ns);
-    
+    println!(
+        "    {}x compinit_lazy: {}µs total, {}ns avg",
+        iterations, total_us, avg_ns
+    );
+
     let (valid, count) = compinit_lazy(&cache);
     assert!(valid);
     println!("    cache valid: {}, entries: {}", valid, count);
-    
+
     // Test full load from cache (slower but loads all into HashMap)
     println!("\n  Testing load_from_cache (loads all entries):");
     let iterations = 100;
@@ -1023,17 +1044,20 @@ fn test_build_cache_from_fpath() {
     }
     let total_us = start.elapsed().as_micros();
     let avg_us = total_us / iterations as u128;
-    println!("    {}x load_from_cache: {}µs total, {}µs avg", iterations, total_us, avg_us);
-    
+    println!(
+        "    {}x load_from_cache: {}µs total, {}µs avg",
+        iterations, total_us, avg_us
+    );
+
     // Verify cache is valid
     assert!(cache_is_valid(&cache));
     println!("    cache_is_valid: true");
-    
+
     // Verify loaded data matches
     let loaded = load_from_cache(&cache).unwrap();
     assert_eq!(loaded.comps.len(), result.comps.len());
     println!("    loaded comps match: {} entries", loaded.comps.len());
-    
+
     // Test single lookup speed (what actually happens during completion)
     println!("\n  Testing single lookups (real-world usage):");
     let start = std::time::Instant::now();
@@ -1043,7 +1067,11 @@ fn test_build_cache_from_fpath() {
         let _ = cache.get_comp("cargo");
     }
     let total_us = start.elapsed().as_micros();
-    println!("    30000 lookups: {}µs ({}ns/lookup)", total_us, (total_us * 1000) / 30000);
-    
+    println!(
+        "    30000 lookups: {}µs ({}ns/lookup)",
+        total_us,
+        (total_us * 1000) / 30000
+    );
+
     println!("  build_cache_from_fpath: OK");
 }

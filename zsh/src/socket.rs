@@ -36,8 +36,6 @@ impl UnixSocket {
 /// Create a listening Unix socket
 #[cfg(unix)]
 pub fn socket_listen(path: &str) -> io::Result<RawFd> {
-    
-
     let fd = unsafe { libc::socket(libc::PF_UNIX, libc::SOCK_STREAM, 0) };
     if fd < 0 {
         return Err(io::Error::last_os_error());
@@ -104,7 +102,9 @@ pub fn socket_accept(listen_fd: RawFd) -> io::Result<(RawFd, String)> {
         break result;
     };
 
-    let path = addr.sun_path.iter()
+    let path = addr
+        .sun_path
+        .iter()
         .take_while(|&&c| c != 0)
         .map(|&c| c as u8 as char)
         .collect::<String>();
@@ -193,7 +193,11 @@ pub fn builtin_zsocket(args: &[&str], options: &ZsocketOptions) -> (i32, String,
                 }
                 (0, output, Some(fd))
             }
-            Err(e) => (1, format!("zsocket: could not bind to {}: {}\n", path, e), None),
+            Err(e) => (
+                1,
+                format!("zsocket: could not bind to {}: {}\n", path, e),
+                None,
+            ),
         }
     } else if options.accept {
         if args.is_empty() {
@@ -222,7 +226,11 @@ pub fn builtin_zsocket(args: &[&str], options: &ZsocketOptions) -> (i32, String,
                 }
                 (0, output, Some(fd))
             }
-            Err(e) => (1, format!("zsocket: could not accept connection: {}\n", e), None),
+            Err(e) => (
+                1,
+                format!("zsocket: could not accept connection: {}\n", e),
+                None,
+            ),
         }
     } else {
         if args.is_empty() {

@@ -8,22 +8,22 @@
 //! - Trap management (trap builtin)
 //! - Job control signals
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
-use std::sync::{Mutex, OnceLock};
 use nix::sys::signal::{sigprocmask, SigmaskHow};
 use nix::sys::signal::{SaFlags, SigAction, SigHandler, SigSet, Signal as NixSignal};
 use nix::unistd::getpid;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 /// Maximum size of signal queue
 const MAX_QUEUE_SIZE: usize = 128;
 
 /// Signal trap flags
 pub mod trap_flags {
-    pub const ZSIG_TRAPPED: u32 = 1;    // Signal is trapped
-    pub const ZSIG_IGNORED: u32 = 2;    // Signal is being ignored
-    pub const ZSIG_FUNC: u32 = 4;       // Trap is a function (TRAPXXX)
-    pub const ZSIG_SHIFT: u32 = 3;      // Bits to shift for local level
+    pub const ZSIG_TRAPPED: u32 = 1; // Signal is trapped
+    pub const ZSIG_IGNORED: u32 = 2; // Signal is being ignored
+    pub const ZSIG_FUNC: u32 = 4; // Trap is a function (TRAPXXX)
+    pub const ZSIG_SHIFT: u32 = 3; // Bits to shift for local level
 }
 
 /// Well-known signal numbers (matching libc on most Unix systems)
@@ -100,7 +100,7 @@ pub static SIGNAL_NAMES: &[(&str, i32)] = &[
     ("SYS", libc::SIGSYS),
     ("DEBUG", SIGDEBUG),
     ("ZERR", SIGZERR),
-    ("ERR", SIGZERR),  // Alias
+    ("ERR", SIGZERR), // Alias
 ];
 
 /// Get signal number from name
@@ -111,13 +111,13 @@ pub fn sig_by_name(name: &str) -> Option<i32> {
     } else {
         &name_upper
     };
-    
+
     for (sig_name, sig_num) in SIGNAL_NAMES {
         if *sig_name == lookup {
             return Some(*sig_num);
         }
     }
-    
+
     // Try parsing as number
     lookup.parse().ok()
 }
@@ -167,11 +167,11 @@ impl SignalQueue {
         let rear = self.rear.load(Ordering::SeqCst);
         let new_rear = (rear + 1) % MAX_QUEUE_SIZE;
         let front = self.front.load(Ordering::SeqCst);
-        
+
         if new_rear == front {
             return false; // Queue full
         }
-        
+
         self.signals[new_rear].store(sig, Ordering::SeqCst);
         self.rear.store(new_rear, Ordering::SeqCst);
         true
@@ -180,11 +180,11 @@ impl SignalQueue {
     fn pop(&self) -> Option<i32> {
         let front = self.front.load(Ordering::SeqCst);
         let rear = self.rear.load(Ordering::SeqCst);
-        
+
         if front == rear {
             return None; // Queue empty
         }
-        
+
         let new_front = (front + 1) % MAX_QUEUE_SIZE;
         let sig = self.signals[new_front].load(Ordering::SeqCst);
         self.front.store(new_front, Ordering::SeqCst);
@@ -252,7 +252,10 @@ impl TrapHandler {
         let mut traps = self.traps.lock().unwrap();
         let mut flags = self.flags.lock().unwrap();
 
-        let was_trapped = flags.get(&sig).map(|f| f & trap_flags::ZSIG_TRAPPED != 0).unwrap_or(false);
+        let was_trapped = flags
+            .get(&sig)
+            .map(|f| f & trap_flags::ZSIG_TRAPPED != 0)
+            .unwrap_or(false);
 
         match &action {
             TrapAction::Ignore => {
@@ -316,7 +319,9 @@ impl TrapHandler {
 
     /// Check if a signal is trapped
     pub fn is_trapped(&self, sig: i32) -> bool {
-        self.flags.lock().unwrap()
+        self.flags
+            .lock()
+            .unwrap()
             .get(&sig)
             .map(|f| f & trap_flags::ZSIG_TRAPPED != 0)
             .unwrap_or(false)
@@ -324,7 +329,9 @@ impl TrapHandler {
 
     /// Check if a signal is ignored
     pub fn is_ignored(&self, sig: i32) -> bool {
-        self.flags.lock().unwrap()
+        self.flags
+            .lock()
+            .unwrap()
             .get(&sig)
             .map(|f| f & trap_flags::ZSIG_IGNORED != 0)
             .unwrap_or(false)
@@ -353,7 +360,9 @@ impl TrapHandler {
 
     /// List all traps
     pub fn list_traps(&self) -> Vec<(i32, TrapAction)> {
-        self.traps.lock().unwrap()
+        self.traps
+            .lock()
+            .unwrap()
             .iter()
             .map(|(k, v)| (*k, v.clone()))
             .collect()
@@ -400,9 +409,13 @@ extern "C" fn handler(sig: i32) {
     // Check if we're a forked child
     if reraise_if_forked_child(sig) {
         #[cfg(target_os = "macos")]
-        unsafe { *libc::__error() = saved_errno };
+        unsafe {
+            *libc::__error() = saved_errno
+        };
         #[cfg(not(target_os = "macos"))]
-        unsafe { *libc::__errno_location() = saved_errno };
+        unsafe {
+            *libc::__errno_location() = saved_errno
+        };
         return;
     }
 
@@ -419,9 +432,13 @@ extern "C" fn handler(sig: i32) {
     if SIGNAL_QUEUE.is_enabled() {
         SIGNAL_QUEUE.push(sig);
         #[cfg(target_os = "macos")]
-        unsafe { *libc::__error() = saved_errno };
+        unsafe {
+            *libc::__error() = saved_errno
+        };
         #[cfg(not(target_os = "macos"))]
-        unsafe { *libc::__errno_location() = saved_errno };
+        unsafe {
+            *libc::__errno_location() = saved_errno
+        };
         return;
     }
 
@@ -429,9 +446,13 @@ extern "C" fn handler(sig: i32) {
     handle_signal(sig);
 
     #[cfg(target_os = "macos")]
-    unsafe { *libc::__error() = saved_errno };
+    unsafe {
+        *libc::__error() = saved_errno
+    };
     #[cfg(not(target_os = "macos"))]
-    unsafe { *libc::__errno_location() = saved_errno };
+    unsafe {
+        *libc::__errno_location() = saved_errno
+    };
 }
 
 /// Handle a signal
@@ -761,14 +782,16 @@ mod tests {
     #[test]
     fn test_trap_handler() {
         let handler = TrapHandler::new();
-        
+
         // Initially not trapped
         assert!(!handler.is_trapped(libc::SIGUSR1));
-        
+
         // Set a trap
-        handler.set_trap(libc::SIGUSR1, TrapAction::Code("echo trapped".to_string())).unwrap();
+        handler
+            .set_trap(libc::SIGUSR1, TrapAction::Code("echo trapped".to_string()))
+            .unwrap();
         assert!(handler.is_trapped(libc::SIGUSR1));
-        
+
         // Unset trap
         handler.unset_trap(libc::SIGUSR1);
         assert!(!handler.is_trapped(libc::SIGUSR1));
@@ -777,7 +800,7 @@ mod tests {
     #[test]
     fn test_ignore_trap() {
         let handler = TrapHandler::new();
-        
+
         handler.set_trap(libc::SIGUSR1, TrapAction::Ignore).unwrap();
         assert!(handler.is_ignored(libc::SIGUSR1));
         assert!(!handler.is_trapped(libc::SIGUSR1));
@@ -788,7 +811,7 @@ mod tests {
         // Enable queueing
         queue_signals();
         assert!(queueing_enabled());
-        
+
         // Disable queueing
         unqueue_signals();
         assert!(!queueing_enabled());
@@ -817,7 +840,9 @@ pub fn install_handler(sig: i32) {
 #[cfg(unix)]
 extern "C" fn handler_func(sig: libc::c_int) {
     // Re-install handler (for non-BSD systems)
-    unsafe { libc::signal(sig, handler_func as libc::sighandler_t); }
+    unsafe {
+        libc::signal(sig, handler_func as libc::sighandler_t);
+    }
     // Record that signal was received
     LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);
 }
@@ -1003,7 +1028,9 @@ pub fn wait_for_processes() -> Vec<(i32, i32)> {
 #[cfg(unix)]
 extern "C" fn zhandler(sig: libc::c_int) {
     // Re-install the handler
-    unsafe { libc::signal(sig, zhandler as libc::sighandler_t); }
+    unsafe {
+        libc::signal(sig, zhandler as libc::sighandler_t);
+    }
     // Record signal
     LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);
 }
@@ -1087,7 +1114,11 @@ pub fn rtsigno(offset: i32) -> Option<i32> {
         let sigrtmin = 34;
         let sigrtmax = 64;
         let sig = sigrtmin + offset;
-        if sig <= sigrtmax { Some(sig) } else { None }
+        if sig <= sigrtmax {
+            Some(sig)
+        } else {
+            None
+        }
     }
     #[cfg(not(target_os = "linux"))]
     {

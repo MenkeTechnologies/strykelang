@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 /// Flags for named directory entries
-pub const ND_USERNAME: u32 = 1;    // Entry from passwd database
+pub const ND_USERNAME: u32 = 1; // Entry from passwd database
 
 /// A named directory entry
 #[derive(Clone, Debug)]
@@ -15,7 +15,7 @@ pub struct NamedDir {
     pub name: String,
     pub dir: String,
     pub flags: u32,
-    pub diff: i32,  // strlen(dir) - strlen(name)
+    pub diff: i32, // strlen(dir) - strlen(name)
 }
 
 /// Named directory hash table
@@ -51,13 +51,16 @@ impl NamedDirTable {
     pub fn add(&mut self, name: &str, dir: &str, flags: u32) {
         let diff = dir.len() as i32 - name.len() as i32;
         self.finddir_cache = None;
-        
-        self.table.insert(name.to_string(), NamedDir {
-            name: name.to_string(),
-            dir: dir.to_string(),
-            flags,
-            diff,
-        });
+
+        self.table.insert(
+            name.to_string(),
+            NamedDir {
+                name: name.to_string(),
+                dir: dir.to_string(),
+                flags,
+                diff,
+            },
+        );
     }
 
     /// Add a user directory (from passwd database)
@@ -173,14 +176,19 @@ impl NamedDirTable {
     /// Print a named directory entry
     pub fn print_entry(&self, name: &str, list_format: bool) -> Option<String> {
         let nd = self.get(name)?;
-        
+
         if list_format {
             let prefix = if name.starts_with('-') {
                 "hash -d -- "
             } else {
                 "hash -d "
             };
-            Some(format!("{}{}={}", prefix, shell_quote(name), shell_quote(&nd.dir)))
+            Some(format!(
+                "{}{}={}",
+                prefix,
+                shell_quote(name),
+                shell_quote(&nd.dir)
+            ))
         } else {
             Some(format!("{}={}", shell_quote(name), shell_quote(&nd.dir)))
         }
@@ -189,7 +197,9 @@ impl NamedDirTable {
 
 /// Quote a string for shell output
 fn shell_quote(s: &str) -> String {
-    if s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-') {
+    if s.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '/' || c == '.' || c == '-')
+    {
         s.to_string()
     } else {
         format!("'{}'", s.replace('\'', "'\\''"))
@@ -210,7 +220,7 @@ mod tests {
     fn test_add_get() {
         let mut table = NamedDirTable::new();
         table.add("proj", "/home/user/projects", 0);
-        
+
         let entry = table.get("proj").unwrap();
         assert_eq!(entry.name, "proj");
         assert_eq!(entry.dir, "/home/user/projects");
@@ -220,7 +230,7 @@ mod tests {
     fn test_remove() {
         let mut table = NamedDirTable::new();
         table.add("test", "/tmp/test", 0);
-        
+
         assert!(table.contains("test"));
         table.remove("test");
         assert!(!table.contains("test"));
@@ -231,7 +241,7 @@ mod tests {
         let mut table = NamedDirTable::new();
         table.add("home", "/home/user", 0);
         table.add("proj", "/home/user/projects", 0);
-        
+
         // Should find the more specific match
         let result = table.finddir("/home/user/projects/foo");
         assert!(result.is_some());
@@ -243,7 +253,7 @@ mod tests {
     fn test_diff_calculation() {
         let mut table = NamedDirTable::new();
         table.add("p", "/home/user/projects", 0);
-        
+
         let entry = table.get("p").unwrap();
         // diff = len("/home/user/projects") - len("p") = 19 - 1 = 18
         assert_eq!(entry.diff, 18);
@@ -253,10 +263,10 @@ mod tests {
     fn test_print_entry() {
         let mut table = NamedDirTable::new();
         table.add("home", "/home/user", 0);
-        
+
         let output = table.print_entry("home", false).unwrap();
         assert_eq!(output, "home=/home/user");
-        
+
         let list_output = table.print_entry("home", true).unwrap();
         assert!(list_output.starts_with("hash -d "));
     }

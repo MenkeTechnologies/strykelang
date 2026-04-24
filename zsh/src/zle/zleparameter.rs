@@ -243,15 +243,7 @@ pub const BUILTIN_WIDGETS: &[&str] = &[
 
 /// Default keymap names
 pub const DEFAULT_KEYMAPS: &[&str] = &[
-    "emacs",
-    "viins",
-    "vicmd",
-    "viopp",
-    "visual",
-    "isearch",
-    "command",
-    "main",
-    ".safe",
+    "emacs", "viins", "vicmd", "viopp", "visual", "isearch", "command", "main", ".safe",
 ];
 
 #[cfg(test)]

@@ -24,7 +24,14 @@ pub struct PtyCmd {
 }
 
 impl PtyCmd {
-    pub fn new(name: &str, args: Vec<String>, master_fd: RawFd, pid: i32, echo: bool, nonblock: bool) -> Self {
+    pub fn new(
+        name: &str,
+        args: Vec<String>,
+        master_fd: RawFd,
+        pid: i32,
+        echo: bool,
+        nonblock: bool,
+    ) -> Self {
         Self {
             name: name.to_string(),
             args,
@@ -85,8 +92,6 @@ impl PtyCmds {
 /// Open a pseudo-terminal pair
 #[cfg(unix)]
 pub fn open_pty() -> io::Result<(RawFd, RawFd)> {
-    
-
     let master_fd = unsafe {
         let fd = libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY);
         if fd < 0 {
@@ -180,7 +185,8 @@ pub fn pty_read(fd: RawFd, pattern: Option<&str>, timeout_ms: Option<i32>) -> io
         }
 
         loop {
-            let n = unsafe { libc::read(fd, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len()) };
+            let n =
+                unsafe { libc::read(fd, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len()) };
 
             if n < 0 {
                 let err = io::Error::last_os_error();
@@ -307,11 +313,7 @@ pub struct ZptyOptions {
 }
 
 /// Execute zpty builtin
-pub fn builtin_zpty(
-    args: &[&str],
-    options: &ZptyOptions,
-    cmds: &mut PtyCmds,
-) -> (i32, String) {
+pub fn builtin_zpty(args: &[&str], options: &ZptyOptions, cmds: &mut PtyCmds) -> (i32, String) {
     let mut output = String::new();
 
     if options.delete {
@@ -340,7 +342,11 @@ pub fn builtin_zpty(
 
     if options.list {
         for (name, cmd) in cmds.iter() {
-            let status = if cmd.finished { "(finished)" } else { "(running)" };
+            let status = if cmd.finished {
+                "(finished)"
+            } else {
+                "(running)"
+            };
             output.push_str(&format!("{}: {} {}\n", name, cmd.args.join(" "), status));
         }
         return (0, output);
@@ -412,64 +418,61 @@ pub fn builtin_zpty(
         #[cfg(unix)]
         {
             match open_pty() {
-                Ok((master, slave)) => {
-                    match unsafe { libc::fork() } {
-                        -1 => {
-                            let _ = pty_close(master);
-                            let _ = pty_close(slave);
-                            (1, format!("zpty: fork failed: {}\n", io::Error::last_os_error()))
-                        }
-                        0 => {
-                            let _ = pty_close(master);
-                            unsafe {
-                                libc::setsid();
-                                libc::dup2(slave, 0);
-                                libc::dup2(slave, 1);
-                                libc::dup2(slave, 2);
-                                if slave > 2 {
-                                    libc::close(slave);
-                                }
-                            }
-
-                            if !options.echo {
-                                let _ = disable_echo(0);
-                            }
-
-                            let cmd = CString::new(cmd_args[0].clone()).unwrap();
-                            let c_args: Vec<CString> = cmd_args.iter()
-                                .map(|s| CString::new(s.as_str()).unwrap())
-                                .collect();
-                            let c_args_ptrs: Vec<*const libc::c_char> = c_args.iter()
-                                .map(|s| s.as_ptr())
-                                .chain(std::iter::once(std::ptr::null()))
-                                .collect();
-
-                            unsafe {
-                                libc::execvp(cmd.as_ptr(), c_args_ptrs.as_ptr());
-                                libc::_exit(1);
+                Ok((master, slave)) => match unsafe { libc::fork() } {
+                    -1 => {
+                        let _ = pty_close(master);
+                        let _ = pty_close(slave);
+                        (
+                            1,
+                            format!("zpty: fork failed: {}\n", io::Error::last_os_error()),
+                        )
+                    }
+                    0 => {
+                        let _ = pty_close(master);
+                        unsafe {
+                            libc::setsid();
+                            libc::dup2(slave, 0);
+                            libc::dup2(slave, 1);
+                            libc::dup2(slave, 2);
+                            if slave > 2 {
+                                libc::close(slave);
                             }
                         }
-                        pid => {
-                            let _ = pty_close(slave);
 
-                            if !options.block {
-                                let _ = set_nonblock(master);
-                            }
+                        if !options.echo {
+                            let _ = disable_echo(0);
+                        }
 
-                            let pty_cmd = PtyCmd::new(
-                                name,
-                                cmd_args,
-                                master,
-                                pid,
-                                options.echo,
-                                !options.block,
-                            );
-                            cmds.add(pty_cmd);
+                        let cmd = CString::new(cmd_args[0].clone()).unwrap();
+                        let c_args: Vec<CString> = cmd_args
+                            .iter()
+                            .map(|s| CString::new(s.as_str()).unwrap())
+                            .collect();
+                        let c_args_ptrs: Vec<*const libc::c_char> = c_args
+                            .iter()
+                            .map(|s| s.as_ptr())
+                            .chain(std::iter::once(std::ptr::null()))
+                            .collect();
 
-                            (0, output)
+                        unsafe {
+                            libc::execvp(cmd.as_ptr(), c_args_ptrs.as_ptr());
+                            libc::_exit(1);
                         }
                     }
-                }
+                    pid => {
+                        let _ = pty_close(slave);
+
+                        if !options.block {
+                            let _ = set_nonblock(master);
+                        }
+
+                        let pty_cmd =
+                            PtyCmd::new(name, cmd_args, master, pid, options.echo, !options.block);
+                        cmds.add(pty_cmd);
+
+                        (0, output)
+                    }
+                },
                 Err(e) => (1, format!("zpty: can't open pty: {}\n", e)),
             }
         }
@@ -506,7 +509,14 @@ mod tests {
 
     #[test]
     fn test_pty_cmd_fields() {
-        let cmd = PtyCmd::new("mypty", vec!["bash".to_string(), "-c".to_string()], 10, 5678, false, true);
+        let cmd = PtyCmd::new(
+            "mypty",
+            vec!["bash".to_string(), "-c".to_string()],
+            10,
+            5678,
+            false,
+            true,
+        );
 
         assert_eq!(cmd.name, "mypty");
         assert_eq!(cmd.args, vec!["bash", "-c"]);

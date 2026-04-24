@@ -13,9 +13,7 @@ pub fn clone_shell(tty_path: &str) -> io::Result<u32> {
     let tty_c = CString::new(tty_path)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid tty path"))?;
 
-    let ttyfd: RawFd = unsafe {
-        libc::open(tty_c.as_ptr(), libc::O_RDWR | libc::O_NOCTTY)
-    };
+    let ttyfd: RawFd = unsafe { libc::open(tty_c.as_ptr(), libc::O_RDWR | libc::O_NOCTTY) };
 
     if ttyfd < 0 {
         return Err(io::Error::last_os_error());
@@ -31,7 +29,10 @@ pub fn clone_shell(tty_path: &str) -> io::Result<u32> {
         0 => {
             unsafe {
                 if libc::setsid() == -1 {
-                    eprintln!("clone: failed to create new session: {}", io::Error::last_os_error());
+                    eprintln!(
+                        "clone: failed to create new session: {}",
+                        io::Error::last_os_error()
+                    );
                 }
 
                 libc::dup2(ttyfd, 0);
@@ -63,7 +64,10 @@ pub fn clone_shell(tty_path: &str) -> io::Result<u32> {
 
 #[cfg(not(unix))]
 pub fn clone_shell(_tty_path: &str) -> io::Result<u32> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "clone not supported"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "clone not supported",
+    ))
 }
 
 /// Execute clone builtin

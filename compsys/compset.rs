@@ -507,15 +507,11 @@ impl CompquoteOpts {
 }
 
 /// Execute compquote builtin
-/// 
+///
 /// compquote quotes special characters in the values of named parameters
 /// so they can be used as completion matches. This is needed when the
 /// values contain characters that would be interpreted by the shell.
-pub fn compquote_execute(
-    params: &mut CompParams,
-    opts: &CompquoteOpts,
-    names: &[String],
-) -> bool {
+pub fn compquote_execute(params: &mut CompParams, opts: &CompquoteOpts, names: &[String]) -> bool {
     for name in names {
         match name.as_str() {
             "PREFIX" => {
@@ -542,10 +538,10 @@ pub fn compquote_execute(
 /// Quote special characters for use in completion
 fn quote_for_completion(s: &str, for_pattern: bool) -> String {
     let mut result = String::with_capacity(s.len() * 2);
-    
+
     for c in s.chars() {
         if for_pattern {
-            // Quote pattern metacharacters: * ? [ ] # ~ ^ 
+            // Quote pattern metacharacters: * ? [ ] # ~ ^
             match c {
                 '*' | '?' | '[' | ']' | '#' | '~' | '^' => {
                     result.push('\\');
@@ -555,15 +551,15 @@ fn quote_for_completion(s: &str, for_pattern: bool) -> String {
         }
         // Always quote shell metacharacters: \ ' " $ ` ! { } ( ) | & ; < > space tab newline
         match c {
-            '\\' | '\'' | '"' | '$' | '`' | '!' | '{' | '}' | '(' | ')' 
-            | '|' | '&' | ';' | '<' | '>' | ' ' | '\t' | '\n' => {
+            '\\' | '\'' | '"' | '$' | '`' | '!' | '{' | '}' | '(' | ')' | '|' | '&' | ';' | '<'
+            | '>' | ' ' | '\t' | '\n' => {
                 result.push('\\');
             }
             _ => {}
         }
         result.push(c);
     }
-    
+
     result
 }
 
@@ -583,7 +579,7 @@ pub struct CompcallOpts {
 impl CompcallOpts {
     pub fn parse(args: &[String]) -> Result<Self, String> {
         let mut opts = Self::default();
-        
+
         for arg in args {
             match arg.as_str() {
                 "-T" => opts.use_command = true,
@@ -594,7 +590,7 @@ impl CompcallOpts {
                 _ => {}
             }
         }
-        
+
         Ok(opts)
     }
 }
@@ -605,10 +601,7 @@ impl CompcallOpts {
 /// from within a completion widget. This provides backward compatibility.
 ///
 /// Returns true if completions were added, false otherwise.
-pub fn compcall_execute(
-    _params: &CompParams,
-    _opts: &CompcallOpts,
-) -> bool {
+pub fn compcall_execute(_params: &CompParams, _opts: &CompcallOpts) -> bool {
     // compcall invokes the old compctl completion system
     // For now, we return false as we don't support compctl
     // In a full implementation, this would:

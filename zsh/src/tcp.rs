@@ -142,7 +142,10 @@ pub fn tcp_connect(host: &str, port: u16) -> io::Result<(RawFd, SocketAddr, Sock
     let addrs: Vec<SocketAddr> = addr_str.to_socket_addrs()?.collect();
 
     if addrs.is_empty() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "host resolution failure"));
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "host resolution failure",
+        ));
     }
 
     for addr in addrs {
@@ -158,7 +161,10 @@ pub fn tcp_connect(host: &str, port: u16) -> io::Result<(RawFd, SocketAddr, Sock
         }
     }
 
-    Err(io::Error::new(io::ErrorKind::ConnectionRefused, "connection failed"))
+    Err(io::Error::new(
+        io::ErrorKind::ConnectionRefused,
+        "connection failed",
+    ))
 }
 
 /// Create a listening TCP socket
@@ -259,15 +265,14 @@ pub fn resolve_host(host: &str) -> io::Result<IpAddr> {
     }
 
     let addrs: Vec<SocketAddr> = format!("{}:0", host).to_socket_addrs()?.collect();
-    addrs.first()
+    addrs
+        .first()
         .map(|a| a.ip())
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "host resolution failure"))
 }
 
 /// Reverse DNS lookup
 pub fn reverse_lookup(addr: &IpAddr) -> Option<String> {
-    
-
     let socket_addr = SocketAddr::new(*addr, 0);
     let hostname = dns_lookup_reverse(&socket_addr);
     hostname
@@ -304,7 +309,10 @@ pub fn builtin_ztcp(
         let fd: RawFd = match args[0].parse() {
             Ok(fd) => fd,
             Err(_) => {
-                return (1, format!("ztcp: {} is an invalid argument to -c\n", args[0]));
+                return (
+                    1,
+                    format!("ztcp: {} is an invalid argument to -c\n", args[0]),
+                );
             }
         };
 
@@ -356,7 +364,13 @@ pub fn builtin_ztcp(
                 return (1, "ztcp: tcp connection not a listener\n".to_string());
             }
         } else {
-            return (1, format!("ztcp: fd {} is not registered as a tcp connection\n", args[0]));
+            return (
+                1,
+                format!(
+                    "ztcp: fd {} is not registered as a tcp connection\n",
+                    args[0]
+                ),
+            );
         }
 
         if options.test {
@@ -385,10 +399,12 @@ pub fn builtin_ztcp(
         }
     } else if args.is_empty() {
         for (_, session) in sessions.iter() {
-            let local_str = session.local_addr
+            let local_str = session
+                .local_addr
                 .map(|a| format_addr(&a, true))
                 .unwrap_or_else(|| "?:?".to_string());
-            let peer_str = session.peer_addr
+            let peer_str = session
+                .peer_addr
                 .map(|a| format_addr(&a, true))
                 .unwrap_or_else(|| "?:?".to_string());
 
@@ -397,9 +413,15 @@ pub fn builtin_ztcp(
                     "{} {} {} {} {} {}\n",
                     session.fd,
                     session.type_char(),
-                    session.local_addr.map(|a| a.ip().to_string()).unwrap_or_default(),
+                    session
+                        .local_addr
+                        .map(|a| a.ip().to_string())
+                        .unwrap_or_default(),
                     session.local_addr.map(|a| a.port()).unwrap_or(0),
-                    session.peer_addr.map(|a| a.ip().to_string()).unwrap_or_default(),
+                    session
+                        .peer_addr
+                        .map(|a| a.ip().to_string())
+                        .unwrap_or_default(),
                     session.peer_addr.map(|a| a.port()).unwrap_or(0),
                 ));
             } else {
