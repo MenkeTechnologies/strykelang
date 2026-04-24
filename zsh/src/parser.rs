@@ -2231,6 +2231,29 @@ impl<'a> ShellParser<'a> {
             return Ok(CondExpr::Not(Box::new(inner)));
         }
 
+        // Precedence: || (lowest) > && > comparisons (highest).
+        // Scan for || first, then &&, then binary operators.
+        // This matches the C implementation's precedence in cond.c.
+
+        // Level 1: || (lowest precedence — split on rightmost to get left-associativity)
+        for i in (0..tokens.len()).rev() {
+            if tokens[i] == "||" {
+                let left = self.parse_cond_tokens(&tokens[..i])?;
+                let right = self.parse_cond_tokens(&tokens[i + 1..])?;
+                return Ok(CondExpr::Or(Box::new(left), Box::new(right)));
+            }
+        }
+
+        // Level 2: &&
+        for i in (0..tokens.len()).rev() {
+            if tokens[i] == "&&" {
+                let left = self.parse_cond_tokens(&tokens[..i])?;
+                let right = self.parse_cond_tokens(&tokens[i + 1..])?;
+                return Ok(CondExpr::And(Box::new(left), Box::new(right)));
+            }
+        }
+
+        // Level 3: binary comparison operators (highest precedence)
         for (i, tok) in tokens.iter().enumerate() {
             match tok.as_str() {
                 "=" | "==" => {
@@ -2320,16 +2343,6 @@ impl<'a> ShellParser<'a> {
                         ShellWord::Literal(left),
                         ShellWord::Literal(right),
                     ));
-                }
-                "&&" => {
-                    let left = self.parse_cond_tokens(&tokens[..i])?;
-                    let right = self.parse_cond_tokens(&tokens[i + 1..])?;
-                    return Ok(CondExpr::And(Box::new(left), Box::new(right)));
-                }
-                "||" => {
-                    let left = self.parse_cond_tokens(&tokens[..i])?;
-                    let right = self.parse_cond_tokens(&tokens[i + 1..])?;
-                    return Ok(CondExpr::Or(Box::new(left), Box::new(right)));
                 }
                 _ => {}
             }

@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.8.10 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.8.11 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -185,13 +185,13 @@ cd strykelang &amp;&amp; cargo build --release
 
 # one-liners
 s 'p "hello, world"'
-s '1..20 |&gt; fi even |&gt; map { _ * _ } |&gt; sum |&gt; p'
+s '1:20 |&gt; fi even |&gt; map { _ * _ } |&gt; sum |&gt; p'
 s '~>1:20fi{even}map{_*_}sum p'
 s 'qw(a b c) |&gt; map uc |&gt; join "," |&gt; p'
 s '~> qw(a,b,c) map{uc} join(",") p'
 
 # parallel primitives
-s '1..8 |&gt; pmap expensive |&gt; p'
+s '1:8 |&gt; pmap expensive |&gt; p'
 
 # read + parse JSON
 s 'read_json("data.json") |&gt; to_yaml |&gt; p'
@@ -243,11 +243,11 @@ s 'p to_yaml read_json "data.json"'</pre>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Sum 1..100</td><td style="color:#0f0;"><code>s 'p sum 1..100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
+            <tr><td>Sum 1:100</td><td style="color:#0f0;"><code>s 'p sum 1:100'</code> <b>19c</b></td><td>45c</td><td>28c</td><td>38c</td></tr>
             <tr><td>Word freq</td><td style="color:#0f0;"><code>s -an 'freq(@F) |&gt; dd'</code> <b>25c</b></td><td>61c</td><td>—</td><td>—</td></tr>
             <tr><td>SHA256 file</td><td style="color:#0f0;"><code>s 'p s256"f"'</code> <b>14c</b></td><td>70c+</td><td>—</td><td>80c+</td></tr>
             <tr><td>CSV → JSON</td><td style="color:#0f0;"><code>s 'csv_read("f") |&gt; tj |&gt; p'</code> <b>33c</b></td><td>needs modules</td><td>needs modules</td><td>90c</td></tr>
-            <tr><td>Parallel map</td><td style="color:#0f0;"><code>s '1..1e6 |&gt; pmap{_ * 2}'</code> <b>30c</b></td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Parallel map</td><td style="color:#0f0;"><code>s '1:1e6 |&gt; pmap{_ * 2}'</code> <b>30c</b></td><td>—</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </section>
@@ -307,13 +307,13 @@ s 'p to_yaml read_json "data.json"'</pre>
         <div class="oneliner">s 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
         <div class="oneliner">s 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every stryke extension</span></div>
         <div class="oneliner">s 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
-        <div class="oneliner">s 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
+        <div class="oneliner">s 'my %f; $f{$b{_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
         <div class="oneliner">s 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
 
         <h3>Notes</h3>
         <ul>
           <li>Every <code>$h{name}</code> lookup is O(1). Inverted indexes (<code>%c</code>, <code>%p</code>) let you do reverse-queries in O(1) too; filters like <code>grep { cond } keys %h</code> are still O(n).</li>
-          <li>Hash sigil namespace is separate from scalars/subs — the short-alias letters don't collide with <code>$a</code>/<code>$b</code> sort specials, the <code>e</code> extension sub, or any other stryke name.</li>
+          <li>Hash sigil namespace is separate from scalars/functions — the short-alias letters don't collide with <code>$a</code>/<code>$b</code> sort specials, the <code>e</code> extension function, or any other stryke name.</li>
           <li><code>%descriptions</code> is sparse: <code>exists $d{$name}</code> doubles as "is this documented in the LSP?".</li>
           <li>A value of <code>"uncategorized"</code> in <code>%builtins</code> flags a name that's dispatched at runtime but missing a <code>// ── category ──</code> section comment in <code>parser.rs</code>.</li>
         </ul>
@@ -335,7 +335,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
 
         <h3>Pipe-RHS sugar</h3>
         <ul>
-          <li><strong>Thread macro</strong> — <code>t EXPR s1 s2 s3</code> expands to <code>EXPR |&gt; s1 |&gt; s2 |&gt; s3</code>. Stages like <code>pow(_, 2)</code> use bare <code>_</code> (or <code>$_</code>) as a placeholder, auto-wrapped in a coderef. Bare <code>_</code> = <code>$_</code> in any expression — enables <code>map{_*2}fi{_&gt;5}</code>.</li>
+          <li><strong>Thread macro</strong> — <code>t EXPR s1 s2 s3</code> expands to <code>EXPR |&gt; s1 |&gt; s2 |&gt; s3</code>. Stages like <code>pow(_, 2)</code> use bare <code>_</code> (or <code>_</code>) as a placeholder, auto-wrapped in a coderef. Bare <code>_</code> = <code>_</code> in any expression — enables <code>map{_*2}fi{_&gt;5}</code>.</li>
           <li><strong><code>&gt;{ BLOCK }</code></strong> — IIFE anywhere an expression is valid; also works as a pipe stage (<code>lhs |&gt; &gt;{ body }</code>).</li>
           <li><strong><code>@[...]</code></strong> — sugar for <code>@{[...]}</code> (deref anonymous arrayref inline).</li>
           <li><strong><code>%[k =&gt; v]</code></strong> — sugar for <code>%{+{k =&gt; v}}</code> (deref anonymous hashref inline, sidesteps the block-vs-hashref ambiguity).</li>
@@ -374,14 +374,14 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
       <section class="tutorial-section">
         <h2>Parallel primitives (highlights)</h2>
         <p>Every <code>p*</code> primitive uses rayon work-stealing, saturates all cores by default, and takes three surface forms:</p>
-<pre># block form   (_ = element, bare _ is shorthand for $_)
-pmap { _ * 2 } 1..1_000_000
+<pre># block form   (_ = element, bare _ is shorthand for _)
+pmap { _ * 2 } 1:1_000_000
 
 # expression form
-pmap _ * 2, 1..1_000_000
+pmap _ * 2, 1:1_000_000
 
 # bare-fn form   (fn double { $_0 * 2 })
-pmap double, 1..1_000_000</pre>
+pmap double, 1:1_000_000</pre>
 
         <h3>fan / pchannel / ppool</h3>
 <pre># fan — run a block N times in parallel (_/$_0 = index 0..N-1)
@@ -389,14 +389,14 @@ fan 16 { heavy_work(_) }
 
 # pchannel — bounded MPMC queue
 my ($tx, $rx) = pchannel(100)
-async { $tx-&gt;send($_) for 1..1000; undef $tx }
+async { $tx-&gt;send(_) for 1:1000; undef $tx }
 while (defined(my $v = $rx-&gt;recv)) { p $v }
 
 # ppool — persistent worker pool
-my $pool = ppool 4, sub {
+my $pool = ppool 4, fn {
   while (defined(my $j = $rx-&gt;recv)) { process($j) }
 }
-$tx-&gt;send($_) for @jobs;  undef $tx
+$tx-&gt;send(_) for @jobs;  undef $tx
 $pool-&gt;join</pre>
 
         <h3>Pipelines</h3>
@@ -405,7 +405,7 @@ pipeline(
   fn { map { _ * 2 } @_ },
   fn { grep { _ &gt; 10 } @_ },
   fn { sum(@_) },
-)-&gt;run(1..1000)
+)-&gt;run(1:1000)
 
 # streaming — bounded crossbeam channels, concurrent stages
 par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input)</pre>
@@ -751,7 +751,7 @@ zshrs script.sh             # run script file
 zshrs --dump-zwc file.zwc   # inspect compiled zsh files
 
 # In interactive mode, @ enters stryke (fat build only):
-$ @ 1..100 |&gt; sum |&gt; p
+$ @ 1:100 |&gt; sum |&gt; p
 5050
 $ @ fetch_json("https://api.github.com/users/octocat") |&gt; dd
 $ @ ls |&gt; pmap { stat(_)-&gt;{size} } |&gt; sum |&gt; p     # parallel file sizes
