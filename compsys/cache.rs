@@ -67,7 +67,8 @@ impl CompsysCache {
                 source TEXT NOT NULL,
                 offset INTEGER NOT NULL,
                 size INTEGER NOT NULL,
-                body TEXT
+                body TEXT,
+                ast BLOB
             ) WITHOUT ROWID;
 
             -- zstyle: flat lookup by pattern+style
@@ -158,6 +159,21 @@ impl CompsysCache {
             CREATE INDEX IF NOT EXISTS idx_named_dirs_name ON named_dirs(name);
         "#,
         )?;
+        self.migrate()?;
+        Ok(())
+    }
+
+    /// Schema migrations for existing databases.
+    fn migrate(&self) -> rusqlite::Result<()> {
+        // Add ast BLOB column to autoloads if missing (pre-v0.8.14 databases)
+        let has_ast: bool = self
+            .conn
+            .prepare("SELECT ast FROM autoloads LIMIT 0")
+            .is_ok();
+        if !has_ast {
+            self.conn
+                .execute_batch("ALTER TABLE autoloads ADD COLUMN ast BLOB")?;
+        }
         Ok(())
     }
 
@@ -258,6 +274,57 @@ impl CompsysCache {
                 |row| row.get(0),
             )
             .optional()
+    }
+
+    /// Get pre-parsed AST blob for a function (skip lex+parse on cache hit).
+    /// Returns None if no AST is cached — caller falls back to parsing the body.
+    pub fn get_autoload_ast(&self, name: &str) -> rusqlite::Result<Option<Vec<u8>>> {
+        self.conn
+            .query_row(
+                "SELECT ast FROM autoloads WHERE name = ?1 AND ast IS NOT NULL",
+                params![name],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    /// Store pre-parsed AST blob for a function.
+    pub fn set_autoload_ast(&self, name: &str, ast: &[u8]) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "UPDATE autoloads SET ast = ?2 WHERE name = ?1",
+            params![name, ast],
+        )?;
+        Ok(())
+    }
+
+    /// Get all autoloads that have a body but no cached AST blob.
+    /// Used for background AST backfill on cached fast path.
+    pub fn get_autoloads_missing_ast(&self) -> rusqlite::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT name, body FROM autoloads WHERE body IS NOT NULL AND ast IS NULL",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        rows.collect()
+    }
+
+    /// Bulk store AST blobs during compinit (one transaction for all functions).
+    pub fn set_autoload_asts_bulk(
+        &mut self,
+        entries: &[(String, Vec<u8>)], // (name, ast_blob)
+    ) -> rusqlite::Result<()> {
+        let tx = self.conn.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE autoloads SET ast = ?2 WHERE name = ?1",
+            )?;
+            for (name, ast) in entries {
+                stmt.execute(params![name, ast])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     /// Get function body with ZWC fallback

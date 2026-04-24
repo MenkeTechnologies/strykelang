@@ -543,13 +543,7 @@ pub fn build_cache_from_fpath(
 
     let autoloads_time = t2.elapsed();
 
-    eprintln!(
-        "  compinit timing: scan={}ms, comps={}ms, autoloads={}ms (total={}ms)",
-        scan_time.as_millis(),
-        comps_time.as_millis(),
-        autoloads_time.as_millis(),
-        (scan_time + comps_time + autoloads_time).as_millis()
-    );
+    // Timing logged by caller in exec.rs via tracing
 
     Ok(result)
 }

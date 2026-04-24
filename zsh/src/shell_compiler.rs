@@ -591,7 +591,7 @@ impl ShellCompiler {
                 let mut end_jumps = Vec::new();
 
                 for (patterns, body, term) in cases {
-                    let mut next_pattern_jumps: Vec<usize> = Vec::new();
+                    let _next_pattern_jumps: Vec<usize> = Vec::new();
 
                     // Try each pattern — any match jumps to body
                     let body_target_placeholder = self.builder.current_pos();

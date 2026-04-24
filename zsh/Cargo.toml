@@ -15,7 +15,7 @@ ctrlc = "3"
 atty = "0.2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-compsys = { path = "../compsys", version = "0.8.14" }
+compsys = { path = "../compsys", version = "0.8.16" }
 fusevm = { path = "../fusevm" }
 regex = "1.11"
 glob = "0.3"
@@ -48,6 +48,7 @@ crossbeam-channel = "0.5.15"
 rayon = "1.10"
 serde = { version = "1", features = ["derive"] }
 bincode = "1"
+toml = "1.1.2"
 
 [features]
 default = []
@@ -62,6 +63,9 @@ flamegraph = ["tracing-flame"]
 ## Enable Prometheus metrics endpoint on localhost:9090/metrics
 ## Build: cargo build -p zsh --features prometheus
 prometheus = ["metrics", "metrics-exporter-prometheus"]
+## Fat binary: include stryke runtime for @ prefix, parallel ops, stryke scripting
+## Build: cargo install --path zsh --features stryke
+## Thin binary (default): pure zshrs shell, no stryke dependency
 
 [dev-dependencies]
 tempfile = "3"

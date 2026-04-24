@@ -5528,17 +5528,18 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::MakeArrayBindingRef(name_idx) => {
-                        let name = names[*name_idx as usize].clone();
-                        // Use a name-based binding ref so mutations through the ref
-                        // (push, store) hit the live scope binding, not a snapshot.
-                        // resolve_binding_ref snapshots at ReturnValue when the scope
-                        // is about to be destroyed.
-                        self.push(PerlValue::array_binding_ref(name));
+                        let name = &names[*name_idx as usize];
+                        // Promote the scope's array to shared Arc-backed storage.
+                        // Both the scope and the returned ref share the same Arc,
+                        // so mutations through either path are visible.
+                        let arc = self.interp.scope.promote_array_to_shared(name);
+                        self.push(PerlValue::array_ref(arc));
                         Ok(())
                     }
                     Op::MakeHashBindingRef(name_idx) => {
-                        let name = names[*name_idx as usize].clone();
-                        self.push(PerlValue::hash_binding_ref(name));
+                        let name = &names[*name_idx as usize];
+                        let arc = self.interp.scope.promote_hash_to_shared(name);
+                        self.push(PerlValue::hash_ref(arc));
                         Ok(())
                     }
                     Op::MakeArrayRefAlias => {
@@ -5558,6 +5559,7 @@ impl<'a> VM<'a> {
                     }
                     Op::MakeArrayRef => {
                         let val = self.pop();
+                        let val = self.interp.scope.resolve_container_binding_ref(val);
                         let arr = if let Some(a) = val.as_array_vec() {
                             a
                         } else {

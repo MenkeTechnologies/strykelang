@@ -8565,15 +8565,15 @@ impl Interpreter {
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_var(name, line)?;
                     let aname = self.stash_array_name_for_package(name);
-                    // Snapshot array data so ref survives scope pop
-                    let data = self.scope.get_array(&aname);
-                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(data))))
+                    // Promote the scope's array to shared Arc-backed storage.
+                    // Both the scope and the returned ref share the same Arc.
+                    let arc = self.scope.promote_array_to_shared(&aname);
+                    Ok(PerlValue::array_ref(arc))
                 }
                 ExprKind::HashVar(name) => {
                     self.check_strict_hash_var(name, line)?;
-                    // Snapshot hash data so ref survives scope pop
-                    let data = self.scope.get_hash(name);
-                    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(data))))
+                    let arc = self.scope.promote_hash_to_shared(name);
+                    Ok(PerlValue::hash_ref(arc))
                 }
                 ExprKind::Deref {
                     expr: e,
@@ -8609,6 +8609,7 @@ impl Interpreter {
                 let mut arr = Vec::with_capacity(elems.len());
                 for e in elems {
                     let v = self.eval_expr_ctx(e, WantarrayCtx::List)?;
+                    let v = self.scope.resolve_container_binding_ref(v);
                     if let Some(vec) = v.as_array_vec() {
                         arr.extend(vec);
                     } else {
@@ -18097,6 +18098,9 @@ impl Interpreter {
         val: PerlValue,
         line: usize,
     ) -> Result<(), FlowOrError> {
+        // Resolve binding refs in the value being stored so they snapshot
+        // the current scope data and survive scope pop.
+        let val = self.scope.resolve_container_binding_ref(val);
         if let Some(r) = arr_ref.as_array_ref() {
             let mut w = r.write();
             if let Some(items) = val.as_array_vec() {

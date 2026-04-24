@@ -73,7 +73,7 @@ cargo publish --allow-dirty -p strykelang 2>&1 | tail -1
 # ── install locally ──
 echo ""
 echo "installing locally..."
-cargo install --path . 2>&1 | tail -1
+cargo install --path . --force
 
 echo ""
 echo "done: strykelang v$NEW published and installed"

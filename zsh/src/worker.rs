@@ -197,11 +197,18 @@ impl WorkerPool {
 
 impl Drop for WorkerPool {
     fn drop(&mut self) {
-        // Drop the sender first → channel closes → recv() returns Err → threads exit
+        // Signal workers to skip remaining queued tasks
+        self.cancelled.store(true, Ordering::Relaxed);
+        // Drop the sender → channel closes → recv() returns Err → threads exit
         drop(self.sender.take());
+        // Give workers a brief window to finish their current task.
+        // Don't block indefinitely — the process is exiting.
         for w in &mut self.workers {
             if let Some(handle) = w.handle.take() {
-                let _ = handle.join();
+                // Detach the thread — OS cleans up on process exit.
+                // join() would block if a worker is mid-parse on a 500-line
+                // completion function. Not worth the wait on Ctrl-D/exit.
+                drop(handle);
             }
         }
         tracing::info!(

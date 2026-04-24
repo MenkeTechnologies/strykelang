@@ -78,6 +78,12 @@ struct Frame {
     frozen_hashes: HashSet<String>,
     /// `typed my $x : Int` — runtime type checks on assignment.
     typed_scalars: HashMap<String, PerlTypeName>,
+    /// Arrays promoted to shared Arc-backed storage by `\@arr`.
+    /// When a ref is taken, both the scope and the ref share the same Arc,
+    /// so mutations through either path are visible. Re-declaration removes the entry.
+    shared_arrays: Vec<(String, Arc<parking_lot::RwLock<Vec<PerlValue>>>)>,
+    /// Hashes promoted to shared Arc-backed storage by `\%hash`.
+    shared_hashes: Vec<(String, Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>)>,
     /// Thread-safe arrays from `mysync @a`
     atomic_arrays: Vec<(String, AtomicArray)>,
     /// Thread-safe hashes from `mysync %h`
@@ -102,6 +108,8 @@ impl Frame {
         self.frozen_arrays.clear();
         self.frozen_hashes.clear();
         self.typed_scalars.clear();
+        self.shared_arrays.clear();
+        self.shared_hashes.clear();
         self.atomic_arrays.clear();
         self.defers.clear();
         self.atomic_hashes.clear();
@@ -127,6 +135,8 @@ impl Frame {
             frozen_scalars: HashSet::new(),
             frozen_arrays: HashSet::new(),
             frozen_hashes: HashSet::new(),
+            shared_arrays: Vec::new(),
+            shared_hashes: Vec::new(),
             typed_scalars: HashMap::new(),
             atomic_arrays: Vec::new(),
             atomic_hashes: Vec::new(),
@@ -214,6 +224,7 @@ impl Frame {
             return true;
         }
         self.arrays.iter().any(|(k, _)| k == name)
+            || self.shared_arrays.iter().any(|(k, _)| k == name)
     }
 
     #[inline]
@@ -251,6 +262,7 @@ impl Frame {
     #[inline]
     fn has_hash(&self, name: &str) -> bool {
         self.hashes.iter().any(|(k, _)| k == name)
+            || self.shared_hashes.iter().any(|(k, _)| k == name)
     }
 
     #[inline]
@@ -408,7 +420,13 @@ impl Scope {
         let idx = slot as usize;
         for frame in self.frames.iter().rev() {
             if idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx) {
-                return frame.scalar_slots[idx].clone();
+                let val = &frame.scalar_slots[idx];
+                // Transparently unwrap ScalarRef (captured closure variable) — consistent
+                // with get_scalar which also unwraps.
+                if let Some(arc) = val.as_scalar_ref() {
+                    return arc.read().clone();
+                }
+                return val.clone();
             }
         }
         PerlValue::UNDEF
@@ -1189,6 +1207,8 @@ impl Scope {
             self.frames.len().saturating_sub(1)
         };
         if let Some(frame) = self.frames.get_mut(idx) {
+            // Remove any existing shared Arc — re-declaration disconnects old refs.
+            frame.shared_arrays.retain(|(k, _)| k != name);
             frame.set_array(name, val);
             if frozen {
                 frame.frozen_arrays.insert(name.to_string());
@@ -1203,6 +1223,10 @@ impl Scope {
         // Check atomic arrays first
         if let Some(aa) = self.find_atomic_array(name) {
             return aa.0.lock().clone();
+        }
+        // Check shared (Arc-backed) arrays
+        if let Some(arc) = self.find_shared_array(name) {
+            return arc.read().clone();
         }
         if name.contains("::") {
             if let Some(f) = self.frames.first() {
@@ -1278,6 +1302,100 @@ impl Scope {
         }
     }
 
+    /// Resolve an [`ArrayBindingRef`] or [`HashBindingRef`] to an Arc-backed
+    /// snapshot so the value survives scope pop. Called when a value is stored
+    /// as an *element* inside a container (array/hash) — NOT for scalar assignment,
+    /// where binding refs must stay live for aliasing.
+    #[inline]
+    pub fn resolve_container_binding_ref(&self, val: PerlValue) -> PerlValue {
+        if let Some(name) = val.as_array_binding_name() {
+            let data = self.get_array(&name);
+            return PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(data)));
+        }
+        if let Some(name) = val.as_hash_binding_name() {
+            let data = self.get_hash(&name);
+            return PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(data)));
+        }
+        val
+    }
+
+    /// Promote `@name` to shared Arc-backed storage and return an [`ArrayRef`] that
+    /// shares the same `Arc`. Both the scope binding and the returned ref point to
+    /// the same data, so mutations through either path are visible.
+    pub fn promote_array_to_shared(
+        &mut self,
+        name: &str,
+    ) -> Arc<parking_lot::RwLock<Vec<PerlValue>>> {
+        // Already promoted? Return the existing Arc.
+        let idx = self.resolve_array_frame_idx(name).unwrap_or_default();
+        let frame = &mut self.frames[idx];
+        if let Some(entry) = frame.shared_arrays.iter().find(|(k, _)| k == name) {
+            return Arc::clone(&entry.1);
+        }
+        // Take data from frame.arrays, create Arc, store in shared_arrays.
+        let data = if let Some(pos) = frame.arrays.iter().position(|(k, _)| k == name) {
+            frame.arrays.swap_remove(pos).1
+        } else if name == "_" {
+            frame.sub_underscore.take().unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let arc = Arc::new(parking_lot::RwLock::new(data));
+        frame.shared_arrays.push((name.to_string(), Arc::clone(&arc)));
+        arc
+    }
+
+    /// Promote `%name` to shared Arc-backed storage and return a [`HashRef`] that
+    /// shares the same `Arc`.
+    pub fn promote_hash_to_shared(
+        &mut self,
+        name: &str,
+    ) -> Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>> {
+        let idx = self.resolve_hash_frame_idx(name).unwrap_or_default();
+        let frame = &mut self.frames[idx];
+        if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
+            return Arc::clone(&entry.1);
+        }
+        let data = if let Some(pos) = frame.hashes.iter().position(|(k, _)| k == name) {
+            frame.hashes.swap_remove(pos).1
+        } else {
+            IndexMap::new()
+        };
+        let arc = Arc::new(parking_lot::RwLock::new(data));
+        frame.shared_hashes.push((name.to_string(), Arc::clone(&arc)));
+        arc
+    }
+
+    /// Find the shared Arc for `@name`, if any.
+    fn find_shared_array(&self, name: &str) -> Option<Arc<parking_lot::RwLock<Vec<PerlValue>>>> {
+        for frame in self.frames.iter().rev() {
+            if let Some(entry) = frame.shared_arrays.iter().find(|(k, _)| k == name) {
+                return Some(Arc::clone(&entry.1));
+            }
+            // If this frame has the plain array, stop — it shadows outer shared ones.
+            if frame.arrays.iter().any(|(k, _)| k == name) {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// Find the shared Arc for `%name`, if any.
+    fn find_shared_hash(
+        &self,
+        name: &str,
+    ) -> Option<Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>> {
+        for frame in self.frames.iter().rev() {
+            if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
+                return Some(Arc::clone(&entry.1));
+            }
+            if frame.hashes.iter().any(|(k, _)| k == name) {
+                return None;
+            }
+        }
+        None
+    }
+
     pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<PerlValue>, PerlError> {
         // Note: can't return &mut into a Mutex. Callers needing atomic array
         // mutation should use atomic_array_mutate instead. For non-atomic arrays:
@@ -1298,8 +1416,13 @@ impl Scope {
 
     /// Push to array — works for both regular and atomic arrays.
     pub fn push_to_array(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+        let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             aa.0.lock().push(val);
+            return Ok(());
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            arc.write().push(val);
             return Ok(());
         }
         self.get_array_mut(name)?.push(val);
@@ -1366,6 +1489,9 @@ impl Scope {
         if let Some(aa) = self.find_atomic_array(name) {
             return aa.0.lock().len();
         }
+        if let Some(arc) = self.find_shared_array(name) {
+            return arc.read().len();
+        }
         if name.contains("::") {
             return self
                 .frames
@@ -1410,6 +1536,15 @@ impl Scope {
             };
             return arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
         }
+        if let Some(arc) = self.find_shared_array(name) {
+            let arr = arc.read();
+            let idx = if index < 0 {
+                (arr.len() as i64 + index) as usize
+            } else {
+                index as usize
+            };
+            return arr.get(idx).cloned().unwrap_or(PerlValue::UNDEF);
+        }
         for frame in self.frames.iter().rev() {
             if let Some(arr) = frame.get_array(name) {
                 let idx = if index < 0 {
@@ -1429,6 +1564,7 @@ impl Scope {
         index: i64,
         val: PerlValue,
     ) -> Result<(), PerlError> {
+        let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -1524,6 +1660,8 @@ impl Scope {
         frozen: bool,
     ) {
         if let Some(frame) = self.frames.last_mut() {
+            // Remove any existing shared Arc — re-declaration disconnects old refs.
+            frame.shared_hashes.retain(|(k, _)| k != name);
             frame.set_hash(name, val);
             if frozen {
                 frame.frozen_hashes.insert(name.to_string());
@@ -1559,6 +1697,9 @@ impl Scope {
     pub fn get_hash(&self, name: &str) -> IndexMap<String, PerlValue> {
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().clone();
+        }
+        if let Some(arc) = self.find_shared_hash(name) {
+            return arc.read().clone();
         }
         for frame in self.frames.iter().rev() {
             if let Some(val) = frame.get_hash(name) {
@@ -1648,6 +1789,9 @@ impl Scope {
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().get(key).cloned().unwrap_or(PerlValue::UNDEF);
         }
+        if let Some(arc) = self.find_shared_hash(name) {
+            return arc.read().get(key).cloned().unwrap_or(PerlValue::UNDEF);
+        }
         for frame in self.frames.iter().rev() {
             if let Some(hash) = frame.get_hash(name) {
                 return hash.get(key).cloned().unwrap_or(PerlValue::UNDEF);
@@ -1713,6 +1857,7 @@ impl Scope {
         key: &str,
         val: PerlValue,
     ) -> Result<(), PerlError> {
+        let val = self.resolve_container_binding_ref(val);
         // `$SIG{INT} = \&h` — lazily install the matching signal hook. Until Perl code touches
         // `%SIG`, the POSIX default stays in place so Ctrl-C terminates immediately.
         if name == "SIG" {
@@ -1720,6 +1865,10 @@ impl Scope {
         }
         if let Some(ah) = self.find_atomic_hash(name) {
             ah.0.lock().insert(key.to_string(), val);
+            return Ok(());
+        }
+        if let Some(arc) = self.find_shared_hash(name) {
+            arc.write().insert(key.to_string(), val);
             return Ok(());
         }
         let hash = self.get_hash_mut(name)?;
@@ -1962,12 +2111,15 @@ impl Scope {
     pub fn restore_capture(&mut self, captured: &[(String, PerlValue)]) {
         for (name, val) in captured {
             if let Some(rest) = name.strip_prefix("$slot:") {
-                // "$slot:INDEX:NAME" — restore into both scalar_slots and scalars.
+                // "$slot:INDEX:NAME" — restore into scalar_slots only.
+                // `get_scalar` finds slots via `get_scalar_from_slot`, so a separate
+                // `declare_scalar` is unnecessary and would double-wrap: `set_scalar`
+                // sees the slot's ScalarRef and writes *through* it, nesting
+                // `ScalarRef(ScalarRef(inner))`.
                 if let Some(colon) = rest.find(':') {
                     let idx: usize = rest[..colon].parse().unwrap_or(0);
                     let sname = &rest[colon + 1..];
                     self.declare_scalar_slot(idx as u8, val.clone(), Some(sname));
-                    self.declare_scalar(sname, val.clone());
                 }
             } else if let Some(stripped) = name.strip_prefix('$') {
                 self.declare_scalar(stripped, val.clone());
