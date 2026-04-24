@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Magic Squares of Odd Order
+
+fn magic_square($n) {
+    my $m = []
+    for my $i (0..$n-1) {
+        my $row = []
+        for my $j (0..$n-1) { push @$row, 0 }
+        push @$m, $row
+    }
+    
+    my $r = 0
+    my $c = $n / 2
+    for my $k (1..$n*$n) {
+        $m->[$r]->[$c] = $k
+        my $nr = ($r - 1 + $n) % $n
+        my $nc = ($c + 1) % $n
+        if ($m->[$nr]->[$nc]) {
+            $r = ($r + 1) % $n
+        } else {
+            $r = $nr
+            $c = $nc
+        }
+    }
+    $m
+}
+
+# 3x3 Magic Square:
+# 8 1 6
+# 3 5 7
+# 4 9 2
+my $sq = magic_square(3)
+assert_eq $sq->[0]->[0], 8, "sq[0][0]"
+assert_eq $sq->[0]->[1], 1, "sq[0][1]"
+assert_eq $sq->[0]->[2], 6, "sq[0][2]"
+assert_eq $sq->[1]->[1], 5, "sq[1][1]"
+assert_eq $sq->[2]->[2], 2, "sq[2][2]"
+
+# Check sums
+fn check_magic($m, $n) {
+    my $sum = $n * ($n * $n + 1) / 2
+    for my $i (0..$n-1) {
+        my $rs = 0
+        my $cs = 0
+        for my $j (0..$n-1) {
+            $rs = $rs + $m->[$i]->[$j]
+            $cs = $cs + $m->[$j]->[$i]
+        }
+        if ($rs != $sum || $cs != $sum) { return 0 }
+    }
+    1
+}
+
+assert_ok check_magic($sq, 3), "3x3 sums are correct"
+assert_ok check_magic(magic_square(5), 5), "5x5 sums are correct"
+
+test_run

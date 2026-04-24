@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arithmetic/Rational
+
+fn rat_simplify($r) {
+    my $n = $r->{n}
+    my $d = $r->{d}
+    if ($d < 0) { $n = 0 - $n; $d = 0 - $d }
+    my $g = gcd(abs($n), abs($d))
+    { n => $n / $g, d => $d / $g }
+}
+
+fn rat_add($a, $b) {
+    rat_simplify({
+        n => $a->{n} * $b->{d} + $b->{n} * $a->{d},
+        d => $a->{d} * $b->{d}
+    })
+}
+
+fn rat_mul($a, $b) {
+    rat_simplify({
+        n => $a->{n} * $b->{n},
+        d => $a->{d} * $b->{d}
+    })
+}
+
+my $r1 = { n => 1, d => 2 } # 1/2
+my $r2 = { n => 1, d => 3 } # 1/3
+
+my $sum = rat_add($r1, $r2) # 5/6
+assert_eq $sum->{n}, 5, "rat add n"
+assert_eq $sum->{d}, 6, "rat add d"
+
+my $prod = rat_mul($r1, $r2) # 1/6
+assert_eq $prod->{n}, 1, "rat mul n"
+assert_eq $prod->{d}, 6, "rat mul d"
+
+my $r3 = { n => 2, d => 4 } # 2/4 => 1/2
+my $simp = rat_simplify($r3)
+assert_eq $simp->{n}, 1, "rat simplify n"
+assert_eq $simp->{d}, 2, "rat simplify d"
+
+test_run

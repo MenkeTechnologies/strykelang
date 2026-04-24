@@ -2594,6 +2594,60 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
 
+                    // ── State variables (persist across calls) ──
+                    Op::DeclareStateScalar(idx) => {
+                        let init_val = self.pop();
+                        let n = names[*idx as usize].as_str();
+                        // Key by source line + name (matches interpreter's state_key format)
+                        let state_key = format!("{}:{}", self.line(), n);
+                        let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
+                            prev.clone()
+                        } else {
+                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            init_val
+                        };
+                        self.interp.scope.declare_scalar_frozen(n, val, false, None)
+                            .map_err(|e| e.at_line(self.line()))?;
+                        // Register for save-back when scope pops
+                        if let Some(frame) = self.interp.state_bindings_stack.last_mut() {
+                            frame.push((n.to_string(), state_key));
+                        }
+                        Ok(())
+                    }
+                    Op::DeclareStateArray(idx) => {
+                        let init_val = self.pop();
+                        let n = names[*idx as usize].as_str();
+                        let state_key = format!("{}:{}", self.line(), n);
+                        let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
+                            prev.clone()
+                        } else {
+                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            init_val
+                        };
+                        self.interp.scope.declare_array(n, val.to_list());
+                        Ok(())
+                    }
+                    Op::DeclareStateHash(idx) => {
+                        let init_val = self.pop();
+                        let n = names[*idx as usize].as_str();
+                        let state_key = format!("{}:{}", self.line(), n);
+                        let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
+                            prev.clone()
+                        } else {
+                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            init_val
+                        };
+                        let items = val.to_list();
+                        let mut map = IndexMap::new();
+                        let mut i = 0;
+                        while i + 1 < items.len() {
+                            map.insert(items[i].to_string(), items[i + 1].clone());
+                            i += 2;
+                        }
+                        self.interp.scope.declare_hash(n, map);
+                        Ok(())
+                    }
+
                     // ── Arrays ──
                     Op::GetArray(idx) => {
                         let n = names[*idx as usize].as_str();
@@ -5462,13 +5516,22 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::MakeArrayBindingRef(name_idx) => {
-                        let name = names[*name_idx as usize].clone();
-                        self.push(PerlValue::array_binding_ref(name));
+                        let name = &names[*name_idx as usize];
+                        // Snapshot the array data so the ref survives scope pop.
+                        // Binding refs by name break when the scope-local array is destroyed.
+                        let data = self.interp.scope.get_array(name);
+                        self.push(PerlValue::array_ref(Arc::new(
+                            parking_lot::RwLock::new(data),
+                        )));
                         Ok(())
                     }
                     Op::MakeHashBindingRef(name_idx) => {
-                        let name = names[*name_idx as usize].clone();
-                        self.push(PerlValue::hash_binding_ref(name));
+                        let name = &names[*name_idx as usize];
+                        // Snapshot hash data so the ref survives scope pop.
+                        let data = self.interp.scope.get_hash(name);
+                        self.push(PerlValue::hash_ref(Arc::new(
+                            parking_lot::RwLock::new(data),
+                        )));
                         Ok(())
                     }
                     Op::MakeArrayRefAlias => {
@@ -5771,6 +5834,12 @@ impl<'a> VM<'a> {
                         let want = WantarrayCtx::from_byte(*wa);
                         let args_val = self.pop();
                         let r = self.pop();
+                        // Auto-deref ScalarRef so closures that captured $f can call $f->()
+                        let r = if let Some(inner) = r.as_scalar_ref() {
+                            inner.read().clone()
+                        } else {
+                            r
+                        };
                         let args = args_val.to_list();
                         if let Some(sub) = r.as_code_ref() {
                             // Higher-order function wrappers (comp, partial, memoize, etc.)

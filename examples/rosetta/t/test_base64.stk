@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Base64 encode
+
+fn my_base64_encode($str) {
+    my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    my @chars = $str |> chars
+    my @res
+    
+    my $i = 0
+    my $len = scalar(@chars)
+    while ($i < $len) {
+        my $b1 = ord(@chars[$i])
+        my $b2 = 0
+        my $b3 = 0
+        
+        if ($i + 1 < $len) { $b2 = ord(@chars[$i+1]) }
+        if ($i + 2 < $len) { $b3 = ord(@chars[$i+2]) }
+        
+        my $n = ($b1 << 16) | ($b2 << 8) | $b3
+        
+        push @res, substr($alphabet, ($n >> 18) & 63, 1)
+        push @res, substr($alphabet, ($n >> 12) & 63, 1)
+        
+        if ($i + 1 < $len) {
+            push @res, substr($alphabet, ($n >> 6) & 63, 1)
+        } else {
+            push @res, "="
+        }
+        
+        if ($i + 2 < $len) {
+            push @res, substr($alphabet, $n & 63, 1)
+        } else {
+            push @res, "="
+        }
+        
+        $i = $i + 3
+    }
+    join("", @res)
+}
+
+assert_eq my_base64_encode("f"), "Zg==", "my_encode 'f'"
+assert_eq my_base64_encode("fo"), "Zm8=", "my_encode 'fo'"
+assert_eq my_base64_encode("foo"), "Zm9v", "my_encode 'foo'"
+
+# Testing builtin
+assert_eq base64_encode("foobar"), "Zm9vYmFy", "builtin_encode 'foobar'"
+
+test_run

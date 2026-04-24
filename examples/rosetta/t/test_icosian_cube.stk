@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Icosian Game (on a cube)
+
+fn solve_path($adj, $start, $visited, $path) {
+    push @$path, $start
+    $visited->{$start} = 1
+    
+    if (scalar(@$path) == 8) {
+        return $path
+    }
+    
+    for my $neighbor (@{$adj->[$start]}) {
+        if (!$visited->{$neighbor}) {
+            my @p = @$path
+            my $res = solve_path($adj, $neighbor, { %$visited }, \@p)
+            if (defined $res) { return $res }
+        }
+    }
+    undef
+}
+
+my $cube_adj = [
+    [1, 3, 4], [0, 2, 5], [1, 3, 6], [0, 2, 7],
+    [0, 5, 7], [1, 4, 6], [2, 5, 7], [3, 4, 6]
+]
+
+my $path = solve_path($cube_adj, 0, {}, [])
+assert_ok defined($path), "Hamiltonian path on cube exists"
+assert_eq scalar(@$path), 8, "path length is 8"
+
+test_run

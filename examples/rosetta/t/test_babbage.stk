@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Babbage Problem
+
+fn solve_babbage {
+    my $n = 1
+    while (1) {
+        my $sq = $n * $n
+        if ($sq % 1000000 == 269696) {
+            return $n
+        }
+        $n = $n + 1
+        if ($n > 100000) { # Safety break
+            return -1
+        }
+    }
+}
+
+assert_eq solve_babbage(), 25264, "Babbage result is 25264"
+
+test_run

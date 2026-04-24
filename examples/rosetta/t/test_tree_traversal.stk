@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tree Traversal
+
+fn preorder($n) {
+    if (!$n) { return () }
+    ($n->{val}, preorder($n->{left}), preorder($n->{right}))
+}
+
+fn inorder($n) {
+    if (!$n) { return () }
+    (inorder($n->{left}), $n->{val}, inorder($n->{right}))
+}
+
+fn postorder($n) {
+    if (!$n) { return () }
+    (postorder($n->{left}), postorder($n->{right}), $n->{val})
+}
+
+fn levelorder($n) {
+    my $q = [$n]
+    my $res = []
+    while (scalar(@$q)) {
+        my $c = shift @$q
+        push @$res, $c->{val}
+        if ($c->{left}) { push @$q, $c->{left} }
+        if ($c->{right}) { push @$q, $c->{right} }
+    }
+    $res
+}
+
+my $tree = {
+    val => 1,
+    left => {
+        val => 2,
+        left => { val => 4 },
+        right => { val => 5 }
+    },
+    right => { val => 3 }
+}
+
+assert_eq join(",", preorder($tree)), "1,2,4,5,3", "preorder"
+assert_eq join(",", inorder($tree)), "4,2,5,1,3", "inorder"
+assert_eq join(",", postorder($tree)), "4,5,2,3,1", "postorder"
+my $lo = levelorder($tree)
+assert_eq join(",", @$lo), "1,2,3,4,5", "levelorder"
+
+test_run

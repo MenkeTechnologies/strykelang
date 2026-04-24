@@ -662,7 +662,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "compsys"
-version = "0.8.12"
+version = "0.8.14"
 dependencies = [
  "dirs 5.0.1",
  "libc",
@@ -1718,6 +1718,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76ee7a02da4d231650c7cea31349b889be2f45ddb3ef3032d2ec8185f6313fd2"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "fusevm"
+version = "0.8.14"
+dependencies = [
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -4828,7 +4836,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.8.12"
+version = "0.8.14"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -6675,7 +6683,7 @@ dependencies = [
 
 [[package]]
 name = "zsh"
-version = "0.8.12"
+version = "0.8.14"
 dependencies = [
  "atty",
  "bincode",
@@ -6685,6 +6693,7 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "dirs 5.0.1",
+ "fusevm",
  "glob",
  "hostname",
  "indexmap",

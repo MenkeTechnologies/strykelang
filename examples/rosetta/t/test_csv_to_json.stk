@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: CSV to JSON
+
+my $f = tempfile()
+append_file($f, "name,age\n")
+append_file($f, "Alice,30\n")
+append_file($f, "Bob,25\n")
+
+my $data = [csv_read($f)]
+my $json = json_encode($data)
+
+my $decoded = json_decode($json)
+assert_eq $decoded->[0]->{name}, "Alice", "first record name"
+assert_eq $decoded->[1]->{age}, "25", "second record age"
+
+test_run

@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Refactorable Numbers
+
+fn is_refactorable($n) {
+    my $c = num_divisors($n)
+    if ($c == 0) { return 0 }
+    return $n % $c == 0
+}
+
+# The first few refactorable numbers are: 1, 2, 8, 9, 12, 18, 24, 36, 40, 56, 60, 72, 80, 84, 88, 96
+my @expected = (1, 2, 8, 9, 12, 18, 24, 36, 40, 56, 60, 72, 80, 84, 88, 96)
+my @found
+for my $i (1..100) {
+    if (is_refactorable($i)) {
+        push @found, $i
+    }
+}
+
+assert_eq join(",", @found), join(",", @expected), "first 100 refactorable numbers"
+
+test_run

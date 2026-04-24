@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Amicable Triples
+
+fn find_triples($limit) {
+    my @res
+    for my $a (1..$limit) {
+        my $sa = sum_divisors($a)
+        for my $b ($a+1..$limit) {
+            my $sb = sum_divisors($b)
+            my $c = $sa - $b
+            if ($c > $b && $c <= $limit) {
+                if ($sb == $a + $c && sum_divisors($c) == $a + $b) {
+                    push @res, [$a, $b, $c]
+                }
+            }
+        }
+    }
+    \@res
+}
+
+# Known triple: (1980, 2016, 2556)
+# s(1980) = 4572. 2016 + 2556 = 4572.
+# s(2016) = 4536. 1980 + 2556 = 4536.
+# s(2556) = 3996. 1980 + 2016 = 3996.
+
+my $triples = find_triples(3000)
+assert_eq $triples->[0]->[0], 1980, "first triple a"
+assert_eq $triples->[0]->[1], 2016, "first triple b"
+assert_eq $triples->[0]->[2], 2556, "first triple c"
+
+test_run

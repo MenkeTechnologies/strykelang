@@ -1171,11 +1171,33 @@ fn main() {
         process::exit(run_prun_subcommand(&args[0], &args[2..]));
     }
 
-    // `stryke test [FILE|DIR...]` — run test files.
-    if args.len() >= 2 && (args[1] == "test" || args[1] == "t") {
-        let targets: Vec<String> = if args.len() >= 3 {
+    // `stryke test [FILE|DIR...]` or `stryke -j 18 t` — run test files.
+    // Find the first positional arg (skip flags and their values).
+    let first_positional_idx = {
+        let mut i = 1;
+        let flags_with_value = ["-j", "-I", "-M", "-e", "-d"];
+        while i < args.len() {
+            if args[i].starts_with('-') {
+                if flags_with_value.iter().any(|f| args[i] == *f) {
+                    i += 2; // skip flag + its value
+                } else {
+                    i += 1; // skip boolean flag
+                }
+            } else {
+                break;
+            }
+        }
+        if i < args.len() { Some(i) } else { None }
+    };
+    let is_test_subcmd = first_positional_idx
+        .map(|i| args[i] == "test" || args[i] == "t")
+        .unwrap_or(false);
+    if is_test_subcmd {
+        let subcmd_idx = first_positional_idx.unwrap();
+        let after_subcmd = subcmd_idx + 1;
+        let targets: Vec<String> = if after_subcmd < args.len() {
             // Multiple targets supported; skip non-existent paths silently
-            args[2..]
+            args[after_subcmd..]
                 .iter()
                 .filter(|t| std::path::Path::new(t).exists())
                 .cloned()
@@ -1252,8 +1274,16 @@ fn main() {
                 .parent() // t/
                 .and_then(|p| p.parent()) // project/
                 .unwrap_or(std::path::Path::new("."));
-            // Capture stderr to count assertions
-            let output = process::Command::new(&exe)
+            // Capture stderr to count assertions.
+            // Forward -j N to each test so parallel builtins use the thread pool.
+            let mut cmd = process::Command::new(&exe);
+            // Extract -j value from original args
+            if let Some(j_pos) = args.iter().position(|a| a == "-j") {
+                if let Some(n) = args.get(j_pos + 1) {
+                    cmd.arg("-j").arg(n);
+                }
+            }
+            let output = cmd
                 .arg(&script_abs)
                 .current_dir(project_root)
                 .stderr(process::Stdio::piped())

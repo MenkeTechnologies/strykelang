@@ -2,7 +2,12 @@
 # Rosetta Code: Self numbers
 
 fn sum_digits($n) {
-    ~> $n chars map { int($_) } reduce { $a + $b }
+    my $sum = 0
+    my @digits = str($n) |> chars
+    for my $d (@digits) {
+        $sum = $sum + int($d)
+    }
+    $sum
 }
 
 fn is_self_number($n) {

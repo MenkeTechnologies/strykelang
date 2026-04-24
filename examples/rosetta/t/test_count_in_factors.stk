@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count in factors
+
+fn count_in_factors($n) {
+    my @f = prime_factors($n)
+    if (scalar(@f) == 0) { return "$n" }
+    join(" * ", @f)
+}
+
+assert_eq count_in_factors(1), "1", "factors of 1"
+assert_eq count_in_factors(2), "2", "factors of 2"
+assert_eq count_in_factors(4), "2 * 2", "factors of 4"
+assert_eq count_in_factors(12), "2 * 2 * 3", "factors of 12"
+assert_eq count_in_factors(100), "2 * 2 * 5 * 5", "factors of 100"
+
+test_run

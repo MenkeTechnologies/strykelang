@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arithmetic coding
+
+fn get_probs($text) {
+    my @chars = $text |> chars
+    my %count
+    for my $c (@chars) { $count{$c} = $count{$c} + 1 }
+    
+    my @sorted_chars = sort(keys %count)
+    my %probs
+    my $curr = 0
+    my $total = scalar(@chars)
+    for my $c (@sorted_chars) {
+        my $p = $count{$c} / $total
+        $probs{$c} = { low => $curr, high => $curr + $p }
+        $curr = $curr + $p
+    }
+    \%probs
+}
+
+fn arith_encode($text, $probs) {
+    my $low = 0
+    my $high = 1
+    my @chars = $text |> chars
+    for my $c (@chars) {
+        my $range = $high - $low
+        my $p = $probs->{$c}
+        $high = $low + $range * $p->{high}
+        $low = $low + $range * $p->{low}
+    }
+    $low
+}
+
+fn arith_decode($val, $probs, $len) {
+    my $res = ""
+    my $v = $val
+    for my $i (1..$len) {
+        for my $c (sort(keys %$probs)) {
+            my $p = $probs->{$c}
+            if ($v >= $p->{low} && $v < $p->{high}) {
+                $res = $res . $c
+                $v = ($v - $p->{low}) / ($p->{high} - $p->{low})
+                last
+            }
+        }
+    }
+    $res
+}
+
+my $input = "WIKI"
+my $probs = get_probs($input)
+my $encoded = arith_encode($input, $probs)
+my $decoded = arith_decode($encoded, $probs, 4)
+
+assert_eq $decoded, $input, "Arithmetic encode/decode 'WIKI'"
+
+test_run

@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compare a list of strings (Manual)
+
+fn all_equal($list) {
+    if (scalar(@$list) <= 1) { return 1 }
+    my $first = $list->[0]
+    for my $s (@$list) {
+        if ($s ne $first) { return 0 }
+    }
+    1
+}
+
+fn all_increasing($list) {
+    if (scalar(@$list) <= 1) { return 1 }
+    for my $i (0..scalar(@$list)-2) {
+        if ($list->[$i] ge $list->[$i+1]) { return 0 }
+    }
+    1
+}
+
+my @eq = ("abc", "abc", "abc")
+assert_ok all_equal(\@eq), "all strings equal"
+
+my @neq = ("abc", "abd", "abc")
+assert_ok !all_equal(\@neq), "not all equal"
+
+my @inc = ("abc", "abd", "abe")
+assert_ok all_increasing(\@inc), "strings increasing"
+
+my @ninc = ("abc", "abe", "abd")
+assert_ok !all_increasing(\@ninc), "not increasing"
+
+test_run

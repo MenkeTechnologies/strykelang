@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Roman Numerals - Decode
+
+fn my_roman_decode($str) {
+    my %vals = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
+    my @chars = $str |> chars
+    my $res = 0
+    my $i = 0
+    while ($i < scalar(@chars)) {
+        my $v1 = $vals{@chars[$i]}
+        my $v2 = ($i + 1 < scalar(@chars)) ? $vals{@chars[$i+1]} : 0
+        
+        if ($v2 > $v1) {
+            $res = $res + ($v2 - $v1)
+            $i = $i + 2
+        } else {
+            $res = $res + $v1
+            $i = $i + 1
+        }
+    }
+    $res
+}
+
+assert_eq my_roman_decode("MCMXC"), 1990, "roman 1990"
+assert_eq my_roman_decode("MMVIII"), 2008, "roman 2008"
+assert_eq my_roman_decode("MDCLXVI"), 1666, "roman 1666"
+
+test_run

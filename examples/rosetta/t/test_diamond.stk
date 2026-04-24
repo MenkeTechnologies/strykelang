@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Diamond lines
+
+fn diamond_row($char, $max_char) {
+    my $dist = ord($char) - ord("A")
+    my $max_dist = ord($max_char) - ord("A")
+    my $outer = $max_dist - $dist
+    my $res = ""
+    for my $i (1..$outer) { $res = $res . " " }
+    $res = $res . $char
+    if ($dist > 0) {
+        my $inner = 2 * $dist - 1
+        for my $i (1..$inner) { $res = $res . " " }
+        $res = $res . $char
+    }
+    # Symmetric trailing spaces not strictly needed for visualization but good for tests
+    for my $i (1..$outer) { $res = $res . " " }
+    $res
+}
+
+fn diamond($max_char) {
+    my @rows
+    my @chars = ("A" .. $max_char)
+    for my $c (@chars) {
+        push @rows, diamond_row($c, $max_char)
+    }
+    my @rev_chars = rev(@chars)
+    shift @rev_chars # remove max_char
+    for my $c (@rev_chars) {
+        push @rows, diamond_row($c, $max_char)
+    }
+    \@rows
+}
+
+my $d_c = diamond("C")
+assert_eq $d_c->[0], "  A  ", "diamond C row 0"
+assert_eq $d_c->[1], " B B ", "diamond C row 1"
+assert_eq $d_c->[2], "C   C", "diamond C row 2"
+assert_eq $d_c->[3], " B B ", "diamond C row 3"
+assert_eq $d_c->[4], "  A  ", "diamond C row 4"
+
+test_run

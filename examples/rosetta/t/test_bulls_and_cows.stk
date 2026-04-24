@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bulls and Cows
+
+fn get_score($secret, $guess) {
+    my @s = str($secret) |> chars
+    my @g = str($guess) |> chars
+    my $bulls = 0
+    my $cows = 0
+    
+    my %s_count; my %g_count
+    for my $i (0..scalar(@s)-1) {
+        if ($s[$i] eq $g[$i]) {
+            $bulls = $bulls + 1
+        } else {
+            $s_count{$s[$i]} = $s_count{$s[$i]} + 1
+            $g_count{$g[$i]} = $g_count{$g[$i]} + 1
+        }
+    }
+    
+    for my $k (keys %g_count) {
+        if (exists $s_count{$k}) {
+            my $m = $s_count{$k}
+            if ($g_count{$k} < $m) { $m = $g_count{$k} }
+            $cows = $cows + $m
+        }
+    }
+    
+    ($bulls, $cows)
+}
+
+my @score1 = get_score(1234, 1234)
+assert_eq $score1[0], 4, "4 bulls"
+assert_eq $score1[1], 0, "0 cows"
+
+my @score2 = get_score(1234, 4321)
+assert_eq $score2[0], 0, "0 bulls"
+assert_eq $score2[1], 4, "4 cows"
+
+my @score3 = get_score(1234, 1357)
+assert_eq $score3[0], 1, "1 bull (1)"
+assert_eq $score3[1], 1, "1 cow (3)"
+
+test_run

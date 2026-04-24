@@ -175,14 +175,24 @@ impl Frame {
             if let Some(ref n) = sn {
                 if n == name {
                     if i < self.scalar_slots.len() {
-                        self.scalar_slots[i] = val;
+                        // Write through ScalarRef so closures sharing this cell see the update
+                        if let Some(r) = self.scalar_slots[i].as_scalar_ref() {
+                            *r.write() = val;
+                        } else {
+                            self.scalar_slots[i] = val;
+                        }
                     }
                     return;
                 }
             }
         }
         if let Some(entry) = self.scalars.iter_mut().find(|(k, _)| k == name) {
-            entry.1 = val;
+            // Write through ScalarRef so closures sharing this cell see the update
+            if let Some(r) = entry.1.as_scalar_ref() {
+                *r.write() = val;
+            } else {
+                entry.1 = val;
+            }
         } else {
             self.scalars.push((name.to_string(), val));
         }
@@ -412,7 +422,12 @@ impl Scope {
         for i in (0..len).rev() {
             if idx < self.frames[i].scalar_slots.len() && self.frames[i].owns_scalar_slot_index(idx)
             {
-                self.frames[i].scalar_slots[idx] = val;
+                // Write through ScalarRef so closures sharing this cell see the update
+                if let Some(r) = self.frames[i].scalar_slots[idx].as_scalar_ref() {
+                    *r.write() = val;
+                } else {
+                    self.frames[i].scalar_slots[idx] = val;
+                }
                 return;
             }
         }
@@ -1853,8 +1868,9 @@ impl Scope {
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    // Scalar slots are used by the VM; don't modify them in-place.
-                    // Wrap in ScalarRef for the captured closure environment only.
+                    // Capture slot value. Don't modify in-place — ScalarRef wrapping
+                    // of slots needs a CaptureCell type to avoid breaking `p $x` semantics.
+                    // For now, capture as-is; self-referential closures need __SUB__.
                     let wrapped = if v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {
