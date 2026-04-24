@@ -7,7 +7,7 @@ use crate::common::*;
 fn begin_defines_subroutine_visible_to_main() {
     assert_eq!(
         eval_int(
-            "BEGIN { sub from_begin { 42 } } \
+            "BEGIN { fn from_begin { 42 } } \
              from_begin()",
         ),
         42

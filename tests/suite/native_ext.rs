@@ -214,8 +214,8 @@ fn par_pipeline_readline_stdin_bare_blocks_bareword_stages() {
     let mut child = Command::new(exe)
         .args([
             "-e",
-            r#"sub parse_json { $_ }
-sub transform { $_ }
+            r#"fn parse_json { $_ }
+fn transform { $_ }
 my $n = par_pipeline(
     source  => { readline(STDIN) },
     stages  => [ { parse_json }, { transform } ],

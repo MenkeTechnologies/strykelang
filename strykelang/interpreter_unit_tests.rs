@@ -10,7 +10,7 @@ fn destroy_runs_when_lexical_overwritten_with_undef() {
     let mut i = Interpreter::new();
     let prog = parse(
         r#"$main::d = 0
-        sub Dtor::DESTROY { $main::d = $main::d + 1 }
+        fn Dtor::DESTROY { $main::d = $main::d + 1 }
         my $o = bless {}, "Dtor"
         $o = undef
         $main::d"#,
@@ -47,10 +47,10 @@ fn super_fixture_succeeds_on_tree_execute_path() {
     let prog = parse(
         r#"
         package P
-        sub meth { 10 }
+        fn meth { 10 }
         package C
         our @ISA = qw(P)
-        sub meth { my $s = shift; $s->SUPER::meth + 5 }
+        fn meth { my $s = shift; $s->SUPER::meth + 5 }
         package main
         my $o = bless {}, "C"
         $o->meth()
@@ -142,7 +142,7 @@ fn execute_tree_my_scalar_sequence() {
 
 #[test]
 fn execute_tree_registers_sub_for_later_call() {
-    let p = parse("sub times6 { return $_0 * 6; } times6(7)").expect("parse");
+    let p = parse("fn times6 { return $_0 * 6; } times6(7)").expect("parse");
     let mut i = Interpreter::new();
     let v = i.execute_tree(&p).expect("execute_tree");
     assert_eq!(v.to_int(), 42);
@@ -160,7 +160,7 @@ fn execute_preserves_scope_scalar_across_two_parses() {
 
 #[test]
 fn subs_map_holds_declared_sub() {
-    let p = parse("sub interp_named { 1 }").expect("parse");
+    let p = parse("fn interp_named { 1 }").expect("parse");
     let mut i = Interpreter::new();
     i.execute_tree(&p).expect("execute_tree");
     assert!(i.subs.contains_key("interp_named"));

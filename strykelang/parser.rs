@@ -1657,7 +1657,7 @@ impl Parser {
     }
 
     /// `defer { BLOCK }` — register a block to run when the current scope exits.
-    /// Desugars to a `defer__internal(sub { BLOCK })` function call that the compiler
+    /// Desugars to a `defer__internal(fn { BLOCK })` function call that the compiler
     /// handles specially by emitting Op::DeferBlock.
     fn parse_defer_stmt(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
@@ -1839,7 +1839,7 @@ impl Parser {
                 Token::Ident(ref name) if name == "sub" => {
                     if !crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
+                            "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
                             stage_line,
                         ));
                     }
@@ -2957,6 +2957,95 @@ impl Parser {
         })
     }
 
+    /// `cond { EXPR => RESULT, ..., default => RESULT }`
+    ///
+    /// Desugars to an if/elsif/else chain at parse time.
+    /// Each arm is `condition => { body }` or `condition => expr`.
+    /// `default => ...` becomes the else branch.
+    fn parse_cond_expr(&mut self, line: usize) -> PerlResult<Expr> {
+        self.expect(&Token::LBrace)?;
+
+        let mut arms: Vec<(Expr, Block)> = Vec::new();
+        let mut else_block: Option<Block> = None;
+
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let arm_line = self.peek_line();
+
+            // Check for `default =>`
+            let is_default = matches!(self.peek(), Token::Ident(ref s) if s == "default")
+                && matches!(self.peek_at(1), Token::FatArrow);
+
+            if is_default {
+                self.advance(); // consume `default`
+                self.advance(); // consume `=>`
+                let body = if matches!(self.peek(), Token::LBrace) {
+                    self.parse_block()?
+                } else {
+                    let expr = self.parse_assign_expr()?;
+                    vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(expr),
+                        line: arm_line,
+                    }]
+                };
+                else_block = Some(body);
+                self.eat(&Token::Comma);
+                break; // default must be last
+            }
+
+            // Parse condition expression (stop before `=>`)
+            let condition = self.parse_assign_expr()?;
+            self.expect(&Token::FatArrow)?;
+
+            let body = if matches!(self.peek(), Token::LBrace) {
+                self.parse_block()?
+            } else {
+                let expr = self.parse_assign_expr()?;
+                vec![Statement {
+                    label: None,
+                    kind: StmtKind::Expression(expr),
+                    line: arm_line,
+                }]
+            };
+
+            arms.push((condition, body));
+            self.eat(&Token::Comma);
+        }
+
+        self.expect(&Token::RBrace)?;
+
+        if arms.is_empty() {
+            return Err(self.syntax_err("cond requires at least one condition arm", line));
+        }
+
+        // Build if/elsif/else chain from the arms.
+        let (first_cond, first_body) = arms.remove(0);
+        let elsifs: Vec<(Expr, Block)> = arms;
+
+        // Wrap in a do-block so `cond { ... }` is an expression.
+        let if_stmt = Statement {
+            label: None,
+            kind: StmtKind::If {
+                condition: first_cond,
+                body: first_body,
+                elsifs,
+                else_block,
+            },
+            line,
+        };
+        let inner = Expr {
+            kind: ExprKind::CodeRef {
+                params: vec![],
+                body: vec![if_stmt],
+            },
+            line,
+        };
+        Ok(Expr {
+            kind: ExprKind::Do(Box::new(inner)),
+            line,
+        })
+    }
+
     /// `match (EXPR) { PATTERN => EXPR, ... }`
     fn parse_algebraic_match_expr(&mut self, line: usize) -> PerlResult<Expr> {
         self.expect(&Token::LParen)?;
@@ -3973,7 +4062,7 @@ impl Parser {
                 // In non-compat mode, `fn {}` anonymous is not allowed — must use `fn {}`
                 if is_sub_keyword && !crate::compat_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
+                        "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
                         line,
                     ));
                 }
@@ -4013,7 +4102,7 @@ impl Parser {
         let mut fields = Vec::new();
         let mut methods = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-            // Check for method definition: `fn name { }` or `sub name { }`
+            // Check for method definition: `fn name { }` or `fn name { }`
             let is_method = match self.peek() {
                 Token::Ident(s) => s == "fn" || s == "sub",
                 _ => false,
@@ -6295,7 +6384,7 @@ impl Parser {
 
             // `LHS |> >{ BLOCK }` — the `>{}` form is parsed everywhere as `Do(CodeRef)` (IIFE).
             // On the RHS of `|>` we want pipe-apply semantics instead: unwrap the Do and invoke
-            // the inner coderef with `lhs` as `$_[0]`, matching `LHS |> sub { ... }`.
+            // the inner coderef with `lhs` as `$_[0]`, matching `LHS |> fn { ... }`.
             ExprKind::Do(inner) if matches!(inner.kind, ExprKind::CodeRef { .. }) => {
                 ExprKind::IndirectCall {
                     target: inner,
@@ -9127,6 +9216,15 @@ impl Parser {
                     })
                 }
             }
+            "cond" => {
+                if crate::compat_mode() {
+                    return Err(self.syntax_err(
+                        "`cond` is a stryke extension (disabled by --compat)",
+                        line,
+                    ));
+                }
+                self.parse_cond_expr(line)
+            }
             "match" => {
                 if crate::compat_mode() {
                     return Err(self.syntax_err(
@@ -9656,7 +9754,7 @@ impl Parser {
                 //   - `ident` — bare function call
                 //   - `ident { block }` — function with block arg
                 //   - `ident arg1 arg2 { block }` — function with args and optional block
-                //   - `sub { block }` — standalone anonymous block
+                //   - `fn { block }` — standalone anonymous block
                 //   - `>{ block }` — shorthand for standalone anonymous block
                 // Desugars to: EXPR |> stage1 |> stage2 |> ...
                 self.parse_thread_macro(line, false)
@@ -11090,10 +11188,10 @@ impl Parser {
                 })
             }
             "sub" => {
-                // In non-compat mode, `sub {}` is not valid — must use `fn {}`
+                // In non-compat mode, `fn {}` is not valid — must use `fn {}`
                 if !crate::compat_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
+                        "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
                         line,
                     ));
                 }
@@ -14463,7 +14561,7 @@ mod tests {
 
     #[test]
     fn parse_subroutine_decl() {
-        let p = parse_ok("sub foo { 1 }");
+        let p = parse_ok("fn foo { 1 }");
         assert_eq!(p.statements.len(), 1);
         match &p.statements[0].kind {
             StmtKind::SubDecl { name, .. } => assert_eq!(name, "foo"),
@@ -14473,7 +14571,7 @@ mod tests {
 
     #[test]
     fn parse_subroutine_with_prototype() {
-        let p = parse_ok("sub foo ($$) { 1 }");
+        let p = parse_ok("fn foo ($$) { 1 }");
         assert_eq!(p.statements.len(), 1);
         match &p.statements[0].kind {
             StmtKind::SubDecl { prototype, .. } => {
@@ -14685,7 +14783,7 @@ mod tests {
 
     #[test]
     fn parse_state_variable() {
-        let p = parse_ok("sub my_counter { state $n = 0; $n++ }");
+        let p = parse_ok("fn my_counter { state $n = 0; $n++ }");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -14721,13 +14819,13 @@ mod tests {
 
     #[test]
     fn parse_return_statement() {
-        let p = parse_ok("sub foo { return 42 }");
+        let p = parse_ok("fn foo { return 42 }");
         assert_eq!(p.statements.len(), 1);
     }
 
     #[test]
     fn parse_wantarray() {
-        let p = parse_ok("sub foo { wantarray ? @a : $a }");
+        let p = parse_ok("fn foo { wantarray ? @a : $a }");
         assert_eq!(p.statements.len(), 1);
     }
 
@@ -14865,7 +14963,7 @@ mod tests {
 
     #[test]
     fn parse_unclosed_brace_error() {
-        let err = parse_err("sub foo {");
+        let err = parse_err("fn foo {");
         assert!(!err.is_empty());
     }
 

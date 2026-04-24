@@ -379,7 +379,7 @@ fn shape_foreach() {
 #[test]
 fn shape_sub_decl() {
     assert!(matches!(
-        first_stmt("sub foo { 1; }"),
+        first_stmt("fn foo { 1; }"),
         StmtKind::SubDecl { .. }
     ));
 }
@@ -387,7 +387,7 @@ fn shape_sub_decl() {
 /// `sub Pkg::name { }` (core `B.pm`, `Exporter.pm`, …).
 #[test]
 fn shape_sub_decl_qualified_name() {
-    match first_stmt("sub B::GV::SAFENAME { 1; }") {
+    match first_stmt("fn B::GV::SAFENAME { 1; }") {
         StmtKind::SubDecl { name, .. } => assert_eq!(name, "B::GV::SAFENAME"),
         _ => panic!("expected SubDecl"),
     }

@@ -286,7 +286,7 @@ fn fan_default_count_matches_rayon_thread_pool() {
     let n = rayon::current_num_threads();
     let expected = (n * n.saturating_sub(1) / 2) as i64;
     assert_eq!(
-        eval_int(r#"sub prto { $s += $_ } mysync $s = 0; fan { prto }; $s"#),
+        eval_int(r#"fn prto { $s += $_ } mysync $s = 0; fan { prto }; $s"#),
         expected,
     );
 }
@@ -347,7 +347,7 @@ fn fan_die_in_worker_is_die_kind() {
 #[test]
 fn fan_bareword_sub_passes_worker_index_as_topic() {
     assert_eq!(
-        eval_int(r#"sub processme { $s += $_ } mysync $s = 0; fan 50 { processme }; $s"#),
+        eval_int(r#"fn processme { $s += $_ } mysync $s = 0; fan 50 { processme }; $s"#),
         1225,
     );
 }
@@ -356,7 +356,7 @@ fn fan_bareword_sub_passes_worker_index_as_topic() {
 #[test]
 fn pfor_bareword_sub_passes_list_item_as_topic() {
     assert_eq!(
-        eval_int(r#"sub processme { $s += $_ } mysync $s = 0; pfor { processme } (0..49); $s"#),
+        eval_int(r#"fn processme { $s += $_ } mysync $s = 0; pfor { processme } (0..49); $s"#),
         1225,
     );
 }

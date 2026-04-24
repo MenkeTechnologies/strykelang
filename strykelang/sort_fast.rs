@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn detects_cmp_ab_from_sub_body() {
-        let p = crate::parse("sub cmpab { $a cmp $b }").expect("parse");
+        let p = crate::parse("fn cmpab { $a cmp $b }").expect("parse");
         let block = match &p.statements[0].kind {
             StmtKind::SubDecl { body, .. } => body,
             _ => panic!("expected sub"),
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn detect_sort_block_fast_rejects_multi_statement_block() {
-        let p = crate::parse("sub two_stmt { $a <=> $b; 1; }").expect("parse");
+        let p = crate::parse("fn two_stmt { $a <=> $b; 1; }").expect("parse");
         let block = match &p.statements[0].kind {
             StmtKind::SubDecl { body, .. } => body,
             _ => panic!("expected sub"),

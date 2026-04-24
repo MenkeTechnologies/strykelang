@@ -15,8 +15,8 @@ fn test_bless_and_ref() {
 fn test_method_call_basic() {
     let code = r#"
         package Foo {
-            sub new { bless { val => $_[1] }, "Foo" }
-            sub get_val { $_[0]->{val} }
+            fn new { bless { val => $_[1] }, "Foo" }
+            fn get_val { $_[0]->{val} }
         }
         my $obj = Foo->new(42)
         $obj->get_val()
@@ -28,7 +28,7 @@ fn test_method_call_basic() {
 fn test_inheritance_isa() {
     let code = r#"
         package Parent {
-            sub identify { "parent" }
+            fn identify { "parent" }
         }
         package Child {
             our @ISA = ("Parent")
@@ -43,7 +43,7 @@ fn test_inheritance_isa() {
 fn test_can_method() {
     let code = r#"
         package TestCan {
-            sub existing { 1 }
+            fn existing { 1 }
         }
         my $obj = bless {}, "TestCan"
         my $c1 = $obj->can("existing") ? "yes" : "no"
@@ -57,7 +57,7 @@ fn test_can_method() {
 fn test_nested_packages() {
     let code = r#"
         package Outer::Inner {
-            sub hello { "inner" }
+            fn hello { "inner" }
         }
         Outer::Inner->hello()
     "#;
@@ -83,8 +83,8 @@ fn test_isa_builtin() {
 fn test_method_override() {
     // Renamed 'm' to 'meth' to avoid confusion with 'm' operator
     let code = r#"
-        package P { sub meth { "P" } }
-        package C { our @ISA = ("P"); sub meth { "C" } }
+        package P { fn meth { "P" } }
+        package C { our @ISA = ("P"); fn meth { "C" } }
         my $obj = bless {}, "C"
         $obj->meth()
     "#;
@@ -94,8 +94,8 @@ fn test_method_override() {
 #[test]
 fn test_explicit_package_call() {
     let code = r#"
-        package P { sub meth { "P" } }
-        package C { our @ISA = ("P"); sub meth { P->meth() . "C" } }
+        package P { fn meth { "P" } }
+        package C { our @ISA = ("P"); fn meth { P->meth() . "C" } }
         my $obj = bless {}, "C"
         $obj->meth()
     "#;

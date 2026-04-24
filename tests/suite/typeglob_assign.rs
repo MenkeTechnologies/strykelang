@@ -7,7 +7,7 @@ fn typeglob_assign_coderef_installs_sub_alias() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub orig { 41 }
+            fn orig { 41 }
             *alias = \&orig;
             alias() + 1"#,
         ),
@@ -20,7 +20,7 @@ fn typeglob_assign_glob_copies_subroutine_slot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub first_fn { 7 }
+            fn first_fn { 7 }
             *two = *first_fn;
             two() * 2"#,
         ),

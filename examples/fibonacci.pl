@@ -6,7 +6,7 @@ use warnings;
 
 my %memo;
 
-sub fib_n {
+fn fib_n {
     my $n = shift @_;
     return $n if $n <= 1;
     return $memo{$n} if exists $memo{$n};

@@ -36,7 +36,7 @@ fn three_expression_statements_distinct_lines() {
 
 #[test]
 fn sub_decl_then_call_without_semicolon_is_two_statements() {
-    let p = stryke::parse("sub foo { return 5 } foo()").expect("parse");
+    let p = stryke::parse("fn foo { return 5 } foo()").expect("parse");
     assert_eq!(
         p.statements.len(),
         2,
@@ -50,7 +50,7 @@ fn sub_decl_then_call_without_semicolon_is_two_statements() {
 
 #[test]
 fn sub_declaration_statement_kind() {
-    let p = stryke::parse("sub foo { return 1; }").expect("parse");
+    let p = stryke::parse("fn foo { return 1; }").expect("parse");
     assert_eq!(p.statements.len(), 1);
     let StmtKind::SubDecl { name, .. } = &p.statements[0].kind else {
         panic!("expected SubDecl");

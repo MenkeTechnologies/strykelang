@@ -90,7 +90,7 @@ fn join_separate_scalars_not_from_sub_return_list() {
 fn wantarray_scalar_branch_in_sub() {
     assert_eq!(
         eval_int(
-            r#"sub pair { wantarray ? (1, 2) : 9 }
+            r#"fn pair { wantarray ? (1, 2) : 9 }
                pair()"#,
         ),
         9
@@ -194,7 +194,7 @@ fn anon_sub_invoked_with_arrow() {
 #[test]
 fn sub_positional_parameter_via_subscript_zero() {
     assert_eq!(
-        eval_int(r#"sub pick_first { $_[0] } pick_first(100, 200)"#),
+        eval_int(r#"fn pick_first { $_[0] } pick_first(100, 200)"#),
         100
     );
 }

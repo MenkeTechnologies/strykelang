@@ -39,9 +39,9 @@ can grep through `src/lsp.rs` and fix multiple in one pass.
 ### `fn` Perl-style sig with array/hash params not supported (2)
 
 - **`[sub]`** — `fn greet($who) { p "hello $who" };`
-  - `expected `$name`, `[ ... ]`, or `{ ... }` in sub signature, got ArrayVar("args") at -e line 4`
+  - `expected `$name`, `[ ... ]`, or `{ ... }` in fn signature, got ArrayVar("args") at -e line 4`
 - **`[bless]`** — `fn new($class, %args) {`
-  - `expected `$name`, `[ ... ]`, or `{ ... }` in sub signature, got HashVar("args") at -e line 1`
+  - `expected `$name`, `[ ... ]`, or `{ ... }` in fn signature, got HashVar("args") at -e line 1`
 
 ### format/write parser issue (2)
 

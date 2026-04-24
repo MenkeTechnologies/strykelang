@@ -588,8 +588,8 @@ mod tests {
 
     #[test]
     fn parse_sub_with_prototype() {
-        parse("sub sum ($$) { return $_0 + $_1; }").expect("sub prototype");
-        parse("sub try (&;@) { my ( $try, @code_refs ) = @_; }").expect("prototype @ slurpy");
+        parse("fn sum ($$) { return $_0 + $_1; }").expect("fn prototype");
+        parse("fn try (&;@) { my ( $try, @code_refs ) = @_; }").expect("prototype @ slurpy");
     }
 
     #[test]

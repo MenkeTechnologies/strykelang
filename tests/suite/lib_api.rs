@@ -71,7 +71,7 @@ fn parse_and_run_string_returns_last_statement_value() {
 #[test]
 fn parse_and_run_string_preserves_subroutine_definitions() {
     let mut interp = Interpreter::new();
-    parse_and_run_string("sub api_t { return 40 + 2; }", &mut interp).expect("define");
+    parse_and_run_string("fn api_t { return 40 + 2; }", &mut interp).expect("define");
     let v = parse_and_run_string("api_t()", &mut interp).expect("call");
     assert_eq!(v.to_int(), 42);
 }
@@ -109,7 +109,7 @@ fn parse_and_run_string_in_file_restores_interp_file_after_runtime_error() {
 fn parse_and_run_string_in_file_parse_error_leaves_interp_file_unchanged() {
     let mut interp = Interpreter::new();
     interp.set_file("caller.pl");
-    assert!(parse_and_run_string_in_file("sub x {", &mut interp, "broken.pl").is_err());
+    assert!(parse_and_run_string_in_file("fn x {", &mut interp, "broken.pl").is_err());
     let after = parse_and_run_string("__FILE__", &mut interp).expect("file after parse err");
     assert_eq!(after.to_string(), "caller.pl");
 }

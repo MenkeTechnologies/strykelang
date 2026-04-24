@@ -68,5 +68,5 @@ parse_batch3! {
     parse_b3_057 => "my $z = 'a' ~~ 'b';";
     parse_b3_058 => "state $st = 1;";
     parse_b3_059 => "continue { 1; }";
-    parse_b3_060 => "sub foo { 1; }";
+    parse_b3_060 => "fn foo { 1; }";
 }

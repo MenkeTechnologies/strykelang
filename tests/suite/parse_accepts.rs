@@ -411,8 +411,8 @@ fn accepts_do_string() {
 
 #[test]
 fn accepts_sub_decl() {
-    p("sub foo { }");
-    p("sub g ($$) { return $_0 + $_1; }");
+    p("fn foo { }");
+    p("fn g ($$) { return $_0 + $_1; }");
 }
 
 #[test]

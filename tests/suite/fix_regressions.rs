@@ -392,12 +392,12 @@ fn require_scans_inc_in_array_order_first_dir_shadows_later() {
     std::fs::create_dir_all(&d2).unwrap();
     std::fs::write(
         d1.join("Shadow.pm"),
-        "package Shadow;\nsub marker { 101 }\n1;\n",
+        "package Shadow;\nfn marker { 101 }\n1;\n",
     )
     .unwrap();
     std::fs::write(
         d2.join("Shadow.pm"),
-        "package Shadow;\nsub marker { 202 }\n1;\n",
+        "package Shadow;\nfn marker { 202 }\n1;\n",
     )
     .unwrap();
     let p1 = d1.to_str().expect("utf-8");
@@ -977,7 +977,7 @@ fn destroy_runs_when_lexical_blessed_ref_dropped() {
     assert_eq!(
         eval_int(
             r#"our $d = 0;
-            sub Dtor::DESTROY { $main::d = $main::d + 1; }
+            fn Dtor::DESTROY { $main::d = $main::d + 1; }
             { my $o = bless {}, "Dtor"; }
             $d"#
         ),
@@ -1093,7 +1093,7 @@ fn elsif_chain_picks_first_true_branch() {
 fn sub_params_via_at_underscore() {
     assert_eq!(
         eval_int(
-            r#"sub add2 {
+            r#"fn add2 {
                 my ($a, $b) = @_;
                 $a + $b;
             }
@@ -1107,7 +1107,7 @@ fn sub_params_via_at_underscore() {
 fn wantarray_distinct_scalar_vs_list_return_single_value() {
     assert_eq!(
         eval_int(
-            r#"sub ctx {
+            r#"fn ctx {
                 wantarray ? 42 : 0;
             }
             my @v = ctx();
@@ -1122,7 +1122,7 @@ fn wantarray_distinct_scalar_vs_list_return_single_value() {
 fn wantarray_false_in_scalar_context() {
     assert_eq!(
         eval_string(
-            r#"sub ctx {
+            r#"fn ctx {
                 wantarray ? ("aa", "bb") : "scalar";
             }
             ctx()"#
@@ -1547,7 +1547,7 @@ fn bless_sets_ref_type_name() {
 fn return_short_circuits_sub_rest() {
     assert_eq!(
         eval_int(
-            r#"sub early {
+            r#"fn early {
                 return 7 if 1;
                 99;
             }
@@ -2119,7 +2119,7 @@ fn chop_removes_one_character_from_end() {
 fn sub_return_list_in_scalar_context_yields_last_element() {
     assert_eq!(
         eval_int(
-            r#"sub trip { return (10, 20, 30) }
+            r#"fn trip { return (10, 20, 30) }
             my $x = trip();
             $x"#
         ),
@@ -3037,14 +3037,14 @@ fn ref_qr_returns_regexp() {
 fn named_sub_prototypes_empty_and_scalar_snapshot() {
     assert_eq!(
         eval_int(
-            r#"sub empty_proto { 1 }
+            r#"fn empty_proto { 1 }
             (prototype(\&empty_proto) eq "") ? 1 : 0"#
         ),
         1
     );
     assert_eq!(
         eval_string(
-            r#"sub one_scalar ($) { 1 }
+            r#"fn one_scalar ($) { 1 }
             prototype(\&one_scalar)"#
         ),
         "$"
@@ -4051,7 +4051,7 @@ fn subroutine_bare_return_yields_undef_in_scalar_context() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            sub fixreg_empty_ret { return; }
+            fn fixreg_empty_ret { return; }
             defined(fixreg_empty_ret()) ? 1 : 0"#
         ),
         0

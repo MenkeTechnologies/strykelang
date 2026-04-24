@@ -595,8 +595,8 @@ fn pipe_forward_method_call() {
     assert_eq!(
         eval_string(
             r#"package Fmt;
-sub new { bless {}, $_[0] }
-sub exclaim { $_[1] . "!" }
+fn new { bless {}, $_[0] }
+fn exclaim { $_[1] . "!" }
 package main;
 my $f = Fmt->new;
 my $r = "hello" |> $f->exclaim;
@@ -608,9 +608,9 @@ $r"#,
     assert_eq!(
         eval_string(
             r#"package Str;
-sub new { bless {}, $_[0] }
-sub upper { uc $_[1] }
-sub wrap { my ($self, $s, $ch) = @_; $ch . $s . $ch }
+fn new { bless {}, $_[0] }
+fn upper { uc $_[1] }
+fn wrap { my ($self, $s, $ch) = @_; $ch . $s . $ch }
 package main;
 my $s = Str->new;
 "hello" |> $s->upper |> $s->wrap("*")"#,
@@ -621,8 +621,8 @@ my $s = Str->new;
     assert_eq!(
         eval_string(
             r#"package Fmt;
-sub new { bless {}, $_[0] }
-sub exclaim { $_[1] . "!" }
+fn new { bless {}, $_[0] }
+fn exclaim { $_[1] . "!" }
 package main;
 my $f = Fmt->new;
 "hello" |> uc |> $f->exclaim"#,
@@ -635,18 +635,18 @@ my $f = Fmt->new;
 
 #[test]
 fn closure_args_in_named_sub_single_arg() {
-    assert_eq!(eval_int(r#"sub dbl { $_0 * 2 } dbl(21)"#), 42);
+    assert_eq!(eval_int(r#"fn dbl { $_0 * 2 } dbl(21)"#), 42);
 }
 
 #[test]
 fn closure_args_in_named_sub_two_args() {
-    assert_eq!(eval_int(r#"sub add { $_0 + $_1 } add(3, 4)"#), 7);
+    assert_eq!(eval_int(r#"fn add { $_0 + $_1 } add(3, 4)"#), 7);
 }
 
 #[test]
 fn closure_args_in_named_sub_three_args() {
     assert_eq!(
-        eval_int(r#"sub mul3 { $_0 * $_1 * $_2 } mul3(2, 3, 4)"#),
+        eval_int(r#"fn mul3 { $_0 * $_1 * $_2 } mul3(2, 3, 4)"#),
         24
     );
 }
@@ -662,7 +662,7 @@ fn closure_args_in_anonymous_fn() {
 #[test]
 fn closure_args_in_thread_with_named_subs() {
     assert_eq!(
-        eval_int(r#"sub dbl { $_0 * 2 } sub add10 { $_0 + 10 } thread 5 dbl add10"#),
+        eval_int(r#"fn dbl { $_0 * 2 } fn add10 { $_0 + 10 } thread 5 dbl add10"#),
         20
     );
 }
@@ -671,9 +671,9 @@ fn closure_args_in_thread_with_named_subs() {
 fn closure_args_in_thread_chain_of_udfs() {
     assert_eq!(
         eval_int(
-            r#"sub dbl { $_0 * 2 }
-               sub tripl { $_0 * 3 }
-               sub add5   { $_0 + 5 }
+            r#"fn dbl { $_0 * 2 }
+               fn tripl { $_0 * 3 }
+               fn add5 { $_0 + 5 }
                thread 2 dbl tripl add5"#
         ),
         17
@@ -686,42 +686,42 @@ fn thread_udf_with_explicit_paren_args() {
     // so the threaded value can be placed at any argument position.
     // First-arg form
     assert_eq!(
-        eval_int(r#"sub add2 { $_0 + $_1 } thread 10 add2($_, 5)"#),
+        eval_int(r#"fn add2 { $_0 + $_1 } thread 10 add2($_, 5)"#),
         15
     );
     // Last-arg form (impossible with implicit first-arg injection)
     assert_eq!(
-        eval_int(r#"sub sub2 { $_0 - $_1 } thread 10 sub2(20, $_)"#),
+        eval_int(r#"fn sub2 { $_0 - $_1 } thread 10 sub2(20, $_)"#),
         10
     );
     // Middle-arg form
     assert_eq!(
-        eval_int(r#"sub add3 { $_0 + $_1 + $_2 } thread 10 add3(5, $_, 10)"#),
+        eval_int(r#"fn add3 { $_0 + $_1 + $_2 } thread 10 add3(5, $_, 10)"#),
         25
     );
     // Chained calls — output of one stage becomes the `$_` for the next
     assert_eq!(
-        eval_int(r#"sub add2 { $_0 + $_1 } thread 10 add2($_, 5) add2($_, 100)"#),
+        eval_int(r#"fn add2 { $_0 + $_1 } thread 10 add2($_, 5) add2($_, 100)"#),
         115
     );
     // Mixes with bare-function stages
     assert_eq!(
-        eval_int(r#"sub sub2 { $_0 - $_1 } thread 10 sub2($_, 15) abs"#),
+        eval_int(r#"fn sub2 { $_0 - $_1 } thread 10 sub2($_, 15) abs"#),
         5
     );
     // `$_` inside a nested expression
     assert_eq!(
-        eval_int(r#"sub mul { $_0 * $_1 } thread 10 mul($_ + 1, 2)"#),
+        eval_int(r#"fn mul { $_0 * $_1 } thread 10 mul($_ + 1, 2)"#),
         22
     );
     // `$_` inside a nested unary builtin
     assert_eq!(
-        eval_int(r#"sub add2 { $_0 + $_1 } thread 10 add2(abs($_), 5)"#),
+        eval_int(r#"fn add2 { $_0 + $_1 } thread 10 add2(abs($_), 5)"#),
         15
     );
     // `$_` inside an interpolated string
     assert_eq!(
-        eval_string(r#"sub greet { "$_0 from $_1" } thread "alice" greet("hi $_", "bob")"#),
+        eval_string(r#"fn greet { "$_0 from $_1" } thread "alice" greet("hi $_", "bob")"#),
         "hi alice from bob"
     );
 }
@@ -949,11 +949,11 @@ fn pipe_long_chain_string() {
 fn thread_user_defined_functions_long_chain() {
     assert_eq!(
         eval_string(
-            r#"sub dbl { $_0 * 2 }
-               sub tripl { $_0 * 3 }
-               sub add5   { $_0 + 5 }
-               sub square_it { $_0 ** 2 }
-               sub halve   { $_0 / 2 }
+            r#"fn dbl { $_0 * 2 }
+               fn tripl { $_0 * 3 }
+               fn add5 { $_0 + 5 }
+               fn square_it { $_0 ** 2 }
+               fn halve { $_0 / 2 }
                thread 2 dbl tripl add5 square_it halve"#
         ),
         "144.5"
@@ -964,11 +964,11 @@ fn thread_user_defined_functions_long_chain() {
 fn thread_user_defined_string_functions() {
     assert_eq!(
         eval_string(
-            r#"sub wrap  { "[$_0]" }
-               sub upper { uc($_0) }
-               sub trim_ { trim($_0) }
-               sub rev_  { rev($_0) }
-               sub bang  { "$_0!" }
+            r#"fn wrap { "[$_0]" }
+               fn upper { uc($_0) }
+               fn trim_ { trim($_0) }
+               fn rev_ { rev($_0) }
+               fn bang { "$_0!" }
                thread "  hello  " trim_ upper rev_ wrap bang"#
         ),
         "[OLLEH]!"
@@ -979,7 +979,7 @@ fn thread_user_defined_string_functions() {
 fn thread_mixed_builtins_and_udfs() {
     assert_eq!(
         eval_int(
-            r#"sub dbl { $_0 * 2 }
+            r#"fn dbl { $_0 * 2 }
                thread 5 dbl uc length"#
         ),
         2
@@ -1052,7 +1052,7 @@ fn dunder_sub_in_named_sub() {
     // __SUB__ works in named subs too
     assert_eq!(
         eval_int(
-            r#"sub countdown { my $n = shift; $n <= 0 ? 0 : 1 + __SUB__->($n - 1) } countdown(5)"#
+            r#"fn countdown { my $n = shift; $n <= 0 ? 0 : 1 + __SUB__->($n - 1) } countdown(5)"#
         ),
         5
     );
@@ -1083,7 +1083,7 @@ fn defer_in_named_sub() {
     // defer executes before sub return
     assert_eq!(
         eval_int(
-            r#"sub foo { my $result = 10; defer { 99 }; $result }
+            r#"fn foo { my $result = 10; defer { 99 }; $result }
                foo()"#
         ),
         10
@@ -1095,7 +1095,7 @@ fn defer_with_explicit_return() {
     // defer still runs when sub has explicit return
     assert_eq!(
         eval_int(
-            r#"sub bar { defer { 99 }; return 42 }
+            r#"fn bar { defer { 99 }; return 42 }
                bar()"#
         ),
         42

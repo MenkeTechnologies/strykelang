@@ -232,7 +232,7 @@ fn worker_session_rejects_invalid_subs_prelude_with_nack() {
     let _ = read_typed_frame(&mut stdout).unwrap();
 
     let init = SessionInit {
-        subs_prelude: "sub broken { {{{".to_string(),
+        subs_prelude: "fn broken { {{{".to_string(),
         block_src: "$_;".to_string(),
         capture: vec![],
     };
@@ -663,7 +663,7 @@ fn worker_session_runs_subs_prelude_once_visible_to_jobs() {
 
     // SESSION_INIT defines a sub `tripl`. Subsequent JOBs must see it.
     let init = SessionInit {
-        subs_prelude: "sub tripl { return $_[0] * 3 }".to_string(),
+        subs_prelude: "fn tripl { return $_[0] * 3 }".to_string(),
         block_src: "tripl($_);".to_string(),
         capture: vec![],
     };
@@ -723,7 +723,7 @@ fn dispatcher_runs_against_fake_ssh_with_two_slots() {
     let items: Vec<serde_json::Value> = (1..=20i64).map(|i| serde_json::json!(i)).collect();
     let result = run_cluster(
         &cluster,
-        "sub square_val { return $_[0] * $_[0] }".to_string(),
+        "fn square_val { return $_[0] * $_[0] }".to_string(),
         "square_val($_);".to_string(),
         vec![],
         items,

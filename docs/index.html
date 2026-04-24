@@ -380,7 +380,7 @@ pmap { _ * 2 } 1..1_000_000
 # expression form
 pmap _ * 2, 1..1_000_000
 
-# bare-fn form   (sub double { $_0 * 2 })
+# bare-fn form   (fn double { $_0 * 2 })
 pmap double, 1..1_000_000</pre>
 
         <h3>fan / pchannel / ppool</h3>
@@ -402,9 +402,9 @@ $pool-&gt;join</pre>
         <h3>Pipelines</h3>
 <pre># sequential (each stage drains list before next)
 pipeline(
-  sub { map { _ * 2 } @_ },
-  sub { grep { _ &gt; 10 } @_ },
-  sub { sum(@_) },
+  fn { map { _ * 2 } @_ },
+  fn { grep { _ &gt; 10 } @_ },
+  fn { sum(@_) },
 )-&gt;run(1..1000)
 
 # streaming — bounded crossbeam channels, concurrent stages

@@ -124,7 +124,7 @@ fn logical_and_assign_short_circuits_on_falsy() {
 
 #[test]
 fn sub_scalar_underscore_counts_arguments() {
-    assert_eq!(eval_int(r#"sub narg { scalar @_ } narg(1, 2, 3, 4)"#), 4);
+    assert_eq!(eval_int(r#"fn narg { scalar @_ } narg(1, 2, 3, 4)"#), 4);
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn our_scalar_readable() {
 fn ref_named_sub_is_code() {
     assert_eq!(
         eval_string(
-            r#"sub batch4_id { 1 }
+            r#"fn batch4_id { 1 }
                ref(\&batch4_id)"#,
         ),
         "CODE"
