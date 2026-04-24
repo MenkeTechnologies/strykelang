@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parallel QuickSort
+
+fn p_quicksort {
+    my $arr_ref = $_[0]
+    my $len = scalar(@$arr_ref)
+    
+    if ($len <= 1) { return @$arr_ref }
+    
+    my @list = @$arr_ref
+    my $pivot = shift @list
+    my @left  = grep { $_ < $pivot } @list
+    my @right = grep { $_ >= $pivot } @list
+    
+    # For very small arrays, just recurse sequentially
+    if ($len < 50) {
+        return (p_quicksort(\@left), $pivot, p_quicksort(\@right))
+    }
+    
+    # For larger arrays, spawn parallel tasks
+    my $t1 = spawn { p_quicksort(\@left) }
+    my $t2 = spawn { p_quicksort(\@right) }
+    
+    return (await($t1), $pivot, await($t2))
+}
+
+# Test with a randomized list
+my @data = ~> 1..100 map { int(rand(1000)) }
+my @sorted = p_quicksort(\@data)
+
+# Verify order
+my $ok = 1
+for (my $i = 0; $i < scalar(@sorted) - 1; $i++) {
+    if ($sorted[$i] > $sorted[$i+1]) { $ok = 0 }
+}
+
+assert_ok $ok, "Parallel QuickSort result is sorted"
+assert_eq scalar(@sorted), 100, "Parallel QuickSort preserved all elements"
+
+test_run
