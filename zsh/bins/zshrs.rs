@@ -619,6 +619,12 @@ pub fn is_zsh_compat() -> bool {
 }
 
 fn main() {
+    zshrs_main();
+}
+
+/// Main entry point — extracted so the fat binary can call it after
+/// registering the stryke handler.
+pub fn zshrs_main() {
     // Initialize logging first — everything after this can use tracing macros.
     let startup_t0 = Instant::now();
 
@@ -1596,6 +1602,18 @@ fn run_interactive() {
 }
 
 fn process_line(line: &str, executor: &mut ShellExecutor) {
+    // @ prefix: dispatch to stryke if fat binary registered a handler
+    if line.starts_with('@') {
+        let code = line.trim_start_matches('@').trim();
+        if !code.is_empty() {
+            if let Some(status) = zsh::try_stryke_dispatch(code) {
+                executor.last_status = status;
+                return;
+            }
+            // No handler registered (thin binary) — treat @ as normal shell input
+        }
+    }
+
     if let Err(e) = executor.execute_script(line) {
         eprintln!("zshrs: {}", e);
     }

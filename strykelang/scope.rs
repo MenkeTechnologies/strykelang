@@ -1326,6 +1326,12 @@ impl Scope {
         &mut self,
         name: &str,
     ) -> Arc<parking_lot::RwLock<Vec<PerlValue>>> {
+        // Atomic (mysync) arrays: snapshot current data into a separate Arc.
+        // Can't share the Mutex-backed storage directly.
+        if let Some(aa) = self.find_atomic_array(name) {
+            let data = aa.0.lock().clone();
+            return Arc::new(parking_lot::RwLock::new(data));
+        }
         // Already promoted? Return the existing Arc.
         let idx = self.resolve_array_frame_idx(name).unwrap_or_default();
         let frame = &mut self.frames[idx];
@@ -1458,15 +1464,18 @@ impl Scope {
         Ok(())
     }
 
-    /// Pop from array — works for both regular and atomic arrays.
+    /// Pop from array — works for regular, shared, and atomic arrays.
     pub fn pop_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             return Ok(aa.0.lock().pop().unwrap_or(PerlValue::UNDEF));
         }
+        if let Some(arc) = self.find_shared_array(name) {
+            return Ok(arc.write().pop().unwrap_or(PerlValue::UNDEF));
+        }
         Ok(self.get_array_mut(name)?.pop().unwrap_or(PerlValue::UNDEF))
     }
 
-    /// Shift from array — works for both regular and atomic arrays.
+    /// Shift from array — works for regular, shared, and atomic arrays.
     pub fn shift_from_array(&mut self, name: &str) -> Result<PerlValue, PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
@@ -1474,6 +1483,14 @@ impl Scope {
                 PerlValue::UNDEF
             } else {
                 guard.remove(0)
+            });
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            let mut arr = arc.write();
+            return Ok(if arr.is_empty() {
+                PerlValue::UNDEF
+            } else {
+                arr.remove(0)
             });
         }
         let arr = self.get_array_mut(name)?;
@@ -1511,6 +1528,10 @@ impl Scope {
     pub fn set_array(&mut self, name: &str, val: Vec<PerlValue>) -> Result<(), PerlError> {
         if let Some(aa) = self.find_atomic_array(name) {
             *aa.0.lock() = val;
+            return Ok(());
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            *arc.write() = val;
             return Ok(());
         }
         self.check_parallel_array_write(name)?;
@@ -1567,6 +1588,19 @@ impl Scope {
         let val = self.resolve_container_binding_ref(val);
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
+            let idx = if index < 0 {
+                (arr.len() as i64 + index).max(0) as usize
+            } else {
+                index as usize
+            };
+            if idx >= arr.len() {
+                arr.resize(idx + 1, PerlValue::UNDEF);
+            }
+            arr[idx] = val;
+            return Ok(());
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            let mut arr = arc.write();
             let idx = if index < 0 {
                 (arr.len() as i64 + index).max(0) as usize
             } else {

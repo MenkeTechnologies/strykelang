@@ -163,6 +163,7 @@ lru = "0.16"
 once_cell = "1.19"
 itertools = "0.14"
 libm = "0.2.16"
+tracing = "0.1.44"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"

@@ -24,6 +24,24 @@ pub fn default_cache_path() -> PathBuf {
 }
 
 impl CompsysCache {
+    /// Access the underlying SQLite connection (for dbview etc.)
+    pub fn conn(&self) -> &Connection {
+        &self.conn
+    }
+
+    /// Count rows in a table.
+    pub fn count_table(&self, table: &str) -> rusqlite::Result<usize> {
+        // Table name is not user input — it comes from our code.
+        let sql = format!("SELECT COUNT(*) FROM {}", table);
+        self.conn.query_row(&sql, [], |row| row.get::<_, i64>(0).map(|n| n as usize))
+    }
+
+    /// Count rows matching a WHERE clause.
+    pub fn count_table_where(&self, table: &str, condition: &str) -> rusqlite::Result<usize> {
+        let sql = format!("SELECT COUNT(*) FROM {} WHERE {}", table, condition);
+        self.conn.query_row(&sql, [], |row| row.get::<_, i64>(0).map(|n| n as usize))
+    }
+
     /// Open or create cache database with maximum performance settings
     pub fn open(path: impl AsRef<Path>) -> rusqlite::Result<Self> {
         let conn = Connection::open(path)?;
@@ -297,16 +315,31 @@ impl CompsysCache {
         Ok(())
     }
 
-    /// Get all autoloads that have a body but no cached AST blob.
-    /// Used for background AST backfill on cached fast path.
+    /// Get a batch of autoloads that have a body but no cached AST blob.
+    /// Returns up to `limit` entries to avoid loading all 16k bodies into RAM.
+    /// Caller should loop until this returns an empty vec.
     pub fn get_autoloads_missing_ast(&self) -> rusqlite::Result<Vec<(String, String)>> {
+        self.get_autoloads_missing_ast_batch(100)
+    }
+
+    /// Get a batch of autoloads missing AST blobs, with configurable limit.
+    pub fn get_autoloads_missing_ast_batch(&self, limit: usize) -> rusqlite::Result<Vec<(String, String)>> {
         let mut stmt = self.conn.prepare(
-            "SELECT name, body FROM autoloads WHERE body IS NOT NULL AND ast IS NULL",
+            "SELECT name, body FROM autoloads WHERE body IS NOT NULL AND ast IS NULL LIMIT ?1",
         )?;
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map(params![limit as i64], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
         rows.collect()
+    }
+
+    /// Count autoloads missing AST blobs (cheap — no body data loaded).
+    pub fn count_autoloads_missing_ast(&self) -> rusqlite::Result<usize> {
+        self.conn.query_row(
+            "SELECT COUNT(*) FROM autoloads WHERE body IS NOT NULL AND ast IS NULL",
+            [],
+            |row| row.get::<_, i64>(0).map(|n| n as usize),
+        )
     }
 
     /// Bulk store AST blobs during compinit (one transaction for all functions).

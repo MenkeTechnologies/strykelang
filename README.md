@@ -1995,34 +1995,121 @@ stryke 'for my $h (qw(b all pc e a d c p)) {
 
 ## [0x13] ZSHRS SHELL
 
-`zshrs` is the most powerful shell ever created — a drop-in zsh replacement written in Rust that combines full bash/zsh/fish script compatibility with SQLite-indexed completions and native stryke parallel operations.
+`zshrs` is the most powerful shell ever created — a drop-in zsh replacement written in Rust. The first shell to minimize forking: no fork for command substitution, no fork for process substitution, no fork for subshells, no fork for completions. Everything runs in-process on a persistent worker thread pool.
+
+> *"No fork, no problems."*
 
 ### Install
 
 Two build options:
 
 ```sh
-# FAT build (24MB) - includes stryke for @ parallel mode
+# FAT build — includes stryke for @ parallel mode + AOP stryke advice
 cargo install strykelang        # includes zshrs binary with stryke
 cargo build --release           # target/release/zshrs (fat)
 
-# LEAN build (5MB) - pure shell, no stryke dependency  
+# LEAN build — pure shell, no stryke dependency  
+cargo install --path zsh        # ~/.cargo/bin/zshrs (lean)
 cargo build --release -p zsh    # target/release/zshrs (lean)
 ```
 
-| Build | Size | `@ mode` | Use case |
-|-------|------|----------|----------|
-| Fat (`strykelang`) | ~24MB | Yes | Full power — parallel ops, JSON, HTTP in shell |
-| Lean (`zsh` crate) | ~4MB | No | Minimal — just the shell, fast startup |
+| Build | `@ mode` | Use case |
+|-------|----------|----------|
+| Fat (`cargo install strykelang`) | Yes | Full power — stryke parallel ops at machine code speed in shell |
+| Lean (`cargo install --path zsh`) | No | Pure shell — all zshrs features, no stryke dependency |
 
 ### Why zshrs?
 
 | vs zsh | vs fish | vs bash |
 |--------|---------|---------|
-| 10x faster startup | Full POSIX compat | Fish-quality UX |
-| SQLite history (frequency, duration, exit status) | Runs `.bashrc` unchanged | Modern completions |
-| Native stryke parallel ops | No syntax translation needed | Syntax highlighting |
-| ZWC precompiled function support | Global/suffix aliases | Autosuggestions |
+| No-fork architecture (10-100x faster) | Full POSIX compat | Fish-quality UX |
+| Persistent worker thread pool [2-18 cores] | Runs `.bashrc` unchanged | Modern completions |
+| AST cache — skip lex+parse on autoload | No syntax translation needed | Syntax highlighting |
+| Plugin delta cache — source once, replay microseconds | Global/suffix aliases | Autosuggestions |
+| SQLite FTS5 completions — instant fuzzy search | Glob qualifiers | Job control |
+| AOP `intercept` builtin — first shell with aspects | Named directories | Full zsh modules |
+| Parallel `**/*.rs` glob across worker pool | | |
+| fusevm bytecode VM target (Cranelift JIT path) | | |
+
+### Architecture — no fork, in-process everything
+
+zsh forks for command substitution `$(...)`, process substitution `<(...)`, subshells `(...)`, pipelines, and completions. Each fork copies the entire shell process. zshrs replaces every fork with in-process execution on a persistent thread pool:
+
+| Operation | zsh | zshrs |
+|-----------|-----|-------|
+| `$(cmd)` | fork + pipe | In-process stdout capture via `dup2` |
+| `<(cmd)` / `>(cmd)` | fork + FIFO | Worker pool thread + FIFO |
+| Glob `**/*.rs` | Single-threaded `opendir` | Parallel `walkdir` per-subdir on pool |
+| Glob qualifiers `*(.x)` | N serial `stat` calls | One parallel metadata prefetch, zero syscalls after |
+| `rehash` | Serial `readdir` per PATH dir | Parallel scan across pool |
+| `compinit` | Synchronous fpath scan | Background scan on pool + AST pre-parse |
+| History write | Synchronous `fsync` blocks prompt | Fire-and-forget to pool |
+| Autoload function | Read file + parse every time | AST blob deserialization from SQLite (microseconds) |
+| Plugin source | Parse + execute every startup | Delta replay from SQLite (functions, aliases, vars, hooks) |
+
+### Worker thread pool
+
+Persistent pool of [2-18] threads (configurable in `~/.config/zshrs/config.toml`). Warm threads, bounded channel with backpressure, panic recovery, task cancellation on Ctrl-C, instant shutdown on exit.
+
+```toml
+# ~/.config/zshrs/config.toml
+[worker_pool]
+size = 8            # 0 = auto (num_cpus clamped [2, 18])
+
+[completion]
+ast_cache = true    # pre-parse autoload functions to AST blobs
+
+[history]
+async_writes = true # write history on worker pool
+
+[glob]
+parallel_threshold = 32   # min files before parallel metadata prefetch
+recursive_parallel = true # fan out **/ across worker pool
+```
+
+### AOP `intercept` — the killer builtin
+
+The first shell ever with aspect-oriented programming. Hook before, after, or around any command or function — at machine code speed, no fork.
+
+```zsh
+# Before — log every git command
+intercept before git { echo "[$(date)] git $INTERCEPT_ARGS" >> ~/git.log }
+
+# After — show timing for completion functions
+intercept after '_*' { echo "$INTERCEPT_NAME took ${INTERCEPT_MS}ms" }
+
+# Around — memoize expensive function
+intercept around expensive_func {
+    local cache=/tmp/cache_${INTERCEPT_ARGS// /_}
+    if [[ -f $cache ]]; then cat $cache
+    else intercept_proceed | tee $cache; fi
+}
+
+# Around — retry with backoff
+intercept around flaky_api {
+    repeat 3; do intercept_proceed; [[ $? == 0 ]] && break; sleep 1; done
+}
+
+# Fat binary — stryke code in advice at machine code speed
+intercept after 'make *' { @pmaps { notify "done: $_" } @(slack email) }
+
+# Management
+intercept list              # show all intercepts
+intercept remove 3          # remove by ID
+intercept clear             # remove all
+```
+
+Variables available in advice: `$INTERCEPT_NAME`, `$INTERCEPT_ARGS`, `$INTERCEPT_CMD`, `$INTERCEPT_MS`, `$INTERCEPT_US`, `$?`
+
+### Exclusive builtins
+
+| Builtin | Description |
+|---------|-------------|
+| **`intercept`** | AOP before/after/around advice on any command — no fork, machine code speed |
+| **`intercept_proceed`** | Call original command from around advice |
+| **`doctor`** | Full diagnostic: pool metrics, cache stats, AST coverage, startup health |
+| **`dbview`** | Browse SQLite cache tables — `dbview autoloads _git`, `dbview comps`, `dbview history` |
+| **`profile`** | In-process command profiling — nanosecond accuracy, no fork overhead |
 
 ### Core features
 
@@ -2032,9 +2119,13 @@ cargo build --release -p zsh    # target/release/zshrs (lean)
 | **Fish-style syntax highlighting** | Real-time colorization as you type — commands green, strings yellow, errors red, variables cyan |
 | **Fish-style autosuggestions** | Ghost-text completions from history, accept with → |
 | **Fish-style abbreviations** | `g` → `git`, `gco` → `git checkout`, expandable with space |
-| **SQLite-indexed completions** | FTS5 prefix search indexes all PATH executables for instant fuzzy completion |
+| **SQLite FTS5 completions** | Indexes all PATH executables for instant fuzzy completion |
 | **SQLite history** | Frequency-ranked, timestamped, tracks duration and exit status per command |
+| **AST cache** | Pre-parsed autoload functions stored as bincode blobs — skip lex+parse |
+| **Plugin delta cache** | Source a file once, cache all side effects, replay in microseconds |
 | **Native stryke mode** | Prefix any line with `@` to execute as stryke code with full parallel primitives |
+| **fusevm target** | Shell compiler lowers to fusevm bytecodes — Cranelift JIT path |
+| **Config file** | `~/.config/zshrs/config.toml` — pool size, completion settings, glob behavior |
 | **ZWC support** | Reads compiled `.zwc` files for fast function loading from fpath |
 | **Job control** | Full `&`, `fg`, `bg`, `jobs`, `wait`, `disown`, `suspend` support |
 | **Traps & signals** | `trap 'cmd' EXIT INT TERM ERR DEBUG` with proper cleanup |
@@ -2137,6 +2228,8 @@ Abbreviations expand inline when you press space — type `gs<space>` and it bec
 **zsh-specific**: `zpty`, `zsocket`, `zprof`, `sched`, `zformat`, `zparseopts`, `zregexparse`, `pcre_compile`, `pcre_match`, `zstyle`, `zstat`, `zle`, `bindkey`, `vared`, `strftime`, `promptinit`, `add-zsh-hook`, `noglob`, `nocorrect`, `repeat`, `coproc`
 
 **Bash compat**: `shopt`, `help`, `caller`, `mapfile`, `readarray`
+
+**zshrs-exclusive**: `intercept`, `intercept_proceed`, `doctor`, `dbview`, `profile`
 
 ### Parameter expansion (full zsh support)
 
