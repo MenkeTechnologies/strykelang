@@ -7,7 +7,7 @@ fn my_proper_divisors($n) {
     } else {
         my $limit = int($n / 2)
         my @divs = ~> 1..$limit grep { $n % $_ == 0 }
-        ([@divs])
+        \@divs
     }
 }
 

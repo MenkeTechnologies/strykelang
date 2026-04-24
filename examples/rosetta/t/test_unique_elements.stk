@@ -11,7 +11,7 @@ fn unique_elements($arr_ref) {
             $seen{$x} = 1
         }
     }
-    ([@unique])
+    \@unique
 }
 
 my $data = [1, 2, 3, 2, 1, 4, 5, 4]

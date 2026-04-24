@@ -15,7 +15,7 @@ fn lucky_numbers($max) {
         @l = @next
         $idx++
     }
-    ([@l])
+    \@l
 }
 
 # Actually the sieve starts with 2, which is NOT lucky.
@@ -47,7 +47,7 @@ fn my_lucky($max) {
             $idx++
         }
     }
-    ([@l])
+    \@l
 }
 
 my $res = my_lucky(50)

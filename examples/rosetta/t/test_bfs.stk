@@ -16,7 +16,7 @@ fn my_bfs($graph, $start) {
             }
         }
     }
-    ([@order])
+    \@order
 }
 
 my $graph = {

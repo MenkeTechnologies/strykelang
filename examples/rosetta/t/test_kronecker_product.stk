@@ -19,7 +19,7 @@ fn my_kronecker_product($a, $b) {
             }
         }
     }
-    ([@res])
+    \@res
 }
 
 my $a = [[1, 2], [3, 4]]

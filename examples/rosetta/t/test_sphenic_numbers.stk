@@ -12,7 +12,7 @@ fn my_prime_factors($n) {
         }
         $d++
     }
-    ([@factors])
+    \@factors
 }
 
 fn is_sphenic($n) {

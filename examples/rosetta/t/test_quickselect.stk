@@ -20,11 +20,11 @@ fn my_quickselect($arr_ref, $left, $right, $k) {
     my $pivot_idx = $left + int(rand($right - $left + 1))
     $pivot_idx = my_partition($arr_ref, $left, $right, $pivot_idx)
     if ($k == $pivot_idx) {
-        return $arr_ref->[$k]
+        $arr_ref->[$k]
     } elsif ($k < $pivot_idx) {
-        return my_quickselect($arr_ref, $left, $pivot_idx - 1, $k)
+        my_quickselect($arr_ref, $left, $pivot_idx - 1, $k)
     } else {
-        return my_quickselect($arr_ref, $pivot_idx + 1, $right, $k)
+        my_quickselect($arr_ref, $pivot_idx + 1, $right, $k)
     }
 }
 

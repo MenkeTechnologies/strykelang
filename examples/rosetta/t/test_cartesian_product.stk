@@ -8,7 +8,7 @@ fn my_cartesian_product($a_ref, $b_ref) {
             push @res, [$x, $y]
         }
     }
-    ([@res])
+    \@res
 }
 
 my $p = my_cartesian_product([1, 2], ["a", "b"])

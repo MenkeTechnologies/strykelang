@@ -31,7 +31,7 @@ fn strand_sort {
         push @merged, @sublist
         @result = @merged
     }
-    ([@result])
+    \@result
 }
 
 my $data = [1, 6, 3, 2, 1, 7, 5, 22, 58, 0, 9, 3, 4]

@@ -5,7 +5,7 @@ fn get_ordered_partitions($n) {
     my @res = ()
     if ($n == 0) {
         push @res, []
-        return ([@res])
+        return \@res
     }
     for my $i (1..$n) {
         my $sub = get_ordered_partitions($n - $i)
@@ -13,7 +13,7 @@ fn get_ordered_partitions($n) {
             push @res, [$i, @$p]
         }
     }
-    ([@res])
+    \@res
 }
 
 my $p3 = get_ordered_partitions(3)

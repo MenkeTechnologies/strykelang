@@ -790,6 +790,26 @@ impl<'a> VM<'a> {
         self.stack.pop().unwrap_or(PerlValue::UNDEF)
     }
 
+    /// Convert a name-based binding ref (`\@array`, `\%hash`, `\$scalar`) into a
+    /// real `Arc`-based ref by snapshotting the current scope data.  This must be
+    /// called before the declaring scope is destroyed (e.g. on function return)
+    /// so the ref survives scope exit — matching Perl 5's refcount semantics.
+    fn resolve_binding_ref(&self, val: PerlValue) -> PerlValue {
+        if let Some(name) = val.as_array_binding_name() {
+            let data = self.interp.scope.get_array(&name);
+            return PerlValue::array_ref(Arc::new(RwLock::new(data)));
+        }
+        if let Some(name) = val.as_hash_binding_name() {
+            let data = self.interp.scope.get_hash(&name);
+            return PerlValue::hash_ref(Arc::new(RwLock::new(data)));
+        }
+        if let Some(name) = val.as_scalar_binding_name() {
+            let data = self.interp.scope.get_scalar(&name);
+            return PerlValue::scalar_ref(Arc::new(RwLock::new(data)));
+        }
+        val
+    }
+
     /// Pop `n` array-slice index specs (TOS = last spec). Each spec is a scalar index or an array
     /// of indices (list-context `..`, `qw/.../`, parenthesized list), matching
     /// [`crate::compiler::Compiler::compile_array_slice_index_expr`]. Returns flattened indices in
@@ -3784,6 +3804,12 @@ impl<'a> VM<'a> {
                     }
                     Op::ReturnValue => {
                         let val = self.pop();
+                        // Resolve binding refs to real refs before scope cleanup.
+                        // `\@array` creates a name-based ArrayBindingRef that looks
+                        // up by name at dereference time.  If the array is a `my`
+                        // variable, its frame will be destroyed below — so we must
+                        // snapshot the data into an Arc-based ref now.
+                        let val = self.resolve_binding_ref(val);
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
                                 return Err(PerlError::runtime(
@@ -3814,6 +3840,7 @@ impl<'a> VM<'a> {
                     }
                     Op::BlockReturnValue => {
                         let val = self.pop();
+                        let val = self.resolve_binding_ref(val);
                         if let Some(frame) = self.call_stack.pop() {
                             if !frame.block_region {
                                 return Err(PerlError::runtime(

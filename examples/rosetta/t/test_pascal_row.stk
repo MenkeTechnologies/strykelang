@@ -7,7 +7,7 @@ fn my_pascal_row($n) {
         my $val = $row[$i-1] * ($n - $i + 1) / $i
         push @row, int($val + 0.5)
     }
-    ([@row])
+    \@row
 }
 
 assert_eq join(",", @{ my_pascal_row(0) }), "1", "row 0"

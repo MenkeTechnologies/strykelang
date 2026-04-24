@@ -523,7 +523,15 @@ impl Parser {
                     }
                     s
                 }
-                "sub" => self.parse_sub_decl(true)?,
+                "sub" => {
+                    if !crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "stryke uses `fn` instead of `sub` (this is not Perl 5)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_sub_decl(true)?
+                }
                 "fn" => self.parse_sub_decl(false)?,
                 "struct" => {
                     if crate::compat_mode() {
@@ -1831,7 +1839,7 @@ impl Parser {
                 Token::Ident(ref name) if name == "sub" => {
                     if !crate::compat_mode() {
                         return Err(self.syntax_err(
-                            "`fn {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                            "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
                             stage_line,
                         ));
                     }
@@ -2386,7 +2394,7 @@ impl Parser {
             "reverse" => {
                 if !crate::compat_mode() {
                     return Err(
-                        self.syntax_err("`reverse` is not valid stryke; use `rev` instead", line)
+                        self.syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line)
                     );
                 }
                 ExprKind::ReverseExpr(Box::new(arg))
@@ -2584,7 +2592,7 @@ impl Parser {
             },
             "say" => {
                 if !crate::compat_mode() {
-                    return Err(self.syntax_err("`say` is not valid stryke; use `p` instead", line));
+                    return Err(self.syntax_err("stryke uses `p` instead of `say` (this is not Perl 5)", line));
                 }
                 ExprKind::Say {
                     handle: None,
@@ -3965,7 +3973,7 @@ impl Parser {
                 // In non-compat mode, `fn {}` anonymous is not allowed — must use `fn {}`
                 if is_sub_keyword && !crate::compat_mode() {
                     return Err(self.syntax_err(
-                        "`fn {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                        "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
                         line,
                     ));
                 }
@@ -6250,7 +6258,7 @@ impl Parser {
                 "reverse" => {
                     if !crate::compat_mode() {
                         return Err(self
-                            .syntax_err("`reverse` is not valid stryke; use `rev` instead", line));
+                            .syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line));
                     }
                     ExprKind::ReverseExpr(Box::new(lhs))
                 }
@@ -8165,7 +8173,7 @@ impl Parser {
             "print" | "pr" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" => {
                 if !crate::compat_mode() {
-                    return Err(self.syntax_err("`say` is not valid stryke; use `p` instead", line));
+                    return Err(self.syntax_err("stryke uses `p` instead of `say` (this is not Perl 5)", line));
                 }
                 self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a })
             }
@@ -8920,7 +8928,7 @@ impl Parser {
             "reverse" => {
                 if !crate::compat_mode() {
                     return Err(
-                        self.syntax_err("`reverse` is not valid stryke; use `rev` instead", line)
+                        self.syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line)
                     );
                 }
                 // On the RHS of `|>`, the operand is supplied by the piped LHS.
@@ -11085,7 +11093,7 @@ impl Parser {
                 // In non-compat mode, `sub {}` is not valid — must use `fn {}`
                 if !crate::compat_mode() {
                     return Err(self.syntax_err(
-                        "`sub {}` anonymous subroutine is not valid stryke; use `fn {}` instead",
+                        "stryke uses `fn {}` instead of `sub {}` (this is not Perl 5)",
                         line,
                     ));
                 }
@@ -12740,7 +12748,7 @@ impl Parser {
         if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
             return Err(self.syntax_err(
                 format!(
-                    "cannot define sub `{name}`: shadows stryke builtin (use --compat for Perl 5 mode)"
+"`{name}` is a stryke builtin and cannot be redefined (this is not Perl 5; use `fn` not `sub`, or pass --compat)"
                 ),
                 line,
             ));
@@ -12754,7 +12762,7 @@ impl Parser {
         if Self::is_reserved_hash_name(name) {
             return Err(self.syntax_err(
                 format!(
-                    "cannot declare hash `%{name}`: shadows stryke reserved hash (use --compat for Perl 5 mode)"
+"`%{name}` is a stryke reserved hash and cannot be redefined (this is not Perl 5; pass --compat for Perl 5 mode)"
                 ),
                 line,
             ));

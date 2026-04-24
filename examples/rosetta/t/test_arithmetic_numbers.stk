@@ -6,7 +6,7 @@ fn my_divisors($n) {
     for my $i (1..$n) {
         if ($n % $i == 0) { push @d, $i }
     }
-    ([@d])
+    \@d
 }
 
 fn is_arithmetic($n) {

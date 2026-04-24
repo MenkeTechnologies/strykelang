@@ -20,7 +20,7 @@ fn stooge_sort_recursive {
         my $res3 = stooge_sort_recursive([@arr], $i, $j - $t)
         @arr = @$res3
     }
-    ([@arr])
+    \@arr
 }
 
 fn stooge_sort {
@@ -28,7 +28,7 @@ fn stooge_sort {
     my @data = @$list
     my $n = scalar(@data)
     if ($n < 2) {
-        return ([@data])
+        return \@data
     }
     stooge_sort_recursive([@data], 0, $n - 1)
 }

@@ -9,7 +9,7 @@ fn mult_table {
         my @row = @indices |> map { $i * $_ }
         push @rows, [@row]
     }
-    ([@rows])
+    \@rows
 }
 
 fn table_to_str {

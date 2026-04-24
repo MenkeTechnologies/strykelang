@@ -9,7 +9,7 @@ fn knuth_shuffle {
         my $j = int(rand($i + 1))
         ($arr[$i], $arr[$j]) = ($arr[$j], $arr[$i])
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [1, 2, 3, 4, 5]

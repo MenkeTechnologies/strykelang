@@ -5,7 +5,7 @@ fn radix_sort {
     my $list = $_[0]
     my @arr = @$list
     my $n = scalar(@arr)
-    if ($n < 2) { return ([@arr]) }
+    if ($n < 2) { return \@arr }
     
     my $max = $arr[0]
     for my $x (@arr) {
@@ -25,7 +25,7 @@ fn radix_sort {
         }
         $exp *= 10
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [170, 45, 75, 90, 802, 24, 2, 66]

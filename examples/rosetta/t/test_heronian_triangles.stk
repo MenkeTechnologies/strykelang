@@ -33,7 +33,7 @@ fn heronian_triangles {
         }
     }
     
-    ([@triangles])
+    \@triangles
 }
 
 # Just a small check as this is computationally intensive

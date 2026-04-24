@@ -16,7 +16,7 @@ fn my_matrix_mul($a, $b) {
             $res[$i][$j] = $sum
         }
     }
-    ([@res])
+    \@res
 }
 
 fn my_matrix_pow($a, $n) {
@@ -39,7 +39,7 @@ fn my_matrix_pow($a, $n) {
         $base = $tmp2
         $curr_n = int($curr_n / 2)
     }
-    ([@res])
+    \@res
 }
 
 my $m = [[1, 1], [1, 0]]

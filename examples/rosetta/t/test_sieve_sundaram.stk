@@ -20,7 +20,7 @@ fn my_sieve_sundaram($n) {
             push @primes, 2 * $i + 1
         }
     }
-    ([@primes])
+    \@primes
 }
 
 my $res = my_sieve_sundaram(100)

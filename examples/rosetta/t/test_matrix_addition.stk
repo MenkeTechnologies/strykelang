@@ -12,9 +12,9 @@ fn my_matrix_add {
             my $j = $_
             $m1->[$i][$j] + $m2->[$i][$j]
         } (0..$cols-1)
-        ([@row])
+        \@row
     }
-    ([@res])
+    \@res
 }
 
 fn matrix_to_string {

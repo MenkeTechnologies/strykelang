@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.8.3 · 3259 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.8.10 · 3260 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -169,7 +169,7 @@
       <ul class="chapter-index">
         <li><a href="#ch-parallel-primitives">Parallel Primitives</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">11</span></li>
-        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">6</span></li>
+        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
@@ -208,9 +208,9 @@
       <article class="doc-entry" id="doc-pmap">
         <h3><a class="doc-anchor" href="#doc-pmap">#</a> <code>pmap</code></h3>
         <p>Parallel <code>map</code> powered by rayon&#39;s work-stealing thread pool. Every element of the input list is processed concurrently across all available CPU cores, and the output order is guaranteed to match the input order. This is the primary workhorse for CPU-bound transforms in stryke — use it whenever you have a pure function and a large list. Pass <code>progress =&gt; 1</code> to get a live progress bar on STDERR for long-running jobs.</p>
-        <p>Two equivalent surface syntaxes: • Block form — <code>pmap BLOCK LIST</code> — element bound to <code>_</code> (bare <code>_</code> = <code>$_</code>) • Bare-fn form — <code>pmap FUNC, LIST</code> — single-arg function name as first argument</p>
-        <pre><code class="lang-perl"># Block form (bare _ is shorthand for $_)
-my @out = pmap { _ * 2 } 1..1_000_000
+        <p>Two equivalent surface syntaxes: • Block form — <code>pmap BLOCK LIST</code> — element bound to <code>$_</code> • Bare-fn form — <code>pmap FUNC, LIST</code> — single-arg function name as first argument</p>
+        <pre><code class="lang-perl"># Block form
+my @out = pmap { $_ * 2 } 1..1_000_000
 my @hashes = pmap sha256 @blobs, progress =&gt; 1
 1..100 |&gt; pmap { fetch(&quot;https://api.example.com/item/$_&quot;) } |&gt; e p
 
@@ -224,15 +224,15 @@ my @r = pmap double, (1..1_000_000)
         <h3><a class="doc-anchor" href="#doc-pmaps">#</a> <code>pmaps</code></h3>
         <p>Streaming parallel <code>map</code> — returns a lazy iterator that processes items across all CPU cores using a persistent worker-thread pool. Unlike <code>pmap</code> which eagerly collects all results into an array, <code>pmaps</code> yields results as they complete through a bounded channel, so downstream consumers see output immediately. Output order is non-deterministic (completion order). Each worker thread reuses a single interpreter instance, making it faster than <code>pmap</code> for large inputs.</p>
         <p>Best for: • Pipelines with <code>take</code>/<code>head</code> — avoids processing the full list • Very large inputs where holding all results in memory is impractical • Streaming pipelines where you want progressive output</p>
-        <pre><code class="lang-perl">range(0, 1e9) |&gt; pmaps { _ * 2 } |&gt; take 10 |&gt; ep
-t 1..1e6 pmaps { expensive(_) } ep
-range(0, 1e6) |&gt; pmaps { fetch(&quot;https://api/item/$_&quot;) } |&gt; pgreps { _-&gt;{ok} } |&gt; ep
+        <pre><code class="lang-perl">range(0, 1e9) |&gt; pmaps { $_ * 2 } |&gt; take 10 |&gt; ep
+t 1..1e6 pmaps { expensive($_) } ep
+range(0, 1e6) |&gt; pmaps { fetch(&quot;https://api/item/$_&quot;) } |&gt; pgreps { $_-&gt;{ok} } |&gt; ep
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pmap-chunked">
         <h3><a class="doc-anchor" href="#doc-pmap-chunked">#</a> <code>pmap_chunked</code></h3>
         <p>Parallel map that groups input into contiguous batches of N elements before distributing to threads. This reduces per-item scheduling overhead when the per-element work is very cheap (e.g. a few arithmetic ops). Each thread receives a slice of N consecutive items, processes them sequentially within the batch, then returns the batch result. Use this instead of <code>pmap</code> when profiling shows rayon overhead dominates the actual computation.</p>
-        <pre><code class="lang-perl">my @out = pmap_chunked 100, { _ ** 2 } 1..1_000_000
+        <pre><code class="lang-perl">my @out = pmap_chunked 100, { $_ ** 2 } 1..1_000_000
 my @parsed = pmap_chunked 50, { json_decode } @json_strings
 </code></pre>
       </article>
@@ -253,13 +253,13 @@ my @e = pgrep even, 1..10        # (2,4,6,8,10)
       <article class="doc-entry" id="doc-pgreps">
         <h3><a class="doc-anchor" href="#doc-pgreps">#</a> <code>pgreps</code></h3>
         <p>Streaming parallel <code>grep</code> — returns a lazy iterator that filters items across all CPU cores. Unlike <code>pgrep</code> which eagerly collects all matching items, <code>pgreps</code> yields matches as they are found through a bounded channel. Output order is non-deterministic (completion order). Each worker thread reuses a single interpreter instance.</p>
-        <pre><code class="lang-perl">range(0, 1e6) |&gt; pgreps { is_prime(_) } |&gt; take 100 |&gt; ep
-t 1..1e9 pgreps { _ % 7 == 0 } take 10 ep
+        <pre><code class="lang-perl">range(0, 1e6) |&gt; pgreps { is_prime($_) } |&gt; take 100 |&gt; ep
+t 1..1e9 pgreps { $_ % 7 == 0 } take 10 ep
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pfor">
         <h3><a class="doc-anchor" href="#doc-pfor">#</a> <code>pfor</code></h3>
-        <p>Parallel <code>foreach</code> that executes a side-effecting block across all CPU cores with no return value. Use this when you need to perform work for each element (writing files, sending requests, updating shared state) but don&#39;t need to collect results. The block receives each element as <code>_</code> (or <code>$_</code>). Iteration order is non-deterministic, so the block must be safe to run concurrently.</p>
+        <p>Parallel <code>foreach</code> that executes a side-effecting block across all CPU cores with no return value. Use this when you need to perform work for each element (writing files, sending requests, updating shared state) but don&#39;t need to collect results. The block receives each element as <code>$_</code>. Iteration order is non-deterministic, so the block must be safe to run concurrently.</p>
         <p>Two equivalent surface syntaxes: <code>pfor { BLOCK } LIST</code> or <code>pfor FUNC, LIST</code>.</p>
         <pre><code class="lang-perl"># Block form
 pfor { write_report } @records
@@ -309,7 +309,7 @@ my $product = preduce { $a * $b } 1..100
       <article class="doc-entry" id="doc-pmap-reduce">
         <h3><a class="doc-anchor" href="#doc-pmap-reduce">#</a> <code>pmap_reduce</code></h3>
         <p>Fused parallel map + tree reduce.</p>
-        <pre><code class="lang-perl">my $sum = pmap_reduce { _*2 } { $_0 + $_1 } @list
+        <pre><code class="lang-perl">my $sum = pmap_reduce { $_*2 } { $_0 + $_1 } @list
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pany">
@@ -339,12 +339,12 @@ my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
       <article class="doc-entry" id="doc-pflat-maps">
         <h3><a class="doc-anchor" href="#doc-pflat-maps">#</a> <code>pflat_maps</code></h3>
         <p>Streaming parallel flat-map — like <code>pmaps</code> but flattens array results. Returns a lazy iterator.</p>
-        <pre><code class="lang-perl">range(0, 1e6) |&gt; pflat_maps { [_, _ * 10] } |&gt; ep
+        <pre><code class="lang-perl">range(0, 1e6) |&gt; pflat_maps { [$_, $_ * 10] } |&gt; ep
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fan">
         <h3><a class="doc-anchor" href="#doc-fan">#</a> <code>fan</code></h3>
-        <p>Execute BLOCK or FUNC N times in parallel (<code>_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
+        <p>Execute BLOCK or FUNC N times in parallel (<code>$_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
         <p>Two equivalent surface syntaxes: • Block form — <code>fan N { BLOCK }</code> or <code>fan { BLOCK }</code> • Bare-fn form — <code>fan N, FUNC</code> or <code>fan FUNC</code></p>
         <pre><code class="lang-perl"># Block form
 fan 8 { work($_) }
@@ -504,7 +504,7 @@ my $both = $s-&gt;union(set(3, 4, 5))
     </section>
     <section class="tutorial-section" id="ch-pipeline-pipe-forward">
       <h2>Pipeline &amp; Pipe-Forward</h2>
-      <p class="chapter-meta">6 topics</p>
+      <p class="chapter-meta">7 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>|&gt;</code></h3>
         <p>Pipe-forward operator — threads LHS as first argument of RHS call.</p>
@@ -516,48 +516,47 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
         <p>Zero runtime cost (parse-time desugaring). Binds looser than <code>||</code>, tighter than <code>?:</code>.</p>
       </article>
       <article class="doc-entry" id="doc-thread">
-        <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code> / <code>~&gt;</code> (thread-first)</h3>
-        <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure's <code>-&gt;</code>).</p>
-        <pre><code class="lang-perl">~&gt;1:10map{_*2}fi{_&gt;5}sum p                    # 104 — ultra-concise
-~&gt; @data grep{_ &gt; 5} map{_ * 2} sort{$_0 &lt;=&gt; $_1} |&gt; join &quot;,&quot; |&gt; p
+        <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
+        <p>Thread-first macro — chain stages where the threaded value is injected as the **first** argument (like Clojure&#39;s <code>-&gt;</code>).</p>
+        <pre><code class="lang-perl">~&gt; @data grep { $_ &gt; 5 } map { $_ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
 sub div { $_0 / $_1 }
 ~&gt; 10 div(2) p                               # div(10, 2) = 5
-~&gt; 10 div(_, 2) p                            # explicit _ position: div(10, 2) = 5
+~&gt; 10 div($_, 2) p                           # explicit $_ position: div(10, 2) = 5
 </code></pre>
-        <p>Spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map{_ * 2}</code>, <code>grep{_ &gt; 5}</code>), <code>name(args)</code> call where <code>_</code> (or <code>$_</code>) is the threaded-value placeholder, or <code>&gt;{}</code> anonymous block. Bare <code>_</code> is equivalent to <code>$_</code> in any expression position. <code>|&gt;</code> terminates the macro.</p>
+        <p>Spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>. Stages: bare function (<code>uc</code>, <code>tm</code>, …), function with block (<code>map { … }</code>, <code>grep { … }</code>), <code>name(args)</code> call where <code>$_</code> is the threaded-value placeholder, or <code>&gt;{}</code> anonymous block. <code>|&gt;</code> terminates the macro.</p>
       </article>
-      <article class="doc-entry" id="doc-thread-last">
-        <h3><a class="doc-anchor" href="#doc-thread-last">#</a> <code>~&gt;&gt;</code> / <code>-&gt;&gt;</code> (thread-last)</h3>
-        <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure's <code>-&gt;&gt;</code>).</p>
+      <article class="doc-entry" id="doc-">
+        <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;&gt;</code></h3>
+        <p>Thread-last macro — chain stages where the threaded value is injected as the **last** argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
         <pre><code class="lang-perl">sub div { $_0 / $_1 }
 ~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
--&gt;&gt; 10 div(_, 2) p                           # explicit _ position overrides: div(10, 2) = 5
+-&gt;&gt; 10 div($_, 2) p                          # explicit $_ overrides: div(10, 2) = 5
 
 # Thread-last is useful for list-consuming functions:
 sub take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
 ~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
 </code></pre>
-        <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>_</code> (or <code>$_</code>) placeholder always takes precedence.</p>
+        <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>$_</code> placeholder always takes precedence.</p>
       </article>
       <article class="doc-entry" id="doc-pipeline">
         <h3><a class="doc-anchor" href="#doc-pipeline">#</a> <code>pipeline</code></h3>
         <p><code>pipeline(@list)</code> — wrap a list (or iterator) in a lazy pipeline object supporting chained <code>-&gt;map</code>, <code>-&gt;filter</code>, <code>-&gt;take</code>, <code>-&gt;skip</code>, <code>-&gt;flat_map</code>, <code>-&gt;tap</code>, and other transforms that execute zero work until a terminal method is called.</p>
         <p>No intermediate lists are allocated between stages — each element flows through the full chain one at a time, making pipelines memory-efficient even on very large or infinite inputs. Terminal methods include <code>-&gt;collect</code> (materialize to list), <code>-&gt;reduce { ... }</code> (fold), <code>-&gt;for_each { ... }</code> (side-effect iteration), and <code>-&gt;count</code>. Pipelines compose naturally with stryke&#39;s <code>|&gt;</code> operator: you can feed <code>pipeline(...)</code> output into further <code>|&gt;</code> stages or vice versa. Use <code>pipeline</code> when you want explicit method-chaining style rather than the flat <code>|&gt;</code> pipe syntax — both compile to the same lazy evaluation engine.</p>
         <pre><code class="lang-perl">my @out = pipeline(@data)
-  -&gt;filter { _ &gt; 0 }
-  -&gt;map { _ * 2 }
+  -&gt;filter { $_ &gt; 0 }
+  -&gt;map { $_ * 2 }
   -&gt;take(10)
   -&gt;collect
 
 pipeline(1..1_000_000)
-  -&gt;filter { _ % 3 == 0 }
-  -&gt;map { _ ** 2 }
+  -&gt;filter { $_ % 3 == 0 }
+  -&gt;map { $_ ** 2 }
   -&gt;take(5)
-  -&gt;for_each { p _ }                # 9 36 81 144 225
+  -&gt;for_each { p $_ }                # 9 36 81 144 225
 
 my $sum = pipeline(@scores)
-  -&gt;filter { _ &gt;= 60 }
+  -&gt;filter { $_ &gt;= 60 }
   -&gt;reduce { $_0 + $_1 }
 </code></pre>
       </article>
@@ -570,7 +569,7 @@ my $sum = pipeline(@scores)
     stages  =&gt; [
         { name =&gt; &quot;parse&quot;,     map =&gt; fn { json_decode } },
         { name =&gt; &quot;transform&quot;, map =&gt; fn { enrich } },
-        { name =&gt; &quot;validate&quot;,  filter =&gt; fn { _-&gt;{valid} } },
+        { name =&gt; &quot;validate&quot;,  filter =&gt; fn { $_-&gt;{valid} } },
     ],
     workers =&gt; 8,
 )
@@ -595,7 +594,7 @@ my $sum = pipeline(@scores)
         <h3><a class="doc-anchor" href="#doc-collect">#</a> <code>collect</code></h3>
         <p><code>collect ITERATOR</code> — materialize a lazy iterator or pipeline into a concrete list.</p>
         <p>Pipeline stages in stryke are lazy: chaining <code>|&gt; map {...} |&gt; grep {...}</code> builds up a deferred computation without consuming any elements. Calling <code>collect</code> forces evaluation and returns all results as a regular Perl list. This is the standard way to terminate a lazy chain when you need the full result in an array. Without <code>collect</code>, the iterator is consumed element-by-element by <code>e</code>, <code>take</code>, or other streaming sinks.</p>
-        <pre><code class="lang-perl">my @out = range(1,5) |&gt; map { _ * 2 } |&gt; collect
+        <pre><code class="lang-perl">my @out = range(1,5) |&gt; map { $_ * 2 } |&gt; collect
 gen { yield $_ for 1..3 } |&gt; collect |&gt; e p
 my @data = stdin |&gt; grep /INFO/ |&gt; collect
 </code></pre>
@@ -607,32 +606,32 @@ my @data = stdin |&gt; grep /INFO/ |&gt; collect
       <article class="doc-entry" id="doc-maps">
         <h3><a class="doc-anchor" href="#doc-maps">#</a> <code>maps</code></h3>
         <p><code>maps { BLOCK } LIST</code> — the lazy, streaming counterpart of <code>map</code>. Instead of materializing the entire output list, <code>maps</code> returns a pull iterator that evaluates the block on demand as downstream consumers request values. This makes it ideal for <code>|&gt;</code> pipeline chains, especially when combined with <code>take</code>, <code>greps</code>, or <code>collect</code>. Use <code>maps</code> over <code>map</code> when working with large ranges, infinite sequences, or when you want to short-circuit processing early with <code>take</code>. Memory usage is constant regardless of input size.</p>
-        <pre><code class="lang-perl">1..10 |&gt; maps { _ * 3 } |&gt; take 4 |&gt; e p
+        <pre><code class="lang-perl">1..10 |&gt; maps { $_ * 3 } |&gt; take 4 |&gt; e p
 # 3 6 9 12
-1..1_000_000 |&gt; maps { _ ** 2 } |&gt; greps { _ &gt; 100 } |&gt; take 3 |&gt; e p
+1..1_000_000 |&gt; maps { $_ ** 2 } |&gt; greps { $_ &gt; 100 } |&gt; take 3 |&gt; e p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-greps">
         <h3><a class="doc-anchor" href="#doc-greps">#</a> <code>greps</code></h3>
-        <p><code>greps { BLOCK } LIST</code> — the lazy, streaming counterpart of <code>grep</code>. Returns a pull iterator that only evaluates the predicate as elements are requested downstream. This is the preferred filtering function in <code>|&gt;</code> pipelines because it avoids materializing intermediate lists. Combine with <code>take</code> to short-circuit early, or with <code>maps</code> and <code>collect</code> for full lazy pipelines. The block receives <code>_</code> (or <code>$_</code>) just like <code>grep</code>.</p>
-        <pre><code class="lang-perl">1..100 |&gt; greps { _ % 7 == 0 } |&gt; take 3 |&gt; e p
+        <p><code>greps { BLOCK } LIST</code> — the lazy, streaming counterpart of <code>grep</code>. Returns a pull iterator that only evaluates the predicate as elements are requested downstream. This is the preferred filtering function in <code>|&gt;</code> pipelines because it avoids materializing intermediate lists. Combine with <code>take</code> to short-circuit early, or with <code>maps</code> and <code>collect</code> for full lazy pipelines. The block receives <code>$_</code> just like <code>grep</code>.</p>
+        <pre><code class="lang-perl">1..100 |&gt; greps { $_ % 7 == 0 } |&gt; take 3 |&gt; e p
 # 7 14 21
 @lines |&gt; greps { /ERROR/ } |&gt; maps { tm } |&gt; e p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-filter">
         <h3><a class="doc-anchor" href="#doc-filter">#</a> <code>filter</code></h3>
-        <p><code>filter</code> (alias <code>fi</code>) <code>{ BLOCK } LIST</code> — stryke-native lazy filter that returns a pull iterator, functionally identical to <code>greps</code> but named for familiarity with Rust/Ruby/JS conventions. Use <code>filter</code> or <code>greps</code> interchangeably in <code>|&gt;</code> chains; both are streaming and both set <code>_</code>/<code>$_</code> in the block. The result must be consumed with <code>collect</code>, <code>e p</code>, <code>foreach</code>, or another terminal. Prefer <code>filter</code> when writing stryke-idiomatic code; prefer <code>grep</code>/<code>greps</code> when porting from Perl.</p>
-        <pre><code class="lang-perl">my @big = 1..1000 |&gt; filter { _ &gt; 990 } |&gt; collect
+        <p><code>filter</code> (alias <code>fi</code>) <code>{ BLOCK } LIST</code> — stryke-native lazy filter that returns a pull iterator, functionally identical to <code>greps</code> but named for familiarity with Rust/Ruby/JS conventions. Use <code>filter</code> or <code>greps</code> interchangeably in <code>|&gt;</code> chains; both are streaming and both set <code>$_</code> in the block. The result must be consumed with <code>collect</code>, <code>e p</code>, <code>foreach</code>, or another terminal. Prefer <code>filter</code> when writing stryke-idiomatic code; prefer <code>grep</code>/<code>greps</code> when porting from Perl.</p>
+        <pre><code class="lang-perl">my @big = 1..1000 |&gt; filter { $_ &gt; 990 } |&gt; collect
 @big |&gt; e p   # 991 992 993 994 995 996 997 998 999 1000
-1..50 |&gt; fi { _ % 2 } |&gt; take 5 |&gt; e p   # 1 3 5 7 9
+1..50 |&gt; fi { $_ % 2 } |&gt; take 5 |&gt; e p   # 1 3 5 7 9
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-tap">
         <h3><a class="doc-anchor" href="#doc-tap">#</a> <code>tap</code></h3>
         <p><code>tap { BLOCK } LIST</code> — execute a side-effecting block for each element, then pass the element through unchanged.</p>
         <p>The return value of the block is ignored; the original element is always forwarded to the next pipeline stage. This makes <code>tap</code> ideal for injecting logging, debugging, or metrics collection into the middle of a pipeline without altering the data flow. It is fully streaming and preserves element order.</p>
-        <pre><code class="lang-perl">1..5 |&gt; tap { log_debug &quot;saw: $_&quot; } |&gt; map { _ * 2 } |&gt; e p
+        <pre><code class="lang-perl">1..5 |&gt; tap { log_debug &quot;saw: $_&quot; } |&gt; map { $_ * 2 } |&gt; e p
 @files |&gt; tap { p &quot;processing: $_&quot; } |&gt; map slurp |&gt; e p
 </code></pre>
       </article>
@@ -650,7 +649,7 @@ p peek $g                             # 2
         <h3><a class="doc-anchor" href="#doc-tee">#</a> <code>tee</code></h3>
         <p><code>tee FILE, ITERATOR</code> — write each element to a file as a side effect while passing it through the pipeline.</p>
         <p>Every element that flows through <code>tee</code> is appended as a line to the specified file, and the element itself continues downstream unchanged. The file is opened once on first element and closed when the iterator is exhausted. This is the stryke equivalent of the Unix <code>tee</code> command, useful for auditing or logging intermediate pipeline results to disk.</p>
-        <pre><code class="lang-perl">1..10 |&gt; tee &quot;/tmp/log.txt&quot; |&gt; map { _ * 2 } |&gt; e p
+        <pre><code class="lang-perl">1..10 |&gt; tee &quot;/tmp/log.txt&quot; |&gt; map { $_ * 2 } |&gt; e p
 stdin |&gt; tee &quot;/tmp/raw.log&quot; |&gt; grep /ERROR/ |&gt; e p
 </code></pre>
       </article>

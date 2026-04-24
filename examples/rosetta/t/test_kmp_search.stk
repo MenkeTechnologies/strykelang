@@ -15,7 +15,7 @@ fn kmp_prefix($p) {
         }
         $pi[$q] = $k
     }
-    ([@pi])
+    \@pi
 }
 
 fn kmp_search($t, $p) {

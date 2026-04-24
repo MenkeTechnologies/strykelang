@@ -10,7 +10,7 @@ fn forward_diff(@arr) {
         for my $i (1..$len-1) {
             push @res, $arr[$i] - $arr[$i-1]
         }
-        ([@res])
+        \@res
     }
 }
 

@@ -31,7 +31,7 @@ fn my_topological_sort($graph) {
     if (scalar(@sorted) != scalar(@nodes)) {
         return undef # Cycle detected
     }
-    ([@sorted])
+    \@sorted
 }
 
 my $graph = {

@@ -16,7 +16,7 @@ fn my_shuffle($arr_ref) {
         my $j = int(rand($i + 1))
         ($arr[$i], $arr[$j]) = ($arr[$j], $arr[$i])
     }
-    ([@arr])
+    \@arr
 }
 
 fn bogosort($arr_ref) {

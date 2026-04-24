@@ -10,7 +10,7 @@ fn my_stern_brocot($n) {
         push @sb, $a + $b, $b
         $i++
     }
-    ([@sb[0..$n-1]])
+    \@sb[0..$n-1]
 }
 
 my $res = my_stern_brocot(15)

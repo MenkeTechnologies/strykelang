@@ -19,7 +19,7 @@ fn my_prime_factors($n) {
         }
         $d++
     }
-    ([@factors])
+    \@factors
 }
 
 fn my_is_smith($n) {

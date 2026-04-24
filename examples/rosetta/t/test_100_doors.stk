@@ -11,7 +11,7 @@ fn doors_puzzle {
         my $divisors = scalar(@divs)
         $divisors % 2 == 1
     }
-    ([@res])
+    \@res
 }
 
 fn doors_optimized {
@@ -20,7 +20,7 @@ fn doors_optimized {
         my $s = sqrt($_)
         $s == int($s)
     }
-    ([@res])
+    \@res
 }
 
 my $result = doors_puzzle(100)

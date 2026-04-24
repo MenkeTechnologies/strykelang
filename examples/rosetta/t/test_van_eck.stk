@@ -13,7 +13,7 @@ fn van_eck($n) {
         push @seq, $next_val
         $last_seen{$val} = $i
     }
-    ([@seq])
+    \@seq
 }
 
 my $res = van_eck(10)

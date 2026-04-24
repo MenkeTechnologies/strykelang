@@ -12,7 +12,7 @@ fn my_floyd_triangle($n) {
         }
         push @rows, [@row]
     }
-    ([@rows])
+    \@rows
 }
 
 my $res = my_floyd_triangle(5)

@@ -10,7 +10,7 @@ fn flip {
     for my $i (0..$k) {
         $arr[$i] = $flipped[$i]
     }
-    ([@arr])
+    \@arr
 }
 
 fn pancake_sort {
@@ -19,7 +19,7 @@ fn pancake_sort {
     my $n = scalar(@arr)
     
     if ($n < 2) {
-        return ([@arr])
+        return \@arr
     }
     
     for my $curr (~> (1..$n) rev) {
@@ -40,7 +40,7 @@ fn pancake_sort {
             @arr = @$res2
         }
     }
-    ([@arr])
+    \@arr
 }
 
 my $data = [6, 7, 2, 1, 8, 9, 5, 3, 4]

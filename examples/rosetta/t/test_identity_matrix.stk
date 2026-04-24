@@ -6,9 +6,9 @@ fn my_identity_matrix {
     my @rows = ~> 0..$n-1 map {
         my $i = $_
         my @row = map { if ($_ == $i) { 1 } else { 0 } } (0..$n-1)
-        ([@row])
+        \@row
     }
-    ([@rows])
+    \@rows
 }
 
 fn matrix_to_string {

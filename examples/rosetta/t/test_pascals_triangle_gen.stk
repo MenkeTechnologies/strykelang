@@ -12,7 +12,7 @@ fn my_pascals_triangle($n) {
         push @row, 1
         push @res, [@row]
     }
-    ([@res])
+    \@res
 }
 
 my $tri = my_pascals_triangle(5)

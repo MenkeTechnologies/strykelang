@@ -16,7 +16,7 @@ fn recaman($n) {
             $used{$next} = 1
         }
     }
-    ([@a])
+    \@a
 }
 
 my $res10 = recaman(10)
