@@ -212,7 +212,7 @@
         <pre><code class="lang-perl"># Block form
 my @out = pmap { _ * 2 } 1:1_000_000
 my @hashes = pmap sha256 @blobs, progress =&gt; 1
-1:100 |&gt; pmap { fetch(&quot;https://api.example.com/item/_&quot;) } |&gt; e p
+1:100 |&gt; pmap { fetch(&quot;https://api.example.com/item/$_&quot;) } |&gt; e p
 
 # Bare-fn form (works for builtins and user-defined subs)
 my @hashes = pmap sha256, @blobs, progress =&gt; 1
@@ -226,7 +226,7 @@ my @r = pmap double, (1:1_000_000)
         <p>Best for: • Pipelines with <code>take</code>/<code>head</code> — avoids processing the full list • Very large inputs where holding all results in memory is impractical • Streaming pipelines where you want progressive output</p>
         <pre><code class="lang-perl">range(0, 1e9) |&gt; pmaps { _ * 2 } |&gt; take 10 |&gt; ep
 t 1:1e6 pmaps { expensive(_) } ep
-range(0, 1e6) |&gt; pmaps { fetch(&quot;https://api/item/_&quot;) } |&gt; pgreps { _-&gt;{ok} } |&gt; ep
+range(0, 1e6) |&gt; pmaps { fetch(&quot;https://api/item/$_&quot;) } |&gt; pgreps { _-&gt;{ok} } |&gt; ep
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pmap-chunked">
@@ -265,7 +265,7 @@ t 1:1e9 pgreps { _ % 7 == 0 } take 10 ep
 pfor { write_report } @records
 pfor { compress_file } glob(&quot;*.log&quot;)
 @urls |&gt; pfor { fetch
-    p &quot;done: _&quot; }
+    p &quot;done: $_&quot; }
 
 # Bare-fn form
 sub work { print &quot;did $_0\n&quot; }
@@ -391,7 +391,7 @@ do_other_work()
 my $val = await $task
 
 # Overlapping multiple fetches:
-my @tasks = map { async { fetch(&quot;https://api.example.com/_&quot;) } } 1:10
+my @tasks = map { async { fetch(&quot;https://api.example.com/$_&quot;) } } 1:10
 my @results = map await @tasks
 </code></pre>
       </article>
@@ -631,8 +631,8 @@ my @data = stdin |&gt; grep /INFO/ |&gt; collect
         <h3><a class="doc-anchor" href="#doc-tap">#</a> <code>tap</code></h3>
         <p><code>tap { BLOCK } LIST</code> — execute a side-effecting block for each element, then pass the element through unchanged.</p>
         <p>The return value of the block is ignored; the original element is always forwarded to the next pipeline stage. This makes <code>tap</code> ideal for injecting logging, debugging, or metrics collection into the middle of a pipeline without altering the data flow. It is fully streaming and preserves element order.</p>
-        <pre><code class="lang-perl">1:5 |&gt; tap { log_debug &quot;saw: _&quot; } |&gt; map { _ * 2 } |&gt; e p
-@files |&gt; tap { p &quot;processing: _&quot; } |&gt; map slurp |&gt; e p
+        <pre><code class="lang-perl">1:5 |&gt; tap { log_debug &quot;saw: $_&quot; } |&gt; map { _ * 2 } |&gt; e p
+@files |&gt; tap { p &quot;processing: $_&quot; } |&gt; map slurp |&gt; e p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-peek">
@@ -2040,7 +2040,7 @@ p &quot;Got users and posts concurrently&quot;
       <article class="doc-entry" id="doc-fetch-async-json">
         <h3><a class="doc-anchor" href="#doc-fetch-async-json">#</a> <code>fetch_async_json</code></h3>
         <p><code>fetch_async_json</code> (alias <code>ftaj</code>) initiates a non-blocking HTTP GET request that automatically decodes the JSON response when awaited. This combines <code>fetch_async</code> with <code>json_decode</code>, making it the ideal choice for concurrent API calls where every response is JSON. The task resolves to the decoded stryke data structure — a hashref, arrayref, or scalar depending on the JSON content.</p>
-        <pre><code class="lang-perl">my @urls = map { &quot;https://api.example.com/item/_&quot; } 1:10
+        <pre><code class="lang-perl">my @urls = map { &quot;https://api.example.com/item/$_&quot; } 1:10
 my @tasks = map fetch_async_json @urls
 my @results = map await @tasks
 @results |&gt; e { p _-&gt;{name} }
@@ -3428,7 +3428,7 @@ my @imgs = glob_par(&quot;assets/**/*.{png,jpg,webp}&quot;)
         <p><code>pwatch(PATH, fn { ... })</code> — watch a file or directory for filesystem changes and invoke the callback on each event.</p>
         <p>The watcher runs on a background thread using OS-native notifications (FSEvents on macOS, inotify on Linux) so it consumes near-zero CPU while idle. The callback receives the event type and affected path in <code>_</code>. Directory watches are recursive by default. The watcher continues until the returned handle is dropped or the program exits. This is useful for building live-reload dev servers, file-triggered pipelines, or audit logs. Combine with <code>debounce</code> or a <code>pchannel</code> if the callback is expensive and rapid bursts of events need to be coalesced.</p>
         <pre><code class="lang-perl">my $w = pwatch &quot;./src&quot;, fn {
-    p &quot;changed: _&quot;
+    p &quot;changed: $_&quot;
     rebuild()
 }
 
@@ -4763,7 +4763,7 @@ my $local = cluster([&quot;localhost:4&quot;])
         <p>Elements from <code>@list</code> are serialized, shipped to remote <code>stryke --remote-worker</code> processes over SSH, executed in parallel across every worker slot in the cluster, and the results are gathered back in input order. This is the distributed equivalent of <code>pmap</code>: same interface, same order guarantee, but the thread pool spans multiple hosts instead of local cores. Use this when a single machine&#39;s CPU count is the bottleneck. The block must be self-contained — it cannot close over local file handles or database connections, since it executes in a separate process on a remote host. Large closures are serialized once and cached on each worker for the lifetime of the cluster.</p>
         <pre><code class="lang-perl">my $cl = cluster([&quot;host1:8&quot;, &quot;host2:8&quot;])
 my @hashes = pmap_on $cl, { sha256(slurp) } @file_paths
-my @results = pmap_on $cl, { fetch(&quot;https://api.example.com/_&quot;) } 1:10_000
+my @results = pmap_on $cl, { fetch(&quot;https://api.example.com/$_&quot;) } 1:10_000
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pflat-map-on">
@@ -4880,7 +4880,7 @@ my $dur = el() - $t0
 p &quot;sort took ${dur}s&quot;
 # progress logging
 1:100 |&gt; e { do_work
-    log_info(&quot;step _ at &quot; . el() . &quot;s&quot;) }
+    log_info(&quot;step $_ at &quot; . el() . &quot;s&quot;) }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-time">
@@ -5440,6 +5440,14 @@ if (fork() == 0) {
 }
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-exe">
+        <h3><a class="doc-anchor" href="#doc-exe">#</a> <code>exe</code></h3>
+        <p><code>exe</code> (alias <code>executables</code>) — list executable file names in a directory (default: current directory). Returns a sorted array of filenames that have the executable bit set. On non-Unix platforms, matches files with <code>.exe</code>, <code>.bat</code>, or <code>.cmd</code> extensions.</p>
+        <pre><code class="lang-perl">p for exe                    # list executables in $PWD
+p for exe("/usr/local/bin")  # list executables in a specific dir
+exe |&gt; grep /^s/ |&gt; e p     # executables starting with 's'
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fork">
         <h3><a class="doc-anchor" href="#doc-fork">#</a> <code>fork</code></h3>
         <p>Fork the current process, creating a child that is an exact copy of the parent. Returns the child&#39;s PID to the parent process and <code>0</code> to the child, allowing each side to branch. Returns <code>undef</code> on failure. Always pair with <code>wait</code>/<code>waitpid</code> to reap the child and avoid zombies.</p>
@@ -5702,7 +5710,7 @@ log_error(&quot;missing required field &#39;name&#39;&quot;)
 log_debug(&quot;cache key: $key&quot;)
 my $result = compute($x)
 log_debug(&quot;compute($x) =&gt; $result&quot;)
-@items |&gt; e { log_debug(&quot;item: _&quot;) }
+@items |&gt; e { log_debug(&quot;item: $_&quot;) }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-log-trace">

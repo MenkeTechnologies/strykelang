@@ -986,11 +986,13 @@ pub enum BuiltinId {
     BlockDevices,
     /// `char_devices` / `char_devices DIR` — list character device names in a directory (default: `.`).
     CharDevices,
+    /// `exe` / `exe DIR` — list executable file names in a directory (default: `.`).
+    Executables,
 }
 
 impl BuiltinId {
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::CharDevices as u16 {
+        if v <= Self::Executables as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
@@ -2315,11 +2317,15 @@ mod tests {
             BuiltinId::from_u16(BuiltinId::CharDevices as u16),
             Some(BuiltinId::CharDevices)
         );
+        assert_eq!(
+            BuiltinId::from_u16(BuiltinId::Executables as u16),
+            Some(BuiltinId::Executables)
+        );
     }
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::CharDevices as u16 + 1), None);
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Executables as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 

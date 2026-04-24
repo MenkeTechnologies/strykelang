@@ -600,6 +600,46 @@ pub fn list_block_devices(dir: &str) -> PerlValue {
     PerlValue::array(names.into_iter().map(PerlValue::string).collect())
 }
 
+/// List only executable file names inside `dir` (non-recursive), sorted.
+/// Returns an empty list if `dir` cannot be read.
+pub fn list_executables(dir: &str) -> PerlValue {
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(unix)]
+    {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false)
+                    && unix_path_executable(&entry.path())
+                {
+                    if let Some(name) = entry.file_name().to_str() {
+                        names.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                    let p = entry.path();
+                    if let Some(ext) = p.extension() {
+                        if ext == "exe" || ext == "bat" || ext == "cmd" {
+                            if let Some(name) = entry.file_name().to_str() {
+                                names.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let _ = dir;
+    names.sort();
+    PerlValue::array(names.into_iter().map(PerlValue::string).collect())
+}
+
 /// List only character device names inside `dir` (non-recursive), sorted.
 /// Returns an empty list if `dir` cannot be read or on non-Unix platforms.
 pub fn list_char_devices(dir: &str) -> PerlValue {

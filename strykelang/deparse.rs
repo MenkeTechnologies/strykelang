@@ -1760,6 +1760,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
         | ExprKind::Pipes(args)
         | ExprKind::BlockDevices(args)
         | ExprKind::CharDevices(args)
+        | ExprKind::Executables(args)
         | ExprKind::Glob(args) => {
             let name = match &expr.kind {
                 ExprKind::Files(_) => "files",
@@ -1772,6 +1773,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
                 ExprKind::Pipes(_) => "pipes",
                 ExprKind::BlockDevices(_) => "block_devices",
                 ExprKind::CharDevices(_) => "char_devices",
+                ExprKind::Executables(_) => "exe",
                 ExprKind::Glob(_) => "glob",
                 _ => unreachable!(),
             };

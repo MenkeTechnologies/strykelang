@@ -2150,11 +2150,15 @@ impl<'a> ShellParser<'a> {
             let body = self.parse_compound_list_until(&[ShellToken::RBrace])?;
             self.expect(ShellToken::RBrace)?;
             body
-        } else {
+        } else if self.current == ShellToken::Do {
             self.expect(ShellToken::Do)?;
             let body = self.parse_compound_list()?;
             self.expect(ShellToken::Done)?;
             body
+        } else {
+            // repeat N SIMPLE_COMMAND (no braces or do/done needed)
+            let cmd = self.parse_command()?;
+            vec![cmd]
         };
 
         Ok(ShellCommand::Compound(CompoundCommand::Repeat {

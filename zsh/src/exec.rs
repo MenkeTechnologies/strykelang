@@ -555,6 +555,10 @@ pub struct ShellExecutor {
     pub comp_iprefix: String,         // IPREFIX parameter
     pub comp_isuffix: String,         // ISUFFIX parameter
     pub readonly_vars: std::collections::HashSet<String>, // Read-only variables
+    /// Stack for `local` variable save/restore (name, old_value).
+    pub local_save_stack: Vec<(String, Option<String>)>,
+    /// Current function scope depth for `local` tracking.
+    pub local_scope_depth: usize,
     pub autoload_pending: HashMap<String, AutoloadFlags>, // Functions marked for autoload
     // zsh hooks (precmd, preexec, chpwd, etc.)
     pub hook_functions: HashMap<String, Vec<String>>, // hook_name -> [function_names]
@@ -654,6 +658,8 @@ impl ShellExecutor {
             comp_iprefix: String::new(),
             comp_isuffix: String::new(),
             readonly_vars: std::collections::HashSet::new(),
+            local_save_stack: Vec::new(),
+            local_scope_depth: 0,
             autoload_pending: HashMap::new(),
             hook_functions: HashMap::new(),
             named_dirs: HashMap::new(),
@@ -1436,6 +1442,11 @@ impl ShellExecutor {
                         expanded
                     };
 
+                    if self.readonly_vars.contains(var) {
+                        eprintln!("zshrs: read-only variable: {}", var);
+                        self.last_status = 1;
+                        return Ok(1);
+                    }
                     if cmd.words.is_empty() {
                         // Just assignment, set in environment
                         env::set_var(var, &final_value);
@@ -1450,11 +1461,29 @@ impl ShellExecutor {
             return Ok(0);
         }
 
+        // Check if this is a noglob precommand — suppress glob expansion
+        let is_noglob = cmd.words.first().map(|w| self.expand_word(w) == "noglob").unwrap_or(false);
+        let saved_noglob = if is_noglob {
+            let saved = self.options.get("noglob").copied();
+            self.options.insert("noglob".to_string(), true);
+            saved
+        } else {
+            None
+        };
+
         let mut words: Vec<String> = cmd
             .words
             .iter()
             .flat_map(|w| self.expand_word_glob(w))
             .collect();
+
+        // Restore noglob after expansion
+        if is_noglob {
+            match saved_noglob {
+                Some(v) => { self.options.insert("noglob".to_string(), v); }
+                None => { self.options.remove("noglob"); }
+            }
+        }
         if words.is_empty() {
             self.last_status = 0;
             return Ok(0);
@@ -1887,6 +1916,11 @@ impl ShellExecutor {
         // Save current positional params
         let saved_params = std::mem::take(&mut self.positional_params);
 
+        // Save local variable scope — any `local` declarations during this
+        // function will be reversed on exit (matches zsh's startparamscope/endparamscope).
+        let saved_local_vars = self.local_save_stack.len();
+        self.local_scope_depth += 1;
+
         // Set new positional params
         self.positional_params = args.to_vec();
 
@@ -1900,6 +1934,17 @@ impl ShellExecutor {
         } else {
             result
         };
+
+        // Restore local variables (endparamscope)
+        self.local_scope_depth -= 1;
+        while self.local_save_stack.len() > saved_local_vars {
+            if let Some((name, old_val)) = self.local_save_stack.pop() {
+                match old_val {
+                    Some(v) => { self.variables.insert(name, v); }
+                    None => { self.variables.remove(&name); }
+                }
+            }
+        }
 
         // Restore positional params
         self.positional_params = saved_params;
@@ -2188,7 +2233,7 @@ impl ShellExecutor {
 
     fn execute_compound(&mut self, compound: &CompoundCommand) -> Result<i32, String> {
         match compound {
-            CompoundCommand::BraceGroup(cmds) | CompoundCommand::Subshell(cmds) => {
+            CompoundCommand::BraceGroup(cmds) => {
                 for cmd in cmds {
                     self.execute_command(cmd)?;
                     if self.returning.is_some() {
@@ -2196,6 +2241,31 @@ impl ShellExecutor {
                     }
                 }
                 Ok(self.last_status)
+            }
+            CompoundCommand::Subshell(cmds) => {
+                // Subshell isolates variable changes — save/restore all state.
+                // In real zsh this forks; we simulate by cloning variables.
+                let saved_vars = self.variables.clone();
+                let saved_arrays = self.arrays.clone();
+                let saved_assoc = self.assoc_arrays.clone();
+                let saved_params = self.positional_params.clone();
+
+                for cmd in cmds {
+                    self.execute_command(cmd)?;
+                    if self.returning.is_some() {
+                        break;
+                    }
+                }
+                let status = self.last_status;
+
+                // Restore state — subshell changes are discarded
+                self.variables = saved_vars;
+                self.arrays = saved_arrays;
+                self.assoc_arrays = saved_assoc;
+                self.positional_params = saved_params;
+                self.last_status = status;
+
+                Ok(status)
             }
 
             CompoundCommand::If {
@@ -2700,14 +2770,17 @@ impl ShellExecutor {
                 // First do brace expansion
                 let brace_expanded = self.expand_braces(&expanded);
 
-                // Then glob expansion on each result
+                // Then glob expansion on each result (unless noglob is set)
+                let noglob = self.options.get("noglob").copied().unwrap_or(false)
+                    || self.options.get("GLOB").map(|v| !v).unwrap_or(false);
                 brace_expanded
                     .into_iter()
                     .flat_map(|s| {
-                        if s.contains('*')
-                            || s.contains('?')
-                            || s.contains('[')
-                            || self.has_extglob_pattern(&s)
+                        if !noglob
+                            && (s.contains('*')
+                                || s.contains('?')
+                                || s.contains('[')
+                                || self.has_extglob_pattern(&s))
                         {
                             self.expand_glob(&s)
                         } else {
@@ -4551,6 +4624,9 @@ impl ShellExecutor {
                             || c == '*'
                             || c == '#'
                             || c == '?'
+                            || c == '$'
+                            || c == '!'
+                            || c == '-'
                         {
                             var_name.push(chars.next().unwrap());
                             // Handle single-char special vars
@@ -4559,6 +4635,9 @@ impl ShellExecutor {
                                 "@" | "*"
                                     | "#"
                                     | "?"
+                                    | "$"
+                                    | "!"
+                                    | "-"
                                     | "0"
                                     | "1"
                                     | "2"
@@ -5331,6 +5410,7 @@ impl ShellExecutor {
         // Handle special parameters
         match name {
             "" => String::new(), // Empty name returns empty
+            "$" => std::process::id().to_string(),
             "@" | "*" => self.positional_params.join(" "),
             "#" => self.positional_params.len().to_string(),
             "?" => self.last_status.to_string(),
@@ -6226,8 +6306,25 @@ impl ShellExecutor {
                 .unwrap_or(false),
             CondExpr::StringEmpty(w) => self.expand_word(w).is_empty(),
             CondExpr::StringNonEmpty(w) => !self.expand_word(w).is_empty(),
-            CondExpr::StringEqual(a, b) => self.expand_word(a) == self.expand_word(b),
-            CondExpr::StringNotEqual(a, b) => self.expand_word(a) != self.expand_word(b),
+            CondExpr::StringEqual(a, b) => {
+                let left = self.expand_word(a);
+                let right = self.expand_word(b);
+                // In [[ ]], == does glob pattern matching on the right side
+                if right.contains('*') || right.contains('?') || right.contains('[') {
+                    crate::glob::pattern_match(&right, &left, true, true)
+                } else {
+                    left == right
+                }
+            }
+            CondExpr::StringNotEqual(a, b) => {
+                let left = self.expand_word(a);
+                let right = self.expand_word(b);
+                if right.contains('*') || right.contains('?') || right.contains('[') {
+                    !crate::glob::pattern_match(&right, &left, true, true)
+                } else {
+                    left != right
+                }
+            }
             CondExpr::StringMatch(a, b) => {
                 let val = self.expand_word(a);
                 let pattern = self.expand_word(b);
@@ -6572,7 +6669,12 @@ impl ShellExecutor {
             return 1;
         }
 
-        let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        // Strip trailing "]" when called as `[`
+        let args: Vec<&str> = args
+            .iter()
+            .map(|s| s.as_str())
+            .filter(|&s| s != "]")
+            .collect();
 
         match args.as_slice() {
             // String tests
@@ -7005,6 +7107,21 @@ impl ShellExecutor {
     }
 
     fn builtin_typeset(&mut self, args: &[String]) -> i32 {
+        // Save old values when inside a function scope (local variable support).
+        // Restored by call_function on function exit.
+        if self.local_scope_depth > 0 {
+            for arg in args {
+                if arg.starts_with('-') || arg.starts_with('+') {
+                    continue;
+                }
+                let name = arg.split('=').next().unwrap_or(arg);
+                if !name.is_empty() {
+                    let old_val = self.variables.get(name).cloned();
+                    self.local_save_stack.push((name.to_string(), old_val));
+                }
+            }
+        }
+
         // typeset [ {+|-}AHUaghlmrtux ] [ {+|-}EFLRZip [ n ] ]
         //         [ + ] [ name[=value] ... ]
         // typeset -T [ {+|-}Urux ] [ {+|-}LRZp [ n ] ] SCALAR[=value] array
@@ -7638,19 +7755,15 @@ impl ShellExecutor {
 
         if array_names.is_empty() {
             // Shift positional parameters
-            if let Some(params) = self.arrays.get_mut("@") {
-                if from_end {
-                    for _ in 0..count {
-                        if !params.is_empty() {
-                            params.pop();
-                        }
+            if from_end {
+                for _ in 0..count {
+                    if !self.positional_params.is_empty() {
+                        self.positional_params.pop();
                     }
-                } else {
-                    for _ in 0..count {
-                        if !params.is_empty() {
-                            params.remove(0);
-                        }
-                    }
+                }
+            } else {
+                for _ in 0..count.min(self.positional_params.len()) {
+                    self.positional_params.remove(0);
                 }
             }
         } else {

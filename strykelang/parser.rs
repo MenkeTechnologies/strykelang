@@ -1402,6 +1402,8 @@ impl Parser {
                 | "pipes"
                 | "block_devices"
                 | "char_devices"
+                | "exe"
+                | "executables"
                 | "rate_limit"
                 | "retry"
                 | "pcache"
@@ -11110,6 +11112,16 @@ impl Parser {
                     line,
                 })
             }
+            "exe" | "executables" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
+                let args = self.parse_builtin_args()?;
+                Ok(Expr {
+                    kind: ExprKind::Executables(args),
+                    line,
+                })
+            }
             "glob" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
@@ -11921,7 +11933,7 @@ impl Parser {
             | "inc" | "dec" | "elapsed"
             // ── filesystem extensions ───────────────────────────────────────
             | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
-            | "sockets" | "pipes" | "block_devices" | "char_devices"
+            | "sockets" | "pipes" | "block_devices" | "char_devices" | "exe" | "executables"
             | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
             | "copy" | "move" | "spurt" | "read_bytes" | "which"
             | "getcwd" | "touch" | "gethostname" | "uname"

@@ -8752,6 +8752,14 @@ impl<'a> VM<'a> {
                 };
                 Ok(crate::perl_fs::list_char_devices(&dir))
             }
+            Some(BuiltinId::Executables) => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(crate::perl_fs::list_executables(&dir))
+            }
             Some(BuiltinId::GlobPar) => {
                 let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
                 Ok(crate::perl_fs::glob_par_patterns(&pats))
