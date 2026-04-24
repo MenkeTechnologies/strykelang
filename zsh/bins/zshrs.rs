@@ -567,20 +567,47 @@ fn init_default_abbreviations() {
     });
 }
 
-/// Global compatibility mode flag
-static mut ZSH_COMPAT_MODE: bool = false;
+/// Shell mode: zshrs (default), --zsh (zsh drop-in), --posix (POSIX sh strict)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellMode {
+    /// Full zshrs — all features, --doctor, plugin cache UI, exclusive builtins
+    Zshrs,
+    /// zsh drop-in — same external interface as zsh, no zshrs-exclusive features visible,
+    /// but full zshrs engine underneath (SQLite, worker pool, parallel everything)
+    Zsh,
+    /// POSIX sh strict — only POSIX builtins, no zsh extensions, no arrays, no [[,
+    /// no extended globbing, no SQLite caches, no worker pool. Dinosaur mode.
+    Posix,
+}
+
+static mut SHELL_MODE: ShellMode = ShellMode::Zshrs;
 
 /// Global log file path for zshrs background operations (compinit, etc.)
-/// Resolves to $HOME/.cache/zshrs/zshrs.log at runtime.
 pub fn zshrs_log_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join(".cache/zshrs/zshrs.log")
 }
 
-/// Check if zsh compatibility mode is enabled
+pub fn shell_mode() -> ShellMode {
+    unsafe { SHELL_MODE }
+}
+
+pub fn is_zsh_mode() -> bool {
+    matches!(shell_mode(), ShellMode::Zsh)
+}
+
+pub fn is_posix_mode() -> bool {
+    matches!(shell_mode(), ShellMode::Posix)
+}
+
+pub fn is_zshrs_mode() -> bool {
+    matches!(shell_mode(), ShellMode::Zshrs)
+}
+
+/// Legacy compat shim — maps to --zsh mode
 pub fn is_zsh_compat() -> bool {
-    unsafe { ZSH_COMPAT_MODE }
+    is_zsh_mode()
 }
 
 fn main() {
@@ -619,12 +646,13 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    // Handle --zsh-compat global flag (must be checked early)
-    if args.iter().any(|a| a == "--zsh-compat") {
-        unsafe {
-            ZSH_COMPAT_MODE = true;
-        }
+    // Handle shell mode flags (must be checked early)
+    if args.iter().any(|a| a == "--posix") {
+        unsafe { SHELL_MODE = ShellMode::Posix; }
+    } else if args.iter().any(|a| a == "--zsh" || a == "--zsh-compat") {
+        unsafe { SHELL_MODE = ShellMode::Zsh; }
     }
+    tracing::info!(mode = ?shell_mode(), "shell mode selected");
 
     // Handle --help (must be identical to zsh --help)
     if args.iter().any(|a| a == "--help") {
@@ -635,6 +663,17 @@ fn main() {
     // Handle --version
     if args.iter().any(|a| a == "--version") {
         println!("zshrs {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    // Handle --doctor (zshrs-exclusive, not available in --zsh or --posix)
+    if args.iter().any(|a| a == "--doctor") {
+        if is_zshrs_mode() {
+            run_doctor();
+        } else {
+            eprintln!("zshrs: --doctor is only available in zshrs mode (not --zsh or --posix)");
+            std::process::exit(1);
+        }
         return;
     }
 
@@ -663,11 +702,16 @@ fn main() {
     // Filter out flags that don't affect -c / script dispatch
     let args: Vec<String> = args
         .into_iter()
-        .filter(|a| a != "--zsh-compat" && a != "-f" && a != "--no-rcs" && a != "-x" && a != "-v")
+        .filter(|a| a != "--zsh-compat" && a != "--zsh" && a != "--posix" && a != "-f" && a != "--no-rcs" && a != "-x" && a != "-v")
         .collect();
 
-    /// Apply CLI flags to executor (xtrace, verbose, etc.)
+    /// Apply CLI flags and shell mode to executor
     fn apply_cli_flags(executor: &mut ShellExecutor, xtrace: bool, verbose: bool) {
+        // Apply shell mode
+        executor.zsh_compat = is_zsh_mode();
+        if is_posix_mode() {
+            executor.enter_posix_mode();
+        }
         if xtrace {
             executor.options.insert("xtrace".to_string(), true);
         }
@@ -681,7 +725,6 @@ fn main() {
         let code = &args[2];
 
         let mut executor = ShellExecutor::new();
-        executor.zsh_compat = is_zsh_compat();
         apply_cli_flags(&mut executor, enable_xtrace, enable_verbose);
         let start = Instant::now();
         let result = executor.execute_script(code);
@@ -709,19 +752,10 @@ fn main() {
     // Handle script file argument
     if args.len() >= 2 && !args[1].starts_with('-') {
         let mut executor = ShellExecutor::new();
-        executor.zsh_compat = is_zsh_compat();
         apply_cli_flags(&mut executor, enable_xtrace, enable_verbose);
-        match std::fs::read_to_string(&args[1]) {
-            Ok(script) => {
-                if let Err(e) = executor.execute_script(&script) {
-                    eprintln!("zshrs: {}: {}", args[1], e);
-                    std::process::exit(1);
-                }
-            }
-            Err(e) => {
-                eprintln!("zshrs: {}: {}", args[1], e);
-                std::process::exit(1);
-            }
+        if let Err(e) = executor.execute_script_file(&args[1]) {
+            eprintln!("zshrs: {}: {}", args[1], e);
+            std::process::exit(1);
         }
         return;
     }
@@ -739,9 +773,299 @@ fn main() {
     }
 }
 
+/// zshrs --doctor: full diagnostic report of shell health, caches, and performance.
+fn run_doctor() {
+    use std::os::unix::fs::MetadataExt;
+
+    let green = |s: &str| format!("\x1b[32m{}\x1b[0m", s);
+    let red = |s: &str| format!("\x1b[31m{}\x1b[0m", s);
+    let yellow = |s: &str| format!("\x1b[33m{}\x1b[0m", s);
+    let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+    let dim = |s: &str| format!("\x1b[2m{}\x1b[0m", s);
+
+    println!("{}", bold("zshrs doctor"));
+    println!("{}", dim(&"=".repeat(60)));
+    println!();
+
+    // --- Version & Environment ---
+    println!("{}", bold("Environment"));
+    println!("  version:    zshrs {}", env!("CARGO_PKG_VERSION"));
+    println!("  pid:        {}", std::process::id());
+    let cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "?".to_string());
+    println!("  cwd:        {}", cwd);
+    println!("  shell:      {}", std::env::var("SHELL").unwrap_or_else(|_| "?".to_string()));
+    let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    println!("  cpus:       {}", cpus);
+    let pool_size = cpus.clamp(2, 18);
+    println!("  pool size:  {}", pool_size);
+    println!();
+
+    // --- PATH ---
+    println!("{}", bold("PATH"));
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    let path_dirs: Vec<&str> = path_var.split(':').filter(|s| !s.is_empty()).collect();
+    let mut path_ok = 0usize;
+    let mut path_missing = 0usize;
+    let mut path_cmds = 0usize;
+    for dir in &path_dirs {
+        if std::path::Path::new(dir).is_dir() {
+            path_ok += 1;
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                path_cmds += entries.count();
+            }
+        } else {
+            path_missing += 1;
+        }
+    }
+    println!("  directories: {} total, {} {}, {} {}",
+        path_dirs.len(),
+        path_ok, green("valid"),
+        path_missing, if path_missing > 0 { red("missing") } else { green("missing") },
+    );
+    println!("  commands:    ~{}", path_cmds);
+    if path_missing > 0 {
+        for dir in &path_dirs {
+            if !std::path::Path::new(dir).is_dir() {
+                println!("  {} PATH entry does not exist: {}", red("!"), dir);
+            }
+        }
+    }
+    println!();
+
+    // --- FPATH ---
+    println!("{}", bold("FPATH"));
+    let fpath_var = std::env::var("FPATH").unwrap_or_default();
+    let fpath_dirs: Vec<&str> = fpath_var.split(':').filter(|s| !s.is_empty()).collect();
+    let mut fpath_ok = 0usize;
+    let mut fpath_missing = 0usize;
+    let mut fpath_files = 0usize;
+    for dir in &fpath_dirs {
+        if std::path::Path::new(dir).is_dir() {
+            fpath_ok += 1;
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                fpath_files += entries.count();
+            }
+        } else {
+            fpath_missing += 1;
+        }
+    }
+    println!("  directories:   {} total, {} {}, {} {}",
+        fpath_dirs.len(),
+        fpath_ok, green("valid"),
+        fpath_missing, if fpath_missing > 0 { red("missing") } else { green("missing") },
+    );
+    println!("  function files: {}", fpath_files);
+    println!();
+
+    // --- SQLite Databases ---
+    println!("{}", bold("SQLite Caches"));
+
+    // History
+    let hist_path = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("zshrs/history.db");
+    if hist_path.exists() {
+        let size = std::fs::metadata(&hist_path).map(|m| m.len()).unwrap_or(0);
+        let count = zsh::history::HistoryEngine::new()
+            .ok()
+            .and_then(|e| e.count().ok())
+            .unwrap_or(0);
+        println!("  history.db:  {} entries, {} bytes  {}",
+            count,
+            format_bytes(size),
+            green("OK"),
+        );
+    } else {
+        println!("  history.db:  {}", yellow("not found"));
+    }
+
+    // Compsys cache
+    let compsys_path = compsys::cache::default_cache_path();
+    if compsys_path.exists() {
+        let size = std::fs::metadata(&compsys_path).map(|m| m.len()).unwrap_or(0);
+        let count = CompsysCache::open(&compsys_path)
+            .ok()
+            .map(|c| compsys::cache_entry_count(&c))
+            .unwrap_or(0);
+        println!("  compsys.db:  {} completions, {}  {}",
+            count,
+            format_bytes(size),
+            green("OK"),
+        );
+    } else {
+        println!("  compsys.db:  {}", yellow("not found — run compinit to create"));
+    }
+
+    // Plugin cache
+    let plugin_path = zsh::plugin_cache::default_cache_path();
+    if plugin_path.exists() {
+        let size = std::fs::metadata(&plugin_path).map(|m| m.len()).unwrap_or(0);
+        let (plugins, functions) = zsh::plugin_cache::PluginCache::open(&plugin_path)
+            .map(|c| c.stats())
+            .unwrap_or((0, 0));
+        println!("  plugins.db:  {} plugins, {} cached functions, {}  {}",
+            plugins,
+            functions,
+            format_bytes(size),
+            green("OK"),
+        );
+
+        // Check for stale entries
+        if let Ok(cache) = zsh::plugin_cache::PluginCache::open(&plugin_path) {
+            let stale = count_stale_plugins(&cache);
+            if stale > 0 {
+                println!("               {} {} plugin(s) have stale cache (file changed since cached)",
+                    yellow("!"), stale);
+            }
+        }
+    } else {
+        println!("  plugins.db:  {}", yellow("not found — source a file to create"));
+    }
+    println!();
+
+    // --- Log file ---
+    println!("{}", bold("Log"));
+    let log_path = zsh::log::log_path();
+    if log_path.exists() {
+        let size = std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0);
+        let lines = std::fs::read_to_string(&log_path)
+            .map(|s| s.lines().count())
+            .unwrap_or(0);
+        println!("  {}  {} lines, {}",
+            log_path.display(), lines, format_bytes(size));
+    } else {
+        println!("  {}", dim("no log file yet"));
+    }
+    println!();
+
+    // --- Startup files ---
+    println!("{}", bold("Startup Files"));
+    let zdotdir = std::env::var("ZDOTDIR")
+        .unwrap_or_else(|_| std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()));
+    let startup_files = [
+        ("/etc/zshenv", true),
+        (&format!("{}/.zshenv", zdotdir), false),
+        ("/etc/zprofile", false),
+        (&format!("{}/.zprofile", zdotdir), false),
+        ("/etc/zshrc", false),
+        (&format!("{}/.zshrc", zdotdir), false),
+        ("/etc/zlogin", false),
+        (&format!("{}/.zlogin", zdotdir), false),
+    ];
+    for (path, always) in &startup_files {
+        let p = std::path::Path::new(path);
+        if p.exists() {
+            let size = std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+            let cached = is_script_cached(&plugin_path, path);
+            let cache_status = if cached { green("cached") } else { yellow("uncached") };
+            println!("  {} {} {}  [{}]",
+                green("*"),
+                path,
+                dim(&format!("({})", format_bytes(size))),
+                cache_status,
+            );
+        } else if *always {
+            println!("  {} {}", dim("-"), dim(path));
+        } else {
+            println!("  {} {}", dim("-"), dim(path));
+        }
+    }
+    println!();
+
+    // --- Profiling ---
+    println!("{}", bold("Profiling Features"));
+    println!("  chrome tracing: {}", if zsh::log::profiling_enabled() { green("enabled") } else { dim("disabled (build with --features profiling)") });
+    println!("  flamegraph:     {}", if zsh::log::flamegraph_enabled() { green("enabled") } else { dim("disabled (build with --features flamegraph)") });
+    println!("  prometheus:     {}", if zsh::log::prometheus_enabled() { green("enabled") } else { dim("disabled (build with --features prometheus)") });
+    println!("  ZSHRS_LOG:      {}", std::env::var("ZSHRS_LOG").unwrap_or_else(|_| "info (default)".to_string()));
+    println!();
+
+    // --- Startup benchmark ---
+    println!("{}", bold("Startup Benchmark"));
+    let t0 = Instant::now();
+    let mut executor = ShellExecutor::new();
+    let init_ms = t0.elapsed().as_millis();
+    println!("  executor init:  {}ms", init_ms);
+
+    let t1 = Instant::now();
+    executor.drain_compinit_bg();
+    let drain_ms = t1.elapsed().as_millis();
+    println!("  compinit drain: {}ms", drain_ms);
+
+    let total = init_ms + drain_ms;
+    let status = if total < 30 {
+        green(&format!("{}ms — excellent", total))
+    } else if total < 100 {
+        yellow(&format!("{}ms — good", total))
+    } else {
+        red(&format!("{}ms — slow", total))
+    };
+    println!("  total:          {}", status);
+    println!();
+
+    // --- Summary ---
+    println!("{}", bold("Summary"));
+    let mut issues = 0;
+    if path_missing > 0 {
+        println!("  {} {} PATH entries missing", red("!"), path_missing);
+        issues += 1;
+    }
+    if fpath_missing > 0 {
+        println!("  {} {} FPATH entries missing", red("!"), fpath_missing);
+        issues += 1;
+    }
+    if !hist_path.exists() {
+        println!("  {} no history database", yellow("!"));
+        issues += 1;
+    }
+    if !compsys_path.exists() {
+        println!("  {} no completion cache", yellow("!"));
+        issues += 1;
+    }
+    if total > 100 {
+        println!("  {} startup > 100ms", red("!"));
+        issues += 1;
+    }
+    if issues == 0 {
+        println!("  {} all checks passed", green("*"));
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{}B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1}KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1}MB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
+fn count_stale_plugins(cache: &zsh::plugin_cache::PluginCache) -> usize {
+    cache.count_stale()
+}
+
+fn is_script_cached(plugin_db_path: &std::path::Path, script_path: &str) -> bool {
+    if !plugin_db_path.exists() {
+        return false;
+    }
+    let cache = match zsh::plugin_cache::PluginCache::open(plugin_db_path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    if let Some((mt_s, mt_ns)) = zsh::plugin_cache::file_mtime(std::path::Path::new(script_path)) {
+        cache.check(script_path, mt_s, mt_ns).is_some()
+    } else {
+        false
+    }
+}
+
 fn run_non_interactive() {
     let mut executor = ShellExecutor::new();
-    executor.zsh_compat = is_zsh_compat();
+    executor.zsh_compat = is_zsh_mode();
+    if is_posix_mode() { executor.enter_posix_mode(); }
     // Read all of stdin at once so multi-line constructs (heredocs, functions,
     // loops, etc.) are parsed correctly — line-by-line breaks them.
     let mut script = String::new();
@@ -778,6 +1102,9 @@ fn get_zdotdir() -> PathBuf {
 ///   8. $ZDOTDIR/.zlogin (login only)
 ///
 /// If file.zwc exists and is newer than file, the compiled version is used.
+///
+/// Optimization: all startup file contents are read into memory in parallel
+/// (overlapping disk I/O), then executed sequentially in the correct order.
 fn source_startup_files(
     executor: &mut ShellExecutor,
     is_login: bool,
@@ -786,34 +1113,118 @@ fn source_startup_files(
 ) {
     let zdotdir = get_zdotdir();
 
-    // /etc/zshenv is ALWAYS read first (cannot be overridden, even with -f)
-    source_file_with_zwc(executor, &PathBuf::from("/etc/zshenv"));
+    // Build the ordered list of candidate startup files.
+    // We read ALL of them in parallel to overlap disk latency, but execute
+    // sequentially and honor RCS/GLOBAL_RCS checks between phases.
+    let mut candidates: Vec<PathBuf> = Vec::with_capacity(8);
 
-    // If -f (no_rcs) was passed, stop here
+    // Phase 0: /etc/zshenv — always read
+    candidates.push(PathBuf::from("/etc/zshenv"));
+
+    if !no_rcs {
+        // Phase 1: user .zshenv
+        candidates.push(zdotdir.join(".zshenv"));
+
+        // Phase 2: login profile files
+        if is_login {
+            candidates.push(PathBuf::from("/etc/zprofile"));
+            candidates.push(zdotdir.join(".zprofile"));
+        }
+
+        // Phase 3: interactive rc files
+        if is_interactive {
+            candidates.push(PathBuf::from("/etc/zshrc"));
+            candidates.push(zdotdir.join(".zshrc"));
+        }
+
+        // Phase 4: login files (after zshrc)
+        if is_login {
+            candidates.push(PathBuf::from("/etc/zlogin"));
+            candidates.push(zdotdir.join(".zlogin"));
+        }
+    }
+
+    // --- Parallel read phase: read all files at once on background threads ---
+    let read_start = std::time::Instant::now();
+    let file_count = candidates.len();
+
+    let handles: Vec<std::thread::JoinHandle<(PathBuf, Option<String>)>> = candidates
+        .into_iter()
+        .map(|path| {
+            std::thread::spawn(move || {
+                let contents = if path.exists() {
+                    std::fs::read_to_string(&path).ok()
+                } else {
+                    None
+                };
+                (path, contents)
+            })
+        })
+        .collect();
+
+    // Collect results in order (handles are in insertion order)
+    let preloaded: Vec<(PathBuf, Option<String>)> = handles
+        .into_iter()
+        .map(|h| h.join().unwrap_or_else(|_| (PathBuf::new(), None)))
+        .collect();
+
+    tracing::debug!(
+        files = file_count,
+        read_ms = read_start.elapsed().as_millis() as u64,
+        "startup files parallel read complete"
+    );
+
+    // --- Sequential execution phase: execute in correct order with RCS checks ---
+
+    // Phase 0: /etc/zshenv — always
+    if let Some((path, contents)) = preloaded.first() {
+        if let Some(ref text) = contents {
+            source_from_memory(executor, path, text);
+        }
+    }
+
     if no_rcs {
         return;
     }
 
-    // Check RCS option - if unset, skip remaining startup files
+    // Check RCS after /etc/zshenv
     if !executor.options.get("rcs").copied().unwrap_or(true) {
         return;
     }
 
-    // $ZDOTDIR/.zshenv
-    source_file_with_zwc(executor, &zdotdir.join(".zshenv"));
-
-    // Re-check RCS after .zshenv (it could have unset it)
-    if !executor.options.get("rcs").copied().unwrap_or(true) {
-        return;
-    }
-
-    // Login shell: /etc/zprofile, $ZDOTDIR/.zprofile
-    if is_login {
-        if executor.options.get("globalrcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &PathBuf::from("/etc/zprofile"));
+    // Phase 1: $ZDOTDIR/.zshenv
+    let mut idx = 1;
+    if idx < preloaded.len() {
+        if let Some(ref text) = preloaded[idx].1 {
+            source_from_memory(executor, &preloaded[idx].0, text);
         }
-        if executor.options.get("rcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &zdotdir.join(".zprofile"));
+        idx += 1;
+    }
+
+    // Re-check RCS after .zshenv
+    if !executor.options.get("rcs").copied().unwrap_or(true) {
+        return;
+    }
+
+    // Phase 2: login profile files
+    if is_login {
+        // /etc/zprofile
+        if idx < preloaded.len() {
+            if executor.options.get("globalrcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            idx += 1;
+        }
+        // $ZDOTDIR/.zprofile
+        if idx < preloaded.len() {
+            if executor.options.get("rcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            idx += 1;
         }
     }
 
@@ -822,13 +1233,25 @@ fn source_startup_files(
         return;
     }
 
-    // Interactive shell: /etc/zshrc, $ZDOTDIR/.zshrc
+    // Phase 3: interactive rc files
     if is_interactive {
-        if executor.options.get("globalrcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &PathBuf::from("/etc/zshrc"));
+        // /etc/zshrc
+        if idx < preloaded.len() {
+            if executor.options.get("globalrcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            idx += 1;
         }
-        if executor.options.get("rcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &zdotdir.join(".zshrc"));
+        // $ZDOTDIR/.zshrc
+        if idx < preloaded.len() {
+            if executor.options.get("rcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            idx += 1;
         }
     }
 
@@ -837,14 +1260,76 @@ fn source_startup_files(
         return;
     }
 
-    // Login shell: /etc/zlogin, $ZDOTDIR/.zlogin (after zshrc)
+    // Phase 4: login files (after zshrc)
     if is_login {
-        if executor.options.get("globalrcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &PathBuf::from("/etc/zlogin"));
+        // /etc/zlogin
+        if idx < preloaded.len() {
+            if executor.options.get("globalrcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            idx += 1;
         }
-        if executor.options.get("rcs").copied().unwrap_or(true) {
-            source_file_with_zwc(executor, &zdotdir.join(".zlogin"));
+        // $ZDOTDIR/.zlogin
+        if idx < preloaded.len() {
+            if executor.options.get("rcs").copied().unwrap_or(true) {
+                if let Some(ref text) = preloaded[idx].1 {
+                    source_from_memory(executor, &preloaded[idx].0, text);
+                }
+            }
+            // suppress unused assignment warning
+            let _ = idx;
         }
+    }
+}
+
+/// Execute a startup file from pre-read memory contents.
+/// Mirrors source_file() logic but skips the fs::read_to_string.
+fn source_from_memory(executor: &mut ShellExecutor, path: &PathBuf, contents: &str) {
+    tracing::trace!(path = %path.display(), "sourcing startup file from memory");
+    let mut buffer = String::new();
+    let mut in_multiline = false;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+
+        // Skip empty lines and comments (unless in multiline)
+        if !in_multiline && (trimmed.is_empty() || trimmed.starts_with('#')) {
+            continue;
+        }
+
+        // Check for line continuation
+        if line.ends_with('\\') {
+            buffer.push_str(&line[..line.len() - 1]);
+            buffer.push(' ');
+            in_multiline = true;
+            continue;
+        }
+
+        // Check for unclosed constructs (heredoc, quotes, braces)
+        if in_multiline {
+            buffer.push_str(line);
+            let open_braces = buffer.matches('{').count();
+            let close_braces = buffer.matches('}').count();
+            let open_parens = buffer.matches('(').count();
+            let close_parens = buffer.matches(')').count();
+
+            if open_braces == close_braces && open_parens == close_parens {
+                process_line(&buffer, executor);
+                buffer.clear();
+                in_multiline = false;
+            } else {
+                buffer.push('\n');
+            }
+        } else {
+            process_line(line, executor);
+        }
+    }
+
+    // Process any remaining buffered content
+    if !buffer.is_empty() {
+        process_line(&buffer, executor);
     }
 }
 
@@ -1000,7 +1485,7 @@ fn run_interactive() {
             }
         };
 
-    let line_editor = setup_editor(compsys_cache);
+    let line_editor = setup_editor(compsys_cache.map(|c| (c, cache_path)));
     if line_editor.is_none() {
         eprintln!("Failed to initialize line editor");
         return;
@@ -1008,7 +1493,8 @@ fn run_interactive() {
     let mut line_editor = line_editor.unwrap();
 
     let mut executor = ShellExecutor::new();
-    executor.zsh_compat = is_zsh_compat();
+    executor.zsh_compat = is_zsh_mode();
+    if is_posix_mode() { executor.enter_posix_mode(); }
 
     // Determine shell type from invocation per zshall(1)
     let args: Vec<String> = std::env::args().collect();
@@ -1107,7 +1593,7 @@ fn process_line(line: &str, executor: &mut ShellExecutor) {
     }
 }
 
-fn setup_editor(compsys_cache: Option<CompsysCache>) -> Option<Reedline> {
+fn setup_editor(compsys_cache: Option<(CompsysCache, PathBuf)>) -> Option<Reedline> {
     let history_path = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".zshrs_history");
@@ -1137,8 +1623,8 @@ fn setup_editor(compsys_cache: Option<CompsysCache>) -> Option<Reedline> {
         .with_highlighter(Box::new(ZshrsHighlighter))
         .with_validator(Box::new(ZshrsValidator));
 
-    if let Some(cache) = compsys_cache {
-        let completer = Box::new(ZshrsCompleter::new(cache));
+    if let Some((cache, cache_path)) = compsys_cache {
+        let completer = Box::new(ZshrsCompleter::new(cache, cache_path));
 
         // Zsh-style menuselect — port of Src/Zle/complist.c domenuselect()
         // Uses compsys MenuState for rendering (group headers, zstyle colors,
@@ -1497,12 +1983,15 @@ impl ReedlineMenuTrait for ZshMenuSelect {
 
 struct ZshrsCompleter {
     cache: CompsysCache,
+    /// Path to the SQLite cache file — needed by completion threads that open
+    /// their own read-only connections to avoid Send issues with rusqlite.
+    cache_path: PathBuf,
     #[allow(dead_code)]
     comp_state: CompletionState,
 }
 
 impl ZshrsCompleter {
-    fn new(mut cache: CompsysCache) -> Self {
+    fn new(mut cache: CompsysCache, cache_path: PathBuf) -> Self {
         // Check if completion mappings need to be built
         let (valid, count) = compinit_lazy(&cache);
         if !valid || count == 0 {
@@ -1513,6 +2002,7 @@ impl ZshrsCompleter {
 
         Self {
             cache,
+            cache_path,
             comp_state: CompletionState::new(),
         }
     }
@@ -1647,143 +2137,128 @@ impl Completer for ZshrsCompleter {
         let words: Vec<&str> = line_to_pos.split_whitespace().collect();
         let is_first_word = words.len() <= 1 && !line_to_pos.ends_with(' ');
 
-        let mut suggestions = Vec::new();
-
         if is_first_word {
-            // Command position - complete executables, builtins, shell functions
-            if !current_word.is_empty() {
-                // Executables from cache
-                if let Ok(executables) = self.cache.get_executables_prefix_fts(current_word) {
-                    for (name, path) in executables.into_iter().take(100) {
-                        suggestions.push(Suggestion {
-                            value: name,
-                            description: Some(path),
-                            style: None,
-                            extra: Some(vec!["command".to_string()]),
-                            span: Span::new(word_start, pos),
-                            append_whitespace: true,
-                            display_override: None,
-                            match_indices: None,
-                        });
+            // Command position — launch executable, builtin, and function lookups
+            // on separate threads to overlap SQLite I/O and string matching.
+            if current_word.is_empty() {
+                return Vec::new();
+            }
+
+            let prefix = current_word.to_string();
+            let prefix_lower = current_word.to_lowercase();
+            let ws = word_start;
+            let p = pos;
+
+            // --- Thread 1: executables from SQLite FTS cache ---
+            let cache_path = self.cache_path.clone();
+            let prefix_exec = prefix.clone();
+            let exec_handle = std::thread::spawn(move || -> Vec<Suggestion> {
+                let mut results = Vec::new();
+                if let Ok(cache) = compsys::cache::CompsysCache::open(&cache_path) {
+                    if let Ok(executables) = cache.get_executables_prefix_fts(&prefix_exec) {
+                        for (name, path) in executables.into_iter().take(100) {
+                            results.push(Suggestion {
+                                value: name,
+                                description: Some(path),
+                                style: None,
+                                extra: Some(vec!["command".to_string()]),
+                                span: Span::new(ws, p),
+                                append_whitespace: true,
+                                display_override: None,
+                                match_indices: None,
+                            });
+                        }
                     }
                 }
+                results
+            });
 
-                // Builtins
+            // --- Thread 2: builtin matching (pure CPU, fast) ---
+            let prefix_builtin = prefix_lower.clone();
+            let builtin_handle = std::thread::spawn(move || -> Vec<Suggestion> {
                 let builtins = [
-                    "alias",
-                    "autoload",
-                    "bg",
-                    "bindkey",
-                    "break",
-                    "builtin",
-                    "cd",
-                    "command",
-                    "compctl",
-                    "continue",
-                    "declare",
-                    "dirs",
-                    "disown",
-                    "echo",
-                    "emulate",
-                    "enable",
-                    "eval",
-                    "exec",
-                    "exit",
-                    "export",
-                    "false",
-                    "fc",
-                    "fg",
-                    "float",
-                    "functions",
-                    "getopts",
-                    "hash",
-                    "history",
-                    "integer",
-                    "jobs",
-                    "kill",
-                    "let",
-                    "limit",
-                    "local",
-                    "log",
-                    "logout",
-                    "noglob",
-                    "popd",
-                    "print",
-                    "printf",
-                    "pushd",
-                    "pwd",
-                    "read",
-                    "readonly",
-                    "rehash",
-                    "return",
-                    "set",
-                    "setopt",
-                    "shift",
-                    "source",
-                    "suspend",
-                    "test",
-                    "times",
-                    "trap",
-                    "true",
-                    "type",
-                    "typeset",
-                    "ulimit",
-                    "umask",
-                    "unalias",
-                    "unfunction",
-                    "unhash",
-                    "unlimit",
-                    "unset",
-                    "unsetopt",
-                    "wait",
-                    "whence",
-                    "where",
-                    "which",
-                    "zcompile",
-                    "zformat",
-                    "zle",
-                    "zmodload",
-                    "zparseopts",
-                    "zprof",
-                    "zpty",
-                    "zregexparse",
-                    "zsocket",
-                    "zstat",
+                    "alias", "autoload", "bg", "bindkey", "break", "builtin", "cd",
+                    "command", "compctl", "continue", "declare", "dirs", "disown",
+                    "echo", "emulate", "enable", "eval", "exec", "exit", "export",
+                    "false", "fc", "fg", "float", "functions", "getopts", "hash",
+                    "history", "integer", "jobs", "kill", "let", "limit", "local",
+                    "log", "logout", "noglob", "popd", "print", "printf", "pushd",
+                    "pwd", "read", "readonly", "rehash", "return", "set", "setopt",
+                    "shift", "source", "suspend", "test", "times", "trap", "true",
+                    "type", "typeset", "ulimit", "umask", "unalias", "unfunction",
+                    "unhash", "unlimit", "unset", "unsetopt", "wait", "whence",
+                    "where", "which", "zcompile", "zformat", "zle", "zmodload",
+                    "zparseopts", "zprof", "zpty", "zregexparse", "zsocket", "zstat",
                     "zstyle",
                 ];
-                let prefix_lower = current_word.to_lowercase();
+                let mut results = Vec::new();
                 for builtin in builtins {
-                    if builtin.starts_with(&prefix_lower) {
-                        suggestions.push(Suggestion {
+                    if builtin.starts_with(&prefix_builtin) {
+                        results.push(Suggestion {
                             value: builtin.to_string(),
                             description: Some("builtin".to_string()),
                             style: None,
                             extra: Some(vec!["builtin".to_string()]),
-                            span: Span::new(word_start, pos),
+                            span: Span::new(ws, p),
                             append_whitespace: true,
                             display_override: None,
                             match_indices: None,
                         });
                     }
                 }
+                results
+            });
 
-                // Shell functions from cache
-                if let Ok(funcs) = self.cache.get_shell_functions_prefix(current_word) {
-                    for (name, source) in funcs.into_iter().take(50) {
-                        suggestions.push(Suggestion {
-                            value: name,
-                            description: Some(source),
-                            style: None,
-                            extra: Some(vec!["function".to_string()]),
-                            span: Span::new(word_start, pos),
-                            append_whitespace: true,
-                            display_override: None,
-                            match_indices: None,
-                        });
+            // --- Thread 3: shell functions from SQLite cache ---
+            let cache_path2 = self.cache_path.clone();
+            let prefix_func = prefix.clone();
+            let func_handle = std::thread::spawn(move || -> Vec<Suggestion> {
+                let mut results = Vec::new();
+                if let Ok(cache) = compsys::cache::CompsysCache::open(&cache_path2) {
+                    if let Ok(funcs) = cache.get_shell_functions_prefix(&prefix_func) {
+                        for (name, source) in funcs.into_iter().take(50) {
+                            results.push(Suggestion {
+                                value: name,
+                                description: Some(source),
+                                style: None,
+                                extra: Some(vec!["function".to_string()]),
+                                span: Span::new(ws, p),
+                                append_whitespace: true,
+                                display_override: None,
+                                match_indices: None,
+                            });
+                        }
                     }
                 }
+                results
+            });
+
+            // Collect results from all threads
+            let mut suggestions = Vec::new();
+            if let Ok(mut exec_results) = exec_handle.join() {
+                suggestions.append(&mut exec_results);
             }
-        } else if current_word.starts_with('-') {
+            if let Ok(mut builtin_results) = builtin_handle.join() {
+                suggestions.append(&mut builtin_results);
+            }
+            if let Ok(mut func_results) = func_handle.join() {
+                suggestions.append(&mut func_results);
+            }
+
+            tracing::trace!(
+                count = suggestions.len(),
+                prefix = %prefix,
+                "parallel command completion complete"
+            );
+
+            suggestions.sort_by(|a, b| a.value.cmp(&b.value));
+            suggestions.dedup_by(|a, b| a.value == b.value);
+            return suggestions;
+        }
+
+        let mut suggestions = Vec::new();
+
+        if current_word.starts_with('-') {
             // Option completion - use compsys cache to find options
             if let Some(cmd) = words.first() {
                 // Try to get options from completion function in cache

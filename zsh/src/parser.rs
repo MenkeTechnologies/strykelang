@@ -6,23 +6,24 @@
 
 use crate::lexer::ZshLexer;
 use crate::tokens::LexTok;
+use serde::{Serialize, Deserialize};
 use std::iter::Peekable;
 use std::str::Chars;
 
 /// AST node for a complete program (list of commands)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshProgram {
     pub lists: Vec<ZshList>,
 }
 
 /// A list is a sequence of sublists separated by ; or & or newline
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshList {
     pub sublist: ZshSublist,
     pub flags: ListFlags,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct ListFlags {
     /// Run asynchronously (&)
     pub async_: bool,
@@ -31,20 +32,20 @@ pub struct ListFlags {
 }
 
 /// A sublist is pipelines connected by && or ||
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshSublist {
     pub pipe: ZshPipe,
     pub next: Option<(SublistOp, Box<ZshSublist>)>,
     pub flags: SublistFlags,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SublistOp {
     And, // &&
     Or,  // ||
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SublistFlags {
     /// Coproc
     pub coproc: bool,
@@ -53,7 +54,7 @@ pub struct SublistFlags {
 }
 
 /// A pipeline is commands connected by |
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshPipe {
     pub cmd: ZshCommand,
     pub next: Option<Box<ZshPipe>>,
@@ -61,7 +62,7 @@ pub struct ZshPipe {
 }
 
 /// A command
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ZshCommand {
     Simple(ZshSimple),
     Subsh(Box<ZshProgram>), // (list)
@@ -80,7 +81,7 @@ pub enum ZshCommand {
 }
 
 /// A simple command (assignments, words, redirections)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshSimple {
     pub assigns: Vec<ZshAssign>,
     pub words: Vec<String>,
@@ -88,21 +89,21 @@ pub struct ZshSimple {
 }
 
 /// An assignment
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshAssign {
     pub name: String,
     pub value: ZshAssignValue,
     pub append: bool, // +=
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ZshAssignValue {
     Scalar(String),
     Array(Vec<String>),
 }
 
 /// A redirection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshRedir {
     pub rtype: RedirType,
     pub fd: i32,
@@ -111,14 +112,14 @@ pub struct ZshRedir {
     pub varid: Option<String>, // {var}>file
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HereDocInfo {
     pub content: String,
     pub terminator: String,
 }
 
 /// Redirection type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RedirType {
     Write,        // >
     Writenow,     // >|
@@ -140,14 +141,14 @@ pub enum RedirType {
 }
 
 /// For loop
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshFor {
     pub var: String,
     pub list: ForList,
     pub body: Box<ZshProgram>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ForList {
     Words(Vec<String>),
     CStyle {
@@ -159,20 +160,20 @@ pub enum ForList {
 }
 
 /// Case statement
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshCase {
     pub word: String,
     pub arms: Vec<CaseArm>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaseArm {
     pub patterns: Vec<String>,
     pub body: ZshProgram,
     pub terminator: CaseTerm,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CaseTerm {
     Break,    // ;;
     Continue, // ;&
@@ -180,7 +181,7 @@ pub enum CaseTerm {
 }
 
 /// If statement
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshIf {
     pub cond: Box<ZshProgram>,
     pub then: Box<ZshProgram>,
@@ -189,7 +190,7 @@ pub struct ZshIf {
 }
 
 /// While/Until loop
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshWhile {
     pub cond: Box<ZshProgram>,
     pub body: Box<ZshProgram>,
@@ -197,14 +198,14 @@ pub struct ZshWhile {
 }
 
 /// Repeat loop
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshRepeat {
     pub count: String,
     pub body: Box<ZshProgram>,
 }
 
 /// Function definition
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshFuncDef {
     pub names: Vec<String>,
     pub body: Box<ZshProgram>,
@@ -212,7 +213,7 @@ pub struct ZshFuncDef {
 }
 
 /// Conditional expression [[ ... ]]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ZshCond {
     Not(Box<ZshCond>),
     And(Box<ZshCond>, Box<ZshCond>),
@@ -223,14 +224,14 @@ pub enum ZshCond {
 }
 
 /// Try/always block
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZshTry {
     pub try_block: Box<ZshProgram>,
     pub always: Box<ZshProgram>,
 }
 
 /// Zsh parameter expansion flags
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ZshParamFlag {
     Lower,                 // L - lowercase
     Upper,                 // U - uppercase
@@ -272,7 +273,7 @@ pub enum ZshParamFlag {
 }
 
 /// List operator (for shell command lists)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ListOp {
     And,     // &&
     Or,      // ||
@@ -282,7 +283,7 @@ pub enum ListOp {
 }
 
 /// Shell word - can be simple literal or complex expansion
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ShellWord {
     Literal(String),
     SingleQuoted(String),
@@ -301,7 +302,7 @@ pub enum ShellWord {
 }
 
 /// Variable modifier for parameter expansion
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VarModifier {
     Default(ShellWord),
     DefaultAssign(ShellWord),
@@ -324,7 +325,7 @@ pub enum VarModifier {
 }
 
 /// Shell command - the old shell_ast compatible type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ShellCommand {
     Simple(SimpleCommand),
     Pipeline(Vec<ShellCommand>, bool),
@@ -334,7 +335,7 @@ pub enum ShellCommand {
 }
 
 /// Simple command with assignments, words, and redirects
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpleCommand {
     pub assignments: Vec<(String, ShellWord, bool)>,
     pub words: Vec<ShellWord>,
@@ -342,7 +343,7 @@ pub struct SimpleCommand {
 }
 
 /// Redirect
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Redirect {
     pub fd: Option<i32>,
     pub op: RedirectOp,
@@ -352,7 +353,7 @@ pub struct Redirect {
 }
 
 /// Redirect operator
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RedirectOp {
     Write,
     Append,
@@ -368,7 +369,7 @@ pub enum RedirectOp {
 }
 
 /// Compound command
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CompoundCommand {
     BraceGroup(Vec<ShellCommand>),
     Subshell(Vec<ShellCommand>),
@@ -424,7 +425,7 @@ pub enum CompoundCommand {
 }
 
 /// Case terminator
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CaseTerminator {
     Break,
     Fallthrough,
@@ -432,7 +433,7 @@ pub enum CaseTerminator {
 }
 
 /// Conditional expression for [[ ]]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CondExpr {
     FileExists(ShellWord),
     FileRegular(ShellWord),
@@ -461,7 +462,7 @@ pub enum CondExpr {
 }
 
 /// Parse errors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParseError {
     pub message: String,
     pub line: u64,

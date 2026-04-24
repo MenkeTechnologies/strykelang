@@ -44,6 +44,9 @@ metrics = { version = "0.24", optional = true }
 metrics-exporter-prometheus = { version = "0.16", optional = true, default-features = false, features = ["http-listener"] }
 walkdir = "2.5.0"
 crossbeam-channel = "0.5.15"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
 
 [features]
 default = []

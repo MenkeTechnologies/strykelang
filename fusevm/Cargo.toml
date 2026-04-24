@@ -1,0 +1,10 @@
+[package]
+name = "fusevm"
+version.workspace = true
+edition.workspace = true
+description = "Language-agnostic bytecode VM with Cranelift JIT and fused superinstructions"
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
