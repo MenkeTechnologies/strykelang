@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knight's Tour
+
+fn backtrack($x, $y, $count, $board, $n, $dx, $dy) {
+    $board->[$x]->[$y] = $count
+    if ($count == $n * $n) { return 1 }
+
+    for my $i (0..7) {
+        my $nx = $x + $dx->[$i]
+        my $ny = $y + $dy->[$i]
+        if ($nx >= 0 && $nx < $n && $ny >= 0 && $ny < $n && $board->[$nx]->[$ny] == 0) {
+            if (backtrack($nx, $ny, $count + 1, $board, $n, $dx, $dy)) { return 1 }
+        }
+    }
+    $board->[$x]->[$y] = 0
+    0
+}
+
+fn solve_knights_tour($n) {
+    my $board = []
+    for my $i (0..$n-1) {
+        my $row = []
+        for my $j (0..$n-1) { push @$row, 0 }
+        push @$board, $row
+    }
+
+    my $dx = [2, 1, -1, -2, -2, -1, 1, 2]
+    my $dy = [1, 2, 2, 1, -1, -2, -2, -1]
+
+    if (backtrack(0, 0, 1, $board, $n, $dx, $dy)) { return $board }
+    undef
+}
+
+
+# 5x5 board is small enough for fast testing
+my $tour = solve_knights_tour(5)
+assert_ok defined($tour), "Knight's tour 5x5 exists"
+
+# Verify all squares are visited
+my $visited_count = 0
+for my $row (@$tour) {
+    for my $val (@$row) {
+        if ($val > 0) { $visited_count = $visited_count + 1 }
+    }
+}
+assert_eq $visited_count, 25, "Knight's tour visited all 25 squares"
+
+test_run

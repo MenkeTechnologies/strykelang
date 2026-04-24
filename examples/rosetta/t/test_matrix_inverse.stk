@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix Inversion
+
+# Test builtin matrix_inverse
+my $m = [[1, 2], [3, 4]]
+my $inv = [matrix_inverse($m)]
+
+# Expected inverse: [[-2, 1], [1.5, -0.5]]
+assert_eq $inv->[0]->[0], -2, "inv[0][0]"
+assert_eq $inv->[0]->[1], 1, "inv[0][1]"
+assert_eq $inv->[1]->[0], 1.5, "inv[1][0]"
+assert_eq $inv->[1]->[1], -0.5, "inv[1][1]"
+
+my $m2 = [[1, 0], [0, 1]]
+my $inv2 = [matrix_inverse($m2)]
+assert_ok deep_equal($m2, $inv2), "inverse of 2x2 identity is identity"
+
+test_run

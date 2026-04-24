@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tree Sort
+
+fn insert_node($n, $v) {
+    if (!defined $n) { return { val => $v, left => undef, right => undef } }
+    if ($v < $n->{val}) {
+        $n->{left} = insert_node($n->{left}, $v)
+    } else {
+        $n->{right} = insert_node($n->{right}, $v)
+    }
+    $n
+}
+
+fn inorder($n, $res) {
+    if (!$n) { return }
+    inorder($n->{left}, $res)
+    push @$res, $n->{val}
+    inorder($n->{right}, $res)
+}
+
+fn tree_sort($list) {
+    my $root = undef
+    for my $v (@$list) {
+        $root = insert_node($root, $v)
+    }
+    my @res
+    my $r = \@res
+    inorder($root, $r)
+    $r
+}
+
+my @input = (5, 3, 8, 1, 9, 2, 7, 4, 6)
+my $sorted = tree_sort(\@input)
+assert_eq join(",", @$sorted), "1,2,3,4,5,6,7,8,9", "tree sort"
+
+test_run

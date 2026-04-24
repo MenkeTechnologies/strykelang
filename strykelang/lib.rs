@@ -274,7 +274,12 @@ pub fn try_vm_execute(
         }
         // `Unsupported` just means "this VM compiler doesn't handle this construct yet" — fall
         // back to the tree interpreter.
-        Err(compiler::CompileError::Unsupported(_)) => None,
+        Err(compiler::CompileError::Unsupported(reason)) => {
+            if std::env::var("STRYKE_LOG_FALLBACK").is_ok() {
+                eprintln!("[fallback] {} ({})", reason, &interp.file);
+            }
+            None
+        }
     }
 }
 

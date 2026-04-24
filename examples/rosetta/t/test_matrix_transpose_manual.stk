@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix Transpose (Manual)
+
+fn my_transpose($m) {
+    my $rows = scalar(@$m)
+    my $cols = scalar(@{$m->[0]})
+    my @res
+    for my $j (0..$cols-1) {
+        my @new_row
+        for my $i (0..$rows-1) {
+            push @new_row, $m->[$i]->[$j]
+        }
+        push @res, [@new_row]
+    }
+    \@res
+}
+
+my $m = [[1, 2, 3], [4, 5, 6]]
+my $tr = my_transpose($m)
+
+# Expected: [[1, 4], [2, 5], [3, 6]]
+assert_eq scalar(@$tr), 3, "transpose rows"
+assert_eq scalar(@{$tr->[0]}), 2, "transpose cols"
+assert_eq $tr->[0]->[1], 4, "tr[0][1]"
+assert_eq $tr->[2]->[0], 3, "tr[2][0]"
+
+test_run

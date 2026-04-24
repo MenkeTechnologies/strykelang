@@ -14,14 +14,19 @@ fn p_quicksort {
     
     # For very small arrays, just recurse sequentially
     if ($len < 50) {
-        return (p_quicksort(\@left), $pivot, p_quicksort(\@right))
+        my @l = p_quicksort(\@left)
+        my @r = p_quicksort(\@right)
+        return (@l, $pivot, @r)
     }
     
     # For larger arrays, spawn parallel tasks
-    my $t1 = spawn { p_quicksort(\@left) }
-    my $t2 = spawn { p_quicksort(\@right) }
+    my $t1 = spawn { [p_quicksort(\@left)] }
+    my $t2 = spawn { [p_quicksort(\@right)] }
     
-    return (await($t1), $pivot, await($t2))
+    my $l_ref = await($t1)
+    my $r_ref = await($t2)
+    
+    return (@$l_ref, $pivot, @$r_ref)
 }
 
 # Test with a randomized list

@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compound Duration
+
+fn my_format_duration($seconds) {
+    my $s = $seconds
+    my $d = int($s / 86400)
+    $s = $s % 86400
+    my $h = int($s / 3600)
+    $s = $s % 3600
+    my $m = int($s / 60)
+    $s = $s % 60
+    
+    my @parts
+    if ($d > 0) { push @parts, "$d d" }
+    if ($h > 0) { push @parts, "$h hr" }
+    if ($m > 0) { push @parts, "$m min" }
+    if ($s > 0) { push @parts, "$s sec" }
+    
+    if (scalar(@parts) == 0) { return "0 sec" }
+    join(", ", @parts)
+}
+
+assert_eq my_format_duration(7259), "2 hr, 59 sec", "duration 7259s"
+assert_eq my_format_duration(86400 + 3600 + 60 + 1), "1 d, 1 hr, 1 min, 1 sec", "all units"
+
+# Builtin check (if signature is similar)
+assert_ok length(format_duration(3600)) > 0, "builtin format_duration"
+
+test_run

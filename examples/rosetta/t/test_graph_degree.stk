@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Node Degree
+
+fn get_degree($adj, $node) {
+    if (!exists $adj->{$node}) { return 0 }
+    scalar(@{$adj->{$node}})
+}
+
+my $graph = {
+    A => ["B", "C"],
+    B => ["A", "C", "D"],
+    C => ["A", "B"],
+    D => ["B"]
+}
+
+assert_eq get_degree($graph, "A"), 2, "degree of A"
+assert_eq get_degree($graph, "B"), 3, "degree of B"
+assert_eq get_degree($graph, "D"), 1, "degree of D"
+assert_eq get_degree($graph, "E"), 0, "degree of missing E"
+
+test_run

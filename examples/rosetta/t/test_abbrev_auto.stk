@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abbreviation, automatic
+
+fn min_abbrev_len($word, $list) {
+    for my $l (1..length($word)) {
+        my $sub = substr($word, 0, $l)
+        my $count = 0
+        for my $w (@$list) {
+            if (substr($w, 0, $l) eq $sub) {
+                $count = $count + 1
+            }
+        }
+        if ($count == 1) { return $l }
+    }
+    length($word)
+}
+
+fn solve_abbrev($list) {
+    my @res
+    for my $w (@$list) {
+        push @res, min_abbrev_len($w, $list)
+    }
+    \@res
+}
+
+my @input = ("apple", "apply", "ape", "april")
+my $res = solve_abbrev(\@input)
+
+# apple -> appl (4) vs apply (appl)
+# apple -> apple (5)
+# apply -> apply (5)
+# ape -> ape (3) vs apple/apply/april (ap)
+# april -> apr (3) vs apple/apply/ape (ap)
+
+assert_eq $res->[2], 3, "ape min abbrev len"
+assert_eq $res->[3], 3, "april min abbrev len"
+
+test_run

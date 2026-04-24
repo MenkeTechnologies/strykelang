@@ -719,7 +719,7 @@ pub struct Interpreter {
     /// Persistent storage for `state` variables, keyed by "line:name".
     pub(crate) state_vars: HashMap<String, PerlValue>,
     /// Per-frame tracking of state variable bindings: (var_name, state_key).
-    state_bindings_stack: Vec<Vec<(String, String)>>,
+    pub(crate) state_bindings_stack: Vec<Vec<(String, String)>>,
     /// PRNG for `rand` / `srand` (matches Perl-style seeding, not crypto).
     pub(crate) rand_rng: StdRng,
     /// Directory handles from `opendir`: name → snapshot + read cursor (`readdir` / `rewinddir` / …).
@@ -8532,11 +8532,15 @@ impl Interpreter {
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_var(name, line)?;
                     let aname = self.stash_array_name_for_package(name);
-                    Ok(PerlValue::array_binding_ref(aname))
+                    // Snapshot array data so ref survives scope pop
+                    let data = self.scope.get_array(&aname);
+                    Ok(PerlValue::array_ref(Arc::new(RwLock::new(data))))
                 }
                 ExprKind::HashVar(name) => {
                     self.check_strict_hash_var(name, line)?;
-                    Ok(PerlValue::hash_binding_ref(name.clone()))
+                    // Snapshot hash data so ref survives scope pop
+                    let data = self.scope.get_hash(name);
+                    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(data))))
                 }
                 ExprKind::Deref {
                     expr: e,
@@ -8678,7 +8682,13 @@ impl Interpreter {
                             for a in arg_exprs {
                                 args.push(self.eval_expr(a)?);
                             }
-                            if let Some(sub) = val.as_code_ref() {
+                            // Auto-deref ScalarRef for closure self-reference: $f->()
+                            let callable = if let Some(inner) = val.as_scalar_ref() {
+                                inner.read().clone()
+                            } else {
+                                val
+                            };
+                            if let Some(sub) = callable.as_code_ref() {
                                 return self.call_sub(&sub, args, ctx, line);
                             }
                             Err(PerlError::runtime("Not a code reference", line).into())

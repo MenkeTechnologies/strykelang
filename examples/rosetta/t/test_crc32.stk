@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: CRC-32
+
+# Test the builtin crc32
+my $s = "123456789"
+my $res = crc32($s)
+
+# Expected CRC-32 for "123456789" is 0xCBF43926 => 3421780262
+assert_eq $res, 3421780262, "CRC-32 of 123456789"
+
+assert_eq crc32(""), 0, "CRC-32 of empty string"
+
+test_run

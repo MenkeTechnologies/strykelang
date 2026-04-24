@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Best Shuffle
+
+fn best_shuffle($str) {
+    my @a = $str |> chars
+    my @b = $str |> chars
+    my $len = scalar(@a)
+    
+    for my $i (0..$len-1) {
+        for my $j (0..$len-1) {
+            if ($a[$i] ne $b[$j] && $a[$j] ne $b[$i]) {
+                my $tmp = $b[$i]
+                $b[$i] = $b[$j]
+                $b[$j] = $tmp
+            }
+        }
+    }
+    join("", @b)
+}
+
+fn count_matches($s1, $s2) {
+    my @a = $s1 |> chars
+    my @b = $s2 |> chars
+    my $m = 0
+    for my $i (0..scalar(@a)-1) {
+        if ($a[$i] eq $b[$i]) { $m = $m + 1 }
+    }
+    $m
+}
+
+my @inputs = ("abracadabra", "seesaw", "elk", "grrit")
+for my $s (@inputs) {
+    my $shuf = best_shuffle($s)
+    # The best shuffle match count is usually 0 if possible
+    # For "seesaw", it's 0. For "abracadabra", it's 0.
+    # We just check if length matches and we minimized matches (not easy to assert absolute best, but we can check if it's reasonable)
+    assert_eq length($shuf), length($s), "shuffle length match: $s"
+}
+
+# Specific check for "seesaw"
+assert_eq count_matches("seesaw", best_shuffle("seesaw")), 0, "seesaw matches 0"
+
+test_run

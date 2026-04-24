@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Base64 decode
+
+fn my_base64_decode($str) {
+    my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    my %vals
+    my @alpha_chars = $alphabet |> chars
+    for my $i (0..63) { $vals{$alpha_chars[$i]} = $i }
+    
+    my @chars = $str |> chars
+    my @res
+    my $i = 0
+    my $len = scalar(@chars)
+    while ($i < $len) {
+        if ($chars[$i] eq "=") { last }
+        
+        my $v1 = $vals{$chars[$i]}
+        my $v2 = $vals{$chars[$i+1]}
+        my $v3 = ($chars[$i+2] eq "=") ? 0 : $vals{$chars[$i+2]}
+        my $v4 = ($chars[$i+3] eq "=") ? 0 : $vals{$chars[$i+3]}
+        
+        my $n = ($v1 << 18) | ($v2 << 12) | ($v3 << 6) | $v4
+        
+        push @res, chr(($n >> 16) & 255)
+        if ($chars[$i+2] ne "=") { push @res, chr(($n >> 8) & 255) }
+        if ($chars[$i+3] ne "=") { push @res, chr($n & 255) }
+        
+        $i = $i + 4
+    }
+    join("", @res)
+}
+
+assert_eq my_base64_decode("Zg=="), "f", "decode 'f'"
+assert_eq my_base64_decode("Zm8="), "fo", "decode 'fo'"
+assert_eq my_base64_decode("Zm9v"), "foo", "decode 'foo'"
+assert_eq my_base64_decode("Zm9vYmFy"), "foobar", "decode 'foobar'"
+
+test_run

@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Birthday Problem
+
+fn birthday_prob($n) {
+    my $p = 1.0
+    for my $i (0..$n-1) {
+        $p = $p * (365 - $i) / 365
+    }
+    1 - $p
+}
+
+my $p23 = birthday_prob(23)
+assert_ok abs($p23 - 0.507397) < 0.0001, "prob(23) approx 0.507"
+
+my $p50 = birthday_prob(50)
+assert_ok abs($p50 - 0.970374) < 0.0001, "prob(50) approx 0.970"
+
+test_run

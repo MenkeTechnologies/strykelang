@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Permutations - Derangements
+
+fn my_perms {
+    my @list = @_
+    if (scalar(@list) == 0) { return [\@list] }
+    if (scalar(@list) == 1) { return [\@list] }
+    my @res
+    for my $i (0..scalar(@list)-1) {
+        my @rest = @list
+        my $item = splice(@rest, $i, 1)
+        my $sub_ref = my_perms(@rest)
+        for my $s (@$sub_ref) {
+            my @c = ($item, @$s)
+            push @res, \@c
+        }
+    }
+    \@res
+}
+
+fn my_derangements($n) {
+    my @items = (0..$n-1)
+    my $all = my_perms(@items)
+    my @res
+    for my $p (@$all) {
+        my $ok = 1
+        for my $i (0..$n-1) {
+            if ($p->[$i] == $i) { $ok = 0; last }
+        }
+        if ($ok) { push @res, $p }
+    }
+    \@res
+}
+
+my $d3 = my_derangements(3)
+assert_eq scalar(@$d3), 2, "derangements(3) count"
+
+my $d4 = my_derangements(4)
+assert_eq scalar(@$d4), 9, "derangements(4) count"
+
+test_run

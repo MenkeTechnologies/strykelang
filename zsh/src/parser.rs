@@ -1313,6 +1313,33 @@ impl<'a> ShellParser<'a> {
                 match c {
                     '\'' => in_single_quote = true,
                     '"' => in_double_quote = true,
+                    '$' if chars.peek() == Some(&'(') => {
+                        // Command substitution $(...)  — flush current, collect balanced parens
+                        if !current.is_empty() {
+                            elements.push(ShellWord::Literal(current.clone()));
+                            current.clear();
+                        }
+                        chars.next(); // consume '('
+                        let mut depth = 1;
+                        let mut cmd = String::new();
+                        while let Some(ch) = chars.next() {
+                            if ch == '(' { depth += 1; }
+                            if ch == ')' { depth -= 1; if depth == 0 { break; } }
+                            cmd.push(ch);
+                        }
+                        // Parse the command substitution content into an AST
+                        let mut sub_parser = ShellParser::new(&cmd);
+                        if let Ok(cmds) = sub_parser.parse_script() {
+                            if cmds.len() == 1 {
+                                elements.push(ShellWord::CommandSub(Box::new(cmds.into_iter().next().unwrap())));
+                            } else if !cmds.is_empty() {
+                                // Multiple commands — wrap in a brace group
+                                elements.push(ShellWord::CommandSub(Box::new(
+                                    ShellCommand::Compound(CompoundCommand::BraceGroup(cmds))
+                                )));
+                            }
+                        }
+                    }
                     ' ' | '\t' | '\n' => {
                         if !current.is_empty() {
                             elements.push(ShellWord::Literal(current.clone()));

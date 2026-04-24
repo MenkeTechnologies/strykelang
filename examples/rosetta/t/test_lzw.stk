@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: LZW Compression
+
+fn my_lzw_encode($text) {
+    my %dict
+    for my $i (0..255) { $dict{chr($i)} = $i }
+    
+    my @chars = $text |> chars
+    my @result
+    my $w = ""
+    my $dict_size = 256
+    
+    for my $c (@chars) {
+        my $wc = $w . $c
+        if (exists $dict{$wc}) {
+            $w = $wc
+        } else {
+            push @result, $dict{$w}
+            $dict{$wc} = $dict_size
+            $dict_size = $dict_size + 1
+            $w = $c
+        }
+    }
+    if ($w ne "") { push @result, $dict{$w} }
+    \@result
+}
+
+fn my_lzw_decode($codes_ref) {
+    my @codes = @$codes_ref
+    my %dict
+    for my $i (0..255) { $dict{$i} = chr($i) }
+    
+    my $dict_size = 256
+    my $w = $dict{shift @codes}
+    my $result = $w
+    
+    for my $k (@codes) {
+        my $entry = ""
+        if (exists $dict{$k}) {
+            $entry = $dict{$k}
+        } elsif ($k == $dict_size) {
+            $entry = $w . substr($w, 0, 1)
+        }
+        
+        $result = $result . $entry
+        $dict{$dict_size} = $w . substr($entry, 0, 1)
+        $dict_size = $dict_size + 1
+        $w = $entry
+    }
+    $result
+}
+
+my $input = "TOBEORNOTTOBEORTOBEORNOT"
+my $encoded = my_lzw_encode($input)
+assert_eq join(",", @$encoded), "84,79,66,69,79,82,78,79,84,256,258,260,265,259,261,263", "LZW encode"
+
+my $decoded = my_lzw_decode($encoded)
+assert_eq $decoded, $input, "LZW decode"
+
+test_run

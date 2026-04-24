@@ -15,13 +15,11 @@
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 
 /// Guards that must live for the duration of the process.
 /// Dropping any of these flushes and stops the associated writer.
 struct Guards {
-    _file: WorkerGuard,
     #[cfg(feature = "profiling")]
     _chrome: tracing_chrome::FlushGuard,
     #[cfg(feature = "flamegraph")]
@@ -54,13 +52,25 @@ pub fn init() {
         let pid = std::process::id();
 
         // --- File log layer (always on) ---
-        let file_appender = tracing_appender::rolling::never(&dir, "zshrs.log");
-        let (non_blocking, file_guard) = tracing_appender::non_blocking(file_appender);
+        // Use a blocking Mutex<File> writer — log writes are microseconds and this
+        // guarantees data reaches disk even when std::process::exit() skips destructors.
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(dir.join("zshrs.log"))
+            .unwrap_or_else(|_| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/zshrs.log")
+                    .expect("cannot open any log file")
+            });
+        let log_writer = std::sync::Mutex::new(log_file);
 
         let env_filter = std::env::var("ZSHRS_LOG").unwrap_or_else(|_| "info".to_string());
 
         let file_layer = tracing_subscriber::fmt::layer()
-            .with_writer(non_blocking)
+            .with_writer(log_writer)
             .with_ansi(false)
             .with_target(true)
             .with_thread_names(true)
@@ -115,13 +125,21 @@ pub fn init() {
         let _ = tracing::subscriber::set_global_default(subscriber);
 
         Guards {
-            _file: file_guard,
             #[cfg(feature = "profiling")]
             _chrome: chrome_guard,
             #[cfg(feature = "flamegraph")]
             _flame: flame_guard,
         }
     });
+}
+
+/// Flush all log writers. Call before std::process::exit() to ensure
+/// buffered log data reaches disk — exit() doesn't run destructors.
+pub fn flush() {
+    // The WorkerGuard flushes on drop, but we can't drop a static.
+    // Instead, give the non-blocking writer time to drain its buffer.
+    // 50ms is more than enough for any reasonable log volume.
+    std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
 /// Convenience: check if profiling features are compiled in

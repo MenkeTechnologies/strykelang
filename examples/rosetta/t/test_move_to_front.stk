@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Move-to-front transform
+
+fn mtf_encode($str) {
+    my @alpha = ("a" .. "z")
+    my @res
+    my @chars = $str |> chars
+    for my $c (@chars) {
+        my $idx = 0
+        for my $i (0..scalar(@alpha)-1) {
+            if ($alpha[$i] eq $c) { $idx = $i; last }
+        }
+        push @res, $idx
+        my $val = splice(@alpha, $idx, 1)
+        unshift @alpha, $val
+    }
+    \@res
+}
+
+fn mtf_decode($codes_ref) {
+    my @alpha = ("a" .. "z")
+    my @codes = @$codes_ref
+    my $res = ""
+    for my $idx (@codes) {
+        my $c = $alpha[$idx]
+        $res = $res . $c
+        my $val = splice(@alpha, $idx, 1)
+        unshift @alpha, $val
+    }
+    $res
+}
+
+my $input = "brood"
+my $encoded = mtf_encode($input)
+# brood ->
+# b is 1 -> res (1), alpha (b a c d ...)
+# r is 17 -> res (1, 17), alpha (r b a c ...)
+# o is 16? no wait.
+assert_eq join(",", @$encoded), "1,17,15,0,5", "mtf_encode 'brood'"
+
+my $decoded = mtf_decode($encoded)
+assert_eq $decoded, $input, "mtf_decode 'brood'"
+
+test_run

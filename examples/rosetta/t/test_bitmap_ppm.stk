@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitmap/Read a PPM file
+
+fn parse_ppm($str) {
+    my @tokens
+    for my $line (split("\n", $str)) {
+        next if $line =~ /^#/
+        for my $t (split(" ", $line)) {
+            if ($t ne "") { push @tokens, $t }
+        }
+    }
+    
+    my $magic = shift @tokens
+    my $w = int(shift @tokens)
+    my $h = int(shift @tokens)
+    my $max = int(shift @tokens)
+    
+    my @pixels
+    for my $i (1..$h) {
+        my @row
+        for my $j (1..$w) {
+            my $r = shift @tokens
+            my $g = shift @tokens
+            my $b = shift @tokens
+            push @row, { r => int($r), g => int($g), b => int($b) }
+        }
+        push @pixels, \@row
+    }
+    \@pixels
+}
+
+my $ppm = "P3\n# comment\n2 2\n255\n255 0 0 0 255 0\n0 0 255 255 255 255\n"
+my $img = parse_ppm($ppm)
+
+assert_eq scalar(@$img), 2, "img height"
+assert_eq scalar(@{$img->[0]}), 2, "img width"
+assert_eq $img->[0]->[0]->{r}, 255, "pixel 0,0 red"
+assert_eq $img->[0]->[1]->{g}, 255, "pixel 0,1 green"
+assert_eq $img->[1]->[0]->{b}, 255, "pixel 1,0 blue"
+
+test_run

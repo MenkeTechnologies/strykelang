@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sleep Sort
+
+fn sleep_sort($list) {
+    mysync @res
+    my @tasks
+    for my $v (@$list) {
+        push @tasks, spawn {
+            sleep($v * 0.05)
+            push @res, $v
+        }
+    }
+    for my $t (@tasks) { await($t) }
+    \@res
+}
+
+my @input = (3, 1, 4, 2)
+my $sorted = sleep_sort(\@input)
+assert_eq join(",", @$sorted), "1,2,3,4", "sleep sort"
+
+test_run

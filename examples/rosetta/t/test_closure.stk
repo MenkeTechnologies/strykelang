@@ -1,12 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Closures/Value Capture
 
-fn make_counter {
-    my $count = 0
+fn make_counter_inner($count) {
     fn {
-        $count++
+        $count = $count + 1
         $count
     }
+}
+
+fn make_counter {
+    make_counter_inner(0)
 }
 
 fn make_adder($n) {

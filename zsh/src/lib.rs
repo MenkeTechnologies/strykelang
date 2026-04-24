@@ -19,8 +19,10 @@
 #![allow(deprecated)]
 #![allow(unexpected_cfgs)]
 
+pub mod ast_opt;
 pub mod attr;
 pub mod cap;
+pub mod compiler;
 pub mod clone;
 pub mod compat;
 pub mod completion;
@@ -92,6 +94,7 @@ pub mod zle;
 pub mod zprof;
 pub mod zpty;
 pub mod zselect;
+pub mod shell_compiler;
 pub mod worker;
 pub mod zutil;
 pub mod zwc;

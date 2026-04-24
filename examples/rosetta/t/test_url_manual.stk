@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL Encoding/Decoding (Manual)
+
+fn my_url_encode($str) {
+    my @chars = $str |> chars
+    my $res = ""
+    for my $c (@chars) {
+        if ($c =~ /[a-zA-Z0-9._~-]/) {
+            $res = $res . $c
+        } else {
+            $res = $res . sprintf("%%%02X", ord($c))
+        }
+    }
+    $res
+}
+
+fn my_url_decode($str) {
+    my $res = ""
+    my $i = 0
+    my $len = length($str)
+    while ($i < $len) {
+        my $c = substr($str, $i, 1)
+        if ($c eq "%") {
+            my $h = substr($str, $i + 1, 2)
+            $res = $res . chr(hex($h))
+            $i = $i + 3
+        } else {
+            $res = $res . $c
+            $i = $i + 1
+        }
+    }
+    $res
+}
+
+my $input = "http://rosettacode.org/wiki/URL_encoding"
+my $encoded = my_url_encode($input)
+assert_eq $encoded, "http%3A%2F%2Frosettacode.org%2Fwiki%2FURL_encoding", "manual url encode"
+
+my $decoded = my_url_decode($encoded)
+assert_eq $decoded, $input, "manual url decode"
+
+test_run

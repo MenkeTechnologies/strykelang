@@ -54,6 +54,16 @@ pub enum Op {
     /// `frozen typed my $x : Type` — immutable after initialization + type-checked.
     DeclareScalarTypedFrozen(u16, u8),
 
+    // ── State variables (persist across calls) ──
+    /// `state $x = EXPR` — pop TOS as initializer on first call only.
+    /// On subsequent calls the persisted value is used as the local binding.
+    /// Key: (sub entry IP, name_idx) in VM's state_vars table.
+    DeclareStateScalar(u16),
+    /// `state @arr = (...)` — array variant.
+    DeclareStateArray(u16),
+    /// `state %hash = (...)` — hash variant.
+    DeclareStateHash(u16),
+
     // ── Arrays ──
     GetArray(u16),
     SetArray(u16),

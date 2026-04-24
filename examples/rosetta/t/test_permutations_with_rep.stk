@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Permutations with repetitions
+
+fn perms_with_rep($list, $k) {
+    if ($k == 0) {
+        return [[]]
+    }
+    my @res
+    my $sub = perms_with_rep($list, $k - 1)
+    for my $item (@$list) {
+        for my $s (@$sub) {
+            my @c = ($item, @$s)
+            push @res, \@c
+        }
+    }
+    \@res
+}
+
+my @input = (1, 2)
+my $res = perms_with_rep(\@input, 2)
+
+# Expected: (1,1), (1,2), (2,1), (2,2)
+assert_eq scalar(@$res), 4, "perms with rep count"
+assert_eq join(",", @{$res->[0]}), "1,1", "perms with rep[0]"
+assert_eq join(",", @{$res->[1]}), "1,2", "perms with rep[1]"
+assert_eq join(",", @{$res->[2]}), "2,1", "perms with rep[2]"
+assert_eq join(",", @{$res->[3]}), "2,2", "perms with rep[3]"
+
+test_run

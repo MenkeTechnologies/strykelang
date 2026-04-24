@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-transitive Dice
+
+fn win_prob($d1, $d2) {
+    my $wins = 0
+    my $total = 0
+    for my $v1 (@$d1) {
+        for my $v2 (@$d2) {
+            if ($v1 > $v2) { $wins = $wins + 1 }
+            $total = $total + 1
+        }
+    }
+    $wins / $total
+}
+
+my $A = [4, 4, 4, 4, 0, 0]
+my $B = [3, 3, 3, 3, 3, 3]
+my $C = [6, 6, 2, 2, 2, 2]
+my $D = [5, 5, 5, 1, 1, 1]
+
+# P(A>B) = 4*6 / 36 = 24/36 = 2/3
+assert_eq win_prob($A, $B), 2/3, "P(A>B)"
+
+# P(B>C) = 6*4 / 36 = 24/36 = 2/3
+assert_eq win_prob($B, $C), 2/3, "P(B>C)"
+
+# P(C>D) = 2*6 + 4*3 / 36 = 24/36 = 2/3
+assert_eq win_prob($C, $D), 2/3, "P(C>D)"
+
+# P(D>A) = 3*6 + 3*2 / 36 = 24/36 = 2/3
+assert_eq win_prob($D, $A), 2/3, "P(D>A)"
+
+test_run

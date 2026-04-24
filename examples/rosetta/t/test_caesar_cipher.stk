@@ -2,11 +2,18 @@
 # Rosetta Code: Caesar Cipher
 
 fn caesar_encode($str, $shift) {
-    ~> $str >{split //, $_} map {
-        $_ =~ /[A-Z]/ ? chr((ord($_) - 65 + $shift) % 26 + 65)
-      : $_ =~ /[a-z]/ ? chr((ord($_) - 97 + $shift) % 26 + 97)
-      : $_
-    } |> join ""
+    my @res
+    my @chars = $str |> chars
+    for my $c (@chars) {
+        if ($c =~ /[A-Z]/) {
+            push @res, chr((ord($c) - 65 + $shift) % 26 + 65)
+        } elsif ($c =~ /[a-z]/) {
+            push @res, chr((ord($c) - 97 + $shift) % 26 + 97)
+        } else {
+            push @res, $c
+        }
+    }
+    join("", @res)
 }
 
 fn my_rot13($str) {

@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.8.12"
+version = "0.8.14"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -146,8 +146,8 @@ lsp-types = "0.97.0"
 unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-compsys = { path = "compsys", version = "0.8.12" }
-zsh = { path = "zsh", version = "0.8.12" }
+compsys = { path = "compsys", version = "0.8.14" }
+zsh = { path = "zsh", version = "0.8.14" }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
@@ -189,10 +189,10 @@ opt-level = 1
 regex = "1.11"
 
 [workspace]
-members = [".", "compsys", "zsh"]
+members = [".", "compsys", "fusevm", "zsh"]
 
 [workspace.package]
-version = "0.8.12"
+version = "0.8.14"
 edition = "2021"
 license = "MIT"
 authors = ["MenkeTechnologies"]

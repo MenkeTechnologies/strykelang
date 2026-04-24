@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Betrothed Numbers
+
+fn find_betrothed($limit) {
+    my @res
+    for my $a (1..$limit) {
+        my $s = sum_divisors($a)
+        if ($s > 1) {
+            my $b = $s - 1
+            if ($b > $a) {
+                if (sum_divisors($b) == $a + 1) {
+                    push @res, [$a, $b]
+                }
+            }
+        }
+    }
+    \@res
+}
+
+my $pairs = find_betrothed(1000)
+# First pair is (48, 75)
+assert_eq $pairs->[0]->[0], 48, "first betrothed a"
+assert_eq $pairs->[0]->[1], 75, "first betrothed b"
+
+# Second pair is (140, 195)
+assert_eq $pairs->[1]->[0], 140, "second betrothed a"
+assert_eq $pairs->[1]->[1], 195, "second betrothed b"
+
+test_run

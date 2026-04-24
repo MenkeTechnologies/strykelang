@@ -258,6 +258,34 @@ static ZSH_OPTIONS_SET: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     .collect()
 });
 
+/// O(1) builtin lookup — replaces the 130+ arm matches! macro in is_builtin()
+static BUILTIN_SET: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    [
+        "cd", "chdir", "pwd", "echo", "export", "unset", "source", "exit",
+        "return", "bye", "logout", "log", "true", "false", "test", "local",
+        "declare", "typeset", "read", "shift", "eval", "jobs", "fg", "bg",
+        "kill", "disown", "wait", "autoload", "history", "fc", "trap",
+        "suspend", "alias", "unalias", "set", "shopt", "setopt", "unsetopt",
+        "getopts", "type", "hash", "command", "builtin", "let", "pushd",
+        "popd", "dirs", "printf", "break", "continue", "disable", "enable",
+        "emulate", "exec", "float", "integer", "functions", "print", "whence",
+        "where", "which", "ulimit", "limit", "unlimit", "umask", "rehash",
+        "unhash", "times", "zmodload", "r", "ttyctl", "noglob", "zstat",
+        "stat", "strftime", "zsleep", "zln", "zmv", "zcp", "coproc",
+        "zparseopts", "readonly", "unfunction", "getln", "pushln", "bindkey",
+        "zle", "sched", "zformat", "zcompile", "vared", "echotc", "echoti",
+        "zpty", "zprof", "zsocket", "ztcp", "zregexparse", "clone",
+        "comparguments", "compcall", "compctl", "compdef", "compdescribe",
+        "compfiles", "compgroups", "compinit", "compquote", "comptags",
+        "comptry", "compvalues", "cdreplay", "cap", "getcap", "setcap",
+        "zftp", "zcurses", "sysread", "syswrite", "syserror", "sysopen",
+        "sysseek", "private", "zgetattr", "zsetattr", "zdelattr", "zlistattr",
+        "[", ".", ":", "compgen", "complete",
+    ]
+    .into_iter()
+    .collect()
+});
+
 /// Convert float to hex representation (%a/%A format)
 fn float_to_hex(val: f64, uppercase: bool) -> String {
     if val.is_nan() {
@@ -1323,19 +1351,22 @@ impl ShellExecutor {
             .map_err(|e| format!("{}: {}", file_path, e))?;
         let expanded = self.expand_history(&content);
         let mut parser = ShellParser::new(&expanded);
-        let commands = parser.parse_script()?;
+        let mut commands = parser.parse_script()?;
         tracing::debug!(
             path = file_path,
             cmds = commands.len(),
             "execute_script_file: AST cache miss, parsed from source"
         );
 
+        // Optimize AST before execution and caching — constant folding, literal merging
+        crate::ast_opt::optimize(&mut commands);
+
         // Execute
         for cmd in &commands {
             self.execute_command(cmd)?;
         }
 
-        // Async-store the AST in SQLite
+        // Async-store the optimized AST in SQLite
         if let Some((mt_s, mt_ns)) = mtime {
             if let Ok(ast_bytes) = bincode::serialize(&commands) {
                 let store_path = file_path.to_string();
@@ -4648,6 +4679,16 @@ impl ShellExecutor {
                 }
                 Err(_) => vec![pattern.clone()],
             },
+            ShellWord::CommandSub(_) => {
+                // Command substitution results must be word-split for array context
+                let val = self.expand_word(word);
+                self.split_words(&val)
+            }
+            ShellWord::Concat(parts) => {
+                // Concat in split context — expand and split the result
+                let val = self.expand_concat_parallel(parts);
+                self.split_words(&val)
+            }
             _ => vec![self.expand_word(word)],
         }
     }
@@ -8849,6 +8890,16 @@ impl ShellExecutor {
                 if is_export {
                     env::set_var(&arg, "");
                 }
+            }
+
+            // Apply readonly flag — must come after the variable is set
+            if is_readonly {
+                let name = if let Some(eq_pos) = arg.find('=') {
+                    arg[..eq_pos].to_string()
+                } else {
+                    arg.clone()
+                };
+                self.readonly_vars.insert(name);
             }
         }
         0
@@ -14829,140 +14880,18 @@ impl ShellExecutor {
     }
 
     /// Helper to check if name is a builtin
+    /// O(1) builtin check via static HashSet — replaces 130+ arm linear match
     fn is_builtin(&self, name: &str) -> bool {
-        matches!(
-            name,
-            "cd" | "chdir"
-                | "pwd"
-                | "echo"
-                | "export"
-                | "unset"
-                | "source"
-                | "exit"
-                | "return"
-                | "bye"
-                | "logout"
-                | "log"
-                | "true"
-                | "false"
-                | "test"
-                | "local"
-                | "declare"
-                | "typeset"
-                | "read"
-                | "shift"
-                | "eval"
-                | "jobs"
-                | "fg"
-                | "bg"
-                | "kill"
-                | "disown"
-                | "wait"
-                | "autoload"
-                | "history"
-                | "fc"
-                | "trap"
-                | "suspend"
-                | "alias"
-                | "unalias"
-                | "set"
-                | "shopt"
-                | "setopt"
-                | "unsetopt"
-                | "getopts"
-                | "type"
-                | "hash"
-                | "command"
-                | "builtin"
-                | "let"
-                | "pushd"
-                | "popd"
-                | "dirs"
-                | "printf"
-                | "break"
-                | "continue"
-                | "disable"
-                | "enable"
-                | "emulate"
-                | "exec"
-                | "float"
-                | "integer"
-                | "functions"
-                | "print"
-                | "whence"
-                | "where"
-                | "which"
-                | "ulimit"
-                | "limit"
-                | "unlimit"
-                | "umask"
-                | "rehash"
-                | "unhash"
-                | "times"
-                | "zmodload"
-                | "r"
-                | "ttyctl"
-                | "noglob"
-                | "zstat"
-                | "stat"
-                | "strftime"
-                | "zsleep"
-                | "zln"
-                | "zmv"
-                | "zcp"
-                | "coproc"
-                | "zparseopts"
-                | "readonly"
-                | "unfunction"
-                | "getln"
-                | "pushln"
-                | "bindkey"
-                | "zle"
-                | "sched"
-                | "zformat"
-                | "zcompile"
-                | "vared"
-                | "echotc"
-                | "echoti"
-                | "zpty"
-                | "zprof"
-                | "zsocket"
-                | "ztcp"
-                | "zregexparse"
-                | "clone"
-                | "comparguments"
-                | "compcall"
-                | "compctl"
-                | "compdef"
-                | "compdescribe"
-                | "compfiles"
-                | "compgroups"
-                | "compinit"
-                | "compquote"
-                | "comptags"
-                | "comptry"
-                | "compvalues"
-                | "cdreplay"
-                | "cap"
-                | "getcap"
-                | "setcap"
-                | "zftp"
-                | "zcurses"
-                | "sysread"
-                | "syswrite"
-                | "syserror"
-                | "sysopen"
-                | "sysseek"
-                | "private"
-                | "zgetattr"
-                | "zsetattr"
-                | "zdelattr"
-                | "zlistattr"
-        ) || name.starts_with('_')
+        BUILTIN_SET.contains(name) || name.starts_with('_')
     }
 
-    /// Helper to find command in PATH
+    /// Helper to find command in PATH — checks command_hash first for O(1) hit
     fn find_in_path(&self, name: &str) -> Option<String> {
+        // O(1) hash table lookup from rehash
+        if let Some(path) = self.command_hash.get(name) {
+            return Some(path.clone());
+        }
+        // Fallback: linear PATH walk
         let path_var = env::var("PATH").unwrap_or_default();
         for dir in path_var.split(':') {
             let full_path = format!("{}/{}", dir, name);
@@ -19110,8 +19039,7 @@ impl ShellExecutor {
 
     /// Check if name is a builtin (process control version)
     fn is_builtin_cmd(&self, name: &str) -> bool {
-        let builtins = Self::get_builtin_names();
-        builtins.contains(&name)
+        BUILTIN_SET.contains(name)
     }
 
     /// Close all file descriptors except stdin/stdout/stderr

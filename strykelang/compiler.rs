@@ -1537,6 +1537,54 @@ impl Compiler {
         Ok(())
     }
 
+    fn compile_state_declarations(
+        &mut self,
+        decls: &[VarDecl],
+        line: usize,
+    ) -> Result<(), CompileError> {
+        for decl in decls {
+            match decl.sigil {
+                Sigil::Scalar => {
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr(init)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    let name_idx = self.chunk.intern_name(&decl.name);
+                    let name = self.chunk.names[name_idx as usize].clone();
+                    self.register_declare(Sigil::Scalar, &name, false);
+                    self.chunk.emit(Op::DeclareStateScalar(name_idx), line);
+                }
+                Sigil::Array => {
+                    let name_idx = self
+                        .chunk
+                        .intern_name(&self.qualify_stash_array_name(&decl.name));
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    self.chunk.emit(Op::DeclareStateArray(name_idx), line);
+                }
+                Sigil::Hash => {
+                    let name_idx = self.chunk.intern_name(&decl.name);
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    self.chunk.emit(Op::DeclareStateHash(name_idx), line);
+                }
+                Sigil::Typeglob => {
+                    return Err(CompileError::Unsupported(
+                        "state *GLOB (use tree interpreter)".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn compile_local_declarations(
         &mut self,
         decls: &[VarDecl],
@@ -1839,7 +1887,7 @@ impl Compiler {
             StmtKind::MySync(decls) => self.compile_mysync_declarations(decls, line)?,
             StmtKind::My(decls) => self.compile_var_declarations(decls, line, true)?,
             StmtKind::Our(decls) => self.compile_var_declarations(decls, line, false)?,
-            StmtKind::State(_) => return Err(CompileError::Unsupported("state".to_string())),
+            StmtKind::State(decls) => self.compile_state_declarations(decls, line)?,
             StmtKind::If {
                 condition,
                 body,
@@ -2853,19 +2901,34 @@ impl Compiler {
                 }
             }
             ExprKind::HashSlice { hash, keys } => {
-                if keys.iter().any(hash_slice_key_expr_is_multi_key) {
-                    return Err(CompileError::Unsupported(
-                        "named hash slice with multi-key subscript (range / qw / list) \
-                         falls back to the tree walker so keys flatten correctly"
-                            .into(),
-                    ));
-                }
                 let hash_idx = self.chunk.intern_name(hash);
+                // Flatten multi-key subscripts (qw, lists) into individual GetHashElem ops
+                let mut total_keys = 0u16;
                 for key_expr in keys {
-                    self.compile_expr(key_expr)?;
-                    self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                    match &key_expr.kind {
+                        ExprKind::QW(words) => {
+                            for w in words {
+                                let cidx = self.chunk.add_constant(PerlValue::string(w.clone()));
+                                self.emit_op(Op::LoadConst(cidx), line, Some(root));
+                                self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                total_keys += 1;
+                            }
+                        }
+                        ExprKind::List(elems) => {
+                            for e in elems {
+                                self.compile_expr(e)?;
+                                self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                total_keys += 1;
+                            }
+                        }
+                        _ => {
+                            self.compile_expr(key_expr)?;
+                            self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                            total_keys += 1;
+                        }
+                    }
                 }
-                self.emit_op(Op::MakeArray(keys.len() as u16), line, Some(root));
+                self.emit_op(Op::MakeArray(total_keys), line, Some(root));
             }
             ExprKind::HashSliceDeref { container, keys } => {
                 self.compile_expr(container)?;
@@ -3791,46 +3854,74 @@ impl Compiler {
                         }
                     }
                     if *op == BinOp::DefinedOr {
-                        // `$x //=` — short-circuit when LHS is defined (see `ExprKind::CompoundAssign` in interpreter).
-                        self.emit_get_scalar(idx, line, Some(root));
-                        let j_def = self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
-                        self.compile_expr(value)?;
-                        self.emit_set_scalar_keep(idx, line, Some(root));
-                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
-                        self.chunk.patch_jump_here(j_def);
-                        self.chunk.patch_jump_here(j_end);
+                        // `$x //=` — short-circuit when LHS is defined.
+                        // Slot-aware: use GetScalarSlot/SetScalarSlot if available.
+                        if let Some(slot) = self.scalar_slot(name) {
+                            self.emit_op(Op::GetScalarSlot(slot), line, Some(root));
+                            let j_def = self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SetScalarSlot(slot), line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_def);
+                            self.chunk.patch_jump_here(j_end);
+                        } else {
+                            self.emit_get_scalar(idx, line, Some(root));
+                            let j_def = self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_set_scalar_keep(idx, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_def);
+                            self.chunk.patch_jump_here(j_end);
+                        }
                         return Ok(());
                     }
                     if *op == BinOp::LogOr {
                         // `$x ||=` — short-circuit when LHS is true.
-                        self.emit_get_scalar(idx, line, Some(root));
-                        let j_true = self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
-                        self.compile_expr(value)?;
-                        self.emit_set_scalar_keep(idx, line, Some(root));
-                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
-                        self.chunk.patch_jump_here(j_true);
-                        self.chunk.patch_jump_here(j_end);
+                        if let Some(slot) = self.scalar_slot(name) {
+                            self.emit_op(Op::GetScalarSlot(slot), line, Some(root));
+                            let j_true = self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SetScalarSlot(slot), line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_true);
+                            self.chunk.patch_jump_here(j_end);
+                        } else {
+                            self.emit_get_scalar(idx, line, Some(root));
+                            let j_true = self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_set_scalar_keep(idx, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j_true);
+                            self.chunk.patch_jump_here(j_end);
+                        }
                         return Ok(());
                     }
                     if *op == BinOp::LogAnd {
                         // `$x &&=` — short-circuit when LHS is false.
-                        self.emit_get_scalar(idx, line, Some(root));
-                        let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
-                        self.compile_expr(value)?;
-                        self.emit_set_scalar_keep(idx, line, Some(root));
-                        let j_end = self.emit_op(Op::Jump(0), line, Some(root));
-                        self.chunk.patch_jump_here(j);
-                        self.chunk.patch_jump_here(j_end);
+                        if let Some(slot) = self.scalar_slot(name) {
+                            self.emit_op(Op::GetScalarSlot(slot), line, Some(root));
+                            let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::SetScalarSlot(slot), line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.chunk.patch_jump_here(j_end);
+                        } else {
+                            self.emit_get_scalar(idx, line, Some(root));
+                            let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
+                            self.compile_expr(value)?;
+                            self.emit_set_scalar_keep(idx, line, Some(root));
+                            let j_end = self.emit_op(Op::Jump(0), line, Some(root));
+                            self.chunk.patch_jump_here(j);
+                            self.chunk.patch_jump_here(j_end);
+                        }
                         return Ok(());
                     }
                     if let Some(op_b) = scalar_compound_op_to_byte(*op) {
                         // Slot-aware path: `my $x` inside a sub body lives in a local slot.
-                        // `Op::ScalarCompoundAssign` is name-based and routes through
-                        // `scope.atomic_mutate(name)`, which bypasses slots — so `$s += 5`
-                        // inside a sub silently updates a different (name-based) slot and
-                        // leaves the real `$s` untouched (issue surfaces when strict_vars was
-                        // previously masking this via tree fallback). For slot lexicals, emit
-                        // the read-modify-write sequence against the slot instead.
                         if let Some(slot) = self.scalar_slot(name) {
                             let vm_op = binop_to_vm_op(*op).ok_or_else(|| {
                                 CompileError::Unsupported("CompoundAssign op (slot)".into())
