@@ -1360,6 +1360,7 @@ impl<'a> ShellParser<'a> {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn parse_script(&mut self) -> Result<Vec<ShellCommand>, String> {
         let mut commands = Vec::new();
         self.skip_newlines();

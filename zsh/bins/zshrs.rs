@@ -18,10 +18,11 @@ use std::time::Instant;
 use nu_ansi_term::{Color as AnsiColor, Style as AnsiStyle};
 use reedline::Color;
 use reedline::{
-    default_emacs_keybindings, ColumnarMenu, Completer, DefaultHinter, Emacs, FileBackedHistory,
-    Highlighter, KeyCode, KeyModifiers, MenuBuilder, Prompt, PromptHistorySearch,
-    PromptHistorySearchStatus, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span, StyledText,
-    Suggestion, ValidationResult, Validator,
+    default_emacs_keybindings, Completer, DefaultHinter, Editor, Emacs, FileBackedHistory,
+    Highlighter, KeyCode, KeyModifiers, Menu as ReedlineMenuTrait, MenuBuilder, MenuEvent,
+    MenuSettings, Painter, Prompt, PromptHistorySearch, PromptHistorySearchStatus, Reedline,
+    ReedlineEvent, ReedlineMenu, Signal, Span, StyledText, Suggestion, ValidationResult, Validator,
+    menu_functions,
 };
 
 use zsh::exec::ShellExecutor;
@@ -30,7 +31,8 @@ use zsh::zwc;
 
 use compsys::{
     build_cache_from_fpath, cache::CompsysCache, compinit_lazy, do_completion, get_system_fpath,
-    Completion as CompsysCompletion, CompletionState,
+    completion::CompletionGroup, menu::MenuState, Completion as CompsysCompletion,
+    CompletionState,
 };
 
 use zsh::{
@@ -568,12 +570,53 @@ fn init_default_abbreviations() {
 /// Global compatibility mode flag
 static mut ZSH_COMPAT_MODE: bool = false;
 
+/// Global log file path for zshrs background operations (compinit, etc.)
+/// Resolves to $HOME/.cache/zshrs/zshrs.log at runtime.
+pub fn zshrs_log_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join(".cache/zshrs/zshrs.log")
+}
+
 /// Check if zsh compatibility mode is enabled
 pub fn is_zsh_compat() -> bool {
     unsafe { ZSH_COMPAT_MODE }
 }
 
 fn main() {
+    // Initialize logging first — everything after this can use tracing macros.
+    let startup_t0 = Instant::now();
+
+    // Default level: info. Override with ZSHRS_LOG=debug or ZSHRS_LOG=trace.
+    zsh::log::init();
+
+    let pid = std::process::id();
+    let cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "?".to_string());
+    let path_count = env::var("PATH")
+        .unwrap_or_default()
+        .split(':')
+        .filter(|s| !s.is_empty())
+        .count();
+    let fpath_count = env::var("FPATH")
+        .unwrap_or_default()
+        .split(':')
+        .filter(|s| !s.is_empty())
+        .count();
+    let cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+
+    tracing::info!(
+        pid,
+        cwd = %cwd,
+        path_dirs = path_count,
+        fpath_dirs = fpath_count,
+        cpus,
+        "zshrs starting"
+    );
+
     let args: Vec<String> = env::args().collect();
 
     // Handle --zsh-compat global flag (must be checked early)
@@ -682,6 +725,11 @@ fn main() {
         }
         return;
     }
+
+    tracing::info!(
+        startup_ms = startup_t0.elapsed().as_millis() as u64,
+        "startup complete, entering main loop"
+    );
 
     // Check if stdin is a TTY
     if atty::is(atty::Stream::Stdin) {
@@ -884,6 +932,7 @@ fn source_logout_files(executor: &mut ShellExecutor, is_login: bool) {
 }
 
 fn run_interactive() {
+    tracing::info!("interactive mode starting");
     // Set up signal handling
     let interrupted = Arc::new(AtomicBool::new(false));
     let i = interrupted.clone();
@@ -936,19 +985,20 @@ fn run_interactive() {
     };
 
     // Initialize SQLite history engine for frequency tracking
-    let history_engine = match HistoryEngine::new() {
-        Ok(engine) => {
-            let count = engine.count().unwrap_or(0);
-            if count > 0 {
-                eprintln!("Loaded {} history entries", count);
+    let history_engine: Option<std::sync::Arc<std::sync::Mutex<HistoryEngine>>> =
+        match HistoryEngine::new() {
+            Ok(engine) => {
+                let count = engine.count().unwrap_or(0);
+                if count > 0 {
+                    eprintln!("Loaded {} history entries", count);
+                }
+                Some(std::sync::Arc::new(std::sync::Mutex::new(engine)))
             }
-            Some(engine)
-        }
-        Err(e) => {
-            eprintln!("Warning: history engine failed to initialize: {e}");
-            None
-        }
-    };
+            Err(e) => {
+                eprintln!("Warning: history engine failed to initialize: {e}");
+                None
+            }
+        };
 
     let line_editor = setup_editor(compsys_cache);
     if line_editor.is_none() {
@@ -989,6 +1039,9 @@ fn run_interactive() {
     println!("Type exit to quit\n");
 
     loop {
+        // Non-blocking: merge background compinit results if ready
+        executor.drain_compinit_bg();
+
         let prompt = ZshrsPrompt::new(&executor);
         match line_editor.read_line(&prompt) {
             Ok(Signal::Success(line)) => {
@@ -1005,14 +1058,22 @@ fn run_interactive() {
                 process_line(line, &mut executor);
                 let duration = start.elapsed().as_millis() as i64;
 
-                // Track in SQLite history with frequency
+                // Ship history write to worker pool — prompt returns instantly,
+                // SQLite write happens in background.
                 if let Some(ref engine) = history_engine {
+                    let engine = std::sync::Arc::clone(engine);
+                    let line = line.to_string();
                     let cwd = std::env::current_dir()
                         .ok()
                         .map(|p| p.to_string_lossy().to_string());
-                    if let Ok(id) = engine.add(line, cwd.as_deref()) {
-                        let _ = engine.update_last(id, duration, executor.last_status);
-                    }
+                    let status = executor.last_status;
+                    executor.worker_pool.submit(move || {
+                        if let Ok(eng) = engine.lock() {
+                            if let Ok(id) = eng.add(&line, cwd.as_deref()) {
+                                let _ = eng.update_last(id, duration, status);
+                            }
+                        }
+                    });
                 }
             }
             Ok(Signal::CtrlD) => {
@@ -1079,13 +1140,10 @@ fn setup_editor(compsys_cache: Option<CompsysCache>) -> Option<Reedline> {
     if let Some(cache) = compsys_cache {
         let completer = Box::new(ZshrsCompleter::new(cache));
 
-        // Create a completion menu (Tab triggers this)
-        let completion_menu = Box::new(
-            ColumnarMenu::default()
-                .with_name("completion_menu")
-                .with_columns(4)
-                .with_column_padding(2),
-        );
+        // Zsh-style menuselect — port of Src/Zle/complist.c domenuselect()
+        // Uses compsys MenuState for rendering (group headers, zstyle colors,
+        // grid navigation with column memory, viewport scrolling).
+        let completion_menu = Box::new(ZshMenuSelect::new());
 
         editor = editor
             .with_completer(completer)
@@ -1181,6 +1239,261 @@ impl Validator for ZshrsValidator {
         }
     }
 }
+
+// ============================================================================
+// ZSH MENUSELECT — Port of Src/Zle/complist.c domenuselect()
+// ============================================================================
+
+/// Reedline Menu backed by compsys MenuState.
+///
+/// Bridges reedline's MenuEvent dispatch to our full zsh-style menuselect
+/// with group headers, zstyle colors, grid navigation with column memory,
+/// and proper viewport scrolling.
+struct ZshMenuSelect {
+    settings: MenuSettings,
+    active: bool,
+    /// compsys menu state — the real engine
+    state: MenuState,
+    /// Cached reedline suggestions (kept for get_values/replace_in_buffer)
+    values: Vec<Suggestion>,
+    event: Option<MenuEvent>,
+    /// Whether values have been loaded into MenuState
+    loaded: bool,
+}
+
+impl ZshMenuSelect {
+    fn new() -> Self {
+        Self {
+            settings: MenuSettings::default().with_name("completion_menu"),
+            active: false,
+            state: MenuState::new(),
+            values: Vec::new(),
+            event: None,
+            loaded: false,
+        }
+    }
+
+    /// Convert reedline Suggestions to compsys CompletionGroup and load into MenuState
+    fn load_suggestions(&mut self, terminal_width: u16) {
+        if self.values.is_empty() || self.loaded {
+            return;
+        }
+
+        // Group suggestions by their extra[0] tag (e.g. "command", "file", "option")
+        let mut groups: std::collections::HashMap<String, Vec<compsys::Completion>> =
+            std::collections::HashMap::new();
+
+        for sugg in &self.values {
+            let group_name = sugg
+                .extra
+                .as_ref()
+                .and_then(|e| e.first())
+                .cloned()
+                .unwrap_or_else(|| "completions".to_string());
+
+            let mut comp = compsys::Completion::new(&sugg.value);
+            if let Some(ref desc) = sugg.description {
+                comp.desc = Some(desc.clone());
+            }
+            groups.entry(group_name).or_default().push(comp);
+        }
+
+        let mut comp_groups = Vec::new();
+        for (name, matches) in groups {
+            let mut g = CompletionGroup::new(&name);
+            g.matches = matches;
+            comp_groups.push(g);
+        }
+
+        self.state.set_term_size(terminal_width as usize, 24);
+        self.state.set_completions(&comp_groups);
+        self.state.start();
+        self.loaded = true;
+    }
+
+    fn index(&self) -> usize {
+        self.state.selected_index().unwrap_or(0)
+    }
+}
+
+impl MenuBuilder for ZshMenuSelect {
+    fn settings_mut(&mut self) -> &mut MenuSettings {
+        &mut self.settings
+    }
+}
+
+impl ReedlineMenuTrait for ZshMenuSelect {
+    fn settings(&self) -> &MenuSettings {
+        &self.settings
+    }
+
+    fn is_active(&self) -> bool {
+        self.active
+    }
+
+    fn can_quick_complete(&self) -> bool {
+        true
+    }
+
+    fn can_partially_complete(
+        &mut self,
+        values_updated: bool,
+        editor: &mut Editor,
+        completer: &mut dyn Completer,
+    ) -> bool {
+        if !values_updated {
+            self.update_values(editor, completer);
+        }
+        menu_functions::can_partially_complete(self.get_values(), editor)
+    }
+
+    fn menu_event(&mut self, event: MenuEvent) {
+        match &event {
+            MenuEvent::Activate(_) => {
+                self.active = true;
+                self.loaded = false;
+            }
+            MenuEvent::Deactivate => {
+                self.active = false;
+                self.loaded = false;
+                self.state.stop();
+            }
+            _ => {}
+        }
+        self.event = Some(event);
+    }
+
+    fn update_values(
+        &mut self,
+        editor: &mut Editor,
+        completer: &mut dyn Completer,
+    ) {
+        let (input, pos) = menu_functions::completer_input(
+            editor.get_buffer(),
+            editor.line_buffer().insertion_point(),
+            None,
+            false,
+        );
+        let (values, _) = completer.complete_with_base_ranges(&input, pos);
+        self.values = values;
+        self.loaded = false;
+    }
+
+    fn update_working_details(
+        &mut self,
+        editor: &mut Editor,
+        completer: &mut dyn Completer,
+        painter: &Painter,
+    ) {
+        if let Some(event) = self.event.take() {
+            match event {
+                MenuEvent::Activate(updated) => {
+                    if !updated {
+                        self.update_values(editor, completer);
+                    }
+                    self.load_suggestions(painter.screen_width());
+                }
+                MenuEvent::Deactivate => {}
+                MenuEvent::Edit(updated) => {
+                    if !updated {
+                        self.update_values(editor, completer);
+                    }
+                    self.loaded = false;
+                    self.load_suggestions(painter.screen_width());
+                }
+                MenuEvent::NextElement => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::Next);
+                }
+                MenuEvent::PreviousElement => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::Prev);
+                }
+                MenuEvent::MoveUp => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self.state.process_action(compsys::MenuAction::Up);
+                }
+                MenuEvent::MoveDown => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::Down);
+                }
+                MenuEvent::MoveLeft => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::Left);
+                }
+                MenuEvent::MoveRight => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::Right);
+                }
+                MenuEvent::NextPage => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::PageDown);
+                }
+                MenuEvent::PreviousPage => {
+                    self.load_suggestions(painter.screen_width());
+                    let _ = self
+                        .state
+                        .process_action(compsys::MenuAction::PageUp);
+                }
+            }
+        }
+    }
+
+    fn replace_in_buffer(&self, editor: &mut Editor) {
+        let value = self.get_values().get(self.index()).cloned();
+        menu_functions::replace_in_buffer(value, editor);
+    }
+
+    fn min_rows(&self) -> u16 {
+        3
+    }
+
+    fn get_values(&self) -> &[Suggestion] {
+        &self.values
+    }
+
+    fn menu_required_lines(&self, _terminal_columns: u16) -> u16 {
+        // Estimate from item count and columns
+        let cols = self.state.cols().max(1);
+        let rows = (self.values.len() + cols - 1) / cols;
+        (rows as u16).max(3)
+    }
+
+    fn menu_string(&self, available_lines: u16, _use_ansi_coloring: bool) -> String {
+        // Use a mutable clone for rendering (Menu trait takes &self)
+        let mut state = self.state.clone();
+        state.set_available_rows(available_lines as usize);
+        let rendering = state.render();
+
+        let mut output = String::new();
+        for (i, line) in rendering.lines.iter().enumerate() {
+            if i > 0 {
+                output.push_str("\r\n");
+            }
+            output.push_str(&line.content);
+        }
+        if rendering.lines.is_empty() {
+            output.push_str("NO RECORDS FOUND");
+        }
+        output
+    }
+}
+
+// ============================================================================
+// COMPLETER
+// ============================================================================
 
 struct ZshrsCompleter {
     cache: CompsysCache,

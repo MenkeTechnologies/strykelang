@@ -36,6 +36,14 @@ impl HistoryEngine {
         let conn = Connection::open(&path)?;
         let engine = Self { conn };
         engine.init_schema()?;
+        let count = engine.count().unwrap_or(0);
+        let db_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        tracing::info!(
+            entries = count,
+            db_bytes = db_size,
+            path = %path.display(),
+            "history: sqlite opened"
+        );
         Ok(engine)
     }
 
