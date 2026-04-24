@@ -15,6 +15,30 @@ use compsys::CompInitResult;
 use parking_lot::Mutex;
 use std::collections::HashSet;
 
+/// AOP advice type — before, after, or around.
+#[derive(Debug, Clone)]
+pub enum AdviceKind {
+    /// Run code before the command executes.
+    Before,
+    /// Run code after the command executes. $? and INTERCEPT_MS available.
+    After,
+    /// Wrap the command. Code must call `intercept_proceed` to run original.
+    Around,
+}
+
+/// An intercept registration.
+#[derive(Debug, Clone)]
+pub struct Intercept {
+    /// Pattern to match command names. Supports glob: "git *", "_*", "*".
+    pub pattern: String,
+    /// What kind of advice.
+    pub kind: AdviceKind,
+    /// Shell code to execute as advice.
+    pub code: String,
+    /// Unique ID for removal.
+    pub id: u32,
+}
+
 /// Result from background compinit thread
 pub struct CompInitBgResult {
     pub result: CompInitResult,
@@ -41,6 +65,24 @@ struct PluginSnapshot {
 /// Cached compiled regexes for hot paths
 static REGEX_CACHE: LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashMap::with_capacity(64)));
+
+/// Match an intercept pattern against a command name or full command string.
+/// Supports: exact match, glob ("git *", "_*", "*"), or "all".
+fn intercept_matches(pattern: &str, cmd_name: &str, full_cmd: &str) -> bool {
+    if pattern == "*" || pattern == "all" {
+        return true;
+    }
+    if pattern == cmd_name {
+        return true;
+    }
+    // Glob match against full command (e.g. "git *" matches "git push")
+    if pattern.contains('*') || pattern.contains('?') {
+        if let Ok(pat) = glob::Pattern::new(pattern) {
+            return pat.matches(cmd_name) || pat.matches(full_cmd);
+        }
+    }
+    false
+}
 
 /// Get or compile a regex, caching the result
 fn cached_regex(pattern: &str) -> Option<regex::Regex> {
@@ -652,6 +694,11 @@ pub struct ShellExecutor {
     pub posix_mode: bool,
     /// Worker thread pool for background tasks (compinit, process subs, etc.)
     pub worker_pool: std::sync::Arc<crate::worker::WorkerPool>,
+    /// AOP intercept table: command/function name → advice chain.
+    /// Glob patterns supported (e.g. "git *", "*").
+    pub intercepts: Vec<Intercept>,
+    /// Defer stack: commands to run on scope exit (LIFO).
+    pub defer_stack: Vec<Vec<String>>,
 }
 
 impl ShellExecutor {
@@ -802,6 +849,8 @@ impl ShellExecutor {
                 let pool_size = crate::config::resolve_pool_size(&config.worker_pool);
                 std::sync::Arc::new(crate::worker::WorkerPool::new(pool_size))
             },
+            intercepts: Vec::new(),
+            defer_stack: Vec::new(),
         }
     }
 
@@ -2397,6 +2446,10 @@ impl ShellExecutor {
             "caller" => self.builtin_caller(args),
             "help" => self.builtin_help(args),
             "doctor" => self.builtin_doctor(args),
+            "dbview" => self.builtin_dbview(args),
+            "profile" => self.builtin_profile(args),
+            "intercept" => self.builtin_intercept(args),
+            "intercept_proceed" => self.builtin_intercept_proceed(args),
             "readarray" | "mapfile" => self.builtin_readarray(args),
             "setopt" => self.builtin_setopt(args),
             "unsetopt" => self.builtin_unsetopt(args),
@@ -2579,6 +2632,20 @@ impl ShellExecutor {
                 0
             }
             _ => {
+                // ── AOP intercept dispatch ──
+                // Check if any intercepts match this command name.
+                // Fast path: skip if no intercepts registered.
+                if !self.intercepts.is_empty() {
+                    let full_cmd = if args.is_empty() {
+                        cmd_name.to_string()
+                    } else {
+                        format!("{} {}", cmd_name, args.join(" "))
+                    };
+                    if let Some(result) = self.run_intercepts(cmd_name, &full_cmd, args) {
+                        return result;
+                    }
+                }
+
                 // Check for function
                 if let Some(func) = self.functions.get(cmd_name).cloned() {
                     return self.call_function(&func, args);
@@ -11370,6 +11437,631 @@ impl ShellExecutor {
         0
     }
 
+    /// dbview — browse zshrs SQLite cache tables without SQL.
+    ///
+    /// Usage:
+    ///   dbview                      — list all tables and row counts
+    ///   dbview autoloads             — dump autoloads table (name, source, body len, ast len)
+    ///   dbview autoloads _git        — show single row by name
+    ///   dbview comps                 — dump comps table
+    ///   dbview history               — recent history entries
+    ///   dbview history <pattern>     — search history
+    ///   dbview plugins               — plugin cache entries
+    ///   dbview executables            — PATH executables cache
+    ///   dbview <table> --count       — just the count
+    fn builtin_dbview(&self, args: &[String]) -> i32 {
+        let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+        let dim = |s: &str| format!("\x1b[2m{}\x1b[0m", s);
+        let cyan = |s: &str| format!("\x1b[36m{}\x1b[0m", s);
+        let green = |s: &str| format!("\x1b[32m{}\x1b[0m", s);
+        let yellow = |s: &str| format!("\x1b[33m{}\x1b[0m", s);
+
+        if args.is_empty() {
+            // List all tables with row counts
+            println!("{}", bold("zshrs SQLite caches"));
+            println!();
+
+            if let Some(ref cache) = self.compsys_cache {
+                println!("  {} {}", bold("compsys.db"), dim("(completion cache)"));
+                if let Ok(n) = cache.count_table("autoloads") {
+                    let ast_count = cache.count_table_where("autoloads", "ast IS NOT NULL").unwrap_or(0);
+                    println!("    autoloads:    {:>6} rows  ({} with AST)", n, ast_count);
+                }
+                if let Ok(n) = cache.count_table("comps") { println!("    comps:        {:>6} rows", n); }
+                if let Ok(n) = cache.count_table("services") { println!("    services:     {:>6} rows", n); }
+                if let Ok(n) = cache.count_table("patcomps") { println!("    patcomps:     {:>6} rows", n); }
+                if let Ok(n) = cache.count_table("executables") { println!("    executables:  {:>6} rows", n); }
+                if let Ok(n) = cache.count_table("zstyles") { println!("    zstyles:      {:>6} rows", n); }
+                println!();
+            }
+
+            if let Some(ref engine) = self.history {
+                println!("  {} {}", bold("history.db"), dim("(command history)"));
+                if let Ok(n) = engine.count() { println!("    entries:      {:>6} rows", n); }
+                println!();
+            }
+
+            if let Some(ref cache) = self.plugin_cache {
+                let (plugins, functions) = cache.stats();
+                println!("  {} {}", bold("plugins.db"), dim("(plugin source cache)"));
+                println!("    plugins:      {:>6} rows", plugins);
+                println!("    functions:    {:>6} rows", functions);
+                println!();
+            }
+
+            println!("  Usage: {} <table> [name] [--count]", cyan("dbview"));
+            return 0;
+        }
+
+        let table = args[0].as_str();
+        let filter = args.get(1).map(|s| s.as_str());
+        let count_only = args.iter().any(|a| a == "--count" || a == "-c");
+
+        match table {
+            "autoloads" => {
+                let Some(ref cache) = self.compsys_cache else {
+                    eprintln!("dbview: no compsys cache");
+                    return 1;
+                };
+
+                if count_only {
+                    let n = cache.count_table("autoloads").unwrap_or(0);
+                    println!("{}", n);
+                    return 0;
+                }
+
+                if let Some(name) = filter {
+                    // Single row lookup
+                    match cache.get_autoload(name) {
+                        Ok(Some(stub)) => {
+                            println!("{}", bold(&format!("autoload: {}", name)));
+                            println!("  source:   {}", stub.source);
+                            println!("  body:     {} bytes", stub.body.as_ref().map(|b| b.len()).unwrap_or(0));
+                            match cache.get_autoload_ast(name) {
+                                Ok(Some(blob)) => println!("  ast:      {} {} bytes", green("YES"), blob.len()),
+                                _ => println!("  ast:      {}", yellow("NULL")),
+                            }
+                            // Show first few lines of body
+                            if let Some(ref body) = stub.body {
+                                println!("  preview:");
+                                for (i, line) in body.lines().take(10).enumerate() {
+                                    println!("    {:>3}: {}", i + 1, dim(line));
+                                }
+                                let total = body.lines().count();
+                                if total > 10 {
+                                    println!("    {} ({} more lines)", dim("..."), total - 10);
+                                }
+                            }
+                        }
+                        _ => {
+                            eprintln!("dbview: autoload '{}' not found", name);
+                            return 1;
+                        }
+                    }
+                    return 0;
+                }
+
+                // Dump all autoloads
+                let conn = &cache.conn();
+                match conn.prepare("SELECT name, source, length(body), length(ast) FROM autoloads ORDER BY name LIMIT 200") {
+                    Ok(mut stmt) => {
+                        let rows = stmt.query_map([], |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, String>(1)?,
+                                row.get::<_, Option<i64>>(2)?,
+                                row.get::<_, Option<i64>>(3)?,
+                            ))
+                        });
+                        if let Ok(rows) = rows {
+                            println!("{:<40} {:>8} {:>8}  {}", bold("NAME"), bold("BODY"), bold("AST"), bold("SOURCE"));
+                            let mut count = 0;
+                            for row in rows.flatten() {
+                                let (name, source, body_len, ast_len) = row;
+                                let ast_str = match ast_len {
+                                    Some(n) => green(&format!("{:>8}", n)),
+                                    None => yellow(&format!("{:>8}", "NULL")),
+                                };
+                                let body_str = match body_len {
+                                    Some(n) => format!("{:>8}", n),
+                                    None => dim("NULL").to_string(),
+                                };
+                                // Truncate source path for display
+                                let src_short = if source.len() > 50 {
+                                    format!("...{}", &source[source.len() - 47..])
+                                } else {
+                                    source
+                                };
+                                println!("{:<40} {} {}  {}", name, body_str, ast_str, dim(&src_short));
+                                count += 1;
+                            }
+                            println!("\n{} rows shown (LIMIT 200)", count);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("dbview: query failed: {}", e);
+                        return 1;
+                    }
+                }
+            }
+
+            "comps" => {
+                let Some(ref cache) = self.compsys_cache else {
+                    eprintln!("dbview: no compsys cache");
+                    return 1;
+                };
+                if count_only {
+                    println!("{}", cache.count_table("comps").unwrap_or(0));
+                    return 0;
+                }
+                let conn = cache.conn();
+                let query = if let Some(pat) = filter {
+                    format!("SELECT command, function FROM comps WHERE command LIKE '%{}%' ORDER BY command LIMIT 100", pat)
+                } else {
+                    "SELECT command, function FROM comps ORDER BY command LIMIT 100".to_string()
+                };
+                match conn.prepare(&query) {
+                    Ok(mut stmt) => {
+                        println!("{:<40} {}", bold("COMMAND"), bold("FUNCTION"));
+                        let rows = stmt.query_map([], |row| {
+                            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                        });
+                        if let Ok(rows) = rows {
+                            for row in rows.flatten() {
+                                println!("{:<40} {}", row.0, cyan(&row.1));
+                            }
+                        }
+                    }
+                    Err(e) => { eprintln!("dbview: {}", e); return 1; }
+                }
+            }
+
+            "executables" => {
+                let Some(ref cache) = self.compsys_cache else {
+                    eprintln!("dbview: no compsys cache");
+                    return 1;
+                };
+                if count_only {
+                    println!("{}", cache.count_table("executables").unwrap_or(0));
+                    return 0;
+                }
+                let conn = cache.conn();
+                let query = if let Some(pat) = filter {
+                    format!("SELECT name, path FROM executables WHERE name LIKE '%{}%' ORDER BY name LIMIT 100", pat)
+                } else {
+                    "SELECT name, path FROM executables ORDER BY name LIMIT 100".to_string()
+                };
+                match conn.prepare(&query) {
+                    Ok(mut stmt) => {
+                        println!("{:<30} {}", bold("NAME"), bold("PATH"));
+                        let rows = stmt.query_map([], |row| {
+                            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                        });
+                        if let Ok(rows) = rows {
+                            for row in rows.flatten() {
+                                println!("{:<30} {}", row.0, dim(&row.1));
+                            }
+                        }
+                    }
+                    Err(e) => { eprintln!("dbview: {}", e); return 1; }
+                }
+            }
+
+            "history" => {
+                let Some(ref engine) = self.history else {
+                    eprintln!("dbview: no history engine");
+                    return 1;
+                };
+                if count_only {
+                    println!("{}", engine.count().unwrap_or(0));
+                    return 0;
+                }
+                if let Some(pat) = filter {
+                    if let Ok(entries) = engine.search(pat, 20) {
+                        for e in entries {
+                            println!("  {} {} {}", dim(&e.timestamp.to_string()), cyan(&e.command), dim(&format!("[{}]", e.exit_code.unwrap_or(0))));
+                        }
+                    }
+                } else if let Ok(entries) = engine.recent(20) {
+                    for e in entries {
+                        println!("  {} {} {}", dim(&e.timestamp.to_string()), cyan(&e.command), dim(&format!("[{}]", e.exit_code.unwrap_or(0))));
+                    }
+                }
+            }
+
+            "plugins" => {
+                let Some(ref cache) = self.plugin_cache else {
+                    eprintln!("dbview: no plugin cache");
+                    return 1;
+                };
+                let (plugins, functions) = cache.stats();
+                println!("{} plugins, {} cached functions", plugins, functions);
+            }
+
+            _ => {
+                eprintln!("dbview: unknown table '{}'. Available: autoloads, comps, executables, history, plugins", table);
+                return 1;
+            }
+        }
+
+        0
+    }
+
+    /// profile — in-process command profiling with nanosecond accuracy.
+    ///
+    /// Unlike `time` (which measures one command) or `zprof` (which only
+    /// profiles function calls), `profile` traces every execute_command,
+    /// expansion, glob, and builtin dispatch inside the block.
+    ///
+    /// Usage:
+    ///   profile { commands }     — profile a block
+    ///   profile -s 'script'     — profile a script string
+    ///   profile -f func         — profile a function call
+    ///   profile --clear         — clear accumulated profile data
+    ///   profile --dump          — show accumulated profile data
+    fn builtin_profile(&mut self, args: &[String]) -> i32 {
+        let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+        let dim = |s: &str| format!("\x1b[2m{}\x1b[0m", s);
+        let cyan = |s: &str| format!("\x1b[36m{}\x1b[0m", s);
+        let yellow = |s: &str| format!("\x1b[33m{}\x1b[0m", s);
+
+        if args.is_empty() {
+            println!("Usage: profile {{ commands }}");
+            println!("       profile -s 'script string'");
+            println!("       profile -f function_name [args...]");
+            println!("       profile --clear");
+            println!("       profile --dump");
+            return 0;
+        }
+
+        if args[0] == "--clear" {
+            self.profiler = crate::zprof::Profiler::new();
+            println!("profile data cleared");
+            return 0;
+        }
+
+        if args[0] == "--dump" {
+            let (_, output) = crate::zprof::builtin_zprof(
+                &mut self.profiler,
+                &crate::zprof::ZprofOptions { clear: false },
+            );
+            if !output.is_empty() {
+                print!("{}", output);
+            } else {
+                println!("{}", dim("no profile data"));
+            }
+            return 0;
+        }
+
+        // Determine what to profile
+        let code = if args[0] == "-s" {
+            // profile -s 'script string'
+            if args.len() < 2 {
+                eprintln!("profile: -s requires a script string");
+                return 1;
+            }
+            args[1..].join(" ")
+        } else if args[0] == "-f" {
+            // profile -f func_name [args...]
+            if args.len() < 2 {
+                eprintln!("profile: -f requires a function name");
+                return 1;
+            }
+            args[1..].join(" ")
+        } else {
+            // profile { commands } — args is the block body
+            args.join(" ")
+        };
+
+        // Enable profiling, run, collect results
+        let was_enabled = self.profiling_enabled;
+        self.profiling_enabled = true;
+        self.profiler = crate::zprof::Profiler::new(); // fresh data for this run
+
+        let t0 = std::time::Instant::now();
+        let result = self.execute_script(&code);
+        let elapsed = t0.elapsed();
+        let status = match result {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("profile: {}", e);
+                1
+            }
+        };
+
+        // Collect timing data
+        println!();
+        println!("{}", bold("profile results"));
+        println!("{}", dim(&"─".repeat(60)));
+        let dur_str = if elapsed.as_secs() > 0 {
+            format!("{:.3}s", elapsed.as_secs_f64())
+        } else if elapsed.as_millis() > 0 {
+            format!("{:.3}ms", elapsed.as_secs_f64() * 1000.0)
+        } else {
+            format!("{:.1}µs", elapsed.as_secs_f64() * 1_000_000.0)
+        };
+        println!("  total:     {}", cyan(&dur_str));
+        println!("  status:    {}", status);
+        println!();
+
+        // Show function-level breakdown from profiler
+        let (_, output) = crate::zprof::builtin_zprof(
+            &mut self.profiler,
+            &crate::zprof::ZprofOptions { clear: false },
+        );
+        if !output.is_empty() {
+            println!("{}", bold("function breakdown"));
+            print!("{}", output);
+        }
+
+        // Per-command breakdown from tracing (if tracing is at debug level)
+        println!();
+        println!("  {} set ZSHRS_LOG=trace for per-command tracing", yellow("tip:"));
+        println!("  {} output: {}", dim("log"), dim(&crate::log::log_path().display().to_string()));
+
+        self.profiling_enabled = was_enabled;
+        status
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // AOP INTERCEPT — the killer builtin
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Check intercepts for a command. Returns Some(result) if an around
+    /// advice fully handled the command, None to proceed normally.
+    fn run_intercepts(
+        &mut self,
+        cmd_name: &str,
+        full_cmd: &str,
+        args: &[String],
+    ) -> Option<Result<i32, String>> {
+        // Collect matching intercepts (clone to avoid borrow issues)
+        let matching: Vec<Intercept> = self
+            .intercepts
+            .iter()
+            .filter(|i| intercept_matches(&i.pattern, cmd_name, full_cmd))
+            .cloned()
+            .collect();
+
+        if matching.is_empty() {
+            return None;
+        }
+
+        // Set INTERCEPT_NAME and INTERCEPT_ARGS for advice code
+        self.variables.insert("INTERCEPT_NAME".to_string(), cmd_name.to_string());
+        self.variables.insert("INTERCEPT_ARGS".to_string(), args.join(" "));
+        self.variables.insert("INTERCEPT_CMD".to_string(), full_cmd.to_string());
+
+        // Run before advice
+        for advice in matching.iter().filter(|i| matches!(i.kind, AdviceKind::Before)) {
+            let _ = self.execute_advice(&advice.code);
+        }
+
+        // Check for around advice — first match wins
+        let around = matching.iter().find(|i| matches!(i.kind, AdviceKind::Around));
+
+        let t0 = std::time::Instant::now();
+
+        let result = if let Some(advice) = around {
+            // Around advice: set INTERCEPT_PROCEED flag, run advice code.
+            // If advice calls `intercept_proceed`, the original command runs.
+            self.variables.insert("__intercept_proceed".to_string(), "0".to_string());
+            let advice_result = self.execute_advice(&advice.code);
+
+            // Check if intercept_proceed was called
+            let proceeded = self.variables.get("__intercept_proceed")
+                .map(|v| v == "1")
+                .unwrap_or(false);
+
+            if proceeded {
+                // The original command was already executed inside the advice
+                advice_result
+            } else {
+                // Advice didn't call proceed — command was suppressed
+                advice_result
+            }
+        } else {
+            // No around advice — run the original command.
+            // We return None to let the normal dispatch continue.
+            // But we still need after advice to fire, so we can't return None here
+            // if there are after advices. Run the command ourselves.
+            let has_after = matching.iter().any(|i| matches!(i.kind, AdviceKind::After));
+            if !has_after {
+                // Only before advice, no after — let normal dispatch continue
+                return None;
+            }
+
+            // Has after advice — we must run the command and then run after advice
+            self.run_original_command(cmd_name, args)
+        };
+
+        let elapsed = t0.elapsed();
+
+        // Set timing variable for after advice
+        let ms = elapsed.as_secs_f64() * 1000.0;
+        self.variables.insert("INTERCEPT_MS".to_string(), format!("{:.3}", ms));
+        self.variables.insert("INTERCEPT_US".to_string(), format!("{:.0}", ms * 1000.0));
+
+        // Run after advice
+        for advice in matching.iter().filter(|i| matches!(i.kind, AdviceKind::After)) {
+            let _ = self.execute_advice(&advice.code);
+        }
+
+        // Clean up
+        self.variables.remove("INTERCEPT_NAME");
+        self.variables.remove("INTERCEPT_ARGS");
+        self.variables.remove("INTERCEPT_CMD");
+        self.variables.remove("INTERCEPT_MS");
+        self.variables.remove("INTERCEPT_US");
+        self.variables.remove("__intercept_proceed");
+
+        Some(result)
+    }
+
+    /// Execute the original command (used by around/after intercept dispatch).
+    /// Execute advice code — dispatches @ prefix to stryke (fat binary),
+    /// everything else to the shell parser. No fork. Machine code speed.
+    fn execute_advice(&mut self, code: &str) -> Result<i32, String> {
+        let code = code.trim();
+        if code.starts_with('@') {
+            let stryke_code = code.trim_start_matches('@').trim();
+            if let Some(status) = crate::try_stryke_dispatch(stryke_code) {
+                self.last_status = status;
+                return Ok(status);
+            }
+            // No stryke handler (thin binary) — fall through to shell
+        }
+        self.execute_script(code)
+    }
+
+    fn run_original_command(&mut self, cmd_name: &str, args: &[String]) -> Result<i32, String> {
+        // Try function
+        if let Some(func) = self.functions.get(cmd_name).cloned() {
+            return self.call_function(&func, args);
+        }
+        if self.maybe_autoload(cmd_name) {
+            if let Some(func) = self.functions.get(cmd_name).cloned() {
+                return self.call_function(&func, args);
+            }
+        }
+        // External command
+        self.execute_external(cmd_name, &args.to_vec(), &[])
+    }
+
+    /// intercept builtin — register AOP advice on commands.
+    ///
+    /// Usage:
+    ///   intercept before <pattern> { code }
+    ///   intercept after <pattern> { code }
+    ///   intercept around <pattern> { code }
+    ///   intercept list                       — show all intercepts
+    ///   intercept remove <id>                — remove by ID
+    ///   intercept clear                      — remove all
+    fn builtin_intercept(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            println!("Usage: intercept <before|after|around> <pattern> {{ code }}");
+            println!("       intercept list | remove <id> | clear");
+            return 0;
+        }
+
+        match args[0].as_str() {
+            "list" => {
+                if self.intercepts.is_empty() {
+                    println!("no intercepts registered");
+                } else {
+                    let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+                    let cyan = |s: &str| format!("\x1b[36m{}\x1b[0m", s);
+                    println!("{:>4}  {:<8}  {:<20}  {}", bold("ID"), bold("KIND"), bold("PATTERN"), bold("CODE"));
+                    for i in &self.intercepts {
+                        let kind = match i.kind {
+                            AdviceKind::Before => "before",
+                            AdviceKind::After => "after",
+                            AdviceKind::Around => "around",
+                        };
+                        let code_preview = if i.code.len() > 40 {
+                            format!("{}...", &i.code[..37])
+                        } else {
+                            i.code.clone()
+                        };
+                        println!("{:>4}  {:<8}  {:<20}  {}", cyan(&i.id.to_string()), kind, i.pattern, code_preview);
+                    }
+                }
+                0
+            }
+            "clear" => {
+                let count = self.intercepts.len();
+                self.intercepts.clear();
+                println!("cleared {} intercepts", count);
+                0
+            }
+            "remove" => {
+                if args.len() < 2 {
+                    eprintln!("intercept remove: requires ID");
+                    return 1;
+                }
+                if let Ok(id) = args[1].parse::<u32>() {
+                    let before = self.intercepts.len();
+                    self.intercepts.retain(|i| i.id != id);
+                    if self.intercepts.len() < before {
+                        println!("removed intercept {}", id);
+                        0
+                    } else {
+                        eprintln!("intercept: no intercept with ID {}", id);
+                        1
+                    }
+                } else {
+                    eprintln!("intercept remove: invalid ID");
+                    1
+                }
+            }
+            "before" | "after" | "around" => {
+                let kind = match args[0].as_str() {
+                    "before" => AdviceKind::Before,
+                    "after" => AdviceKind::After,
+                    "around" => AdviceKind::Around,
+                    _ => unreachable!(),
+                };
+
+                if args.len() < 3 {
+                    eprintln!("intercept {}: requires <pattern> {{ code }}", args[0]);
+                    return 1;
+                }
+
+                let pattern = args[1].clone();
+                // Join remaining args as the code (handles { code } or 'code')
+                let code = args[2..].join(" ");
+                // Strip surrounding braces if present
+                let code = code.trim().to_string();
+                let code = if code.starts_with('{') && code.ends_with('}') {
+                    code[1..code.len() - 1].trim().to_string()
+                } else {
+                    code
+                };
+
+                let id = self.intercepts.iter().map(|i| i.id).max().unwrap_or(0) + 1;
+                self.intercepts.push(Intercept {
+                    pattern,
+                    kind: kind.clone(),
+                    code: code.clone(),
+                    id,
+                });
+
+                let kind_str = match kind {
+                    AdviceKind::Before => "before",
+                    AdviceKind::After => "after",
+                    AdviceKind::Around => "around",
+                };
+                println!("intercept #{}: {} {} → {}", id, kind_str, self.intercepts.last().unwrap().pattern,
+                    if code.len() > 50 { format!("{}...", &code[..47]) } else { code });
+                0
+            }
+            _ => {
+                eprintln!("intercept: unknown subcommand '{}'. Use before|after|around|list|remove|clear", args[0]);
+                1
+            }
+        }
+    }
+
+    /// intercept_proceed — called from around advice to execute the original command.
+    fn builtin_intercept_proceed(&mut self, _args: &[String]) -> i32 {
+        self.variables.insert("__intercept_proceed".to_string(), "1".to_string());
+        // Run the original command using saved INTERCEPT_NAME/INTERCEPT_ARGS
+        let cmd_name = self.variables.get("INTERCEPT_NAME").cloned().unwrap_or_default();
+        let args_str = self.variables.get("INTERCEPT_ARGS").cloned().unwrap_or_default();
+        let args: Vec<String> = if args_str.is_empty() {
+            Vec::new()
+        } else {
+            args_str.split_whitespace().map(|s| s.to_string()).collect()
+        };
+        match self.run_original_command(&cmd_name, &args) {
+            Ok(status) => status,
+            Err(e) => {
+                eprintln!("intercept_proceed: {}", e);
+                1
+            }
+        }
+    }
+
     /// help - display help for builtins (bash)
     fn builtin_help(&self, args: &[String]) -> i32 {
         if args.is_empty() {
@@ -12652,39 +13344,54 @@ impl ShellExecutor {
                         // Background: fill AST blobs for any autoloads that have body but no ast.
                         // This populates the cache so subsequent autoload calls skip parsing.
                         if let Some(ref cache) = self.compsys_cache {
-                            if let Ok(stubs) = cache.get_autoloads_missing_ast() {
-                                if !stubs.is_empty() {
+                            if let Ok(missing) = cache.count_autoloads_missing_ast() {
+                                if missing > 0 {
                                     tracing::info!(
-                                        count = stubs.len(),
+                                        count = missing,
                                         "compinit: backfilling AST blobs on worker pool"
                                     );
                                     let cache_path = compsys::cache::default_cache_path();
+                                    let total_missing = missing;
                                     self.worker_pool.submit(move || {
                                         let mut cache = match compsys::cache::CompsysCache::open(&cache_path) {
                                             Ok(c) => c,
                                             Err(_) => return,
                                         };
-                                        let mut ast_entries: Vec<(String, Vec<u8>)> = Vec::new();
-                                        for (name, body) in &stubs {
-                                            let mut parser = crate::parser::ShellParser::new(body);
-                                            if let Ok(commands) = parser.parse_script() {
-                                                if !commands.is_empty() {
-                                                    if let Ok(blob) = bincode::serialize(&commands) {
-                                                        ast_entries.push((name.clone(), blob));
+                                        // Loop in batches of 100: fetch 100 bodies from SQLite,
+                                        // parse them, write AST blobs back, repeat until none left.
+                                        // Peak memory: ~100 function bodies + ASTs at a time.
+                                        let mut total_cached = 0usize;
+                                        loop {
+                                            let stubs = match cache.get_autoloads_missing_ast_batch(100) {
+                                                Ok(s) if !s.is_empty() => s,
+                                                _ => break,
+                                            };
+                                            let mut batch: Vec<(String, Vec<u8>)> = Vec::with_capacity(stubs.len());
+                                            for (name, body) in &stubs {
+                                                let mut parser = crate::parser::ShellParser::new(body);
+                                                if let Ok(commands) = parser.parse_script() {
+                                                    if !commands.is_empty() {
+                                                        if let Ok(blob) = bincode::serialize(&commands) {
+                                                            batch.push((name.clone(), blob));
+                                                        }
                                                     }
                                                 }
                                             }
+                                            total_cached += batch.len();
+                                            if let Err(e) = cache.set_autoload_asts_bulk(&batch) {
+                                                tracing::warn!(error = %e, "compinit: AST backfill batch failed");
+                                                break;
+                                            }
+                                            // If we got fewer than 100 results, we're done
+                                            if stubs.len() < 100 {
+                                                break;
+                                            }
                                         }
-                                        let count = ast_entries.len();
-                                        if let Err(e) = cache.set_autoload_asts_bulk(&mut ast_entries) {
-                                            tracing::warn!(error = %e, "compinit: AST backfill failed");
-                                        } else {
-                                            tracing::info!(
-                                                cached = count,
-                                                total = stubs.len(),
-                                                "compinit: AST backfill complete"
-                                            );
-                                        }
+                                        tracing::info!(
+                                            cached = total_cached,
+                                            total = total_missing,
+                                            "compinit: AST backfill complete"
+                                        );
                                     });
                                 }
                             }
@@ -12744,44 +13451,52 @@ impl ShellExecutor {
                     "compinit: background scan complete"
                 );
 
-                // Pre-parse all function bodies and cache AST blobs.
-                // On subsequent autoload calls, we deserialize instead of re-parsing.
+                // Pre-parse function bodies and cache AST blobs.
+                // Stream: parse one → serialize → write → drop. Never accumulate.
+                // 16k functions × ~10KB AST = OOM if held in memory.
                 let parse_start = std::time::Instant::now();
-                let mut ast_entries: Vec<(String, Vec<u8>)> = Vec::new();
                 let mut parse_ok = 0usize;
                 let mut parse_fail = 0usize;
                 let mut no_body = 0usize;
+                let batch_size = 100;
+                let mut batch: Vec<(String, Vec<u8>)> = Vec::with_capacity(batch_size);
+
                 for file in &result.files {
                     if let Some(ref body) = file.body {
                         let mut parser = crate::parser::ShellParser::new(body);
                         match parser.parse_script() {
                             Ok(commands) if !commands.is_empty() => {
                                 if let Ok(blob) = bincode::serialize(&commands) {
-                                    ast_entries.push((file.name.clone(), blob));
+                                    batch.push((file.name.clone(), blob));
                                     parse_ok += 1;
+                                    // Flush batch to SQLite, then drop to free memory
+                                    if batch.len() >= batch_size {
+                                        let _ = cache.set_autoload_asts_bulk(&batch);
+                                        batch.clear();
+                                    }
                                 }
                             }
-                            Ok(_) => { parse_fail += 1; } // empty parse
+                            Ok(_) => { parse_fail += 1; }
                             Err(_) => { parse_fail += 1; }
                         }
                     } else {
                         no_body += 1;
                     }
                 }
-                let parsed_count = ast_entries.len();
-                if let Err(e) = cache.set_autoload_asts_bulk(&mut ast_entries) {
-                    tracing::warn!(error = %e, "compinit: failed to cache AST blobs");
-                } else {
-                    tracing::info!(
-                        cached = parsed_count,
-                        parsed = parse_ok,
-                        failed = parse_fail,
-                        no_body = no_body,
-                        total = result.files.len(),
-                        ms = parse_start.elapsed().as_millis() as u64,
-                        "compinit: AST blobs cached"
-                    );
+                // Flush remaining
+                if !batch.is_empty() {
+                    let _ = cache.set_autoload_asts_bulk(&batch);
+                    batch.clear();
                 }
+
+                tracing::info!(
+                    cached = parse_ok,
+                    failed = parse_fail,
+                    no_body = no_body,
+                    total = result.files.len(),
+                    ms = parse_start.elapsed().as_millis() as u64,
+                    "compinit: AST blobs cached"
+                );
 
                 let _ = tx.send(CompInitBgResult { result, cache });
             });

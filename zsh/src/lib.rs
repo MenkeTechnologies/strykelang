@@ -134,3 +134,27 @@ pub use fish_features::{
 pub use lexer::ZshLexer;
 pub use parser::ZshParser;
 pub use tokens::{char_tokens, LexTok};
+
+// ── Stryke integration hook ──
+// The fat binary registers a handler for @ prefix dispatch.
+// The thin binary leaves this as None — @ is treated as a normal character.
+
+use std::sync::OnceLock;
+
+type StrykeHandler = Box<dyn Fn(&str) -> i32 + Send + Sync>;
+static STRYKE_HANDLER: OnceLock<StrykeHandler> = OnceLock::new();
+
+/// Register a handler for @ prefix lines (fat binary sets this to stryke::run).
+pub fn set_stryke_handler<F>(f: F)
+where
+    F: Fn(&str) -> i32 + Send + Sync + 'static,
+{
+    let _ = STRYKE_HANDLER.set(Box::new(f));
+}
+
+/// Try to dispatch a line starting with @ to stryke.
+/// Returns Some(exit_code) if handled, None if no handler registered.
+pub fn try_stryke_dispatch(code: &str) -> Option<i32> {
+    STRYKE_HANDLER.get().map(|f| f(code))
+}
+
