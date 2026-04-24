@@ -158,18 +158,28 @@ impl FtpSession {
         })
     }
 
-    /// Connect to FTP server
+    /// Connect to FTP server — DNS resolution on background thread to avoid hangs
     pub fn connect(&mut self, host: &str, port: Option<u16>) -> io::Result<FtpResponse> {
         let port = port.unwrap_or(21);
-        let addr = format!("{}:{}", host, port);
+        let addr_str = format!("{}:{}", host, port);
+        let dns_timeout = Duration::from_secs(10);
 
-        let stream = TcpStream::connect_timeout(
-            &addr
-                .to_socket_addrs()?
-                .next()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid address"))?,
-            Duration::from_secs(30),
-        )?;
+        // DNS on background thread
+        let (tx, rx) = std::sync::mpsc::channel();
+        let dns = addr_str.clone();
+        std::thread::Builder::new()
+            .name("zftp-dns".to_string())
+            .spawn(move || { let _ = tx.send(dns.to_socket_addrs().map(|a| a.collect::<Vec<_>>())); })
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        let addrs = rx.recv_timeout(dns_timeout)
+            .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "DNS resolution timed out"))?
+            .map_err(|e| { tracing::warn!(host, error = %e, "zftp: DNS failed"); e })?;
+
+        let sock_addr = addrs.into_iter().next()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid address"))?;
+
+        let stream = TcpStream::connect_timeout(&sock_addr, Duration::from_secs(30))?;
 
         stream.set_read_timeout(Some(Duration::from_secs(60)))?;
         stream.set_write_timeout(Some(Duration::from_secs(60)))?;

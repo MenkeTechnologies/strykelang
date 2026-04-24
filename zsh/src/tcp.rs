@@ -136,10 +136,36 @@ pub struct ZtcpOptions {
     pub target_fd: Option<RawFd>,
 }
 
-/// Connect to a TCP host
+/// Connect to a TCP host with timeout on DNS and connect (default 10s).
+/// DNS resolution runs on a background thread so it can't hang the shell.
 pub fn tcp_connect(host: &str, port: u16) -> io::Result<(RawFd, SocketAddr, SocketAddr)> {
+    tcp_connect_timeout(host, port, std::time::Duration::from_secs(10))
+}
+
+/// Connect with explicit timeout.
+pub fn tcp_connect_timeout(
+    host: &str,
+    port: u16,
+    timeout: std::time::Duration,
+) -> io::Result<(RawFd, SocketAddr, SocketAddr)> {
+    // DNS resolution on a background thread — can hang for seconds on bad DNS
     let addr_str = format!("{}:{}", host, port);
-    let addrs: Vec<SocketAddr> = addr_str.to_socket_addrs()?.collect();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let dns_str = addr_str.clone();
+    std::thread::Builder::new()
+        .name("dns-resolve".to_string())
+        .spawn(move || {
+            let result: io::Result<Vec<SocketAddr>> = dns_str.to_socket_addrs().map(|a| a.collect());
+            let _ = tx.send(result);
+        })
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    let addrs = rx.recv_timeout(timeout)
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "DNS resolution timed out"))?
+        .map_err(|e| {
+            tracing::warn!(host, error = %e, "DNS resolution failed");
+            e
+        })?;
 
     if addrs.is_empty() {
         return Err(io::Error::new(
@@ -149,15 +175,19 @@ pub fn tcp_connect(host: &str, port: u16) -> io::Result<(RawFd, SocketAddr, Sock
     }
 
     for addr in addrs {
-        match TcpStream::connect(addr) {
+        match TcpStream::connect_timeout(&addr, timeout) {
             Ok(stream) => {
+                tracing::debug!(%addr, "tcp: connected");
                 let local = stream.local_addr()?;
                 let peer = stream.peer_addr()?;
                 let fd = stream.as_raw_fd();
                 std::mem::forget(stream);
                 return Ok((fd, local, peer));
             }
-            Err(_) => continue,
+            Err(e) => {
+                tracing::trace!(%addr, error = %e, "tcp: connect attempt failed");
+                continue;
+            }
         }
     }
 

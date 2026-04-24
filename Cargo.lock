@@ -6678,6 +6678,7 @@ name = "zsh"
 version = "0.8.12"
 dependencies = [
  "atty",
+ "bincode",
  "bitflags 2.11.1",
  "chrono",
  "compsys",
@@ -6697,9 +6698,11 @@ dependencies = [
  "os_pipe",
  "parking_lot",
  "rand 0.8.6",
+ "rayon",
  "reedline",
  "regex",
  "rusqlite",
+ "serde",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",

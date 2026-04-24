@@ -23,6 +23,21 @@ pub struct CompInitBgResult {
 use std::io::Write;
 use std::sync::LazyLock;
 
+/// State snapshot for plugin delta computation.
+struct PluginSnapshot {
+    functions: std::collections::HashSet<String>,
+    aliases: std::collections::HashSet<String>,
+    global_aliases: std::collections::HashSet<String>,
+    suffix_aliases: std::collections::HashSet<String>,
+    variables: HashMap<String, String>,
+    arrays: std::collections::HashSet<String>,
+    assoc_arrays: std::collections::HashSet<String>,
+    fpath: Vec<PathBuf>,
+    options: HashMap<String, bool>,
+    hooks: HashMap<String, Vec<String>>,
+    autoloads: std::collections::HashSet<String>,
+}
+
 /// Cached compiled regexes for hot paths
 static REGEX_CACHE: LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashMap::with_capacity(64)));
@@ -587,6 +602,8 @@ pub struct ShellExecutor {
     pub compsys_cache: Option<CompsysCache>,
     // Background compinit — receiver for async fpath scan result
     pub compinit_pending: Option<(std::sync::mpsc::Receiver<CompInitBgResult>, std::time::Instant)>,
+    // Plugin source cache — stores side effects of source/. in SQLite
+    pub plugin_cache: Option<crate::plugin_cache::PluginCache>,
     // cdreplay - deferred compdef calls for zinit turbo mode
     pub deferred_compdefs: Vec<Vec<String>>,
     // command hash table (hash builtin)
@@ -603,6 +620,8 @@ pub struct ShellExecutor {
     pub style_table: StyleTable,
     /// zsh compatibility mode - use .zcompdump, fpath scanning, etc.
     pub zsh_compat: bool,
+    /// POSIX sh strict mode — no SQLite, no worker pool, no zsh extensions
+    pub posix_mode: bool,
     /// Worker thread pool for background tasks (compinit, process subs, etc.)
     pub worker_pool: std::sync::Arc<crate::worker::WorkerPool>,
 }
@@ -716,6 +735,28 @@ impl ShellExecutor {
                 }
             },
             compinit_pending: None, // (receiver, start_time)
+            plugin_cache: {
+                let pc_path = crate::plugin_cache::default_cache_path();
+                if let Some(parent) = pc_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match crate::plugin_cache::PluginCache::open(&pc_path) {
+                    Ok(pc) => {
+                        let (plugins, functions) = pc.stats();
+                        tracing::info!(
+                            plugins,
+                            cached_functions = functions,
+                            path = %pc_path.display(),
+                            "plugin_cache: sqlite opened"
+                        );
+                        Some(pc)
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "plugin_cache: failed to open");
+                        None
+                    }
+                }
+            },
             deferred_compdefs: Vec::new(),
             command_hash: HashMap::new(),
             returning: None,
@@ -727,8 +768,23 @@ impl ShellExecutor {
             profiler: Profiler::new(),
             style_table: StyleTable::new(),
             zsh_compat: false,
+            posix_mode: false,
             worker_pool: std::sync::Arc::new(crate::worker::WorkerPool::default_size()),
         }
+    }
+
+    /// Enter POSIX strict mode — drop all SQLite caches, shrink worker pool to minimum.
+    /// No zsh extensions, no caching, no threads beyond the bare minimum. Dinosaur mode.
+    pub fn enter_posix_mode(&mut self) {
+        self.posix_mode = true;
+        self.plugin_cache = None;
+        self.compsys_cache = None;
+        self.compinit_pending = None;
+        // Worker pool stays at size 1 — we can't drop it entirely because
+        // some code paths use it unconditionally, but with 1 thread it's
+        // effectively serial.
+        self.worker_pool = std::sync::Arc::new(crate::worker::WorkerPool::new(1));
+        tracing::info!("POSIX strict mode: SQLite caches dropped, worker pool shrunk to 1");
     }
 
     /// Run hook functions (precmd, preexec, chpwd, etc.)
@@ -1201,6 +1257,106 @@ impl ShellExecutor {
         regex::Regex::new(&regex_pattern)
             .map(|re| re.is_match(s))
             .unwrap_or(false)
+    }
+
+    /// Static glob match — same logic as glob_match but callable without &self,
+    /// needed for Rayon parallel iterators that can't capture &self.
+    pub fn glob_match_static(s: &str, pattern: &str) -> bool {
+        let mut regex_pattern = String::from("^");
+        let mut chars = pattern.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '*' => regex_pattern.push_str(".*"),
+                '?' => regex_pattern.push('.'),
+                '[' => {
+                    regex_pattern.push('[');
+                    while let Some(cc) = chars.next() {
+                        if cc == ']' {
+                            regex_pattern.push(']');
+                            break;
+                        }
+                        regex_pattern.push(cc);
+                    }
+                }
+                '(' => regex_pattern.push('('),
+                ')' => regex_pattern.push(')'),
+                '|' => regex_pattern.push('|'),
+                '.' | '+' | '^' | '$' | '\\' | '{' | '}' => {
+                    regex_pattern.push('\\');
+                    regex_pattern.push(c);
+                }
+                _ => regex_pattern.push(c),
+            }
+        }
+        regex_pattern.push('$');
+        regex::Regex::new(&regex_pattern)
+            .map(|re| re.is_match(s))
+            .unwrap_or(false)
+    }
+
+    /// Execute a script file with AST caching — skips lex+parse on cache hit.
+    /// The AST is stored in SQLite keyed by (path, mtime).
+    pub fn execute_script_file(&mut self, file_path: &str) -> Result<i32, String> {
+        let path = std::path::Path::new(file_path);
+        let mtime = crate::plugin_cache::file_mtime(path);
+
+        // Try AST cache first
+        if let (Some(ref cache), Some((mt_s, mt_ns))) = (&self.plugin_cache, mtime) {
+            if let Some(ast_bytes) = cache.check_ast(file_path, mt_s, mt_ns) {
+                if let Ok(commands) = bincode::deserialize::<Vec<crate::parser::ShellCommand>>(&ast_bytes) {
+                    tracing::info!(
+                        path = file_path,
+                        cmds = commands.len(),
+                        bytes = ast_bytes.len(),
+                        "execute_script_file: AST cache hit, skipping lex+parse"
+                    );
+                    for cmd in commands {
+                        self.execute_command(&cmd)?;
+                    }
+                    return Ok(self.last_status);
+                }
+            }
+        }
+
+        // Cache miss — read file, parse, execute, cache AST on worker
+        let content = std::fs::read_to_string(file_path)
+            .map_err(|e| format!("{}: {}", file_path, e))?;
+        let expanded = self.expand_history(&content);
+        let mut parser = ShellParser::new(&expanded);
+        let commands = parser.parse_script()?;
+        tracing::debug!(
+            path = file_path,
+            cmds = commands.len(),
+            "execute_script_file: AST cache miss, parsed from source"
+        );
+
+        // Execute
+        for cmd in &commands {
+            self.execute_command(cmd)?;
+        }
+
+        // Async-store the AST in SQLite
+        if let Some((mt_s, mt_ns)) = mtime {
+            if let Ok(ast_bytes) = bincode::serialize(&commands) {
+                let store_path = file_path.to_string();
+                let cache_db_path = crate::plugin_cache::default_cache_path();
+                let ast_size = ast_bytes.len();
+                self.worker_pool.submit(move || {
+                    match crate::plugin_cache::PluginCache::open(&cache_db_path) {
+                        Ok(cache) => {
+                            if let Err(e) = cache.store_ast(&store_path, mt_s, mt_ns, &ast_bytes) {
+                                tracing::error!(path = %store_path, error = %e, "AST cache store failed");
+                            } else {
+                                tracing::debug!(path = %store_path, bytes = ast_size, "AST cached");
+                            }
+                        }
+                        Err(e) => tracing::error!(error = %e, "plugin_cache: open for AST write failed"),
+                    }
+                });
+            }
+        }
+
+        Ok(self.last_status)
     }
 
     #[tracing::instrument(skip(self, script), fields(len = script.len()))]
@@ -1964,10 +2120,23 @@ impl ShellExecutor {
             None
         };
 
+        // Pre-launch external command substitutions in parallel before expanding words.
+        // Each external $(cmd) gets spawned on the worker pool immediately.
+        // When we reach that word during sequential expansion, we collect the result.
+        let preflight = self.preflight_command_subs(&cmd.words);
+
         let mut words: Vec<String> = cmd
             .words
             .iter()
-            .flat_map(|w| self.expand_word_glob(w))
+            .enumerate()
+            .flat_map(|(i, w)| {
+                if let Some(rx) = &preflight[i] {
+                    // Pre-launched external command sub — collect result
+                    vec![rx.recv().unwrap_or_default()]
+                } else {
+                    self.expand_word_glob(w)
+                }
+            })
             .collect();
 
         // Restore noglob after expansion
@@ -4629,7 +4798,7 @@ impl ShellExecutor {
                     Err(_) => pattern.clone(),
                 }
             }
-            ShellWord::Concat(parts) => parts.iter().map(|p| self.expand_word(p)).collect(),
+            ShellWord::Concat(parts) => self.expand_concat_parallel(parts),
             ShellWord::CommandSub(cmd) => self.execute_command_substitution(cmd),
             ShellWord::ProcessSubIn(cmd) => self.execute_process_sub_in(cmd),
             ShellWord::ProcessSubOut(cmd) => self.execute_process_sub_out(cmd),
@@ -4641,6 +4810,122 @@ impl ShellExecutor {
                 .collect::<Vec<_>>()
                 .join(" "),
         }
+    }
+
+    /// Pre-launch external command substitutions from a word list onto the worker pool.
+    /// Returns a Vec aligned with `words` — Some(receiver) for pre-launched externals, None otherwise.
+    fn preflight_command_subs(
+        &mut self,
+        words: &[ShellWord],
+    ) -> Vec<Option<crossbeam_channel::Receiver<String>>> {
+        use crate::parser::ShellWord;
+        use std::process::{Command, Stdio};
+
+        let mut receivers = Vec::with_capacity(words.len());
+
+        // Count external command subs — don't bother with pool overhead for just one
+        let external_count = words.iter().filter(|w| {
+            if let ShellWord::CommandSub(cmd) = w {
+                if let ShellCommand::Simple(simple) = cmd.as_ref() {
+                    if let Some(first) = simple.words.first() {
+                        let name = self.expand_word(first);
+                        return !self.functions.contains_key(&name) && !self.is_builtin(&name);
+                    }
+                }
+            }
+            false
+        }).count();
+
+        if external_count < 2 {
+            // Not worth parallelizing — fall through to sequential
+            return vec![None; words.len()];
+        }
+
+        for word in words {
+            if let ShellWord::CommandSub(cmd) = word {
+                if let ShellCommand::Simple(simple) = cmd.as_ref() {
+                    let first = simple.words.first().map(|w| self.expand_word(w));
+                    if let Some(ref name) = first {
+                        if !self.functions.contains_key(name) && !self.is_builtin(name) {
+                            let expanded: Vec<String> =
+                                simple.words.iter().map(|w| self.expand_word(w)).collect();
+                            let rx = self.worker_pool.submit_with_result(move || {
+                                let output = Command::new(&expanded[0])
+                                    .args(&expanded[1..])
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::inherit())
+                                    .output();
+                                match output {
+                                    Ok(out) => String::from_utf8_lossy(&out.stdout)
+                                        .trim_end_matches('\n')
+                                        .to_string(),
+                                    Err(_) => String::new(),
+                                }
+                            });
+                            receivers.push(Some(rx));
+                            continue;
+                        }
+                    }
+                }
+            }
+            receivers.push(None);
+        }
+
+        receivers
+    }
+
+    /// Expand a Concat word list, launching external command substitutions in parallel.
+    /// Internal subs (builtins/functions) still run sequentially on the main thread.
+    fn expand_concat_parallel(&mut self, parts: &[ShellWord]) -> String {
+        use crate::parser::ShellWord;
+        use std::process::{Command, Stdio};
+
+        // Phase 1: identify external command subs and pre-launch them
+        let mut preflight: Vec<Option<crossbeam_channel::Receiver<String>>> = Vec::with_capacity(parts.len());
+
+        for part in parts {
+            if let ShellWord::CommandSub(cmd) = part {
+                if let ShellCommand::Simple(simple) = cmd.as_ref() {
+                    let first = simple.words.first().map(|w| self.expand_word(w));
+                    if let Some(ref name) = first {
+                        if !self.functions.contains_key(name) && !self.is_builtin(name) {
+                            // External command — pre-launch on background thread
+                            let words: Vec<String> =
+                                simple.words.iter().map(|w| self.expand_word(w)).collect();
+                            let rx = self.worker_pool.submit_with_result(move || {
+                                let output = Command::new(&words[0])
+                                    .args(&words[1..])
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::inherit())
+                                    .output();
+                                match output {
+                                    Ok(out) => String::from_utf8_lossy(&out.stdout)
+                                        .trim_end_matches('\n')
+                                        .to_string(),
+                                    Err(_) => String::new(),
+                                }
+                            });
+                            preflight.push(Some(rx));
+                            continue;
+                        }
+                    }
+                }
+            }
+            preflight.push(None); // not pre-launched
+        }
+
+        // Phase 2: collect results in order, using pre-launched receivers where available
+        let mut result = String::new();
+        for (i, part) in parts.iter().enumerate() {
+            if let Some(rx) = preflight[i].take() {
+                // Pre-launched external command sub — collect result
+                result.push_str(&rx.recv().unwrap_or_default());
+            } else {
+                // Everything else — expand sequentially (may be internal sub, variable, literal)
+                result.push_str(&self.expand_word(part));
+            }
+        }
+        result
     }
 
     fn expand_braced_variable(&mut self, content: &str) -> String {
@@ -4709,24 +4994,42 @@ impl ShellExecutor {
                 if let Some(filter_pos) = rest.find(":#") {
                     let var_name = &rest[..filter_pos];
                     let pattern = &rest[filter_pos + 2..];
-                    let val = self.get_variable(var_name);
 
+                    // Array path: filter each element against pattern
+                    if let Some(arr) = self.arrays.get(var_name).cloned() {
+                        let filtered: Vec<String> = if arr.len() >= 1000 {
+                            tracing::trace!(
+                                count = arr.len(),
+                                pattern,
+                                "using parallel filter (rayon) for large array"
+                            );
+                            use rayon::prelude::*;
+                            let pattern = pattern.to_string();
+                            arr.into_par_iter()
+                                .filter(|elem| {
+                                    let m = Self::glob_match_static(elem, &pattern);
+                                    if has_match_flag { m } else { !m }
+                                })
+                                .collect()
+                        } else {
+                            arr.into_iter()
+                                .filter(|elem| {
+                                    let m = self.glob_match(elem, pattern);
+                                    if has_match_flag { m } else { !m }
+                                })
+                                .collect()
+                        };
+                        return filtered.join(" ");
+                    }
+
+                    // Scalar path: original behavior
+                    let val = self.get_variable(var_name);
                     let matches = self.glob_match(&val, pattern);
 
                     return if has_match_flag {
-                        // (M) - return value if matches, empty otherwise
-                        if matches {
-                            val
-                        } else {
-                            String::new()
-                        }
+                        if matches { val } else { String::new() }
                     } else {
-                        // No (M) - return empty if matches, value otherwise
-                        if matches {
-                            String::new()
-                        } else {
-                            val
-                        }
+                        if matches { String::new() } else { val }
                     };
                 }
 
@@ -6640,25 +6943,71 @@ impl ShellExecutor {
             ZshParamFlag::Quote => format!("'{}'", val.replace('\'', "'\\''")),
             ZshParamFlag::DoubleQuote => format!("\"{}\"", val.replace('"', "\\\"")),
             ZshParamFlag::Unique => {
-                let mut seen = std::collections::HashSet::new();
-                val.split_whitespace()
+                // Unique preserves first-occurrence order, so parallel doesn't help.
+                // For 1000+ elements, pre-allocate the HashSet for less rehashing.
+                let words: Vec<&str> = val.split_whitespace().collect();
+                let mut seen = std::collections::HashSet::with_capacity(
+                    if words.len() >= 1000 { words.len() } else { 0 },
+                );
+                if words.len() >= 1000 {
+                    tracing::trace!(
+                        count = words.len(),
+                        "unique on large array ({} elements)",
+                        words.len()
+                    );
+                }
+                words
+                    .into_iter()
                     .filter(|s| seen.insert(*s))
                     .collect::<Vec<_>>()
                     .join(" ")
             }
-            ZshParamFlag::Reverse => val.chars().rev().collect(),
+            ZshParamFlag::Reverse => {
+                // (O) flag: reverse sort (sort descending)
+                let mut words: Vec<&str> = val.split_whitespace().collect();
+                if words.len() >= 1000 {
+                    tracing::trace!(
+                        count = words.len(),
+                        "using parallel reverse sort (rayon) for large array"
+                    );
+                    use rayon::prelude::*;
+                    words.par_sort_unstable_by(|a, b| b.cmp(a));
+                } else {
+                    words.sort_unstable_by(|a, b| b.cmp(a));
+                }
+                words.join(" ")
+            }
             ZshParamFlag::Sort => {
                 let mut words: Vec<&str> = val.split_whitespace().collect();
-                words.sort();
+                if words.len() >= 1000 {
+                    tracing::trace!(
+                        count = words.len(),
+                        "using parallel sort (rayon) for large array"
+                    );
+                    use rayon::prelude::*;
+                    words.par_sort_unstable();
+                } else {
+                    words.sort_unstable();
+                }
                 words.join(" ")
             }
             ZshParamFlag::NumericSort => {
                 let mut words: Vec<&str> = val.split_whitespace().collect();
-                words.sort_by(|a, b| {
+                let cmp = |a: &&str, b: &&str| {
                     let na: i64 = a.parse().unwrap_or(0);
                     let nb: i64 = b.parse().unwrap_or(0);
                     na.cmp(&nb)
-                });
+                };
+                if words.len() >= 1000 {
+                    tracing::trace!(
+                        count = words.len(),
+                        "using parallel numeric sort (rayon) for large array"
+                    );
+                    use rayon::prelude::*;
+                    words.par_sort_unstable_by(cmp);
+                } else {
+                    words.sort_unstable_by(cmp);
+                }
                 words.join(" ")
             }
             ZshParamFlag::Keys => {
@@ -7399,27 +7748,89 @@ impl ShellExecutor {
         let saved_zero = self.variables.get("0").cloned();
         self.variables.insert("0".to_string(), abs_path.clone());
 
-        tracing::debug!(path = %abs_path, "source: loading file");
-        let result = match std::fs::read_to_string(&abs_path) {
-            Ok(content) => match self.execute_script(&content) {
-                Ok(status) => {
-                    tracing::trace!(path = %abs_path, status, "source: done");
-                    status
+        let result;
+
+        if self.posix_mode {
+            // --- POSIX mode: plain read + execute, no SQLite, no caching, no threads ---
+            result = match std::fs::read_to_string(&abs_path) {
+                Ok(content) => match self.execute_script(&content) {
+                    Ok(status) => status,
+                    Err(e) => { eprintln!("source: {}: {}", path, e); 1 }
+                },
+                Err(e) => { eprintln!("source: {}: {}", path, e); 1 }
+            };
+        } else {
+            // --- zshrs/zsh mode: plugin cache + AST cache + worker pool ---
+            let file_path = std::path::Path::new(&abs_path);
+
+            // Check plugin cache for side-effect replay
+            if let Some(ref cache) = self.plugin_cache {
+                if let Some((mt_s, mt_ns)) = crate::plugin_cache::file_mtime(file_path) {
+                    if let Some(plugin_id) = cache.check(&abs_path, mt_s, mt_ns) {
+                        if let Ok(delta) = cache.load(plugin_id) {
+                            let t0 = std::time::Instant::now();
+                            self.replay_plugin_delta(&delta);
+                            tracing::info!(
+                                path = %abs_path,
+                                replay_us = t0.elapsed().as_micros() as u64,
+                                funcs = delta.functions.len(),
+                                aliases = delta.aliases.len(),
+                                vars = delta.variables.len() + delta.exports.len(),
+                                "source: cache hit, replayed"
+                            );
+                            // Restore $0
+                            if let Some(z) = saved_zero { self.variables.insert("0".to_string(), z); }
+                            else { self.variables.remove("0"); }
+                            return 0;
+                        }
+                    }
                 }
+            }
+
+            // Cache miss — snapshot, execute via AST-cached path, diff, async store
+            let snapshot = self.snapshot_state();
+            let t0 = std::time::Instant::now();
+            tracing::debug!(path = %abs_path, "source: cache miss, executing via AST-cached path");
+            result = match self.execute_script_file(&abs_path) {
+                Ok(status) => status,
                 Err(e) => {
                     tracing::warn!(path = %abs_path, error = %e, "source: execution failed");
                     eprintln!("source: {}: {}", path, e);
                     1
                 }
-            },
-            Err(e) => {
-                tracing::warn!(path = %abs_path, error = %e, "source: file not found");
-                eprintln!("source: {}: {}", path, e);
-                1
-            }
-        };
+            };
+            let source_ms = t0.elapsed().as_millis() as u64;
 
-        // Handle return from sourced script - clear the flag and use its value
+            // Async-store delta to plugin cache on worker pool
+            if result == 0 {
+                if let Some((mt_s, mt_ns)) = crate::plugin_cache::file_mtime(file_path) {
+                    let delta = self.diff_state(&snapshot);
+                    let store_path = abs_path.clone();
+                    tracing::info!(
+                        path = %abs_path, source_ms,
+                        funcs = delta.functions.len(),
+                        aliases = delta.aliases.len(),
+                        vars = delta.variables.len() + delta.exports.len(),
+                        "source: caching delta on worker"
+                    );
+                    let cache_db_path = crate::plugin_cache::default_cache_path();
+                    self.worker_pool.submit(move || {
+                        match crate::plugin_cache::PluginCache::open(&cache_db_path) {
+                            Ok(cache) => {
+                                if let Err(e) = cache.store(&store_path, mt_s, mt_ns, source_ms, &delta) {
+                                    tracing::error!(path = %store_path, error = %e, "plugin_cache: store failed");
+                                } else {
+                                    tracing::debug!(path = %store_path, "plugin_cache: stored");
+                                }
+                            }
+                            Err(e) => tracing::error!(error = %e, "plugin_cache: open for write failed"),
+                        }
+                    });
+                }
+            }
+        }
+
+        // Handle return from sourced script
         let final_result = if let Some(ret) = self.returning.take() {
             ret
         } else {
@@ -7434,6 +7845,178 @@ impl ShellExecutor {
         }
 
         final_result
+    }
+
+    /// Snapshot executor state before sourcing a plugin (for delta computation).
+    fn snapshot_state(&self) -> PluginSnapshot {
+        PluginSnapshot {
+            functions: self.functions.keys().cloned().collect(),
+            aliases: self.aliases.keys().cloned().collect(),
+            global_aliases: self.global_aliases.keys().cloned().collect(),
+            suffix_aliases: self.suffix_aliases.keys().cloned().collect(),
+            variables: self.variables.clone(),
+            arrays: self.arrays.keys().cloned().collect(),
+            assoc_arrays: self.assoc_arrays.keys().cloned().collect(),
+            fpath: self.fpath.clone(),
+            options: self.options.clone(),
+            hooks: self.hook_functions.clone(),
+            autoloads: self.autoload_pending.keys().cloned().collect(),
+        }
+    }
+
+    /// Compute the delta between current state and a previous snapshot.
+    fn diff_state(&self, snap: &PluginSnapshot) -> crate::plugin_cache::PluginDelta {
+        use crate::plugin_cache::{AliasKind, PluginDelta};
+        let mut delta = PluginDelta::default();
+
+        // New functions — serialize AST to bincode for instant replay
+        for (name, body) in &self.functions {
+            if !snap.functions.contains(name) {
+                if let Ok(bytes) = bincode::serialize(body) {
+                    delta.functions.push((name.clone(), bytes));
+                }
+            }
+        }
+
+        // New aliases
+        for (name, value) in &self.aliases {
+            if !snap.aliases.contains(name) {
+                delta.aliases.push((name.clone(), value.clone(), AliasKind::Regular));
+            }
+        }
+        for (name, value) in &self.global_aliases {
+            if !snap.global_aliases.contains(name) {
+                delta.aliases.push((name.clone(), value.clone(), AliasKind::Global));
+            }
+        }
+        for (name, value) in &self.suffix_aliases {
+            if !snap.suffix_aliases.contains(name) {
+                delta.aliases.push((name.clone(), value.clone(), AliasKind::Suffix));
+            }
+        }
+
+        // New/changed variables
+        for (name, value) in &self.variables {
+            if name == "0" { continue; } // skip $0 (we set it ourselves)
+            match snap.variables.get(name) {
+                Some(old) if old == value => {} // unchanged
+                _ => {
+                    // Check if it's also exported
+                    if env::var(name).ok().as_ref() == Some(value) {
+                        delta.exports.push((name.clone(), value.clone()));
+                    } else {
+                        delta.variables.push((name.clone(), value.clone()));
+                    }
+                }
+            }
+        }
+
+        // New arrays
+        for (name, values) in &self.arrays {
+            if !snap.arrays.contains(name) {
+                delta.arrays.push((name.clone(), values.clone()));
+            }
+        }
+
+        // New fpath entries
+        for p in &self.fpath {
+            if !snap.fpath.contains(p) {
+                delta.fpath_additions.push(p.to_string_lossy().to_string());
+            }
+        }
+
+        // Changed options
+        for (name, value) in &self.options {
+            match snap.options.get(name) {
+                Some(old) if old == value => {}
+                _ => delta.options_changed.push((name.clone(), *value)),
+            }
+        }
+
+        // New hooks
+        for (hook, funcs) in &self.hook_functions {
+            let old_funcs = snap.hooks.get(hook);
+            for f in funcs {
+                let is_new = old_funcs.map_or(true, |old| !old.contains(f));
+                if is_new {
+                    delta.hooks.push((hook.clone(), f.clone()));
+                }
+            }
+        }
+
+        // New autoloads
+        for (name, flags) in &self.autoload_pending {
+            if !snap.autoloads.contains(name) {
+                delta.autoloads.push((name.clone(), format!("{:?}", flags)));
+            }
+        }
+
+        delta
+    }
+
+    /// Replay a cached plugin delta into the executor state.
+    fn replay_plugin_delta(&mut self, delta: &crate::plugin_cache::PluginDelta) {
+        use crate::plugin_cache::AliasKind;
+
+        // Aliases
+        for (name, value, kind) in &delta.aliases {
+            match kind {
+                AliasKind::Regular => { self.aliases.insert(name.clone(), value.clone()); }
+                AliasKind::Global => { self.global_aliases.insert(name.clone(), value.clone()); }
+                AliasKind::Suffix => { self.suffix_aliases.insert(name.clone(), value.clone()); }
+            }
+        }
+
+        // Variables
+        for (name, value) in &delta.variables {
+            self.variables.insert(name.clone(), value.clone());
+        }
+
+        // Exports (set in both variables and process env)
+        for (name, value) in &delta.exports {
+            self.variables.insert(name.clone(), value.clone());
+            env::set_var(name, value);
+        }
+
+        // Arrays
+        for (name, values) in &delta.arrays {
+            self.arrays.insert(name.clone(), values.clone());
+        }
+
+        // Fpath additions
+        for p in &delta.fpath_additions {
+            let pb = PathBuf::from(p);
+            if !self.fpath.contains(&pb) {
+                self.fpath.push(pb);
+            }
+        }
+
+        // Completions
+        for (cmd, func) in &delta.completions {
+            if let Some(ref mut comps) = self.assoc_arrays.get_mut("_comps") {
+                comps.insert(cmd.clone(), func.clone());
+            }
+        }
+
+        // Options
+        for (name, enabled) in &delta.options_changed {
+            self.options.insert(name.clone(), *enabled);
+        }
+
+        // Hooks
+        for (hook, func) in &delta.hooks {
+            self.hook_functions
+                .entry(hook.clone())
+                .or_insert_with(Vec::new)
+                .push(func.clone());
+        }
+
+        // Functions — deserialize bincode AST blobs directly into self.functions
+        for (name, bytes) in &delta.functions {
+            if let Ok(ast) = bincode::deserialize::<crate::parser::ShellCommand>(bytes) {
+                self.functions.insert(name.clone(), ast);
+            }
+        }
     }
 
     fn builtin_exit(&mut self, args: &[String]) -> i32 {
@@ -7464,6 +8047,23 @@ impl ShellExecutor {
             .map(|s| s.as_str())
             .filter(|&s| s != "]")
             .collect();
+
+        // Prefetch metadata for all file paths in the expression — one stat() per unique path
+        // instead of one stat() per test flag. Avoids 7 serial stat()s for -r -w -x -g -k -u -s.
+        let mut meta_cache: HashMap<String, Option<std::fs::Metadata>> = HashMap::new();
+        for arg in &args {
+            if !arg.starts_with('-') && !arg.starts_with('!') && *arg != "(" && *arg != ")" {
+                let path_str = arg.to_string();
+                if !meta_cache.contains_key(&path_str) {
+                    meta_cache.insert(path_str, std::fs::metadata(arg).ok());
+                }
+            }
+        }
+
+        // Helper closure: get metadata from cache or fetch
+        let get_meta = |path: &str| -> Option<std::fs::Metadata> {
+            meta_cache.get(path).cloned().unwrap_or_else(|| std::fs::metadata(path).ok())
+        };
 
         match args.as_slice() {
             // String tests
@@ -7556,10 +8156,10 @@ impl ShellExecutor {
                 }
             }
 
-            // File permission tests
+            // File permission tests — all use prefetched metadata (one stat per path)
             ["-r", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if let Ok(meta) = std::fs::metadata(path) {
+                if let Some(meta) = get_meta(path) {
                     let mode = meta.mode();
                     let uid = unsafe { libc::geteuid() };
                     let gid = unsafe { libc::getegid() };
@@ -7570,18 +8170,14 @@ impl ShellExecutor {
                     } else {
                         mode & 0o004 != 0
                     };
-                    if readable {
-                        0
-                    } else {
-                        1
-                    }
+                    if readable { 0 } else { 1 }
                 } else {
                     1
                 }
             }
             ["-w", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if let Ok(meta) = std::fs::metadata(path) {
+                if let Some(meta) = get_meta(path) {
                     let mode = meta.mode();
                     let uid = unsafe { libc::geteuid() };
                     let gid = unsafe { libc::getegid() };
@@ -7592,18 +8188,14 @@ impl ShellExecutor {
                     } else {
                         mode & 0o002 != 0
                     };
-                    if writable {
-                        0
-                    } else {
-                        1
-                    }
+                    if writable { 0 } else { 1 }
                 } else {
                     1
                 }
             }
             ["-x", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if let Ok(meta) = std::fs::metadata(path) {
+                if let Some(meta) = get_meta(path) {
                     let mode = meta.mode();
                     let uid = unsafe { libc::geteuid() };
                     let gid = unsafe { libc::getegid() };
@@ -7614,42 +8206,24 @@ impl ShellExecutor {
                     } else {
                         mode & 0o001 != 0
                     };
-                    if executable {
-                        0
-                    } else {
-                        1
-                    }
+                    if executable { 0 } else { 1 }
                 } else {
                     1
                 }
             }
 
-            // Special permission bits
+            // Special permission bits — prefetched metadata
             ["-g", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if std::fs::metadata(path)
-                    .map(|m| m.mode() & 0o2000 != 0)
-                    .unwrap_or(false)
-                {
-                    0
-                } else {
-                    1
-                }
+                if get_meta(path).map(|m| m.mode() & 0o2000 != 0).unwrap_or(false) { 0 } else { 1 }
             }
             ["-k", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if std::fs::metadata(path)
-                    .map(|m| m.mode() & 0o1000 != 0)
-                    .unwrap_or(false)
-                {
-                    0
-                } else {
-                    1
-                }
+                if get_meta(path).map(|m| m.mode() & 0o1000 != 0).unwrap_or(false) { 0 } else { 1 }
             }
             ["-u", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if std::fs::metadata(path)
+                if get_meta(path)
                     .map(|m| m.mode() & 0o4000 != 0)
                     .unwrap_or(false)
                 {
@@ -7659,46 +8233,25 @@ impl ShellExecutor {
                 }
             }
 
-            // File size
+            // File size — prefetched metadata
             ["-s", path] => {
-                if std::fs::metadata(path)
-                    .map(|m| m.len() > 0)
-                    .unwrap_or(false)
-                {
-                    0
-                } else {
-                    1
-                }
+                if get_meta(path).map(|m| m.len() > 0).unwrap_or(false) { 0 } else { 1 }
             }
 
-            // Ownership
+            // Ownership — prefetched metadata
             ["-O", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if std::fs::metadata(path)
-                    .map(|m| m.uid() == unsafe { libc::geteuid() })
-                    .unwrap_or(false)
-                {
-                    0
-                } else {
-                    1
-                }
+                if get_meta(path).map(|m| m.uid() == unsafe { libc::geteuid() }).unwrap_or(false) { 0 } else { 1 }
             }
             ["-G", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if std::fs::metadata(path)
-                    .map(|m| m.gid() == unsafe { libc::getegid() })
-                    .unwrap_or(false)
-                {
-                    0
-                } else {
-                    1
-                }
+                if get_meta(path).map(|m| m.gid() == unsafe { libc::getegid() }).unwrap_or(false) { 0 } else { 1 }
             }
 
-            // File times
+            // File times — prefetched metadata
             ["-N", path] => {
                 use std::os::unix::fs::MetadataExt;
-                if let Ok(meta) = std::fs::metadata(path) {
+                if let Some(meta) = get_meta(path) {
                     if meta.mtime() > meta.atime() {
                         0
                     } else {
@@ -8774,6 +9327,45 @@ impl ShellExecutor {
                         func_name
                     );
                 }
+            }
+        }
+
+        // Batch pre-resolution: when multiple autoloads are registered at once
+        // (common during .zshrc processing), dispatch fpath lookups in parallel
+        // across the worker pool to pre-read function files into the OS page cache.
+        if functions.len() >= 4 && !resolve && !execute_now {
+            let fpath_dirs: Vec<PathBuf> = self.fpath.clone();
+            let names: Vec<String> = functions.clone();
+            let pool = std::sync::Arc::clone(&self.worker_pool);
+
+            tracing::debug!(
+                count = names.len(),
+                fpath_dirs = fpath_dirs.len(),
+                "batch autoload: pre-resolving fpath lookups on worker pool"
+            );
+
+            // Submit resolution tasks — each worker scans fpath for a subset of names.
+            // Results are cached in a shared map for later use by load_autoload_function.
+            let resolved = std::sync::Arc::new(parking_lot::Mutex::new(
+                HashMap::<String, PathBuf>::with_capacity(names.len()),
+            ));
+
+            for name in names {
+                let dirs = fpath_dirs.clone();
+                let resolved = std::sync::Arc::clone(&resolved);
+                pool.submit(move || {
+                    for dir in &dirs {
+                        let path = dir.join(&name);
+                        if path.exists() && path.is_file() {
+                            // Pre-read to warm OS page cache (the read result is discarded,
+                            // but the pages stay in the kernel buffer cache)
+                            let _ = std::fs::read(&path);
+                            resolved.lock().insert(name.clone(), path);
+                            tracing::trace!(func = %name, "autoload batch: pre-resolved");
+                            break;
+                        }
+                    }
+                });
             }
         }
 
@@ -11785,12 +12377,14 @@ impl ShellExecutor {
         // -C: use cache if valid (skip fpath scan)
         // -D: don't dump (don't write .zcompdump)
         // -d file: specify dump file
-        // -u/-i: ignore security checks (we always ignore)
+        // -u: use insecure dirs anyway  -i: silently ignore insecure dirs
         // -q: quiet
         let mut quiet = false;
         let mut no_dump = false;
         let mut dump_file: Option<String> = None;
         let mut use_cache = false;
+        let mut ignore_insecure = false;
+        let mut use_insecure = false;
 
         let mut i = 0;
         while i < args.len() {
@@ -11804,10 +12398,28 @@ impl ShellExecutor {
                         dump_file = Some(args[i].clone());
                     }
                 }
-                "-u" | "-i" => {} // ignore security checks (we don't do them)
+                "-u" => use_insecure = true,
+                "-i" => ignore_insecure = true,
                 _ => {}
             }
             i += 1;
+        }
+
+        // Run compaudit with SQLite cache (unless -u skips it entirely)
+        if !use_insecure && !self.posix_mode {
+            if let Some(ref cache) = self.plugin_cache {
+                let insecure = cache.compaudit_cached(&self.fpath);
+                if !insecure.is_empty() && !ignore_insecure {
+                    if !quiet {
+                        eprintln!("compinit: insecure directories:");
+                        for d in &insecure {
+                            eprintln!("  {}", d);
+                        }
+                        eprintln!("compinit: run with -i to ignore or -u to use anyway");
+                    }
+                    return 1;
+                }
+            }
         }
 
         // ZSH COMPAT MODE: Use traditional zsh algorithm (fpath scan, .zcompdump, no SQLite)

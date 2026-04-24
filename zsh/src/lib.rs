@@ -63,6 +63,7 @@ pub mod params;
 pub mod parser;
 pub mod pattern;
 pub mod pcre;
+pub mod plugin_cache;
 pub mod prompt;
 pub mod random;
 pub mod random_real;
