@@ -9,7 +9,7 @@
 //! License: GPL-2.0 (incorporates code from fish-shell)
 
 use std::env;
-use std::io::{self, BufRead};
+use std::io::{self, Read};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -613,11 +613,25 @@ fn main() {
         return;
     }
 
+    // Extract flags before filtering: -x (xtrace), -f (no rcs), -v (verbose)
+    let enable_xtrace = args.iter().any(|a| a == "-x");
+    let enable_verbose = args.iter().any(|a| a == "-v");
+
     // Filter out flags that don't affect -c / script dispatch
     let args: Vec<String> = args
         .into_iter()
-        .filter(|a| a != "--zsh-compat" && a != "-f" && a != "--no-rcs")
+        .filter(|a| a != "--zsh-compat" && a != "-f" && a != "--no-rcs" && a != "-x" && a != "-v")
         .collect();
+
+    /// Apply CLI flags to executor (xtrace, verbose, etc.)
+    fn apply_cli_flags(executor: &mut ShellExecutor, xtrace: bool, verbose: bool) {
+        if xtrace {
+            executor.options.insert("xtrace".to_string(), true);
+        }
+        if verbose {
+            executor.options.insert("verbose".to_string(), true);
+        }
+    }
 
     // Handle -c 'command' syntax
     if args.len() >= 3 && args[1] == "-c" {
@@ -625,6 +639,7 @@ fn main() {
 
         let mut executor = ShellExecutor::new();
         executor.zsh_compat = is_zsh_compat();
+        apply_cli_flags(&mut executor, enable_xtrace, enable_verbose);
         let start = Instant::now();
         let result = executor.execute_script(code);
         let duration = start.elapsed().as_millis() as i64;
@@ -643,6 +658,8 @@ fn main() {
             eprintln!("zshrs: {}", e);
             std::process::exit(1);
         }
+        std::process::exit(executor.last_status);
+        #[allow(unreachable_code)]
         return;
     }
 
@@ -650,6 +667,7 @@ fn main() {
     if args.len() >= 2 && !args[1].starts_with('-') {
         let mut executor = ShellExecutor::new();
         executor.zsh_compat = is_zsh_compat();
+        apply_cli_flags(&mut executor, enable_xtrace, enable_verbose);
         match std::fs::read_to_string(&args[1]) {
             Ok(script) => {
                 if let Err(e) = executor.execute_script(&script) {
@@ -676,18 +694,16 @@ fn main() {
 fn run_non_interactive() {
     let mut executor = ShellExecutor::new();
     executor.zsh_compat = is_zsh_compat();
-    let stdin = io::stdin();
-    for line in stdin.lock().lines() {
-        match line {
-            Ok(line) => {
-                let line = line.trim();
-                if line.is_empty() || line == "exit" || line == "logout" {
-                    continue;
-                }
-                process_line(line, &mut executor);
-            }
-            Err(_) => break,
+    // Read all of stdin at once so multi-line constructs (heredocs, functions,
+    // loops, etc.) are parsed correctly — line-by-line breaks them.
+    let mut script = String::new();
+    io::stdin().lock().read_to_string(&mut script).unwrap_or(0);
+    if !script.is_empty() {
+        if let Err(e) = executor.execute_script(&script) {
+            eprintln!("zshrs: {}", e);
+            std::process::exit(1);
         }
+        std::process::exit(executor.last_status);
     }
 }
 

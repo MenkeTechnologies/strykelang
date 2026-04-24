@@ -634,7 +634,17 @@ impl ShellExecutor {
             suffix_aliases: HashMap::new(),
             last_status: 0,
             variables,
-            arrays: HashMap::new(),
+            arrays: {
+                let mut a = HashMap::new();
+                // $path mirrors $PATH (tied array)
+                let path_dirs: Vec<String> = env::var("PATH")
+                    .unwrap_or_default()
+                    .split(':')
+                    .map(|s| s.to_string())
+                    .collect();
+                a.insert("path".to_string(), path_dirs);
+                a
+            },
             assoc_arrays: HashMap::new(),
             jobs: JobTable::new(),
             fpath,
@@ -1175,6 +1185,12 @@ impl ShellExecutor {
             self.execute_command(&cmd)?;
         }
 
+        // Fire EXIT trap if set (matches zsh's zshexit behavior).
+        // Remove it first to prevent infinite recursion.
+        if let Some(action) = self.traps.remove("EXIT") {
+            let _ = self.execute_script(&action);
+        }
+
         Ok(self.last_status)
     }
 
@@ -1351,8 +1367,12 @@ impl ShellExecutor {
                 ShellWord::ArrayLiteral(elements) => {
                     // Array assignment: arr=(a b c) or arr+=(a b c)
                     // For associative arrays: assoc=(k1 v1 k2 v2)
-                    let new_elements: Vec<String> =
-                        elements.iter().map(|e| self.expand_word(e)).collect();
+                    // Use expand_word_split so $(cmd) and $var undergo
+                    // word splitting into separate array elements (C zsh behavior).
+                    let new_elements: Vec<String> = elements
+                        .iter()
+                        .flat_map(|e| self.expand_word_split(e))
+                        .collect();
 
                     // Check if this is an associative array
                     if self.assoc_arrays.contains_key(var) {
@@ -1496,6 +1516,12 @@ impl ShellExecutor {
                 .into_iter()
                 .map(|w| global_aliases.get(&w).cloned().unwrap_or(w))
                 .collect();
+        }
+
+        // xtrace: print expanded command to stderr (zsh -x / set -x)
+        if self.options.get("xtrace").copied().unwrap_or(false) {
+            let ps4 = self.variables.get("PS4").cloned().unwrap_or_else(|| "+".to_string());
+            eprintln!("{}{}", ps4, words.join(" "));
         }
 
         // Check for regular alias expansion (alias > builtin > function > command)
@@ -2540,8 +2566,8 @@ impl ShellExecutor {
                 try_body,
                 always_body,
             } => {
-                let saved_errflag = false;
-
+                // Port of exectry() from Src/loop.c
+                // The :try clause
                 for cmd in try_body {
                     if let Err(_e) = self.execute_command(cmd) {
                         break;
@@ -2551,20 +2577,35 @@ impl ShellExecutor {
                     }
                 }
 
-                let try_status = self.last_status;
-                let saved_returning = self.returning.take();
+                // endval = lastval ? lastval : errflag
+                let endval = self.last_status;
 
+                // Save and reset control flow flags for the always clause
+                let save_returning = self.returning.take();
+                let save_breaking = self.breaking;
+                let save_continuing = self.continuing;
+                self.breaking = 0;
+                self.continuing = 0;
+
+                // The always clause — executes unconditionally
                 for cmd in always_body {
                     let _ = self.execute_command(cmd);
                 }
 
-                self.returning = saved_returning;
-
-                if !saved_errflag {
-                    self.last_status = try_status;
+                // Restore control flow: C uses "if (!retflag) retflag = save"
+                // i.e. always block's flags take precedence if set
+                if self.returning.is_none() {
+                    self.returning = save_returning;
+                }
+                if self.breaking == 0 {
+                    self.breaking = save_breaking;
+                }
+                if self.continuing == 0 {
+                    self.continuing = save_continuing;
                 }
 
-                Ok(self.last_status)
+                self.last_status = endval;
+                Ok(endval)
             }
 
             CompoundCommand::Cond(expr) => {
@@ -4616,18 +4657,39 @@ impl ShellExecutor {
                     }
                     result.push_str(&self.expand_braced_variable(&brace_content));
                 } else {
+                    // Check for single-char special vars first: $$, $!, $-
+                    if matches!(chars.peek(), Some(&'$') | Some(&'!') | Some(&'-')) {
+                        let sc = chars.next().unwrap();
+                        result.push_str(&self.get_variable(&sc.to_string()));
+                        continue;
+                    }
+                    // $#name → ${#name} (string/array length)
+                    if chars.peek() == Some(&'#') {
+                        let mut peek_iter = chars.clone();
+                        peek_iter.next(); // skip #
+                        if peek_iter.peek().map(|c| c.is_alphabetic() || *c == '_').unwrap_or(false) {
+                            chars.next(); // consume #
+                            let mut name = String::new();
+                            while let Some(&c) = chars.peek() {
+                                if c.is_alphanumeric() || c == '_' {
+                                    name.push(chars.next().unwrap());
+                                } else {
+                                    break;
+                                }
+                            }
+                            // Return length of variable or array
+                            let len = if let Some(arr) = self.arrays.get(&name) {
+                                arr.len()
+                            } else {
+                                self.get_variable(&name).len()
+                            };
+                            result.push_str(&len.to_string());
+                            continue;
+                        }
+                    }
                     let mut var_name = String::new();
                     while let Some(&c) = chars.peek() {
-                        if c.is_alphanumeric()
-                            || c == '_'
-                            || c == '@'
-                            || c == '*'
-                            || c == '#'
-                            || c == '?'
-                            || c == '$'
-                            || c == '!'
-                            || c == '-'
-                        {
+                        if c.is_alphanumeric() || c == '_' || c == '@' || c == '*' || c == '#' || c == '?' {
                             var_name.push(chars.next().unwrap());
                             // Handle single-char special vars
                             if matches!(
@@ -4854,7 +4916,11 @@ impl ShellExecutor {
     fn run_command_substitution(&mut self, cmd_str: &str) -> String {
         use std::process::Stdio;
 
-        // Parse and execute the command
+        // Port of getoutput() from Src/exec.c:
+        // C zsh forks, redirects stdout to a pipe, executes via execode(),
+        // and the parent reads back the output.  We achieve the same by
+        // capturing stdout through an in-process pipe.
+
         let mut parser = ShellParser::new(cmd_str);
         let commands = match parser.parse_script() {
             Ok(cmds) => cmds,
@@ -4865,42 +4931,80 @@ impl ShellExecutor {
             return String::new();
         }
 
-        // For simple external commands, capture output directly
-        if let ShellCommand::Simple(simple) = &commands[0] {
-            let words: Vec<String> = simple.words.iter().map(|w| self.expand_word(w)).collect();
-            if words.is_empty() {
-                return String::new();
-            }
-
-            let cmd_name = &words[0];
-            let args = &words[1..];
-
-            // Handle echo specially
-            if cmd_name == "echo" {
-                return args.join(" ");
-            }
-
-            if cmd_name == "pwd" {
-                return env::current_dir()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default();
-            }
-
-            // External command
-            let output = Command::new(cmd_name)
-                .args(args)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::inherit())
-                .output();
-
-            match output {
-                Ok(output) => String::from_utf8_lossy(&output.stdout)
-                    .trim_end_matches('\n')
-                    .to_string(),
-                Err(_) => String::new(),
+        // Check if this is a simple external-only command (no builtins/functions)
+        // so we can use the fast path of spawning a child process.
+        let is_internal = if let ShellCommand::Simple(simple) = &commands[0] {
+            let first = simple.words.first().map(|w| self.expand_word(w));
+            if let Some(ref name) = first {
+                self.functions.contains_key(name)
+                    || self.is_builtin(name)
+            } else {
+                true
             }
         } else {
-            String::new()
+            true // compound commands are always internal
+        };
+
+        if is_internal {
+            // Internal execution: capture stdout via a pipe
+            let (read_fd, write_fd) = {
+                let mut fds = [0i32; 2];
+                if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
+                    return String::new();
+                }
+                (fds[0], fds[1])
+            };
+
+            // Save original stdout and redirect to our pipe
+            let saved_stdout = unsafe { libc::dup(1) };
+            unsafe { libc::dup2(write_fd, 1); }
+            unsafe { libc::close(write_fd); }
+
+            // Execute all commands
+            for cmd in &commands {
+                let _ = self.execute_command(cmd);
+            }
+
+            // Flush stdout so buffered output goes to pipe
+            use std::io::Write;
+            let _ = io::stdout().flush();
+
+            // Restore stdout
+            unsafe { libc::dup2(saved_stdout, 1); }
+            unsafe { libc::close(saved_stdout); }
+
+            // Read captured output
+            use std::os::unix::io::FromRawFd;
+            let mut output = String::new();
+            let read_file = unsafe { std::fs::File::from_raw_fd(read_fd) };
+            use std::io::Read;
+            let _ = std::io::BufReader::new(read_file).read_to_string(&mut output);
+
+            output.trim_end_matches('\n').to_string()
+        } else {
+            // External command: spawn child and capture stdout
+            if let ShellCommand::Simple(simple) = &commands[0] {
+                let words: Vec<String> =
+                    simple.words.iter().map(|w| self.expand_word(w)).collect();
+                if words.is_empty() {
+                    return String::new();
+                }
+
+                let output = Command::new(&words[0])
+                    .args(&words[1..])
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::inherit())
+                    .output();
+
+                match output {
+                    Ok(out) => String::from_utf8_lossy(&out.stdout)
+                        .trim_end_matches('\n')
+                        .to_string(),
+                    Err(_) => String::new(),
+                }
+            } else {
+                String::new()
+            }
         }
     }
 
@@ -5431,10 +5535,14 @@ impl ShellExecutor {
                 }
             }
             _ => {
-                // Check local variables first, then env
+                // Check local variables first, then arrays, then env
                 self.variables
                     .get(name)
                     .cloned()
+                    .or_else(|| {
+                        // In zsh, $arr expands to space-joined array elements
+                        self.arrays.get(name).map(|a| a.join(" "))
+                    })
                     .or_else(|| env::var(name).ok())
                     .unwrap_or_default()
             }
@@ -5702,12 +5810,12 @@ impl ShellExecutor {
                 'U' => flags.push(ZshParamFlag::Upper),
                 'C' => flags.push(ZshParamFlag::Capitalize),
                 'j' => {
-                    // j:sep: - join with separator
-                    if chars.peek() == Some(&':') {
-                        chars.next();
+                    // j<delim>sep<delim> — join with separator (delim can be any char)
+                    if let Some(&delim) = chars.peek() {
+                        chars.next(); // consume delimiter char
                         let mut sep = String::new();
                         while let Some(&ch) = chars.peek() {
-                            if ch == ':' {
+                            if ch == delim {
                                 chars.next();
                                 break;
                             }
@@ -6328,9 +6436,31 @@ impl ShellExecutor {
             CondExpr::StringMatch(a, b) => {
                 let val = self.expand_word(a);
                 let pattern = self.expand_word(b);
-                cached_regex(&pattern)
-                    .map(|re| re.is_match(&val))
-                    .unwrap_or(false)
+                if let Some(re) = cached_regex(&pattern) {
+                    if let Some(caps) = re.captures(&val) {
+                        // Set $MATCH to the full match
+                        if let Some(m) = caps.get(0) {
+                            self.variables.insert("MATCH".to_string(), m.as_str().to_string());
+                        }
+                        // Set $match array with capture groups
+                        let mut match_arr = Vec::new();
+                        for i in 1..caps.len() {
+                            if let Some(g) = caps.get(i) {
+                                match_arr.push(g.as_str().to_string());
+                            }
+                        }
+                        if !match_arr.is_empty() {
+                            self.arrays.insert("match".to_string(), match_arr);
+                        }
+                        true
+                    } else {
+                        self.variables.remove("MATCH");
+                        self.arrays.remove("match");
+                        false
+                    }
+                } else {
+                    false
+                }
             }
             CondExpr::StringLess(a, b) => self.expand_word(a) < self.expand_word(b),
             CondExpr::StringGreater(a, b) => self.expand_word(a) > self.expand_word(b),
@@ -6575,7 +6705,12 @@ impl ShellExecutor {
     fn builtin_export(&mut self, args: &[String]) -> i32 {
         for arg in args {
             if let Some((key, value)) = arg.split_once('=') {
+                self.variables.insert(key.to_string(), value.to_string());
                 env::set_var(key, value);
+            } else {
+                // export VAR (no value) — mark existing var as exported
+                let val = self.get_variable(arg);
+                env::set_var(arg, &val);
             }
         }
         0
@@ -13659,6 +13794,33 @@ impl ShellExecutor {
     /// limit - csh-style resource limits
     fn builtin_limit(&self, args: &[String]) -> i32 {
         // Delegate to ulimit with csh-style names
+        if args.is_empty() {
+            // Print all resource limits in csh format
+            use libc::{getrlimit, rlimit, RLIM_INFINITY};
+            let resources = [
+                (libc::RLIMIT_CPU, "cputime", 1, "seconds"),
+                (libc::RLIMIT_FSIZE, "filesize", 1024, "kB"),
+                (libc::RLIMIT_DATA, "datasize", 1024, "kB"),
+                (libc::RLIMIT_STACK, "stacksize", 1024, "kB"),
+                (libc::RLIMIT_CORE, "coredumpsize", 1024, "kB"),
+                (libc::RLIMIT_RSS, "memoryuse", 1024, "kB"),
+                #[cfg(target_os = "linux")]
+                (libc::RLIMIT_NPROC, "maxproc", 1, ""),
+                (libc::RLIMIT_NOFILE, "descriptors", 1, ""),
+            ];
+            for (res, name, divisor, unit) in resources {
+                let mut rl: rlimit = unsafe { std::mem::zeroed() };
+                unsafe { getrlimit(res, &mut rl); }
+                let val = if rl.rlim_cur == RLIM_INFINITY as _ {
+                    "unlimited".to_string()
+                } else {
+                    let v = rl.rlim_cur as u64 / divisor;
+                    if unit.is_empty() { format!("{}", v) } else { format!("{}{}", v, unit) }
+                };
+                println!("{:<16}{}", name, val);
+            }
+            return 0;
+        }
         self.builtin_ulimit(args)
     }
 
