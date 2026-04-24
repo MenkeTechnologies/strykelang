@@ -833,7 +833,7 @@ mod tests {
 #[cfg(unix)]
 pub fn install_handler(sig: i32) {
     unsafe {
-        libc::signal(sig, handler_func as libc::sighandler_t);
+        libc::signal(sig, handler_func as *const () as libc::sighandler_t);
     }
 }
 
@@ -841,7 +841,7 @@ pub fn install_handler(sig: i32) {
 extern "C" fn handler_func(sig: libc::c_int) {
     // Re-install handler (for non-BSD systems)
     unsafe {
-        libc::signal(sig, handler_func as libc::sighandler_t);
+        libc::signal(sig, handler_func as *const () as libc::sighandler_t);
     }
     // Record that signal was received
     LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);
@@ -1029,7 +1029,7 @@ pub fn wait_for_processes() -> Vec<(i32, i32)> {
 extern "C" fn zhandler(sig: libc::c_int) {
     // Re-install the handler
     unsafe {
-        libc::signal(sig, zhandler as libc::sighandler_t);
+        libc::signal(sig, zhandler as *const () as libc::sighandler_t);
     }
     // Record signal
     LAST_SIGNAL.store(sig, std::sync::atomic::Ordering::Relaxed);

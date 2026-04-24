@@ -27,11 +27,11 @@ path = "strykelang/main.rs"
 
 [[bin]]
 name = "gen-docs"
-path = "strykelang/bin/gen_docs.rs"
+path = "strykelang/bins/gen_docs.rs"
 
 [[bin]]
 name = "zshrs"
-path = "strykelang/bin/zshrs.rs"
+path = "strykelang/bins/zshrs.rs"
 
 [dependencies]
 rayon = "1.10"
@@ -146,8 +146,8 @@ lsp-types = "0.97.0"
 unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-compsys = { path = "compsys" }
-zsh = { path = "zsh" }
+compsys = { path = "compsys", version = "0.8.7" }
+zsh = { path = "zsh", version = "0.8.7" }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"

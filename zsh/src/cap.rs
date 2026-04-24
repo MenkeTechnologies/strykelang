@@ -1,44 +1,66 @@
 //! Capabilities module - port of Modules/cap.c
 //!
 //! Provides POSIX.1e capability manipulation via cap, getcap, setcap builtins.
+//! Requires the `libcap` feature and libcap on Linux
+//! (`apt install libcap-dev` / `dnf install libcap-devel`).
 
 use std::io;
 
+// libcap FFI — these live in libcap (-lcap), not in libc.
+#[cfg(all(target_os = "linux", feature = "libcap"))]
+mod ffi {
+    use libc::{c_char, c_int, c_void, ssize_t};
+
+    /// Opaque capability state (cap_t is a pointer to this).
+    pub type CapT = *mut c_void;
+
+    #[link(name = "cap")]
+    extern "C" {
+        pub fn cap_get_proc() -> CapT;
+        pub fn cap_set_proc(cap_p: CapT) -> c_int;
+        pub fn cap_get_file(path: *const c_char) -> CapT;
+        pub fn cap_set_file(path: *const c_char, cap_p: CapT) -> c_int;
+        pub fn cap_from_text(buf: *const c_char) -> CapT;
+        pub fn cap_to_text(caps: CapT, length: *mut ssize_t) -> *mut c_char;
+        pub fn cap_free(obj: *mut c_void) -> c_int;
+    }
+}
+
 /// Get process capabilities
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libcap"))]
 pub fn get_proc_caps() -> io::Result<String> {
     use std::ffi::CStr;
 
     unsafe {
-        let caps = libc::cap_get_proc();
+        let caps = ffi::cap_get_proc();
         if caps.is_null() {
             return Err(io::Error::last_os_error());
         }
 
-        let text = libc::cap_to_text(caps, std::ptr::null_mut());
+        let text = ffi::cap_to_text(caps, std::ptr::null_mut());
         if text.is_null() {
-            libc::cap_free(caps as *mut libc::c_void);
+            ffi::cap_free(caps);
             return Err(io::Error::last_os_error());
         }
 
         let result = CStr::from_ptr(text).to_string_lossy().into_owned();
-        libc::cap_free(text as *mut libc::c_void);
-        libc::cap_free(caps as *mut libc::c_void);
+        ffi::cap_free(text as *mut libc::c_void);
+        ffi::cap_free(caps);
 
         Ok(result)
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(all(target_os = "linux", feature = "libcap")))]
 pub fn get_proc_caps() -> io::Result<String> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "capabilities not supported",
+        "capabilities not supported (build with --features libcap on Linux)",
     ))
 }
 
 /// Set process capabilities
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libcap"))]
 pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
     use std::ffi::CString;
 
@@ -46,7 +68,7 @@ pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid capability string"))?;
 
     unsafe {
-        let caps = libc::cap_from_text(cap_c.as_ptr());
+        let caps = ffi::cap_from_text(cap_c.as_ptr());
         if caps.is_null() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -54,8 +76,8 @@ pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
             ));
         }
 
-        let result = libc::cap_set_proc(caps);
-        libc::cap_free(caps as *mut libc::c_void);
+        let result = ffi::cap_set_proc(caps);
+        ffi::cap_free(caps);
 
         if result != 0 {
             return Err(io::Error::last_os_error());
@@ -65,16 +87,16 @@ pub fn set_proc_caps(cap_string: &str) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(all(target_os = "linux", feature = "libcap")))]
 pub fn set_proc_caps(_cap_string: &str) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "capabilities not supported",
+        "capabilities not supported (build with --features libcap on Linux)",
     ))
 }
 
 /// Get file capabilities
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libcap"))]
 pub fn get_file_caps(path: &str) -> io::Result<String> {
     use std::ffi::{CStr, CString};
 
@@ -82,35 +104,35 @@ pub fn get_file_caps(path: &str) -> io::Result<String> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
 
     unsafe {
-        let caps = libc::cap_get_file(path_c.as_ptr());
+        let caps = ffi::cap_get_file(path_c.as_ptr());
         if caps.is_null() {
             return Err(io::Error::last_os_error());
         }
 
-        let text = libc::cap_to_text(caps, std::ptr::null_mut());
+        let text = ffi::cap_to_text(caps, std::ptr::null_mut());
         if text.is_null() {
-            libc::cap_free(caps as *mut libc::c_void);
+            ffi::cap_free(caps);
             return Err(io::Error::last_os_error());
         }
 
         let result = CStr::from_ptr(text).to_string_lossy().into_owned();
-        libc::cap_free(text as *mut libc::c_void);
-        libc::cap_free(caps as *mut libc::c_void);
+        ffi::cap_free(text as *mut libc::c_void);
+        ffi::cap_free(caps);
 
         Ok(result)
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(all(target_os = "linux", feature = "libcap")))]
 pub fn get_file_caps(_path: &str) -> io::Result<String> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "capabilities not supported",
+        "capabilities not supported (build with --features libcap on Linux)",
     ))
 }
 
 /// Set file capabilities
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libcap"))]
 pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
     use std::ffi::CString;
 
@@ -120,7 +142,7 @@ pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid path"))?;
 
     unsafe {
-        let caps = libc::cap_from_text(cap_c.as_ptr());
+        let caps = ffi::cap_from_text(cap_c.as_ptr());
         if caps.is_null() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -128,8 +150,8 @@ pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
             ));
         }
 
-        let result = libc::cap_set_file(path_c.as_ptr(), caps);
-        libc::cap_free(caps as *mut libc::c_void);
+        let result = ffi::cap_set_file(path_c.as_ptr(), caps);
+        ffi::cap_free(caps);
 
         if result != 0 {
             return Err(io::Error::last_os_error());
@@ -139,11 +161,11 @@ pub fn set_file_caps(cap_string: &str, path: &str) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(all(target_os = "linux", feature = "libcap")))]
 pub fn set_file_caps(_cap_string: &str, _path: &str) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "capabilities not supported",
+        "capabilities not supported (build with --features libcap on Linux)",
     ))
 }
 
@@ -214,7 +236,7 @@ mod tests {
     #[test]
     fn test_builtin_cap_no_args() {
         let (status, _) = builtin_cap(&[]);
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(all(target_os = "linux", feature = "libcap")))]
         assert_eq!(status, 1);
     }
 

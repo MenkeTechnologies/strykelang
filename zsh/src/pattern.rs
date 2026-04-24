@@ -1236,47 +1236,41 @@ pub struct PatternScope {
     pub disabled: Vec<String>,
 }
 
-static mut PATTERN_SCOPES: Vec<PatternScope> = Vec::new();
+use std::sync::Mutex;
+
+static PATTERN_SCOPES: Mutex<Vec<PatternScope>> = Mutex::new(Vec::new());
 
 /// Start a pattern scope (from pattern.c startpatternscope)
 pub fn startpatternscope() {
-    unsafe {
-        PATTERN_SCOPES.push(PatternScope::default());
-    }
+    PATTERN_SCOPES.lock().unwrap().push(PatternScope::default());
 }
 
 /// End a pattern scope (from pattern.c endpatternscope)
 pub fn endpatternscope() {
-    unsafe {
-        PATTERN_SCOPES.pop();
-    }
+    PATTERN_SCOPES.lock().unwrap().pop();
 }
 
 /// Save pattern disables state
 pub fn savepatterndisables() -> Vec<String> {
-    unsafe {
-        PATTERN_SCOPES
-            .last()
-            .map(|s| s.disabled.clone())
-            .unwrap_or_default()
-    }
+    PATTERN_SCOPES
+        .lock()
+        .unwrap()
+        .last()
+        .map(|s| s.disabled.clone())
+        .unwrap_or_default()
 }
 
 /// Restore pattern disables state
 pub fn restorepatterndisables(disables: Vec<String>) {
-    unsafe {
-        if let Some(scope) = PATTERN_SCOPES.last_mut() {
-            scope.disabled = disables;
-        }
+    if let Some(scope) = PATTERN_SCOPES.lock().unwrap().last_mut() {
+        scope.disabled = disables;
     }
 }
 
 /// Clear pattern disables
 pub fn clearpatterndisables() {
-    unsafe {
-        if let Some(scope) = PATTERN_SCOPES.last_mut() {
-            scope.disabled.clear();
-        }
+    if let Some(scope) = PATTERN_SCOPES.lock().unwrap().last_mut() {
+        scope.disabled.clear();
     }
 }
 
