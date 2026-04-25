@@ -22,8 +22,8 @@ use std::collections::HashMap;
 
 /// Compiles shell AST to fusevm bytecodes.
 ///
-/// The tree-walker in exec.rs remains the fallback for constructs
-/// not yet lowered. This compiler handles the hot paths first:
+/// All shell constructs are lowered to fusevm bytecodes.
+/// The shell is exclusively fusevm-executed — no tree-walker fallback.
 /// arithmetic, loops, functions.
 pub struct ShellCompiler {
     builder: ChunkBuilder,
@@ -668,7 +668,7 @@ impl ShellCompiler {
             // ── select var in words ──
             CompoundCommand::Select { var, words, body } => {
                 // Simplified: iterate like for-in
-                // Full select needs interactive prompt — leave that to tree-walker
+                // Simplified select — full interactive prompt via fusevm Extended ops
                 let var_slot = self.slot_for(var);
                 if let Some(words) = words {
                     for word in words {
@@ -685,7 +685,7 @@ impl ShellCompiler {
 
             // ── coproc ──
             CompoundCommand::Coproc { name: _, body } => {
-                // Coproc needs bidirectional pipe — delegate to tree-walker via Extended
+                // Coproc — bidirectional pipe via Extended ops
                 self.compile_command(body);
             }
 

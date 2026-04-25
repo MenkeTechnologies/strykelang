@@ -151,7 +151,7 @@
           <tr><td><code>rehash</code></td><td>Serial <code>readdir</code> per PATH dir</td><td>Parallel scan across pool</td></tr>
           <tr><td><code>compinit</code></td><td>Synchronous fpath scan</td><td>Background scan on pool + AST pre-parse</td></tr>
           <tr><td>History write</td><td>Synchronous <code>fsync</code> blocks prompt</td><td>Fire-and-forget to pool</td></tr>
-          <tr><td>Autoload function</td><td>Read file + parse every time</td><td>AST blob deserialization from SQLite (&micro;s)</td></tr>
+          <tr><td>Autoload function</td><td>Read file + parse every time</td><td>Bytecode deserialization from SQLite (&micro;s)</td></tr>
           <tr><td>Plugin source</td><td>Parse + execute every startup</td><td>Delta replay from SQLite cache (&micro;s)</td></tr>
         </table>
       </section>
@@ -267,11 +267,11 @@
 
       <!-- ════════════════════════════════════════════════════════════ -->
       <section class="tutorial-section">
-        <h2><span class="section-num">[0x05]</span> AST CACHING</h2>
+        <h2><span class="section-num">[0x05]</span> BYTECODE CACHING</h2>
 
-        <p>Every autoload function in fpath gets pre-parsed during <code>compinit</code>.
-        The AST is serialized to bincode and stored in SQLite. Subsequent loads
-        skip lexing and parsing entirely &mdash; pure deserialization in microseconds.</p>
+        <p>Every autoload function in fpath gets compiled to fusevm bytecodes during <code>compinit</code>.
+        The bytecodes are serialized to bincode and stored in SQLite. Subsequent loads
+        skip lexing, parsing, and compilation entirely &mdash; pure deserialization to executable bytecodes in microseconds.</p>
 
         <div class="diagram">
 First call to _git:
@@ -279,30 +279,33 @@ First call to _git:
   fpath/_git (source text)
        │
        ▼
-  ShellParser::parse_script()    ~2ms
+  ShellParser::parse_script()     ~1ms
        │
        ▼
-  Vec&lt;ShellCommand&gt; (AST)
+  ShellCompiler::compile()         ~0.5ms
        │
-       ├──► execute                ~0ms (in-process)
+       ▼
+  fusevm::Chunk (bytecodes)
+       │
+       ├──► VM::run()              native dispatch
        │
        └──► bincode::serialize()   ~0.1ms
             │
             ▼
-       SQLite autoloads.ast        (stored)
+       SQLite autoloads.bytecode   (stored)
 
 Every subsequent call:
 
-  SQLite autoloads.ast
+  SQLite autoloads.bytecode
        │
        ▼
   bincode::deserialize()           ~0.05ms
        │
        ▼
-  Vec&lt;ShellCommand&gt; (AST)         (no lexer, no parser)
+  fusevm::Chunk                    (no lexer, no parser, no compiler)
        │
        ▼
-  execute                          ~0ms
+  VM::run()                        native bytecode dispatch
         </div>
       </section>
 
