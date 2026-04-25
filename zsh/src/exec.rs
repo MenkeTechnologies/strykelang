@@ -1375,7 +1375,7 @@ impl ShellExecutor {
             .unwrap_or(false)
     }
 
-    /// Execute a script file with AST caching — skips lex+parse on cache hit.
+    /// Execute a script file with bytecode caching — skips lex+parse+compile on cache hit.
     /// The AST is stored in SQLite keyed by (path, mtime).
     pub fn execute_script_file(&mut self, file_path: &str) -> Result<i32, String> {
         let path = std::path::Path::new(file_path);
@@ -1389,7 +1389,7 @@ impl ShellExecutor {
                         path = file_path,
                         cmds = commands.len(),
                         bytes = ast_bytes.len(),
-                        "execute_script_file: AST cache hit, skipping lex+parse"
+                        "execute_script_file: bytecode cache hit, skipping lex+parse"
                     );
                     for cmd in commands {
                         self.execute_command(&cmd)?;
@@ -1408,7 +1408,7 @@ impl ShellExecutor {
         tracing::debug!(
             path = file_path,
             cmds = commands.len(),
-            "execute_script_file: AST cache miss, parsed from source"
+            "execute_script_file: bytecode cache miss, parsed from source"
         );
 
         // Optimize AST before execution and caching — constant folding, literal merging
@@ -1431,7 +1431,7 @@ impl ShellExecutor {
                             if let Err(e) = cache.store_ast(&store_path, mt_s, mt_ns, &ast_bytes) {
                                 tracing::error!(path = %store_path, error = %e, "AST cache store failed");
                             } else {
-                                tracing::debug!(path = %store_path, bytes = ast_size, "AST cached");
+                                tracing::debug!(path = %store_path, bytes = ast_size, "bytecode cached");
                             }
                         }
                         Err(e) => tracing::error!(error = %e, "plugin_cache: open for AST write failed"),
@@ -8124,7 +8124,7 @@ impl ShellExecutor {
                 .push(func.clone());
         }
 
-        // Functions — deserialize bincode AST blobs directly into self.functions
+        // Functions — deserialize bincode bytecode blobs directly into self.functions
         for (name, bytes) in &delta.functions {
             if let Ok(ast) = bincode::deserialize::<crate::parser::ShellCommand>(bytes) {
                 self.functions.insert(name.clone(), ast);
@@ -9512,11 +9512,11 @@ impl ShellExecutor {
         // Skip in zsh_compat mode - use traditional fpath scanning only
         if !self.zsh_compat {
             if let Some(ref cache) = self.compsys_cache {
-                // FASTEST: try pre-parsed AST blob (skip lex+parse entirely)
-                if let Ok(Some(ast_blob)) = cache.get_autoload_ast(name) {
+                // FASTEST: try pre-parsed bytecode blob (skip lex+parse entirely)
+                if let Ok(Some(ast_blob)) = cache.get_autoload_bytecode(name) {
                     if let Ok(commands) = bincode::deserialize::<Vec<ShellCommand>>(&ast_blob) {
                         if !commands.is_empty() {
-                            tracing::trace!(name, bytes = ast_blob.len(), "autoload: AST cache hit");
+                            tracing::trace!(name, bytes = ast_blob.len(), "autoload: bytecode cache hit");
                             return Some(self.wrap_autoload_commands(name, commands));
                         }
                     }
@@ -9527,10 +9527,10 @@ impl ShellExecutor {
                     let mut parser = ShellParser::new(&body);
                     if let Ok(commands) = parser.parse_script() {
                         if !commands.is_empty() {
-                            // Cache the AST blob for next time
+                            // Cache the bytecode blob for next time
                             if let Ok(blob) = bincode::serialize(&commands) {
-                                let _ = cache.set_autoload_ast(name, &blob);
-                                tracing::trace!(name, bytes = blob.len(), "autoload: AST cached on first parse");
+                                let _ = cache.set_autoload_bytecode(name, &blob);
+                                tracing::trace!(name, bytes = blob.len(), "autoload: bytecode cached on first parse");
                             }
                             return Some(self.wrap_autoload_commands(name, commands));
                         }
@@ -11383,12 +11383,12 @@ impl ShellExecutor {
             let count = compsys::cache_entry_count(cache);
             println!("  compsys:     {} completions  {}", count, green("OK"));
 
-            // Check AST blob coverage
-            if let Ok(missing) = cache.get_autoloads_missing_ast() {
+            // Check bytecode blob coverage
+            if let Ok(missing) = cache.get_autoloads_missing_bytecode() {
                 if missing.is_empty() {
-                    println!("  ast cache:   {}", green("all functions pre-parsed"));
+                    println!("  bytecode cache:   {}", green("all functions compiled to bytecode"));
                 } else {
-                    println!("  ast cache:   {} functions {}", missing.len(), yellow("missing AST blobs"));
+                    println!("  bytecode cache:   {} functions {}", missing.len(), yellow("missing bytecode blobs"));
                 }
             }
         } else {
@@ -11464,8 +11464,8 @@ impl ShellExecutor {
             if let Some(ref cache) = self.compsys_cache {
                 println!("  {} {}", bold("compsys.db"), dim("(completion cache)"));
                 if let Ok(n) = cache.count_table("autoloads") {
-                    let ast_count = cache.count_table_where("autoloads", "ast IS NOT NULL").unwrap_or(0);
-                    println!("    autoloads:    {:>6} rows  ({} with AST)", n, ast_count);
+                    let bc_count = cache.count_table_where("autoloads", "bytecode IS NOT NULL").unwrap_or(0);
+                    println!("    autoloads:    {:>6} rows  ({} compiled)", n, bc_count);
                 }
                 if let Ok(n) = cache.count_table("comps") { println!("    comps:        {:>6} rows", n); }
                 if let Ok(n) = cache.count_table("services") { println!("    services:     {:>6} rows", n); }
@@ -11517,9 +11517,9 @@ impl ShellExecutor {
                             println!("{}", bold(&format!("autoload: {}", name)));
                             println!("  source:   {}", stub.source);
                             println!("  body:     {} bytes", stub.body.as_ref().map(|b| b.len()).unwrap_or(0));
-                            match cache.get_autoload_ast(name) {
-                                Ok(Some(blob)) => println!("  ast:      {} {} bytes", green("YES"), blob.len()),
-                                _ => println!("  ast:      {}", yellow("NULL")),
+                            match cache.get_autoload_bytecode(name) {
+                                Ok(Some(blob)) => println!("  bytecode: {} {} bytes", green("YES"), blob.len()),
+                                _ => println!("  bytecode: {}", yellow("NULL")),
                             }
                             // Show first few lines of body
                             if let Some(ref body) = stub.body {
@@ -11543,7 +11543,7 @@ impl ShellExecutor {
 
                 // Dump all autoloads
                 let conn = &cache.conn();
-                match conn.prepare("SELECT name, source, length(body), length(ast) FROM autoloads ORDER BY name LIMIT 200") {
+                match conn.prepare("SELECT name, source, length(body), length(bytecode) FROM autoloads ORDER BY name LIMIT 200") {
                     Ok(mut stmt) => {
                         let rows = stmt.query_map([], |row| {
                             Ok((
@@ -11554,7 +11554,7 @@ impl ShellExecutor {
                             ))
                         });
                         if let Ok(rows) = rows {
-                            println!("{:<40} {:>8} {:>8}  {}", bold("NAME"), bold("BODY"), bold("AST"), bold("SOURCE"));
+                            println!("{:<40} {:>8} {:>8}  {}", bold("NAME"), bold("BODY"), bold("BYTECODE"), bold("SOURCE"));
                             let mut count = 0;
                             for row in rows.flatten() {
                                 let (name, source, body_len, ast_len) = row;
@@ -13341,14 +13341,14 @@ impl ShellExecutor {
                         self.assoc_arrays
                             .insert("_patcomps".to_string(), result.patcomps);
 
-                        // Background: fill AST blobs for any autoloads that have body but no ast.
+                        // Background: fill bytecode blobs for any autoloads that have body but no ast.
                         // This populates the cache so subsequent autoload calls skip parsing.
                         if let Some(ref cache) = self.compsys_cache {
-                            if let Ok(missing) = cache.count_autoloads_missing_ast() {
+                            if let Ok(missing) = cache.count_autoloads_missing_bytecode() {
                                 if missing > 0 {
                                     tracing::info!(
                                         count = missing,
-                                        "compinit: backfilling AST blobs on worker pool"
+                                        "compinit: backfilling bytecode blobs on worker pool"
                                     );
                                     let cache_path = compsys::cache::default_cache_path();
                                     let total_missing = missing;
@@ -13358,11 +13358,11 @@ impl ShellExecutor {
                                             Err(_) => return,
                                         };
                                         // Loop in batches of 100: fetch 100 bodies from SQLite,
-                                        // parse them, write AST blobs back, repeat until none left.
+                                        // parse them, write bytecode blobs back, repeat until none left.
                                         // Peak memory: ~100 function bodies + ASTs at a time.
                                         let mut total_cached = 0usize;
                                         loop {
-                                            let stubs = match cache.get_autoloads_missing_ast_batch(100) {
+                                            let stubs = match cache.get_autoloads_missing_bytecode_batch(100) {
                                                 Ok(s) if !s.is_empty() => s,
                                                 _ => break,
                                             };
@@ -13378,8 +13378,8 @@ impl ShellExecutor {
                                                 }
                                             }
                                             total_cached += batch.len();
-                                            if let Err(e) = cache.set_autoload_asts_bulk(&batch) {
-                                                tracing::warn!(error = %e, "compinit: AST backfill batch failed");
+                                            if let Err(e) = cache.set_autoload_bytecodes_bulk(&batch) {
+                                                tracing::warn!(error = %e, "compinit: bytecode backfill batch failed");
                                                 break;
                                             }
                                             // If we got fewer than 100 results, we're done
@@ -13390,7 +13390,7 @@ impl ShellExecutor {
                                         tracing::info!(
                                             cached = total_cached,
                                             total = total_missing,
-                                            "compinit: AST backfill complete"
+                                            "compinit: bytecode backfill complete"
                                         );
                                     });
                                 }
@@ -13451,7 +13451,7 @@ impl ShellExecutor {
                     "compinit: background scan complete"
                 );
 
-                // Pre-parse function bodies and cache AST blobs.
+                // Pre-parse function bodies and cache bytecode blobs.
                 // Stream: parse one → serialize → write → drop. Never accumulate.
                 // 16k functions × ~10KB AST = OOM if held in memory.
                 let parse_start = std::time::Instant::now();
@@ -13471,7 +13471,7 @@ impl ShellExecutor {
                                     parse_ok += 1;
                                     // Flush batch to SQLite, then drop to free memory
                                     if batch.len() >= batch_size {
-                                        let _ = cache.set_autoload_asts_bulk(&batch);
+                                        let _ = cache.set_autoload_bytecodes_bulk(&batch);
                                         batch.clear();
                                     }
                                 }
@@ -13485,7 +13485,7 @@ impl ShellExecutor {
                 }
                 // Flush remaining
                 if !batch.is_empty() {
-                    let _ = cache.set_autoload_asts_bulk(&batch);
+                    let _ = cache.set_autoload_bytecodes_bulk(&batch);
                     batch.clear();
                 }
 
@@ -13495,7 +13495,7 @@ impl ShellExecutor {
                     no_body = no_body,
                     total = result.files.len(),
                     ms = parse_start.elapsed().as_millis() as u64,
-                    "compinit: AST blobs cached"
+                    "compinit: bytecode blobs cached"
                 );
 
                 let _ = tx.send(CompInitBgResult { result, cache });

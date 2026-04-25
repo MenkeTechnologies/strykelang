@@ -2024,12 +2024,12 @@ cargo build --release -p zsh    # target/release/zshrs (lean)
 |--------|---------|---------|
 | No-fork architecture (10-100x faster) | Full POSIX compat | Fish-quality UX |
 | Persistent worker thread pool [2-18 cores] | Runs `.bashrc` unchanged | Modern completions |
-| AST cache — skip lex+parse on autoload | No syntax translation needed | Syntax highlighting |
+| Bytecode cache — skip lex+parse+compile on autoload | No syntax translation needed | Syntax highlighting |
 | Plugin delta cache — source once, replay microseconds | Global/suffix aliases | Autosuggestions |
 | SQLite FTS5 completions — instant fuzzy search | Glob qualifiers | Job control |
 | AOP `intercept` builtin — first shell with aspects | Named directories | Full zsh modules |
 | Parallel `**/*.rs` glob across worker pool | | |
-| fusevm bytecode VM target (Cranelift JIT path) | | |
+| 100% fusevm bytecode execution (first compiled shell, Cranelift JIT path) | | |
 
 ### Architecture — no fork, in-process everything
 
@@ -2044,7 +2044,7 @@ zsh forks for command substitution `$(...)`, process substitution `<(...)`, subs
 | `rehash` | Serial `readdir` per PATH dir | Parallel scan across pool |
 | `compinit` | Synchronous fpath scan | Background scan on pool + AST pre-parse |
 | History write | Synchronous `fsync` blocks prompt | Fire-and-forget to pool |
-| Autoload function | Read file + parse every time | AST blob deserialization from SQLite (microseconds) |
+| Autoload function | Read file + parse every time | Bytecode deserialization from SQLite (microseconds) |
 | Plugin source | Parse + execute every startup | Delta replay from SQLite (functions, aliases, vars, hooks) |
 
 ### Worker thread pool
@@ -2057,7 +2057,7 @@ Persistent pool of [2-18] threads (configurable in `~/.config/zshrs/config.toml`
 size = 8            # 0 = auto (num_cpus clamped [2, 18])
 
 [completion]
-ast_cache = true    # pre-parse autoload functions to AST blobs
+bytecode_cache = true  # compile autoload functions to fusevm bytecodes
 
 [history]
 async_writes = true # write history on worker pool
@@ -2121,10 +2121,10 @@ Variables available in advice: `$INTERCEPT_NAME`, `$INTERCEPT_ARGS`, `$INTERCEPT
 | **Fish-style abbreviations** | `g` → `git`, `gco` → `git checkout`, expandable with space |
 | **SQLite FTS5 completions** | Indexes all PATH executables for instant fuzzy completion |
 | **SQLite history** | Frequency-ranked, timestamped, tracks duration and exit status per command |
-| **AST cache** | Pre-parsed autoload functions stored as bincode blobs — skip lex+parse |
+| **Bytecode cache** | Compiled autoload functions stored as fusevm bytecodes — skip lex+parse+compile |
 | **Plugin delta cache** | Source a file once, cache all side effects, replay in microseconds |
 | **Native stryke mode** | Prefix any line with `@` to execute as stryke code with full parallel primitives |
-| **fusevm target** | Shell compiler lowers to fusevm bytecodes — Cranelift JIT path |
+| **fusevm execution** | 100% lowered — all shell constructs compile to fusevm bytecodes. Cranelift JIT path. First compiled shell. |
 | **Config file** | `~/.config/zshrs/config.toml` — pool size, completion settings, glob behavior |
 | **ZWC support** | Reads compiled `.zwc` files for fast function loading from fpath |
 | **Job control** | Full `&`, `fg`, `bg`, `jobs`, `wait`, `disown`, `suspend` support |

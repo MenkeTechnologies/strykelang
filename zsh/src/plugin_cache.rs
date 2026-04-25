@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 /// Side effects captured from sourcing a plugin file.
 #[derive(Debug, Clone, Default)]
 pub struct PluginDelta {
-    pub functions: Vec<(String, Vec<u8>)>,         // name → bincode-serialized AST
+    pub functions: Vec<(String, Vec<u8>)>,         // name → bincode-serialized bytecode
     pub aliases: Vec<(String, String, AliasKind)>, // name → value, kind
     pub global_aliases: Vec<(String, String)>,
     pub suffix_aliases: Vec<(String, String)>,

@@ -86,7 +86,7 @@ impl CompsysCache {
                 offset INTEGER NOT NULL,
                 size INTEGER NOT NULL,
                 body TEXT,
-                ast BLOB
+                bytecode BLOB
             ) WITHOUT ROWID;
 
             -- zstyle: flat lookup by pattern+style
@@ -183,14 +183,24 @@ impl CompsysCache {
 
     /// Schema migrations for existing databases.
     fn migrate(&self) -> rusqlite::Result<()> {
-        // Add ast BLOB column to autoloads if missing (pre-v0.8.14 databases)
-        let has_ast: bool = self
+        // Add bytecode BLOB column to autoloads if missing (pre-v0.8.16 databases)
+        let has_bytecode: bool = self
             .conn
-            .prepare("SELECT ast FROM autoloads LIMIT 0")
+            .prepare("SELECT bytecode FROM autoloads LIMIT 0")
             .is_ok();
-        if !has_ast {
-            self.conn
-                .execute_batch("ALTER TABLE autoloads ADD COLUMN ast BLOB")?;
+        if !has_bytecode {
+            // Try renaming old ast column, or add new one
+            let has_ast: bool = self
+                .conn
+                .prepare("SELECT ast FROM autoloads LIMIT 0")
+                .is_ok();
+            if has_ast {
+                self.conn
+                    .execute_batch("ALTER TABLE autoloads RENAME COLUMN ast TO bytecode")?;
+            } else {
+                self.conn
+                    .execute_batch("ALTER TABLE autoloads ADD COLUMN bytecode BLOB")?;
+            }
         }
         Ok(())
     }
@@ -296,10 +306,10 @@ impl CompsysCache {
 
     /// Get pre-parsed AST blob for a function (skip lex+parse on cache hit).
     /// Returns None if no AST is cached — caller falls back to parsing the body.
-    pub fn get_autoload_ast(&self, name: &str) -> rusqlite::Result<Option<Vec<u8>>> {
+    pub fn get_autoload_bytecode(&self, name: &str) -> rusqlite::Result<Option<Vec<u8>>> {
         self.conn
             .query_row(
-                "SELECT ast FROM autoloads WHERE name = ?1 AND ast IS NOT NULL",
+                "SELECT bytecode FROM autoloads WHERE name = ?1 AND bytecode IS NOT NULL",
                 params![name],
                 |row| row.get(0),
             )
@@ -307,9 +317,9 @@ impl CompsysCache {
     }
 
     /// Store pre-parsed AST blob for a function.
-    pub fn set_autoload_ast(&self, name: &str, ast: &[u8]) -> rusqlite::Result<()> {
+    pub fn set_autoload_bytecode(&self, name: &str, ast: &[u8]) -> rusqlite::Result<()> {
         self.conn.execute(
-            "UPDATE autoloads SET ast = ?2 WHERE name = ?1",
+            "UPDATE autoloads SET bytecode = ?2 WHERE name = ?1",
             params![name, ast],
         )?;
         Ok(())
@@ -318,14 +328,14 @@ impl CompsysCache {
     /// Get a batch of autoloads that have a body but no cached AST blob.
     /// Returns up to `limit` entries to avoid loading all 16k bodies into RAM.
     /// Caller should loop until this returns an empty vec.
-    pub fn get_autoloads_missing_ast(&self) -> rusqlite::Result<Vec<(String, String)>> {
-        self.get_autoloads_missing_ast_batch(100)
+    pub fn get_autoloads_missing_bytecode(&self) -> rusqlite::Result<Vec<(String, String)>> {
+        self.get_autoloads_missing_bytecode_batch(100)
     }
 
     /// Get a batch of autoloads missing AST blobs, with configurable limit.
-    pub fn get_autoloads_missing_ast_batch(&self, limit: usize) -> rusqlite::Result<Vec<(String, String)>> {
+    pub fn get_autoloads_missing_bytecode_batch(&self, limit: usize) -> rusqlite::Result<Vec<(String, String)>> {
         let mut stmt = self.conn.prepare(
-            "SELECT name, body FROM autoloads WHERE body IS NOT NULL AND ast IS NULL LIMIT ?1",
+            "SELECT name, body FROM autoloads WHERE body IS NOT NULL AND bytecode IS NULL LIMIT ?1",
         )?;
         let rows = stmt.query_map(params![limit as i64], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -334,23 +344,23 @@ impl CompsysCache {
     }
 
     /// Count autoloads missing AST blobs (cheap — no body data loaded).
-    pub fn count_autoloads_missing_ast(&self) -> rusqlite::Result<usize> {
+    pub fn count_autoloads_missing_bytecode(&self) -> rusqlite::Result<usize> {
         self.conn.query_row(
-            "SELECT COUNT(*) FROM autoloads WHERE body IS NOT NULL AND ast IS NULL",
+            "SELECT COUNT(*) FROM autoloads WHERE body IS NOT NULL AND bytecode IS NULL",
             [],
             |row| row.get::<_, i64>(0).map(|n| n as usize),
         )
     }
 
     /// Bulk store AST blobs during compinit (one transaction for all functions).
-    pub fn set_autoload_asts_bulk(
+    pub fn set_autoload_bytecodes_bulk(
         &mut self,
         entries: &[(String, Vec<u8>)], // (name, ast_blob)
     ) -> rusqlite::Result<()> {
         let tx = self.conn.transaction()?;
         {
             let mut stmt = tx.prepare(
-                "UPDATE autoloads SET ast = ?2 WHERE name = ?1",
+                "UPDATE autoloads SET bytecode = ?2 WHERE name = ?1",
             )?;
             for (name, ast) in entries {
                 stmt.execute(params![name, ast])?;
