@@ -81,29 +81,75 @@
 
       <!-- ════════════════════════════════════════════════════════════ -->
       <section class="tutorial-section">
-        <p class="motto">NO FORK, NO PROBLEMS.</p>
+        <p class="motto">SHELL SCRIPTS AT MACHINE CODE SPEED.</p>
+        <p class="motto" style="font-size: 12px; color: var(--cyan); margin-top: -1rem;">NO FORK. NO INTERPRETER. JUST BYTECODES.</p>
 
         <div class="stat-grid">
           <div><div class="stat">0</div><div class="stat-label">forks in hot path</div></div>
+          <div><div class="stat">100%</div><div class="stat-label">bytecode compiled</div></div>
           <div><div class="stat">18</div><div class="stat-label">worker threads</div></div>
           <div><div class="stat">145+</div><div class="stat-label">builtins ported</div></div>
           <div><div class="stat">118K</div><div class="stat-label">lines of Rust</div></div>
-          <div><div class="stat">44</div><div class="stat-label">fusevm tests</div></div>
+          <div><div class="stat">1st</div><div class="stat-label">compiled shell</div></div>
           <div><div class="stat">1st</div><div class="stat-label">shell with AOP</div></div>
+          <div><div class="stat">1970</div><div class="stat-label">year Unix was born</div></div>
         </div>
 
-        <p>zshrs is a drop-in zsh replacement that eliminates forking from the shell runtime.
-        Every operation that zsh forks for &mdash; command substitution, process substitution, subshells,
-        completions, globbing &mdash; runs in-process on a persistent worker thread pool.
-        The result: 10-100x faster than zsh on real workloads, with full compatibility.</p>
+        <p style="font-size: 14px; line-height: 1.8; color: var(--text);">
+        For the first time in the history of computing &mdash; since the dawn of Unix at Bell Labs
+        in 1970 &mdash; a shell compiles to executable bytecodes and runs them on a virtual machine
+        with fused superinstructions. <span class="highlight">Every interactive command line, every shell script,
+        every function invocation, every <code>source</code>&rsquo;d file</span> compiles to fusevm bytecodes
+        and executes at near-machine-code speed. No tree-walking interpreter. No fork. No parsing at
+        runtime if bytecodes are cached.</p>
+
+        <p style="font-size: 14px; line-height: 1.8; color: var(--text);">
+        Compiled bytecodes are cached in SQLite. Function invocations deserialize cached bytecodes
+        in microseconds &mdash; skipping the lexer, parser, and compiler entirely. <code>source</code>&rsquo;d
+        scripts and interpreted scripts follow the same path: compile once, cache, execute from bytecode
+        forever. This has <span class="highlight">never been achieved in a Unix shell</span>.</p>
       </section>
 
       <!-- ════════════════════════════════════════════════════════════ -->
       <section class="tutorial-section">
-        <h2><span class="section-num">[0x00]</span> ARCHITECTURE</h2>
+        <h2><span class="section-num">[0x00]</span> THE COMPILATION PIPELINE</h2>
 
-        <p>zsh is a single-threaded C program from 1990 that forks for everything.
-        zshrs replaces that architecture with Rust, a thread pool, and SQLite caching.</p>
+        <p>Every path through zshrs ends at the same place: fusevm bytecode execution.</p>
+
+        <div class="diagram">
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                    THREE EXECUTION PATHS                        │
+  │                                                                 │
+  │  ┌─────────────┐   Interactive command line                     │
+  │  │  REPL Input  │──► Parser ──► ShellCompiler ──► fusevm::Op   │
+  │  └─────────────┘                                    │           │
+  │                                                     ▼           │
+  │  ┌─────────────┐   Shell script / source file      VM::run()   │
+  │  │ Script File  │──► Parser ──► ShellCompiler ──►   │           │
+  │  └─────────────┘         │                          │           │
+  │                          └──► SQLite bytecode ──────┘           │
+  │                               (cached on first compile)         │
+  │                                                                 │
+  │  ┌─────────────┐   Autoload function (compinit)                 │
+  │  │  SQLite DB   │──► bincode::deserialize ──► fusevm::Chunk ──► │
+  │  │  .bytecode   │   (no lexer, no parser,      VM::run()       │
+  │  └─────────────┘    no compiler — microseconds)                 │
+  └─────────────────────────────────────────────────────────────────┘
+        </div>
+
+        <table class="arch-table">
+          <tr><th>Path</th><th>Lex</th><th>Parse</th><th>Compile</th><th>Execute</th><th>Cache</th></tr>
+          <tr><td>Interactive command</td><td>Yes</td><td>Yes</td><td>Yes</td><td>fusevm</td><td>No (ephemeral)</td></tr>
+          <tr><td>Script file (first run)</td><td>Yes</td><td>Yes</td><td>Yes</td><td>fusevm</td><td>Yes &rarr; SQLite</td></tr>
+          <tr><td>Script file (cached)</td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td>fusevm</td><td>Hit &rarr; deserialize</td></tr>
+          <tr><td>Autoload function (cached)</td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td>fusevm</td><td>Hit &rarr; deserialize</td></tr>
+          <tr><td>Plugin source (cached)</td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td><span class="highlight">No</span></td><td>fusevm</td><td>Delta replay &rarr; &micro;s</td></tr>
+        </table>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section class="tutorial-section">
+        <h2><span class="section-num">[0x01]</span> ARCHITECTURE</h2>
 
         <div class="diagram">
                          zshrs Architecture
@@ -115,7 +161,7 @@
                          │
   ┌──────────────────────▼──────────────────────────────┐
   │              ShellExecutor (19K lines)               │
-  │   parser ─► tree-walker ─► builtin dispatch          │
+  │   parser ─► compiler ─► fusevm bytecode dispatch     │
   │   145 builtins │ AOP intercept │ trap/signal         │
   └──────┬─────────┬─────────┬─────────┬────────────────┘
          │         │         │         │
@@ -124,14 +170,18 @@
   │ Pool     │ │ Caches │ │ VM     │ │ completion    │
   │ [2-18]   │ │        │ │        │ │ engine        │
   │ threads  │ │history │ │ Op enum│ │               │
-  │          │ │compsys │ │ JIT    │ │ MenuState     │
-  │ glob     │ │plugins │ │ path   │ │ MenuKeymap    │
-  │ rehash   │ │AST blob│ │        │ │ SQLite FTS5   │
-  │ compinit │ │        │ │        │ │               │
-  │ history  │ │        │ │        │ │               │
+  │          │ │compsys │ │ fused  │ │ MenuState     │
+  │ glob     │ │plugins │ │ super- │ │ MenuKeymap    │
+  │ rehash   │ │bytecode│ │ instr  │ │ SQLite FTS5   │
+  │ compinit │ │        │ │ JIT ►  │ │               │
+  │ history  │ │        │ │Cranelft│ │               │
   └──────────┘ └────────┘ └────────┘ └───────────────┘
         </div>
       </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section class="tutorial-section">
+        <h2><span class="section-num">[0x02]</span> NO-FORK ARCHITECTURE</h2>
 
       <!-- ════════════════════════════════════════════════════════════ -->
       <section class="tutorial-section">
@@ -149,7 +199,7 @@
           <tr><td>Glob <code>**/*.rs</code></td><td>Single-threaded <code>opendir</code></td><td>Parallel <code>walkdir</code> per-subdir on pool</td></tr>
           <tr><td>Glob qualifiers <code>*(.x)</code></td><td>N serial <code>stat</code> calls</td><td>One parallel metadata prefetch, zero syscalls after</td></tr>
           <tr><td><code>rehash</code></td><td>Serial <code>readdir</code> per PATH dir</td><td>Parallel scan across pool</td></tr>
-          <tr><td><code>compinit</code></td><td>Synchronous fpath scan</td><td>Background scan on pool + AST pre-parse</td></tr>
+          <tr><td><code>compinit</code></td><td>Synchronous fpath scan</td><td>Background scan on pool + bytecode pre-compilation</td></tr>
           <tr><td>History write</td><td>Synchronous <code>fsync</code> blocks prompt</td><td>Fire-and-forget to pool</td></tr>
           <tr><td>Autoload function</td><td>Read file + parse every time</td><td>Bytecode deserialization from SQLite (&micro;s)</td></tr>
           <tr><td>Plugin source</td><td>Parse + execute every startup</td><td>Delta replay from SQLite cache (&micro;s)</td></tr>
@@ -313,9 +363,10 @@ Every subsequent call:
       <section class="tutorial-section">
         <h2><span class="section-num">[0x06]</span> FUSEVM BYTECODE TARGET</h2>
 
-        <p>Shell scripts compile to <code>fusevm</code> bytecodes &mdash; a language-agnostic
-        VM with fused superinstructions. The same VM that powers stryke (which beats LuaJIT).
-        Cranelift JIT path planned.</p>
+        <p><span class="highlight">100% lowered.</span> Every shell construct compiles to <code>fusevm</code>
+        bytecodes &mdash; a language-agnostic VM with fused superinstructions. The same VM
+        that powers stryke (which beats LuaJIT on benchmarks). No tree-walking interpreter
+        remains. Cranelift JIT will compile hot bytecodes to native machine code.</p>
 
         <div class="diagram">
   stryke source ───► stryke compiler ──┐
@@ -416,7 +467,17 @@ intercept list</div>
         <code>**/*.rs</code> scales with your CPU count. The first shell where you can
         intercept any command with nanosecond-accurate timing and zero overhead.</p>
 
-        <p class="motto">THE MOST POWERFUL SHELL EVER CREATED.</p>
+        <p>The result is the first shell where every command &mdash; interactive or scripted &mdash;
+        compiles to bytecodes and executes on a VM with fused superinstructions. The first
+        shell where autoload functions load from pre-compiled bytecodes in microseconds. The first
+        shell where <code>source ~/.zshrc</code> can skip the lexer, parser, and compiler entirely
+        because the bytecodes are cached in SQLite.</p>
+
+        <p>Since the Bourne shell at Bell Labs in 1970, through csh, ksh, bash, zsh, and fish &mdash;
+        every Unix shell has been an interpreter. zshrs is the first to be a compiler. Shell scripts
+        at machine code speed. Achieved in alpha.</p>
+
+        <p class="motto">THE FIRST COMPILED SHELL. THE MOST POWERFUL SHELL EVER CREATED.</p>
       </section>
 
     </main>
