@@ -4166,6 +4166,30 @@ impl<'a> VM<'a> {
                         )?;
                         Ok(())
                     }
+                    Op::GetHashSlice(hash_idx, n) => {
+                        let n = *n as usize;
+                        let mut key_vals = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            key_vals.push(self.pop());
+                        }
+                        key_vals.reverse();
+                        let name = names[*hash_idx as usize].as_str();
+                        let h = self.interp.scope.get_hash(name);
+                        let mut result = Vec::new();
+                        for kv in &key_vals {
+                            if let Some(vv) = kv.as_array_vec() {
+                                for v in vv {
+                                    let k = v.to_string();
+                                    result.push(h.get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                                }
+                            } else {
+                                let k = kv.to_string();
+                                result.push(h.get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                            }
+                        }
+                        self.push(PerlValue::array(result));
+                        Ok(())
+                    }
                     Op::HashSliceDerefCompound(op_byte, n) => {
                         let n = *n as usize;
                         let mut key_vals = Vec::with_capacity(n);
