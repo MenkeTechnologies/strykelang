@@ -2042,7 +2042,7 @@ zsh forks for command substitution `$(...)`, process substitution `<(...)`, subs
 | Glob `**/*.rs` | Single-threaded `opendir` | Parallel `walkdir` per-subdir on pool |
 | Glob qualifiers `*(.x)` | N serial `stat` calls | One parallel metadata prefetch, zero syscalls after |
 | `rehash` | Serial `readdir` per PATH dir | Parallel scan across pool |
-| `compinit` | Synchronous fpath scan | Background scan on pool + AST pre-parse |
+| `compinit` | Synchronous fpath scan | Background scan on pool + bytecode compilation |
 | History write | Synchronous `fsync` blocks prompt | Fire-and-forget to pool |
 | Autoload function | Read file + parse every time | Bytecode deserialization from SQLite (microseconds) |
 | Plugin source | Parse + execute every startup | Delta replay from SQLite (functions, aliases, vars, hooks) |
@@ -2107,7 +2107,7 @@ Variables available in advice: `$INTERCEPT_NAME`, `$INTERCEPT_ARGS`, `$INTERCEPT
 |---------|-------------|
 | **`intercept`** | AOP before/after/around advice on any command — no fork, machine code speed |
 | **`intercept_proceed`** | Call original command from around advice |
-| **`doctor`** | Full diagnostic: pool metrics, cache stats, AST coverage, startup health |
+| **`doctor`** | Full diagnostic: pool metrics, cache stats, bytecode coverage, startup health |
 | **`dbview`** | Browse SQLite cache tables — `dbview autoloads _git`, `dbview comps`, `dbview history` |
 | **`profile`** | In-process command profiling — nanosecond accuracy, no fork overhead |
 
