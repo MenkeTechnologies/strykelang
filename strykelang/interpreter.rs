@@ -5036,17 +5036,11 @@ impl Interpreter {
         } else if fh == "STDIN" {
             std::io::stdin().read(&mut buf).unwrap_or(0)
         } else {
-            return Err(PerlError::runtime(
-                format!("read: unopened handle {}", fh),
-                line,
-            )
-            .into());
+            return Err(PerlError::runtime(format!("read: unopened handle {}", fh), line).into());
         };
         buf.truncate(n);
         let read_str = crate::perl_fs::decode_utf8_or_latin1(&buf);
-        let _ = self
-            .scope
-            .set_scalar(var_name, PerlValue::string(read_str));
+        let _ = self.scope.set_scalar(var_name, PerlValue::string(read_str));
         Ok(PerlValue::integer(n as i64))
     }
 

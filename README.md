@@ -11,6 +11,7 @@
 [![Crates.io](https://img.shields.io/crates/v/strykelang.svg)](https://crates.io/crates/strykelang)
 [![Downloads](https://img.shields.io/crates/d/strykelang.svg)](https://crates.io/crates/strykelang)
 [![Docs.rs](https://docs.rs/strykelang/badge.svg)](https://docs.rs/strykelang)
+ [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/strykelang/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### `[THE 2ND FASTEST DYNAMIC LANGUAGE IN THE WORLD]`

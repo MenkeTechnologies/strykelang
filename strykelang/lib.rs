@@ -253,8 +253,7 @@ pub fn try_vm_execute(
     };
 
     if let Some(fp) = interp.pec_cache_fingerprint.take() {
-        let bundle =
-            pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
+        let bundle = pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
         let _ = pec::try_save(&bundle);
     }
     Some(run_compiled_chunk(chunk, interp))
@@ -423,13 +422,8 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
 
 /// Compile program and run only the prelude (BEGIN/CHECK/INIT phase blocks) via the VM.
 /// Stores the compiled chunk on `interp.line_mode_chunk` for per-line re-execution.
-pub fn compile_and_run_prelude(
-    program: &ast::Program,
-    interp: &mut Interpreter,
-) -> PerlResult<()> {
-    if let Err(e) = interp.prepare_program_top_level(program) {
-        return Err(e);
-    }
+pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
+    interp.prepare_program_top_level(program)?;
     let comp = compiler::Compiler::new()
         .with_source_file(interp.file.clone())
         .with_strict_vars(interp.strict_vars);

@@ -645,10 +645,7 @@ fn closure_args_in_named_sub_two_args() {
 
 #[test]
 fn closure_args_in_named_sub_three_args() {
-    assert_eq!(
-        eval_int(r#"fn mul3 { $_0 * $_1 * $_2 } mul3(2, 3, 4)"#),
-        24
-    );
+    assert_eq!(eval_int(r#"fn mul3 { $_0 * $_1 * $_2 } mul3(2, 3, 4)"#), 24);
 }
 
 #[test]

@@ -1187,7 +1187,11 @@ fn main() {
                 break;
             }
         }
-        if i < args.len() { Some(i) } else { None }
+        if i < args.len() {
+            Some(i)
+        } else {
+            None
+        }
     };
     let is_test_subcmd = first_positional_idx
         .map(|i| args[i] == "test" || args[i] == "t")
