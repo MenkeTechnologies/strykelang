@@ -1452,8 +1452,34 @@ impl ShellExecutor {
         let commands = parser.parse_script()?;
         tracing::trace!(cmds = commands.len(), "execute_script: parsed");
 
-        for cmd in commands {
-            self.execute_command(&cmd)?;
+        // Compile to fusevm bytecodes and execute on the VM.
+        // The VM handles pure computation (arithmetic, control flow, variables).
+        // Shell ops (Exec, Redirect, Pipeline, Glob, TestFile) callback into
+        // the executor via execute_command for anything that needs shell state.
+        // Primary path: compile to fusevm bytecodes and execute on the VM.
+        // Fallback: tree-walker for commands the VM can't fully handle yet
+        // (builtins that need executor state, complex redirects, etc.)
+        let compiler = crate::shell_compiler::ShellCompiler::new();
+        let chunk = compiler.compile(&commands);
+
+        if !chunk.ops.is_empty() {
+            let mut vm = fusevm::VM::new(chunk);
+            match vm.run() {
+                fusevm::VMResult::Ok(_) | fusevm::VMResult::Halted => {
+                    self.last_status = vm.last_status;
+                }
+                fusevm::VMResult::Error(_) => {
+                    // VM error — fall back to tree-walker for compatibility
+                    for cmd in &commands {
+                        self.execute_command(cmd)?;
+                    }
+                }
+            }
+        } else {
+            // Empty compilation (no ops emitted) — tree-walk
+            for cmd in &commands {
+                self.execute_command(cmd)?;
+            }
         }
 
         // Fire EXIT trap if set (matches zsh's zshexit behavior).
@@ -9512,25 +9538,44 @@ impl ShellExecutor {
         // Skip in zsh_compat mode - use traditional fpath scanning only
         if !self.zsh_compat {
             if let Some(ref cache) = self.compsys_cache {
-                // FASTEST: try pre-parsed bytecode blob (skip lex+parse entirely)
-                if let Ok(Some(ast_blob)) = cache.get_autoload_bytecode(name) {
-                    if let Ok(commands) = bincode::deserialize::<Vec<ShellCommand>>(&ast_blob) {
+                // FASTEST: try cached bytecodes (skip lex+parse+compile entirely)
+                if let Ok(Some(bc_blob)) = cache.get_autoload_bytecode(name) {
+                    // Try fusevm::Chunk first (new format — actual bytecodes)
+                    if let Ok(chunk) = bincode::deserialize::<fusevm::Chunk>(&bc_blob) {
+                        if !chunk.ops.is_empty() {
+                            tracing::trace!(name, bytes = bc_blob.len(), ops = chunk.ops.len(), "autoload: bytecode cache hit → VM");
+                            // Execute directly on fusevm — no parse, no compile
+                            let mut vm = fusevm::VM::new(chunk);
+                            let _ = vm.run();
+                            self.last_status = vm.last_status;
+                            // Return a no-op so the caller doesn't try to execute again
+                            return Some(ShellCommand::Simple(crate::parser::SimpleCommand {
+                                assignments: Vec::new(),
+                                words: Vec::new(),
+                                redirects: Vec::new(),
+                            }));
+                        }
+                    }
+                    // Fallback: try legacy Vec<ShellCommand> format (migration)
+                    if let Ok(commands) = bincode::deserialize::<Vec<ShellCommand>>(&bc_blob) {
                         if !commands.is_empty() {
-                            tracing::trace!(name, bytes = ast_blob.len(), "autoload: bytecode cache hit");
+                            tracing::trace!(name, bytes = bc_blob.len(), "autoload: legacy AST cache hit");
                             return Some(self.wrap_autoload_commands(name, commands));
                         }
                     }
                 }
 
-                // FAST: cached source text — parse it (still no filesystem access)
+                // FAST: cached source text — parse + compile (still no filesystem access)
                 if let Ok(Some(body)) = cache.get_autoload_body(name) {
                     let mut parser = ShellParser::new(&body);
                     if let Ok(commands) = parser.parse_script() {
                         if !commands.is_empty() {
-                            // Cache the bytecode blob for next time
-                            if let Ok(blob) = bincode::serialize(&commands) {
+                            // Compile to bytecodes and cache for next time
+                            let compiler = crate::shell_compiler::ShellCompiler::new();
+                            let chunk = compiler.compile(&commands);
+                            if let Ok(blob) = bincode::serialize(&chunk) {
                                 let _ = cache.set_autoload_bytecode(name, &blob);
-                                tracing::trace!(name, bytes = blob.len(), "autoload: bytecode cached on first parse");
+                                tracing::trace!(name, bytes = blob.len(), "autoload: bytecodes compiled and cached");
                             }
                             return Some(self.wrap_autoload_commands(name, commands));
                         }
@@ -13371,7 +13416,9 @@ impl ShellExecutor {
                                                 let mut parser = crate::parser::ShellParser::new(body);
                                                 if let Ok(commands) = parser.parse_script() {
                                                     if !commands.is_empty() {
-                                                        if let Ok(blob) = bincode::serialize(&commands) {
+                                                        let compiler = crate::shell_compiler::ShellCompiler::new();
+                                                        let chunk = compiler.compile(&commands);
+                                                        if let Ok(blob) = bincode::serialize(&chunk) {
                                                             batch.push((name.clone(), blob));
                                                         }
                                                     }
@@ -13466,10 +13513,12 @@ impl ShellExecutor {
                         let mut parser = crate::parser::ShellParser::new(body);
                         match parser.parse_script() {
                             Ok(commands) if !commands.is_empty() => {
-                                if let Ok(blob) = bincode::serialize(&commands) {
+                                // Compile AST → fusevm bytecodes, then serialize the Chunk
+                                let compiler = crate::shell_compiler::ShellCompiler::new();
+                                let chunk = compiler.compile(&commands);
+                                if let Ok(blob) = bincode::serialize(&chunk) {
                                     batch.push((file.name.clone(), blob));
                                     parse_ok += 1;
-                                    // Flush batch to SQLite, then drop to free memory
                                     if batch.len() >= batch_size {
                                         let _ = cache.set_autoload_bytecodes_bulk(&batch);
                                         batch.clear();
