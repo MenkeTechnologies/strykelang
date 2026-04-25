@@ -2029,7 +2029,7 @@ cargo build --release -p zsh    # target/release/zshrs (lean)
 | SQLite FTS5 completions — instant fuzzy search | Glob qualifiers | Job control |
 | AOP `intercept` builtin — first shell with aspects | Named directories | Full zsh modules |
 | Parallel `**/*.rs` glob across worker pool | | |
-| 100% fusevm bytecode execution (first compiled shell, Cranelift JIT path) | | |
+| 100% fusevm bytecode execution (first compiled Unix shell, Cranelift JIT path) | | |
 
 ### Architecture — no fork, in-process everything
 
@@ -2124,7 +2124,7 @@ Variables available in advice: `$INTERCEPT_NAME`, `$INTERCEPT_ARGS`, `$INTERCEPT
 | **Bytecode cache** | Compiled autoload functions stored as fusevm bytecodes — skip lex+parse+compile |
 | **Plugin delta cache** | Source a file once, cache all side effects, replay in microseconds |
 | **Native stryke mode** | Prefix any line with `@` to execute as stryke code with full parallel primitives |
-| **fusevm execution** | 100% lowered — all shell constructs compile to fusevm bytecodes. Cranelift JIT path. First compiled shell. |
+| **fusevm execution** | 100% lowered — all shell constructs compile to fusevm bytecodes. Cranelift JIT path. First compiled Unix shell. |
 | **Config file** | `~/.config/zshrs/config.toml` — pool size, completion settings, glob behavior |
 | **ZWC support** | Reads compiled `.zwc` files for fast function loading from fpath |
 | **Job control** | Full `&`, `fg`, `bg`, `jobs`, `wait`, `disown`, `suspend` support |
