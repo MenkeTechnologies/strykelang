@@ -889,7 +889,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my $cat   = qw(a b c) |> fold { $a . $b }
   ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
-- **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl in tree-walker and VM.
+- **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl.
 - **String interpolation** — `$var` `#{23 * 52}`, `$h{k}`, `$a[i]`, `@a`, `@a[slice]` (joined with `$"`), `$#a` in slice indices, `$0`, `$1..$n`. Escapes: `\n \r \t \a \b \f \e \0`, `\x{hex}`, `\xHH`, `\u{hex}`, `\o{oct}`, `\NNN` (octal), `\cX` (control), `\N{U+hex}`, `\N{UNICODE NAME}`, `\U..\E`, `\L..\E`, `\u`, `\l`, `\Q..\E`.
 - **`__FILE__` / `__LINE__`** — compile-time literals.
 - Heredocs `<<EOF`, POD skipping, shebang handling, `qw()/q()/qq()` with paired delimiters.
@@ -1550,23 +1550,22 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
  │                                    ▼                │
  │                            Bytecode (bytecode.rs)   │
  │                                    │                │
- │            ┌───────────────────────┼───────────┐    │
- │            ▼                       ▼           ▼    │
- │   Tree-walker fallback     VM (vm.rs)   Cranelift   │
- │   (interpreter.rs)            │            JIT       │
- │                               ▼                      │
- │                  Rayon work-stealing scheduler       │
- │                  CORE 0 │ CORE 1 │ ... │ CORE N      │
+ │                    ┌───────────────┴───────────┐    │
+ │                    ▼                           ▼    │
+ │               VM (vm.rs)                 Cranelift  │
+ │                    │                      Block JIT │
+ │                    ▼                                │
+ │       Rayon work-stealing scheduler                 │
+ │       CORE 0 │ CORE 1 │ ... │ CORE N                │
  └─────────────────────────────────────────────────────┘
 ```
 
 - **Lexer** ([`src/lexer.rs`](src/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
 - **Parser** ([`src/parser.rs`](src/parser.rs)) — recursive descent + Pratt precedence climbing.
-- **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — match-dispatch interpreter; `try_vm_execute` runs bytecode first then falls back to tree-walker on `CompileError::Unsupported` or unsupported ops. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
-- **JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift two-tier JIT (linear-sub + block) with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) interpreter invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles straight-line numeric hot loops. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
+- **Compiler / VM** ([`src/compiler.rs`](src/compiler.rs), [`src/vm.rs`](src/vm.rs)) — 100% lowered to bytecode. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
+- **Block JIT** ([`src/jit.rs`](src/jit.rs)) — Cranelift Block JIT with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) VM invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles hot loops to native code. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
 - **Feature work policy** — prefer **new VM opcodes** in [`bytecode.rs`](src/bytecode.rs), lowering in [`compiler.rs`](src/compiler.rs), implementation in [`vm.rs`](src/vm.rs). Do **not** add new `ExprKind`/`StmtKind` variants for new behavior.
-- **Tree-walker** ([`src/interpreter.rs`](src/interpreter.rs)) — fallback execution with `Arc<RwLock>` for thread-safe ref types; `fib_like_tail.rs` specializes simple integer-base-case recursive `f(n-1)+f(n-2)` patterns to avoid nested scope frames.
-- **Parallelism** — each parallel block spawns an isolated interpreter with captured scope; rayon does work-stealing.
+- **Parallelism** — each parallel block spawns an isolated VM with captured scope; Rayon does work-stealing across all cores.
 
 ---
 
@@ -1640,8 +1639,8 @@ stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p scalar($a | $b), " ", scalar
 ```
   map   (eager, sequential):     0.01s  — inline execution, zero per-item overhead
   maps  (streaming, sequential): 0.11s  — lazy iterator, single interpreter reused
-  pmap  (eager, 18 cores):       0.14s  — pre-built interpreter pool, rayon par_iter
-  pmaps (streaming, 18 cores):   0.49s  — background worker threads, bounded channel
+  pmap  (eager, MAX cores):      0.14s  — pre-built interpreter pool, rayon par_iter
+  pmaps (streaming, MAX cores):  0.49s  — background worker threads, bounded channel
 ```
 
 `maps`/`pmaps` are **streaming** — they return lazy iterators that never materialize the full result list. Use `pmaps` for pipelines over billions of items where holding all results in memory is impractical, or with `take` for early termination: `range(0, 1e9) |> pmaps { expensive($_) } |> take 10 |> ep`.
@@ -1929,11 +1928,11 @@ heat(60)
 
 Output:
 ```
-🔥 HEAT: Pinning 18 cores to 100% TDP for 60s (Ctrl-C to stop early)
-🔥 HEAT: 3,116,320,000 hashes in 60.00s (51.9M/s across 18 cores)
+🔥 HEAT: Pinning MAX cores to 100% TDP for 60s (Ctrl-C to stop early)
+🔥 HEAT: 3,116,320,000 hashes in 60.00s (51.9M/s)
 ```
 
-### Measured Performance (Apple M3 Max, 18 cores)
+### Measured Performance (Apple M3 Max)
 
 | Function | Result | CPU Usage |
 |----------|--------|-----------|
@@ -2253,7 +2252,7 @@ cargo build --release -p zsh    # target/release/zshrs (lean)
 | vs zsh | vs fish | vs bash |
 |--------|---------|---------|
 | No-fork architecture (10-100x faster) | Full POSIX compat | Fish-quality UX |
-| Persistent worker thread pool [2-18 cores] | Runs `.bashrc` unchanged | Modern completions |
+| Persistent worker thread pool [MAX cores] | Runs `.bashrc` unchanged | Modern completions |
 | Bytecode cache — skip lex+parse+compile on autoload | No syntax translation needed | Syntax highlighting |
 | Plugin delta cache — source once, replay microseconds | Global/suffix aliases | Autosuggestions |
 | SQLite FTS5 completions — instant fuzzy search | Glob qualifiers | Job control |

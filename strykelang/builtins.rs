@@ -1542,6 +1542,7 @@ pub(crate) fn try_builtin(
         "stress_io" | "sio" => Some(builtin_stress_io(args)),
         "stress_test" | "st" => Some(builtin_stress_test(args, line)),
         "heat" => Some(builtin_heat(args)),
+        "fire_and_forget" | "faf" | "pin" => Some(builtin_fire_and_forget()),
         "serve" => Some(interp.builtin_serve(args, line)),
         "fetch" | "ft" => Some(builtin_fetch(args, line)),
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
@@ -3915,6 +3916,62 @@ fn builtin_heat(args: &[PerlValue]) -> PerlResult<PerlValue> {
     );
 
     Ok(PerlValue::integer(total))
+}
+
+/// `fire_and_forget` — Spawn detached threads running heat forever on all cores.
+/// Returns immediately. The threads run until the process exits.
+fn builtin_fire_and_forget() -> PerlResult<PerlValue> {
+    use sha2::{Digest, Sha256};
+    use std::sync::atomic::{AtomicI64, Ordering};
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let num_cores = std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(1);
+
+    let total_count = Arc::new(AtomicI64::new(0));
+    let start = Instant::now();
+
+    eprintln!(
+        "🔥 FIRE: Computing INFINITY hashes at 100% TDP on {} cores (This is going to take a while...)",
+        num_cores
+    );
+
+    for _ in 0..num_cores {
+        let counter = Arc::clone(&total_count);
+        std::thread::spawn(move || {
+            let mut data = [0u8; 64];
+            let mut local_count: i64 = 0;
+            loop {
+                for _ in 0..1000 {
+                    let hash = Sha256::digest(&data);
+                    data[..32].copy_from_slice(&hash);
+                    local_count += 1;
+                }
+                if local_count % 100_000 == 0 {
+                    counter.fetch_add(100_000, Ordering::Relaxed);
+                }
+            }
+        });
+    }
+
+    // Reporter thread — prints stats every second
+    let counter = Arc::clone(&total_count);
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let total = counter.load(Ordering::Relaxed);
+            let elapsed = start.elapsed().as_secs_f64();
+            let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
+            eprintln!(
+                "🔥 FIRE: {} hashes in {:.1}s ({:.1}M/s across {} cores)",
+                total, elapsed, rate, num_cores
+            );
+        }
+    });
+
+    Ok(PerlValue::UNDEF)
 }
 
 /// `fetch` — Fetch.
