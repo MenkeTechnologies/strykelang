@@ -33,6 +33,7 @@
 //! ```
 
 pub mod chunk;
+pub mod jit;
 pub mod op;
 pub mod value;
 pub mod vm;
@@ -40,4 +41,5 @@ pub mod vm;
 pub use chunk::{Chunk, ChunkBuilder};
 pub use op::Op;
 pub use value::Value;
+pub use jit::{JitCompiler, JitExtension, NativeCode};
 pub use vm::{Frame, VM, VMResult};
