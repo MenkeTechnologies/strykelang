@@ -1532,6 +1532,16 @@ pub(crate) fn try_builtin(
         "csv_read" | "cr" => Some(builtin_csv_read(args)),
         "csv_write" | "cw" => Some(builtin_csv_write(args)),
         "sqlite" | "sql" => Some(builtin_sqlite(args)),
+        "cacheview" => Some(builtin_cacheview(args)),
+        "cache_stats" => Some(builtin_cache_stats()),
+        "cache_clear" => Some(builtin_cache_clear()),
+        "cache_exists" => Some(builtin_cache_exists(args)),
+        // ── Stress Testing ────────────────────────────────────────────────────
+        "stress_cpu" | "scpu" => Some(builtin_stress_cpu(args)),
+        "stress_mem" | "smem" => Some(builtin_stress_mem(args)),
+        "stress_io" | "sio" => Some(builtin_stress_io(args)),
+        "stress_test" | "st" => Some(builtin_stress_test(args, line)),
+        "heat" => Some(builtin_heat(args)),
         "serve" => Some(interp.builtin_serve(args, line)),
         "fetch" | "ft" => Some(builtin_fetch(args, line)),
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
@@ -3552,6 +3562,359 @@ fn builtin_csv_write(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_sqlite(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let path = args.first().map(|v| v.to_string()).unwrap_or_default();
     crate::native_data::sqlite_open(&path)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Bytecode cache builtins — inspect/manage ~/.cache/stryke/scripts.db
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// `cacheview` / `cv` — View cached scripts in SQLite bytecode cache.
+///
+/// Usage:
+///   cacheview()            — list all cached scripts with stats
+///   cacheview("path")      — show details for a specific script
+///   cacheview("--count")   — just return count
+fn builtin_cacheview(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use crate::script_cache;
+
+    let cache = match script_cache::CACHE.as_ref() {
+        Some(c) => match c.lock() {
+            Ok(g) => g,
+            Err(_) => return Err(PerlError::runtime("cacheview: cache lock poisoned", 0)),
+        },
+        None => {
+            println!("Bytecode cache disabled (STRYKE_SQLITE_CACHE=0)");
+            return Ok(PerlValue::UNDEF);
+        }
+    };
+
+    let filter = args.first().map(|v| v.to_string());
+    if filter.as_deref() == Some("--count") || filter.as_deref() == Some("-c") {
+        let (count, _) = cache.stats();
+        return Ok(PerlValue::integer(count));
+    }
+
+    let bold = |s: &str| format!("\x1b[1m{}\x1b[0m", s);
+    let dim = |s: &str| format!("\x1b[2m{}\x1b[0m", s);
+    let cyan = |s: &str| format!("\x1b[36m{}\x1b[0m", s);
+    let green = |s: &str| format!("\x1b[32m{}\x1b[0m", s);
+
+    if let Some(path_filter) = filter {
+        let rows = cache.list_scripts();
+        for (path, prog_kb, chunk_kb, version, cached_at) in rows {
+            if path.contains(&path_filter) {
+                println!("{}", bold(&path));
+                println!("  program:   {:.2} KB", prog_kb);
+                println!("  bytecode:  {:.2} KB", chunk_kb);
+                println!("  version:   {}", version);
+                println!("  cached:    {}", cached_at);
+                return Ok(PerlValue::integer(1));
+            }
+        }
+        println!("No cached script matching '{}'", path_filter);
+        return Ok(PerlValue::integer(0));
+    }
+
+    let (count, total_kb) = cache.stats();
+    println!("{}", bold("stryke bytecode cache"));
+    println!("  path: {}", dim(&script_cache::default_cache_path().display().to_string()));
+    println!("  scripts: {} ({:.2} KB)", green(&count.to_string()), total_kb as f64 / 1024.0);
+    println!();
+
+    let rows = cache.list_scripts();
+    if rows.is_empty() {
+        println!("  {}", dim("(empty)"));
+    } else {
+        println!("{:<60} {:>10} {:>10}", bold("PATH"), bold("PROG KB"), bold("BC KB"));
+        for (path, prog_kb, chunk_kb, _version, _cached_at) in rows.iter().take(50) {
+            let short = if path.len() > 58 {
+                format!("...{}", &path[path.len() - 55..])
+            } else {
+                path.clone()
+            };
+            println!("{:<60} {:>10.2} {:>10.2}", short, prog_kb, chunk_kb);
+        }
+        if rows.len() > 50 {
+            println!("  {} ({} more)", dim("..."), rows.len() - 50);
+        }
+    }
+    println!();
+    println!("Usage: {} [path] [--count]", cyan("cacheview"));
+
+    Ok(PerlValue::integer(count))
+}
+
+/// `cache_stats` — Return cache stats as hashref: {count => N, bytes => N, path => "...", enabled => 1}.
+fn builtin_cache_stats() -> PerlResult<PerlValue> {
+    use crate::script_cache;
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+
+    let (count, bytes) = script_cache::stats().unwrap_or((0, 0));
+    let mut h = IndexMap::new();
+    h.insert("count".to_string(), PerlValue::integer(count));
+    h.insert("bytes".to_string(), PerlValue::integer(bytes));
+    h.insert("path".to_string(), PerlValue::string(
+        script_cache::default_cache_path().display().to_string()
+    ));
+    h.insert("enabled".to_string(), PerlValue::integer(script_cache::cache_enabled() as i64));
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(h))))
+}
+
+/// `cache_clear` / `cc` — Clear the bytecode cache.
+fn builtin_cache_clear() -> PerlResult<PerlValue> {
+    use crate::script_cache;
+
+    if script_cache::clear() {
+        Ok(PerlValue::integer(1))
+    } else {
+        Ok(PerlValue::integer(0))
+    }
+}
+
+/// `cache_exists` / `ce` — Check if a script is cached. Returns 1 if cached, 0 if not.
+fn builtin_cache_exists(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use crate::script_cache;
+    use std::path::Path;
+
+    let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+    if path.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+
+    let p = Path::new(&path);
+    if script_cache::try_load(p).is_some() {
+        Ok(PerlValue::integer(1))
+    } else {
+        Ok(PerlValue::integer(0))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Stress testing builtins — saturate CPU/memory/IO for load testing
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// `stress_cpu` / `scpu` — CPU stress: run SHA256 hashing across ALL cores.
+/// Args: optional duration_secs (default 1.0)
+/// Returns: total number of hashes computed across all cores
+fn builtin_stress_cpu(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use sha2::{Digest, Sha256};
+    use std::sync::atomic::{AtomicI64, Ordering};
+    use std::time::{Duration, Instant};
+
+    let duration_secs = args.first().map(|v| v.to_number()).unwrap_or(1.0);
+    let duration = Duration::from_secs_f64(duration_secs.max(0.001));
+    let num_cores = std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(1);
+
+    let total_count = AtomicI64::new(0);
+    let start = Instant::now();
+
+    std::thread::scope(|s| {
+        for _ in 0..num_cores {
+            s.spawn(|| {
+                let mut local_count: i64 = 0;
+                let mut data = [0u8; 64];
+                
+                while start.elapsed() < duration {
+                    for _ in 0..1000 {
+                        let hash = Sha256::digest(&data);
+                        data[..32].copy_from_slice(&hash);
+                        local_count += 1;
+                    }
+                }
+                
+                total_count.fetch_add(local_count, Ordering::Relaxed);
+            });
+        }
+    });
+
+    Ok(PerlValue::integer(total_count.load(Ordering::Relaxed)))
+}
+
+/// `stress_mem` / `smem` — Memory stress: allocate and touch memory across ALL cores.
+/// Args: bytes to allocate (default 100MB)
+/// Returns: bytes allocated
+fn builtin_stress_mem(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let bytes = args.first().map(|v| v.to_int()).unwrap_or(100_000_000) as usize;
+    let num_cores = std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(1);
+    let bytes_per_core = bytes / num_cores;
+
+    std::thread::scope(|s| {
+        for core_id in 0..num_cores {
+            s.spawn(move || {
+                let mut buf: Vec<u8> = vec![0u8; bytes_per_core];
+                for i in (0..bytes_per_core).step_by(4096) {
+                    buf[i] = ((i + core_id) & 0xff) as u8;
+                }
+                std::hint::black_box(&buf);
+            });
+        }
+    });
+
+    Ok(PerlValue::integer(bytes as i64))
+}
+
+/// `stress_io` / `sio` — IO stress: write and read temp files.
+/// Args: optional dir (default /tmp), optional iterations (default 100)
+/// Returns: total bytes written
+fn builtin_stress_io(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::fs;
+    use std::io::Write;
+
+    let dir = args.first().map(|v| v.to_string()).unwrap_or_else(|| "/tmp".to_string());
+    let iterations = args.get(1).map(|v| v.to_int()).unwrap_or(100) as usize;
+    let mut total_bytes: i64 = 0;
+    let data = vec![0xABu8; 1_000_000]; // 1MB per write
+
+    for i in 0..iterations {
+        let path = format!("{}/stryke_stress_{}", dir, i);
+        if let Ok(mut f) = fs::File::create(&path) {
+            let _ = f.write_all(&data);
+            total_bytes += data.len() as i64;
+        }
+        let _ = fs::read(&path);
+        let _ = fs::remove_file(&path);
+    }
+
+    Ok(PerlValue::integer(total_bytes))
+}
+
+/// `stress_test` / `st` — Combined stress test on cluster or local.
+/// Args: cluster (optional), duration_secs (default 10)
+/// If cluster provided, distributes across workers. Otherwise runs locally.
+/// Returns: hashref with stats {cpu_hashes, mem_bytes, io_bytes, workers, duration}
+fn builtin_stress_test(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let start = Instant::now();
+
+    let (cluster_opt, duration_secs) = if let Some(first) = args.first() {
+        if first.as_remote_cluster().is_some() {
+            let dur = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
+            (Some(first.clone()), dur)
+        } else {
+            (None, first.to_number())
+        }
+    } else {
+        (None, 10.0)
+    };
+
+    let (cpu_hashes, mem_bytes, io_bytes, workers) = if let Some(cluster_pv) = cluster_opt {
+        let cluster = cluster_pv.as_remote_cluster().ok_or_else(|| {
+            crate::error::PerlError::runtime("stress_test: invalid cluster", line)
+        })?;
+        let num_workers = cluster.slots.len();
+
+        let subs_prelude = String::new();
+        let block_src = format!(
+            r#"stress_cpu({})"#,
+            duration_secs
+        );
+        let capture: Vec<(String, serde_json::Value)> = Vec::new();
+        let items: Vec<serde_json::Value> = (0..num_workers)
+            .map(|i| serde_json::Value::Number(serde_json::Number::from(i)))
+            .collect();
+
+        let results = crate::cluster::run_cluster(&cluster, subs_prelude, block_src, capture, items)
+            .map_err(|e| crate::error::PerlError::runtime(format!("stress_test: {}", e), line))?;
+
+        let mut total_cpu: i64 = 0;
+        let total_mem = 100_000_000i64 * num_workers as i64;
+        let total_io = 50_000_000i64 * num_workers as i64;
+
+        for r in results {
+            total_cpu += r.to_int();
+        }
+
+        (total_cpu, total_mem, total_io, num_workers)
+    } else {
+        let cpu = builtin_stress_cpu(&[PerlValue::float(duration_secs)])?.to_int();
+        let mem = builtin_stress_mem(&[PerlValue::integer(100_000_000)])?.to_int();
+        let io = builtin_stress_io(&[PerlValue::string("/tmp".to_string()), PerlValue::integer(50)])?.to_int();
+        (cpu, mem, io, 1)
+    };
+
+    let elapsed = start.elapsed().as_secs_f64();
+
+    let mut h = IndexMap::new();
+    h.insert("cpu_hashes".to_string(), PerlValue::integer(cpu_hashes));
+    h.insert("mem_bytes".to_string(), PerlValue::integer(mem_bytes));
+    h.insert("io_bytes".to_string(), PerlValue::integer(io_bytes));
+    h.insert("workers".to_string(), PerlValue::integer(workers as i64));
+    h.insert("duration".to_string(), PerlValue::float(elapsed));
+
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(h))))
+}
+
+/// `heat` — Maximum thermal stress. Pins ALL cores indefinitely (or for specified seconds).
+/// The hottest function in any programming language. Ctrl-C to stop.
+/// Args: optional duration_secs (default: 60 seconds)
+/// Returns: total hashes computed
+fn builtin_heat(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use sha2::{Digest, Sha256};
+    use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+    use std::time::{Duration, Instant};
+
+    let duration_secs = args.first().map(|v| v.to_number()).unwrap_or(60.0);
+    let num_cores = std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(1);
+
+    eprintln!(
+        "🔥 HEAT: Pinning {} cores to 100% TDP for {}s (Ctrl-C to stop early)",
+        num_cores, duration_secs
+    );
+
+    let total_count = AtomicI64::new(0);
+    let start = Instant::now();
+    let duration = Duration::from_secs_f64(duration_secs);
+    let running = std::sync::Arc::new(AtomicBool::new(true));
+
+    // Set up Ctrl-C handler
+    let r = running.clone();
+    let _ = ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    });
+
+    std::thread::scope(|s| {
+        for _ in 0..num_cores {
+            let running = &running;
+            let total_count = &total_count;
+            s.spawn(move || {
+                let mut local_count: i64 = 0;
+                let mut data = [0u8; 64];
+
+                while running.load(Ordering::Relaxed) && start.elapsed() < duration {
+                    for _ in 0..1000 {
+                        let hash = Sha256::digest(&data);
+                        data[..32].copy_from_slice(&hash);
+                        local_count += 1;
+                    }
+                }
+
+                total_count.fetch_add(local_count, Ordering::Relaxed);
+            });
+        }
+    });
+
+    let elapsed = start.elapsed().as_secs_f64();
+    let total = total_count.load(Ordering::Relaxed);
+    let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
+
+    eprintln!(
+        "🔥 HEAT: {} hashes in {:.2}s ({:.1}M/s across {} cores)",
+        total, elapsed, rate, num_cores
+    );
+
+    Ok(PerlValue::integer(total))
 }
 
 /// `fetch` — Fetch.

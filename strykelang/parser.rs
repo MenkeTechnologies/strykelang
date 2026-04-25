@@ -12064,6 +12064,10 @@ impl Parser {
             // ── system info ─────────────────────────────────────────────────
             | "mounts" | "du" | "du_tree" | "process_list"
             | "thread_count" | "pool_info" | "par_bench"
+            // ── stress testing ──────────────────────────────────────────────
+            | "stress_cpu" | "scpu" | "stress_mem" | "smem"
+            | "stress_io" | "sio" | "stress_test" | "st"
+            | "heat"
             // ── I/O extensions ──────────────────────────────────────────────
             | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"

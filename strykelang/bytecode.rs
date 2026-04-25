@@ -1026,7 +1026,7 @@ impl BuiltinId {
 pub struct Chunk {
     pub ops: Vec<Op>,
     /// Constant pool: string literals, regex patterns, etc.
-    #[serde(with = "crate::pec::constants_pool_codec")]
+    #[serde(with = "crate::script_cache::constants_pool_codec")]
     pub constants: Vec<PerlValue>,
     /// Name pool: variable names, sub names (interned/deduped).
     pub names: Vec<String>,
