@@ -1448,7 +1448,7 @@ test result: ok. 738 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; fi
       <table class="file-table">
         <thead><tr><th>Subsystem</th><th>Key Files</th><th class="num">Lines</th><th class="num">%</th><th style="min-width:100px;">Share</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);">Core Pipeline</td><td><code>lexer, parser, compiler, vm, interpreter, ast, bytecode</code></td><td class="num">59,133</td><td class="num">35.6%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:35.6%"></div></div></td><td>Lexer &rarr; Parser (328 AST nodes) &rarr; Compiler (446 opcodes) &rarr; VM (register+stack hybrid) &rarr; Interpreter (tree-walk fallback)</td></tr>
+          <tr><td style="color:var(--accent);">Core Pipeline</td><td><code>lexer, parser, compiler, vm, ast, bytecode</code></td><td class="num">59,133</td><td class="num">35.6%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:35.6%"></div></div></td><td>Lexer &rarr; Parser (328 AST nodes) &rarr; Compiler (446 opcodes) &rarr; VM (register+stack hybrid) &rarr; Cranelift Block JIT</td></tr>
           <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins, builtins_extended</code></td><td class="num">40,296</td><td class="num">24.3%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:24.3%"></div></div></td><td>3,700+ Perl builtins: string, array, hash, I/O, regex, math, file, process, OO, format, pack/unpack</td></tr>
           <tr><td style="color:var(--accent);">Value System</td><td><code>value, nanbox, scope, convert, capture</code></td><td class="num">7,321</td><td class="num">4.4%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:4.4%"></div></div></td><td>NaN-boxed PerlValue (int/float/string/array/hash/regex/code/undef), scoping, type coercion, captures</td></tr>
           <tr><td style="color:var(--accent);">JIT Compiler</td><td><code>jit</code></td><td class="num">5,169</td><td class="num">3.1%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:3.1%"></div></div></td><td>Cranelift-based JIT: hot loop detection, native code generation, deoptimization</td></tr>
@@ -1470,7 +1470,7 @@ test result: ok. 738 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; fi
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
         <tbody>
           <tr><td>builtins.rs</td><td class="num">27,778</td><td>3,604 Perl builtins: string, array, hash, I/O, file, regex, math, system, OO</td></tr>
-          <tr><td>interpreter.rs</td><td class="num">19,492</td><td>Tree-walking interpreter: eval loop, context, error handling, debugger hooks</td></tr>
+          <tr><td>interpreter.rs</td><td class="num">19,492</td><td>Interpreter state: scope management, context, error handling, debugger hooks</td></tr>
           <tr><td>parser.rs</td><td class="num">14,794</td><td>Recursive-descent parser: 328 AST node types, operator precedence, heredocs</td></tr>
           <tr><td>builtins_extended.rs</td><td class="num">12,518</td><td>Extended builtins: crypto, JWT, codecs, compression, HTTP, email, QR</td></tr>
           <tr><td>vm.rs</td><td class="num">9,553</td><td>Bytecode VM: register+stack hybrid, 446 opcodes, hot path optimization</td></tr>
