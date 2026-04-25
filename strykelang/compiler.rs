@@ -2902,33 +2902,42 @@ impl Compiler {
             }
             ExprKind::HashSlice { hash, keys } => {
                 let hash_idx = self.chunk.intern_name(hash);
-                // Flatten multi-key subscripts (qw, lists) into individual GetHashElem ops
-                let mut total_keys = 0u16;
-                for key_expr in keys {
-                    match &key_expr.kind {
-                        ExprKind::QW(words) => {
-                            for w in words {
-                                let cidx = self.chunk.add_constant(PerlValue::string(w.clone()));
-                                self.emit_op(Op::LoadConst(cidx), line, Some(root));
+                // If any key expression is a range, we need runtime flattening via GetHashSlice.
+                let has_dynamic_keys = keys.iter().any(|k| matches!(&k.kind, ExprKind::Range { .. }));
+                if has_dynamic_keys {
+                    for key_expr in keys {
+                        self.compile_hash_slice_key_expr(key_expr)?;
+                    }
+                    self.emit_op(Op::GetHashSlice(hash_idx, keys.len() as u16), line, Some(root));
+                } else {
+                    // Flatten multi-key subscripts (qw, lists) into individual GetHashElem ops
+                    let mut total_keys = 0u16;
+                    for key_expr in keys {
+                        match &key_expr.kind {
+                            ExprKind::QW(words) => {
+                                for w in words {
+                                    let cidx = self.chunk.add_constant(PerlValue::string(w.clone()));
+                                    self.emit_op(Op::LoadConst(cidx), line, Some(root));
+                                    self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                    total_keys += 1;
+                                }
+                            }
+                            ExprKind::List(elems) => {
+                                for e in elems {
+                                    self.compile_expr(e)?;
+                                    self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                    total_keys += 1;
+                                }
+                            }
+                            _ => {
+                                self.compile_expr(key_expr)?;
                                 self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                                 total_keys += 1;
                             }
-                        }
-                        ExprKind::List(elems) => {
-                            for e in elems {
-                                self.compile_expr(e)?;
-                                self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
-                                total_keys += 1;
-                            }
-                        }
-                        _ => {
-                            self.compile_expr(key_expr)?;
-                            self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
-                            total_keys += 1;
                         }
                     }
+                    self.emit_op(Op::MakeArray(total_keys), line, Some(root));
                 }
-                self.emit_op(Op::MakeArray(total_keys), line, Some(root));
             }
             ExprKind::HashSliceDeref { container, keys } => {
                 self.compile_expr(container)?;
@@ -8765,4 +8774,5 @@ literal line
         );
         assert_last_halt(&chunk);
     }
+
 }

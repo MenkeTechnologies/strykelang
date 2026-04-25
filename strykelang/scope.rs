@@ -420,13 +420,7 @@ impl Scope {
         let idx = slot as usize;
         for frame in self.frames.iter().rev() {
             if idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx) {
-                let val = &frame.scalar_slots[idx];
-                // Transparently unwrap ScalarRef (captured closure variable) — consistent
-                // with get_scalar which also unwraps.
-                if let Some(arc) = val.as_scalar_ref() {
-                    return arc.read().clone();
-                }
-                return val.clone();
+                return frame.scalar_slots[idx].clone();
             }
         }
         PerlValue::UNDEF

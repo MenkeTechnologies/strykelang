@@ -265,6 +265,10 @@ pub enum Op {
     SetHashSliceDeref(u16),
     /// `%name{k1,k2} = VALUE` — stack: `[value, key1, …, keyN]` (TOS = last key); pops `N+1`. Pool: hash name, key count.
     SetHashSlice(u16, u16),
+    /// `@h{k1,k2}` read — stack: `[key1, …, keyN]` (TOS = last key); pops `N` values; pushes array of slot values.
+    /// Each key value may be a scalar or array (from list-context range); arrays are flattened into individual keys.
+    /// Pool: hash name index, key-expression count.
+    GetHashSlice(u16, u16),
     /// `@$href{k1,k2} OP= VALUE` — stack: `[rhs, container, key1, …, keyN]` (TOS = last key); pops `N+2`, pushes the new value.
     /// `u8` = [`crate::compiler::scalar_compound_op_to_byte`] encoding of the binop.
     /// Perl 5 applies the op only to the **last** key’s element.
