@@ -818,14 +818,12 @@ pub struct Interpreter {
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
-    /// Sideband: precompiled [`crate::bytecode::Chunk`] loaded from a `.pec` cache hit. When
+    /// Sideband: precompiled [`crate::bytecode::Chunk`] loaded from SQLite cache hit. When
     /// `Some`, [`crate::try_vm_execute`] uses it directly and skips `compile_program`. Consumed
     /// (`.take()`) on first read so re-entry compiles normally.
-    pub pec_precompiled_chunk: Option<crate::bytecode::Chunk>,
-    /// Sideband: fingerprint to save the compiled chunk under after a cache miss (pairs with
-    /// [`crate::pec::try_save`]). `None` when the cache is disabled or the caller does not want
-    /// the compiled chunk persisted.
-    pub pec_cache_fingerprint: Option<[u8; 32]>,
+    pub cached_chunk: Option<crate::bytecode::Chunk>,
+    /// Sideband: script path for SQLite cache save after compilation (mtime-based).
+    pub sqlite_cache_script_path: Option<std::path::PathBuf>,
     /// Set while stepping a `gen { }` body (`yield`).
     pub(crate) in_generator: bool,
     /// `-n`/`-p` driver: prelude only; body runs per line in [`Self::process_line_vm`].
@@ -1577,8 +1575,8 @@ impl Interpreter {
                         || v.eq_ignore_ascii_case("yes")
             ),
             disasm_bytecode: false,
-            pec_precompiled_chunk: None,
-            pec_cache_fingerprint: None,
+            cached_chunk: None,
+            sqlite_cache_script_path: None,
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: None,
@@ -1803,8 +1801,8 @@ impl Interpreter {
             vm_jit_enabled: self.vm_jit_enabled,
             disasm_bytecode: self.disasm_bytecode,
             // Sideband cache fields belong to the top-level driver, not line-mode workers.
-            pec_precompiled_chunk: None,
-            pec_cache_fingerprint: None,
+            cached_chunk: None,
+            sqlite_cache_script_path: None,
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: self.line_mode_chunk.clone(),

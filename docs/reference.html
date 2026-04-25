@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.8.11 · 3260 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.9.2 · 3271 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -197,9 +197,9 @@
         <li><a href="#ch-markup-web-scraping">Markup / Web Scraping</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-date-utilities">Date Utilities</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
-        <li><a href="#ch-system">System</a> <span class="chapter-count">8</span></li>
+        <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2604</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2610</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -3356,7 +3356,7 @@ p scalar @json_files
 par_walk &quot;.&quot;, fn {
     if (/\.log$/) {
         my @hits = grep /FATAL/, rl
-        p &quot;_: &quot;, scalar @hits, &quot; fatals&quot; if @hits
+        p &quot;$_: &quot;, scalar @hits, &quot; fatals&quot; if @hits
     }
 }
 </code></pre>
@@ -3617,9 +3617,9 @@ Note: returns an empty list for an empty file.
         <h3><a class="doc-anchor" href="#doc-append-file">#</a> <code>append_file</code></h3>
         <p>Append a string to the end of a file, creating it if it does not exist. This is the safe way to add content without overwriting — useful for log files, CSV accumulation, or incremental output. The short alias <code>af</code> is convenient in pipelines. The file is opened, written, and closed atomically per call.</p>
         <pre><code class="lang-perl">af(&quot;log.txt&quot;, &quot;started at &quot; . datetime_utc() . &quot;\n&quot;)
-1:5 |&gt; e { af(&quot;nums.txt&quot;, &quot;_\n&quot;) }
+1:5 |&gt; e { af(&quot;nums.txt&quot;, &quot;$_\n&quot;) }
 my @data = (&quot;a&quot;,&quot;b&quot;,&quot;c&quot;)
-@data |&gt; e { af &quot;out.txt&quot;, &quot;_\n&quot; }
+@data |&gt; e { af &quot;out.txt&quot;, &quot;$_\n&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-to-file">
@@ -4822,7 +4822,7 @@ to_file(&quot;backup_$log_ts.sql&quot;, $data)
 p datetime_now_tz(&quot;Asia/Tokyo&quot;)           # 2026-04-15 21:30:00 JST
 p datetime_now_tz(&quot;UTC&quot;)                  # same as datetime_utc
 my @offices = (&quot;US/Pacific&quot;, &quot;Europe/Berlin&quot;, &quot;Asia/Kolkata&quot;)
-@offices |&gt; e { p &quot;_: &quot; . datetime_now_tz }
+@offices |&gt; e { p &quot;$_: &quot; . datetime_now_tz }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-datetime-format-tz">
@@ -5440,14 +5440,6 @@ if (fork() == 0) {
 }
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-exe">
-        <h3><a class="doc-anchor" href="#doc-exe">#</a> <code>exe</code></h3>
-        <p><code>exe</code> (alias <code>executables</code>) — list executable file names in a directory (default: current directory). Returns a sorted array of filenames that have the executable bit set. On non-Unix platforms, matches files with <code>.exe</code>, <code>.bat</code>, or <code>.cmd</code> extensions.</p>
-        <pre><code class="lang-perl">p for exe                    # list executables in $PWD
-p for exe("/usr/local/bin")  # list executables in a specific dir
-exe |&gt; grep /^s/ |&gt; e p     # executables starting with 's'
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-fork">
         <h3><a class="doc-anchor" href="#doc-fork">#</a> <code>fork</code></h3>
         <p>Fork the current process, creating a child that is an exact copy of the parent. Returns the child&#39;s PID to the parent process and <code>0</code> to the child, allowing each side to branch. Returns <code>undef</code> on failure. Always pair with <code>wait</code>/<code>waitpid</code> to reap the child and avoid zombies.</p>
@@ -5681,7 +5673,7 @@ p unpack(&quot;B8&quot;, $bits)  # 10000001
         <pre><code class="lang-perl">log_info(&quot;server started on port $port&quot;)
 my @rows = rl(&quot;data.csv&quot;)
 log_info(&quot;loaded &quot; . scalar(@rows) . &quot; rows&quot;)
-1:5 |&gt; e { log_info(&quot;processing item _&quot;) }
+1:5 |&gt; e { log_info(&quot;processing item $_&quot;) }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-log-warn">
@@ -6161,7 +6153,7 @@ p gshow(&quot;abc1234&quot;)
     </section>
     <section class="tutorial-section" id="ch-system">
       <h2>System</h2>
-      <p class="chapter-meta">8 topics</p>
+      <p class="chapter-meta">13 topics</p>
       <article class="doc-entry" id="doc-mounts">
         <h3><a class="doc-anchor" href="#doc-mounts">#</a> <code>mounts</code></h3>
         <p><code>mounts</code> (aliases <code>disk_mounts</code>, <code>filesystems</code>) — list mounted filesystems with usage (total, used, available).</p>
@@ -6214,6 +6206,61 @@ p $text |&gt; lines |&gt; cnt   # number of lines
         <p><code>jq</code> — alias for <code>json_jq</code>. Query JSON data with jq-style expressions.</p>
         <pre><code class="lang-perl">my $data = json_decode(slurp(&quot;data.json&quot;))
 p jq($data, &quot;.items[].name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-cpu">
+        <h3><a class="doc-anchor" href="#doc-stress-cpu">#</a> <code>stress_cpu</code></h3>
+        <p><code>stress_cpu</code> (alias <code>scpu</code>) — CPU stress test: run SHA256 hashing in a tight loop for the specified duration (default 1 second). Returns number of hashes computed. Use for load testing and thermal validation.</p>
+        <pre><code class="lang-perl">my $hashes = stress_cpu(10)   # 10 seconds of CPU stress
+p &quot;Computed $hashes hashes&quot;
+
+# Distributed across cluster
+my $c = cluster([&quot;node1:8&quot;, &quot;node2:8&quot;])
+1:16 |&gt; pmap_on $c { stress_cpu(60) }   # 60s stress on all workers
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-mem">
+        <h3><a class="doc-anchor" href="#doc-stress-mem">#</a> <code>stress_mem</code></h3>
+        <p><code>stress_mem</code> (alias <code>smem</code>) — Memory stress test: allocate and touch the specified number of bytes (default 100MB). Returns bytes allocated. Use for memory pressure testing and OOM validation.</p>
+        <pre><code class="lang-perl">my $bytes = stress_mem(1e9)   # Allocate 1GB
+p &quot;Allocated $bytes bytes&quot;
+
+# Memory pressure across cluster
+1:16 |&gt; pmap_on $cluster { stress_mem(4e9) }   # 4GB per worker
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-io">
+        <h3><a class="doc-anchor" href="#doc-stress-io">#</a> <code>stress_io</code></h3>
+        <p><code>stress_io</code> (alias <code>sio</code>) — IO stress test: write and read temp files in the specified directory (default /tmp) for N iterations (default 100). Returns total bytes written. Use for storage IOPS testing.</p>
+        <pre><code class="lang-perl">my $bytes = stress_io(&quot;/tmp&quot;, 1000)   # 1000 iterations
+p &quot;Wrote $bytes bytes&quot;
+
+# IO stress across cluster
+1:16 |&gt; pmap_on $cluster { stress_io(&quot;/data&quot;, 500) }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-test">
+        <h3><a class="doc-anchor" href="#doc-stress-test">#</a> <code>stress_test</code></h3>
+        <p><code>stress_test</code> (alias <code>st</code>) — Combined CPU/memory/IO stress test. If cluster provided, distributes across all workers. Returns hashref with stats: {cpu_hashes, mem_bytes, io_bytes, workers, duration}.</p>
+        <pre><code class="lang-perl"># Local stress test (10 seconds)
+my $r = stress_test(10)
+p &quot;CPU: $r-&gt;{cpu_hashes}, Workers: $r-&gt;{workers}&quot;
+
+# Distributed stress test
+my $c = cluster([&quot;node1:8&quot;, &quot;node2:8&quot;, &quot;node3:8&quot;])
+my $r = stress_test($c, 60)   # 60s across 24 workers
+p &quot;Hashes: $r-&gt;{cpu_hashes}, Duration: $r-&gt;{duration}s&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-heat">
+        <h3><a class="doc-anchor" href="#doc-heat">#</a> <code>heat</code></h3>
+        <p><code>heat</code> — Maximum thermal stress. Pins ALL cores to 100% TDP. The hottest function in any programming language. Use for infrastructure burn-in, cooling validation, and power testing.</p>
+        <pre><code class="lang-perl">heat(60)     # 60 seconds of maximum heat
+heat()       # default 60 seconds
+
+# Output:
+# 🔥 HEAT: Pinning 18 cores to 100% TDP for 60s
+# 🔥 HEAT: 3,116,320,000 hashes in 60.00s (51.9M/s across 18 cores)
 </code></pre>
       </article>
     </section>
@@ -6328,7 +6375,7 @@ test_run   # prints summary, exits 1 on failure
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2604 topics</p>
+      <p class="chapter-meta">2610 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -8479,6 +8526,38 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <h3><a class="doc-anchor" href="#doc-c-to-k">#</a> <code>c_to_k</code></h3>
         <p><code>c_to_k</code> — unit conversions builtin.</p>
         <pre><code class="lang-perl">my $result = c_to_k $input 
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cache-clear">
+        <h3><a class="doc-anchor" href="#doc-cache-clear">#</a> <code>cache_clear</code></h3>
+        <p><code>cache_clear</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cache_clear $x 
+# or in a pipeline:
+@list |&gt; map cache_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cache-exists">
+        <h3><a class="doc-anchor" href="#doc-cache-exists">#</a> <code>cache_exists</code></h3>
+        <p><code>cache_exists</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cache_exists $x 
+# or in a pipeline:
+@list |&gt; map cache_exists |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cache-stats">
+        <h3><a class="doc-anchor" href="#doc-cache-stats">#</a> <code>cache_stats</code></h3>
+        <p><code>cache_stats</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cache_stats $x 
+# or in a pipeline:
+@list |&gt; map cache_stats |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-cacheview">
+        <h3><a class="doc-anchor" href="#doc-cacheview">#</a> <code>cacheview</code></h3>
+        <p><code>cacheview</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = cacheview $x 
+# or in a pipeline:
+@list |&gt; map cacheview |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-caesar-shift">
@@ -11823,6 +11902,22 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
         <pre><code class="lang-perl">my $result = ewo $x 
 # or in a pipeline:
 @list |&gt; map ewo |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-exe">
+        <h3><a class="doc-anchor" href="#doc-exe">#</a> <code>exe</code></h3>
+        <p><code>exe</code> — filesystem extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = exe $x 
+# or in a pipeline:
+@list |&gt; map exe |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-executables">
+        <h3><a class="doc-anchor" href="#doc-executables">#</a> <code>executables</code></h3>
+        <p><code>executables</code> — filesystem extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = executables $x 
+# or in a pipeline:
+@list |&gt; map executables |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-exp2">

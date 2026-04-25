@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.8.11 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.9.2 · Rust-powered · Rayon work-stealing · Cranelift JIT · Perl 5 compat surface + pipe-forward sugar</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -227,6 +227,8 @@ s 'p to_yaml read_json "data.json"'</pre>
             <tr><td>In-place edit <code>-i</code></td><td style="color:#0f0;">parallel</td><td>sequential</td><td>sequential</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Data viz (spark/bars/flame)</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Clipboard</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
+            <tr><td>Stress testing / heat</td><td style="color:#f55;"><b>100% TDP</b></td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
+            <tr><td>Distributed agents</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>JIT compiler</td><td style="color:#0f0;">Cranelift</td><td>&#10007;</td><td>YJIT</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Single binary</td><td style="color:#0f0;">26MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
           </tbody>
@@ -259,6 +261,7 @@ s 'p to_yaml read_json "data.json"'</pre>
           <li><strong>Values</strong> — <code>PerlValue</code> is a NaN-boxed <code>u64</code>: immediates (<code>undef</code>, <code>i32</code>, raw <code>f64</code> bits) and tagged <code>Arc&lt;HeapObject&gt;</code> pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.</li>
           <li><strong>Regex</strong> — three-tier engine: Rust <code>regex</code> → <code>fancy-regex</code> (backrefs) → <code>pcre2</code> (PCRE-only verbs).</li>
           <li><strong>Parallelism</strong> — every parallel builtin uses rayon work-stealing across all cores. See <code>pmap</code>, <code>pflat_map</code>, <code>pgrep</code>, <code>pfor</code>, <code>psort</code>, <code>preduce</code>, <code>pcache</code>, <code>ppool</code>, <code>fan</code>, <code>pipeline</code>, <code>par_pipeline_stream</code>, <code>pchannel</code>, <code>pselect</code>, <code>par_walk</code>, <code>par_lines</code>, <code>par_sed</code>.</li>
+          <li><strong>Stress testing</strong> — <code>heat(60)</code> pins ALL cores to 100% TDP. <code>stryke agent</code> + <code>stryke controller</code> for distributed fleet-wide load testing. The hottest language ever created.</li>
           <li><strong>Binary size</strong> — ~21 MB stripped with LTO + O3.</li>
         </ul>
       </section>
@@ -357,6 +360,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
           <div class="cat-card"><h4>Filesystem (84+)</h4><p><code>files/f fr dirs/d dr sym_links glob glob_par basename dirname realpath which stat lstat size copy move spurt read_bytes path_ext path_stem path_parent path_join path_split path_is_abs path_is_rel strip_prefix strip_suffix ensure_prefix ensure_suffix</code></p></div>
           <div class="cat-card"><h4>Serialization</h4><p><code>to_json/tj to_csv/tc to_toml/tt to_yaml/ty to_xml/tx to_html/th to_markdown/to_md/tmd ddump/dd stringify/str json_encode/decode yaml_encode/decode toml_encode/decode xml_encode/decode json_pretty json_minify escape_json</code></p></div>
           <div class="cat-card"><h4>Parallel (31)</h4><p><code>pmap pflat_map pgrep pfor psort preduce preduce_init pmap_reduce pmap_chunked pcache ppool pchannel pselect puniq pfirst pany fan fan_cap pipeline par_pipeline_stream glob_par par_walk par_lines par_sed par_find_files par_line_count pwatch watch</code></p></div>
+          <div class="cat-card" style="border-color:#f55;"><h4>🔥 Stress Testing</h4><p><code>stress_cpu stress_mem stress_io stress_test heat</code> — Pin ALL cores to 100% TDP. <code>stryke agent</code> + <code>stryke controller</code> for distributed fleet-wide load testing. The hottest language ever created. Literally.</p></div>
           <div class="cat-card"><h4>Functional (56+)</h4><p><code>reduce fold inject collect complement constantly coalesce default_to when_true when_false if_else safe_div safe_mod safe_sqrt safe_log scan accumulate keep_if reject_if group_consecutive normalize_list softmax argmax argmin juxt2 juxt3 tap_val debug_val converge iterate_n unfold</code> &hellip;</p></div>
           <div class="cat-card"><h4>Matrix / Linear Algebra (29+)</h4><p><code>dot_product cross_product matrix_add matrix_scale matrix_multiply identity_matrix zeros_matrix ones_matrix diagonal matrix_trace matrix_shape matrix_row matrix_col magnitude vec_normalize vec_add vec_sub vec_scale linspace arange</code></p></div>
           <div class="cat-card"><h4>Data / Network (50+)</h4><p><code>fetch fetch_json fetch_async par_fetch csv_read csv_write dataframe sqlite json_jq ipv4_to_int int_to_ipv4 email_domain email_local url_host url_path url_query url_scheme</code></p></div>

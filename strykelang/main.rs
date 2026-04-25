@@ -1096,6 +1096,65 @@ fn main() {
         process::exit(stryke::run_lsp_stdio());
     }
 
+    // `stryke agent` — distributed load testing agent
+    if args.len() >= 2 && args[1] == "agent" {
+        if args.len() >= 3 && (args[2] == "--help" || args[2] == "-h") {
+            stryke::agent::print_help();
+            process::exit(0);
+        }
+        let mut config_path: Option<&str> = None;
+        let mut controller_override: Option<String> = None;
+        let mut port_override: Option<u16> = None;
+        let mut i = 2;
+        while i < args.len() {
+            match args[i].as_str() {
+                "-c" | "--config" if i + 1 < args.len() => {
+                    config_path = Some(&args[i + 1]);
+                    i += 2;
+                }
+                "--controller" if i + 1 < args.len() => {
+                    controller_override = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                "--port" if i + 1 < args.len() => {
+                    port_override = args[i + 1].parse().ok();
+                    i += 2;
+                }
+                _ => i += 1,
+            }
+        }
+        process::exit(stryke::agent::run_agent_with_overrides(
+            config_path,
+            controller_override.as_deref(),
+            port_override,
+        ));
+    }
+
+    // `stryke controller` — distributed load testing controller REPL
+    if args.len() >= 2 && args[1] == "controller" {
+        if args.len() >= 3 && (args[2] == "--help" || args[2] == "-h") {
+            stryke::controller::print_help();
+            process::exit(0);
+        }
+        let mut bind = "0.0.0.0";
+        let mut port = 9999u16;
+        let mut i = 2;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--bind" | "-b" if i + 1 < args.len() => {
+                    bind = &args[i + 1];
+                    i += 2;
+                }
+                "--port" | "-p" if i + 1 < args.len() => {
+                    port = args[i + 1].parse().unwrap_or(9999);
+                    i += 2;
+                }
+                _ => i += 1,
+            }
+        }
+        process::exit(stryke::controller::run_controller(bind, port));
+    }
+
     // `stryke build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
     // to be added to the main `Cli` struct (keeping the perl-compatible flag surface clean).
     if args.len() >= 2 && args[1] == "build" {
@@ -1660,23 +1719,9 @@ fn main() {
     let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
 
-    // `.pec` bytecode cache fast path — skip parse AND compile on warm starts.
-    //
-    // Keyed on (crate version, filename, full source including `-M` prelude). Enabled by
-    // `STRYKE_BC_CACHE=1` (opt-in for v1 — see [`stryke::pec::cache_enabled`]). On a hit,
-    // the [`stryke::pec::PecBundle`] carries both the AST `Program` and the compiled
-    // `Chunk`; we hand the chunk to the interpreter via a sideband field that
-    // [`stryke::try_vm_execute`] consumes. On a miss, we parse normally and stash the
-    // fingerprint so the try-VM path persists the freshly-compiled chunk after run.
-    //
-    // **Disabled for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than
-    // cold for tiny scripts because the deserialize cost (~1-2 ms for fs read + zstd decode
-    // + bincode) dominates the parse+compile work it replaces (~500 µs). One-liners would
-    // also pollute the cache directory with one entry per unique `-e` invocation, with no
-    // GC in v1. The break-even is around 1000+ lines, so file-based scripts only.
+    // SQLite bytecode cache — mtime-based, skips lex/parse/compile on 2+ runs.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
-    let pec_on = stryke::pec::cache_enabled()
-        && !cli.line_mode
+    let cache_eligible = !cli.line_mode
         && !cli.print_mode
         && !cli.lint
         && !cli.check_only
@@ -1686,22 +1731,16 @@ fn main() {
         && !cli.flame
         && !is_one_liner
         && !filename.is_empty();
-    let pec_fp_opt: Option<[u8; 32]> = if pec_on {
-        // `strict_vars` enters the fingerprint as `false` here; an eventual [`PecBundle::strict_vars`]
-        // mismatch at load time is treated as a miss (see [`stryke::pec::try_load`]), so two strict
-        // modes may collide in one slot without producing wrong answers.
-        Some(stryke::pec::source_fingerprint(
-            false, &filename, &full_code,
-        ))
+
+    let script_path = std::path::Path::new(&filename);
+    let cached = if cache_eligible && script_path.exists() {
+        stryke::script_cache::try_load(script_path)
     } else {
         None
     };
-    let cached_bundle = pec_fp_opt
-        .as_ref()
-        .and_then(|fp| stryke::pec::try_load(fp, false).ok().flatten());
 
-    let (program, pec_precompiled) = if let Some(bundle) = cached_bundle {
-        (bundle.program, Some(bundle.chunk))
+    let (program, cached_chunk, needs_cache_save) = if let Some(c) = cached {
+        (c.program, Some(c.chunk), false)
     } else {
         let parsed = match stryke::parse_with_file(&full_code, &filename) {
             Ok(p) => p,
@@ -1710,7 +1749,7 @@ fn main() {
                 process::exit(255);
             }
         };
-        (parsed, None)
+        (parsed, None, cache_eligible)
     };
 
     if cli.dump_ast {
@@ -1771,10 +1810,14 @@ fn main() {
     if cli.profile || cli.flame {
         interp.profiler = Some(stryke::profiler::Profiler::new(filename.clone()));
     }
-    // Hand the `.pec` sideband to the interpreter so `try_vm_execute` either runs the
+    // Hand the cache sidebands to the interpreter so `try_vm_execute` either runs the
     // pre-compiled chunk (cache hit) or saves the freshly-compiled one (cache miss).
-    interp.pec_precompiled_chunk = pec_precompiled;
-    interp.pec_cache_fingerprint = if pec_on { pec_fp_opt } else { None };
+    interp.cached_chunk = cached_chunk;
+    interp.sqlite_cache_script_path = if needs_cache_save {
+        Some(script_path.to_path_buf())
+    } else {
+        None
+    };
     configure_interpreter(&cli, &mut interp, &filename);
     if let Some(data) = data_opt {
         interp.install_data_handle(data);
@@ -1887,35 +1930,13 @@ fn main() {
 /// the target machine's `perl` (which may not exist) is not consulted. `-I` at build time
 /// is not yet supported (v1); drop everything into the `rust { ... }` block instead.
 fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
-    // AOT binaries pick up the `.pec` bytecode cache for free when `STRYKE_BC_CACHE=1` —
-    // the first run of a shipped binary parses and compiles the embedded source, then
-    // every subsequent run reuses the cached chunk. Cache key includes the script name
-    // embedded in the trailer, so two binaries with different embedded scripts will not
-    // collide.
-    let pec_on = stryke::pec::cache_enabled();
-    let pec_fp = if pec_on {
-        Some(stryke::pec::source_fingerprint(
-            false,
-            &embedded.name,
-            &embedded.source,
-        ))
-    } else {
-        None
-    };
-    let cached = pec_fp
-        .as_ref()
-        .and_then(|fp| stryke::pec::try_load(fp, false).ok().flatten());
-    let (program, pec_precompiled) = if let Some(bundle) = cached {
-        (bundle.program, Some(bundle.chunk))
-    } else {
-        let parsed = match stryke::parse_with_file(&embedded.source, &embedded.name) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("{}", e);
-                return 255;
-            }
-        };
-        (parsed, None)
+    // AOT binaries don't use SQLite cache — they're self-contained and parse/compile on every run.
+    let program = match stryke::parse_with_file(&embedded.source, &embedded.name) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 255;
+        }
     };
     let mut interp = Interpreter::new();
     interp.set_file(&embedded.name);
@@ -1931,8 +1952,6 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
         "INC",
         vec![stryke::value::PerlValue::string(".".to_string())],
     );
-    interp.pec_precompiled_chunk = pec_precompiled;
-    interp.pec_cache_fingerprint = pec_fp;
     match interp.execute(&program) {
         Ok(_) => {
             let _ = interp.run_global_teardown();

@@ -2439,6 +2439,13 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "thread_count" | "nthreads" => "`thread_count` (alias `nthreads`) — return the rayon thread pool size.\n\n```perl\np nthreads()   # e.g. 8\n```",
         "pool_info" | "par_info" => "`pool_info` (alias `par_info`) — return thread pool details as a hashref (threads, queued, active).\n\n```perl\nmy $info = par_info()\np $info->{threads}\n```",
         "par_bench" | "pbench" => "`par_bench` (alias `pbench`) — run a parallel throughput benchmark and return results.\n\n```perl\nmy $result = pbench(1000000)\np $result->{ops_per_sec}\n```",
+
+        // ── Stress Testing ───────────────────────────────────────────────
+        "stress_cpu" | "scpu" => "`stress_cpu` (alias `scpu`) — CPU stress test: run SHA256 hashing in a tight loop for the specified duration (default 1 second). Returns number of hashes computed. Use for load testing and thermal validation.\n\n```perl\nmy $hashes = stress_cpu(10)   # 10 seconds of CPU stress\np \"Computed $hashes hashes\"\n\n# Distributed across cluster\nmy $c = cluster([\"node1:8\", \"node2:8\"])\n1:16 |> pmap_on $c { stress_cpu(60) }   # 60s stress on all workers\n```",
+        "stress_mem" | "smem" => "`stress_mem` (alias `smem`) — Memory stress test: allocate and touch the specified number of bytes (default 100MB). Returns bytes allocated. Use for memory pressure testing and OOM validation.\n\n```perl\nmy $bytes = stress_mem(1e9)   # Allocate 1GB\np \"Allocated $bytes bytes\"\n\n# Memory pressure across cluster\n1:16 |> pmap_on $cluster { stress_mem(4e9) }   # 4GB per worker\n```",
+        "stress_io" | "sio" => "`stress_io` (alias `sio`) — IO stress test: write and read temp files in the specified directory (default /tmp) for N iterations (default 100). Returns total bytes written. Use for storage IOPS testing.\n\n```perl\nmy $bytes = stress_io(\"/tmp\", 1000)   # 1000 iterations\np \"Wrote $bytes bytes\"\n\n# IO stress across cluster\n1:16 |> pmap_on $cluster { stress_io(\"/data\", 500) }\n```",
+        "stress_test" | "st" => "`stress_test` (alias `st`) — Combined CPU/memory/IO stress test. If cluster provided, distributes across all workers. Returns hashref with stats: {cpu_hashes, mem_bytes, io_bytes, workers, duration}.\n\n```perl\n# Local stress test (10 seconds)\nmy $r = stress_test(10)\np \"CPU: $r->{cpu_hashes}, Workers: $r->{workers}\"\n\n# Distributed stress test\nmy $c = cluster([\"node1:8\", \"node2:8\", \"node3:8\"])\nmy $r = stress_test($c, 60)   # 60s across 24 workers\np \"Hashes: $r->{cpu_hashes}, Duration: $r->{duration}s\"\n```",
+        "heat" => "`heat` — Maximum thermal stress. Pins ALL cores to 100% TDP. The hottest function in any programming language. Use for infrastructure burn-in, cooling validation, and power testing.\n\n```perl\nheat(60)     # 60 seconds of maximum heat\nheat()       # default 60 seconds\n\n# Output:\n# 🔥 HEAT: Pinning 18 cores to 100% TDP for 60s\n# 🔥 HEAT: 3,116,320,000 hashes in 60.00s (51.9M/s across 18 cores)\n```",
         "to_pdf" => "`to_pdf` — generate a PDF from text, SVG, or structured data. Returns raw PDF bytes.\n\n```perl\n\"Hello World\" |> to_pdf |> to_file(\"out.pdf\")\nscatter_svg([1,2,3], [1,4,9]) |> to_pdf |> to_file(\"plot.pdf\")\n```",
         "jq" => "`jq` — alias for `json_jq`. Query JSON data with jq-style expressions.\n\n```perl\nmy $data = json_decode(slurp(\"data.json\"))\np jq($data, \".items[].name\")\n```",
 
@@ -3299,6 +3306,11 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "pdf_text",
             "pdf_pages",
             "jq",
+            "stress_cpu",
+            "stress_mem",
+            "stress_io",
+            "stress_test",
+            "heat",
         ],
     ),
     (

@@ -17,6 +17,10 @@
 ### `[THE 2ND FASTEST DYNAMIC LANGUAGE IN THE WORLD]`
 
 > *"There is more than one way to do it — in parallel."*
+>
+> *"100% TDP — beware."*
+>
+> *"The hottest language ever created. Literally."*
 
 The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike Pall's LuaJIT, and beating it on 3 of 8 benchmarks. A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, streaming iterators, and rayon work-stealing across all cores. Faster than perl5, Python, Ruby, Julia, and Raku on every benchmark.
 
@@ -43,8 +47,10 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
-- [\[0x0F\] Bytecode Cache (`.pec`)](#0x0f-bytecode-cache-pec)
+- [\[0x0F\] Bytecode Cache (SQLite)](#0x0f-bytecode-cache-sqlite)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
+- [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
+- [\[0x10b\] Agent/Controller Architecture](#0x10b-agentcontroller-architecture)
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0x13\] zshrs Shell](#0x13-zshrs-shell)
@@ -57,6 +63,9 @@ The 2nd fastest dynamic language runtime ever benchmarked — behind only Mike P
 
 `stryke` parses and executes Perl 5 scripts with rayon-powered work-stealing primitives across every CPU core. Highlights:
 
+- **Server farms first** — the first language designed for distributed infrastructure load testing
+- **Bare metal heat** — `heat(60)` pins ALL cores to 100% TDP for 60 seconds
+- **Agent/Controller architecture** — `stryke controller` + `stryke agent` for fleet-wide stress testing
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
@@ -1734,42 +1743,53 @@ p fib 50             # 12586269025
 
 ---
 
-## [0x0F] BYTECODE CACHE (`.pec`)
+## [0x0F] BYTECODE CACHE (SQLite)
 
-`STRYKE_BC_CACHE=1` enables the on-disk bytecode cache. The first run of a script parses + compiles + persists a `.pec` bundle to `~/.cache/stryke/bc/<sha256>.pec`. Every subsequent run skips **both parse and compile** and feeds the cached chunk straight into the VM.
+stryke stores compiled bytecode in a SQLite database at `~/.cache/stryke/scripts.db`. The first run of a script parses + compiles + persists to SQLite. Every subsequent run skips **lex, parse, and compile** entirely — just deserialize and dispatch to the VM.
 
 ```sh
-STRYKE_BC_CACHE=1 stryke my_app.stk              # cold: parse + compile + save
-STRYKE_BC_CACHE=1 stryke my_app.stk              # warm: load + dispatch
+stryke my_app.stk              # cold: parse + compile + save to SQLite
+stryke my_app.stk              # warm: load from SQLite + dispatch (skips lex/parse/compile)
 ```
 
-**Measured impact** (Apple M5, 13 MB release `stryke`, hyperfine `--warmup 5 -N`, mean ± σ):
+**Cache invalidation:** mtime-based. Edit the script → cache miss → recompile. No stale bytecode.
 
-| script              | cold (no cache) | warm (.pec)    | speedup       | `.pec` size |
-|---------------------|-----------------|----------------|---------------|-------------|
-| 6 002 lines, 3000 subs | **67.9 ms ± 5.1** | **19.9 ms ± 1.0** | **3.41×**     | 47 KB       |
-| 1 002 lines, 500 subs  | 6.8 ms ± 0.5    | 6.5 ms ± 0.5    | 1.06× wall, **1.32× user CPU** | 5 KB |
-| 3 lines (toy)       | 3.5 ms ± 0.3    | 4.8 ms ± 0.4    | cache loses    | 1.9 KB      |
+**Built-in inspection** — no SQL required:
 
-The toy-script result is the honest one to call out: for tiny scripts the cache deserialize cost outweighs the parse cost it replaces. The cache wins decisively on anything substantial — startup time becomes O(deserialize) instead of O(parse + compile).
+```stk
+cacheview()                    # list all cached scripts with stats
+cacheview("pattern")           # filter by path pattern
+cacheview("--count")           # just the count
 
-**Tuning knobs:**
+cache_stats()                  # returns {count, bytes, path, enabled}
+cache_exists("script.stk")     # 1 if cached, 0 if not
+cache_clear()                  # wipe the cache
+```
 
-- `STRYKE_BC_CACHE=1` — opt-in. (V1 is opt-in to avoid surprising users with stray cache files; flip to opt-out once we have a `stryke cache prune` subcommand and confidence in invalidation.)
-- `STRYKE_BC_DIR=/path/to/dir` — override the cache location. Useful for test isolation and CI.
+**Example output:**
 
-**Format** ([`src/pec.rs`](src/pec.rs)): `[4B magic b"PEC2"][zstd-compressed bincode of PecBundle]`. The `PecBundle` carries `format_version`, `pointer_width` (so a cache built on a 64-bit host is rejected on 32-bit), `strict_vars` (a mismatch is treated as a clean miss → re-compile), `source_fingerprint`, the parsed `Program`, and the compiled `Chunk`. Format version 2 introduced zstd compression — files dropped ~10× in size and warm-load latency dropped with them.
+```
+$ stryke -e 'cacheview()'
+stryke bytecode cache
+  path: ~/.cache/stryke/scripts.db
+  scripts: 103 (612.45 KB)
 
-**Cache key** ([`pec::source_fingerprint`](src/pec.rs)): SHA-256 of `(crate version, source filename, full source including -M prelude)`. Editing the script, upgrading stryke, or changing the `-M` flags all force a recompile. The crate version is mixed in so a `cargo install strykelang` upgrade silently invalidates everyone's cache rather than risking a stale-bytecode mismatch.
+PATH                                                      PROG KB    BC KB
+/Users/me/project/lib/heavy_module.stk                       8.57     19.48
+/Users/me/project/bin/main.stk                               2.45      5.84
+...
+```
 
-**Pairs with [`stryke build`](#0x0d-standalone-binaries-stryke-build):** AOT binaries pick up the cache for free. The first run of a shipped binary parses and compiles the embedded source; every subsequent run on the same machine reuses the cached chunk. The cache key includes the script name baked into the trailer, so two binaries with different embedded scripts never collide.
+**Tuning:**
 
-**Limitations (v1):**
+- `STRYKE_SQLITE_CACHE=0` — disable caching entirely
+- Cache is enabled by default for file-based scripts
+- Bypassed for `-e` / `-E` one-liners (overhead > benefit for tiny scripts)
+- Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes
 
-- **Bypassed for `-e` / `-E` one-liners.** Measured: warm `.pec` is ~2-3× *slower* than cold for tiny scripts because the deserialize cost (~1-2 ms for fs read + zstd decode + bincode) dominates the parse+compile work it replaces (~500 µs). Each unique `-e` invocation would also pollute the cache directory with no GC. The break-even is around 1000 lines, so file-based scripts only.
-- Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes (those paths run a different driver loop).
-- No automatic eviction yet — old `.pec` files for edited scripts accumulate. `rm ~/.cache/stryke/bc/*.pec` is a fine workaround until `stryke cache prune` lands.
-- Cache hit path cannot fall back to the tree walker mid-run — but this is unreachable in practice because `compile_program` only emits ops the VM implements before persisting.
+**Format:** zstd-compressed bincode of `(Program, Chunk)` stored in SQLite with schema versioning and pointer-width checks. Upgrading stryke or switching architectures triggers automatic recompile.
+
+**Inspired by zshrs:** same SQLite bytecode cache architecture that enables sub-30ms shell startup with millions of cached plugins.
 
 ---
 
@@ -1878,6 +1898,215 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 - **`mysync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
 - **No streaming results** — the dispatcher buffers the full result vector before returning. For huge fan-outs this is the next thing to fix (likely via `pchannel` integration).
 - **No SSH connection pool across calls** — each `pmap_on` invocation builds fresh sessions. Subsequent `pmap_on` calls in the same script reconnect from scratch.
+
+---
+
+## [0x10a] INFRASTRUCTURE LOAD TESTING
+
+> *"The hottest language ever created. Literally."*
+
+stryke is a **server farms first** language — the first programming language designed from the ground up for distributed infrastructure load testing. Not HTTP load testing. Not API benchmarks. **Bare metal heat.**
+
+### Stress Testing Builtins
+
+All stress functions pin **ALL cores to 100% TDP** simultaneously:
+
+```stk
+stress_cpu(10)           # 10 seconds, SHA256 across ALL cores
+stress_mem(1e9)          # 1GB allocated + touched across ALL cores
+stress_io("/tmp", 100)   # parallel file I/O across ALL cores
+stress_test(60)          # combined CPU + memory + IO stress
+heat(60)                 # 🔥 maximum thermal assault
+```
+
+### The `heat` Function
+
+The hottest function in any programming language:
+
+```stk
+heat(60)
+```
+
+Output:
+```
+🔥 HEAT: Pinning 18 cores to 100% TDP for 60s (Ctrl-C to stop early)
+🔥 HEAT: 3,116,320,000 hashes in 60.00s (51.9M/s across 18 cores)
+```
+
+### Measured Performance (Apple M3 Max, 18 cores)
+
+| Function | Result | CPU Usage |
+|----------|--------|-----------|
+| `stress_cpu(3)` | 154M hashes | 1117% (all cores) |
+| `stress_mem(1e9)` | 1GB touched | 452% (parallel) |
+| `heat(60)` | 3.1B hashes | 1800% (max TDP) |
+
+### What stryke Tests
+
+This isn't application performance testing. This is **infrastructure validation**:
+
+| Layer | What You Test |
+|-------|---------------|
+| **Cooling** | Can CRAC units handle sustained full load? |
+| **Power** | PDU rated for 100% simultaneous draw? |
+| **UPS/Generator** | Backup power actually works? |
+| **Hardware** | Which blade has the failing fan? |
+| **Ops** | Does the NOC notice? How fast? |
+
+### Distributed Load Testing
+
+Combine with `cluster` + `pmap_on` for fleet-wide stress:
+
+```stk
+my $c = cluster(["node1:16", "node2:16", "node3:16"])
+
+# Pin 48 cores across 3 servers for 60 seconds
+1:48 |> pmap_on $c { heat(60) }
+```
+
+Or use the built-in `stress_test` with cluster:
+
+```stk
+my $r = stress_test($c, 60)
+p "Total hashes: $r->{cpu_hashes}"
+p "Workers: $r->{workers}"
+```
+
+### Use Cases
+
+- **BCP/DR exercises** — stress primary datacenter, validate failover
+- **Capacity planning** — prove infrastructure handles peak load
+- **Burn-in testing** — validate new hardware before production
+- **Cooling validation** — find thermal limits before summer hits
+- **Compliance** — demonstrate resilience for SOC 2, PCI DSS, FedRAMP
+
+---
+
+## [0x10b] AGENT/CONTROLLER ARCHITECTURE
+
+stryke includes a complete distributed load testing system with persistent agents and interactive control.
+
+### Controller (Master REPL)
+
+```sh
+stryke controller                    # listen on 0.0.0.0:9999
+stryke controller --port 8888        # custom port
+stryke controller --bind 10.0.0.1    # specific interface
+```
+
+**Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `status` | List connected agents with cores, memory, state |
+| `fire [SECS]` | Start stress test on all agents (default: 10s) |
+| `terminate` | Stop stress test immediately |
+| `shutdown` | Disconnect all agents and exit |
+
+### Agent (Worker Daemon)
+
+```sh
+stryke agent                              # use config file
+stryke agent --controller 10.0.0.1        # connect to specific host
+stryke agent --port 9999                  # specific port
+```
+
+**Config file:** `~/.config/stryke/agent.toml`
+
+```toml
+[controller]
+host = "controller.example.com"
+port = 9999
+
+[limits]
+max_temp = 85       # auto-terminate if CPU temp exceeds
+max_duration = 3600 # max seconds per session
+
+[agent]
+name = "node-01"    # optional, defaults to hostname
+```
+
+### Example Session
+
+```
+$ stryke controller
+stryke controller listening on 0.0.0.0:9999
+[agent connected] node-01 (cores=64, session=1)
+[agent connected] node-02 (cores=64, session=2)
+[agent connected] node-03 (cores=64, session=3)
+
+controller> status
+AGENT                 CORES     MEMORY        STATE       UPTIME
+------------------------------------------------------------
+node-01                  64       256GB         idle         42s
+node-02                  64       256GB         idle         38s
+node-03                  64       256GB         idle         35s
+
+Total: 3 agents, 192 cores, 0 firing
+
+controller> fire 60
+[fire] 3 agents, duration=60s
+
+controller> terminate
+[terminate] 3 agents
+```
+
+### Wire Protocol
+
+Framed binary protocol over TCP:
+
+```
+CONTROLLER                    AGENT
+    │                           │
+    │◄──── AGENT_HELLO ─────────│  (hostname, cores, memory)
+    │───── AGENT_HELLO_ACK ────►│  (session_id)
+    │                           │
+    │───── FIRE ───────────────►│  (workload, duration)
+    │◄──── METRICS ─────────────│  (cpu%, hashes/sec)
+    │───── TERMINATE ──────────►│
+    │◄──── TERM_ACK ────────────│  (final stats)
+```
+
+### Deployment
+
+**Single binary, zero dependencies:**
+
+```sh
+# Build self-contained agent binary
+stryke build agent.stk -o stryke-agent
+
+# Deploy to any Linux server
+scp stryke-agent node1:/usr/local/bin/
+ssh node1 'stryke-agent --controller controller:9999'
+```
+
+**Kubernetes DaemonSet:**
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: stryke-agent
+spec:
+  template:
+    spec:
+      containers:
+      - name: agent
+        image: ghcr.io/menketechnologies/stryke:latest
+        args: ["agent", "--controller", "stryke-controller:9999"]
+```
+
+### Why This Matters
+
+| Other Tools | stryke |
+|-------------|--------|
+| External load generators | Agents inside cluster |
+| Config files, YAML, XML | `fire 60` — two words |
+| Batch jobs, wait for results | Interactive REPL |
+| Install runtime on every node | Single binary, no deps |
+| Test application performance | Test infrastructure: cooling, power, fabric |
+
+**stryke is the ultimate load testing tool for distributed computing clusters.**
 
 ---
 

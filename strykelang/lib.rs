@@ -6,9 +6,11 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(clippy::needless_range_loop)]
 
+pub mod agent;
 pub mod aot;
 pub mod ast;
 pub mod builtins;
+pub mod controller;
 pub mod bytecode;
 pub mod capture;
 pub mod cluster;
@@ -45,8 +47,8 @@ pub mod parallel_trace;
 pub mod parser;
 pub mod pcache;
 pub mod pchannel;
-pub mod pec;
 mod pending_destroy;
+pub mod script_cache;
 pub mod perl_decode;
 pub mod perl_fs;
 pub mod perl_inc;
@@ -211,11 +213,11 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 
 /// Try to compile and run via bytecode VM. Returns None if compilation fails.
 ///
-/// **`.pec` bytecode cache integration.** When `interp.pec_precompiled_chunk` is populated
-/// (set by the `stryke` driver from a [`crate::pec::try_load`] hit), this function skips
-/// `compile_program` entirely and runs the preloaded chunk. On cache miss the compiler
-/// runs normally and, if `interp.pec_cache_fingerprint` is set, the fresh chunk + program
-/// are persisted as a `.pec` bundle so the next warm start can skip both parse and compile.
+/// **SQLite bytecode cache.** When `interp.cached_chunk` is populated (from a SQLite
+/// cache hit), this function skips `compile_program` entirely and runs the preloaded
+/// chunk. On cache miss the compiler runs normally and, if `interp.sqlite_cache_script_path`
+/// is set, the fresh chunk + program are persisted to SQLite so the next run skips
+/// lex/parse/compile entirely.
 pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut Interpreter,
@@ -224,11 +226,9 @@ pub fn try_vm_execute(
         return Some(Err(e));
     }
 
-    // Fast path: chunk loaded from a `.pec` cache hit. Consume the slot with `.take()` so a
-    // subsequent re-entry (e.g. nested `do FILE`) does not reuse a stale chunk. On cache hit
-    // we surface any "VM unimplemented op" as a real error (in practice unreachable: the
-    // chunk was produced by `compile_program`, which only emits ops the VM implements).
-    if let Some(chunk) = interp.pec_precompiled_chunk.take() {
+    // Fast path: chunk loaded from SQLite cache hit. Consume the slot with `.take()` so a
+    // subsequent re-entry (e.g. nested `do FILE`) does not reuse a stale chunk.
+    if let Some(chunk) = interp.cached_chunk.take() {
         return Some(run_compiled_chunk(chunk, interp));
     }
 
@@ -252,9 +252,9 @@ pub fn try_vm_execute(
         }
     };
 
-    if let Some(fp) = interp.pec_cache_fingerprint.take() {
-        let bundle = pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
-        let _ = pec::try_save(&bundle);
+    // Save to SQLite cache (mtime-based, skips lex/parse/compile on 2+ runs)
+    if let Some(path) = interp.sqlite_cache_script_path.take() {
+        let _ = script_cache::try_save(&path, program, &chunk);
     }
     Some(run_compiled_chunk(chunk, interp))
 }

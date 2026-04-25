@@ -3,7 +3,7 @@
 use crate::interpreter::Interpreter;
 use crate::{
     compat_mode, convert_to_stryke, deconvert_to_perl, format_program, lint_program, parse,
-    parse_and_run_string_in_file, pec, run, set_compat_mode, try_vm_execute,
+    parse_and_run_string_in_file, run, script_cache, set_compat_mode, try_vm_execute,
 };
 use std::fs;
 
@@ -56,35 +56,30 @@ fn test_compat_mode_toggle() {
 }
 
 #[test]
-fn test_pec_cache_save_load() {
-    let code = "2 + 3";
-    let p = parse(code).expect("parse");
-    let mut interp = Interpreter::new();
-    interp.prepare_program_top_level(&p).expect("prep");
+fn test_sqlite_cache_save_load() {
+    use tempfile::tempdir;
 
-    let comp = crate::compiler::Compiler::new();
-    let chunk = comp.compile_program(&p).expect("compile");
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("test.db");
+    let cache = script_cache::ScriptCache::open(&db_path).unwrap();
 
-    let fp = pec::source_fingerprint(false, "test.pl", code);
-    let bundle = pec::PecBundle::new(false, fp, p.clone(), chunk);
+    let script_path = dir.path().join("test.stk");
+    fs::write(&script_path, "p 42").unwrap();
 
-    // Use a temp dir for cache to avoid polluting home
-    let tmp_dir = std::env::temp_dir().join("stryke_pec_test");
-    fs::create_dir_all(&tmp_dir).expect("mkdir");
-    let old_dir = std::env::var("STRYKE_BC_DIR").ok();
-    std::env::set_var("STRYKE_BC_DIR", &tmp_dir);
+    let (mtime_s, mtime_ns) = script_cache::file_mtime(&script_path).unwrap();
+    let path_str = script_path.to_string_lossy().to_string();
 
-    pec::try_save(&bundle).expect("save");
+    let program = parse("p 42").unwrap();
+    let chunk = crate::compiler::Compiler::new()
+        .compile_program(&program)
+        .unwrap();
 
-    let loaded = pec::try_load(&fp, false).expect("load").expect("some");
-    assert_eq!(loaded.source_fingerprint, fp);
+    cache
+        .put(&path_str, mtime_s, mtime_ns, &program, &chunk)
+        .unwrap();
 
-    fs::remove_dir_all(&tmp_dir).expect("rmdir");
-    if let Some(d) = old_dir {
-        std::env::set_var("STRYKE_BC_DIR", d);
-    } else {
-        std::env::remove_var("STRYKE_BC_DIR");
-    }
+    let loaded = cache.get(&path_str, mtime_s, mtime_ns).unwrap();
+    assert_eq!(loaded.chunk.ops.len(), chunk.ops.len());
 }
 
 #[test]
