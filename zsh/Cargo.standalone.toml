@@ -24,7 +24,7 @@ ctrlc = "3"
 atty = "0.2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-compsys = "0.8.17"
+compsys = { path = "compsys", version = "0.8.17" }
 fusevm = "0.8.17"
 regex = "1.11"
 glob = "0.3"
@@ -66,6 +66,15 @@ prometheus = ["metrics", "metrics-exporter-prometheus"]
 
 [dev-dependencies]
 tempfile = "3"
+
+[workspace]
+members = [".", "compsys"]
+
+[workspace.package]
+version = "0.8.17"
+edition = "2021"
+license = "MIT"
+authors = ["MenkeTechnologies"]
 
 [profile.release]
 opt-level = 3
