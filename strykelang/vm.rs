@@ -68,6 +68,7 @@ struct ParallelBlockVmShared {
     unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
     splice_expr_entries: Vec<SpliceExprEntry>,
     lvalues: Vec<Expr>,
+    ast_eval_exprs: Vec<Expr>,
     format_decls: Vec<(String, Vec<String>)>,
     use_overload_entries: Vec<Vec<(String, String)>>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
@@ -122,6 +123,7 @@ impl ParallelBlockVmShared {
             unshift_expr_entries: vm.unshift_expr_entries.clone(),
             splice_expr_entries: vm.splice_expr_entries.clone(),
             lvalues: vm.lvalues.clone(),
+            ast_eval_exprs: vm.ast_eval_exprs.clone(),
             format_decls: vm.format_decls.clone(),
             use_overload_entries: vm.use_overload_entries.clone(),
             runtime_sub_decls: Arc::clone(&vm.runtime_sub_decls),
@@ -176,6 +178,7 @@ impl ParallelBlockVmShared {
             unshift_expr_entries: self.unshift_expr_entries.clone(),
             splice_expr_entries: self.splice_expr_entries.clone(),
             lvalues: self.lvalues.clone(),
+            ast_eval_exprs: self.ast_eval_exprs.clone(),
             format_decls: self.format_decls.clone(),
             use_overload_entries: self.use_overload_entries.clone(),
             runtime_sub_decls: Arc::clone(&self.runtime_sub_decls),
@@ -296,10 +299,11 @@ pub struct VM<'a> {
     unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
     splice_expr_entries: Vec<SpliceExprEntry>,
     lvalues: Vec<Expr>,
+    ast_eval_exprs: Vec<Expr>,
     format_decls: Vec<(String, Vec<String>)>,
     use_overload_entries: Vec<Vec<(String, String)>>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
-    ip: usize,
+    pub(crate) ip: usize,
     stack: Vec<PerlValue>,
     call_stack: Vec<CallFrame>,
     /// Paired with [`Op::WantarrayPush`] / [`Op::WantarrayPop`] (e.g. `splice` list vs scalar return).
@@ -403,6 +407,7 @@ impl<'a> VM<'a> {
             unshift_expr_entries: chunk.unshift_expr_entries.clone(),
             splice_expr_entries: chunk.splice_expr_entries.clone(),
             lvalues: chunk.lvalues.clone(),
+            ast_eval_exprs: chunk.ast_eval_exprs.clone(),
             format_decls: chunk.format_decls.clone(),
             use_overload_entries: chunk.use_overload_entries.clone(),
             runtime_sub_decls: Arc::new(chunk.runtime_sub_decls.clone()),
@@ -555,7 +560,7 @@ impl<'a> VM<'a> {
         // map's BLOCK is list context. The shared block bytecode region is compiled with a
         // scalar-context tail (grep/sort consumers need that), so when the block's tail is
         // list-sensitive (`($_, $_*10)`, `1..$_`, `reverse …`, an array variable, …) fall
-        // back to the tree walker's list-tail [`Interpreter::exec_block_with_tail`]. For
+        // back to the interpreter's list-tail [`Interpreter::exec_block_with_tail`]. For
         // plain scalar tails (`$_ * 2`, `f($_)`, string ops) the bytecode region produces
         // the same value in either context, so keep using it for speed.
         let block_tail_is_list_sensitive = self
@@ -1612,7 +1617,7 @@ impl<'a> VM<'a> {
         // Safety limit: [`run_main_dispatch_loop`] counts ops (1B cap).
         let mut op_count: u64 = 0;
 
-        // Match tree-walker `exec_statement_inner`: deliver `%SIG` and set `$^C` latch (Unix).
+        // Match Perl signal delivery: deliver `%SIG` and set `$^C` latch (Unix).
         crate::perl_signal::poll(self.interp)?;
         if self.jit_enabled {
             let mut top_slot_len: Option<usize> = None;
@@ -2942,7 +2947,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let n = names[*idx as usize].as_str();
                         // `local $X` on a special var (`$/`, `$\`, `$,`, `$"`, …) — see
-                        // tree-interpreter's `StmtKind::Local` handler. Save prior value to
+                        // Perl's `local` handler. Save prior value to
                         // the interpreter's `special_var_restore_frames` so `scope_pop_hook`
                         // restores the backing field on block exit.
                         if Interpreter::is_special_scalar_name_for_set(n) {
@@ -3832,7 +3837,7 @@ impl<'a> VM<'a> {
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
                                 return Err(PerlError::runtime(
-                                    "Return in map/grep/sort block bytecode (use tree interpreter)",
+                                    "Return in map/grep/sort block bytecode",
                                     self.line(),
                                 ));
                             }
@@ -3867,7 +3872,7 @@ impl<'a> VM<'a> {
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
                                 return Err(PerlError::runtime(
-                                    "Return in map/grep/sort block bytecode (use tree interpreter)",
+                                    "Return in map/grep/sort block bytecode",
                                     self.line(),
                                 ));
                             }
@@ -6069,7 +6074,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
 
-                    // ── Map/Grep/Sort with blocks (opcodes when lowered; else tree-walker) ──
+                    // ── Map/Grep/Sort with blocks (opcodes when lowered; else AST block fallback) ──
                     Op::MapIntMul(k) => {
                         let list = self.pop().to_list();
                         if list.len() == 1 {
@@ -8075,6 +8080,21 @@ impl<'a> VM<'a> {
                     // ── Halt ──
                     Op::Halt => {
                         self.halt = true;
+                        Ok(())
+                    }
+                    Op::EvalAstExpr(idx) => {
+                        let expr = &self.ast_eval_exprs[*idx as usize];
+                        let val = match self.interp.eval_expr_ctx(expr, self.interp.wantarray_kind) {
+                            Ok(v) => v,
+                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                            Err(crate::interpreter::FlowOrError::Flow(f)) => {
+                                return Err(PerlError::runtime(
+                                    format!("unexpected flow control in EvalAstExpr: {:?}", f),
+                                    self.line(),
+                                ));
+                            }
+                        };
+                        self.push(val);
                         Ok(())
                     }
                 }

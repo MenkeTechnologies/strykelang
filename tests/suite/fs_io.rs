@@ -98,10 +98,10 @@ fn print_and_printf_no_args_use_topic() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-/// Piped `open` plus `<FH>` readline: bytecode (`execute`) and tree-walker (`execute_tree`) must agree.
+/// Piped `open` plus `<FH>` readline validates piped open readline.
 #[cfg(unix)]
 #[test]
-fn piped_open_readline_vm_matches_tree_walker() {
+fn piped_open_readline_works() {
     let code = r#"
         open(FH, "-|", "echo hi");
         my $x = <FH>;
@@ -109,12 +109,9 @@ fn piped_open_readline_vm_matches_tree_walker() {
         $x;
     "#;
     let program = stryke::parse(code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(v_vm.to_string(), v_tree.to_string());
-    assert!(v_vm.to_string().contains("hi"));
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert!(v.to_string().contains("hi"));
 }
 
 #[cfg(unix)]
@@ -194,7 +191,7 @@ fn umask_read_roundtrip() {
 
 #[cfg(unix)]
 #[test]
-fn pipe_builtin_rw_roundtrip_vm_matches_tree() {
+fn pipe_builtin_rw_roundtrip() {
     let code = r#"
         pipe(RD, WR);
         print WR "ping\n";
@@ -205,12 +202,9 @@ fn pipe_builtin_rw_roundtrip_vm_matches_tree() {
         $x eq "ping\n" ? 1 : 0;
     "#;
     let program = stryke::parse(code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(v_vm.to_int(), v_tree.to_int());
-    assert_eq!(v_vm.to_int(), 1);
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert_eq!(v.to_int(), 1);
 }
 
 #[test]

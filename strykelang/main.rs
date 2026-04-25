@@ -470,7 +470,7 @@ fn print_cyberpunk_help() {
         "  pcache {{BLOCK}} @list [, progress => EXPR] {G}//{N} Parallel memoize (key = stringified topic)"
     );
     println!(
-        "  par_lines PATH, CODE [, progress => EXPR] {G}//{N} mmap + parallel line scan (tree-walker)"
+        "  par_lines PATH, CODE [, progress => EXPR] {G}//{N} mmap + parallel line scan (interpreter)"
     );
     println!(
         "  par_walk PATH, CODE [, progress => EXPR] {G}//{N} parallel recursive dir walk; topic is each path"

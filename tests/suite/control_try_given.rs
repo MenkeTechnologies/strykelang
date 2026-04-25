@@ -1,4 +1,4 @@
-//! `try`/`catch`, `given`/`when`/`default`, and `eval_timeout` (tree interpreter).
+//! `try`/`catch`, `given`/`when`/`default`, and `eval_timeout`.
 
 use stryke::ast::StmtKind;
 use stryke::parse;

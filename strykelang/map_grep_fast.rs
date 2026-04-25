@@ -1,4 +1,4 @@
-//! Detect trivial `map` / `grep` blocks that can run without the tree-walker per element.
+//! Detect trivial `map` / `grep` blocks that can run without AST interpretation per element.
 
 use crate::ast::{BinOp, Block, Expr, ExprKind, StmtKind};
 
