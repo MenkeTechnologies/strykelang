@@ -662,7 +662,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "compsys"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "dirs 5.0.1",
  "libc",
@@ -1722,7 +1722,7 @@ dependencies = [
 
 [[package]]
 name = "fusevm"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "glob",
  "serde",
@@ -4846,7 +4846,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -6739,7 +6739,7 @@ dependencies = [
 
 [[package]]
 name = "zsh"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "atty",
  "bincode",

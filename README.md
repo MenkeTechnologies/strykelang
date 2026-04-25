@@ -2231,6 +2231,8 @@ Abbreviations expand inline when you press space — type `gs<space>` and it bec
 
 **zshrs-exclusive**: `intercept`, `intercept_proceed`, `doctor`, `dbview`, `profile`
 
+**Concurrent primitives**: `async`, `await`, `pmap`, `pgrep`, `peach`, `barrier`
+
 ### Parameter expansion (full zsh support)
 
 **Defaults and assignment**:
