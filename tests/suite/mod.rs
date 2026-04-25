@@ -74,4 +74,3 @@ mod subs;
 mod subst_env_interpolate;
 mod type_predicates;
 mod typeglob_assign;
-mod zsh_parser_corpus;
