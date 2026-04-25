@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="zshrs — the most powerful shell ever created. No-fork architecture, AOP intercept, worker thread pool, AST caching, fusevm bytecode target.">
+  <meta name="description" content="zshrs — the most powerful shell ever created. No-fork architecture, AOP intercept, worker thread pool, bytecode caching, fusevm compiled execution.">
   <title>zshrs — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -218,7 +218,7 @@
 <span class="var">size</span> = <span class="string">8</span>            <span class="comment"># 0 = auto (num_cpus clamped [2, 18])</span>
 
 [completion]
-<span class="var">ast_cache</span> = <span class="keyword">true</span>    <span class="comment"># pre-parse autoload functions to AST blobs</span>
+<span class="var">bytecode_cache</span> = <span class="keyword">true</span>  <span class="comment"># compile autoload functions to fusevm bytecodes</span>
 
 [history]
 <span class="var">async_writes</span> = <span class="keyword">true</span> <span class="comment"># write history on worker pool</span>
@@ -229,7 +229,7 @@
 
         <p>Tasks shipped to the pool:</p>
         <div class="cat-grid">
-          <div class="cat-card"><h4>compinit</h4><p>Background fpath scan + AST pre-parse of 16K+ functions</p></div>
+          <div class="cat-card"><h4>compinit</h4><p>Background fpath scan + bytecode compilation of 16K+ functions</p></div>
           <div class="cat-card"><h4>Process Sub</h4><p><code>&lt;(cmd)</code> and <code>&gt;(cmd)</code> on pool threads instead of fork</p></div>
           <div class="cat-card"><h4>Parallel Glob</h4><p><code>**/</code> recursive walk split per-subdir across pool</p></div>
           <div class="cat-card"><h4>Metadata Prefetch</h4><p>Glob qualifiers: one parallel <code>stat</code> batch, zero syscalls after</p></div>
@@ -290,7 +290,7 @@
         <div class="cat-grid">
           <div class="cat-card">
             <h4>compsys.db</h4>
-            <p>Completion cache: autoloads with source text + AST blobs, comps mapping,
+            <p>Completion cache: autoloads with source text + compiled bytecodes, comps mapping,
             services, patcomps, PATH executables with FTS5 index</p>
           </div>
           <div class="cat-card">
@@ -397,7 +397,7 @@ Every subsequent call:
           <tr><th>Builtin</th><th>Description</th></tr>
           <tr><td><code>intercept</code></td><td>AOP before/after/around advice on any command. Glob pattern matching. Nanosecond timing. Stryke <code>@</code> dispatch in advice (fat binary).</td></tr>
           <tr><td><code>intercept_proceed</code></td><td>Call original command from around advice.</td></tr>
-          <tr><td><code>doctor</code></td><td>Full diagnostic: worker pool metrics, cache stats, AST coverage, option count, startup health.</td></tr>
+          <tr><td><code>doctor</code></td><td>Full diagnostic: worker pool metrics, cache stats, bytecode coverage, option count, startup health.</td></tr>
           <tr><td><code>dbview</code></td><td>Browse SQLite caches without SQL. Tables: autoloads, comps, executables, history, plugins.</td></tr>
           <tr><td><code>profile</code></td><td>In-process command profiling. Nanosecond <code>Instant::now()</code> accuracy. No fork overhead in measurement. Function-level call tree.</td></tr>
         </table>
