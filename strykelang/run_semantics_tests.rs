@@ -673,10 +673,7 @@ fn glob_par_finds_rs_sources_under_src() {
 fn glob_par_plain_matches_count() {
     let program = crate::parse(r#"glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
-    let n = interp
-        .execute(&program)
-        .expect("execute")
-        .to_int();
+    let n = interp.execute(&program).expect("execute").to_int();
     assert!(
         n > 0,
         "glob_par (plain) should match at least one file, got {n}"
@@ -687,14 +684,8 @@ fn glob_par_plain_matches_count() {
 fn glob_par_matches_count() {
     let program = crate::parse(r#"scalar glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
-    let n = interp
-        .execute(&program)
-        .expect("execute")
-        .to_int();
-    assert!(
-        n > 0,
-        "glob_par should match at least one file, got {n}"
-    );
+    let n = interp.execute(&program).expect("execute").to_int();
+    assert!(n > 0, "glob_par should match at least one file, got {n}");
 }
 
 #[test]

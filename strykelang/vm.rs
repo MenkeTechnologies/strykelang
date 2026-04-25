@@ -2608,10 +2608,14 @@ impl<'a> VM<'a> {
                         let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
                             prev.clone()
                         } else {
-                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            self.interp
+                                .state_vars
+                                .insert(state_key.clone(), init_val.clone());
                             init_val
                         };
-                        self.interp.scope.declare_scalar_frozen(n, val, false, None)
+                        self.interp
+                            .scope
+                            .declare_scalar_frozen(n, val, false, None)
                             .map_err(|e| e.at_line(self.line()))?;
                         // Register for save-back when scope pops
                         if let Some(frame) = self.interp.state_bindings_stack.last_mut() {
@@ -2626,7 +2630,9 @@ impl<'a> VM<'a> {
                         let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
                             prev.clone()
                         } else {
-                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            self.interp
+                                .state_vars
+                                .insert(state_key.clone(), init_val.clone());
                             init_val
                         };
                         self.interp.scope.declare_array(n, val.to_list());
@@ -2639,7 +2645,9 @@ impl<'a> VM<'a> {
                         let val = if let Some(prev) = self.interp.state_vars.get(&state_key) {
                             prev.clone()
                         } else {
-                            self.interp.state_vars.insert(state_key.clone(), init_val.clone());
+                            self.interp
+                                .state_vars
+                                .insert(state_key.clone(), init_val.clone());
                             init_val
                         };
                         let items = val.to_list();
@@ -8084,7 +8092,8 @@ impl<'a> VM<'a> {
                     }
                     Op::EvalAstExpr(idx) => {
                         let expr = &self.ast_eval_exprs[*idx as usize];
-                        let val = match self.interp.eval_expr_ctx(expr, self.interp.wantarray_kind) {
+                        let val = match self.interp.eval_expr_ctx(expr, self.interp.wantarray_kind)
+                        {
                             Ok(v) => v,
                             Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
                             Err(crate::interpreter::FlowOrError::Flow(f)) => {

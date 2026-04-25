@@ -2395,9 +2395,10 @@ impl Parser {
             "shift" => ExprKind::Shift(Box::new(arg)),
             "reverse" => {
                 if !crate::compat_mode() {
-                    return Err(
-                        self.syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line)
-                    );
+                    return Err(self.syntax_err(
+                        "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                        line,
+                    ));
                 }
                 ExprKind::ReverseExpr(Box::new(arg))
             }
@@ -2594,7 +2595,10 @@ impl Parser {
             },
             "say" => {
                 if !crate::compat_mode() {
-                    return Err(self.syntax_err("stryke uses `p` instead of `say` (this is not Perl 5)", line));
+                    return Err(self.syntax_err(
+                        "stryke uses `p` instead of `say` (this is not Perl 5)",
+                        line,
+                    ));
                 }
                 ExprKind::Say {
                     handle: None,
@@ -6348,8 +6352,10 @@ impl Parser {
             ExprKind::Bareword(name) => match name.as_str() {
                 "reverse" => {
                     if !crate::compat_mode() {
-                        return Err(self
-                            .syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line));
+                        return Err(self.syntax_err(
+                            "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                            line,
+                        ));
                     }
                     ExprKind::ReverseExpr(Box::new(lhs))
                 }
@@ -8264,7 +8270,10 @@ impl Parser {
             "print" | "pr" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" => {
                 if !crate::compat_mode() {
-                    return Err(self.syntax_err("stryke uses `p` instead of `say` (this is not Perl 5)", line));
+                    return Err(self.syntax_err(
+                        "stryke uses `p` instead of `say` (this is not Perl 5)",
+                        line,
+                    ));
                 }
                 self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a })
             }
@@ -9018,9 +9027,10 @@ impl Parser {
             }
             "reverse" => {
                 if !crate::compat_mode() {
-                    return Err(
-                        self.syntax_err("stryke uses `rev` instead of `reverse` (this is not Perl 5)", line)
-                    );
+                    return Err(self.syntax_err(
+                        "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                        line,
+                    ));
                 }
                 // On the RHS of `|>`, the operand is supplied by the piped LHS.
                 let a = if self.in_pipe_rhs()
@@ -9220,10 +9230,8 @@ impl Parser {
             }
             "cond" => {
                 if crate::compat_mode() {
-                    return Err(self.syntax_err(
-                        "`cond` is a stryke extension (disabled by --compat)",
-                        line,
-                    ));
+                    return Err(self
+                        .syntax_err("`cond` is a stryke extension (disabled by --compat)", line));
                 }
                 self.parse_cond_expr(line)
             }

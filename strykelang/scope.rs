@@ -83,7 +83,10 @@ struct Frame {
     /// so mutations through either path are visible. Re-declaration removes the entry.
     shared_arrays: Vec<(String, Arc<parking_lot::RwLock<Vec<PerlValue>>>)>,
     /// Hashes promoted to shared Arc-backed storage by `\%hash`.
-    shared_hashes: Vec<(String, Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>)>,
+    shared_hashes: Vec<(
+        String,
+        Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
+    )>,
     /// Thread-safe arrays from `mysync @a`
     atomic_arrays: Vec<(String, AtomicArray)>,
     /// Thread-safe hashes from `mysync %h`
@@ -1341,7 +1344,9 @@ impl Scope {
             Vec::new()
         };
         let arc = Arc::new(parking_lot::RwLock::new(data));
-        frame.shared_arrays.push((name.to_string(), Arc::clone(&arc)));
+        frame
+            .shared_arrays
+            .push((name.to_string(), Arc::clone(&arc)));
         arc
     }
 
@@ -1362,7 +1367,9 @@ impl Scope {
             IndexMap::new()
         };
         let arc = Arc::new(parking_lot::RwLock::new(data));
-        frame.shared_hashes.push((name.to_string(), Arc::clone(&arc)));
+        frame
+            .shared_hashes
+            .push((name.to_string(), Arc::clone(&arc)));
         arc
     }
 

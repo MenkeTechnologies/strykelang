@@ -1213,8 +1213,8 @@ fn perl_keyword_kind(word: &str) -> Option<CompletionItemKind> {
         "and", "async", "await", "catch", "class", "continue", "default", "do", "else", "elsif",
         "eval", "extends", "finally", "for", "foreach", "given", "if", "impl", "last", "local",
         "my", "next", "no", "not", "or", "our", "package", "priv", "pub", "redo", "return",
-        "spawn", "state", "struct", "trait", "try", "typed", "unless", "until", "use",
-        "when", "while",
+        "spawn", "state", "struct", "trait", "try", "typed", "unless", "until", "use", "when",
+        "while",
     ];
     KW.binary_search(&word).ok()?;
     Some(CompletionItemKind::KEYWORD)

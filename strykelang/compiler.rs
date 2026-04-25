@@ -1529,9 +1529,7 @@ impl Compiler {
                         self.emit_declare_hash(name_idx, line, frozen);
                     }
                     Sigil::Typeglob => {
-                        return Err(CompileError::Unsupported(
-                            "my/our *GLOB".into(),
-                        ));
+                        return Err(CompileError::Unsupported("my/our *GLOB".into()));
                     }
                 }
             }
@@ -1578,9 +1576,7 @@ impl Compiler {
                     self.chunk.emit(Op::DeclareStateHash(name_idx), line);
                 }
                 Sigil::Typeglob => {
-                    return Err(CompileError::Unsupported(
-                        "state *GLOB".into(),
-                    ));
+                    return Err(CompileError::Unsupported("state *GLOB".into()));
                 }
             }
         }
@@ -1620,8 +1616,7 @@ impl Compiler {
                     }
                     Sigil::Typeglob => {
                         return Err(CompileError::Unsupported(
-                            "local (*a,*b,...) with list initializer and typeglob"
-                                .into(),
+                            "local (*a,*b,...) with list initializer and typeglob".into(),
                         ));
                     }
                 }
@@ -1857,9 +1852,7 @@ impl Compiler {
                 self.chunk.emit(Op::LocalDeclareHash(name_idx), line);
                 Ok(())
             }
-            _ => Err(CompileError::Unsupported(
-                "local on this lvalue".into(),
-            )),
+            _ => Err(CompileError::Unsupported("local on this lvalue".into())),
         }
     }
 
@@ -2893,12 +2886,18 @@ impl Compiler {
             ExprKind::HashSlice { hash, keys } => {
                 let hash_idx = self.chunk.intern_name(hash);
                 // If any key expression is a range, we need runtime flattening via GetHashSlice.
-                let has_dynamic_keys = keys.iter().any(|k| matches!(&k.kind, ExprKind::Range { .. }));
+                let has_dynamic_keys = keys
+                    .iter()
+                    .any(|k| matches!(&k.kind, ExprKind::Range { .. }));
                 if has_dynamic_keys {
                     for key_expr in keys {
                         self.compile_hash_slice_key_expr(key_expr)?;
                     }
-                    self.emit_op(Op::GetHashSlice(hash_idx, keys.len() as u16), line, Some(root));
+                    self.emit_op(
+                        Op::GetHashSlice(hash_idx, keys.len() as u16),
+                        line,
+                        Some(root),
+                    );
                 } else {
                     // Flatten multi-key subscripts (qw, lists) into individual GetHashElem ops
                     let mut total_keys = 0u16;
@@ -2906,7 +2905,8 @@ impl Compiler {
                         match &key_expr.kind {
                             ExprKind::QW(words) => {
                                 for w in words {
-                                    let cidx = self.chunk.add_constant(PerlValue::string(w.clone()));
+                                    let cidx =
+                                        self.chunk.add_constant(PerlValue::string(w.clone()));
                                     self.emit_op(Op::LoadConst(cidx), line, Some(root));
                                     self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                                     total_keys += 1;
@@ -4381,9 +4381,7 @@ impl Compiler {
                         return Ok(());
                     }
                     if self.is_mysync_hash(hash) {
-                        return Err(CompileError::Unsupported(
-                            "mysync hash slice update".into(),
-                        ));
+                        return Err(CompileError::Unsupported("mysync hash slice update".into()));
                     }
                     self.check_strict_hash_access(hash, line)?;
                     self.check_hash_mutable(hash, line)?;
@@ -4792,14 +4790,19 @@ impl Compiler {
                 // read(FH, $buf, LEN) — emit ReadIntoVar with the buffer variable's name index
                 "read" | "CORE::read" => {
                     if args.len() < 3 {
-                        return Err(CompileError::Unsupported("read() needs at least 3 args".into()));
+                        return Err(CompileError::Unsupported(
+                            "read() needs at least 3 args".into(),
+                        ));
                     }
                     // Extract buffer variable name from 2nd arg
                     let buf_name = match &args[1].kind {
                         ExprKind::ScalarVar(n) => n.clone(),
-                        _ => return Err(CompileError::Unsupported(
-                            "read() buffer must be a simple scalar variable for bytecode".into(),
-                        )),
+                        _ => {
+                            return Err(CompileError::Unsupported(
+                                "read() buffer must be a simple scalar variable for bytecode"
+                                    .into(),
+                            ))
+                        }
                     };
                     let buf_idx = self.chunk.intern_name(&buf_name);
                     // Stack: [filehandle, length]
@@ -4900,7 +4903,11 @@ impl Compiler {
                         self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
-                    self.emit_op(Op::Call(name_idx, args.len() as u8, ctx.as_byte()), line, Some(root));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
                 }
                 "ppool" => {
                     if args.len() != 1 {
@@ -7471,9 +7478,7 @@ impl Compiler {
             ExprKind::HashSlice { hash, keys } => {
                 if keys.is_empty() {
                     if self.is_mysync_hash(hash) {
-                        return Err(CompileError::Unsupported(
-                            "mysync hash slice assign".into(),
-                        ));
+                        return Err(CompileError::Unsupported("mysync hash slice assign".into()));
                     }
                     self.check_strict_hash_access(hash, line)?;
                     self.check_hash_mutable(hash, line)?;
@@ -7485,9 +7490,7 @@ impl Compiler {
                     return Ok(());
                 }
                 if self.is_mysync_hash(hash) {
-                    return Err(CompileError::Unsupported(
-                        "mysync hash slice assign".into(),
-                    ));
+                    return Err(CompileError::Unsupported("mysync hash slice assign".into()));
                 }
                 self.check_strict_hash_access(hash, line)?;
                 self.check_hash_mutable(hash, line)?;
@@ -8761,5 +8764,4 @@ literal line
         );
         assert_last_halt(&chunk);
     }
-
 }
