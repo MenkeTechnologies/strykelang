@@ -322,7 +322,11 @@ fn build_uname_hash() -> IndexMap<String, PerlValue> {
 #[cfg(unix)]
 fn build_limits_hash() -> IndexMap<String, PerlValue> {
     use libc::{getrlimit, rlimit, RLIM_INFINITY};
-    fn get_limit(resource: libc::c_int) -> (i64, i64) {
+    #[cfg(target_os = "linux")]
+    type RlimitResource = libc::__rlimit_resource_t;
+    #[cfg(not(target_os = "linux"))]
+    type RlimitResource = libc::c_int;
+    fn get_limit(resource: RlimitResource) -> (i64, i64) {
         let mut rlim = rlimit {
             rlim_cur: 0,
             rlim_max: 0,

@@ -541,6 +541,10 @@ pub(crate) enum HeapObject {
     ArrayRef(Arc<RwLock<Vec<PerlValue>>>),
     HashRef(Arc<RwLock<IndexMap<String, PerlValue>>>),
     ScalarRef(Arc<RwLock<PerlValue>>),
+    /// Closure-capture cell: same Arc<RwLock> sharing as ScalarRef but transparently unwrapped
+    /// by [`crate::scope::Scope::get_scalar_slot`] and [`crate::scope::Scope::get_scalar`].
+    /// Created by [`crate::scope::Scope::capture`] to share lexical scalars between closures.
+    CaptureCell(Arc<RwLock<PerlValue>>),
     /// `\\$name` when `name` is a plain scalar variable — aliases that binding (Perl ref to lexical).
     ScalarBindingRef(String),
     /// `\\@name` — aliases the live array in [`crate::scope::Scope`] (same stash key as [`Op::GetArray`]).
@@ -1147,6 +1151,11 @@ impl PerlValue {
     }
 
     #[inline]
+    pub fn capture_cell(r: Arc<RwLock<PerlValue>>) -> Self {
+        Self::from_heap(Arc::new(HeapObject::CaptureCell(r)))
+    }
+
+    #[inline]
     pub fn scalar_binding_ref(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarBindingRef(name)))
     }
@@ -1467,6 +1476,16 @@ impl PerlValue {
     pub fn as_scalar_ref(&self) -> Option<Arc<RwLock<PerlValue>>> {
         self.with_heap(|h| match h {
             HeapObject::ScalarRef(r) => Some(Arc::clone(r)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    /// Returns the inner Arc if this is a [`HeapObject::CaptureCell`].
+    #[inline]
+    pub fn as_capture_cell(&self) -> Option<Arc<RwLock<PerlValue>>> {
+        self.with_heap(|h| match h {
+            HeapObject::CaptureCell(r) => Some(Arc::clone(r)),
             _ => None,
         })
         .flatten()
@@ -1994,7 +2013,7 @@ impl PerlValue {
             HeapObject::Hash(_) => "HASH".to_string(),
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => "ARRAY".to_string(),
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => "HASH".to_string(),
-            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => "SCALAR".to_string(),
+            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => "SCALAR".to_string(),
             HeapObject::CodeRef(_) => "CODE".to_string(),
             HeapObject::Regex(_, _, _) => "Regexp".to_string(),
             HeapObject::Blessed(b) => b.class.clone(),
@@ -2265,7 +2284,7 @@ impl fmt::Display for PerlValue {
             HeapObject::Hash(h) => write!(f, "{}/{}", h.len(), h.capacity()),
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => f.write_str("ARRAY(0x...)"),
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => f.write_str("HASH(0x...)"),
-            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => {
+            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => {
                 f.write_str("SCALAR(0x...)")
             }
             HeapObject::CodeRef(sub) => write!(f, "CODE({})", sub.name),
@@ -2410,7 +2429,7 @@ pub fn set_member_key(v: &PerlValue) -> String {
             let d = b.data.read();
             format!("b:{}:{}", b.class, set_member_key(&d))
         }
-        HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => format!("sr:{v}"),
+        HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => format!("sr:{v}"),
         HeapObject::ArrayBindingRef(n) => format!("abind:{n}"),
         HeapObject::HashBindingRef(n) => format!("hbind:{n}"),
         HeapObject::CodeRef(_) => format!("c:{v}"),

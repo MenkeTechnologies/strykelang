@@ -278,7 +278,7 @@ fn while_let_some_empty_generator_never_enters_body() {
 }
 
 #[test]
-#[ignore = "VM/interpreter boundary: `last` in while-let match arm produces Flow::Last that cannot propagate to VM bytecode loop — needs flow control bridging"]
+#[ignore = "Flow::Last from AST match arm cannot propagate to VM bytecode loop"]
 fn parenless_zero_arg_method_then_block_not_consumed_as_arg() {
     // Regression: `->next` must not slurp `{` as a hash/method argument.
     let v = run(r#"my $g = gen { yield 1; };
