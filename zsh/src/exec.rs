@@ -697,6 +697,10 @@ pub struct ShellExecutor {
     /// AOP intercept table: command/function name → advice chain.
     /// Glob patterns supported (e.g. "git *", "*").
     pub intercepts: Vec<Intercept>,
+    /// Async job handles: id → receiver for (status, stdout)
+    pub async_jobs: HashMap<u32, crossbeam_channel::Receiver<(i32, String)>>,
+    /// Next async job ID
+    pub next_async_id: u32,
     /// Defer stack: commands to run on scope exit (LIFO).
     pub defer_stack: Vec<Vec<String>>,
 }
@@ -850,6 +854,8 @@ impl ShellExecutor {
                 std::sync::Arc::new(crate::worker::WorkerPool::new(pool_size))
             },
             intercepts: Vec::new(),
+            async_jobs: HashMap::new(),
+            next_async_id: 1,
             defer_stack: Vec::new(),
         }
     }
@@ -2476,6 +2482,13 @@ impl ShellExecutor {
             "profile" => self.builtin_profile(args),
             "intercept" => self.builtin_intercept(args),
             "intercept_proceed" => self.builtin_intercept_proceed(args),
+            // ── Concurrent primitives ──
+            "async" => self.builtin_async(args),
+            "await" => self.builtin_await(args),
+            "pmap" => self.builtin_pmap(args),
+            "pgrep" => self.builtin_pgrep(args),
+            "peach" => self.builtin_peach(args),
+            "barrier" => self.builtin_barrier(args),
             "readarray" | "mapfile" => self.builtin_readarray(args),
             "setopt" => self.builtin_setopt(args),
             "unsetopt" => self.builtin_unsetopt(args),
@@ -12105,6 +12118,318 @@ impl ShellExecutor {
                 1
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CONCURRENT PRIMITIVES — ship work to the worker pool from shell
+    // No stryke dependency. Pure zshrs. Thin binary gets full parallelism.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// async { cmd } — run command on worker pool, return job ID immediately.
+    /// Output captured in background, retrieve with `await $id`.
+    ///
+    /// Usage:
+    ///   id=$(async 'sleep 2; echo done')
+    ///   ... do other work ...
+    ///   result=$(await $id)
+    fn builtin_async(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            eprintln!("async: requires a command string");
+            return 1;
+        }
+
+        let code = args.join(" ");
+        let id = self.next_async_id;
+        self.next_async_id += 1;
+
+        let (tx, rx) = crossbeam_channel::bounded::<(i32, String)>(1);
+        let pool = std::sync::Arc::clone(&self.worker_pool);
+
+        pool.submit(move || {
+            // Execute in a subprocess to capture stdout
+            use std::process::{Command, Stdio};
+            let output = Command::new("sh")
+                .args(["-c", &code])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit())
+                .output();
+            match output {
+                Ok(out) => {
+                    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                    let status = out.status.code().unwrap_or(1);
+                    let _ = tx.send((status, stdout));
+                }
+                Err(_) => {
+                    let _ = tx.send((127, String::new()));
+                }
+            }
+        });
+
+        self.async_jobs.insert(id, rx);
+        // Print the job ID so it can be captured: id=$(async 'cmd')
+        println!("{}", id);
+        0
+    }
+
+    /// await $id — block until async job completes, print its stdout, return its status.
+    ///
+    /// Usage:
+    ///   id=$(async 'expensive_command')
+    ///   await $id    # blocks until done, prints output
+    ///   echo $?      # exit status of the async command
+    fn builtin_await(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            eprintln!("await: requires a job ID");
+            return 1;
+        }
+
+        let id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            Err(_) => {
+                eprintln!("await: invalid job ID '{}'", args[0]);
+                return 1;
+            }
+        };
+
+        let rx = match self.async_jobs.remove(&id) {
+            Some(rx) => rx,
+            None => {
+                eprintln!("await: no async job with ID {}", id);
+                return 1;
+            }
+        };
+
+        // Block until the job completes
+        match rx.recv() {
+            Ok((status, stdout)) => {
+                if !stdout.is_empty() {
+                    print!("{}", stdout);
+                }
+                self.last_status = status;
+                status
+            }
+            Err(_) => {
+                eprintln!("await: job {} died without result", id);
+                1
+            }
+        }
+    }
+
+    /// pmap 'cmd {}' arg1 arg2 arg3 — parallel map across worker pool.
+    /// Runs `cmd` for each argument, replacing `{}` with the argument.
+    /// Output is collected in order. Returns 0 if all succeed.
+    ///
+    /// Usage:
+    ///   pmap 'gzip {}' *.log
+    ///   pmap 'echo {}' a b c d
+    ///   ls *.rs | pmap 'wc -l {}'
+    fn builtin_pmap(&mut self, args: &[String]) -> i32 {
+        if args.len() < 2 {
+            eprintln!("pmap: requires 'command {{}}' followed by arguments");
+            return 1;
+        }
+
+        let template = &args[0];
+        let items = &args[1..];
+
+        // Ship each item to the pool
+        let mut receivers = Vec::with_capacity(items.len());
+        for item in items {
+            let cmd = template.replace("{}", item);
+            let rx = self.worker_pool.submit_with_result(move || {
+                use std::process::{Command, Stdio};
+                let output = Command::new("sh")
+                    .args(["-c", &cmd])
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::inherit())
+                    .output();
+                match output {
+                    Ok(out) => (
+                        out.status.code().unwrap_or(1),
+                        String::from_utf8_lossy(&out.stdout).to_string(),
+                    ),
+                    Err(_) => (127, String::new()),
+                }
+            });
+            receivers.push(rx);
+        }
+
+        // Collect results in order
+        let mut any_fail = false;
+        for rx in receivers {
+            if let Ok((status, stdout)) = rx.recv() {
+                if !stdout.is_empty() {
+                    print!("{}", stdout);
+                }
+                if status != 0 {
+                    any_fail = true;
+                }
+            }
+        }
+
+        if any_fail { 1 } else { 0 }
+    }
+
+    /// pgrep 'pattern' arg1 arg2 ... — parallel grep/filter across worker pool.
+    /// Runs the pattern command for each argument, prints args where command succeeds.
+    ///
+    /// Usage:
+    ///   pgrep 'test -f {}' /path/a /path/b /path/c
+    ///   pgrep 'grep -q TODO {}' *.rs
+    fn builtin_pgrep(&mut self, args: &[String]) -> i32 {
+        if args.len() < 2 {
+            eprintln!("pgrep: requires 'test_command {{}}' followed by arguments");
+            return 1;
+        }
+
+        let template = &args[0];
+        let items = &args[1..];
+
+        let mut receivers: Vec<(String, crossbeam_channel::Receiver<bool>)> = Vec::with_capacity(items.len());
+        for item in items {
+            let cmd = template.replace("{}", item);
+            let rx = self.worker_pool.submit_with_result(move || {
+                use std::process::{Command, Stdio};
+                Command::new("sh")
+                    .args(["-c", &cmd])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+            });
+            receivers.push((item.clone(), rx));
+        }
+
+        for (item, rx) in receivers {
+            if let Ok(true) = rx.recv() {
+                println!("{}", item);
+            }
+        }
+
+        0
+    }
+
+    /// peach 'cmd {}' arg1 arg2 ... — parallel for-each, no output ordering.
+    /// Like pmap but doesn't collect output — fire-and-forget, print as completed.
+    ///
+    /// Usage:
+    ///   peach 'convert {} {}.png' *.svg
+    ///   peach 'rsync -a {} remote:{}' dir1 dir2 dir3
+    fn builtin_peach(&mut self, args: &[String]) -> i32 {
+        if args.len() < 2 {
+            eprintln!("peach: requires 'command {{}}' followed by arguments");
+            return 1;
+        }
+
+        let template = &args[0];
+        let items = &args[1..];
+
+        let (tx, rx) = crossbeam_channel::unbounded::<(String, i32, String)>();
+
+        for item in items {
+            let cmd = template.replace("{}", item);
+            let item_clone = item.clone();
+            let tx = tx.clone();
+            self.worker_pool.submit(move || {
+                use std::process::{Command, Stdio};
+                let output = Command::new("sh")
+                    .args(["-c", &cmd])
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::inherit())
+                    .output();
+                match output {
+                    Ok(out) => {
+                        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                        let status = out.status.code().unwrap_or(1);
+                        let _ = tx.send((item_clone, status, stdout));
+                    }
+                    Err(_) => {
+                        let _ = tx.send((item_clone, 127, String::new()));
+                    }
+                }
+            });
+        }
+        drop(tx);
+
+        let mut any_fail = false;
+        for (_, status, stdout) in rx {
+            if !stdout.is_empty() {
+                print!("{}", stdout);
+            }
+            if status != 0 {
+                any_fail = true;
+            }
+        }
+
+        if any_fail { 1 } else { 0 }
+    }
+
+    /// barrier cmd1 ::: cmd2 ::: cmd3 — run commands in parallel, wait for ALL to complete.
+    /// Returns the worst (highest) exit status.
+    ///
+    /// Usage:
+    ///   barrier 'make -C proj1' ::: 'make -C proj2' ::: 'make -C proj3'
+    ///   barrier 'npm test' ::: 'cargo test' ::: 'pytest'
+    fn builtin_barrier(&mut self, args: &[String]) -> i32 {
+        if args.is_empty() {
+            eprintln!("barrier: requires commands separated by :::");
+            return 1;
+        }
+
+        // Split on ::: delimiter
+        let mut commands: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for arg in args {
+            if arg == ":::" {
+                if !current.is_empty() {
+                    commands.push(current.trim().to_string());
+                    current.clear();
+                }
+            } else {
+                if !current.is_empty() {
+                    current.push(' ');
+                }
+                current.push_str(arg);
+            }
+        }
+        if !current.is_empty() {
+            commands.push(current.trim().to_string());
+        }
+
+        if commands.is_empty() {
+            return 0;
+        }
+
+        // Ship all to pool
+        let mut receivers = Vec::with_capacity(commands.len());
+        for cmd in &commands {
+            let cmd = cmd.clone();
+            let rx = self.worker_pool.submit_with_result(move || {
+                use std::process::{Command, Stdio};
+                Command::new("sh")
+                    .args(["-c", &cmd])
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .status()
+                    .map(|s| s.code().unwrap_or(1))
+                    .unwrap_or(127)
+            });
+            receivers.push(rx);
+        }
+
+        // Wait for all — return worst status
+        let mut worst = 0i32;
+        for rx in receivers {
+            if let Ok(status) = rx.recv() {
+                if status > worst {
+                    worst = status;
+                }
+            }
+        }
+
+        self.last_status = worst;
+        worst
     }
 
     /// help - display help for builtins (bash)
