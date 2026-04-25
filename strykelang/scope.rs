@@ -188,8 +188,8 @@ impl Frame {
             if let Some(ref n) = sn {
                 if n == name {
                     if i < self.scalar_slots.len() {
-                        // Write through ScalarRef so closures sharing this cell see the update
-                        if let Some(r) = self.scalar_slots[i].as_scalar_ref() {
+                        // Write through CaptureCell so closures sharing this cell see the update
+                        if let Some(r) = self.scalar_slots[i].as_capture_cell() {
                             *r.write() = val;
                         } else {
                             self.scalar_slots[i] = val;
@@ -200,8 +200,8 @@ impl Frame {
             }
         }
         if let Some(entry) = self.scalars.iter_mut().find(|(k, _)| k == name) {
-            // Write through ScalarRef so closures sharing this cell see the update
-            if let Some(r) = entry.1.as_scalar_ref() {
+            // Write through CaptureCell so closures sharing this cell see the update
+            if let Some(r) = entry.1.as_capture_cell() {
                 *r.write() = val;
             } else {
                 entry.1 = val;
@@ -423,7 +423,13 @@ impl Scope {
         let idx = slot as usize;
         for frame in self.frames.iter().rev() {
             if idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx) {
-                return frame.scalar_slots[idx].clone();
+                let val = &frame.scalar_slots[idx];
+                // Transparently unwrap CaptureCell (closure-captured variable) — read through
+                // the shared lock. User-created ScalarRef from `\expr` is NOT unwrapped.
+                if let Some(arc) = val.as_capture_cell() {
+                    return arc.read().clone();
+                }
+                return val.clone();
             }
         }
         PerlValue::UNDEF
@@ -437,8 +443,8 @@ impl Scope {
         for i in (0..len).rev() {
             if idx < self.frames[i].scalar_slots.len() && self.frames[i].owns_scalar_slot_index(idx)
             {
-                // Write through ScalarRef so closures sharing this cell see the update
-                if let Some(r) = self.frames[i].scalar_slots[idx].as_scalar_ref() {
+                // Write through CaptureCell so closures sharing this cell see the update
+                if let Some(r) = self.frames[i].scalar_slots[idx].as_capture_cell() {
                     *r.write() = val;
                 } else {
                     self.frames[i].scalar_slots[idx] = val;
@@ -871,8 +877,9 @@ impl Scope {
                 if let Some(arc) = val.as_atomic_arc() {
                     return arc.lock().clone();
                 }
-                // Transparently unwrap ScalarRef (captured closure variable) — read through the lock
-                if let Some(arc) = val.as_scalar_ref() {
+                // Transparently unwrap CaptureCell (closure-captured variable) — read through the lock.
+                // User-created ScalarRef from `\expr` is NOT unwrapped.
+                if let Some(arc) = val.as_capture_cell() {
                     return arc.read().clone();
                 }
                 return val.clone();
@@ -1057,8 +1064,8 @@ impl Scope {
                     crate::parallel_trace::emit_scalar_mutation(name, &old, &val);
                     return Ok(());
                 }
-                // If the existing value is ScalarRef (captured closure variable), write through it
-                if let Some(arc) = v.as_scalar_ref() {
+                // If the existing value is CaptureCell (closure-captured variable), write through it
+                if let Some(arc) = v.as_capture_cell() {
                     *arc.write() = val;
                     return Ok(());
                 }
@@ -2033,16 +2040,16 @@ impl Scope {
         let mut captured = Vec::new();
         for frame in &mut self.frames {
             for (k, v) in &mut frame.scalars {
-                // Wrap scalar in ScalarRef so the closure shares the same memory cell.
-                // If it's already a ScalarRef, just clone it (shares the same Arc).
+                // Wrap scalar in CaptureCell so the closure shares the same memory cell.
+                // If it's already a CaptureCell or ScalarRef, clone as-is (shares the same Arc).
                 // Only wrap simple scalars (integers, floats, strings, undef); complex values
                 // like refs, blessed objects, atomics, etc. already share via Arc and wrapping
-                // them in ScalarRef breaks type detection (as_ppool, as_blessed_ref, etc.).
-                if v.as_scalar_ref().is_some() {
+                // them in CaptureCell breaks type detection (as_ppool, as_blessed_ref, etc.).
+                if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                     captured.push((format!("${}", k), v.clone()));
                 } else if v.is_simple_scalar() {
-                    let wrapped = PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())));
-                    // Update the original scope variable to point to the same ScalarRef
+                    let wrapped = PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())));
+                    // Update the original scope variable to point to the same CaptureCell
                     // so that subsequent closures share the same reference.
                     *v = wrapped.clone();
                     captured.push((format!("${}", k), wrapped));
@@ -2052,13 +2059,11 @@ impl Scope {
             }
             for (i, v) in frame.scalar_slots.iter().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    // Capture slot value. Don't modify in-place — ScalarRef wrapping
-                    // of slots needs a CaptureCell type to avoid breaking `p $x` semantics.
-                    // For now, capture as-is; self-referential closures need __SUB__.
-                    let wrapped = if v.as_scalar_ref().is_some() {
+                    // Wrap slot value in CaptureCell for closure sharing.
+                    let wrapped = if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {
-                        PerlValue::scalar_ref(Arc::new(RwLock::new(v.clone())))
+                        PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())))
                     };
                     captured.push((format!("$slot:{}:{}", i, name), wrapped));
                 }
