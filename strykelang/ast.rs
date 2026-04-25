@@ -1020,7 +1020,7 @@ pub enum ExprKind {
         callback: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
-    /// `pwatch GLOB, fn { ... }` — notify-based watcher (tree-walker only).
+    /// `pwatch GLOB, fn { ... }` — notify-based watcher (evaluated by interpreter).
     PwatchExpr {
         path: Box<Expr>,
         callback: Box<Expr>,

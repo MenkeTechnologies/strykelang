@@ -18,7 +18,7 @@ fn list_range_numeric_string_endpoints_say() {
 }
 
 /// `@h{'a'..'c'}` — hash-slice key must be list context so the range expands into three keys
-/// instead of collapsing to a scalar flip-flop value (regression: tree-walker + VM paths).
+/// instead of collapsing to a scalar flip-flop value (regression test).
 #[test]
 fn range_hash_slice_string_keys_read() {
     assert_eq!(
@@ -670,30 +670,30 @@ fn glob_par_finds_rs_sources_under_src() {
 }
 
 #[test]
-fn glob_par_tree_walker_plain_matches_count() {
+fn glob_par_plain_matches_count() {
     let program = crate::parse(r#"glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
     let n = interp
-        .execute_tree(&program)
-        .expect("execute_tree")
+        .execute(&program)
+        .expect("execute")
         .to_int();
     assert!(
         n > 0,
-        "tree-walker glob_par (plain) should match at least one file, got {n}"
+        "glob_par (plain) should match at least one file, got {n}"
     );
 }
 
 #[test]
-fn glob_par_tree_walker_matches_count() {
+fn glob_par_matches_count() {
     let program = crate::parse(r#"scalar glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
     let n = interp
-        .execute_tree(&program)
-        .expect("execute_tree")
+        .execute(&program)
+        .expect("execute")
         .to_int();
     assert!(
         n > 0,
-        "tree-walker glob_par should match at least one file, got {n}"
+        "glob_par should match at least one file, got {n}"
     );
 }
 

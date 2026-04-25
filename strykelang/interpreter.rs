@@ -534,7 +534,7 @@ pub(crate) struct RegexMatchMemo {
     pub result: PerlValue,
 }
 
-/// Tree-walker state for scalar `..` / `...` (key: `Expr` address).
+/// State for scalar `..` / `...` (key: `Expr` address).
 #[derive(Clone, Copy, Default)]
 struct FlipFlopTreeState {
     active: bool,
@@ -621,7 +621,7 @@ pub struct Interpreter {
     /// per re-evaluation on the same `$.` (matches Perl `pp_flop`: two evaluations of the same
     /// range on one line return the same sequence number).
     pub(crate) flip_flop_last_dot: Vec<Option<i64>>,
-    /// Scalar `..` / `...` flip-flop for tree-walker (key: `Expr` address).
+    /// Scalar `..` / `...` flip-flop state (key: `Expr` address).
     flip_flop_tree: HashMap<usize, FlipFlopTreeState>,
     /// `$^C` — set when SIGINT is pending before handler runs (cleared on read).
     pub sigint_pending_caret: Cell<bool>,
@@ -732,16 +732,16 @@ pub struct Interpreter {
     pub(crate) socket_handles: HashMap<String, PerlSocket>,
     /// `wantarray()` inside the current subroutine (`WantarrayCtx`; VM threads it on `Call`/`MethodCall`/`ArrowCall`).
     pub(crate) wantarray_kind: WantarrayCtx,
-    /// `struct Name { ... }` definitions (merged from VM chunks and tree-walker).
+    /// `struct Name { ... }` definitions (merged from VM chunks).
     pub struct_defs: HashMap<String, Arc<StructDef>>,
-    /// `enum Name { ... }` definitions (merged from VM chunks and tree-walker).
+    /// `enum Name { ... }` definitions (merged from VM chunks).
     pub enum_defs: HashMap<String, Arc<EnumDef>>,
     /// `class Name extends ... impl ... { ... }` definitions.
     pub class_defs: HashMap<String, Arc<ClassDef>>,
     /// `trait Name { ... }` definitions.
     pub trait_defs: HashMap<String, Arc<TraitDef>>,
     /// When set, `stryke --profile` records timings: VM path uses per-opcode line samples and sub
-    /// call/return (JIT disabled); tree-walker fallback uses per-statement lines and subs.
+    /// call/return (JIT disabled); per-statement lines and subs.
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
     pub(crate) module_export_lists: HashMap<String, ModuleExportLists>,
@@ -824,8 +824,11 @@ pub struct Interpreter {
     pub pec_cache_fingerprint: Option<[u8; 32]>,
     /// Set while stepping a `gen { }` body (`yield`).
     pub(crate) in_generator: bool,
-    /// `-n`/`-p` driver: prelude only in [`Self::execute_tree`]; body runs in [`Self::process_line`].
+    /// `-n`/`-p` driver: prelude only; body runs per line in [`Self::process_line_vm`].
     pub line_mode_skip_main: bool,
+    /// Pre-compiled chunk for `-n`/`-p` line mode. Stored after the prelude `execute()` call
+    /// so `process_line_vm` can re-execute the body portion per input line.
+    pub line_mode_chunk: Option<crate::bytecode::Chunk>,
     /// Set for the duration of each [`Self::process_line`] call when the current line is the last
     /// from the active input source (stdin or current `@ARGV` file), so `eof` with no arguments
     /// matches Perl (true on the last line of that source).
@@ -1574,6 +1577,7 @@ impl Interpreter {
             pec_cache_fingerprint: None,
             in_generator: false,
             line_mode_skip_main: false,
+            line_mode_chunk: None,
             line_mode_eof_pending: false,
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
@@ -1799,6 +1803,7 @@ impl Interpreter {
             pec_cache_fingerprint: None,
             in_generator: false,
             line_mode_skip_main: false,
+            line_mode_chunk: self.line_mode_chunk.clone(),
             line_mode_eof_pending: false,
             line_mode_stdin_pending: VecDeque::new(),
             rate_limit_slots: Vec::new(),
@@ -2057,7 +2062,7 @@ impl Interpreter {
         }
     }
 
-    /// Tree-walker: bare `$x` after `our $x` reads the package stash scalar (`main::x` / `Pkg::x`).
+    /// Bare `$x` after `our $x` reads the package stash scalar (`main::x` / `Pkg::x`).
     pub(crate) fn tree_scalar_storage_name(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
@@ -2369,8 +2374,7 @@ impl Interpreter {
         self.scope.set_parallel_guard(true);
     }
 
-    /// BEGIN/END are lowered into the VM chunk; clear interpreter queues so a later tree-walker
-    /// run does not execute them again.
+    /// BEGIN/END are lowered into the VM chunk; clear interpreter queues after VM compilation.
     pub(crate) fn clear_begin_end_blocks_after_vm_compile(&mut self) {
         self.begin_blocks.clear();
         self.unit_check_blocks.clear();
@@ -4323,7 +4327,7 @@ impl Interpreter {
         self.line_mode_eof_pending
     }
 
-    /// `eof` / `eof()` / `eof FH` — shared by the tree walker, [`crate::vm::VM`], and
+    /// `eof` / `eof()` / `eof FH` — shared by [`crate::vm::VM`] and
     /// [`crate::builtins::try_builtin`] (`CORE::eof`, `builtin::eof`, which parse as [`ExprKind::FuncCall`],
     /// not [`ExprKind::Eof`]).
     pub(crate) fn eof_builtin_execute(
@@ -5012,7 +5016,7 @@ impl Interpreter {
         )))
     }
 
-    /// Shared `chomp` for tree-walker and VM (mutates `target`).
+    /// Shared `chomp` implementation (mutates `target`).
     /// `read(FH, $buf, LEN)` — read from filehandle into named variable.
     /// Returns bytes read count (or error). Called from VM's ReadIntoVar op.
     pub(crate) fn builtin_read_into(
@@ -5058,7 +5062,7 @@ impl Interpreter {
         Ok(PerlValue::integer(removed))
     }
 
-    /// Shared `chop` for tree-walker and VM (mutates `target`).
+    /// Shared `chop` implementation (mutates `target`).
     pub(crate) fn chop_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
         let mut s = val.to_string();
         let chopped = s
@@ -5069,7 +5073,7 @@ impl Interpreter {
         Ok(chopped)
     }
 
-    /// Shared regex match for tree-walker and VM (`pos` is updated for scalar `/g`).
+    /// Shared regex match implementation (`pos` is updated for scalar `/g`).
     pub(crate) fn regex_match_execute(
         &mut self,
         s: String,
@@ -5228,7 +5232,7 @@ impl Interpreter {
         Ok(out)
     }
 
-    /// Shared `s///` for tree-walker and VM.
+    /// Shared `s///` implementation.
     ///
     /// Perl replacement strings accept both `\1` and `$1` for back-references.
     /// The Rust `regex` / `fancy_regex` crates (and our PCRE2 shim) only
@@ -5370,7 +5374,7 @@ impl Interpreter {
         Ok(PerlValue::integer(0))
     }
 
-    /// Shared `tr///` for tree-walker and VM.
+    /// Shared `tr///` implementation.
     pub(crate) fn regex_transliterate_execute(
         &mut self,
         s: String,
@@ -5597,19 +5601,13 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
-        // `-n`/`-p`: main must run only inside [`Self::process_line`], not as a full-program VM/tree
-        // run (would execute `print` once before any input, etc.).
+        // `-n`/`-p`: compile and run only the prelude, store chunk for per-line re-execution.
         if self.line_mode_skip_main {
-            return self.execute_tree(program);
+            crate::compile_and_run_prelude(program, self)?;
+            return Ok(PerlValue::UNDEF);
         }
-        // With `--profile`, the VM records per-opcode line times and sub enter/return (JIT off).
-        // Try bytecode VM first — falls back to tree-walker on unsupported features
-        if let Some(result) = crate::try_vm_execute(program, self) {
-            return result;
-        }
-
-        // Tree-walker fallback
-        self.execute_tree(program)
+        crate::try_vm_execute(program, self)
+            .expect("VM compilation must succeed — all execution is VM-only")
     }
 
     /// Run `END` blocks (after `-n`/`-p` line loop when prelude used [`Self::line_mode_skip_main`]).
@@ -5661,116 +5659,6 @@ impl Interpreter {
             }
         }
         Ok(())
-    }
-
-    /// Tree-walking execution (fallback when bytecode compilation fails).
-    pub fn execute_tree(&mut self, program: &Program) -> PerlResult<PerlValue> {
-        // `${^GLOBAL_PHASE}` — each program starts in `RUN` (Perl before any `BEGIN` runs).
-        self.global_phase = "RUN".to_string();
-        self.clear_flip_flop_state();
-        // First pass: subs, `use` (source order), BEGIN/END collection
-        self.prepare_program_top_level(program)?;
-
-        // Execute BEGIN blocks (Perl uses phase `START` here).
-        let begins = std::mem::take(&mut self.begin_blocks);
-        if !begins.is_empty() {
-            self.global_phase = "START".to_string();
-        }
-        for block in &begins {
-            self.exec_block(block).map_err(|e| match e {
-                FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in BEGIN", 0),
-            })?;
-        }
-
-        // UNITCHECK — reverse order of compilation (end of unit, before CHECK).
-        // Perl keeps `${^GLOBAL_PHASE}` as **`START`** during these blocks (not `UNITCHECK`).
-        let ucs = std::mem::take(&mut self.unit_check_blocks);
-        for block in ucs.iter().rev() {
-            self.exec_block(block).map_err(|e| match e {
-                FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => {
-                    PerlError::runtime("Unexpected flow control in UNITCHECK", 0)
-                }
-            })?;
-        }
-
-        // CHECK — reverse order (end of compile phase).
-        let checks = std::mem::take(&mut self.check_blocks);
-        if !checks.is_empty() {
-            self.global_phase = "CHECK".to_string();
-        }
-        for block in checks.iter().rev() {
-            self.exec_block(block).map_err(|e| match e {
-                FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in CHECK", 0),
-            })?;
-        }
-
-        // INIT — forward order (before main runtime).
-        let inits = std::mem::take(&mut self.init_blocks);
-        if !inits.is_empty() {
-            self.global_phase = "INIT".to_string();
-        }
-        for block in &inits {
-            self.exec_block(block).map_err(|e| match e {
-                FlowOrError::Error(e) => e,
-                FlowOrError::Flow(_) => PerlError::runtime("Unexpected flow control in INIT", 0),
-            })?;
-        }
-
-        self.global_phase = "RUN".to_string();
-
-        if self.line_mode_skip_main {
-            // Body runs once per input line in [`Self::process_line`]; `END` runs after the loop
-            // via [`Self::run_end_blocks`].
-            return Ok(PerlValue::UNDEF);
-        }
-
-        // Execute main program
-        let mut last = PerlValue::UNDEF;
-        for stmt in &program.statements {
-            match &stmt.kind {
-                StmtKind::Begin(_)
-                | StmtKind::UnitCheck(_)
-                | StmtKind::Check(_)
-                | StmtKind::Init(_)
-                | StmtKind::End(_)
-                | StmtKind::UsePerlVersion { .. }
-                | StmtKind::Use { .. }
-                | StmtKind::No { .. }
-                | StmtKind::FormatDecl { .. } => continue,
-                _ => {
-                    match self.exec_statement(stmt) {
-                        Ok(val) => last = val,
-                        Err(FlowOrError::Error(e)) => {
-                            // Execute END blocks before propagating (all exit codes, including 0)
-                            self.global_phase = "END".to_string();
-                            let ends = std::mem::take(&mut self.end_blocks);
-                            for block in &ends {
-                                let _ = self.exec_block(block);
-                            }
-                            return Err(e);
-                        }
-                        Err(FlowOrError::Flow(Flow::Return(v))) => {
-                            last = v;
-                            break;
-                        }
-                        Err(FlowOrError::Flow(_)) => {}
-                    }
-                }
-            }
-        }
-
-        // Execute END blocks (Perl uses phase `END` here).
-        self.global_phase = "END".to_string();
-        let ends = std::mem::take(&mut self.end_blocks);
-        for block in &ends {
-            let _ = self.exec_block(block);
-        }
-
-        self.drain_pending_destroys(0)?;
-        Ok(last)
     }
 
     pub(crate) fn exec_block(&mut self, block: &Block) -> ExecResult {
@@ -13045,7 +12933,7 @@ impl Interpreter {
         Ok(old)
     }
 
-    /// `BAREWORD` as an rvalue — matches `ExprKind::Bareword` in the tree walker. If a nullary
+    /// `BAREWORD` as an rvalue — matches `ExprKind::Bareword` evaluation. If a nullary
     /// subroutine by that name is defined, call it; otherwise stringify (bareword-as-string).
     /// `strict subs` is enforced transitively: if the bareword is used where a sub is called
     /// explicitly (`&foo` / `foo()`) and the sub is undefined, `call_named_sub` emits the
@@ -13088,8 +12976,8 @@ impl Interpreter {
         Ok(PerlValue::array(out))
     }
 
-    /// `@$aref[i1,i2,...] = LIST` — element-wise assignment matching the tree-walker
-    /// `assign_value` path for multi-index `ArrowDeref { Array, List }`. Shared by the VM
+    /// `@$aref[i1,i2,...] = LIST` — element-wise assignment for
+    /// multi-index `ArrowDeref { Array, List }`. Shared by the VM
     /// [`crate::bytecode::Op::SetArrowArraySlice`].
     pub(crate) fn assign_arrow_array_slice(
         &mut self,
@@ -14007,7 +13895,7 @@ impl Interpreter {
         }
     }
 
-    /// `@$aref` / `@{...}` after optional peeling — for tree `SpliceExpr` / `pop` fallbacks.
+    /// `@$aref` / `@{...}` after optional peeling — for `SpliceExpr` / `pop` operations.
     fn try_eval_array_deref_container(
         &mut self,
         expr: &Expr,
@@ -19147,55 +19035,22 @@ impl Interpreter {
         s
     }
 
-    /// Process a line in -n/-p mode.
+    /// Process a line in -n/-p mode via the VM.
     ///
     /// `is_last_input_line` is true when this line is the last from the current stdin or `@ARGV`
     /// file so `eof` with no arguments matches Perl behavior on that line.
     pub fn process_line(
         &mut self,
         line_str: &str,
-        program: &Program,
+        _program: &Program,
         is_last_input_line: bool,
     ) -> PerlResult<Option<String>> {
-        self.line_mode_eof_pending = is_last_input_line;
-        let result: PerlResult<Option<String>> = (|| {
-            self.line_number += 1;
-            self.scope
-                .set_topic(PerlValue::string(line_str.to_string()));
-
-            if self.auto_split {
-                let sep = self.field_separator.as_deref().unwrap_or(" ");
-                let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-                let fields: Vec<PerlValue> = re
-                    .split(line_str)
-                    .map(|s| PerlValue::string(s.to_string()))
-                    .collect();
-                self.scope.set_array("F", fields)?;
-            }
-
-            for stmt in &program.statements {
-                match &stmt.kind {
-                    StmtKind::SubDecl { .. }
-                    | StmtKind::Begin(_)
-                    | StmtKind::UnitCheck(_)
-                    | StmtKind::Check(_)
-                    | StmtKind::Init(_)
-                    | StmtKind::End(_) => continue,
-                    _ => match self.exec_statement(stmt) {
-                        Ok(_) => {}
-                        Err(FlowOrError::Error(e)) => return Err(e),
-                        Err(FlowOrError::Flow(_)) => {}
-                    },
-                }
-            }
-
-            // `-p` implicit print matches `print $_` (appends `$\` / [`Self::ors`] — set by `-l`).
-            let mut out = self.scope.get_scalar("_").to_string();
-            out.push_str(&self.ors);
-            Ok(Some(out))
-        })();
-        self.line_mode_eof_pending = false;
-        result
+        let chunk = self
+            .line_mode_chunk
+            .as_ref()
+            .expect("process_line called without compiled chunk — execute() must run first")
+            .clone();
+        crate::run_line_body(&chunk, self, line_str, is_last_input_line)
     }
 }
 

@@ -1,7 +1,7 @@
 //! `<>` / `<STDIN>` / `<FH>` in **list** context must read all lines until EOF (Perl `readline` list semantics).
 //! Scalar context (`$x = <>` / `my $x = scalar(<>)`) stays one line. Covers `sort <>` / `grep {} <>` / `for (<>)`,
 //! `reverse <>` / `reverse <STDIN>`, `my @l = <>`, **`@a = <>` (global/package, not only `my`)**,
-//! `join('', <>)`, and `join('', <F>)` VM vs tree parity, and the zpwr `zpwrVerbsFZF` `-e` one-liner.
+//! `join('', <>)`, and `join('', <F>)`, and the zpwr `zpwrVerbsFZF` `-e` one-liner.
 
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -175,9 +175,9 @@ fn scalar_diamond_still_reads_only_first_line() {
     assert_eq!(String::from_utf8_lossy(&out.stdout), "first\n");
 }
 
-/// Bytecode VM and tree-walker must agree on `<FH>` list slurp from a real file (not only stdin pipe).
+/// `<FH>` list slurp from a real file (not only stdin pipe).
 #[test]
-fn open_file_readline_list_vm_matches_tree_walker() {
+fn open_file_readline_list_slurps_all_lines() {
     let path =
         std::env::temp_dir().join(format!("stryke_readline_list_{}.txt", std::process::id()));
     std::fs::write(&path, b"one\ntwo\nthree\n").expect("write temp");
@@ -191,22 +191,15 @@ fn open_file_readline_list_vm_matches_tree_walker() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(
-        v_vm.to_int(),
-        v_tree.to_int(),
-        "vm={v_vm:?} tree={v_tree:?}"
-    );
-    assert_eq!(v_vm.to_int(), 3);
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert_eq!(v.to_int(), 3);
     std::fs::remove_file(&path).ok();
 }
 
-/// Global `@a = <F>`: VM vs tree-walker (must not regress to scalar readline).
+/// Global `@a = <F>`: must not regress to scalar readline.
 #[test]
-fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
+fn open_file_global_array_assign_readline_list_slurps() {
     let path = std::env::temp_dir().join(format!("stryke_global_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"u\nv\nw\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
@@ -219,22 +212,15 @@ fn open_file_global_array_assign_readline_list_vm_matches_tree_walker() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(
-        v_vm.to_int(),
-        v_tree.to_int(),
-        "vm={v_vm:?} tree={v_tree:?}"
-    );
-    assert_eq!(v_vm.to_int(), 3);
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert_eq!(v.to_int(), 3);
     std::fs::remove_file(&path).ok();
 }
 
 /// `reverse <FH>`: list context through `reverse` (same zpwr pattern as `reverse <>` on stdin).
 #[test]
-fn open_file_reverse_readline_list_vm_matches_tree_walker() {
+fn open_file_reverse_readline_list_reverses() {
     let path =
         std::env::temp_dir().join(format!("stryke_reverse_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"aa\nbb\ncc\n").expect("write temp");
@@ -248,12 +234,9 @@ fn open_file_reverse_readline_list_vm_matches_tree_walker() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(v_vm.to_string(), v_tree.to_string());
-    assert_eq!(v_vm.to_string(), "cc\n");
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert_eq!(v.to_string(), "cc\n");
     std::fs::remove_file(&path).ok();
 }
 
@@ -406,9 +389,9 @@ fn grep_diamond_list_operand_slurps_stdin() {
     assert_eq!(String::from_utf8_lossy(&out.stdout), "2");
 }
 
-/// Slurped file content via `join('', <F>)`: VM vs tree-walker agree on full bytes.
+/// Slurped file content via `join('', <F>)` concatenates all lines.
 #[test]
-fn open_file_join_readline_list_vm_matches_tree_walker() {
+fn open_file_join_readline_list_slurps() {
     let path = std::env::temp_dir().join(format!("stryke_join_slurp_{}.txt", std::process::id()));
     std::fs::write(&path, b"part1\npart2\n").expect("write temp");
     let ps = path.to_str().expect("utf-8 path");
@@ -421,12 +404,9 @@ fn open_file_join_readline_list_vm_matches_tree_walker() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut vm_interp = Interpreter::new();
-    let v_vm = vm_interp.execute(&program).expect("execute vm");
-    let mut tree_interp = Interpreter::new();
-    let v_tree = tree_interp.execute_tree(&program).expect("execute tree");
-    assert_eq!(v_vm.to_string(), v_tree.to_string());
-    assert_eq!(v_vm.to_string(), "part1\npart2\n");
+    let mut interp = Interpreter::new();
+    let v = interp.execute(&program).expect("execute");
+    assert_eq!(v.to_string(), "part1\npart2\n");
     std::fs::remove_file(&path).ok();
 }
 

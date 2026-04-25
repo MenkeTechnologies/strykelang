@@ -1,4 +1,4 @@
-//! Unit tests for `Interpreter`: defaults, `set_file`, and `execute_tree` behavior.
+//! Unit tests for `Interpreter`: defaults, `set_file`, and `execute` behavior.
 
 use crate::ast::StmtKind;
 use crate::interpreter::Interpreter;
@@ -37,7 +37,7 @@ fn destroy_runs_when_lexical_overwritten_with_undef() {
 fn our_isa_stores_c_isa_for_parents_of_class() {
     let mut i = Interpreter::new();
     let prog = parse("package C; our @ISA = qw(P); 1").unwrap();
-    i.execute_tree(&prog).unwrap();
+    i.execute(&prog).unwrap();
     assert_eq!(i.parents_of_class("C"), vec!["P".to_string()]);
 }
 
@@ -57,12 +57,12 @@ fn super_fixture_succeeds_on_tree_execute_path() {
     "#,
     )
     .unwrap();
-    let v = i.execute_tree(&prog).expect("execute_tree");
+    let v = i.execute(&prog).expect("execute");
     assert_eq!(v.to_int(), 15);
 }
 
 #[test]
-fn execute_tree_sets_global_phase_start_run_end() {
+fn execute_sets_global_phase_start_run_end() {
     let mut i = Interpreter::new();
     let prog = parse(
         r#"
@@ -72,7 +72,7 @@ fn execute_tree_sets_global_phase_start_run_end() {
         "#,
     )
     .expect("parse");
-    i.execute_tree(&prog).expect("execute_tree");
+    i.execute(&prog).expect("execute");
     assert_eq!(i.scope.get_scalar("main::g").to_string(), "START");
     assert_eq!(i.scope.get_scalar("main::m").to_string(), "RUN");
     assert_eq!(i.scope.get_scalar("main::e").to_string(), "END");
@@ -82,7 +82,7 @@ fn execute_tree_sets_global_phase_start_run_end() {
 fn qualify_sub_key_preserves_package_qualified_sub_name() {
     let mut i = Interpreter::new();
     let prog = parse("package JSON::PP; 1").unwrap();
-    i.execute_tree(&prog).unwrap();
+    i.execute(&prog).unwrap();
     assert_eq!(i.qualify_sub_key("B::GV::SAFENAME"), "B::GV::SAFENAME");
     assert_eq!(i.qualify_sub_key("safename"), "JSON::PP::safename");
 }
@@ -125,26 +125,26 @@ fn set_file_updates_file_field() {
 }
 
 #[test]
-fn execute_tree_computed_expression() {
+fn execute_computed_expression() {
     let p = parse("7 * 6").expect("parse");
     let mut i = Interpreter::new();
-    let v = i.execute_tree(&p).expect("execute_tree");
+    let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
 
 #[test]
-fn execute_tree_my_scalar_sequence() {
+fn execute_my_scalar_sequence() {
     let p = parse("my $a = 10; my $b = 32; $a + $b").expect("parse");
     let mut i = Interpreter::new();
-    let v = i.execute_tree(&p).expect("execute_tree");
+    let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
 
 #[test]
-fn execute_tree_registers_sub_for_later_call() {
+fn execute_registers_sub_for_later_call() {
     let p = parse("fn times6 { return $_0 * 6; } times6(7)").expect("parse");
     let mut i = Interpreter::new();
-    let v = i.execute_tree(&p).expect("execute_tree");
+    let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
 
@@ -153,8 +153,8 @@ fn execute_preserves_scope_scalar_across_two_parses() {
     let p1 = parse("my $interp_unit_x = 41").expect("parse");
     let p2 = parse("$interp_unit_x + 1").expect("parse");
     let mut i = Interpreter::new();
-    i.execute_tree(&p1).expect("first");
-    let v = i.execute_tree(&p2).expect("second");
+    i.execute(&p1).expect("first");
+    let v = i.execute(&p2).expect("second");
     assert_eq!(v.to_int(), 42);
 }
 
@@ -162,7 +162,7 @@ fn execute_preserves_scope_scalar_across_two_parses() {
 fn subs_map_holds_declared_sub() {
     let p = parse("fn interp_named { 1 }").expect("parse");
     let mut i = Interpreter::new();
-    i.execute_tree(&p).expect("execute_tree");
+    i.execute(&p).expect("execute");
     assert!(i.subs.contains_key("interp_named"));
 }
 
@@ -263,7 +263,7 @@ fn end_foreach_iterates_list_context() {
 END { foreach $k (1..3) { $main::end_out .= "k=$k " } }"#,
     )
     .expect("parse");
-    let _ = i.execute_tree(&prog).expect("execute_tree");
+    let _ = i.execute(&prog).expect("execute");
     assert_eq!(
         i.scope.get_scalar("main::end_out").to_string(),
         "k=1 k=2 k=3 "
@@ -283,7 +283,7 @@ fn stash_array_caret_prefixed_stays_global() {
 fn at_is_dualvar_after_eval_failure() {
     let mut i = Interpreter::new();
     let prog = parse(r#"eval("1/0"); 0+$@"#).expect("parse");
-    let v = i.execute_tree(&prog).expect("execute_tree");
+    let v = i.execute(&prog).expect("execute");
     assert_eq!(v.to_int(), 1);
 }
 
@@ -351,7 +351,7 @@ fn at_set_special_string_zero_still_gets_code_one() {
 fn capture_array_after_bind_match() {
     let mut i = Interpreter::new();
     let prog = parse(r#""foo=bar" =~ /=(.*)/; 1"#).expect("parse");
-    i.execute_tree(&prog).expect("execute_tree");
+    i.execute(&prog).expect("execute");
     let cap = i.scope.get_array("^CAPTURE");
     assert_eq!(cap.len(), 1);
     assert_eq!(cap[0].to_string(), "bar");

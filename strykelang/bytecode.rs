@@ -349,8 +349,8 @@ pub enum Op {
     /// [`crate::interpreter::Interpreter::resolve_bareword_rvalue`].
     BarewordRvalue(u16),
     /// Throw `PerlError::runtime` with the message at constant pool index `u16`. Used by the compiler
-    /// to hard-reject constructs whose only valid response is the same runtime error that the
-    /// tree-walker produces (e.g. `++@$r`, `%{...}--`) without falling back to the tree path.
+    /// to hard-reject constructs whose only valid response is a runtime error
+    /// (e.g. `++@$r`, `%{...}--`) without AST fallback.
     RuntimeErrorConst(u16),
     MakeHash(u16), // pop N key-value pairs, push as Hash
     Range,         // stack: [from, to] → Array
@@ -792,6 +792,9 @@ pub enum Op {
     /// Set `${^GLOBAL_PHASE}` on the interpreter. See [`GP_START`] … [`GP_END`].
     SetGlobalPhase(u8),
     Halt,
+    /// Delegate an AST expression to `Interpreter::eval_expr_ctx` at runtime.
+    /// Operand is an index into [`Chunk::ast_eval_exprs`].
+    EvalAstExpr(u16),
 
     // ── Streaming map (appended — do not reorder earlier op tags) ─────────────
     /// `maps { BLOCK } LIST` — stack: \[list\] → lazy iterator (pull-based; stryke extension).
@@ -964,7 +967,7 @@ pub enum BuiltinId {
     ParSed,
     /// `par_sed(..., progress => EXPR)` — last stack arg is truthy progress flag.
     ParSedProgress,
-    /// `each EXPR` — matches tree interpreter (returns empty list).
+    /// `each EXPR` — returns empty list.
     Each,
     /// `` `cmd` `` / `qx{...}` — stdout string via `sh -c` (Perl readpipe); sets `$?`.
     Readpipe,
@@ -1049,6 +1052,11 @@ pub struct Chunk {
     pub static_sub_calls: Vec<(usize, bool, u16)>,
     /// Assign targets for `s///` / `tr///` bytecode (LHS expressions).
     pub lvalues: Vec<Expr>,
+    /// AST expressions delegated to interpreter at runtime via [`Op::EvalAstExpr`].
+    pub ast_eval_exprs: Vec<Expr>,
+    /// Instruction pointer where the main program body starts (after BEGIN/CHECK/INIT phase blocks).
+    /// Used by `-n`/`-p` line mode to re-execute only the body per input line.
+    pub body_start_ip: usize,
     /// `struct Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
     pub struct_defs: Vec<StructDef>,
     /// `enum Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
@@ -1147,6 +1155,8 @@ impl Chunk {
             block_bytecode_ranges: Vec::new(),
             static_sub_calls: Vec::new(),
             lvalues: Vec::new(),
+            ast_eval_exprs: Vec::new(),
+            body_start_ip: 0,
             struct_defs: Vec::new(),
             enum_defs: Vec::new(),
             class_defs: Vec::new(),

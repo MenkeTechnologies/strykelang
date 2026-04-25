@@ -6,7 +6,7 @@
 //! **`NEEDS_VM_SYNC`:** `BlessedRef::drop` cannot call into the interpreter. The bytecode VM
 //! therefore checks this flag **after each opcode** and runs [`Interpreter::drain_pending_destroys`]
 //! so `DESTROY` runs before the next op (matching Perl's synchronous destructor semantics). The
-//! tree walker already drains once per statement.
+//! VM already drains once per statement.
 //!
 //! **Thread-local storage:** Each thread has its own queue to avoid cross-test interference when
 //! Cargo runs tests in parallel. Each Perl interpreter is single-threaded anyway.

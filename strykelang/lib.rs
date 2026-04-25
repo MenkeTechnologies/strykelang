@@ -159,7 +159,7 @@ pub fn parse_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
 }
 
 /// Parse and execute a string of Perl code within an existing interpreter.
-/// Tries bytecode VM first, falls back to tree-walker on unsupported features.
+/// Compile and execute via the bytecode VM.
 /// Uses [`Interpreter::file`] for both parse diagnostics and `__FILE__` during this execution.
 pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<PerlValue> {
     let file = interp.file.clone();
@@ -226,9 +226,8 @@ pub fn try_vm_execute(
 
     // Fast path: chunk loaded from a `.pec` cache hit. Consume the slot with `.take()` so a
     // subsequent re-entry (e.g. nested `do FILE`) does not reuse a stale chunk. On cache hit
-    // we cannot fall back to the tree walker mid-run — surface any "VM unimplemented op" as
-    // a real error (in practice unreachable: the chunk was produced by `compile_program`,
-    // which only emits ops the VM implements).
+    // we surface any "VM unimplemented op" as a real error (in practice unreachable: the
+    // chunk was produced by `compile_program`, which only emits ops the VM implements).
     if let Some(chunk) = interp.pec_precompiled_chunk.take() {
         return Some(run_compiled_chunk(chunk, interp));
     }
@@ -240,47 +239,25 @@ pub fn try_vm_execute(
     let comp = compiler::Compiler::new()
         .with_source_file(interp.file.clone())
         .with_strict_vars(interp.strict_vars);
-    match comp.compile_program(program) {
-        Ok(chunk) => {
-            // Persist after a cache miss so the next warm start can skip both parse and
-            // compile. Save failures are swallowed: a broken cache is an optimization loss,
-            // not a runtime error.
-            if let Some(fp) = interp.pec_cache_fingerprint.take() {
-                let bundle =
-                    pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
-                let _ = pec::try_save(&bundle);
-            }
-            match run_compiled_chunk(chunk, interp) {
-                Ok(result) => Some(Ok(result)),
-                Err(e) => {
-                    let msg = e.message.as_str();
-                    if msg.starts_with("VM: unimplemented op")
-                        || msg.starts_with("Unimplemented builtin")
-                    {
-                        None
-                    } else {
-                        Some(Err(e))
-                    }
-                }
-            }
-        }
-        // `CompileError::Frozen` is a hard compile-time error (strict pragma violations, frozen
-        // lvalue writes, unknown goto labels). Promote it to a user-visible runtime error so
-        // the VM path matches `perl` — without this promotion the fallback would run the tree
-        // interpreter, which sometimes silently accepts the same construct (e.g. strict_vars
-        // isn't enforced on scalar assignment in the tree path).
+    let chunk = match comp.compile_program(program) {
+        Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {
-            Some(Err(PerlError::runtime(detail, line)))
+            return Some(Err(PerlError::runtime(detail, line)));
         }
-        // `Unsupported` just means "this VM compiler doesn't handle this construct yet" — fall
-        // back to the tree interpreter.
         Err(compiler::CompileError::Unsupported(reason)) => {
-            if std::env::var("STRYKE_LOG_FALLBACK").is_ok() {
-                eprintln!("[fallback] {} ({})", reason, &interp.file);
-            }
-            None
+            return Some(Err(PerlError::runtime(
+                format!("VM compile error (unsupported): {}", reason),
+                0,
+            )));
         }
+    };
+
+    if let Some(fp) = interp.pec_cache_fingerprint.take() {
+        let bundle =
+            pec::PecBundle::new(interp.strict_vars, fp, program.clone(), chunk.clone());
+        let _ = pec::try_save(&bundle);
     }
+    Some(run_compiled_chunk(chunk, interp))
 }
 
 /// Shared execution tail used by both the cache-hit and compile paths in
@@ -430,7 +407,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             interp.drain_pending_destroys(0)?;
             Ok(val)
         }
-        // On cache-hit path we cannot fall back to the tree walker (we no longer hold the
+        // On cache-hit path, surface VM errors directly (we no longer hold the
         // fresh Program the caller passed). For the cold-compile path, the compiler would
         // have already returned `Unsupported` for anything the VM cannot run, so this
         // branch is effectively unreachable there. Either way, surface as a runtime error.
@@ -442,6 +419,130 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
         }
         Err(e) => Err(e),
     }
+}
+
+/// Compile program and run only the prelude (BEGIN/CHECK/INIT phase blocks) via the VM.
+/// Stores the compiled chunk on `interp.line_mode_chunk` for per-line re-execution.
+pub fn compile_and_run_prelude(
+    program: &ast::Program,
+    interp: &mut Interpreter,
+) -> PerlResult<()> {
+    if let Err(e) = interp.prepare_program_top_level(program) {
+        return Err(e);
+    }
+    let comp = compiler::Compiler::new()
+        .with_source_file(interp.file.clone())
+        .with_strict_vars(interp.strict_vars);
+    let mut chunk = match comp.compile_program(program) {
+        Ok(chunk) => chunk,
+        Err(compiler::CompileError::Frozen { line, detail }) => {
+            return Err(PerlError::runtime(detail, line));
+        }
+        Err(compiler::CompileError::Unsupported(reason)) => {
+            return Err(PerlError::runtime(
+                format!("VM compile error (unsupported): {}", reason),
+                0,
+            ));
+        }
+    };
+
+    interp.clear_flip_flop_state();
+    interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
+    if interp.disasm_bytecode {
+        eprintln!("{}", chunk.disassemble());
+    }
+    interp.clear_begin_end_blocks_after_vm_compile();
+    for def in &chunk.struct_defs {
+        interp
+            .struct_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    for def in &chunk.enum_defs {
+        interp
+            .enum_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    for def in &chunk.trait_defs {
+        interp
+            .trait_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    for def in &chunk.class_defs {
+        interp
+            .class_defs
+            .insert(def.name.clone(), std::sync::Arc::new(def.clone()));
+    }
+    // Register class methods.
+    for def in &chunk.class_defs {
+        for m in &def.methods {
+            if let Some(ref body) = m.body {
+                let fq = format!("{}::{}", def.name, m.name);
+                let sub = std::sync::Arc::new(crate::value::PerlSub {
+                    name: fq.clone(),
+                    params: m.params.clone(),
+                    body: body.clone(),
+                    closure_env: None,
+                    prototype: None,
+                    fib_like: None,
+                });
+                interp.subs.insert(fq, sub);
+            }
+        }
+    }
+
+    let body_ip = chunk.body_start_ip;
+    if body_ip > 0 && body_ip < chunk.ops.len() {
+        // Run only the prelude: temporarily place Halt at body start.
+        let saved_op = chunk.ops[body_ip].clone();
+        chunk.ops[body_ip] = bytecode::Op::Halt;
+        let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();
+        let mut vm = vm::VM::new(&chunk, interp);
+        vm.set_jit_enabled(vm_jit);
+        let _ = vm.execute()?;
+        chunk.ops[body_ip] = saved_op;
+    }
+
+    interp.line_mode_chunk = Some(chunk);
+    Ok(())
+}
+
+/// Execute the body portion of a pre-compiled chunk for one input line.
+/// Sets `$_` to `line_str`, runs from `body_start_ip` to Halt, returns `$_` for `-p` output.
+pub fn run_line_body(
+    chunk: &bytecode::Chunk,
+    interp: &mut Interpreter,
+    line_str: &str,
+    is_last_input_line: bool,
+) -> PerlResult<Option<String>> {
+    interp.line_mode_eof_pending = is_last_input_line;
+    let result: PerlResult<Option<String>> = (|| {
+        interp.line_number += 1;
+        interp
+            .scope
+            .set_topic(value::PerlValue::string(line_str.to_string()));
+
+        if interp.auto_split {
+            let sep = interp.field_separator.as_deref().unwrap_or(" ");
+            let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
+            let fields: Vec<value::PerlValue> = re
+                .split(line_str)
+                .map(|s| value::PerlValue::string(s.to_string()))
+                .collect();
+            interp.scope.set_array("F", fields)?;
+        }
+
+        let vm_jit = interp.vm_jit_enabled && interp.profiler.is_none();
+        let mut vm = vm::VM::new(chunk, interp);
+        vm.set_jit_enabled(vm_jit);
+        vm.ip = chunk.body_start_ip;
+        let _ = vm.execute()?;
+
+        let mut out = interp.scope.get_scalar("_").to_string();
+        out.push_str(&interp.ors);
+        Ok(Some(out))
+    })();
+    interp.line_mode_eof_pending = false;
+    result
 }
 
 /// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
@@ -486,12 +587,12 @@ mod tests {
     }
 
     #[test]
-    fn interpreter_scope_persists_global_scalar_across_execute_tree_calls() {
+    fn interpreter_scope_persists_global_scalar_across_execute_calls() {
         let mut interp = Interpreter::new();
         let assign = parse("$persist_test = 100").expect("parse assign");
-        interp.execute_tree(&assign).expect("assign");
+        interp.execute(&assign).expect("assign");
         let read = parse("$persist_test").expect("parse read");
-        let v = interp.execute_tree(&read).expect("read");
+        let v = interp.execute(&read).expect("read");
         assert_eq!(v.to_int(), 100);
     }
 

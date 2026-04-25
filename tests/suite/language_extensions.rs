@@ -1,4 +1,4 @@
-//! Tree-interpreter extensions: `retry`, `rate_limit`, `every`, `gen` / `yield`.
+//! Language extensions: `retry`, `rate_limit`, `every`, `gen` / `yield`.
 
 use crate::common::*;
 

@@ -4894,8 +4894,8 @@ fn try_vm_execute_until_with_continue_block() {
 }
 
 /// `++@{…}` / `%{…}++` are rejected at compile time by the VM path — [`try_vm_execute`] returns
-/// `Some(Err(_))` (not `None`), so the fallback to the tree interpreter is no longer needed.
-/// Error message matches the tree-walker's `Can't modify {array,hash} dereference in …`.
+/// `Some(Err(_))` (not `None`), so the compilation error is surfaced directly.
+/// Error message matches Perl's `Can't modify {array,hash} dereference in …`.
 #[test]
 fn try_vm_execute_rejects_aggregate_symbolic_inc_dec_directly() {
     use crate::bytecode::Op;

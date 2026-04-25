@@ -1,6 +1,6 @@
 //! Wall-clock profiler for `stryke --profile`.
 //!
-//! **Tree-walker**: per-statement line times and [`Profiler::enter_sub`] / [`Profiler::exit_sub`]
+//! **Per-statement line times** and [`Profiler::enter_sub`] / [`Profiler::exit_sub`]
 //! around subroutine bodies.
 //!
 //! **Bytecode VM**: per-opcode wall time is charged to that opcode's source line; `Call` / `Return`

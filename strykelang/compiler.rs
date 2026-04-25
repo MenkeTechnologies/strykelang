@@ -12,8 +12,8 @@ use crate::value::PerlValue;
 /// list context than in scalar context — Range (flip-flop vs list), comma lists, `reverse` /
 /// `sort` / `map` / `grep` calls, array/hash variables and derefs, `@{...}`, etc. Shared
 /// block-bytecode regions compile the tail in scalar context for grep/sort, so map VM paths
-/// consult this predicate to decide whether to reuse the region or fall back to the tree
-/// walker's list-tail [`Interpreter::exec_block_with_tail`](crate::interpreter::Interpreter::exec_block_with_tail).
+/// consult this predicate to decide whether to reuse the shared region or emit a
+/// list-tail [`Interpreter::exec_block_with_tail`](crate::interpreter::Interpreter::exec_block_with_tail) call.
 pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     match &expr.kind {
         // Range `..` in scalar context is flip-flop, in list context is expansion.
@@ -60,7 +60,7 @@ pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
             ..
         } => expr_tail_is_list_sensitive(then_expr) || expr_tail_is_list_sensitive(else_expr),
         // ArrayVar, HashVar, slices — handled by VM's ReturnValue + List context
-        // compilation. Do NOT fall back to tree-walker for these.
+        // compilation. Do NOT allow these to trigger a compilation error.
         _ => false,
     }
 }
@@ -83,7 +83,7 @@ pub(crate) fn hash_slice_needs_slice_ops(keys: &[Expr]) -> bool {
 }
 
 /// `$r->[EXPR] //=` / `||=` / `&&=` — the bytecode fast path uses [`Op::ArrowArray`] (scalar index).
-/// Range / multi-word `qw`/list subscripts need different semantics; keep those on the tree walker.
+/// Range / multi-word `qw`/list subscripts need different semantics; not yet lowered to bytecode.
 /// `$r->[IX]` reads/writes via [`Op::ArrowArray`] only when `IX` is a **plain scalar** subscript.
 /// `..` / `qw/.../` / `(a,b)` / nested lists always go through slice ops (flattened index specs).
 pub(crate) fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) -> bool {
@@ -101,7 +101,7 @@ pub(crate) fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) ->
     }
 }
 
-/// Compilation error — triggers fallback to tree-walker.
+/// Compilation error — halts compilation with an error.
 #[derive(Debug)]
 pub enum CompileError {
     Unsupported(String),
@@ -129,7 +129,7 @@ struct ScopeLayer {
     next_scalar_slot: u8,
     /// True when compiling a subroutine body (enables slot assignment).
     use_slots: bool,
-    /// `mysync @name` — element `++`/`--`/compound assign must stay on the tree-walker (atomic RMW).
+    /// `mysync @name` — element `++`/`--`/compound assign not yet lowered to bytecode (atomic RMW).
     mysync_arrays: HashSet<String>,
     /// `mysync %name` — same as [`Self::mysync_arrays`].
     mysync_hashes: HashSet<String>,
@@ -190,8 +190,8 @@ pub struct Compiler {
     /// region. `goto` is only resolved against the top frame (matches Perl's "goto must target a
     /// label in the same lexical context" intuition).
     goto_ctx_stack: Vec<GotoCtx>,
-    /// `use strict 'vars'` — reject access to undeclared globals at compile time (mirrors the
-    /// tree-walker's `Interpreter::check_strict_*_var` runtime checks). Set via
+    /// `use strict 'vars'` — reject access to undeclared globals at compile time (mirrors
+    /// `Interpreter::check_strict_*_var` runtime checks). Set via
     /// [`Self::with_strict_vars`] before `compile_program` runs; stable throughout a single
     /// compile because `use strict` is resolved in `prepare_program_top_level` before the VM
     /// compile begins.
@@ -260,9 +260,9 @@ impl Compiler {
 
     /// Set `use strict 'vars'` at compile time. When enabled, [`compile_expr`] rejects any read
     /// or write of an undeclared global scalar / array / hash with `CompileError::Frozen` — the
-    /// same diagnostic the tree-walker emits at runtime (`Global symbol "$name" requires
+    /// same diagnostic emitted at runtime (`Global symbol "$name" requires
     /// explicit package name`). `try_vm_execute` pulls the flag from `Interpreter::strict_vars`
-    /// before constructing the compiler, matching the timing of the tree path's
+    /// before constructing the compiler, matching the timing of
     /// `prepare_program_top_level` (which processes `use strict` before main body execution).
     pub fn with_strict_vars(mut self, v: bool) -> Self {
         self.strict_vars = v;
@@ -277,11 +277,11 @@ impl Compiler {
     }
 
     /// Resolve all pending forward gotos and pop the scope. Returns `CompileError::Frozen` if a
-    /// `goto` targets a label that was never defined in this scope (same diagnostic the tree
-    /// interpreter returns at runtime: `goto: unknown label NAME`). Returns `Unsupported` if a
+    /// `goto` targets a label that was never defined in this scope (same diagnostic as
+    /// runtime: `goto: unknown label NAME`). Returns `Unsupported` if a
     /// `goto` crosses a frame boundary (e.g. from inside an `if` body out to an outer label) —
-    /// crossing frames would skip `PopFrame` ops and corrupt the scope stack. That case falls
-    /// back to the tree interpreter for now.
+    /// crossing frames would skip `PopFrame` ops and corrupt the scope stack. That case is
+    /// not yet lowered to bytecode.
     fn exit_goto_scope(&mut self) -> Result<(), CompileError> {
         let ctx = self
             .goto_ctx_stack
@@ -695,8 +695,8 @@ impl Compiler {
     /// `use strict 'vars'` check for a scalar `$name`. Mirrors [`Interpreter::check_strict_scalar_var`]:
     /// ok if strict is off, the name contains `::` (package-qualified), the name is a Perl special
     /// scalar, or the name is declared via `my`/`our` in any enclosing compiler scope layer.
-    /// Otherwise errors with the exact tree-walker diagnostic message so the user sees the same
-    /// error whether execution goes via VM or tree fallback.
+    /// Otherwise errors with the exact diagnostic message so the user sees a consistent
+    /// error from the VM.
     fn check_strict_scalar_access(&self, name: &str, line: usize) -> Result<(), CompileError> {
         if !self.strict_vars
             || name.contains("::")
@@ -861,7 +861,7 @@ impl Compiler {
         }
     }
 
-    /// Emit an `Op::RuntimeErrorConst` that matches the tree-walker's
+    /// Emit an `Op::RuntimeErrorConst` that matches Perl's
     /// `Can't modify {array,hash} dereference in {pre,post}{increment,decrement} (++|--)` message.
     /// Used for `++@{…}`, `%{…}--`, `@$r++`, etc. — constructs that are invalid in Perl 5.
     /// Pushes `LoadUndef` afterwards so the rvalue position has a value on the stack for any
@@ -899,7 +899,7 @@ impl Compiler {
         Ok(())
     }
 
-    /// `mysync @arr` / `mysync %h` — aggregate element updates use `atomic_*_mutate` in the tree interpreter only.
+    /// `mysync @arr` / `mysync %h` — aggregate element updates use `atomic_*_mutate`, not yet lowered to bytecode.
     fn is_mysync_array(&self, array_name: &str) -> bool {
         let q = self.qualify_stash_array_name(array_name);
         self.scope_stack
@@ -965,14 +965,14 @@ impl Compiler {
             .last()
             .map(|s| matches!(s.kind, StmtKind::TryCatch { .. }))
             .unwrap_or(false);
-        // BEGIN blocks run before main (same order as [`Interpreter::execute_tree`]).
+        // BEGIN blocks run before main (same order as Perl phase blocks).
         if !self.begin_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_START), 0);
         }
         for block in &self.begin_blocks.clone() {
             self.compile_block(block)?;
         }
-        // Perl: `${^GLOBAL_PHASE}` stays **`START`** during UNITCHECK blocks (see `execute_tree`).
+        // Perl: `${^GLOBAL_PHASE}` stays **`START`** during UNITCHECK blocks.
         let unit_check_rev: Vec<Block> = self.unit_check_blocks.iter().rev().cloned().collect();
         for block in unit_check_rev {
             self.compile_block(&block)?;
@@ -992,6 +992,8 @@ impl Compiler {
             self.compile_block(&block)?;
         }
         self.chunk.emit(Op::SetGlobalPhase(GP_RUN), 0);
+        // Record where the main body starts — used by `-n`/`-p` to re-execute only the body per line.
+        self.chunk.body_start_ip = self.chunk.ops.len();
 
         // Top-level `goto LABEL` scope: labels defined on main-program statements are targetable
         // from `goto` statements in the same main program. Pushed before the main loop and
@@ -1081,7 +1083,7 @@ impl Compiler {
         // Resolve all forward `goto LABEL` against labels recorded in the main scope.
         self.exit_goto_scope()?;
 
-        // END blocks run after main, before halt (same order as [`Interpreter::execute_tree`]).
+        // END blocks run after main, before halt (same order as Perl phase blocks).
         if !self.end_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_END), 0);
         }
@@ -1422,7 +1424,7 @@ impl Compiler {
                             if let Some(ref ty) = decl.type_annotation {
                                 let ty_byte = ty.as_byte().ok_or_else(|| {
                                     CompileError::Unsupported(format!(
-                                        "typed my with struct type `{}` (use tree-walker)",
+                                        "typed my with struct type `{}`",
                                         ty.display_name()
                                     ))
                                 })?;
@@ -1481,7 +1483,7 @@ impl Compiler {
                             if let Some(ref ty) = decl.type_annotation {
                                 let ty_byte = ty.as_byte().ok_or_else(|| {
                                     CompileError::Unsupported(format!(
-                                        "typed my with struct type `{}` (use tree-walker)",
+                                        "typed my with struct type `{}`",
                                         ty.display_name()
                                     ))
                                 })?;
@@ -1528,7 +1530,7 @@ impl Compiler {
                     }
                     Sigil::Typeglob => {
                         return Err(CompileError::Unsupported(
-                            "my/our *GLOB (use tree interpreter)".into(),
+                            "my/our *GLOB".into(),
                         ));
                     }
                 }
@@ -1577,7 +1579,7 @@ impl Compiler {
                 }
                 Sigil::Typeglob => {
                     return Err(CompileError::Unsupported(
-                        "state *GLOB (use tree interpreter)".into(),
+                        "state *GLOB".into(),
                     ));
                 }
             }
@@ -1618,7 +1620,7 @@ impl Compiler {
                     }
                     Sigil::Typeglob => {
                         return Err(CompileError::Unsupported(
-                            "local (*a,*b,...) with list initializer and typeglob (use tree interpreter)"
+                            "local (*a,*b,...) with list initializer and typeglob"
                                 .into(),
                         ));
                     }
@@ -1660,7 +1662,7 @@ impl Compiler {
                         if let Some(init) = &decl.initializer {
                             let ExprKind::Typeglob(rhs) = &init.kind else {
                                 return Err(CompileError::Unsupported(
-                                    "local *GLOB = non-typeglob (use tree interpreter)".into(),
+                                    "local *GLOB = non-typeglob".into(),
                                 ));
                             };
                             let rhs_idx = self.chunk.intern_name(rhs);
@@ -1774,7 +1776,7 @@ impl Compiler {
                 if let Some(init) = initializer {
                     let ExprKind::Typeglob(rhs) = &init.kind else {
                         return Err(CompileError::Unsupported(
-                            "local *GLOB = non-typeglob (use tree interpreter)".into(),
+                            "local *GLOB = non-typeglob".into(),
                         ));
                     };
                     let rhs_idx = self.chunk.intern_name(rhs);
@@ -1793,7 +1795,7 @@ impl Compiler {
                 if let Some(init) = initializer {
                     let ExprKind::Typeglob(rhs) = &init.kind else {
                         return Err(CompileError::Unsupported(
-                            "local *GLOB = non-typeglob (use tree interpreter)".into(),
+                            "local *GLOB = non-typeglob".into(),
                         ));
                     };
                     let rhs_idx = self.chunk.intern_name(rhs);
@@ -1810,7 +1812,7 @@ impl Compiler {
                 if let Some(init) = initializer {
                     let ExprKind::Typeglob(rhs) = &init.kind else {
                         return Err(CompileError::Unsupported(
-                            "local *GLOB = non-typeglob (use tree interpreter)".into(),
+                            "local *GLOB = non-typeglob".into(),
                         ));
                     };
                     let rhs_idx = self.chunk.intern_name(rhs);
@@ -1856,7 +1858,7 @@ impl Compiler {
                 Ok(())
             }
             _ => Err(CompileError::Unsupported(
-                "local on this lvalue (use tree interpreter)".into(),
+                "local on this lvalue".into(),
             )),
         }
     }
@@ -2214,29 +2216,23 @@ impl Compiler {
             }
             StmtKind::Continue(block) => {
                 // A bare `continue { ... }` statement (no attached loop) is a parser edge case:
-                // the tree interpreter just runs the block (`Interpreter::exec_block_smart`).
-                // Match that in the VM path so the fallback is unneeded.
+                // Perl just runs the block (`Interpreter::exec_block_smart`).
+                // Match that in the VM path.
                 for stmt in block {
                     self.compile_statement(stmt)?;
                 }
             }
             StmtKind::Return(val) => {
                 if let Some(expr) = val {
-                    // `return EXPR` must pick up the caller's wantarray context so
-                    // `return 1..$n` flattens in list callers and flip-flops in scalar callers.
-                    // The VM can't runtime-thread that context through `compile_expr`, so any
-                    // `return` whose expression could behave differently in list vs scalar
-                    // context (Range / flip-flop today) falls back to the tree walker which
-                    // evaluates via `self.wantarray_kind`.
-                    if matches!(expr.kind, ExprKind::Range { .. })
-                        || expr_tail_is_list_sensitive(expr)
-                    {
-                        return Err(CompileError::Unsupported(
-                            "return of list/range needs caller-context dispatch (tree interpreter)"
-                                .into(),
-                        ));
+                    // `return 1..$n` must expand the range (list context), not produce a
+                    // scalar flip-flop. Other list-sensitive expressions (List, slices, etc.)
+                    // use default context — scalar callers get the last element via Perl
+                    // comma-operator semantics.
+                    if matches!(expr.kind, ExprKind::Range { .. }) {
+                        self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                    } else {
+                        self.compile_expr(expr)?;
                     }
-                    self.compile_expr(expr)?;
                     self.chunk.emit(Op::ReturnValue, line);
                 } else {
                     self.chunk.emit(Op::Return, line);
@@ -2270,14 +2266,14 @@ impl Compiler {
                                 label.as_deref().unwrap_or("")
                             )
                         } else {
-                            "last/next outside any loop (tree interpreter)".into()
+                            "last/next outside any loop".into()
                         })
                     })?
                 };
                 // Cross-try-frame flow control is not modeled in bytecode.
                 if self.try_depth != entry_try_depth {
                     return Err(CompileError::Unsupported(
-                        "last/next across try { } frame (tree interpreter)".into(),
+                        "last/next across try { } frame".into(),
                     ));
                 }
                 // Tear down any scope frames pushed since the loop was entered.
@@ -2318,13 +2314,13 @@ impl Compiler {
                                 label.as_deref().unwrap_or("")
                             )
                         } else {
-                            "redo outside any loop (tree interpreter)".into()
+                            "redo outside any loop".into()
                         })
                     })?
                 };
                 if self.try_depth != entry_try_depth {
                     return Err(CompileError::Unsupported(
-                        "redo across try { } frame (tree interpreter)".into(),
+                        "redo across try { } frame".into(),
                     ));
                 }
                 let frames_to_pop = self.frame_depth.saturating_sub(entry_frame_depth);
@@ -2709,12 +2705,6 @@ impl Compiler {
                 }
             }
             StmtKind::Expression(expr) => {
-                if expr_tail_is_list_sensitive(expr) {
-                    return Err(CompileError::Unsupported(
-                        "implicit return of list-sensitive expr needs caller-context dispatch"
-                            .into(),
-                    ));
-                }
                 for stmt in &body[..last_idx] {
                     self.compile_statement(stmt)?;
                 }
@@ -2818,7 +2808,7 @@ impl Compiler {
             ExprKind::Bareword(name) => {
                 // `BAREWORD` as an rvalue: run-time lookup via `Op::BarewordRvalue` — if a sub
                 // with this name exists at run time, call it nullary; otherwise push the name
-                // as a string. Mirrors the tree-walker's `ExprKind::Bareword` eval path.
+                // as a string. Mirrors Perl's `ExprKind::Bareword` eval path.
                 let idx = self.chunk.intern_name(name);
                 self.emit_op(Op::BarewordRvalue(idx), line, Some(root));
             }
@@ -3075,7 +3065,7 @@ impl Compiler {
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
                         if self.is_mysync_array(array) {
                             return Err(CompileError::Unsupported(
-                                "mysync array element update (tree interpreter)".into(),
+                                "mysync array element update".into(),
                             ));
                         }
                         let q = self.qualify_stash_array_name(array);
@@ -3092,7 +3082,7 @@ impl Compiler {
                     } else if let ExprKind::ArraySlice { array, indices } = &expr.kind {
                         if self.is_mysync_array(array) {
                             return Err(CompileError::Unsupported(
-                                "mysync array element update (tree interpreter)".into(),
+                                "mysync array element update".into(),
                             ));
                         }
                         self.check_strict_array_access(array, line)?;
@@ -3110,7 +3100,7 @@ impl Compiler {
                     } else if let ExprKind::HashElement { hash, key } = &expr.kind {
                         if self.is_mysync_hash(hash) {
                             return Err(CompileError::Unsupported(
-                                "mysync hash element update (tree interpreter)".into(),
+                                "mysync hash element update".into(),
                             ));
                         }
                         self.check_hash_mutable(hash, line)?;
@@ -3126,7 +3116,7 @@ impl Compiler {
                     } else if let ExprKind::HashSlice { hash, keys } = &expr.kind {
                         if self.is_mysync_hash(hash) {
                             return Err(CompileError::Unsupported(
-                                "mysync hash element update (tree interpreter)".into(),
+                                "mysync hash element update".into(),
                             ));
                         }
                         self.check_hash_mutable(hash, line)?;
@@ -3210,7 +3200,7 @@ impl Compiler {
                         self.emit_op(Op::SetArrowHashKeep, line, Some(root));
                     } else if let ExprKind::HashSliceDeref { container, keys } = &expr.kind {
                         if hash_slice_needs_slice_ops(keys) {
-                            // Multi-key: matches tree-walker's generic PreIncrement fallback
+                            // Multi-key: matches generic PreIncrement fallback
                             // (list → int → ±1 → slice assign). Dedicated op in VM delegates to
                             // Interpreter::hash_slice_deref_inc_dec.
                             self.compile_expr(container)?;
@@ -3251,8 +3241,8 @@ impl Compiler {
                         self.emit_op(Op::SetSymbolicScalarRefKeep, line, Some(root));
                     } else if let ExprKind::Deref { kind, .. } = &expr.kind {
                         // `++@{…}` / `++%{…}` (and `++@$r` / `++%$r`) are invalid in Perl 5.
-                        // Emit a runtime error directly so `try_vm_execute` doesn't fall back to
-                        // the tree interpreter just to produce the same error.
+                        // Emit a runtime error directly so the VM produces the same error
+                        // Perl would.
                         self.emit_aggregate_symbolic_inc_dec_error(*kind, true, true, line, root)?;
                     } else {
                         return Err(CompileError::Unsupported("PreInc on non-scalar".into()));
@@ -3266,7 +3256,7 @@ impl Compiler {
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
                         if self.is_mysync_array(array) {
                             return Err(CompileError::Unsupported(
-                                "mysync array element update (tree interpreter)".into(),
+                                "mysync array element update".into(),
                             ));
                         }
                         let q = self.qualify_stash_array_name(array);
@@ -3283,7 +3273,7 @@ impl Compiler {
                     } else if let ExprKind::ArraySlice { array, indices } = &expr.kind {
                         if self.is_mysync_array(array) {
                             return Err(CompileError::Unsupported(
-                                "mysync array element update (tree interpreter)".into(),
+                                "mysync array element update".into(),
                             ));
                         }
                         self.check_strict_array_access(array, line)?;
@@ -3301,7 +3291,7 @@ impl Compiler {
                     } else if let ExprKind::HashElement { hash, key } = &expr.kind {
                         if self.is_mysync_hash(hash) {
                             return Err(CompileError::Unsupported(
-                                "mysync hash element update (tree interpreter)".into(),
+                                "mysync hash element update".into(),
                             ));
                         }
                         self.check_hash_mutable(hash, line)?;
@@ -3317,7 +3307,7 @@ impl Compiler {
                     } else if let ExprKind::HashSlice { hash, keys } = &expr.kind {
                         if self.is_mysync_hash(hash) {
                             return Err(CompileError::Unsupported(
-                                "mysync hash element update (tree interpreter)".into(),
+                                "mysync hash element update".into(),
                             ));
                         }
                         self.check_hash_mutable(hash, line)?;
@@ -3481,7 +3471,7 @@ impl Compiler {
                 } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
                     if self.is_mysync_array(array) {
                         return Err(CompileError::Unsupported(
-                            "mysync array element update (tree interpreter)".into(),
+                            "mysync array element update".into(),
                         ));
                     }
                     let q = self.qualify_stash_array_name(array);
@@ -3505,7 +3495,7 @@ impl Compiler {
                 } else if let ExprKind::ArraySlice { array, indices } = &expr.kind {
                     if self.is_mysync_array(array) {
                         return Err(CompileError::Unsupported(
-                            "mysync array element update (tree interpreter)".into(),
+                            "mysync array element update".into(),
                         ));
                     }
                     self.check_strict_array_access(array, line)?;
@@ -3527,7 +3517,7 @@ impl Compiler {
                 } else if let ExprKind::HashElement { hash, key } = &expr.kind {
                     if self.is_mysync_hash(hash) {
                         return Err(CompileError::Unsupported(
-                            "mysync hash element update (tree interpreter)".into(),
+                            "mysync hash element update".into(),
                         ));
                     }
                     self.check_hash_mutable(hash, line)?;
@@ -3550,7 +3540,7 @@ impl Compiler {
                 } else if let ExprKind::HashSlice { hash, keys } = &expr.kind {
                     if self.is_mysync_hash(hash) {
                         return Err(CompileError::Unsupported(
-                            "mysync hash element update (tree interpreter)".into(),
+                            "mysync hash element update".into(),
                         ));
                     }
                     self.check_hash_mutable(hash, line)?;
@@ -3663,7 +3653,7 @@ impl Compiler {
                     self.emit_op(Op::ArrowHashPostfix(b), line, Some(root));
                 } else if let ExprKind::HashSliceDeref { container, keys } = &expr.kind {
                     if hash_slice_needs_slice_ops(keys) {
-                        // Multi-key postfix ++/--: matches tree-walker's generic PostfixOp fallback
+                        // Multi-key postfix ++/--: matches generic PostfixOp fallback
                         // (reads slice list, assigns scalar back, returns old list).
                         let kind_byte: u8 = match op {
                             PostfixOp::Increment => 2,
@@ -3957,7 +3947,7 @@ impl Compiler {
                 } else if let ExprKind::ArrayElement { array, index } = &target.kind {
                     if self.is_mysync_array(array) {
                         return Err(CompileError::Unsupported(
-                            "mysync array element update (tree interpreter)".into(),
+                            "mysync array element update".into(),
                         ));
                     }
                     let q = self.qualify_stash_array_name(array);
@@ -4006,7 +3996,7 @@ impl Compiler {
                 } else if let ExprKind::HashElement { hash, key } = &target.kind {
                     if self.is_mysync_hash(hash) {
                         return Err(CompileError::Unsupported(
-                            "mysync hash element update (tree interpreter)".into(),
+                            "mysync hash element update".into(),
                         ));
                     }
                     self.check_hash_mutable(hash, line)?;
@@ -4376,7 +4366,7 @@ impl Compiler {
                     if keys.is_empty() {
                         if self.is_mysync_hash(hash) {
                             return Err(CompileError::Unsupported(
-                                "mysync hash slice update (tree interpreter)".into(),
+                                "mysync hash slice update".into(),
                             ));
                         }
                         self.check_strict_hash_access(hash, line)?;
@@ -4392,7 +4382,7 @@ impl Compiler {
                     }
                     if self.is_mysync_hash(hash) {
                         return Err(CompileError::Unsupported(
-                            "mysync hash slice update (tree interpreter)".into(),
+                            "mysync hash slice update".into(),
                         ));
                     }
                     self.check_strict_hash_access(hash, line)?;
@@ -4490,7 +4480,7 @@ impl Compiler {
                     if indices.is_empty() {
                         if self.is_mysync_array(array) {
                             return Err(CompileError::Unsupported(
-                                "mysync array slice update (tree interpreter)".into(),
+                                "mysync array slice update".into(),
                             ));
                         }
                         let q = self.qualify_stash_array_name(array);
@@ -4521,7 +4511,7 @@ impl Compiler {
                     }
                     if self.is_mysync_array(array) {
                         return Err(CompileError::Unsupported(
-                            "mysync array slice update (tree interpreter)".into(),
+                            "mysync array slice update".into(),
                         ));
                     }
                     let q = self.qualify_stash_array_name(array);
@@ -4906,14 +4896,11 @@ impl Compiler {
                 // pipeline runs staged ops; any other value is materialized as an array
                 // (`|> … |> collect()`).
                 "collect" => {
-                    if args.len() != 1 {
-                        return Err(CompileError::Unsupported(
-                            "collect() expects exactly one argument".into(),
-                        ));
+                    for arg in args {
+                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
-                    self.compile_expr_ctx(&args[0], WantarrayCtx::List)?;
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
-                    self.emit_op(Op::Call(name_idx, 1, ctx.as_byte()), line, Some(root));
+                    self.emit_op(Op::Call(name_idx, args.len() as u8, ctx.as_byte()), line, Some(root));
                 }
                 "ppool" => {
                     if args.len() != 1 {
@@ -7302,9 +7289,9 @@ impl Compiler {
             | ExprKind::GenBlock { .. }
             | ExprKind::Yield(_)
             | ExprKind::Spinner { .. } => {
-                return Err(CompileError::Unsupported(
-                    "retry/rate_limit/every/gen/yield (tree interpreter only)".into(),
-                ));
+                let idx = self.chunk.ast_eval_exprs.len() as u16;
+                self.chunk.ast_eval_exprs.push(root.clone());
+                self.emit_op(Op::EvalAstExpr(idx), line, Some(root));
             }
             ExprKind::MyExpr { keyword, decls } => {
                 // `my $x = EXPR` in expression context (e.g. `while (my $line = <$fh>)`)
@@ -7429,7 +7416,7 @@ impl Compiler {
                 if indices.is_empty() {
                     if self.is_mysync_array(array) {
                         return Err(CompileError::Unsupported(
-                            "mysync array slice assign (tree interpreter)".into(),
+                            "mysync array slice assign".into(),
                         ));
                     }
                     self.check_strict_array_access(array, line)?;
@@ -7444,7 +7431,7 @@ impl Compiler {
                 }
                 if self.is_mysync_array(array) {
                     return Err(CompileError::Unsupported(
-                        "mysync array slice assign (tree interpreter)".into(),
+                        "mysync array slice assign".into(),
                     ));
                 }
                 self.check_strict_array_access(array, line)?;
@@ -7485,7 +7472,7 @@ impl Compiler {
                 if keys.is_empty() {
                     if self.is_mysync_hash(hash) {
                         return Err(CompileError::Unsupported(
-                            "mysync hash slice assign (tree interpreter)".into(),
+                            "mysync hash slice assign".into(),
                         ));
                     }
                     self.check_strict_hash_access(hash, line)?;
@@ -7499,7 +7486,7 @@ impl Compiler {
                 }
                 if self.is_mysync_hash(hash) {
                     return Err(CompileError::Unsupported(
-                        "mysync hash slice assign (tree interpreter)".into(),
+                        "mysync hash slice assign".into(),
                     ));
                 }
                 self.check_strict_hash_access(hash, line)?;
@@ -7655,7 +7642,7 @@ impl Compiler {
                 ..
             } => {
                 return Err(CompileError::Unsupported(
-                    "Assign to arrow call deref (tree interpreter)".into(),
+                    "Assign to arrow call deref".into(),
                 ));
             }
             ExprKind::HashSliceDeref { container, keys } => {

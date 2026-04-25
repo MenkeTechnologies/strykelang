@@ -2029,6 +2029,7 @@ pub(crate) fn segment_blocks_subroutine_linear_jit(
         | Op::JumpIfTrueKeep(_)
         | Op::JumpIfDefinedKeep(_)
         | Op::Halt
+        | Op::EvalAstExpr(_)
         | Op::Return
         | Op::ReturnValue
         | Op::BindSubClosure(_)
