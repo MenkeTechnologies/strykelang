@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Strong primes
 
-fn my_is_prime($n) {
+fn Rosetta::IsPrime::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -20,32 +20,32 @@ fn my_is_prime($n) {
     }
 }
 
-fn my_prev_prime($n) {
+fn Rosetta::PrevPrime::prev_prime($n) {
     my $p = $n - 1
     while ($p > 1) {
-        if (my_is_prime($p)) { return $p }
+        if (Rosetta::IsPrime::is_prime($p)) { return $p }
         $p--
     }
     0
 }
 
-fn my_next_prime($n) {
+fn Rosetta::NextPrime::next_prime($n) {
     my $p = $n + 1
     while (1) {
-        if (my_is_prime($p)) { return $p }
+        if (Rosetta::IsPrime::is_prime($p)) { return $p }
         $p++
     }
 }
 
 fn is_strong_prime($n) {
-    if (!my_is_prime($n)) {
+    if (!Rosetta::IsPrime::is_prime($n)) {
         0
     } else {
-        my $prev = my_prev_prime($n)
+        my $prev = Rosetta::PrevPrime::prev_prime($n)
         if ($prev == 0) {
             0
         } else {
-            my $next = my_next_prime($n)
+            my $next = Rosetta::NextPrime::next_prime($n)
             $n * 2 > $prev + $next
         }
     }

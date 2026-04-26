@@ -1,14 +1,17 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Remove Vowels
+# Rosetta Code: Remove vowels
 
-fn my_remove_vowels {
-    my $s = $_[0]
-    ~> $s s/[aeiouAEIOU]//gr
+fn Rosetta::RemoveVowels::remove_vowels($str) {
+    my $modified_str = $str;
+    $modified_str =~ tr/aeiouAEIOU//d;
+    return $modified_str;
 }
 
-assert_eq my_remove_vowels("Hello World"), "Hll Wrld", "remove from hello world"
-assert_eq my_remove_vowels("Stryke Language"), "Stryk Lngg", "remove from stryke"
-assert_eq my_remove_vowels("AEIOU"), "", "only vowels"
-assert_eq my_remove_vowels("bcd"), "bcd", "no vowels"
+assert_eq Rosetta::RemoveVowels::remove_vowels("Hello World"), "Hll Wrld", "remove from hello world"
+assert_eq Rosetta::RemoveVowels::remove_vowels("Stryke Language"), "Stryk Lngg", "remove from stryke"
+assert_eq Rosetta::RemoveVowels::remove_vowels("AEIOU"), "", "only vowels"
+assert_eq Rosetta::RemoveVowels::remove_vowels("bcd"), "bcd", "no vowels"
+
+"madam" |> Rosetta::RemoveVowels::remove_vowels |> assert_eq("mdm", "pipe remove vowels")
 
 test_run

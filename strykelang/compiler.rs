@@ -2217,14 +2217,16 @@ impl Compiler {
             }
             StmtKind::Return(val) => {
                 if let Some(expr) = val {
-                    // `return 1..$n` must expand the range (list context), not produce a
-                    // scalar flip-flop. Other list-sensitive expressions (List, slices, etc.)
-                    // use default context — scalar callers get the last element via Perl
-                    // comma-operator semantics.
-                    if matches!(expr.kind, ExprKind::Range { .. }) {
-                        self.compile_expr_ctx(expr, WantarrayCtx::List)?;
-                    } else {
-                        self.compile_expr(expr)?;
+                    // Compile in List context for expressions that need it to return
+                    // their contents (arrays, ranges), but use default for others so
+                    // that `return (1, 2, 3)` in scalar context gives last element.
+                    match &expr.kind {
+                        ExprKind::Range { .. } | ExprKind::ArrayVar(_) => {
+                            self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                        }
+                        _ => {
+                            self.compile_expr(expr)?;
+                        }
                     }
                     self.chunk.emit(Op::ReturnValue, line);
                 } else {

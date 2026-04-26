@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Repunit primes
 
-fn my_is_prime($n) {
+fn Rosetta::Repunit::isPrime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -20,7 +20,7 @@ fn my_is_prime($n) {
     }
 }
 
-fn repunit($n) {
+fn Rosetta::Repunit::repunit($n) {
     my $r = 0
     my $i = 0
     while ($i < $n) {
@@ -31,11 +31,11 @@ fn repunit($n) {
 }
 
 fn is_repunit_prime($n) {
-    if (!my_is_prime($n)) {
+    if (!Rosetta::Repunit::isPrime($n)) {
         0
     } else {
-        my $r = repunit($n)
-        my_is_prime($r)
+        my $r = Rosetta::Repunit::repunit($n)
+        Rosetta::Repunit::isPrime($r)
     }
 }
 
@@ -43,6 +43,6 @@ assert_ok is_repunit_prime(2), "R2 = 11 is prime"
 assert_ok !is_repunit_prime(3), "R3 = 111 is not (3*37)"
 assert_ok !is_repunit_prime(5), "R5 = 11111 is not (41*271)"
 
-2 |> is_repunit_prime |> assert_ok("pipe repunit prime")
+2 |> is_repunit_prime |> assert_ok("pipe Rosetta::Repunit::repunit prime")
 
 test_run

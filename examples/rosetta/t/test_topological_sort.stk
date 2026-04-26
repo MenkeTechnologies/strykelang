@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Topological sort
 
-fn my_topological_sort($graph) {
+fn Rosetta::TopologicalSort::topological_sort($graph) {
     my $in_degree = {}
     my @nodes = keys %$graph
     for my $u (@nodes) {
@@ -43,7 +43,7 @@ my $graph = {
     "F" => []
 }
 
-my $res = my_topological_sort($graph)
+my $res = Rosetta::TopologicalSort::topological_sort($graph)
 assert_ok defined($res), "Topological sort exists"
 
 # Verify order

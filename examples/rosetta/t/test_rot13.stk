@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Rot-13
 
-fn my_rot13($s) {
+fn Rosetta::Rot13::rot13($s) {
     ~> $s >{split //, $_} map {
         $_ =~ /[A-Ma-m]/ ? chr(ord($_) + 13)
       : $_ =~ /[N-Zn-z]/ ? chr(ord($_) - 13)
@@ -9,15 +9,15 @@ fn my_rot13($s) {
     } |> join ""
 }
 
-assert_eq my_rot13("Hello"), "Uryyb", "rot13 Hello"
-assert_eq my_rot13("Uryyb"), "Hello", "rot13 Uryyb"
-assert_eq my_rot13("The Quick Brown Fox"), "Gur Dhvpx Oebja Sbk", "rot13 sentence"
-assert_eq my_rot13("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"), "NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm", "full alphabet"
+assert_eq Rosetta::Rot13::rot13("Hello"), "Uryyb", "rot13 Hello"
+assert_eq Rosetta::Rot13::rot13("Uryyb"), "Hello", "rot13 Uryyb"
+assert_eq Rosetta::Rot13::rot13("The Quick Brown Fox"), "Gur Dhvpx Oebja Sbk", "rot13 sentence"
+assert_eq Rosetta::Rot13::rot13("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"), "NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm", "full alphabet"
 
-assert_eq my_rot13("123!@#"), "123!@#", "non-alpha unchanged"
-assert_eq my_rot13(""), "", "empty string"
+assert_eq Rosetta::Rot13::rot13("123!@#"), "123!@#", "non-alpha unchanged"
+assert_eq Rosetta::Rot13::rot13(""), "", "empty string"
 
 my $original = "Why did the chicken cross the road?"
-assert_eq my_rot13(my_rot13($original)), $original, "rot13 is self-inverse"
+assert_eq Rosetta::Rot13::rot13(Rosetta::Rot13::rot13($original)), $original, "rot13 is self-inverse"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: URL Encoding/Decoding (Manual)
 
-fn my_url_encode($str) {
+fn Rosetta::UrlEncode::url_encode($str) {
     my @chars = $str |> chars
     my $res = ""
     for my $c (@chars) {
@@ -14,7 +14,7 @@ fn my_url_encode($str) {
     $res
 }
 
-fn my_url_decode($str) {
+fn Rosetta::UrlDecode::url_decode($str) {
     my $res = ""
     my $i = 0
     my $len = length($str)
@@ -33,10 +33,10 @@ fn my_url_decode($str) {
 }
 
 my $input = "http://rosettacode.org/wiki/URL_encoding"
-my $encoded = my_url_encode($input)
+my $encoded = Rosetta::UrlEncode::url_encode($input)
 assert_eq $encoded, "http%3A%2F%2Frosettacode.org%2Fwiki%2FURL_encoding", "manual url encode"
 
-my $decoded = my_url_decode($encoded)
+my $decoded = Rosetta::UrlDecode::url_decode($encoded)
 assert_eq $decoded, $input, "manual url decode"
 
 test_run

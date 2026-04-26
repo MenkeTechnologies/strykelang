@@ -16,14 +16,14 @@ fn is_valid($grid, $r, $c, $v) {
     1
 }
 
-fn my_solve($grid) {
+fn Rosetta::Solve::solve($grid) {
     for my $r (0..3) {
         for my $c (0..3) {
             if ($grid->[$r]->[$c] == 0) {
                 for my $v (1..4) {
                     if (is_valid($grid, $r, $c, $v)) {
                         $grid->[$r]->[$c] = $v
-                        if (my_solve($grid)) { return 1 }
+                        if (Rosetta::Solve::solve($grid)) { return 1 }
                         $grid->[$r]->[$c] = 0
                     }
                 }
@@ -43,7 +43,7 @@ fn get_test_grids {
 my @grids = get_test_grids()
 my $grid = $grids[0]
 
-if (my_solve($grid)) {
+if (Rosetta::Solve::solve($grid)) {
     my $ok = 1
     for my $i (0..3) {
         my %row; my %col

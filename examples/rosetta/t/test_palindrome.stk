@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Palindrome detection
 
-fn my_is_palindrome($s) {
+fn Rosetta::IsPalindrome::is_palindrome($s) {
     my $clean = ~> $s lc s/[^a-z0-9]//gr
     my $rev = ~> $clean >{split //, $_} rev |> join ""
     $clean eq $rev
 }
 
-assert_ok my_is_palindrome("racecar"), "racecar is palindrome"
-assert_ok my_is_palindrome("A man, a plan, a canal: Panama"), "Panama palindrome"
-assert_ok !my_is_palindrome("hello"), "hello is not palindrome"
+assert_ok Rosetta::IsPalindrome::is_palindrome("racecar"), "racecar is palindrome"
+assert_ok Rosetta::IsPalindrome::is_palindrome("A man, a plan, a canal: Panama"), "Panama palindrome"
+assert_ok !Rosetta::IsPalindrome::is_palindrome("hello"), "hello is not palindrome"
 
-"madam" |> my_is_palindrome |> assert_ok("madam is palindrome")
+"madam" |> Rosetta::IsPalindrome::is_palindrome |> assert_ok("madam is palindrome")
 
 test_run

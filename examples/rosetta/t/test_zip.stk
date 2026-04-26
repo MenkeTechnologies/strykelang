@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Zip
 
-fn my_zip($l1, $l2) {
+fn Rosetta::Zip::zip($l1, $l2) {
     my @res
     my $len = scalar(@$l1)
     my $len2 = scalar(@$l2)
@@ -15,7 +15,7 @@ fn my_zip($l1, $l2) {
 
 my @a = (1, 2, 3)
 my @b = ("a", "b", "c")
-my $zipped = my_zip(\@a, \@b)
+my $zipped = Rosetta::Zip::zip(\@a, \@b)
 
 assert_eq scalar(@$zipped), 3, "zipped length"
 assert_eq $zipped->[0]->[0], 1, "zipped[0][0]"
@@ -23,7 +23,7 @@ assert_eq $zipped->[0]->[1], "a", "zipped[0][1]"
 assert_eq $zipped->[2]->[1], "c", "zipped[2][1]"
 
 my @c = (4, 5)
-my $zipped2 = my_zip(\@a, \@c)
+my $zipped2 = Rosetta::Zip::zip(\@a, \@c)
 assert_eq scalar(@$zipped2), 2, "zipped uneven length"
 
 test_run

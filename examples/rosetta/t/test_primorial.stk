@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Primorial numbers
 
-fn my_is_prime($n) {
+fn Rosetta::IsPrime::is_prime($n) {
     if ($n < 2) {
         0
     } elsif ($n == 2) {
@@ -30,7 +30,7 @@ fn primorial($n) {
         my @primes
         my $p = 2
         while (scalar(@primes) < $n) {
-            if (my_is_prime($p)) {
+            if (Rosetta::IsPrime::is_prime($p)) {
                 push @primes, $p
             }
             $p++

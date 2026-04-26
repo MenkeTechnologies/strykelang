@@ -7,7 +7,7 @@ fn dot($v1, $v2) {
     $sum
 }
 
-fn my_qr($A) {
+fn Rosetta::Qr::decompose($A) {
     my $rows = scalar(@$A)
     my $cols = scalar(@{$A->[0]})
     my @Q; my @R
@@ -48,7 +48,7 @@ fn my_qr($A) {
 }
 
 my $A = [[12, -51, 4], [6, 167, -68], [-4, 24, -41]]
-my ($Q, $R) = my_qr($A)
+my ($Q, $R) = Rosetta::Qr::decompose($A)
 
 # Check R diagonal
 assert_ok abs($R->[0]->[0] - 14.0) < 0.0001, "R[0][0] is 14"

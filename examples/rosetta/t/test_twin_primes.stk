@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Twin primes
 
-fn TwinPrimes::my_is_prime($n) {
+fn Rosetta::TwinPrimes::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -21,7 +21,7 @@ fn TwinPrimes::my_is_prime($n) {
 }
 
 fn TwinPrimes::are_twin_primes($p1, $p2) {
-    TwinPrimes::my_is_prime($p1) && TwinPrimes::my_is_prime($p2) && abs($p1 - $p2) == 2
+    Rosetta::TwinPrimes::is_prime($p1) && Rosetta::TwinPrimes::is_prime($p2) && abs($p1 - $p2) == 2
 }
 
 assert_ok TwinPrimes::are_twin_primes(3, 5), "3 and 5"

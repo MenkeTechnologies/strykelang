@@ -13,7 +13,7 @@ fn strip_both($s) {
     ~> $s s/^\s+|\s+$//gr
 }
 
-fn my_collapse_whitespace($s) {
+fn Rosetta::CollapseWhitespace::collapse_whitespace($s) {
     ~> $s s/\s+/ /gr s/^\s+|\s+$//gr
 }
 
@@ -22,8 +22,8 @@ assert_eq strip_right("hello  "), "hello", "strip right"
 assert_eq strip_both("  hello  "), "hello", "strip both"
 assert_eq strip_both("\t\nhello\t\n"), "hello", "strip tabs/newlines"
 
-assert_eq my_collapse_whitespace("  hello   world  "), "hello world", "collapse whitespace"
-assert_eq my_collapse_whitespace("a  b  c"), "a b c", "multiple spaces"
+assert_eq Rosetta::CollapseWhitespace::collapse_whitespace("  hello   world  "), "hello world", "collapse whitespace"
+assert_eq Rosetta::CollapseWhitespace::collapse_whitespace("a  b  c"), "a b c", "multiple spaces"
 
 assert_eq strip_both("hello"), "hello", "nothing to strip"
 assert_eq strip_both("   "), "", "all whitespace"

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Move-to-front transform
 
-fn mtf_encode($str) {
+fn Rosetta::MoveToFront::mtf_encode($str) {
     my @alpha = ("a" .. "z")
     my @res
     my @chars = $str |> chars
@@ -17,7 +17,7 @@ fn mtf_encode($str) {
     \@res
 }
 
-fn mtf_decode($codes_ref) {
+fn Rosetta::MoveToFront::mtf_decode($codes_ref) {
     my @alpha = ("a" .. "z")
     my @codes = @$codes_ref
     my $res = ""
@@ -31,14 +31,10 @@ fn mtf_decode($codes_ref) {
 }
 
 my $input = "brood"
-my $encoded = mtf_encode($input)
-# brood ->
-# b is 1 -> res (1), alpha (b a c d ...)
-# r is 17 -> res (1, 17), alpha (r b a c ...)
-# o is 16? no wait.
+my $encoded = Rosetta::MoveToFront::mtf_encode($input)
 assert_eq join(",", @$encoded), "1,17,15,0,5", "mtf_encode 'brood'"
 
-my $decoded = mtf_decode($encoded)
+my $decoded = Rosetta::MoveToFront::mtf_decode($encoded)
 assert_eq $decoded, $input, "mtf_decode 'brood'"
 
 test_run
