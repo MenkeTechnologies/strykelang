@@ -9289,8 +9289,7 @@ impl Interpreter {
             ExprKind::FuncCall { name, args } => {
                 // Stryke builtins are unprefixed; `CORE::name` callers route back to the
                 // bare-name dispatch so the matches below stay flat.
-                let dispatch_name: &str =
-                    name.strip_prefix("CORE::").unwrap_or(name.as_str());
+                let dispatch_name: &str = name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 // read(FH, $buf, LEN [, OFFSET]) needs special handling: $buf is an lvalue
                 if matches!(dispatch_name, "read") && args.len() >= 3 {
                     let fh_val = self.eval_expr(&args[0])?;
@@ -9383,6 +9382,11 @@ impl Interpreter {
                 } else if matches!(
                     dispatch_name,
                     "zip"
+                        | "zip_longest"
+                        | "zip_shortest"
+                        | "mesh"
+                        | "mesh_longest"
+                        | "mesh_shortest"
                 ) {
                     let mut v = Vec::with_capacity(args.len());
                     for a in args {
@@ -9404,12 +9408,7 @@ impl Interpreter {
                         | "size"
                         | "cnt"
                         | "with_index"
-
-
-
-
                         | "shuffle"
-
                         | "sum"
                         | "sum0"
                         | "product"
@@ -9422,26 +9421,10 @@ impl Interpreter {
                         | "mode"
                         | "stddev"
                         | "variance"
-
-
-
-
-
-
-
-
-
-
-
-
                         | "pairs"
                         | "unpairs"
                         | "pairkeys"
                         | "pairvalues"
-
-
-
-
                 ) {
                     // Slurpy list `(@)`: one list expr (`uniq @x`) or multiple actuals
                     // (`uniq(1, 1, 2)`). Each actual is evaluated in list context so
@@ -9455,10 +9438,7 @@ impl Interpreter {
                         }
                     }
                     list_out
-                } else if matches!(
-                    dispatch_name,
-                    "take" | "head" | "tail" | "drop"
-                ) {
+                } else if matches!(dispatch_name, "take" | "head" | "tail" | "drop") {
                     if args.is_empty() {
                         return Err(PerlError::runtime(
                             "take/head/tail/drop: need LIST..., N or unary N",
@@ -9477,10 +9457,7 @@ impl Interpreter {
                         arg_vals.push(self.eval_expr(&args[args.len() - 1])?);
                     }
                     arg_vals
-                } else if matches!(
-                    dispatch_name,
-                    "chunked" | "windowed"
-                ) {
+                } else if matches!(dispatch_name, "chunked" | "windowed") {
                     let mut list_out = Vec::new();
                     match args.len() {
                         0 => {
@@ -14052,9 +14029,9 @@ impl Interpreter {
             | "none" | "notall" | "first" | "fst" | "reduce" | "rd" | "reductions" | "sum"
             | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
             | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
-            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst"
-            | "blessed" | "refaddr" | "reftype" | "weaken" | "unweaken" | "isweak"
-            | "set_subname" | "subname" | "unicode_to_native" => {
+            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" | "blessed"
+            | "refaddr" | "reftype" | "weaken" | "unweaken" | "isweak" | "set_subname"
+            | "subname" | "unicode_to_native" => {
                 self.call_bare_list_builtin(name, args, line, want)
             }
             "deque" => {

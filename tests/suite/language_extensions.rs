@@ -173,10 +173,7 @@ fn bare_chunked_list_context_and_last_arg_is_size() {
         ),
         3
     );
-    assert_eq!(
-        eval_int(r#"scalar ((10, 20, 30) |> chunked 2)"#),
-        2
-    );
+    assert_eq!(eval_int(r#"scalar ((10, 20, 30) |> chunked 2)"#), 2);
 }
 
 #[test]
@@ -217,10 +214,7 @@ fn windowed_sliding_pairs_like_example() {
         eval_string(r#"(1, 2, 3) |> windowed 2 |> map { join ",", @$_ } |> join "-""#),
         "1,2-2,3"
     );
-    assert_eq!(
-        eval_int(r#"scalar ((5, 6, 7) |> windowed 2)"#),
-        2
-    );
+    assert_eq!(eval_int(r#"scalar ((5, 6, 7) |> windowed 2)"#), 2);
 }
 
 #[test]
@@ -403,10 +397,7 @@ fn tap_peek_pass_through_and_pipe() {
 fn list_fold_same_semantics_as_reduce_and_pipe() {
     assert_eq!(eval_int(r#"(1, 2, 3, 4) |> fold { $a + $b }"#), 10);
     assert_eq!(eval_int(r#"(1, 2, 3, 4) |> reduce { $a + $b }"#), 10);
-    assert_eq!(
-        eval_string(r#"qw(a b c) |> fold { $a . $b }"#),
-        "abc"
-    );
+    assert_eq!(eval_string(r#"qw(a b c) |> fold { $a . $b }"#), "abc");
     assert_eq!(eval_int(r#"(2, 3, 4) |> fold { $a * $b }"#), 24);
     assert_eq!(eval_int(r#"(42) |> fold { $a + $b }"#), 42);
 }

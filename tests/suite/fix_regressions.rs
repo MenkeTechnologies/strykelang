@@ -1,8 +1,8 @@
 //! Integration regressions locking in recent parity fixes: UTF-8/Latin-1 text reads, regex class
 //! edge cases and `$`/`/m`, `quotemeta`, `tell`/`sysseek`, `splice` on array refs, hash/array slices
 //! and slice `+=` (last slot only), `@INC` order for `require`, aggregate ops on refs, `split` limit,
-//! `reverse` scalar vs list, short-circuit `&&`/`||`, `eval { }`, `Sub::Util`,
-//! `utf8::unicode_to_native`, `do { }` list context, `chomp`, `CORE::tell`, string `eval`, `sprintf`,
+//! `reverse` scalar vs list, short-circuit `&&`/`||`, `eval { }`, `set_subname`/`subname`,
+//! `unicode_to_native`, `do { }` list context, `chomp`, `CORE::tell`, string `eval`, `sprintf`,
 //! `hex`/`oct`/`int`, `map`/`grep`/`sort` contexts, `//`/`//=`, bitwise ops, `for`/`last`/`next`/`until`,
 //! `unless`/`elsif`, subs and `wantarray`, list builtins, `values`, `split`, append `open`,
 //! `\\A`/`\z`, negative array indices, slice assign, postfix `if`, `tr`/`substr`, `||=`/`&&=`, `__LINE__`,
@@ -20,7 +20,7 @@
 //! `uc` edge cases, list assignment unpack, hash slices, `pack` space-padding, `qx`/`readpipe`, empty aggregates,
 //! `${^PREMATCH}`/`$&`/`$1`, `not`, postfix `if`/`unless` guards, `$"`, extra `sprintf` widths, `substr` from end,
 //! float array index / `%`, `%g`, `|=`/`&=`, unary `+`, `.=`, boolean falsity of `0`/`""`/`"0"`, `ord`/`chr`,
-//! `Scalar::Util::blessed`/`reftype`, `for` default topic after loop, `sort` by `length`, `seekdir(0)`, `-z`, `push` expr,
+//! `blessed`/`reftype`, `for` default topic after loop, `sort` by `length`, `seekdir(0)`, `-z`, `push` expr,
 //! postfix `unless`, regex `(?i)`, `\d`, captures, lookahead, `/s`/`/m`, `\A`, `\Q…\E`, `split //`, array `[0..N]`,
 //! `int` on float/string, `**` edge cases, `sprintf` `%X`/`%c`, bitwise `~`, `pack` `v`/`n` endianness,
 //! regex `(?!…)` / `+?` / `\1` / `\s`/`\w`/`\b` / `(?<=…)` / `(?:…)`, `$+`, `reduce`, `grep` boolean negation,
@@ -316,7 +316,7 @@ fn sub_util_set_subname_returns_coderef_still_invokable() {
         eval_int(
             r#"
             my $f = fn { 41 };
-            my $g = Sub::Util::set_subname("main::x", $f);
+            my $g = set_subname("main::x", $f);
             $g->() + 1;
         "#
         ),
@@ -330,7 +330,7 @@ fn sub_util_subname_alias_returns_second_arg() {
         eval_int(
             r#"
             my $f = fn { 3 };
-            my $h = Sub::Util::subname("pkg::y", $f);
+            my $h = subname("pkg::y", $f);
             $h->() + 4;
         "#
         ),
@@ -341,8 +341,8 @@ fn sub_util_subname_alias_returns_second_arg() {
 /// Native stub for core XS (`JSON::PP` BEGIN) — must exist before `utf8_heavy` loads.
 #[test]
 fn utf8_unicode_to_native_stub_returns_codepoint_as_integer() {
-    assert_eq!(eval_int(r#"utf8::unicode_to_native(0x20AC)"#), 0x20AC);
-    assert_eq!(eval_int(r#"utf8::unicode_to_native()"#), 0);
+    assert_eq!(eval_int(r#"unicode_to_native(0x20AC)"#), 0x20AC);
+    assert_eq!(eval_int(r#"unicode_to_native()"#), 0);
 }
 
 #[test]
@@ -1140,10 +1140,7 @@ fn list_util_sum_adds_numbers() {
 
 #[test]
 fn list_util_uniq_preserves_first_occurrence_order() {
-    assert_eq!(
-        eval_string(r#"join "-", uniq(1, 1, 2, 2, 3)"#),
-        "1-2-3"
-    );
+    assert_eq!(eval_string(r#"join "-", uniq(1, 1, 2, 2, 3)"#), "1-2-3");
 }
 
 #[test]
@@ -1151,7 +1148,7 @@ fn scalar_util_reftype_arrayref() {
     assert_eq!(
         eval_string(
             r#"no strict 'vars';
-            Scalar::Util::reftype([])"#
+            reftype([])"#
         ),
         "ARRAY"
     );
@@ -1162,7 +1159,7 @@ fn scalar_util_reftype_hashref() {
     assert_eq!(
         eval_string(
             r#"no strict 'vars';
-            Scalar::Util::reftype({})"#
+            reftype({})"#
         ),
         "HASH"
     );
@@ -1382,9 +1379,7 @@ fn eval_block_die_populates_at_exception() {
 #[test]
 fn list_util_max_min_product_combine() {
     assert_eq!(
-        eval_int(
-            r#"max(3, 9, 4) - min(3, 9, 4) + product(2, 3)"#
-        ),
+        eval_int(r#"max(3, 9, 4) - min(3, 9, 4) + product(2, 3)"#),
         12
     );
     assert_eq!(eval_int(r#"product(1, 2, 3, 4)"#), 24);
@@ -1559,31 +1554,16 @@ fn return_short_circuits_sub_rest() {
 
 #[test]
 fn list_util_head_and_tail_take_slice_ends() {
-    assert_eq!(
-        eval_string(r#"join "-", head(10, 20, 30, 40, 2)"#),
-        "10-20"
-    );
-    assert_eq!(
-        eval_string(r#"join "-", tail(10, 20, 30, 40, 2)"#),
-        "30-40"
-    );
-    assert_eq!(
-        eval_string(r#"scalar head(qw(a b c d), 2)"#),
-        "b"
-    );
-    assert_eq!(
-        eval_string(r#"scalar tail(qw(a b c d), 2)"#),
-        "d"
-    );
+    assert_eq!(eval_string(r#"join "-", head(10, 20, 30, 40, 2)"#), "10-20");
+    assert_eq!(eval_string(r#"join "-", tail(10, 20, 30, 40, 2)"#), "30-40");
+    assert_eq!(eval_string(r#"scalar head(qw(a b c d), 2)"#), "b");
+    assert_eq!(eval_string(r#"scalar tail(qw(a b c d), 2)"#), "d");
 }
 
 #[test]
 fn list_util_none_and_notall_predicates() {
     assert_eq!(eval_int(r#"none(fn { $_ < 0 }, 1, 2, 3)"#), 1);
-    assert_eq!(
-        eval_int(r#"notall(fn { $_ > 0 }, 1, -1, 2)"#),
-        1
-    );
+    assert_eq!(eval_int(r#"notall(fn { $_ > 0 }, 1, -1, 2)"#), 1);
 }
 
 #[test]
@@ -1719,10 +1699,7 @@ fn list_util_sum0_empty_list_is_zero() {
 
 #[test]
 fn list_util_pairkeys_pairvalues_split_pairs() {
-    assert_eq!(
-        eval_string(r#"join "-", pairkeys(1, 10, 2, 20)"#),
-        "1-2"
-    );
+    assert_eq!(eval_string(r#"join "-", pairkeys(1, 10, 2, 20)"#), "1-2");
     assert_eq!(
         eval_string(r#"join "-", pairvalues(1, 10, 2, 20)"#),
         "10-20"
@@ -1793,10 +1770,7 @@ fn substitution_global_flag_replaces_every_occurrence() {
 
 #[test]
 fn list_util_mesh_interleaves_parallel_lists() {
-    assert_eq!(
-        eval_string(r#"join "", mesh(1, 2, 10, 20)"#),
-        "121020"
-    );
+    assert_eq!(eval_string(r#"join "", mesh(1, 2, 10, 20)"#), "121020");
 }
 
 #[test]
@@ -1907,9 +1881,7 @@ fn assign_undef_makes_defined_false() {
 #[test]
 fn list_util_minstr_maxstr_lexical() {
     assert_eq!(
-        eval_string(
-            r#"join ",", minstr("dog", "cat"), maxstr("dog", "cat")"#
-        ),
+        eval_string(r#"join ",", minstr("dog", "cat"), maxstr("dog", "cat")"#),
         "cat,dog"
     );
 }
@@ -1950,14 +1922,8 @@ fn list_util_mesh_shortest_interleaves_until_shorter_exhausted() {
 
 #[test]
 fn list_util_uniqstr_and_uniqnum_dedupe() {
-    assert_eq!(
-        eval_string(r#"join "-", uniqstr("a", "a", "b")"#),
-        "a-b"
-    );
-    assert_eq!(
-        eval_string(r#"join "-", uniqnum(1.0, 1, 2)"#),
-        "1-2"
-    );
+    assert_eq!(eval_string(r#"join "-", uniqstr("a", "a", "b")"#), "a-b");
+    assert_eq!(eval_string(r#"join "-", uniqnum(1.0, 1, 2)"#), "1-2");
 }
 
 #[test]
@@ -2163,10 +2129,7 @@ fn sprintf_percent_b_and_percent_o_formats() {
 
 #[test]
 fn list_util_uniqint_deduplicates_integer_values() {
-    assert_eq!(
-        eval_string(r#"join "-", uniqint(1, 1, 2, 2, 3)"#),
-        "1-2-3"
-    );
+    assert_eq!(eval_string(r#"join "-", uniqint(1, 1, 2, 2, 3)"#), "1-2-3");
 }
 
 #[test]
@@ -2604,18 +2567,12 @@ fn ord_chr_round_trip_for_ascii_printable() {
 
 #[test]
 fn scalar_util_blessed_reports_package_for_blessed_ref() {
-    assert_eq!(
-        eval_string(r#"Scalar::Util::blessed(bless {}, "Zpkg")"#),
-        "Zpkg"
-    );
+    assert_eq!(eval_string(r#"blessed(bless {}, "Zpkg")"#), "Zpkg");
 }
 
 #[test]
 fn scalar_util_reftype_array_under_blessed_arrayref() {
-    assert_eq!(
-        eval_string(r#"Scalar::Util::reftype(bless [], "Zpkg")"#),
-        "ARRAY"
-    );
+    assert_eq!(eval_string(r#"reftype(bless [], "Zpkg")"#), "ARRAY");
 }
 
 #[test]
@@ -2905,18 +2862,12 @@ fn ref_anon_subroutine_is_code() {
 
 #[test]
 fn list_util_reduce_concatenates_list_left_to_right() {
-    assert_eq!(
-        eval_string(r#"qw(x y z) |> reduce { $a . $b }"#),
-        "xyz"
-    );
+    assert_eq!(eval_string(r#"qw(x y z) |> reduce { $a . $b }"#), "xyz");
 }
 
 #[test]
 fn list_util_fold_alias_concatenates_like_reduce() {
-    assert_eq!(
-        eval_string(r#"qw(x y z) |> fold { $a . $b }"#),
-        "xyz"
-    );
+    assert_eq!(eval_string(r#"qw(x y z) |> fold { $a . $b }"#), "xyz");
 }
 
 #[test]
@@ -5775,10 +5726,7 @@ fn defined_or_assign_leaves_defined_positive_unchanged() {
 
 #[test]
 fn list_util_all_true_under_upper_bound() {
-    assert_eq!(
-        eval_int(r#"0 + all(fn { $_ < 10 }, 1, 2, 3)"#),
-        1
-    );
+    assert_eq!(eval_int(r#"0 + all(fn { $_ < 10 }, 1, 2, 3)"#), 1);
 }
 
 #[test]

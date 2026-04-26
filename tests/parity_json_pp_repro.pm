@@ -26,7 +26,7 @@ my $invalid_char_re;
 BEGIN {
     $invalid_char_re = "[";
     for my $i (0 .. 0x01F, 0x22, 0x5c) {
-        $invalid_char_re .= quotemeta chr utf8::unicode_to_native($i);
+        $invalid_char_re .= quotemeta chr unicode_to_native($i);
     }
 
     $invalid_char_re = qr/$invalid_char_re]/;

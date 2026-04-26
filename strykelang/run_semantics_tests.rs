@@ -4653,17 +4653,17 @@ fn core_prefix_routes_to_builtin() {
 
 #[test]
 fn main_qualified_udf_call() {
-    assert_eq!(rs(r#"fn greet { "hi $_0" }; main::greet("perl")"#), "hi perl");
+    assert_eq!(
+        rs(r#"fn greet { "hi $_0" }; main::greet("perl")"#),
+        "hi perl"
+    );
 }
 
 #[test]
 fn bare_coderef_resolves_main_udf() {
     // `\&greet` must find `main::greet`. Was broken: resolve_sub_by_name
     // skipped the package fallback when `pkg == "main"`.
-    assert_eq!(
-        ri(r#"fn greet { 7 }; my $cr = \&greet; $cr->()"#),
-        7
-    );
+    assert_eq!(ri(r#"fn greet { 7 }; my $cr = \&greet; $cr->()"#), 7);
 }
 
 #[test]

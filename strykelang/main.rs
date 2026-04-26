@@ -188,6 +188,10 @@ pub(crate) struct Cli {
     #[arg(long = "compat")]
     compat: bool,
 
+    /// No Perl interop: reject Perl-isms (sub/say/reverse), force idiomatic stryke
+    #[arg(long = "no-interop")]
+    no_interop: bool,
+
     /// Force argument to be treated as a script file (skip code detection)
     #[arg(long = "script")]
     force_script: bool,
@@ -400,6 +404,9 @@ fn print_cyberpunk_help() {
     println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!(
         "  --compat               {G}//{N} Perl 5 strict-compat: disable all stryke extensions"
+    );
+    println!(
+        "  --no-interop           {G}//{N} Reject Perl-isms (sub/say/reverse), force idiomatic stryke"
     );
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
@@ -1544,9 +1551,12 @@ fn main() {
     };
     normalize_argv_after_dash_e(&mut cli);
 
-    // Set global compat-mode flag before any parsing happens.
+    // Set global mode flags before any parsing happens.
     if cli.compat {
         stryke::set_compat_mode(true);
+    }
+    if cli.no_interop {
+        stryke::set_no_interop_mode(true);
     }
 
     if cli.help {

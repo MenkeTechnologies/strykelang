@@ -1718,9 +1718,9 @@ dependencies = [
 
 [[package]]
 name = "fusevm"
-version = "0.9.7"
+version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f268ee4f7ae6fbcee3764c811484137619d189cc83e172620df91bd9cca97223"
+checksum = "0809c7addcdf6958a131b4f6b9f0f0d1f829b1d469da28096626b6cadf47f17f"
 dependencies = [
  "glob",
  "serde",
@@ -4609,7 +4609,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.9.7"
+version = "0.9.9"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -6455,9 +6455,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "661feb71a193242b0d4684833a6b02815c263ca1327d9421e334be806cc8b6cd"
+checksum = "7430bf2b8d68bce87d919af8877ca9f1865a0d8f7600454bd2ffcf7710179330"
 dependencies = [
  "atty",
  "bincode",
@@ -6467,6 +6467,7 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "dirs 5.0.1",
+ "filetime",
  "fusevm",
  "glob",
  "hostname",

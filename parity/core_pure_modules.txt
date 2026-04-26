@@ -8,9 +8,7 @@ File::Copy
 File::Spec
 File::Spec::Functions
 Getopt::Long
-List::Util
 POSIX
-Scalar::Util
 Text::ParseWords
 Text::Tabs
 Text::Wrap
