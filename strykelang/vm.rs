@@ -4724,28 +4724,11 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::RangeStep => {
-                        let step = self.pop().to_int();
-                        let to = self.pop().to_int();
-                        let from = self.pop().to_int();
-                        let arr = if step == 0 {
-                            vec![]
-                        } else if step > 0 {
-                            (from..=to)
-                                .step_by(step as usize)
-                                .map(PerlValue::integer)
-                                .collect()
-                        } else {
-                            std::iter::successors(Some(from), |&x| {
-                                let next = x + step; // step is negative
-                                if next >= to {
-                                    Some(next)
-                                } else {
-                                    None
-                                }
-                            })
-                            .map(PerlValue::integer)
-                            .collect()
-                        };
+                        let step = self.pop();
+                        let to = self.pop();
+                        let from = self.pop();
+                        let arr =
+                            crate::value::perl_list_range_expand_stepped(from, to, step);
                         self.push(PerlValue::array(arr));
                         Ok(())
                     }
