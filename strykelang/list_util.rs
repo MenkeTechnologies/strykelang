@@ -1,6 +1,5 @@
-//! Stryke list builtins — native Rust implementations of `sum`, `min`, `max`, `uniq`,
-//! `reduce`, `zip`, the `pairs` family, and friends. Every fn here is a bare-name builtin
-//! reachable via [`dispatch_by_name`]; there is no Perl module emulation layer.
+//! Perl 5 `List::Util` — core Perl ships an XS `List/Util.pm`; stryke registers native Rust
+//! implementations here so every `EXPORT_OK` name is callable and matches common Perl 5 semantics.
 
 use std::sync::Arc;
 
@@ -8,105 +7,290 @@ use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::interpreter::{ExecResult, Interpreter, WantarrayCtx};
-use crate::value::{BlessedRef, HeapObject, PerlValue};
+use crate::ast::{Block, Program};
+use crate::interpreter::{ExecResult, Interpreter, ModuleExportLists, WantarrayCtx};
+use crate::value::{BlessedRef, HeapObject, PerlSub, PerlValue};
 
-/// Dispatch a list builtin by bare name. Stryke exposes every list builtin as a
-/// bare-name builtin; callers pass the unqualified name (e.g. `"sum"`, `"reduce"`).
-pub(crate) fn dispatch_by_name(
+/// True if the program may reference `List::Util` (`use`, `require`, or qualified calls).
+/// Used to skip installing [`install_list_util`] for tiny programs (benchmark startup).
+pub fn program_needs_list_util(program: &Program) -> bool {
+    let s = format!("{program:?}");
+    s.contains("List::Util")
+        || s.contains("chunked")
+        || s.contains("windowed")
+        || s.contains("fold")
+        || s.contains("inject")
+        || s.contains("find_all")
+}
+
+/// Ensure [`install_list_util`] ran (cheap `contains_key` after the first program prepare).
+/// Deferred from [`Interpreter::new`] so tiny scripts pay less fixed startup.
+pub fn ensure_list_util(interp: &mut Interpreter) {
+    if interp.subs.contains_key("List::Util::sum") {
+        return;
+    }
+    install_list_util(interp);
+}
+
+/// `Scalar::Util` — native stubs (vendor `Scalar/Util.pm` is a no-op package header).
+/// `Sub::Util::set_subname` / `subname` — core XS in perl; [`Try::Tiny`] optional-depends on these.
+/// No-op naming: return the coderef so try/catch stack traces work without renaming closures.
+pub fn install_sub_util(interp: &mut Interpreter) {
+    if interp.subs.contains_key("Sub::Util::set_subname") {
+        return;
+    }
+    let empty: Block = vec![];
+    let export_ok: Vec<String> = SUB_UTIL_NATIVE.iter().map(|s| (*s).to_string()).collect();
+    interp.module_export_lists.insert(
+        "Sub::Util".to_string(),
+        ModuleExportLists {
+            export: vec![],
+            export_ok,
+        },
+    );
+    for name in SUB_UTIL_NATIVE {
+        let key = format!("Sub::Util::{}", name);
+        interp.subs.insert(
+            key.clone(),
+            Arc::new(PerlSub {
+                name: key,
+                params: vec![],
+                body: empty.clone(),
+                prototype: None,
+                closure_env: None,
+                fib_like: None,
+            }),
+        );
+    }
+}
+
+const SUB_UTIL_NATIVE: &[&str] = &["set_subname", "subname"];
+
+pub fn install_scalar_util(interp: &mut Interpreter) {
+    if interp.subs.contains_key("Scalar::Util::blessed") {
+        return;
+    }
+    let empty: Block = vec![];
+    let export_ok: Vec<String> = SCALAR_UTIL_NATIVE
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    interp.module_export_lists.insert(
+        "Scalar::Util".to_string(),
+        ModuleExportLists {
+            export: vec![],
+            export_ok,
+        },
+    );
+    for name in SCALAR_UTIL_NATIVE {
+        let key = format!("Scalar::Util::{}", name);
+        interp.subs.insert(
+            key.clone(),
+            Arc::new(PerlSub {
+                name: key,
+                params: vec![],
+                body: empty.clone(),
+                prototype: None,
+                closure_env: None,
+                fib_like: None,
+            }),
+        );
+    }
+}
+
+const SCALAR_UTIL_NATIVE: &[&str] = &[
+    "blessed", "refaddr", "reftype", "weaken", "unweaken", "isweak",
+];
+
+/// Insert placeholder subs (empty body) and route calls through `native_dispatch`.
+pub fn install_list_util(interp: &mut Interpreter) {
+    let empty: Block = vec![];
+    let export_ok: Vec<String> = LIST_UTIL_ROOT.iter().map(|s| (*s).to_string()).collect();
+    interp.module_export_lists.insert(
+        "List::Util".to_string(),
+        ModuleExportLists {
+            export: export_ok.clone(),
+            export_ok,
+        },
+    );
+    for name in LIST_UTIL_ROOT {
+        let key = format!("List::Util::{}", name);
+        interp.subs.insert(
+            key.clone(),
+            Arc::new(PerlSub {
+                name: key,
+                params: vec![],
+                body: empty.clone(),
+                prototype: None,
+                closure_env: None,
+                fib_like: None,
+            }),
+        );
+    }
+    for name in PAIR_METHODS {
+        let key = format!("List::Util::_Pair::{}", name);
+        interp.subs.insert(
+            key.clone(),
+            Arc::new(PerlSub {
+                name: key,
+                params: vec![],
+                body: empty.clone(),
+                prototype: None,
+                closure_env: None,
+                fib_like: None,
+            }),
+        );
+    }
+}
+
+const LIST_UTIL_ROOT: &[&str] = &[
+    "all",
+    "any",
+    "first",
+    "min",
+    "max",
+    "minstr",
+    "maxstr",
+    "mean",
+    "median",
+    "mode",
+    "none",
+    "notall",
+    "product",
+    "reduce",
+    "fold",
+    "reductions",
+    "sum",
+    "sum0",
+    "stddev",
+    "variance",
+    "sample",
+    "shuffle",
+    "uniq",
+    "uniqint",
+    "uniqnum",
+    "uniqstr",
+    "zip",
+    "zip_longest",
+    "zip_shortest",
+    "mesh",
+    "mesh_longest",
+    "mesh_shortest",
+    "chunked",
+    "windowed",
+    "head",
+    "tail",
+    "pairs",
+    "unpairs",
+    "pairkeys",
+    "pairvalues",
+    "pairmap",
+    "pairgrep",
+    "pairfirst",
+];
+
+const PAIR_METHODS: &[&str] = &["key", "value", "TO_JSON"];
+
+/// If `sub` is a native `List::Util::*` stub, run the Rust implementation.
+pub(crate) fn native_dispatch(
     interp: &mut Interpreter,
-    name: &str,
+    sub: &PerlSub,
     args: &[PerlValue],
     want: WantarrayCtx,
 ) -> Option<ExecResult> {
-    match name {
-        "uniq" => Some(dispatch_ok(uniq_with_want(args, want))),
-        "uniqstr" => Some(dispatch_ok(uniqstr_with_want(args, want))),
-        "uniqint" => Some(dispatch_ok(uniqint_with_want(args, want))),
-        "uniqnum" => Some(dispatch_ok(uniqnum_with_want(args, want))),
-        "sum" => Some(dispatch_ok(sum(args).map(|v| aggregate_wantarray(v, want)))),
-        "sum0" => Some(dispatch_ok(
+    match sub.name.as_str() {
+        "List::Util::uniq" => Some(dispatch_ok(uniq_with_want(args, want))),
+        "List::Util::uniqstr" => Some(dispatch_ok(uniqstr_with_want(args, want))),
+        "List::Util::uniqint" => Some(dispatch_ok(uniqint_with_want(args, want))),
+        "List::Util::uniqnum" => Some(dispatch_ok(uniqnum_with_want(args, want))),
+        "List::Util::sum" => Some(dispatch_ok(sum(args).map(|v| aggregate_wantarray(v, want)))),
+        "List::Util::sum0" => Some(dispatch_ok(
             sum0(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "product" => Some(dispatch_ok(
+        "List::Util::product" => Some(dispatch_ok(
             product(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "mean" => Some(dispatch_ok(
+        "List::Util::mean" => Some(dispatch_ok(
             mean(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "median" => Some(dispatch_ok(
+        "List::Util::median" => Some(dispatch_ok(
             median(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "mode" => Some(dispatch_ok(mode_with_want(args, want))),
-        "variance" => Some(dispatch_ok(
+        "List::Util::mode" => Some(dispatch_ok(mode_with_want(args, want))),
+        "List::Util::variance" => Some(dispatch_ok(
             variance(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "stddev" => Some(dispatch_ok(
+        "List::Util::stddev" => Some(dispatch_ok(
             stddev(args).map(|v| aggregate_wantarray(v, want)),
         )),
-        "min" => Some(dispatch_ok(
+        "List::Util::min" => Some(dispatch_ok(
             minmax(args, MinMax::MinNum).map(|v| aggregate_wantarray(v, want)),
         )),
-        "max" => Some(dispatch_ok(
+        "List::Util::max" => Some(dispatch_ok(
             minmax(args, MinMax::MaxNum).map(|v| aggregate_wantarray(v, want)),
         )),
-        "minstr" => Some(dispatch_ok(
+        "List::Util::minstr" => Some(dispatch_ok(
             minmax(args, MinMax::MinStr).map(|v| aggregate_wantarray(v, want)),
         )),
-        "maxstr" => Some(dispatch_ok(
+        "List::Util::maxstr" => Some(dispatch_ok(
             minmax(args, MinMax::MaxStr).map(|v| aggregate_wantarray(v, want)),
         )),
-        "shuffle" => Some(dispatch_ok(shuffle_native(interp, args))),
-        "chunked" => Some(dispatch_ok(chunked_with_want(args, want))),
-        "windowed" => Some(dispatch_ok(windowed_with_want(args, want))),
-        "sample" => Some(dispatch_ok(sample_native(interp, args))),
-        "head" => Some(dispatch_ok(head_tail_take_impl(
+        "List::Util::shuffle" => Some(dispatch_ok(shuffle_native(interp, args))),
+        "List::Util::chunked" => Some(dispatch_ok(chunked_with_want(args, want))),
+        "List::Util::windowed" => Some(dispatch_ok(windowed_with_want(args, want))),
+        "List::Util::sample" => Some(dispatch_ok(sample_native(interp, args))),
+        "List::Util::head" => Some(dispatch_ok(head_tail_take_impl(
             args,
-            HeadTailTake::HeadByList,
+            HeadTailTake::ListUtilHead,
             want,
         ))),
-        "tail" => Some(dispatch_ok(head_tail_take_impl(
+        "List::Util::tail" => Some(dispatch_ok(head_tail_take_impl(
             args,
-            HeadTailTake::TailByList,
+            HeadTailTake::ListUtilTail,
             want,
         ))),
-        "reduce" | "fold" => Some(reduce_like(interp, args, want, false)),
-        "reductions" => Some(reduce_like(interp, args, want, true)),
-        "any" => Some(any_all_none(interp, args, want, AnyMode::Any)),
-        "all" => Some(any_all_none(interp, args, want, AnyMode::All)),
-        "none" => Some(any_all_none(interp, args, want, AnyMode::None)),
-        "notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
-        "first" => Some(first_native(interp, args, want)),
-        "pairs" => Some(dispatch_ok(pairs_native(args))),
-        "unpairs" => Some(dispatch_ok(unpairs_native(args))),
-        "pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),
-        "pairvalues" => Some(dispatch_ok(pairkeys_values(false, args))),
-        "pairgrep" => Some(pairgrep_map(interp, args, want, PairMode::Grep)),
-        "pairmap" => Some(pairgrep_map(interp, args, want, PairMode::Map)),
-        "pairfirst" => Some(pairgrep_map(interp, args, want, PairMode::First)),
-        "zip" | "zip_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest))),
-        "zip_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipShortest))),
-        "mesh" | "mesh_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest))),
-        "mesh_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshShortest))),
-        // Pair-method dispatch (blessed `_Pair` arrayrefs from `pairs`).
-        "_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
-        "_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
-        "_Pair::TO_JSON" => Some(dispatch_ok(pair_to_json(args))),
-        // `Scalar::Util` natives — keyed bare since callers strip the qualifier before dispatch.
-        "blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
-        "refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
-        "reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
-        "weaken" | "unweaken" => Some(dispatch_ok(Ok(PerlValue::UNDEF))),
-        "isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
-        // `Sub::Util` no-ops — return the coderef unchanged.
-        "set_subname" | "subname" => Some(dispatch_ok(sub_util_set_subname(args))),
-        // Core XS in perl; JSON::PP BEGIN uses this before utf8_heavy loads.
-        "unicode_to_native" => Some(dispatch_ok(utf8_unicode_to_native(args.first()))),
+        "List::Util::reduce" | "List::Util::fold" => Some(reduce_like(interp, args, want, false)),
+        "List::Util::reductions" => Some(reduce_like(interp, args, want, true)),
+        "List::Util::any" => Some(any_all_none(interp, args, want, AnyMode::Any)),
+        "List::Util::all" => Some(any_all_none(interp, args, want, AnyMode::All)),
+        "List::Util::none" => Some(any_all_none(interp, args, want, AnyMode::None)),
+        "List::Util::notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
+        "List::Util::first" => Some(first_native(interp, args, want)),
+        "List::Util::pairs" => Some(dispatch_ok(pairs_native(args))),
+        "List::Util::unpairs" => Some(dispatch_ok(unpairs_native(args))),
+        "List::Util::pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),
+        "List::Util::pairvalues" => Some(dispatch_ok(pairkeys_values(false, args))),
+        "List::Util::pairgrep" => Some(pairgrep_map(interp, args, want, PairMode::Grep)),
+        "List::Util::pairmap" => Some(pairgrep_map(interp, args, want, PairMode::Map)),
+        "List::Util::pairfirst" => Some(pairgrep_map(interp, args, want, PairMode::First)),
+        "List::Util::zip" | "List::Util::zip_longest" => {
+            Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest)))
+        }
+        "List::Util::zip_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipShortest))),
+        "List::Util::mesh" | "List::Util::mesh_longest" => {
+            Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest)))
+        }
+        "List::Util::mesh_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshShortest))),
+        "List::Util::_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
+        "List::Util::_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
+        "List::Util::_Pair::TO_JSON" => Some(dispatch_ok(pair_to_json(args))),
+        "Scalar::Util::blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
+        "Scalar::Util::refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
+        "Scalar::Util::reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
+        "Scalar::Util::weaken" | "Scalar::Util::unweaken" => {
+            Some(dispatch_ok(Ok(PerlValue::UNDEF)))
+        }
+        "Scalar::Util::isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
+        "Sub::Util::set_subname" | "Sub::Util::subname" => {
+            Some(dispatch_ok(sub_util_set_subname(args)))
+        }
+        // Core XS in perl; JSON::PP BEGIN uses this before utf8_heavy loads (see utf8::AUTOLOAD).
+        "utf8::unicode_to_native" => Some(dispatch_ok(utf8_unicode_to_native(args.first()))),
         _ => None,
     }
 }
 
-/// `set_subname $name, $coderef` → returns `$coderef` (stryke does not rename closures).
+/// Perl: `set_subname $name, $coderef` → returns `$coderef` (stryke does not rename closures).
 fn sub_util_set_subname(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     Ok(args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
 }
@@ -531,7 +715,7 @@ fn chunked_with_want(
 ) -> crate::error::PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(crate::error::PerlError::runtime(
-            "chunked: expected LIST, N",
+            "List::Util::chunked: expected LIST, N",
             0,
         ));
     }
@@ -571,7 +755,7 @@ fn windowed_with_want(
 ) -> crate::error::PerlResult<PerlValue> {
     if args.is_empty() {
         return Err(crate::error::PerlError::runtime(
-            "windowed: expected LIST, N",
+            "List::Util::windowed: expected LIST, N",
             0,
         ));
     }
@@ -627,14 +811,14 @@ fn sample_native(
 pub(crate) enum HeadTailTake {
     /// Builtin `take` / bare `head` — negative count is treated as zero (`max(0)`).
     Take,
-    /// `head` — negative count means “all but last |k|”.
-    HeadByList,
-    /// `tail` — same size rules as Perl `tail`.
-    TailByList,
+    /// `List::Util::head` — negative count means “all but last |k|”.
+    ListUtilHead,
+    /// `List::Util::tail` — same size rules as Perl `tail`.
+    ListUtilTail,
 }
 
-/// Shared by [`crate::builtins::builtin_take`], bare `head`, and `head` / `tail`.
-/// **Argument order:** list operands first, **count last** — `take(@l, N)`, `head(10,20,30,2)`.
+/// Shared by [`crate::builtins::builtin_take`], bare `head`, and `List::Util::head` / `tail`.
+/// **Argument order:** list operands first, **count last** — `take(@l, N)`, `List::Util::head(10,20,30,2)`.
 /// A single argument is treated as **N** with an empty list (`take(3)` → empty).
 /// List context: array slice; scalar context: last element of that slice, or `undef` if empty.
 pub(crate) fn head_tail_take_impl(
@@ -668,7 +852,7 @@ pub(crate) fn head_tail_take_impl(
             let size = raw.max(0);
             size.min(n).max(0) as usize
         }
-        HeadTailTake::HeadByList | HeadTailTake::TailByList => {
+        HeadTailTake::ListUtilHead | HeadTailTake::ListUtilTail => {
             let size = raw;
             if size >= 0 {
                 size.min(n).max(0) as usize
@@ -679,8 +863,8 @@ pub(crate) fn head_tail_take_impl(
         }
     };
     let out: Vec<PerlValue> = match kind {
-        HeadTailTake::Take | HeadTailTake::HeadByList => list.into_iter().take(take_n).collect(),
-        HeadTailTake::TailByList => {
+        HeadTailTake::Take | HeadTailTake::ListUtilHead => list.into_iter().take(take_n).collect(),
+        HeadTailTake::ListUtilTail => {
             let len = list.len();
             let skip = len.saturating_sub(take_n);
             list.into_iter().skip(skip).collect()
@@ -796,7 +980,7 @@ fn reduce_like(
         Some(s) => s,
         _ => {
             return Err(crate::error::PerlError::runtime(
-                "reduce: first argument must be a CODE reference",
+                "List::Util::reduce: first argument must be a CODE reference",
                 0,
             )
             .into());
@@ -857,7 +1041,7 @@ fn any_all_none(
         Some(s) => s,
         _ => {
             return Err(crate::error::PerlError::runtime(
-                "any/all/none/notall: first argument must be a CODE reference",
+                "List::Util::any/all/...: first argument must be a CODE reference",
                 0,
             )
             .into());
@@ -893,7 +1077,7 @@ fn first_native(interp: &mut Interpreter, args: &[PerlValue], _want: WantarrayCt
         Some(s) => s,
         _ => {
             return Err(crate::error::PerlError::runtime(
-                "first: first argument must be a CODE reference",
+                "List::Util::first: first argument must be a CODE reference",
                 0,
             )
             .into());
@@ -917,7 +1101,7 @@ fn pairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
         let row = vec![args[i].clone(), args[i + 1].clone()];
         let ar = PerlValue::array_ref(Arc::new(RwLock::new(row)));
         let b = PerlValue::blessed(Arc::new(BlessedRef::new_blessed(
-            "Pair".to_string(),
+            "List::Util::_Pair".to_string(),
             ar,
         )));
         out.push(b);
@@ -934,7 +1118,7 @@ fn unpairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
             out.push(g.first().cloned().unwrap_or(PerlValue::UNDEF));
             out.push(g.get(1).cloned().unwrap_or(PerlValue::UNDEF));
         } else if let Some(b) = x.as_blessed_ref() {
-            if b.class == "Pair" {
+            if b.class == "List::Util::_Pair" {
                 let d = b.data.read();
                 if let Some(r) = d.as_array_ref() {
                     let g = r.read();
@@ -1062,18 +1246,18 @@ fn pairgrep_map(
 
 fn pair_accessor(args: &[PerlValue], idx: usize) -> crate::error::PerlResult<PerlValue> {
     let obj = args.first().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::key/value: missing invocant", 0)
+        crate::error::PerlError::runtime("List::Util::_Pair::key/value: missing invocant", 0)
     })?;
     pair_field(obj, idx)
 }
 
 fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue> {
     let b = obj.as_blessed_ref().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::method: not a pair object", 0)
+        crate::error::PerlError::runtime("List::Util::_Pair::method: not a pair object", 0)
     })?;
-    if b.class != "Pair" {
+    if b.class != "List::Util::_Pair" {
         return Err(crate::error::PerlError::runtime(
-            "Pair::method: not a pair object",
+            "List::Util::_Pair::method: not a pair object",
             0,
         ));
     }
@@ -1083,14 +1267,14 @@ fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue
         return Ok(g.get(idx).cloned().unwrap_or(PerlValue::UNDEF));
     }
     Err(crate::error::PerlError::runtime(
-        "Pair: internal data is not an ARRAY reference",
+        "List::Util::_Pair: internal data is not an ARRAY reference",
         0,
     ))
 }
 
 fn pair_to_json(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     let obj = args.first().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::TO_JSON: missing invocant", 0)
+        crate::error::PerlError::runtime("List::Util::_Pair::TO_JSON: missing invocant", 0)
     })?;
     let k = pair_field(obj, 0)?;
     let v = pair_field(obj, 1)?;
@@ -1157,14 +1341,20 @@ mod tests {
 
     fn call_native(
         interp: &mut Interpreter,
-        name: &str,
+        fq: &str,
         args: &[PerlValue],
         want: WantarrayCtx,
     ) -> PerlValue {
-        match dispatch_by_name(interp, name, args, want) {
+        ensure_list_util(interp);
+        let sub = interp
+            .subs
+            .get(fq)
+            .unwrap_or_else(|| panic!("missing fn {fq}"))
+            .clone();
+        match native_dispatch(interp, &sub, args, want) {
             Some(Ok(v)) => v,
             Some(Err(e)) => panic!("{:?}", e),
-            None => panic!("not a stryke list builtin: {name}"),
+            None => panic!("not a List::Util native: {fq}"),
         }
     }
 
@@ -1173,7 +1363,7 @@ mod tests {
         let mut i = Interpreter::new();
         let s = call_native(
             &mut i,
-            "sum",
+            "List::Util::sum",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1184,7 +1374,7 @@ mod tests {
         assert_eq!(s.to_int(), 6);
         let p = call_native(
             &mut i,
-            "product",
+            "List::Util::product",
             &[PerlValue::integer(2), PerlValue::integer(3)],
             WantarrayCtx::Scalar,
         );
@@ -1194,16 +1384,16 @@ mod tests {
     #[test]
     fn sum_empty_is_undef_sum0_empty_is_zero() {
         let mut i = Interpreter::new();
-        let s = call_native(&mut i, "sum", &[], WantarrayCtx::Scalar);
+        let s = call_native(&mut i, "List::Util::sum", &[], WantarrayCtx::Scalar);
         assert!(s.is_undef());
-        let z = call_native(&mut i, "sum0", &[], WantarrayCtx::Scalar);
+        let z = call_native(&mut i, "List::Util::sum0", &[], WantarrayCtx::Scalar);
         assert_eq!(z.to_int(), 0);
     }
 
     #[test]
     fn product_empty_is_one() {
         let mut i = Interpreter::new();
-        let p = call_native(&mut i, "product", &[], WantarrayCtx::Scalar);
+        let p = call_native(&mut i, "List::Util::product", &[], WantarrayCtx::Scalar);
         assert_eq!(p.to_int(), 1);
     }
 
@@ -1212,21 +1402,21 @@ mod tests {
         let mut i = Interpreter::new();
         let mn = call_native(
             &mut i,
-            "min",
+            "List::Util::min",
             &[PerlValue::float(3.0), PerlValue::float(1.0)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(mn.to_int(), 1);
         let mx = call_native(
             &mut i,
-            "max",
+            "List::Util::max",
             &[PerlValue::integer(3), PerlValue::integer(9)],
             WantarrayCtx::Scalar,
         );
         assert_eq!(mx.to_int(), 9);
         let ms = call_native(
             &mut i,
-            "minstr",
+            "List::Util::minstr",
             &[PerlValue::string("z".into()), PerlValue::string("a".into())],
             WantarrayCtx::Scalar,
         );
@@ -1236,10 +1426,10 @@ mod tests {
     #[test]
     fn mean_median_mode_variance_stddev() {
         let mut i = Interpreter::new();
-        assert!(call_native(&mut i, "mean", &[], WantarrayCtx::Scalar).is_undef());
+        assert!(call_native(&mut i, "List::Util::mean", &[], WantarrayCtx::Scalar).is_undef());
         let m = call_native(
             &mut i,
-            "mean",
+            "List::Util::mean",
             &[
                 PerlValue::integer(2),
                 PerlValue::integer(4),
@@ -1251,7 +1441,7 @@ mod tests {
 
         let med_odd = call_native(
             &mut i,
-            "median",
+            "List::Util::median",
             &[
                 PerlValue::integer(3),
                 PerlValue::integer(1),
@@ -1263,7 +1453,7 @@ mod tests {
 
         let med_even = call_native(
             &mut i,
-            "median",
+            "List::Util::median",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1276,7 +1466,7 @@ mod tests {
 
         let mode_sc = call_native(
             &mut i,
-            "mode",
+            "List::Util::mode",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1289,7 +1479,7 @@ mod tests {
 
         let mode_li = call_native(
             &mut i,
-            "mode",
+            "List::Util::mode",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1306,7 +1496,7 @@ mod tests {
 
         let var_one = call_native(
             &mut i,
-            "variance",
+            "List::Util::variance",
             &[PerlValue::integer(5)],
             WantarrayCtx::Scalar,
         );
@@ -1314,7 +1504,7 @@ mod tests {
 
         let var_pop = call_native(
             &mut i,
-            "variance",
+            "List::Util::variance",
             &[
                 PerlValue::integer(2),
                 PerlValue::integer(4),
@@ -1326,7 +1516,7 @@ mod tests {
 
         let sd = call_native(
             &mut i,
-            "stddev",
+            "List::Util::stddev",
             &[PerlValue::integer(0), PerlValue::integer(0)],
             WantarrayCtx::Scalar,
         );
@@ -1341,14 +1531,14 @@ mod tests {
             PerlValue::integer(2),
             PerlValue::integer(3),
         ];
-        let ls = call_native(&mut i, "sum", &args_sum, WantarrayCtx::List);
+        let ls = call_native(&mut i, "List::Util::sum", &args_sum, WantarrayCtx::List);
         let asum = ls.as_array_vec().expect("sum list");
         assert_eq!(asum.len(), 1);
         assert_eq!(asum[0].to_int(), 6);
 
         let lp = call_native(
             &mut i,
-            "product",
+            "List::Util::product",
             &[PerlValue::integer(2), PerlValue::integer(4)],
             WantarrayCtx::List,
         );
@@ -1358,14 +1548,14 @@ mod tests {
 
         let lmn = call_native(
             &mut i,
-            "min",
+            "List::Util::min",
             &[PerlValue::integer(9), PerlValue::integer(2)],
             WantarrayCtx::List,
         );
         assert_eq!(lmn.as_array_vec().unwrap()[0].to_int(), 2);
         let lmx = call_native(
             &mut i,
-            "max",
+            "List::Util::max",
             &[PerlValue::integer(9), PerlValue::integer(2)],
             WantarrayCtx::List,
         );
@@ -1375,7 +1565,7 @@ mod tests {
     #[test]
     fn min_max_empty_undef() {
         let mut i = Interpreter::new();
-        let mn = call_native(&mut i, "min", &[], WantarrayCtx::Scalar);
+        let mn = call_native(&mut i, "List::Util::min", &[], WantarrayCtx::Scalar);
         assert!(mn.is_undef());
     }
 
@@ -1384,7 +1574,7 @@ mod tests {
         let mut i = Interpreter::new();
         let u = call_native(
             &mut i,
-            "uniq",
+            "List::Util::uniq",
             &[
                 PerlValue::string("a".into()),
                 PerlValue::string("a".into()),
@@ -1403,7 +1593,7 @@ mod tests {
         let mut i = Interpreter::new();
         let u = call_native(
             &mut i,
-            "uniqstr",
+            "List::Util::uniqstr",
             &[PerlValue::string("01".into()), PerlValue::integer(1)],
             WantarrayCtx::List,
         );
@@ -1416,7 +1606,7 @@ mod tests {
         let mut i = Interpreter::new();
         let u = call_native(
             &mut i,
-            "uniqint",
+            "List::Util::uniqint",
             &[
                 PerlValue::integer(2),
                 PerlValue::integer(2),
@@ -1435,7 +1625,7 @@ mod tests {
         let mut i = Interpreter::new();
         let c = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1460,7 +1650,7 @@ mod tests {
 
         let ns = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1477,7 +1667,7 @@ mod tests {
         let mut i = Interpreter::new();
         let z = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1488,7 +1678,7 @@ mod tests {
         assert_eq!(z.to_int(), 0);
         let zl = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1500,7 +1690,7 @@ mod tests {
 
         let only_n = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[PerlValue::integer(5)],
             WantarrayCtx::Scalar,
         );
@@ -1512,7 +1702,7 @@ mod tests {
         let mut i = Interpreter::new();
         let c = call_native(
             &mut i,
-            "chunked",
+            "List::Util::chunked",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1534,7 +1724,7 @@ mod tests {
         let mut i = Interpreter::new();
         let w = call_native(
             &mut i,
-            "windowed",
+            "List::Util::windowed",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1561,7 +1751,7 @@ mod tests {
         let mut i = Interpreter::new();
         let w = call_native(
             &mut i,
-            "windowed",
+            "List::Util::windowed",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1577,7 +1767,7 @@ mod tests {
         let mut i = Interpreter::new();
         let w = call_native(
             &mut i,
-            "windowed",
+            "List::Util::windowed",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1593,7 +1783,7 @@ mod tests {
         let mut i = Interpreter::new();
         let w = call_native(
             &mut i,
-            "windowed",
+            "List::Util::windowed",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1616,7 +1806,7 @@ mod tests {
         let mut i = Interpreter::new();
         let h = call_native(
             &mut i,
-            "head",
+            "List::Util::head",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1630,7 +1820,7 @@ mod tests {
         assert_eq!(hv[0].to_int(), 10);
         let hs = call_native(
             &mut i,
-            "head",
+            "List::Util::head",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1642,7 +1832,7 @@ mod tests {
         assert_eq!(hs.to_int(), 20);
         let hn = call_native(
             &mut i,
-            "head",
+            "List::Util::head",
             &[
                 PerlValue::integer(1),
                 PerlValue::integer(2),
@@ -1657,7 +1847,7 @@ mod tests {
         assert_eq!(hnv[1].to_int(), 2);
         let t = call_native(
             &mut i,
-            "tail",
+            "List::Util::tail",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1671,7 +1861,7 @@ mod tests {
         assert_eq!(tv[1].to_int(), 30);
         let ts = call_native(
             &mut i,
-            "tail",
+            "List::Util::tail",
             &[
                 PerlValue::integer(10),
                 PerlValue::integer(20),
@@ -1688,7 +1878,7 @@ mod tests {
         let mut i = Interpreter::new();
         let k = call_native(
             &mut i,
-            "pairkeys",
+            "List::Util::pairkeys",
             &[
                 PerlValue::string("a".into()),
                 PerlValue::integer(1),
@@ -1703,7 +1893,7 @@ mod tests {
         assert_eq!(kv[1].to_string(), "b");
         let vals = call_native(
             &mut i,
-            "pairvalues",
+            "List::Util::pairvalues",
             &[
                 PerlValue::string("a".into()),
                 PerlValue::integer(1),
@@ -1722,7 +1912,7 @@ mod tests {
         let mut i = Interpreter::new();
         let z = call_native(
             &mut i,
-            "zip_shortest",
+            "List::Util::zip_shortest",
             &[
                 PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
                 PerlValue::array(vec![PerlValue::integer(10)]),
@@ -1743,7 +1933,7 @@ mod tests {
         let mut i = Interpreter::new();
         let m = call_native(
             &mut i,
-            "mesh_shortest",
+            "List::Util::mesh_shortest",
             &[
                 PerlValue::array(vec![PerlValue::integer(1), PerlValue::integer(2)]),
                 PerlValue::array(vec![PerlValue::integer(10), PerlValue::integer(20)]),
@@ -1763,7 +1953,7 @@ mod tests {
         let mut i = Interpreter::new();
         let s = call_native(
             &mut i,
-            "sample",
+            "List::Util::sample",
             &[PerlValue::integer(3)],
             WantarrayCtx::List,
         );
@@ -1777,14 +1967,14 @@ mod tests {
         let cr = PerlValue::integer(42);
         let out = call_native(
             &mut i,
-            "set_subname",
+            "Sub::Util::set_subname",
             &[PerlValue::string("main::foo".into()), cr.clone()],
             WantarrayCtx::Scalar,
         );
         assert_eq!(out.to_int(), 42);
         let out2 = call_native(
             &mut i,
-            "subname",
+            "Sub::Util::subname",
             &[PerlValue::string("main::bar".into()), cr],
             WantarrayCtx::Scalar,
         );
