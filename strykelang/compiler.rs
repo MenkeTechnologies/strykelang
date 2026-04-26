@@ -2982,7 +2982,7 @@ impl Compiler {
                             self.compile_expr(left)?;
                         }
                         let j = self.emit_op(Op::JumpIfTrueKeep(0), line, Some(root));
-                        self.emit_op(Op::Pop, line, Some(root));
+                        // JumpIfTrueKeep already pops on fall-through, so no explicit Pop needed
                         if matches!(right.kind, ExprKind::Regex(..)) {
                             self.compile_boolean_rvalue_condition(right)?;
                             self.emit_op(Op::RegexBoolToScalar, line, Some(root));

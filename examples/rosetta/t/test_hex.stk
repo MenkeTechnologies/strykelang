@@ -1,32 +1,32 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hexadecimal
 
-fn my_to_hex($n) {
+fn Rosetta::Hex::to_hex($n) {
     sprintf("%X", $n)
 }
 
-fn my_to_hex_lower($n) {
+fn Rosetta::Hex::to_hex_lower($n) {
     sprintf("%x", $n)
 }
 
-fn my_from_hex($s) {
+fn Rosetta::Hex::from_hex($s) {
     hex($s)
 }
 
-assert_eq my_to_hex(0), "0", "hex 0"
-assert_eq my_to_hex(15), "F", "hex 15"
-assert_eq my_to_hex(16), "10", "hex 16"
-assert_eq my_to_hex(255), "FF", "hex 255"
-assert_eq my_to_hex(256), "100", "hex 256"
-assert_eq my_to_hex(65535), "FFFF", "hex 65535"
+assert_eq Rosetta::Hex::to_hex(0), "0", "hex 0"
+assert_eq Rosetta::Hex::to_hex(15), "F", "hex 15"
+assert_eq Rosetta::Hex::to_hex(16), "10", "hex 16"
+assert_eq Rosetta::Hex::to_hex(255), "FF", "hex 255"
+assert_eq Rosetta::Hex::to_hex(256), "100", "hex 256"
+assert_eq Rosetta::Hex::to_hex(65535), "FFFF", "hex 65535"
 
-assert_eq my_to_hex_lower(255), "ff", "hex lower"
+assert_eq Rosetta::Hex::to_hex_lower(255), "ff", "hex lower"
 
-assert_eq my_from_hex("0"), 0, "from hex 0"
-assert_eq my_from_hex("F"), 15, "from hex F"
-assert_eq my_from_hex("ff"), 255, "from hex ff"
-assert_eq my_from_hex("100"), 256, "from hex 100"
-assert_eq my_from_hex("FFFF"), 65535, "from hex FFFF"
+assert_eq Rosetta::Hex::from_hex("0"), 0, "from hex 0"
+assert_eq Rosetta::Hex::from_hex("F"), 15, "from hex F"
+assert_eq Rosetta::Hex::from_hex("ff"), 255, "from hex ff"
+assert_eq Rosetta::Hex::from_hex("100"), 256, "from hex 100"
+assert_eq Rosetta::Hex::from_hex("FFFF"), 65535, "from hex FFFF"
 
 assert_eq sprintf("%02X", 5), "05", "zero-padded hex"
 assert_eq sprintf("%04X", 255), "00FF", "4-digit hex"

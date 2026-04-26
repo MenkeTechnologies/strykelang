@@ -1,17 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Heronian triangles
 
-fn my_gcd {
-    my $a = $_[0]
-    my $b = $_[1]
-    while ($b) {
+fn Rosetta::Heronian::gcd($a, $b) {
+    while ($b != 0) {
         ($a, $b) = ($b, $a % $b)
     }
     $a
 }
 
-fn heronian_triangles {
-    my $max_p = $_[0]
+fn Rosetta::Heronian::generate($max_p) {
     my @triangles
     
     for my $c (1..$max_p) {
@@ -19,12 +16,15 @@ fn heronian_triangles {
             for my $a (1..$b) {
                 if ($a + $b > $c) {
                     my $s = ($a + $b + $c) / 2
-                    my $area_sq = $s * ($s - $a) * ($s - $b) * ($s - $c)
-                    if ($area_sq > 0) {
-                        my $area = sqrt($area_sq)
-                        if ($area == int($area)) {
-                            if (my_gcd($a, my_gcd($b, $c)) == 1) {
-                                push @triangles, "[$a,$b,$c]"
+                    if ($s > $a && $s > $b && $s > $c) {
+                        my $area_sq = $s * ($s - $a) * ($s - $b) * ($s - $c)
+                        if ($area_sq > 0) {
+                            my $area = sqrt($area_sq)
+                            if ($area == int($area)) {
+                                my $g = Rosetta::Heronian::gcd($a, Rosetta::Heronian::gcd($b, $c))
+                                if ($g == 1) {
+                                    push @triangles, [$a, $b, $c]
+                                }
                             }
                         }
                     }
@@ -37,7 +37,7 @@ fn heronian_triangles {
 }
 
 # Just a small check as this is computationally intensive
-my $res = heronian_triangles(25)
+my $res = Rosetta::Heronian::generate(25)
 assert_ok scalar(@$res) > 0, "found at least one Heronian triangle"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Increment a numerical string
 
-fn increment_string_demo() {
+fn Rosetta::IncrementString::demo() {
     "Increment Numerical String Examples:" |> p
     
     # Basic string to number conversion and increment
@@ -46,4 +46,5 @@ fn increment_string_demo() {
     my $result = ~> "2023" >{ $_ + 1 }
 }
 
-increment_string_demo
+Rosetta::IncrementString::demo()
+test_run

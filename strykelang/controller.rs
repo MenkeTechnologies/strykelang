@@ -50,6 +50,12 @@ pub struct Controller {
     running: AtomicBool,
 }
 
+impl Default for Controller {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Controller {
     pub fn new() -> Self {
         Self {
@@ -265,7 +271,7 @@ impl Controller {
                 Err(_) => break,
             };
 
-            let parts: Vec<&str> = line.trim().split_whitespace().collect();
+            let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.is_empty() {
                 continue;
             }

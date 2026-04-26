@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Forward difference
 
-fn forward_diff(@arr) {
+fn Rosetta::ForwardDifference::solve(@arr) {
     my $len = scalar(@arr)
     if ($len < 2) {
-        ([])
+        return []
     } else {
         my @res
         for my $i (1..$len-1) {
@@ -14,21 +14,21 @@ fn forward_diff(@arr) {
     }
 }
 
-fn nth_forward_diff($n, @arr) {
+fn Rosetta::ForwardDifference::nth($n, @arr) {
     my $res = [@arr]
     for my $i (1..$n) {
-        $res = forward_diff(@$res)
+        $res = Rosetta::ForwardDifference::solve(@$res)
     }
     $res
 }
 
 my @data = (90, 47, 58, 29, 22, 32, 55, 5, 55, 73)
-my $d1 = forward_diff(@data)
+my $d1 = Rosetta::ForwardDifference::solve(@data)
 assert_eq join(",", @$d1), "-43,11,-29,-7,10,23,-50,50,18", "1st forward diff"
 
-my $d2 = nth_forward_diff(2, @data)
+my $d2 = Rosetta::ForwardDifference::nth(2, @data)
 assert_eq join(",", @$d2), "54,-40,22,17,13,-73,100,-32", "2nd forward diff"
 
-@data |> forward_diff |> map { join(",", @$_) } |> assert_eq("-43,11,-29,-7,10,23,-50,50,18", "pipe forward diff")
+@data |> Rosetta::ForwardDifference::solve |> map { join(",", @$_) } |> assert_eq("-43,11,-29,-7,10,23,-50,50,18", "pipe forward diff")
 
 test_run

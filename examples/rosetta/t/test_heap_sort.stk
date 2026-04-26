@@ -1,71 +1,58 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Heap Sort
 
-fn sift_down {
-    my $list = $_[0]
-    my $start = $_[1]
-    my $end = $_[2]
-    my @arr = @$list
-    
+fn Rosetta::HeapSort::sift_down($arr_ref, $start, $end) {
     my $root = $start
     while ($root * 2 + 1 <= $end) {
         my $child = $root * 2 + 1
         my $swap = $root
         
-        if ($arr[$swap] < $arr[$child]) {
+        if ($arr_ref->[$swap] < $arr_ref->[$child]) {
             $swap = $child
         }
-        if ($child + 1 <= $end && $arr[$swap] < $arr[$child + 1]) {
+        if ($child + 1 <= $end && $arr_ref->[$swap] < $arr_ref->[$child + 1]) {
             $swap = $child + 1
         }
         if ($swap == $root) {
-            return \@arr
+            return
         } else {
-            ($arr[$root], $arr[$swap]) = ($arr[$swap], $arr[$root])
+            ($arr_ref->[$root], $arr_ref->[$swap]) = ($arr_ref->[$swap], $arr_ref->[$root])
             $root = $swap
         }
     }
-    \@arr
 }
 
-fn heapify {
-    my $list = $_[0]
-    my @arr = @$list
-    my $count = scalar(@arr)
+fn Rosetta::HeapSort::heapify($arr_ref) {
+    my $count = scalar(@$arr_ref)
     my $start = int(($count - 2) / 2)
     while ($start >= 0) {
-        my $res = sift_down([@arr], $start, $count - 1)
-        @arr = @$res
+        Rosetta::HeapSort::sift_down($arr_ref, $start, $count - 1)
         $start--
     }
-    \@arr
 }
 
-fn heap_sort {
-    my $list = $_[0]
+fn Rosetta::HeapSort::sort($list) {
     my @arr = @$list
     my $count = scalar(@arr)
     if ($count < 2) { return \@arr }
     
-    my $res_h = heapify([@arr])
-    @arr = @$res_h
+    Rosetta::HeapSort::heapify(\@arr)
     
     my $end = $count - 1
     while ($end > 0) {
         ($arr[$end], $arr[0]) = ($arr[0], $arr[$end])
         $end--
-        my $res = sift_down([@arr], 0, $end)
-        @arr = @$res
+        Rosetta::HeapSort::sift_down(\@arr, 0, $end)
     }
     \@arr
 }
 
 my $data = [4, 10, 3, 5, 1]
-my $sorted = heap_sort($data)
+my $sorted = Rosetta::HeapSort::sort($data)
 assert_eq join(",", @$sorted), "1,3,4,5,10", "heap sort"
 
 my $data2 = [1, 6, 3, 2, 1, 7, 5, 22, 58, 0, 9, 3, 4]
-my $sorted2 = heap_sort($data2)
+my $sorted2 = Rosetta::HeapSort::sort($data2)
 assert_eq join(",", @$sorted2), "0,1,1,2,3,3,4,5,6,7,9,22,58", "heap sort 2"
 
 test_run

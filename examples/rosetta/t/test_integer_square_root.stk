@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Integer square root
 
-fn integer_sqrt {
-    my $n = $_[0]
+fn Rosetta::IntSqrt::compute($n) {
     if ($n < 0) { 0 }
     else {
         my $root = int(sqrt($n))
@@ -10,9 +9,9 @@ fn integer_sqrt {
     }
 }
 
-assert_eq integer_sqrt(16), 4, "isqrt(16)"
-assert_eq integer_sqrt(17), 4, "isqrt(17)"
-assert_eq integer_sqrt(25), 5, "isqrt(25)"
-assert_eq integer_sqrt(0), 0, "isqrt(0)"
+assert_eq Rosetta::IntSqrt::compute(16), 4, "isqrt(16)"
+assert_eq Rosetta::IntSqrt::compute(17), 4, "isqrt(17)"
+assert_eq Rosetta::IntSqrt::compute(25), 5, "isqrt(25)"
+assert_eq Rosetta::IntSqrt::compute(0), 0, "isqrt(0)"
 
 test_run

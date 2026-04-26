@@ -1,26 +1,27 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Identity Matrix
 
-fn my_identity_matrix {
-    my $n = $_[0]
-    my @rows = ~> 0..$n-1 map {
-        my $i = $_
-        my @row = map { if ($_ == $i) { 1 } else { 0 } } (0..$n-1)
-        \@row
+fn Rosetta::IdentityMatrix::generate($n) {
+    my @rows
+    for my $i (0..$n-1) {
+        my @row
+        for my $j (0..$n-1) {
+            push @row, ($i == $j ? 1 : 0)
+        }
+        push @rows, \@row
     }
     \@rows
 }
 
-fn matrix_to_string {
-    my $m = $_[0]
+fn Rosetta::IdentityMatrix::to_str($m) {
     my @rows = ~> @$m map { join(",", @$_) }
     join(";", @rows)
 }
 
-my $id3 = my_identity_matrix(3)
-assert_eq matrix_to_string($id3), "1,0,0;0,1,0;0,0,1", "3x3 identity"
+my $id3 = Rosetta::IdentityMatrix::generate(3)
+assert_eq Rosetta::IdentityMatrix::to_str($id3), "1,0,0;0,1,0;0,0,1", "3x3 identity"
 
-my $id1 = my_identity_matrix(1)
-assert_eq matrix_to_string($id1), "1", "1x1 identity"
+my $id1 = Rosetta::IdentityMatrix::generate(1)
+assert_eq Rosetta::IdentityMatrix::to_str($id1), "1", "1x1 identity"
 
 test_run

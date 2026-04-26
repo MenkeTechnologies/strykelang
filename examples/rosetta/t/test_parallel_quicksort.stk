@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Parallel QuickSort
 
-fn p_quicksort {
+fn Rosetta::ParallelQuicksort::sort {
     my $arr_ref = $_[0]
     my $len = scalar(@$arr_ref)
     
@@ -14,24 +14,27 @@ fn p_quicksort {
     
     # For very small arrays, just recurse sequentially
     if ($len < 50) {
-        my @l = p_quicksort(\@left)
-        my @r = p_quicksort(\@right)
+        my @l = Rosetta::ParallelQuicksort::sort(\@left)
+        my @r = Rosetta::ParallelQuicksort::sort(\@right)
         return (@l, $pivot, @r)
     }
     
     # For larger arrays, spawn parallel tasks
-    my $t1 = spawn { [p_quicksort(\@left)] }
-    my $t2 = spawn { [p_quicksort(\@right)] }
+    # The block in spawn should return an array reference to the result
+    my $t1 = spawn { [Rosetta::ParallelQuicksort::sort(\@left)] }
+    my $t2 = spawn { [Rosetta::ParallelQuicksort::sort(\@right)] }
     
+    # await returns the array reference
     my $l_ref = await($t1)
     my $r_ref = await($t2)
     
-    return (@$l_ref, $pivot, @$r_ref)
+    # Dereference the outer array reference from await, then the inner from the list
+    return (@{$l_ref->[0]}, $pivot, @{$r_ref->[0]})
 }
 
 # Test with a randomized list
 my @data = ~> 1..100 map { int(rand(1000)) }
-my @sorted = p_quicksort(\@data)
+my @sorted = Rosetta::ParallelQuicksort::sort(\@data)
 
 # Verify order
 my $ok = 1

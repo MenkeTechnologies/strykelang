@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Insertion Sort
 
-fn insertion_sort(@arr) {
+fn Rosetta::InsertionSort::sort(@arr) {
     for my $i (1..$#arr) {
         my $key = $arr[$i]
         my $j = $i - 1
@@ -14,22 +14,22 @@ fn insertion_sort(@arr) {
     @arr
 }
 
-my @sorted = insertion_sort(64, 34, 25, 12, 22, 11, 90)
+my @sorted = Rosetta::InsertionSort::sort(64, 34, 25, 12, 22, 11, 90)
 assert_eq join(",", @sorted), "11,12,22,25,34,64,90", "insertion sort"
 
-my @single = insertion_sort(42)
+my @single = Rosetta::InsertionSort::sort(42)
 assert_eq join(",", @single), "42", "single element"
 
-my @already = insertion_sort(1, 2, 3, 4, 5)
+my @already = Rosetta::InsertionSort::sort(1, 2, 3, 4, 5)
 assert_eq join(",", @already), "1,2,3,4,5", "already sorted"
 
-my @reverse = insertion_sort(5, 4, 3, 2, 1)
+my @reverse = Rosetta::InsertionSort::sort(5, 4, 3, 2, 1)
 assert_eq join(",", @reverse), "1,2,3,4,5", "reverse"
 
-my @dups = insertion_sort(3, 1, 4, 1, 5, 9, 2, 6)
+my @dups = Rosetta::InsertionSort::sort(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq join(",", @dups), "1,1,2,3,4,5,6,9", "with duplicates"
 
-my @neg = insertion_sort(-5, 3, -1, 0, 2)
+my @neg = Rosetta::InsertionSort::sort(-5, 3, -1, 0, 2)
 assert_eq join(",", @neg), "-5,-1,0,2,3", "with negatives"
 
 test_run
