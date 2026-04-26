@@ -98,6 +98,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// the parser, compiler, and interpreter.
 static COMPAT_MODE: AtomicBool = AtomicBool::new(false);
 
+/// When `true`, Perl-isms (`sub`, `say`, `reverse`) are rejected — forces
+/// idiomatic stryke (`fn`, `p`, `rev`). Used with `--no-interop` to train
+/// bots or enforce style.
+static NO_INTEROP_MODE: AtomicBool = AtomicBool::new(false);
+
 /// Enable Perl 5 strict-compatibility mode (disables all stryke extensions).
 pub fn set_compat_mode(on: bool) {
     COMPAT_MODE.store(on, Ordering::Relaxed);
@@ -107,6 +112,17 @@ pub fn set_compat_mode(on: bool) {
 #[inline]
 pub fn compat_mode() -> bool {
     COMPAT_MODE.load(Ordering::Relaxed)
+}
+
+/// Enable no-interop mode (rejects Perl-isms, forces idiomatic stryke).
+pub fn set_no_interop_mode(on: bool) {
+    NO_INTEROP_MODE.store(on, Ordering::Relaxed);
+}
+
+/// Returns `true` when `--no-interop` is active.
+#[inline]
+pub fn no_interop_mode() -> bool {
+    NO_INTEROP_MODE.load(Ordering::Relaxed)
 }
 use value::PerlValue;
 

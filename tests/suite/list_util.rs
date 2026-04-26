@@ -35,8 +35,9 @@ fn list_util_sum_and_sum0() {
 #[test]
 fn list_util_min_max() {
     let mut interp = with_vendor_inc();
-    let p = parse("(min(3,9,2), max(3,9,2), minstr(\"b\",\"a\"), maxstr(\"b\",\"a\")) |> join \",\"")
-        .expect("parse");
+    let p =
+        parse("(min(3,9,2), max(3,9,2), minstr(\"b\",\"a\"), maxstr(\"b\",\"a\")) |> join \",\"")
+            .expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_string(), "2,9,a,b");
 }
@@ -119,8 +120,7 @@ fn bare_mean_and_list_util_qualified_stats() {
     let p = parse(r#"mean(2, 4, 10) == mean(2, 4, 10)"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert!(v.is_true());
-    let p2 = parse(r#"my @m = mode(1, 2, 2, 3, 3); scalar @m + $m[0] + $m[1]"#)
-        .expect("parse");
+    let p2 = parse(r#"my @m = mode(1, 2, 2, 3, 3); scalar @m + $m[0] + $m[1]"#).expect("parse");
     let v2 = interp.execute(&p2).expect("run");
     assert_eq!(v2.to_int(), 2 + 2 + 3);
 }

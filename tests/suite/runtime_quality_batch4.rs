@@ -79,7 +79,7 @@ fn list_util_product_three_factors() {
 
 #[test]
 fn scalar_util_reftype_array_ref() {
-    assert_eq!(eval_string(r#"Scalar::Util::reftype([])"#), "ARRAY");
+    assert_eq!(eval_string(r#"reftype([])"#), "ARRAY");
 }
 
 #[test]
@@ -371,47 +371,32 @@ fn list_util_first_with_coderef_finds_element() {
 
 #[test]
 fn list_util_none_with_coderef_no_match() {
-    assert_eq!(
-        eval_int(r#"none(fn { $_ > 10 }, 1, 2, 3) ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"none(fn { $_ > 10 }, 1, 2, 3) ? 1 : 0"#), 1);
 }
 
 #[test]
 fn list_util_any_with_coderef_one_hit() {
-    assert_eq!(
-        eval_int(r#"any(fn { $_ == 2 }, 1, 2, 3) ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"any(fn { $_ == 2 }, 1, 2, 3) ? 1 : 0"#), 1);
 }
 
 #[test]
 fn list_util_all_with_coderef_all_positive() {
-    assert_eq!(
-        eval_int(r#"all(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"all(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#), 1);
 }
 
 #[test]
 fn list_util_notall_with_coderef_all_match() {
-    assert_eq!(
-        eval_int(r#"notall(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"notall(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#), 0);
 }
 
 #[test]
 fn scalar_util_blessed_reports_package() {
-    assert_eq!(
-        eval_string(r#"Scalar::Util::blessed(bless {}, "Box")"#),
-        "Box"
-    );
+    assert_eq!(eval_string(r#"blessed(bless {}, "Box")"#), "Box");
 }
 
 #[test]
 fn scalar_util_blessed_plain_ref_undef() {
-    assert_eq!(eval_int(r#"defined(Scalar::Util::blessed([])) ? 1 : 0"#), 0);
+    assert_eq!(eval_int(r#"defined(blessed([])) ? 1 : 0"#), 0);
 }
 
 #[test]

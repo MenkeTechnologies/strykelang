@@ -319,7 +319,7 @@ fn explicit_for_loop_captures_by_value() {
             $sum
             "#
         ),
-        60  // 10 + 20 + 30
+        60 // 10 + 20 + 30
     );
 }
 

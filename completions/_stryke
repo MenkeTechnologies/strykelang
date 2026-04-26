@@ -214,6 +214,7 @@ _stryke() {
     '--flame[SVG flamegraph to stdout (st --flame script.stk > flame.svg)]' \
     '--no-jit[disable Cranelift JIT (bytecode interpreter only)]' \
     '--explain=[print expanded hint for an error code]:error code (e.g. E0001):' \
+    '--no-interop[enforce idiomatic stryke]' \
     '-d+[run program under debugger]::module:' \
     '-D+[set debugging flags]:flags:_stryke_debug_flags' \
     '-u[dump core after parsing program]' \

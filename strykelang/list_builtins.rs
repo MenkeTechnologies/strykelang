@@ -92,15 +92,15 @@ pub(crate) fn dispatch_by_name(
         "_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
         "_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
         "_Pair::TO_JSON" => Some(dispatch_ok(pair_to_json(args))),
-        // `Scalar::Util` natives — keyed bare since callers strip the qualifier before dispatch.
+        // Introspection builtins (bare names, no module prefix).
         "blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
         "refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
         "reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
         "weaken" | "unweaken" => Some(dispatch_ok(Ok(PerlValue::UNDEF))),
         "isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
-        // `Sub::Util` no-ops — return the coderef unchanged.
+        // Subname helpers — return the coderef unchanged.
         "set_subname" | "subname" => Some(dispatch_ok(sub_util_set_subname(args))),
-        // Core XS in perl; JSON::PP BEGIN uses this before utf8_heavy loads.
+        // UTF-8 codepoint passthrough.
         "unicode_to_native" => Some(dispatch_ok(utf8_unicode_to_native(args.first()))),
         _ => None,
     }
@@ -916,10 +916,7 @@ fn pairs_native(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     while i + 1 < args.len() {
         let row = vec![args[i].clone(), args[i + 1].clone()];
         let ar = PerlValue::array_ref(Arc::new(RwLock::new(row)));
-        let b = PerlValue::blessed(Arc::new(BlessedRef::new_blessed(
-            "Pair".to_string(),
-            ar,
-        )));
+        let b = PerlValue::blessed(Arc::new(BlessedRef::new_blessed("Pair".to_string(), ar)));
         out.push(b);
         i += 2;
     }
@@ -1061,16 +1058,16 @@ fn pairgrep_map(
 }
 
 fn pair_accessor(args: &[PerlValue], idx: usize) -> crate::error::PerlResult<PerlValue> {
-    let obj = args.first().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::key/value: missing invocant", 0)
-    })?;
+    let obj = args
+        .first()
+        .ok_or_else(|| crate::error::PerlError::runtime("Pair::key/value: missing invocant", 0))?;
     pair_field(obj, idx)
 }
 
 fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue> {
-    let b = obj.as_blessed_ref().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::method: not a pair object", 0)
-    })?;
+    let b = obj
+        .as_blessed_ref()
+        .ok_or_else(|| crate::error::PerlError::runtime("Pair::method: not a pair object", 0))?;
     if b.class != "Pair" {
         return Err(crate::error::PerlError::runtime(
             "Pair::method: not a pair object",
@@ -1089,9 +1086,9 @@ fn pair_field(obj: &PerlValue, idx: usize) -> crate::error::PerlResult<PerlValue
 }
 
 fn pair_to_json(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
-    let obj = args.first().ok_or_else(|| {
-        crate::error::PerlError::runtime("Pair::TO_JSON: missing invocant", 0)
-    })?;
+    let obj = args
+        .first()
+        .ok_or_else(|| crate::error::PerlError::runtime("Pair::TO_JSON: missing invocant", 0))?;
     let k = pair_field(obj, 0)?;
     let v = pair_field(obj, 1)?;
     Ok(PerlValue::array(vec![k, v]))

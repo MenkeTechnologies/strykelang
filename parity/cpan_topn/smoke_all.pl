@@ -190,13 +190,11 @@ eval {
 };
 fail( 'Module::Load', $@ ) if $@;
 
-# --- List::Util (native builtins; vendor stub + import for sum) ---
+# --- sum builtin (bare name) ---
 eval {
-    require List::Util;
-    List::Util->import('sum');
     sum( 1, 2, 3 ) == 6 or die "sum";
 };
-fail( 'List::Util(native)', $@ ) if $@;
+fail( 'sum(native)', $@ ) if $@;
 
 print "cpan_topn: all smokes passed\n";
 exit 0;

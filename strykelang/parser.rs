@@ -524,9 +524,9 @@ impl Parser {
                     s
                 }
                 "sub" => {
-                    if !crate::compat_mode() {
+                    if crate::no_interop_mode() {
                         return Err(self.syntax_err(
-                            "stryke uses `fn` instead of `sub` (this is not Perl 5)",
+                            "stryke uses `fn` instead of `sub` (--no-interop is active)",
                             self.peek_line(),
                         ));
                     }
@@ -1837,11 +1837,11 @@ impl Parser {
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                 }
-                // `fn { block }` — only valid in compat mode
+                // `sub { block }` — blocked in no-interop mode
                 Token::Ident(ref name) if name == "sub" => {
-                    if !crate::compat_mode() {
+                    if crate::no_interop_mode() {
                         return Err(self.syntax_err(
-                            "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
+                            "stryke uses `fn {}` instead of `sub {}` (--no-interop)",
                             stage_line,
                         ));
                     }
@@ -1879,7 +1879,10 @@ impl Parser {
                             self.advance();
                         } else {
                             return Err(self.syntax_err(
-                                format!("Expected identifier after `::` in thread stage, got {:?}", self.peek()),
+                                format!(
+                                    "Expected identifier after `::` in thread stage, got {:?}",
+                                    self.peek()
+                                ),
                                 stage_line,
                             ));
                         }
@@ -2409,9 +2412,9 @@ impl Parser {
             "pop" => ExprKind::Pop(Box::new(arg)),
             "shift" => ExprKind::Shift(Box::new(arg)),
             "reverse" => {
-                if !crate::compat_mode() {
+                if crate::no_interop_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                        "stryke uses `rev` instead of `reverse` (--no-interop)",
                         line,
                     ));
                 }
@@ -2609,11 +2612,10 @@ impl Parser {
                 args: vec![arg],
             },
             "say" => {
-                if !crate::compat_mode() {
-                    return Err(self.syntax_err(
-                        "stryke uses `p` instead of `say` (this is not Perl 5)",
-                        line,
-                    ));
+                if crate::no_interop_mode() {
+                    return Err(
+                        self.syntax_err("stryke uses `p` instead of `say` (--no-interop)", line)
+                    );
                 }
                 ExprKind::Say {
                     handle: None,
@@ -4080,10 +4082,10 @@ impl Parser {
                 })
             }
             Token::LParen | Token::LBrace | Token::Colon => {
-                // In non-compat mode, `fn {}` anonymous is not allowed — must use `fn {}`
-                if is_sub_keyword && !crate::compat_mode() {
+                // In no-interop mode, `sub {}` anonymous is not allowed — must use `fn {}`
+                if is_sub_keyword && crate::no_interop_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
+                        "stryke uses `fn {}` instead of `sub {}` (--no-interop)",
                         line,
                     ));
                 }
@@ -5753,8 +5755,7 @@ impl Parser {
             ExprKind::FuncCall { name, mut args } => {
                 // Stryke builtins are unprefixed; `CORE::` callers route back to the
                 // bare-name pipe-forward dispatch below.
-                let dispatch_name: &str =
-                    name.strip_prefix("CORE::").unwrap_or(name.as_str());
+                let dispatch_name: &str = name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
@@ -6370,9 +6371,9 @@ impl Parser {
             // ── Bareword function name → plain unary call ──────────────────────
             ExprKind::Bareword(name) => match name.as_str() {
                 "reverse" => {
-                    if !crate::compat_mode() {
+                    if crate::no_interop_mode() {
                         return Err(self.syntax_err(
-                            "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                            "stryke uses `rev` instead of `reverse` (--no-interop)",
                             line,
                         ));
                     }
@@ -8293,11 +8294,10 @@ impl Parser {
             }
             "print" | "pr" => self.parse_print_like(|h, a| ExprKind::Print { handle: h, args: a }),
             "say" => {
-                if !crate::compat_mode() {
-                    return Err(self.syntax_err(
-                        "stryke uses `p` instead of `say` (this is not Perl 5)",
-                        line,
-                    ));
+                if crate::no_interop_mode() {
+                    return Err(
+                        self.syntax_err("stryke uses `p` instead of `say` (--no-interop)", line)
+                    );
                 }
                 self.parse_print_like(|h, a| ExprKind::Say { handle: h, args: a })
             }
@@ -9050,9 +9050,9 @@ impl Parser {
                 })
             }
             "reverse" => {
-                if !crate::compat_mode() {
+                if crate::no_interop_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `rev` instead of `reverse` (this is not Perl 5)",
+                        "stryke uses `rev` instead of `reverse` (--no-interop)",
                         line,
                     ));
                 }
@@ -10478,6 +10478,20 @@ impl Parser {
                 ))
             }
             "any" | "all" | "none" => {
+                // `any(CODEREF, LIST)` with parens — parse as normal call.
+                if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    let args = self.parse_arg_list()?;
+                    self.expect(&Token::RParen)?;
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.clone(),
+                            args,
+                        },
+                        line,
+                    });
+                }
+                // `any BLOCK LIST` without parens.
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(self.syntax_err(
@@ -10502,6 +10516,20 @@ impl Parser {
             }
             // Ruby `detect` / `find` — same as `first` (first element matching block).
             "first" | "detect" | "find" => {
+                // `first(CODEREF, LIST)` with parens — parse as normal call.
+                if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    let args = self.parse_arg_list()?;
+                    self.expect(&Token::RParen)?;
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "first".to_string(),
+                            args,
+                        },
+                        line,
+                    });
+                }
+                // `first BLOCK LIST` without parens.
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(self.syntax_err(
@@ -11232,10 +11260,10 @@ impl Parser {
                 })
             }
             "sub" => {
-                // In non-compat mode, `fn {}` is not valid — must use `fn {}`
-                if !crate::compat_mode() {
+                // In no-interop mode, `sub {}` is not valid — must use `fn {}`
+                if crate::no_interop_mode() {
                     return Err(self.syntax_err(
-                        "stryke uses `fn {}` instead of `fn {}` (this is not Perl 5)",
+                        "stryke uses `fn {}` instead of `sub {}` (--no-interop)",
                         line,
                     ));
                 }
@@ -12343,7 +12371,7 @@ impl Parser {
             | "apply" | "appl"
             // ── python/ruby stdlib ───────────────────────────────────────────
             | "divmod" | "dm" | "accumulate" | "accum" | "starmap" | "smap"
-            | "zip_longest" | "zipl" | "combinations" | "comb" | "permutations" | "perm"
+            | "zip_longest" | "zipl" | "zip_fill" | "zipf" | "combinations" | "comb" | "permutations" | "perm"
             | "cartesian_product" | "cprod" | "compress" | "cmpr" | "filterfalse" | "falf"
             | "islice" | "isl" | "chain_from" | "chfr" | "pairwise_iter" | "pwi"
             | "tee_iter" | "teei" | "groupby_iter" | "gbi"

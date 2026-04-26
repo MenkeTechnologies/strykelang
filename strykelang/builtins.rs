@@ -1428,12 +1428,8 @@ pub(crate) fn try_builtin(
         "touch" => Some(interp.builtin_touch_execute(args, line)),
         "utime" => Some(interp.builtin_utime_execute(args, line)),
         "umask" => Some(interp.builtin_umask_execute(args, line)),
-        "getcwd" | "Cwd::getcwd" | "pwd" => {
-            Some(interp.builtin_getcwd_execute(args, line))
-        }
-        "realpath" | "Cwd::realpath" | "rp" => {
-            Some(interp.builtin_realpath_execute(args, line))
-        }
+        "getcwd" | "Cwd::getcwd" | "pwd" => Some(interp.builtin_getcwd_execute(args, line)),
+        "realpath" | "Cwd::realpath" | "rp" => Some(interp.builtin_realpath_execute(args, line)),
         "canonpath" => Some(builtin_canonpath(args)),
         "pipe" => Some(interp.builtin_pipe_execute(args, line)),
         "prototype" => Some(builtin_prototype(args)),
@@ -1481,9 +1477,7 @@ pub(crate) fn try_builtin(
         "getpriority" => Some(builtin_getpriority(args, line)),
         "setpriority" => Some(builtin_setpriority(args, line)),
         "gethostbyname" => Some(interp.builtin_gethostbyname(args, line)),
-        "getprotobyname" => {
-            Some(interp.builtin_getprotobyname(args, line))
-        }
+        "getprotobyname" => Some(interp.builtin_getprotobyname(args, line)),
         "getservbyname" => Some(interp.builtin_getservbyname(args, line)),
         "setsockopt" => Some(interp.builtin_setsockopt(args, line)),
         "getsockopt" => Some(interp.builtin_getsockopt(args, line)),
@@ -2234,7 +2228,7 @@ pub(crate) fn try_builtin(
         "divmod" | "dm" => Some(builtin_divmod(args)),
         "accumulate" | "accum" => Some(builtin_accumulate(interp, args, line)),
         "starmap" | "smap" => Some(builtin_starmap(interp, args, line)),
-        "zip_longest" | "zipl" => Some(builtin_zip_longest(args)),
+        "zip_fill" | "zipf" => Some(builtin_zip_fill(args)),
         "combinations" | "comb" => Some(builtin_combinations(args)),
         "permutations" | "perm" => Some(builtin_permutations(args)),
         "cartesian_product" | "cprod" => Some(builtin_cartesian_product(args)),
@@ -13154,8 +13148,8 @@ fn builtin_starmap(
     Ok(PerlValue::array(result))
 }
 
-/// `zip_longest FILL, LIST1, LIST2, ...` — zips lists, filling shorter ones with FILL (Python's itertools.zip_longest).
-fn builtin_zip_longest(args: &[PerlValue]) -> PerlResult<PerlValue> {
+/// `zip_fill FILL, LIST1, LIST2, ...` — zips lists, filling shorter ones with FILL (Python's itertools.zip_longest with explicit fill).
+fn builtin_zip_fill(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
     }

@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.9.7"
+version = "0.9.9"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -142,7 +142,7 @@ lsp-types = "0.97.0"
 unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
-zsh = { package = "zshrs", version = "0.9.3" }
+zsh = { package = "zshrs", version = "0.9.4" }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
