@@ -4,11 +4,11 @@
 //! `reverse` scalar vs list, short-circuit `&&`/`||`, `eval { }`, `Sub::Util`,
 //! `utf8::unicode_to_native`, `do { }` list context, `chomp`, `CORE::tell`, string `eval`, `sprintf`,
 //! `hex`/`oct`/`int`, `map`/`grep`/`sort` contexts, `//`/`//=`, bitwise ops, `for`/`last`/`next`/`until`,
-//! `unless`/`elsif`, subs and `wantarray`, `List::Util`/`Scalar::Util`, `values`, `split`, append `open`,
+//! `unless`/`elsif`, subs and `wantarray`, list builtins, `values`, `split`, append `open`,
 //! `\\A`/`\z`, negative array indices, slice assign, postfix `if`, `tr`/`substr`, `||=`/`&&=`, `__LINE__`,
 //! `$@` after `eval { die }`, filetests (`-e`/`-f`/`-d`; `-s` is nonzero-size, not byte count), `cos`,
 //! `mkdir`/`unlink`, `map`/`grep` blocks, `index`/`rindex`, `exp`/`log`/`atan2`/`sin`, `bless`, `return`,
-//! `List::Util::head`/`tail`/`none`/`notall`, `scalar` comma list, `and`/`or`, `pack`/`unpack`, `qw`,
+//! `head`/`tail`/`none`/`notall`, `scalar` comma list, `and`/`or`, `pack`/`unpack`, `qw`,
 //! `rename`, `sum0`, `pairkeys`/`pairvalues`/`zip`, `$$`/`$^O`, `delete`/`exists` (avoid bareword keys like
 //! `p`/`q`/`m` that tokenize as ops). `use constant`, `qr//`, `/g` list capture, `s///g`, `mesh`,
 //! `shuffle`, `pop`/`unshift`/`$#array`, `split` on escaped metachars, `sprintf` float, pi via
@@ -23,7 +23,7 @@
 //! `Scalar::Util::blessed`/`reftype`, `for` default topic after loop, `sort` by `length`, `seekdir(0)`, `-z`, `push` expr,
 //! postfix `unless`, regex `(?i)`, `\d`, captures, lookahead, `/s`/`/m`, `\A`, `\Q…\E`, `split //`, array `[0..N]`,
 //! `int` on float/string, `**` edge cases, `sprintf` `%X`/`%c`, bitwise `~`, `pack` `v`/`n` endianness,
-//! regex `(?!…)` / `+?` / `\1` / `\s`/`\w`/`\b` / `(?<=…)` / `(?:…)`, `$+`, `List::Util::reduce`, `grep` boolean negation,
+//! regex `(?!…)` / `+?` / `\1` / `\s`/`\w`/`\b` / `(?<=…)` / `(?:…)`, `$+`, `reduce`, `grep` boolean negation,
 //! `unpack` `x` skip, `pack` `N`/`V`, fractional `**` (via `sprintf`), `sqrt`, `s///g` scalar count, array copy,
 //! `->` deref, `-=` / `^=`, `sprintf` `%+f`, `ref` of `sub`, `(?<!…)` lookbehind, `${^POSTMATCH}`, `\h`/`\v`,
 //! `m{…}` delimiters, `sort`/`cmp`, `prototype`, possessive `*+`, `map` on `qw`, list `x` in `push`, `sprintf` `#`,
@@ -71,13 +71,13 @@
 //! `reverse sort`, `s///g` + count, `map ord`, `pack`/`unpack` `a2`, `&&=` / `+=` coercion, `exists` past end, `map lc`,
 //! `splice` tail, `*=` / `-=` / `int`, `.=` join flatten, `//` + `//=`, truthiness `""`/`"0"`/`"0E0"`, `bless` `[]`.
 //! `scalar` `@{[…]}`, `sort` `keys`/`values`, `qw`/`join`, `$#`, `ref` `[]`/`{}`, `->[]`, `/./g`, `split` `\\s+`,
-//! `sprintf` `%b`/`%o`, `splice` zero-remove insert, `List::Util::all`, `map chr`, `shift`/`pop`, `atan2`/`sqrt`,
+//! `sprintf` `%b`/`%o`, `splice` zero-remove insert, `all`, `map chr`, `shift`/`pop`, `atan2`/`sqrt`,
 //! postfix `for` `*=`, `unshift`, string `x`, list slice, `sprintf` `%.0f`, `3 & ~1`, `map` reassignment, `@a[i,k]`,
 //! `substr`, `index`, `pack`/`unpack` `H*`, `reverse` `..`.
 //! `map` squares + `reverse` `qw`, slice reorder + `..` slice, `<=>` / `cmp`, `tr`/`s` cleanup, `s` backref,
 //! `keys` growth, `scalar values`, `push` flatten tail, subscript expr, `int(cos+sin)`, `/g` + `join`, `grep` `eq`,
 //! sparse `scalar`/`$#`, first-slot array, scalar `/` float.
-//! `map` float + range `grep`, `List::Util::product`/`min`, `index`/`rindex`/`substr`, `fc`, `sprintf` `%.2f`,
+//! `map` float + range `grep`, `product`/`min`, `index`/`rindex`/`substr`, `fc`, `sprintf` `%.2f`,
 //! slice assign, `delete`+`keys`, `@` in scalar, `defined`, `$a[-1]` read/write, `map` `++`, `%`, `|=`/`&=`,
 //! `/^…/`, `grep` `%`, `pack C`, `undef` assign, `//=`, `exists`/`delete`+`map//`, `/g` doubles, `s` capture rotate,
 //! `"01"` `==`/`eq`, `splice` head, `atan2(0,-1)>3`.
@@ -85,7 +85,7 @@
 //! `split` `|`/`,`, `..` slice, float `+`/`*`, `int` pair, `scalar @a`/empty, `//` display, `/[aeiou]/g`, `lc`/`uc`,
 //! `sprintf` `%x`/`%X`/`%o`, `@a[i,j,k]`, `sort` `$b cmp $a`, `s/./x/g`, `int(log(near-e))`, hash `//=`, `4==4.0`,
 //! `join` `-`+`/./g`, `scalar reverse @a`, `-2**2`, `*= -1`.
-//! List literal slice, `map` scale + `..`, `grep` scalar on `@a`, `List::Util::max`/`min`, `substr` negative + len,
+//! List literal slice, `map` scale + `..`, `grep` scalar on `@a`, `max`/`min`, `substr` negative + len,
 //! `index`, `sprintf` `%04d`/`%+d`, `*=`, `^`, hash `+=`, `tr`, `s/\\d/_`, `/g` doubles, `grep`→`@a[…]`, `exp`/`atan2`,
 //! sum first+last index, `reverse` `qw`, `map` case flip + `split`, `ne` on stringy ints, `sort` by `length`.
 //! `map` default `$_`, `reverse`+`map`, `unpack` `C*`, `sort` longest-first, `&&`/`||` stringy, `//`, `<=>` chain,
@@ -1131,17 +1131,17 @@ fn wantarray_false_in_scalar_context() {
     );
 }
 
-// ── Native List::Util / Scalar::Util (CPAN bootstrap paths) ──
+// ── Native list / scalar builtins (CPAN bootstrap paths) ──
 
 #[test]
 fn list_util_sum_adds_numbers() {
-    assert_eq!(eval_int(r#"List::Util::sum(10, 20, 30)"#), 60);
+    assert_eq!(eval_int(r#"sum(10, 20, 30)"#), 60);
 }
 
 #[test]
 fn list_util_uniq_preserves_first_occurrence_order() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::uniq(1, 1, 2, 2, 3)"#),
+        eval_string(r#"join "-", uniq(1, 1, 2, 2, 3)"#),
         "1-2-3"
     );
 }
@@ -1377,23 +1377,23 @@ fn eval_block_die_populates_at_exception() {
     );
 }
 
-// ── More `List::Util` native paths ──
+// ── More list-builtin native paths ──
 
 #[test]
 fn list_util_max_min_product_combine() {
     assert_eq!(
         eval_int(
-            r#"List::Util::max(3, 9, 4) - List::Util::min(3, 9, 4) + List::Util::product(2, 3)"#
+            r#"max(3, 9, 4) - min(3, 9, 4) + product(2, 3)"#
         ),
         12
     );
-    assert_eq!(eval_int(r#"List::Util::product(1, 2, 3, 4)"#), 24);
+    assert_eq!(eval_int(r#"product(1, 2, 3, 4)"#), 24);
 }
 
 #[test]
 fn list_util_any_all_with_coderef() {
-    assert_eq!(eval_int(r#"List::Util::any(fn { $_ > 2 }, 1, 2, 3)"#), 1);
-    assert_eq!(eval_int(r#"List::Util::all(fn { $_ > 0 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"any(fn { $_ > 2 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"all(fn { $_ > 0 }, 1, 2, 3)"#), 1);
 }
 
 // ── Math: `cos` at zero ──
@@ -1530,7 +1530,7 @@ fn sin_zero_is_zero() {
     assert_eq!(eval_int(r#"int(sin(0) * 1000)"#), 0);
 }
 
-// ── `bless`, early `return`, `List::Util::head` / `tail` ──
+// ── `bless`, early `return`, `head` / `tail` ──
 
 #[test]
 fn bless_sets_ref_type_name() {
@@ -1560,28 +1560,28 @@ fn return_short_circuits_sub_rest() {
 #[test]
 fn list_util_head_and_tail_take_slice_ends() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::head(10, 20, 30, 40, 2)"#),
+        eval_string(r#"join "-", head(10, 20, 30, 40, 2)"#),
         "10-20"
     );
     assert_eq!(
-        eval_string(r#"join "-", List::Util::tail(10, 20, 30, 40, 2)"#),
+        eval_string(r#"join "-", tail(10, 20, 30, 40, 2)"#),
         "30-40"
     );
     assert_eq!(
-        eval_string(r#"scalar List::Util::head(qw(a b c d), 2)"#),
+        eval_string(r#"scalar head(qw(a b c d), 2)"#),
         "b"
     );
     assert_eq!(
-        eval_string(r#"scalar List::Util::tail(qw(a b c d), 2)"#),
+        eval_string(r#"scalar tail(qw(a b c d), 2)"#),
         "d"
     );
 }
 
 #[test]
 fn list_util_none_and_notall_predicates() {
-    assert_eq!(eval_int(r#"List::Util::none(fn { $_ < 0 }, 1, 2, 3)"#), 1);
+    assert_eq!(eval_int(r#"none(fn { $_ < 0 }, 1, 2, 3)"#), 1);
     assert_eq!(
-        eval_int(r#"List::Util::notall(fn { $_ > 0 }, 1, -1, 2)"#),
+        eval_int(r#"notall(fn { $_ > 0 }, 1, -1, 2)"#),
         1
     );
 }
@@ -1688,7 +1688,7 @@ fn caret_o_osname_nonempty() {
     assert_eq!(eval_int(r#"(length($^O) >= 2) ? 1 : 0"#), 1);
 }
 
-// ── `rename`, more `List::Util` ──
+// ── `rename`, more list builtins ──
 
 #[test]
 fn rename_moves_file_contents_preserved() {
@@ -1714,17 +1714,17 @@ fn rename_moves_file_contents_preserved() {
 
 #[test]
 fn list_util_sum0_empty_list_is_zero() {
-    assert_eq!(eval_int(r#"List::Util::sum0()"#), 0);
+    assert_eq!(eval_int(r#"sum0()"#), 0);
 }
 
 #[test]
 fn list_util_pairkeys_pairvalues_split_pairs() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::pairkeys(1, 10, 2, 20)"#),
+        eval_string(r#"join "-", pairkeys(1, 10, 2, 20)"#),
         "1-2"
     );
     assert_eq!(
-        eval_string(r#"join "-", List::Util::pairvalues(1, 10, 2, 20)"#),
+        eval_string(r#"join "-", pairvalues(1, 10, 2, 20)"#),
         "10-20"
     );
 }
@@ -1734,7 +1734,7 @@ fn list_util_zip_pairs_first_row_snapshot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my @z = List::Util::zip(1, 2, 10, 20);
+            my @z = zip(1, 2, 10, 20);
             $z[0]->[0] + $z[0]->[1]"#
         ),
         3
@@ -1789,12 +1789,12 @@ fn substitution_global_flag_replaces_every_occurrence() {
     );
 }
 
-// ── `List::Util::mesh`, `shuffle` (length only) ──
+// ── `mesh`, `shuffle` (length only) ──
 
 #[test]
 fn list_util_mesh_interleaves_parallel_lists() {
     assert_eq!(
-        eval_string(r#"join "", List::Util::mesh(1, 2, 10, 20)"#),
+        eval_string(r#"join "", mesh(1, 2, 10, 20)"#),
         "121020"
     );
 }
@@ -1804,7 +1804,7 @@ fn shuffle_returns_permutation_of_same_length() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my @s = List::Util::shuffle(7, 8, 9, 10);
+            my @s = shuffle(7, 8, 9, 10);
             scalar @s"#
         ),
         4
@@ -1887,7 +1887,7 @@ fn cosine_at_pi_is_negative_one() {
 
 #[test]
 fn list_util_product_empty_list_is_zero() {
-    assert_eq!(eval_int(r#"List::Util::product()"#), 0);
+    assert_eq!(eval_int(r#"product()"#), 0);
 }
 
 // ── `defined`, `undef`; string min/max ──
@@ -1908,7 +1908,7 @@ fn assign_undef_makes_defined_false() {
 fn list_util_minstr_maxstr_lexical() {
     assert_eq!(
         eval_string(
-            r#"join ",", List::Util::minstr("dog", "cat"), List::Util::maxstr("dog", "cat")"#
+            r#"join ",", minstr("dog", "cat"), maxstr("dog", "cat")"#
         ),
         "cat,dog"
     );
@@ -1926,14 +1926,14 @@ fn values_sorted_join_numeric_strings() {
     );
 }
 
-// ── More `List::Util`: `zip_shortest`, `mesh_shortest`, `uniqstr`/`uniqnum`, `pairs` ──
+// ── More list builtins: zip_shortest, mesh_shortest, uniqstr/uniqnum, pairs ──
 
 #[test]
 fn list_util_zip_shortest_first_row_snapshot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my @z = List::Util::zip_shortest(1, 2, 3, 10, 20);
+            my @z = zip_shortest(1, 2, 3, 10, 20);
             $z[0]->[0] + $z[0]->[1]"#
         ),
         3
@@ -1943,7 +1943,7 @@ fn list_util_zip_shortest_first_row_snapshot() {
 #[test]
 fn list_util_mesh_shortest_interleaves_until_shorter_exhausted() {
     assert_eq!(
-        eval_string(r#"join "", List::Util::mesh_shortest(1, 2, 3, 10, 20)"#),
+        eval_string(r#"join "", mesh_shortest(1, 2, 3, 10, 20)"#),
         "1231020"
     );
 }
@@ -1951,11 +1951,11 @@ fn list_util_mesh_shortest_interleaves_until_shorter_exhausted() {
 #[test]
 fn list_util_uniqstr_and_uniqnum_dedupe() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::uniqstr("a", "a", "b")"#),
+        eval_string(r#"join "-", uniqstr("a", "a", "b")"#),
         "a-b"
     );
     assert_eq!(
-        eval_string(r#"join "-", List::Util::uniqnum(1.0, 1, 2)"#),
+        eval_string(r#"join "-", uniqnum(1.0, 1, 2)"#),
         "1-2"
     );
 }
@@ -1965,7 +1965,7 @@ fn list_util_pairs_returns_one_pair_object_per_kv() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my @pr = List::Util::pairs(1, 10, 2, 20);
+            my @pr = pairs(1, 10, 2, 20);
             scalar @pr"#
         ),
         2
@@ -2164,7 +2164,7 @@ fn sprintf_percent_b_and_percent_o_formats() {
 #[test]
 fn list_util_uniqint_deduplicates_integer_values() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::uniqint(1, 1, 2, 2, 3)"#),
+        eval_string(r#"join "-", uniqint(1, 1, 2, 2, 3)"#),
         "1-2-3"
     );
 }
@@ -2906,7 +2906,7 @@ fn ref_anon_subroutine_is_code() {
 #[test]
 fn list_util_reduce_concatenates_list_left_to_right() {
     assert_eq!(
-        eval_string(r#"qw(x y z) |> List::Util::reduce { $a . $b }"#),
+        eval_string(r#"qw(x y z) |> reduce { $a . $b }"#),
         "xyz"
     );
 }
@@ -2914,7 +2914,7 @@ fn list_util_reduce_concatenates_list_left_to_right() {
 #[test]
 fn list_util_fold_alias_concatenates_like_reduce() {
     assert_eq!(
-        eval_string(r#"qw(x y z) |> List::Util::fold { $a . $b }"#),
+        eval_string(r#"qw(x y z) |> fold { $a . $b }"#),
         "xyz"
     );
 }
@@ -5661,7 +5661,7 @@ fn string_truthiness_distinguishes_zero_exponent_from_empty() {
     );
 }
 
-// ── `scalar @{[]}`, hash `keys`/`values`, `ref`, `aref`, regex/split, `sprintf`, `splice`, `List::Util::all`, `shift`/`pop`, `atan2`, `for`, `pack`/`unpack` `H*` ──
+// ── `scalar @{[]}`, hash `keys`/`values`, `ref`, `aref`, regex/split, `sprintf`, `splice`, `all`, `shift`/`pop`, `atan2`, `for`, `pack`/`unpack` `H*` ──
 
 #[test]
 fn scalar_deref_anonymous_array_brackets_counts_elements() {
@@ -5776,7 +5776,7 @@ fn defined_or_assign_leaves_defined_positive_unchanged() {
 #[test]
 fn list_util_all_true_under_upper_bound() {
     assert_eq!(
-        eval_int(r#"0 + List::Util::all(fn { $_ < 10 }, 1, 2, 3)"#),
+        eval_int(r#"0 + all(fn { $_ < 10 }, 1, 2, 3)"#),
         1
     );
 }
@@ -6164,7 +6164,7 @@ fn scalar_division_yields_float_for_odd_numerator() {
     );
 }
 
-// ── `map`/`grep`/`List::Util`, string ops, hash/array surgery, bitwise, regex, `pack`, `splice`, `atan2` ──
+// ── `map`/`grep`/list builtins, string ops, hash/array surgery, bitwise, regex, `pack`, `splice`, `atan2` ──
 
 #[test]
 fn map_adds_fraction_to_integer_topics() {
@@ -6190,12 +6190,12 @@ fn grep_filters_named_array_by_numeric_comparison() {
 
 #[test]
 fn list_util_product_three_integers() {
-    assert_eq!(eval_int(r#"List::Util::product(2, 3, 4)"#), 24);
+    assert_eq!(eval_int(r#"product(2, 3, 4)"#), 24);
 }
 
 #[test]
 fn list_util_min_of_three_integers() {
-    assert_eq!(eval_int(r#"List::Util::min(8, 3, 5)"#), 3);
+    assert_eq!(eval_int(r#"min(8, 3, 5)"#), 3);
 }
 
 #[test]
@@ -6746,7 +6746,7 @@ fn rindex_finds_last_occurrence_of_single_letter() {
     assert_eq!(eval_int(r#"rindex("fr11_aba", "a")"#), 7);
 }
 
-// ── List/map/grep, `List::Util`, strings, `sprintf`, assigns, `tr`/`s`, regex, math, `reverse`, sort by length ──
+// ── List/map/grep, list builtins, strings, `sprintf`, assigns, `tr`/`s`, regex, math, `reverse`, sort by length ──
 
 #[test]
 fn list_literal_non_contiguous_indices_join() {
@@ -6772,12 +6772,12 @@ fn scalar_grep_counts_equality_hits_on_named_array() {
 
 #[test]
 fn list_util_max_one_through_four_inclusive() {
-    assert_eq!(eval_int(r#"List::Util::max(1, 2, 3, 4)"#), 4);
+    assert_eq!(eval_int(r#"max(1, 2, 3, 4)"#), 4);
 }
 
 #[test]
 fn list_util_min_among_nine_four_and_seven() {
-    assert_eq!(eval_int(r#"List::Util::min(9, 4, 7)"#), 4);
+    assert_eq!(eval_int(r#"min(9, 4, 7)"#), 4);
 }
 
 #[test]

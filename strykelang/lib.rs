@@ -30,7 +30,7 @@ pub mod interpreter;
 mod jit;
 mod jwt;
 pub mod lexer;
-pub mod list_util;
+pub mod list_builtins;
 pub mod lsp;
 mod map_grep_fast;
 mod map_stream;

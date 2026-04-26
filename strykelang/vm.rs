@@ -876,11 +876,8 @@ impl<'a> VM<'a> {
 
     #[inline]
     fn call_preserve_operand_arrays(name: &str) -> bool {
-        // Stryke builtins are unprefixed; route `CORE::` / `List::Util::` callers to bare names.
-        let name = name
-            .strip_prefix("CORE::")
-            .or_else(|| name.strip_prefix("List::Util::"))
-            .unwrap_or(name);
+        // Stryke builtins are unprefixed; `CORE::` callers route to bare names.
+        let name = name.strip_prefix("CORE::").unwrap_or(name);
         matches!(
             name,
             "zip"
@@ -2046,11 +2043,7 @@ impl<'a> VM<'a> {
                     self.interp
                         .apply_sub_signature(&sub, &argv, line)
                         .map_err(|e| e.at_line(line))?;
-                    let result = if let Some(r) =
-                        crate::list_util::native_dispatch(self.interp, &sub, &argv, want)
-                    {
-                        r
-                    } else {
+                    let result = {
                         self.interp.scope.declare_array("_", argv.clone());
                         self.interp.scope.set_closure_args(&argv);
                         self.interp

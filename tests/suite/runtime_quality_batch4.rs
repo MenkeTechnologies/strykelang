@@ -1,4 +1,4 @@
-//! Interpreter integration tests: `pack`/`unpack`, regex features, ranges, `List::Util` / `Scalar::Util`,
+//! Interpreter integration tests: `pack`/`unpack`, regex features, ranges, list / scalar builtins,
 //! compound assigns, hash slices, pragmas, `package`/`our`, refs, and aggregate edges.
 
 use crate::common::*;
@@ -59,22 +59,22 @@ fn numeric_range_singleton() {
 
 #[test]
 fn list_util_sum_three_args() {
-    assert_eq!(eval_int(r#"List::Util::sum(10, 20, 30)"#), 60);
+    assert_eq!(eval_int(r#"sum(10, 20, 30)"#), 60);
 }
 
 #[test]
 fn list_util_max_of_three() {
-    assert_eq!(eval_int(r#"List::Util::max(3, 9, 2)"#), 9);
+    assert_eq!(eval_int(r#"max(3, 9, 2)"#), 9);
 }
 
 #[test]
 fn list_util_min_of_three() {
-    assert_eq!(eval_int(r#"List::Util::min(3, 9, 2)"#), 2);
+    assert_eq!(eval_int(r#"min(3, 9, 2)"#), 2);
 }
 
 #[test]
 fn list_util_product_three_factors() {
-    assert_eq!(eval_int(r#"List::Util::product(2, 3, 4)"#), 24);
+    assert_eq!(eval_int(r#"product(2, 3, 4)"#), 24);
 }
 
 #[test]
@@ -366,13 +366,13 @@ fn string_ne_force_string_compare() {
 
 #[test]
 fn list_util_first_with_coderef_finds_element() {
-    assert_eq!(eval_int(r#"List::Util::first(fn { $_ > 2 }, 1, 2, 3)"#), 3);
+    assert_eq!(eval_int(r#"first(fn { $_ > 2 }, 1, 2, 3)"#), 3);
 }
 
 #[test]
 fn list_util_none_with_coderef_no_match() {
     assert_eq!(
-        eval_int(r#"List::Util::none(fn { $_ > 10 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"none(fn { $_ > 10 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -380,7 +380,7 @@ fn list_util_none_with_coderef_no_match() {
 #[test]
 fn list_util_any_with_coderef_one_hit() {
     assert_eq!(
-        eval_int(r#"List::Util::any(fn { $_ == 2 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"any(fn { $_ == 2 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -388,7 +388,7 @@ fn list_util_any_with_coderef_one_hit() {
 #[test]
 fn list_util_all_with_coderef_all_positive() {
     assert_eq!(
-        eval_int(r#"List::Util::all(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"all(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
         1
     );
 }
@@ -396,7 +396,7 @@ fn list_util_all_with_coderef_all_positive() {
 #[test]
 fn list_util_notall_with_coderef_all_match() {
     assert_eq!(
-        eval_int(r#"List::Util::notall(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
+        eval_int(r#"notall(fn { $_ > 0 }, 1, 2, 3) ? 1 : 0"#),
         0
     );
 }
@@ -453,13 +453,13 @@ fn regex_digit_class() {
 
 #[test]
 fn list_util_pairs_four_elements_two_objects() {
-    assert_eq!(eval_int(r#"scalar List::Util::pairs(1, 2, 3, 4)"#), 2);
+    assert_eq!(eval_int(r#"scalar pairs(1, 2, 3, 4)"#), 2);
 }
 
 #[test]
 fn list_util_pairkeys_two_keys() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::pairkeys(10, 20, 30, 40)"#),
+        eval_string(r#"join "-", pairkeys(10, 20, 30, 40)"#),
         "10-30"
     );
 }
@@ -467,7 +467,7 @@ fn list_util_pairkeys_two_keys() {
 #[test]
 fn list_util_pairvalues_two_values() {
     assert_eq!(
-        eval_string(r#"join "-", List::Util::pairvalues(10, 20, 30, 40)"#),
+        eval_string(r#"join "-", pairvalues(10, 20, 30, 40)"#),
         "20-40"
     );
 }

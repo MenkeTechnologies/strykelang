@@ -1031,7 +1031,7 @@ pub enum ExprKind {
         list: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
-    /// `reduce { $a + $b } @list` — sequential left fold (like `List::Util::reduce`).
+    /// `reduce { $a + $b } @list` — sequential left fold over the list.
     /// `$a` is the accumulator; `$b` is the next list element.
     ReduceExpr {
         block: Block,
