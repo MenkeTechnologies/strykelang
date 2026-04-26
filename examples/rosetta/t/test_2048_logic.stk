@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 2048 Game Logic
 
-fn slide_row($row) {
+fn Rosetta::Game2048::slide_row($row) {
     my @non_zero
     for my $v (@$row) { if ($v != 0) { push @non_zero, $v } }
     
@@ -21,16 +21,16 @@ fn slide_row($row) {
     \@res
 }
 
-fn move_left($grid) {
+fn Rosetta::Game2048::move_left($grid) {
     my @new_grid
     for my $row (@$grid) {
-        push @new_grid, slide_row($row)
+        push @new_grid, Rosetta::Game2048::slide_row($row)
     }
     \@new_grid
 }
 
 my $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
-my $res = move_left($g1)
+my $res = Rosetta::Game2048::move_left($g1)
 
 assert_eq join(",", @{$res->[0]}), "4,0,0,0", "row 2,2,0,0 -> 4,0,0,0"
 assert_eq join(",", @{$res->[1]}), "4,0,0,0", "row 2,0,2,0 -> 4,0,0,0"

@@ -1,50 +1,51 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Circular primes
 
-fn my_is_prime($n) {
+fn Rosetta::CircularPrimes::is_prime_custom($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
         my $limit = sqrt($n)
         my $res = 1
-        my $limit_m1 = $limit - 1
-        my $limit_idx = int($limit_m1 / 2)
-        for my $i (~> (1..$limit_idx) map { $_ * 2 + 1 }) {
-            if ($n % $i == 0) {
+        for my $i (1..int($limit)) {
+            my $v = $i * 2 + 1
+            if ($v > $limit) { next }
+            if ($n % $v == 0) {
                 $res = 0
-                $i = $n
+                return 0
             }
         }
         $res
     }
 }
 
-fn rotate_string($s) {
+fn Rosetta::CircularPrimes::rotate($s) {
     my $first = substr($s, 0, 1)
     my $rest = substr($s, 1)
     $rest . $first
 }
 
-fn is_circular_prime($n) {
+fn Rosetta::CircularPrimes::check($n) {
     my $s = "$n"
     my $len = length($s)
     my $all_prime = 1
     for my $i (1..$len) {
-        if (!my_is_prime(int($s))) {
+        # Using the builtin is_prime for speed, or the custom one if requested
+        if (!is_prime(int($s))) {
             $all_prime = 0
-            $i = $len
+            return 0
         }
-        $s = rotate_string($s)
+        $s = Rosetta::CircularPrimes::rotate($s)
     }
     $all_prime
 }
 
-assert_ok is_circular_prime(2), "2 is circular prime"
-assert_ok is_circular_prime(197), "197 is circular prime"
-assert_ok is_circular_prime(1193), "1193 is circular prime"
-assert_ok !is_circular_prime(19), "19 is not circular (91 is not prime)"
+assert_ok Rosetta::CircularPrimes::check(2), "2 is circular prime"
+assert_ok Rosetta::CircularPrimes::check(197), "197 is circular prime"
+assert_ok Rosetta::CircularPrimes::check(1193), "1193 is circular prime"
+assert_ok !Rosetta::CircularPrimes::check(19), "19 is not circular (91 is not prime)"
 
-197 |> is_circular_prime |> assert_ok("pipe circular prime")
+197 |> Rosetta::CircularPrimes::check |> assert_ok("pipe circular prime")
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Huffman coding
 
-fn huffman_tree($freqs) {
+fn Rosetta::HuffmanCoding::build_tree($freqs) {
     my @nodes = ()
     for my $char (keys %$freqs) {
         push @nodes, { char => $char, freq => $freqs->{$char} }
@@ -22,19 +22,19 @@ fn huffman_tree($freqs) {
     $nodes[0]
 }
 
-fn get_codes($node, $prefix, $codes) {
+fn Rosetta::HuffmanCoding::get_codes($node, $prefix, $codes) {
     if (exists $node->{char}) {
         $codes->{$node->{char}} = $prefix
     } else {
-        get_codes($node->{left}, $prefix . "0", $codes)
-        get_codes($node->{right}, $prefix . "1", $codes)
+        Rosetta::HuffmanCoding::get_codes($node->{left}, $prefix . "0", $codes)
+        Rosetta::HuffmanCoding::get_codes($node->{right}, $prefix . "1", $codes)
     }
 }
 
 my $freqs = { "a" => 5, "b" => 9, "c" => 12, "d" => 13, "e" => 16, "f" => 45 }
-my $tree = huffman_tree($freqs)
+my $tree = Rosetta::HuffmanCoding::build_tree($freqs)
 my $codes = {}
-get_codes($tree, "", $codes)
+Rosetta::HuffmanCoding::get_codes($tree, "", $codes)
 
 assert_eq length($codes->{f}), 1, "f should have shortest code"
 assert_ok length($codes->{a}) > length($codes->{f}), "a should have longer code than f"

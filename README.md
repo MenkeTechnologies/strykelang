@@ -14,7 +14,7 @@
  [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/strykelang/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### `[THE 2ND FASTEST DYNAMIC LANGUAGE IN THE WORLD]`
+### `[THE FASTEST DYNAMIC LANGUAGE IN THE WORLD FOR PARALLEL OPERATIONS]`
 
 > *"There is more than one way to do it — in parallel."*
 >

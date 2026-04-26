@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: FizzBuzz
 
-fn my_fizzbuzz {
-    my $n = $_[0]
+fn Rosetta::FizzBuzz::compute($n) {
     if ($n % 15 == 0) {
         "FizzBuzz"
     } elsif ($n % 3 == 0) {
@@ -14,20 +13,19 @@ fn my_fizzbuzz {
     }
 }
 
-fn fizzbuzz_list {
-    my $max = $_[0]
-    my @res = ~> 1..$max map { my_fizzbuzz($_) }
-    \@res
+fn Rosetta::FizzBuzz::list($max) {
+    # Using thread macro and pmap for a parallel fizzbuzz
+    ~> 1:$max pmap { Rosetta::FizzBuzz::compute($_) }
 }
 
-assert_eq my_fizzbuzz(1), 1, "fizzbuzz(1)"
-assert_eq my_fizzbuzz(3), "Fizz", "fizzbuzz(3)"
-assert_eq my_fizzbuzz(5), "Buzz", "fizzbuzz(5)"
-assert_eq my_fizzbuzz(15), "FizzBuzz", "fizzbuzz(15)"
-assert_eq my_fizzbuzz(7), 7, "fizzbuzz(7)"
+assert_eq Rosetta::FizzBuzz::compute(1), 1, "fizzbuzz(1)"
+assert_eq Rosetta::FizzBuzz::compute(3), "Fizz", "fizzbuzz(3)"
+assert_eq Rosetta::FizzBuzz::compute(5), "Buzz", "fizzbuzz(5)"
+assert_eq Rosetta::FizzBuzz::compute(15), "FizzBuzz", "fizzbuzz(15)"
+assert_eq Rosetta::FizzBuzz::compute(7), 7, "fizzbuzz(7)"
 
-my $list = fizzbuzz_list(15)
-assert_eq $list->[2], "Fizz", "list[3] is Fizz"
-assert_eq $list->[14], "FizzBuzz", "list[15] is FizzBuzz"
+my @list = Rosetta::FizzBuzz::list(15)
+assert_eq $list[2], "Fizz", "list[3] is Fizz"
+assert_eq $list[14], "FizzBuzz", "list[15] is FizzBuzz"
 
 test_run

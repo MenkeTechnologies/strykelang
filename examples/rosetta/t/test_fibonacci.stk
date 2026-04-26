@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fibonacci Sequence
 
-fn my_fib($n) {
+fn Rosetta::Fibonacci::compute($n) {
     if ($n <= 1) {
         $n
     } else {
-        my_fib($n - 1) + my_fib($n - 2)
+        Rosetta::Fibonacci::compute($n - 1) + Rosetta::Fibonacci::compute($n - 2)
     }
 }
 
-fn fib_iter($n) {
+fn Rosetta::Fibonacci::compute_iter($n) {
     my ($a, $b) = (0, 1)
     for my $i (1..$n) {
         ($a, $b) = ($b, $a + $b)
@@ -17,12 +17,12 @@ fn fib_iter($n) {
     $a
 }
 
-assert_eq my_fib(0), 0, "fib(0)"
-assert_eq my_fib(1), 1, "fib(1)"
-assert_eq my_fib(10), 55, "fib(10)"
-assert_eq my_fib(20), 6765, "fib(20)"
+assert_eq Rosetta::Fibonacci::compute(0), 0, "fib(0)"
+assert_eq Rosetta::Fibonacci::compute(1), 1, "fib(1)"
+assert_eq Rosetta::Fibonacci::compute(10), 55, "fib(10)"
+assert_eq Rosetta::Fibonacci::compute(20), 6765, "fib(20)"
 
-assert_eq fib_iter(0), 0, "fib_iter(0)"
-assert_eq fib_iter(10), 55, "fib_iter(10)"
+assert_eq Rosetta::Fibonacci::compute_iter(0), 0, "fib_iter(0)"
+assert_eq Rosetta::Fibonacci::compute_iter(10), 55, "fib_iter(10)"
 
 test_run

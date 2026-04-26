@@ -3,7 +3,7 @@
 
 # This is a single line comment in Stryke
 
-fn show_comments() {
+fn Rosetta::Comments::show() {
     # This function demonstrates different comment styles
     "Comments demonstrated:" |> p
     "1. Hash (#) for single line comments" |> p
@@ -18,7 +18,8 @@ fn show_comments() {
 # This is line 2 of a multi-line comment
 # This is line 3 of a multi-line comment
 
-show_comments
+Rosetta::Comments::show()
 
 # Comments are essential for code documentation
 # They explain the 'why', not just the 'what'
+test_run

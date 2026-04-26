@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Comma quibbler
 
-fn quibble(@list) {
+fn Rosetta::CommaQuibbler::quibble(@list) {
     my $len = scalar(@list)
     if ($len == 0) {
         "{}"
@@ -14,11 +14,11 @@ fn quibble(@list) {
     }
 }
 
-assert_eq quibble(), "{}", "empty list"
-assert_eq quibble("ABC"), "{ABC}", "one element"
-assert_eq quibble("ABC", "DEF"), "{ABC and DEF}", "two elements"
-assert_eq quibble("ABC", "DEF", "GHI", "JKL"), "{ABC, DEF, GHI and JKL}", "four elements"
+assert_eq Rosetta::CommaQuibbler::quibble(), "{}", "empty list"
+assert_eq Rosetta::CommaQuibbler::quibble("ABC"), "{ABC}", "one element"
+assert_eq Rosetta::CommaQuibbler::quibble("ABC", "DEF"), "{ABC and DEF}", "two elements"
+assert_eq Rosetta::CommaQuibbler::quibble("ABC", "DEF", "GHI", "JKL"), "{ABC, DEF, GHI and JKL}", "four elements"
 
-qw(one two three) |> quibble |> assert_eq("{one, two and three}", "pipe quibble")
+qw(one two three) |> Rosetta::CommaQuibbler::quibble |> assert_eq("{one, two and three}", "pipe quibble")
 
 test_run

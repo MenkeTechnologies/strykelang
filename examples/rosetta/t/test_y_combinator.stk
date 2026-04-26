@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Y Combinator
+
+fn Rosetta::YCombinator::y($f) {
+    my $g = fn ($h) {
+        $f->(fn { $h->($h)->(@_) })
+    }
+    $g->($g)
+}
+
+# Factorial using Y combinator
+my $fac = Rosetta::YCombinator::y(fn ($f) {
+    fn ($n) {
+        $n <= 1 ? 1 : $n * $f->($n - 1)
+    }
+})
+
+# Fibonacci using Y combinator
+my $fib = Rosetta::YCombinator::y(fn ($f) {
+    fn ($n) {
+        $n <= 1 ? $n : $f->($n - 1) + $f->($n - 2)
+    }
+})
+
+assert_eq $fac->(5), 120, "factorial(5) via Y"
+assert_eq $fac->(10), 3628800, "factorial(10) via Y"
+assert_eq $fib->(10), 55, "fibonacci(10) via Y"
+
+test_run

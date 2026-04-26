@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Monty Hall Problem
+
+fn Rosetta::MontyHall::simulate($trials, $switch) {
+    my @results = ~> 1:$trials pmap {
+        srand($_ + now_ns)
+        my $prize_door = int(rand(3))
+        my $chosen_door = int(rand(3))
+        
+        if ($switch) {
+            $chosen_door != $prize_door ? 1 : 0
+        } else {
+            $chosen_door == $prize_door ? 1 : 0
+        }
+    }
+    my $s = sum(@results)
+    return $s
+}
+
+my $trials = 1000
+my $stay_wins = Rosetta::MontyHall::simulate($trials, 0)
+my $switch_wins = Rosetta::MontyHall::simulate($trials, 1)
+
+p "DEBUG: stay_wins = $stay_wins"
+p "DEBUG: trials = $trials"
+
+my $stay_rate = $stay_wins / $trials
+my $switch_rate = $switch_wins / $trials
+
+p "Stay win rate: $stay_rate ($stay_wins/$trials)"
+p "Switch win rate: $switch_rate ($switch_wins/$trials)"
+
+assert_near $stay_rate, 0.333, 0.05, "Stay rate should be ~1/3"
+assert_near $switch_rate, 0.666, 0.05, "Switch rate should be ~2/3"
+
+test_run

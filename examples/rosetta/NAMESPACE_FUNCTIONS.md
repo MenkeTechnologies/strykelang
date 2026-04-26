@@ -1,0 +1,1 @@
+../../docs/NAMESPACE_FUNCTIONS.md

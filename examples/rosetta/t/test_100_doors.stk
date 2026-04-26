@@ -1,35 +1,31 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 100 Doors
 
-fn doors_puzzle {
-    my $n = $_[0]
-    my @res = ~> (1..$n) grep {
+fn Rosetta::OneHundredDoors::solve($n) {
+    # A door is open if it is toggled an odd number of times.
+    # It is toggled for every divisor it has.
+    # Numbers with an odd number of divisors are perfect squares.
+    ~> 1:$n pgrep {
         my $door = $_
-        # A door is open if it is toggled an odd number of times.
-        # It is toggled for every divisor it has.
-        my @divs = grep { $door % $_ == 0 } (1..$door)
-        my $divisors = scalar(@divs)
-        $divisors % 2 == 1
+        my @divs = grep { $door % $_ == 0 } 1:$door
+        scalar(@divs) % 2 == 1
     }
-    \@res
 }
 
-fn doors_optimized {
-    my $n = $_[0]
-    my @res = ~> (1..$n) grep {
+fn Rosetta::OneHundredDoors::solve_optimized($n) {
+    ~> 1:$n pgrep {
         my $s = sqrt($_)
         $s == int($s)
     }
-    \@res
 }
 
-my $result = doors_puzzle(100)
-assert_eq join(",", @$result), "1,4,9,16,25,36,49,64,81,100", "100 doors puzzle"
+my @result = Rosetta::OneHundredDoors::solve(100)
+assert_eq join(",", @result), "1,4,9,16,25,36,49,64,81,100", "100 doors puzzle"
 
-my $opt = doors_optimized(100)
-assert_eq join(",", @$opt), "1,4,9,16,25,36,49,64,81,100", "optimized (perfect squares)"
+my @opt = Rosetta::OneHundredDoors::solve_optimized(100)
+assert_eq join(",", @opt), "1,4,9,16,25,36,49,64,81,100", "optimized (perfect squares)"
 
-my $small = doors_puzzle(10)
-assert_eq join(",", @$small), "1,4,9", "10 doors"
+my @small = Rosetta::OneHundredDoors::solve(10)
+assert_eq join(",", @small), "1,4,9", "10 doors"
 
 test_run
