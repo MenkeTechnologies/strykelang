@@ -14042,7 +14042,9 @@ impl Interpreter {
             | "none" | "notall" | "first" | "fst" | "reduce" | "rd" | "reductions" | "sum"
             | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
             | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
-            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" => {
+            | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst"
+            | "blessed" | "refaddr" | "reftype" | "weaken" | "unweaken" | "isweak"
+            | "set_subname" | "subname" | "unicode_to_native" => {
                 self.call_bare_list_builtin(name, args, line, want)
             }
             "deque" => {

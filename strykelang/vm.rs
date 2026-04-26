@@ -2111,6 +2111,16 @@ impl<'a> VM<'a> {
                             | "pairgrep"
                             | "pairmap"
                             | "pairfirst"
+                            // Scalar/Sub/utf8-utility bare builtins (no module — direct names)
+                            | "blessed"
+                            | "refaddr"
+                            | "reftype"
+                            | "weaken"
+                            | "unweaken"
+                            | "isweak"
+                            | "set_subname"
+                            | "subname"
+                            | "unicode_to_native"
                     )
                 {
                     let t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
