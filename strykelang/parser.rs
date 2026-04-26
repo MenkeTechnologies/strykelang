@@ -1865,10 +1865,25 @@ impl Parser {
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                 }
-                // `ident` possibly followed by block
+                // `ident` possibly followed by block (or namespaced like `Foo::Bar::func`)
                 Token::Ident(ref name) => {
-                    let func_name = name.clone();
+                    let mut func_name = name.clone();
                     self.advance();
+
+                    // Collect namespaced function name (e.g., Rosetta::Stack::push)
+                    while matches!(self.peek(), Token::PackageSep) {
+                        self.advance(); // consume `::`
+                        if let Token::Ident(ref part) = self.peek().clone() {
+                            func_name.push_str("::");
+                            func_name.push_str(part);
+                            self.advance();
+                        } else {
+                            return Err(self.syntax_err(
+                                format!("Expected identifier after `::` in thread stage, got {:?}", self.peek()),
+                                stage_line,
+                            ));
+                        }
+                    }
 
                     // Handle s/// and tr/// encoded tokens
                     if func_name.starts_with('\x00') {

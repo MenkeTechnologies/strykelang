@@ -55,6 +55,7 @@ mod readline_list_context;
 mod readme_stryke_commands;
 mod reflection;
 mod regex;
+mod regression_2026_04;
 mod regex_extended;
 mod runtime_extra;
 mod runtime_integration_deep;
