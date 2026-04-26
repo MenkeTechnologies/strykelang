@@ -1179,7 +1179,7 @@ mod tests {
 
     #[test]
     fn state_var_ok() {
-        assert!(lint("fn my_counter { state $n = 0; $n++; }").is_ok());
+        assert!(lint("fn Test::counter { state $n = 0; $n++; }").is_ok());
     }
 
     #[test]

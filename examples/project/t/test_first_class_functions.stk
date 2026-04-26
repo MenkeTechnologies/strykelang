@@ -138,34 +138,34 @@ my @nums = (1, 2, 3, 4, 5)
 my @squared = map { $_ * $_ } @nums
 assert_eq join(",", @squared), "1,4,9,16,25", "map with block"
 
-fn my_map($fn, @list) {
+fn List::transform($fn, @list) {
     my @out = ()
     for my $x (@list) { push @out, $fn($x) }
     @out
 }
-my @tripled = my_map(fn($x) { $x * 3 }, 1, 2, 3)
+my @tripled = List::transform(fn($x) { $x * 3 }, 1, 2, 3)
 assert_eq join(",", @tripled), "3,6,9", "custom map with fn arg"
 
 # filter with custom function
-fn my_filter($pred, @list) {
+fn List::filter($pred, @list) {
     my @out = ()
     for my $x (@list) { 
         push @out, $x if $pred($x)
     }
     @out
 }
-my @evens = my_filter(fn($x) { $x % 2 == 0 }, 1, 2, 3, 4, 5, 6)
+my @evens = List::filter(fn($x) { $x % 2 == 0 }, 1, 2, 3, 4, 5, 6)
 assert_eq join(",", @evens), "2,4,6", "custom filter with fn arg"
 
 # reduce with custom function
-fn my_reduce($fn, $init, @list) {
+fn List::fold($fn, $init, @list) {
     my $acc = $init
     for my $x (@list) { $acc = $fn($acc, $x) }
     $acc
 }
-my $sum = my_reduce(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
+my $sum = List::fold(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
 assert_eq $sum, 15, "custom reduce: sum"
-my $product = my_reduce(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
+my $product = List::fold(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
 assert_eq $product, 120, "custom reduce: product"
 
 # ══════════════════════════════════════════════════════════════════════════════

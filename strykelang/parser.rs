@@ -14899,7 +14899,7 @@ mod tests {
 
     #[test]
     fn parse_state_variable() {
-        let p = parse_ok("fn my_counter { state $n = 0; $n++ }");
+        let p = parse_ok("fn Test::counter { state $n = 0; $n++ }");
         assert_eq!(p.statements.len(), 1);
     }
 

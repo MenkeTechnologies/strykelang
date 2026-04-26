@@ -4,7 +4,7 @@ require "./lib/math.stk"
 
 # ── Euclidean Distance ────────────────────────────────────────────
 
-fn my_euclidean_distance($p1, $p2) {
+fn AI::Math::euclidean_distance($p1, $p2) {
     my $sum = 0
     for my $i (0..scalar(@$p1) - 1) {
         $sum += ($p1->[$i] - $p2->[$i]) ** 2
@@ -27,7 +27,7 @@ class KNNClassifier {
     fn predict($point) {
         my @distances
         for my $i (0..scalar(@{$self->data}) - 1) {
-            my $dist = my_euclidean_distance($point, $self->data->[$i])
+            my $dist = AI::Math::euclidean_distance($point, $self->data->[$i])
             push @distances, [$dist, $self->labels->[$i]]
         }
 

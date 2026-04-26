@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sexy primes
 
-fn SexyPrimes::my_is_prime($n) {
+fn SexyPrimes::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -21,7 +21,7 @@ fn SexyPrimes::my_is_prime($n) {
 }
 
 fn SexyPrimes::are_sexy_primes($p1, $p2) {
-    SexyPrimes::my_is_prime($p1) && SexyPrimes::my_is_prime($p2) && abs($p1 - $p2) == 6
+    SexyPrimes::is_prime($p1) && SexyPrimes::is_prime($p2) && abs($p1 - $p2) == 6
 }
 
 assert_ok SexyPrimes::are_sexy_primes(7, 13), "7 and 13 are sexy primes"

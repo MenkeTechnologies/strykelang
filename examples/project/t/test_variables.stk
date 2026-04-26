@@ -117,10 +117,10 @@ assert_eq argv_like(), "one,two,three", "argv like"
 # DECLARATION MODIFIERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq my_list_decl(), 6, "my list decl"
-assert_eq my_array_decl(), 3, "my array decl"
-assert_eq my_hash_decl(), 2, "my hash decl"
-assert_eq my_mixed_init(), 7, "my mixed init"
+assert_eq Var::Test::list_decl(), 6, "my list decl"
+assert_eq Var::Test::array_decl(), 3, "my array decl"
+assert_eq Var::Test::hash_decl(), 2, "my hash decl"
+assert_eq Var::Test::mixed_init(), 7, "my mixed init"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTOVIVIFICATION

@@ -1,23 +1,23 @@
 # lib/functional.stk — functional programming utilities
 
-# ── my_every: returns true if all elements satisfy the predicate ─────
-fn my_every($pred, @list) {
+# ── Fn::every: returns true if all elements satisfy the predicate ─────
+fn Fn::every($pred, @list) {
     for my $item (@list) {
         return 0 unless $pred->($item)
     }
     1
 }
 
-# ── my_some: returns true if at least one element satisfies the predicate ─────
-fn my_some($pred, @list) {
+# ── Fn::some: returns true if at least one element satisfies the predicate ─────
+fn Fn::some($pred, @list) {
     for my $item (@list) {
         return 1 if $pred->($item)
     }
     0
 }
 
-# ── my_reduce: reduces a list to a single value using an accumulator ─────
-fn my_reduce($func, $initial, @list) {
+# ── Fn::reduce: reduces a list to a single value using an accumulator ─────
+fn Fn::reduce($func, $initial, @list) {
     my $acc = $initial
     for my $item (@list) {
         $acc = $func->($acc, $item)
@@ -25,8 +25,8 @@ fn my_reduce($func, $initial, @list) {
     $acc
 }
 
-# ── my_zip: combines two lists into a list of pairs (as array refs) ─────
-fn my_zip(\@a, \@b) {
+# ── Fn::zip: combines two lists into a list of pairs (as array refs) ─────
+fn Fn::zip(\@a, \@b) {
     my @result
     my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
     for my $i (0..$len-1) {
@@ -35,8 +35,8 @@ fn my_zip(\@a, \@b) {
     @result
 }
 
-# ── my_curry2: curries a function of 2 arguments ─────
-fn my_curry2($f) {
+# ── Fn::curry2: curries a function of 2 arguments ─────
+fn Fn::curry2($f) {
     fn ($a) {
         fn ($b) {
             $f->($a, $b)
@@ -44,15 +44,15 @@ fn my_curry2($f) {
     }
 }
 
-# ── my_flip: flips the first two arguments of a function ─────
-fn my_flip($f) {
+# ── Fn::flip: flips the first two arguments of a function ─────
+fn Fn::flip($f) {
     fn ($a, $b) {
         $f->($b, $a)
     }
 }
 
-# ── my_partition: splits a list into two lists based on a predicate ─────
-fn my_partition($pred, @list) {
+# ── Fn::partition: splits a list into two lists based on a predicate ─────
+fn Fn::partition($pred, @list) {
     my $t = [];
     my $f = [];
     for my $item (@list) {
@@ -65,13 +65,13 @@ fn my_partition($pred, @list) {
     return [$t, $f];
 }
 
-# ── my_pluck: extracts a field from a list of hashes ─────
-fn my_pluck($key, @list) {
+# ── Fn::pluck: extracts a field from a list of hashes ─────
+fn Fn::pluck($key, @list) {
     map { $_->{$key} } @list
 }
 
-# ── my_find: returns the first element satisfying the predicate ─────
-fn my_find($pred, @list) {
+# ── Fn::find: returns the first element satisfying the predicate ─────
+fn Fn::find($pred, @list) {
     for my $item (@list) {
         return $item if $pred->($item)
     }
