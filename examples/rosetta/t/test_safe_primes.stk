@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Safe primes
 
-fn SafePrimes::my_is_prime($n) {
+fn Rosetta::SafePrimes::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -21,11 +21,11 @@ fn SafePrimes::my_is_prime($n) {
 }
 
 fn SafePrimes::is_safe_prime($p) {
-    if (!SafePrimes::my_is_prime($p)) {
+    if (!Rosetta::SafePrimes::is_prime($p)) {
         0
     } else {
         my $q = ($p - 1) / 2
-        SafePrimes::my_is_prime($q)
+        Rosetta::SafePrimes::is_prime($q)
     }
 }
 

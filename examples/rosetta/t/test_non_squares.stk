@@ -5,7 +5,7 @@ fn non_square($n) {
     int($n + 0.5 + sqrt($n))
 }
 
-fn my_is_square($n) {
+fn Rosetta::IsSquare::is_square($n) {
     my $root = int(sqrt($n))
     $root * $root == $n
 }
@@ -18,7 +18,7 @@ assert_eq non_square(4), 6, "a(4)=6"
 # Verify non-squares up to 20
 for my $i (1..20) {
     my $val = non_square($i)
-    assert_ok !my_is_square($val), "$val is not square"
+    assert_ok !Rosetta::IsSquare::is_square($val), "$val is not square"
 }
 
 10 |> non_square |> assert_eq(13, "pipe non-square")

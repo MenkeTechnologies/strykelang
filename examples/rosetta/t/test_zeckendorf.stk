@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Zeckendorf number representation
 
-fn my_rev(@arr) {
+fn Rosetta::Rev::rev(@arr) {
     my @reversed
     my $i = $#arr
     while ($i >= 0) {
@@ -25,7 +25,7 @@ fn zeckendorf($n) {
     if ($n == 0) {
         return ()
     }
-    my @fibs = my_rev(fib_seq_until($n))
+    my @fibs = Rosetta::Rev::rev(fib_seq_until($n))
     my @result
     for my $fib (@fibs) {
         if ($n >= $fib) {
@@ -33,7 +33,7 @@ fn zeckendorf($n) {
             $n = $n - $fib
         }
     }
-    my @rev_res = my_rev(@result)
+    my @rev_res = Rosetta::Rev::rev(@result)
     @rev_res
 }
 

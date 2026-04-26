@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: N-body Problem (Simplified)
 
-fn my_step($b1, $b2, $dt) {
+fn Rosetta::Step::step($b1, $b2, $dt) {
     my $dx = $b2->{px} - $b1->{px}
     my $dy = $b2->{py} - $b1->{py}
     my $d2 = $dx*$dx + $dy*$dy
@@ -24,7 +24,7 @@ my $b1 = { m => 1.0, px => 1.0, py => 0.0, vx => 0.0, vy => 31.622 }
 my $b2 = { m => 1000.0, px => 0.0, py => 0.0, vx => 0.0, vy => 0.0 }
 
 for my $i (1..1000) {
-    my_step($b1, $b2, 0.0001)
+    Rosetta::Step::step($b1, $b2, 0.0001)
 }
 
 # Check if it stayed relatively close to radius 1.0

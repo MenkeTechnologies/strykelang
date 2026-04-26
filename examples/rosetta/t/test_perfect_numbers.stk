@@ -1,47 +1,55 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Perfect Numbers
+# Rosetta Code: Perfect numbers
 
-fn my_divisors($n) {
-    1..int($n/2) |> filter { $n % $_ == 0 }
-}
-
-fn sum_array(@arr) {
-    my $sum = 0
-    for my $x (@arr) {
-        $sum += $x
+fn Rosetta::PerfectNumbers::divisors($n) {
+    my @divs = (1) # Proper divisors start with 1
+    my $limit = int(sqrt($n))
+    for my $i (2..$limit) {
+        if ($n % $i == 0) {
+            push @divs, $i
+            my $j = $n / $i
+            if ($j != $i) {
+                push @divs, $j
+            }
+        }
     }
-    $sum
+    @divs = sort { $a <=> $b } @divs # Sort the divisors numerically
+    \@divs # Return the sorted list of proper divisors
 }
 
-fn my_is_perfect($n) {
+fn Rosetta::PerfectNumbers::is_perfect($n) {
     if ($n < 2) {
-        0
+        return 0 # Not perfect
     } else {
-        my @divs = my_divisors($n)
-        my $sum = sum_array(@divs)
-        $sum == $n
+        my @divs = @{ Rosetta::PerfectNumbers::divisors($n) } # Gets the list of proper divisors
+        my $sum = 0
+        for my $d (@divs) { $sum += $d } # Sums the list
+        return $sum == $n ? 1 : 0; # Explicitly return 1 for true, 0 for false
     }
 }
 
-fn my_perfect_numbers($max) {
-    2..$max |> filter { my_is_perfect($_) }
+fn Rosetta::PerfectNumbers::perfect_numbers($max) {
+    my @perfects
+    for my $n (2..$max) {
+        if (Rosetta::PerfectNumbers::is_perfect($n)) {
+            push @perfects, $n
+        }
+    }
+    \@perfects
 }
 
-assert_ok my_is_perfect(6), "6 is perfect (1+2+3)"
-assert_ok my_is_perfect(28), "28 is perfect (1+2+4+7+14)"
-assert_ok my_is_perfect(496), "496 is perfect"
+assert_eq join(",", @{ Rosetta::PerfectNumbers::divisors(6) }), "1,2,3", "proper divisors of 6"
+assert_eq join(",", @{ Rosetta::PerfectNumbers::divisors(28) }), "1,2,4,7,14", "proper divisors of 28"
+assert_eq join(",", @{ Rosetta::PerfectNumbers::divisors(1) }), "1", "proper divisors of 1"
 
-assert_ok !my_is_perfect(1), "1 is not perfect"
-assert_ok !my_is_perfect(12), "12 is not perfect"
-assert_ok !my_is_perfect(100), "100 is not perfect"
+assert_ok Rosetta::PerfectNumbers::is_perfect(6), "6 is perfect (1+2+3)"
+assert_ok Rosetta::PerfectNumbers::is_perfect(28), "28 is perfect (1+2+4+7+14)"
+assert_ok Rosetta::PerfectNumbers::is_perfect(496), "496 is perfect"
+assert_ok !Rosetta::PerfectNumbers::is_perfect(1), "1 is not perfect"
+assert_ok !Rosetta::PerfectNumbers::is_perfect(12), "12 is not perfect"
+assert_ok !Rosetta::PerfectNumbers::is_perfect(100), "100 is not perfect"
 
-my @perfects = my_perfect_numbers(500)
+my @perfects = @{ Rosetta::PerfectNumbers::perfect_numbers(500) }
 assert_eq join(",", @perfects), "6,28,496", "perfect numbers up to 500"
-
-my @div6 = my_divisors(6)
-assert_eq join(",", @div6), "1,2,3", "divisors of 6"
-
-my @div28 = my_divisors(28)
-assert_eq join(",", @div28), "1,2,4,7,14", "divisors of 28"
 
 test_run

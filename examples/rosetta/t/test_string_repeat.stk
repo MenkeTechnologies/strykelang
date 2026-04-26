@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Repeat a String
 
-fn my_repeat_string($s, $n) {
+fn Rosetta::RepeatString::repeat_string($s, $n) {
     $s x $n
 }
 
@@ -11,10 +11,10 @@ fn repeat_array($n, @arr) {
     @result
 }
 
-assert_eq my_repeat_string("ha", 3), "hahaha", "repeat ha 3x"
-assert_eq my_repeat_string("*", 5), "*****", "repeat * 5x"
-assert_eq my_repeat_string("abc", 1), "abc", "repeat 1x"
-assert_eq my_repeat_string("test", 0), "", "repeat 0x"
+assert_eq Rosetta::RepeatString::repeat_string("ha", 3), "hahaha", "repeat ha 3x"
+assert_eq Rosetta::RepeatString::repeat_string("*", 5), "*****", "repeat * 5x"
+assert_eq Rosetta::RepeatString::repeat_string("abc", 1), "abc", "repeat 1x"
+assert_eq Rosetta::RepeatString::repeat_string("test", 0), "", "repeat 0x"
 
 assert_eq "=" x 10, "==========", "x operator"
 assert_eq "-" x 20, "--------------------", "line of dashes"

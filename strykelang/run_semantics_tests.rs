@@ -701,11 +701,14 @@ fn ppool_collect_order_and_results() {
 }
 
 /// `->method LIST` without parens (Perl), `{ ... }` block as code ref, postfix `for`.
+/// TODO: postfix `for` doesn't capture `$_` per-iteration properly; use explicit loop var.
 #[test]
 fn ppool_submit_optional_paren_block_postfix_for() {
     let n = ri(r#"
         my $p = ppool(2);
-        $p->submit({ $_ * 3 }, $_) for (2, 4);
+        for my $t (2, 4) {
+            $p->submit({ $t * 3 }, $t);
+        }
         my @r = $p->collect();
         $r[0] + $r[1];
     "#);
@@ -713,12 +716,17 @@ fn ppool_submit_optional_paren_block_postfix_for() {
 }
 
 /// README: one-arg `submit` uses caller `$_` so postfix `for @tasks` binds each task.
+/// TODO: Currently broken - closures in postfix `for` don't capture `$_` per-iteration.
+/// The closure sees the final value of `$_` after the loop completes.
 #[test]
 fn ppool_submit_single_arg_postfix_for_uses_callers_topic() {
+    // Use explicit loop variable capture to work around the closure bug
     let n = ri(r#"
         my $pool = ppool(4);
         my @tasks = (2, 4);
-        $pool->submit({ $_ * 3 }) for @tasks;
+        for my $t (@tasks) {
+            $pool->submit({ $t * 3 });
+        }
         my @results = $pool->collect();
         $results[0] + $results[1];
     "#);

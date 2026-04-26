@@ -3,22 +3,22 @@
 
 fn Rosetta::TreeTraversal::preorder($n) {
     if (!$n) { return () }
-    my @left = Rosetta::TreeTraversal::preorder($n->{left});
-    my @right = Rosetta::TreeTraversal::preorder($n->{right});
+    my @left = Rosetta::TreeTraversal::preorder($n->{left})
+    my @right = Rosetta::TreeTraversal::preorder($n->{right})
     ($n->{val}, @left, @right)
 }
 
 fn Rosetta::TreeTraversal::inorder($n) {
     if (!$n) { return () }
-    my @left = Rosetta::TreeTraversal::inorder($n->{left});
-    my @right = Rosetta::TreeTraversal::inorder($n->{right});
+    my @left = Rosetta::TreeTraversal::inorder($n->{left})
+    my @right = Rosetta::TreeTraversal::inorder($n->{right})
     (@left, $n->{val}, @right)
 }
 
 fn Rosetta::TreeTraversal::postorder($n) {
     if (!$n) { return () }
-    my @left = Rosetta::TreeTraversal::postorder($n->{left});
-    my @right = Rosetta::TreeTraversal::postorder($n->{right});
+    my @left = Rosetta::TreeTraversal::postorder($n->{left})
+    my @right = Rosetta::TreeTraversal::postorder($n->{right})
     (@left, @right, $n->{val})
 }
 

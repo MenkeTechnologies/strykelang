@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pythagorean Triples
 
-fn my_is_square {
+fn Rosetta::IsSquare::is_square {
     my $n = $_[0]
     my $root = int($n ** 0.5)
     $root * $root == $n
@@ -13,7 +13,7 @@ fn pythagorean_triples {
     for my $a (1..$max) {
         for my $b ($a..$max) {
             my $c2 = $a*$a + $b*$b
-            if (my_is_square($c2)) {
+            if (Rosetta::IsSquare::is_square($c2)) {
                 my $c = int($c2 ** 0.5)
                 if ($c <= $max) {
                     push @triples, "$a,$b,$c"

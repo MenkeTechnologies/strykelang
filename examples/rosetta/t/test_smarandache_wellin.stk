@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Smarandache-Wellin numbers
 
-fn my_is_prime($n) {
+fn Rosetta::IsPrime::is_prime($n) {
     if ($n < 2) {
         0
     } elsif ($n == 2) {
@@ -28,7 +28,7 @@ fn smarandache_wellin($n) {
     my $p = 2
     my $s = ""
     while ($count < $n) {
-        if (my_is_prime($p)) {
+        if (Rosetta::IsPrime::is_prime($p)) {
             $s = $s . $p
             $count++
         }

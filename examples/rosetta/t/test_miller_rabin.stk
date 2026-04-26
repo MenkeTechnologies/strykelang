@@ -12,7 +12,7 @@ fn MillerRabin::power($a, $b, $m) {
     $res
 }
 
-fn MillerRabin::my_miller_rabin($n, $k) {
+fn Rosetta::MillerRabin::miller_rabin($n, $k) {
     if ($n == 2 || $n == 3) { return 1 }
     if ($n < 2 || $n % 2 == 0) { return 0 }
     
@@ -40,10 +40,10 @@ fn MillerRabin::my_miller_rabin($n, $k) {
     1
 }
 
-assert_ok MillerRabin::my_miller_rabin(13, 5), "13 is prime"
-assert_ok MillerRabin::my_miller_rabin(17, 5), "17 is prime"
-assert_ok !MillerRabin::my_miller_rabin(15, 5), "15 is not prime"
-assert_ok !MillerRabin::my_miller_rabin(100, 5), "100 is not prime"
-assert_ok MillerRabin::my_miller_rabin(101, 5), "101 is prime"
+assert_ok Rosetta::MillerRabin::miller_rabin(13, 5), "13 is prime"
+assert_ok Rosetta::MillerRabin::miller_rabin(17, 5), "17 is prime"
+assert_ok !Rosetta::MillerRabin::miller_rabin(15, 5), "15 is not prime"
+assert_ok !Rosetta::MillerRabin::miller_rabin(100, 5), "100 is not prime"
+assert_ok Rosetta::MillerRabin::miller_rabin(101, 5), "101 is prime"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Mersenne primes
 
-fn my_is_prime($n) {
+fn Rosetta::IsPrime::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -23,11 +23,11 @@ fn my_is_prime($n) {
 fn is_mersenne_prime($p) {
     # Check if 2^p - 1 is prime
     # (Note: p must be prime itself for 2^p - 1 to be prime)
-    if (!my_is_prime($p)) {
+    if (!Rosetta::IsPrime::is_prime($p)) {
         0
     } else {
         my $m = 2**$p - 1
-        my_is_prime($m)
+        Rosetta::IsPrime::is_prime($m)
     }
 }
 

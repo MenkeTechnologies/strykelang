@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Prime Decomposition (Factorization)
 
-fn my_prime_factors($n) {
+fn Rosetta::PrimeFactors::prime_factors($n) {
     my @factors
     my $d = 2
     while ($d * $d <= $n) {
@@ -19,24 +19,24 @@ fn is_prime_via_factors($n) {
     if ($n < 2) {
         0
     } else {
-        my @f = my_prime_factors($n)
+        my @f = Rosetta::PrimeFactors::prime_factors($n)
         scalar(@f) == 1 && $f[0] == $n
     }
 }
 
-my @f12 = my_prime_factors(12)
+my @f12 = Rosetta::PrimeFactors::prime_factors(12)
 assert_eq join("*", @f12), "2*2*3", "12 = 2*2*3"
 
-my @f100 = my_prime_factors(100)
+my @f100 = Rosetta::PrimeFactors::prime_factors(100)
 assert_eq join("*", @f100), "2*2*5*5", "100 = 2*2*5*5"
 
-my @f17 = my_prime_factors(17)
+my @f17 = Rosetta::PrimeFactors::prime_factors(17)
 assert_eq join("*", @f17), "17", "17 is prime"
 
-my @f1 = my_prime_factors(1)
+my @f1 = Rosetta::PrimeFactors::prime_factors(1)
 assert_eq scalar(@f1), 0, "1 has no prime factors"
 
-my @f84 = my_prime_factors(84)
+my @f84 = Rosetta::PrimeFactors::prime_factors(84)
 assert_eq join("*", @f84), "2*2*3*7", "84 = 2*2*3*7"
 
 assert_ok is_prime_via_factors(17), "17 is prime"

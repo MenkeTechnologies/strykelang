@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Palindromic primes
 
-fn my_is_prime($n) {
+fn Rosetta::IsPrime::is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -20,14 +20,14 @@ fn my_is_prime($n) {
     }
 }
 
-fn my_is_palindrome($n) {
+fn Rosetta::IsPalindrome::is_palindrome($n) {
     my $s = "$n"
     my $rev = ~> $s >{split //, $_} rev |> join("")
     $s eq $rev
 }
 
 fn is_palindromic_prime($n) {
-    my_is_prime($n) && my_is_palindrome($n)
+    Rosetta::IsPrime::is_prime($n) && Rosetta::IsPalindrome::is_palindrome($n)
 }
 
 assert_ok is_palindromic_prime(2), "2 is palindromic prime"

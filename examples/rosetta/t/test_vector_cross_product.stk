@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Vector cross product
 
-fn my_cross_product {
+fn Rosetta::CrossProduct::cross_product {
     my $a = $_[0]
     my $b = $_[1]
     
@@ -15,12 +15,12 @@ fn my_cross_product {
 
 my $v1 = [1, 2, 3]
 my $v2 = [4, 5, 6]
-my $cp = my_cross_product($v1, $v2)
+my $cp = Rosetta::CrossProduct::cross_product($v1, $v2)
 assert_eq join(",", @$cp), "-3,6,-3", "cross product of [1,2,3] and [4,5,6]"
 
 my $i = [1, 0, 0]
 my $j = [0, 1, 0]
-my $k = my_cross_product($i, $j)
+my $k = Rosetta::CrossProduct::cross_product($i, $j)
 assert_eq join(",", @$k), "0,0,1", "i x j = k"
 
 test_run

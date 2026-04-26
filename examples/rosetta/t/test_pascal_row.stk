@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pascal's triangle row
 
-fn my_pascal_row($n) {
+fn Rosetta::PascalRow::pascal_row($n) {
     my @row = (1)
     for my $i (1..$n) {
         my $val = $row[$i-1] * ($n - $i + 1) / $i
@@ -10,12 +10,12 @@ fn my_pascal_row($n) {
     \@row
 }
 
-assert_eq join(",", @{ my_pascal_row(0) }), "1", "row 0"
-assert_eq join(",", @{ my_pascal_row(1) }), "1,1", "row 1"
-assert_eq join(",", @{ my_pascal_row(2) }), "1,2,1", "row 2"
-assert_eq join(",", @{ my_pascal_row(3) }), "1,3,3,1", "row 3"
-assert_eq join(",", @{ my_pascal_row(4) }), "1,4,6,4,1", "row 4"
+assert_eq join(",", @{ Rosetta::PascalRow::pascal_row(0) }), "1", "row 0"
+assert_eq join(",", @{ Rosetta::PascalRow::pascal_row(1) }), "1,1", "row 1"
+assert_eq join(",", @{ Rosetta::PascalRow::pascal_row(2) }), "1,2,1", "row 2"
+assert_eq join(",", @{ Rosetta::PascalRow::pascal_row(3) }), "1,3,3,1", "row 3"
+assert_eq join(",", @{ Rosetta::PascalRow::pascal_row(4) }), "1,4,6,4,1", "row 4"
 
-4 |> my_pascal_row |> map { join(",", @$_) } |> assert_eq("1,4,6,4,1", "pipe pascal row")
+4 |> Rosetta::PascalRow::pascal_row |> map { join(",", @$_) } |> assert_eq("1,4,6,4,1", "pipe pascal row")
 
 test_run

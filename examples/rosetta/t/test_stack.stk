@@ -1,36 +1,40 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Stack
 
-fn my_stack_new {
+fn Rosetta::Stack::new {
     ([])
 }
 
-fn my_stack_push($stack, $val) {
+fn Rosetta::Stack::push($stack, $val) {
     push @$stack, $val
     $stack
 }
 
-fn my_stack_pop($stack) {
+fn Rosetta::Stack::pop($stack) {
     pop @$stack
 }
 
-fn my_stack_peek($stack) {
+fn Rosetta::Stack::peek($stack) {
     $stack->[-1]
 }
 
-fn my_stack_empty($stack) {
+fn Rosetta::Stack::empty($stack) {
     scalar(@$stack) == 0
 }
 
-my $s = my_stack_new()
-$s |> my_stack_push(10) |> my_stack_push(20)
+my $s = Rosetta::Stack::new()
+$s |> Rosetta::Stack::push(10) |> Rosetta::Stack::push(20)
 
-assert_eq my_stack_peek($s), 20, "peek stack"
-assert_eq my_stack_pop($s), 20, "pop 20"
-assert_eq my_stack_pop($s), 10, "pop 10"
-assert_ok my_stack_empty($s), "stack is empty"
+assert_eq Rosetta::Stack::peek($s), 20, "peek stack"
+assert_eq Rosetta::Stack::pop($s), 20, "pop 20"
+assert_eq Rosetta::Stack::pop($s), 10, "pop 10"
+assert_ok Rosetta::Stack::empty($s), "stack is empty"
 
-# Threading with stack
-~> my_stack_new() my_stack_push(1) my_stack_push(2) my_stack_push(3) |> my_stack_pop |> assert_eq(3, "threaded stack pop")
+# Test with regular calls
+my $st = Rosetta::Stack::new()
+Rosetta::Stack::push($st, 1)
+Rosetta::Stack::push($st, 2)
+Rosetta::Stack::push($st, 3)
+assert_eq Rosetta::Stack::pop($st), 3, "threaded stack pop"
 
 test_run

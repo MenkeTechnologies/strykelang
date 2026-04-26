@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Median
 
-fn my_median {
+fn Rosetta::Median::median {
     my $list = $_[0]
     if (scalar(@$list) == 0) {
         0
@@ -18,12 +18,12 @@ fn my_median {
 }
 
 my $data1 = [4, 1, 3, 2, 5]
-assert_eq my_median($data1), 3, "median of odd length"
+assert_eq Rosetta::Median::median($data1), 3, "median of odd length"
 
 my $data2 = [1, 2, 3, 4]
-assert_eq my_median($data2), 2.5, "median of even length"
+assert_eq Rosetta::Median::median($data2), 2.5, "median of even length"
 
 my $data3 = [10]
-assert_eq my_median($data3), 10, "median of single element"
+assert_eq Rosetta::Median::median($data3), 10, "median of single element"
 
 test_run

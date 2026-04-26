@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Roman Numerals - Decode
 
-fn my_roman_decode($str) {
+fn Rosetta::RomanDecode::roman_decode($str) {
     my %vals = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
     my @chars = $str |> chars
     my $res = 0
@@ -21,8 +21,8 @@ fn my_roman_decode($str) {
     $res
 }
 
-assert_eq my_roman_decode("MCMXC"), 1990, "roman 1990"
-assert_eq my_roman_decode("MMVIII"), 2008, "roman 2008"
-assert_eq my_roman_decode("MDCLXVI"), 1666, "roman 1666"
+assert_eq Rosetta::RomanDecode::roman_decode("MCMXC"), 1990, "roman 1990"
+assert_eq Rosetta::RomanDecode::roman_decode("MMVIII"), 2008, "roman 2008"
+assert_eq Rosetta::RomanDecode::roman_decode("MDCLXVI"), 1666, "roman 1666"
 
 test_run
