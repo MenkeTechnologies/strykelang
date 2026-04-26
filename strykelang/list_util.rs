@@ -191,103 +191,126 @@ const LIST_UTIL_ROOT: &[&str] = &[
 
 const PAIR_METHODS: &[&str] = &["key", "value", "TO_JSON"];
 
-/// If `sub` is a native `List::Util::*` stub, run the Rust implementation.
+/// Dispatch a list builtin by bare name. Stryke exposes every former List::Util fn as a
+/// bare-name builtin; callers pass the unqualified name (e.g. `"sum"`, `"reduce"`).
+pub(crate) fn dispatch_by_name(
+    interp: &mut Interpreter,
+    name: &str,
+    args: &[PerlValue],
+    want: WantarrayCtx,
+) -> Option<ExecResult> {
+    match name {
+        "uniq" => Some(dispatch_ok(uniq_with_want(args, want))),
+        "uniqstr" => Some(dispatch_ok(uniqstr_with_want(args, want))),
+        "uniqint" => Some(dispatch_ok(uniqint_with_want(args, want))),
+        "uniqnum" => Some(dispatch_ok(uniqnum_with_want(args, want))),
+        "sum" => Some(dispatch_ok(sum(args).map(|v| aggregate_wantarray(v, want)))),
+        "sum0" => Some(dispatch_ok(
+            sum0(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "product" => Some(dispatch_ok(
+            product(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "mean" => Some(dispatch_ok(
+            mean(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "median" => Some(dispatch_ok(
+            median(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "mode" => Some(dispatch_ok(mode_with_want(args, want))),
+        "variance" => Some(dispatch_ok(
+            variance(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "stddev" => Some(dispatch_ok(
+            stddev(args).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "min" => Some(dispatch_ok(
+            minmax(args, MinMax::MinNum).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "max" => Some(dispatch_ok(
+            minmax(args, MinMax::MaxNum).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "minstr" => Some(dispatch_ok(
+            minmax(args, MinMax::MinStr).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "maxstr" => Some(dispatch_ok(
+            minmax(args, MinMax::MaxStr).map(|v| aggregate_wantarray(v, want)),
+        )),
+        "shuffle" => Some(dispatch_ok(shuffle_native(interp, args))),
+        "chunked" => Some(dispatch_ok(chunked_with_want(args, want))),
+        "windowed" => Some(dispatch_ok(windowed_with_want(args, want))),
+        "sample" => Some(dispatch_ok(sample_native(interp, args))),
+        "head" => Some(dispatch_ok(head_tail_take_impl(
+            args,
+            HeadTailTake::ListUtilHead,
+            want,
+        ))),
+        "tail" => Some(dispatch_ok(head_tail_take_impl(
+            args,
+            HeadTailTake::ListUtilTail,
+            want,
+        ))),
+        "reduce" | "fold" => Some(reduce_like(interp, args, want, false)),
+        "reductions" => Some(reduce_like(interp, args, want, true)),
+        "any" => Some(any_all_none(interp, args, want, AnyMode::Any)),
+        "all" => Some(any_all_none(interp, args, want, AnyMode::All)),
+        "none" => Some(any_all_none(interp, args, want, AnyMode::None)),
+        "notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
+        "first" => Some(first_native(interp, args, want)),
+        "pairs" => Some(dispatch_ok(pairs_native(args))),
+        "unpairs" => Some(dispatch_ok(unpairs_native(args))),
+        "pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),
+        "pairvalues" => Some(dispatch_ok(pairkeys_values(false, args))),
+        "pairgrep" => Some(pairgrep_map(interp, args, want, PairMode::Grep)),
+        "pairmap" => Some(pairgrep_map(interp, args, want, PairMode::Map)),
+        "pairfirst" => Some(pairgrep_map(interp, args, want, PairMode::First)),
+        "zip" | "zip_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest))),
+        "zip_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipShortest))),
+        "mesh" | "mesh_longest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest))),
+        "mesh_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshShortest))),
+        // Pair-method dispatch (blessed `_Pair` arrayrefs from `pairs`).
+        "_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
+        "_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
+        "_Pair::TO_JSON" => Some(dispatch_ok(pair_to_json(args))),
+        // `Scalar::Util` natives — keyed bare since callers strip the qualifier before dispatch.
+        "blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
+        "refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
+        "reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
+        "weaken" | "unweaken" => Some(dispatch_ok(Ok(PerlValue::UNDEF))),
+        "isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
+        // `Sub::Util` no-ops — return the coderef unchanged.
+        "set_subname" | "subname" => Some(dispatch_ok(sub_util_set_subname(args))),
+        // Core XS in perl; JSON::PP BEGIN uses this before utf8_heavy loads.
+        "unicode_to_native" => Some(dispatch_ok(utf8_unicode_to_native(args.first()))),
+        _ => None,
+    }
+}
+
+/// Stash-sub dispatcher: callers carry the qualified sub name (`Pkg::name`); strip the
+/// package and forward to [`dispatch_by_name`]. Used by the VM when a placeholder sub
+/// installed by an old `use` import is invoked through the regular call path.
 pub(crate) fn native_dispatch(
     interp: &mut Interpreter,
     sub: &PerlSub,
     args: &[PerlValue],
     want: WantarrayCtx,
 ) -> Option<ExecResult> {
-    match sub.name.as_str() {
-        "List::Util::uniq" => Some(dispatch_ok(uniq_with_want(args, want))),
-        "List::Util::uniqstr" => Some(dispatch_ok(uniqstr_with_want(args, want))),
-        "List::Util::uniqint" => Some(dispatch_ok(uniqint_with_want(args, want))),
-        "List::Util::uniqnum" => Some(dispatch_ok(uniqnum_with_want(args, want))),
-        "List::Util::sum" => Some(dispatch_ok(sum(args).map(|v| aggregate_wantarray(v, want)))),
-        "List::Util::sum0" => Some(dispatch_ok(
-            sum0(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::product" => Some(dispatch_ok(
-            product(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::mean" => Some(dispatch_ok(
-            mean(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::median" => Some(dispatch_ok(
-            median(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::mode" => Some(dispatch_ok(mode_with_want(args, want))),
-        "List::Util::variance" => Some(dispatch_ok(
-            variance(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::stddev" => Some(dispatch_ok(
-            stddev(args).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::min" => Some(dispatch_ok(
-            minmax(args, MinMax::MinNum).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::max" => Some(dispatch_ok(
-            minmax(args, MinMax::MaxNum).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::minstr" => Some(dispatch_ok(
-            minmax(args, MinMax::MinStr).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::maxstr" => Some(dispatch_ok(
-            minmax(args, MinMax::MaxStr).map(|v| aggregate_wantarray(v, want)),
-        )),
-        "List::Util::shuffle" => Some(dispatch_ok(shuffle_native(interp, args))),
-        "List::Util::chunked" => Some(dispatch_ok(chunked_with_want(args, want))),
-        "List::Util::windowed" => Some(dispatch_ok(windowed_with_want(args, want))),
-        "List::Util::sample" => Some(dispatch_ok(sample_native(interp, args))),
-        "List::Util::head" => Some(dispatch_ok(head_tail_take_impl(
-            args,
-            HeadTailTake::ListUtilHead,
-            want,
-        ))),
-        "List::Util::tail" => Some(dispatch_ok(head_tail_take_impl(
-            args,
-            HeadTailTake::ListUtilTail,
-            want,
-        ))),
-        "List::Util::reduce" | "List::Util::fold" => Some(reduce_like(interp, args, want, false)),
-        "List::Util::reductions" => Some(reduce_like(interp, args, want, true)),
-        "List::Util::any" => Some(any_all_none(interp, args, want, AnyMode::Any)),
-        "List::Util::all" => Some(any_all_none(interp, args, want, AnyMode::All)),
-        "List::Util::none" => Some(any_all_none(interp, args, want, AnyMode::None)),
-        "List::Util::notall" => Some(any_all_none(interp, args, want, AnyMode::NotAll)),
-        "List::Util::first" => Some(first_native(interp, args, want)),
-        "List::Util::pairs" => Some(dispatch_ok(pairs_native(args))),
-        "List::Util::unpairs" => Some(dispatch_ok(unpairs_native(args))),
-        "List::Util::pairkeys" => Some(dispatch_ok(pairkeys_values(true, args))),
-        "List::Util::pairvalues" => Some(dispatch_ok(pairkeys_values(false, args))),
-        "List::Util::pairgrep" => Some(pairgrep_map(interp, args, want, PairMode::Grep)),
-        "List::Util::pairmap" => Some(pairgrep_map(interp, args, want, PairMode::Map)),
-        "List::Util::pairfirst" => Some(pairgrep_map(interp, args, want, PairMode::First)),
-        "List::Util::zip" | "List::Util::zip_longest" => {
-            Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipLongest)))
-        }
-        "List::Util::zip_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::ZipShortest))),
-        "List::Util::mesh" | "List::Util::mesh_longest" => {
-            Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshLongest)))
-        }
-        "List::Util::mesh_shortest" => Some(dispatch_ok(zip_mesh(args, ZipMesh::MeshShortest))),
-        "List::Util::_Pair::key" => Some(dispatch_ok(pair_accessor(args, 0))),
-        "List::Util::_Pair::value" => Some(dispatch_ok(pair_accessor(args, 1))),
-        "List::Util::_Pair::TO_JSON" => Some(dispatch_ok(pair_to_json(args))),
-        "Scalar::Util::blessed" => Some(dispatch_ok(scalar_util_blessed(args.first()))),
-        "Scalar::Util::refaddr" => Some(dispatch_ok(scalar_util_refaddr(args.first()))),
-        "Scalar::Util::reftype" => Some(dispatch_ok(scalar_util_reftype(args.first()))),
-        "Scalar::Util::weaken" | "Scalar::Util::unweaken" => {
-            Some(dispatch_ok(Ok(PerlValue::UNDEF)))
-        }
-        "Scalar::Util::isweak" => Some(dispatch_ok(Ok(PerlValue::integer(0)))),
-        "Sub::Util::set_subname" | "Sub::Util::subname" => {
-            Some(dispatch_ok(sub_util_set_subname(args)))
-        }
-        // Core XS in perl; JSON::PP BEGIN uses this before utf8_heavy loads (see utf8::AUTOLOAD).
-        "utf8::unicode_to_native" => Some(dispatch_ok(utf8_unicode_to_native(args.first()))),
-        _ => None,
-    }
+    let bare = sub
+        .name
+        .rsplit_once("::")
+        .map(|(_, b)| b)
+        .unwrap_or(sub.name.as_str());
+    // Pair-method dispatch keeps its `_Pair::` prefix to disambiguate from a future
+    // bare `key`/`value` builtin — qualify it back from the full sub name.
+    let key = if let Some(rest) = sub.name.strip_prefix("List::Util::_Pair::") {
+        let mut s = String::with_capacity(8 + rest.len());
+        s.push_str("_Pair::");
+        s.push_str(rest);
+        return dispatch_by_name(interp, &s, args, want);
+    } else {
+        bare
+    };
+    dispatch_by_name(interp, key, args, want)
 }
 
 /// Perl: `set_subname $name, $coderef` → returns `$coderef` (stryke does not rename closures).

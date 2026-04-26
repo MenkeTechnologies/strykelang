@@ -14022,76 +14022,38 @@ impl Interpreter {
     }
 
     /// Bare `uniq` / `distinct` (alias of `uniq`) / `shuffle` / `chunked` / `windowed` / `zip` /
-    /// `sum` / `sum0` /
-    /// `product` / `min` / `max` / `mean` / `median` / `mode` / `stddev` / `variance` /
-    /// `any` / `all` / `none` / `first` (Ruby `detect` / `find` parse to `first`; same as `List::Util` after
-    /// [`crate::list_util::ensure_list_util`]).
-    pub(crate) fn call_bare_list_util(
+    /// Bare-name dispatch for stryke list builtins (`sum`, `min`, `uniq`, `reduce`, `zip`, …).
+    /// Resolves short aliases (`uq`, `shuf`, `chk`, `win`, `fst`, `rd`, `med`, `std`, `var`, …)
+    /// and forwards to [`crate::list_util::dispatch_by_name`].
+    pub(crate) fn call_bare_list_builtin(
         &mut self,
         name: &str,
         args: Vec<PerlValue>,
         line: usize,
         want: WantarrayCtx,
     ) -> ExecResult {
-        crate::list_util::ensure_list_util(self);
-        let fq = match name {
-            "uniq" | "distinct" | "uq" => "List::Util::uniq",
-            "uniqstr" => "List::Util::uniqstr",
-            "uniqint" => "List::Util::uniqint",
-            "uniqnum" => "List::Util::uniqnum",
-            "shuffle" | "shuf" => "List::Util::shuffle",
-            "sample" => "List::Util::sample",
-            "chunked" | "chk" => "List::Util::chunked",
-            "windowed" | "win" => "List::Util::windowed",
-            "zip" | "zp" => "List::Util::zip",
-            "zip_longest" => "List::Util::zip_longest",
-            "zip_shortest" => "List::Util::zip_shortest",
-            "mesh" => "List::Util::mesh",
-            "mesh_longest" => "List::Util::mesh_longest",
-            "mesh_shortest" => "List::Util::mesh_shortest",
-            "any" => "List::Util::any",
-            "all" => "List::Util::all",
-            "none" => "List::Util::none",
-            "notall" => "List::Util::notall",
-            "first" | "fst" => "List::Util::first",
-            "reduce" | "rd" => "List::Util::reduce",
-            "reductions" => "List::Util::reductions",
-            "sum" => "List::Util::sum",
-            "sum0" => "List::Util::sum0",
-            "product" => "List::Util::product",
-            "min" => "List::Util::min",
-            "max" => "List::Util::max",
-            "minstr" => "List::Util::minstr",
-            "maxstr" => "List::Util::maxstr",
-            "mean" => "List::Util::mean",
-            "median" | "med" => "List::Util::median",
-            "mode" => "List::Util::mode",
-            "stddev" | "std" => "List::Util::stddev",
-            "variance" | "var" => "List::Util::variance",
-            "pairs" => "List::Util::pairs",
-            "unpairs" => "List::Util::unpairs",
-            "pairkeys" => "List::Util::pairkeys",
-            "pairvalues" => "List::Util::pairvalues",
-            "pairgrep" => "List::Util::pairgrep",
-            "pairmap" => "List::Util::pairmap",
-            "pairfirst" => "List::Util::pairfirst",
-            _ => {
-                return Err(PerlError::runtime(
-                    format!("internal: not a bare list-util alias: {name}"),
-                    line,
-                )
-                .into());
-            }
-        };
-        let Some(sub) = self.subs.get(fq).cloned() else {
-            return Err(PerlError::runtime(
-                format!("internal: missing native stub for {fq}"),
-                line,
-            )
-            .into());
+        let canonical = match name {
+            "distinct" | "uq" => "uniq",
+            "shuf" => "shuffle",
+            "chk" => "chunked",
+            "win" => "windowed",
+            "zp" => "zip",
+            "fst" => "first",
+            "rd" => "reduce",
+            "med" => "median",
+            "std" => "stddev",
+            "var" => "variance",
+            other => other,
         };
         let args = self.with_topic_default_args(args);
-        self.call_sub(&sub, args, want, line)
+        match crate::list_util::dispatch_by_name(self, canonical, &args, want) {
+            Some(r) => r,
+            None => Err(PerlError::runtime(
+                format!("internal: not a stryke list builtin: {name}"),
+                line,
+            )
+            .into()),
+        }
     }
 
     fn call_named_sub(
@@ -14113,7 +14075,7 @@ impl Interpreter {
             | "sum0" | "product" | "min" | "max" | "minstr" | "maxstr" | "mean" | "median"
             | "med" | "mode" | "stddev" | "std" | "variance" | "var" | "pairs" | "unpairs"
             | "pairkeys" | "pairvalues" | "pairgrep" | "pairmap" | "pairfirst" => {
-                self.call_bare_list_util(name, args, line, want)
+                self.call_bare_list_builtin(name, args, line, want)
             }
             "deque" => {
                 if !args.is_empty() {
