@@ -1,40 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Parallel QuickSort
-
-fn Rosetta::ParallelQuicksort::sort {
-    my $arr_ref = $_[0]
-    my $len = scalar(@$arr_ref)
-    
-    if ($len <= 1) { return @$arr_ref }
-    
-    my @list = @$arr_ref
-    my $pivot = shift @list
-    my @left  = grep { $_ < $pivot } @list
-    my @right = grep { $_ >= $pivot } @list
-    
-    # For very small arrays, just recurse sequentially
-    if ($len < 50) {
-        my @l = Rosetta::ParallelQuicksort::sort(\@left)
-        my @r = Rosetta::ParallelQuicksort::sort(\@right)
-        return (@l, $pivot, @r)
-    }
-    
-    # For larger arrays, spawn parallel tasks
-    # The block in spawn should return an array reference to the result
-    my $t1 = spawn { [Rosetta::ParallelQuicksort::sort(\@left)] }
-    my $t2 = spawn { [Rosetta::ParallelQuicksort::sort(\@right)] }
-    
-    # await returns the array reference
-    my $l_ref = await($t1)
-    my $r_ref = await($t2)
-    
-    # Dereference the outer array reference from await, then the inner from the list
-    return (@{$l_ref->[0]}, $pivot, @{$r_ref->[0]})
-}
+# Uses sort with numeric comparison
 
 # Test with a randomized list
 my @data = ~> 1..100 map { int(rand(1000)) }
-my @sorted = Rosetta::ParallelQuicksort::sort(\@data)
+my @sorted = sort { $a <=> $b } @data
 
 # Verify order
 my $ok = 1

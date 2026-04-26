@@ -1,36 +1,28 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Mandelbrot Set
+# Rosetta Code: Mandelbrot set
 
-fn mandelbrot_iter($c_real, $c_imag, $max_iter) {
-    my $z_real = 0
-    my $z_imag = 0
-    my $result = -1
+fn Rosetta::Mandelbrot::iterations($c_re, $c_im, $max_iter) {
+    my $z_re = 0.0
+    my $z_im = 0.0
+    my $iter = 0
     
-    for my $i (0..$max_iter-1) {
-        if ($result == -1) {
-            my $z_real_sq = $z_real * $z_real
-            my $z_imag_sq = $z_imag * $z_imag
-            
-            if ($z_real_sq + $z_imag_sq > 4) {
-                $result = $i
-            } else {
-                my $new_real = $z_real_sq - $z_imag_sq + $c_real
-                my $new_imag = 2 * $z_real * $z_imag + $c_imag
-                
-                $z_real = $new_real
-                $z_imag = $new_imag
-            }
-        }
+    while ($iter < $max_iter) {
+        my $z_re_sq = $re * $re
+        my $z_im_sq = $im * $im
+        
+        if ($z_re_sq + $z_im_sq > 4.0) { return $iter }
+        
+        my $next_re = $z_re_sq - $z_im_sq + $c_re
+        my $next_im = 2.0 * $z_re * $z_im + $c_im
+        
+        $z_re = $next_re
+        $z_im = $next_im
+        $iter++
     }
-    
-    if ($result == -1) {
-        $max_iter
-    } else {
-        $result
-    }
+    $max_iter
 }
 
-fn draw_mandelbrot($width, $height, $max_iter) {
+fn Rosetta::Mandelbrot::render($width, $height, $max_iter) {
     my $x_min = -2.5
     my $x_max = 1.5
     my $y_min = -2.0
@@ -39,30 +31,29 @@ fn draw_mandelbrot($width, $height, $max_iter) {
     my $x_scale = ($x_max - $x_min) / $width
     my $y_scale = ($y_max - $y_min) / $height
     
+    my $output = ""
     for my $y (0..$height-1) {
         for my $x (0..$width-1) {
             my $c_real = $x_min + $x * $x_scale
             my $c_imag = $y_min + $y * $y_scale
             
-            my $iterations = mandelbrot_iter($c_real, $c_imag, $max_iter)
+            my $iterations = Rosetta::Mandelbrot::iterations($c_real, $c_imag, $max_iter)
             
-            if ($iterations == $max_iter) {
-                print "*"
-            } elsif ($iterations > $max_iter * 0.8) {
-                print "+"
-            } elsif ($iterations > $max_iter * 0.6) {
-                print "o"
-            } elsif ($iterations > $max_iter * 0.4) {
-                print "-"
-            } elsif ($iterations > $max_iter * 0.2) {
-                print "."
-            } else {
-                print " "
-            }
+            if ($iterations == $max_iter) { $output .= "*" }
+            elsif ($iterations > $max_iter * 0.8) { $output .= "+"; }
+            elsif ($iterations > $max_iter * 0.6) { $output .= "o"; }
+            elsif ($iterations > $max_iter * 0.4) { $output .= "-"; }
+            elsif ($iterations > $max_iter * 0.2) { $output .= "."; }
+            else { $output .= " " }
         }
-        print "\n"
+        $output .= "
+"
     }
+    $output
 }
 
-print "Mandelbrot Set (40x20):\n"
-draw_mandelbrot(40, 20, 50)
+print "Mandelbrot Set (40x20):
+"
+print Rosetta::Mandelbrot::render(40, 20, 50)
+
+test_run

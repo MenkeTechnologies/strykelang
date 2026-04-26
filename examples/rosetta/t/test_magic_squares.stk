@@ -1,57 +1,72 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Magic Squares of Odd Order
+# Rosetta Code: Magic Squares (Odd Order)
 
-fn magic_square($n) {
-    my $m = []
+fn Rosetta::MagicSquare::generate($n) {
+    my @matrix
     for my $i (0..$n-1) {
         my $row = []
         for my $j (0..$n-1) { push @$row, 0 }
-        push @$m, $row
+        push @matrix, $row
     }
     
     my $r = 0
-    my $c = $n / 2
-    for my $k (1..$n*$n) {
-        $m->[$r]->[$c] = $k
+    my $c = int($n / 2)
+    for my $i (1..$n*$n) {
+        $matrix[$r][$c] = $i
+        
         my $nr = ($r - 1 + $n) % $n
         my $nc = ($c + 1) % $n
-        if ($m->[$nr]->[$nc]) {
+        
+        if ($matrix[$nr][$nc] != 0) { # Check if next position is occupied
             $r = ($r + 1) % $n
         } else {
             $r = $nr
             $c = $nc
         }
     }
-    $m
+    \@matrix # Return the reference to the matrix
+}
+
+fn Rosetta::MagicSquare::to_string($m) {
+    my @rows
+    for my $row (@$m) { # Iterate over the array of rows (which are array refs)
+        push @rows, join(",", @$row) # Dereference row to get elements
+    }
+    join(";", @rows)
 }
 
 # 3x3 Magic Square:
 # 8 1 6
 # 3 5 7
 # 4 9 2
-my $sq = magic_square(3)
-assert_eq $sq->[0]->[0], 8, "sq[0][0]"
-assert_eq $sq->[0]->[1], 1, "sq[0][1]"
-assert_eq $sq->[0]->[2], 6, "sq[0][2]"
-assert_eq $sq->[1]->[1], 5, "sq[1][1]"
-assert_eq $sq->[2]->[2], 2, "sq[2][2]"
+my $m3 = Rosetta::MagicSquare::generate(3)
+assert_eq $m3->[0]->[0], 8, "3x3 sq[0][0]"
+assert_eq $m3->[0][1], 1, "3x3 sq[0][1]"
+assert_eq $m3->[0][2], 6, "3x3 sq[0][2]"
+assert_eq $m3->[1][1], 5, "3x3 sq[1][1]"
+assert_eq $m3->[2][2], 2, "3x3 sq[2][2]"
 
 # Check sums
-fn check_magic($m, $n) {
-    my $sum = $n * ($n * $n + 1) / 2
+fn Rosetta::MagicSquare::check_sums($m, $n) {
+    my $magic_sum = $n * ($n * $n + 1) / 2
     for my $i (0..$n-1) {
-        my $rs = 0
-        my $cs = 0
+        my $row_sum = 0
+        my $col_sum = 0
         for my $j (0..$n-1) {
-            $rs = $rs + $m->[$i]->[$j]
-            $cs = $cs + $m->[$j]->[$i]
+            $row_sum += $m->[$i]->[$j]
+            $col_sum += $m->[$j]->[$i]
         }
-        if ($rs != $sum || $cs != $sum) { return 0 }
+        if ($row_sum != $magic_sum || $col_sum != $magic_sum) { return 0 }
     }
     1
 }
 
-assert_ok check_magic($sq, 3), "3x3 sums are correct"
-assert_ok check_magic(magic_square(5), 5), "5x5 sums are correct"
+assert_ok Rosetta::MagicSquare::check_sums($m3, 3), "3x3 sums are correct"
+
+# Test larger square
+my $m5 = Rosetta::MagicSquare::generate(5)
+assert_eq $m5->[0]->[0], 17, "5x5 sq[0][0]"
+assert_eq $m5->[2][2], 13, "5x5 sq[2][2]"
+assert_ok Rosetta::MagicSquare::check_sums($m5, 5), "5x5 sums are correct"
 
 test_run

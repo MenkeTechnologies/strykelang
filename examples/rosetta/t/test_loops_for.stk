@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Loops/For
 
-fn for_loop_examples() {
+fn Rosetta::LoopsFor::demo() {
     "For Loop Examples:" |> p
     
     # Basic for loop with range
@@ -53,4 +53,5 @@ fn for_loop_examples() {
     }
 }
 
-for_loop_examples
+Rosetta::LoopsFor::demo()
+test_run

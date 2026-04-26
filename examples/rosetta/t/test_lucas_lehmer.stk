@@ -1,24 +1,25 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Lucas-Lehmer primality test
 
-fn lucas_lehmer($p) {
-    if ($p == 2) {
-        1
-    } else {
-        my $m = 2**$p - 1
-        my $s = 4
-        for my $i (1..$p-2) {
-            $s = ($s * $s - 2) % $m
-        }
-        $s == 0
+fn Rosetta::LucasLehmer::check($p) {
+    if ($p == 2) { return 1 }
+    if ($p % 2 == 0 || $p < 2) { return 0 } # Not prime if even or < 2
+    
+    my $m = (2**$p) - 1
+    my $s = 4
+    
+    for my $i (1..$p-2) {
+        $s = ($s * $s - 2) % $m
     }
+    $s == 0
 }
 
-assert_ok lucas_lehmer(3), "2^3-1=7 is prime"
-assert_ok lucas_lehmer(7), "2^7-1=127 is prime"
-assert_ok !lucas_lehmer(4), "2^4-1=15 is not prime"
-assert_ok !lucas_lehmer(11), "2^11-1=2047 is not prime"
+assert_ok Rosetta::LucasLehmer::check(3), "2^3-1=7 is prime"
+assert_ok Rosetta::LucasLehmer::check(5), "2^5-1=31 is prime"
+assert_ok Rosetta::LucasLehmer::check(7), "2^7-1=127 is prime"
+assert_ok !Rosetta::LucasLehmer::check(4), "2^4-1=15 is not prime"
+assert_ok !Rosetta::LucasLehmer::check(11), "2^11-1=2047 is not prime"
 
-7 |> lucas_lehmer |> assert_ok("pipe LL test 7")
+7 |> Rosetta::LucasLehmer::check |> assert_ok("pipe LL test 7")
 
 test_run

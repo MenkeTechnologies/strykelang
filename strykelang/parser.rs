@@ -7479,6 +7479,11 @@ impl Parser {
                     }
                 }
                 Token::LBracket => {
+                    // Implicit semicolon: `[` on a new line is a new statement (array literal),
+                    // not an array subscript on the preceding expression.
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
                     // `$a[i]` — or chained `$r->{k}[i]` / `$a[1][2]` — or list slice `(sort ...)[0]`.
                     let line = expr.line;
                     if matches!(expr.kind, ExprKind::ScalarVar(_)) {

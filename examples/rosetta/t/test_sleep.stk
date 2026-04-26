@@ -1,15 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sleep
 
-fn Rosetta::Sleep::test() {
-    my $start = time()
-    sleep(1)
-    my $end = time()
-    my $diff = $end - $start
-    # Allow for some minor timing variation
-    $diff >= 1
+fn Rosetta::Sleep::wait($seconds) {
+    sleep($seconds)
 }
 
-assert_ok Rosetta::Sleep::test(), "slept for at least 1 second"
+# Test sleeping for 1 second
+my $start_time = time()
+Rosetta::Sleep::wait(1)
+my $end_time = time()
+assert_ok $end_time - $start_time >= 1, "sleep for 1 second works"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Knight's Tour
 
-fn backtrack($x, $y, $count, $board, $n, $dx, $dy) {
+fn Rosetta::KnightsTour::backtrack($x, $y, $count, $board, $n, $dx, $dy) {
     $board->[$x]->[$y] = $count
     if ($count == $n * $n) { return 1 }
 
@@ -9,14 +9,14 @@ fn backtrack($x, $y, $count, $board, $n, $dx, $dy) {
         my $nx = $x + $dx->[$i]
         my $ny = $y + $dy->[$i]
         if ($nx >= 0 && $nx < $n && $ny >= 0 && $ny < $n && $board->[$nx]->[$ny] == 0) {
-            if (backtrack($nx, $ny, $count + 1, $board, $n, $dx, $dy)) { return 1 }
+            if (Rosetta::KnightsTour::backtrack($nx, $ny, $count + 1, $board, $n, $dx, $dy)) { return 1 }
         }
     }
     $board->[$x]->[$y] = 0
     0
 }
 
-fn solve_knights_tour($n) {
+fn Rosetta::KnightsTour::solve($n) {
     my $board = []
     for my $i (0..$n-1) {
         my $row = []
@@ -27,13 +27,12 @@ fn solve_knights_tour($n) {
     my $dx = [2, 1, -1, -2, -2, -1, 1, 2]
     my $dy = [1, 2, 2, 1, -1, -2, -2, -1]
 
-    if (backtrack(0, 0, 1, $board, $n, $dx, $dy)) { return $board }
+    if (Rosetta::KnightsTour::backtrack(0, 0, 1, $board, $n, $dx, $dy)) { return $board }
     undef
 }
 
-
 # 5x5 board is small enough for fast testing
-my $tour = solve_knights_tour(5)
+my $tour = Rosetta::KnightsTour::solve(5)
 assert_ok defined($tour), "Knight's tour 5x5 exists"
 
 # Verify all squares are visited

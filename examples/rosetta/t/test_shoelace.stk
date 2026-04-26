@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Shoelace Formula
 
-fn algo_area($p) {
+fn Shoelace::algo_area($p) {
     my $sum = 0.0
     my $n = scalar(@$p)
     for my $i (0..$n-1) {
@@ -13,5 +13,5 @@ fn algo_area($p) {
 }
 
 my $sq = [[0,0], [2,0], [2,2], [0,2]]
-assert_eq algo_area($sq), 4, "area square"
+assert_eq Shoelace::algo_area($sq), 4, "area square"
 test_run

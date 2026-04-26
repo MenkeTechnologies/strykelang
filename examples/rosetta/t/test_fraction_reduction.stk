@@ -1,13 +1,8 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fraction reduction
 
-fn Rosetta::FractionReduction::gcd($a, $b) {
-    if ($b == 0) { return $a }
-    Rosetta::FractionReduction::gcd($b, $a % $b)
-}
-
 fn Rosetta::FractionReduction::reduce($num, $den) {
-    my $g = Rosetta::FractionReduction::gcd($num, $den)
+    my $g = gcd($num, $den)
     [$num / $g, $den / $g]
 }
 
