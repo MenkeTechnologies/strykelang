@@ -361,22 +361,22 @@ fn argv_like {
 # DECLARATION MODIFIERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn my_list_decl {
+fn Var::Test::list_decl {
     my ($a, $b, $c) = (1, 2, 3)
     $a + $b + $c
 }
 
-fn my_array_decl {
+fn Var::Test::array_decl {
     my @arr = (1, 2, 3)
     scalar @arr
 }
 
-fn my_hash_decl {
+fn Var::Test::hash_decl {
     my %hash = (a => 1, b => 2)
     scalar(keys %hash)
 }
 
-fn my_mixed_init {
+fn Var::Test::mixed_init {
     my $x = 1
     my @a = (2, 3)
     my %h = (k => 4)

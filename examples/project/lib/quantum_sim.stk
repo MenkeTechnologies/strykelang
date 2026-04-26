@@ -6,12 +6,12 @@ class Vector3 {
     x; y; z;
 }
 
-fn my_q_vector_magnitude($v) {
+fn Quantum::Vec::magnitude($v) {
     sqrt($v->x ** 2 + $v->y ** 2 + $v->z ** 2)
 }
 
-fn my_q_vector_normalize($v) {
-    my $mag = my_q_vector_magnitude($v);
+fn Quantum::Vec::normalize($v) {
+    my $mag = Quantum::Vec::magnitude($v);
     return $v if $mag == 0;
     return Vector3(
         x => $v->x / $mag,

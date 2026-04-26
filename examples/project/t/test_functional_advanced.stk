@@ -3,11 +3,11 @@
 
 # ── Higher-Order Functions & Combinators ───────────────────────────────
 
-fn my_compose($f, $g) {
+fn Fn::compose($f, $g) {
     fn ($x) { $f->($g->($x)) }
 }
 
-fn my_pipe(@funcs) {
+fn Fn::pipe(@funcs) {
     fn ($x) {
         my $result = $x
         for my $func (@funcs) {
@@ -20,12 +20,12 @@ fn my_pipe(@funcs) {
 # Test composition
 my $add5 = fn ($x) { $x + 5 }
 my $mul2 = fn ($x) { $x * 2 }
-my $composed = my_compose($add5, $mul2)
+my $composed = Fn::compose($add5, $mul2)
 
-assert_eq $composed->(3), 11, "my_compose: add5(mul2(3))"
+assert_eq $composed->(3), 11, "Fn::compose: add5(mul2(3))"
 
 # Test pipe
-my $pipeline = my_pipe($mul2, $add5, fn ($x) { $x ** 2 })
+my $pipeline = Fn::pipe($mul2, $add5, fn ($x) { $x ** 2 })
 assert_eq $pipeline->(3), 121, "pipe: ((3*2)+5)^2"
 
 # ── Maybe Monad for Error Handling ─────────────────────────────────────
@@ -71,46 +71,46 @@ class Maybe {
     }
 }
 
-fn safe_divide($a, $b) {
+fn Math::safe_divide($a, $b) {
     $b == 0 ? Maybe::none() : Maybe::some($a / $b)
 }
 
 my $result = Maybe::some(10)
-    ->flat_map(fn ($x) { safe_divide($x, 2) })
+    ->flat_map(fn ($x) { Math::safe_divide($x, 2) })
     ->map(fn ($x) { $x + 1 })
 
 assert_eq $result->unwrap_or(0), 6, "maybe chain success"
 
 my $fail_result = Maybe::some(10)
-    ->flat_map(fn ($x) { safe_divide($x, 0) })
+    ->flat_map(fn ($x) { Math::safe_divide($x, 0) })
     ->map(fn ($x) { $x + 1 })
 
 assert_eq $fail_result->unwrap_or(-1), -1, "maybe chain failure"
 
 # ── Function Utilities ─────────────────────────────────────────────────
 
-fn my_partial($func, $arg1) {
+fn Fn::partial($func, $arg1) {
     fn ($arg2) {
         $func->($arg1, $arg2)
     }
 }
 
-fn my_flip($func) {
+fn Fn::flip($func) {
     fn ($a, $b, @rest) {
         $func->($b, $a, @rest)
     }
 }
 
 my $subtract = fn ($a, $b) { $a - $b }
-my $subtract_from_10 = my_partial($subtract, 10)
+my $subtract_from_10 = Fn::partial($subtract, 10)
 assert_eq $subtract_from_10->(3), 7, "partial application"
 
-my $flipped_subtract = my_flip($subtract)
+my $flipped_subtract = Fn::flip($subtract)
 assert_eq $flipped_subtract->(3, 10), 7, "flipped function"
 
 # ── Memoization ────────────────────────────────────────────────────────
 
-fn my_memoize($func) {
+fn Fn::memoize($func) {
     my %cache = ()
     fn (@args) {
         my $key = join(",", @args)
@@ -122,7 +122,7 @@ fn my_memoize($func) {
     }
 }
 
-fn expensive_computation($n) {
+fn Test::expensive_computation($n) {
     my $result = $n
     for (1..10) {  # simplified
         $result = $result * 1.001
@@ -130,7 +130,7 @@ fn expensive_computation($n) {
     int($result)
 }
 
-my $memoized = my_memoize(\&expensive_computation)
+my $memoized = Fn::memoize(\&Test::expensive_computation)
 my $result1 = $memoized->(10)
 my $result2 = $memoized->(10)
 

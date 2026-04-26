@@ -6,9 +6,9 @@ require "./lib/quantum_sim.stk"
 # ── 1. Vector Math ────────────────────────────────────────────────
 
 my $v = Vector3(x => 3, y => 4, z => 0)
-assert_eq my_q_vector_magnitude($v), 5, "Vector magnitude"
+assert_eq Quantum::Vec::magnitude($v), 5, "Vector magnitude"
 
-my $vn = my_q_vector_normalize($v)
+my $vn = Quantum::Vec::normalize($v)
 assert_eq $vn->x, 0.6, "Normalized x"
 assert_eq $vn->y, 0.8, "Normalized y"
 

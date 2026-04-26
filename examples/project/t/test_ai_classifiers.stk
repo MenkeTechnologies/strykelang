@@ -7,7 +7,7 @@ require "./lib/ai/classifiers.stk"
 
 my $p1 = [1, 1];
 my $p2 = [4, 5];
-assert_eq my_euclidean_distance($p1, $p2), 5, "Euclidean distance calculation";
+assert_eq AI::Math::euclidean_distance($p1, $p2), 5, "Euclidean distance calculation";
 
 # ── 2. KNN Classifier ─────────────────────────────────────────────
 

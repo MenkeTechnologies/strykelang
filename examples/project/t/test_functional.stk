@@ -3,61 +3,61 @@
 
 require "./lib/functional.stk"
 
-# ── my_every ──────────────────────────────────────────────────────────
+# ── Fn::every ──────────────────────────────────────────────────────────
 my $is_positive = fn ($x) { $x > 0 }
-assert_eq my_every($is_positive, 1, 2, 3), 1, "every positive"
-assert_eq my_every($is_positive, 1, -2, 3), 0, "every positive with one negative"
-assert_eq my_every($is_positive), 1, "every with empty list (vacuously true)"
+assert_eq Fn::every($is_positive, 1, 2, 3), 1, "every positive"
+assert_eq Fn::every($is_positive, 1, -2, 3), 0, "every positive with one negative"
+assert_eq Fn::every($is_positive), 1, "every with empty list (vacuously true)"
 
-# ── my_some ───────────────────────────────────────────────────────────
+# ── Fn::some ───────────────────────────────────────────────────────────
 my $is_even = fn ($x) { $x % 2 == 0 }
-assert_eq my_some($is_even, 1, 3, 5), 0, "some even (none)"
-assert_eq my_some($is_even, 1, 2, 5), 1, "some even (one)"
-assert_eq my_some($is_even), 0, "some with empty list"
+assert_eq Fn::some($is_even, 1, 3, 5), 0, "some even (none)"
+assert_eq Fn::some($is_even, 1, 2, 5), 1, "some even (one)"
+assert_eq Fn::some($is_even), 0, "some with empty list"
 
-# ── my_reduce ─────────────────────────────────────────────────────────
+# ── Fn::reduce ─────────────────────────────────────────────────────────
 my $add = fn ($acc, $val) { $acc + $val }
-assert_eq my_reduce($add, 0, 1, 2, 3, 4, 5), 15, "reduce sum"
+assert_eq Fn::reduce($add, 0, 1, 2, 3, 4, 5), 15, "reduce sum"
 my $multiply = fn ($acc, $val) { $acc * $val }
-assert_eq my_reduce($multiply, 1, 1, 2, 3, 4), 24, "reduce product"
+assert_eq Fn::reduce($multiply, 1, 1, 2, 3, 4), 24, "reduce product"
 
-# ── my_zip ────────────────────────────────────────────────────────────
+# ── Fn::zip ────────────────────────────────────────────────────────────
 my @a = (1, 2, 3)
 my @b = ("a", "b", "c")
-my @zipped = my_zip(@a, @b)
+my @zipped = Fn::zip(@a, @b)
 assert_eq scalar(@zipped), 3, "zip length"
 assert_eq $zipped[0]->[0], 1, "zip 0-0"
 assert_eq $zipped[0]->[1], "a", "zip 0-1"
 assert_eq $zipped[2]->[0], 3, "zip 2-0"
 
-# ── my_curry2 ─────────────────────────────────────────────────────────
-my $c_add = my_curry2($add)
+# ── Fn::curry2 ─────────────────────────────────────────────────────────
+my $c_add = Fn::curry2($add)
 my $add10 = $c_add->(10)
 assert_eq $add10->(5), 15, "curried add"
 
-# ── my_flip ───────────────────────────────────────────────────────────
+# ── Fn::flip ───────────────────────────────────────────────────────────
 my $sub = fn ($x, $y) { $x - $y }
-my $f_sub = my_flip($sub)
+my $f_sub = Fn::flip($sub)
 assert_eq $sub->(10, 3), 7, "normal sub"
 assert_eq $f_sub->(10, 3), -7, "flipped sub (3 - 10)"
 
-# ── my_partition ──────────────────────────────────────────────────────
-my $res = my_partition($is_even, 1, 2, 3, 4, 5, 6)
+# ── Fn::partition ──────────────────────────────────────────────────────
+my $res = Fn::partition($is_even, 1, 2, 3, 4, 5, 6)
 my ($even, $odd) = @$res
 assert_eq scalar(@$even), 3, "partition even count"
 assert_eq scalar(@$odd), 3, "partition odd count"
 assert_eq $even->[0], 2, "first even"
 assert_eq $odd->[0], 1, "first odd"
 
-# ── my_pluck ──────────────────────────────────────────────────────────
+# ── Fn::pluck ──────────────────────────────────────────────────────────
 my @data = ({id => 1, name => "alice"}, {id => 2, name => "bob"})
-my @names = my_pluck("name", @data)
+my @names = Fn::pluck("name", @data)
 assert_eq join(",", @names), "alice,bob", "pluck names"
 
-# ── my_find ───────────────────────────────────────────────────────────
-my $found = my_find(fn ($x) { $x > 10 }, 1, 5, 12, 8, 15)
+# ── Fn::find ───────────────────────────────────────────────────────────
+my $found = Fn::find(fn ($x) { $x > 10 }, 1, 5, 12, 8, 15)
 assert_eq $found, 12, "find first > 10"
-my $not_found = my_find(fn ($x) { $x > 100 }, 1, 5, 12)
+my $not_found = Fn::find(fn ($x) { $x > 100 }, 1, 5, 12)
 assert_false defined($not_found), "find nothing"
 
 test_run

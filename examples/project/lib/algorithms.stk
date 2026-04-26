@@ -1,7 +1,7 @@
 # lib/algorithms.stk — various algorithm implementations
 
-# ── my_binary_search: returns index of target in sorted list, or -1 ─────
-fn my_binary_search($target, @list) {
+# ── Algo::binary_search: returns index of target in sorted list, or -1 ─────
+fn Algo::binary_search($target, @list) {
     my $low = 0
     my $high = scalar(@list) - 1
     
