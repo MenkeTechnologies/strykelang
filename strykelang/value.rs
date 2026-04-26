@@ -2013,7 +2013,9 @@ impl PerlValue {
             HeapObject::Hash(_) => "HASH".to_string(),
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => "ARRAY".to_string(),
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => "HASH".to_string(),
-            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => "SCALAR".to_string(),
+            HeapObject::ScalarRef(_)
+            | HeapObject::ScalarBindingRef(_)
+            | HeapObject::CaptureCell(_) => "SCALAR".to_string(),
             HeapObject::CodeRef(_) => "CODE".to_string(),
             HeapObject::Regex(_, _, _) => "Regexp".to_string(),
             HeapObject::Blessed(b) => b.class.clone(),
@@ -2284,9 +2286,9 @@ impl fmt::Display for PerlValue {
             HeapObject::Hash(h) => write!(f, "{}/{}", h.len(), h.capacity()),
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => f.write_str("ARRAY(0x...)"),
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => f.write_str("HASH(0x...)"),
-            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => {
-                f.write_str("SCALAR(0x...)")
-            }
+            HeapObject::ScalarRef(_)
+            | HeapObject::ScalarBindingRef(_)
+            | HeapObject::CaptureCell(_) => f.write_str("SCALAR(0x...)"),
             HeapObject::CodeRef(sub) => write!(f, "CODE({})", sub.name),
             HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
             HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
@@ -2429,7 +2431,9 @@ pub fn set_member_key(v: &PerlValue) -> String {
             let d = b.data.read();
             format!("b:{}:{}", b.class, set_member_key(&d))
         }
-        HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => format!("sr:{v}"),
+        HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) | HeapObject::CaptureCell(_) => {
+            format!("sr:{v}")
+        }
         HeapObject::ArrayBindingRef(n) => format!("abind:{n}"),
         HeapObject::HashBindingRef(n) => format!("hbind:{n}"),
         HeapObject::CodeRef(_) => format!("c:{v}"),

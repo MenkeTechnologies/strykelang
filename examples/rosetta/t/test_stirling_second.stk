@@ -1,30 +1,30 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Stirling numbers of the second kind
 
-my %stirling_memo
+my %STIRLING_MEMO
 
-fn my_stirling_second($n, $k) {
+fn Rosetta::StirlingSecond::compute($n, $k) {
     if ($k == 1 || $k == $n) {
         1
     } elsif ($k == 0 || $k > $n) {
         0
-    } elsif (exists $stirling_memo{"$n,$k"}) {
-        $stirling_memo{"$n,$k"}
+    } elsif (exists $STIRLING_MEMO{"$n,$k"}) {
+        $STIRLING_MEMO{"$n,$k"}
     } else {
-        my $v1 = my_stirling_second($n - 1, $k)
-        my $v2 = my_stirling_second($n - 1, $k - 1)
+        my $v1 = Rosetta::StirlingSecond::compute($n - 1, $k)
+        my $v2 = Rosetta::StirlingSecond::compute($n - 1, $k - 1)
         my $res = $k * $v1 + $v2
-        $stirling_memo{"$n,$k"} = $res
+        $STIRLING_MEMO{"$n,$k"} = $res
         $res
     }
 }
 
-assert_eq my_stirling_second(3, 2), 3, "S2(3, 2)"
-assert_eq my_stirling_second(4, 2), 7, "S2(4, 2)"
-assert_eq my_stirling_second(5, 2), 15, "S2(5, 2)"
-assert_eq my_stirling_second(5, 3), 25, "S2(5, 3)"
-assert_eq my_stirling_second(10, 5), 42525, "S2(10, 5)"
+assert_eq Rosetta::StirlingSecond::compute(3, 2), 3, "S2(3, 2)"
+assert_eq Rosetta::StirlingSecond::compute(4, 2), 7, "S2(4, 2)"
+assert_eq Rosetta::StirlingSecond::compute(5, 2), 15, "S2(5, 2)"
+assert_eq Rosetta::StirlingSecond::compute(5, 3), 25, "S2(5, 3)"
+assert_eq Rosetta::StirlingSecond::compute(10, 5), 42525, "S2(10, 5)"
 
-(10, 5) |> my_stirling_second |> assert_eq(42525, "pipe stirling")
+(10, 5) |> Rosetta::StirlingSecond::compute |> assert_eq(42525, "pipe stirling")
 
 test_run

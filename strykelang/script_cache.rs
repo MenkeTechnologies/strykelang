@@ -262,9 +262,10 @@ impl ScriptCache {
     /// Evict stale entries (file deleted or mtime changed).
     pub fn evict_stale(&self) -> usize {
         let paths: Vec<(i64, String, i64, i64)> = {
-            let mut stmt = match self.conn.prepare(
-                "SELECT id, path, mtime_secs, mtime_nsecs FROM scripts",
-            ) {
+            let mut stmt = match self
+                .conn
+                .prepare("SELECT id, path, mtime_secs, mtime_nsecs FROM scripts")
+            {
                 Ok(s) => s,
                 Err(_) => return 0,
             };
@@ -288,7 +289,9 @@ impl ScriptCache {
                 None => true,
             };
             if stale {
-                let _ = self.conn.execute("DELETE FROM scripts WHERE id = ?1", params![id]);
+                let _ = self
+                    .conn
+                    .execute("DELETE FROM scripts WHERE id = ?1", params![id]);
                 evicted += 1;
             }
         }
@@ -323,7 +326,9 @@ pub static CACHE: once_cell::sync::Lazy<Option<std::sync::Mutex<ScriptCache>>> =
         if !cache_enabled() {
             return None;
         }
-        ScriptCache::open(&default_cache_path()).ok().map(std::sync::Mutex::new)
+        ScriptCache::open(&default_cache_path())
+            .ok()
+            .map(std::sync::Mutex::new)
     });
 
 /// Check if SQLite cache is enabled (default: true, disable with `STRYKE_SQLITE_CACHE=0`).
@@ -366,7 +371,10 @@ pub fn try_save(path: &Path, program: &Program, chunk: &Chunk) -> PerlResult<()>
 
 /// Get global cache stats.
 pub fn stats() -> Option<(i64, i64)> {
-    CACHE.as_ref().and_then(|c| c.lock().ok()).map(|c| c.stats())
+    CACHE
+        .as_ref()
+        .and_then(|c| c.lock().ok())
+        .map(|c| c.stats())
 }
 
 /// Evict stale entries from global cache.

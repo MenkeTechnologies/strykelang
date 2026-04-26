@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hello World
 
-fn hello {
+fn Rosetta::HelloWorld::greet() {
     "Hello, World!"
 }
 
-assert_eq hello(), "Hello, World!", "hello world"
+assert_eq Rosetta::HelloWorld::greet(), "Hello, World!", "hello world"
 
 test_run

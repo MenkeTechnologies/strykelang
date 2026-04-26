@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Longest common prefix
 
-fn my_common_prefix($s1, $s2) {
+fn Rosetta::LongestCommonPrefix::common($s1, $s2) {
     my @c1 = chars($s1)
     my @c2 = chars($s2)
     my $len = scalar(@c1) < scalar(@c2) ? scalar(@c1) : scalar(@c2)
@@ -18,19 +18,19 @@ fn my_common_prefix($s1, $s2) {
     $res
 }
 
-fn my_longest_common_prefix(@strings) {
+fn Rosetta::LongestCommonPrefix::solve(@strings) {
     if (scalar(@strings) == 0) {
         ""
     } else {
-        @strings |> reduce { my_common_prefix($a, $b) }
+        @strings |> reduce { Rosetta::LongestCommonPrefix::common($a, $b) }
     }
 }
 
-assert_eq my_longest_common_prefix("interspecies", "interstellar", "interstate"), "inters", "prefix inters"
-assert_eq my_longest_common_prefix("throne", "throne"), "throne", "prefix throne"
-assert_eq my_longest_common_prefix("throne", "dungeon"), "", "no prefix"
+assert_eq Rosetta::LongestCommonPrefix::solve("interspecies", "interstellar", "interstate"), "inters", "prefix inters"
+assert_eq Rosetta::LongestCommonPrefix::solve("throne", "throne"), "throne", "prefix throne"
+assert_eq Rosetta::LongestCommonPrefix::solve("throne", "dungeon"), "", "no prefix"
 
 # Pipe
-qw(interspecies interstellar interstate) |> my_longest_common_prefix |> assert_eq("inters", "pipe prefix")
+qw(interspecies interstellar interstate) |> Rosetta::LongestCommonPrefix::solve |> assert_eq("inters", "pipe prefix")
 
 test_run

@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Perfect shuffle
 
-fn perfect_shuffle {
-    my $deck = $_[0]
+fn Rosetta::PerfectShuffle::shuffle($deck) {
     my $len = scalar(@$deck)
     my $mid = int($len / 2)
     
@@ -19,11 +18,11 @@ fn perfect_shuffle {
 }
 
 my $deck = [1..8]
-my $shuffled = perfect_shuffle($deck)
+my $shuffled = Rosetta::PerfectShuffle::shuffle($deck)
 assert_eq join(",", @$shuffled), "1,5,2,6,3,7,4,8", "perfect shuffle of 1..8"
 
 my $deck2 = ["A", "B", "C", "D"]
-my $shuffled2 = perfect_shuffle($deck2)
+my $shuffled2 = Rosetta::PerfectShuffle::shuffle($deck2)
 assert_eq join(",", @$shuffled2), "A,C,B,D", "perfect shuffle of ABCD"
 
 test_run

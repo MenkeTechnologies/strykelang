@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Entropy
 
-fn shannon_entropy($s) {
+fn Rosetta::Entropy::shannon($s) {
     my $len = length($s)
     if ($len == 0) { return 0 }
     my $counts = {}
@@ -18,8 +18,8 @@ fn shannon_entropy($s) {
     $entropy
 }
 
-assert_ok abs(shannon_entropy("1223334444") - 1.8464) < 0.0001, "Entropy of 1223334444"
-assert_eq shannon_entropy("aaaaa"), 0, "Entropy of aaaaa is 0"
-assert_eq shannon_entropy(""), 0, "Entropy of empty string"
+assert_near Rosetta::Entropy::shannon("1223334444"), 1.8464, 0.0001, "Entropy of 1223334444"
+assert_eq Rosetta::Entropy::shannon("aaaaa"), 0, "Entropy of aaaaa is 0"
+assert_eq Rosetta::Entropy::shannon(""), 0, "Entropy of empty string"
 
 test_run

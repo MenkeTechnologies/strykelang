@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Thue-Morse sequence
 
-fn thue_morse($n) {
+fn Rosetta::ThueMorse::generate($n) {
     if ($n == 0) {
         "0"
     } else {
@@ -15,11 +15,11 @@ fn thue_morse($n) {
     }
 }
 
-assert_eq thue_morse(0), "0", "TM 0"
-assert_eq thue_morse(1), "01", "TM 1"
-assert_eq thue_morse(2), "0110", "TM 2"
-assert_eq thue_morse(3), "01101001", "TM 3"
+assert_eq Rosetta::ThueMorse::generate(0), "0", "TM 0"
+assert_eq Rosetta::ThueMorse::generate(1), "01", "TM 1"
+assert_eq Rosetta::ThueMorse::generate(2), "0110", "TM 2"
+assert_eq Rosetta::ThueMorse::generate(3), "01101001", "TM 3"
 
-3 |> thue_morse |> assert_eq("01101001", "pipe Thue-Morse")
+3 |> Rosetta::ThueMorse::generate |> assert_eq("01101001", "pipe Thue-Morse")
 
 test_run

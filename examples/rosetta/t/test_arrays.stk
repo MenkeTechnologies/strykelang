@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Arrays
 
-fn array_examples() {
+fn Rosetta::Arrays::demo() {
     "Array Examples in Stryke:" |> p
     
     # Array creation and initialization
@@ -53,4 +53,5 @@ fn array_examples() {
     ("   Filtered (>3): " . join(", ", @filtered)) |> p
 }
 
-array_examples
+Rosetta::Arrays::demo()
+test_run

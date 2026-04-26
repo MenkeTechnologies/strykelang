@@ -1,14 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Acronym
 
-fn my_acronym {
-    my $s = $_[0]
+fn Rosetta::Acronym::compute($s) {
     $s |> split /[\s-]+/ |> map { substr($_, 0, 1) } |> join "" |> uc
 }
 
-assert_eq my_acronym("Portable Network Graphics"), "PNG", "PNG"
-assert_eq my_acronym("First In, First Out"), "FIFO", "FIFO"
-assert_eq my_acronym("GNU Image Manipulation Program"), "GIMP", "GIMP"
-assert_eq my_acronym("Complementary metal-oxide-semiconductor"), "CMOS", "CMOS"
+assert_eq Rosetta::Acronym::compute("Portable Network Graphics"), "PNG", "PNG"
+assert_eq Rosetta::Acronym::compute("First In, First Out"), "FIFO", "FIFO"
+assert_eq Rosetta::Acronym::compute("GNU Image Manipulation Program"), "GIMP", "GIMP"
+assert_eq Rosetta::Acronym::compute("Complementary metal-oxide-semiconductor"), "CMOS", "CMOS"
 
 test_run

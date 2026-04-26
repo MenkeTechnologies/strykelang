@@ -1,20 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Depth-first search
 
-fn dfs_rec($graph, $u, $visited, $order) {
+fn Rosetta::DFS::dfs_recursive($graph, $u, $visited, $order) {
     push @$order, $u
     $visited->{$u} = 1
     for my $v (@{$graph->{$u}}) {
         if (!exists $visited->{$v}) {
-            dfs_rec($graph, $v, $visited, $order)
+            Rosetta::DFS::dfs_recursive($graph, $v, $visited, $order)
         }
     }
 }
 
-fn my_dfs($graph, $start) {
+fn Rosetta::DFS::solve($graph, $start) {
     my $visited = {}
     my $order = []
-    dfs_rec($graph, $start, $visited, $order)
+    Rosetta::DFS::dfs_recursive($graph, $start, $visited, $order)
     $order
 }
 
@@ -27,7 +27,7 @@ my $graph = {
     "F" => []
 }
 
-my $res = my_dfs($graph, "A")
+my $res = Rosetta::DFS::solve($graph, "A")
 # DFS from A with this adjacency order: A -> B -> D, then B -> E -> F, then C
 assert_eq join(",", @$res), "A,B,D,E,F,C", "DFS order from A"
 

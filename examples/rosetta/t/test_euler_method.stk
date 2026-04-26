@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Euler Method
 
-fn my_euler_method($f, $y0, $h, $n) {
+fn Rosetta::EulerMethod::solve($f, $y0, $h, $n) {
     my $y = $y0
     my $t = 0
     for my $i (1..$n) {
@@ -13,15 +13,13 @@ fn my_euler_method($f, $y0, $h, $n) {
 
 # Solve y' = y, y(0) = 1. Result at t=1 should be approx e.
 my $f = fn ($t, $y) { $y }
-my $res = my_euler_method($f, 1, 0.001, 1000)
+my $res = Rosetta::EulerMethod::solve($f, 1, 0.001, 1000)
 my $e = 2.718281828
-my $diff = abs($res - $e)
-
-assert_ok $diff < 0.01, "my_euler method approximation of e"
+assert_near $res, $e, 0.01, "my_euler method approximation of e"
 
 # Solve y' = 2t, y(0) = 0. Result at t=1 should be approx 1.
 my $f2 = fn ($t, $y) { 2 * $t }
-my $res2 = my_euler_method($f2, 0, 0.001, 1000)
-assert_ok abs($res2 - 1.0) < 0.01, "my_euler method approximation of t^2"
+my $res2 = Rosetta::EulerMethod::solve($f2, 0, 0.001, 1000)
+assert_near $res2, 1.0, 0.01, "my_euler method approximation of t^2"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Boustrophedon transform
 
-fn boustrophedon($arr_ref) {
+fn Rosetta::Boustrophedon::transform($arr_ref) {
     my @arr = @$arr_ref
     my $n = scalar(@arr)
     if ($n == 0) { return ([]) }
@@ -20,7 +20,7 @@ fn boustrophedon($arr_ref) {
         } else {
             # right to left
             $curr_row[$i] = $arr[$i]
-            for my $j (~> (0..$i-1) rev) {
+            for my $j (~> (0:$i-1) rev) {
                 $curr_row[$j] = $curr_row[$j+1] + $prev_row[$j]
             }
         }
@@ -31,7 +31,7 @@ fn boustrophedon($arr_ref) {
 }
 
 # e.g. for (1, 0, 0, 0, ...) it should give Euler numbers (1, 1, 1, 2, 5, 16, 61, ...)
-my $res = boustrophedon([1, 0, 0, 0, 0, 0])
+my $res = Rosetta::Boustrophedon::transform([1, 0, 0, 0, 0, 0])
 assert_eq join(",", @$res), "1,1,1,2,5,16", "Euler numbers via Boustrophedon"
 
 test_run

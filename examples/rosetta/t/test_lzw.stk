@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: LZW Compression
 
-fn my_lzw_encode($text) {
+fn Rosetta::LZW::encode($text) {
     my %dict
     for my $i (0..255) { $dict{chr($i)} = $i }
     
@@ -25,7 +25,7 @@ fn my_lzw_encode($text) {
     \@result
 }
 
-fn my_lzw_decode($codes_ref) {
+fn Rosetta::LZW::decode($codes_ref) {
     my @codes = @$codes_ref
     my %dict
     for my $i (0..255) { $dict{$i} = chr($i) }
@@ -51,10 +51,10 @@ fn my_lzw_decode($codes_ref) {
 }
 
 my $input = "TOBEORNOTTOBEORTOBEORNOT"
-my $encoded = my_lzw_encode($input)
+my $encoded = Rosetta::LZW::encode($input)
 assert_eq join(",", @$encoded), "84,79,66,69,79,82,78,79,84,256,258,260,265,259,261,263", "LZW encode"
 
-my $decoded = my_lzw_decode($encoded)
+my $decoded = Rosetta::LZW::decode($encoded)
 assert_eq $decoded, $input, "LZW decode"
 
 test_run

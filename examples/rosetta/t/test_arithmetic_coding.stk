@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Arithmetic coding
 
-fn get_probs($text) {
+fn Rosetta::ArithmeticCoding::get_probs($text) {
     my @chars = $text |> chars
     my %count
     for my $c (@chars) { $count{$c} = $count{$c} + 1 }
@@ -18,7 +18,7 @@ fn get_probs($text) {
     \%probs
 }
 
-fn arith_encode($text, $probs) {
+fn Rosetta::ArithmeticCoding::encode($text, $probs) {
     my $low = 0
     my $high = 1
     my @chars = $text |> chars
@@ -31,7 +31,7 @@ fn arith_encode($text, $probs) {
     $low
 }
 
-fn arith_decode($val, $probs, $len) {
+fn Rosetta::ArithmeticCoding::decode($val, $probs, $len) {
     my $res = ""
     my $v = $val
     for my $i (1..$len) {
@@ -48,9 +48,9 @@ fn arith_decode($val, $probs, $len) {
 }
 
 my $input = "WIKI"
-my $probs = get_probs($input)
-my $encoded = arith_encode($input, $probs)
-my $decoded = arith_decode($encoded, $probs, 4)
+my $probs = Rosetta::ArithmeticCoding::get_probs($input)
+my $encoded = Rosetta::ArithmeticCoding::encode($input, $probs)
+my $decoded = Rosetta::ArithmeticCoding::decode($encoded, $probs, 4)
 
 assert_eq $decoded, $input, "Arithmetic encode/decode 'WIKI'"
 

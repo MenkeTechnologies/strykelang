@@ -1,33 +1,35 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Collatz Conjecture (Hailstone Sequence)
 
-fn collatz_step($n) {
+fn Rosetta::Collatz::step($n) {
     $n % 2 == 0 ? $n / 2 : 3 * $n + 1
 }
 
-fn collatz_seq($n) {
+fn Rosetta::Collatz::sequence($n) {
     my @seq = ($n)
-    while ($n != 1) {
-        $n = collatz_step($n)
-        push @seq, $n
+    my $curr = $n
+    while ($curr != 1) {
+        $curr = Rosetta::Collatz::step($curr)
+        push @seq, $curr
     }
     @seq
 }
 
-fn collatz_len($n) {
+fn Rosetta::Collatz::length($n) {
     my $len = 1
-    while ($n != 1) {
-        $n = collatz_step($n)
+    my $curr = $n
+    while ($curr != 1) {
+        $curr = Rosetta::Collatz::step($curr)
         $len++
     }
     $len
 }
 
-assert_eq collatz_len(1), 1, "collatz_len(1)"
-assert_eq collatz_len(2), 2, "collatz_len(2)"
-assert_eq collatz_len(27), 112, "collatz_len(27)"
+assert_eq Rosetta::Collatz::length(1), 1, "collatz_len(1)"
+assert_eq Rosetta::Collatz::length(2), 2, "collatz_len(2)"
+assert_eq Rosetta::Collatz::length(27), 112, "collatz_len(27)"
 
-my @seq = collatz_seq(6)
+my @seq = Rosetta::Collatz::sequence(6)
 assert_eq join(",", @seq), "6,3,10,5,16,8,4,2,1", "collatz_seq(6)"
 
 test_run

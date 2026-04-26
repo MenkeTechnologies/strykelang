@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: A* search algorithm
 
-fn h($node, $end) {
+fn Rosetta::AStar::heuristic($node, $end) {
     abs($node->[0] - $end->[0]) + abs($node->[1] - $end->[1])
 }
 
-fn my_astar($grid, $start, $end) {
+fn Rosetta::AStar::solve($grid, $start, $end) {
     my $rows = scalar(@$grid)
     my $cols = scalar(@{$grid->[0]})
-    my $open = [[$start->[0], $start->[1], 0, h($start, $end)]] # r, c, g, f
+    my $open = [[$start->[0], $start->[1], 0, Rosetta::AStar::heuristic($start, $end)]] # r, c, g, f
     my %closed
     
     while (scalar(@$open) > 0) {
@@ -35,7 +35,7 @@ fn my_astar($grid, $start, $end) {
             my $nc = $c + $d->[1]
             if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
                 if ($grid->[$nr][$nc] == 0) {
-                    push @$open, [$nr, $nc, $g + 1, $g + 1 + h([$nr, $nc], $end)]
+                    push @$open, [$nr, $nc, $g + 1, $g + 1 + Rosetta::AStar::heuristic([$nr, $nc], $end)]
                 }
             }
         }
@@ -48,7 +48,7 @@ my $grid = [
     [0, 1, 0],
     [0, 0, 0]
 ]
-my $dist = my_astar($grid, [0, 0], [2, 2])
+my $dist = Rosetta::AStar::solve($grid, [0, 0], [2, 2])
 # Path: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) or similar, length 4
 assert_eq $dist, 4, "A* distance on 3x3 grid with obstacle"
 

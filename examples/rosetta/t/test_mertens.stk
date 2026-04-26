@@ -1,26 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Mertens function
 
-fn my_prime_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
-    while ($temp > 1) {
-        while ($temp % $d == 0) {
-            push @factors, $d
-            $temp = int($temp / $d)
-        }
-        $d++
-    }
-    \@factors
-}
-
-fn moebius($n) {
+fn Rosetta::Mertens::moebius($n) {
     if ($n == 1) {
         1
     } else {
-        my $factors_ref = my_prime_factors($n)
-        my @factors = @$factors_ref
+        my @factors = prime_factors($n)
         my %counts
         my $has_square = 0
         for my $f (@factors) {
@@ -36,19 +21,19 @@ fn moebius($n) {
     }
 }
 
-fn mertens($n) {
+fn Rosetta::Mertens::compute($n) {
     my $sum = 0
     for my $k (1..$n) {
-        $sum += moebius($k)
+        $sum += Rosetta::Mertens::moebius($k)
     }
     $sum
 }
 
-assert_eq mertens(1), 1, "M(1) = 1"
-assert_eq mertens(10), -1, "M(10) = -1"
-assert_eq mertens(20), -3, "M(20) = -3"
-assert_eq mertens(100), 1, "M(100) = 1"
+assert_eq Rosetta::Mertens::compute(1), 1, "M(1) = 1"
+assert_eq Rosetta::Mertens::compute(10), -1, "M(10) = -1"
+assert_eq Rosetta::Mertens::compute(20), -3, "M(20) = -3"
+assert_eq Rosetta::Mertens::compute(100), 1, "M(100) = 1"
 
-10 |> mertens |> assert_eq(-1, "pipe Mertens")
+10 |> Rosetta::Mertens::compute |> assert_eq(-1, "pipe Mertens")
 
 test_run

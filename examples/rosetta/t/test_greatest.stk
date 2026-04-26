@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Greatest Element of a List
 
-fn greatest(@nums) {
+fn Rosetta::Greatest::max(@nums) {
     my $max = $nums[0]
     for my $n (@nums) {
         $max = $n if $n > $max
@@ -9,7 +9,7 @@ fn greatest(@nums) {
     $max
 }
 
-fn least(@nums) {
+fn Rosetta::Greatest::min(@nums) {
     my $min = $nums[0]
     for my $n (@nums) {
         $min = $n if $n < $min
@@ -17,7 +17,7 @@ fn least(@nums) {
     $min
 }
 
-fn my_minmax(@nums) {
+fn Rosetta::Greatest::minmax(@nums) {
     my $min = $nums[0]
     my $max = $nums[0]
     for my $n (@nums) {
@@ -27,14 +27,14 @@ fn my_minmax(@nums) {
     ($min, $max)
 }
 
-assert_eq greatest(3, 1, 4, 1, 5, 9, 2, 6), 9, "greatest of list"
-assert_eq greatest(42), 42, "single element"
-assert_eq greatest(-5, -2, -10, -1), -1, "greatest negative"
+assert_eq Rosetta::Greatest::max(3, 1, 4, 1, 5, 9, 2, 6), 9, "greatest of list"
+assert_eq Rosetta::Greatest::max(42), 42, "single element"
+assert_eq Rosetta::Greatest::max(-5, -2, -10, -1), -1, "greatest negative"
 
-assert_eq least(3, 1, 4, 1, 5, 9, 2, 6), 1, "least of list"
-assert_eq least(-5, -2, -10, -1), -10, "least negative"
+assert_eq Rosetta::Greatest::min(3, 1, 4, 1, 5, 9, 2, 6), 1, "least of list"
+assert_eq Rosetta::Greatest::min(-5, -2, -10, -1), -10, "least negative"
 
-my ($min, $max) = my_minmax(3, 1, 4, 1, 5, 9, 2, 6)
+my ($min, $max) = Rosetta::Greatest::minmax(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq $min, 1, "min via minmax"
 assert_eq $max, 9, "max via minmax"
 

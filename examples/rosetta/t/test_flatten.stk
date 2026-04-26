@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Flatten a List (single level)
 
-fn my_flatten(@list) {
+fn Rosetta::Flatten::solve(@list) {
     my @result
     for my $item (@list) {
         if (ref($item) eq 'ARRAY') {
@@ -14,15 +14,15 @@ fn my_flatten(@list) {
 }
 
 my @nested = ([1, 2], [3, 4], 5)
-my @flat = my_flatten(@nested)
+my @flat = Rosetta::Flatten::solve(@nested)
 assert_eq join(",", @flat), "1,2,3,4,5", "flatten single level"
 
 my @simple = (1, 2, 3)
-my @flat_simple = my_flatten(@simple)
+my @flat_simple = Rosetta::Flatten::solve(@simple)
 assert_eq join(",", @flat_simple), "1,2,3", "flatten simple"
 
 my @mixed = ([1], 2, [3, 4])
-my @flat_mixed = my_flatten(@mixed)
+my @flat_mixed = Rosetta::Flatten::solve(@mixed)
 assert_eq join(",", @flat_mixed), "1,2,3,4", "flatten mixed"
 
 test_run

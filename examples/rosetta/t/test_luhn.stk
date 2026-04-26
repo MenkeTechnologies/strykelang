@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Luhn Test (Credit Card Validation)
 
-fn my_luhn_check($num) {
+fn Rosetta::Luhn::check($num) {
     my @all_digits = split //, "$num"
     my @digits
     for my $d (@all_digits) {
@@ -14,21 +14,21 @@ fn my_luhn_check($num) {
         my $d = $digits[$i]
         if ($i % 2 == 1) {
             $d *= 2
-            $d -= 9 if $d > 9
+            if ($d > 9) { $d = $d - 9 }
         }
         $sum += $d
     }
     $sum % 10 == 0
 }
 
-assert_ok my_luhn_check(49927398716), "49927398716 valid"
-assert_ok my_luhn_check(79927398713), "79927398713 valid"
-assert_ok my_luhn_check(1234567812345670), "1234567812345670 valid"
+assert_ok Rosetta::Luhn::check(49927398716), "49927398716 valid"
+assert_ok Rosetta::Luhn::check(79927398713), "79927398713 valid"
+assert_ok Rosetta::Luhn::check(1234567812345670), "1234567812345670 valid"
 
-assert_ok !my_luhn_check(49927398717), "49927398717 invalid"
-assert_ok !my_luhn_check(1234567812345678), "1234567812345678 invalid"
+assert_ok !Rosetta::Luhn::check(49927398717), "49927398717 invalid"
+assert_ok !Rosetta::Luhn::check(1234567812345678), "1234567812345678 invalid"
 
-assert_ok my_luhn_check(0), "0 valid"
-assert_ok !my_luhn_check(1), "1 invalid"
+assert_ok Rosetta::Luhn::check(0), "0 valid"
+assert_ok !Rosetta::Luhn::check(1), "1 invalid"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Roots of a function (Newton's Method)
 
-fn my_newton($f, $df, $x0, $tol) {
+fn Rosetta::Newton::solve($f, $df, $x0, $tol) {
     my $x = $x0
     for my $i (1..100) {
         my $fx = $f->($x)
@@ -16,13 +16,13 @@ fn my_newton($f, $df, $x0, $tol) {
 # x^2 - 2 = 0
 my $f = fn { $_ * $_ - 2 }
 my $df = fn { 2 * $_ }
-my $root = my_newton($f, $df, 1.5, 0.000001)
-assert_ok abs($root - sqrt(2)) < 0.0001, "Newton root of x^2-2"
+my $root = Rosetta::Newton::solve($f, $df, 1.5, 0.000001)
+assert_near $root, sqrt(2), 0.0001, "Newton root of x^2-2"
 
 # cos(x) - x = 0
 my $f2 = fn { cos($_) - $_ }
 my $df2 = fn { -sin($_) - 1 }
-my $root2 = my_newton($f2, $df2, 0.5, 0.000001)
-assert_ok abs($root2 - 0.739085) < 0.0001, "Newton root of cos(x)-x"
+my $root2 = Rosetta::Newton::solve($f2, $df2, 0.5, 0.000001)
+assert_near $root2, 0.739085, 0.0001, "Newton root of cos(x)-x"
 
 test_run

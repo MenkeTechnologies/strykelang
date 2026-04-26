@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Balanced numbers
 
-fn sum_digits($n) {
+fn Rosetta::BalancedNumbers::sum_digits($n) {
     my @digits = ~> "$n" chars map { int($_) }
     if (scalar(@digits) == 0) {
         0
@@ -10,7 +10,7 @@ fn sum_digits($n) {
     }
 }
 
-fn is_balanced($n) {
+fn Rosetta::BalancedNumbers::check($n) {
     my $s = "$n"
     my $len = length($s)
     my $half = int($len / 2)
@@ -19,16 +19,16 @@ fn is_balanced($n) {
     } else {
         my $s1 = substr($s, 0, $half)
         my $s2 = substr($s, $len - $half)
-        sum_digits($s1) == sum_digits($s2)
+        Rosetta::BalancedNumbers::sum_digits($s1) == Rosetta::BalancedNumbers::sum_digits($s2)
     }
 }
 
-assert_ok is_balanced(1221), "1221 is balanced (1+2 = 2+1)"
-assert_ok is_balanced(1230), "1230 is balanced (1+2 = 3+0)"
-assert_ok is_balanced(121), "121 is balanced (1 = 1)"
-assert_ok is_balanced(7), "7 is balanced (0 = 0)"
-assert_ok !is_balanced(1234), "1234 not (3 != 7)"
+assert_ok Rosetta::BalancedNumbers::check(1221), "1221 is balanced (1+2 = 2+1)"
+assert_ok Rosetta::BalancedNumbers::check(1230), "1230 is balanced (1+2 = 3+0)"
+assert_ok Rosetta::BalancedNumbers::check(121), "121 is balanced (1 = 1)"
+assert_ok Rosetta::BalancedNumbers::check(7), "7 is balanced (0 = 0)"
+assert_ok !Rosetta::BalancedNumbers::check(1234), "1234 not (3 != 7)"
 
-1221 |> is_balanced |> assert_ok("pipe balanced")
+1221 |> Rosetta::BalancedNumbers::check |> assert_ok("pipe balanced")
 
 test_run

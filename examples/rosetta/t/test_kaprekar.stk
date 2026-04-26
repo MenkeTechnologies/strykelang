@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Kaprekar Numbers
 
-fn my_is_kaprekar($n) {
+fn Rosetta::Kaprekar::check($n) {
     if ($n == 1) {
         1
     } else {
@@ -22,21 +22,21 @@ fn my_is_kaprekar($n) {
     }
 }
 
-fn kaprekar_numbers($max) {
-    1..$max |> filter { my_is_kaprekar($_) }
+fn Rosetta::Kaprekar::generate($max) {
+    1:$max |> grep { Rosetta::Kaprekar::check($_) }
 }
 
-assert_ok my_is_kaprekar(1), "1 is kaprekar"
-assert_ok my_is_kaprekar(9), "9 is kaprekar (81 = 8+1)"
-assert_ok my_is_kaprekar(45), "45 is kaprekar (2025 = 20+25)"
-assert_ok my_is_kaprekar(55), "55 is kaprekar (3025 = 30+25)"
-assert_ok my_is_kaprekar(99), "99 is kaprekar (9801 = 98+01)"
-assert_ok my_is_kaprekar(297), "297 is kaprekar (88209 = 88+209)"
+assert_ok Rosetta::Kaprekar::check(1), "1 is kaprekar"
+assert_ok Rosetta::Kaprekar::check(9), "9 is kaprekar (81 = 8+1)"
+assert_ok Rosetta::Kaprekar::check(45), "45 is kaprekar (2025 = 20+25)"
+assert_ok Rosetta::Kaprekar::check(55), "55 is kaprekar (3025 = 30+25)"
+assert_ok Rosetta::Kaprekar::check(99), "99 is kaprekar (9801 = 98+01)"
+assert_ok Rosetta::Kaprekar::check(297), "297 is kaprekar (88209 = 88+209)"
 
-assert_ok !my_is_kaprekar(2), "2 is not kaprekar"
-assert_ok !my_is_kaprekar(10), "10 is not kaprekar"
+assert_ok !Rosetta::Kaprekar::check(2), "2 is not kaprekar"
+assert_ok !Rosetta::Kaprekar::check(10), "10 is not kaprekar"
 
-my @kap = kaprekar_numbers(100)
+my @kap = Rosetta::Kaprekar::generate(100)
 assert_eq join(",", @kap), "1,9,45,55,99", "kaprekar up to 100"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Monte Carlo methods
 
-fn monte_carlo_pi($samples) {
+fn Rosetta::MonteCarlo::pi_sequential($samples) {
     my $inside = 0
     for my $i (1..$samples) {
         my $x = rand()
@@ -13,10 +13,11 @@ fn monte_carlo_pi($samples) {
     4.0 * $inside / $samples
 }
 
-fn p_monte_carlo_pi($samples, $workers) {
+fn Rosetta::MonteCarlo::pi_parallel($samples, $workers) {
     my $chunk = int($samples / $workers)
-    my @results = 1..$workers |> pmap {
+    my @results = ~> 1:$workers pmap {
         my $inside = 0
+        srand($_ + now_ns)
         for my $i (1..$chunk) {
             my $x = rand()
             my $y = rand()
@@ -33,14 +34,14 @@ fn p_monte_carlo_pi($samples, $workers) {
     4.0 * $total_inside / ($chunk * $workers)
 }
 
-my $pi_seq = monte_carlo_pi(100000)
+my $pi_seq = Rosetta::MonteCarlo::pi_sequential(100000)
 assert_ok $pi_seq > 3.1 && $pi_seq < 3.2, "Sequential MC Pi is approximately Pi: $pi_seq"
 
-my $pi_par = p_monte_carlo_pi(100000, 4)
+my $pi_par = Rosetta::MonteCarlo::pi_parallel(100000, 4)
 assert_ok $pi_par > 3.1 && $pi_par < 3.2, "Parallel MC Pi is approximately Pi: $pi_par"
 
 # Pipeline version: using the dedicated pmap_reduce builtin
-my $inside_pipe = 0 + (1..10000 |> pmap_reduce { srand($_); my $x = rand(); my $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
+my $inside_pipe = 0 + (1:10000 |> pmap_reduce { srand($_ + now_ns); my $x = rand(); my $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
 my $pi_pipe = 4.0 * $inside_pipe / 10000
 assert_ok $pi_pipe > 3.0 && $pi_pipe < 3.3, "Pipeline MC Pi is approximately Pi: $pi_pipe"
 

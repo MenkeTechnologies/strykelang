@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Ludic numbers
 
-fn get_ludic($n) {
+fn Rosetta::Ludic::generate($n) {
     my @ludics = (1)
     my @nums = (2..$n)
     while (scalar(@nums) > 0) {
@@ -20,10 +20,10 @@ fn get_ludic($n) {
     \@ludics
 }
 
-my $res = get_ludic(25)
+my $res = Rosetta::Ludic::generate(25)
 assert_eq join(",", @$res), "1,2,3,5,7,11,13,17,23,25", "Ludic up to 25"
 
-my $res2 = get_ludic(200)
+my $res2 = Rosetta::Ludic::generate(200)
 assert_eq $res2->[24], 107, "25th Ludic is 107"
 
 test_run

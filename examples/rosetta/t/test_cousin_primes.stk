@@ -1,34 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cousin primes
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
+fn Rosetta::CousinPrimes::check($p1, $p2) {
+    is_prime($p1) && is_prime($p2) && abs($p1 - $p2) == 4
 }
 
-fn are_cousin_primes($p1, $p2) {
-    my_is_prime($p1) && my_is_prime($p2) && abs($p1 - $p2) == 4
-}
+assert_ok Rosetta::CousinPrimes::check(3, 7), "3 and 7"
+assert_ok Rosetta::CousinPrimes::check(7, 11), "7 and 11"
+assert_ok Rosetta::CousinPrimes::check(13, 17), "13 and 17"
+assert_ok !Rosetta::CousinPrimes::check(3, 5), "3 and 5 not"
 
-assert_ok are_cousin_primes(3, 7), "3 and 7"
-assert_ok are_cousin_primes(7, 11), "7 and 11"
-assert_ok are_cousin_primes(13, 17), "13 and 17"
-assert_ok !are_cousin_primes(3, 5), "3 and 5 not"
-
-3 |> are_cousin_primes(7) |> assert_ok("pipe cousin")
+3 |> Rosetta::CousinPrimes::check(7) |> assert_ok("pipe cousin")
 
 test_run

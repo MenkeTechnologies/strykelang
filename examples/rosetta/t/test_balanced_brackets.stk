@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Balanced brackets
 
-fn are_balanced($s) {
+fn Rosetta::BalancedBrackets::check($s) {
     my $count = 0
     my $balanced = 1
     my @chars = chars($s)
@@ -17,14 +17,14 @@ fn are_balanced($s) {
     $balanced
 }
 
-assert_ok are_balanced(""), "empty is balanced"
-assert_ok are_balanced("[]"), "[] is balanced"
-assert_ok are_balanced("[[][]]"), "[[ ] []] is balanced"
-assert_ok !are_balanced("["), "[ is not"
-assert_ok !are_balanced("]"), "] is not"
-assert_ok !are_balanced("]["), "][ is not"
-assert_ok !are_balanced("[]]"), "[]] is not"
+assert_ok Rosetta::BalancedBrackets::check(""), "empty is balanced"
+assert_ok Rosetta::BalancedBrackets::check("[]"), "[] is balanced"
+assert_ok Rosetta::BalancedBrackets::check("[[][]]"), "[[ ] []] is balanced"
+assert_ok !Rosetta::BalancedBrackets::check("["), "[ is not"
+assert_ok !Rosetta::BalancedBrackets::check("]"), "] is not"
+assert_ok !Rosetta::BalancedBrackets::check("]["), "][ is not"
+assert_ok !Rosetta::BalancedBrackets::check("[]]"), "[]] is not"
 
-"[[[]]]" |> are_balanced |> assert_ok("pipe balanced")
+"[[[]]]" |> Rosetta::BalancedBrackets::check |> assert_ok("pipe balanced")
 
 test_run

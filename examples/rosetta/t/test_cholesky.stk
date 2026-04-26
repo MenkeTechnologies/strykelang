@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cholesky Decomposition
 
-fn my_cholesky($A) {
+fn Rosetta::Cholesky::decompose($A) {
     my $n = scalar(@$A)
     my @L
     for my $i (0..$n-1) {
@@ -27,7 +27,7 @@ fn my_cholesky($A) {
 }
 
 my $A = [[25, 15, -5], [15, 18, 0], [-5, 0, 11]]
-my $L = my_cholesky($A)
+my $L = Rosetta::Cholesky::decompose($A)
 
 # Expected: [[5, 0, 0], [3, 3, 0], [-1, 1, 3]]
 assert_eq $L->[0]->[0], 5, "L[0][0]"

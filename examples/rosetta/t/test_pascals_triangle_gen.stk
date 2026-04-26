@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pascal's triangle
 
-fn my_pascals_triangle($n) {
+fn Rosetta::PascalTriangleGen::generate($n) {
     my @res = ([1])
     for my $i (1..$n-1) {
         my @row = (1)
@@ -15,7 +15,7 @@ fn my_pascals_triangle($n) {
     \@res
 }
 
-my $tri = my_pascals_triangle(5)
+my $tri = Rosetta::PascalTriangleGen::generate(5)
 assert_eq scalar(@$tri), 5, "5 rows"
 assert_eq join(",", @{$tri->[0]}), "1", "row 0"
 assert_eq join(",", @{$tri->[2]}), "1,2,1", "row 2"

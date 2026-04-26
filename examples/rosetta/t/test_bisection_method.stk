@@ -1,10 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bisection method
 
-fn my_bisection {
-    my $f = $_[0]
-    my $a = $_[1]
-    my $b = $_[2]
+fn Rosetta::BisectionMethod::solve($f, $a, $b) {
     my $tol = 0.0001
     
     my $c = ($a + $b) / 2
@@ -24,13 +21,13 @@ fn my_bisection {
 }
 
 # Find root of x^2 - 4 = 0 between 0 and 100
-my $f1 = fn { $_[0]**2 - 4 }
-my $root1 = my_bisection($f1, 0, 100)
-assert_ok abs($root1 - 2) < 0.001, "root of x^2-4 is 2"
+my $f1 = fn { $_**2 - 4 }
+my $root1 = Rosetta::BisectionMethod::solve($f1, 0, 100)
+assert_near $root1, 2, 0.001, "root of x^2-4 is 2"
 
 # Find root of cos(x) = 0 between 0 and 3
-my $f2 = fn { cos($_[0]) }
-my $root2 = my_bisection($f2, 0, 3)
-assert_ok abs($root2 - 1.5707) < 0.001, "root of cos(x) is pi/2"
+my $f2 = fn { cos($_) }
+my $root2 = Rosetta::BisectionMethod::solve($f2, 0, 3)
+assert_near $root2, 1.5707, 0.001, "root of cos(x) is pi/2"
 
 test_run

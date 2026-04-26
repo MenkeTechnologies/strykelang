@@ -1,38 +1,19 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Composite numbers
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
-}
-
-fn is_composite($n) {
+fn Rosetta::Composite::check($n) {
     if ($n < 4) { 0 }
     else {
-        !my_is_prime($n)
+        !is_prime($n)
     }
 }
 
-assert_ok is_composite(4), "4 is composite"
-assert_ok is_composite(6), "6 is composite"
-assert_ok is_composite(9), "9 is composite"
-assert_ok !is_composite(2), "2 is not"
-assert_ok !is_composite(7), "7 is not"
+assert_ok Rosetta::Composite::check(4), "4 is composite"
+assert_ok Rosetta::Composite::check(6), "6 is composite"
+assert_ok Rosetta::Composite::check(9), "9 is composite"
+assert_ok !Rosetta::Composite::check(2), "2 is not"
+assert_ok !Rosetta::Composite::check(7), "7 is not"
 
-4 |> is_composite |> assert_ok("pipe composite")
+4 |> Rosetta::Composite::check |> assert_ok("pipe composite")
 
 test_run

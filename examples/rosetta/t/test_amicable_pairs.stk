@@ -1,37 +1,32 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Amicable Pairs
 
-fn sum_proper_divisors {
-    my $n = $_[0]
+fn Rosetta::AmicablePairs::sum_divisors($n) {
     if ($n < 2) {
-        0
-    } else {
-        my @divs = 1..int($n / 2) |> filter { $n % $_ == 0 }
-        if (scalar(@divs) == 0) {
-            0
-        } else {
-            @divs |> reduce { $a + $b }
+        return 0
+    }
+    my $sum = 0
+    my $limit = int($n / 2)
+    for my $i (1..$limit) {
+        if ($n % $i == 0) {
+            $sum = $sum + $i
         }
     }
+    $sum
 }
 
-fn are_amicable {
-    my $a = $_[0]
-    my $b = $_[1]
-    if ($a == $b) {
-        0
-    } else {
-        if (sum_proper_divisors($a) == $b && sum_proper_divisors($b) == $a) {
-            1
-        } else {
-            0
-        }
+fn Rosetta::AmicablePairs::check($val1, $val2) {
+    if ($val1 == $val2) {
+        return 0
     }
+    my $sa = Rosetta::AmicablePairs::sum_divisors($val1)
+    my $sb = Rosetta::AmicablePairs::sum_divisors($val2)
+    ($sa == $val2 && $sb == $val1) ? 1 : 0
 }
 
-assert_ok are_amicable(220, 284), "220 and 284 are amicable"
-assert_ok are_amicable(1184, 1210), "1184 and 1210 are amicable"
-assert_ok !are_amicable(220, 220), "same numbers are not amicable"
-assert_ok !are_amicable(100, 200), "100 and 200 are not amicable"
+assert_ok Rosetta::AmicablePairs::check(220, 284), "220 and 284 are amicable"
+assert_ok Rosetta::AmicablePairs::check(1184, 1210), "1184 and 1210 are amicable"
+assert_ok !Rosetta::AmicablePairs::check(220, 220), "same numbers are not amicable"
+assert_ok !Rosetta::AmicablePairs::check(100, 200), "100 and 200 are not amicable"
 
 test_run

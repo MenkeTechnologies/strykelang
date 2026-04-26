@@ -1,32 +1,32 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Mutual Recursion (Hofstadter Female and Male sequences)
 
-fn F($n) {
+fn Rosetta::HofstadterFM::F($n) {
     if ($n == 0) {
         1
     } else {
-        $n - M(F($n - 1))
+        $n - Rosetta::HofstadterFM::M(Rosetta::HofstadterFM::F($n - 1))
     }
 }
 
-fn M($n) {
+fn Rosetta::HofstadterFM::M($n) {
     if ($n == 0) {
         0
     } else {
-        $n - F(M($n - 1))
+        $n - Rosetta::HofstadterFM::F(Rosetta::HofstadterFM::M($n - 1))
     }
 }
 
 # F: 1, 1, 2, 2, 3, 3, 4, 5, 5, 6
 my @f_expected = (1, 1, 2, 2, 3, 3, 4, 5, 5, 6)
 for my $i (0..9) {
-    assert_eq F($i), @f_expected[$i], "F($i)"
+    assert_eq Rosetta::HofstadterFM::F($i), $f_expected[$i], "F($i)"
 }
 
 # M: 0, 0, 1, 2, 2, 3, 4, 4, 5, 6
 my @m_expected = (0, 0, 1, 2, 2, 3, 4, 4, 5, 6)
 for my $i (0..9) {
-    assert_eq M($i), @m_expected[$i], "M($i)"
+    assert_eq Rosetta::HofstadterFM::M($i), $m_expected[$i], "M($i)"
 }
 
 test_run

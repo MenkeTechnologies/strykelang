@@ -1,35 +1,16 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cuban primes
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
-}
-
-fn cuban_prime($y) {
+fn Rosetta::CubanPrimes::formula($y) {
     3 * $y * $y + 3 * $y + 1
 }
 
-fn list_cuban_primes($count) {
+fn Rosetta::CubanPrimes::generate($count) {
     my @res
     my $y = 1
     while (scalar(@res) < $count) {
-        my $p = cuban_prime($y)
-        if (my_is_prime($p)) {
+        my $p = Rosetta::CubanPrimes::formula($y)
+        if (is_prime($p)) {
             push @res, $p
         }
         $y++
@@ -37,8 +18,8 @@ fn list_cuban_primes($count) {
     \@res
 }
 
-assert_eq join(",", @{ list_cuban_primes(5) }), "7,19,37,61,127", "first 5 cuban primes"
+assert_eq join(",", @{ Rosetta::CubanPrimes::generate(5) }), "7,19,37,61,127", "first 5 cuban primes"
 
-5 |> list_cuban_primes |> map { join(",", @$_) } |> assert_eq("7,19,37,61,127", "pipe cuban")
+5 |> Rosetta::CubanPrimes::generate |> map { join(",", @$_) } |> assert_eq("7,19,37,61,127", "pipe cuban")
 
 test_run

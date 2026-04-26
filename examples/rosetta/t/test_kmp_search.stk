@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Knuth-Morris-Pratt string search
 
-fn kmp_prefix($p) {
+fn Rosetta::KMP::prefix($p) {
     my @chars = ~> $p chars
     my $m = scalar(@chars)
     my @pi = (0)
@@ -18,14 +18,14 @@ fn kmp_prefix($p) {
     \@pi
 }
 
-fn kmp_search($t, $p) {
+fn Rosetta::KMP::search($t, $p) {
     my @t_chars = ~> $t chars
     my @p_chars = ~> $p chars
     my $n = scalar(@t_chars)
     my $m = scalar(@p_chars)
     if ($m == 0) { return 0 }
     
-    my $pi_ref = kmp_prefix($p)
+    my $pi_ref = Rosetta::KMP::prefix($p)
     my @pi = @$pi_ref
     my $q = 0
     for my $i (0..$n-1) {
@@ -42,10 +42,10 @@ fn kmp_search($t, $p) {
     -1
 }
 
-assert_eq kmp_search("abcabcabc", "abc"), 0, "Find abc at 0"
-assert_eq kmp_search("abcabcabc", "bca"), 1, "Find bca at 1"
-assert_eq kmp_search("abcabcabc", "cab"), 2, "Find cab at 2"
-assert_eq kmp_search("ABC ABCDAB ABCDABCDABDE", "ABCDABD"), 15, "Complex match"
-assert_eq kmp_search("hello world", "bye"), -1, "Not found"
+assert_eq Rosetta::KMP::search("abcabcabc", "abc"), 0, "Find abc at 0"
+assert_eq Rosetta::KMP::search("abcabcabc", "bca"), 1, "Find bca at 1"
+assert_eq Rosetta::KMP::search("abcabcabc", "cab"), 2, "Find cab at 2"
+assert_eq Rosetta::KMP::search("ABC ABCDAB ABCDABCDABDE", "ABCDABD"), 15, "Complex match"
+assert_eq Rosetta::KMP::search("hello world", "bye"), -1, "Not found"
 
 test_run

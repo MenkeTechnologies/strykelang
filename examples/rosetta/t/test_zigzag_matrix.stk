@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Zig-zag matrix
 
-fn zigzag_matrix($n) {
+fn Rosetta::ZigZagMatrix::generate($n) {
     my @matrix = ()
     for my $i (0..$n-1) { $matrix[$i] = [] }
     
@@ -32,7 +32,7 @@ fn zigzag_matrix($n) {
     \@matrix
 }
 
-my $m3 = zigzag_matrix(3)
+my $m3 = Rosetta::ZigZagMatrix::generate(3)
 # 0 1 5
 # 2 4 6
 # 3 7 8
@@ -41,7 +41,7 @@ assert_eq $m3->[0][1], 1, "m[0][1]"
 assert_eq $m3->[1][1], 4, "m[1][1]"
 assert_eq $m3->[2][2], 8, "m[2][2]"
 
-my $m5 = zigzag_matrix(5)
+my $m5 = Rosetta::ZigZagMatrix::generate(5)
 assert_eq $m5->[4][4], 24, "m5[4][4] is 24"
 
 test_run

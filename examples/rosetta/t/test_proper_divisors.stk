@@ -1,29 +1,30 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Proper Divisors
 
-fn my_proper_divisors($n) {
+fn Rosetta::ProperDivisors::get($n) {
     if ($n < 2) {
         ([])
     } else {
         my $limit = int($n / 2)
-        my @divs = ~> 1..$limit grep { $n % $_ == 0 }
+        my @divs = ~> 1:$limit grep { $n % $_ == 0 }
         \@divs
     }
 }
 
 # sum of proper divisors
-fn sum_proper_divisors($n) {
-    my $divs = my_proper_divisors($n)
+fn Rosetta::ProperDivisors::sum($n) {
+    my $divs = Rosetta::ProperDivisors::get($n)
+    if (scalar(@$divs) == 0) { return 0 }
     ~> @$divs reduce { $a + $b }
 }
 
-my $d6 = my_proper_divisors(6)
+my $d6 = Rosetta::ProperDivisors::get(6)
 assert_eq join(",", @$d6), "1,2,3", "proper divisors 6"
 
-my $d10 = my_proper_divisors(10)
+my $d10 = Rosetta::ProperDivisors::get(10)
 assert_eq join(",", @$d10), "1,2,5", "proper divisors 10"
 
-assert_eq sum_proper_divisors(6), 6, "sum proper divisors 6"
-assert_eq sum_proper_divisors(12), 16, "sum proper divisors 12"
+assert_eq Rosetta::ProperDivisors::sum(6), 6, "sum proper divisors 6"
+assert_eq Rosetta::ProperDivisors::sum(12), 16, "sum proper divisors 12"
 
 test_run

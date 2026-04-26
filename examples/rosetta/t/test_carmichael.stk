@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Carmichael numbers
 
-fn my_prime_factors($n) {
+fn Rosetta::Carmichael::get_factors($n) {
     my @factors
     my $d = 2
     my $temp = $n
@@ -15,8 +15,8 @@ fn my_prime_factors($n) {
     \@factors
 }
 
-fn is_carmichael($n) {
-    my $factors_ref = my_prime_factors($n)
+fn Rosetta::Carmichael::check($n) {
+    my $factors_ref = Rosetta::Carmichael::get_factors($n)
     my @factors = @$factors_ref
     if (scalar(@factors) < 2) {
         0
@@ -29,7 +29,7 @@ fn is_carmichael($n) {
             if ($counts{$f} > 1) { $square_free = 0 }
         }
         
-        if (!$square_free) {
+        if (!$square_free || is_prime($n)) {
             0
         } else {
             my $all_div = 1
@@ -43,11 +43,11 @@ fn is_carmichael($n) {
     }
 }
 
-assert_ok is_carmichael(561), "561 is Carmichael (3*11*17)"
-assert_ok is_carmichael(1105), "1105 is Carmichael (5*13*17)"
-assert_ok !is_carmichael(562), "562 is not"
-assert_ok !is_carmichael(7), "7 is prime, not Carmichael"
+assert_ok Rosetta::Carmichael::check(561), "561 is Carmichael (3*11*17)"
+assert_ok Rosetta::Carmichael::check(1105), "1105 is Carmichael (5*13*17)"
+assert_ok !Rosetta::Carmichael::check(562), "562 is not"
+assert_ok !Rosetta::Carmichael::check(7), "7 is prime, not Carmichael"
 
-561 |> is_carmichael |> assert_ok("pipe Carmichael")
+561 |> Rosetta::Carmichael::check |> assert_ok("pipe Carmichael")
 
 test_run

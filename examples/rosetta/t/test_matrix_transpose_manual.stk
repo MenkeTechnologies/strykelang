@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Matrix Transpose (Manual)
 
-fn my_transpose($m) {
+fn Rosetta::MatrixTranspose::solve($m) {
     my $rows = scalar(@$m)
     my $cols = scalar(@{$m->[0]})
     my @res
@@ -16,7 +16,7 @@ fn my_transpose($m) {
 }
 
 my $m = [[1, 2, 3], [4, 5, 6]]
-my $tr = my_transpose($m)
+my $tr = Rosetta::MatrixTranspose::solve($m)
 
 # Expected: [[1, 4], [2, 5], [3, 6]]
 assert_eq scalar(@$tr), 3, "transpose rows"

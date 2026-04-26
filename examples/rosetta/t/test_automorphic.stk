@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Automorphic numbers
 
-fn is_automorphic($n) {
+fn Rosetta::Automorphic::check($n) {
     my $sq = $n * $n
     my $s_n = "$n"
     my $s_sq = "$sq"
@@ -10,13 +10,13 @@ fn is_automorphic($n) {
     $end eq $s_n
 }
 
-assert_ok is_automorphic(1), "1 is automorphic"
-assert_ok is_automorphic(5), "5 is automorphic (25)"
-assert_ok is_automorphic(6), "6 is automorphic (36)"
-assert_ok is_automorphic(25), "25 is automorphic (625)"
-assert_ok is_automorphic(76), "76 is automorphic (5776)"
-assert_ok !is_automorphic(7), "7 is not (49)"
+assert_ok Rosetta::Automorphic::check(1), "1 is automorphic"
+assert_ok Rosetta::Automorphic::check(5), "5 is automorphic (25)"
+assert_ok Rosetta::Automorphic::check(6), "6 is automorphic (36)"
+assert_ok Rosetta::Automorphic::check(25), "25 is automorphic (625)"
+assert_ok Rosetta::Automorphic::check(76), "76 is automorphic (5776)"
+assert_ok !Rosetta::Automorphic::check(7), "7 is not (49)"
 
-25 |> is_automorphic |> assert_ok("pipe automorphic")
+25 |> Rosetta::Automorphic::check |> assert_ok("pipe automorphic")
 
 test_run

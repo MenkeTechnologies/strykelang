@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bogosort
 
-fn my_is_sorted($arr_ref) {
+fn Rosetta::Bogosort::is_sorted($arr_ref) {
     my @arr = @$arr_ref
     for my $i (0..scalar(@arr)-2) {
         if ($arr[$i] > $arr[$i+1]) { return 0 }
@@ -9,26 +9,27 @@ fn my_is_sorted($arr_ref) {
     1
 }
 
-fn my_shuffle($arr_ref) {
+fn Rosetta::Bogosort::custom_shuffle($arr_ref) {
     my @arr = @$arr_ref
     my $n = scalar(@arr)
-    for my $i (~> (1..$n-1) rev) {
+    for my $i (~> (1:$n-1) rev) {
         my $j = int(rand($i + 1))
         ($arr[$i], $arr[$j]) = ($arr[$j], $arr[$i])
     }
     \@arr
 }
 
-fn bogosort($arr_ref) {
+fn Rosetta::Bogosort::sort($arr_ref) {
     my $curr = $arr_ref
-    while (!my_is_sorted($curr)) {
-        $curr = my_shuffle($curr)
+    while (!Rosetta::Bogosort::is_sorted($curr)) {
+        # Using builtin shuffle for speed if available, or custom
+        $curr = [shuffle(@$curr)]
     }
     $curr
 }
 
 my $data = [3, 1, 2]
-my $sorted = bogosort($data)
+my $sorted = Rosetta::Bogosort::sort($data)
 assert_eq join(",", @$sorted), "1,2,3", "bogosort small array"
 
 test_run

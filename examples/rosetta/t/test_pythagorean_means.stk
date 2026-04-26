@@ -1,38 +1,38 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Averages/Pythagorean means
 
-fn my_arithmetic_mean {
+fn Rosetta::PythagoreanMeans::arithmetic(@nums) {
     my $sum = 0
-    my $count = scalar(@_)
+    my $count = scalar(@nums)
     if ($count == 0) { return 0 }
-    for my $x (@_) { $sum += $x }
+    for my $x (@nums) { $sum += $x }
     $sum / $count
 }
 
-fn my_geometric_mean {
-    my $count = scalar(@_)
+fn Rosetta::PythagoreanMeans::geometric(@nums) {
+    my $count = scalar(@nums)
     if ($count == 0) { return 0 }
     my $prod = 1
-    for my $x (@_) { $prod *= $x }
+    for my $x (@nums) { $prod *= $x }
     $prod ** (1 / $count)
 }
 
-fn my_harmonic_mean {
-    my $count = scalar(@_)
+fn Rosetta::PythagoreanMeans::harmonic(@nums) {
+    my $count = scalar(@nums)
     if ($count == 0) { return 0 }
     my $sum_inv = 0
-    for my $x (@_) { $sum_inv += 1 / $x }
+    for my $x (@nums) { $sum_inv += 1 / $x }
     $count / $sum_inv
 }
 
 my @data = (1..10)
-my $am = my_arithmetic_mean(@data)
-my $gm = my_geometric_mean(@data)
-my $hm = my_harmonic_mean(@data)
+my $am = Rosetta::PythagoreanMeans::arithmetic(@data)
+my $gm = Rosetta::PythagoreanMeans::geometric(@data)
+my $hm = Rosetta::PythagoreanMeans::harmonic(@data)
 
-assert_ok abs($am - 5.5) < 0.0001, "Arithmetic mean of 1..10"
-assert_ok abs($gm - 4.5287) < 0.0001, "Geometric mean of 1..10"
-assert_ok abs($hm - 3.4141) < 0.0001, "Harmonic mean of 1..10"
+assert_near $am, 5.5, 0.0001, "Arithmetic mean of 1..10"
+assert_near $gm, 4.5287, 0.0001, "Geometric mean of 1..10"
+assert_near $hm, 3.4141, 0.0001, "Harmonic mean of 1..10"
 
 assert_ok $am >= $gm, "AM >= GM"
 assert_ok $gm >= $hm, "GM >= HM"

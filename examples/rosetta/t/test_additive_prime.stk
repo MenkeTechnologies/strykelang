@@ -1,43 +1,26 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Additive primes
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
+fn Rosetta::AdditivePrime::sum_digits($n) {
+    my @digits = ~> "$n" chars map { int($_) }
+    if (scalar(@digits) == 0) { return 0 }
+    @digits |> reduce { $a + $b }
 }
 
-fn sum_digits($n) {
-    ~> "$n" chars map { int($_) } reduce { $a + $b }
-}
-
-fn is_additive_prime($n) {
-    if (my_is_prime($n)) {
-        my_is_prime(sum_digits($n))
+fn Rosetta::AdditivePrime::check($n) {
+    if (is_prime($n)) {
+        is_prime(Rosetta::AdditivePrime::sum_digits($n))
     } else {
         0
     }
 }
 
-assert_ok is_additive_prime(2), "2 is additive prime (sum 2 is prime)"
-assert_ok is_additive_prime(11), "11 is additive prime (sum 2 is prime)"
-assert_ok is_additive_prime(29), "29 is additive prime (sum 11 is prime)"
-assert_ok !is_additive_prime(13), "13 is not (sum 4 is not prime)"
-assert_ok !is_additive_prime(15), "15 is not prime"
+assert_ok Rosetta::AdditivePrime::check(2), "2 is additive prime (sum 2 is prime)"
+assert_ok Rosetta::AdditivePrime::check(11), "11 is additive prime (sum 2 is prime)"
+assert_ok Rosetta::AdditivePrime::check(29), "29 is additive prime (sum 11 is prime)"
+assert_ok !Rosetta::AdditivePrime::check(13), "13 is not (sum 4 is not prime)"
+assert_ok !Rosetta::AdditivePrime::check(15), "15 is not prime"
 
-29 |> is_additive_prime |> assert_ok("pipe additive prime")
+29 |> Rosetta::AdditivePrime::check |> assert_ok("pipe additive prime")
 
 test_run

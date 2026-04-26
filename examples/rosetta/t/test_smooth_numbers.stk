@@ -1,28 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Smooth numbers
 
-fn my_prime_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
-    while ($temp > 1 && $d * $d <= $temp) {
-        while ($temp % $d == 0) {
-            push @factors, $d
-            $temp = int($temp / $d)
-        }
-        $d++
-    }
-    push @factors, $temp if $temp > 1
-    @factors
-}
-
-fn is_smooth($n, $p) {
+fn Rosetta::SmoothNumbers::check($n, $p) {
     if ($n < 1) {
         0
     } elsif ($n == 1) {
         1
     } else {
-        my @f = my_prime_factors($n)
+        my @f = prime_factors($n)
         my $max_f = 0
         for my $x (@f) {
             $max_f = $x if $x > $max_f
@@ -31,13 +16,13 @@ fn is_smooth($n, $p) {
     }
 }
 
-assert_ok is_smooth(1, 2), "1 is 2-smooth"
-assert_ok is_smooth(8, 2), "8 is 2-smooth (2^3)"
-assert_ok is_smooth(10, 5), "10 is 5-smooth (2*5)"
-assert_ok is_smooth(12, 3), "12 is 3-smooth (2^2*3)"
-assert_ok !is_smooth(10, 3), "10 is not 3-smooth"
-assert_ok !is_smooth(14, 5), "14 is not 5-smooth (2*7)"
+assert_ok Rosetta::SmoothNumbers::check(1, 2), "1 is 2-smooth"
+assert_ok Rosetta::SmoothNumbers::check(8, 2), "8 is 2-smooth (2^3)"
+assert_ok Rosetta::SmoothNumbers::check(10, 5), "10 is 5-smooth (2*5)"
+assert_ok Rosetta::SmoothNumbers::check(12, 3), "12 is 3-smooth (2^2*3)"
+assert_ok !Rosetta::SmoothNumbers::check(10, 3), "10 is not 3-smooth"
+assert_ok !Rosetta::SmoothNumbers::check(14, 5), "14 is not 5-smooth (2*7)"
 
-12 |> is_smooth(3) |> assert_ok("pipe smooth")
+12 |> Rosetta::SmoothNumbers::check(3) |> assert_ok("pipe smooth")
 
 test_run

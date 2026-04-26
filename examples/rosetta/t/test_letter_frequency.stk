@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Letter Frequency
 
-fn letter_frequency {
-    my $s = $_[0]
+fn Rosetta::LetterFrequency::compute($s) {
     my $freq = {}
     my @chars = ~> $s chars
     for my $c (@chars) {
@@ -11,19 +10,18 @@ fn letter_frequency {
     $freq
 }
 
-fn freq_to_str {
-    my $h = $_[0]
+fn Rosetta::LetterFrequency::to_str($h) {
     my @ks = sort(keys %$h)
     my @res = @ks |> map { "$_:" . $h->{$_} }
     join(",", @res)
 }
 
-my $f = letter_frequency("hello")
+my $f = Rosetta::LetterFrequency::compute("hello")
 assert_eq $f->{h}, 1, "h count"
 assert_eq $f->{e}, 1, "e count"
 assert_eq $f->{l}, 2, "l count"
 assert_eq $f->{o}, 1, "o count"
 
-assert_eq freq_to_str(letter_frequency("banana")), "a:3,b:1,n:2", "banana frequency"
+assert_eq Rosetta::LetterFrequency::to_str(Rosetta::LetterFrequency::compute("banana")), "a:3,b:1,n:2", "banana frequency"
 
 test_run

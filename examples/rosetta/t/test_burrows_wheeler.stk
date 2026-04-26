@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Burrows-Wheeler transform
 
-fn my_bwt($s) {
+fn Rosetta::BWT::compute($s) {
     my $n = length($s)
     my @rotations = ()
     for my $i (0..$n-1) {
         push @rotations, substr($s, $i) . substr($s, 0, $i)
     }
-    my @sorted = ~> @rotations sort
+    my @sorted = sort(@rotations)
     my $res = ""
     for my $r (@sorted) {
         $res = $res . substr($r, -1)
@@ -15,7 +15,7 @@ fn my_bwt($s) {
     $res
 }
 
-assert_eq substr(my_bwt("banana$"), 0, 4), "annb", "BWT of banana$ prefix"
-assert_eq substr(my_bwt("abracadabra$"), 0, 3), "ard", "BWT of abracadabra$ prefix"
+assert_eq substr(Rosetta::BWT::compute("banana$"), 0, 4), "annb", "BWT of banana$ prefix"
+assert_eq substr(Rosetta::BWT::compute("abracadabra$"), 0, 3), "ard", "BWT of abracadabra$ prefix"
 
 test_run

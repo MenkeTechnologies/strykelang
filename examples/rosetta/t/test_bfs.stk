@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Breadth-first search
 
-fn my_bfs($graph, $start) {
+fn Rosetta::BFS::solve($graph, $start) {
     my @queue = ($start)
     my %visited = ($start => 1)
     my @order = ()
@@ -28,7 +28,7 @@ my $graph = {
     "F" => []
 }
 
-my $res = my_bfs($graph, "A")
+my $res = Rosetta::BFS::solve($graph, "A")
 assert_eq join(",", @$res), "A,B,C,D,E,F", "BFS order from A"
 
 test_run

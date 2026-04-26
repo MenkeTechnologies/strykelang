@@ -1,24 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Character codes
 
-fn char_to_code {
-    my $c = $_[0]
+fn Rosetta::CharacterCodes::to_code($c) {
     ord($c)
 }
 
-fn code_to_char {
-    my $n = $_[0]
+fn Rosetta::CharacterCodes::to_char($n) {
     chr($n)
 }
 
-assert_eq char_to_code("a"), 97, "ord('a') is 97"
-assert_eq code_to_char(97), "a", "chr(97) is 'a'"
+assert_eq Rosetta::CharacterCodes::to_code("a"), 97, "ord('a') is 97"
+assert_eq Rosetta::CharacterCodes::to_char(97), "a", "chr(97) is 'a'"
 
-assert_eq char_to_code("z"), 122, "ord('z') is 122"
-assert_eq code_to_char(122), "z", "chr(122) is 'z'"
+assert_eq Rosetta::CharacterCodes::to_code("z"), 122, "ord('z') is 122"
+assert_eq Rosetta::CharacterCodes::to_char(122), "z", "chr(122) is 'z'"
 
 my $str = "abc"
-my @codes = ~> $str chars map { char_to_code($_) }
+my @codes = ~> $str chars map { Rosetta::CharacterCodes::to_code($_) }
 assert_eq join(",", @codes), "97,98,99", "abc -> 97,98,99"
 
 test_run

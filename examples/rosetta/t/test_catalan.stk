@@ -1,27 +1,27 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Catalan numbers
 
-fn catalan_recursive($n) {
+fn Rosetta::Catalan::compute($n) {
     if ($n == 0) {
         1
     } else {
-        my $prev = catalan_recursive($n - 1)
+        my $prev = Rosetta::Catalan::compute($n - 1)
         (2 * (2 * $n - 1) * $prev) / ($n + 1)
     }
 }
 
-fn catalan_list($max) {
-    ~> 0..$max map { catalan_recursive($_) }
+fn Rosetta::Catalan::list($max) {
+    ~> 0:$max map { Rosetta::Catalan::compute($_) }
 }
 
-assert_eq catalan_recursive(0), 1, "C0"
-assert_eq catalan_recursive(1), 1, "C1"
-assert_eq catalan_recursive(3), 5, "C3"
-assert_eq catalan_recursive(10), 16796, "C10"
+assert_eq Rosetta::Catalan::compute(0), 1, "C0"
+assert_eq Rosetta::Catalan::compute(1), 1, "C1"
+assert_eq Rosetta::Catalan::compute(3), 5, "C3"
+assert_eq Rosetta::Catalan::compute(10), 16796, "C10"
 
-my @list = catalan_list(5)
+my @list = Rosetta::Catalan::list(5)
 assert_eq join(",", @list), "1,1,2,5,14,42", "catalan list first 6"
 
-5 |> catalan_recursive |> assert_eq(42, "pipe catalan 5")
+5 |> Rosetta::Catalan::compute |> assert_eq(42, "pipe catalan 5")
 
 test_run

@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cycle Sort
 
-fn cycle_sort {
-    my $list = $_[0]
+fn Rosetta::CycleSort::sort($list) {
     my @arr = @$list
     my $n = scalar(@arr)
     
@@ -41,7 +40,7 @@ fn cycle_sort {
 }
 
 my $data = [0, 1, 2, 2, 2, 2, 1, 9, 3, 5]
-my $sorted = cycle_sort($data)
+my $sorted = Rosetta::CycleSort::sort($data)
 assert_eq join(",", @$sorted), "0,1,1,2,2,2,2,3,5,9", "cycle sort"
 
 test_run

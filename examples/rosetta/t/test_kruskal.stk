@@ -1,17 +1,17 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Kruskal's algorithm
 
-fn find_set($parent, $i) {
+fn Rosetta::Kruskal::find_set($parent, $i) {
     if ($parent->{$i} eq $i) {
         return $i
     }
-    $parent->{$i} = find_set($parent, $parent->{$i})
+    $parent->{$i} = Rosetta::Kruskal::find_set($parent, $parent->{$i})
     $parent->{$i}
 }
 
-fn union_sets($parent, $rank, $x, $y) {
-    my $xroot = find_set($parent, $x)
-    my $yroot = find_set($parent, $y)
+fn Rosetta::Kruskal::union_sets($parent, $rank, $x, $y) {
+    my $xroot = Rosetta::Kruskal::find_set($parent, $x)
+    my $yroot = Rosetta::Kruskal::find_set($parent, $y)
     if ($rank->{$xroot} < $rank->{$yroot}) {
         $parent->{$xroot} = $yroot
     } elsif ($rank->{$xroot} > $rank->{$yroot}) {
@@ -22,7 +22,7 @@ fn union_sets($parent, $rank, $x, $y) {
     }
 }
 
-fn my_kruskal($n, $edges) {
+fn Rosetta::Kruskal::solve($n, $edges) {
     my @sorted_edges = sort { $a->[2] <=> $b->[2] } @$edges
     my $parent = {}
     my $rank = {}
@@ -35,11 +35,11 @@ fn my_kruskal($n, $edges) {
     for my $e (@sorted_edges) {
         my $u = $e->[0]
         my $v = $e->[1]
-        my $root_u = find_set($parent, $u)
-        my $root_v = find_set($parent, $v)
+        my $root_u = Rosetta::Kruskal::find_set($parent, $u)
+        my $root_v = Rosetta::Kruskal::find_set($parent, $v)
         if ($root_u ne $root_v) {
             push @mst, $e
-            union_sets($parent, $rank, $root_u, $root_v)
+            Rosetta::Kruskal::union_sets($parent, $rank, $root_u, $root_v)
         }
     }
     \@mst
@@ -52,7 +52,7 @@ my $edges = [
     [1, 3, 15],
     [2, 3, 4]
 ]
-my $mst = my_kruskal(4, $edges)
+my $mst = Rosetta::Kruskal::solve(4, $edges)
 # MST should be [2,3,4], [0,3,5], [0,1,10]
 # Total weight: 4 + 5 + 10 = 19
 my $total_w = 0

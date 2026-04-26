@@ -26,8 +26,8 @@ use std::thread;
 use std::time::Instant;
 
 use crate::agent::{
-    frame_kind, AgentHello, AgentHelloAck, AgentMetrics, AgentState, FireCommand, TermAck,
-    WorkloadType, AGENT_PROTO_VERSION,
+    frame_kind, AgentHello, AgentHelloAck, AgentState, FireCommand, WorkloadType,
+    AGENT_PROTO_VERSION,
 };
 
 /// Connected agent state
@@ -38,6 +38,7 @@ struct ConnectedAgent {
     memory_bytes: u64,
     agent_name: Option<String>,
     state: AgentState,
+    #[allow(dead_code)]
     session_id: u64,
     connected_at: Instant,
 }
@@ -112,7 +113,8 @@ impl Controller {
                         message: "connected".to_string(),
                     };
                     let ack_bytes = bincode::serialize(&ack).unwrap();
-                    if let Err(e) = write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &ack_bytes)
+                    if let Err(e) =
+                        write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &ack_bytes)
                     {
                         eprintln!("controller: failed to send hello ack: {}", e);
                         continue;

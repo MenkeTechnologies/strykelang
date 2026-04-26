@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Minesweeper (Generating)
 
-fn gen_mines($w, $h, $num) {
+fn Rosetta::MinesweeperGen::generate($w, $h, $num) {
     my @board
     for my $i (0..$h-1) {
         my @row
@@ -38,7 +38,7 @@ fn gen_mines($w, $h, $num) {
     \@board
 }
 
-my $b = gen_mines(5, 5, 5)
+my $b = Rosetta::MinesweeperGen::generate(5, 5, 5)
 assert_eq scalar(@$b), 5, "board height"
 assert_eq scalar(@{$b->[0]}), 5, "board width"
 

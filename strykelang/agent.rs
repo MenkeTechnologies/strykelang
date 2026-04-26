@@ -230,9 +230,7 @@ pub fn default_config_path() -> PathBuf {
 
 /// Load config from file or return defaults
 pub fn load_config(path: Option<&str>) -> AgentConfig {
-    let config_path = path
-        .map(PathBuf::from)
-        .unwrap_or_else(default_config_path);
+    let config_path = path.map(PathBuf::from).unwrap_or_else(default_config_path);
 
     if config_path.exists() {
         match std::fs::read_to_string(&config_path) {
@@ -250,11 +248,7 @@ pub fn load_config(path: Option<&str>) -> AgentConfig {
                 }
             },
             Err(e) => {
-                eprintln!(
-                    "stryke agent: cannot read {}: {}",
-                    config_path.display(),
-                    e
-                );
+                eprintln!("stryke agent: cannot read {}: {}", config_path.display(), e);
             }
         }
     }
@@ -302,7 +296,7 @@ fn run_workload(
     match workload {
         WorkloadType::Cpu | WorkloadType::Combined => {
             let total_hashes = AtomicU64::new(0);
-            
+
             std::thread::scope(|s| {
                 for _ in 0..num_cores {
                     let term = Arc::clone(&terminate);
@@ -310,7 +304,7 @@ fn run_workload(
                     s.spawn(move || {
                         let mut local_count: u64 = 0;
                         let mut data = [0u8; 64];
-                        
+
                         while start.elapsed() < duration && !term.load(Ordering::Relaxed) {
                             for _ in 0..1000 {
                                 let hash = Sha256::digest(&data);
@@ -318,17 +312,20 @@ fn run_workload(
                                 local_count += 1;
                             }
                         }
-                        
+
                         counter.fetch_add(local_count, Ordering::Relaxed);
                     });
                 }
             });
-            
-            (total_hashes.load(Ordering::Relaxed), start.elapsed().as_secs_f64())
+
+            (
+                total_hashes.load(Ordering::Relaxed),
+                start.elapsed().as_secs_f64(),
+            )
         }
         WorkloadType::Memory { bytes } => {
             let bytes_per_core = *bytes as usize / num_cores;
-            
+
             std::thread::scope(|s| {
                 for core_id in 0..num_cores {
                     let term = Arc::clone(&terminate);
@@ -347,16 +344,16 @@ fn run_workload(
                     });
                 }
             });
-            
+
             (*bytes, start.elapsed().as_secs_f64())
         }
         WorkloadType::Io { dir, iterations } => {
             use std::fs;
             use std::io::Write as IoWrite;
-            
+
             let total_bytes = AtomicU64::new(0);
             let iters_per_core = *iterations as usize / num_cores;
-            
+
             std::thread::scope(|s| {
                 for core_id in 0..num_cores {
                     let term = Arc::clone(&terminate);
@@ -379,8 +376,11 @@ fn run_workload(
                     });
                 }
             });
-            
-            (total_bytes.load(Ordering::Relaxed), start.elapsed().as_secs_f64())
+
+            (
+                total_bytes.load(Ordering::Relaxed),
+                start.elapsed().as_secs_f64(),
+            )
         }
         WorkloadType::Custom { code: _ } => {
             // TODO: execute custom stryke code
@@ -480,6 +480,7 @@ pub fn run_agent_with_overrides(
 
     // Main command loop
     let terminate = Arc::new(AtomicBool::new(false));
+    #[allow(unused_assignments)]
     let mut state = AgentState::Idle;
     let mut session_start: Option<Instant> = None;
     let mut total_hashes: u64 = 0;
@@ -513,7 +514,10 @@ pub fn run_agent_with_overrides(
                     cmd.duration_secs, cmd.intensity
                 );
 
-                state = AgentState::Firing;
+                #[allow(unused_assignments)]
+                {
+                    state = AgentState::Firing;
+                }
                 session_start = Some(Instant::now());
                 terminate.store(false, Ordering::Relaxed);
 
@@ -522,7 +526,8 @@ pub fn run_agent_with_overrides(
                 let workload = cmd.workload.clone();
                 let duration = cmd.duration_secs;
 
-                let handle = std::thread::spawn(move || run_workload(&workload, duration, term_clone));
+                let handle =
+                    std::thread::spawn(move || run_workload(&workload, duration, term_clone));
 
                 // Wait for completion or termination
                 let (hashes, elapsed) = handle.join().unwrap_or((0, 0.0));
@@ -555,7 +560,9 @@ pub fn run_agent_with_overrides(
                 eprintln!("stryke agent: TERMINATE received");
                 terminate.store(true, Ordering::Relaxed);
 
-                let elapsed = session_start.map(|s| s.elapsed().as_secs_f64()).unwrap_or(0.0);
+                let elapsed = session_start
+                    .map(|s| s.elapsed().as_secs_f64())
+                    .unwrap_or(0.0);
                 let term_ack = TermAck {
                     total_hashes,
                     total_duration: elapsed,
@@ -580,7 +587,9 @@ pub fn run_agent_with_overrides(
                     },
                     memory_used: 0,
                     hashes_per_sec: 0,
-                    elapsed_secs: session_start.map(|s| s.elapsed().as_secs_f64()).unwrap_or(0.0),
+                    elapsed_secs: session_start
+                        .map(|s| s.elapsed().as_secs_f64())
+                        .unwrap_or(0.0),
                     state,
                 };
 
