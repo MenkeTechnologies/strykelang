@@ -1,37 +1,36 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Kaprekar constant
 
-fn rev_string($s) {
-    ~> $s >{split //, $_} rev |> join("")
+fn Rosetta::KaprekarConstant::rev_string($s) {
+    ~> $s chars rev |> join("")
 }
 
-fn kaprekar_step($n) {
+fn Rosetta::KaprekarConstant::step($n) {
     my $s = sprintf("%04d", $n)
     my $asc_s = ~> $s chars sort join("")
-    my $desc_s = rev_string($asc_s)
+    my $desc_s = Rosetta::KaprekarConstant::rev_string($asc_s)
     my $asc = int($asc_s)
     my $desc = int($desc_s)
     $desc - $asc
 }
 
-fn kaprekar_reaches($n) {
+fn Rosetta::KaprekarConstant::reaches($n) {
     my $curr = $n
-    my $count = 0
     for my $i (1..10) {
         if ($curr != 6174) {
-            $curr = kaprekar_step($curr)
+            $curr = Rosetta::KaprekarConstant::step($curr)
         }
     }
     $curr
 }
 
-assert_eq kaprekar_step(1234), 3087, "step 1234"
-assert_eq kaprekar_step(3087), 8352, "step 3087"
-assert_eq kaprekar_step(8352), 6174, "step 8352"
+assert_eq Rosetta::KaprekarConstant::step(1234), 3087, "step 1234"
+assert_eq Rosetta::KaprekarConstant::step(3087), 8352, "step 3087"
+assert_eq Rosetta::KaprekarConstant::step(8352), 6174, "step 8352"
 
-assert_eq kaprekar_reaches(1234), 6174, "reaches 6174 from 1234"
-assert_eq kaprekar_reaches(5200), 6174, "reaches 6174 from 5200"
+assert_eq Rosetta::KaprekarConstant::reaches(1234), 6174, "reaches 6174 from 1234"
+assert_eq Rosetta::KaprekarConstant::reaches(5200), 6174, "reaches 6174 from 5200"
 
-1234 |> kaprekar_reaches |> assert_eq(6174, "pipe kaprekar reaches")
+1234 |> Rosetta::KaprekarConstant::reaches |> assert_eq(6174, "pipe kaprekar reaches")
 
 test_run

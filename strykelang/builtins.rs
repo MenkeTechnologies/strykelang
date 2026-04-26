@@ -3743,7 +3743,7 @@ fn builtin_stress_cpu(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
                 while start.elapsed() < duration {
                     for _ in 0..1000 {
-                        let hash = Sha256::digest(&data);
+                        let hash = Sha256::digest(data);
                         data[..32].copy_from_slice(&hash);
                         local_count += 1;
                     }
@@ -3924,7 +3924,7 @@ fn builtin_heat(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
                 while running.load(Ordering::Relaxed) && start.elapsed() < duration {
                     for _ in 0..1000 {
-                        let hash = Sha256::digest(&data);
+                        let hash = Sha256::digest(data);
                         data[..32].copy_from_slice(&hash);
                         local_count += 1;
                     }
@@ -3978,7 +3978,7 @@ fn builtin_fire_and_forget() -> PerlResult<PerlValue> {
             let mut local_count: i64 = 0;
             loop {
                 for _ in 0..1000 {
-                    let hash = Sha256::digest(&data);
+                    let hash = Sha256::digest(data);
                     data[..32].copy_from_slice(&hash);
                     local_count += 1;
                 }

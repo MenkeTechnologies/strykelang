@@ -307,7 +307,7 @@ fn run_workload(
 
                         while start.elapsed() < duration && !term.load(Ordering::Relaxed) {
                             for _ in 0..1000 {
-                                let hash = Sha256::digest(&data);
+                                let hash = Sha256::digest(data);
                                 data[..32].copy_from_slice(&hash);
                                 local_count += 1;
                             }

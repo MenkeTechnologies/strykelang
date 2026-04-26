@@ -48,7 +48,6 @@ mod parse_program_shape_extra;
 mod parse_program_shape_ops;
 mod parse_syntax_errors;
 mod parse_syntax_errors_more;
-mod pec_cache;
 mod phases;
 mod pragmas;
 mod range_perl;

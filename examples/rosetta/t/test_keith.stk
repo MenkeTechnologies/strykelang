@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Keith numbers
 
-fn is_keith($n) {
+fn Rosetta::Keith::check($n) {
     my $s = "$n"
     my @digits = ~> $s chars map { int($_) }
     my $len = scalar(@digits)
@@ -23,11 +23,11 @@ fn is_keith($n) {
     }
 }
 
-assert_ok is_keith(197), "197 is Keith"
-assert_ok is_keith(14), "14 is Keith (1, 4, 5, 9, 14)"
-assert_ok is_keith(1104), "1104 is Keith"
-assert_ok !is_keith(100), "100 is not"
+assert_ok Rosetta::Keith::check(197), "197 is Keith"
+assert_ok Rosetta::Keith::check(14), "14 is Keith (1, 4, 5, 9, 14)"
+assert_ok Rosetta::Keith::check(1104), "1104 is Keith"
+assert_ok !Rosetta::Keith::check(100), "100 is not"
 
-197 |> is_keith |> assert_ok("pipe keith")
+197 |> Rosetta::Keith::check |> assert_ok("pipe keith")
 
 test_run

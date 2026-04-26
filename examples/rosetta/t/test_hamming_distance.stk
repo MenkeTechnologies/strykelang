@@ -1,9 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hamming Distance
 
-fn my_hamming_distance {
-    my $s1 = $_[0]
-    my $s2 = $_[1]
+fn Rosetta::HammingDistance::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
     
@@ -13,9 +11,9 @@ fn my_hamming_distance {
     } |> scalar
 }
 
-assert_eq my_hamming_distance("karolin", "kathrin"), 3, "karolin vs kathrin"
-assert_eq my_hamming_distance("karolin", "kerstin"), 3, "karolin vs kerstin"
-assert_eq my_hamming_distance("1011101", "1001001"), 2, "binary distance"
-assert_eq my_hamming_distance("abc", "abc"), 0, "equal strings"
+assert_eq Rosetta::HammingDistance::compute("karolin", "kathrin"), 3, "karolin vs kathrin"
+assert_eq Rosetta::HammingDistance::compute("karolin", "kerstin"), 3, "karolin vs kerstin"
+assert_eq Rosetta::HammingDistance::compute("1011101", "1001001"), 2, "binary distance"
+assert_eq Rosetta::HammingDistance::compute("abc", "abc"), 0, "equal strings"
 
 test_run

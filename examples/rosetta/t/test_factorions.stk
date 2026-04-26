@@ -1,22 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Factorions
 
-my @facs = (1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880)
+my @FACS = (1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880)
 
-fn is_factorion($n) {
+fn Rosetta::Factorions::check($n) {
     my $sum = 0
     my @digits = "$n" |> chars
     for my $d (@digits) {
-        $sum = $sum + $facs[int($d)]
+        $sum = $sum + $FACS[int($d)]
     }
     $sum == $n
 }
 
-assert_ok is_factorion(1), "1 is factorion"
-assert_ok is_factorion(2), "2 is factorion"
-assert_ok is_factorion(145), "145 is factorion (1!+4!+5! = 1+24+120)"
-assert_ok !is_factorion(10), "10 is not"
+assert_ok Rosetta::Factorions::check(1), "1 is factorion"
+assert_ok Rosetta::Factorions::check(2), "2 is factorion"
+assert_ok Rosetta::Factorions::check(145), "145 is factorion (1!+4!+5! = 1+24+120)"
+assert_ok !Rosetta::Factorions::check(10), "10 is not"
 
-145 |> is_factorion |> assert_ok("pipe factorion")
+145 |> Rosetta::Factorions::check |> assert_ok("pipe factorion")
 
 test_run

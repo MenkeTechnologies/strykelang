@@ -1,39 +1,45 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Happy Numbers
 
-fn sum_sq_digits($n) {
-    "$n" |> split // |> map { $_ * $_ } |> reduce { $a + $b }
+fn Rosetta::HappyNumbers::sum_sq_digits($n) {
+    my $sum = 0
+    my @digits = "$n" |> chars
+    for my $d (@digits) { $sum = $sum + (int($d)**2) }
+    $sum
 }
 
-fn is_happy($n) {
+fn Rosetta::HappyNumbers::check($n) {
     my %seen
-    while ($n != 1 && !$seen{$n}) {
-        $seen{$n} = 1
-        $n = sum_sq_digits($n)
+    my $curr = $n
+    while ($curr != 1 && !$seen{$curr}) {
+        $seen{$curr} = 1
+        $curr = Rosetta::HappyNumbers::sum_sq_digits($curr)
     }
-    $n == 1
+    $curr == 1
 }
 
-fn happy_numbers($count) {
+fn Rosetta::HappyNumbers::generate($count) {
     my @happy
     my $n = 1
     while (scalar(@happy) < $count) {
-        push @happy, $n if is_happy($n)
+        if (Rosetta::HappyNumbers::check($n)) {
+            push @happy, $n
+        }
         $n++
     }
     @happy
 }
 
-assert_ok is_happy(1), "1 is happy"
-assert_ok is_happy(7), "7 is happy"
-assert_ok is_happy(10), "10 is happy"
-assert_ok is_happy(13), "13 is happy"
-assert_ok is_happy(19), "19 is happy"
+assert_ok Rosetta::HappyNumbers::check(1), "1 is happy"
+assert_ok Rosetta::HappyNumbers::check(7), "7 is happy"
+assert_ok Rosetta::HappyNumbers::check(10), "10 is happy"
+assert_ok Rosetta::HappyNumbers::check(13), "13 is happy"
+assert_ok Rosetta::HappyNumbers::check(19), "19 is happy"
 
-assert_ok !is_happy(2), "2 is not happy"
-assert_ok !is_happy(4), "4 is not happy"
+assert_ok !Rosetta::HappyNumbers::check(2), "2 is not happy"
+assert_ok !Rosetta::HappyNumbers::check(4), "4 is not happy"
 
-my @first8 = happy_numbers(8)
+my @first8 = Rosetta::HappyNumbers::generate(8)
 assert_eq join(",", @first8), "1,7,10,13,19,23,28,31", "first 8 happy numbers"
 
 test_run

@@ -12055,6 +12055,8 @@ impl Parser {
             | "async" | "spawn" | "trace" | "timer" | "bench"
             | "eval_timeout" | "retry" | "rate_limit" | "every"
             | "gen" | "watch"
+            // ── caching ────────────────────────────────────────────────────────
+            | "cache_clear" | "cache_exists" | "cache_stats" | "cacheview"
             // ── testing framework ────────────────────────────────────────────
             | "assert_eq" | "assert_ne" | "assert_ok" | "assert_err"
             | "assert_true" | "assert_false"
@@ -12067,7 +12069,7 @@ impl Parser {
             // ── stress testing ──────────────────────────────────────────────
             | "stress_cpu" | "scpu" | "stress_mem" | "smem"
             | "stress_io" | "sio" | "stress_test" | "st"
-            | "heat"
+            | "heat" | "fire" | "fire_and_forget" | "pin"
             // ── I/O extensions ──────────────────────────────────────────────
             | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"

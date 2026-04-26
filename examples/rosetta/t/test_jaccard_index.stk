@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Jaccard index
 
-fn my_jaccard_index($a_ref, $b_ref) {
+fn Rosetta::JaccardIndex::compute($a_ref, $b_ref) {
     my %set_a
     my %set_b
     for my $x (@$a_ref) { $set_a{$x} = 1 }
@@ -28,10 +28,10 @@ my $s2 = [3, 4, 5, 6]
 # intersection: 3, 4 (size 2)
 # union: 1, 2, 3, 4, 5, 6 (size 6)
 # index: 2/6 = 0.3333
-assert_ok abs(my_jaccard_index($s1, $s2) - 0.3333) < 0.0001, "Jaccard index 1,2,3,4 vs 3,4,5,6"
+assert_near Rosetta::JaccardIndex::compute($s1, $s2), 0.3333, 0.0001, "Jaccard index 1,2,3,4 vs 3,4,5,6"
 
 my $s3 = ["apple", "banana"]
 my $s4 = ["apple", "banana"]
-assert_eq my_jaccard_index($s3, $s4), 1.0, "Identical sets"
+assert_eq Rosetta::JaccardIndex::compute($s3, $s4), 1.0, "Identical sets"
 
 test_run

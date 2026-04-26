@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Inventory sequence
 
-fn next_inventory(@nums) {
+fn Rosetta::InventorySequence::next_step(@nums) {
     my %counts
     for my $n (@nums) { $counts{$n}++ }
     my @res = ()
@@ -12,13 +12,13 @@ fn next_inventory(@nums) {
 }
 
 my @s1 = (1)
-my @s2 = next_inventory(@s1)
+my @s2 = Rosetta::InventorySequence::next_step(@s1)
 assert_eq join(",", @s2), "1,1", "inv(1) -> 1,1"
 
-my @s3 = next_inventory(@s2)
+my @s3 = Rosetta::InventorySequence::next_step(@s2)
 assert_eq join(",", @s3), "2,1", "inv(1,1) -> 2,1"
 
-my @s4 = next_inventory(@s3)
+my @s4 = Rosetta::InventorySequence::next_step(@s3)
 assert_eq join(",", @s4), "1,1,1,2", "inv(2,1) -> 1,1,1,2"
 
 test_run
