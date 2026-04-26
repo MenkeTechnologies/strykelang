@@ -12866,14 +12866,84 @@ impl Parser {
 
     /// Check if a UDF name shadows a stryke builtin and error if so.
     /// Called only in non-compat mode — compat mode allows shadowing for Perl 5 parity.
+    /// Reserved words that cannot be used as function names because they are
+    /// lexer-level operators or language keywords that would be mis-tokenized.
+    const RESERVED_FUNCTION_NAMES: &'static [&'static str] = &[
+        "y",
+        "tr",
+        "s",
+        "m",
+        "q",
+        "qq",
+        "qw",
+        "qx",
+        "qr",
+        "if",
+        "unless",
+        "while",
+        "until",
+        "for",
+        "foreach",
+        "given",
+        "when",
+        "else",
+        "elsif",
+        "do",
+        "eval",
+        "return",
+        "last",
+        "next",
+        "redo",
+        "goto",
+        "my",
+        "our",
+        "local",
+        "state",
+        "sub",
+        "fn",
+        "class",
+        "struct",
+        "enum",
+        "trait",
+        "use",
+        "no",
+        "require",
+        "package",
+        "BEGIN",
+        "END",
+        "CHECK",
+        "INIT",
+        "UNITCHECK",
+        "and",
+        "or",
+        "not",
+        "x",
+        "eq",
+        "ne",
+        "lt",
+        "gt",
+        "le",
+        "ge",
+        "cmp",
+    ];
+
     fn check_udf_shadows_builtin(&self, name: &str, line: usize) -> PerlResult<()> {
-        if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
-            return Err(self.syntax_err(
-                format!(
+        // Only check bare names, not namespaced ones (Foo::y is allowed)
+        if !name.contains("::") {
+            if Self::RESERVED_FUNCTION_NAMES.contains(&name) {
+                return Err(self.syntax_err(
+                    format!("`{name}` is a reserved word and cannot be used as a function name"),
+                    line,
+                ));
+            }
+            if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
+                return Err(self.syntax_err(
+                    format!(
 "`{name}` is a stryke builtin and cannot be redefined (this is not Perl 5; use `fn` not `sub`, or pass --compat)"
-                ),
-                line,
-            ));
+                    ),
+                    line,
+                ));
+            }
         }
         Ok(())
     }

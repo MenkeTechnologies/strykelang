@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Conditional Structures
 
-fn conditional_examples() {
+fn Rosetta::ConditionalStructures::demo() {
     "Conditional Structure Examples:" |> p
     
     my $x = 42
@@ -73,4 +73,5 @@ fn conditional_examples() {
     "   y is odd" |> p unless $y % 2 == 0
 }
 
-conditional_examples
+Rosetta::ConditionalStructures::demo()
+test_run

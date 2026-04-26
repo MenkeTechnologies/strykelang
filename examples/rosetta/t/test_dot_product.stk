@@ -1,9 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Dot Product
 
-fn my_dot_product {
-    my $v1 = $_[0]
-    my $v2 = $_[1]
+fn Rosetta::DotProduct::compute($v1, $v2) {
     my $sum = 0
     for my $i (0..scalar(@$v1)-1) {
         $sum += $v1->[$i] * $v2->[$i]
@@ -14,6 +12,6 @@ fn my_dot_product {
 my $a = [1, 3, -5]
 my $b = [4, -2, -1]
 # 1*4 + 3*-2 + -5*-1 = 4 - 6 + 5 = 3
-assert_eq my_dot_product($a, $b), 3, "dot product [1,3,-5].[4,-2,-1]"
+assert_eq Rosetta::DotProduct::compute($a, $b), 3, "dot product [1,3,-5].[4,-2,-1]"
 
 test_run

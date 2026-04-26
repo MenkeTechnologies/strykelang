@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 24 Game Solver
 
-fn eval_expr($a, $b, $op) {
+fn Rosetta::Game24::eval_op($a, $b, $op) {
     if ($op eq "+") { return $a + $b }
     if ($op eq "-") { return $a - $b }
     if ($op eq "*") { return $a * $b }
@@ -9,23 +9,33 @@ fn eval_expr($a, $b, $op) {
     undef
 }
 
-fn solve_24($d) {
+fn Rosetta::Game24::perms(@list) {
+    if (scalar(@list) <= 1) { return [\@list] }
+    my @res
+    for my $i (0..scalar(@list)-1) {
+        my @rest = @list
+        my $item = splice(@rest, $i, 1)
+        my $sub_ref = Rosetta::Game24::perms(@rest)
+        for my $s (@$sub_ref) {
+            push @res, [$item, @$s]
+        }
+    }
+    \@res
+}
+
+fn Rosetta::Game24::solve($d) {
     my @ops = ("+", "-", "*", "/")
-    
-    # Simple brute force for 4 digits
-    # Permutations of digits
-    my $perms = my_perms(@$d)
+    my $perms = Rosetta::Game24::perms(@$d)
     
     for my $p (@$perms) {
         for my $o1 (@ops) {
             for my $o2 (@ops) {
                 for my $o3 (@ops) {
-                    # Form: ((a op1 b) op2 c) op3 d
-                    my $v1 = eval_expr($p->[0], $p->[1], $o1)
+                    my $v1 = Rosetta::Game24::eval_op($p->[0], $p->[1], $o1)
                     if (defined $v1) {
-                        my $v2 = eval_expr($v1, $p->[2], $o2)
+                        my $v2 = Rosetta::Game24::eval_op($v1, $p->[2], $o2)
                         if (defined $v2) {
-                            my $v3 = eval_expr($v2, $p->[3], $o3)
+                            my $v3 = Rosetta::Game24::eval_op($v2, $p->[3], $o3)
                             if (defined $v3 && abs($v3 - 24) < 0.0001) {
                                 return "(($p->[0] $o1 $p->[1]) $o2 $p->[2]) $o3 $p->[3]"
                             }
@@ -38,34 +48,10 @@ fn solve_24($d) {
     undef
 }
 
-# Copying my_perms from previous batch
-fn my_perms {
-    my @list = @_
-    if (scalar(@list) == 0) { return [[]] }
-    if (scalar(@list) == 1) { return [[$list[0]]] }
-    my @res
-    for my $i (0..scalar(@list)-1) {
-        my @rest = @list
-        my $item = splice(@rest, $i, 1)
-        my $sub = my_perms(@rest)
-        for my $s (@$sub) {
-            push @res, [$item, @$s]
-        }
-    }
-    \@res
-}
-
-my $res = solve_24([4, 6, 8, 2])
+my $res = Rosetta::Game24::solve([4, 6, 8, 2])
 assert_ok defined($res), "24 game solution found for 4,6,8,2"
-# ((4 * 6) / 2) + 8 = 12 + 8 = 20. No.
-# (4 * 6) + (8 - 2) = 24 + 6 = 30. No.
-# 4 * 6 * (8 / 8) ... 
-# 4 * 6 is 24.
-# (4 * 6 * 2) - 8 = 48 - 8 = 40.
-# (4 * 6) + 8 - 8 = 24. OK.
 
-my $res2 = solve_24([1, 2, 3, 4])
-# 1*2*3*4 = 24.
+my $res2 = Rosetta::Game24::solve([1, 2, 3, 4])
 assert_ok defined($res2), "24 game solution found for 1,2,3,4"
 
 test_run

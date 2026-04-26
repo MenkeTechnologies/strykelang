@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cosine similarity
 
-fn my_cosine_similarity($v1, $v2) {
+fn Rosetta::CosineSimilarity::compute($v1, $v2) {
     my $dot = 0
     my $mag1 = 0
     my $mag2 = 0
@@ -16,10 +16,10 @@ fn my_cosine_similarity($v1, $v2) {
 
 my $v1 = [1, 2, 3]
 my $v2 = [1, 2, 3]
-assert_eq my_cosine_similarity($v1, $v2), 1.0, "Identical vectors"
+assert_eq Rosetta::CosineSimilarity::compute($v1, $v2), 1.0, "Identical vectors"
 
 my $v3 = [1, 0]
 my $v4 = [0, 1]
-assert_eq my_cosine_similarity($v3, $v4), 0, "Orthogonal vectors"
+assert_eq Rosetta::CosineSimilarity::compute($v3, $v4), 0, "Orthogonal vectors"
 
 test_run

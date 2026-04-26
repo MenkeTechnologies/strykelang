@@ -1,29 +1,29 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fibonacci word
 
-fn fib_word($n) {
+fn Rosetta::FibonacciWord::compute($n) {
     if ($n == 1) {
         "1"
     } elsif ($n == 2) {
         "0"
     } else {
-        fib_word($n - 1) . fib_word($n - 2)
+        Rosetta::FibonacciWord::compute($n - 1) . Rosetta::FibonacciWord::compute($n - 2)
     }
 }
 
-fn fib_word_list($max) {
-    ~> 1..$max map { fib_word($_) }
+fn Rosetta::FibonacciWord::list($max) {
+    ~> 1:$max map { Rosetta::FibonacciWord::compute($_) }
 }
 
-assert_eq fib_word(1), "1", "FW 1"
-assert_eq fib_word(2), "0", "FW 2"
-assert_eq fib_word(3), "01", "FW 3"
-assert_eq fib_word(4), "010", "FW 4"
-assert_eq fib_word(5), "01001", "FW 5"
+assert_eq Rosetta::FibonacciWord::compute(1), "1", "FW 1"
+assert_eq Rosetta::FibonacciWord::compute(2), "0", "FW 2"
+assert_eq Rosetta::FibonacciWord::compute(3), "01", "FW 3"
+assert_eq Rosetta::FibonacciWord::compute(4), "010", "FW 4"
+assert_eq Rosetta::FibonacciWord::compute(5), "01001", "FW 5"
 
-my @list = fib_word_list(5)
+my @list = Rosetta::FibonacciWord::list(5)
 assert_eq join(",", @list), "1,0,01,010,01001", "FW list"
 
-6 |> fib_word |> assert_eq("01001010", "FW 6")
+6 |> Rosetta::FibonacciWord::compute |> assert_eq("01001010", "FW 6")
 
 test_run

@@ -1,9 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Nth Root
 
-fn my_nth_root {
-    my $x = $_[0]
-    my $n = $_[1]
+fn Rosetta::NthRoot::compute($x, $n) {
     if ($x == 0) { 0 }
     else {
         my $guess = $x / $n
@@ -16,13 +14,13 @@ fn my_nth_root {
     }
 }
 
-my $r1 = my_nth_root(2, 2)
-assert_ok abs($r1 - 1.41421356) < 0.000001, "sqrt(2)"
+my $r1 = Rosetta::NthRoot::compute(2, 2)
+assert_near $r1, 1.41421356, 0.000001, "sqrt(2)"
 
-my $r2 = my_nth_root(125, 3)
-assert_ok abs($r2 - 5) < 0.000001, "cbrt(125)"
+my $r2 = Rosetta::NthRoot::compute(125, 3)
+assert_near $r2, 5, 0.000001, "cbrt(125)"
 
-my $r3 = my_nth_root(625, 4)
-assert_ok abs($r3 - 5) < 0.000001, "4th root of 625"
+my $r3 = Rosetta::NthRoot::compute(625, 4)
+assert_near $r3, 5, 0.000001, "4th root of 625"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Dijkstra's algorithm
 
-fn my_dijkstra($graph, $start) {
+fn Rosetta::Dijkstra::solve($graph, $start) {
     my $dist = {}
     my $prev = {}
     my @nodes = keys %$graph
@@ -33,7 +33,7 @@ fn my_dijkstra($graph, $start) {
             }
         }
     }
-    ($dist, $prev)
+    return [$dist, $prev]
 }
 
 my $graph = {
@@ -45,7 +45,8 @@ my $graph = {
     "f" => [["a", 14], ["c", 2], ["e", 9]]
 }
 
-my ($dist, $prev) = my_dijkstra($graph, "a")
+my $res = Rosetta::Dijkstra::solve($graph, "a")
+my $dist = $res->[0]
 assert_eq $dist->{a}, 0, "dist a"
 assert_eq $dist->{b}, 7, "dist b"
 assert_eq $dist->{c}, 9, "dist c"

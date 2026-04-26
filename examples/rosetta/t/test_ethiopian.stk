@@ -1,31 +1,35 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Ethiopian Multiplication
 
-fn my_halve($n) { int($n / 2) }
-fn my_double($n) { $n * 2 }
-fn my_is_odd($n) { $n % 2 != 0 }
+fn Rosetta::Ethiopian::halve($n) { int($n / 2) }
+fn Rosetta::Ethiopian::double($n) { $n * 2 }
+fn Rosetta::Ethiopian::is_odd($n) { $n % 2 != 0 }
 
-fn ethiopian_multiply($a, $b) {
+fn Rosetta::Ethiopian::multiply($a, $b) {
+    my $curr_a = $a
+    my $curr_b = $b
     my $result = 0
-    while ($a >= 1) {
-        $result += $b if my_is_odd($a)
-        $a = my_halve($a)
-        $b = my_double($b)
+    while ($curr_a >= 1) {
+        if (Rosetta::Ethiopian::is_odd($curr_a)) {
+            $result = $result + $curr_b
+        }
+        $curr_a = Rosetta::Ethiopian::halve($curr_a)
+        $curr_b = Rosetta::Ethiopian::double($curr_b)
     }
     $result
 }
 
-assert_eq ethiopian_multiply(17, 34), 578, "17 * 34 = 578"
-assert_eq ethiopian_multiply(12, 15), 180, "12 * 15 = 180"
-assert_eq ethiopian_multiply(1, 100), 100, "1 * 100 = 100"
-assert_eq ethiopian_multiply(100, 1), 100, "100 * 1 = 100"
-assert_eq ethiopian_multiply(7, 8), 56, "7 * 8 = 56"
-assert_eq ethiopian_multiply(99, 99), 9801, "99 * 99 = 9801"
+assert_eq Rosetta::Ethiopian::multiply(17, 34), 578, "17 * 34 = 578"
+assert_eq Rosetta::Ethiopian::multiply(12, 15), 180, "12 * 15 = 180"
+assert_eq Rosetta::Ethiopian::multiply(1, 100), 100, "1 * 100 = 100"
+assert_eq Rosetta::Ethiopian::multiply(100, 1), 100, "100 * 1 = 100"
+assert_eq Rosetta::Ethiopian::multiply(7, 8), 56, "7 * 8 = 56"
+assert_eq Rosetta::Ethiopian::multiply(99, 99), 9801, "99 * 99 = 9801"
 
-assert_eq my_halve(10), 5, "halve 10"
-assert_eq my_halve(17), 8, "halve 17"
-assert_eq my_double(5), 10, "double 5"
-assert_ok my_is_odd(17), "17 is odd"
-assert_ok !my_is_odd(34), "34 is not odd"
+assert_eq Rosetta::Ethiopian::halve(10), 5, "halve 10"
+assert_eq Rosetta::Ethiopian::halve(17), 8, "halve 17"
+assert_eq Rosetta::Ethiopian::double(5), 10, "double 5"
+assert_ok Rosetta::Ethiopian::is_odd(17), "17 is odd"
+assert_ok !Rosetta::Ethiopian::is_odd(34), "34 is not odd"
 
 test_run

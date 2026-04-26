@@ -1,43 +1,43 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Closures/Value Capture
 
-fn make_counter_inner($count) {
+fn Rosetta::Closure::make_counter_inner($count) {
     fn {
         $count = $count + 1
         $count
     }
 }
 
-fn make_counter {
-    make_counter_inner(0)
+fn Rosetta::Closure::make_counter {
+    Rosetta::Closure::make_counter_inner(0)
 }
 
-fn make_adder($n) {
+fn Rosetta::Closure::make_adder($n) {
     fn ($x) { $x + $n }
 }
 
-fn make_multiplier($n) {
+fn Rosetta::Closure::make_multiplier($n) {
     fn ($x) { $x * $n }
 }
 
-my $c1 = make_counter()
+my $c1 = Rosetta::Closure::make_counter()
 assert_eq $c1->(), 1, "counter 1"
 assert_eq $c1->(), 2, "counter 2"
 assert_eq $c1->(), 3, "counter 3"
 
-my $c2 = make_counter()
+my $c2 = Rosetta::Closure::make_counter()
 assert_eq $c2->(), 1, "second counter starts at 1"
 assert_eq $c1->(), 4, "first counter continues"
 
-my $add5 = make_adder(5)
+my $add5 = Rosetta::Closure::make_adder(5)
 assert_eq $add5->(10), 15, "add5(10)=15"
 assert_eq $add5->(0), 5, "add5(0)=5"
 
-my $mul3 = make_multiplier(3)
+my $mul3 = Rosetta::Closure::make_multiplier(3)
 assert_eq $mul3->(7), 21, "mul3(7)=21"
 
-my $add10 = make_adder(10)
-my $mul2 = make_multiplier(2)
+my $add10 = Rosetta::Closure::make_adder(10)
+my $mul2 = Rosetta::Closure::make_multiplier(2)
 assert_eq $mul2->($add10->(5)), 30, "compose: (5+10)*2=30"
 
 test_run

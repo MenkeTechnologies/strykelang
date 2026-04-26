@@ -1,14 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Count Vowels
 
-fn my_count_vowels {
-    my $s = $_[0]
+fn Rosetta::CountVowels::solve($s) {
     ~> $s chars grep { $_ =~ /[aeiouAEIOU]/ } scalar
 }
 
-assert_eq my_count_vowels("alphabet"), 3, "alphabet has 3 vowels"
-assert_eq my_count_vowels("Stryke"), 1, "Stryke has 1 vowel"
-assert_eq my_count_vowels("AEIOU"), 5, "AEIOU has 5 vowels"
-assert_eq my_count_vowels("bcdfg"), 0, "no vowels"
+assert_eq Rosetta::CountVowels::solve("alphabet"), 3, "alphabet has 3 vowels"
+assert_eq Rosetta::CountVowels::solve("Stryke"), 1, "Stryke has 1 vowel"
+assert_eq Rosetta::CountVowels::solve("AEIOU"), 5, "AEIOU has 5 vowels"
+assert_eq Rosetta::CountVowels::solve("bcdfg"), 0, "no vowels"
 
 test_run

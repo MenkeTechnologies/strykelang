@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Determinant
 
-fn det2x2($m) {
+fn Rosetta::Determinant::det2x2($m) {
     $m->[0]->[0] * $m->[1]->[1] - $m->[0]->[1] * $m->[1]->[0]
 }
 
-fn det3x3($m) {
+fn Rosetta::Determinant::det3x3($m) {
     my $a = $m->[0]->[0]
     my $b = $m->[0]->[1]
     my $c = $m->[0]->[2]
@@ -20,12 +20,12 @@ fn det3x3($m) {
 }
 
 my $m2 = [[1, 2], [3, 4]]
-assert_eq det2x2($m2), -2, "det 2x2"
+assert_eq Rosetta::Determinant::det2x2($m2), -2, "det 2x2"
 
 my $m3 = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-assert_eq det3x3($m3), 0, "det 3x3 (singular)"
+assert_eq Rosetta::Determinant::det3x3($m3), 0, "det 3x3 (singular)"
 
 my $m3b = [[6, 1, 1], [4, -2, 5], [2, 8, 7]]
-assert_eq det3x3($m3b), -306, "det 3x3"
+assert_eq Rosetta::Determinant::det3x3($m3b), -306, "det 3x3"
 
 test_run

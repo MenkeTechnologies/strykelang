@@ -1,52 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Emirp
 
-fn my_is_prime($n) {
-    if ($n < 2) {
-        0
-    } elsif ($n == 2) {
-        1
-    } elsif ($n % 2 == 0) {
-        0
-    } else {
-        my $i = 3
-        my $limit = sqrt($n)
-        my $res = 1
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
-}
-
-fn my_rev_int($n) {
-    my $s = str $n
-    my @chars = $s |> chars
-    my @r = rev(@chars)
-    join("", @r) |> int
-}
-
-fn my_is_emirp($n) {
-    my $res = 0
-    if (my_is_prime($n)) {
-        my $rev = my_rev_int($n)
+fn Rosetta::Emirp::check($n) {
+    if (is_prime($n)) {
+        my $rev = int(join("", rev(chars(str($n)))))
         if ($rev != $n) {
-            $res = my_is_prime($rev)
+            return is_prime($rev)
         }
     }
-    $res
+    0
 }
 
-assert_ok my_is_emirp(13), "13 is emirp"
-assert_ok my_is_emirp(17), "17 is emirp"
-assert_ok my_is_emirp(31), "31 is emirp"
-assert_eq my_is_emirp(2), 0, "2 is not emirp"
-assert_eq my_is_emirp(19), 0, "19 is not emirp"
+assert_ok Rosetta::Emirp::check(13), "13 is emirp"
+assert_ok Rosetta::Emirp::check(17), "17 is emirp"
+assert_ok Rosetta::Emirp::check(31), "31 is emirp"
+assert_eq Rosetta::Emirp::check(2), 0, "2 is not emirp"
+assert_eq Rosetta::Emirp::check(19), 0, "19 is not emirp"
 
-13 |> my_is_emirp |> assert_ok("pipe emirp check")
+13 |> Rosetta::Emirp::check |> assert_ok("pipe emirp check")
 
 test_run

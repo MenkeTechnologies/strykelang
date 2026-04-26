@@ -506,6 +506,18 @@ par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input)</pre>
       </section>
 
       <section class="tutorial-section">
+        <h2>Reserved Words</h2>
+        <p>These cannot be used as function names (they are lexer-level operators or language keywords):</p>
+        <div class="oneliner" style="font-size:11px;">y tr s m q qq qw qx qr
+if unless while until for foreach given when else elsif
+do eval return last next redo goto
+my our local state sub fn class struct enum trait
+use no require package BEGIN END CHECK INIT UNITCHECK
+and or not x eq ne lt gt le ge cmp</div>
+        <p>Attempting <code>fn y { }</code> or <code>fn goto { }</code> produces: <code>`y` is a reserved word and cannot be used as a function name</code></p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Perl-compat highlights</h2>
         <ul>
           <li><strong>OOP</strong> — <code>@ISA</code>, C3 MRO (live, not cached), <code>$obj-&gt;SUPER::method</code>, <code>tie</code> for scalars/arrays/hashes with <code>TIESCALAR</code>/<code>TIEARRAY</code>/<code>TIEHASH</code>, plus <code>EXISTS</code>/<code>DELETE</code>; <code>use overload</code> with full binary dispatch, <code>nomethod</code>, unary <code>neg</code>/<code>bool</code>/<code>abs</code>. Native <code>class</code> syntax with inheritance, traits, abstract/final, visibility, static fields, operator overloading, and reflection — see <a href="#oop">OOP section</a> below.</li>

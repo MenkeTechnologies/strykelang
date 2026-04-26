@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Four is magic
 
-fn number_to_words($n) {
+fn Rosetta::FourIsMagic::number_to_words($n) {
     if ($n == 0) { return "zero" }
     if ($n == 1) { return "one" }
     if ($n == 2) { return "two" }
@@ -31,18 +31,18 @@ fn number_to_words($n) {
     return "too_big"
 }
 
-fn magic($n) {
-    my $words = number_to_words($n)
-    my $l = $words |> len
+fn Rosetta::FourIsMagic::solve($n) {
+    my $words = Rosetta::FourIsMagic::number_to_words($n)
+    my $l = length($words)
     if ($n == 4) {
         return "four is magic."
     } else {
-        return $words . " is " . number_to_words($l) . ", " . magic($l)
+        return $words . " is " . Rosetta::FourIsMagic::number_to_words($l) . ", " . Rosetta::FourIsMagic::solve($l)
     }
 }
 
-assert_eq magic(10), "ten is three, three is five, five is four, four is magic.", "magic(10)"
-assert_eq magic(1), "one is three, three is five, five is four, four is magic.", "magic(1)"
-assert_eq magic(4), "four is magic.", "magic(4)"
+assert_eq Rosetta::FourIsMagic::solve(10), "ten is three, three is five, five is four, four is magic.", "magic(10)"
+assert_eq Rosetta::FourIsMagic::solve(1), "one is three, three is five, five is four, four is magic.", "magic(1)"
+assert_eq Rosetta::FourIsMagic::solve(4), "four is magic.", "magic(4)"
 
 test_run
