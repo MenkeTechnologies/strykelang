@@ -2740,15 +2740,16 @@ impl Interpreter {
         }
     }
 
-    /// `sub name` in `package P` → stash key `P::name` (otherwise `name` in `main`).
+    /// `sub name` in `package P` → stash key `P::name`.
     /// `sub Q::name { }` is already fully qualified — do not prepend the current package.
+    /// Unqualified names in the main package become `main::name` for Perl 5 compatibility.
     pub(crate) fn qualify_sub_key(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
         }
         let pkg = self.current_package();
         if pkg.is_empty() || pkg == "main" {
-            name.to_string()
+            format!("main::{}", name)
         } else {
             format!("{}::{}", pkg, name)
         }
@@ -2930,14 +2931,16 @@ impl Interpreter {
             return Some(s.clone());
         }
         if !name.contains("::") {
+            // Bare names are stored as `Pkg::name` (or `main::name` in the default package).
+            // The previous guard skipped the lookup for `main`, so `\&greet` and `defined &greet`
+            // failed to find UDFs declared at the top level.
             let pkg = self.current_package();
-            if !pkg.is_empty() && pkg != "main" {
-                let mut q = String::with_capacity(pkg.len() + 2 + name.len());
-                q.push_str(&pkg);
-                q.push_str("::");
-                q.push_str(name);
-                return self.subs.get(&q).cloned();
-            }
+            let pkg = if pkg.is_empty() { "main" } else { pkg.as_str() };
+            let mut q = String::with_capacity(pkg.len() + 2 + name.len());
+            q.push_str(pkg);
+            q.push_str("::");
+            q.push_str(name);
+            return self.subs.get(&q).cloned();
         }
         None
     }

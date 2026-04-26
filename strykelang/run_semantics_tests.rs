@@ -4640,3 +4640,34 @@ fn thread_last_tilde_spelling() {
         0.2
     );
 }
+
+// ── Perl parity: CORE::builtin and main::UDF ──────────────────────────────
+
+#[test]
+fn core_prefix_routes_to_builtin() {
+    // `CORE::getcwd` reaches the same builtin as bare `getcwd`. Stryke builtins
+    // are not parser-level reserved words — `CORE::name` is just a qualified
+    // name that the compiler/runtime recognize as the core implementation.
+    assert_eq!(rs(r#"CORE::getcwd()"#), rs(r#"getcwd()"#));
+}
+
+#[test]
+fn main_qualified_udf_call() {
+    assert_eq!(rs(r#"fn greet { "hi $_0" }; main::greet("perl")"#), "hi perl");
+}
+
+#[test]
+fn bare_coderef_resolves_main_udf() {
+    // `\&greet` must find `main::greet`. Was broken: resolve_sub_by_name
+    // skipped the package fallback when `pkg == "main"`.
+    assert_eq!(
+        ri(r#"fn greet { 7 }; my $cr = \&greet; $cr->()"#),
+        7
+    );
+}
+
+#[test]
+fn defined_amp_main_udf_is_true() {
+    assert_eq!(ri(r#"fn greet { 1 }; defined &greet ? 1 : 0"#), 1);
+    assert_eq!(ri(r#"fn greet { 1 }; defined &main::greet ? 1 : 0"#), 1);
+}
