@@ -2698,6 +2698,84 @@ pub(crate) fn perl_magic_string_increment_for_range(s: &mut String) -> PerlListR
     }
 }
 
+/// Magical string `--` for ASCII letter/digit runs (stryke extension — Perl doesn't have this).
+/// Returns `None` if we've hit the floor (e.g., "a" can't decrement, "aa" → "z").
+pub(crate) fn perl_magic_string_decrement_for_range(s: &mut String) -> Option<()> {
+    if s.is_empty() {
+        return None;
+    }
+    // Validate: must be all alpha then all digit (like increment)
+    let b = s.as_bytes();
+    let mut i = 0usize;
+    while i < b.len() && b[i].is_ascii_alphabetic() {
+        i += 1;
+    }
+    while i < b.len() && b[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i < b.len() {
+        return None; // Not a pure alpha/digit string
+    }
+
+    let bytes = unsafe { s.as_mut_vec() };
+    let mut idx = bytes.len() - 1;
+    loop {
+        if bytes[idx].is_ascii_digit() {
+            if bytes[idx] > b'0' {
+                bytes[idx] -= 1;
+                return Some(());
+            }
+            // Borrow: '0' becomes '9', continue to next position
+            bytes[idx] = b'9';
+            if idx == 0 {
+                // "0" → can't go lower, or "00" → "9" (shrink)
+                if bytes.len() == 1 {
+                    bytes[0] = b'0'; // restore, signal floor
+                    return None;
+                }
+                bytes.remove(0);
+                return Some(());
+            }
+            idx -= 1;
+        } else if bytes[idx].is_ascii_lowercase() {
+            if bytes[idx] > b'a' {
+                bytes[idx] -= 1;
+                return Some(());
+            }
+            // Borrow: 'a' becomes 'z', continue to next position
+            bytes[idx] = b'z';
+            if idx == 0 {
+                // "a" can't decrement, "aa" → "z"
+                if bytes.len() == 1 {
+                    bytes[0] = b'a'; // restore
+                    return None;
+                }
+                bytes.remove(0);
+                return Some(());
+            }
+            idx -= 1;
+        } else if bytes[idx].is_ascii_uppercase() {
+            if bytes[idx] > b'A' {
+                bytes[idx] -= 1;
+                return Some(());
+            }
+            // Borrow: 'A' becomes 'Z', continue to next position
+            bytes[idx] = b'Z';
+            if idx == 0 {
+                if bytes.len() == 1 {
+                    bytes[0] = b'A'; // restore
+                    return None;
+                }
+                bytes.remove(0);
+                return Some(());
+            }
+            idx -= 1;
+        } else {
+            return None;
+        }
+    }
+}
+
 fn perl_list_range_max_bound(right: &str) -> usize {
     if right.is_ascii() {
         right.len()
@@ -2754,6 +2832,596 @@ pub(crate) fn perl_list_range_expand(from: PerlValue, to: PerlValue) -> Vec<Perl
         }
     } else {
         perl_list_range_expand_string_magic(from, to)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Polymorphic range types — stryke extension (world first!)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Check if string is a valid Roman numeral.
+fn is_roman_numeral(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let upper = s.to_ascii_uppercase();
+    upper.chars().all(|c| matches!(c, 'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M'))
+}
+
+/// Check if string is an IPv4 address.
+fn is_ipv4(s: &str) -> bool {
+    let parts: Vec<&str> = s.split('.').collect();
+    parts.len() == 4 && parts.iter().all(|p| p.parse::<u8>().is_ok())
+}
+
+/// Parse IPv4 to u32.
+fn ipv4_to_u32(s: &str) -> Option<u32> {
+    let parts: Vec<u8> = s.split('.').filter_map(|p| p.parse().ok()).collect();
+    if parts.len() != 4 { return None; }
+    Some(((parts[0] as u32) << 24) | ((parts[1] as u32) << 16) | ((parts[2] as u32) << 8) | (parts[3] as u32))
+}
+
+/// Convert u32 to IPv4 string.
+fn u32_to_ipv4(n: u32) -> String {
+    format!("{}.{}.{}.{}", (n >> 24) & 0xFF, (n >> 16) & 0xFF, (n >> 8) & 0xFF, n & 0xFF)
+}
+
+/// IPv4 range with step.
+fn ipv4_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some(start) = ipv4_to_u32(from) else { return vec![] };
+    let Some(end) = ipv4_to_u32(to) else { return vec![] };
+    let mut out = Vec::new();
+    if step > 0 {
+        let mut cur = start as i64;
+        while cur <= end as i64 {
+            out.push(PerlValue::string(u32_to_ipv4(cur as u32)));
+            cur += step;
+        }
+    } else {
+        let mut cur = start as i64;
+        while cur >= end as i64 {
+            out.push(PerlValue::string(u32_to_ipv4(cur as u32)));
+            cur += step;
+        }
+    }
+    out
+}
+
+/// Check if string is ISO date YYYY-MM-DD.
+fn is_iso_date(s: &str) -> bool {
+    if s.len() != 10 { return false; }
+    let parts: Vec<&str> = s.split('-').collect();
+    parts.len() == 3 
+        && parts[0].len() == 4 && parts[0].parse::<u16>().is_ok()
+        && parts[1].len() == 2 && parts[1].parse::<u8>().map(|m| m >= 1 && m <= 12).unwrap_or(false)
+        && parts[2].len() == 2 && parts[2].parse::<u8>().map(|d| d >= 1 && d <= 31).unwrap_or(false)
+}
+
+/// Check if string is YYYY-MM (month range).
+fn is_year_month(s: &str) -> bool {
+    if s.len() != 7 { return false; }
+    let parts: Vec<&str> = s.split('-').collect();
+    parts.len() == 2
+        && parts[0].len() == 4 && parts[0].parse::<u16>().is_ok()
+        && parts[1].len() == 2 && parts[1].parse::<u8>().map(|m| m >= 1 && m <= 12).unwrap_or(false)
+}
+
+/// Parse ISO date to (year, month, day).
+fn parse_iso_date(s: &str) -> Option<(i32, u32, u32)> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 3 { return None; }
+    Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+}
+
+/// Parse YYYY-MM to (year, month).
+fn parse_year_month(s: &str) -> Option<(i32, u32)> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 2 { return None; }
+    Some((parts[0].parse().ok()?, parts[1].parse().ok()?))
+}
+
+/// Days in month (handles leap years).
+fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 { 29 } else { 28 },
+        _ => 30,
+    }
+}
+
+/// Add days to a date, returning new (year, month, day).
+fn add_days(mut year: i32, mut month: u32, mut day: u32, mut delta: i64) -> (i32, u32, u32) {
+    if delta > 0 {
+        while delta > 0 {
+            let dim = days_in_month(year, month);
+            let remaining = dim - day;
+            if delta <= remaining as i64 {
+                day += delta as u32;
+                break;
+            }
+            delta -= (remaining + 1) as i64;
+            day = 1;
+            month += 1;
+            if month > 12 { month = 1; year += 1; }
+        }
+    } else {
+        while delta < 0 {
+            if (-delta) < day as i64 {
+                day = (day as i64 + delta) as u32;
+                break;
+            }
+            delta += day as i64;
+            month -= 1;
+            if month == 0 { month = 12; year -= 1; }
+            day = days_in_month(year, month);
+        }
+    }
+    (year, month, day)
+}
+
+/// ISO date range with step (step = days).
+fn iso_date_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some((mut y, mut m, mut d)) = parse_iso_date(from) else { return vec![] };
+    let Some((ey, em, ed)) = parse_iso_date(to) else { return vec![] };
+    let mut out = Vec::new();
+    let mut guard = 0;
+    if step > 0 {
+        while (y, m, d) <= (ey, em, ed) && guard < 50_000 {
+            out.push(PerlValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
+            (y, m, d) = add_days(y, m, d, step);
+            guard += 1;
+        }
+    } else {
+        while (y, m, d) >= (ey, em, ed) && guard < 50_000 {
+            out.push(PerlValue::string(format!("{:04}-{:02}-{:02}", y, m, d)));
+            (y, m, d) = add_days(y, m, d, step);
+            guard += 1;
+        }
+    }
+    out
+}
+
+/// Add months to (year, month).
+fn add_months(mut year: i32, mut month: u32, delta: i64) -> (i32, u32) {
+    let total = (year as i64 * 12 + month as i64 - 1) + delta;
+    year = (total / 12) as i32;
+    month = ((total % 12) + 1) as u32;
+    if month == 0 { month = 12; year -= 1; }
+    (year, month)
+}
+
+/// YYYY-MM range with step (step = months).
+fn year_month_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some((mut y, mut m)) = parse_year_month(from) else { return vec![] };
+    let Some((ey, em)) = parse_year_month(to) else { return vec![] };
+    let mut out = Vec::new();
+    let mut guard = 0;
+    if step > 0 {
+        while (y, m) <= (ey, em) && guard < 50_000 {
+            out.push(PerlValue::string(format!("{:04}-{:02}", y, m)));
+            (y, m) = add_months(y, m, step);
+            guard += 1;
+        }
+    } else {
+        while (y, m) >= (ey, em) && guard < 50_000 {
+            out.push(PerlValue::string(format!("{:04}-{:02}", y, m)));
+            (y, m) = add_months(y, m, step);
+            guard += 1;
+        }
+    }
+    out
+}
+
+/// Check if string looks like HH:MM time.
+fn is_time_hhmm(s: &str) -> bool {
+    if s.len() != 5 { return false; }
+    let parts: Vec<&str> = s.split(':').collect();
+    parts.len() == 2
+        && parts[0].len() == 2 && parts[0].parse::<u8>().map(|h| h < 24).unwrap_or(false)
+        && parts[1].len() == 2 && parts[1].parse::<u8>().map(|m| m < 60).unwrap_or(false)
+}
+
+/// Parse HH:MM to minutes since midnight.
+fn parse_time_hhmm(s: &str) -> Option<i32> {
+    let parts: Vec<&str> = s.split(':').collect();
+    if parts.len() != 2 { return None; }
+    let h: i32 = parts[0].parse().ok()?;
+    let m: i32 = parts[1].parse().ok()?;
+    Some(h * 60 + m)
+}
+
+/// Minutes to HH:MM string.
+fn minutes_to_hhmm(mins: i32) -> String {
+    let h = (mins / 60) % 24;
+    let m = mins % 60;
+    format!("{:02}:{:02}", h, m)
+}
+
+/// HH:MM time range with step (step = minutes).
+fn time_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some(start) = parse_time_hhmm(from) else { return vec![] };
+    let Some(end) = parse_time_hhmm(to) else { return vec![] };
+    let mut out = Vec::new();
+    let mut guard = 0;
+    if step > 0 {
+        let mut cur = start;
+        while cur <= end && guard < 50_000 {
+            out.push(PerlValue::string(minutes_to_hhmm(cur)));
+            cur += step as i32;
+            guard += 1;
+        }
+    } else {
+        let mut cur = start;
+        while cur >= end && guard < 50_000 {
+            out.push(PerlValue::string(minutes_to_hhmm(cur)));
+            cur += step as i32;
+            guard += 1;
+        }
+    }
+    out
+}
+
+const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS_FULL: [&str; 7] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/// Check if string is a weekday name.
+fn weekday_index(s: &str) -> Option<usize> {
+    let lower = s.to_ascii_lowercase();
+    for (i, &d) in WEEKDAYS.iter().enumerate() {
+        if d.to_ascii_lowercase() == lower { return Some(i); }
+    }
+    for (i, &d) in WEEKDAYS_FULL.iter().enumerate() {
+        if d.to_ascii_lowercase() == lower { return Some(i); }
+    }
+    None
+}
+
+/// Weekday range with step.
+fn weekday_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some(start) = weekday_index(from) else { return vec![] };
+    let Some(end) = weekday_index(to) else { return vec![] };
+    let full = from.len() > 3;
+    let names = if full { &WEEKDAYS_FULL } else { &WEEKDAYS };
+    let mut out = Vec::new();
+    if step > 0 {
+        let mut cur = start as i64;
+        let target = if end >= start { end as i64 } else { end as i64 + 7 };
+        while cur <= target {
+            out.push(PerlValue::string(names[(cur % 7) as usize].to_string()));
+            cur += step;
+        }
+    } else {
+        let mut cur = start as i64;
+        let target = if end <= start { end as i64 } else { end as i64 - 7 };
+        while cur >= target {
+            out.push(PerlValue::string(names[((cur % 7 + 7) % 7) as usize].to_string()));
+            cur += step;
+        }
+    }
+    out
+}
+
+const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_FULL: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/// Check if string is a month name.
+fn month_name_index(s: &str) -> Option<usize> {
+    let lower = s.to_ascii_lowercase();
+    for (i, &m) in MONTHS.iter().enumerate() {
+        if m.to_ascii_lowercase() == lower { return Some(i); }
+    }
+    for (i, &m) in MONTHS_FULL.iter().enumerate() {
+        if m.to_ascii_lowercase() == lower { return Some(i); }
+    }
+    None
+}
+
+/// Month name range with step.
+fn month_name_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some(start) = month_name_index(from) else { return vec![] };
+    let Some(end) = month_name_index(to) else { return vec![] };
+    let full = from.len() > 3;
+    let names = if full { &MONTHS_FULL } else { &MONTHS };
+    let mut out = Vec::new();
+    if step > 0 {
+        let mut cur = start as i64;
+        let target = if end >= start { end as i64 } else { end as i64 + 12 };
+        while cur <= target {
+            out.push(PerlValue::string(names[(cur % 12) as usize].to_string()));
+            cur += step;
+        }
+    } else {
+        let mut cur = start as i64;
+        let target = if end <= start { end as i64 } else { end as i64 - 12 };
+        while cur >= target {
+            out.push(PerlValue::string(names[((cur % 12 + 12) % 12) as usize].to_string()));
+            cur += step;
+        }
+    }
+    out
+}
+
+/// Check if both operands are float-like (contain decimal point, not date/time/IP).
+fn is_float_pair(from: &str, to: &str) -> bool {
+    fn is_float(s: &str) -> bool {
+        s.contains('.') && !s.contains(':') && s.matches('.').count() == 1 && s.parse::<f64>().is_ok()
+    }
+    is_float(from) && is_float(to)
+}
+
+/// Float range with step.
+fn float_range_stepped(from: &str, to: &str, step: f64) -> Vec<PerlValue> {
+    let Ok(start) = from.parse::<f64>() else { return vec![] };
+    let Ok(end) = to.parse::<f64>() else { return vec![] };
+    let mut out = Vec::new();
+    let mut guard = 0;
+    // Use integer counting to avoid floating point accumulation errors
+    if step > 0.0 {
+        let mut i = 0i64;
+        loop {
+            let cur = start + (i as f64) * step;
+            if cur > end + step.abs() * f64::EPSILON * 10.0 || guard >= 50_000 {
+                break;
+            }
+            // Round to avoid floating point noise
+            let rounded = (cur * 1e12).round() / 1e12;
+            out.push(PerlValue::float(rounded));
+            i += 1;
+            guard += 1;
+        }
+    } else if step < 0.0 {
+        let mut i = 0i64;
+        loop {
+            let cur = start + (i as f64) * step;
+            if cur < end - step.abs() * f64::EPSILON * 10.0 || guard >= 50_000 {
+                break;
+            }
+            let rounded = (cur * 1e12).round() / 1e12;
+            out.push(PerlValue::float(rounded));
+            i += 1;
+            guard += 1;
+        }
+    }
+    out
+}
+
+/// Convert Roman numeral string to integer.
+fn roman_to_int(s: &str) -> Option<i64> {
+    let upper = s.to_ascii_uppercase();
+    let mut result = 0i64;
+    let mut prev = 0i64;
+    for c in upper.chars().rev() {
+        let val = match c {
+            'I' => 1,
+            'V' => 5,
+            'X' => 10,
+            'L' => 50,
+            'C' => 100,
+            'D' => 500,
+            'M' => 1000,
+            _ => return None,
+        };
+        if val < prev {
+            result -= val;
+        } else {
+            result += val;
+        }
+        prev = val;
+    }
+    if result > 0 { Some(result) } else { None }
+}
+
+/// Convert integer to Roman numeral string.
+fn int_to_roman(mut n: i64, lowercase: bool) -> Option<String> {
+    if n <= 0 || n > 3999 {
+        return None;
+    }
+    let numerals = [
+        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+        (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+        (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+    ];
+    let mut result = String::new();
+    for (val, sym) in numerals {
+        while n >= val {
+            result.push_str(sym);
+            n -= val;
+        }
+    }
+    if lowercase {
+        Some(result.to_ascii_lowercase())
+    } else {
+        Some(result)
+    }
+}
+
+/// Expand a Roman numeral range with step.
+fn roman_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Some(start) = roman_to_int(from) else { return vec![] };
+    let Some(end) = roman_to_int(to) else { return vec![] };
+    let lowercase = from.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false);
+    
+    let mut out = Vec::new();
+    if step > 0 {
+        let mut cur = start;
+        while cur <= end {
+            if let Some(r) = int_to_roman(cur, lowercase) {
+                out.push(PerlValue::string(r));
+            }
+            cur += step;
+        }
+    } else {
+        let mut cur = start;
+        while cur >= end {
+            if let Some(r) = int_to_roman(cur, lowercase) {
+                out.push(PerlValue::string(r));
+            }
+            cur += step; // step is negative
+        }
+    }
+    out
+}
+
+/// Stepped range expansion — polymorphic across many types (stryke world first!).
+/// Supports: integers, floats, strings, Roman numerals, dates, times, weekdays, months, IPv4.
+pub(crate) fn perl_list_range_expand_stepped(
+    from: PerlValue,
+    to: PerlValue,
+    step_val: PerlValue,
+) -> Vec<PerlValue> {
+    let from_str = from.to_string();
+    let to_str = to.to_string();
+    
+    // Check if this is a float range (operands have decimal points)
+    let is_float_range = is_float_pair(&from_str, &to_str);
+    
+    // Get step as float or int depending on context
+    let step_float = step_val.as_float().unwrap_or(step_val.to_int() as f64);
+    let step_int = step_val.to_int();
+    
+    if step_int == 0 && step_float == 0.0 {
+        return vec![];
+    }
+    
+    // Float ranges use float step
+    if is_float_range {
+        return float_range_stepped(&from_str, &to_str, step_float);
+    }
+    
+    // Pure numeric integers
+    if perl_list_range_pair_is_numeric(&from, &to) {
+        let i = from.to_int();
+        let j = to.to_int();
+        if step_int > 0 {
+            (i..=j)
+                .step_by(step_int as usize)
+                .map(PerlValue::integer)
+                .collect()
+        } else {
+            std::iter::successors(Some(i), |&x| {
+                let next = x + step_int;
+                if next >= j {
+                    Some(next)
+                } else {
+                    None
+                }
+            })
+            .map(PerlValue::integer)
+            .collect()
+        }
+    } else {
+        // Check special types in order of specificity
+        
+        // IPv4 addresses (must check before floats due to dots)
+        if is_ipv4(&from_str) && is_ipv4(&to_str) {
+            return ipv4_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // ISO dates YYYY-MM-DD (step = days)
+        if is_iso_date(&from_str) && is_iso_date(&to_str) {
+            return iso_date_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Year-month YYYY-MM (step = months)
+        if is_year_month(&from_str) && is_year_month(&to_str) {
+            return year_month_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Time HH:MM (step = minutes)
+        if is_time_hhmm(&from_str) && is_time_hhmm(&to_str) {
+            return time_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Weekday names
+        if weekday_index(&from_str).is_some() && weekday_index(&to_str).is_some() {
+            return weekday_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Month names
+        if month_name_index(&from_str).is_some() && month_name_index(&to_str).is_some() {
+            return month_name_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Roman numerals
+        if is_roman_numeral(&from_str) && is_roman_numeral(&to_str) {
+            return roman_range_stepped(&from_str, &to_str, step_int);
+        }
+        
+        // Fall back to magic string increment/decrement
+        perl_list_range_expand_string_magic_stepped(from, to, step_int)
+    }
+}
+
+fn perl_list_range_expand_string_magic_stepped(
+    from: PerlValue,
+    to: PerlValue,
+    step: i64,
+) -> Vec<PerlValue> {
+    if step == 0 {
+        return vec![];
+    }
+    let mut cur = from.into_string();
+    let right = to.into_string();
+
+    if step > 0 {
+        // Forward iteration
+        let step = step as usize;
+        let right_ascii = right.is_ascii();
+        let max_bound = perl_list_range_max_bound(&right);
+        let mut out = Vec::new();
+        let mut guard = 0usize;
+        let mut idx = 0usize;
+        loop {
+            guard += 1;
+            if guard > 50_000_000 {
+                break;
+            }
+            let cur_bound = perl_list_range_cur_bound(&cur, right_ascii);
+            if cur_bound > max_bound {
+                break;
+            }
+            if idx % step == 0 {
+                out.push(PerlValue::string(cur.clone()));
+            }
+            if cur == right {
+                break;
+            }
+            match perl_magic_string_increment_for_range(&mut cur) {
+                PerlListRangeIncOutcome::Continue => {}
+                PerlListRangeIncOutcome::BecameNumeric => break,
+            }
+            idx += 1;
+        }
+        out
+    } else {
+        // Reverse iteration (stryke extension)
+        let step = (-step) as usize;
+        let mut out = Vec::new();
+        let mut guard = 0usize;
+        let mut idx = 0usize;
+        loop {
+            guard += 1;
+            if guard > 50_000_000 {
+                break;
+            }
+            if idx % step == 0 {
+                out.push(PerlValue::string(cur.clone()));
+            }
+            if cur == right {
+                break;
+            }
+            // Check if we've gone past the target (cur < right lexicographically)
+            if cur < right {
+                break;
+            }
+            match perl_magic_string_decrement_for_range(&mut cur) {
+                Some(()) => {}
+                None => break, // Hit floor
+            }
+            idx += 1;
+        }
+        out
     }
 }
 
