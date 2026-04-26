@@ -1249,7 +1249,7 @@ impl Scope {
     }
 
     /// Borrow the innermost binding for `name` when it is a plain [`Vec`] (not `mysync`).
-    /// Used to pass `@_` to [`crate::list_util::native_dispatch`] without cloning the vector.
+    /// Used to pass `@_` to [`crate::list_builtins::native_dispatch`] without cloning the vector.
     #[inline]
     pub fn get_array_borrow(&self, name: &str) -> Option<&[PerlValue]> {
         if self.find_atomic_array(name).is_some() {

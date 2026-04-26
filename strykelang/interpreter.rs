@@ -1589,27 +1589,7 @@ impl Interpreter {
             debug_call_stack: Vec::new(),
         };
         s.install_overload_pragma_stubs();
-        crate::list_util::install_scalar_util(&mut s);
-        crate::list_util::install_sub_util(&mut s);
-        s.install_utf8_unicode_to_native_stub();
         s
-    }
-
-    /// `utf8::unicode_to_native` — core XS in perl; JSON::PP calls it from BEGIN before utf8_heavy.
-    fn install_utf8_unicode_to_native_stub(&mut self) {
-        let empty: Block = vec![];
-        let key = "utf8::unicode_to_native".to_string();
-        self.subs.insert(
-            key.clone(),
-            Arc::new(PerlSub {
-                name: key,
-                params: vec![],
-                body: empty,
-                prototype: None,
-                closure_env: None,
-                fib_like: None,
-            }),
-        );
     }
 
     /// Lazily populate the reflection hashes (`%b`, `%stryke::builtins`, etc.)
@@ -2819,9 +2799,6 @@ impl Interpreter {
     }
 
     fn import_all_from_module(&mut self, module: &str, line: usize) -> PerlResult<()> {
-        if module == "List::Util" {
-            crate::list_util::ensure_list_util(self);
-        }
         if let Some(lists) = self.module_export_lists.get(module) {
             let export: Vec<String> = lists.export.clone();
             for short in export {
@@ -2849,9 +2826,6 @@ impl Interpreter {
 
     /// Copy `Module::name` into the caller stash (`name` must exist as a sub).
     fn import_named_sub(&mut self, module: &str, short: &str, line: usize) -> PerlResult<()> {
-        if module == "List::Util" {
-            crate::list_util::ensure_list_util(self);
-        }
         let qual = format!("{}::{}", module, short);
         let sub = self.subs.get(&qual).cloned().ok_or_else(|| {
             PerlError::runtime(
@@ -3616,9 +3590,6 @@ impl Interpreter {
 
     /// Register subs, run `use` in source order, collect `BEGIN`/`END` (before `BEGIN` execution).
     pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> PerlResult<()> {
-        if crate::list_util::program_needs_list_util(program) {
-            crate::list_util::ensure_list_util(self);
-        }
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Package { name } => {
@@ -9306,12 +9277,10 @@ impl Interpreter {
 
             // Function calls
             ExprKind::FuncCall { name, args } => {
-                // Stryke builtins are unprefixed; route `CORE::name` and `List::Util::name`
-                // callers back to the bare-name dispatch so the matches below stay flat.
-                let dispatch_name: &str = name
-                    .strip_prefix("CORE::")
-                    .or_else(|| name.strip_prefix("List::Util::"))
-                    .unwrap_or(name.as_str());
+                // Stryke builtins are unprefixed; `CORE::name` callers route back to the
+                // bare-name dispatch so the matches below stay flat.
+                let dispatch_name: &str =
+                    name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 // read(FH, $buf, LEN [, OFFSET]) needs special handling: $buf is an lvalue
                 if matches!(dispatch_name, "read") && args.len() >= 3 {
                     let fh_val = self.eval_expr(&args[0])?;
@@ -9464,9 +9433,9 @@ impl Interpreter {
 
 
                 ) {
-                    // Perl prototype `(@)`: one slurpy list — either one list expr (`uniq @x`) or
-                    // multiple actuals (`List::Util::uniq(1, 1, 2)`). Each actual is evaluated in
-                    // list context so `@a, @b` flattens like Perl.
+                    // Slurpy list `(@)`: one list expr (`uniq @x`) or multiple actuals
+                    // (`uniq(1, 1, 2)`). Each actual is evaluated in list context so
+                    // `@a, @b` flattens.
                     let mut list_out = Vec::new();
                     if args.len() == 1 {
                         list_out = self.eval_expr_ctx(&args[0], WantarrayCtx::List)?.to_list();
@@ -9482,7 +9451,7 @@ impl Interpreter {
                 ) {
                     if args.is_empty() {
                         return Err(PerlError::runtime(
-                            "take/head/tail/drop/List::Util::head|tail: need LIST..., N or unary N",
+                            "take/head/tail/drop: need LIST..., N or unary N",
                             line,
                         )
                         .into());
@@ -12837,9 +12806,8 @@ impl Interpreter {
             };
             return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
         }
-        // Blessed arrayref (e.g. `List::Util::_Pair`) — Perl allows `->[N]` on
-        // blessed arrayrefs; `pairs` returns blessed `_Pair` objects that the
-        // doc shows being indexed via `$_->[0]` / `$_->[1]`.
+        // Blessed arrayref (e.g. `Pair`) — `pairs` returns blessed `Pair` objects that
+        // can be indexed via `$_->[0]` / `$_->[1]`.
         if let Some(b) = container.as_blessed_ref() {
             let inner = b.data.read().clone();
             if let Some(a) = inner.as_array_ref() {
@@ -14024,7 +13992,7 @@ impl Interpreter {
     /// Bare `uniq` / `distinct` (alias of `uniq`) / `shuffle` / `chunked` / `windowed` / `zip` /
     /// Bare-name dispatch for stryke list builtins (`sum`, `min`, `uniq`, `reduce`, `zip`, …).
     /// Resolves short aliases (`uq`, `shuf`, `chk`, `win`, `fst`, `rd`, `med`, `std`, `var`, …)
-    /// and forwards to [`crate::list_util::dispatch_by_name`].
+    /// and forwards to [`crate::list_builtins::dispatch_by_name`].
     pub(crate) fn call_bare_list_builtin(
         &mut self,
         name: &str,
@@ -14046,7 +14014,7 @@ impl Interpreter {
             other => other,
         };
         let args = self.with_topic_default_args(args);
-        match crate::list_util::dispatch_by_name(self, canonical, &args, want) {
+        match crate::list_builtins::dispatch_by_name(self, canonical, &args, want) {
             Some(r) => r,
             None => Err(PerlError::runtime(
                 format!("internal: not a stryke list builtin: {name}"),
@@ -17339,21 +17307,11 @@ impl Interpreter {
         // so `>{ $_ + 1 }` works instead of requiring `>{ $_[0] + 1 }`
         // Must be AFTER restore_capture so we don't get shadowed by captured $_
         self.scope.set_closure_args(&args);
-        // Move `@_` out so `native_dispatch` / `fib_like` take `&[PerlValue]` without `get_array` cloning.
+        // Move `@_` out so `fib_like` / hof dispatch take `&[PerlValue]` without cloning.
         let argv = self.scope.take_sub_underscore().unwrap_or_default();
         self.apply_sub_signature(sub, &argv, _line)?;
         let saved = self.wantarray_kind;
         self.wantarray_kind = want;
-        if let Some(r) = crate::list_util::native_dispatch(self, sub, &argv, want) {
-            self.wantarray_kind = saved;
-            self.scope_pop_hook();
-            self.current_sub_stack.pop();
-            return match r {
-                Ok(v) => Ok(v),
-                Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
-                Err(e) => Err(e),
-            };
-        }
         if let Some(r) = self.try_hof_dispatch(sub, &argv, want, _line) {
             self.wantarray_kind = saved;
             self.scope_pop_hook();

@@ -5751,12 +5751,10 @@ impl Parser {
         let new_kind = match kind {
             // ── Generic / user-defined calls ───────────────────────────────────
             ExprKind::FuncCall { name, mut args } => {
-                // Stryke builtins are unprefixed; route `CORE::` / `List::Util::` callers
-                // back to the bare-name pipe-forward dispatch below.
-                let dispatch_name: &str = name
-                    .strip_prefix("CORE::")
-                    .or_else(|| name.strip_prefix("List::Util::"))
-                    .unwrap_or(name.as_str());
+                // Stryke builtins are unprefixed; `CORE::` callers route back to the
+                // bare-name pipe-forward dispatch below.
+                let dispatch_name: &str =
+                    name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
@@ -10502,7 +10500,7 @@ impl Parser {
                     line,
                 })
             }
-            // Ruby `detect` / `find` — same as `List::Util::first` (first element matching block).
+            // Ruby `detect` / `find` — same as `first` (first element matching block).
             "first" | "detect" | "find" => {
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {

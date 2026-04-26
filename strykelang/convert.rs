@@ -1598,7 +1598,7 @@ mod tests {
     #[test]
     fn reduce_direct() {
         // Single stage with block: direct syntax
-        let out = convert("use List::Util 'reduce';\nreduce { $a + $b } @nums");
+        let out = convert("reduce { $a + $b } @nums");
         assert!(out.contains("reduce {\n$a + $b\n} @nums"));
     }
 

@@ -348,12 +348,9 @@ pub(crate) fn try_builtin(
     args: &[PerlValue],
     line: usize,
 ) -> Option<PerlResult<PerlValue>> {
-    // Stryke builtins are unprefixed. `CORE::name` and `List::Util::name` callers route
-    // back to the bare-name arms so we never list every prefixed alternate below.
-    let name = name
-        .strip_prefix("CORE::")
-        .or_else(|| name.strip_prefix("List::Util::"))
-        .unwrap_or(name);
+    // Stryke builtins are unprefixed. `CORE::name` callers route back to the bare-name
+    // arms so we never list every prefixed alternate below.
+    let name = name.strip_prefix("CORE::").unwrap_or(name);
     let undef = PerlValue::UNDEF;
     match name {
         "basename" | "bn" => Some(builtin_basename(args)),
@@ -4077,23 +4074,23 @@ fn builtin_move(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 }
 
 /// First `$n` elements: operands are **list values then count** (`take @l, N`); see
-/// [`crate::list_util::head_tail_take_impl`]. Unary `take(N)` uses an empty list.
+/// [`crate::list_builtins::head_tail_take_impl`]. Unary `take(N)` uses an empty list.
 fn builtin_take(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    crate::list_util::head_tail_take_impl(
+    crate::list_builtins::head_tail_take_impl(
         args,
-        crate::list_util::HeadTailTake::Take,
+        crate::list_builtins::HeadTailTake::Take,
         interp.wantarray_kind,
     )
 }
 
 /// `tail` — Tail.
 fn builtin_tail(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    crate::list_util::extension_tail_impl(args, interp.wantarray_kind)
+    crate::list_builtins::extension_tail_impl(args, interp.wantarray_kind)
 }
 
 /// `drop` — Drop.
 fn builtin_drop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
-    crate::list_util::extension_drop_impl(args, interp.wantarray_kind)
+    crate::list_builtins::extension_drop_impl(args, interp.wantarray_kind)
 }
 
 /// `list_count` / `list_size` + `LIST` — like [`builtin_flatten`]: one-level
@@ -12032,7 +12029,7 @@ fn exec_to_perl_result(
     }
 }
 
-/// `first [CODEREF,] LIST` — if first arg is a code ref, returns first element matching predicate (List::Util::first).
+/// `first [CODEREF,] LIST` — if first arg is a code ref, returns first element matching predicate.
 /// Otherwise returns the first element of the list (Clojure's first).
 fn builtin_first_clj(
     interp: &mut Interpreter,

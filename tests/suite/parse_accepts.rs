@@ -698,7 +698,7 @@ fn accepts_bare_uniq_any_all_none() {
     p(r#"(9, 8) |> windowed 2"#);
     p(r#"(1, 2) |> fold { $a + $b }"#);
     p(r#"(1, 2, 3) |> fold { $a + $b }"#);
-    p(r#"qw(x y) |> List::Util::fold { $a . $b }"#);
+    p(r#"qw(x y) |> fold { $a . $b }"#);
     p(r#"(1, 2) |> take_while { $_ < 9 } |> join ','"#);
     p(r#"(1, 2) |> drop_while { 0 } |> join ','"#);
     p(r#"(1, 2) |> tap { 1 } |> join ','"#);

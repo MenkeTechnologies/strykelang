@@ -4789,12 +4789,10 @@ impl Compiler {
 
             // ── Function calls ──
             ExprKind::FuncCall { name, args } => {
-                // Stryke builtins are unprefixed; route `CORE::name` and `List::Util::name`
-                // callers back to the bare-name fast path so the arms below stay flat.
-                let dispatch_name: &str = name
-                    .strip_prefix("CORE::")
-                    .or_else(|| name.strip_prefix("List::Util::"))
-                    .unwrap_or(name.as_str());
+                // Stryke builtins are unprefixed; `CORE::name` callers route back to the
+                // bare-name fast path so the arms below stay flat.
+                let dispatch_name: &str =
+                    name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 match dispatch_name {
                 // read(FH, $buf, LEN) — emit ReadIntoVar with the buffer variable's name index
                 "read" => {
@@ -5106,7 +5104,7 @@ impl Compiler {
                 "take" | "head" | "tail" | "drop" => {
                     if args.is_empty() {
                         return Err(CompileError::Unsupported(
-                            "take/head/tail/drop/List::Util::head|tail expect LIST..., N or unary N"
+                            "take/head/tail/drop expect LIST..., N or unary N"
                                 .into(),
                         ));
                     }

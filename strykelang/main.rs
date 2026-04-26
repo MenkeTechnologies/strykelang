@@ -997,7 +997,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filenam
             .collect(),
     );
 
-    // Order: `-I`, in-tree `vendor/perl` (pure-Perl List::Util, …), system `perl`’s @INC, script
+    // Order: `-I`, in-tree `vendor/perl` (pure-Perl modules, …), system `perl`’s @INC, script
     // dir, `STRYKE_INC`, then `.` (deduped).
     let mut inc_paths: Vec<String> = cli.include.clone();
     let vendor = stryke::vendor_perl_inc_path();
