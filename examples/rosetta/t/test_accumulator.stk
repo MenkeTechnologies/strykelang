@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Accumulator Factory
 
-fn make_accumulator($sum) {
+fn Rosetta::Accumulator::make($sum) {
     fn {
         my $n = $_[0]
         $sum = $sum + $n
@@ -9,18 +9,18 @@ fn make_accumulator($sum) {
     }
 }
 
-my $acc = make_accumulator(0)
+my $acc = Rosetta::Accumulator::make(0)
 assert_eq $acc->(1), 1, "0+1=1"
 assert_eq $acc->(5), 6, "1+5=6"
 assert_eq $acc->(10), 16, "6+10=16"
 
-my $acc2 = make_accumulator(100)
+my $acc2 = Rosetta::Accumulator::make(100)
 assert_eq $acc2->(1), 101, "100+1=101"
 assert_eq $acc2->(1), 102, "101+1=102"
 
 assert_eq $acc->(0), 16, "first acc unchanged by second"
 
-my $acc3 = make_accumulator(0.5)
+my $acc3 = Rosetta::Accumulator::make(0.5)
 assert_eq $acc3->(1.5), 2, "float accumulator"
 
 test_run

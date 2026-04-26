@@ -1,22 +1,23 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sørensen–Dice coefficient
 
-fn my_dice_coefficient($s1, $s2) {
+fn Rosetta::DiceCoefficient::get_bigrams($s) {
+    my @chars = ~> $s chars
+    my $bg = {}
+    if (scalar(@chars) < 2) { return $bg }
+    for my $i (0..scalar(@chars)-2) {
+        my $b = $chars[$i] . $chars[$i+1]
+        $bg->{$b} = ($bg->{$b} || 0) + 1
+    }
+    $bg
+}
+
+fn Rosetta::DiceCoefficient::compute($s1, $s2) {
     if ($s1 eq $s2) { return 1.0 }
     if (length($s1) < 2 || length($s2) < 2) { return 0.0 }
     
-    fn get_bigrams($s) {
-        my @chars = ~> $s chars
-        my $bg = {}
-        for my $i (0..scalar(@chars)-2) {
-            my $b = $chars[$i] . $chars[$i+1]
-            $bg->{$b} = ($bg->{$b} || 0) + 1
-        }
-        $bg
-    }
-    
-    my $b1 = get_bigrams($s1)
-    my $b2 = get_bigrams($s2)
+    my $b1 = Rosetta::DiceCoefficient::get_bigrams($s1)
+    my $b2 = Rosetta::DiceCoefficient::get_bigrams($s2)
     
     my $intersection = 0
     for my $k (keys %$b1) {
@@ -29,8 +30,8 @@ fn my_dice_coefficient($s1, $s2) {
     (2.0 * $intersection) / $total
 }
 
-assert_ok abs(my_dice_coefficient("night", "nacht") - 0.25) < 0.0001, "night vs nacht"
-assert_ok abs(my_dice_coefficient("context", "contact") - 0.5) < 0.0001, "context vs contact"
-assert_eq my_dice_coefficient("abc", "abc"), 1.0, "identical strings"
+assert_near Rosetta::DiceCoefficient::compute("night", "nacht"), 0.25, 0.0001, "night vs nacht"
+assert_near Rosetta::DiceCoefficient::compute("context", "contact"), 0.5, 0.0001, "context vs contact"
+assert_eq Rosetta::DiceCoefficient::compute("abc", "abc"), 1.0, "identical strings"
 
 test_run

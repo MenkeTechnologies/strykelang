@@ -1,22 +1,18 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Dutch National Flag Problem
 
-fn dnf_sort($arr_ref) {
+fn Rosetta::DNF::sort($arr_ref) {
     my @arr = @$arr_ref
     my ($low, $mid, $high) = (0, 0, scalar(@arr) - 1)
     while ($mid <= $high) {
         if ($arr[$mid] == 0) {
-            my $tmp = $arr[$low]
-            $arr[$low] = $arr[$mid]
-            $arr[$mid] = $tmp
+            ($arr[$low], $arr[$mid]) = ($arr[$mid], $arr[$low])
             $low = $low + 1
             $mid = $mid + 1
         } elsif ($arr[$mid] == 1) {
             $mid = $mid + 1
         } else {
-            my $tmp = $arr[$high]
-            $arr[$high] = $arr[$mid]
-            $arr[$mid] = $tmp
+            ($arr[$high], $arr[$mid]) = ($arr[$mid], $arr[$high])
             $high = $high - 1
         }
     }
@@ -24,11 +20,11 @@ fn dnf_sort($arr_ref) {
 }
 
 my @input = (2, 0, 1, 2, 0, 1)
-my $sorted = dnf_sort(\@input)
+my $sorted = Rosetta::DNF::sort(\@input)
 assert_eq join(",", @$sorted), "0,0,1,1,2,2", "sorted DNF"
 
 my @input2 = (1, 1, 0, 2, 0, 2, 1)
-my $sorted2 = dnf_sort(\@input2)
+my $sorted2 = Rosetta::DNF::sort(\@input2)
 assert_eq join(",", @$sorted2), "0,0,1,1,1,2,2", "sorted DNF 2"
 
 test_run

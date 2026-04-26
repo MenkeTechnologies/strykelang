@@ -1,19 +1,19 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Factorial/Trailing zeros
 
-fn my_trailing_zeros {
-    my $n = $_[0]
+fn Rosetta::FactorialTrailingZeros::solve($n) {
+    my $curr_n = $n
     my $count = 0
-    while ($n >= 5) {
-        $n = int($n / 5)
-        $count += $n
+    while ($curr_n >= 5) {
+        $curr_n = int($curr_n / 5)
+        $count = $count + $curr_n
     }
     $count
 }
 
-assert_eq my_trailing_zeros(25), 6, "25! has 6 trailing zeros"
-assert_eq my_trailing_zeros(100), 24, "100! has 24 trailing zeros"
-assert_eq my_trailing_zeros(1000), 249, "1000! has 249 trailing zeros"
-assert_eq my_trailing_zeros(4), 0, "4! has 0"
+assert_eq Rosetta::FactorialTrailingZeros::solve(25), 6, "25! has 6 trailing zeros"
+assert_eq Rosetta::FactorialTrailingZeros::solve(100), 24, "100! has 24 trailing zeros"
+assert_eq Rosetta::FactorialTrailingZeros::solve(1000), 249, "1000! has 249 trailing zeros"
+assert_eq Rosetta::FactorialTrailingZeros::solve(4), 0, "4! has 0"
 
 test_run

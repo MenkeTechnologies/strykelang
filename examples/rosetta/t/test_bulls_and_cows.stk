@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bulls and Cows
 
-fn get_score($secret, $guess) {
+fn Rosetta::BullsAndCows::get_score($secret, $guess) {
     my @s = str($secret) |> chars
     my @g = str($guess) |> chars
     my $bulls = 0
@@ -25,19 +25,19 @@ fn get_score($secret, $guess) {
         }
     }
     
-    ($bulls, $cows)
+    return [$bulls, $cows]
 }
 
-my @score1 = get_score(1234, 1234)
-assert_eq $score1[0], 4, "4 bulls"
-assert_eq $score1[1], 0, "0 cows"
+my $score1 = Rosetta::BullsAndCows::get_score(1234, 1234)
+assert_eq $score1->[0], 4, "4 bulls"
+assert_eq $score1->[1], 0, "0 cows"
 
-my @score2 = get_score(1234, 4321)
-assert_eq $score2[0], 0, "0 bulls"
-assert_eq $score2[1], 4, "4 cows"
+my $score2 = Rosetta::BullsAndCows::get_score(1234, 4321)
+assert_eq $score2->[0], 0, "0 bulls"
+assert_eq $score2->[1], 4, "4 cows"
 
-my @score3 = get_score(1234, 1357)
-assert_eq $score3[0], 1, "1 bull (1)"
-assert_eq $score3[1], 1, "1 cow (3)"
+my $score3 = Rosetta::BullsAndCows::get_score(1234, 1357)
+assert_eq $score3->[0], 1, "1 bull (1)"
+assert_eq $score3->[1], 1, "1 cow (3)"
 
 test_run

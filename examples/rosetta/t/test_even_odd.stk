@@ -1,38 +1,38 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Even or Odd
 
-fn my_is_even($n) {
+fn Rosetta::EvenOdd::is_even($n) {
     $n % 2 == 0
 }
 
-fn my_is_odd($n) {
+fn Rosetta::EvenOdd::is_odd($n) {
     $n % 2 != 0
 }
 
-fn evens(@nums) {
-    @nums |> filter { my_is_even($_) }
+fn Rosetta::EvenOdd::evens(@nums) {
+    @nums |> filter { Rosetta::EvenOdd::is_even($_) }
 }
 
-fn odds(@nums) {
-    @nums |> filter { my_is_odd($_) }
+fn Rosetta::EvenOdd::odds(@nums) {
+    @nums |> filter { Rosetta::EvenOdd::is_odd($_) }
 }
 
-assert_ok my_is_even(0), "0 is even"
-assert_ok my_is_even(2), "2 is even"
-assert_ok my_is_even(-4), "-4 is even"
-assert_ok my_is_even(100), "100 is even"
+assert_ok Rosetta::EvenOdd::is_even(0), "0 is even"
+assert_ok Rosetta::EvenOdd::is_even(2), "2 is even"
+assert_ok Rosetta::EvenOdd::is_even(-4), "-4 is even"
+assert_ok Rosetta::EvenOdd::is_even(100), "100 is even"
 
-assert_ok my_is_odd(1), "1 is odd"
-assert_ok my_is_odd(-3), "-3 is odd"
-assert_ok my_is_odd(99), "99 is odd"
+assert_ok Rosetta::EvenOdd::is_odd(1), "1 is odd"
+assert_ok Rosetta::EvenOdd::is_odd(-3), "-3 is odd"
+assert_ok Rosetta::EvenOdd::is_odd(99), "99 is odd"
 
-assert_ok !my_is_even(1), "1 is not even"
-assert_ok !my_is_odd(2), "2 is not odd"
+assert_ok !Rosetta::EvenOdd::is_even(1), "1 is not even"
+assert_ok !Rosetta::EvenOdd::is_odd(2), "2 is not odd"
 
-my @e = evens(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+my @e = Rosetta::EvenOdd::evens(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 assert_eq join(",", @e), "2,4,6,8,10", "filter evens"
 
-my @o = odds(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+my @o = Rosetta::EvenOdd::odds(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 assert_eq join(",", @o), "1,3,5,7,9", "filter odds"
 
 test_run

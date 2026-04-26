@@ -1829,6 +1829,17 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "tr" | "y" => {
+                        // After `::`, treat as package-qualified identifier, not transliteration.
+                        // e.g. `Foo::y(...)` is a function call, not `y///`.
+                        if self.pos >= ident.len() + 2 {
+                            let prev_start = self.pos - ident.len() - 2;
+                            if self.input.get(prev_start) == Some(&':')
+                                && self.input.get(prev_start + 1) == Some(&':')
+                            {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         // `tr` / `y` followed by terminators is a bareword, not transliteration.
                         // Check BEFORE skipping whitespace to catch newlines (implicit semicolon).
                         if let Some(d) = self.peek() {
@@ -1852,6 +1863,36 @@ impl Lexer {
                             }
                         }
                         self.pos = start_pos;
+                        // Check for function signature pattern: y(...) { — this is `fn y`, not tr
+                        if self.peek() == Some('(') {
+                            // Scan ahead to see if there's ) followed by {
+                            let scan_pos = self.pos;
+                            self.advance(); // skip (
+                            let mut depth = 1;
+                            while depth > 0 {
+                                match self.peek() {
+                                    Some('(') => {
+                                        self.advance();
+                                        depth += 1;
+                                    }
+                                    Some(')') => {
+                                        self.advance();
+                                        depth -= 1;
+                                    }
+                                    Some(_) => {
+                                        self.advance();
+                                    }
+                                    None => break,
+                                }
+                            }
+                            self.skip_whitespace_only();
+                            let is_func_def = self.peek() == Some('{');
+                            self.pos = scan_pos;
+                            if is_func_def {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                        }
                         // tr/from/to/flags
                         if let Some(delim) = self.peek() {
                             if !delim.is_alphanumeric() && delim != '_' && delim != ' ' {

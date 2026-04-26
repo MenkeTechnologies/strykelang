@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Digit fifth powers
 
-fn sum_fifth_powers($n) {
+fn Rosetta::DigitFifthPowers::sum($n) {
     my $sum = 0
     my @digits = ~> "$n" chars map { int($_) }
     for my $d (@digits) { $sum += $d ** 5 }
     $sum
 }
 
-fn is_sum_fifth_powers($n) {
-    sum_fifth_powers($n) == $n
+fn Rosetta::DigitFifthPowers::check($n) {
+    Rosetta::DigitFifthPowers::sum($n) == $n
 }
 
-assert_ok is_sum_fifth_powers(4150), "4150 is sum of 5th powers"
-assert_ok is_sum_fifth_powers(4151), "4151 is sum of 5th powers"
-assert_ok !is_sum_fifth_powers(123), "123 is not"
+assert_ok Rosetta::DigitFifthPowers::check(4150), "4150 is sum of 5th powers"
+assert_ok Rosetta::DigitFifthPowers::check(4151), "4151 is sum of 5th powers"
+assert_ok !Rosetta::DigitFifthPowers::check(123), "123 is not"
 
-4150 |> is_sum_fifth_powers |> assert_ok("pipe fifth powers")
+4150 |> Rosetta::DigitFifthPowers::check |> assert_ok("pipe fifth powers")
 
 test_run

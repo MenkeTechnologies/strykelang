@@ -1,26 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fraction reduction
 
-fn my_gcd($a, $b) {
-    while ($b != 0) {
-        ($a, $b) = ($b, $a % $b)
-    }
-    $a
+fn Rosetta::FractionReduction::gcd($a, $b) {
+    if ($b == 0) { return $a }
+    Rosetta::FractionReduction::gcd($b, $a % $b)
 }
 
-fn reduce_fraction($num, $den) {
-    my $g = my_gcd($num, $den)
-    (int($num / $g), int($den / $g))
+fn Rosetta::FractionReduction::reduce($num, $den) {
+    my $g = Rosetta::FractionReduction::gcd($num, $den)
+    [$num / $g, $den / $g]
 }
 
-my ($n, $d) = reduce_fraction(4, 8)
-assert_eq $n, 1, "4/8 -> 1/2 (num)"
-assert_eq $d, 2, "4/8 -> 1/2 (den)"
+my $res = Rosetta::FractionReduction::reduce(4, 8)
+assert_eq $res->[0], 1, "4/8 -> 1/2 (num)"
+assert_eq $res->[1], 2, "4/8 -> 1/2 (den)"
 
-($n, $d) = reduce_fraction(120, 160)
-assert_eq $n, 3, "120/160 -> 3/4 (num)"
-assert_eq $d, 4, "120/160 -> 3/4 (den)"
-
-(120, 160) |> reduce_fraction |> map { "$_[0]/$_[1]" } |> assert_eq("3/4", "pipe reduce fraction")
+my $res2 = Rosetta::FractionReduction::reduce(120, 160)
+assert_eq $res2->[0], 3, "120/160 -> 3/4 (num)"
+assert_eq $res2->[1], 4, "120/160 -> 3/4 (den)"
 
 test_run

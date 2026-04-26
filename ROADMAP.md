@@ -43,6 +43,7 @@ This document outlines the path to mass worldwide adoption.
 - [x] Direct builtin invocation: `stryke pin`, `stryke heat 60`, `stryke basename /a/b`
 - [x] Resolution order: subcommand → builtin → script → inline code
 - [x] `--script` flag to force script lookup when name conflicts with builtin
+- [x] Reserved words blacklist: `y tr s m q qq qw qx qr if unless while until for foreach given when else elsif do eval return last next redo goto my our local state sub fn class struct enum trait use no require package BEGIN END CHECK INIT UNITCHECK and or not x eq ne lt gt le ge cmp`
 
 ### Distributed Load Testing
 - [x] Agent/Controller architecture

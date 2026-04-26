@@ -1,24 +1,27 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Dudeney numbers
 
-fn sum_digits($n) {
-    ~> $n chars map { int($_) } reduce { $a + $b }
+fn Rosetta::Dudeney::sum_digits($n) {
+    my $sum = 0
+    my @digits = ~> "$n" chars map { int($_) }
+    for my $d (@digits) { $sum += $d }
+    $sum
 }
 
-fn is_dudeney($n) {
-    my $root = sprintf("%d", $n**(1/3) + 0.5)
+fn Rosetta::Dudeney::check($n) {
+    my $root = int($n**(1/3) + 0.5)
     if ($root**3 == $n) {
-        sum_digits($n) == $root
+        Rosetta::Dudeney::sum_digits($n) == $root
     } else {
         0
     }
 }
 
-assert_ok is_dudeney(512), "512 is Dudeney"
-assert_ok is_dudeney(5832), "5832 is Dudeney"
-assert_ok !is_dudeney(27), "27 is not Dudeney (3^3, but 2+7=9 != 3)"
-assert_ok !is_dudeney(100), "100 is not Dudeney"
+assert_ok Rosetta::Dudeney::check(512), "512 is Dudeney"
+assert_ok Rosetta::Dudeney::check(5832), "5832 is Dudeney"
+assert_ok !Rosetta::Dudeney::check(27), "27 is not Dudeney (3^3, but 2+7=9 != 3)"
+assert_ok !Rosetta::Dudeney::check(100), "100 is not Dudeney"
 
-512 |> is_dudeney |> assert_ok("pipe Dudeney check")
+512 |> Rosetta::Dudeney::check |> assert_ok("pipe Dudeney check")
 
 test_run
