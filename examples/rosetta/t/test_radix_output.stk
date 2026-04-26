@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Radix output
 
-fn to_radix($n, $base) {
+fn Rosetta::RadixOutput::encode($n, $base) {
     if ($n == 0) {
         "0"
     } else {
@@ -17,11 +17,11 @@ fn to_radix($n, $base) {
     }
 }
 
-assert_eq to_radix(255, 16), "FF", "255 base 16"
-assert_eq to_radix(255, 2), "11111111", "255 base 2"
-assert_eq to_radix(255, 10), "255", "255 base 10"
-assert_eq to_radix(10, 2), "1010", "10 base 2"
+assert_eq Rosetta::RadixOutput::encode(255, 16), "FF", "255 base 16"
+assert_eq Rosetta::RadixOutput::encode(255, 2), "11111111", "255 base 2"
+assert_eq Rosetta::RadixOutput::encode(255, 10), "255", "255 base 10"
+assert_eq Rosetta::RadixOutput::encode(10, 2), "1010", "10 base 2"
 
-255 |> to_radix(16) |> assert_eq("FF", "pipe radix")
+255 |> Rosetta::RadixOutput::encode(16) |> assert_eq("FF", "pipe radix")
 
 test_run

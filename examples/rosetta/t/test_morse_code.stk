@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Morse code
 
-my %morse = (
+my %MORSE_MAP = (
     A=>".-", B=>"-...", C=>"-.-.", D=>"-..", E=>".", F=>"..-.",
     G=>"--.", H=>"....", I=>"..", J=>".---", K=>"-.-", L=>".-..",
     M=>"--", N=>"-.", O=>"---", P=>".--.", Q=>"--.-", R=>".-.",
@@ -11,18 +11,17 @@ my %morse = (
     6=>"-....", 7=>"--...", 8=>"---..", 9=>"----.", 0=>"-----"
 )
 
-fn to_morse {
-    my $s = $_[0]
+fn Rosetta::MorseCode::encode($s) {
     my @parts
     for my $c (~> $s uc chars) {
-        if ($morse{$c}) {
-            push @parts, $morse{$c}
+        if (exists $MORSE_MAP{$c}) {
+            push @parts, $MORSE_MAP{$c}
         }
     }
     join(" ", @parts)
 }
 
-assert_eq to_morse("SOS"), "... --- ...", "SOS to morse"
-assert_eq to_morse("Hello 123"), ".... . .-.. .-.. --- .---- ..--- ...--", "Hello 123 to morse"
+assert_eq Rosetta::MorseCode::encode("SOS"), "... --- ...", "SOS to morse"
+assert_eq Rosetta::MorseCode::encode("Hello 123"), ".... . .-.. .-.. --- .---- ..--- ...--", "Hello 123 to morse"
 
 test_run

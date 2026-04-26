@@ -1,19 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Word Count
 
-fn my_word_count {
-    my $s = $_[0]
+fn Rosetta::WordCount::solve($s) {
     my $counts = {}
     my @words = split /\s+/, $s
-    ~> @words map { $counts->{$_} = $counts->{$_} + 1 }
+    for my $w (@words) {
+        if ($w ne "") { $counts->{$w} = $counts->{$w} + 1 }
+    }
     $counts
 }
 
-my $res = my_word_count("hello world hello")
+my $res = Rosetta::WordCount::solve("hello world hello")
 assert_eq $res->{hello}, 2, "hello count"
 assert_eq $res->{world}, 1, "world count"
 
-my $res2 = my_word_count("apple banana apple cherry banana apple")
+my $res2 = Rosetta::WordCount::solve("apple banana apple cherry banana apple")
 assert_eq $res2->{apple}, 3, "apple count"
 assert_eq $res2->{banana}, 2, "banana count"
 assert_eq $res2->{cherry}, 1, "cherry count"

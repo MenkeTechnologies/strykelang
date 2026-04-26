@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Modular inverse
 
-fn extended_gcd($a, $b) {
+fn Rosetta::ModularInverse::extended_gcd($a, $b) {
     my ($old_r, $r) = ($a, $b)
     my ($old_s, $s) = (1, 0)
     my ($old_t, $t) = (0, 1)
@@ -13,11 +13,12 @@ fn extended_gcd($a, $b) {
         ($old_t, $t) = ($t, $old_t - $quotient * $t)
     }
     
-    ($old_s, $old_t, $old_r)
+    [$old_s, $old_t, $old_r]
 }
 
-fn mod_inverse($a, $n) {
-    my ($s, $t, $g) = extended_gcd($a, $n)
+fn Rosetta::ModularInverse::compute($a, $n) {
+    my $res = Rosetta::ModularInverse::extended_gcd($a, $n)
+    my $s = $res->[0]; my $t = $res->[1]; my $g = $res->[2]
     if ($g != 1) {
         0
     } else {
@@ -25,11 +26,11 @@ fn mod_inverse($a, $n) {
     }
 }
 
-assert_eq mod_inverse(3, 11), 4, "3 * 4 = 12 = 1 (mod 11)"
-assert_eq mod_inverse(10, 17), 12, "10 * 12 = 120 = 17 * 7 + 1 = 1 (mod 17)"
-assert_eq mod_inverse(42, 2017), 1969, "42 * 1969 = 82698 = 2017 * 41 + 1"
-assert_eq mod_inverse(40, 1), 0, "no inverse if g != 1"
+assert_eq Rosetta::ModularInverse::compute(3, 11), 4, "3 * 4 = 12 = 1 (mod 11)"
+assert_eq Rosetta::ModularInverse::compute(10, 17), 12, "10 * 12 = 120 = 17 * 7 + 1 = 1 (mod 17)"
+assert_eq Rosetta::ModularInverse::compute(42, 2017), 1969, "42 * 1969 = 82698 = 2017 * 41 + 1"
+assert_eq Rosetta::ModularInverse::compute(40, 1), 0, "no inverse if g != 1"
 
-42 |> mod_inverse(2017) |> assert_eq(1969, "pipe mod_inverse")
+42 |> Rosetta::ModularInverse::compute(2017) |> assert_eq(1969, "pipe mod_inverse")
 
 test_run

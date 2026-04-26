@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Jewels and Stones
 
-fn count_jewels($jewels, $stones) {
+fn Rosetta::JewelsAndStones::count($jewels, $stones) {
     my %j_map
     my @j_chars = chars($jewels)
     for my $j (@j_chars) { $j_map{$j} = 1 }
@@ -14,10 +14,10 @@ fn count_jewels($jewels, $stones) {
     $count
 }
 
-assert_eq count_jewels("aA", "aAAbbbb"), 3, "2 jewels in stones"
-assert_eq count_jewels("z", "ZZ"), 0, "no jewels (case sensitive)"
+assert_eq Rosetta::JewelsAndStones::count("aA", "aAAbbbb"), 3, "2 jewels in stones"
+assert_eq Rosetta::JewelsAndStones::count("z", "ZZ"), 0, "no jewels (case sensitive)"
 
 # Chaining
-"aA" |> count_jewels("aAAbbbb") |> assert_eq(3, "pipe jewels")
+"aA" |> Rosetta::JewelsAndStones::count("aAAbbbb") |> assert_eq(3, "pipe jewels")
 
 test_run
