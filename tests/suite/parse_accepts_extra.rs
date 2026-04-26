@@ -91,7 +91,7 @@ fn accepts_array_slice_syntax() {
 
 #[test]
 fn accepts_prototype_parens_on_sub() {
-    p("fn sum ($$) { $_0 + $_1; }");
+    p("fn add2 ($$) { $_0 + $_1; }");
 }
 
 #[test]

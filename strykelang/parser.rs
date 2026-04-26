@@ -126,6 +126,9 @@ pub struct Parser {
     /// When true, `pipe_forward_apply` uses thread-last semantics (append to args)
     /// instead of thread-first (prepend). Set by `->>` thread macro.
     thread_last_mode: bool,
+    /// When true, we're parsing a module (via `use`/`require`), not user code.
+    /// Modules are allowed to shadow builtins; user code is not (unless `--compat`).
+    pub parsing_module: bool,
 }
 
 impl Parser {
@@ -150,6 +153,7 @@ impl Parser {
             suppress_m_regex: 0,
             suppress_colon_range: 0,
             thread_last_mode: false,
+            parsing_module: false,
         }
     }
 
@@ -4063,7 +4067,15 @@ impl Parser {
         match self.peek().clone() {
             Token::Ident(_) => {
                 let name = self.parse_package_qualified_identifier()?;
-                if !crate::compat_mode() {
+                // Allow shadowing builtins:
+                // - In compat mode (full Perl 5)
+                // - When parsing a module (imports should work)
+                // Block shadowing:
+                // - In user code (default mode, not parsing module)
+                // - Always in no-interop mode
+                let allow_shadow = crate::compat_mode()
+                    || (self.parsing_module && !crate::no_interop_mode());
+                if !allow_shadow {
                     self.check_udf_shadows_builtin(&name, line)?;
                 }
                 self.declared_subs.insert(name.clone());
@@ -12990,7 +13002,10 @@ impl Parser {
                     line,
                 ));
             }
-            if Self::is_known_bareword(name) || Self::is_try_builtin_name(name) {
+            if Self::is_known_bareword(name)
+                || Self::is_try_builtin_name(name)
+                || crate::list_builtins::is_list_builtin_name(name)
+            {
                 return Err(self.syntax_err(
                     format!(
 "`{name}` is a stryke builtin and cannot be redefined (this is not Perl 5; use `fn` not `sub`, or pass --compat)"

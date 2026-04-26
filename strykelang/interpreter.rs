@@ -3227,7 +3227,7 @@ impl Interpreter {
         self.scope
             .set_hash_element("INC", &key, PerlValue::string(key.clone()))?;
         let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-        let r = crate::parse_and_run_string_in_file(code, self, &key);
+        let r = crate::parse_and_run_module_in_file(code, self, &key);
         let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
         r?;
         self.invoke_require_hook("require__after", &key, line)?;
@@ -3262,7 +3262,7 @@ impl Interpreter {
                 PerlValue::string(format!("(virtual)/{}", relpath)),
             )?;
             let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-            let r = crate::parse_and_run_string_in_file(code, self, relpath);
+            let r = crate::parse_and_run_module_in_file(code, self, relpath);
             let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
             r?;
             self.invoke_require_hook("require__after", relpath, line)?;
@@ -3284,7 +3284,7 @@ impl Interpreter {
                 self.scope
                     .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
                 let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-                let r = crate::parse_and_run_string_in_file(code, self, &abs_s);
+                let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
                 let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
                 r?;
                 self.invoke_require_hook("require__after", relpath, line)?;

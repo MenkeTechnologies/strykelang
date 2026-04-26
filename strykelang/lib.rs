@@ -162,6 +162,16 @@ pub fn parse(code: &str) -> PerlResult<ast::Program> {
 /// Parse with a **source path** for lexer/parser diagnostics (`… at FILE line N`), e.g. a script
 /// path or a required `.pm` absolute path. Use [`parse`] for snippets where `-e` is appropriate.
 pub fn parse_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
+    parse_with_file_inner(code, file, false)
+}
+
+/// Like [`parse_with_file`], but marks the parser as loading a module. Modules are allowed to
+/// shadow stryke builtins (e.g. `sub blessed { ... }` in Scalar::Util.pm) unless `--no-interop`.
+pub fn parse_module_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
+    parse_with_file_inner(code, file, true)
+}
+
+fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<ast::Program> {
     // `rust { ... }` FFI blocks are desugared at source level into BEGIN-wrapped builtin
     // calls — the parity roadmap forbids new `StmtKind` variants for new behavior, so this
     // pre-pass is the right shape. No-op for programs that don't mention `rust`.
@@ -173,6 +183,7 @@ pub fn parse_with_file(code: &str, file: &str) -> PerlResult<ast::Program> {
     let mut lexer = lexer::Lexer::new_with_file(&desugared, file);
     let tokens = lexer.tokenize()?;
     let mut parser = parser::Parser::new_with_file(tokens, file);
+    parser.parsing_module = is_module;
     parser.parse_program()
 }
 
@@ -191,7 +202,30 @@ pub fn parse_and_run_string_in_file(
     interp: &mut Interpreter,
     file: &str,
 ) -> PerlResult<PerlValue> {
-    let program = parse_with_file(code, file)?;
+    parse_and_run_string_in_file_inner(code, interp, file, false)
+}
+
+/// Like [`parse_and_run_string_in_file`], but marks parsing as a module load. Allows shadowing
+/// stryke builtins (e.g. `sub blessed { ... }`) unless `--no-interop` is active.
+pub fn parse_and_run_module_in_file(
+    code: &str,
+    interp: &mut Interpreter,
+    file: &str,
+) -> PerlResult<PerlValue> {
+    parse_and_run_string_in_file_inner(code, interp, file, true)
+}
+
+fn parse_and_run_string_in_file_inner(
+    code: &str,
+    interp: &mut Interpreter,
+    file: &str,
+    is_module: bool,
+) -> PerlResult<PerlValue> {
+    let program = if is_module {
+        parse_module_with_file(code, file)?
+    } else {
+        parse_with_file(code, file)?
+    };
     let saved = interp.file.clone();
     interp.file = file.to_string();
     let r = interp.execute(&program);
@@ -704,8 +738,8 @@ mod tests {
 
     #[test]
     fn parse_sub_with_prototype() {
-        parse("fn sum ($$) { return $_0 + $_1; }").expect("fn prototype");
-        parse("fn try (&;@) { my ( $try, @code_refs ) = @_; }").expect("prototype @ slurpy");
+        parse("fn add2 ($$) { return $_0 + $_1; }").expect("fn prototype");
+        parse("fn try_block (&;@) { my ( $try, @code_refs ) = @_; }").expect("prototype @ slurpy");
     }
 
     #[test]
