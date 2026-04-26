@@ -4,6 +4,26 @@
 
 use std::sync::Arc;
 
+/// All bare-name list builtins that shouldn't be shadowed by user code.
+pub const LIST_BUILTIN_NAMES: &[&str] = &[
+    "uniq", "uniqstr", "uniqint", "uniqnum", "sum", "sum0", "product",
+    "mean", "median", "mode", "variance", "stddev",
+    "min", "max", "minstr", "maxstr",
+    "shuffle", "chunked", "windowed", "sample",
+    "head", "tail", "take", "drop",
+    "reduce", "fold", "reductions",
+    "any", "all", "none", "notall", "first",
+    "pairs", "unpairs", "pairkeys", "pairvalues", "pairgrep", "pairmap", "pairfirst",
+    "zip", "zip_longest", "zip_shortest", "mesh", "mesh_longest", "mesh_shortest",
+    "blessed", "refaddr", "reftype", "weaken", "unweaken", "isweak",
+    "set_subname", "subname", "unicode_to_native",
+];
+
+/// Returns true if `name` is a list builtin that shouldn't be shadowed.
+pub fn is_list_builtin_name(name: &str) -> bool {
+    LIST_BUILTIN_NAMES.contains(&name)
+}
+
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;

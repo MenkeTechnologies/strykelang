@@ -4576,7 +4576,7 @@ fn try_vm_execute_strict_vars_rejects_undeclared_scalar() {
 #[test]
 fn try_vm_execute_strict_vars_allows_underscore_and_foreach_var() {
     let p = parse(
-        r#"use strict; fn sum() { my $s = 0; for my $x (@_) { $s += $x }; $s }; sum(1, 2, 3, 4, 5)"#,
+        r#"use strict; fn add_all() { my $s = 0; for my $x (@_) { $s += $x }; $s }; add_all(1, 2, 3, 4, 5)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
