@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Stable marriage problem
 
-fn my_stable_marriage($guys_pref, $girls_pref) {
+fn Rosetta::StableMarriage::solve($guys_pref, $girls_pref) {
     my $guys_match = {}
     my $girls_match = {}
     my @free_guys = keys %$guys_pref
@@ -53,13 +53,7 @@ my $girls = {
     "ivon" => ["abe", "bob", "col"]
 }
 
-my $res = my_stable_marriage($guys, $girls)
-# Result depends on who proposes first. If guys propose:
-# abe -> abi (accepted)
-# bob -> eve (accepted)
-# col -> abi (rejected by abi, abi prefers abe)
-# col -> eve (rejected by eve, eve prefers bob)
-# col -> ivon (accepted)
+my $res = Rosetta::StableMarriage::solve($guys, $girls)
 assert_eq $res->{abe}, "abi", "abe matched with abi"
 assert_eq $res->{bob}, "eve", "bob matched with eve"
 assert_eq $res->{col}, "ivon", "col matched with ivon"

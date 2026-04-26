@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bitwise operations
 
-fn bitwise_and($a, $b) { $a & $b }
-fn bitwise_or($a, $b) { $a | $b }
-fn bitwise_xor($a, $b) { $a ^ $b }
-fn bitwise_not($a) { ~$a }
-fn bitwise_shl($a, $b) { $a << $b }
-fn bitwise_shr($a, $b) { $a >> $b }
+fn Rosetta::Bitwise::bit_and($a, $b) { $a & $b }
+fn Rosetta::Bitwise::bit_or($a, $b) { $a | $b }
+fn Rosetta::Bitwise::bit_xor($a, $b) { $a ^ $b }
+fn Rosetta::Bitwise::bit_not($a) { ~$a }
+fn Rosetta::Bitwise::bit_shl($a, $b) { $a << $b }
+fn Rosetta::Bitwise::bit_shr($a, $b) { $a >> $b }
 
-assert_eq bitwise_and(10, 2), 2, "10 & 2"
-assert_eq bitwise_or(10, 2), 10, "10 | 2"
-assert_eq bitwise_xor(10, 2), 8, "10 ^ 2"
-assert_eq bitwise_shl(10, 2), 40, "10 << 2"
-assert_eq bitwise_shr(10, 2), 2, "10 >> 2"
+assert_eq Rosetta::Bitwise::bit_and(10, 2), 2, "10 & 2"
+assert_eq Rosetta::Bitwise::bit_or(10, 2), 10, "10 | 2"
+assert_eq Rosetta::Bitwise::bit_xor(10, 2), 8, "10 ^ 2"
+assert_eq Rosetta::Bitwise::bit_shl(10, 2), 40, "10 << 2"
+assert_eq Rosetta::Bitwise::bit_shr(10, 2), 2, "10 >> 2"
 
 # pipe and threading
-10 |> bitwise_and(2) |> assert_eq(2, "pipe and")
-~> 10 bitwise_or(2) |> assert_eq(10, "threaded or")
+10 |> Rosetta::Bitwise::bit_and(2) |> assert_eq(2, "pipe and")
+~> 10 fn { Rosetta::Bitwise::bit_or($_, 2) } |> assert_eq(10, "threaded or")
 
 test_run

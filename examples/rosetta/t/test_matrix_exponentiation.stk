@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Matrix exponentiation
 
-fn my_matrix_mul($a, $b) {
+fn Rosetta::MatrixPow::mul($a, $b) {
     my $m = scalar(@$a)
     my $n = scalar(@{$a->[0]})
     my $p = scalar(@{$b->[0]})
@@ -19,7 +19,7 @@ fn my_matrix_mul($a, $b) {
     \@res
 }
 
-fn my_matrix_pow($a, $n) {
+fn Rosetta::MatrixPow::compute($a, $n) {
     my $size = scalar(@$a)
     my @res = ()
     for my $i (0..$size-1) {
@@ -32,10 +32,10 @@ fn my_matrix_pow($a, $n) {
     my $curr_n = $n
     while ($curr_n > 0) {
         if ($curr_n % 2 == 1) {
-            my $tmp = my_matrix_mul([@res], $base)
+            my $tmp = Rosetta::MatrixPow::mul([@res], $base)
             @res = @$tmp
         }
-        my $tmp2 = my_matrix_mul($base, $base)
+        my $tmp2 = Rosetta::MatrixPow::mul($base, $base)
         $base = $tmp2
         $curr_n = int($curr_n / 2)
     }
@@ -43,7 +43,7 @@ fn my_matrix_pow($a, $n) {
 }
 
 my $m = [[1, 1], [1, 0]]
-my $res = my_matrix_pow($m, 5)
+my $res = Rosetta::MatrixPow::compute($m, 5)
 # Fibonacci matrix power 5 should be [[8, 5], [5, 3]]
 assert_eq $res->[0][0], 8, "Fib(6)"
 assert_eq $res->[0][1], 5, "Fib(5)"

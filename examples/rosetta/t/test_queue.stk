@@ -1,31 +1,32 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Queue
 
-fn my_queue_new {
-    ([])
+fn Rosetta::Queue::new {
+    []
 }
 
-fn my_queue_enqueue($q, $val) {
+fn Rosetta::Queue::enqueue($q, $val) {
     push @$q, $val
     $q
 }
 
-fn my_queue_dequeue($q) {
+fn Rosetta::Queue::dequeue($q) {
     shift @$q
 }
 
-fn my_queue_empty($q) {
+fn Rosetta::Queue::is_empty($q) {
     scalar(@$q) == 0
 }
 
-my $q = my_queue_new()
-$q |> my_queue_enqueue("a") |> my_queue_enqueue("b")
+my $q = Rosetta::Queue::new()
+$q |> Rosetta::Queue::enqueue("a") |> Rosetta::Queue::enqueue("b")
 
-assert_eq my_queue_dequeue($q), "a", "dequeue a"
-assert_eq my_queue_dequeue($q), "b", "dequeue b"
-assert_ok my_queue_empty($q), "queue empty"
+assert_eq Rosetta::Queue::dequeue($q), "a", "dequeue a"
+assert_eq Rosetta::Queue::dequeue($q), "b", "dequeue b"
+assert_ok Rosetta::Queue::is_empty($q), "queue empty"
 
-# Threaded queue
-~> my_queue_new() my_queue_enqueue(1) my_queue_enqueue(2) |> my_queue_dequeue |> assert_eq(1, "threaded dequeue")
+# Pipe-forward queue
+my $q2 = Rosetta::Queue::new() |> Rosetta::Queue::enqueue(1) |> Rosetta::Queue::enqueue(2)
+assert_eq Rosetta::Queue::dequeue($q2), 1, "pipe-forward dequeue"
 
 test_run

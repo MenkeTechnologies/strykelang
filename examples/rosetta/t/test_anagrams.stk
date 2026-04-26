@@ -1,41 +1,36 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Anagrams
 
-fn sorted_chars {
-    my $s = $_[0]
+fn Rosetta::Anagrams::sort_chars($s) {
     ~> $s lc chars sort join("")
 }
 
-fn are_anagrams {
-    my $a = $_[0]
-    my $b = $_[1]
-    my $s1 = sorted_chars($a)
-    my $s2 = sorted_chars($b)
+fn Rosetta::Anagrams::check($a, $b) {
+    my $s1 = Rosetta::Anagrams::sort_chars($a)
+    my $s2 = Rosetta::Anagrams::sort_chars($b)
     $s1 eq $s2
 }
 
-fn find_anagrams {
-    my $word = $_[0]
-    my @words = @_[1..scalar(@_)-1]
-    my $key = sorted_chars($word)
+fn Rosetta::Anagrams::find($word, @words) {
+    my $key = Rosetta::Anagrams::sort_chars($word)
     my @res = ~> @words grep {
-        my $sc = sorted_chars($_)
-        $sc eq $key && $_ ne $word
+        my $sc = Rosetta::Anagrams::sort_chars($_)
+        $sc eq $key && lc($_) ne lc($word)
     }
     \@res
 }
 
-assert_ok are_anagrams("listen", "silent"), "listen/silent"
-assert_ok are_anagrams("evil", "vile"), "evil/vile"
-assert_ok are_anagrams("Elvis", "lives"), "Elvis/lives (case insensitive)"
-assert_ok !are_anagrams("hello", "world"), "hello/world not anagrams"
+assert_ok Rosetta::Anagrams::check("listen", "silent"), "listen/silent"
+assert_ok Rosetta::Anagrams::check("evil", "vile"), "evil/vile"
+assert_ok Rosetta::Anagrams::check("Elvis", "lives"), "Elvis/lives (case insensitive)"
+assert_ok !Rosetta::Anagrams::check("hello", "world"), "hello/world not anagrams"
 
 my @words = qw(cat act tac dog god)
-my $cat_anagrams = find_anagrams("cat", @words)
+my $cat_anagrams = Rosetta::Anagrams::find("cat", @words)
 my @sorted_cat = sort(@$cat_anagrams)
 assert_eq join(",", @sorted_cat), "act,tac", "anagrams of cat"
 
-my $dog_anagrams = find_anagrams("dog", @words)
+my $dog_anagrams = Rosetta::Anagrams::find("dog", @words)
 assert_eq join(",", @$dog_anagrams), "god", "anagrams of dog"
 
 test_run

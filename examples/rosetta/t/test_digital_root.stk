@@ -1,36 +1,36 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Digital Root
 
-fn my_digital_root {
-    my $n = $_[0]
+fn Rosetta::DigitalRoot::compute($n) {
     if ($n < 10) { return $n }
     my $sum = 0
-    while ($n > 0) {
-        $sum += $n % 10
-        $n = int($n / 10)
+    my $curr = $n
+    while ($curr > 0) {
+        $sum += $curr % 10
+        $curr = int($curr / 10)
     }
-    my_digital_root($sum)
+    Rosetta::DigitalRoot::compute($sum)
 }
 
-fn digital_root_additive_persistence {
-    my $n = $_[0]
-    my $persistence = 0
-    while ($n >= 10) {
+fn Rosetta::DigitalRoot::persistence($n) {
+    my $curr = $n
+    my $count = 0
+    while ($curr >= 10) {
         my $sum = 0
-        while ($n > 0) {
-            $sum += $n % 10
-            $n = int($n / 10)
+        while ($curr > 0) {
+            $sum += $curr % 10
+            $curr = int($curr / 10)
         }
-        $n = $sum
-        $persistence++
+        $curr = $sum
+        $count++
     }
-    ([$n, $persistence])
+    ([$curr, $count])
 }
 
-assert_eq my_digital_root(627615), 9, "dr(627615)"
-assert_eq my_digital_root(39390), 6, "dr(39390)"
+assert_eq Rosetta::DigitalRoot::compute(627615), 9, "dr(627615)"
+assert_eq Rosetta::DigitalRoot::compute(39390), 6, "dr(39390)"
 
-my $res = digital_root_additive_persistence(627615)
+my $res = Rosetta::DigitalRoot::persistence(627615)
 assert_eq $res->[0], 9, "root"
 assert_eq $res->[1], 2, "persistence"
 

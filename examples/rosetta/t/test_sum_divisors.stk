@@ -1,23 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sum of divisors
 
-fn my_divisors($n) {
-    my @res = (1..$n) |> grep { $n % $_ == 0 }
+fn Rosetta::SumDivisors::get($n) {
+    my @res = 1:$n |> grep { $n % $_ == 0 }
     @res
 }
 
-fn my_sum_divisors($n) {
-    my @d = my_divisors($n)
-    if (scalar(@d) == 0) {
-        0
-    } else {
-        @d |> reduce { $a + $b }
-    }
+fn Rosetta::SumDivisors::sum($n) {
+    my @d = Rosetta::SumDivisors::get($n)
+    my $sum = 0
+    for my $v (@d) { $sum = $sum + $v }
+    $sum
 }
 
-assert_eq my_sum_divisors(6), 12, "sum divisors 6"
-assert_eq my_sum_divisors(12), 28, "sum divisors 12"
+assert_eq Rosetta::SumDivisors::sum(6), 12, "sum divisors 6"
+assert_eq Rosetta::SumDivisors::sum(12), 28, "sum divisors 12"
 
-6 |> my_sum_divisors |> assert_eq(12, "pipe sum divisors")
+6 |> Rosetta::SumDivisors::sum |> assert_eq(12, "pipe sum divisors")
 
 test_run

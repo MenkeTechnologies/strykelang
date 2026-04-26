@@ -1,7 +1,7 @@
-#!/usr/bin/env stryke  
+#!/usr/bin/env stryke
 # Rosetta Code: Sum and product of an array
 
-fn sum_product_demo() {
+fn Rosetta::SumProduct::demo() {
     "Sum and Product of Array Examples:" |> p
     
     my @numbers = (1, 2, 3, 4, 5)
@@ -44,4 +44,5 @@ fn sum_product_demo() {
     "Mixed product: " . (@mixed |> product) |> p
 }
 
-sum_product_demo
+Rosetta::SumProduct::demo()
+test_run

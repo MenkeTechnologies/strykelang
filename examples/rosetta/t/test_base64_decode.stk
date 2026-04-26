@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Base64 decode
 
-fn my_base64_decode($str) {
+fn Rosetta::Base64Decode::custom($str) {
     my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     my %vals
     my @alpha_chars = $alphabet |> chars
@@ -30,9 +30,9 @@ fn my_base64_decode($str) {
     join("", @res)
 }
 
-assert_eq my_base64_decode("Zg=="), "f", "decode 'f'"
-assert_eq my_base64_decode("Zm8="), "fo", "decode 'fo'"
-assert_eq my_base64_decode("Zm9v"), "foo", "decode 'foo'"
-assert_eq my_base64_decode("Zm9vYmFy"), "foobar", "decode 'foobar'"
+assert_eq Rosetta::Base64Decode::custom("Zg=="), "f", "decode 'f'"
+assert_eq Rosetta::Base64Decode::custom("Zm8="), "fo", "decode 'fo'"
+assert_eq Rosetta::Base64Decode::custom("Zm9v"), "foo", "decode 'foo'"
+assert_eq Rosetta::Base64Decode::custom("Zm9vYmFy"), "foobar", "decode 'foobar'"
 
 test_run

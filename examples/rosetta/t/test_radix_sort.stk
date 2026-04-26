@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Radix Sort
 
-fn radix_sort {
-    my $list = $_[0]
+fn Rosetta::RadixSort::sort($list) {
     my @arr = @$list
     my $n = scalar(@arr)
     if ($n < 2) { return \@arr }
@@ -29,7 +28,7 @@ fn radix_sort {
 }
 
 my $data = [170, 45, 75, 90, 802, 24, 2, 66]
-my $sorted = radix_sort($data)
+my $sorted = Rosetta::RadixSort::sort($data)
 assert_eq join(",", @$sorted), "2,24,45,66,75,90,170,802", "radix sort"
 
 test_run

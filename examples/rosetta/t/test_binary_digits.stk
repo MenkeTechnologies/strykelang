@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Binary Digits
 
-fn to_binary($n) {
+fn Rosetta::BinaryDigits::encode($n) {
     if ($n == 0) {
         "0"
     } else {
@@ -11,11 +11,11 @@ fn to_binary($n) {
             unshift @bits, $num % 2
             $num = int($num / 2)
         }
-        ~> @bits |> join ""
+        join("", @bits)
     }
 }
 
-fn from_binary($s) {
+fn Rosetta::BinaryDigits::decode($s) {
     my $result = 0
     my @bits = split //, $s
     for my $bit (@bits) {
@@ -26,23 +26,25 @@ fn from_binary($s) {
     $result
 }
 
-fn count_ones($n) {
-    ~> to_binary($n) chars grep { $_ eq "1" } |> scalar
+fn Rosetta::BinaryDigits::count_ones($n) {
+    my $bin = Rosetta::BinaryDigits::encode($n)
+    my @ones = grep { $_ eq "1" } chars($bin)
+    scalar(@ones)
 }
 
-assert_eq to_binary(0), "0", "binary 0"
-assert_eq to_binary(1), "1", "binary 1"
-assert_eq to_binary(5), "101", "binary 5"
-assert_eq to_binary(50), "110010", "binary 50"
-assert_eq to_binary(255), "11111111", "binary 255"
+assert_eq Rosetta::BinaryDigits::encode(0), "0", "binary 0"
+assert_eq Rosetta::BinaryDigits::encode(1), "1", "binary 1"
+assert_eq Rosetta::BinaryDigits::encode(5), "101", "binary 5"
+assert_eq Rosetta::BinaryDigits::encode(50), "110010", "binary 50"
+assert_eq Rosetta::BinaryDigits::encode(255), "11111111", "binary 255"
 
-assert_eq from_binary("0"), 0, "from binary 0"
-assert_eq from_binary("101"), 5, "from binary 101"
-assert_eq from_binary("110010"), 50, "from binary 110010"
-assert_eq from_binary("11111111"), 255, "from binary 11111111"
+assert_eq Rosetta::BinaryDigits::decode("0"), 0, "from binary 0"
+assert_eq Rosetta::BinaryDigits::decode("101"), 5, "from binary 101"
+assert_eq Rosetta::BinaryDigits::decode("110010"), 50, "from binary 110010"
+assert_eq Rosetta::BinaryDigits::decode("11111111"), 255, "from binary 11111111"
 
-assert_eq count_ones(5), 2, "5 has 2 ones"
-assert_eq count_ones(255), 8, "255 has 8 ones"
-assert_eq count_ones(0), 0, "0 has 0 ones"
+assert_eq Rosetta::BinaryDigits::count_ones(5), 2, "5 has 2 ones"
+assert_eq Rosetta::BinaryDigits::count_ones(255), 8, "255 has 8 ones"
+assert_eq Rosetta::BinaryDigits::count_ones(0), 0, "0 has 0 ones"
 
 test_run

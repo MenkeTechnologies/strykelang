@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Conway's Game of Life (1 iteration)
 
-fn count_neighbors($grid, $r, $c, $rows, $cols) {
+fn Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols) {
     my $count = 0
     for my $dr (-1..1) {
         for my $dc (-1..1) {
@@ -16,14 +16,14 @@ fn count_neighbors($grid, $r, $c, $rows, $cols) {
     $count
 }
 
-fn life_step($grid) {
+fn Rosetta::GameOfLife::step($grid) {
     my $rows = scalar(@$grid)
     my $cols = scalar(@{$grid->[0]})
     my @next = ()
     for my $r (0..$rows-1) {
         $next[$r] = []
         for my $c (0..$cols-1) {
-            my $n = count_neighbors($grid, $r, $c, $rows, $cols)
+            my $n = Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols)
             if ($grid->[$r][$c]) {
                 $next[$r][$c] = ($n == 2 || $n == 3 ? 1 : 0)
             } else {
@@ -39,7 +39,7 @@ fn life_step($grid) {
 # 1 1 1 -> 0 1 0
 # 0 0 0    0 1 0
 my $blinker = [[0, 0, 0], [1, 1, 1], [0, 0, 0]]
-my $next = life_step($blinker)
+my $next = Rosetta::GameOfLife::step($blinker)
 
 assert_eq $next->[0][1], 1, "blinker step [0][1]"
 assert_eq $next->[1][1], 1, "blinker step [1][1]"

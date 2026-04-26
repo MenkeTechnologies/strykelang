@@ -1,28 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Eulerian numbers
 
-my %euler_memo
-
-fn eulerian($n, $k) {
-    if ($k < 0 || $k >= $n) {
-        if ($n == 0 && $k == 0) { 1 }
-        else { 0 }
-    } else {
-        # A(n, k) = sum_{j=0..k} (-1)^j * binom(n+1, j) * (k-j+1)^n
-        my $res = 0
-        for my $j (0..$k) {
-            my $term = my_binomial($n + 1, $j) * (($k - $j + 1)**$n)
-            if ($j % 2 == 1) {
-                $res -= $term
-            } else {
-                $res += $term
-            }
-        }
-        int($res + 0.5)
-    }
-}
-
-fn my_binomial($n, $k) {
+fn Rosetta::Eulerian::binomial($n, $k) {
     if ($k < 0 || $k > $n) { 0 }
     elsif ($k == 0 || $k == $n) { 1 }
     else {
@@ -35,12 +14,30 @@ fn my_binomial($n, $k) {
     }
 }
 
-assert_eq eulerian(3, 0), 1, "A(3, 0)"
-assert_eq eulerian(3, 1), 4, "A(3, 1)"
-assert_eq eulerian(3, 2), 1, "A(3, 2)"
-assert_eq eulerian(4, 1), 11, "A(4, 1)"
-assert_eq eulerian(4, 2), 11, "A(4, 2)"
+fn Rosetta::Eulerian::compute($n, $k) {
+    if ($k < 0 || $k >= $n) {
+        if ($n == 0 && $k == 0) { 1 }
+        else { 0 }
+    } else {
+        my $res = 0
+        for my $j (0..$k) {
+            my $term = Rosetta::Eulerian::binomial($n + 1, $j) * (($k - $j + 1)**$n)
+            if ($j % 2 == 1) {
+                $res -= $term
+            } else {
+                $res += $term
+            }
+        }
+        int($res + 0.5)
+    }
+}
 
-(3, 1) |> eulerian |> assert_eq(4, "pipe eulerian")
+assert_eq Rosetta::Eulerian::compute(3, 0), 1, "A(3, 0)"
+assert_eq Rosetta::Eulerian::compute(3, 1), 4, "A(3, 1)"
+assert_eq Rosetta::Eulerian::compute(3, 2), 1, "A(3, 2)"
+assert_eq Rosetta::Eulerian::compute(4, 1), 11, "A(4, 1)"
+assert_eq Rosetta::Eulerian::compute(4, 2), 11, "A(4, 2)"
+
+(3, 1) |> Rosetta::Eulerian::compute |> assert_eq(4, "pipe eulerian")
 
 test_run

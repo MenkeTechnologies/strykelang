@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Integer roots
 
-fn integer_root($n, $base) {
+fn Rosetta::IntegerRoots::compute($n, $base) {
     if ($n == 0) { return 0 }
     if ($n == 1) { return 1 }
     
@@ -14,9 +14,9 @@ fn integer_root($n, $base) {
     $x
 }
 
-assert_eq integer_root(8, 3), 2, "3rd root of 8"
-assert_eq integer_root(27, 3), 3, "3rd root of 27"
-assert_eq integer_root(100, 2), 10, "2nd root of 100"
-assert_eq integer_root(100, 3), 4, "3rd root of 100 (int(4.64) = 4)"
+assert_eq Rosetta::IntegerRoots::compute(8, 3), 2, "3rd root of 8"
+assert_eq Rosetta::IntegerRoots::compute(27, 3), 3, "3rd root of 27"
+assert_eq Rosetta::IntegerRoots::compute(100, 2), 10, "2nd root of 100"
+assert_eq Rosetta::IntegerRoots::compute(100, 3), 4, "3rd root of 100 (int(4.64) = 4)"
 
 test_run

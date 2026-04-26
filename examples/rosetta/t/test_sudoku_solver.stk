@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sudoku solver (backtracking)
 
-fn is_valid($board, $row, $col, $num) {
+fn Rosetta::Sudoku::is_valid($board, $row, $col, $num) {
     # Check row
     for my $i (0..3) {
         if ($board->[$row][$i] == $num) { return 0 }
@@ -21,14 +21,14 @@ fn is_valid($board, $row, $col, $num) {
     1
 }
 
-fn solve_sudoku($board) {
+fn Rosetta::Sudoku::solve($board) {
     for my $row (0..3) {
         for my $col (0..3) {
             if ($board->[$row][$col] == 0) {
                 for my $num (1..4) {
-                    if (is_valid($board, $row, $col, $num)) {
+                    if (Rosetta::Sudoku::is_valid($board, $row, $col, $num)) {
                         $board->[$row][$col] = $num
-                        if (solve_sudoku($board)) { return 1 }
+                        if (Rosetta::Sudoku::solve($board)) { return 1 }
                         $board->[$row][$col] = 0
                     }
                 }
@@ -46,7 +46,7 @@ my $board = [
     [0, 0, 0, 4]
 ]
 
-if (solve_sudoku($board)) {
+if (Rosetta::Sudoku::solve($board)) {
     assert_eq $board->[0][1], 2, "sol[0][1]"
     assert_eq $board->[1][1], 4, "sol[1][1]"
     assert_eq $board->[2][0], 4, "sol[2][0]"

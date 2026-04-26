@@ -1,22 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Cullen numbers
 
-fn cullen($n) {
+fn Rosetta::Cullen::compute($n) {
     $n * (2 ** $n) + 1
 }
 
-fn cullen_list($max_n) {
-    ~> 1..$max_n map { cullen($_) }
+fn Rosetta::Cullen::list($max_n) {
+    ~> 1:$max_n map { Rosetta::Cullen::compute($_) }
 }
 
-assert_eq cullen(1), 3, "C1"
-assert_eq cullen(2), 9, "C2 (2*4+1)"
-assert_eq cullen(3), 25, "C3 (3*8+1)"
-assert_eq cullen(4), 65, "C4"
+assert_eq Rosetta::Cullen::compute(1), 3, "C1"
+assert_eq Rosetta::Cullen::compute(2), 9, "C2 (2*4+1)"
+assert_eq Rosetta::Cullen::compute(3), 25, "C3 (3*8+1)"
+assert_eq Rosetta::Cullen::compute(4), 65, "C4"
 
-my @list = cullen_list(5)
+my @list = Rosetta::Cullen::list(5)
 assert_eq join(",", @list), "3,9,25,65,161", "Cullen list"
 
-5 |> cullen |> assert_eq(161, "pipe cullen 5")
+5 |> Rosetta::Cullen::compute |> assert_eq(161, "pipe cullen 5")
 
 test_run

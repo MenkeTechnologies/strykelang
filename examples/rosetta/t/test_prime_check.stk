@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Primality by Trial Division
 
-fn prime_check($n) {
+fn Rosetta::PrimeCheck::check($n) {
     if ($n < 2) {
         0
     } elsif ($n < 4) {
@@ -10,29 +10,29 @@ fn prime_check($n) {
         0
     } else {
         my $i = 3
-        my $is_prime = 1
-        while ($i * $i <= $n && $is_prime) {
+        my $is_p = 1
+        while ($i * $i <= $n && $is_p) {
             if ($n % $i == 0) {
-                $is_prime = 0
+                $is_p = 0
             }
             $i += 2
         }
-        $is_prime
+        $is_p
     }
 }
 
-fn list_primes($max) {
-    2..$max |> filter { prime_check($_) }
+fn Rosetta::PrimeCheck::list($max) {
+    2:$max |> grep { Rosetta::PrimeCheck::check($_) }
 }
 
-assert_ok prime_check(2), "2 is prime"
-assert_ok prime_check(17), "17 is prime"
-assert_ok prime_check(97), "97 is prime"
-assert_ok !prime_check(1), "1 is not prime"
-assert_ok !prime_check(4), "4 is not prime"
-assert_ok !prime_check(15), "15 is not prime"
+assert_ok Rosetta::PrimeCheck::check(2), "2 is prime"
+assert_ok Rosetta::PrimeCheck::check(17), "17 is prime"
+assert_ok Rosetta::PrimeCheck::check(97), "97 is prime"
+assert_ok !Rosetta::PrimeCheck::check(1), "1 is not prime"
+assert_ok !Rosetta::PrimeCheck::check(4), "4 is not prime"
+assert_ok !Rosetta::PrimeCheck::check(15), "15 is not prime"
 
-my @primes = list_primes(20)
+my @primes = Rosetta::PrimeCheck::list(20)
 assert_eq join(",", @primes), "2,3,5,7,11,13,17,19", "primes up to 20"
 
 test_run

@@ -377,7 +377,10 @@ fn print_cyberpunk_help() {
     println!("  'CODE'                 {G}//{N} Inline code — no -e needed if arg looks like code");
     println!("  -e CODE                {G}//{N} Explicit inline (required with -n/-p/-l/-a)");
     println!("  -E CODE                {G}//{N} Like -e, but enables all optional features");
-    println!("  --script               {G}//{N} Force arg to be a file (skip code detection)");
+    println!("  BUILTIN [ARGS]         {G}//{N} Call builtin fn directly: stryke pin, stryke basename /a/b");
+    println!(
+        "  --script               {G}//{N} Force script lookup when name conflicts with builtin"
+    );
     println!("  -c                     {G}//{N} Check syntax only (parse; no compile/run)");
     println!("  --lint / --check       {G}//{N} Parse + compile bytecode without running");
     println!(
@@ -1494,6 +1497,26 @@ fn main() {
         process::exit(run_ast_subcommand(&args[2..]));
     }
 
+    // Hierarchy: subcommand → builtin → script
+    // `stryke pin` calls `pin()` builtin, not a script named `pin`.
+    // `stryke --script pin` forces script lookup when there's a conflict.
+    // `-e BUILTIN` or `-e 'code'` forces inline code execution.
+    //
+    // Check: if args[1] is a known builtin name AND not forced to script AND file doesn't exist,
+    // execute it as a builtin call. This allows `stryke pin`, `stryke heat`, etc.
+    let force_script = args.iter().any(|a| a == "--script");
+    if args.len() >= 2
+        && !args[1].starts_with('-')
+        && !force_script
+        && stryke::builtins::is_builtin(&args[1])
+        && !Path::new(&args[1]).exists()
+    {
+        // Execute as `BUILTIN(@ARGV)` where @ARGV is the remaining args
+        let builtin_name = &args[1];
+        let builtin_args: Vec<String> = args[2..].to_vec();
+        process::exit(run_builtin_subcommand(builtin_name, &builtin_args));
+    }
+
     // Fast path: `stryke SCRIPT [ARGS...]` with no dashes anywhere — the common case, and
     // clap parsing is the dominant term on `print "hello\n"` (it knocks ~1ms off the
     // startup bench). We can't bypass clap when any flag is present, so fall through to the
@@ -2009,6 +2032,52 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
     for (path, source) in &bundle.files {
         interp.register_virtual_module(path.clone(), source.clone());
     }
+
+    match interp.execute(&program) {
+        Ok(_) => {
+            let _ = interp.run_global_teardown();
+            let _ = io::stdout().flush();
+            0
+        }
+        Err(e) => match e.kind {
+            ErrorKind::Exit(code) => code,
+            ErrorKind::Die => {
+                eprint!("{}", e);
+                255
+            }
+            _ => {
+                eprintln!("{}", e);
+                255
+            }
+        },
+    }
+}
+
+/// `stryke BUILTIN [ARGS...]` — invoke a builtin function directly from CLI.
+/// Hierarchy: subcommand → builtin → script. Use `--script` to force script lookup.
+fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
+    use stryke::interpreter::Interpreter;
+    use stryke::value::PerlValue;
+
+    let mut interp = Interpreter::new();
+    let argv_values: Vec<PerlValue> = argv.iter().map(|s| PerlValue::string(s.clone())).collect();
+    let _ = interp.scope.set_array("ARGV", argv_values);
+
+    // Wrap in `p(...)` to print the result — most builtins return values without printing.
+    // Exceptions like `pin`/`fire_and_forget` loop forever and print to stderr anyway.
+    let code = if argv.is_empty() {
+        format!("p {}()", name)
+    } else {
+        format!("p {}(@ARGV)", name)
+    };
+
+    let program = match stryke::parse_with_file(&code, "-e") {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            return 255;
+        }
+    };
 
     match interp.execute(&program) {
         Ok(_) => {

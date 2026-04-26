@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bioinformatics/Base count
 
-fn base_count($dna) {
+fn Rosetta::DNABaseCount::compute($dna) {
     my $counts = {A => 0, C => 0, G => 0, T => 0}
     my @bases = ~> $dna uc chars
     for my $b (@bases) {
@@ -13,7 +13,7 @@ fn base_count($dna) {
 }
 
 my $dna = "CGATATATGGGTTTTAGC"
-my $res = base_count($dna)
+my $res = Rosetta::DNABaseCount::compute($dna)
 assert_eq $res->{A}, 4, "Count of A"
 assert_eq $res->{C}, 2, "Count of C"
 assert_eq $res->{G}, 5, "Count of G"

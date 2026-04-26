@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Comb sort
 
-fn comb_sort {
-    my $list = $_[0]
+fn Rosetta::CombSort::sort($list) {
     my @arr = @$list
     my $len = scalar(@arr)
     my $gap = $len
@@ -25,11 +24,11 @@ fn comb_sort {
 }
 
 my $data = [9, 8, 3, 7, 5, 6, 4, 1]
-my $sorted = comb_sort($data)
+my $sorted = Rosetta::CombSort::sort($data)
 assert_eq join(",", @$sorted), "1,3,4,5,6,7,8,9", "comb sort"
 
 my $data2 = [5, 1, 4, 2, 8]
-my $sorted2 = comb_sort($data2)
+my $sorted2 = Rosetta::CombSort::sort($data2)
 assert_eq join(",", @$sorted2), "1,2,4,5,8", "comb sort 2"
 
 test_run

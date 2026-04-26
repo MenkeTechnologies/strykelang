@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: String length
 
-fn string_length_demo() {
+fn Rosetta::StringLength::demo() {
     "String Length Examples:" |> p
     
     # Basic string length
@@ -47,4 +47,5 @@ fn string_length_demo() {
     "Number as string '$num_str' length: " . ($num_str |> len) |> p
 }
 
-string_length_demo
+Rosetta::StringLength::demo()
+test_run

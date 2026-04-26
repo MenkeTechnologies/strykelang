@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Self-descriptive numbers
 
-fn is_self_descriptive($n) {
+fn Rosetta::SelfDescriptive::check($n) {
     my @digits = ~> "$n" chars
     my $len = scalar(@digits)
     my @counts = (0) x $len
@@ -18,8 +18,8 @@ fn is_self_descriptive($n) {
     1
 }
 
-assert_ok is_self_descriptive(1210), "1210 is self-descriptive (1 '0', 2 '1's, 1 '2', 0 '3's)"
-assert_ok is_self_descriptive(2020), "2020 is self-descriptive"
-assert_ok !is_self_descriptive(1234), "1234 is not"
+assert_ok Rosetta::SelfDescriptive::check(1210), "1210 is self-descriptive (1 '0', 2 '1's, 1 '2', 0 '3's)"
+assert_ok Rosetta::SelfDescriptive::check(2020), "2020 is self-descriptive"
+assert_ok !Rosetta::SelfDescriptive::check(1234), "1234 is not"
 
 test_run

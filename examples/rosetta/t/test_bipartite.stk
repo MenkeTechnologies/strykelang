@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bipartite Graph Check
 
-fn is_bipartite($adj) {
+fn Rosetta::Bipartite::check($adj) {
     my %color
     for my $start (keys %$adj) {
         next if exists $color{$start}
@@ -22,7 +22,7 @@ fn is_bipartite($adj) {
 }
 
 my $g1 = { A => ["B"], B => ["A", "C"], C => ["B"] }
-assert_ok is_bipartite($g1), "path is bipartite"
+assert_ok Rosetta::Bipartite::check($g1), "path is bipartite"
 my $g2 = { A => ["B", "C"], B => ["A", "C"], C => ["A", "B"] }
-assert_ok !is_bipartite($g2), "triangle not bipartite"
+assert_ok !Rosetta::Bipartite::check($g2), "triangle not bipartite"
 test_run

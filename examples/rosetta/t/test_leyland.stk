@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Leyland numbers
 
-fn is_leyland($n) {
+fn Rosetta::Leyland::check($n) {
     my $found = 0
     my $x = 2
     while ($x**2 < $n && !$found) {
@@ -17,13 +17,13 @@ fn is_leyland($n) {
     $found
 }
 
-assert_ok is_leyland(8), "8 is Leyland (2^2 + 2^2)"
-assert_ok is_leyland(17), "17 is Leyland (2^3 + 3^2)"
-assert_ok is_leyland(32), "32 is Leyland (2^4 + 4^2)"
-assert_ok is_leyland(54), "54 is Leyland (3^3 + 3^3)"
-assert_ok is_leyland(57), "57 is Leyland (2^5 + 5^2)"
-assert_ok !is_leyland(10), "10 is not Leyland"
+assert_ok Rosetta::Leyland::check(8), "8 is Leyland (2^2 + 2^2)"
+assert_ok Rosetta::Leyland::check(17), "17 is Leyland (2^3 + 3^2)"
+assert_ok Rosetta::Leyland::check(32), "32 is Leyland (2^4 + 4^2)"
+assert_ok Rosetta::Leyland::check(54), "54 is Leyland (3^3 + 3^3)"
+assert_ok Rosetta::Leyland::check(57), "57 is Leyland (2^5 + 5^2)"
+assert_ok !Rosetta::Leyland::check(10), "10 is not Leyland"
 
-17 |> is_leyland |> assert_ok("pipe Leyland")
+17 |> Rosetta::Leyland::check |> assert_ok("pipe Leyland")
 
 test_run

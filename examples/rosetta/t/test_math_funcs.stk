@@ -1,24 +1,24 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Gamma and Zeta (Approximations)
 
-fn algo_gamma($z) {
+fn Rosetta::MathFuncs::gamma($z) {
     # Lanczos approximation (g=7, n=9)
     my @p = (0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7)
-    if ($z < 0.5) { return 3.1415926535 / (sin(3.1415926535 * $z) * algo_gamma(1 - $z)) }
-    $z = $z - 1
+    if ($z < 0.5) { return 3.1415926535 / (sin(3.1415926535 * $z) * Rosetta::MathFuncs::gamma(1 - $z)) }
+    my $curr_z = $z - 1
     my $x = $p[0]
-    for my $i (1..8) { $x = $x + $p[$i] / ($z + $i) }
-    my $t = $z + 7 + 0.5
-    sqrt(2 * 3.1415926535) * $t**($z + 0.5) * exp(0 - $t) * $x
+    for my $i (1..8) { $x = $x + $p[$i] / ($curr_z + $i) }
+    my $t = $curr_z + 7 + 0.5
+    sqrt(2 * 3.1415926535) * $t**($curr_z + 0.5) * exp(0 - $t) * $x
 }
 
-fn algo_zeta($s) {
+fn Rosetta::MathFuncs::zeta($s) {
     # Simple series for s > 1
     my $sum = 0.0
     for my $n (1..1000) { $sum = $sum + 1.0 / ($n ** $s) }
     $sum
 }
 
-assert_ok abs(algo_gamma(5) - 24) < 0.001, "gamma(5) is 4!"
-assert_ok abs(algo_zeta(2) - 1.644934) < 0.001, "zeta(2) is pi^2/6"
+assert_near Rosetta::MathFuncs::gamma(5), 24, 0.001, "gamma(5) is 4!"
+assert_near Rosetta::MathFuncs::zeta(2), 1.644934, 0.001, "zeta(2) is pi^2/6"
 test_run

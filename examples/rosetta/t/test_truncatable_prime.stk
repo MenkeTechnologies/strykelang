@@ -1,32 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Truncatable primes
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
-}
-
-fn is_left_truncatable($n) {
+fn Rosetta::TruncatablePrime::is_left($n) {
     my $s = "$n"
     if ($s =~ /0/) { 0 }
     else {
         my $valid = 1
         while (length($s) > 0 && $valid) {
-            if (!my_is_prime(int($s))) {
+            if (!is_prime(int($s))) {
                 $valid = 0
             }
             $s = substr($s, 1)
@@ -35,13 +16,13 @@ fn is_left_truncatable($n) {
     }
 }
 
-fn is_right_truncatable($n) {
+fn Rosetta::TruncatablePrime::is_right($n) {
     my $s = "$n"
     if ($s =~ /0/) { 0 }
     else {
         my $valid = 1
         while (length($s) > 0 && $valid) {
-            if (!my_is_prime(int($s))) {
+            if (!is_prime(int($s))) {
                 $valid = 0
             }
             $s = substr($s, 0, length($s) - 1)
@@ -50,11 +31,11 @@ fn is_right_truncatable($n) {
     }
 }
 
-assert_ok is_left_truncatable(9137), "9137 is left-truncatable"
-assert_ok is_right_truncatable(7393), "7393 is right-truncatable"
-assert_ok is_left_truncatable(13), "13 is left-truncatable"
-assert_ok !is_left_truncatable(19), "19 is not left-truncatable"
+assert_ok Rosetta::TruncatablePrime::is_left(9137), "9137 is left-truncatable"
+assert_ok Rosetta::TruncatablePrime::is_right(7393), "7393 is right-truncatable"
+assert_ok Rosetta::TruncatablePrime::is_left(13), "13 is left-truncatable"
+assert_ok !Rosetta::TruncatablePrime::is_left(19), "19 is not left-truncatable"
 
-9137 |> is_left_truncatable |> assert_ok("pipe left-truncatable")
+9137 |> Rosetta::TruncatablePrime::is_left |> assert_ok("pipe left-truncatable")
 
 test_run

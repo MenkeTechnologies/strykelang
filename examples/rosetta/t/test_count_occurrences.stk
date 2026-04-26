@@ -1,19 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Count Character Occurrences
 
-fn count_occurrences {
-    my $s = $_[0]
+fn Rosetta::CountOccurrences::solve($s) {
     my $counts = {}
-    ~> $s chars map { $counts->{$_} = $counts->{$_} + 1 }
+    my @chars = chars($s)
+    for my $c (@chars) {
+        $counts->{$c} = $counts->{$c} + 1
+    }
     $counts
 }
 
-my $res = count_occurrences("banana")
+my $res = Rosetta::CountOccurrences::solve("banana")
 assert_eq $res->{b}, 1, "b count"
 assert_eq $res->{a}, 3, "a count"
 assert_eq $res->{n}, 2, "n count"
 
-my $res2 = count_occurrences("mississippi")
+my $res2 = Rosetta::CountOccurrences::solve("mississippi")
 assert_eq $res2->{m}, 1, "m count"
 assert_eq $res2->{i}, 4, "i count"
 assert_eq $res2->{s}, 4, "s count"

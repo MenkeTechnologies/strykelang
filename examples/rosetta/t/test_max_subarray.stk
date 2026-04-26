@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Maximum subarray sum
 
-fn max_subarray(@arr) {
+fn Rosetta::MaxSubarray::sum(@arr) {
     if (scalar(@arr) == 0) {
         0
     } else {
@@ -17,14 +17,14 @@ fn max_subarray(@arr) {
 }
 
 my @data = (-2, 1, -3, 4, -1, 2, 1, -5, 4)
-assert_eq max_subarray(@data), 6, "max subarray of (-2, 1, -3, 4, -1, 2, 1, -5, 4) is 6"
+assert_eq Rosetta::MaxSubarray::sum(@data), 6, "max subarray of (-2, 1, -3, 4, -1, 2, 1, -5, 4) is 6"
 
 my @data2 = (1, 2, 3)
-assert_eq max_subarray(@data2), 6, "all positive"
+assert_eq Rosetta::MaxSubarray::sum(@data2), 6, "all positive"
 
 my @data3 = (-1, -2, -3)
-assert_eq max_subarray(@data3), -1, "all negative"
+assert_eq Rosetta::MaxSubarray::sum(@data3), -1, "all negative"
 
-@data |> max_subarray |> assert_eq(6, "pipe max_subarray")
+@data |> Rosetta::MaxSubarray::sum |> assert_eq(6, "pipe max_subarray")
 
 test_run

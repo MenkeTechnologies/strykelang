@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Caesar Cipher
 
-fn caesar_encode($str, $shift) {
+fn Rosetta::CaesarCipher::encode($str, $shift) {
     my @res
     my @chars = $str |> chars
     for my $c (@chars) {
@@ -16,15 +16,15 @@ fn caesar_encode($str, $shift) {
     join("", @res)
 }
 
-fn my_rot13($str) {
-    caesar_encode($str, 13)
+fn Rosetta::CaesarCipher::rot13($str) {
+    Rosetta::CaesarCipher::encode($str, 13)
 }
 
-assert_eq caesar_encode("ABC", 1), "BCD", "shift ABC by 1"
-assert_eq caesar_encode("XYZ", 3), "ABC", "shift XYZ wraps"
-assert_eq caesar_encode("Hello, World!", 13), "Uryyb, Jbeyq!", "rot13 hello"
+assert_eq Rosetta::CaesarCipher::encode("ABC", 1), "BCD", "shift ABC by 1"
+assert_eq Rosetta::CaesarCipher::encode("XYZ", 3), "ABC", "shift XYZ wraps"
+assert_eq Rosetta::CaesarCipher::encode("Hello, World!", 13), "Uryyb, Jbeyq!", "rot13 hello"
 
-assert_eq my_rot13("Hello"), "Uryyb", "rot13 encode"
-assert_eq my_rot13(my_rot13("Test")), "Test", "rot13 is self-inverse"
+assert_eq Rosetta::CaesarCipher::rot13("Hello"), "Uryyb", "rot13 encode"
+assert_eq Rosetta::CaesarCipher::rot13(Rosetta::CaesarCipher::rot13("Test")), "Test", "rot13 is self-inverse"
 
 test_run

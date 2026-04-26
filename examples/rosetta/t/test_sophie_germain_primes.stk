@@ -1,35 +1,16 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sophie Germain primes
 
-fn my_is_prime($n) {
-    if ($n < 2) { 0 }
-    elsif ($n == 2) { 1 }
-    elsif ($n % 2 == 0) { 0 }
-    else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
+fn Rosetta::SophieGermain::check($p) {
+    is_prime($p) && is_prime(2 * $p + 1)
 }
 
-fn is_sophie_germain_prime($p) {
-    my_is_prime($p) && my_is_prime(2 * $p + 1)
-}
+assert_ok Rosetta::SophieGermain::check(2), "2 is Sophie Germain (2*2+1=5)"
+assert_ok Rosetta::SophieGermain::check(3), "3 is Sophie Germain (2*3+1=7)"
+assert_ok Rosetta::SophieGermain::check(5), "5 is Sophie Germain (2*5+1=11)"
+assert_ok Rosetta::SophieGermain::check(11), "11 is Sophie Germain (2*11+1=23)"
+assert_ok !Rosetta::SophieGermain::check(7), "7 is not (2*7+1=15)"
 
-assert_ok is_sophie_germain_prime(2), "2 is Sophie Germain (2*2+1=5)"
-assert_ok is_sophie_germain_prime(3), "3 is Sophie Germain (2*3+1=7)"
-assert_ok is_sophie_germain_prime(5), "5 is Sophie Germain (2*5+1=11)"
-assert_ok is_sophie_germain_prime(11), "11 is Sophie Germain (2*11+1=23)"
-assert_ok !is_sophie_germain_prime(7), "7 is not (2*7+1=15)"
-
-11 |> is_sophie_germain_prime |> assert_ok("pipe Sophie Germain")
+11 |> Rosetta::SophieGermain::check |> assert_ok("pipe Sophie Germain")
 
 test_run

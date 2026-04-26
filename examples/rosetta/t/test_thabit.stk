@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Thabit numbers
 
-fn thabit($n) {
+fn Rosetta::ThabitNumbers::compute($n) {
     3 * (2**$n) - 1
 }
 
-fn is_thabit($n) {
+fn Rosetta::ThabitNumbers::check($n) {
     my $m = $n + 1
     if ($m % 3 != 0) {
         0
@@ -16,17 +16,17 @@ fn is_thabit($n) {
     }
 }
 
-assert_eq thabit(0), 2, "T0"
-assert_eq thabit(1), 5, "T1"
-assert_eq thabit(2), 11, "T2"
-assert_eq thabit(3), 23, "T3"
-assert_eq thabit(4), 47, "T4"
+assert_eq Rosetta::ThabitNumbers::compute(0), 2, "T0"
+assert_eq Rosetta::ThabitNumbers::compute(1), 5, "T1"
+assert_eq Rosetta::ThabitNumbers::compute(2), 11, "T2"
+assert_eq Rosetta::ThabitNumbers::compute(3), 23, "T3"
+assert_eq Rosetta::ThabitNumbers::compute(4), 47, "T4"
 
-assert_ok is_thabit(2), "2 is thabit"
-assert_ok is_thabit(5), "5 is thabit"
-assert_ok is_thabit(11), "11 is thabit"
-assert_ok !is_thabit(10), "10 is not"
+assert_ok Rosetta::ThabitNumbers::check(2), "2 is thabit"
+assert_ok Rosetta::ThabitNumbers::check(5), "5 is thabit"
+assert_ok Rosetta::ThabitNumbers::check(11), "11 is thabit"
+assert_ok !Rosetta::ThabitNumbers::check(10), "10 is not"
 
-4 |> thabit |> assert_eq(47, "pipe thabit")
+4 |> Rosetta::ThabitNumbers::compute |> assert_eq(47, "pipe thabit")
 
 test_run

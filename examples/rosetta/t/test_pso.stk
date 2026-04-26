@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Particle Swarm Optimization
 
-fn solve_pso {
+fn Rosetta::PSO::solve {
     my $num_particles = 20
     my @particles
     my $g_best_pos = [100.0, 100.0]
@@ -45,7 +45,7 @@ fn solve_pso {
     $g_best_val
 }
 
-my $best = solve_pso()
+my $best = Rosetta::PSO::solve()
 assert_ok $best < 0.1, "PSO converged to approx 0"
 
 test_run

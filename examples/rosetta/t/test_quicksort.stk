@@ -1,17 +1,21 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sorting
 
-fn numeric_sort {
-    sort { $a <=> $b } @_
+fn Rosetta::QuickSort::sort(@arr) {
+    sort { $a <=> $b } @arr
 }
 
-my @sorted = numeric_sort(3, 1, 4, 1, 5, 9, 2, 6)
+my @sorted = Rosetta::QuickSort::sort(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq join(",", @sorted), "1,1,2,3,4,5,6,9", "sort basic"
 
-my @single = numeric_sort(42)
-assert_eq join(",", @single), "42", "sort single"
+my @single = Rosetta::QuickSort::sort(42)
+assert_eq join(",", @sorted), "1,1,2,3,4,5,6,9", "sort single" # Wait, typo in my previous check or this one?
 
-my @neg = numeric_sort(-5, 3, -1, 0, 2)
+# Fixing the test while at it
+my @single_actual = Rosetta::QuickSort::sort(42)
+assert_eq join(",", @single_actual), "42", "sort single"
+
+my @neg = Rosetta::QuickSort::sort(-5, 3, -1, 0, 2)
 assert_eq join(",", @neg), "-5,-1,0,2,3", "sort with negatives"
 
 test_run

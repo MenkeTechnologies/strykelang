@@ -1,22 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Triangular numbers
 
-fn triangular($n) {
+fn Rosetta::Triangular::compute($n) {
     int($n * ($n + 1) / 2)
 }
 
-fn my_is_triangular($n) {
+fn Rosetta::Triangular::check($n) {
     my $val = 8 * $n + 1
     my $root = int(sqrt($val))
     $root * $root == $val
 }
 
-assert_eq triangular(1), 1, "T1"
-assert_eq triangular(5), 15, "T5"
-assert_ok my_is_triangular(1), "1 is triangular"
-assert_ok my_is_triangular(15), "15 is triangular"
-assert_ok !my_is_triangular(2), "2 is not"
+assert_eq Rosetta::Triangular::compute(1), 1, "T1"
+assert_eq Rosetta::Triangular::compute(5), 15, "T5"
+assert_ok Rosetta::Triangular::check(1), "1 is triangular"
+assert_ok Rosetta::Triangular::check(15), "15 is triangular"
+assert_ok !Rosetta::Triangular::check(2), "2 is not"
 
-15 |> my_is_triangular |> assert_ok("pipe triangular")
+15 |> Rosetta::Triangular::check |> assert_ok("pipe triangular")
 
 test_run

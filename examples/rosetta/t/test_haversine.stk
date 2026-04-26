@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Haversine formula
 
-fn my_haversine($lat1, $lon1, $lat2, $lon2) {
+fn Rosetta::Haversine::compute($lat1, $lon1, $lat2, $lon2) {
     my $r = 6371 # Earth radius in km
     my $dlat = ($lat2 - $lat1) * (3.14159265 / 180)
     my $dlon = ($lon2 - $lon1) * (3.14159265 / 180)
@@ -13,7 +13,7 @@ fn my_haversine($lat1, $lon1, $lat2, $lon2) {
 
 # Nashville: 36.12, -86.67
 # LAX: 33.94, -118.40
-my $dist = my_haversine(36.12, -86.67, 33.94, -118.40)
-assert_ok abs($dist - 2887.25) < 1.0, "Nashville to LAX is approx 2887km"
+my $dist = Rosetta::Haversine::compute(36.12, -86.67, 33.94, -118.40)
+assert_near $dist, 2887.25, 1.0, "Nashville to LAX is approx 2887km"
 
 test_run

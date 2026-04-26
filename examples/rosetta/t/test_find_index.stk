@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Find First and Last Index
 
-fn my_find_first($needle, @haystack) {
+fn Rosetta::FindIndex::first($needle, @haystack) {
     my $found = -1
     for my $i (0..$#haystack) {
         if ($found == -1 && $haystack[$i] eq $needle) {
@@ -11,7 +11,7 @@ fn my_find_first($needle, @haystack) {
     $found
 }
 
-fn my_find_last($needle, @haystack) {
+fn Rosetta::FindIndex::last($needle, @haystack) {
     my $found = -1
     for my $i (0..$#haystack) {
         if ($haystack[$i] eq $needle) {
@@ -21,7 +21,7 @@ fn my_find_last($needle, @haystack) {
     $found
 }
 
-fn my_find_all($needle, @haystack) {
+fn Rosetta::FindIndex::all($needle, @haystack) {
     my @indices
     for my $i (0..$#haystack) {
         push @indices, $i if $haystack[$i] eq $needle
@@ -31,16 +31,16 @@ fn my_find_all($needle, @haystack) {
 
 my @arr = qw(a b c d b e b)
 
-assert_eq my_find_first("b", @arr), 1, "first b at 1"
-assert_eq my_find_last("b", @arr), 6, "last b at 6"
-assert_eq my_find_first("d", @arr), 3, "first d at 3"
-assert_eq my_find_first("x", @arr), -1, "x not found"
+assert_eq Rosetta::FindIndex::first("b", @arr), 1, "first b at 1"
+assert_eq Rosetta::FindIndex::last("b", @arr), 6, "last b at 6"
+assert_eq Rosetta::FindIndex::first("d", @arr), 3, "first d at 3"
+assert_eq Rosetta::FindIndex::first("x", @arr), -1, "x not found"
 
-my @all_b = my_find_all("b", @arr)
+my @all_b = Rosetta::FindIndex::all("b", @arr)
 assert_eq join(",", @all_b), "1,4,6", "all indices of b"
 
 my @nums = (1, 2, 3, 2, 4, 2, 5)
-assert_eq my_find_first(2, @nums), 1, "first 2"
-assert_eq my_find_last(2, @nums), 5, "last 2"
+assert_eq Rosetta::FindIndex::first(2, @nums), 1, "first 2"
+assert_eq Rosetta::FindIndex::last(2, @nums), 5, "last 2"
 
 test_run

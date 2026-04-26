@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Almost prime
 
-fn count_prime_factors($n) {
+fn Rosetta::AlmostPrime::count_factors($n) {
     my $count = 0
     my $d = 2
     my $temp = $n
@@ -19,16 +19,16 @@ fn count_prime_factors($n) {
     $count
 }
 
-fn is_almost_prime($n, $k) {
-    count_prime_factors($n) == $k
+fn Rosetta::AlmostPrime::check($n, $k) {
+    Rosetta::AlmostPrime::count_factors($n) == $k
 }
 
-assert_ok is_almost_prime(4, 2), "4 is 2-almost prime (2*2)"
-assert_ok is_almost_prime(6, 2), "6 is 2-almost prime (2*3)"
-assert_ok is_almost_prime(8, 3), "8 is 3-almost prime (2*2*2)"
-assert_ok is_almost_prime(30, 3), "30 is 3-almost prime (2*3*5)"
-assert_ok !is_almost_prime(10, 3), "10 is not 3-almost prime"
+assert_ok Rosetta::AlmostPrime::check(4, 2), "4 is 2-almost prime (2*2)"
+assert_ok Rosetta::AlmostPrime::check(6, 2), "6 is 2-almost prime (2*3)"
+assert_ok Rosetta::AlmostPrime::check(8, 3), "8 is 3-almost prime (2*2*2)"
+assert_ok Rosetta::AlmostPrime::check(30, 3), "30 is 3-almost prime (2*3*5)"
+assert_ok !Rosetta::AlmostPrime::check(10, 3), "10 is not 3-almost prime"
 
-30 |> is_almost_prime(3) |> assert_ok("pipe almost prime")
+30 |> Rosetta::AlmostPrime::check(3) |> assert_ok("pipe almost prime")
 
 test_run

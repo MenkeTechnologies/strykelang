@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Look-and-Say Sequence
 
-fn next_look_and_say {
-    my $s = $_[0]
+fn Rosetta::LookAndSay::next_step($s) {
     if (length($s) == 0) { "" }
     else {
         my @chars = ~> $s chars
@@ -23,24 +22,22 @@ fn next_look_and_say {
     }
 }
 
-fn look_and_say_seq {
-    my $start = $_[0]
-    my $n = $_[1]
+fn Rosetta::LookAndSay::generate($start, $n) {
     my @seq = ($start)
     for my $i (1..$n-1) {
         my $prev = $seq[-1]
-        my $next = next_look_and_say($prev)
+        my $next = Rosetta::LookAndSay::next_step($prev)
         push @seq, $next
     }
-    [@seq]
+    \@seq
 }
 
-assert_eq next_look_and_say("1"), "11", "1 -> 11"
-assert_eq next_look_and_say("11"), "21", "11 -> 21"
-assert_eq next_look_and_say("21"), "1211", "21 -> 1211"
-assert_eq next_look_and_say("1211"), "111221", "1211 -> 111221"
+assert_eq Rosetta::LookAndSay::next_step("1"), "11", "1 -> 11"
+assert_eq Rosetta::LookAndSay::next_step("11"), "21", "11 -> 21"
+assert_eq Rosetta::LookAndSay::next_step("21"), "1211", "21 -> 1211"
+assert_eq Rosetta::LookAndSay::next_step("1211"), "111221", "1211 -> 111221"
 
-my $s = look_and_say_seq("1", 5)
+my $s = Rosetta::LookAndSay::generate("1", 5)
 assert_eq join(",", @$s), "1,11,21,1211,111221", "first 5 terms"
 
 test_run

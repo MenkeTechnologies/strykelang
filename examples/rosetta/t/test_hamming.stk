@@ -1,9 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hamming Numbers (Regular Numbers)
-# Numbers whose only prime factors are 2, 3, and 5
 
-fn is_hamming {
-    my $n = $_[0]
+fn Rosetta::Hamming::check($n) {
     if ($n < 1) {
         0
     } else {
@@ -15,12 +13,11 @@ fn is_hamming {
     }
 }
 
-fn hamming_numbers {
-    my $count = $_[0]
+fn Rosetta::Hamming::generate($count) {
     my @h
     my $n = 1
     while (scalar(@h) < $count) {
-        if (is_hamming($n)) {
+        if (Rosetta::Hamming::check($n)) {
             push @h, $n
         }
         $n = $n + 1
@@ -28,19 +25,19 @@ fn hamming_numbers {
     \@h
 }
 
-assert_ok is_hamming(1), "1 is hamming"
-assert_ok is_hamming(2), "2 is hamming"
-assert_ok is_hamming(3), "3 is hamming"
-assert_ok is_hamming(5), "5 is hamming"
-assert_ok is_hamming(6), "6 is hamming (2*3)"
-assert_ok is_hamming(8), "8 is hamming (2^3)"
-assert_ok is_hamming(30), "30 is hamming (2*3*5)"
+assert_ok Rosetta::Hamming::check(1), "1 is hamming"
+assert_ok Rosetta::Hamming::check(2), "2 is hamming"
+assert_ok Rosetta::Hamming::check(3), "3 is hamming"
+assert_ok Rosetta::Hamming::check(5), "5 is hamming"
+assert_ok Rosetta::Hamming::check(6), "6 is hamming (2*3)"
+assert_ok Rosetta::Hamming::check(8), "8 is hamming (2^3)"
+assert_ok Rosetta::Hamming::check(30), "30 is hamming (2*3*5)"
 
-assert_ok !is_hamming(7), "7 is not hamming"
-assert_ok !is_hamming(11), "11 is not hamming"
-assert_ok !is_hamming(14), "14 is not hamming (has 7)"
+assert_ok !Rosetta::Hamming::check(7), "7 is not hamming"
+assert_ok !Rosetta::Hamming::check(11), "11 is not hamming"
+assert_ok !Rosetta::Hamming::check(14), "14 is not hamming (has 7)"
 
-my $first20 = hamming_numbers(20)
+my $first20 = Rosetta::Hamming::generate(20)
 assert_eq join(",", @$first20), "1,2,3,4,5,6,8,9,10,12,15,16,18,20,24,25,27,30,32,36", "first 20 hamming"
 
 test_run

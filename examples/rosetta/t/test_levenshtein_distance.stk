@@ -1,9 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Levenshtein distance
 
-fn my_levenshtein {
-    my $s1 = $_[0]
-    my $s2 = $_[1]
+fn Rosetta::Levenshtein::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
     my $len1 = scalar(@c1)
@@ -25,8 +23,8 @@ fn my_levenshtein {
     $d[$len1][$len2]
 }
 
-assert_eq my_levenshtein("saturday", "sunday"), 3, "saturday vs sunday"
-assert_eq my_levenshtein("kitten", "sitting"), 3, "kitten vs sitting"
-assert_eq my_levenshtein("book", "back"), 2, "book vs back"
+assert_eq Rosetta::Levenshtein::compute("saturday", "sunday"), 3, "saturday vs sunday"
+assert_eq Rosetta::Levenshtein::compute("kitten", "sitting"), 3, "kitten vs sitting"
+assert_eq Rosetta::Levenshtein::compute("book", "back"), 2, "book vs back"
 
 test_run

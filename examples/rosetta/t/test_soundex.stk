@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Soundex
 
-fn my_soundex {
-    my $name = $_[0]
+fn Rosetta::Soundex::compute($name) {
     my $s = ~> $name uc
     my @chars = ~> $s chars
     
@@ -36,8 +35,8 @@ fn my_soundex {
     substr($code, 0, 4)
 }
 
-assert_eq my_soundex("Robert"), "R163", "Soundex of Robert"
-assert_eq my_soundex("Rupert"), "R163", "Soundex of Rupert"
-assert_eq my_soundex("Ashcraft"), "A261", "Soundex of Ashcraft"
+assert_eq Rosetta::Soundex::compute("Robert"), "R163", "Soundex of Robert"
+assert_eq Rosetta::Soundex::compute("Rupert"), "R163", "Soundex of Rupert"
+assert_eq Rosetta::Soundex::compute("Ashcraft"), "A261", "Soundex of Ashcraft"
 
 test_run

@@ -1,45 +1,23 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Nth prime
 
-fn my_is_prime($n) {
-    if ($n < 2) {
-        0
-    } elsif ($n == 2) {
-        1
-    } elsif ($n % 2 == 0) {
-        0
-    } else {
-        my $i = 3
-        my $limit = sqrt($n)
-        my $res = 1
-        while ($i <= $limit) {
-            if ($n % $i == 0) {
-                $res = 0
-                $i = $n
-            }
-            $i += 2
-        }
-        $res
-    }
-}
-
-fn my_nth_prime($n) {
+fn Rosetta::NthPrime::solve($n) {
     my $count = 0
     my $candidate = 1
     while ($count < $n) {
         $candidate++
-        if (my_is_prime($candidate)) {
+        if (is_prime($candidate)) {
             $count++
         }
     }
     $candidate
 }
 
-assert_eq my_nth_prime(1), 2, "1st prime"
-assert_eq my_nth_prime(2), 3, "2nd prime"
-assert_eq my_nth_prime(5), 11, "5th prime"
-assert_eq my_nth_prime(10), 29, "10th prime"
+assert_eq Rosetta::NthPrime::solve(1), 2, "1st prime"
+assert_eq Rosetta::NthPrime::solve(2), 3, "2nd prime"
+assert_eq Rosetta::NthPrime::solve(5), 11, "5th prime"
+assert_eq Rosetta::NthPrime::solve(10), 29, "10th prime"
 
-10 |> my_nth_prime |> assert_eq(29, "pipe 10th prime")
+10 |> Rosetta::NthPrime::solve |> assert_eq(29, "pipe 10th prime")
 
 test_run

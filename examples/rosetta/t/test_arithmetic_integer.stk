@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Arithmetic/Integer
 
-fn arithmetic_demo() {
+fn Rosetta::ArithmeticInteger::demo() {
     "Integer Arithmetic Examples:" |> p
     
     my $a = 17
@@ -47,4 +47,5 @@ fn arithmetic_demo() {
     ($x--) |> map { "Post-decrement: $_ (x is now $x)" } |> p
 }
 
-arithmetic_demo
+Rosetta::ArithmeticInteger::demo()
+test_run

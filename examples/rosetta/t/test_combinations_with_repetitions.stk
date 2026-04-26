@@ -1,28 +1,26 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Combinations with repetitions
 
-fn backtrack($n, $k, $start, $curr_ref, $res_ref) {
+fn Rosetta::CombinationsWithRep::backtrack($n, $k, $start, $curr_ref, $res_ref) {
     if (scalar(@$curr_ref) == $k) {
         push @$res_ref, [@$curr_ref]
         return
     }
     for my $i ($start..$n-1) {
         push @$curr_ref, $i
-        backtrack($n, $k, $i, $curr_ref, $res_ref)
+        Rosetta::CombinationsWithRep::backtrack($n, $k, $i, $curr_ref, $res_ref)
         pop @$curr_ref
     }
 }
 
-fn combinations_with_rep {
-    my $n = $_[0]
-    my $k = $_[1]
+fn Rosetta::CombinationsWithRep::generate($n, $k) {
     my $res = []
-    backtrack($n, $k, 0, [], $res)
+    Rosetta::CombinationsWithRep::backtrack($n, $k, 0, [], $res)
     $res
 }
 
 # 3 items, choose 2 with rep: 00, 01, 02, 11, 12, 22 (6 total)
-my $c = combinations_with_rep(3, 2)
+my $c = Rosetta::CombinationsWithRep::generate(3, 2)
 assert_eq scalar(@$c), 6, "3 choose 2 with rep is 6"
 
 test_run

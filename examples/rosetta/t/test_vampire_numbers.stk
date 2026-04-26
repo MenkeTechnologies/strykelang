@@ -1,17 +1,17 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Vampire number
 
-fn sort_digits($n) {
+fn Rosetta::Vampire::sort_digits($n) {
     ~> $n chars sort join("")
 }
 
-fn is_vampire($n) {
+fn Rosetta::Vampire::check($n) {
     my $s = sprintf("%d", $n)
     my $len = length($s)
     if ($len % 2 != 0) {
         0
     } else {
-        my $target = sort_digits($n)
+        my $target = Rosetta::Vampire::sort_digits($n)
         my $found = 0
         my $half = $len / 2
         my $start = 10**($half - 1)
@@ -22,7 +22,7 @@ fn is_vampire($n) {
                 my $b = $n / $a
                 if ($b >= $start && $b <= $end) {
                     if (!($a % 10 == 0 && $b % 10 == 0)) {
-                        if (sort_digits($a . $b) eq $target) {
+                        if (Rosetta::Vampire::sort_digits($a . $b) eq $target) {
                             $found = 1
                         }
                     }
@@ -33,10 +33,10 @@ fn is_vampire($n) {
     }
 }
 
-assert_ok is_vampire(1260), "1260 is vampire (21 * 60)"
-assert_ok is_vampire(1395), "1395 is vampire (15 * 93)"
-assert_ok !is_vampire(1000), "1000 is not vampire"
+assert_ok Rosetta::Vampire::check(1260), "1260 is vampire (21 * 60)"
+assert_ok Rosetta::Vampire::check(1395), "1395 is vampire (15 * 93)"
+assert_ok !Rosetta::Vampire::check(1000), "1000 is not vampire"
 
-1260 |> is_vampire |> assert_ok("pipe vampire check")
+1260 |> Rosetta::Vampire::check |> assert_ok("pipe vampire check")
 
 test_run

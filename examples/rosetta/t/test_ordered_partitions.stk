@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Ordered partitions
 
-fn get_ordered_partitions($n) {
+fn Rosetta::OrderedPartitions::generate($n) {
     my @res = ()
     if ($n == 0) {
         push @res, []
         return \@res
     }
     for my $i (1..$n) {
-        my $sub = get_ordered_partitions($n - $i)
+        my $sub = Rosetta::OrderedPartitions::generate($n - $i)
         for my $p (@$sub) {
             push @res, [$i, @$p]
         }
@@ -16,8 +16,8 @@ fn get_ordered_partitions($n) {
     \@res
 }
 
-my $p3 = get_ordered_partitions(3)
-# Partitions of 3: (3), (2,1), (1,2), (1,1,1)
+my $p3 = Rosetta::OrderedPartitions::generate(3)
+# Partitions of 3: (1,1,1), (1,2), (2,1), (3)
 assert_eq scalar(@$p3), 4, "3 has 4 ordered partitions"
 
 my $joined = ~> @$p3 map { join("", @$_) } |> join(",")

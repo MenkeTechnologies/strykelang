@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fermat numbers
 
-fn fermat($n) {
+fn Rosetta::Fermat::compute($n) {
     (2**(2**$n)) + 1
 }
 
-assert_eq fermat(0), 3, "F0"
-assert_eq fermat(1), 5, "F1"
-assert_eq fermat(2), 17, "F2"
-assert_eq fermat(3), 257, "F3"
-assert_eq fermat(4), 65537, "F4"
+assert_eq Rosetta::Fermat::compute(0), 3, "F0"
+assert_eq Rosetta::Fermat::compute(1), 5, "F1"
+assert_eq Rosetta::Fermat::compute(2), 17, "F2"
+assert_eq Rosetta::Fermat::compute(3), 257, "F3"
+assert_eq Rosetta::Fermat::compute(4), 65537, "F4"
 
-3 |> fermat |> assert_eq(257, "pipe fermat")
+3 |> Rosetta::Fermat::compute |> assert_eq(257, "pipe fermat")
 
 test_run

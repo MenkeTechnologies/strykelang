@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Kaprekar numbers
 
-fn my_is_kaprekar($n) {
+fn Rosetta::KaprekarNumbers::check($n) {
     if ($n == 1) { return 1 }
     my $sq = $n * $n
     my $s = "$sq"
@@ -16,10 +16,10 @@ fn my_is_kaprekar($n) {
     0
 }
 
-assert_ok my_is_kaprekar(1), "1 is Kaprekar"
-assert_ok my_is_kaprekar(9), "9 is Kaprekar (81 -> 8+1=9)"
-assert_ok my_is_kaprekar(45), "45 is Kaprekar (2025 -> 20+25=45)"
-assert_ok my_is_kaprekar(297), "297 is Kaprekar (88209 -> 88+209=297)"
-assert_ok !my_is_kaprekar(10), "10 is not"
+assert_ok Rosetta::KaprekarNumbers::check(1), "1 is Kaprekar"
+assert_ok Rosetta::KaprekarNumbers::check(9), "9 is Kaprekar (81 -> 8+1=9)"
+assert_ok Rosetta::KaprekarNumbers::check(45), "45 is Kaprekar (2025 -> 20+25=45)"
+assert_ok Rosetta::KaprekarNumbers::check(297), "297 is Kaprekar (88209 -> 88+209=297)"
+assert_ok !Rosetta::KaprekarNumbers::check(10), "10 is not"
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Chinese remainder theorem
 
-fn crt_2($n1, $n2, $a1, $a2) {
+fn Rosetta::CRT::solve_2($n1, $n2, $a1, $a2) {
     my $prod = $n1 * $n2
     my $x = 0
     while ($x < $prod) {
@@ -13,7 +13,7 @@ fn crt_2($n1, $n2, $a1, $a2) {
     -1
 }
 
-fn crt_3($n1, $n2, $n3, $a1, $a2, $a3) {
+fn Rosetta::CRT::solve_3($n1, $n2, $n3, $a1, $a2, $a3) {
     my $prod = $n1 * $n2 * $n3
     my $x = 0
     while ($x < $prod) {
@@ -25,7 +25,7 @@ fn crt_3($n1, $n2, $n3, $a1, $a2, $a3) {
     -1
 }
 
-assert_eq crt_3(3, 5, 7, 2, 3, 2), 23, "CRT(3,5,7; 2,3,2) = 23"
-assert_eq crt_2(5, 7, 3, 4), 18, "CRT(5,7; 3,4) = 18"
+assert_eq Rosetta::CRT::solve_3(3, 5, 7, 2, 3, 2), 23, "CRT(3,5,7; 2,3,2) = 23"
+assert_eq Rosetta::CRT::solve_2(5, 7, 3, 4), 18, "CRT(5,7; 3,4) = 18"
 
 test_run

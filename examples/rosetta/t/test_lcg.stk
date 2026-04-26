@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Linear Congruential Generator
 
-fn next_lcg($x) {
+fn Rosetta::LCG::next_val($x) {
     # BSD/Microsoft formula: a=1103515245, c=12345, m=2^31
     (1103515245 * $x + 12345) % 2147483648
 }
@@ -9,7 +9,7 @@ fn next_lcg($x) {
 my $x = 1 # seed
 my @res
 for my $i (1..5) {
-    $x = next_lcg($x)
+    $x = Rosetta::LCG::next_val($x)
     push @res, $x
 }
 

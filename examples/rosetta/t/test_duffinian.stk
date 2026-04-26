@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Duffinian numbers
 
-fn my_gcd($a, $b) {
+fn Rosetta::Duffinian::gcd($a, $b) {
     while ($b != 0) { ($a, $b) = ($b, $a % $b) }
     $a
 }
 
-fn my_sum_divisors($n) {
+fn Rosetta::Duffinian::sum_divisors($n) {
     my $sum = 0
     for my $i (1..$n) {
         if ($n % $i == 0) { $sum += $i }
@@ -14,28 +14,28 @@ fn my_sum_divisors($n) {
     $sum
 }
 
-fn is_duffinian($n) {
-    my $sigma = my_sum_divisors($n)
-    my $rel_prime = my_gcd($n, $sigma) == 1
+fn Rosetta::Duffinian::check($n) {
+    my $sigma = Rosetta::Duffinian::sum_divisors($n)
+    my $rel_prime = Rosetta::Duffinian::gcd($n, $sigma) == 1
     # Duffinian numbers must be composite
-    my $is_composite = 0
+    my $is_comp = 0
     if ($n > 1) {
         for my $i (2..int(sqrt($n))) {
             if ($n % $i == 0) {
-                $is_composite = 1
-                $i = $n
+                $is_comp = 1
+                return $rel_prime && $is_comp
             }
         }
     }
-    $rel_prime && $is_composite
+    $rel_prime && $is_comp
 }
 
-assert_ok is_duffinian(4), "4 is Duffinian (sigma 7, gcd(4,7)=1, composite)"
-assert_ok is_duffinian(8), "8 is Duffinian (sigma 15, gcd(8,15)=1, composite)"
-assert_ok is_duffinian(9), "9 is Duffinian (sigma 13, gcd(9,13)=1, composite)"
-assert_ok !is_duffinian(6), "6 is not (sigma 12, gcd(6,12)=6)"
-assert_ok !is_duffinian(7), "7 is not (prime)"
+assert_ok Rosetta::Duffinian::check(4), "4 is Duffinian (sigma 7, gcd(4,7)=1, composite)"
+assert_ok Rosetta::Duffinian::check(8), "8 is Duffinian (sigma 15, gcd(8,15)=1, composite)"
+assert_ok Rosetta::Duffinian::check(9), "9 is Duffinian (sigma 13, gcd(9,13)=1, composite)"
+assert_ok !Rosetta::Duffinian::check(6), "6 is not (sigma 12, gcd(6,12)=6)"
+assert_ok !Rosetta::Duffinian::check(7), "7 is not (prime)"
 
-4 |> is_duffinian |> assert_ok("pipe Duffinian")
+4 |> Rosetta::Duffinian::check |> assert_ok("pipe Duffinian")
 
 test_run

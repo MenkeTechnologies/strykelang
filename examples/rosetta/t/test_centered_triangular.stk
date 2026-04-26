@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Centered triangular numbers
 
-fn centered_triangular($n) {
+fn Rosetta::CenteredTriangular::compute($n) {
     int((3 * $n * $n + 3 * $n + 2) / 2)
 }
 
-assert_eq centered_triangular(1), 4, "CT 1"
-assert_eq centered_triangular(2), 10, "CT 2"
-assert_eq centered_triangular(3), 19, "CT 3"
-assert_eq centered_triangular(4), 31, "CT 4"
+assert_eq Rosetta::CenteredTriangular::compute(1), 4, "CT 1"
+assert_eq Rosetta::CenteredTriangular::compute(2), 10, "CT 2"
+assert_eq Rosetta::CenteredTriangular::compute(3), 19, "CT 3"
+assert_eq Rosetta::CenteredTriangular::compute(4), 31, "CT 4"
 
-10 |> centered_triangular |> assert_eq(166, "pipe centered triangular")
+10 |> Rosetta::CenteredTriangular::compute |> assert_eq(166, "pipe centered triangular")
 
 test_run

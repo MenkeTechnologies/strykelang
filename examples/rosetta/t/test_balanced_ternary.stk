@@ -1,29 +1,28 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Balanced Ternary
 
-fn to_balanced_ternary {
-    my $n = $_[0]
+fn Rosetta::BalancedTernary::encode($n) {
     if ($n == 0) { return "0" }
     my $res = ""
-    while ($n != 0) {
-        my $rem = $n % 3
+    my $curr = $n
+    while ($curr != 0) {
+        my $rem = $curr % 3
         if ($rem < 0) { $rem += 3 }
         if ($rem == 0) {
             $res = "0" . $res
-            $n = int($n / 3)
+            $curr = int($curr / 3)
         } elsif ($rem == 1) {
             $res = "1" . $res
-            $n = int(($n - 1) / 3)
+            $curr = int(($curr - 1) / 3)
         } else {
             $res = "Z" . $res
-            $n = int(($n + 1) / 3)
+            $curr = int(($curr + 1) / 3)
         }
     }
     $res
 }
 
-fn from_balanced_ternary {
-    my $s = $_[0]
+fn Rosetta::BalancedTernary::decode($s) {
     my $res = 0
     my @chars = ~> $s chars
     for my $c (@chars) {
@@ -33,11 +32,11 @@ fn from_balanced_ternary {
     $res
 }
 
-assert_eq to_balanced_ternary(2), "1Z", "2 to BT"
-assert_eq to_balanced_ternary(8), "10Z", "8 to BT"
-assert_eq to_balanced_ternary(-2), "Z1", "-2 to BT"
-assert_eq from_balanced_ternary("1Z"), 2, "1Z to decimal"
-assert_eq from_balanced_ternary("Z1"), -2, "Z1 to decimal"
-assert_eq from_balanced_ternary("10Z"), 8, "10Z to decimal"
+assert_eq Rosetta::BalancedTernary::encode(2), "1Z", "2 to BT"
+assert_eq Rosetta::BalancedTernary::encode(8), "10Z", "8 to BT"
+assert_eq Rosetta::BalancedTernary::encode(-2), "Z1", "-2 to BT"
+assert_eq Rosetta::BalancedTernary::decode("1Z"), 2, "1Z to decimal"
+assert_eq Rosetta::BalancedTernary::decode("Z1"), -2, "Z1 to decimal"
+assert_eq Rosetta::BalancedTernary::decode("10Z"), 8, "10Z to decimal"
 
 test_run

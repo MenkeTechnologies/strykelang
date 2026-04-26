@@ -772,6 +772,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
 --compat               // Perl 5 strict-compat: disable all stryke extensions
 -n / -p / -i           // stdin line-mode + in-place edit
 -j N                   // parallel threads for multi-file execution
+--script               // force script lookup when name conflicts with builtin
 
 // Subcommands
 s build SCRIPT -o OUT  // AOT compile to standalone binary
@@ -791,6 +792,32 @@ s prun FILE...         // run multiple files in parallel
 s convert FILE...      // convert Perl to stryke syntax
 s deconvert FILE...    // convert stryke back to Perl
 s --remote-worker      // worker process for distributed cluster</pre>
+
+        <h3>Command Resolution Hierarchy</h3>
+        <p>When you run <code>stryke ARG</code>, resolution follows this order:</p>
+        <ol>
+          <li><strong>Subcommand</strong> — <code>build</code>, <code>docs</code>, <code>fmt</code>, <code>test</code>, <code>bench</code>, <code>init</code>, <code>repl</code>, <code>run</code>, <code>serve</code>, <code>check</code>, <code>disasm</code>, <code>profile</code>, <code>lsp</code>, <code>ast</code>, <code>prun</code>, <code>convert</code>, <code>deconvert</code>, <code>completions</code>, <code>agent</code>, <code>controller</code></li>
+          <li><strong>Builtin function</strong> — if ARG is a known builtin AND no file named ARG exists, call <code>ARG(@ARGV)</code> and print result</li>
+          <li><strong>Script file</strong> — if file exists, run as script</li>
+          <li><strong>Inline code</strong> — if ARG looks like code (contains operators, parens, etc.), execute as one-liner</li>
+        </ol>
+        <p>Use <code>--script</code> to force script lookup when a builtin name conflicts with a script file.</p>
+<pre><span class="comment"># Call builtins directly from CLI</span>
+s pin                       <span class="comment"># calls pin() — 100% TDP forever</span>
+s heat 60                   <span class="comment"># calls heat(60) — 100% TDP for 60s</span>
+s basename /foo/bar/baz.txt <span class="comment"># calls basename(@ARGV) → "baz.txt"</span>
+s dirname /foo/bar/baz.txt  <span class="comment"># calls dirname(@ARGV) → "/foo/bar"</span>
+s gethostname               <span class="comment"># calls gethostname() → hostname</span>
+s avg 1 2 3 4 5             <span class="comment"># calls avg(@ARGV) → 3</span>
+
+<span class="comment"># Aliases work too</span>
+s bn /foo/bar/baz.txt       <span class="comment"># basename alias</span>
+s dn /foo/bar/baz.txt       <span class="comment"># dirname alias</span>
+s hn                        <span class="comment"># gethostname alias</span>
+s faf                       <span class="comment"># fire_and_forget alias (same as pin)</span>
+
+<span class="comment"># Force script when name conflicts</span>
+s --script basename         <span class="comment"># run ./basename script, not builtin</span></pre>
       </section>
 
       <section class="tutorial-section">

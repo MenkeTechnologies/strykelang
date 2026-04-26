@@ -39,6 +39,11 @@ This document outlines the path to mass worldwide adoption.
 - [x] `stress_test` — Combined stress workload
 - [x] `heat` — Maximum TDP, Ctrl-C termination
 
+### CLI Hierarchy
+- [x] Direct builtin invocation: `stryke pin`, `stryke heat 60`, `stryke basename /a/b`
+- [x] Resolution order: subcommand → builtin → script → inline code
+- [x] `--script` flag to force script lookup when name conflicts with builtin
+
 ### Distributed Load Testing
 - [x] Agent/Controller architecture
 - [x] `stryke agent` daemon mode

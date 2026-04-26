@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bernoulli numbers (Akiyama-Tanigawa algorithm)
 
-fn bernoulli_numbers($n) {
+fn Rosetta::BernoulliNumbers::compute($n) {
     my @a = ()
     for my $m (0..$n) {
         $a[$m] = 1 / ($m + 1)
@@ -13,9 +13,9 @@ fn bernoulli_numbers($n) {
 }
 
 # B0 = 1, B1 = 1/2 (or -1/2), B2 = 1/6, B4 = -1/30
-assert_ok abs(bernoulli_numbers(0) - 1.0) < 0.0001, "B0 = 1"
-assert_ok abs(bernoulli_numbers(1) - 0.5) < 0.0001, "B1 = 0.5"
-assert_ok abs(bernoulli_numbers(2) - 0.166666) < 0.0001, "B2 = 1/6"
-assert_ok abs(bernoulli_numbers(4) + 0.033333) < 0.0001, "B4 = -1/30"
+assert_near Rosetta::BernoulliNumbers::compute(0), 1.0, 0.0001, "B0 = 1"
+assert_near Rosetta::BernoulliNumbers::compute(1), 0.5, 0.0001, "B1 = 0.5"
+assert_near Rosetta::BernoulliNumbers::compute(2), 0.166666, 0.0001, "B2 = 1/6"
+assert_near Rosetta::BernoulliNumbers::compute(4), -0.033333, 0.0001, "B4 = -1/30"
 
 test_run

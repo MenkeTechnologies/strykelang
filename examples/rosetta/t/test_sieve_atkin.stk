@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sieve of Atkin
 
-fn my_sieve_atkin($limit) {
+fn Rosetta::SieveAtkin::compute($limit) {
     if ($limit < 2) { return ([]) }
     if ($limit == 2) { return ([2]) }
     if ($limit == 3) { return ([2, 3]) }
@@ -44,7 +44,7 @@ fn my_sieve_atkin($limit) {
     \@primes
 }
 
-my $res = my_sieve_atkin(100)
+my $res = Rosetta::SieveAtkin::compute(100)
 assert_eq join(",", @$res), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97", "Primes up to 100"
 
 test_run

@@ -1,10 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Counting Sort
 
-fn counting_sort {
-    my $list = $_[0]
-    my $min = $_[1]
-    my $max = $_[2]
+fn Rosetta::CountingSort::sort($list, $min, $max) {
     my @arr = @$list
     my @count = ()
     
@@ -24,7 +21,7 @@ fn counting_sort {
 }
 
 my $data = [4, 2, 2, 8, 3, 3, 1]
-my $sorted = counting_sort($data, 1, 8)
+my $sorted = Rosetta::CountingSort::sort($data, 1, 8)
 assert_eq join(",", @$sorted), "1,2,2,3,3,4,8", "counting sort"
 
 test_run

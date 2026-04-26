@@ -1,24 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Multiplication Table
 
-fn mult_table {
-    my $n = $_[0]
+fn Rosetta::MultiplicationTable::generate($n) {
     my @indices = (1..$n)
     my @rows
     for my $i (@indices) {
         my @row = @indices |> map { $i * $_ }
-        push @rows, [@row]
+        push @rows, \@row
     }
     \@rows
 }
 
-fn table_to_str {
-    my $m = $_[0]
-    my @lines = ~> @$m map { join(",", @{ $_ }) }
-    @lines |> join(";")
+fn Rosetta::MultiplicationTable::to_str($m) {
+    my @lines = ~> @$m map { join(",", @$_) }
+    join(";", @lines)
 }
 
-my $t3 = mult_table(3)
-assert_eq table_to_str($t3), "1,2,3;2,4,6;3,6,9", "3x3 mult table"
+my $t3 = Rosetta::MultiplicationTable::generate(3)
+assert_eq Rosetta::MultiplicationTable::to_str($t3), "1,2,3;2,4,6;3,6,9", "3x3 mult table"
 
 test_run

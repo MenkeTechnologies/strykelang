@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Matrix Multiplication
 
-fn matrix_to_str($m) {
+fn Rosetta::Matrix::to_str($m) {
     my @rows
     for my $row (@$m) {
         push @rows, join(",", @$row)
@@ -12,28 +12,28 @@ fn matrix_to_str($m) {
 # 2x2 * 2x2
 my $a = [[1,2], [3,4]]
 my $b = [[5,6], [7,8]]
-my @c = matrix_mul($a, $b)
-assert_eq matrix_to_str(\@c), "19,22;43,50", "2x2 * 2x2"
+my $c = [matrix_mul($a, $b)]
+assert_eq Rosetta::Matrix::to_str($c), "19,22;43,50", "2x2 * 2x2"
 
 # Identity matrix
 my $i = [[1,0], [0,1]]
-my @d = mm($a, $i)
-assert_eq matrix_to_str(\@d), "1,2;3,4", "A * I = A"
+my $d = [mm($a, $i)]
+assert_eq Rosetta::Matrix::to_str($d), "1,2;3,4", "A * I = A"
 
 # 2x3 * 3x2
 my $e = [[1,2,3], [4,5,6]]
 my $f = [[7,8], [9,10], [11,12]]
-my @g = matmul($e, $f)
-assert_eq matrix_to_str(\@g), "58,64;139,154", "2x3 * 3x2"
+my $g = [matmul($e, $f)]
+assert_eq Rosetta::Matrix::to_str($g), "58,64;139,154", "2x3 * 3x2"
 
 # 1x3 * 3x1 (dot product as matrix)
 my $h = [[1,2,3]]
 my $j = [[4], [5], [6]]
-my @k = matrix_mul($h, $j)
-assert_eq matrix_to_str(\@k), "32", "1x3 * 3x1 = dot product"
+my $k = [matrix_mul($h, $j)]
+assert_eq Rosetta::Matrix::to_str($k), "32", "1x3 * 3x1 = dot product"
 
 # 3x1 * 1x3 (outer product)
-my @l = matrix_mul($j, $h)
-assert_eq matrix_to_str(\@l), "4,8,12;5,10,15;6,12,18", "3x1 * 1x3 = outer product"
+my $l = [matrix_mul($j, $h)]
+assert_eq Rosetta::Matrix::to_str($l), "4,8,12;5,10,15;6,12,18", "3x1 * 1x3 = outer product"
 
 test_run

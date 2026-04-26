@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Base64 encode
 
-fn my_base64_encode($str) {
+fn Rosetta::Base64::custom_encode($str) {
     my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     my @chars = $str |> chars
     my @res
@@ -38,11 +38,12 @@ fn my_base64_encode($str) {
     join("", @res)
 }
 
-assert_eq my_base64_encode("f"), "Zg==", "my_encode 'f'"
-assert_eq my_base64_encode("fo"), "Zm8=", "my_encode 'fo'"
-assert_eq my_base64_encode("foo"), "Zm9v", "my_encode 'foo'"
+assert_eq Rosetta::Base64::custom_encode("f"), "Zg==", "custom_encode 'f'"
+assert_eq Rosetta::Base64::custom_encode("fo"), "Zm8=", "custom_encode 'fo'"
+assert_eq Rosetta::Base64::custom_encode("foo"), "Zm9v", "custom_encode 'foo'"
 
-# Testing builtin
-assert_eq base64_encode("foobar"), "Zm9vYmFy", "builtin_encode 'foobar'"
+# Testing builtins b64e and b64d
+assert_eq b64e("foobar"), "Zm9vYmFy", "builtin b64e 'foobar'"
+assert_eq b64d("Zm9vYmFy"), "foobar", "builtin b64d"
 
 test_run

@@ -167,6 +167,12 @@ pub fn descriptions_hash_map() -> indexmap::IndexMap<String, PerlValue> {
         .collect()
 }
 
+/// Returns `true` if `name` is a known builtin function (primary or alias).
+/// Used by CLI to implement `stryke BUILTIN` invocation (hierarchy: subcommand → builtin → script).
+pub fn is_builtin(name: &str) -> bool {
+    ALL_CATEGORY_MAP.iter().any(|(n, _)| *n == name)
+}
+
 #[inline]
 fn is_http_opts_hash(v: &PerlValue) -> bool {
     !v.is_undef() && (v.as_hash_map().is_some() || v.as_hash_ref().is_some())
@@ -3618,15 +3624,27 @@ fn builtin_cacheview(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
     let (count, total_kb) = cache.stats();
     println!("{}", bold("stryke bytecode cache"));
-    println!("  path: {}", dim(&script_cache::default_cache_path().display().to_string()));
-    println!("  scripts: {} ({:.2} KB)", green(&count.to_string()), total_kb as f64 / 1024.0);
+    println!(
+        "  path: {}",
+        dim(&script_cache::default_cache_path().display().to_string())
+    );
+    println!(
+        "  scripts: {} ({:.2} KB)",
+        green(&count.to_string()),
+        total_kb as f64 / 1024.0
+    );
     println!();
 
     let rows = cache.list_scripts();
     if rows.is_empty() {
         println!("  {}", dim("(empty)"));
     } else {
-        println!("{:<60} {:>10} {:>10}", bold("PATH"), bold("PROG KB"), bold("BC KB"));
+        println!(
+            "{:<60} {:>10} {:>10}",
+            bold("PATH"),
+            bold("PROG KB"),
+            bold("BC KB")
+        );
         for (path, prog_kb, chunk_kb, _version, _cached_at) in rows.iter().take(50) {
             let short = if path.len() > 58 {
                 format!("...{}", &path[path.len() - 55..])
@@ -3656,10 +3674,14 @@ fn builtin_cache_stats() -> PerlResult<PerlValue> {
     let mut h = IndexMap::new();
     h.insert("count".to_string(), PerlValue::integer(count));
     h.insert("bytes".to_string(), PerlValue::integer(bytes));
-    h.insert("path".to_string(), PerlValue::string(
-        script_cache::default_cache_path().display().to_string()
-    ));
-    h.insert("enabled".to_string(), PerlValue::integer(script_cache::cache_enabled() as i64));
+    h.insert(
+        "path".to_string(),
+        PerlValue::string(script_cache::default_cache_path().display().to_string()),
+    );
+    h.insert(
+        "enabled".to_string(),
+        PerlValue::integer(script_cache::cache_enabled() as i64),
+    );
     Ok(PerlValue::hash_ref(Arc::new(RwLock::new(h))))
 }
 
@@ -3718,7 +3740,7 @@ fn builtin_stress_cpu(args: &[PerlValue]) -> PerlResult<PerlValue> {
             s.spawn(|| {
                 let mut local_count: i64 = 0;
                 let mut data = [0u8; 64];
-                
+
                 while start.elapsed() < duration {
                     for _ in 0..1000 {
                         let hash = Sha256::digest(&data);
@@ -3726,7 +3748,7 @@ fn builtin_stress_cpu(args: &[PerlValue]) -> PerlResult<PerlValue> {
                         local_count += 1;
                     }
                 }
-                
+
                 total_count.fetch_add(local_count, Ordering::Relaxed);
             });
         }
@@ -3767,7 +3789,10 @@ fn builtin_stress_io(args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::fs;
     use std::io::Write;
 
-    let dir = args.first().map(|v| v.to_string()).unwrap_or_else(|| "/tmp".to_string());
+    let dir = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "/tmp".to_string());
     let iterations = args.get(1).map(|v| v.to_int()).unwrap_or(100) as usize;
     let mut total_bytes: i64 = 0;
     let data = vec![0xABu8; 1_000_000]; // 1MB per write
@@ -3815,17 +3840,17 @@ fn builtin_stress_test(args: &[PerlValue], line: usize) -> PerlResult<PerlValue>
         let num_workers = cluster.slots.len();
 
         let subs_prelude = String::new();
-        let block_src = format!(
-            r#"stress_cpu({})"#,
-            duration_secs
-        );
+        let block_src = format!(r#"stress_cpu({})"#, duration_secs);
         let capture: Vec<(String, serde_json::Value)> = Vec::new();
         let items: Vec<serde_json::Value> = (0..num_workers)
             .map(|i| serde_json::Value::Number(serde_json::Number::from(i)))
             .collect();
 
-        let results = crate::cluster::run_cluster(&cluster, subs_prelude, block_src, capture, items)
-            .map_err(|e| crate::error::PerlError::runtime(format!("stress_test: {}", e), line))?;
+        let results =
+            crate::cluster::run_cluster(&cluster, subs_prelude, block_src, capture, items)
+                .map_err(|e| {
+                    crate::error::PerlError::runtime(format!("stress_test: {}", e), line)
+                })?;
 
         let mut total_cpu: i64 = 0;
         let total_mem = 100_000_000i64 * num_workers as i64;
@@ -3839,7 +3864,11 @@ fn builtin_stress_test(args: &[PerlValue], line: usize) -> PerlResult<PerlValue>
     } else {
         let cpu = builtin_stress_cpu(&[PerlValue::float(duration_secs)])?.to_int();
         let mem = builtin_stress_mem(&[PerlValue::integer(100_000_000)])?.to_int();
-        let io = builtin_stress_io(&[PerlValue::string("/tmp".to_string()), PerlValue::integer(50)])?.to_int();
+        let io = builtin_stress_io(&[
+            PerlValue::string("/tmp".to_string()),
+            PerlValue::integer(50),
+        ])?
+        .to_int();
         (cpu, mem, io, 1)
     };
 
@@ -3908,7 +3937,11 @@ fn builtin_heat(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
     let elapsed = start.elapsed().as_secs_f64();
     let total = total_count.load(Ordering::Relaxed);
-    let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
+    let rate = if elapsed > 0.0 {
+        total as f64 / elapsed / 1e6
+    } else {
+        0.0
+    };
 
     eprintln!(
         "🔥 HEAT: {} hashes in {:.2}s ({:.1}M/s across {} cores)",
@@ -3961,7 +3994,11 @@ fn builtin_fire_and_forget() -> PerlResult<PerlValue> {
         std::thread::sleep(std::time::Duration::from_secs(1));
         let total = total_count.load(Ordering::Relaxed);
         let elapsed = start.elapsed().as_secs_f64();
-        let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
+        let rate = if elapsed > 0.0 {
+            total as f64 / elapsed / 1e6
+        } else {
+            0.0
+        };
         eprintln!(
             "🔥 FIRE: {} hashes in {:.1}s ({:.1}M/s across {} cores)",
             total, elapsed, rate, num_cores

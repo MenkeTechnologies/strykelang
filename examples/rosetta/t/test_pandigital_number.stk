@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pandigital number
 
-fn is_pandigital($n) {
+fn Rosetta::Pandigital::check($n) {
     my $s = "$n"
     my %digits
     my @c = chars($s)
@@ -11,11 +11,11 @@ fn is_pandigital($n) {
     scalar(keys %digits) == 10
 }
 
-assert_ok is_pandigital(1023456789), "1023456789 is pandigital"
-assert_ok is_pandigital(1234567890), "1234567890 is pandigital"
-assert_ok !is_pandigital(123456789), "123456789 is not (missing 0)"
-assert_ok !is_pandigital(102345678), "102345678 is not (missing 9)"
+assert_ok Rosetta::Pandigital::check(1023456789), "1023456789 is pandigital"
+assert_ok Rosetta::Pandigital::check(1234567890), "1234567890 is pandigital"
+assert_ok !Rosetta::Pandigital::check(123456789), "123456789 is not (missing 0)"
+assert_ok !Rosetta::Pandigital::check(102345678), "102345678 is not (missing 9)"
 
-1234567890 |> is_pandigital |> assert_ok("pipe pandigital")
+1234567890 |> Rosetta::Pandigital::check |> assert_ok("pipe pandigital")
 
 test_run

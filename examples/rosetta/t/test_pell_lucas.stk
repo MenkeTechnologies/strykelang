@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pell-Lucas numbers
 
-fn pell_lucas($n) {
+fn Rosetta::PellLucas::compute($n) {
     if ($n == 0) {
         2
     } elsif ($n == 1) {
@@ -17,13 +17,13 @@ fn pell_lucas($n) {
     }
 }
 
-assert_eq pell_lucas(0), 2, "Q(0)"
-assert_eq pell_lucas(1), 2, "Q(1)"
-assert_eq pell_lucas(2), 6, "Q(2)"
-assert_eq pell_lucas(3), 14, "Q(3)"
-assert_eq pell_lucas(4), 34, "Q(4)"
-assert_eq pell_lucas(10), 6726, "Q(10)"
+assert_eq Rosetta::PellLucas::compute(0), 2, "Q(0)"
+assert_eq Rosetta::PellLucas::compute(1), 2, "Q(1)"
+assert_eq Rosetta::PellLucas::compute(2), 6, "Q(2)"
+assert_eq Rosetta::PellLucas::compute(3), 14, "Q(3)"
+assert_eq Rosetta::PellLucas::compute(4), 34, "Q(4)"
+assert_eq Rosetta::PellLucas::compute(10), 6726, "Q(10)"
 
-10 |> pell_lucas |> assert_eq(6726, "pipe pell-lucas")
+10 |> Rosetta::PellLucas::compute |> assert_eq(6726, "pipe pell-lucas")
 
 test_run

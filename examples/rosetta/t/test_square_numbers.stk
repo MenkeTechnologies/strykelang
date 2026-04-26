@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Perfect square
 
-fn my_is_square($n) {
+fn Rosetta::Square::check($n) {
     if ($n < 0) {
         0
     } else {
@@ -10,15 +10,15 @@ fn my_is_square($n) {
     }
 }
 
-assert_ok my_is_square(0), "0 is square"
-assert_ok my_is_square(1), "1 is square"
-assert_ok my_is_square(4), "4 is square"
-assert_ok my_is_square(9), "9 is square"
-assert_ok my_is_square(100), "100 is square"
-assert_ok !my_is_square(2), "2 is not"
-assert_ok !my_is_square(3), "3 is not"
-assert_ok !my_is_square(-1), "-1 is not"
+assert_ok Rosetta::Square::check(0), "0 is square"
+assert_ok Rosetta::Square::check(1), "1 is square"
+assert_ok Rosetta::Square::check(4), "4 is square"
+assert_ok Rosetta::Square::check(9), "9 is square"
+assert_ok Rosetta::Square::check(100), "100 is square"
+assert_ok !Rosetta::Square::check(2), "2 is not"
+assert_ok !Rosetta::Square::check(3), "3 is not"
+assert_ok !Rosetta::Square::check(-1), "-1 is not"
 
-100 |> my_is_square |> assert_ok("pipe square")
+100 |> Rosetta::Square::check |> assert_ok("pipe square")
 
 test_run

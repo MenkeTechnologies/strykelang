@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Copy a string
 
-fn string_copy_demo() {
+fn Rosetta::CopyString::demo() {
     "String Copy Examples:" |> p
     
     # Basic string assignment (copy)
@@ -52,4 +52,5 @@ fn string_copy_demo() {
     my $threaded_copy = ~> $copy1 >{ "$_" }
 }
 
-string_copy_demo
+Rosetta::CopyString::demo()
+test_run

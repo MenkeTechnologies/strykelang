@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Diamond lines
 
-fn diamond_row($char, $max_char) {
+fn Rosetta::Diamond::row($char, $max_char) {
     my $dist = ord($char) - ord("A")
     my $max_dist = ord($max_char) - ord("A")
     my $outer = $max_dist - $dist
@@ -18,21 +18,21 @@ fn diamond_row($char, $max_char) {
     $res
 }
 
-fn diamond($max_char) {
+fn Rosetta::Diamond::build($max_char) {
     my @rows
     my @chars = ("A" .. $max_char)
     for my $c (@chars) {
-        push @rows, diamond_row($c, $max_char)
+        push @rows, Rosetta::Diamond::row($c, $max_char)
     }
     my @rev_chars = rev(@chars)
     shift @rev_chars # remove max_char
     for my $c (@rev_chars) {
-        push @rows, diamond_row($c, $max_char)
+        push @rows, Rosetta::Diamond::row($c, $max_char)
     }
     \@rows
 }
 
-my $d_c = diamond("C")
+my $d_c = Rosetta::Diamond::build("C")
 assert_eq $d_c->[0], "  A  ", "diamond C row 0"
 assert_eq $d_c->[1], " B B ", "diamond C row 1"
 assert_eq $d_c->[2], "C   C", "diamond C row 2"

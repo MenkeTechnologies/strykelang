@@ -1,24 +1,30 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sierpinski Triangle
 
-fn sierpinski_triangle($n) {
+fn Rosetta::Sierpinski::generate($n) {
+    my @res
     for my $i (0..$n-1) {
-        for my $s (0..$n-$i-2) { print " " }
+        my $row = ""
+        for my $s (0..$n-$i-2) { $row = $row . " " }
         
         my $c = 1
         for my $j (0..$i) {
             if ($c % 2 == 1) {
-                print "* "
+                $row = $row . "* "
             } else {
-                print "  "
+                $row = $row . "  "
             }
             $c = $c * ($i - $j) / ($j + 1)
         }
-        print "\n"
+        push @res, $row
     }
+    \@res
 }
 
 print "Sierpinski Triangle (8 rows):\n"
-sierpinski_triangle 8
-print "\nSierpinski Triangle (16 rows):\n" 
-sierpinski_triangle 16
+my $rows = Rosetta::Sierpinski::generate(8)
+for my $r (@$rows) { print "$r\n" }
+
+assert_eq scalar(@$rows), 8, "8 rows generated"
+
+test_run

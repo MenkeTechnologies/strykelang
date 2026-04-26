@@ -1,29 +1,29 @@
 #!/usr/bin/env stryke
 # Rosetta Code: String Case
 
-fn to_upper($s) { ~> $s uc }
-fn to_lower($s) { ~> $s lc }
+fn Rosetta::StringCase::upper($s) { ~> $s uc }
+fn Rosetta::StringCase::lower($s) { ~> $s lc }
 
-fn to_title($s) {
+fn Rosetta::StringCase::title($s) {
     ~> $s >{split /\s+/, $_} map { ucfirst(lc($_)) } |> join " "
 }
 
-fn my_swap_case($s) {
-    ~> $s >{split //, $_} map {
+fn Rosetta::StringCase::swap($s) {
+    ~> $s chars map {
         $_ eq uc($_) ? lc($_) : uc($_)
     } |> join ""
 }
 
-assert_eq to_upper("hello"), "HELLO", "upper"
-assert_eq to_lower("HELLO"), "hello", "lower"
-assert_eq to_upper("Hello World"), "HELLO WORLD", "upper phrase"
-assert_eq to_lower("Hello World"), "hello world", "lower phrase"
+assert_eq Rosetta::StringCase::upper("hello"), "HELLO", "upper"
+assert_eq Rosetta::StringCase::lower("HELLO"), "hello", "lower"
+assert_eq Rosetta::StringCase::upper("Hello World"), "HELLO WORLD", "upper phrase"
+assert_eq Rosetta::StringCase::lower("Hello World"), "hello world", "lower phrase"
 
-assert_eq to_title("hello world"), "Hello World", "title case"
-assert_eq to_title("THE QUICK BROWN FOX"), "The Quick Brown Fox", "title from upper"
+assert_eq Rosetta::StringCase::title("hello world"), "Hello World", "title case"
+assert_eq Rosetta::StringCase::title("THE QUICK BROWN FOX"), "The Quick Brown Fox", "title from upper"
 
-assert_eq my_swap_case("Hello"), "hELLO", "swap case hello"
-assert_eq my_swap_case("HeLLo WoRLD"), "hEllO wOrld", "swap mixed"
+assert_eq Rosetta::StringCase::swap("Hello"), "hELLO", "swap case hello"
+assert_eq Rosetta::StringCase::swap("HeLLo WoRLD"), "hEllO wOrld", "swap mixed"
 
 assert_eq ucfirst("hello"), "Hello", "ucfirst"
 assert_eq lcfirst("HELLO"), "hELLO", "lcfirst"

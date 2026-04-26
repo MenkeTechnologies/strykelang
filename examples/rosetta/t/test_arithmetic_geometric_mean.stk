@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Arithmetic-geometric mean
 
-fn agm($a, $g) {
+fn Rosetta::AGM::compute($a, $g) {
     for my $i (1..10) {
         my $next_a = ($a + $g) / 2
         my $next_g = sqrt($a * $g)
@@ -11,11 +11,10 @@ fn agm($a, $g) {
     $a
 }
 
-my $res = agm(1, 1 / sqrt(2))
-my $diff = abs($res - 0.847213)
-assert_ok $diff < 0.0001, "AGM(1, 1/sqrt(2))"
+my $res = Rosetta::AGM::compute(1, 1 / sqrt(2))
+assert_near $res, 0.847213, 0.0001, "AGM(1, 1/sqrt(2))"
 
 # Pipe
-1 |> agm(0.707106) |> map { abs($_ - 0.847213) < 0.0001 } |> assert_ok("pipe AGM")
+1 |> Rosetta::AGM::compute(0.707106) |> assert_near(0.847213, 0.0001, "pipe AGM")
 
 test_run

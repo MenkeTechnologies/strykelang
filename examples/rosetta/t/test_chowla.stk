@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Chowla numbers
 
-fn chowla($n) {
+fn Rosetta::Chowla::compute($n) {
     if ($n < 2) {
         0
     } else {
@@ -13,11 +13,11 @@ fn chowla($n) {
     }
 }
 
-assert_eq chowla(1), 0, "chowla(1)"
-assert_eq chowla(6), 5, "chowla(6) = 2+3=5"
-assert_eq chowla(20), 21, "chowla(20) = 2+4+5+10=21"
-assert_eq chowla(37), 0, "chowla(37) is prime"
+assert_eq Rosetta::Chowla::compute(1), 0, "chowla(1)"
+assert_eq Rosetta::Chowla::compute(6), 5, "chowla(6) = 2+3=5"
+assert_eq Rosetta::Chowla::compute(20), 21, "chowla(20) = 2+4+5+10=21"
+assert_eq Rosetta::Chowla::compute(37), 0, "chowla(37) is prime"
 
-20 |> chowla |> assert_eq(21, "pipe chowla")
+20 |> Rosetta::Chowla::compute |> assert_eq(21, "pipe chowla")
 
 test_run

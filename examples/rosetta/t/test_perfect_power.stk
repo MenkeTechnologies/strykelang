@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Perfect power
 
-fn is_perfect_power($n) {
+fn Rosetta::PerfectPower::check($n) {
     if ($n < 4) {
         $n == 1
     } else {
@@ -12,22 +12,22 @@ fn is_perfect_power($n) {
             my $a = int($n**(1/$b) + 0.5)
             if ($a**$b == $n) {
                 $found = 1
-                $b = $limit_b # break
+                return 1
             }
         }
         $found
     }
 }
 
-assert_ok is_perfect_power(1), "1 is perfect power"
-assert_ok is_perfect_power(4), "4 is perfect power (2^2)"
-assert_ok is_perfect_power(8), "8 is perfect power (2^3)"
-assert_ok is_perfect_power(9), "9 is perfect power (3^2)"
-assert_ok is_perfect_power(32), "32 is perfect power (2^5)"
-assert_ok is_perfect_power(36), "36 is perfect power (6^2)"
-assert_ok !is_perfect_power(6), "6 is not"
-assert_ok !is_perfect_power(10), "10 is not"
+assert_ok Rosetta::PerfectPower::check(1), "1 is perfect power"
+assert_ok Rosetta::PerfectPower::check(4), "4 is perfect power (2^2)"
+assert_ok Rosetta::PerfectPower::check(8), "8 is perfect power (2^3)"
+assert_ok Rosetta::PerfectPower::check(9), "9 is perfect power (3^2)"
+assert_ok Rosetta::PerfectPower::check(32), "32 is perfect power (2^5)"
+assert_ok Rosetta::PerfectPower::check(36), "36 is perfect power (6^2)"
+assert_ok !Rosetta::PerfectPower::check(6), "6 is not"
+assert_ok !Rosetta::PerfectPower::check(10), "10 is not"
 
-36 |> is_perfect_power |> assert_ok("pipe perfect power")
+36 |> Rosetta::PerfectPower::check |> assert_ok("pipe perfect power")
 
 test_run

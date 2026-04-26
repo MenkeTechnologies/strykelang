@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Babbage Problem
 
-fn solve_babbage {
+fn Rosetta::Babbage::solve {
     my $n = 1
     while (1) {
         my $sq = $n * $n
@@ -15,6 +15,6 @@ fn solve_babbage {
     }
 }
 
-assert_eq solve_babbage(), 25264, "Babbage result is 25264"
+assert_eq Rosetta::Babbage::solve(), 25264, "Babbage result is 25264"
 
 test_run

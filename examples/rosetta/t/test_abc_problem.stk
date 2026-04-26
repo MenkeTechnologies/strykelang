@@ -1,45 +1,43 @@
 #!/usr/bin/env stryke
 # Rosetta Code: ABC Problem
 
-fn can_make_word($word, @blocks) {
-    my @chars = ~> $word lc chars
-    my @b_list = ~> @blocks map { lc($_) }
-    _can_make_word_rec(\@chars, \@b_list)
-}
-
-fn _can_make_word_rec($chars_ref, $blocks_ref) {
+fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
     if (scalar(@$chars_ref) == 0) {
-        1
-    } else {
-        my @chars = @$chars_ref
-        my @blocks = @$blocks_ref
-        my $c = shift @chars
-        my $found = 0
-        for my $i (0..scalar(@blocks)-1) {
-            if (index($blocks[$i], $c) >= 0) {
-                my @rem = @blocks
-                splice(@remaining, 0, 0, @rem) # Copy array
-                splice(@rem, $i, 1)
-                if (_can_make_word_rec(\@chars, \@rem)) {
-                    $found = 1
-                    $i = scalar(@blocks)
-                }
+        return 1
+    }
+    
+    my @chars = @$chars_ref
+    my @blocks = @$blocks_ref
+    my $c = shift @chars
+    
+    for my $i (0..scalar(@blocks)-1) {
+        if (index($blocks[$i], $c) >= 0) {
+            my @remaining = @blocks
+            splice(@remaining, $i, 1)
+            if (Rosetta::ABCProblem::check_recursive(\@chars, \@remaining)) {
+                return 1
             }
         }
-        $found
     }
+    0
+}
+
+fn Rosetta::ABCProblem::check($word, @blocks) {
+    my @chars = ~> $word lc chars
+    my @b_list = ~> @blocks map { lc($_) }
+    Rosetta::ABCProblem::check_recursive(\@chars, \@b_list)
 }
 
 my @blocks = ("BO", "XK", "DQ", "CP", "NA", "GT", "RE", "TG", "QD", "FS", "JW", "HU", "VI", "AN", "OB", "ER", "FS", "LY", "PC", "ZM")
 
-assert_ok can_make_word("A", @blocks), "can make A"
-assert_ok can_make_word("BARK", @blocks), "can make BARK"
-assert_ok !can_make_word("BOOK", @blocks), "cannot make BOOK (needs two O blocks)"
-assert_ok can_make_word("TREAT", @blocks), "can make TREAT"
-assert_ok !can_make_word("COMMON", @blocks), "cannot make COMMON"
-assert_ok can_make_word("SQUAD", @blocks), "can make SQUAD"
-assert_ok can_make_word("CONFUSE", @blocks), "can make CONFUSE"
+assert_ok Rosetta::ABCProblem::check("A", @blocks), "can make A"
+assert_ok Rosetta::ABCProblem::check("BARK", @blocks), "can make BARK"
+assert_ok !Rosetta::ABCProblem::check("BOOK", @blocks), "cannot make BOOK (needs two O blocks)"
+assert_ok Rosetta::ABCProblem::check("TREAT", @blocks), "can make TREAT"
+assert_ok !Rosetta::ABCProblem::check("COMMON", @blocks), "cannot make COMMON"
+assert_ok Rosetta::ABCProblem::check("SQUAD", @blocks), "can make SQUAD"
+assert_ok Rosetta::ABCProblem::check("CONFUSE", @blocks), "can make CONFUSE"
 
-"BARK" |> can_make_word(@blocks) |> assert_ok("pipe BARK")
+"BARK" |> Rosetta::ABCProblem::check(@blocks) |> assert_ok("pipe BARK")
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Vector Cross Product
 
-fn algo_cross($a, $b) {
+fn Rosetta::VectorCross::compute($a, $b) {
     [
         $a->[1]*$b->[2] - $a->[2]*$b->[1],
         $a->[2]*$b->[0] - $a->[0]*$b->[2],
@@ -11,7 +11,7 @@ fn algo_cross($a, $b) {
 
 my $v1 = [1, 2, 3]
 my $v2 = [4, 5, 6]
-my $res = algo_cross($v1, $v2)
+my $res = Rosetta::VectorCross::compute($v1, $v2)
 
 # Expected: [-3, 6, -3]
 assert_eq $res->[0], -3, "cross x"

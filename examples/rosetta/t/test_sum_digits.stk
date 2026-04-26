@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sum Digits of an Integer
 
-fn sum_digits {
-    my $n = $_[0]
-    ~> $n abs >{ sprintf("%d", $_) } chars map { int($_) } reduce { $a + $b }
+fn Rosetta::SumDigits::compute($n) {
+    my $sum = 0
+    my @digits = ~> $n abs >{ sprintf("%d", $_) } chars
+    for my $d (@digits) { $sum = $sum + int($d) }
+    $sum
 }
 
-fn sum_digits_base {
-    my $n = $_[0]
-    my $base = $_[1]
+fn Rosetta::SumDigits::compute_base($n, $base) {
     my $sum = 0
     my $curr = abs($n)
     while ($curr > 0) {
@@ -18,14 +18,14 @@ fn sum_digits_base {
     $sum
 }
 
-assert_eq sum_digits(123), 6, "123 -> 6"
-assert_eq sum_digits(1234567890), 45, "1234567890 -> 45"
-assert_eq sum_digits(0), 0, "0 -> 0"
-assert_eq sum_digits(-123), 6, "negative handled"
+assert_eq Rosetta::SumDigits::compute(123), 6, "123 -> 6"
+assert_eq Rosetta::SumDigits::compute(1234567890), 45, "1234567890 -> 45"
+assert_eq Rosetta::SumDigits::compute(0), 0, "0 -> 0"
+assert_eq Rosetta::SumDigits::compute(-123), 6, "negative handled"
 
-assert_eq sum_digits_base(1, 10), 1, "base 10: 1"
-assert_eq sum_digits_base(1234, 10), 10, "base 10: 1234"
-assert_eq sum_digits_base(0xfe, 16), 29, "base 16: 0xfe (15+14)"
-assert_eq sum_digits_base(0b1010, 2), 2, "base 2: 1010"
+assert_eq Rosetta::SumDigits::compute_base(1, 10), 1, "base 10: 1"
+assert_eq Rosetta::SumDigits::compute_base(1234, 10), 10, "base 10: 1234"
+assert_eq Rosetta::SumDigits::compute_base(0xfe, 16), 29, "base 16: 0xfe (15+14)"
+assert_eq Rosetta::SumDigits::compute_base(0b1010, 2), 2, "base 2: 1010"
 
 test_run
