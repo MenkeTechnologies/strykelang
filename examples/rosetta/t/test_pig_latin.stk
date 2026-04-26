@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pig Latin
 
-fn my_pig_latin($word) {
+fn Rosetta::PigLatin::translate($word) {
     if ($word =~ /^[aeiou]/i) {
         $word . "way"
     } else {
@@ -13,11 +13,11 @@ fn my_pig_latin($word) {
     }
 }
 
-assert_eq my_pig_latin("apple"), "appleway", "apple -> appleway"
-assert_eq my_pig_latin("pig"), "igpay", "pig -> igpay"
-assert_eq my_pig_latin("latin"), "atinlay", "latin -> latinay"
-assert_eq my_pig_latin("smile"), "ilesmay", "smile -> ilesmay"
+assert_eq Rosetta::PigLatin::translate("apple"), "appleway", "apple -> appleway"
+assert_eq Rosetta::PigLatin::translate("pig"), "igpay", "pig -> igpay"
+assert_eq Rosetta::PigLatin::translate("latin"), "atinlay", "latin -> latinay"
+assert_eq Rosetta::PigLatin::translate("smile"), "ilesmay", "smile -> ilesmay"
 
-"hello" |> my_pig_latin |> assert_eq("ellohay", "pipe pig latin")
+"hello" |> Rosetta::PigLatin::translate |> assert_eq("ellohay", "pipe pig latin")
 
 test_run

@@ -3956,22 +3956,17 @@ fn builtin_fire_and_forget() -> PerlResult<PerlValue> {
         });
     }
 
-    // Reporter thread — prints stats every second
-    let counter = Arc::clone(&total_count);
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let total = counter.load(Ordering::Relaxed);
-            let elapsed = start.elapsed().as_secs_f64();
-            let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
-            eprintln!(
-                "🔥 FIRE: {} hashes in {:.1}s ({:.1}M/s across {} cores)",
-                total, elapsed, rate, num_cores
-            );
-        }
-    });
-
-    Ok(PerlValue::UNDEF)
+    // Block forever, reporting stats every second (Ctrl-C to stop)
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let total = total_count.load(Ordering::Relaxed);
+        let elapsed = start.elapsed().as_secs_f64();
+        let rate = if elapsed > 0.0 { total as f64 / elapsed / 1e6 } else { 0.0 };
+        eprintln!(
+            "🔥 FIRE: {} hashes in {:.1}s ({:.1}M/s across {} cores)",
+            total, elapsed, rate, num_cores
+        );
+    }
 }
 
 /// `fetch` — Fetch.

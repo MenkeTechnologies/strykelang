@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Bubble Sort
 
-fn bubble_sort(@arr) {
+fn Rosetta::BubbleSort::sort(@arr) {
     my $n = scalar(@arr)
     for my $i (0..$n-2) {
         for my $j (0..$n-2-$i) {
@@ -13,19 +13,19 @@ fn bubble_sort(@arr) {
     @arr
 }
 
-my @sorted = bubble_sort(64, 34, 25, 12, 22, 11, 90)
+my @sorted = Rosetta::BubbleSort::sort(64, 34, 25, 12, 22, 11, 90)
 assert_eq join(",", @sorted), "11,12,22,25,34,64,90", "bubble sort"
 
-my @single = bubble_sort(42)
+my @single = Rosetta::BubbleSort::sort(42)
 assert_eq join(",", @single), "42", "single element"
 
-my @already = bubble_sort(1, 2, 3, 4, 5)
+my @already = Rosetta::BubbleSort::sort(1, 2, 3, 4, 5)
 assert_eq join(",", @already), "1,2,3,4,5", "already sorted"
 
-my @reverse = bubble_sort(5, 4, 3, 2, 1)
+my @reverse = Rosetta::BubbleSort::sort(5, 4, 3, 2, 1)
 assert_eq join(",", @reverse), "1,2,3,4,5", "reverse sorted"
 
-my @dups = bubble_sort(3, 1, 4, 1, 5, 9, 2, 6)
+my @dups = Rosetta::BubbleSort::sort(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq join(",", @dups), "1,1,2,3,4,5,6,9", "with duplicates"
 
 test_run

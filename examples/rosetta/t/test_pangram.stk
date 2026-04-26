@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Pangram
 
-fn my_is_pangram($s) {
+fn Rosetta::Pangram::check($s) {
     my $lower = lc($s)
     my @missing = ~> 'a'..'z' grep { index($lower, $_) < 0 }
     scalar(@missing) == 0
 }
 
-assert_ok my_is_pangram("The quick brown fox jumps over the lazy dog"), "Standard pangram"
-assert_ok my_is_pangram("Pack my box with five dozen liquor jugs"), "Another pangram"
-assert_ok !my_is_pangram("Hello World"), "Not a pangram"
+assert_ok Rosetta::Pangram::check("The quick brown fox jumps over the lazy dog"), "Standard pangram"
+assert_ok Rosetta::Pangram::check("Pack my box with five dozen liquor jugs"), "Another pangram"
+assert_ok !Rosetta::Pangram::check("Hello World"), "Not a pangram"
 
 test_run

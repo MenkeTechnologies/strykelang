@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Icosian Game (on a cube)
 
-fn solve_path($adj, $start, $visited, $path) {
+fn Rosetta::IcosianCube::solve($adj, $start, $visited, $path) {
     push @$path, $start
     $visited->{$start} = 1
     
@@ -12,7 +12,7 @@ fn solve_path($adj, $start, $visited, $path) {
     for my $neighbor (@{$adj->[$start]}) {
         if (!$visited->{$neighbor}) {
             my @p = @$path
-            my $res = solve_path($adj, $neighbor, { %$visited }, \@p)
+            my $res = Rosetta::IcosianCube::solve($adj, $neighbor, { %$visited }, \@p)
             if (defined $res) { return $res }
         }
     }
@@ -24,7 +24,7 @@ my $cube_adj = [
     [0, 5, 7], [1, 4, 6], [2, 5, 7], [3, 4, 6]
 ]
 
-my $path = solve_path($cube_adj, 0, {}, [])
+my $path = Rosetta::IcosianCube::solve($cube_adj, 0, {}, [])
 assert_ok defined($path), "Hamiltonian path on cube exists"
 assert_eq scalar(@$path), 8, "path length is 8"
 

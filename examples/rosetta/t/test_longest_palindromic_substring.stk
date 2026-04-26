@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Longest palindromic substring
 
-fn my_is_palindrome($s) {
+fn Rosetta::LongestPalindromicSubstring::is_palindrome($s) {
     my $rev = ~> $s chars rev |> join ""
     $s eq $rev
 }
 
-fn longest_palindromic_substring($s) {
+fn Rosetta::LongestPalindromicSubstring::find($s) {
     my $len = length($s)
     if ($len <= 1) { return $s }
     
@@ -16,7 +16,7 @@ fn longest_palindromic_substring($s) {
     for my $i (0..$len-1) {
         for my $j ($i+$max_len..$len-1) {
             my $sub = substr($s, $i, $j - $i + 1)
-            if (length($sub) > $max_len && my_is_palindrome($sub)) {
+            if (length($sub) > $max_len && Rosetta::LongestPalindromicSubstring::is_palindrome($sub)) {
                 $max_len = length($sub)
                 $max_str = $sub
             }
@@ -25,8 +25,8 @@ fn longest_palindromic_substring($s) {
     $max_str
 }
 
-assert_eq longest_palindromic_substring("babad"), "bab", "LPS babad -> bab (or aba)"
-assert_eq longest_palindromic_substring("cbbd"), "bb", "LPS cbbd -> bb"
-assert_eq longest_palindromic_substring("racecar"), "racecar", "LPS racecar -> racecar"
+assert_eq Rosetta::LongestPalindromicSubstring::find("babad"), "bab", "LPS babad -> bab (or aba)"
+assert_eq Rosetta::LongestPalindromicSubstring::find("cbbd"), "bb", "LPS cbbd -> bb"
+assert_eq Rosetta::LongestPalindromicSubstring::find("racecar"), "racecar", "LPS racecar -> racecar"
 
 test_run

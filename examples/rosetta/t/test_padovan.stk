@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Padovan sequence
 
-fn padovan($n) {
+fn Rosetta::Padovan::compute($n) {
     if ($n < 3) {
         1
     } else {
@@ -16,18 +16,18 @@ fn padovan($n) {
     }
 }
 
-fn padovan_list($max_n) {
-    ~> 0..$max_n map { padovan($_) }
+fn Rosetta::Padovan::list($max_n) {
+    ~> 0..$max_n map { Rosetta::Padovan::compute($_) }
 }
 
-assert_eq padovan(0), 1, "P0"
-assert_eq padovan(3), 2, "P3"
-assert_eq padovan(5), 3, "P5"
-assert_eq padovan(10), 12, "P10"
+assert_eq Rosetta::Padovan::compute(0), 1, "P0"
+assert_eq Rosetta::Padovan::compute(3), 2, "P3"
+assert_eq Rosetta::Padovan::compute(5), 3, "P5"
+assert_eq Rosetta::Padovan::compute(10), 12, "P10"
 
-my @list = padovan_list(5)
+my @list = Rosetta::Padovan::list(5)
 assert_eq join(",", @list), "1,1,1,2,2,3", "Padovan list"
 
-10 |> padovan |> assert_eq(12, "pipe padovan")
+10 |> Rosetta::Padovan::compute |> assert_eq(12, "pipe padovan")
 
 test_run
