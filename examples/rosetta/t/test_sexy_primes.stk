@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Sexy primes
 
-fn my_is_prime($n) {
+fn SexyPrimes::my_is_prime($n) {
     if ($n < 2) { 0 }
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
@@ -20,15 +20,15 @@ fn my_is_prime($n) {
     }
 }
 
-fn are_sexy_primes($p1, $p2) {
-    my_is_prime($p1) && my_is_prime($p2) && abs($p1 - $p2) == 6
+fn SexyPrimes::are_sexy_primes($p1, $p2) {
+    SexyPrimes::my_is_prime($p1) && SexyPrimes::my_is_prime($p2) && abs($p1 - $p2) == 6
 }
 
-assert_ok are_sexy_primes(7, 13), "7 and 13 are sexy primes"
-assert_ok are_sexy_primes(11, 17), "11 and 17"
-assert_ok are_sexy_primes(13, 19), "13 and 19"
-assert_ok !are_sexy_primes(5, 7), "5 and 7 are not (gap 2)"
+assert_ok SexyPrimes::are_sexy_primes(7, 13), "7 and 13 are sexy primes"
+assert_ok SexyPrimes::are_sexy_primes(11, 17), "11 and 17"
+assert_ok SexyPrimes::are_sexy_primes(13, 19), "13 and 19"
+assert_ok !SexyPrimes::are_sexy_primes(5, 7), "5 and 7 are not (gap 2)"
 
-7 |> are_sexy_primes(13) |> assert_ok("pipe sexy primes")
+7 |> SexyPrimes::are_sexy_primes(13) |> assert_ok("pipe sexy primes")
 
 test_run

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Longest increasing subsequence
 
-fn lis($arr_ref) {
+fn Rosetta::LIS::solve($arr_ref) {
     my @arr = @$arr_ref
     my $n = scalar(@arr)
     if ($n == 0) { return 0 }
@@ -24,8 +24,8 @@ fn lis($arr_ref) {
     $size
 }
 
-assert_eq lis([0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]), 6, "LIS length is 6"
-assert_eq lis([1, 2, 3, 4, 5]), 5, "LIS of sorted"
-assert_eq lis([5, 4, 3, 2, 1]), 1, "LIS of reverse sorted"
+assert_eq Rosetta::LIS::solve([0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]), 6, "LIS length is 6"
+assert_eq Rosetta::LIS::solve([1, 2, 3, 4, 5]), 5, "LIS of sorted"
+assert_eq Rosetta::LIS::solve([5, 4, 3, 2, 1]), 1, "LIS of reverse sorted"
 
 test_run

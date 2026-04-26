@@ -24,7 +24,7 @@ fn Rosetta::NQueens::solve($n) {
 }
 
 assert_eq Rosetta::NQueens::solve(1), 1, "N-Queens(1)"
-assert_eq Rosetta::NQueens::solve(4), 2, "N-Queens(4)"
+assert_eq Rosetta::NQueens::solve(4), 2, "N-4 queens"
 assert_eq Rosetta::NQueens::solve(5), 10, "N-Queens(5)"
 assert_eq Rosetta::NQueens::solve(6), 4, "N-Queens(6)"
 assert_eq Rosetta::NQueens::solve(8), 92, "N-Queens(8)"

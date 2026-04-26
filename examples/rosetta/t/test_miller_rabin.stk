@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Miller-Rabin primality test
 
-fn power($a, $b, $m) {
+fn MillerRabin::power($a, $b, $m) {
     my $res = 1
     $a %= $m
     while ($b > 0) {
@@ -12,7 +12,7 @@ fn power($a, $b, $m) {
     $res
 }
 
-fn my_miller_rabin($n, $k) {
+fn MillerRabin::my_miller_rabin($n, $k) {
     if ($n == 2 || $n == 3) { return 1 }
     if ($n < 2 || $n % 2 == 0) { return 0 }
     
@@ -25,7 +25,7 @@ fn my_miller_rabin($n, $k) {
     
     for my $i (1..$k) {
         my $a = 2 + int(rand($n - 4))
-        my $x = power($a, $d, $n)
+        my $x = MillerRabin::power($a, $d, $n)
         if ($x == 1 || $x == $n - 1) { next }
         my $composite = 1
         for my $r (1..$s-1) {
@@ -40,10 +40,10 @@ fn my_miller_rabin($n, $k) {
     1
 }
 
-assert_ok my_miller_rabin(13, 5), "13 is prime"
-assert_ok my_miller_rabin(17, 5), "17 is prime"
-assert_ok !my_miller_rabin(15, 5), "15 is not prime"
-assert_ok !my_miller_rabin(100, 5), "100 is not prime"
-assert_ok my_miller_rabin(101, 5), "101 is prime"
+assert_ok MillerRabin::my_miller_rabin(13, 5), "13 is prime"
+assert_ok MillerRabin::my_miller_rabin(17, 5), "17 is prime"
+assert_ok !MillerRabin::my_miller_rabin(15, 5), "15 is not prime"
+assert_ok !MillerRabin::my_miller_rabin(100, 5), "100 is not prime"
+assert_ok MillerRabin::my_miller_rabin(101, 5), "101 is prime"
 
 test_run

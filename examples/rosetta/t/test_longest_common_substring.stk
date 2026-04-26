@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Longest common substring
 
-fn my_lcs_substring($s1, $s2) {
+fn Rosetta::LCSSubstring::solve($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
     my $m = scalar(@c1)
@@ -31,8 +31,8 @@ fn my_lcs_substring($s1, $s2) {
     substr($s1, $end_idx - $max_len, $max_len)
 }
 
-assert_eq my_lcs_substring("abcde", "abfde"), "ab", "LCS substring abcde/abfde"
-assert_eq my_lcs_substring("thisisatest", "testing123testing"), "test", "LCS substring test"
-assert_eq my_lcs_substring("apple", "banana"), "a", "Common 'a'"
+assert_eq Rosetta::LCSSubstring::solve("abcde", "abfde"), "ab", "LCS substring abcde/abfde"
+assert_eq Rosetta::LCSSubstring::solve("thisisatest", "testing123testing"), "test", "LCS substring test"
+assert_eq Rosetta::LCSSubstring::solve("apple", "banana"), "a", "Common 'a'"
 
 test_run

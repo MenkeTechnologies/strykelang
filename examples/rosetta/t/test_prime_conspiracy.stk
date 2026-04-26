@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Prime conspiracy
 
-fn my_is_prime {
+fn PrimeConspiracy::my_is_prime {
     my $n = $_[0]
     if ($n < 2) { return 0 }
     if ($n == 2 || $n == 3) { return 1 }
@@ -14,30 +14,30 @@ fn my_is_prime {
     1
 }
 
-fn my_next_prime($n) {
+fn PrimeConspiracy::my_next_prime($n) {
     my $p = $n + 1
-    while (!my_is_prime($p)) {
+    while (!PrimeConspiracy::my_is_prime($p)) {
         $p++
     }
     $p
 }
 
-fn last_digit($n) {
+fn PrimeConspiracy::last_digit($n) {
     $n % 10
 }
 
 my $p = 2
-my $p_next = my_next_prime($p)
-my $d1 = last_digit($p)
-my $d2 = last_digit($p_next)
+my $p_next = PrimeConspiracy::my_next_prime($p)
+my $d1 = PrimeConspiracy::last_digit($p)
+my $d2 = PrimeConspiracy::last_digit($p_next)
 
 assert_eq $d1, 2, "last digit of 2 is 2"
 assert_eq $d2, 3, "last digit of next prime (3) is 3"
 
 $p = 7
-$p_next = my_next_prime($p)
-my $d3 = last_digit($p)
-my $d4 = last_digit($p_next)
+$p_next = PrimeConspiracy::my_next_prime($p)
+my $d3 = PrimeConspiracy::last_digit($p)
+my $d4 = PrimeConspiracy::last_digit($p_next)
 
 assert_eq $d3, 7, "last digit of 7 is 7"
 assert_eq $d4, 1, "last digit of next prime (11) is 1"

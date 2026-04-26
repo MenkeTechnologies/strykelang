@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Leonardo numbers
 
-fn leonardo($n) {
+fn Rosetta::Leonardo::compute($n) {
     if ($n < 2) {
         1
     } else {
@@ -15,13 +15,13 @@ fn leonardo($n) {
     }
 }
 
-assert_eq leonardo(0), 1, "L(0)"
-assert_eq leonardo(1), 1, "L(1)"
-assert_eq leonardo(2), 3, "L(2) = 1+1+1"
-assert_eq leonardo(3), 5, "L(3) = 1+3+1"
-assert_eq leonardo(4), 9, "L(4) = 3+5+1"
-assert_eq leonardo(10), 177, "L(10)"
+assert_eq Rosetta::Leonardo::compute(0), 1, "L(0)"
+assert_eq Rosetta::Leonardo::compute(1), 1, "L(1)"
+assert_eq Rosetta::Leonardo::compute(2), 3, "L(2) = 1+1+1"
+assert_eq Rosetta::Leonardo::compute(3), 5, "L(3) = 1+3+1"
+assert_eq Rosetta::Leonardo::compute(4), 9, "L(4) = 3+5+1"
+assert_eq Rosetta::Leonardo::compute(10), 177, "L(10)"
 
-10 |> leonardo |> assert_eq(177, "pipe leonardo")
+10 |> Rosetta::Leonardo::compute |> assert_eq(177, "pipe leonardo")
 
 test_run

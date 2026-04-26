@@ -1,25 +1,27 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Lychrel numbers
 
-fn my_is_palindrome($s) {
+fn Rosetta::Lychrel::check_palindrome($s) {
     my $rev = ~> $s chars rev |> join ""
     $s eq $rev
 }
 
-fn my_is_lychrel($n, $max_iter) {
+fn Rosetta::Lychrel::check($n, $max_iter) {
     my $curr = $n
     for my $i (1..$max_iter) {
         my $rev = ~> "$curr" chars rev |> join ""
         $curr = $curr + $rev
-        if (my_is_palindrome("$curr")) {
+        if (Rosetta::Lychrel::check_palindrome("$curr")) {
             return 0
         }
     }
     1
 }
 
-assert_ok !my_is_lychrel(121, 50), "121 is not Lychrel"
-assert_ok !my_is_lychrel(47, 50), "47 is not Lychrel (47+74=121)"
-assert_ok my_is_lychrel(196, 50), "196 is likely Lychrel"
+assert_ok !Rosetta::Lychrel::check(121, 50), "121 is not Lychrel"
+assert_ok !Rosetta::Lychrel::check(47, 50), "47 is not Lychrel (47+74=121)"
+assert_ok Rosetta::Lychrel::check(196, 50), "196 is likely Lychrel"
+
+196 |> Rosetta::Lychrel::check(50) |> assert_ok("pipe Lychrel check")
 
 test_run

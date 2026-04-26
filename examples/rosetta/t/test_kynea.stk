@@ -1,22 +1,22 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Kynea numbers
 
-fn kynea($n) {
+fn Rosetta::Kynea::compute($n) {
     (2**$n + 1)**2 - 2
 }
 
-fn kynea_list($max_n) {
-    ~> 1..$max_n map { kynea($_) }
+fn Rosetta::Kynea::list($max_n) {
+    ~> 1:$max_n map { Rosetta::Kynea::compute($_) }
 }
 
-assert_eq kynea(1), 7, "K1"
-assert_eq kynea(2), 23, "K2"
-assert_eq kynea(3), 79, "K3"
-assert_eq kynea(4), 287, "K4"
+assert_eq Rosetta::Kynea::compute(1), 7, "K1"
+assert_eq Rosetta::Kynea::compute(2), 23, "K2"
+assert_eq Rosetta::Kynea::compute(3), 79, "K3"
+assert_eq Rosetta::Kynea::compute(4), 287, "K4"
 
-my @list = kynea_list(4)
+my @list = Rosetta::Kynea::list(4)
 assert_eq join(",", @list), "7,23,79,287", "Kynea list"
 
-4 |> kynea |> assert_eq(287, "pipe Kynea")
+4 |> Rosetta::Kynea::compute |> assert_eq(287, "pipe Kynea")
 
 test_run

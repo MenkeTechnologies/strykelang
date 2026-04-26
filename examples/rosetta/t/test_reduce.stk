@@ -1,36 +1,36 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Reduce (Fold)
 
-fn my_sum(@nums) {
+fn Rosetta::Reduce::sum(@nums) {
     @nums |> reduce { $a + $b }
 }
 
-fn my_product(@nums) {
+fn Rosetta::Reduce::product(@nums) {
     @nums |> reduce { $a * $b }
 }
 
-fn my_max(@nums) {
+fn Rosetta::Reduce::max(@nums) {
     @nums |> reduce { $a > $b ? $a : $b }
 }
 
-fn my_min(@nums) {
+fn Rosetta::Reduce::min(@nums) {
     @nums |> reduce { $a < $b ? $a : $b }
 }
 
-fn concat_strings(@strs) {
+fn Rosetta::Reduce::concat_strings(@strs) {
     @strs |> reduce { "$a$b" }
 }
 
-assert_eq my_sum(1, 2, 3, 4, 5), 15, "sum 1..5"
-assert_eq my_sum(10), 10, "sum single"
+assert_eq Rosetta::Reduce::sum(1, 2, 3, 4, 5), 15, "sum 1..5"
+assert_eq Rosetta::Reduce::sum(10), 10, "sum single"
 
-assert_eq my_product(1, 2, 3, 4, 5), 120, "product 1..5"
-assert_eq my_product(2, 3), 6, "product 2,3"
+assert_eq Rosetta::Reduce::product(1, 2, 3, 4, 5), 120, "product 1..5"
+assert_eq Rosetta::Reduce::product(2, 3), 6, "product 2,3"
 
-assert_eq my_max(3, 1, 4, 1, 5, 9), 9, "max"
-assert_eq my_min(3, 1, 4, 1, 5, 9), 1, "min"
+assert_eq Rosetta::Reduce::max(3, 1, 4, 1, 5, 9), 9, "max"
+assert_eq Rosetta::Reduce::min(3, 1, 4, 1, 5, 9), 1, "min"
 
-assert_eq concat_strings("a", "b", "c"), "abc", "concat strings"
+assert_eq Rosetta::Reduce::concat_strings("a", "b", "c"), "abc", "concat strings"
 
 my $sum_sq = 1..5 |> map { $_ * $_ } |> reduce { $a + $b }
 assert_eq $sum_sq, 55, "sum of squares 1..5"
