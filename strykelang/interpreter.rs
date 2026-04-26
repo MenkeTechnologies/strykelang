@@ -2720,16 +2720,17 @@ impl Interpreter {
         }
     }
 
-    /// `sub name` in `package P` → stash key `P::name`.
-    /// `sub Q::name { }` is already fully qualified — do not prepend the current package.
-    /// Unqualified names in the main package become `main::name` for Perl 5 compatibility.
+    /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully
+    /// qualified — do not prepend the current package. Unqualified names in `main` are stored
+    /// **bare** (`name`), matching the compiler's `Op::Call` interning so the VM's
+    /// `sub_for_closure_restore` lookup hits in one step.
     pub(crate) fn qualify_sub_key(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
         }
         let pkg = self.current_package();
         if pkg.is_empty() || pkg == "main" {
-            format!("main::{}", name)
+            name.to_string()
         } else {
             format!("{}::{}", pkg, name)
         }
@@ -2905,16 +2906,25 @@ impl Interpreter {
             return Some(s.clone());
         }
         if !name.contains("::") {
-            // Bare names are stored as `Pkg::name` (or `main::name` in the default package).
-            // The previous guard skipped the lookup for `main`, so `\&greet` and `defined &greet`
-            // failed to find UDFs declared at the top level.
+            // Non-`main` packages store subs at `Pkg::name`; resolve bare callers there.
             let pkg = self.current_package();
-            let pkg = if pkg.is_empty() { "main" } else { pkg.as_str() };
-            let mut q = String::with_capacity(pkg.len() + 2 + name.len());
-            q.push_str(pkg);
-            q.push_str("::");
-            q.push_str(name);
-            return self.subs.get(&q).cloned();
+            if !pkg.is_empty() && pkg != "main" {
+                let mut q = String::with_capacity(pkg.len() + 2 + name.len());
+                q.push_str(&pkg);
+                q.push_str("::");
+                q.push_str(name);
+                return self.subs.get(&q).cloned();
+            }
+            return None;
+        }
+        // `\&main::greet` / `defined &main::greet`: subs in `main` are stored bare so the
+        // compiler's `Op::Call("greet", ...)` and the runtime stash lookup share a key.
+        // Strip the `main::` qualifier and try the bare form so explicit qualified callers
+        // still resolve to the same sub.
+        if let Some(rest) = name.strip_prefix("main::") {
+            if !rest.contains("::") {
+                return self.subs.get(rest).cloned();
+            }
         }
         None
     }
