@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Execute Brainfuck
 
-fn execute_brainfuck {
-    my $code = $_[0]
+fn Rosetta::Brainfuck::execute($code) {
     my @chars = split "", $code
     my %jumps
     my @stack
@@ -61,20 +60,18 @@ fn execute_brainfuck {
 
 # Test 1: Simple Hello World
 my $hw_code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
-assert_eq execute_brainfuck($hw_code), "Hello World!\n", "Brainfuck: Hello World"
+assert_eq Rosetta::Brainfuck::execute($hw_code), "Hello World!\n", "Brainfuck: Hello World"
 
 # Test 2: Simple arithmetic and output
-assert_eq execute_brainfuck("+++++ ."), chr(5), "Brainfuck: Simple Increment"
+assert_eq Rosetta::Brainfuck::execute("+++++ ."), chr(5), "Brainfuck: Simple Increment"
 
 # Test 3: Nested loops (Multiplication: 3 * 7 = 21)
-# 21 is ASCII Control Character NAK, but we check the value
-assert_eq execute_brainfuck("+++ [ > +++++++ < - ] > ."), chr(21), "Brainfuck: Multiplication"
+assert_eq Rosetta::Brainfuck::execute("+++ [ > +++++++ < - ] > ."), chr(21), "Brainfuck: Multiplication"
 
 # Test 4: Cell wrapping (0 - 1 = 255)
-assert_eq execute_brainfuck("- ."), chr(255), "Brainfuck: Underflow Wrap"
+assert_eq Rosetta::Brainfuck::execute("- ."), chr(255), "Brainfuck: Underflow Wrap"
 
 # Test 5: Complex Nested Loops (Print 'A')
-# 65 is 'A'
-assert_eq execute_brainfuck("++++++ [ > ++++++++++ < - ] > +++++ ."), "A", "Brainfuck: Nested Loop 'A'"
+assert_eq Rosetta::Brainfuck::execute("++++++ [ > ++++++++++ < - ] > +++++ ."), "A", "Brainfuck: Nested Loop 'A'"
 
 test_run

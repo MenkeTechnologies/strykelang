@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Loops/While
 
-fn while_loop_examples() {
+fn Rosetta::LoopsWhile::demo() {
     "While Loop Examples:" |> p
     
     # Basic while loop
@@ -32,7 +32,6 @@ fn while_loop_examples() {
     # While loop with pattern matching
     "4. Extract digits from string:" |> p
     my $text = "a1b2c3d"
-    my $pos = 0
     while ($text =~ /(\d)/g) {
         "   Found digit: $1" |> p
     }
@@ -56,4 +55,5 @@ fn while_loop_examples() {
     }
 }
 
-while_loop_examples
+Rosetta::LoopsWhile::demo()
+test_run

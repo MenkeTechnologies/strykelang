@@ -1,21 +1,18 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Day of the week
 
-fn day_of_week {
-    my $y = $_[0]
-    my $m = $_[1]
-    my $d = $_[2]
-    
+fn Rosetta::DayOfWeek::compute($y, $m, $d) {
+    my $curr_y = $y
     my @t = (0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
-    if ($m < 3) { $y -= 1 }
+    if ($m < 3) { $curr_y -= 1 }
     
-    my $day = ($y + int($y/4) - int($y/100) + int($y/400) + $t[$m-1] + $d) % 7
+    my $day_idx = ($curr_y + int($curr_y/4) - int($curr_y/100) + int($curr_y/400) + $t[$m-1] + $d) % 7
     my @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday)
-    $days[$day]
+    $days[$day_idx]
 }
 
-assert_eq day_of_week(2024, 4, 22), "Monday", "2024-04-22"
-assert_eq day_of_week(2000, 1, 1), "Saturday", "2000-01-01"
-assert_eq day_of_week(1987, 6, 10), "Wednesday", "1987-06-10"
+assert_eq Rosetta::DayOfWeek::compute(2024, 4, 22), "Monday", "2024-04-22"
+assert_eq Rosetta::DayOfWeek::compute(2000, 1, 1), "Saturday", "2000-01-01"
+assert_eq Rosetta::DayOfWeek::compute(1987, 6, 10), "Wednesday", "1987-06-10"
 
 test_run

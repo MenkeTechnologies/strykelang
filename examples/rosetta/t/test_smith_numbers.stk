@@ -1,49 +1,34 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Smith numbers
 
-fn sum_digits($n) {
+fn Rosetta::SmithNumbers::sum_digits($n) {
     my @digits = ~> "$n" chars map { int($_) }
     my $sum = 0
     for my $d (@digits) { $sum += $d }
     $sum
 }
 
-fn my_prime_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
-    while ($temp > 1) {
-        while ($temp % $d == 0) {
-            push @factors, $d
-            $temp = int($temp / $d)
-        }
-        $d++
-    }
-    \@factors
-}
-
-fn my_is_smith($n) {
+fn Rosetta::SmithNumbers::check($n) {
     # Must be composite
-    my $factors_ref = my_prime_factors($n)
-    my @factors = @$factors_ref
+    my @factors = prime_factors($n)
     if (scalar(@factors) < 2) {
         0
     } else {
-        my $sum_n = sum_digits($n)
+        my $sum_n = Rosetta::SmithNumbers::sum_digits($n)
         my $sum_f = 0
         for my $f (@factors) {
-            $sum_f += sum_digits($f)
+            $sum_f += Rosetta::SmithNumbers::sum_digits($f)
         }
         $sum_n == $sum_f
     }
 }
 
-assert_ok my_is_smith(4), "4 is Smith (sum 4, factors 2,2 sum 4)"
-assert_ok my_is_smith(22), "22 is Smith (sum 4, factors 2,11 sum 2+1+1=4)"
-assert_ok my_is_smith(27), "27 is Smith (sum 9, factors 3,3,3 sum 9)"
-assert_ok my_is_smith(121), "121 is Smith (sum 4, factors 11,11 sum 1+1+1+1=4)"
-assert_ok !my_is_smith(7), "7 is not Smith (prime)"
+assert_ok Rosetta::SmithNumbers::check(4), "4 is Smith (sum 4, factors 2,2 sum 4)"
+assert_ok Rosetta::SmithNumbers::check(22), "22 is Smith (sum 4, factors 2,11 sum 2+1+1=4)"
+assert_ok Rosetta::SmithNumbers::check(27), "27 is Smith (sum 9, factors 3,3,3 sum 9)"
+assert_ok Rosetta::SmithNumbers::check(121), "121 is Smith (sum 4, factors 11,11 sum 1+1+1+1=4)"
+assert_ok !Rosetta::SmithNumbers::check(7), "7 is not Smith (prime)"
 
-22 |> my_is_smith |> assert_ok("pipe Smith")
+22 |> Rosetta::SmithNumbers::check |> assert_ok("pipe Smith")
 
 test_run

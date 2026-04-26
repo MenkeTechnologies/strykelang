@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Self numbers
 
-fn sum_digits($n) {
+fn Rosetta::SelfNumbers::sum_digits($n) {
     my $sum = 0
     my @digits = str($n) |> chars
     for my $d (@digits) {
@@ -10,26 +10,25 @@ fn sum_digits($n) {
     $sum
 }
 
-fn is_self_number($n) {
+fn Rosetta::SelfNumbers::check($n) {
     my $found = 0
     # A candidate m must be less than n
-    # Also m must be > n - 9 * digits(n)
     my $start = $n - 100
-    $start = 1 if $start < 1
+    if ($start < 1) { $start = 1 }
     for my $m ($start..$n-1) {
-        if ($m + sum_digits($m) == $n) {
+        if ($m + Rosetta::SelfNumbers::sum_digits($m) == $n) {
             $found = 1
-            $m = $n # break
+            return 0
         }
     }
-    !$found
+    1
 }
 
-assert_ok is_self_number(1), "1 is self number"
-assert_ok is_self_number(20), "20 is self number"
-assert_ok !is_self_number(21), "21 is not (15+6)"
-assert_ok is_self_number(31), "31 is self number"
+assert_ok Rosetta::SelfNumbers::check(1), "1 is self number"
+assert_ok Rosetta::SelfNumbers::check(20), "20 is self number"
+assert_ok !Rosetta::SelfNumbers::check(21), "21 is not (15+6)"
+assert_ok Rosetta::SelfNumbers::check(31), "31 is self number"
 
-20 |> is_self_number |> assert_ok("pipe self number check")
+20 |> Rosetta::SelfNumbers::check |> assert_ok("pipe self number check")
 
 test_run

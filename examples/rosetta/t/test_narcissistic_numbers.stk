@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Narcissistic decimal number
 
-fn my_is_narcissistic($n) {
+fn Rosetta::Narcissistic::check($n) {
     my $s = "$n"
     my $len = length($s)
     my @digits = ~> $s chars
@@ -12,9 +12,9 @@ fn my_is_narcissistic($n) {
     $sum == $n
 }
 
-assert_ok my_is_narcissistic(153), "153 is narcissistic"
-assert_ok my_is_narcissistic(370), "370 is narcissistic"
-assert_ok my_is_narcissistic(9474), "9474 is narcissistic"
-assert_ok !my_is_narcissistic(154), "154 is not"
+assert_ok Rosetta::Narcissistic::check(153), "153 is narcissistic"
+assert_ok Rosetta::Narcissistic::check(370), "370 is narcissistic"
+assert_ok Rosetta::Narcissistic::check(9474), "9474 is narcissistic"
+assert_ok !Rosetta::Narcissistic::check(154), "154 is not"
 
 test_run

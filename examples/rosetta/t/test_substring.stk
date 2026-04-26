@@ -1,43 +1,43 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Substring Operations
 
-fn my_starts_with($str, $prefix) {
+fn Rosetta::Substring::starts_with($str, $prefix) {
     substr($str, 0, length($prefix)) eq $prefix
 }
 
-fn my_ends_with($str, $suffix) {
+fn Rosetta::Substring::ends_with($str, $suffix) {
     substr($str, -length($suffix)) eq $suffix
 }
 
-fn my_contains($str, $sub) {
+fn Rosetta::Substring::contains($str, $sub) {
     index($str, $sub) >= 0
 }
 
-fn first_n($str, $n) {
+fn Rosetta::Substring::first_n($str, $n) {
     substr($str, 0, $n)
 }
 
-fn last_n($str, $n) {
+fn Rosetta::Substring::last_n($str, $n) {
     substr($str, -$n)
 }
 
-fn from_pos($str, $pos, $len) {
+fn Rosetta::Substring::from_pos($str, $pos, $len) {
     substr($str, $pos, $len)
 }
 
 my $s = "Hello, World!"
 
-assert_eq first_n($s, 5), "Hello", "first 5"
-assert_eq last_n($s, 6), "World!", "last 6"
-assert_eq from_pos($s, 7, 5), "World", "from pos 7 len 5"
+assert_eq Rosetta::Substring::first_n($s, 5), "Hello", "first 5"
+assert_eq Rosetta::Substring::last_n($s, 6), "World!", "last 6"
+assert_eq Rosetta::Substring::from_pos($s, 7, 5), "World", "from pos 7 len 5"
 
-assert_ok my_starts_with($s, "Hello"), "starts with Hello"
-assert_ok my_ends_with($s, "!"), "ends with !"
-assert_ok my_contains($s, "World"), "contains World"
+assert_ok Rosetta::Substring::starts_with($s, "Hello"), "starts with Hello"
+assert_ok Rosetta::Substring::ends_with($s, "!"), "ends with !"
+assert_ok Rosetta::Substring::contains($s, "World"), "contains World"
 
-assert_ok !my_starts_with($s, "World"), "doesn't start with World"
-assert_ok !my_ends_with($s, "Hello"), "doesn't end with Hello"
-assert_ok !my_contains($s, "xyz"), "doesn't contain xyz"
+assert_ok !Rosetta::Substring::starts_with($s, "World"), "doesn't start with World"
+assert_ok !Rosetta::Substring::ends_with($s, "Hello"), "doesn't end with Hello"
+assert_ok !Rosetta::Substring::contains($s, "xyz"), "doesn't contain xyz"
 
 assert_eq substr($s, 0, 5), "Hello", "substr basic"
 assert_eq substr($s, -6, 5), "World", "substr negative"
