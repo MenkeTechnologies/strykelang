@@ -876,21 +876,23 @@ impl<'a> VM<'a> {
 
     #[inline]
     fn call_preserve_operand_arrays(name: &str) -> bool {
+        // Stryke builtins are unprefixed; route `CORE::` / `List::Util::` callers to bare names.
+        let name = name
+            .strip_prefix("CORE::")
+            .or_else(|| name.strip_prefix("List::Util::"))
+            .unwrap_or(name);
         matches!(
             name,
             "zip"
-                | "List::Util::zip"
-                | "List::Util::zip_longest"
-                | "List::Util::zip_shortest"
-                | "List::Util::mesh"
-                | "List::Util::mesh_longest"
-                | "List::Util::mesh_shortest"
+                | "zip_longest"
+                | "zip_shortest"
+                | "mesh"
+                | "mesh_longest"
+                | "mesh_shortest"
                 | "take"
                 | "head"
                 | "tail"
                 | "drop"
-                | "List::Util::head"
-                | "List::Util::tail"
         )
     }
 

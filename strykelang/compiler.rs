@@ -4788,9 +4788,16 @@ impl Compiler {
             }
 
             // ── Function calls ──
-            ExprKind::FuncCall { name, args } => match name.as_str() {
+            ExprKind::FuncCall { name, args } => {
+                // Stryke builtins are unprefixed; route `CORE::name` and `List::Util::name`
+                // callers back to the bare-name fast path so the arms below stay flat.
+                let dispatch_name: &str = name
+                    .strip_prefix("CORE::")
+                    .or_else(|| name.strip_prefix("List::Util::"))
+                    .unwrap_or(name.as_str());
+                match dispatch_name {
                 // read(FH, $buf, LEN) — emit ReadIntoVar with the buffer variable's name index
-                "read" | "CORE::read" => {
+                "read" => {
                     if args.len() < 3 {
                         return Err(CompileError::Unsupported(
                             "read() needs at least 3 args".into(),
@@ -4962,7 +4969,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "rmdir" | "CORE::rmdir" => {
+                "rmdir" => {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
@@ -4972,7 +4979,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "utime" | "CORE::utime" => {
+                "utime" => {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
@@ -4982,7 +4989,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "umask" | "CORE::umask" => {
+                "umask" => {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
@@ -4992,7 +4999,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "getcwd" | "CORE::getcwd" | "Cwd::getcwd" => {
+                "getcwd" | "Cwd::getcwd" => {
                     for arg in args {
                         self.compile_expr(arg)?;
                     }
@@ -5002,7 +5009,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "pipe" | "CORE::pipe" => {
+                "pipe" => {
                     if args.len() != 2 {
                         return Err(CompileError::Unsupported(
                             "pipe requires exactly two arguments".into(),
@@ -5023,7 +5030,7 @@ impl Compiler {
                 | "count"
                 | "size"
                 | "cnt"
-                | "List::Util::uniq"
+
                 | "sum"
                 | "sum0"
                 | "product"
@@ -5034,18 +5041,18 @@ impl Compiler {
                 | "mode"
                 | "stddev"
                 | "variance"
-                | "List::Util::sum"
-                | "List::Util::sum0"
-                | "List::Util::product"
-                | "List::Util::min"
-                | "List::Util::max"
-                | "List::Util::minstr"
-                | "List::Util::maxstr"
-                | "List::Util::mean"
-                | "List::Util::median"
-                | "List::Util::mode"
-                | "List::Util::stddev"
-                | "List::Util::variance" => {
+
+
+
+
+
+
+
+
+
+
+
+ => {
                     for arg in args {
                         self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
@@ -5056,7 +5063,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "shuffle" | "List::Util::shuffle" => {
+                "shuffle" => {
                     for arg in args {
                         self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
@@ -5067,7 +5074,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "chunked" | "List::Util::chunked" | "windowed" | "List::Util::windowed" => {
+                "chunked" | "windowed" => {
                     match args.len() {
                         0 => {
                             return Err(CompileError::Unsupported(
@@ -5096,7 +5103,7 @@ impl Compiler {
                         Some(root),
                     );
                 }
-                "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail" => {
+                "take" | "head" | "tail" | "drop" => {
                     if args.is_empty() {
                         return Err(CompileError::Unsupported(
                             "take/head/tail/drop/List::Util::head|tail expect LIST..., N or unary N"
@@ -5158,14 +5165,16 @@ impl Compiler {
                         self.emit_op(Op::StackArrayLen, line, Some(root));
                     }
                 }
-                "zip" | "List::Util::zip" | "List::Util::zip_longest" => {
+                "zip" | "zip_longest" => {
                     for arg in args {
                         self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
-                    let fq = match name.as_str() {
-                        "List::Util::zip_longest" => "List::Util::zip_longest",
-                        "List::Util::zip" => "List::Util::zip",
-                        _ => "zip",
+                    // Bare `zip` routes through the imported alias (`main::zip`); `zip_longest`
+                    // routes through the qualified List::Util sub since there is no bare alias.
+                    let fq = if dispatch_name == "zip_longest" {
+                        "List::Util::zip_longest"
+                    } else {
+                        "zip"
                     };
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(fq));
                     self.emit_op(
@@ -5234,7 +5243,8 @@ impl Compiler {
                         Some(root),
                     );
                 }
-            },
+                }
+            }
 
             // ── Method calls ──
             ExprKind::MethodCall {

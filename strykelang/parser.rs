@@ -5751,7 +5751,13 @@ impl Parser {
         let new_kind = match kind {
             // ── Generic / user-defined calls ───────────────────────────────────
             ExprKind::FuncCall { name, mut args } => {
-                match name.as_str() {
+                // Stryke builtins are unprefixed; route `CORE::` / `List::Util::` callers
+                // back to the bare-name pipe-forward dispatch below.
+                let dispatch_name: &str = name
+                    .strip_prefix("CORE::")
+                    .or_else(|| name.strip_prefix("List::Util::"))
+                    .unwrap_or(name.as_str());
+                match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
                     | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
@@ -5778,7 +5784,7 @@ impl Parser {
                         }
                         args.insert(0, lhs);
                     }
-                    "List::Util::reduce" | "List::Util::fold" => {
+                    "reduce" | "fold" => {
                         args.push(lhs);
                     }
                     "grep_v" | "pluck" | "tee" | "nth" | "chunk" => {
@@ -5811,7 +5817,7 @@ impl Parser {
                         }
                         args[1] = lhs;
                     }
-                    "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail" => {
+                    "take" | "head" | "tail" | "drop" => {
                         if args.is_empty() {
                             return Err(self.syntax_err(
                                 "|>: `{name}` needs N last — e.g. `@a |> take(3)` for `take(@a, 3)`",
