@@ -30,11 +30,7 @@ assert_eq Rosetta::Stack::pop($s), 20, "pop 20"
 assert_eq Rosetta::Stack::pop($s), 10, "pop 10"
 assert_ok Rosetta::Stack::empty($s), "stack is empty"
 
-# Test with regular calls
-my $st = Rosetta::Stack::new()
-Rosetta::Stack::push($st, 1)
-Rosetta::Stack::push($st, 2)
-Rosetta::Stack::push($st, 3)
-assert_eq Rosetta::Stack::pop($st), 3, "threaded stack pop"
+# Threading with stack
+~> Rosetta::Stack::new() Rosetta::Stack::push(1) Rosetta::Stack::push(2) Rosetta::Stack::push(3) |> Rosetta::Stack::pop |> assert_eq(3, "threaded stack pop")
 
 test_run
