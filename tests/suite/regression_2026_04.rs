@@ -363,9 +363,54 @@ fn recursive_factorial() {
     );
 }
 
+// =============================================================================
+// BUG: Passing empty array to recursive call incorrectly substituted $_
+// FIX: Only call with_topic_default_args when argc == 0, not when args is empty
+// =============================================================================
+
+#[test]
+fn recursive_sum_with_shift() {
+    // Recursive sum using shift @nums - now works correctly
+    assert_eq!(
+        eval_int(
+            r#"
+            fn Test::List::sum(@nums) {
+                if (scalar(@nums) == 0) { 0 }
+                else {
+                    my $first = shift @nums
+                    $first + Test::List::sum(@nums)
+                }
+            }
+            Test::List::sum(1, 2, 3, 4, 5)
+            "#
+        ),
+        15
+    );
+}
+
+#[test]
+fn recursive_with_empty_array_param() {
+    // Passing empty array should not substitute $_ topic
+    assert_eq!(
+        eval_int(
+            r#"
+            fn Test::Count::len(@arr) {
+                if (scalar(@arr) == 0) { 0 }
+                else {
+                    shift @arr
+                    1 + Test::Count::len(@arr)
+                }
+            }
+            Test::Count::len(1, 2, 3)
+            "#
+        ),
+        3
+    );
+}
+
 #[test]
 fn recursive_sum_with_index() {
-    // Test recursion using index instead of shift (shift has issues in recursive calls)
+    // Alternative: recursion using index (also valid approach)
     assert_eq!(
         eval_int(
             r#"

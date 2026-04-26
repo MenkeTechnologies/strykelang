@@ -1972,7 +1972,13 @@ impl<'a> VM<'a> {
                 } else {
                     self.pop_call_operands_flattened(argc)
                 };
-                let args = self.interp.with_topic_default_args(args);
+                // Only substitute $_ when the call site has no syntactic arguments (argc == 0).
+                // When argc > 0 but args is empty (e.g., passing an empty array), keep args empty.
+                let args = if argc == 0 {
+                    self.interp.with_topic_default_args(args)
+                } else {
+                    args
+                };
                 self.call_stack.push(CallFrame {
                     return_ip: self.ip,
                     stack_base: self.stack.len(),
@@ -2020,7 +2026,12 @@ impl<'a> VM<'a> {
                     if let Some(p) = &mut self.interp.profiler {
                         p.enter_sub(name);
                     }
-                    let args = self.interp.with_topic_default_args(args);
+                    // Only substitute $_ when argc == 0; passing an empty array keeps args empty.
+                    let args = if argc == 0 {
+                        self.interp.with_topic_default_args(args)
+                    } else {
+                        args
+                    };
                     let saved_wa = self.interp.wantarray_kind;
                     self.interp.wantarray_kind = want;
                     self.interp.scope_push_hook();
@@ -2135,7 +2146,11 @@ impl<'a> VM<'a> {
                     }
                 } else if let Some(result) = self.interp.try_autoload_call(
                     name,
-                    self.interp.with_topic_default_args(args.clone()),
+                    if argc == 0 {
+                        self.interp.with_topic_default_args(args.clone())
+                    } else {
+                        args.clone()
+                    },
                     self.line(),
                     want,
                     None,
