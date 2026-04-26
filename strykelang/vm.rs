@@ -2128,7 +2128,7 @@ impl<'a> VM<'a> {
                     self.interp.wantarray_kind = want;
                     let out = self
                         .interp
-                        .call_bare_list_util(name, args, self.line(), want);
+                        .call_bare_list_builtin(name, args, self.line(), want);
                     self.interp.wantarray_kind = saved_wa;
                     match out {
                         Ok(v) => self.push(v),

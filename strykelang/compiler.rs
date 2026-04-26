@@ -5127,7 +5127,10 @@ impl Compiler {
                     );
                 }
                 "any" | "all" | "none" | "first" | "take_while" | "drop_while" | "tap" | "peek" => {
-                    if args.len() != 2 {
+                    // Two shapes: `any { BLOCK } @list` (2 args) and the slurpy
+                    // `(&@)` form `any(fn { ... }, 1, 2, 3)` (N >= 1 args). Both
+                    // start with a coderef; the rest is evaluated in list context.
+                    if args.is_empty() {
                         return Err(CompileError::Unsupported(
                             "any/all/none/first/take_while/drop_while/tap/peek expect BLOCK, LIST"
                                 .into(),
@@ -5140,9 +5143,15 @@ impl Compiler {
                         ));
                     }
                     self.compile_expr(&args[0])?;
-                    self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
+                    for arg in &args[1..] {
+                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+                    }
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
-                    self.emit_op(Op::Call(name_idx, 2, ctx.as_byte()), line, Some(root));
+                    self.emit_op(
+                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+                        line,
+                        Some(root),
+                    );
                 }
                 "group_by" | "chunk_by" => {
                     if args.len() != 2 {
@@ -5169,14 +5178,9 @@ impl Compiler {
                     for arg in args {
                         self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                     }
-                    // Bare `zip` routes through the imported alias (`main::zip`); `zip_longest`
-                    // routes through the qualified List::Util sub since there is no bare alias.
-                    let fq = if dispatch_name == "zip_longest" {
-                        "List::Util::zip_longest"
-                    } else {
-                        "zip"
-                    };
-                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(fq));
+                    // Both forms are stryke bare-name builtins; the VM slow path strips the
+                    // `main::` qualifier and routes through `try_builtin` → `dispatch_by_name`.
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(dispatch_name));
                     self.emit_op(
                         Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
                         line,
