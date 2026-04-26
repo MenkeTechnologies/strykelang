@@ -9306,8 +9306,14 @@ impl Interpreter {
 
             // Function calls
             ExprKind::FuncCall { name, args } => {
+                // Stryke builtins are unprefixed; route `CORE::name` and `List::Util::name`
+                // callers back to the bare-name dispatch so the matches below stay flat.
+                let dispatch_name: &str = name
+                    .strip_prefix("CORE::")
+                    .or_else(|| name.strip_prefix("List::Util::"))
+                    .unwrap_or(name.as_str());
                 // read(FH, $buf, LEN [, OFFSET]) needs special handling: $buf is an lvalue
-                if matches!(name.as_str(), "read" | "CORE::read") && args.len() >= 3 {
+                if matches!(dispatch_name, "read") && args.len() >= 3 {
                     let fh_val = self.eval_expr(&args[0])?;
                     let fh = fh_val
                         .as_io_handle_name()
@@ -9353,7 +9359,7 @@ impl Interpreter {
                     }
                     return Ok(PerlValue::integer(n as i64));
                 }
-                if matches!(name.as_str(), "group_by" | "chunk_by") {
+                if matches!(dispatch_name, "group_by" | "chunk_by") {
                     if args.len() != 2 {
                         return Err(PerlError::runtime(
                             "group_by/chunk_by: expected { BLOCK } or EXPR, LIST",
@@ -9363,24 +9369,24 @@ impl Interpreter {
                     }
                     return self.eval_chunk_by_builtin(&args[0], &args[1], ctx, line);
                 }
-                if matches!(name.as_str(), "puniq" | "pfirst" | "pany") {
+                if matches!(dispatch_name, "puniq" | "pfirst" | "pany") {
                     let mut arg_vals = Vec::with_capacity(args.len());
                     for a in args {
                         arg_vals.push(self.eval_expr(a)?);
                     }
                     let saved_wa = self.wantarray_kind;
                     self.wantarray_kind = ctx;
-                    let r = self.eval_par_list_call(name.as_str(), &arg_vals, ctx, line);
+                    let r = self.eval_par_list_call(dispatch_name, &arg_vals, ctx, line);
                     self.wantarray_kind = saved_wa;
                     return r.map_err(Into::into);
                 }
-                let arg_vals = if matches!(name.as_str(), "any" | "all" | "none" | "first")
+                let arg_vals = if matches!(dispatch_name, "any" | "all" | "none" | "first")
                     || matches!(
-                        name.as_str(),
+                        dispatch_name,
                         "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
                     )
                     || matches!(
-                        name.as_str(),
+                        dispatch_name,
                         "partition" | "min_by" | "max_by" | "zip_with" | "count_by"
                     ) {
                     if args.len() != 2 {
@@ -9396,8 +9402,8 @@ impl Interpreter {
                     v.extend(list_src.to_list());
                     v
                 } else if matches!(
-                    name.as_str(),
-                    "zip" | "List::Util::zip" | "List::Util::zip_longest"
+                    dispatch_name,
+                    "zip"
                 ) {
                     let mut v = Vec::with_capacity(args.len());
                     for a in args {
@@ -9405,7 +9411,7 @@ impl Interpreter {
                     }
                     v
                 } else if matches!(
-                    name.as_str(),
+                    dispatch_name,
                     "uniq"
                         | "distinct"
                         | "uniqstr"
@@ -9419,12 +9425,12 @@ impl Interpreter {
                         | "size"
                         | "cnt"
                         | "with_index"
-                        | "List::Util::uniq"
-                        | "List::Util::uniqstr"
-                        | "List::Util::uniqint"
-                        | "List::Util::uniqnum"
+
+
+
+
                         | "shuffle"
-                        | "List::Util::shuffle"
+
                         | "sum"
                         | "sum0"
                         | "product"
@@ -9437,26 +9443,26 @@ impl Interpreter {
                         | "mode"
                         | "stddev"
                         | "variance"
-                        | "List::Util::sum"
-                        | "List::Util::sum0"
-                        | "List::Util::product"
-                        | "List::Util::min"
-                        | "List::Util::max"
-                        | "List::Util::minstr"
-                        | "List::Util::maxstr"
-                        | "List::Util::mean"
-                        | "List::Util::median"
-                        | "List::Util::mode"
-                        | "List::Util::stddev"
-                        | "List::Util::variance"
+
+
+
+
+
+
+
+
+
+
+
+
                         | "pairs"
                         | "unpairs"
                         | "pairkeys"
                         | "pairvalues"
-                        | "List::Util::pairs"
-                        | "List::Util::unpairs"
-                        | "List::Util::pairkeys"
-                        | "List::Util::pairvalues"
+
+
+
+
                 ) {
                     // Perl prototype `(@)`: one slurpy list — either one list expr (`uniq @x`) or
                     // multiple actuals (`List::Util::uniq(1, 1, 2)`). Each actual is evaluated in
@@ -9471,8 +9477,8 @@ impl Interpreter {
                     }
                     list_out
                 } else if matches!(
-                    name.as_str(),
-                    "take" | "head" | "tail" | "drop" | "List::Util::head" | "List::Util::tail"
+                    dispatch_name,
+                    "take" | "head" | "tail" | "drop"
                 ) {
                     if args.is_empty() {
                         return Err(PerlError::runtime(
@@ -9493,8 +9499,8 @@ impl Interpreter {
                     }
                     arg_vals
                 } else if matches!(
-                    name.as_str(),
-                    "chunked" | "List::Util::chunked" | "windowed" | "List::Util::windowed"
+                    dispatch_name,
+                    "chunked" | "windowed"
                 ) {
                     let mut list_out = Vec::new();
                     match args.len() {
@@ -9547,16 +9553,16 @@ impl Interpreter {
                 // In compat mode, user subs shadow builtins (Perl 5 semantics).
                 if !crate::compat_mode() {
                     if matches!(
-                        name.as_str(),
+                        dispatch_name,
                         "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
                     ) {
                         let r =
-                            self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
+                            self.list_higher_order_block_builtin(dispatch_name, &arg_vals, line);
                         self.wantarray_kind = saved_wa;
                         return r.map_err(Into::into);
                     }
                     if let Some(r) =
-                        crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
+                        crate::builtins::try_builtin(self, dispatch_name, &arg_vals, line)
                     {
                         self.wantarray_kind = saved_wa;
                         return r.map_err(Into::into);
@@ -9570,16 +9576,16 @@ impl Interpreter {
                 // Compat mode: check builtins after user subs (Perl 5 semantics).
                 if crate::compat_mode() {
                     if matches!(
-                        name.as_str(),
+                        dispatch_name,
                         "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
                     ) {
                         let r =
-                            self.list_higher_order_block_builtin(name.as_str(), &arg_vals, line);
+                            self.list_higher_order_block_builtin(dispatch_name, &arg_vals, line);
                         self.wantarray_kind = saved_wa;
                         return r.map_err(Into::into);
                     }
                     if let Some(r) =
-                        crate::builtins::try_builtin(self, name.as_str(), &arg_vals, line)
+                        crate::builtins::try_builtin(self, dispatch_name, &arg_vals, line)
                     {
                         self.wantarray_kind = saved_wa;
                         return r.map_err(Into::into);
