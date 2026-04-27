@@ -7414,13 +7414,7 @@ impl Parser {
                                 }
                                 Token::LBracket => {
                                     self.advance();
-                                    let mut indices = Vec::new();
-                                    while !matches!(self.peek(), Token::RBracket | Token::Eof) {
-                                        indices.push(self.parse_assign_expr()?);
-                                        if !self.eat(&Token::Comma) {
-                                            break;
-                                        }
-                                    }
+                                    let indices = self.parse_slice_arg_list(false)?;
                                     self.expect(&Token::RBracket)?;
                                     let source = Expr {
                                         kind: ExprKind::Deref {
@@ -7439,13 +7433,7 @@ impl Parser {
                                 }
                                 Token::LBrace => {
                                     self.advance();
-                                    let mut keys = Vec::new();
-                                    while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                                        keys.push(self.parse_assign_expr()?);
-                                        if !self.eat(&Token::Comma) {
-                                            break;
-                                        }
-                                    }
+                                    let keys = self.parse_slice_arg_list(true)?;
                                     self.expect(&Token::RBrace)?;
                                     expr = Expr {
                                         kind: ExprKind::HashSliceDeref {
@@ -7848,7 +7836,7 @@ impl Parser {
                 match self.peek() {
                     Token::LBracket => {
                         self.advance();
-                        let indices = self.parse_arg_list()?;
+                        let indices = self.parse_slice_arg_list(false)?;
                         self.expect(&Token::RBracket)?;
                         Ok(Expr {
                             kind: ExprKind::ArraySlice {
@@ -7860,7 +7848,7 @@ impl Parser {
                     }
                     Token::LBrace if self.suppress_scalar_hash_brace == 0 => {
                         self.advance();
-                        let keys = self.parse_arg_list()?;
+                        let keys = self.parse_slice_arg_list(true)?;
                         self.expect(&Token::RBrace)?;
                         Ok(Expr {
                             kind: ExprKind::HashSlice { hash: name, keys },
@@ -8013,7 +8001,7 @@ impl Parser {
                 };
                 if matches!(self.peek(), Token::LBrace) {
                     self.advance();
-                    let keys = self.parse_arg_list()?;
+                    let keys = self.parse_slice_arg_list(true)?;
                     self.expect(&Token::RBrace)?;
                     return Ok(Expr {
                         kind: ExprKind::HashSliceDeref {
@@ -13551,6 +13539,175 @@ impl Parser {
         }
         self.no_pipe_forward_depth = saved_no_pf;
         Ok(args)
+    }
+
+    /// Parse a comma-separated list of slice subscript args. Each arg may be a regular
+    /// expression, a closed range (`1:3`, `1..3:2`), or an open-ended Python-style colon
+    /// range (`:`, `::`, `:N`, `N:`, `::-1`, `:N:M`, `N::M`, `::M`). Open-ended forms
+    /// produce `ExprKind::SliceRange`; closed `1:3` produces `ExprKind::Range` (legacy).
+    ///
+    /// `is_hash` enables fat-comma-style bareword auto-quoting for endpoints — `{a:c:1}`
+    /// treats `a` and `c` as string keys without quoting (cannot be a function call;
+    /// use `func():other` if you actually want to invoke).
+    pub(crate) fn parse_slice_arg_list(&mut self, is_hash: bool) -> PerlResult<Vec<Expr>> {
+        let mut args = Vec::new();
+        let saved_no_pf = self.no_pipe_forward_depth;
+        self.no_pipe_forward_depth = 0;
+        while !matches!(
+            self.peek(),
+            Token::RParen | Token::RBracket | Token::RBrace | Token::Eof
+        ) {
+            let arg = match self.parse_slice_arg(is_hash) {
+                Ok(e) => e,
+                Err(err) => {
+                    self.no_pipe_forward_depth = saved_no_pf;
+                    return Err(err);
+                }
+            };
+            args.push(arg);
+            if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
+                break;
+            }
+        }
+        self.no_pipe_forward_depth = saved_no_pf;
+        Ok(args)
+    }
+
+    /// Parse one slice subscript argument (see [`Self::parse_slice_arg_list`]).
+    fn parse_slice_arg(&mut self, is_hash: bool) -> PerlResult<Expr> {
+        let line = self.peek_line();
+
+        // Open-start: `:` or `::` immediately
+        if matches!(self.peek(), Token::Colon) {
+            self.advance();
+            return self.finish_slice_range(None, false, is_hash, line);
+        }
+        if matches!(self.peek(), Token::PackageSep) {
+            self.advance();
+            return self.finish_slice_range(None, true, is_hash, line);
+        }
+
+        // Parse FROM with `:` suppressed inside `parse_range` so it doesn't get
+        // consumed as a colon-range there — we want to handle the colon ourselves.
+        self.suppress_colon_range = self.suppress_colon_range.saturating_add(1);
+        let result = self.parse_slice_endpoint(is_hash);
+        self.suppress_colon_range = self.suppress_colon_range.saturating_sub(1);
+        let from_expr = result?;
+
+        // Trailing `:` or `::` after the FROM endpoint?
+        if matches!(self.peek(), Token::Colon) {
+            self.advance();
+            return self.finish_slice_range(Some(Box::new(from_expr)), false, is_hash, line);
+        }
+        if matches!(self.peek(), Token::PackageSep) {
+            self.advance();
+            return self.finish_slice_range(Some(Box::new(from_expr)), true, is_hash, line);
+        }
+
+        Ok(from_expr)
+    }
+
+    /// After consuming the first colon (or `::` pair), parse the rest of the slice range.
+    /// `double` is true if we just consumed `::` — TO is implicit `None`, the next
+    /// expression (if any) is STEP.
+    ///
+    /// Returns `ExprKind::Range` for fully-closed forms (legacy compatibility) and
+    /// `ExprKind::SliceRange` whenever any endpoint is omitted (open-ended).
+    fn finish_slice_range(
+        &mut self,
+        from: Option<Box<Expr>>,
+        double: bool,
+        is_hash: bool,
+        line: usize,
+    ) -> PerlResult<Expr> {
+        let (to, step) = if double {
+            // `::` so TO is implicit; STEP is whatever (if anything) follows.
+            let step_v = self.parse_slice_optional_endpoint(is_hash)?;
+            (None, step_v)
+        } else {
+            // single `:` — parse TO, then optional `:STEP`.
+            let to_v = self.parse_slice_optional_endpoint(is_hash)?;
+            let step_v = if matches!(self.peek(), Token::Colon) {
+                self.advance();
+                self.parse_slice_optional_endpoint(is_hash)?
+            } else if matches!(self.peek(), Token::PackageSep) {
+                return Err(self.syntax_err(
+                    "Unexpected `::` after slice TO endpoint".to_string(),
+                    line,
+                ));
+            } else {
+                None
+            };
+            (to_v, step_v)
+        };
+
+        // Closed form (both endpoints present) — produce a regular `Range` so the
+        // rest of the compiler/VM keeps reusing existing range-expansion paths.
+        if let (Some(f), Some(t)) = (from.as_ref(), to.as_ref()) {
+            return Ok(Expr {
+                kind: ExprKind::Range {
+                    from: f.clone(),
+                    to: t.clone(),
+                    exclusive: false,
+                    step,
+                },
+                line,
+            });
+        }
+
+        Ok(Expr {
+            kind: ExprKind::SliceRange { from, to, step },
+            line,
+        })
+    }
+
+    /// Parse an optional slice endpoint: returns `None` if the next token closes the slice
+    /// arg (`,`, `]`, `}`, or another `:`). Otherwise parses an endpoint expression.
+    fn parse_slice_optional_endpoint(
+        &mut self,
+        is_hash: bool,
+    ) -> PerlResult<Option<Box<Expr>>> {
+        if matches!(
+            self.peek(),
+            Token::Colon
+                | Token::PackageSep
+                | Token::Comma
+                | Token::RBracket
+                | Token::RBrace
+                | Token::Eof
+        ) {
+            return Ok(None);
+        }
+        self.suppress_colon_range = self.suppress_colon_range.saturating_add(1);
+        let r = self.parse_slice_endpoint(is_hash);
+        self.suppress_colon_range = self.suppress_colon_range.saturating_sub(1);
+        Ok(Some(Box::new(r?)))
+    }
+
+    /// Parse a single slice endpoint expression. For hash slices, a bareword `Ident`
+    /// followed by `:`, `::`, `,`, `]`, or `}` auto-quotes (fat-comma style); otherwise
+    /// fall through to standard expression parsing. For array slices, no auto-quote.
+    fn parse_slice_endpoint(&mut self, is_hash: bool) -> PerlResult<Expr> {
+        if is_hash {
+            if let Token::Ident(name) = self.peek().clone() {
+                if matches!(
+                    self.peek_at(1),
+                    Token::Colon
+                        | Token::PackageSep
+                        | Token::Comma
+                        | Token::RBracket
+                        | Token::RBrace
+                ) {
+                    let line = self.peek_line();
+                    self.advance();
+                    return Ok(Expr {
+                        kind: ExprKind::String(name),
+                        line,
+                    });
+                }
+            }
+        }
+        self.parse_assign_expr()
     }
 
     /// Arguments for `->name` / `->SUPER::name` **without** `(...)`. Unlike `die foo + 1`

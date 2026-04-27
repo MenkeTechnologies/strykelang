@@ -830,6 +830,19 @@ pub enum ExprKind {
         step: Option<Box<Expr>>,
     },
 
+    /// Slice subscript range with optional endpoints — Python-style `[start:stop:step]`.
+    /// Only emitted by the parser inside `@arr[...]` / `@h{...}` (and arrow-deref forms).
+    /// Open-ended forms: `[::-1]` (reverse), `[:N]`, `[N:]`, `[::M]`, `[N::M]`.
+    /// Compiler dispatches to typed integer-strict (array) or stringify-all (hash) ops.
+    SliceRange {
+        #[serde(default)]
+        from: Option<Box<Expr>>,
+        #[serde(default)]
+        to: Option<Box<Expr>>,
+        #[serde(default)]
+        step: Option<Box<Expr>>,
+    },
+
     /// `my $x = EXPR` (or `our` / `state` / `local`) used as an *expression* —
     /// e.g. inside `if (my $line = readline)` / `while (my $x = next())`.
     /// Evaluation: declare each var in the current scope, evaluate the initializer

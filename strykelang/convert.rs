@@ -1114,6 +1114,14 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         ),
 
         // ── Range / repeat ───────────────────────────────────────────────
+        ExprKind::SliceRange { from, to, step } => {
+            let f = from.as_ref().map(|e| convert_expr(e)).unwrap_or_default();
+            let t = to.as_ref().map(|e| convert_expr(e)).unwrap_or_default();
+            match step {
+                Some(s) => format!("{}:{}:{}", f, t, convert_expr(s)),
+                None => format!("{}:{}", f, t),
+            }
+        }
         ExprKind::Range {
             from,
             to,

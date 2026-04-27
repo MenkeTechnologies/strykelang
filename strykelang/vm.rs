@@ -4732,6 +4732,50 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::array(arr));
                         Ok(())
                     }
+                    Op::ArraySliceRange(arr_idx) => {
+                        let step = self.pop();
+                        let to = self.pop();
+                        let from = self.pop();
+                        let line = self.line();
+                        let name = names[*arr_idx as usize].as_str();
+                        let arr_len = self.interp.scope.array_len(name) as i64;
+                        let indices = match crate::value::compute_array_slice_indices(
+                            arr_len, &from, &to, &step,
+                        ) {
+                            Ok(v) => v,
+                            Err(msg) => {
+                                return Err(PerlError::runtime(msg, line));
+                            }
+                        };
+                        let mut out = Vec::with_capacity(indices.len());
+                        for i in indices {
+                            out.push(self.interp.scope.get_array_element(name, i));
+                        }
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
+                    Op::HashSliceRange(hash_idx) => {
+                        let step = self.pop();
+                        let to = self.pop();
+                        let from = self.pop();
+                        let line = self.line();
+                        let name = names[*hash_idx as usize].as_str();
+                        let keys = match crate::value::compute_hash_slice_keys(
+                            &from, &to, &step,
+                        ) {
+                            Ok(v) => v,
+                            Err(msg) => {
+                                return Err(PerlError::runtime(msg, line));
+                            }
+                        };
+                        let h = self.interp.scope.get_hash(name);
+                        let mut out = Vec::with_capacity(keys.len());
+                        for k in &keys {
+                            out.push(h.get(k).cloned().unwrap_or(PerlValue::UNDEF));
+                        }
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
                     Op::ScalarFlipFlop(slot, exclusive) => {
                         let to = self.pop().to_int();
                         let from = self.pop().to_int();
