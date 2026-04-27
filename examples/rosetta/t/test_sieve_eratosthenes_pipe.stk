@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sieve of Eratosthenes (using pipes)
+
+fn Rosetta::Sieve::solve($n) {
+    return () if $n < 2
+    my @primes = ~> 0:$n map { 1 }
+    $primes[0] = $primes[1] = 0
+    
+    for my $i (2:sqrt($n)) {
+        if ($primes[$i]) {
+            # Inner marking loop
+            for (my $j = $i * $i; $j <= $n; $j += $i) {
+                $primes[$j] = 0
+            }
+        }
+    }
+    
+    # Use pipe to filter indices where value is 1
+    ~> 0:$n grep { $primes[$_] }
+}
+
+my @p = Rosetta::Sieve::solve(30)
+assert_eq join(",", @p), "2,3,5,7,11,13,17,19,23,29", "primes up to 30"
+
+test_run

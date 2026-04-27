@@ -215,7 +215,13 @@ stryke disasm script.stk                     # disassemble bytecode (learning/de
 stryke profile script.stk                    # run with profiling, structured output
 stryke profile --flame script.stk -o out.svg # flamegraph to file
 stryke bench                                 # run all benchmarks in bench/ or benches/
-stryke init myapp                            # scaffold a new project (lib/, bench/, t/)
+stryke init myapp                            # scaffold a new project (stryke.toml, lib/, t/, benches/)
+stryke new myapp                             # alias for `init` that creates ./myapp/
+stryke install                               # populate stryke.lock from stryke.toml (path deps; registry deps soon)
+stryke add mylib --path=../mylib             # add a local path dep (registry deps land in RFC phase 7-8)
+stryke remove mylib                          # drop a dep, regenerate stryke.lock
+stryke tree                                  # print resolved dep graph from stryke.lock
+stryke info mylib                            # show lockfile entry + store path for a dep
 stryke repl                                  # start interactive REPL explicitly
 stryke repl --load lib.stk                   # pre-load a library, then enter REPL
 stryke lsp                                   # language server over stdio ([0x11])

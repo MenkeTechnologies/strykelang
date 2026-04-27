@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word count (using pipes)
+
+fn Rosetta::WordCount::solve($text) {
+    my %counts
+    $text |> lc() |> split(/\W+/) |> map { 
+        if ($_ ne "") {
+            $counts{$_}++
+        }
+    }
+    %counts
+}
+
+my $t = "Hello hello world World! WORLD"
+my %res = Rosetta::WordCount::solve($t)
+
+assert_eq $res{"hello"}, 2, "hello count"
+assert_eq $res{"world"}, 3, "world count"
+assert_eq scalar(keys %res), 2, "unique words"
+
+test_run

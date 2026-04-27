@@ -89,7 +89,10 @@ impl<'a> Resolver<'a> {
             });
         }
         lockfile.canonicalize();
-        Ok(ResolveOutcome { lockfile, installed })
+        Ok(ResolveOutcome {
+            lockfile,
+            installed,
+        })
     }
 
     /// Flatten direct deps from `[deps]`, `[dev-deps]`, and every `[groups.*]`.
@@ -193,14 +196,7 @@ impl<'a> Resolver<'a> {
         let mut transitive: Vec<String> = Vec::new();
         if let Some(nm) = nested.as_ref() {
             for (sub_name, sub_spec) in &nm.deps {
-                self.walk_dep(
-                    sub_name,
-                    sub_spec,
-                    src,
-                    graph,
-                    installed,
-                    visiting,
-                )?;
+                self.walk_dep(sub_name, sub_spec, src, graph, installed, visiting)?;
                 let sub_version = graph
                     .values()
                     .find(|d| &d.name == sub_name)
@@ -304,7 +300,9 @@ mod tests {
         assert_eq!(outcome.lockfile.packages.len(), 1);
         assert_eq!(outcome.lockfile.packages[0].name, "mylib");
         assert_eq!(outcome.lockfile.packages[0].version, "1.0.0");
-        assert!(outcome.lockfile.packages[0].integrity.starts_with("sha256-"));
+        assert!(outcome.lockfile.packages[0]
+            .integrity
+            .starts_with("sha256-"));
         assert!(store.package_dir("mylib", "1.0.0").is_dir());
     }
 

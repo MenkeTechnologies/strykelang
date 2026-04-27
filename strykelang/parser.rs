@@ -198,6 +198,35 @@ impl Parser {
         }
     }
 
+    /// List builtins that take `{ BLOCK }, LIST` and accept the threaded list at
+    /// `args[1]` via [`Self::pipe_forward_apply`]. Used by both the pipe-forward
+    /// dispatcher and `parse_thread_stage_with_block` so `~> @a NAME { ... }` and
+    /// `@a |> NAME { ... }` route through the same substitution.
+    fn is_block_then_list_pipe_builtin(name: &str) -> bool {
+        matches!(
+            name,
+            "pfirst"
+                | "pany"
+                | "any"
+                | "all"
+                | "none"
+                | "first"
+                | "take_while"
+                | "drop_while"
+                | "skip_while"
+                | "reject"
+                | "tap"
+                | "peek"
+                | "group_by"
+                | "chunk_by"
+                | "partition"
+                | "min_by"
+                | "max_by"
+                | "zip_with"
+                | "count_by"
+        )
+    }
+
     /// Lift a `Bareword("f")` to `FuncCall { f, [$_] }`.
     ///
     /// stryke extension contexts (map/grep/fore expression forms, pipe-forward)
@@ -2015,6 +2044,36 @@ impl Parser {
                             line: stage_line,
                         };
                         result = self.pipe_forward_apply(result, stage, stage_line)?;
+                    // `pmap_on $cluster { BLOCK }` — parallel map dispatched to a remote
+                    // cluster. Mirrors the `pmap_chunked` thread-stage shape; the cluster
+                    // expression is parsed before the block, the threaded list slots in
+                    // as the placeholder.
+                    } else if func_name == "pmap_on" || func_name == "pflat_map_on" {
+                        // Suppress `$cluster { ... }` auto-arrow (`$h->{...}`) so the
+                        // brace opens the block, not a hash subscript.
+                        self.suppress_scalar_hash_brace =
+                            self.suppress_scalar_hash_brace.saturating_add(1);
+                        let cluster = self.parse_assign_expr();
+                        self.suppress_scalar_hash_brace =
+                            self.suppress_scalar_hash_brace.saturating_sub(1);
+                        let cluster = cluster?;
+                        // Optional comma between cluster and block (matches the
+                        // canonical `pmap_on $c, { BLOCK } @list` form in the LSP docs).
+                        self.eat(&Token::Comma);
+                        let block = self.parse_block_or_bareword_block()?;
+                        let placeholder = self.pipe_placeholder_list(stage_line);
+                        let stage = Expr {
+                            kind: ExprKind::PMapExpr {
+                                block,
+                                list: Box::new(placeholder),
+                                progress: None,
+                                flat_outputs: func_name == "pflat_map_on",
+                                on_cluster: Some(Box::new(cluster)),
+                                stream: false,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
                     // Check if followed by a block (like `filter { }`, `sort { }`, `map { }`)
                     } else if matches!(self.peek(), Token::LBrace) {
                         // Parse as a block-taking builtin
@@ -2428,6 +2487,11 @@ impl Parser {
             "sort" | "so" => ExprKind::SortExpr {
                 cmp: None,
                 list: Box::new(arg),
+            },
+            "psort" => ExprKind::PSortExpr {
+                cmp: None,
+                list: Box::new(arg),
+                progress: None,
             },
             "uniq" | "distinct" | "uq" => ExprKind::FuncCall {
                 name: "uniq".to_string(),
@@ -2875,7 +2939,12 @@ impl Parser {
                 line,
             }),
             _ => {
-                // Generic: parse block and treat as FuncCall with code ref arg
+                // Generic: parse block and treat as FuncCall with code ref arg.
+                // Block-then-list pipe builtins (`pfirst`, `any`, `take_while`, etc.)
+                // need the threaded list slot pre-allocated at args[1] so
+                // `pipe_forward_apply` can substitute the lhs there (parser.rs:5823).
+                // For everything else, the generic pipe-forward arm prepends or
+                // appends the lhs based on `thread_last_mode`.
                 let code_ref = Expr {
                     kind: ExprKind::CodeRef {
                         params: vec![],
@@ -2883,10 +2952,15 @@ impl Parser {
                     },
                     line,
                 };
+                let args = if Self::is_block_then_list_pipe_builtin(name) {
+                    vec![code_ref, placeholder]
+                } else {
+                    vec![code_ref]
+                };
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
                         name: name.to_string(),
-                        args: vec![code_ref],
+                        args,
                     },
                     line,
                 })
@@ -4073,8 +4147,8 @@ impl Parser {
                 // Block shadowing:
                 // - In user code (default mode, not parsing module)
                 // - Always in no-interop mode
-                let allow_shadow = crate::compat_mode()
-                    || (self.parsing_module && !crate::no_interop_mode());
+                let allow_shadow =
+                    crate::compat_mode() || (self.parsing_module && !crate::no_interop_mode());
                 if !allow_shadow {
                     self.check_udf_shadows_builtin(&name, line)?;
                 }
@@ -5815,9 +5889,7 @@ impl Parser {
                         // data |> clamp MIN, MAX → clamp(MIN, MAX, data...)
                         args.push(lhs);
                     }
-                    "pfirst" | "pany" | "any" | "all" | "none" | "first" | "take_while"
-                    | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "group_by"
-                    | "chunk_by" | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
+                    n if Self::is_block_then_list_pipe_builtin(n) => {
                         if args.len() < 2 {
                             return Err(self.syntax_err(
                                 format!(
@@ -11561,7 +11633,14 @@ impl Parser {
     fn parse_cluster_block_then_list_optional_progress(
         &mut self,
     ) -> PerlResult<(Expr, Block, Expr, Option<Expr>)> {
-        let cluster = self.parse_assign_expr()?;
+        // `pmap_on $c { BLOCK } @list` — suppress `$c { ... }` hash-subscript
+        // auto-arrow so the brace opens the BLOCK, not a `$c->{...}` deref.
+        self.suppress_scalar_hash_brace = self.suppress_scalar_hash_brace.saturating_add(1);
+        let cluster = self.parse_assign_expr();
+        self.suppress_scalar_hash_brace = self.suppress_scalar_hash_brace.saturating_sub(1);
+        let cluster = cluster?;
+        // Accept the canonical `pmap_on $c, { BLOCK } @list` LSP-doc form too.
+        self.eat(&Token::Comma);
         let block = self.parse_block_or_bareword_block()?;
         self.eat(&Token::Comma);
         let line = self.peek_line();
@@ -13631,10 +13710,9 @@ impl Parser {
                 self.advance();
                 self.parse_slice_optional_endpoint(is_hash)?
             } else if matches!(self.peek(), Token::PackageSep) {
-                return Err(self.syntax_err(
-                    "Unexpected `::` after slice TO endpoint".to_string(),
-                    line,
-                ));
+                return Err(
+                    self.syntax_err("Unexpected `::` after slice TO endpoint".to_string(), line)
+                );
             } else {
                 None
             };
@@ -13663,10 +13741,7 @@ impl Parser {
 
     /// Parse an optional slice endpoint: returns `None` if the next token closes the slice
     /// arg (`,`, `]`, `}`, or another `:`). Otherwise parses an endpoint expression.
-    fn parse_slice_optional_endpoint(
-        &mut self,
-        is_hash: bool,
-    ) -> PerlResult<Option<Box<Expr>>> {
+    fn parse_slice_optional_endpoint(&mut self, is_hash: bool) -> PerlResult<Option<Box<Expr>>> {
         if matches!(
             self.peek(),
             Token::Colon

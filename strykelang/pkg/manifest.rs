@@ -23,7 +23,11 @@ pub struct Manifest {
     pub deps: IndexMap<String, DepSpec>,
 
     /// `[dev-deps]` — only present when running tests/benches.
-    #[serde(rename = "dev-deps", default, skip_serializing_if = "IndexMap::is_empty")]
+    #[serde(
+        rename = "dev-deps",
+        default,
+        skip_serializing_if = "IndexMap::is_empty"
+    )]
     pub dev_deps: IndexMap<String, DepSpec>,
 
     /// `[groups.NAME]` — bundler-style arbitrary groups (e.g. `groups.bench`).
@@ -110,16 +114,26 @@ pub struct DetailedDep {
     #[serde(default, skip_serializing_if = "is_false")]
     pub optional: bool,
     /// `default-features = false` — opt out of the dep's default features.
-    #[serde(rename = "default-features", default = "default_true", skip_serializing_if = "is_true_default")]
+    #[serde(
+        rename = "default-features",
+        default = "default_true",
+        skip_serializing_if = "is_true_default"
+    )]
     pub default_features: bool,
     /// `workspace = true` — inherit version/features from workspace root.
     #[serde(default, skip_serializing_if = "is_false")]
     pub workspace: bool,
 }
 
-fn is_false(b: &bool) -> bool { !*b }
-fn default_true() -> bool { true }
-fn is_true_default(b: &bool) -> bool { *b }
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+fn default_true() -> bool {
+    true
+}
+fn is_true_default(b: &bool) -> bool {
+    *b
+}
 
 /// `[workspace]` table.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -137,17 +151,15 @@ impl Manifest {
     /// Parse a `stryke.toml` from a string. Returns a structured diagnostic on
     /// failure (line numbers when the underlying TOML parser provides them).
     pub fn from_str(s: &str) -> PkgResult<Manifest> {
-        toml::from_str::<Manifest>(s).map_err(|e| {
-            PkgError::Manifest(format!("stryke.toml: {}", e.message()))
-        })
+        toml::from_str::<Manifest>(s)
+            .map_err(|e| PkgError::Manifest(format!("stryke.toml: {}", e.message())))
     }
 
     /// Parse from a path, treating any I/O error as `PkgError::Io` and any TOML
     /// error as `PkgError::Manifest`.
     pub fn from_path(path: &Path) -> PkgResult<Manifest> {
-        let s = std::fs::read_to_string(path).map_err(|e| {
-            PkgError::Io(format!("read {}: {}", path.display(), e))
-        })?;
+        let s = std::fs::read_to_string(path)
+            .map_err(|e| PkgError::Io(format!("read {}: {}", path.display(), e)))?;
         Manifest::from_str(&s)
     }
 
@@ -156,9 +168,8 @@ impl Manifest {
     /// `IndexMap`-backed sections preserve insertion order so dep lists stay
     /// stable across `s add`/`s remove`.
     pub fn to_toml_string(&self) -> PkgResult<String> {
-        toml::to_string_pretty(self).map_err(|e| {
-            PkgError::Manifest(format!("serialize stryke.toml: {}", e))
-        })
+        toml::to_string_pretty(self)
+            .map_err(|e| PkgError::Manifest(format!("serialize stryke.toml: {}", e)))
     }
 
     /// Validate semantic invariants on top of TOML schema (cheap fast fails).
@@ -168,9 +179,10 @@ impl Manifest {
                 return Err(PkgError::Manifest("[package].name is required".into()));
             }
             if pkg.version.is_empty() {
-                return Err(PkgError::Manifest(
-                    format!("[package].version is required for `{}`", pkg.name),
-                ));
+                return Err(PkgError::Manifest(format!(
+                    "[package].version is required for `{}`",
+                    pkg.name
+                )));
             }
         } else if self.workspace.is_none() {
             return Err(PkgError::Manifest(
@@ -284,10 +296,7 @@ myapp = "main.stk"
         let m = Manifest::from_str(src).unwrap();
         assert_eq!(m.deps.len(), 4);
         assert_eq!(m.deps.get("http").unwrap().version_req(), Some("1.0"));
-        assert_eq!(
-            m.deps.get("local-lib").unwrap().source(),
-            DepSource::Path
-        );
+        assert_eq!(m.deps.get("local-lib").unwrap().source(), DepSource::Path);
         assert_eq!(m.deps.get("git-lib").unwrap().source(), DepSource::Git);
         assert_eq!(m.bin.get("myapp").unwrap(), "main.stk");
     }

@@ -87,6 +87,393 @@ fn parallel_sort_empty_list() {
     assert_eq!(eval_int(r#"scalar psort ()"#), 0);
 }
 
+/// Regression: blockless `psort` as a thread-macro stage must build a `PSortExpr`,
+/// not a generic `FuncCall { name: "psort" }` (which fails at runtime with
+/// "Undefined subroutine &psort"). See `thread_apply_bare_func` in parser.rs.
+#[test]
+fn parallel_sort_thread_macro_blockless_stage() {
+    assert_eq!(
+        crate::common::eval_string(r#"my @a = (3, 1, 2); join(",", ~> @a psort)"#),
+        "1,2,3"
+    );
+}
+
+/// Same regression — string sort path through the thread macro.
+#[test]
+fn parallel_sort_thread_macro_strings() {
+    assert_eq!(
+        crate::common::eval_string(
+            r#"my @a = ("banana", "apple", "cherry"); join(",", ~> @a psort)"#
+        ),
+        "apple,banana,cherry"
+    );
+}
+
+/// Block-form builtins (`pfirst`/`pany`/`any`/`all`/`none`/`first`/`take_while`/
+/// `drop_while`/`reject`/`tap`/`peek`/`group_by`/`chunk_by`/`partition`/`min_by`/
+/// `max_by`/`zip_with`/`count_by`) used to fail in thread context with
+/// `\`NAME\` needs { BLOCK }, LIST so the list can receive the pipe`. The
+/// `parse_thread_stage_with_block` default arm only emitted a one-arg `FuncCall`,
+/// then `pipe_forward_apply` rejected it (args.len() < 2). Now both sites share
+/// `is_block_then_list_pipe_builtin` and the placeholder list slot is reserved.
+#[test]
+fn block_form_pipe_builtins_work_as_thread_stage() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) any { $_ > 2 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) all { $_ > 0 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) none { $_ > 10 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) first { $_ > 2 }"#), 3);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) pfirst { $_ > 2 }"#), 3);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) pany { $_ > 3 }"#), 1);
+}
+
+#[test]
+fn block_form_pipe_builtins_work_via_pipe_forward() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"(1,2,3,4) |> any { $_ > 2 }"#), 1);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> first { $_ > 2 }"#), 3);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-builtin regression matrix for the 18 block-form pipe builtins.
+// Each builtin gets one `~>` assertion and one `|>` assertion to lock down both
+// dispatch paths (parse_thread_stage_with_block default arm + pipe_forward_apply).
+// Output values are the empirically observed outputs from the audit's probe.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn thread_stage_any_truthy_match() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) any { $_ > 3 }"#), 1);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> any { $_ > 3 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) any { $_ > 99 }"#), 0);
+}
+
+#[test]
+fn thread_stage_all_universal_match() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) all { $_ > 0 }"#), 1);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> all { $_ > 0 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) all { $_ > 1 }"#), 0);
+}
+
+#[test]
+fn thread_stage_none_universal_no_match() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) none { $_ > 99 }"#), 1);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> none { $_ > 99 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) none { $_ > 0 }"#), 0);
+}
+
+#[test]
+fn thread_stage_first_existential_value() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) first { $_ > 2 }"#), 3);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> first { $_ > 2 }"#), 3);
+}
+
+#[test]
+fn thread_stage_pfirst_parallel_existential() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) pfirst { $_ > 2 }"#), 3);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> pfirst { $_ > 2 }"#), 3);
+}
+
+#[test]
+fn thread_stage_pany_parallel_existential() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1,2,3,4) pany { $_ > 3 }"#), 1);
+    assert_eq!(eval_int(r#"(1,2,3,4) |> pany { $_ > 3 }"#), 1);
+    assert_eq!(eval_int(r#"~> (1,2,3,4) pany { $_ > 99 }"#), 0);
+}
+
+#[test]
+fn thread_stage_take_while_stops_at_first_falsy() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3,0,4) take_while { $_ > 0 }; join(",", @r)"#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (1,2,3,0,4) |> take_while { $_ > 0 }; join(",", @r)"#),
+        "1,2,3"
+    );
+}
+
+#[test]
+fn thread_stage_drop_while_skips_leading_truthy() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (0,0,1,2,3) drop_while { $_ == 0 }; join(",", @r)"#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (0,0,1,2,3) |> drop_while { $_ == 0 }; join(",", @r)"#),
+        "1,2,3"
+    );
+}
+
+#[test]
+fn thread_stage_skip_while_alias_of_drop_while() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,5,3,4) skip_while { $_ < 3 }; join(",", @r)"#),
+        "5,3,4"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (1,2,5,3,4) |> skip_while { $_ < 3 }; join(",", @r)"#),
+        "5,3,4"
+    );
+}
+
+#[test]
+fn thread_stage_reject_keeps_falsy_elements() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3,4) reject { $_ > 2 }; join(",", @r)"#),
+        "1,2"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (1,2,3,4) |> reject { $_ > 2 }; join(",", @r)"#),
+        "1,2"
+    );
+}
+
+#[test]
+fn thread_stage_tap_returns_original_list_unchanged() {
+    use crate::common::eval_string;
+    // `tap` runs the block for side effects; the threaded list passes through.
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3) tap { $_ * 100 }; join(",", @r)"#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (1,2,3) |> tap { $_ * 100 }; join(",", @r)"#),
+        "1,2,3"
+    );
+}
+
+#[test]
+fn thread_stage_peek_returns_original_list_unchanged() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3) peek { $_ * 100 }; join(",", @r)"#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = (1,2,3) |> peek { $_ * 100 }; join(",", @r)"#),
+        "1,2,3"
+    );
+}
+
+#[test]
+fn thread_stage_partition_pass_fail_arrayrefs() {
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(
+            r#"my ($pass, $fail) = ~> (1,2,3,4) partition { $_ > 2 };
+               join(",", @$pass) . "|" . join(",", @$fail)"#
+        ),
+        "3,4|1,2"
+    );
+    assert_eq!(
+        eval_string(
+            r#"my ($pass, $fail) = (1,2,3,4) |> partition { $_ > 2 };
+               join(",", @$pass) . "|" . join(",", @$fail)"#
+        ),
+        "3,4|1,2"
+    );
+}
+
+#[test]
+fn thread_stage_min_by_smallest_key() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1, -5, 3, -2) min_by { abs($_) }"#), 1);
+    assert_eq!(eval_int(r#"(1, -5, 3, -2) |> min_by { abs($_) }"#), 1);
+}
+
+#[test]
+fn thread_stage_max_by_largest_key() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> (1, -5, 3, -2) max_by { abs($_) }"#), -5);
+    assert_eq!(eval_int(r#"(1, -5, 3, -2) |> max_by { abs($_) }"#), -5);
+}
+
+#[test]
+fn thread_stage_count_by_returns_keyed_hash() {
+    use crate::common::eval_int;
+    // `count_by` returns a hashref counting elements per key.
+    assert_eq!(
+        eval_int(r#"my $h = ~> (1,2,3,4,5) count_by { $_ % 2 }; $h->{0}"#),
+        2
+    );
+    assert_eq!(
+        eval_int(r#"my $h = ~> (1,2,3,4,5) count_by { $_ % 2 }; $h->{1}"#),
+        3
+    );
+    assert_eq!(
+        eval_int(r#"my $h = (1,2,3,4,5) |> count_by { $_ % 2 }; $h->{1}"#),
+        3
+    );
+}
+
+#[test]
+fn thread_stage_chunk_by_runs_of_consecutive_equal_keys() {
+    use crate::common::eval_int;
+    // `(1,1,2,2,3,1) chunk_by { $_ }` → 4 runs: [1,1], [2,2], [3], [1].
+    assert_eq!(
+        eval_int(r#"my @r = ~> (1,1,2,2,3,1) chunk_by { $_ }; scalar @r"#),
+        4
+    );
+    assert_eq!(
+        eval_int(r#"my @r = (1,1,2,2,3,1) |> chunk_by { $_ }; scalar @r"#),
+        4
+    );
+}
+
+#[test]
+fn thread_stage_group_by_does_not_error() {
+    use crate::common::eval_string;
+    // Lock the routing, not the exact return shape (which is intentionally
+    // group-key-keyed and may evolve). Just confirm it doesn't raise.
+    let r = eval_string(r#"my @r = ~> (1,2,3,4,5) group_by { $_ % 2 }; scalar @r"#);
+    assert!(!r.is_empty());
+    let r = eval_string(r#"my @r = (1,2,3,4,5) |> group_by { $_ % 2 }; scalar @r"#);
+    assert!(!r.is_empty());
+}
+
+#[test]
+fn thread_stage_zip_with_pairs_lists() {
+    use crate::common::eval_int;
+    // `zip_with { ... }` over a list of arrayrefs — verify routing doesn't error
+    // and produces a non-empty result.
+    let n = crate::common::eval_int(r#"my @r = ~> ([1,2,3]) zip_with { [$_] }; scalar @r"#);
+    assert!(n > 0);
+    let n = eval_int(r#"my @r = ([1,2,3]) |> zip_with { [$_] }; scalar @r"#);
+    assert!(n > 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty-list edge cases for the predicate builtins (any/all/none/first).
+// `all` and `none` are vacuously true on empty lists; `any` and `first` are not.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn thread_stage_any_empty_list_is_false() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> () any { 1 }"#), 0);
+    assert_eq!(eval_int(r#"() |> any { 1 }"#), 0);
+}
+
+#[test]
+fn thread_stage_all_empty_list_is_vacuously_true() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> () all { 1 }"#), 1);
+    assert_eq!(eval_int(r#"() |> all { 1 }"#), 1);
+}
+
+#[test]
+fn thread_stage_none_empty_list_is_vacuously_true() {
+    use crate::common::eval_int;
+    assert_eq!(eval_int(r#"~> () none { 1 }"#), 1);
+    assert_eq!(eval_int(r#"() |> none { 1 }"#), 1);
+}
+
+#[test]
+fn thread_stage_first_empty_list_is_undef() {
+    use crate::common::eval_int;
+    assert_eq!(
+        eval_int(r#"my $r = ~> () first { 1 }; defined($r) ? 1 : 0"#),
+        0
+    );
+    assert_eq!(
+        eval_int(r#"my $r = () |> first { 1 }; defined($r) ? 1 : 0"#),
+        0
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composition: chained block-form stages must keep working when piped together.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn thread_stage_chained_block_form_composes() {
+    use crate::common::eval_string;
+    // `(1..6) → reject odd → take_while < 6 → first` should pick the first
+    // even number under 6, i.e. 2.
+    assert_eq!(
+        eval_string(r#"~> (1,2,3,4,5,6) reject { $_ % 2 } take_while { $_ < 6 } first { $_ > 0 }"#),
+        "2"
+    );
+}
+
+#[test]
+fn thread_stage_paren_form_with_arg_for_head_take_join() {
+    // The audit confirmed `head(N)`, `take(N)`, `join(SEP)` require paren form
+    // in `~>` (bareword positional args go to the next stage, by design).
+    use crate::common::eval_string;
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3,4,5) head(3); join(",", @r)"#),
+        "1,2,3"
+    );
+    assert_eq!(
+        eval_string(r#"my @r = ~> (1,2,3,4,5) take(2); join(",", @r)"#),
+        "1,2"
+    );
+    assert_eq!(eval_string(r#"~> (1,2,3) join(",")"#), "1,2,3");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pmap_on / pflat_map_on parser dispatch. Full execution requires a wired
+// `cluster(...)` runtime constructor that doesn't exist yet (LSP docs reference
+// it but no runtime sub is registered). Parse-only coverage in
+// parse_accepts_parallel locks the AST shape; here we confirm the parser path
+// yields a *runtime* error (not a parse error or "Undefined subroutine
+// &pmap_on") when handed an undef cluster — that's the pre-fix failure mode.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn thread_stage_pmap_on_undef_cluster_runtime_error() {
+    use crate::common::eval_err_kind;
+    use stryke::error::ErrorKind;
+    assert_eq!(
+        eval_err_kind(r#"my $c = undef; my @r = ~> (1,2,3) pmap_on $c { $_ * 2 }; 0"#),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn thread_stage_pmap_on_with_comma_undef_cluster_runtime_error() {
+    use crate::common::eval_err_kind;
+    use stryke::error::ErrorKind;
+    // The optional comma between cluster and block (canonical LSP-doc form)
+    // must parse identically to the no-comma form.
+    assert_eq!(
+        eval_err_kind(r#"my $c = undef; my @r = ~> (1,2,3) pmap_on $c, { $_ * 2 }; 0"#),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn thread_stage_pflat_map_on_undef_cluster_runtime_error() {
+    use crate::common::eval_err_kind;
+    use stryke::error::ErrorKind;
+    assert_eq!(
+        eval_err_kind(r#"my $c = undef; my @r = ~> (1,2,3) pflat_map_on $c { ($_, $_) }; 0"#),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn pipe_forward_pmap_on_undef_cluster_runtime_error() {
+    use crate::common::eval_err_kind;
+    use stryke::error::ErrorKind;
+    assert_eq!(
+        eval_err_kind(r#"my $c = undef; my @r = (1,2,3) |> pmap_on $c { $_ * 2 }; 0"#),
+        ErrorKind::Runtime
+    );
+}
+
 #[test]
 fn pmap_chunked_empty_list() {
     assert_eq!(eval_int(r#"scalar pmap_chunked 4 { $_ } ()"#), 0);

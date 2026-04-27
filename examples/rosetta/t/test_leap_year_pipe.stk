@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Leap year (using pipes)
+
+fn Rosetta::LeapYear::solve($year) {
+    $year % 4 == 0 && ($year % 100 != 0 || $year % 400 == 0)
+}
+
+fn Rosetta::LeapYear::filter(@years) {
+    ~> @years grep { Rosetta::LeapYear::solve($_) }
+}
+
+assert_eq Rosetta::LeapYear::solve(2000), 1, "2000 is leap year"
+assert_eq Rosetta::LeapYear::solve(1900), 0, "1900 is not leap year"
+assert_eq Rosetta::LeapYear::solve(2004), 1, "2004 is leap year"
+assert_eq Rosetta::LeapYear::solve(2001), 0, "2001 is not leap year"
+assert_eq Rosetta::LeapYear::solve(2002), 0, "2002 is not leap year"
+
+my @test_years = (1900, 1996, 2000, 2001, 2004, 2100)
+my @leaps = Rosetta::LeapYear::filter(@test_years)
+assert_eq join(",", @leaps), "1996,2000,2004", "filtered leap years"
+
+# Can also pipe into the filter
+my @piped_leaps = @test_years |> Rosetta::LeapYear::filter()
+assert_eq join(",", @piped_leaps), "1996,2000,2004", "piped leap years"
+
+test_run

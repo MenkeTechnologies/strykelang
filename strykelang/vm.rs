@@ -4727,8 +4727,7 @@ impl<'a> VM<'a> {
                         let step = self.pop();
                         let to = self.pop();
                         let from = self.pop();
-                        let arr =
-                            crate::value::perl_list_range_expand_stepped(from, to, step);
+                        let arr = crate::value::perl_list_range_expand_stepped(from, to, step);
                         self.push(PerlValue::array(arr));
                         Ok(())
                     }
@@ -4760,9 +4759,7 @@ impl<'a> VM<'a> {
                         let from = self.pop();
                         let line = self.line();
                         let name = names[*hash_idx as usize].as_str();
-                        let keys = match crate::value::compute_hash_slice_keys(
-                            &from, &to, &step,
-                        ) {
+                        let keys = match crate::value::compute_hash_slice_keys(&from, &to, &step) {
                             Ok(v) => v,
                             Err(msg) => {
                                 return Err(PerlError::runtime(msg, line));

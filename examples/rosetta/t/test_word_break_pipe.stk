@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word break problem (using pipes)
+
+fn Rosetta::WordBreak::can_break($s, $dict) {
+    return 1 if $s eq ""
+    
+    # Try every prefix of $s
+    my @valid = ~> 1:length($s) grep {
+        my $len = $_
+        my $prefix = substr($s, 0, $len)
+        if (exists $dict->{$prefix}) {
+            Rosetta::WordBreak::can_break(substr($s, $len), $dict)
+        } else {
+            0
+        }
+    }
+    scalar(@valid) > 0
+}
+
+my %dict = ( "stryke" => 1, "is" => 1, "fast" => 1, "language" => 1 )
+assert_eq Rosetta::WordBreak::can_break("strykeisfast", \%dict), 1, "strykeisfast"
+assert_eq Rosetta::WordBreak::can_break("strykeispower", \%dict), 0, "strykeispower"
+
+test_run

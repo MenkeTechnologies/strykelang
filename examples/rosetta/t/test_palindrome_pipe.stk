@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Palindrome detection (using pipes)
+
+fn Rosetta::Palindrome::is_palindrome($s) {
+    # Clean string: lowercase and remove non-alphanumeric
+    my $clean = $s |> lc() |> { $_ =~ s/[^a-z0-9]//gr }
+    $clean eq ($clean |> rev())
+}
+
+assert_eq Rosetta::Palindrome::is_palindrome("racecar"), 1, "racecar is a palindrome"
+assert_eq Rosetta::Palindrome::is_palindrome("A man, a plan, a canal: Panama"), 1, "Panama is a palindrome"
+assert_eq Rosetta::Palindrome::is_palindrome("hello"), 0, "hello is not a palindrome"
+
+test_run

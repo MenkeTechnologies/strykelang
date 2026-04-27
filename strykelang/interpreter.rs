@@ -7969,7 +7969,10 @@ impl Interpreter {
         &mut self,
         key_expr: &Expr,
     ) -> Result<Vec<String>, FlowOrError> {
-        let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
+        let v = if matches!(
+            key_expr.kind,
+            ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+        ) {
             self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
         } else {
             self.eval_expr(key_expr)?
@@ -8446,7 +8449,10 @@ impl Interpreter {
                 let hv = self.eval_expr(container)?;
                 let mut key_vals = Vec::with_capacity(keys.len());
                 for key_expr in keys {
-                    let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
+                    let v = if matches!(
+                        key_expr.kind,
+                        ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+                    ) {
                         self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
                     } else {
                         self.eval_expr(key_expr)?
@@ -9288,7 +9294,8 @@ impl Interpreter {
                         return Err(PerlError::runtime(
                             "open-ended slice range cannot be evaluated outside slice subscript",
                             line,
-                        ).into());
+                        )
+                        .into());
                     }
                 };
                 let t = match to {
@@ -9297,7 +9304,8 @@ impl Interpreter {
                         return Err(PerlError::runtime(
                             "open-ended slice range cannot be evaluated outside slice subscript",
                             line,
-                        ).into());
+                        )
+                        .into());
                     }
                 };
                 let list = if let Some(s) = step {
@@ -13047,7 +13055,10 @@ impl Interpreter {
     ) -> Result<Vec<i64>, FlowOrError> {
         let mut out = Vec::new();
         for idx_expr in indices {
-            let v = if matches!(idx_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
+            let v = if matches!(
+                idx_expr.kind,
+                ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+            ) {
                 self.eval_expr_ctx(idx_expr, WantarrayCtx::List)?
             } else {
                 self.eval_expr(idx_expr)?
@@ -13445,7 +13456,10 @@ impl Interpreter {
                 }
                 let mut key_vals = Vec::with_capacity(keys.len());
                 for key_expr in keys {
-                    let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
+                    let v = if matches!(
+                        key_expr.kind,
+                        ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+                    ) {
                         self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
                     } else {
                         self.eval_expr(key_expr)?

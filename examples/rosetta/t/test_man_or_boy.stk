@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Man or boy test
+
+fn Rosetta::ManOrBoy::a($k_val, $x1, $x2, $x3, $x4, $x5) {
+    my $k = [$k_val]
+    my $b
+    $b = fn {
+        $k->[0] -= 1
+        Rosetta::ManOrBoy::a($k->[0], $b, $x1, $x2, $x3, $x4)
+    }
+    return $x4->() + $x5->() if $k->[0] <= 0
+    return $b->()
+}
+
+# Values for x1..x5
+my $f1  = fn { 1 }
+my $f0  = fn { 0 }
+my $fn1 = fn { -1 }
+
+# Standard test values
+assert_eq Rosetta::ManOrBoy::a(0, $f1, $fn1, $fn1, $f1, $f0), 1,  "Man or boy A(0)"
+assert_eq Rosetta::ManOrBoy::a(1, $f1, $fn1, $fn1, $f1, $f0), 0,  "Man or boy A(1)"
+assert_eq Rosetta::ManOrBoy::a(2, $f1, $fn1, $fn1, $f1, $f0), -2, "Man or boy A(2)"
+assert_eq Rosetta::ManOrBoy::a(3, $f1, $fn1, $fn1, $f1, $f0), 0,  "Man or boy A(3)"
+
+test_run

@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hamming weight (using pipes)
+
+fn Rosetta::HammingWeight::solve($n) {
+    # Convert to binary string and count '1's
+    # Using printf + chars + grep pipe
+    sprintf("%b", $n) |> chars() |> grep { $_ eq "1" } |> scalar()
+}
+
+assert_eq Rosetta::HammingWeight::solve(0), 0, "weight of 0"
+assert_eq Rosetta::HammingWeight::solve(1), 1, "weight of 1"
+assert_eq Rosetta::HammingWeight::solve(7), 3, "weight of 7"
+assert_eq Rosetta::HammingWeight::solve(255), 8, "weight of 255"
+
+test_run

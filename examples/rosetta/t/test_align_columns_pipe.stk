@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Align columns (using pipes)
+
+fn Rosetta::AlignColumns::solve($text, $align) {
+    # Split into lines and words
+    my @lines = $text |> split("\n") |> map { [ $_ |> split(/\$/) ] }
+    
+    # Find max width for each column
+    my %widths
+    ~> @lines for {
+        my $row = $_
+        0..$#$row |> map {
+            my $col = $_
+            my $w = length($row->[$col])
+            $widths{$col} = $w if $w > $widths{$col}
+        }
+    }
+    
+    # Format lines
+    ~> @lines map {
+        my $row = $_
+        0..$#$row |> map {
+            my $col = $_
+            my $val = $row->[$col]
+            my $w = $widths{$col}
+            if ($align eq "left") {
+                sprintf("%-${w}s", $val)
+            } elsif ($align eq "right") {
+                sprintf("%${w}s", $val)
+            } else { # center
+                my $pad = $w - length($val)
+                my $l = int($pad / 2)
+                my $r = $pad - $l
+                (" " * $l) . $val . (" " * $r)
+            }
+        } |> join(" ")
+    } |> join("\n")
+}
+
+my $input = "Given\$a\$text\$file\$of\$many\$lines,\$where\$fields\$within\$a\$line\n" .
+            "are\$delineated\$by\$a\$single\$'col'\$character,\$write\$a\$program\n" .
+            "that\$aligns\$each\$column\$of\$fields\$by\$ensuring\$that\$words\$in\$each\n" .
+            "column\$are\$separated\$by\$at\$least\$one\$space.\n" .
+            "Further,\$allow\$for\$each\$column\$to\$be\$left,\$right,\$or\$center\$aligned\$within\$its\$column."
+
+my $left = Rosetta::AlignColumns::solve($input, "left")
+my @res_lines = $left |> split("\n")
+my @first_line = $res_lines[0] |> split(/\s+/)
+assert_eq $first_line[0], "Given", "first word left aligned"
+my @cols = $first_line[0] |> split("  ")
+assert_eq length($first_line[0]), 5, "width check"
+
+test_run

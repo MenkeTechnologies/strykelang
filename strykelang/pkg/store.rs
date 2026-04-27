@@ -18,11 +18,12 @@ impl Store {
     /// environment variable for tests and CI sandboxes.
     pub fn user_default() -> PkgResult<Store> {
         if let Ok(custom) = std::env::var("STRYKE_HOME") {
-            return Ok(Store { root: PathBuf::from(custom) });
+            return Ok(Store {
+                root: PathBuf::from(custom),
+            });
         }
-        let home = std::env::var("HOME").map_err(|_| {
-            PkgError::Other("HOME environment variable not set".into())
-        })?;
+        let home = std::env::var("HOME")
+            .map_err(|_| PkgError::Other("HOME environment variable not set".into()))?;
         Ok(Store {
             root: PathBuf::from(home).join(".stryke"),
         })
@@ -33,12 +34,24 @@ impl Store {
         Store { root: root.into() }
     }
 
-    pub fn root(&self) -> &Path { &self.root }
-    pub fn store_dir(&self) -> PathBuf { self.root.join("store") }
-    pub fn cache_dir(&self) -> PathBuf { self.root.join("cache") }
-    pub fn git_dir(&self) -> PathBuf { self.root.join("git") }
-    pub fn bin_dir(&self) -> PathBuf { self.root.join("bin") }
-    pub fn index_dir(&self) -> PathBuf { self.root.join("index") }
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+    pub fn store_dir(&self) -> PathBuf {
+        self.root.join("store")
+    }
+    pub fn cache_dir(&self) -> PathBuf {
+        self.root.join("cache")
+    }
+    pub fn git_dir(&self) -> PathBuf {
+        self.root.join("git")
+    }
+    pub fn bin_dir(&self) -> PathBuf {
+        self.root.join("bin")
+    }
+    pub fn index_dir(&self) -> PathBuf {
+        self.root.join("index")
+    }
 
     /// Path where a package extraction lives: `~/.stryke/store/{name}@{version}/`.
     pub fn package_dir(&self, name: &str, version: &str) -> PathBuf {
@@ -55,9 +68,8 @@ impl Store {
             self.bin_dir(),
             self.index_dir(),
         ] {
-            std::fs::create_dir_all(&d).map_err(|e| {
-                PkgError::Io(format!("create {}: {}", d.display(), e))
-            })?;
+            std::fs::create_dir_all(&d)
+                .map_err(|e| PkgError::Io(format!("create {}: {}", d.display(), e)))?;
         }
         Ok(())
     }
@@ -70,17 +82,11 @@ impl Store {
     /// Recursively copy a directory tree into the store as `name@version`. Used
     /// for path deps where the source is a local directory the user maintains.
     /// Existing destination is removed first so re-installs see fresh content.
-    pub fn install_path_dep(
-        &self,
-        name: &str,
-        version: &str,
-        src: &Path,
-    ) -> PkgResult<PathBuf> {
+    pub fn install_path_dep(&self, name: &str, version: &str, src: &Path) -> PkgResult<PathBuf> {
         let dst = self.package_dir(name, version);
         if dst.exists() {
-            std::fs::remove_dir_all(&dst).map_err(|e| {
-                PkgError::Io(format!("clear {}: {}", dst.display(), e))
-            })?;
+            std::fs::remove_dir_all(&dst)
+                .map_err(|e| PkgError::Io(format!("clear {}: {}", dst.display(), e)))?;
         }
         std::fs::create_dir_all(&dst)?;
         copy_dir(src, &dst)?;
@@ -101,9 +107,8 @@ fn copy_dir(src: &Path, dst: &Path) -> PkgResult<()> {
             #[cfg(unix)]
             {
                 let target = std::fs::read_link(&from)?;
-                std::os::unix::fs::symlink(target, &to).map_err(|e| {
-                    PkgError::Io(format!("symlink {}: {}", to.display(), e))
-                })?;
+                std::os::unix::fs::symlink(target, &to)
+                    .map_err(|e| PkgError::Io(format!("symlink {}: {}", to.display(), e)))?;
             }
             #[cfg(not(unix))]
             std::fs::copy(&from, &to)
@@ -112,9 +117,8 @@ fn copy_dir(src: &Path, dst: &Path) -> PkgResult<()> {
             std::fs::create_dir_all(&to)?;
             copy_dir(&from, &to)?;
         } else {
-            std::fs::copy(&from, &to).map_err(|e| {
-                PkgError::Io(format!("copy {}: {}", from.display(), e))
-            })?;
+            std::fs::copy(&from, &to)
+                .map_err(|e| PkgError::Io(format!("copy {}: {}", from.display(), e)))?;
         }
     }
     Ok(())

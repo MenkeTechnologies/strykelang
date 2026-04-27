@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Inverted index (using pipes)
+
+fn Rosetta::InvertedIndex::create(@docs) {
+    my %index
+    ~> 0:$#docs map {
+        my $id = $_
+        my $text = $docs[$id]
+        # Clean and split into unique words
+        my @words = $text |> lc() |> split(/\W+/) |> grep { $_ ne "" }
+        my %seen
+        for my $w (@words) {
+            if (!$seen{$w}++) {
+                $index{$w} = [] if !exists $index{$w}
+                push @{$index{$w}}, $id
+            }
+        }
+    }
+    \%index
+}
+
+my @docs = (
+    "it is what it is",
+    "what is it",
+    "it is a banana"
+)
+
+my $idx = Rosetta::InvertedIndex::create(@docs)
+
+assert_eq join(",", @{$idx->{"banana"}}), "2", "banana in doc 2"
+assert_eq join(",", @{$idx->{"what"}}), "0,1", "what in docs 0 and 1"
+assert_eq join(",", @{$idx->{"it"}}), "0,1,2", "it in all docs"
+
+test_run

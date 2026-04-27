@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String joining (using pipes)
+
+my @words = ("Stryke", "is", "fast")
+
+my $j1 = @words |> join(" ")
+assert_eq $j1, "Stryke is fast", "join with space"
+
+# Join with comma and uppercase
+my $res = @words |> map { uc($_) } |> join(",")
+assert_eq $res, "STRYKE,IS,FAST", "map uc |> join ,"
+
+# Reverse words and join
+my $rev = @words |> rev() |> join(" ")
+assert_eq $rev, "fast is Stryke", "rev |> join"
+
+test_run

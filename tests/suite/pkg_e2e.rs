@@ -30,7 +30,10 @@ fn make_path_dep(name: &str, version: &str, files: &[(&str, &str)]) -> PathBuf {
     let dir = tempdir(name);
     std::fs::write(
         dir.join("stryke.toml"),
-        format!("[package]\nname = \"{}\"\nversion = \"{}\"\n", name, version),
+        format!(
+            "[package]\nname = \"{}\"\nversion = \"{}\"\n",
+            name, version
+        ),
     )
     .unwrap();
     for (rel, body) in files {
@@ -216,13 +219,19 @@ fn module_resolution_via_lockfile_finds_store_path() {
         .unwrap()
         .expect("resolved");
     let canonical_resolved = resolved.canonicalize().unwrap();
-    let canonical_expected = store.package_dir("mylib", "1.0.0").join("lib/Greet.stk").canonicalize().unwrap();
+    let canonical_expected = store
+        .package_dir("mylib", "1.0.0")
+        .join("lib/Greet.stk")
+        .canonicalize()
+        .unwrap();
     assert_eq!(canonical_resolved, canonical_expected);
 
     // Also verify the project-local lib/ takes precedence when present.
     std::fs::create_dir_all(project.join("lib")).unwrap();
     std::fs::write(project.join("lib/Local.stk"), "1\n").unwrap();
-    let local = resolve_module(&project, "Local").unwrap().expect("resolved");
+    let local = resolve_module(&project, "Local")
+        .unwrap()
+        .expect("resolved");
     assert!(local.ends_with("lib/Local.stk"), "got {:?}", local);
 
     std::env::remove_var("STRYKE_HOME");
