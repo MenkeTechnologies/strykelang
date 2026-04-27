@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Caesar cipher (using pipes)
+
+fn Rosetta::CaesarCipher::shift($c, $shift) {
+    my $ord = ord($c)
+    if ($ord >= 65 && $ord <= 90) {
+        chr((($ord - 65 + $shift) % 26) + 65)
+    } elsif ($ord >= 97 && $ord <= 122) {
+        chr((($ord - 97 + $shift) % 26) + 97)
+    } else {
+        $c
+    }
+}
+
+fn Rosetta::CaesarCipher::encrypt($text, $shift) {
+    ~> $text chars map { Rosetta::CaesarCipher::shift($_, $shift) } |> join("")
+}
+
+fn Rosetta::CaesarCipher::decrypt($text, $shift) {
+    Rosetta::CaesarCipher::encrypt($text, 26 - ($shift % 26))
+}
+
+my $msg = "The quick brown fox jumps over the lazy dog."
+my $enc = Rosetta::CaesarCipher::encrypt($msg, 3)
+my $dec = Rosetta::CaesarCipher::decrypt($enc, 3)
+
+assert_eq $enc, "Wkh txlfn eurzq ira mxpsv ryhu wkh odcb grj.", "encrypt"
+assert_eq $dec, $msg, "decrypt"
+
+test_run

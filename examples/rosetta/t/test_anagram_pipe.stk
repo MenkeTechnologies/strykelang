@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anagram check (using pipes)
+
+fn Rosetta::Anagram::normalize($word) {
+    $word |> lc() |> split("") |> sort() |> join("")
+}
+
+fn Rosetta::Anagram::is_anagram($w1, $w2) {
+    return 0 if $w1 eq $w2
+    Rosetta::Anagram::normalize($w1) eq Rosetta::Anagram::normalize($w2)
+}
+
+assert_eq Rosetta::Anagram::is_anagram("listen", "silent"), 1, "listen and silent are anagrams"
+assert_eq Rosetta::Anagram::is_anagram("hello", "world"), 0, "hello and world are not anagrams"
+assert_eq Rosetta::Anagram::is_anagram("rat", "tar"), 1, "rat and tar are anagrams"
+
+test_run

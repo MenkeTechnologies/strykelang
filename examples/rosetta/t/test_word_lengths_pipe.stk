@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word lengths (using pipes)
+
+fn Rosetta::WordLengths::solve($text) {
+    $text |> trim() |> split(/\s+/) |> map { length($_) }
+}
+
+my @lengths = Rosetta::WordLengths::solve("The quick brown fox")
+assert_eq join(",", @lengths), "3,5,5,3", "word lengths of 'The quick brown fox'"
+
+test_run
