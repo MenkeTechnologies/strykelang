@@ -1134,12 +1134,12 @@ fn wantarray_false_in_scalar_context() {
 // ── Native list / scalar builtins (CPAN bootstrap paths) ──
 
 #[test]
-fn list_util_sum_adds_numbers() {
+fn bare_builtin_sum_adds_numbers() {
     assert_eq!(eval_int(r#"sum(10, 20, 30)"#), 60);
 }
 
 #[test]
-fn list_util_uniq_preserves_first_occurrence_order() {
+fn bare_builtin_uniq_preserves_first_occurrence_order() {
     assert_eq!(eval_string(r#"join "-", uniq(1, 1, 2, 2, 3)"#), "1-2-3");
 }
 
@@ -1377,7 +1377,7 @@ fn eval_block_die_populates_at_exception() {
 // ── More list-builtin native paths ──
 
 #[test]
-fn list_util_max_min_product_combine() {
+fn bare_builtin_max_min_product_combine() {
     assert_eq!(
         eval_int(r#"max(3, 9, 4) - min(3, 9, 4) + product(2, 3)"#),
         12
@@ -1386,7 +1386,7 @@ fn list_util_max_min_product_combine() {
 }
 
 #[test]
-fn list_util_any_all_with_coderef() {
+fn bare_builtin_any_all_with_coderef() {
     assert_eq!(eval_int(r#"any(fn { $_ > 2 }, 1, 2, 3)"#), 1);
     assert_eq!(eval_int(r#"all(fn { $_ > 0 }, 1, 2, 3)"#), 1);
 }
@@ -1553,7 +1553,7 @@ fn return_short_circuits_sub_rest() {
 }
 
 #[test]
-fn list_util_head_and_tail_take_slice_ends() {
+fn bare_builtin_head_and_tail_take_slice_ends() {
     assert_eq!(eval_string(r#"join "-", head(10, 20, 30, 40, 2)"#), "10-20");
     assert_eq!(eval_string(r#"join "-", tail(10, 20, 30, 40, 2)"#), "30-40");
     assert_eq!(eval_string(r#"scalar head(qw(a b c d), 2)"#), "b");
@@ -1561,7 +1561,7 @@ fn list_util_head_and_tail_take_slice_ends() {
 }
 
 #[test]
-fn list_util_none_and_notall_predicates() {
+fn bare_builtin_none_and_notall_predicates() {
     assert_eq!(eval_int(r#"none(fn { $_ < 0 }, 1, 2, 3)"#), 1);
     assert_eq!(eval_int(r#"notall(fn { $_ > 0 }, 1, -1, 2)"#), 1);
 }
@@ -1693,12 +1693,12 @@ fn rename_moves_file_contents_preserved() {
 }
 
 #[test]
-fn list_util_sum0_empty_list_is_zero() {
+fn bare_builtin_sum0_empty_list_is_zero() {
     assert_eq!(eval_int(r#"sum0()"#), 0);
 }
 
 #[test]
-fn list_util_pairkeys_pairvalues_split_pairs() {
+fn bare_builtin_pairkeys_pairvalues_split_pairs() {
     assert_eq!(eval_string(r#"join "-", pairkeys(1, 10, 2, 20)"#), "1-2");
     assert_eq!(
         eval_string(r#"join "-", pairvalues(1, 10, 2, 20)"#),
@@ -1707,7 +1707,7 @@ fn list_util_pairkeys_pairvalues_split_pairs() {
 }
 
 #[test]
-fn list_util_zip_pairs_first_row_snapshot() {
+fn bare_builtin_zip_pairs_first_row_snapshot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
@@ -1769,7 +1769,7 @@ fn substitution_global_flag_replaces_every_occurrence() {
 // ── `mesh`, `shuffle` (length only) ──
 
 #[test]
-fn list_util_mesh_interleaves_parallel_lists() {
+fn bare_builtin_mesh_interleaves_parallel_lists() {
     assert_eq!(eval_string(r#"join "", mesh(1, 2, 10, 20)"#), "121020");
 }
 
@@ -1859,9 +1859,14 @@ fn cosine_at_pi_is_negative_one() {
     );
 }
 
+/// `product()` of an empty list is `1` (the multiplicative identity).
+/// Pinned at the unit-test layer in `strykelang/list_builtins.rs`
+/// (`product_empty_is_one`); this is the user-visible pin from the
+/// bytecode VM path. Compare with `sum0()` → `0` (additive identity) and
+/// `sum()` → `undef`.
 #[test]
-fn list_util_product_empty_list_is_zero() {
-    assert_eq!(eval_int(r#"product()"#), 0);
+fn bare_builtin_product_empty_list_is_one() {
+    assert_eq!(eval_int(r#"product()"#), 1);
 }
 
 // ── `defined`, `undef`; string min/max ──
@@ -1879,7 +1884,7 @@ fn assign_undef_makes_defined_false() {
 }
 
 #[test]
-fn list_util_minstr_maxstr_lexical() {
+fn bare_builtin_minstr_maxstr_lexical() {
     assert_eq!(
         eval_string(r#"join ",", minstr("dog", "cat"), maxstr("dog", "cat")"#),
         "cat,dog"
@@ -1901,7 +1906,7 @@ fn values_sorted_join_numeric_strings() {
 // ── More list builtins: zip_shortest, mesh_shortest, uniqstr/uniqnum, pairs ──
 
 #[test]
-fn list_util_zip_shortest_first_row_snapshot() {
+fn bare_builtin_zip_shortest_first_row_snapshot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
@@ -1913,7 +1918,7 @@ fn list_util_zip_shortest_first_row_snapshot() {
 }
 
 #[test]
-fn list_util_mesh_shortest_interleaves_until_shorter_exhausted() {
+fn bare_builtin_mesh_shortest_interleaves_until_shorter_exhausted() {
     assert_eq!(
         eval_string(r#"join "", mesh_shortest(1, 2, 3, 10, 20)"#),
         "1231020"
@@ -1921,13 +1926,13 @@ fn list_util_mesh_shortest_interleaves_until_shorter_exhausted() {
 }
 
 #[test]
-fn list_util_uniqstr_and_uniqnum_dedupe() {
+fn bare_builtin_uniqstr_and_uniqnum_dedupe() {
     assert_eq!(eval_string(r#"join "-", uniqstr("a", "a", "b")"#), "a-b");
     assert_eq!(eval_string(r#"join "-", uniqnum(1.0, 1, 2)"#), "1-2");
 }
 
 #[test]
-fn list_util_pairs_returns_one_pair_object_per_kv() {
+fn bare_builtin_pairs_returns_one_pair_object_per_kv() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
@@ -2128,7 +2133,7 @@ fn sprintf_percent_b_and_percent_o_formats() {
 }
 
 #[test]
-fn list_util_uniqint_deduplicates_integer_values() {
+fn bare_builtin_uniqint_deduplicates_integer_values() {
     assert_eq!(eval_string(r#"join "-", uniqint(1, 1, 2, 2, 3)"#), "1-2-3");
 }
 
@@ -2861,12 +2866,12 @@ fn ref_anon_subroutine_is_code() {
 }
 
 #[test]
-fn list_util_reduce_concatenates_list_left_to_right() {
+fn bare_builtin_reduce_concatenates_list_left_to_right() {
     assert_eq!(eval_string(r#"qw(x y z) |> reduce { $a . $b }"#), "xyz");
 }
 
 #[test]
-fn list_util_fold_alias_concatenates_like_reduce() {
+fn bare_builtin_fold_alias_concatenates_like_reduce() {
     assert_eq!(eval_string(r#"qw(x y z) |> fold { $a . $b }"#), "xyz");
 }
 
@@ -5725,7 +5730,7 @@ fn defined_or_assign_leaves_defined_positive_unchanged() {
 }
 
 #[test]
-fn list_util_all_true_under_upper_bound() {
+fn bare_builtin_all_true_under_upper_bound() {
     assert_eq!(eval_int(r#"0 + all(fn { $_ < 10 }, 1, 2, 3)"#), 1);
 }
 
@@ -6137,12 +6142,12 @@ fn grep_filters_named_array_by_numeric_comparison() {
 }
 
 #[test]
-fn list_util_product_three_integers() {
+fn bare_builtin_product_three_integers() {
     assert_eq!(eval_int(r#"product(2, 3, 4)"#), 24);
 }
 
 #[test]
-fn list_util_min_of_three_integers() {
+fn bare_builtin_min_of_three_integers() {
     assert_eq!(eval_int(r#"min(8, 3, 5)"#), 3);
 }
 
@@ -6719,12 +6724,12 @@ fn scalar_grep_counts_equality_hits_on_named_array() {
 }
 
 #[test]
-fn list_util_max_one_through_four_inclusive() {
+fn bare_builtin_max_one_through_four_inclusive() {
     assert_eq!(eval_int(r#"max(1, 2, 3, 4)"#), 4);
 }
 
 #[test]
-fn list_util_min_among_nine_four_and_seven() {
+fn bare_builtin_min_among_nine_four_and_seven() {
     assert_eq!(eval_int(r#"min(9, 4, 7)"#), 4);
 }
 

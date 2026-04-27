@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Roots of unity — n-th roots of 1, returned as (real, imag) tuples.
+
+fn Rosetta::RootsUnity::compute($n) {
+    return [[1, 0]] if $n == 0
+    my $two_pi = 2 * 3.14159265358979323846
+    my @roots
+    for my $k (0..$n-1) {
+        my $angle = $two_pi * $k / $n
+        push @roots, [cos($angle), sin($angle)]
+    }
+    \@roots
+}
+
+fn Rosetta::RootsUnity::approx_eq($a, $b) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < 1e-9
+}
+
+# 1st root of unity is just 1
+my $r1 = Rosetta::RootsUnity::compute(1)
+assert_eq scalar(@$r1), 1, "n=1: 1 root"
+assert_ok Rosetta::RootsUnity::approx_eq($r1->[0]->[0], 1), "real part is 1"
+assert_ok Rosetta::RootsUnity::approx_eq($r1->[0]->[1], 0), "imag part is 0"
+
+# 2nd roots: 1, -1
+my $r2 = Rosetta::RootsUnity::compute(2)
+assert_eq scalar(@$r2), 2, "n=2: 2 roots"
+assert_ok Rosetta::RootsUnity::approx_eq($r2->[1]->[0], -1), "second is -1"
+
+# 4th roots: 1, i, -1, -i
+my $r4 = Rosetta::RootsUnity::compute(4)
+assert_ok Rosetta::RootsUnity::approx_eq($r4->[0]->[0], 1),  "1"
+assert_ok Rosetta::RootsUnity::approx_eq($r4->[1]->[1], 1),  "i"
+assert_ok Rosetta::RootsUnity::approx_eq($r4->[2]->[0], -1), "-1"
+assert_ok Rosetta::RootsUnity::approx_eq($r4->[3]->[1], -1), "-i"
+
+# Each root z^n == 1 (within tolerance)
+for my $n (3, 5, 6, 8, 12) {
+    my $rs = Rosetta::RootsUnity::compute($n)
+    for my $z (@$rs) {
+        # Compute z^n via repeated complex multiplication
+        my $a = 1
+        my $b = 0
+        for my $i (1..$n) {
+            my $na = $a * $z->[0] - $b * $z->[1]
+            my $nb = $a * $z->[1] + $b * $z->[0]
+            $a = $na
+            $b = $nb
+        }
+        assert_ok Rosetta::RootsUnity::approx_eq($a, 1) && Rosetta::RootsUnity::approx_eq($b, 0),
+            "z^$n = 1 verified"
+    }
+}
+
+# Sum of all n-th roots of unity is 0 (for n > 1)
+for my $n (2, 3, 4, 5, 7, 10) {
+    my $rs = Rosetta::RootsUnity::compute($n)
+    my $sum_re = 0
+    my $sum_im = 0
+    for my $z (@$rs) {
+        $sum_re += $z->[0]
+        $sum_im += $z->[1]
+    }
+    assert_ok Rosetta::RootsUnity::approx_eq($sum_re, 0), "sum real for n=$n"
+    assert_ok Rosetta::RootsUnity::approx_eq($sum_im, 0), "sum imag for n=$n"
+}
+
+test_run

@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tonelli-Shanks algorithm — modular square root mod prime p
+# Returns r such that r^2 ≡ n (mod p), when n is a QR mod p; else undef.
+
+fn Rosetta::Tonelli::modpow($base, $exp, $mod) {
+    my $result = 1
+    my $b = $base % $mod
+    my $e = $exp
+    while ($e > 0) {
+        if ($e % 2 == 1) {
+            $result = ($result * $b) % $mod
+        }
+        $e = int($e / 2)
+        $b = ($b * $b) % $mod
+    }
+    $result
+}
+
+fn Rosetta::Tonelli::is_qr($n, $p) {
+    Rosetta::Tonelli::modpow($n % $p, int(($p - 1) / 2), $p) == 1
+}
+
+fn Rosetta::Tonelli::sqrt($n, $p) {
+    return 0 if $n % $p == 0
+    return undef if !Rosetta::Tonelli::is_qr($n, $p)
+    return Rosetta::Tonelli::modpow($n, int(($p + 1) / 4), $p) if $p % 4 == 3
+
+    # Decompose p - 1 = q * 2^s
+    my $q = $p - 1
+    my $s = 0
+    while ($q % 2 == 0) { $q = int($q / 2); $s += 1 }
+
+    # Find a non-residue z
+    my $z = 2
+    while (Rosetta::Tonelli::modpow($z, int(($p - 1) / 2), $p) != $p - 1) { $z += 1 }
+
+    my $m = $s
+    my $c = Rosetta::Tonelli::modpow($z, $q, $p)
+    my $t = Rosetta::Tonelli::modpow($n, $q, $p)
+    my $r = Rosetta::Tonelli::modpow($n, int(($q + 1) / 2), $p)
+
+    while (1) {
+        return $r if $t == 1
+        # Find smallest i such that t^(2^i) == 1
+        my $i = 0
+        my $tt = $t
+        while ($tt != 1) {
+            $tt = ($tt * $tt) % $p
+            $i += 1
+        }
+        my $b = Rosetta::Tonelli::modpow($c, Rosetta::Tonelli::modpow(2, $m - $i - 1, $p - 1), $p)
+        $m = $i
+        $c = ($b * $b) % $p
+        $t = ($t * $c) % $p
+        $r = ($r * $b) % $p
+    }
+}
+
+# Verify r^2 ≡ n mod p
+fn Rosetta::Tonelli::check($n, $p) {
+    my $r = Rosetta::Tonelli::sqrt($n, $p)
+    return 1 if !defined $r
+    ($r * $r) % $p == $n % $p
+}
+
+# Sample cases (Wikipedia / textbook)
+my $r1 = Rosetta::Tonelli::sqrt(10, 13)
+my $r1_ok = ($r1 == 6 || $r1 == 7)
+assert_ok $r1_ok, "sqrt(10) mod 13 is 6 or 7"
+
+my $r2 = Rosetta::Tonelli::sqrt(56, 101)
+my $r2_check = ($r2 * $r2) % 101
+assert_eq $r2_check, 56, "sqrt(56) mod 101 verifies"
+
+my $r3 = Rosetta::Tonelli::sqrt(1030, 10009)
+my $r3_check = ($r3 * $r3) % 10009
+assert_eq $r3_check, 1030, "sqrt(1030) mod 10009 verifies"
+
+# Non-residue: returns undef
+assert_eq Rosetta::Tonelli::sqrt(5, 7), undef, "5 not a QR mod 7"
+
+# Trivial cases
+assert_eq Rosetta::Tonelli::sqrt(0, 13), 0, "sqrt(0) = 0"
+assert_eq Rosetta::Tonelli::sqrt(1, 13), 1, "sqrt(1) = 1"
+
+# QR detection
+assert_ok  Rosetta::Tonelli::is_qr(4, 13),  "4 is QR mod 13"
+assert_ok !Rosetta::Tonelli::is_qr(2, 13),  "2 not QR mod 13"
+assert_ok  Rosetta::Tonelli::is_qr(10, 13), "10 is QR mod 13"
+
+# p ≡ 3 (mod 4) fast path: sqrt(n) = n^((p+1)/4) — pick QR 9 mod 11
+my $r4 = Rosetta::Tonelli::sqrt(9, 11)
+my $r4_check = ($r4 * $r4) % 11
+assert_eq $r4_check, 9, "sqrt(9) mod 11 (fast path)"
+
+test_run

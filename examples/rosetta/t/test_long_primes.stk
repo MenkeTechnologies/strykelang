@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Long primes — primes p where 10 has multiplicative order p-1 mod p,
+# i.e. 1/p has a repeating decimal of maximum length p-1.
+
+fn Rosetta::LongPrimes::is_long($p) {
+    return 0 if $p < 7
+    return 0 if !is_prime($p)
+    return 0 if $p == 2 || $p == 5
+    my $r = 1
+    for my $k (1..$p-2) {
+        $r = ($r * 10) % $p
+        return 0 if $r == 1
+    }
+    ($r * 10) % $p == 1
+}
+
+fn Rosetta::LongPrimes::list($limit) {
+    2:$limit |> grep { Rosetta::LongPrimes::is_long($_) }
+}
+
+# OEIS A001913: 7, 17, 19, 23, 29, 47, 59, 61, 97, 109, 113, 131, 149, 167, 179, 181, ...
+my @under_200 = Rosetta::LongPrimes::list(200)
+assert_eq join(",", @under_200),
+    "7,17,19,23,29,47,59,61,97,109,113,131,149,167,179,181,193",
+    "long primes < 200"
+
+# Known long primes
+assert_ok  Rosetta::LongPrimes::is_long(7),   "7: 1/7 has period 6"
+assert_ok  Rosetta::LongPrimes::is_long(97),  "97 is long"
+assert_ok  Rosetta::LongPrimes::is_long(983), "983 is long"
+
+# Negatives
+assert_ok !Rosetta::LongPrimes::is_long(13), "13: period 6, not 12"
+assert_ok !Rosetta::LongPrimes::is_long(31), "31: period 15, not 30"
+assert_ok !Rosetta::LongPrimes::is_long(41), "41: period 5"
+assert_ok !Rosetta::LongPrimes::is_long(15), "15 not prime"
+
+test_run

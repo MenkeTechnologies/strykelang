@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lyndon words — strictly minimal among rotations.
+# Duval's algorithm produces all Lyndon words of length ≤ n over alphabet of size k.
+
+fn Rosetta::Lyndon::generate($n, $k) {
+    my @result
+    my @w = (-1)
+    while (scalar(@w) > 0) {
+        $w[-1] += 1
+        my $m = scalar(@w)
+        push @result, [@w] if $m == $n
+        # Repeat the prefix to reach length n
+        while (scalar(@w) < $n) {
+            push @w, $w[scalar(@w) - $m]
+        }
+        # Remove trailing 'k-1's
+        while (scalar(@w) > 0 && $w[-1] == $k - 1) {
+            pop @w
+        }
+    }
+    \@result
+}
+
+fn Rosetta::Lyndon::to_string($word) {
+    my $s = ""
+    for my $d (@$word) { $s .= chr(ord("a") + $d) }
+    $s
+}
+
+# Lyndon words of length n=1..4 over alphabet 2 (binary)
+my $b3 = Rosetta::Lyndon::generate(3, 2)
+my @s3 = map { Rosetta::Lyndon::to_string($_) } @$b3
+@s3 = sort @s3
+assert_eq join(",", @s3), "aab,abb", "Lyndon length-3 binary"
+
+# Length 4 binary: aaab, aabb, abbb
+my $b4 = Rosetta::Lyndon::generate(4, 2)
+my @s4 = sort map { Rosetta::Lyndon::to_string($_) } @$b4
+assert_eq join(",", @s4), "aaab,aabb,abbb", "Lyndon length-4 binary"
+
+# Length 5 binary: aaaab, aaabb, aabab, aabbb, ababb, abbbb
+my $b5 = Rosetta::Lyndon::generate(5, 2)
+assert_eq scalar(@$b5), 6, "Lyndon length-5 binary count"
+
+# Length 3 ternary: alphabet abc, expected: aab, aac, abb, abc, acb, acc, bbc, bcc
+my $t3 = Rosetta::Lyndon::generate(3, 3)
+my @st3 = sort map { Rosetta::Lyndon::to_string($_) } @$t3
+assert_eq join(",", @st3), "aab,aac,abb,abc,acb,acc,bbc,bcc", "Lyndon length-3 ternary"
+
+# Necklace counting formula: for n=4, k=2 → 3 (matches output above)
+assert_eq scalar(@$b4), 3, "ternary 3"
+
+# Empty alphabet edge: length n, k=1 — only "aaa...a" but that's not strictly Lyndon (it's a power).
+# Duval generates only proper Lyndon words; for k=1 the result is empty when n>1.
+my $k1n3 = Rosetta::Lyndon::generate(3, 1)
+assert_eq scalar(@$k1n3), 0, "k=1, n=3: no Lyndon words"
+
+# Each generated word's lex rotations are all >=
+fn Rosetta::Lyndon::is_strict_lyndon($word) {
+    my $n = scalar(@$word)
+    return 1 if $n == 1
+    my $orig = join(",", @$word)
+    for my $i (1..$n-1) {
+        my @rot
+        for my $j (0..$n-1) { push @rot, $word->[($j + $i) % $n] }
+        my $r = join(",", @rot)
+        return 0 if $r le $orig
+    }
+    1
+}
+
+for my $w (@$b5) {
+    assert_ok Rosetta::Lyndon::is_strict_lyndon($w),
+        "verify: " . Rosetta::Lyndon::to_string($w) . " is Lyndon"
+}
+
+test_run

@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Validate CUSIP — 9-char US securities identifier with mod-10 check.
+
+fn Rosetta::CUSIP::char_value($c) {
+    return int($c) if $c =~ /\d/
+    return ord($c) - ord("A") + 10 if $c =~ /[A-Z]/
+    return 36 if $c eq "*"
+    return 37 if $c eq "@"
+    return 38 if $c eq "#"
+    -1
+}
+
+fn Rosetta::CUSIP::is_valid($cusip) {
+    return 0 if length($cusip) != 9
+    return 0 if $cusip !~ /^[0-9A-Z*@#]+$/
+    my @cs = ~> $cusip chars
+    my $sum = 0
+    for my $i (0..7) {
+        my $v = Rosetta::CUSIP::char_value($cs[$i])
+        $v *= 2 if $i % 2 == 1
+        $sum += int($v / 10) + ($v % 10)
+    }
+    my $check = (10 - ($sum % 10)) % 10
+    $check == int($cs[8])
+}
+
+# Rosetta canonical valid CUSIPs
+assert_ok Rosetta::CUSIP::is_valid("037833100"), "Apple"
+assert_ok Rosetta::CUSIP::is_valid("17275R102"), "Cisco"
+assert_ok Rosetta::CUSIP::is_valid("38259P508"), "Google"
+assert_ok Rosetta::CUSIP::is_valid("594918104"), "Microsoft"
+assert_ok Rosetta::CUSIP::is_valid("68389X105"), "Oracle"
+
+# Invalid: bad check digit
+assert_ok !Rosetta::CUSIP::is_valid("037833101"), "Apple wrong check"
+
+# Invalid: bad length
+assert_ok !Rosetta::CUSIP::is_valid("03783310"),    "8 chars"
+assert_ok !Rosetta::CUSIP::is_valid("0378331001"),  "10 chars"
+
+# Invalid: lowercase / forbidden char
+assert_ok !Rosetta::CUSIP::is_valid("037833a00"), "lowercase letter"
+assert_ok !Rosetta::CUSIP::is_valid("037833-00"), "dash"
+
+# Char value sanity
+assert_eq Rosetta::CUSIP::char_value("0"), 0,  "0 -> 0"
+assert_eq Rosetta::CUSIP::char_value("9"), 9,  "9 -> 9"
+assert_eq Rosetta::CUSIP::char_value("A"), 10, "A -> 10"
+assert_eq Rosetta::CUSIP::char_value("Z"), 35, "Z -> 35"
+
+test_run

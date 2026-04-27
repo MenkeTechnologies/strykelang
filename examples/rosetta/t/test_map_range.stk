@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Map range — linearly remap a value from [a1,a2] to [b1,b2]
+
+fn Rosetta::MapRange::map($a1, $a2, $b1, $b2, $s) {
+    $b1 + ($s - $a1) * ($b2 - $b1) / ($a2 - $a1)
+}
+
+fn Rosetta::MapRange::approx_eq($a, $b) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < 1e-9
+}
+
+# Standard sample: [0,10] → [-1,0], 0..10 should map to -1..0
+for my $i (0..10) {
+    my $expected = $i / 10 - 1
+    my $got      = Rosetta::MapRange::map(0, 10, -1, 0, $i)
+    assert_ok Rosetta::MapRange::approx_eq($got, $expected), "0..10 -> -1..0 at $i"
+}
+
+# Identity map
+assert_eq Rosetta::MapRange::map(0, 1, 0, 1, 0.5), 0.5, "identity midpoint"
+assert_eq Rosetta::MapRange::map(0, 1, 0, 1, 0), 0, "identity 0"
+assert_eq Rosetta::MapRange::map(0, 1, 0, 1, 1), 1, "identity 1"
+
+# Inverted target range
+assert_eq Rosetta::MapRange::map(0, 100, 100, 0, 25), 75, "inverted: 25 -> 75"
+assert_eq Rosetta::MapRange::map(0, 100, 100, 0, 0),  100, "inverted: 0 -> 100"
+
+# Extrapolation outside source range
+assert_eq Rosetta::MapRange::map(0, 10, 0, 100, 15),  150, "extrapolate above"
+assert_eq Rosetta::MapRange::map(0, 10, 0, 100, -1),  -10, "extrapolate below"
+
+# Asymmetric scale
+my $celsius_to_f = fn ($c) { Rosetta::MapRange::map(0, 100, 32, 212, $c) }
+assert_eq $celsius_to_f->(0),   32,  "0 C = 32 F"
+assert_eq $celsius_to_f->(100), 212, "100 C = 212 F"
+assert_eq $celsius_to_f->(37),  98.6, "37 C ~ 98.6 F"
+
+test_run

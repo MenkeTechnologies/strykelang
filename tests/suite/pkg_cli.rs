@@ -86,7 +86,10 @@ fn cli_install_writes_lockfile_for_no_deps() {
     assert!(lock.is_file(), "stryke.lock written");
     let body = std::fs::read_to_string(&lock).unwrap();
     assert!(body.contains("version = 1"), "{body}");
-    assert!(body.contains("Auto-generated"), "header comment present: {body}");
+    assert!(
+        body.contains("Auto-generated"),
+        "header comment present: {body}"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp);
 }
@@ -220,7 +223,10 @@ fn cli_tree_prints_dep_graph_from_lockfile() {
     let stdout = String::from_utf8_lossy(&tree.stdout);
     assert!(stdout.contains("myapp v0.1.0"), "root header: {stdout}");
     assert!(stdout.contains("mylib v1.0.0"), "child entry: {stdout}");
-    assert!(stdout.contains("└──") || stdout.contains("├──"), "tree connector glyph: {stdout}");
+    assert!(
+        stdout.contains("└──") || stdout.contains("├──"),
+        "tree connector glyph: {stdout}"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp);
 }
@@ -302,11 +308,7 @@ fn cli_add_then_remove_round_trip() {
     let add_out = Command::new(stryke())
         .current_dir(&myapp)
         .env("STRYKE_HOME", &store)
-        .args([
-            "add",
-            "mylib",
-            &format!("--path={}", mylib.display()),
-        ])
+        .args(["add", "mylib", &format!("--path={}", mylib.display())])
         .output()
         .expect("spawn");
     assert_success("stryke add mylib --path=...", &add_out);
@@ -455,10 +457,7 @@ fn cli_new_dash_h_emits_help_without_creating_directory() {
         .expect("spawn");
     assert_success("stryke new -h", &out);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("usage: stryke new"),
-        "help text: {stdout}"
-    );
+    assert!(stdout.contains("usage: stryke new"), "help text: {stdout}");
     assert!(
         !tmp.join("-h").exists(),
         "BUG: `s new -h` created a directory named `-h` instead of printing help"
@@ -474,7 +473,10 @@ fn cli_install_dash_h_emits_help() {
         .expect("spawn");
     assert_success("stryke install --help", &out);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("--offline"), "help mentions --offline: {stdout}");
+    assert!(
+        stdout.contains("--offline"),
+        "help mentions --offline: {stdout}"
+    );
 }
 
 #[test]
@@ -487,7 +489,10 @@ fn cli_add_dash_h_emits_help_with_flags() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("--dev"), "help mentions --dev: {stdout}");
     assert!(stdout.contains("--path"), "help mentions --path: {stdout}");
-    assert!(stdout.contains("--features"), "help mentions --features: {stdout}");
+    assert!(
+        stdout.contains("--features"),
+        "help mentions --features: {stdout}"
+    );
 }
 
 #[test]
@@ -558,7 +563,15 @@ fn cli_top_level_help_lists_pkg_subcommands() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
-    for sub in ["new ", "install ", "add NAME", "remove NAME", "tree ", "info NAME", "pkg "] {
+    for sub in [
+        "new ",
+        "install ",
+        "add NAME",
+        "remove NAME",
+        "tree ",
+        "info NAME",
+        "pkg ",
+    ] {
         assert!(
             combined.contains(sub),
             "top-level --help missing subcommand fragment `{sub}`"

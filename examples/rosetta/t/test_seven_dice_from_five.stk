@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Seven-sided dice from five — generate uniform 1..7 from a 5-sided die.
+
+fn Rosetta::SevenFromFive::dice5() {
+    int(rand(5)) + 1
+}
+
+# Reject-sample: roll dice5 twice -> 25 outcomes; map (1..21) -> (1..7), reject 22..25.
+fn Rosetta::SevenFromFive::dice7() {
+    while (1) {
+        my $a = Rosetta::SevenFromFive::dice5()
+        my $b = Rosetta::SevenFromFive::dice5()
+        my $val = ($a - 1) * 5 + ($b - 1) + 1   # 1..25
+        return (($val - 1) % 7) + 1 if $val <= 21
+    }
+}
+
+# All outputs in 1..7
+for my $i (1..1000) {
+    my $r = Rosetta::SevenFromFive::dice7()
+    assert_ok $r >= 1 && $r <= 7, "trial $i in 1..7"
+}
+
+# Each face shows up at least once across 10 000 rolls (extremely high probability)
+my %seen
+for my $i (1..10000) { $seen{Rosetta::SevenFromFive::dice7()} = 1 }
+for my $face (1..7) {
+    assert_ok exists $seen{$face}, "face $face seen"
+}
+
+# Distribution roughly uniform: each face's frequency within 25% of expected (1429 ≈ 10000/7)
+my %counts
+for my $face (1..7) { $counts{$face} = 0 }
+for my $i (1..10000) {
+    my $r = Rosetta::SevenFromFive::dice7()
+    $counts{$r} += 1
+}
+my $expected = 10000 / 7
+for my $face (1..7) {
+    my $diff = $counts{$face} - $expected
+    $diff = -$diff if $diff < 0
+    my $rel = $diff / $expected
+    assert_ok $rel < 0.25, "face $face within 25% of expected"
+}
+
+# Sanity: dice5 alone ranges 1..5
+for my $i (1..200) {
+    my $r = Rosetta::SevenFromFive::dice5()
+    assert_ok $r >= 1 && $r <= 5, "dice5 trial $i in 1..5"
+}
+
+test_run

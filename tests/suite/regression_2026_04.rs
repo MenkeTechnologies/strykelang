@@ -699,7 +699,8 @@ fn cache_keywords_are_known_barewords() {
     for name in &["cache_clear", "cache_exists", "cache_stats", "cacheview"] {
         let kind = parse_err_kind(&format!("fn {name} {{ 0 }}"));
         assert_eq!(
-            kind, ErrorKind::Syntax,
+            kind,
+            ErrorKind::Syntax,
             "expected parse-time syntax rejection for builtin name `{name}`"
         );
     }

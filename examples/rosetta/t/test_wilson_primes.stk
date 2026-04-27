@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wilson primes — primes p where (p-1)! ≡ -1 (mod p^2)
+# Only three known: 5, 13, 563 (within reach of the search; p > 5e8 unknown).
+
+fn Rosetta::Wilson::factorial_mod($n, $mod) {
+    my $r = 1
+    for my $i (2..$n) {
+        $r = ($r * $i) % $mod
+    }
+    $r
+}
+
+fn Rosetta::Wilson::is_wilson($p) {
+    return 0 if !is_prime($p)
+    my $mod = $p * $p
+    Rosetta::Wilson::factorial_mod($p - 1, $mod) == $mod - 1
+}
+
+fn Rosetta::Wilson::list($limit) {
+    2:$limit |> grep { Rosetta::Wilson::is_wilson($_) }
+}
+
+# All three known Wilson primes within 1000
+my @found = Rosetta::Wilson::list(1000)
+assert_eq join(",", @found), "5,13,563", "Wilson primes < 1000"
+
+# Specific membership
+assert_ok  Rosetta::Wilson::is_wilson(5),   "5 is Wilson"
+assert_ok  Rosetta::Wilson::is_wilson(13),  "13 is Wilson"
+assert_ok  Rosetta::Wilson::is_wilson(563), "563 is Wilson"
+
+# Negatives — primes that are NOT Wilson
+assert_ok !Rosetta::Wilson::is_wilson(2),   "2 not Wilson (4!=3 mod 4 != 3)"
+assert_ok !Rosetta::Wilson::is_wilson(3),   "3 not Wilson"
+assert_ok !Rosetta::Wilson::is_wilson(7),   "7 not Wilson"
+assert_ok !Rosetta::Wilson::is_wilson(11),  "11 not Wilson"
+assert_ok !Rosetta::Wilson::is_wilson(17),  "17 not Wilson"
+assert_ok !Rosetta::Wilson::is_wilson(101), "101 not Wilson"
+
+# Composites are never Wilson
+assert_ok !Rosetta::Wilson::is_wilson(15), "15 (composite)"
+assert_ok !Rosetta::Wilson::is_wilson(25), "25 (composite)"
+
+test_run

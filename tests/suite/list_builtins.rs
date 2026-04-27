@@ -17,7 +17,7 @@ fn with_vendor_inc() -> Interpreter {
 }
 
 #[test]
-fn list_util_uniq_adjacent_dedup() {
+fn bare_builtin_uniq_adjacent_dedup() {
     let mut interp = with_vendor_inc();
     let p = parse("(1,1,2,3) |> uniq |> join \",\"").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -25,7 +25,7 @@ fn list_util_uniq_adjacent_dedup() {
 }
 
 #[test]
-fn list_util_sum_and_sum0() {
+fn bare_builtin_sum_and_sum0() {
     let mut interp = with_vendor_inc();
     let p = parse("sum(1,2,3) + sum0()").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -33,7 +33,7 @@ fn list_util_sum_and_sum0() {
 }
 
 #[test]
-fn list_util_min_max() {
+fn bare_builtin_min_max() {
     let mut interp = with_vendor_inc();
     let p =
         parse("(min(3,9,2), max(3,9,2), minstr(\"b\",\"a\"), maxstr(\"b\",\"a\")) |> join \",\"")
@@ -43,7 +43,7 @@ fn list_util_min_max() {
 }
 
 #[test]
-fn list_util_require_loads_pm() {
+fn bare_builtin_require_loads_pm() {
     let mut interp = with_vendor_inc();
     let p = parse("(7,7,8) |> uniq |> join \",\"").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -51,7 +51,7 @@ fn list_util_require_loads_pm() {
 }
 
 #[test]
-fn list_util_reduce_block_form() {
+fn bare_builtin_reduce_block_form() {
     let mut interp = with_vendor_inc();
     let p = parse("(1, 2, 3, 4) |> reduce { $a + $b }").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -59,7 +59,7 @@ fn list_util_reduce_block_form() {
 }
 
 #[test]
-fn list_util_any_coderef() {
+fn bare_builtin_any_coderef() {
     let mut interp = Interpreter::new();
     let p = parse("any(fn { $_ > 2 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -67,7 +67,7 @@ fn list_util_any_coderef() {
 }
 
 #[test]
-fn list_util_all_coderef() {
+fn bare_builtin_all_coderef() {
     let mut interp = Interpreter::new();
     let p = parse("all(fn { $_ > 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -75,7 +75,7 @@ fn list_util_all_coderef() {
 }
 
 #[test]
-fn list_util_none_coderef() {
+fn bare_builtin_none_coderef() {
     let mut interp = Interpreter::new();
     let p = parse("none(fn { $_ < 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -83,7 +83,7 @@ fn list_util_none_coderef() {
 }
 
 #[test]
-fn list_util_notall_coderef() {
+fn bare_builtin_notall_coderef() {
     let mut interp = Interpreter::new();
     let p = parse("notall(fn { $_ > 0 }, 1, -1, 2)").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -91,7 +91,7 @@ fn list_util_notall_coderef() {
 }
 
 #[test]
-fn list_util_product_scalar() {
+fn bare_builtin_product_scalar() {
     let mut interp = Interpreter::new();
     let p = parse("product(2, 3, 4)").expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -99,7 +99,7 @@ fn list_util_product_scalar() {
 }
 
 #[test]
-fn list_util_sum_in_list_context_joins_like_scalar() {
+fn bare_builtin_sum_in_list_context_joins_like_scalar() {
     let mut interp = Interpreter::new();
     let p = parse(r#"sum(10, 3) |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -115,7 +115,7 @@ fn bare_sum_min_max_product_without_import() {
 }
 
 #[test]
-fn bare_mean_and_list_util_qualified_stats() {
+fn bare_mean_and_mode_stats() {
     let mut interp = Interpreter::new();
     let p = parse(r#"mean(2, 4, 10) == mean(2, 4, 10)"#).expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -126,7 +126,7 @@ fn bare_mean_and_list_util_qualified_stats() {
 }
 
 #[test]
-fn list_util_uniqstr_case_sensitive() {
+fn bare_builtin_uniqstr_case_sensitive() {
     let mut interp = Interpreter::new();
     let p = parse(r#"uniqstr("a", "A", "a") |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -134,7 +134,7 @@ fn list_util_uniqstr_case_sensitive() {
 }
 
 #[test]
-fn list_util_mesh_interleaves_array_refs() {
+fn bare_builtin_mesh_interleaves_array_refs() {
     let mut interp = Interpreter::new();
     let p = parse(r#"my @m = mesh([1, 2], [10, 20]); @m |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -142,7 +142,7 @@ fn list_util_mesh_interleaves_array_refs() {
 }
 
 #[test]
-fn list_util_zip_shortest_pairs_rows_by_min_length() {
+fn bare_builtin_zip_shortest_pairs_rows_by_min_length() {
     let mut interp = Interpreter::new();
     let p = parse(
         "my @z = zip_shortest([1, 2, 3], [10, 20]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + $z[1]->[1]",
@@ -153,7 +153,7 @@ fn list_util_zip_shortest_pairs_rows_by_min_length() {
 }
 
 #[test]
-fn list_util_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
+fn bare_builtin_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
     let mut interp = Interpreter::new();
     let p = parse(
         "my @z = zip_longest([1, 2], [10]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + ($z[1]->[1] + 0)",
@@ -164,7 +164,7 @@ fn list_util_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
 }
 
 #[test]
-fn list_util_pairs_returns_blessed_arrays() {
+fn bare_builtin_pairs_returns_blessed_arrays() {
     let mut interp = Interpreter::new();
     let p = parse("pairs(\"a\", 1, \"b\", 2) |> join \",\"").expect("parse");
     let v = interp.execute(&p).expect("run");

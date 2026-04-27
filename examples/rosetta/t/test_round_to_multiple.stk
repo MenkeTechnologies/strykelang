@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Round n to nearest multiple of m (banker's rounding for halfway)
+
+fn Rosetta::RoundMul::round($n, $m) {
+    return $n if $m == 0
+    my $abs_m = $m < 0 ? -$m : $m
+    my $q = $n / $abs_m
+    my $floor_q = int($q)
+    $floor_q -= 1 if $q < $floor_q
+    my $frac = $q - $floor_q
+    if ($frac < 0.5) {
+        return $floor_q * $abs_m
+    } elsif ($frac > 0.5) {
+        return ($floor_q + 1) * $abs_m
+    } else {
+        # Halfway: round to even (banker's rounding)
+        my $down = $floor_q * $abs_m
+        my $up   = ($floor_q + 1) * $abs_m
+        my $down_q = int($down / $abs_m)
+        return $down_q % 2 == 0 ? $down : $up
+    }
+}
+
+# Standard nearest-multiple
+assert_eq Rosetta::RoundMul::round(10, 3),  9,   "10 -> nearest 3 = 9"
+assert_eq Rosetta::RoundMul::round(11, 3),  12,  "11 -> 12"
+assert_eq Rosetta::RoundMul::round(12, 3),  12,  "12 already on multiple"
+assert_eq Rosetta::RoundMul::round(7, 5),   5,   "7 nearest 5"
+assert_eq Rosetta::RoundMul::round(8, 5),   10,  "8 closer to 10"
+
+# Halfway: banker's rounding (to even)
+assert_eq Rosetta::RoundMul::round(15, 10), 20,  "15 -> 20 (2*10 even)"
+assert_eq Rosetta::RoundMul::round(25, 10), 20,  "25 -> 20 (2*10 even)"
+assert_eq Rosetta::RoundMul::round(35, 10), 40,  "35 -> 40 (4*10 even)"
+
+# Negative arguments
+assert_eq Rosetta::RoundMul::round(-7, 5),  -5,  "-7 nearest 5"
+assert_eq Rosetta::RoundMul::round(-8, 5), -10,  "-8 nearest 10"
+assert_eq Rosetta::RoundMul::round(10, -3),  9,  "negative m treated as positive"
+
+# Identity: m == 0
+assert_eq Rosetta::RoundMul::round(42, 0),  42,  "m=0 returns n unchanged"
+
+# Floats
+assert_eq Rosetta::RoundMul::round(7.5, 2), 8,   "7.5 -> 8 (banker's: 4*2 even)"
+assert_eq Rosetta::RoundMul::round(2.4, 1), 2,   "2.4 -> 2"
+assert_eq Rosetta::RoundMul::round(2.6, 1), 3,   "2.6 -> 3"
+
+test_run

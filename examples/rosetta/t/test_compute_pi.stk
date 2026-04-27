@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compute π via three classic series (Leibniz, Nilakantha, Machin-like)
+
+fn Rosetta::Pi::leibniz($n) {
+    # 4 * (1 - 1/3 + 1/5 - 1/7 + ...)  — slow O(1/n) convergence
+    my $sum = 0.0
+    my $sign = 1
+    for my $k (0..$n-1) {
+        $sum += $sign / (2 * $k + 1)
+        $sign = -$sign
+    }
+    4 * $sum
+}
+
+fn Rosetta::Pi::nilakantha($n) {
+    # 3 + 4/(2*3*4) - 4/(4*5*6) + 4/(6*7*8) - ... — much faster
+    my $sum = 3.0
+    my $sign = 1
+    for my $k (1..$n) {
+        my $a = 2 * $k
+        my $b = $a + 1
+        my $c = $b + 1
+        $sum += $sign * 4 / ($a * $b * $c)
+        $sign = -$sign
+    }
+    $sum
+}
+
+fn Rosetta::Pi::machin_arctan($x_num, $x_den, $terms) {
+    # arctan(x_num/x_den) via Taylor series
+    my $sum = 0.0
+    my $num = $x_num
+    my $den = $x_den
+    my $sign = 1
+    for my $k (0..$terms-1) {
+        $sum += $sign * $num / ((2 * $k + 1) * $den)
+        $num *= $x_num * $x_num
+        $den *= $x_den * $x_den
+        $sign = -$sign
+    }
+    $sum
+}
+
+fn Rosetta::Pi::machin($terms) {
+    # 4 * (4 * arctan(1/5) - arctan(1/239))
+    my $a = 16 * Rosetta::Pi::machin_arctan(1, 5, $terms)
+    my $b = 4 * Rosetta::Pi::machin_arctan(1, 239, $terms)
+    $a - $b
+}
+
+fn Rosetta::Pi::approx_eq($a, $b, $eps) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < $eps
+}
+
+my $pi = 3.141592653589793
+
+# Leibniz: slow — 100k terms gets 4 digits
+my $l = Rosetta::Pi::leibniz(100000)
+assert_ok Rosetta::Pi::approx_eq($l, $pi, 0.0001), "Leibniz with 100k terms"
+
+# Nilakantha: 50 terms gets ~6 digits, 1000 terms gets ~10
+my $nilak = Rosetta::Pi::nilakantha(50)
+assert_ok Rosetta::Pi::approx_eq($nilak, $pi, 1e-5), "Nilakantha 50 terms"
+
+my $nilak1000 = Rosetta::Pi::nilakantha(1000)
+assert_ok Rosetta::Pi::approx_eq($nilak1000, $pi, 1e-9), "Nilakantha 1000 terms"
+
+# Machin: 10 terms gets ~16 digits (FP limit)
+my $m = Rosetta::Pi::machin(10)
+assert_ok Rosetta::Pi::approx_eq($m, $pi, 1e-12), "Machin 10 terms"
+
+# arctan(1) * 4 ≈ π — sanity check via Leibniz form built into machin_arctan
+my $a1 = Rosetta::Pi::machin_arctan(1, 1, 100000)
+assert_ok Rosetta::Pi::approx_eq(4 * $a1, $pi, 0.0001), "arctan(1)*4"
+
+test_run

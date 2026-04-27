@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nim — Sprague-Grundy theory, XOR of pile sizes.
+
+fn Rosetta::Nim::nim_sum(@piles) {
+    my $x = 0
+    for my $p (@piles) { $x = $x ^ $p }
+    $x
+}
+
+# Position is losing (P-position) iff nim sum is 0.
+fn Rosetta::Nim::is_losing(@piles) {
+    Rosetta::Nim::nim_sum(@piles) == 0
+}
+
+# Find a winning move: pick a pile and reduce it so nim_sum becomes 0.
+fn Rosetta::Nim::winning_move(@piles) {
+    my $x = Rosetta::Nim::nim_sum(@piles)
+    return undef if $x == 0
+    for my $i (0..scalar(@piles)-1) {
+        my $target = $piles[$i] ^ $x
+        if ($target < $piles[$i]) {
+            return [$i, $piles[$i] - $target]
+        }
+    }
+    undef
+}
+
+# Classic 3-4-5 starting position has nim_sum 2; winning
+assert_eq Rosetta::Nim::nim_sum(3, 4, 5), 2, "3 XOR 4 XOR 5 = 2"
+assert_ok !Rosetta::Nim::is_losing(3, 4, 5), "(3,4,5) winning"
+
+# Find the move from (3,4,5)
+my $mv = Rosetta::Nim::winning_move(3, 4, 5)
+assert_ok defined $mv, "winning move exists"
+
+# Apply move and verify the new position is losing
+my @piles = (3, 4, 5)
+$piles[$mv->[0]] -= $mv->[1]
+assert_ok Rosetta::Nim::is_losing(@piles), "after winning move: P-position"
+
+# Equal piles in pairs are losing (XOR cancels)
+assert_ok Rosetta::Nim::is_losing(7, 7),       "(7,7)"
+assert_ok Rosetta::Nim::is_losing(1, 2, 1, 2), "(1,2,1,2)"
+assert_ok Rosetta::Nim::is_losing(0, 0, 0),    "all zero"
+
+# 1^2^3 = 0, so (1,2,3) is a P-position (losing for the player to move)
+assert_ok Rosetta::Nim::is_losing(1, 2, 3),    "(1,2,3): 1^2^3=0 (P-position)"
+assert_eq Rosetta::Nim::winning_move(1, 2, 3), undef, "no winning move from P-position"
+
+# Single pile: always winning (just take all)
+assert_ok !Rosetta::Nim::is_losing(7), "single pile of 7"
+my $mv2 = Rosetta::Nim::winning_move(7)
+assert_eq $mv2->[0], 0, "from pile 0"
+assert_eq $mv2->[1], 7, "take all 7"
+
+# Empty all-zero: actually losing (player must move but cannot)
+assert_ok Rosetta::Nim::is_losing(0), "(0)"
+
+test_run

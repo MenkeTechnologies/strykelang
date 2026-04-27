@@ -994,7 +994,7 @@ pub enum BuiltinId {
     Utime,
     /// `umask EXPR` / `umask()` — process file mode creation mask (Unix).
     Umask,
-    /// `getcwd` / `Cwd::getcwd` / `CORE::getcwd`.
+    /// `getcwd` / `pwd` — bare-name builtin returning the absolute current working directory.
     Getcwd,
     /// `pipe READHANDLE, WRITEHANDLE` — OS pipe ends (Unix).
     Pipe,

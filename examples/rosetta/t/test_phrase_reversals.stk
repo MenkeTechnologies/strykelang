@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Phrase reversals — three flavors of reversal applied to a string
+
+fn Rosetta::PhraseRev::reverse_string($s) {
+    my @cs = ~> $s chars
+    join("", rev @cs)
+}
+
+fn Rosetta::PhraseRev::reverse_words($s) {
+    my @ws = split /\s+/, $s
+    join(" ", rev @ws)
+}
+
+fn Rosetta::PhraseRev::reverse_each_word($s) {
+    my @ws = split /\s+/, $s
+    my @reved
+    for my $w (@ws) {
+        push @reved, Rosetta::PhraseRev::reverse_string($w)
+    }
+    join(" ", @reved)
+}
+
+# Standard sample
+my $s = "rosetta code phrase reversal"
+
+assert_eq Rosetta::PhraseRev::reverse_string($s),
+    "lasrever esarhp edoc attesor",
+    "reverse string"
+
+assert_eq Rosetta::PhraseRev::reverse_words($s),
+    "reversal phrase code rosetta",
+    "reverse word order"
+
+assert_eq Rosetta::PhraseRev::reverse_each_word($s),
+    "attesor edoc esarhp lasrever",
+    "reverse each word"
+
+# Edge: single word
+assert_eq Rosetta::PhraseRev::reverse_words("hello"),    "hello",  "single word - same word order"
+assert_eq Rosetta::PhraseRev::reverse_string("hello"),   "olleh",  "single word - reversed string"
+
+# Palindrome
+assert_eq Rosetta::PhraseRev::reverse_string("level"),   "level",  "palindrome stays the same"
+
+# Mixed-case + punctuation preserved
+my $s2 = "Hello, World!"
+assert_eq Rosetta::PhraseRev::reverse_string($s2), "!dlroW ,olleH", "case and punctuation"
+
+# Numbers and symbols
+assert_eq Rosetta::PhraseRev::reverse_each_word("abc 123 xyz"),
+    "cba 321 zyx",
+    "each word reversed"
+
+test_run
