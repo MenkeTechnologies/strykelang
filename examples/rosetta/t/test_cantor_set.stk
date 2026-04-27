@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cantor set — print levels 0..n of the middle-thirds construction.
+
+fn Rosetta::Cantor::level($depth) {
+    my $width = 3 ** $depth
+    my @cells
+    for my $i (0..$width-1) { $cells[$i] = "#" }
+    Rosetta::Cantor::erase(\@cells, 0, $width, $depth)
+    join("", @cells)
+}
+
+fn Rosetta::Cantor::erase($cells, $start, $len, $depth) {
+    return undef if $depth == 0
+    my $third = int($len / 3)
+    for my $i (0..$third-1) {
+        $cells->[$start + $third + $i] = " "
+    }
+    Rosetta::Cantor::erase($cells, $start, $third, $depth - 1)
+    Rosetta::Cantor::erase($cells, $start + 2 * $third, $third, $depth - 1)
+}
+
+# Level 0: a single solid cell
+assert_eq Rosetta::Cantor::level(0), "#", "L0 is single cell"
+
+# Level 1: ## with middle third blank — for width 3 it's "# #"
+assert_eq Rosetta::Cantor::level(1), "# #", "L1: thirds removed"
+
+# Level 2: width 9, "# #   # #"
+assert_eq Rosetta::Cantor::level(2), "# #   # #", "L2"
+
+# Level 3: width 27
+assert_eq Rosetta::Cantor::level(3), "# #   # #         # #   # #", "L3"
+
+# Number of remaining "#" at level n is 2^n
+for my $depth (0..5) {
+    my $line = Rosetta::Cantor::level($depth)
+    my $count = 0
+    my @cs = ~> $line chars
+    for my $c (@cs) { $count += 1 if $c eq "#" }
+    my $expected = 2 ** $depth
+    assert_eq $count, $expected, "level $depth has 2^$depth = $expected hashes"
+}
+
+test_run

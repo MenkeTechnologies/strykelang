@@ -1020,6 +1020,19 @@ impl Lexer {
                 if name.is_empty() {
                     return Err(self.syntax_err("Expected variable name after $", self.line));
                 }
+                // `--no-interop`: reject `$a` / `$b` (Perl's reduce/sort/pair*
+                // comparator-bind globals). Stryke's runtime also binds `$_0`
+                // / `$_1` for the same positions; in idiomatic-only mode users
+                // must use those instead.
+                if crate::no_interop_mode() && (name == "a" || name == "b") {
+                    return Err(self.syntax_err(
+                        format!(
+                            "stryke uses `$_0` / `$_1` instead of `${}` (--no-interop is active)",
+                            name
+                        ),
+                        self.line,
+                    ));
+                }
                 self.last_was_term = true;
                 if let Some(tail) = Self::braced_body_symbolic_scalar_deref_name(&name) {
                     return Ok(Token::DerefScalarVar(tail.to_string()));

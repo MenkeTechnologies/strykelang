@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Magnanimous numbers — every split of digits gives a prime sum
+
+fn Rosetta::Magnanimous::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Magnanimous::is_magnanimous($n) {
+    my $s = "$n"
+    my $len = length($s)
+    return 1 if $len == 1
+    for my $i (1..$len-1) {
+        my $left  = int(substr($s, 0, $i))
+        my $right = int(substr($s, $i))
+        return 0 unless Rosetta::Magnanimous::is_prime($left + $right)
+    }
+    1
+}
+
+fn Rosetta::Magnanimous::list($limit) {
+    0:$limit |> grep { Rosetta::Magnanimous::is_magnanimous($_) }
+}
+
+# OEIS A252996 begins: 0,1,2,3,4,5,6,7,8,9,11,12,14,16,20,21,23,25,29,30,32,...
+my @first22 = Rosetta::Magnanimous::list(32)
+assert_eq join(",", @first22),
+    "0,1,2,3,4,5,6,7,8,9,11,12,14,16,20,21,23,25,29,30,32",
+    "first magnanimous numbers up to 32"
+
+assert_ok Rosetta::Magnanimous::is_magnanimous(4001), "4001: 4+001=5, 40+01=41, 400+1=401 all prime"
+assert_ok !Rosetta::Magnanimous::is_magnanimous(13),   "13: 1+3=4 not prime"
+assert_ok !Rosetta::Magnanimous::is_magnanimous(2018), "2018: 2+018=20 not prime"
+assert_ok Rosetta::Magnanimous::is_magnanimous(7),     "single-digit 7 is magnanimous"
+
+test_run

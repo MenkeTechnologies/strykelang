@@ -3586,40 +3586,54 @@ pub(crate) fn compute_array_slice_indices(
         }
     };
 
-    let from_i = if from.is_undef() {
+    // Open-ended slice (`@a[..3]`, `@a[-3..]`) is a stryke extension where each
+    // explicit endpoint wraps once from the end. Closed `Range` slices
+    // (`@a[0..-1]`, `@a[3..-1]`, `@a[-3..-1]`) follow Perl's raw-integer range
+    // semantics: `0..-1` is empty, `-3..-1` is `(-3, -2, -1)`, and each
+    // generated integer wraps individually when looked up.
+    let any_undef = from.is_undef() || to.is_undef();
+
+    let from_raw = if from.is_undef() {
         if step_i > 0 {
             0
         } else {
             arr_len - 1
         }
     } else {
-        normalize(perl_slice_endpoint_to_strict_int(from, "start")?)
+        perl_slice_endpoint_to_strict_int(from, "start")?
     };
 
-    let to_i = if to.is_undef() {
+    let to_raw = if to.is_undef() {
         if step_i > 0 {
             arr_len - 1
         } else {
             0
         }
     } else {
-        normalize(perl_slice_endpoint_to_strict_int(to, "stop")?)
+        perl_slice_endpoint_to_strict_int(to, "stop")?
     };
 
     let mut out = Vec::new();
     if arr_len == 0 {
         return Ok(out);
     }
+
+    let (from_i, to_i) = if any_undef {
+        (normalize(from_raw), normalize(to_raw))
+    } else {
+        (from_raw, to_raw)
+    };
+
     if step_i > 0 {
         let mut i = from_i;
         while i <= to_i {
-            out.push(i);
+            out.push(if any_undef { i } else { normalize(i) });
             i += step_i;
         }
     } else {
         let mut i = from_i;
         while i >= to_i {
-            out.push(i);
+            out.push(if any_undef { i } else { normalize(i) });
             i += step_i; // step_i is negative
         }
     }

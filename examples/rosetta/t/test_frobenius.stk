@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Frobenius numbers (Chicken McNugget theorem)
+# Largest integer not expressible as a non-negative combination of given coins.
+
+fn Rosetta::Frobenius::two($a, $b) {
+    # Closed form for two coprime positives.
+    $a * $b - $a - $b
+}
+
+fn Rosetta::Frobenius::dp(@coins) {
+    my @sorted = sort { $a <=> $b } @coins
+    return -1 if $sorted[0] == 1
+    my $bound = 1
+    for my $c (@coins) { $bound *= $c }
+    my @reach
+    for my $i (0..$bound) { $reach[$i] = 0 }
+    $reach[0] = 1
+    for my $i (0..$bound) {
+        next if !$reach[$i]
+        for my $c (@coins) {
+            if ($i + $c <= $bound) { $reach[$i + $c] = 1 }
+        }
+    }
+    my $last = -1
+    for my $i (0..$bound) {
+        if (!$reach[$i]) { $last = $i }
+    }
+    $last
+}
+
+assert_eq Rosetta::Frobenius::two(3, 5),  7,  "F(3,5) = 7"
+assert_eq Rosetta::Frobenius::two(7, 11), 59, "F(7,11) = 59"
+assert_eq Rosetta::Frobenius::two(2, 3),  1,  "F(2,3) = 1"
+
+# Three coins, no closed form
+assert_eq Rosetta::Frobenius::dp(6, 9, 20), 43, "Chicken McNugget (6,9,20)"
+assert_eq Rosetta::Frobenius::dp(3, 5),     7,  "DP matches two-coin formula"
+assert_eq Rosetta::Frobenius::dp(7, 11),    59, "DP (7,11)"
+assert_eq Rosetta::Frobenius::dp(1, 5),    -1,  "1 in coin set -> nothing unreachable"
+
+test_run

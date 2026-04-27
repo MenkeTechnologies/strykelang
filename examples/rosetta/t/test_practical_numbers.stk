@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Practical numbers
+# n is practical iff every k in 1..n is the sum of distinct divisors of n.
+
+fn Rosetta::Practical::divisors($n) {
+    my @d
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @d, $i
+            push @d, int($n / $i) if $i != int($n / $i)
+        }
+        $i += 1
+    }
+    [sort { $a <=> $b } @d]
+}
+
+fn Rosetta::Practical::is_practical($n) {
+    return 0 if $n < 1
+    return 1 if $n == 1
+    return 0 if $n % 2 != 0
+    my $divs = Rosetta::Practical::divisors($n)
+    # Stewart's criterion: for each prime power p^k || n with k>=1,
+    # p <= sigma(m) + 1, where m is product of smaller primes' parts of n.
+    # Implemented as: walk divisors sorted; each new divisor d_i must be
+    # <= 1 + sum(previous divisors).
+    my $sum = 0
+    for my $d (@$divs) {
+        return 0 if $d > $sum + 1
+        $sum += $d
+    }
+    1
+}
+
+fn Rosetta::Practical::list($limit) {
+    1:$limit |> grep { Rosetta::Practical::is_practical($_) }
+}
+
+# OEIS A005153 first terms: 1, 2, 4, 6, 8, 12, 16, 18, 20, 24, 28, 30, 32, 36, 40, 42
+my @first16 = Rosetta::Practical::list(42)
+assert_eq join(",", @first16),
+    "1,2,4,6,8,12,16,18,20,24,28,30,32,36,40,42",
+    "first practical numbers up to 42"
+
+assert_ok Rosetta::Practical::is_practical(12), "12 is practical"
+assert_ok Rosetta::Practical::is_practical(150), "150 is practical"
+assert_ok !Rosetta::Practical::is_practical(10), "10 is not practical"
+assert_ok !Rosetta::Practical::is_practical(11), "11 (prime) not practical"
+
+test_run

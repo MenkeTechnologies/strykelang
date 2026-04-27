@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Negative base numbers — encode/decode integers in base -2..-10
+
+fn Rosetta::NegativeBase::encode($n, $b) {
+    return "0" if $n == 0
+    my @digits
+    my $x = $n
+    while ($x != 0) {
+        my $r = $x % $b
+        $x = int($x / $b)
+        if ($r < 0) {
+            $r -= $b
+            $x += 1
+        }
+        push @digits, $r
+    }
+    @digits = rev @digits
+    join("", map { $_ < 10 ? "$_" : chr(ord("A") + $_ - 10) } @digits)
+}
+
+fn Rosetta::NegativeBase::decode($s, $b) {
+    my @chars = ~> $s chars
+    my $result = 0
+    for my $c (@chars) {
+        my $v
+        if ($c =~ /\d/) {
+            $v = int($c)
+        } else {
+            $v = ord(uc $c) - ord("A") + 10
+        }
+        $result = $result * $b + $v
+    }
+    $result
+}
+
+# Round-trip on a variety of values
+for my $base (-2, -3, -8, -10) {
+    for my $n (-100, -7, -1, 0, 1, 7, 42, 1000) {
+        my $enc = Rosetta::NegativeBase::encode($n, $base)
+        my $dec = Rosetta::NegativeBase::decode($enc, $base)
+        assert_eq $dec, $n, "round-trip $n in base $base via $enc"
+    }
+}
+
+# Known encodings
+assert_eq Rosetta::NegativeBase::encode(10, -2), "11110", "10 in base -2"
+assert_eq Rosetta::NegativeBase::encode(-15, -10), "25", "-15 in base -10"
+assert_eq Rosetta::NegativeBase::encode(146, -3), "21102", "146 in base -3"
+
+test_run

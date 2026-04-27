@@ -12,7 +12,7 @@
 //!   (fat-comma style). Open-ended forms abort (no notion of "all keys" in unordered
 //!   hash). Numeric ranges (`{1:3}`) work as string keys "1","2","3".
 
-use crate::common::{eval_err_kind, eval_string};
+use crate::common::{eval_err_kind, eval_int, eval_string};
 use stryke::error::ErrorKind;
 
 // ── Closed integer ranges (existing behavior, now goes through ArraySliceRange) ──
@@ -193,4 +193,84 @@ fn array_slice_double_dot_matches_colon() {
     let cols = eval_string(r#"my @a=(10,20,30,40,50); join(",", @a[1:3])"#);
     assert_eq!(dots, cols);
     assert_eq!(dots, "20,30,40");
+}
+
+// ── Edge cases: empty arrays, single-element arrays, length-clamped behavior ──
+
+#[test]
+fn array_slice_empty_array_full_returns_empty() {
+    assert_eq!(
+        eval_int(r#"my @a=(); my @r = @a[::]; scalar @r"#),
+        0
+    );
+}
+
+#[test]
+fn array_slice_empty_array_reversed_returns_empty() {
+    assert_eq!(
+        eval_int(r#"my @a=(); my @r = @a[::-1]; scalar @r"#),
+        0
+    );
+}
+
+#[test]
+fn array_slice_single_element_reversed() {
+    assert_eq!(
+        eval_int(r#"my @a=(42); my @r = @a[::-1]; $r[0]"#),
+        42
+    );
+}
+
+#[test]
+fn array_slice_single_element_full() {
+    assert_eq!(
+        eval_int(r#"my @a=(42); my @r = @a[::]; $r[0]"#),
+        42
+    );
+}
+
+#[test]
+fn array_slice_step_larger_than_length_returns_first() {
+    // `@a[::100]` with default from=0, to=len-1, step=100 — only index 0 fits.
+    assert_eq!(
+        eval_string(r#"my @a=(10,20,30); my @r = @a[::100]; join(",", @r)"#),
+        "10"
+    );
+}
+
+#[test]
+fn hash_slice_single_key_range_returns_one_value() {
+    // `{a:a}` is a one-element string range. Auto-quoted barewords resolve
+    // to the same key, lookup returns the value.
+    assert_eq!(
+        eval_int(r#"my %h=(a=>42, b=>99); my @r = @h{a:a}; $r[0]"#),
+        42
+    );
+}
+
+#[test]
+fn array_slice_negative_index_clamps_to_zero() {
+    // `@a[-2:-1]` on a 5-element array: -2 normalizes to 3, -1 normalizes to 4.
+    // Both inclusive, step=1 → indices 3,4.
+    assert_eq!(
+        eval_string(r#"my @a=(10,20,30,40,50); my @r = @a[-2:-1]; join(",", @r)"#),
+        "40,50"
+    );
+}
+
+#[test]
+fn array_slice_full_reverse_of_two_element_array() {
+    assert_eq!(
+        eval_string(r#"my @a=(10,20); my @r = @a[::-1]; join(",", @r)"#),
+        "20,10"
+    );
+}
+
+#[test]
+fn hash_slice_numeric_range_with_negative_step_aborts_on_open_end() {
+    // `@h{:5}` is open-start which is invalid for hashes (not the same as array).
+    assert_eq!(
+        eval_err_kind(r#"my %h=("1"=>1, "2"=>2); my @s = @h{:5}; 0"#),
+        ErrorKind::Runtime
+    );
 }

@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multifactorial — n!^(k) = n * (n-k) * (n-2k) * ... while > 0
+
+fn Rosetta::Multifactorial::compute($n, $k) {
+    my $result = 1
+    my $i = $n
+    while ($i > 0) {
+        $result *= $i
+        $i -= $k
+    }
+    $result
+}
+
+fn Rosetta::Multifactorial::row($k, $count) {
+    1:$count |> map { Rosetta::Multifactorial::compute($_, $k) }
+}
+
+assert_eq Rosetta::Multifactorial::compute(5, 1), 120, "5! = 120"
+assert_eq Rosetta::Multifactorial::compute(8, 2), 384, "8!! = 8*6*4*2 = 384"
+assert_eq Rosetta::Multifactorial::compute(7, 3), 28, "7!!! = 7*4*1 = 28"
+assert_eq Rosetta::Multifactorial::compute(10, 4), 120, "10!^(4) = 10*6*2 = 120"
+assert_eq Rosetta::Multifactorial::compute(1, 5), 1, "1!^(5) = 1"
+
+my @row1 = Rosetta::Multifactorial::row(1, 10)
+assert_eq join(",", @row1), "1,2,6,24,120,720,5040,40320,362880,3628800", "k=1: factorials 1..10"
+
+my @row2 = Rosetta::Multifactorial::row(2, 10)
+assert_eq join(",", @row2), "1,2,3,8,15,48,105,384,945,3840", "k=2: double factorials 1..10"
+
+test_run

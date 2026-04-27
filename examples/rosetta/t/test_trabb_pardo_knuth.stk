@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Trabb Pardo-Knuth algorithm
+# Read 11 numbers, for each compute f(x) = sqrt(|x|) + 5*x^3, report whether overflows threshold.
+
+fn Rosetta::TPK::f($x) {
+    my $abs = $x < 0 ? -$x : $x
+    sqrt($abs) + 5 * $x ** 3
+}
+
+fn Rosetta::TPK::process($nums, $threshold) {
+    my @results
+    for (my $i = scalar(@$nums) - 1; $i >= 0; $i -= 1) {
+        my $x = $nums->[$i]
+        my $y = Rosetta::TPK::f($x)
+        if ($y > $threshold) {
+            push @results, [$x, "TOO LARGE"]
+        } else {
+            push @results, [$x, $y]
+        }
+    }
+    \@results
+}
+
+# Standard demo set
+my @demo = (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0)
+my $r = Rosetta::TPK::process(\@demo, 400)
+
+# Result is reversed (last input first)
+assert_eq $r->[0]->[0], 11, "first reported is x=11"
+assert_eq $r->[10]->[0], 1, "last reported is x=1"
+assert_eq $r->[10]->[1], 6, "f(1) = sqrt(1) + 5 = 6"
+
+# Threshold flagged
+my $first = $r->[0]
+assert_eq $first->[1], "TOO LARGE", "x=11 overflows"
+
+# Pure function checks
+my $f3 = Rosetta::TPK::f(3)
+my $delta = $f3 - (sqrt(3) + 135)
+$delta = -$delta if $delta < 0
+assert_ok $delta < 1e-9, "f(3) = sqrt(3) + 135"
+
+assert_eq Rosetta::TPK::f(0), 0, "f(0) = 0"
+assert_eq Rosetta::TPK::f(2), sqrt(2) + 40, "f(2) = sqrt(2) + 40"
+
+test_run

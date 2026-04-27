@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ordered words — words whose letters appear in non-decreasing order
+
+fn Rosetta::OrderedWords::is_ordered($word) {
+    my @cs = ~> $word lc chars
+    my $n = scalar(@cs)
+    return 1 if $n < 2
+    for my $i (1..$n-1) {
+        return 0 if $cs[$i] lt $cs[$i-1]
+    }
+    1
+}
+
+fn Rosetta::OrderedWords::longest(@words) {
+    my @ordered = grep { Rosetta::OrderedWords::is_ordered($_) } @words
+    my $maxlen = 0
+    for my $w (@ordered) {
+        my $l = length($w)
+        $maxlen = $l if $l > $maxlen
+    }
+    [grep { length($_) == $maxlen } @ordered]
+}
+
+assert_ok  Rosetta::OrderedWords::is_ordered("abbey"),    "abbey is ordered"
+assert_ok  Rosetta::OrderedWords::is_ordered("billowy"),  "billowy is ordered"
+assert_ok  Rosetta::OrderedWords::is_ordered("bijoux"),   "bijoux is ordered"
+assert_ok !Rosetta::OrderedWords::is_ordered("hello"),    "hello not ordered"
+assert_ok !Rosetta::OrderedWords::is_ordered("cab"),      "cab not ordered"
+
+# All single chars are ordered
+assert_ok Rosetta::OrderedWords::is_ordered("a"),  "single char"
+assert_ok Rosetta::OrderedWords::is_ordered(""),   "empty string"
+
+# Find longest in a small dictionary — billowy (7) is the unique longest
+my @dict = ("abbey", "abbot", "billowy", "bijoux", "biopsy", "chinos", "almost",
+            "knotty", "begin", "happy", "ghost", "first")
+my $longest = Rosetta::OrderedWords::longest(@dict)
+my @sorted = sort @$longest
+assert_eq join(",", @sorted), "billowy", "billowy is the longest ordered word"
+assert_eq scalar(@$longest), 1, "exactly one longest"
+
+test_run

@@ -33,8 +33,42 @@ pub fn find_project_root(start: &Path) -> Option<PathBuf> {
     }
 }
 
+/// True if `arg` is a help flag (`-h` or `--help`).
+fn is_help_flag(arg: &str) -> bool {
+    arg == "-h" || arg == "--help"
+}
+
+fn print_new_help() {
+    println!("usage: stryke new NAME");
+    println!();
+    println!("Scaffold a new stryke project at ./NAME/. Same layout as `stryke init`,");
+    println!("but creates the directory for you.");
+    println!();
+    println!("The new project gets:");
+    println!("  NAME/stryke.toml          manifest with [package] and [bin]");
+    println!("  NAME/main.stk             entry point");
+    println!("  NAME/lib/                 library modules (used by `use Foo::Bar`)");
+    println!("  NAME/t/                   test files (run with `s test`)");
+    println!("  NAME/benches/             benchmark files (run with `s bench`)");
+    println!("  NAME/bin/                 additional executables");
+    println!("  NAME/examples/            example programs");
+    println!("  NAME/.gitignore           ignores target/, *.stkc, *.pec");
+}
+
+fn print_init_help() {
+    println!("usage: stryke init [NAME]");
+    println!();
+    println!("Scaffold the current directory as a stryke project. NAME defaults to the");
+    println!("cwd's basename. Writes stryke.toml + main.stk + lib/, t/, benches/, bin/,");
+    println!("examples/, .gitignore. Existing files are left alone.");
+}
+
 /// `s new NAME` — scaffold a new project at `./NAME/`.
 pub fn cmd_new(name: &str) -> i32 {
+    if is_help_flag(name) {
+        print_new_help();
+        return 0;
+    }
     let project_dir = PathBuf::from(name);
     if project_dir.exists() {
         eprintln!("s new: {} already exists", name);
@@ -50,6 +84,10 @@ pub fn cmd_new(name: &str) -> i32 {
 /// `s init [NAME]` — scaffold the current directory as a stryke project.
 /// `NAME` defaults to the current directory's basename.
 pub fn cmd_init(name: Option<&str>) -> i32 {
+    if matches!(name, Some(n) if is_help_flag(n)) {
+        print_init_help();
+        return 0;
+    }
     let cwd = match std::env::current_dir() {
         Ok(c) => c,
         Err(e) => {
@@ -158,6 +196,24 @@ fn default_manifest_for(name: &str) -> Manifest {
 /// `stryke.toml` and re-run install. Idempotent on the manifest level: adding
 /// the same dep twice updates the version in place rather than duplicating.
 pub fn cmd_add(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke add NAME[@VER] [--dev | --group=NAME] [--path=DIR] [--features=A,B]");
+        println!();
+        println!("Add a dependency to stryke.toml and run `s install` to refresh stryke.lock.");
+        println!();
+        println!("Flags:");
+        println!("  --dev            add as a [dev-deps] entry instead of [deps]");
+        println!("  --group=NAME     add to [groups.NAME] (bundler-style)");
+        println!("  --path=DIR       depend on a local checkout (no registry needed)");
+        println!("  --features=A,B   enable feature flags A and B for this dep");
+        println!();
+        println!("Examples:");
+        println!("  stryke add http@1.0");
+        println!("  stryke add test-utils --dev");
+        println!("  stryke add criterion --group=bench");
+        println!("  stryke add mylib --path=../mylib");
+        return 0;
+    }
     let parsed = match parse_add_args(args) {
         Ok(p) => p,
         Err(msg) => {
@@ -321,6 +377,13 @@ fn format_dep_for_log(spec: &DepSpec) -> String {
 
 /// `s remove NAME` — drop the dep from `stryke.toml` and re-run install.
 pub fn cmd_remove(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke remove NAME");
+        println!();
+        println!("Drop NAME from stryke.toml ([deps], [dev-deps], or [groups.*]) and");
+        println!("rerun `s install` so stryke.lock matches.");
+        return 0;
+    }
     if args.len() != 1 {
         eprintln!("usage: s remove NAME");
         return 1;
@@ -383,6 +446,16 @@ pub fn cmd_remove(args: &[String]) -> i32 {
 /// the store, write `stryke.lock`. Registry/git deps return a clear error since
 /// the wire protocol isn't wired yet (RFC phases 7-8).
 pub fn cmd_install(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke install [--offline]");
+        println!();
+        println!("Resolve manifest deps, install path/workspace deps into ~/.stryke/store/,");
+        println!("and write stryke.lock with deterministic ordering + SHA-256 integrity hashes.");
+        println!();
+        println!("Flags:");
+        println!("  --offline    only use cached packages; never fetch from the network");
+        return 0;
+    }
     let _offline = args.iter().any(|a| a == "--offline");
 
     let cwd = match std::env::current_dir() {
@@ -467,7 +540,16 @@ pub fn cmd_install(args: &[String]) -> i32 {
 /// `s tree` — print the resolved dep graph from the lockfile in a human-friendly
 /// format. Roots are the direct deps from `stryke.toml`; transitive deps render
 /// indented underneath. Cycles are not possible (resolver rejects them).
-pub fn cmd_tree(_args: &[String]) -> i32 {
+pub fn cmd_tree(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke tree");
+        println!();
+        println!("Print the resolved dependency graph from stryke.lock as a tree, with the");
+        println!("project at the root and direct + transitive deps underneath.");
+        println!();
+        println!("Run `s install` first to generate stryke.lock.");
+        return 0;
+    }
     let cwd = match std::env::current_dir() {
         Ok(c) => c,
         Err(e) => {
@@ -551,6 +633,15 @@ fn print_tree_entry(lock: &Lockfile, name: &str, prefix: &str, last: bool) {
 /// Reads `~/.stryke/store/NAME@VERSION/stryke.toml` (resolved via current
 /// project's lockfile) and pretty-prints the metadata.
 pub fn cmd_info(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke info NAME");
+        println!();
+        println!("Print the lockfile entry and store path for an installed dep. Shows name,");
+        println!("version, source URL, integrity hash, enabled features, and transitive deps.");
+        println!();
+        println!("Run `s install` first to generate stryke.lock.");
+        return 0;
+    }
     if args.len() != 1 {
         eprintln!("usage: s info NAME");
         return 1;
@@ -697,9 +788,24 @@ fn segments_to_path(segments: &[&str]) -> PathBuf {
 /// the primary surface (each subcommand is wired individually in `main.rs`),
 /// but useful when porting from prototype shells.
 pub fn dispatch(args: &[String]) -> i32 {
-    if args.is_empty() {
-        eprintln!("usage: s pkg {{init|new|add|remove|install|tree|info}}");
-        return 1;
+    let want_help = args.first().map(|a| is_help_flag(a)).unwrap_or(false);
+    if args.is_empty() || want_help {
+        println!("usage: stryke pkg <subcommand> [args]");
+        println!();
+        println!("Package-manager subcommand dispatcher. The same handlers are also");
+        println!("reachable as top-level commands (e.g. `stryke install` ≡ `stryke pkg install`).");
+        println!();
+        println!("Subcommands:");
+        println!("  init [NAME]               scaffold project in cwd");
+        println!("  new NAME                  scaffold project at ./NAME/");
+        println!("  install [--offline]       resolve deps + write stryke.lock");
+        println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
+        println!("  remove NAME               drop a dep from stryke.toml");
+        println!("  tree                      print resolved dep graph");
+        println!("  info NAME                 show lockfile entry for a dep");
+        println!();
+        println!("Run `stryke <subcommand> -h` for per-subcommand flags.");
+        return if args.is_empty() { 1 } else { 0 };
     }
     match args[0].as_str() {
         "init" => cmd_init(args.get(1).map(|s| s.as_str())),

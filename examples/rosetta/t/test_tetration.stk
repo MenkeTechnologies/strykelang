@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tetration — n^^k = n^(n^(n^...^n))) with k copies of n.
+
+fn Rosetta::Tetration::tower($base, $height) {
+    return 1 if $height == 0
+    my $result = $base
+    for my $i (2..$height) {
+        $result = $base ** $result
+    }
+    $result
+}
+
+# Modular tower for very large heights — uses CRT-style reduction (here just bound by mod)
+fn Rosetta::Tetration::tower_mod($base, $height, $mod) {
+    return 1 % $mod if $height == 0
+    return $base % $mod if $height == 1
+    my $sub = Rosetta::Tetration::tower_mod($base, $height - 1, $mod)
+    my $result = 1
+    my $b = $base % $mod
+    my $e = $sub
+    while ($e > 0) {
+        if ($e % 2 == 1) {
+            $result = ($result * $b) % $mod
+        }
+        $e = int($e / 2)
+        $b = ($b * $b) % $mod
+    }
+    $result
+}
+
+# n^^0 = 1 always
+assert_eq Rosetta::Tetration::tower(2, 0), 1, "2^^0 = 1"
+assert_eq Rosetta::Tetration::tower(7, 0), 1, "7^^0 = 1"
+# n^^1 = n
+assert_eq Rosetta::Tetration::tower(5, 1), 5, "5^^1 = 5"
+# 2^^2 = 2^2 = 4
+assert_eq Rosetta::Tetration::tower(2, 2), 4, "2^^2 = 4"
+# 2^^3 = 2^(2^2) = 16
+assert_eq Rosetta::Tetration::tower(2, 3), 16, "2^^3 = 16"
+# 2^^4 = 2^16 = 65536
+assert_eq Rosetta::Tetration::tower(2, 4), 65536, "2^^4 = 65536"
+# 3^^2 = 27, 3^^3 = 3^27 = 7625597484987
+assert_eq Rosetta::Tetration::tower(3, 2), 27, "3^^2 = 27"
+assert_eq Rosetta::Tetration::tower(3, 3), 7625597484987, "3^^3 = 3^27"
+
+# Modular tower keeps a bounded answer for huge heights
+assert_eq Rosetta::Tetration::tower_mod(2, 4, 100), 36, "2^^4 mod 100"
+assert_eq Rosetta::Tetration::tower_mod(2, 5, 1000), 736, "2^^5 mod 1000 (last 3 digits of 2^65536)"
+
+test_run

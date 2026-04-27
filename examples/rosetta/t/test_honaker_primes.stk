@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Honaker primes — the n-th prime p_n where digit_sum(p_n) == digit_sum(n).
+
+fn Rosetta::Honaker::digit_sum($n) {
+    my $s = 0
+    my $x = $n
+    while ($x > 0) {
+        $s += $x % 10
+        $x = int($x / 10)
+    }
+    $s
+}
+
+fn Rosetta::Honaker::find($count) {
+    my @result
+    my $idx = 0
+    my $n = 2
+    while (scalar(@result) < $count) {
+        if (is_prime($n)) {
+            $idx += 1
+            if (Rosetta::Honaker::digit_sum($n) == Rosetta::Honaker::digit_sum($idx)) {
+                push @result, [$idx, $n]
+            }
+        }
+        $n += 1
+    }
+    \@result
+}
+
+# OEIS A033548: 131, 263, 457, 1039, 1049, 1051, 1093, 1129, 1163, 1217, ...
+my $first5 = Rosetta::Honaker::find(5)
+my @primes = map { $_->[1] } @$first5
+assert_eq join(",", @primes), "131,263,457,1039,1049", "first 5 Honaker primes"
+
+my @indices = map { $_->[0] } @$first5
+assert_eq join(",", @indices), "32,56,88,175,176", "their indices"
+
+# Verify: digit_sum(131) = 5, digit_sum(32) = 5
+assert_eq Rosetta::Honaker::digit_sum(131), Rosetta::Honaker::digit_sum(32),
+    "digit sums match for (32, 131)"
+assert_eq Rosetta::Honaker::digit_sum(263), Rosetta::Honaker::digit_sum(56),
+    "digit sums match for (56, 263) — both 11"
+
+test_run

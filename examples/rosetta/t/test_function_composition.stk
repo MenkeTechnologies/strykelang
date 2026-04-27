@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Function composition — compose(f, g)(x) = f(g(x))
+
+fn Rosetta::Compose::compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+fn Rosetta::Compose::pipeline(@fns) {
+    @fns |> reduce { Rosetta::Compose::compose($a, $b) }
+}
+
+my $inc = fn ($x) { $x + 1 }
+my $dbl = fn ($x) { $x * 2 }
+my $sq  = fn ($x) { $x * $x }
+
+# (inc . dbl)(3) = inc(dbl(3)) = inc(6) = 7
+my $inc_of_dbl = Rosetta::Compose::compose($inc, $dbl)
+assert_eq $inc_of_dbl->(3), 7, "(inc . dbl)(3) = 7"
+
+# (dbl . inc)(3) = dbl(inc(3)) = dbl(4) = 8
+my $dbl_of_inc = Rosetta::Compose::compose($dbl, $inc)
+assert_eq $dbl_of_inc->(3), 8, "(dbl . inc)(3) = 8"
+
+# (sq . inc)(4) = sq(5) = 25
+my $sq_of_inc = Rosetta::Compose::compose($sq, $inc)
+assert_eq $sq_of_inc->(4), 25, "(sq . inc)(4) = 25"
+
+# Compose with itself: inc(inc(x)) = x+2
+my $inc2 = Rosetta::Compose::compose($inc, $inc)
+assert_eq $inc2->(10), 12, "(inc . inc)(10) = 12"
+
+# Three-way: (sq . inc . dbl)(3) = sq(inc(dbl(3))) = sq(7) = 49
+my $three = Rosetta::Compose::pipeline($sq, $inc, $dbl)
+assert_eq $three->(3), 49, "(sq . inc . dbl)(3) = 49"
+
+test_run

@@ -49,6 +49,8 @@ mod parse_program_shape_ops;
 mod parse_syntax_errors;
 mod parse_syntax_errors_more;
 mod phases;
+mod no_interop;
+mod pkg_cli;
 mod pkg_e2e;
 mod pragmas;
 mod range_perl;

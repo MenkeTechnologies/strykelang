@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Damerau-Levenshtein distance — Optimal String Alignment variant
+# (insert / delete / substitute / transpose adjacent chars; no overlapping edits)
+
+fn Rosetta::DamerauLevenshtein::compute($s1, $s2) {
+    my @c1 = ~> $s1 chars
+    my @c2 = ~> $s2 chars
+    my $n = scalar(@c1)
+    my $m = scalar(@c2)
+
+    my @d
+    for my $i (0..$n) {
+        $d[$i] = []
+        $d[$i][0] = $i
+    }
+    for my $j (0..$m) { $d[0][$j] = $j }
+
+    for my $i (1..$n) {
+        for my $j (1..$m) {
+            my $cost = ($c1[$i-1] eq $c2[$j-1]) ? 0 : 1
+            my $del = $d[$i-1][$j] + 1
+            my $ins = $d[$i][$j-1] + 1
+            my $sub = $d[$i-1][$j-1] + $cost
+            my $best = $del
+            $best = $ins if $ins < $best
+            $best = $sub if $sub < $best
+            if ($i > 1 && $j > 1
+                && $c1[$i-1] eq $c2[$j-2]
+                && $c1[$i-2] eq $c2[$j-1]) {
+                my $tr = $d[$i-2][$j-2] + 1
+                $best = $tr if $tr < $best
+            }
+            $d[$i][$j] = $best
+        }
+    }
+    $d[$n][$m]
+}
+
+assert_eq Rosetta::DamerauLevenshtein::compute("ca", "abc"), 3, "ca vs abc (OSA)"
+assert_eq Rosetta::DamerauLevenshtein::compute("kitten", "sitting"), 3, "kitten vs sitting"
+assert_eq Rosetta::DamerauLevenshtein::compute("ifish", "fish"), 1, "ifish vs fish (insert)"
+assert_eq Rosetta::DamerauLevenshtein::compute("abcd", "acbd"), 1, "abcd vs acbd (transpose)"
+assert_eq Rosetta::DamerauLevenshtein::compute("ab", "ba"), 1, "ab vs ba (single transpose)"
+assert_eq Rosetta::DamerauLevenshtein::compute("smtih", "smith"), 1, "smtih vs smith"
+assert_eq Rosetta::DamerauLevenshtein::compute("", ""), 0, "empty equal"
+assert_eq Rosetta::DamerauLevenshtein::compute("abc", "abc"), 0, "identical"
+assert_eq Rosetta::DamerauLevenshtein::compute("", "abc"), 3, "empty to abc"
+
+test_run
