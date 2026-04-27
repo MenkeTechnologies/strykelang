@@ -50,6 +50,7 @@ mod parse_syntax_errors;
 mod parse_syntax_errors_more;
 mod phases;
 mod pragmas;
+mod pkg_e2e;
 mod range_perl;
 mod readline_list_context;
 mod readme_stryke_commands;

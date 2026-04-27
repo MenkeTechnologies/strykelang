@@ -2720,6 +2720,31 @@ impl Interpreter {
         }
     }
 
+    /// Lockfile-driven module resolution (RFC §"Module Resolution"). Walks up from
+    /// `cwd` for `stryke.toml`, then asks [`crate::pkg::commands::resolve_module`]
+    /// to find the module either in `lib/` or in the lockfile-pinned store. The
+    /// `relpath` arg is the `@INC`-style path (`Foo/Bar.pm`) used elsewhere in
+    /// `require`; it is converted to a logical name (`Foo::Bar`) for the resolver.
+    /// Both `.pm` and `.stk` variants are tried — stryke source uses `.stk`.
+    fn try_resolve_via_lockfile(relpath: &str) -> Option<std::path::PathBuf> {
+        let cwd = std::env::current_dir().ok()?;
+        let project_root = crate::pkg::commands::find_project_root(&cwd)?;
+
+        // Convert "Foo/Bar.pm" → "Foo::Bar". Drop the trailing extension so
+        // `resolve_module` (which appends `.stk`) builds the right path.
+        let stem = relpath
+            .strip_suffix(".pm")
+            .or_else(|| relpath.strip_suffix(".pl"))
+            .or_else(|| relpath.strip_suffix(".stk"))
+            .unwrap_or(relpath);
+        let logical = stem.replace('/', "::");
+
+        match crate::pkg::commands::resolve_module(&project_root, &logical) {
+            Ok(found) => found,
+            Err(_) => None,
+        }
+    }
+
     /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully
     /// qualified — do not prepend the current package. Unqualified names in `main` are stored
     /// **bare** (`name`), matching the compiler's `Op::Call` interning so the VM's
@@ -3252,6 +3277,31 @@ impl Interpreter {
             return Ok(PerlValue::integer(1));
         }
         self.invoke_require_hook("require__before", relpath, line)?;
+
+        // Lockfile-driven module resolution. When the cwd is inside a stryke
+        // project (`stryke.toml` reachable), `use Foo::Bar` first looks at
+        // `lib/Foo/Bar.stk` and then at lockfile-pinned store entries before
+        // falling through to `@INC`. See docs/PACKAGE_REGISTRY.md §"Module
+        // Resolution".
+        if let Some(found) = Self::try_resolve_via_lockfile(relpath) {
+            let code = read_file_text_perl_compat(&found).map_err(|e| {
+                PerlError::runtime(
+                    format!("Can't open {} for reading: {}", found.display(), e),
+                    line,
+                )
+            })?;
+            let code = crate::data_section::strip_perl_end_marker(&code);
+            let abs = found.canonicalize().unwrap_or(found);
+            let abs_s = abs.to_string_lossy().into_owned();
+            self.scope
+                .set_hash_element("INC", relpath, PerlValue::string(abs_s.clone()))?;
+            let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+            let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
+            let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+            r?;
+            self.invoke_require_hook("require__after", relpath, line)?;
+            return Ok(PerlValue::integer(1));
+        }
 
         // Check virtual modules first (AOT bundles).
         if let Some(code) = self.virtual_modules.get(relpath).cloned() {
