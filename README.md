@@ -3171,7 +3171,7 @@ All documentation is served via GitHub Pages at [`menketechnologies.github.io/st
 |----------|-------------|
 | [`Docs Home`](https://menketechnologies.github.io/strykelang/) | Stryke reference — quickstart, builtins, parallel primitives, pipe-forward syntax, reflection hashes |
 | [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html) | Complete language reference — every builtin, operator, special variable, and regex feature |
-| [`Coverage Report`](https://menketechnologies.github.io/strykelang/report.html) | Engineering report — zshrs C-to-Rust port (55,236 C lines → 47,954 Rust), compsys (19,822 lines), strykelang (166,139 lines), full function mapping for all 859 C functions across 14 source files, 145 shell builtins, 20 loadable modules, ZLE line editor, and workspace grand total (270,403 lines, 2,936 tests) |
+| [`Engineering Report`](https://menketechnologies.github.io/strykelang/report.html) | strykelang internals — 198,178 Rust lines across 182 files, 3,737 callable builtins (207 Perl 5 core + 3,022 stryke extensions), 338 VM opcodes, 330 AST variants, Cranelift JIT, rayon-backed parallel runtime, 4,796 tests, 20,056 perl-parity cases |
 
 ---
 
