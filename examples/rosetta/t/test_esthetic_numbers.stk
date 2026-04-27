@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Esthetic numbers — adjacent digits differ by exactly 1 (in given base).
+
+fn Rosetta::Esthetic::is_esthetic($n, $base) {
+    return 1 if $n < $base
+    my $x = $n
+    my $prev = $x % $base
+    $x = int($x / $base)
+    while ($x > 0) {
+        my $d = $x % $base
+        my $diff = $d - $prev
+        $diff = -$diff if $diff < 0
+        return 0 if $diff != 1
+        $prev = $d
+        $x = int($x / $base)
+    }
+    1
+}
+
+fn Rosetta::Esthetic::list($lo, $hi, $base) {
+    $lo:$hi |> grep { Rosetta::Esthetic::is_esthetic($_, $base) }
+}
+
+# Base 10 esthetic numbers, OEIS A033075: 1,2,3,4,5,6,7,8,9,10,12,21,23,32,34,...
+my @under_50 = Rosetta::Esthetic::list(1, 50, 10)
+assert_eq join(",", @under_50),
+    "1,2,3,4,5,6,7,8,9,10,12,21,23,32,34,43,45",
+    "esthetic base 10 up to 50"
+
+# Base 2 esthetics are alternating-bit numbers: 1, 10, 101, 1010, 10101, ...
+my @b2 = Rosetta::Esthetic::list(1, 25, 2)
+assert_eq join(",", @b2), "1,2,5,10,21", "base-2 esthetic numbers up to 25"
+
+# Base 16 esthetic: smallest two-digit ones are 0x01, 0x10, 0x12, 0x21, ..., 0x9A, 0xA9, ...
+assert_ok  Rosetta::Esthetic::is_esthetic(0x12, 16), "0x12 esthetic base 16"
+assert_ok  Rosetta::Esthetic::is_esthetic(0x9A, 16), "0x9A esthetic base 16"
+assert_ok !Rosetta::Esthetic::is_esthetic(0x13, 16), "0x13 NOT esthetic base 16"
+
+# Sanity tests for the predicate
+assert_ok  Rosetta::Esthetic::is_esthetic(7, 10), "single-digit 7 is esthetic"
+assert_ok !Rosetta::Esthetic::is_esthetic(11, 10), "11 not esthetic (diff 0)"
+assert_ok !Rosetta::Esthetic::is_esthetic(135, 10), "135 not esthetic"
+
+test_run

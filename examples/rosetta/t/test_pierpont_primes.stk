@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pierpont primes — primes of form 2^u * 3^v + 1
+
+fn Rosetta::Pierpont::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Pierpont::generate($count) {
+    my @candidates
+    my $two = 1
+    while ($two <= 100000) {
+        my $three = 1
+        while ($two * $three <= 100000) {
+            push @candidates, $two * $three + 1
+            $three *= 3
+        }
+        $two *= 2
+    }
+    my @primes = sort { $a <=> $b } grep { Rosetta::Pierpont::is_prime($_) } @candidates
+    my @uniq
+    my $last = -1
+    for my $p (@primes) {
+        if ($p != $last) {
+            push @uniq, $p
+            $last = $p
+        }
+    }
+    [@uniq[0..$count-1]]
+}
+
+my $first10 = Rosetta::Pierpont::generate(10)
+assert_eq join(",", @$first10), "2,3,5,7,13,17,19,37,73,97", "first 10 Pierpont (1st kind) primes"
+
+assert_ok Rosetta::Pierpont::is_prime(97), "97 is prime"
+assert_ok !Rosetta::Pierpont::is_prime(91), "91 = 7*13 not prime"
+
+test_run

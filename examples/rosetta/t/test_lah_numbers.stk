@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lah numbers — unsigned L(n,k) = C(n-1,k-1) * n! / k!
+# (number of ways to partition n objects into k ordered nonempty subsets).
+
+fn Rosetta::Lah::factorial($n) {
+    my $r = 1
+    for my $i (2..$n) { $r *= $i }
+    $r
+}
+
+fn Rosetta::Lah::value($n, $k) {
+    return 1 if $n == 0 && $k == 0
+    return 0 if $n == 0 || $k == 0
+    return 0 if $k > $n
+    return Rosetta::Lah::factorial($n) if $k == 1
+    return 1 if $n == $k
+    # L(n,k) = (n!/k!) * C(n-1,k-1)
+    my $a = Rosetta::Lah::factorial($n)
+    my $b = Rosetta::Lah::factorial($k)
+    my $num = $a
+    my $denom = $b
+    # C(n-1,k-1) = (n-1)! / ((k-1)! * (n-k)!)
+    $num   *= Rosetta::Lah::factorial($n - 1)
+    $denom *= Rosetta::Lah::factorial($k - 1) * Rosetta::Lah::factorial($n - $k)
+    return int($num / $denom)
+}
+
+# Row 0: 1
+assert_eq Rosetta::Lah::value(0, 0), 1, "L(0,0)"
+
+# Row 1: 1
+assert_eq Rosetta::Lah::value(1, 1), 1, "L(1,1)"
+
+# L(n,1) = n!
+assert_eq Rosetta::Lah::value(5, 1), 120, "L(5,1) = 120"
+assert_eq Rosetta::Lah::value(7, 1), 5040, "L(7,1) = 5040"
+
+# L(n,n) = 1
+assert_eq Rosetta::Lah::value(6, 6), 1, "L(6,6)"
+
+# Specific row: L(4,k) for k=1..4 is 24, 36, 12, 1
+assert_eq Rosetta::Lah::value(4, 1), 24, "L(4,1)"
+assert_eq Rosetta::Lah::value(4, 2), 36, "L(4,2)"
+assert_eq Rosetta::Lah::value(4, 3), 12, "L(4,3)"
+assert_eq Rosetta::Lah::value(4, 4), 1,  "L(4,4)"
+
+# Row sums: A000262 - 1,1,3,13,73,501
+my @row_sums
+for my $n (0..5) {
+    my $sum = 0
+    if ($n == 0) {
+        $sum = 1
+    } else {
+        for my $k (1..$n) {
+            my $v = Rosetta::Lah::value($n, $k)
+            $sum += $v
+        }
+    }
+    push @row_sums, $sum
+}
+assert_eq join(",", @row_sums), "1,1,3,13,73,501", "Lah row sums"
+
+test_run

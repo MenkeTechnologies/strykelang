@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum to 100 — between digits 1..9 insert +, -, or join, count expressions == 100
+
+fn Rosetta::SumTo100::eval_ops($ops) {
+    my $sum = 0
+    my $cur = 1
+    my $sign = 1
+    for my $i (0..7) {
+        my $op = $ops->[$i]
+        my $d = $i + 2
+        if ($op == 0) {                      # join: 10*cur + d
+            $cur = $cur * 10 + $d
+        } else {                             # add or subtract
+            $sum += $sign * $cur
+            $cur = $d
+            $sign = ($op == 1) ? 1 : -1
+        }
+    }
+    $sum + $sign * $cur
+}
+
+fn Rosetta::SumTo100::count($target) {
+    my $count = 0
+    # 8 operator slots between 1..9, each one of {join, +, -}
+    # Iterate 3^8 = 6561 combinations
+    for my $mask (0..6560) {
+        my @ops
+        my $m = $mask
+        for my $i (0..7) {
+            push @ops, $m % 3
+            $m = int($m / 3)
+        }
+        if (Rosetta::SumTo100::eval_ops(\@ops) == $target) {
+            $count += 1
+        }
+    }
+    $count
+}
+
+# 11 distinct expressions hit 100 (Rosetta canonical answer)
+assert_eq Rosetta::SumTo100::count(100), 11, "11 ways to hit 100"
+
+# Reasonableness: -36 has many; 0 has many; trivial join 123456789 hits target with +0=
+assert_eq Rosetta::SumTo100::count(123456789), 1, "only one trivial join expression"
+
+test_run

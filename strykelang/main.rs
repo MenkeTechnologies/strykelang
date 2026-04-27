@@ -406,7 +406,7 @@ fn print_cyberpunk_help() {
         "  --compat               {G}//{N} Perl 5 strict-compat: disable all stryke extensions"
     );
     println!(
-        "  --no-interop           {G}//{N} Reject Perl-isms (sub/say/reverse), force idiomatic stryke"
+        "  --no-interop           {G}//{N} Reject Perl-isms (sub/say/reverse, $a/$b), force idiomatic stryke ($_0/$_1)"
     );
     println!("  -d[t][:MOD]            {G}//{N} Run program under debugger or module Devel::MOD");
     println!("  -D[number/letters]     {G}//{N} Set debugging flags");
@@ -458,7 +458,30 @@ fn print_cyberpunk_help() {
     println!(
         "  bench [FILE|DIR]       {G}//{N} Run benchmarks from bench/ or benches/ (stryke bench)"
     );
-    println!("  init [NAME]            {G}//{N} Scaffold a new project (stryke init myapp)");
+    println!(
+        "  init [NAME]            {G}//{N} Scaffold project in cwd (stryke.toml + lib/, t/, benches/)"
+    );
+    println!(
+        "  new NAME               {G}//{N} Scaffold a new project at ./NAME/ (same layout as init)"
+    );
+    println!(
+        "  install [--offline]    {G}//{N} Resolve manifest deps, populate stryke.lock + ~/.stryke/store"
+    );
+    println!(
+        "  add NAME[@VER] [...]   {G}//{N} Add a dep to stryke.toml; flags: --dev --group=N --path=DIR --features=A,B"
+    );
+    println!(
+        "  remove NAME            {G}//{N} Drop a dep from stryke.toml; reruns install"
+    );
+    println!(
+        "  tree                   {G}//{N} Print resolved dep graph from stryke.lock"
+    );
+    println!(
+        "  info NAME              {G}//{N} Show lockfile entry + store path for a dep"
+    );
+    println!(
+        "  pkg <subcommand>       {G}//{N} Dispatcher for the package commands above (init/new/install/add/remove/tree/info)"
+    );
     println!(
         "  repl [--load FILE]     {G}//{N} Interactive REPL with optional pre-load (stryke repl)"
     );

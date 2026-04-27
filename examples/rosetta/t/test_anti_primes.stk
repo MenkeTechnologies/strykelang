@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anti-primes (highly composite numbers)
+
+fn Rosetta::AntiPrimes::divisor_count($n) {
+    my $count = 0
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $count += ($i * $i == $n) ? 1 : 2
+        }
+        $i += 1
+    }
+    $count
+}
+
+fn Rosetta::AntiPrimes::list($limit) {
+    my @res
+    my $max_d = 0
+    for my $n (1..$limit) {
+        my $d = Rosetta::AntiPrimes::divisor_count($n)
+        if ($d > $max_d) {
+            push @res, $n
+            $max_d = $d
+        }
+    }
+    \@res
+}
+
+assert_eq Rosetta::AntiPrimes::divisor_count(12), 6, "12 has 6 divisors"
+assert_eq Rosetta::AntiPrimes::divisor_count(60), 12, "60 has 12 divisors"
+
+my $first10 = Rosetta::AntiPrimes::list(120)
+assert_eq join(",", @$first10), "1,2,4,6,12,24,36,48,60,120", "first 10 anti-primes"
+
+test_run

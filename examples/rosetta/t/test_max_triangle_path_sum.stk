@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Maximum triangle path sum (bottom-up DP)
+# Each step from row i to row i+1 must move to an adjacent number.
+
+fn Rosetta::TrianglePath::max_sum($triangle) {
+    my @rows = map { [@$_] } @$triangle
+    my $n = scalar(@rows)
+    for (my $i = $n - 2; $i >= 0; $i -= 1) {
+        my $rlen = scalar(@{$rows[$i]})
+        for my $j (0..$rlen-1) {
+            my $a = $rows[$i+1][$j]
+            my $b = $rows[$i+1][$j+1]
+            my $best = $a > $b ? $a : $b
+            $rows[$i][$j] += $best
+        }
+    }
+    $rows[0][0]
+}
+
+my $small = [
+    [3],
+    [7, 4],
+    [2, 4, 6],
+    [8, 5, 9, 3]
+]
+# Best path: 3 -> 7 -> 4 -> 9 = 23
+assert_eq Rosetta::TrianglePath::max_sum($small), 23, "small triangle"
+
+my $rosetta_demo = [
+    [55],
+    [94, 48],
+    [95, 30, 96],
+    [77, 71, 26, 67]
+]
+# Best path: 55 -> 94 -> 95 -> 77 = 321
+assert_eq Rosetta::TrianglePath::max_sum($rosetta_demo), 321, "rosetta sample"
+
+my $single = [[42]]
+assert_eq Rosetta::TrianglePath::max_sum($single), 42, "single element"
+
+my $two_rows = [[1], [2, 3]]
+assert_eq Rosetta::TrianglePath::max_sum($two_rows), 4, "two rows: 1+3"
+
+test_run

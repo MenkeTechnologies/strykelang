@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Topswops — given a permutation of 1..n, repeatedly reverse the
+# prefix of length perm[0]; count steps until perm[0] == 1. Find max over perms.
+
+fn Rosetta::Topswops::flip($perm) {
+    my $k = $perm->[0]
+    return 0 if $k == 1
+    my $count = 0
+    my @p = @$perm
+    while ($p[0] != 1) {
+        my $first = $p[0]
+        my @rev = rev @p[0..$first-1]
+        for my $i (0..$first-1) { $p[$i] = $rev[$i] }
+        $count += 1
+    }
+    $count
+}
+
+fn Rosetta::Topswops::permutations($arr) {
+    my $n = scalar(@$arr)
+    return [[@$arr]] if $n <= 1
+    my @result
+    for my $i (0..$n-1) {
+        my @rest
+        for my $j (0..$n-1) {
+            push @rest, $arr->[$j] if $j != $i
+        }
+        my $sub = Rosetta::Topswops::permutations(\@rest)
+        for my $p (@$sub) {
+            push @result, [$arr->[$i], @$p]
+        }
+    }
+    \@result
+}
+
+fn Rosetta::Topswops::max_swaps($n) {
+    my @initial = (1..$n)
+    my $perms = Rosetta::Topswops::permutations(\@initial)
+    my $max = 0
+    for my $p (@$perms) {
+        my $c = Rosetta::Topswops::flip($p)
+        $max = $c if $c > $max
+    }
+    $max
+}
+
+# OEIS A000375: 0, 1, 2, 4, 7, 10, 16, 22, 30, 38, 51, ...
+assert_eq Rosetta::Topswops::max_swaps(1), 0,  "topswops(1) = 0"
+assert_eq Rosetta::Topswops::max_swaps(2), 1,  "topswops(2) = 1"
+assert_eq Rosetta::Topswops::max_swaps(3), 2,  "topswops(3) = 2"
+assert_eq Rosetta::Topswops::max_swaps(4), 4,  "topswops(4) = 4"
+assert_eq Rosetta::Topswops::max_swaps(5), 7,  "topswops(5) = 7"
+assert_eq Rosetta::Topswops::max_swaps(6), 10, "topswops(6) = 10"
+assert_eq Rosetta::Topswops::max_swaps(7), 16, "topswops(7) = 16"
+
+# Specific permutation flip counts
+assert_eq Rosetta::Topswops::flip([4, 3, 2, 1]), 1, "[4,3,2,1] -> reverse all -> done"
+assert_eq Rosetta::Topswops::flip([1, 2, 3, 4]), 0, "[1,...] is fixed"
+assert_eq Rosetta::Topswops::flip([2, 4, 1, 3]), 4, "[2,4,1,3] takes 4 flips"
+assert_eq Rosetta::Topswops::flip([3, 1, 2]), 2, "[3,1,2] -> [2,1,3] -> [1,2,3]"
+
+test_run

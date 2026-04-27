@@ -14137,6 +14137,22 @@ impl Parser {
         base
     }
 
+    /// Reject `$a` / `$b` references in `--no-interop` mode (lexer catches them
+    /// outside double-quoted strings; this catches the in-string interpolation
+    /// path which has its own parser bypassing `Token::ScalarVar`).
+    fn no_interop_check_scalar_var_name(&self, name: &str, line: usize) -> PerlResult<()> {
+        if crate::no_interop_mode() && (name == "a" || name == "b") {
+            return Err(self.syntax_err(
+                format!(
+                    "stryke uses `$_0` / `$_1` instead of `${}` (--no-interop is active)",
+                    name
+                ),
+                line,
+            ));
+        }
+        Ok(())
+    }
+
     fn parse_interpolated_string(&self, s: &str, line: usize) -> PerlResult<Expr> {
         // Parse $var and @var inside double-quoted strings
         let mut parts = Vec::new();
@@ -14186,6 +14202,7 @@ impl Parser {
                             i += 1;
                         }
                     }
+                    self.no_interop_check_scalar_var_name(&sname, line)?;
                     parts.push(StringPart::ScalarVar(sname));
                     continue;
                 }
@@ -14265,6 +14282,7 @@ impl Parser {
                         }
                     } else {
                         // Treat as a plain (possibly qualified) variable name.
+                        self.no_interop_check_scalar_var_name(&inner, line)?;
                         Expr {
                             kind: ExprKind::ScalarVar(inner),
                             line,
@@ -14355,6 +14373,7 @@ impl Parser {
                             line,
                         }));
                     } else {
+                        self.no_interop_check_scalar_var_name(&name, line)?;
                         parts.push(StringPart::ScalarVar(name));
                     }
                 } else if chars[i].is_alphabetic() || chars[i] == '_' {
@@ -14370,6 +14389,11 @@ impl Parser {
                             i += 1;
                         }
                     }
+                    // `--no-interop`: `$a` / `$b` are Perl-isms; reject inside
+                    // string interpolation too. Catches both `"$a"` and `"$a[0]"`
+                    // / `"$a{k}"` / `"$a->[0]"` because every branch below uses
+                    // `name` to build the expression.
+                    self.no_interop_check_scalar_var_name(&name, line)?;
                     // Build the base expression, then thread arrow-deref chains
                     // (`->[…]` / `->{…}`) onto it so things like `$ar->[2]`,
                     // `$href->{k}`, and chained `$x->{a}[1]->{b}` interpolate
@@ -14534,6 +14558,7 @@ impl Parser {
                             if matches!(base.kind, ExprKind::ScalarVar(_)) {
                                 // No chain extension — use the simpler ScalarVar part
                                 if let ExprKind::ScalarVar(name) = base.kind {
+                                    self.no_interop_check_scalar_var_name(&name, line)?;
                                     parts.push(StringPart::ScalarVar(name));
                                 }
                             } else {

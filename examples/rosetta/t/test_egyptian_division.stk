@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Egyptian division — divide using only doubling and halving (mediation/duplation).
+
+fn Rosetta::EgyptianDiv::divide($dividend, $divisor) {
+    return [0, $dividend] if $divisor == 0
+    my @powers
+    my @doublings
+    my $p = 1
+    my $d = $divisor
+    while ($d <= $dividend) {
+        push @powers, $p
+        push @doublings, $d
+        $p *= 2
+        $d *= 2
+    }
+    my $answer    = 0
+    my $remainder = $dividend
+    for (my $i = scalar(@powers) - 1; $i >= 0; $i -= 1) {
+        if ($doublings[$i] <= $remainder) {
+            $answer    += $powers[$i]
+            $remainder -= $doublings[$i]
+        }
+    }
+    [$answer, $remainder]
+}
+
+# Spot checks against ordinary integer division
+for my $pair ([580, 34], [123, 7], [1000, 1], [42, 6], [100, 13], [987654, 321]) {
+    my $a = $pair->[0]
+    my $b = $pair->[1]
+    my $r = Rosetta::EgyptianDiv::divide($a, $b)
+    my $q_expected = int($a / $b)
+    my $r_expected = $a - $q_expected * $b
+    assert_eq $r->[0], $q_expected, "$a / $b = $q_expected (Egyptian)"
+    assert_eq $r->[1], $r_expected, "$a mod $b = $r_expected (Egyptian)"
+}
+
+# Identity: always q*b + r == a
+for my $pair ([0, 5], [5, 5], [4, 5], [1234, 567]) {
+    my $a = $pair->[0]
+    my $b = $pair->[1]
+    my $r = Rosetta::EgyptianDiv::divide($a, $b)
+    my $sum = $r->[0] * $b + $r->[1]
+    assert_eq $sum, $a, "q*b+r reconstructs $a from $b"
+}
+
+test_run

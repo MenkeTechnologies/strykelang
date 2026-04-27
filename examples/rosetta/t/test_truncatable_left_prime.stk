@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find the largest left-truncatable prime in a given base.
+
+fn Rosetta::LargestLeftTrunc::is_prime_in_base($digits, $base) {
+    my $n = 0
+    for my $d (@$digits) { $n = $n * $base + $d }
+    is_prime($n)
+}
+
+fn Rosetta::LargestLeftTrunc::find($base) {
+    my @prev
+    for my $d (1..$base-1) {
+        push @prev, [$d] if is_prime($d)
+    }
+    my $best = 0
+    while (scalar(@prev) > 0) {
+        my @next
+        for my $cand (@prev) {
+            my $val = 0
+            for my $d (@$cand) { $val = $val * $base + $d }
+            $best = $val if $val > $best
+            for my $d (1..$base-1) {
+                my @new = ($d, @$cand)
+                if (Rosetta::LargestLeftTrunc::is_prime_in_base(\@new, $base)) {
+                    push @next, \@new
+                }
+            }
+        }
+        @prev = @next
+    }
+    $best
+}
+
+# Largest left-truncatable prime in base 3 (no zeros) is 23 (base 3: "212")
+assert_eq Rosetta::LargestLeftTrunc::find(3), 23, "base 3 LTP = 23"
+
+# Base 4: 4091 (per Rosetta)
+assert_eq Rosetta::LargestLeftTrunc::find(4), 4091, "base 4 LTP = 4091"
+
+# Base 5: 7817
+assert_eq Rosetta::LargestLeftTrunc::find(5), 7817, "base 5 LTP = 7817"
+
+# Base 2: only digit is "1" and 1 isn't prime, so no LTP exists.
+assert_eq Rosetta::LargestLeftTrunc::find(2), 0, "base 2 has no LTP"
+
+# Higher bases (6, 7, ...) take noticeably longer; verify base 6 too.
+assert_eq Rosetta::LargestLeftTrunc::find(6), 4836525320399, "base 6 LTP"
+
+test_run

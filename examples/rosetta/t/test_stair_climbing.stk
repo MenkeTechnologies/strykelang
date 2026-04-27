@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stair-climbing puzzle — count ways to climb n stairs taking 1 or 2 at a time.
+# (This is the Fibonacci recurrence; we also generalise to k-step climbs.)
+
+fn Rosetta::StairClimb::ways($n) {
+    return 1 if $n <= 1
+    my $a = 1
+    my $b = 1
+    for my $i (2..$n) {
+        ($a, $b) = ($b, $a + $b)
+    }
+    $b
+}
+
+# Generalised: at each step you may take any number of stairs in @steps
+fn Rosetta::StairClimb::ways_with($n, $steps) {
+    my @dp
+    for my $i (0..$n) { $dp[$i] = 0 }
+    $dp[0] = 1
+    for my $i (1..$n) {
+        for my $s (@$steps) {
+            $dp[$i] += $dp[$i - $s] if $i - $s >= 0
+        }
+    }
+    $dp[$n]
+}
+
+assert_eq Rosetta::StairClimb::ways(0),  1, "0 stairs"
+assert_eq Rosetta::StairClimb::ways(1),  1, "1 stair"
+assert_eq Rosetta::StairClimb::ways(2),  2, "2 stairs (1+1, 2)"
+assert_eq Rosetta::StairClimb::ways(4),  5, "4 stairs"
+assert_eq Rosetta::StairClimb::ways(10), 89, "10 stairs"
+assert_eq Rosetta::StairClimb::ways(20), 10946, "20 stairs"
+
+# {1,2,3} matches the tribonacci numbers shifted
+assert_eq Rosetta::StairClimb::ways_with(4, [1, 2, 3]),  7,  "4 stairs with {1,2,3}"
+assert_eq Rosetta::StairClimb::ways_with(10, [1, 2, 3]), 274, "10 stairs with {1,2,3}"
+
+# Step-set {2,5}: ordered sequences (compositions), not partitions
+assert_eq Rosetta::StairClimb::ways_with(0, [2, 5]),  1, "trivial 0"
+assert_eq Rosetta::StairClimb::ways_with(7, [2, 5]),  2, "7: 2+5 and 5+2"
+assert_eq Rosetta::StairClimb::ways_with(9, [2, 5]),  3, "9: three ordered sequences"
+assert_eq Rosetta::StairClimb::ways_with(3, [2, 5]),  0, "no way to make 3 from {2,5}"
+
+test_run

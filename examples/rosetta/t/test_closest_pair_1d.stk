@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Closest pair (1D) — sort and scan adjacent differences in O(n log n)
+
+fn Rosetta::ClosestPair::find(@pts) {
+    my $n = scalar(@pts)
+    return undef if $n < 2
+    my @sorted = sort { $a <=> $b } @pts
+    my $best_d = abs($sorted[1] - $sorted[0])
+    my $best_a = $sorted[0]
+    my $best_b = $sorted[1]
+    for my $i (1..$n-2) {
+        my $d = abs($sorted[$i+1] - $sorted[$i])
+        if ($d < $best_d) {
+            $best_d = $d
+            $best_a = $sorted[$i]
+            $best_b = $sorted[$i+1]
+        }
+    }
+    [$best_a, $best_b, $best_d]
+}
+
+my $r = Rosetta::ClosestPair::find(1, 7, 3, 10, 4, 9)
+assert_eq $r->[2], 1, "closest pair distance 1 (3 and 4)"
+assert_eq $r->[0], 3, "closest pair lower"
+assert_eq $r->[1], 4, "closest pair upper"
+
+my $r2 = Rosetta::ClosestPair::find(0.5, 1.0, 3.5, 7.2, 7.21)
+my $delta = abs($r2->[2] - 0.01)
+assert_ok $delta < 0.0001, "floating-point closest pair"
+
+my $r3 = Rosetta::ClosestPair::find(-10, -3, 5, 100)
+assert_eq $r3->[2], 7, "spread distance 7"
+
+assert_eq Rosetta::ClosestPair::find(42), undef, "single point -> undef"
+
+test_run

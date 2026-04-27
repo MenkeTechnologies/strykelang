@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Integer partitions p(n) — number of ways n is sum of positive ints.
+# Also p(n,k): partitions of n into exactly k parts.
+
+fn Rosetta::Partition::count($n) {
+    return 1 if $n == 0
+    my @dp
+    for my $i (0..$n) { $dp[$i] = 0 }
+    $dp[0] = 1
+    for my $part (1..$n) {
+        for my $i ($part..$n) {
+            $dp[$i] += $dp[$i - $part]
+        }
+    }
+    $dp[$n]
+}
+
+# p(n,k): partitions of n into exactly k positive parts
+fn Rosetta::Partition::with_k($n, $k) {
+    return 1 if $n == 0 && $k == 0
+    return 0 if $n == 0 || $k == 0
+    my @dp
+    for my $i (0..$n) {
+        $dp[$i] = []
+        for my $j (0..$k) { $dp[$i][$j] = 0 }
+    }
+    $dp[0][0] = 1
+    for my $i (1..$n) {
+        for my $j (1..$k) {
+            # Either j-th part is 1 (and remove from total) -> dp[i-1][j-1]
+            # OR all parts >= 2 -> dp[i-j][j]
+            $dp[$i][$j] = $dp[$i-1][$j-1]
+            $dp[$i][$j] += $dp[$i-$j][$j] if $i - $j >= 0
+        }
+    }
+    return $dp[$n][$k]
+}
+
+# OEIS A000041: 1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, ...
+my @p
+for my $i (0..16) { push @p, Rosetta::Partition::count($i) }
+assert_eq join(",", @p), "1,1,2,3,5,7,11,15,22,30,42,56,77,101,135,176,231",
+    "p(0..16)"
+
+assert_eq Rosetta::Partition::count(50), 204226, "p(50) = 204226"
+assert_eq Rosetta::Partition::count(100), 190569292, "p(100)"
+
+# p(n,k) sample values
+assert_eq Rosetta::Partition::with_k(7, 3),  4, "p(7,3) = 4"
+assert_eq Rosetta::Partition::with_k(10, 3), 8, "p(10,3) = 8"
+assert_eq Rosetta::Partition::with_k(10, 4), 9, "p(10,4) = 9"
+assert_eq Rosetta::Partition::with_k(5, 5),  1, "p(5,5) = 1 (1+1+1+1+1)"
+assert_eq Rosetta::Partition::with_k(5, 1),  1, "p(5,1) = 1 (just 5)"
+
+# Sum_k p(n,k) over k=1..n equals p(n)
+my @ns = (1, 5, 10, 15)
+for my $n (@ns) {
+    my $sum = 0
+    for my $k (1..$n) {
+        my $v = Rosetta::Partition::with_k($n, $k)
+        $sum += $v
+    }
+    my $expected = Rosetta::Partition::count($n)
+    assert_eq $sum, $expected, "sum_k p($n,k) = p($n)"
+}
+
+test_run

@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Star numbers — S(n) = 6n(n-1) + 1
+
+fn Rosetta::StarNumbers::nth($n) {
+    6 * $n * ($n - 1) + 1
+}
+
+fn Rosetta::StarNumbers::list($count) {
+    1:$count |> map { Rosetta::StarNumbers::nth($_) }
+}
+
+assert_eq Rosetta::StarNumbers::nth(1), 1, "S(1) = 1"
+assert_eq Rosetta::StarNumbers::nth(2), 13, "S(2) = 13"
+assert_eq Rosetta::StarNumbers::nth(3), 37, "S(3) = 37"
+assert_eq Rosetta::StarNumbers::nth(10), 541, "S(10) = 541"
+
+my @first10 = Rosetta::StarNumbers::list(10)
+assert_eq join(",", @first10), "1,13,37,73,121,181,253,337,433,541", "first 10 star numbers"
+
+# S(n) - S(n-1) is always 12(n-1) -> star differences sequence
+my $diff = Rosetta::StarNumbers::nth(5) - Rosetta::StarNumbers::nth(4)
+assert_eq $diff, 48, "S(5) - S(4) = 12*4"
+
+test_run

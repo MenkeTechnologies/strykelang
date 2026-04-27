@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Curzon numbers — n such that 2n+1 divides k^n + 1
+
+fn Rosetta::Curzon::modpow($base, $exp, $mod) {
+    my $result = 1
+    my $b = $base % $mod
+    my $e = $exp
+    while ($e > 0) {
+        if ($e % 2 == 1) {
+            $result = ($result * $b) % $mod
+        }
+        $e = int($e / 2)
+        $b = ($b * $b) % $mod
+    }
+    $result
+}
+
+fn Rosetta::Curzon::is_curzon($n, $k) {
+    my $m = 2 * $n + 1
+    (Rosetta::Curzon::modpow($k, $n, $m) + 1) % $m == 0
+}
+
+fn Rosetta::Curzon::list($limit, $k) {
+    1:$limit |> grep { Rosetta::Curzon::is_curzon($_, $k) }
+}
+
+my @c2 = Rosetta::Curzon::list(60, 2)
+assert_eq join(",", @c2), "1,2,5,6,9,14,18,21,26,29,30,33,41,50,53,54", "Curzon base 2 up to 60"
+
+assert_ok Rosetta::Curzon::is_curzon(50, 2), "50 is base-2 Curzon"
+assert_ok !Rosetta::Curzon::is_curzon(7, 2), "7 is not base-2 Curzon"
+
+test_run

@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of multiples of 3 and 5 below n (Project Euler #1)
+
+fn Rosetta::SumMultiples::brute($n) {
+    1:$n-1 |> grep { $_ % 3 == 0 || $_ % 5 == 0 } |> sum()
+}
+
+# Closed form: sum(k=1..floor(n/d)) = d * k*(k+1)/2
+fn Rosetta::SumMultiples::triangle($a, $b) {
+    int($a * $b * ($b + 1) / 2)
+}
+
+fn Rosetta::SumMultiples::fast($n) {
+    my $m = $n - 1
+    my $a = Rosetta::SumMultiples::triangle(3, int($m / 3))
+    my $b = Rosetta::SumMultiples::triangle(5, int($m / 5))
+    my $c = Rosetta::SumMultiples::triangle(15, int($m / 15))
+    $a + $b - $c
+}
+
+assert_eq Rosetta::SumMultiples::brute(10), 23, "below 10: 3+5+6+9 = 23"
+assert_eq Rosetta::SumMultiples::brute(1000), 233168, "Project Euler #1 (brute)"
+
+assert_eq Rosetta::SumMultiples::fast(10), 23, "below 10 (fast)"
+assert_eq Rosetta::SumMultiples::fast(1000), 233168, "Project Euler #1 (fast)"
+assert_eq Rosetta::SumMultiples::fast(100000), 2333316668, "below 100000"
+
+# Brute and fast agree across a range of inputs
+for my $n (5, 16, 100, 999, 12345) {
+    assert_eq Rosetta::SumMultiples::brute($n),
+              Rosetta::SumMultiples::fast($n),
+              "brute == fast for $n"
+}
+
+test_run

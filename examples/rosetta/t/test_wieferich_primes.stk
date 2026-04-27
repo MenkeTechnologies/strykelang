@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wieferich primes — primes p such that p^2 divides 2^(p-1) - 1
+# Only two known under 6.7e15: 1093 and 3511.
+
+fn Rosetta::Wieferich::modpow($base, $exp, $mod) {
+    my $result = 1
+    my $b = $base % $mod
+    my $e = $exp
+    while ($e > 0) {
+        if ($e % 2 == 1) {
+            $result = ($result * $b) % $mod
+        }
+        $e = int($e / 2)
+        $b = ($b * $b) % $mod
+    }
+    $result
+}
+
+fn Rosetta::Wieferich::is_wieferich($p) {
+    return 0 unless is_prime($p)
+    my $sq = $p * $p
+    Rosetta::Wieferich::modpow(2, $p - 1, $sq) == 1
+}
+
+fn Rosetta::Wieferich::list($limit) {
+    2:$limit |> grep { Rosetta::Wieferich::is_wieferich($_) }
+}
+
+# Both known Wieferich primes < 5000
+my @found = Rosetta::Wieferich::list(5000)
+assert_eq join(",", @found), "1093,3511", "Wieferich primes under 5000"
+
+assert_ok  Rosetta::Wieferich::is_wieferich(1093), "1093 is Wieferich"
+assert_ok  Rosetta::Wieferich::is_wieferich(3511), "3511 is Wieferich"
+assert_ok !Rosetta::Wieferich::is_wieferich(5),    "5 is not Wieferich"
+assert_ok !Rosetta::Wieferich::is_wieferich(1009), "1009 (prime, not Wieferich)"
+assert_ok !Rosetta::Wieferich::is_wieferich(4),    "4 (not prime)"
+
+test_run

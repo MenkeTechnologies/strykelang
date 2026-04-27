@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polite numbers — count of ways to express n as sum of consecutive
+# positive integers; equals (number-of-odd-divisors) - 1.
+# A polite number is any positive integer with politeness > 0 (everything except powers of 2).
+
+fn Rosetta::PoliteNumbers::politeness($n) {
+    my $count = 0
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            if ($i % 2 == 1) { $count += 1 }
+            my $other = int($n / $i)
+            if ($other != $i && $other % 2 == 1) { $count += 1 }
+        }
+        $i += 1
+    }
+    $count - 1
+}
+
+fn Rosetta::PoliteNumbers::is_polite($n) {
+    Rosetta::PoliteNumbers::politeness($n) > 0
+}
+
+# OEIS A069283: politeness for n = 1..15
+my @want = (0, 0, 1, 0, 1, 1, 1, 0, 2, 1, 1, 1, 1, 1, 3)
+for my $i (0..14) {
+    assert_eq Rosetta::PoliteNumbers::politeness($i + 1), $want[$i],
+        "politeness($i + 1) = $want[$i]"
+}
+
+# Powers of two are the impolite numbers
+for my $k (0..6) {
+    my $p = 1
+    for my $j (1..$k) { $p *= 2 }
+    assert_ok !Rosetta::PoliteNumbers::is_polite($p), "$p is impolite (power of 2)"
+}
+
+# Everything else is polite
+for my $n (3, 5, 6, 7, 9, 10, 11, 12, 13, 15, 100, 99) {
+    assert_ok Rosetta::PoliteNumbers::is_polite($n), "$n is polite"
+}
+
+test_run

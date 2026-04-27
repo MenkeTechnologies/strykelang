@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Idoneal numbers (Euler's idoneal numbers)
+# n is idoneal iff every odd factorization n = a*b + c (with a >= b > 0, c > 0)
+# of n + r*s for r,s coprime expressing n in form a^2 + b^2 (etc.) — simplified test:
+# n is idoneal iff there are no positive integers a,b,c with n = a*b + a*c + b*c
+# and 0 < a < b < c.
+
+fn Rosetta::Idoneal::is_idoneal($n) {
+    # Try every triple a < b < c with a*b + a*c + b*c == n.
+    # If any exist, n is NOT idoneal.
+    for my $a (1..int($n / 3)) {
+        for my $b ($a + 1..int(($n - $a * $a) / (2 * $a + 1))) {
+            my $rem = $n - $a * $b
+            my $denom = $a + $b
+            next if $denom == 0 || $rem <= 0
+            next if $rem % $denom != 0
+            my $c = int($rem / $denom)
+            return 0 if $c > $b
+        }
+    }
+    1
+}
+
+fn Rosetta::Idoneal::list($limit) {
+    1:$limit |> grep { Rosetta::Idoneal::is_idoneal($_) }
+}
+
+# Euler's 65 known idoneal numbers begin: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13,
+# 15, 16, 18, 21, 22, 24, 25, 28, 30, 33, 37, 40, 42, 45, 48, 57, 58, 60, 70, ...
+my @first10 = Rosetta::Idoneal::list(10)
+assert_eq join(",", @first10), "1,2,3,4,5,6,7,8,9,10", "idoneal up to 10"
+
+my @first_30 = Rosetta::Idoneal::list(30)
+assert_eq join(",", @first_30),
+    "1,2,3,4,5,6,7,8,9,10,12,13,15,16,18,21,22,24,25,28,30",
+    "idoneal up to 30"
+
+assert_ok !Rosetta::Idoneal::is_idoneal(11), "11 is not idoneal (1+2+8=11)"
+assert_ok !Rosetta::Idoneal::is_idoneal(14), "14 is not idoneal"
+assert_ok Rosetta::Idoneal::is_idoneal(13), "13 is idoneal"
+
+test_run
