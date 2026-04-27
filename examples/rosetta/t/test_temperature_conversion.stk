@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Temperature conversion — Kelvin / Celsius / Fahrenheit / Rankine
+
+fn Rosetta::Temp::k_to_c($k) { $k - 273.15 }
+fn Rosetta::Temp::k_to_f($k) { $k * 9 / 5 - 459.67 }
+fn Rosetta::Temp::k_to_r($k) { $k * 9 / 5 }
+
+fn Rosetta::Temp::c_to_k($c) { $c + 273.15 }
+fn Rosetta::Temp::c_to_f($c) { $c * 9 / 5 + 32 }
+
+fn Rosetta::Temp::f_to_k($f) { ($f + 459.67) * 5 / 9 }
+fn Rosetta::Temp::f_to_c($f) { ($f - 32) * 5 / 9 }
+
+fn Rosetta::Temp::approx_eq($a, $b) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < 0.001
+}
+
+# Absolute zero
+assert_eq Rosetta::Temp::k_to_c(0), -273.15, "0 K = -273.15 C"
+assert_eq Rosetta::Temp::k_to_r(0), 0, "0 K = 0 R"
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::k_to_f(0), -459.67), "0 K = -459.67 F"
+
+# Water freezing
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::c_to_k(0), 273.15), "0 C = 273.15 K"
+assert_eq Rosetta::Temp::c_to_f(0), 32, "0 C = 32 F"
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::f_to_c(32), 0), "32 F = 0 C"
+
+# Water boiling
+assert_eq Rosetta::Temp::c_to_f(100), 212, "100 C = 212 F"
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::f_to_c(212), 100), "212 F = 100 C"
+
+# Body temperature
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::c_to_f(37), 98.6), "37 C ~ 98.6 F"
+
+# Round trip
+assert_ok Rosetta::Temp::approx_eq(Rosetta::Temp::k_to_c(Rosetta::Temp::c_to_k(25)), 25),
+    "round-trip C -> K -> C"
+
+test_run

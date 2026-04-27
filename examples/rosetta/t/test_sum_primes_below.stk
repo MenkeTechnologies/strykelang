@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of primes below N (Project Euler #10)
+
+fn Rosetta::SumPrimes::sum_below($n) {
+    return 0 if $n < 3
+    my @sieve
+    for my $i (0..$n-1) { $sieve[$i] = 1 }
+    $sieve[0] = 0; $sieve[1] = 0
+    my $i = 2
+    while ($i * $i < $n) {
+        if ($sieve[$i]) {
+            my $j = $i * $i
+            while ($j < $n) { $sieve[$j] = 0; $j += $i }
+        }
+        $i += 1
+    }
+    my $sum = 0
+    for my $k (2..$n-1) { $sum += $k if $sieve[$k] }
+    $sum
+}
+
+assert_eq Rosetta::SumPrimes::sum_below(2),       0,         "sum < 2"
+assert_eq Rosetta::SumPrimes::sum_below(3),       2,         "{2}"
+assert_eq Rosetta::SumPrimes::sum_below(10),      17,        "2+3+5+7"
+assert_eq Rosetta::SumPrimes::sum_below(100),     1060,      "primes < 100"
+assert_eq Rosetta::SumPrimes::sum_below(1000),    76127,     "primes < 1000"
+assert_eq Rosetta::SumPrimes::sum_below(2000000), 142913828922, "Project Euler #10"
+
+test_run

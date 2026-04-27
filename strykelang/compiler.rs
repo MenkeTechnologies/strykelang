@@ -6578,15 +6578,23 @@ impl Compiler {
                 DerefKind::Array => {
                     self.compile_arrow_array_base_expr(expr)?;
                     let mut used_arrow_slice = false;
-                    if let ExprKind::List(indices) = &index.kind {
+                    // `$r->[$i]` with a single plain-scalar subscript is element
+                    // access, not a slice — even when the parser wraps it in a
+                    // 1-element `List`. Returning a 1-element list here breaks
+                    // arithmetic (`$a + $b` numifies via length to `1+1=2`).
+                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                        let inner = match &index.kind {
+                            ExprKind::List(el) if el.len() == 1 => &el[0],
+                            _ => index.as_ref(),
+                        };
+                        self.compile_expr(inner)?;
+                        self.emit_op(Op::ArrowArray, line, Some(root));
+                    } else if let ExprKind::List(indices) = &index.kind {
                         for ix in indices {
                             self.compile_array_slice_index_expr(ix)?;
                         }
                         self.emit_op(Op::ArrowArraySlice(indices.len() as u16), line, Some(root));
                         used_arrow_slice = true;
-                    } else if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
-                        self.compile_expr(index)?;
-                        self.emit_op(Op::ArrowArray, line, Some(root));
                     } else {
                         // One subscript expr may expand to multiple indices (`$r->[0..1]`, `[(0,1)]`).
                         self.compile_array_slice_index_expr(index)?;

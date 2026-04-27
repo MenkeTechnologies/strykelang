@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Spelling of cardinal numbers (English short scale, 0..999_999_999)
+
+fn Rosetta::Cardinal::say($n) {
+    return "negative " . Rosetta::Cardinal::say(-$n) if $n < 0
+    return "zero" if $n == 0
+    Rosetta::Cardinal::trim(Rosetta::Cardinal::big($n))
+}
+
+fn Rosetta::Cardinal::trim($s) {
+    my $r = $s
+    $r =~ s/^\s+|\s+$//g
+    $r =~ s/\s+/ /g
+    $r
+}
+
+fn Rosetta::Cardinal::big($n) {
+    return "" if $n == 0
+    my $billion  = 1000000000
+    my $million  = 1000000
+    my $thousand = 1000
+    if ($n >= $billion) {
+        return Rosetta::Cardinal::big(int($n / $billion)) . " billion " . Rosetta::Cardinal::big($n % $billion)
+    }
+    if ($n >= $million) {
+        return Rosetta::Cardinal::big(int($n / $million)) . " million " . Rosetta::Cardinal::big($n % $million)
+    }
+    if ($n >= $thousand) {
+        return Rosetta::Cardinal::big(int($n / $thousand)) . " thousand " . Rosetta::Cardinal::big($n % $thousand)
+    }
+    Rosetta::Cardinal::under_thousand($n)
+}
+
+fn Rosetta::Cardinal::under_thousand($n) {
+    my @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                 "ten", "eleven", "twelve", "thirteen", "fourteen",
+                 "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
+    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    my $s = ""
+    my $x = $n
+    if ($x >= 100) {
+        $s .= $units[int($x / 100)] . " hundred"
+        $x %= 100
+        $s .= " and" if $x > 0
+    }
+    if ($x >= 20) {
+        $s .= " " . $tens[int($x / 10)]
+        $x %= 10
+        $s .= "-" . $units[$x] if $x > 0
+    } elsif ($x > 0) {
+        $s .= " " . $units[$x]
+    }
+    $s
+}
+
+assert_eq Rosetta::Cardinal::say(0),        "zero",        "0"
+assert_eq Rosetta::Cardinal::say(1),        "one",         "1"
+assert_eq Rosetta::Cardinal::say(7),        "seven",       "7"
+assert_eq Rosetta::Cardinal::say(13),       "thirteen",    "13"
+assert_eq Rosetta::Cardinal::say(20),       "twenty",      "20"
+assert_eq Rosetta::Cardinal::say(21),       "twenty-one",  "21"
+assert_eq Rosetta::Cardinal::say(99),       "ninety-nine", "99"
+assert_eq Rosetta::Cardinal::say(100),      "one hundred", "100"
+assert_eq Rosetta::Cardinal::say(123),      "one hundred and twenty-three", "123"
+assert_eq Rosetta::Cardinal::say(1000),     "one thousand", "1000"
+assert_eq Rosetta::Cardinal::say(1001),     "one thousand one", "1001"
+assert_eq Rosetta::Cardinal::say(1234),     "one thousand two hundred and thirty-four", "1234"
+assert_eq Rosetta::Cardinal::say(1000000),  "one million", "1M"
+assert_eq Rosetta::Cardinal::say(2718281828),
+    "two billion seven hundred and eighteen million two hundred and eighty-one thousand eight hundred and twenty-eight",
+    "≈e * 1e9"
+assert_eq Rosetta::Cardinal::say(-42), "negative forty-two", "negative"
+
+test_run

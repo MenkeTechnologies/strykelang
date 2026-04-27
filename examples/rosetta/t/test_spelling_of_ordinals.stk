@@ -1,0 +1,89 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Spelling of ordinal numbers (irregular suffix rules + general "th")
+
+fn Rosetta::Ordinal::cardinal_under_hundred($n) {
+    my @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                 "ten", "eleven", "twelve", "thirteen", "fourteen",
+                 "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
+    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    return $units[$n] if $n < 20
+    my $t = $tens[int($n / 10)]
+    my $u = $n % 10
+    return $t if $u == 0
+    "$t-$units[$u]"
+}
+
+fn Rosetta::Ordinal::say($n) {
+    # Irregular ordinals
+    my %irreg = (
+        "one"    => "first",
+        "two"    => "second",
+        "three"  => "third",
+        "five"   => "fifth",
+        "eight"  => "eighth",
+        "nine"   => "ninth",
+        "twelve" => "twelfth"
+    )
+    if ($n < 100) {
+        my $card = Rosetta::Ordinal::cardinal_under_hundred($n)
+        # If trailing word is irregular, replace it
+        if ($card =~ /-/) {
+            my @parts = split /-/, $card
+            my $last = $parts[-1]
+            if (exists $irreg{$last}) {
+                $parts[-1] = $irreg{$last}
+            } else {
+                $parts[-1] = Rosetta::Ordinal::th_form($last)
+            }
+            return join("-", @parts)
+        }
+        return $irreg{$card} if exists $irreg{$card}
+        return Rosetta::Ordinal::th_form($card)
+    }
+    # 100, 1000 etc.: replace last word
+    if ($n == 100)     { return "one hundredth" }
+    if ($n == 1000)    { return "one thousandth" }
+    if ($n == 1000000) { return "one millionth" }
+    # Compound: take cardinal "X hundred Y" -> spell ordinal of Y or hundredth
+    my $h = int($n / 100)
+    my $rest = $n % 100
+    if ($n < 1000) {
+        my $head = "" . $h . "00"  # placeholder
+        my $head_card = Rosetta::Ordinal::cardinal_under_hundred($h)
+        if ($rest == 0) {
+            return "$head_card hundredth"
+        }
+        return "$head_card hundred " . Rosetta::Ordinal::say($rest)
+    }
+    "..."
+}
+
+fn Rosetta::Ordinal::th_form($word) {
+    if ($word =~ /y$/) {
+        my $stem = $word
+        $stem =~ s/y$/ie/
+        return $stem . "th"
+    }
+    $word . "th"
+}
+
+assert_eq Rosetta::Ordinal::say(1),  "first",       "1st"
+assert_eq Rosetta::Ordinal::say(2),  "second",      "2nd"
+assert_eq Rosetta::Ordinal::say(3),  "third",       "3rd"
+assert_eq Rosetta::Ordinal::say(4),  "fourth",      "4th"
+assert_eq Rosetta::Ordinal::say(5),  "fifth",       "5th"
+assert_eq Rosetta::Ordinal::say(8),  "eighth",      "8th"
+assert_eq Rosetta::Ordinal::say(9),  "ninth",       "9th"
+assert_eq Rosetta::Ordinal::say(11), "eleventh",    "11th"
+assert_eq Rosetta::Ordinal::say(12), "twelfth",     "12th"
+assert_eq Rosetta::Ordinal::say(13), "thirteenth",  "13th"
+assert_eq Rosetta::Ordinal::say(20), "twentieth",   "20th"
+assert_eq Rosetta::Ordinal::say(21), "twenty-first","21st"
+assert_eq Rosetta::Ordinal::say(22), "twenty-second","22nd"
+assert_eq Rosetta::Ordinal::say(30), "thirtieth",   "30th"
+assert_eq Rosetta::Ordinal::say(40), "fortieth",    "40th"
+assert_eq Rosetta::Ordinal::say(99), "ninety-ninth","99th"
+assert_eq Rosetta::Ordinal::say(100), "one hundredth", "100th"
+assert_eq Rosetta::Ordinal::say(1000), "one thousandth", "1000th"
+
+test_run

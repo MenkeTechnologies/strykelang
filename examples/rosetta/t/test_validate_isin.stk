@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Validate International Securities Identification Number (ISIN)
+# Format: 2-letter country + 9 alphanumeric + 1 numeric check digit, length 12.
+# Algorithm: convert letters to digits (A=10, B=11, ..., Z=35), then Luhn-mod-10.
+
+fn Rosetta::ISIN::is_valid($isin) {
+    return 0 if length($isin) != 12
+    return 0 if $isin !~ /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/
+    my $digits = ""
+    my @cs = ~> $isin chars
+    for my $c (@cs) {
+        if ($c =~ /[A-Z]/) {
+            $digits .= ord($c) - ord("A") + 10
+        } else {
+            $digits .= $c
+        }
+    }
+    # Luhn check on digit string (right-to-left, every 2nd digit doubled)
+    my @ds = ~> $digits chars
+    my $sum = 0
+    my $n = scalar(@ds)
+    for my $i (0..$n-1) {
+        my $d = int($ds[$n - 1 - $i])
+        if ($i % 2 == 1) {
+            $d *= 2
+            $d -= 9 if $d > 9
+        }
+        $sum += $d
+    }
+    $sum % 10 == 0
+}
+
+# Valid samples (Rosetta canonical examples)
+assert_ok  Rosetta::ISIN::is_valid("US0378331005"), "Apple"
+assert_ok  Rosetta::ISIN::is_valid("AU0000XVGZA3"), "AU sample"
+assert_ok  Rosetta::ISIN::is_valid("AU0000VXGZA3"), "another AU"
+assert_ok  Rosetta::ISIN::is_valid("FR0000988040"), "FR sample"
+
+# Invalid: bad check digit
+assert_ok !Rosetta::ISIN::is_valid("US0378331006"), "Apple wrong check"
+
+# Invalid: bad length
+assert_ok !Rosetta::ISIN::is_valid("US037833100"),  "11 chars"
+assert_ok !Rosetta::ISIN::is_valid("US03783310050"), "13 chars"
+
+# Invalid: lowercase / non-allowed chars
+assert_ok !Rosetta::ISIN::is_valid("us0378331005"), "lowercase"
+assert_ok !Rosetta::ISIN::is_valid("US-378331005"), "dash"
+
+# Invalid: country code with digit
+assert_ok !Rosetta::ISIN::is_valid("U10378331005"), "country with digit"
+
+# Invalid: check digit position non-numeric
+assert_ok !Rosetta::ISIN::is_valid("US037833100A"), "alpha check digit"
+
+test_run

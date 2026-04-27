@@ -1,0 +1,114 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zhang-Suen thinning algorithm
+
+fn Rosetta::ZhangSuen::neighbors($img, $r, $c) {
+    my @ns = (
+        $img->[$r-1]->[$c],
+        $img->[$r-1]->[$c+1],
+        $img->[$r]->[$c+1],
+        $img->[$r+1]->[$c+1],
+        $img->[$r+1]->[$c],
+        $img->[$r+1]->[$c-1],
+        $img->[$r]->[$c-1],
+        $img->[$r-1]->[$c-1]
+    )
+    \@ns
+}
+
+fn Rosetta::ZhangSuen::transitions($ns) {
+    my $count = 0
+    for my $i (0..7) {
+        my $a = $ns->[$i]
+        my $b = $ns->[($i + 1) % 8]
+        $count += 1 if $a == 0 && $b == 1
+    }
+    $count
+}
+
+fn Rosetta::ZhangSuen::black_neighbors($ns) {
+    my $sum = 0
+    for my $v (@$ns) { $sum += $v }
+    $sum
+}
+
+fn Rosetta::ZhangSuen::thin($img) {
+    my @grid = map { [@$_] } @$img
+    my $rows = scalar(@grid)
+    my $cols = scalar(@{$grid[0]})
+    my $changed = 1
+    while ($changed) {
+        $changed = 0
+        # Step 1
+        my @to_zero
+        for my $r (1..$rows-2) {
+            for my $c (1..$cols-2) {
+                next if $grid[$r][$c] == 0
+                my $ns = Rosetta::ZhangSuen::neighbors(\@grid, $r, $c)
+                my $b = Rosetta::ZhangSuen::black_neighbors($ns)
+                next if $b < 2 || $b > 6
+                next if Rosetta::ZhangSuen::transitions($ns) != 1
+                next if $ns->[0] * $ns->[2] * $ns->[4] != 0
+                next if $ns->[2] * $ns->[4] * $ns->[6] != 0
+                push @to_zero, [$r, $c]
+            }
+        }
+        for my $p (@to_zero) {
+            $grid[$p->[0]][$p->[1]] = 0
+            $changed = 1
+        }
+        # Step 2
+        @to_zero = ()
+        for my $r (1..$rows-2) {
+            for my $c (1..$cols-2) {
+                next if $grid[$r][$c] == 0
+                my $ns = Rosetta::ZhangSuen::neighbors(\@grid, $r, $c)
+                my $b = Rosetta::ZhangSuen::black_neighbors($ns)
+                next if $b < 2 || $b > 6
+                next if Rosetta::ZhangSuen::transitions($ns) != 1
+                next if $ns->[0] * $ns->[2] * $ns->[6] != 0
+                next if $ns->[0] * $ns->[4] * $ns->[6] != 0
+                push @to_zero, [$r, $c]
+            }
+        }
+        for my $p (@to_zero) {
+            $grid[$p->[0]][$p->[1]] = 0
+            $changed = 1
+        }
+    }
+    \@grid
+}
+
+fn Rosetta::ZhangSuen::count_black($grid) {
+    my $count = 0
+    for my $row (@$grid) {
+        for my $v (@$row) { $count += 1 if $v == 1 }
+    }
+    $count
+}
+
+# Solid 5x5 block — thinning collapses it (typically to a small skeleton)
+my $block = []
+for my $r (0..6) {
+    my @row
+    for my $c (0..6) {
+        push @row, ($r >= 1 && $r <= 5 && $c >= 1 && $c <= 5) ? 1 : 0
+    }
+    push @$block, \@row
+}
+my $thinned = Rosetta::ZhangSuen::thin($block)
+my $before = Rosetta::ZhangSuen::count_black($block)
+my $after  = Rosetta::ZhangSuen::count_black($thinned)
+assert_eq $before, 25, "block has 25 ones"
+assert_ok $after < $before, "thinning reduced ones"
+assert_ok $after >= 1, "at least one pixel survives"
+
+# Linear 1xN strip stays single-pixel-thick: identical input/output
+my $strip = [
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0, 0]
+]
+my $thin_strip = Rosetta::ZhangSuen::thin($strip)
+assert_eq Rosetta::ZhangSuen::count_black($thin_strip), 5, "1-thick strip preserved"
+
+test_run

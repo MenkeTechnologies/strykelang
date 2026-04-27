@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bilinear interpolation — interpolate within a 4-point unit square.
+
+fn Rosetta::Bilinear::interp($q11, $q12, $q21, $q22, $x1, $x2, $y1, $y2, $x, $y) {
+    my $denom = ($x2 - $x1) * ($y2 - $y1)
+    my $a = $q11 * ($x2 - $x) * ($y2 - $y)
+    my $b = $q21 * ($x  - $x1) * ($y2 - $y)
+    my $c = $q12 * ($x2 - $x) * ($y  - $y1)
+    my $d = $q22 * ($x  - $x1) * ($y  - $y1)
+    ($a + $b + $c + $d) / $denom
+}
+
+# Identity at corners
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 0, 0), 10, "(0,0) -> q11"
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 1, 0), 30, "(1,0) -> q21"
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 0, 1), 20, "(0,1) -> q12"
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 1, 1), 40, "(1,1) -> q22"
+
+# Center is the average of all four
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 0.5, 0.5), 25, "center average"
+
+# Edge midpoint along x at y=0
+assert_eq Rosetta::Bilinear::interp(10, 20, 30, 40, 0, 1, 0, 1, 0.5, 0), 20, "x midpoint"
+
+# Linear in x at y boundary
+my $v = Rosetta::Bilinear::interp(0, 0, 100, 200, 0, 10, 0, 5, 5, 5)
+assert_eq $v, 100, "interpolation lin in x at y=5"
+
+test_run

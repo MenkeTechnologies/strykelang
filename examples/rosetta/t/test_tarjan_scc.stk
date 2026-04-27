@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tarjan's strongly connected components
+
+fn Rosetta::Tarjan::run($graph) {
+    my $state = {
+        index    => 0,
+        stack    => [],
+        on_stack => {},
+        idx      => {},
+        lowlink  => {},
+        sccs     => []
+    }
+    for my $node (sort keys %$graph) {
+        if (!exists $state->{idx}->{$node}) {
+            Rosetta::Tarjan::strongconnect($graph, $node, $state)
+        }
+    }
+    $state->{sccs}
+}
+
+fn Rosetta::Tarjan::strongconnect($graph, $v, $state) {
+    $state->{idx}->{$v}     = $state->{index}
+    $state->{lowlink}->{$v} = $state->{index}
+    $state->{index}        += 1
+    push @{$state->{stack}}, $v
+    $state->{on_stack}->{$v} = 1
+
+    my $neighbors = $graph->{$v}
+    if (defined $neighbors) {
+        for my $w (@$neighbors) {
+            if (!exists $state->{idx}->{$w}) {
+                Rosetta::Tarjan::strongconnect($graph, $w, $state)
+                my $a = $state->{lowlink}->{$v}
+                my $b = $state->{lowlink}->{$w}
+                $state->{lowlink}->{$v} = $a < $b ? $a : $b
+            } elsif ($state->{on_stack}->{$w}) {
+                my $a = $state->{lowlink}->{$v}
+                my $b = $state->{idx}->{$w}
+                $state->{lowlink}->{$v} = $a < $b ? $a : $b
+            }
+        }
+    }
+
+    if ($state->{lowlink}->{$v} == $state->{idx}->{$v}) {
+        my @scc
+        while (1) {
+            my $w = pop @{$state->{stack}}
+            $state->{on_stack}->{$w} = 0
+            push @scc, $w
+            last if $w eq $v
+        }
+        push @{$state->{sccs}}, [sort @scc]
+    }
+}
+
+# Wikipedia example
+my $g = {
+    "1" => ["2"],
+    "2" => ["3"],
+    "3" => ["1"],
+    "4" => ["2", "3", "5"],
+    "5" => ["4", "6"],
+    "6" => ["3", "7"],
+    "7" => ["6"],
+    "8" => ["5", "7", "8"]
+}
+
+my $sccs = Rosetta::Tarjan::run($g)
+my @sorted = sort { join(",", @$a) cmp join(",", @$b) } @$sccs
+my @flat = map { join(",", @$_) } @sorted
+assert_eq join("|", @flat), "1,2,3|4,5|6,7|8", "Wikipedia SCCs"
+
+# Single-node graph
+my $single = { "x" => [] }
+my $r1 = Rosetta::Tarjan::run($single)
+assert_eq scalar(@$r1), 1, "single node = 1 SCC"
+assert_eq $r1->[0]->[0], "x", "the node"
+
+# Disconnected pair: each its own SCC
+my $disc = { "a" => [], "b" => [] }
+my $r2 = Rosetta::Tarjan::run($disc)
+assert_eq scalar(@$r2), 2, "disconnected = 2 SCCs"
+
+# Cycle of 4: one SCC of 4
+my $cycle = { "a" => ["b"], "b" => ["c"], "c" => ["d"], "d" => ["a"] }
+my $r3 = Rosetta::Tarjan::run($cycle)
+assert_eq scalar(@$r3), 1, "cycle = 1 SCC"
+assert_eq scalar(@{$r3->[0]}), 4, "cycle SCC has 4 members"
+
+test_run
