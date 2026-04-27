@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix transposition (using zip and pipes)
+
+fn Rosetta::MatrixTranspose::solve($m) {
+    my $cols = scalar(@{$m->[0]})
+    ~> 0..$cols-1 map {
+        my $j = $_
+        [ ~> @$m map { $_->[$j] } ]
+    }
+}
+
+my @matrix = (
+    [1, 2, 3],
+    [4, 5, 6]
+)
+
+my @transposed = Rosetta::MatrixTranspose::solve(\@matrix)
+# [[1, 4], [2, 5], [3, 6]]
+
+assert_eq scalar(@transposed), 3, "transposed has 3 rows"
+assert_eq join(",", @{$transposed[0]}), "1,4", "row 0: 1,4"
+assert_eq join(",", @{$transposed[1]}), "2,5", "row 1: 2,5"
+assert_eq join(",", @{$transposed[2]}), "3,6", "row 2: 3,6"
+
+test_run

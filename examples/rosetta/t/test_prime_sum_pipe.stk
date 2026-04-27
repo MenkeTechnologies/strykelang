@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of primes (using pgrep and preduce with pipes)
+
+fn Rosetta::PrimeSum::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    for my $i (2:sqrt($n)) {
+        return 0 if $n % $i == 0
+    }
+    return 1
+}
+
+fn Rosetta::PrimeSum::solve($max) {
+    ~> 1:$max pgrep { Rosetta::PrimeSum::is_prime($_) } |> sum()
+}
+
+assert_eq Rosetta::PrimeSum::solve(10), 17, "sum of primes up to 10 (2,3,5,7)"
+assert_eq Rosetta::PrimeSum::solve(20), 77, "sum of primes up to 20"
+
+test_run

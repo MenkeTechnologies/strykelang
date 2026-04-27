@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String manipulation (using multiple pipes)
+
+fn Rosetta::StringManip::process($str) {
+    $str |> trim() |> uc() |> rev()
+}
+
+assert_eq Rosetta::StringManip::process("  hello world  "), "DLROW OLLEH", "trim, uc, reverse"
+
+fn Rosetta::StringManip::words_to_slug($str) {
+    $str |> lc() |> split(/\s+/) |> join("-")
+}
+
+assert_eq Rosetta::StringManip::words_to_slug("Hello World Stryke"), "hello-world-stryke", "words to slug"
+
+test_run

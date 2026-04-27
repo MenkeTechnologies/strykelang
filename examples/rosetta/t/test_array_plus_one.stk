@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Array plus one (using map and pipe)
+
+fn Rosetta::ArrayPlusOne::solve(@arr) {
+    ~> @arr map { $_ + 1 }
+}
+
+my @input = (1, 2, 3, 4, 5)
+my @output = Rosetta::ArrayPlusOne::solve(@input)
+
+assert_eq join(",", @output), "2,3,4,5,6", "array plus one"
+
+# Using pipeline operator directly
+my @output2 = (10, 20, 30) |> Rosetta::ArrayPlusOne::solve()
+assert_eq join(",", @output2), "11,21,31", "array plus one with |>"
+
+test_run
