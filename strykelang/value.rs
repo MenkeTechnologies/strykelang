@@ -541,7 +541,7 @@ pub(crate) enum HeapObject {
     ArrayRef(Arc<RwLock<Vec<PerlValue>>>),
     HashRef(Arc<RwLock<IndexMap<String, PerlValue>>>),
     ScalarRef(Arc<RwLock<PerlValue>>),
-    /// Closure-capture cell: same Arc<RwLock> sharing as ScalarRef but transparently unwrapped
+    /// Closure-capture cell: same `Arc<RwLock>` sharing as ScalarRef but transparently unwrapped
     /// by [`crate::scope::Scope::get_scalar_slot`] and [`crate::scope::Scope::get_scalar`].
     /// Created by [`crate::scope::Scope::capture`] to share lexical scalars between closures.
     CaptureCell(Arc<RwLock<PerlValue>>),

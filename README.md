@@ -24,9 +24,7 @@
 
 The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded — behind only Mike Pall's LuaJIT, and beating it on 3 of 8 benchmarks. The fastest on all mulithreaded benchmarks.  A Perl 5 compatible interpreter in Rust with native parallel primitives, NaN-boxed values, three-tier regex, bytecode VM + Cranelift JIT, streaming iterators, and rayon work-stealing across all cores. Faster than perl5, Python, Ruby, Julia, and Raku on every benchmark.
 
-### Strykelang is under heavy development and will soon replace zsh/fish/bash and all other login shells
-
-### [`Read the Docs`](https://menketechnologies.github.io/strykelang/) &middot; [`Coverage Report`](https://menketechnologies.github.io/strykelang/report.html) &middot; [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html)
+### [`Read the Docs`](https://menketechnologies.github.io/strykelang/) &middot; [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html)
 
 ---
 

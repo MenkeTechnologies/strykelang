@@ -57,7 +57,7 @@ fn perl_from_cache_const(c: CacheConst) -> PerlValue {
     }
 }
 
-/// Serde codec for serializing Vec<PerlValue> in bytecode Chunk.
+/// Serde codec for serializing `Vec<PerlValue>` in bytecode Chunk.
 pub mod constants_pool_codec {
     use super::*;
 
