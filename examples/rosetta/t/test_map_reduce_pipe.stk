@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parallel Map-Reduce (using pipes)
+
+fn Rosetta::PMapReduce::solve($max) {
+    (1..$max) |> pmap { $_ * $_ } |> sum()
+}
+
+# sum of squares 1..4 = 1+4+9+16 = 30
+assert_eq Rosetta::PMapReduce::solve(4), 30, "sum of squares to 4"
+assert_eq Rosetta::PMapReduce::solve(10), 385, "sum of squares to 10"
+
+test_run

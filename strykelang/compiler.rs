@@ -237,10 +237,7 @@ impl Compiler {
 
     /// Push the value of `expr` if present, or `Undef` (the omitted-endpoint sentinel
     /// used by [`Op::ArraySliceRange`] / [`Op::HashSliceRange`]) if `None`.
-    fn compile_optional_or_undef(
-        &mut self,
-        expr: Option<&Expr>,
-    ) -> Result<(), CompileError> {
+    fn compile_optional_or_undef(&mut self, expr: Option<&Expr>) -> Result<(), CompileError> {
         match expr {
             Some(e) => self.compile_expr(e),
             None => {

@@ -71,16 +71,14 @@ impl Lockfile {
 
     /// Parse from a string.
     pub fn from_str(s: &str) -> PkgResult<Lockfile> {
-        toml::from_str::<Lockfile>(s).map_err(|e| {
-            PkgError::Lockfile(format!("stryke.lock: {}", e.message()))
-        })
+        toml::from_str::<Lockfile>(s)
+            .map_err(|e| PkgError::Lockfile(format!("stryke.lock: {}", e.message())))
     }
 
     /// Parse from a file path.
     pub fn from_path(path: &Path) -> PkgResult<Lockfile> {
-        let s = std::fs::read_to_string(path).map_err(|e| {
-            PkgError::Io(format!("read {}: {}", path.display(), e))
-        })?;
+        let s = std::fs::read_to_string(path)
+            .map_err(|e| PkgError::Io(format!("read {}: {}", path.display(), e)))?;
         Lockfile::from_str(&s)
     }
 
@@ -88,9 +86,8 @@ impl Lockfile {
     /// output is bit-stable across resolver runs that produce equivalent graphs.
     pub fn to_toml_string(&mut self) -> PkgResult<String> {
         self.canonicalize();
-        let body = toml::to_string_pretty(&self).map_err(|e| {
-            PkgError::Lockfile(format!("serialize stryke.lock: {}", e))
-        })?;
+        let body = toml::to_string_pretty(&self)
+            .map_err(|e| PkgError::Lockfile(format!("serialize stryke.lock: {}", e)))?;
         Ok(format!("# Auto-generated. Do not edit.\n{}", body))
     }
 
@@ -155,11 +152,7 @@ pub fn integrity_for_directory(root: &Path) -> PkgResult<String> {
     Ok(format!("sha256-{:x}", hasher.finalize()))
 }
 
-fn walk_collect(
-    root: &Path,
-    cur: &Path,
-    out: &mut Vec<std::path::PathBuf>,
-) -> PkgResult<()> {
+fn walk_collect(root: &Path, cur: &Path, out: &mut Vec<std::path::PathBuf>) -> PkgResult<()> {
     for entry in std::fs::read_dir(cur)? {
         let entry = entry?;
         let path = entry.path();

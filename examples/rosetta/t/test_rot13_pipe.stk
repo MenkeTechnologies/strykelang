@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: ROT-13 (using pipes)
+
+fn Rosetta::ROT13::solve($text) {
+    ~> $text chars map {
+        my $o = ord($_)
+        if ($o >= 65 && $o <= 90) {
+            chr((($o - 65 + 13) % 26) + 65)
+        } elsif ($o >= 97 && $o <= 122) {
+            chr((($o - 97 + 13) % 26) + 97)
+        } else {
+            $_
+        }
+    } |> join("")
+}
+
+my $t1 = "Hello World!"
+my $e1 = Rosetta::ROT13::solve($t1)
+my $d1 = Rosetta::ROT13::solve($e1)
+
+assert_eq $e1, "Uryyb Jbeyq!", "encrypt Hello World!"
+assert_eq $d1, "Hello World!", "decrypt Uryyb Jbeyq!"
+
+my $t2 = "abcdefghijklmnopqrstuvwxyz"
+my $e2 = Rosetta::ROT13::solve($t2)
+assert_eq $e2, "nopqrstuvwxyzabcdefghijklm", "encrypt alphabet"
+
+test_run

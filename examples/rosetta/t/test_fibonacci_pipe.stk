@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fibonacci sequence (using pipes)
+
+fn Rosetta::Fibonacci::sequence($n) {
+    return (0) if $n == 0
+    return (0, 1) if $n == 1
+    
+    my @fibs = (0, 1)
+    # Use range and pfor/pmap to show we can, but iterative is better here.
+    # We'll use a standard loop to build the list, then pipe it.
+    for my $i (2:$n) {
+        push @fibs, $fibs[$i-1] + $fibs[$i-2]
+    }
+    @fibs
+}
+
+fn Rosetta::Fibonacci::nth($n) {
+    # Using the closed-form Binet's formula via pipeline for fun
+    my $phi = (1 + sqrt(5)) / 2
+    my $psi = (1 - sqrt(5)) / 2
+    $n |> { ($phi**$_ - $psi**$_) / sqrt(5) } |> round()
+}
+
+assert_eq join(",", Rosetta::Fibonacci::sequence(10)), "0,1,1,2,3,5,8,13,21,34,55", "fib sequence to 10"
+assert_eq Rosetta::Fibonacci::nth(10), 55, "10th fib number"
+
+test_run

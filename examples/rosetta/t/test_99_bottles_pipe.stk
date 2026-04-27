@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 99 bottles of beer (using pipes)
+
+fn Rosetta::NinetyNineBottles::verse($n) {
+    my $b1 = $n == 1 ? "1 bottle" : ($n == 0 ? "No more bottles" : "$n bottles")
+    my $b2 = ($n - 1) == 1 ? "1 bottle" : (($n - 1) == 0 ? "no more bottles" : ($n - 1) . " bottles")
+    my $action = $n == 0 ? "Go to the store and buy some more" : "Take one down and pass it around"
+    my $b3 = $n == 0 ? "99 bottles" : $b2
+    "$b1 of beer on the wall, $b1 of beer.\n$action, $b3 of beer on the wall."
+}
+
+fn Rosetta::NinetyNineBottles::solve() {
+    # Range 0 to 99, reverse it, map to verse, join with double newline
+    ~> 0:99 rev map { Rosetta::NinetyNineBottles::verse($_) } |> join("\n\n")
+}
+
+my $song = Rosetta::NinetyNineBottles::solve()
+my @verses = $song |> split("\n\n")
+
+assert_eq scalar(@verses), 100, "100 verses generated"
+assert_eq index($verses[0], "99 bottles of beer on the wall") >= 0, 1, "first verse starts with 99"
+assert_eq index($verses[99], "No more bottles of beer on the wall") >= 0, 1, "last verse starts with No more"
+
+test_run

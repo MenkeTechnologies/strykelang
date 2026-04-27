@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Self-referential sequence
+
+fn Rosetta::SelfReferential::next($n) {
+    # Count digits in $n and return string of "count digit" pairs sorted descending
+    my %counts
+    "$n" |> chars() |> map { $counts{$_}++ }
+    
+    ~> keys %counts sort map { $counts{$_} . $_ } |> join("")
+}
+
+fn Rosetta::SelfReferential::solve($start) {
+    my @seq = ($start)
+    my %seen = ($start => 0)
+    my $curr = $start
+    
+    while (1) {
+        $curr = Rosetta::SelfReferential::next($curr)
+        if (exists $seen{$curr}) {
+            push @seq, $curr
+            return \@seq
+        }
+        push @seq, $curr
+        $seen{$curr} = scalar(@seq) - 1
+    }
+}
+
+my $res = Rosetta::SelfReferential::solve(22)
+# 22 -> 22 (cycle)
+assert_eq join(",", @$res), "22,22", "sequence from 22"
+
+my $res2 = Rosetta::SelfReferential::solve(121)
+# 121 -> 2112 -> 2122 -> 3211 -> 131221 -> 232211 -> 134211 -> 14131221 -> ...
+# Just testing the first step
+assert_eq $res2->[1], "2112", "121 -> 2112"
+
+test_run

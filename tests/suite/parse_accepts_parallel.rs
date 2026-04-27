@@ -278,3 +278,19 @@ fn accepts_binmode_handle() {
 fn accepts_select_four_arg() {
     p("select RB, WB, EB, 0.5");
 }
+
+/// Regression: `pmap_on $cluster { BLOCK }` and `pflat_map_on $cluster { BLOCK }`
+/// must parse as thread-macro stages. Used to fall through to a generic
+/// `FuncCall { name: "pmap_on" }` and error at runtime with "Undefined subroutine".
+/// See parse_thread_macro main-body special-case.
+#[test]
+fn accepts_pmap_on_thread_stage() {
+    p("my @r = ~> (1,2,3) pmap_on $cluster { $_ * 2 }");
+    p("(1,2,3) |> pmap_on $cluster { $_ * 2 } |> p");
+}
+
+#[test]
+fn accepts_pflat_map_on_thread_stage() {
+    p("my @r = ~> (1,2,3) pflat_map_on $cluster { ($_, $_ * 2) }");
+    p("(1,2,3) |> pflat_map_on $cluster { ($_, $_ * 2) } |> p");
+}

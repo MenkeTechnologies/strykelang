@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Remove duplicate elements (using hash and pipes)
+
+fn Rosetta::RemoveDuplicates::solve(@arr) {
+    my %seen
+    ~> @arr grep { !$seen{$_}++ }
+}
+
+my @input = (1, 2, 3, 2, 3, 4, 5, 1, 6)
+my @unique = Rosetta::RemoveDuplicates::solve(@input)
+
+assert_eq join(",", @unique), "1,2,3,4,5,6", "remove duplicates"
+
+test_run

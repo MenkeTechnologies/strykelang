@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sorting (using psort and pipes)
+
+my @data = (5, 3, 8, 1, 9, 2, 7, 4, 6)
+
+# Sequential sort
+my @sorted = @data |> sort()
+assert_eq join(",", @sorted), "1,2,3,4,5,6,7,8,9", "sequential sort"
+
+# Parallel sort
+my @psorted = @data |> psort
+assert_eq join(",", @psorted), "1,2,3,4,5,6,7,8,9", "parallel sort"
+
+# Custom sort (descending)
+my @desc = @data |> sort { $b <=> $a }
+assert_eq join(",", @desc), "9,8,7,6,5,4,3,2,1", "descending sort"
+
+# Pipe sort into reverse
+my @rev = ~> @data sort rev
+assert_eq join(",", @rev), "9,8,7,6,5,4,3,2,1", "sort |> rev"
+
+test_run

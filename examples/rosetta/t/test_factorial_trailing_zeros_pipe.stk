@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Factorial trailing zeros (using pipes)
+
+fn Rosetta::FactorialZeros::solve($n) {
+    # Count factors of 5
+    my $zeros = 0
+    my $power = 5
+    while ($n >= $power) {
+        $zeros += int($n / $power)
+        $power *= 5
+    }
+    $zeros
+}
+
+# Pipeline approach using a sequence and reduce (more idiomatic stryke)
+fn Rosetta::FactorialZeros::solve_pipe($n) {
+    # Generate powers of 5 up to $n
+    my @powers
+    my $p = 5
+    while ($p <= $n) {
+        push @powers, $p
+        $p *= 5
+    }
+    
+    # Map each power to int($n / power) and sum
+    my $sum = ~> @powers map { int($n / $_) } |> sum()
+    $sum || 0
+}
+
+
+assert_eq Rosetta::FactorialZeros::solve(10), 2, "trailing zeros of 10! (solve)"
+assert_eq Rosetta::FactorialZeros::solve_pipe(10), 2, "trailing zeros of 10! (pipe)"
+
+assert_eq Rosetta::FactorialZeros::solve(100), 24, "trailing zeros of 100! (solve)"
+assert_eq Rosetta::FactorialZeros::solve_pipe(100), 24, "trailing zeros of 100! (pipe)"
+
+test_run

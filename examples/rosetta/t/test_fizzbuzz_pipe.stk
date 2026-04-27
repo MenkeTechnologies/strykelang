@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FizzBuzz (using pmap and pipes)
+
+fn Rosetta::FizzBuzz::compute($n) {
+    my $s = ""
+    $s .= "Fizz" if $n % 3 == 0
+    $s .= "Buzz" if $n % 5 == 0
+    $s || "$n"
+}
+
+fn Rosetta::FizzBuzz::solve($max) {
+    ~> 1:$max pmap { Rosetta::FizzBuzz::compute($_) }
+}
+
+my @res = Rosetta::FizzBuzz::solve(15)
+assert_eq $res[2], "Fizz", "3 is Fizz"
+assert_eq $res[4], "Buzz", "5 is Buzz"
+assert_eq $res[14], "FizzBuzz", "15 is FizzBuzz"
+assert_eq $res[0], "1", "1 is 1"
+
+test_run

@@ -250,9 +250,7 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
             s if s.starts_with("--group=") => {
                 kind = AddKind::Group(s["--group=".len()..].to_string())
             }
-            s if s.starts_with("--path=") => {
-                path_override = Some(s["--path=".len()..].to_string())
-            }
+            s if s.starts_with("--path=") => path_override = Some(s["--path=".len()..].to_string()),
             s if s.starts_with("--features=") => {
                 features = s["--features=".len()..]
                     .split(',')
@@ -649,10 +647,7 @@ pub fn load_project(root: &Path) -> PkgResult<(Manifest, Option<Lockfile>)> {
 ///    and `~/.stryke/store/foo@VERSION/lib/Bar.stk` exists.
 ///
 /// Returns `Ok(None)` if neither resolved (caller falls through to `@INC`).
-pub fn resolve_module(
-    root: &Path,
-    logical_name: &str,
-) -> PkgResult<Option<PathBuf>> {
+pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathBuf>> {
     let segments: Vec<&str> = logical_name.split("::").collect();
     if segments.is_empty() {
         return Ok(None);
@@ -746,8 +741,11 @@ mod tests {
     #[test]
     fn find_project_root_walks_up() {
         let root = tempdir("root");
-        std::fs::write(root.join(MANIFEST_FILE), "[package]\nname=\"x\"\nversion=\"0.1.0\"\n")
-            .unwrap();
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
         let nested = root.join("a/b/c");
         std::fs::create_dir_all(&nested).unwrap();
         let canonical_root = root.canonicalize().unwrap();
@@ -760,8 +758,11 @@ mod tests {
     #[test]
     fn resolve_module_local_lib_hit() {
         let root = tempdir("proj");
-        std::fs::write(root.join(MANIFEST_FILE), "[package]\nname=\"x\"\nversion=\"0.1.0\"\n")
-            .unwrap();
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
         std::fs::create_dir_all(root.join("lib/Foo")).unwrap();
         std::fs::write(root.join("lib/Foo/Bar.stk"), "# bar").unwrap();
         let r = resolve_module(&root, "Foo::Bar").unwrap().unwrap();
@@ -771,8 +772,11 @@ mod tests {
     #[test]
     fn resolve_module_falls_back_when_nothing_resolves() {
         let root = tempdir("proj");
-        std::fs::write(root.join(MANIFEST_FILE), "[package]\nname=\"x\"\nversion=\"0.1.0\"\n")
-            .unwrap();
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
         let r = resolve_module(&root, "Foo::Bar").unwrap();
         assert!(r.is_none());
     }

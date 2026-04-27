@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Egg dropping puzzle (using pipes)
+
+fn Rosetta::EggDropping::binomial($n, $k) {
+    return 0 if $k < 0 || $k > $n
+    return 1 if $k == 0 || $k == $n
+    $k = $n - $k if $k > $n / 2
+    
+    my $res = 1
+    for my $i (1:$k) {
+        $res = $res * ($n - $i + 1) / $i
+    }
+    $res
+}
+
+fn Rosetta::EggDropping::max_floors($drops, $eggs) {
+    # The max floors for d drops and e eggs is sum_{i=1..e} binom(d, i)
+    ~> 1:$eggs map { Rosetta::EggDropping::binomial($drops, $_) } |> sum()
+}
+
+assert_eq Rosetta::EggDropping::max_floors(6, 2), 21, "max floors for 6 drops, 2 eggs"
+assert_eq Rosetta::EggDropping::max_floors(14, 2), 105, "max floors for 14 drops, 2 eggs"
+
+test_run
