@@ -46,6 +46,7 @@ pub mod par_walk;
 pub mod parallel_trace;
 pub mod parser;
 pub mod pcache;
+pub mod pkg;
 pub mod pchannel;
 mod pending_destroy;
 pub mod perl_decode;

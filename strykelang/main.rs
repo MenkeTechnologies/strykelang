@@ -1196,9 +1196,40 @@ fn main() {
         process::exit(run_bench_subcommand(&args[0], &args[2..]));
     }
 
-    // `stryke init [NAME]` — scaffold a new stryke project.
+    // `stryke init [NAME]` — scaffold a new stryke project (with stryke.toml).
     if args.len() >= 2 && args[1] == "init" {
-        process::exit(run_init_subcommand(&args[2..]));
+        process::exit(stryke::pkg::commands::cmd_init(
+            args.get(2).map(|s| s.as_str()),
+        ));
+    }
+
+    // `stryke new NAME` — scaffold a new project at ./NAME/.
+    if args.len() >= 2 && args[1] == "new" {
+        if args.len() < 3 {
+            eprintln!("usage: stryke new NAME");
+            process::exit(1);
+        }
+        process::exit(stryke::pkg::commands::cmd_new(&args[2]));
+    }
+
+    // Package manager subcommands. See docs/PACKAGE_REGISTRY.md.
+    if args.len() >= 2 && args[1] == "add" {
+        process::exit(stryke::pkg::commands::cmd_add(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "remove" {
+        process::exit(stryke::pkg::commands::cmd_remove(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "install" {
+        process::exit(stryke::pkg::commands::cmd_install(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "tree" {
+        process::exit(stryke::pkg::commands::cmd_tree(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "info" {
+        process::exit(stryke::pkg::commands::cmd_info(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "pkg" {
+        process::exit(stryke::pkg::commands::dispatch(&args[2..]));
     }
 
     // `stryke repl [--load FILE]` — explicit REPL entry.
@@ -4160,121 +4191,6 @@ fn run_bench_subcommand(argv0: &str, args: &[String]) -> i32 {
 }
 
 /// `stryke init [NAME]` — scaffold a new stryke project.
-fn run_init_subcommand(args: &[String]) -> i32 {
-    if !args.is_empty() && (args[0] == "-h" || args[0] == "--help") {
-        println!("usage: stryke init [NAME]");
-        println!();
-        println!("Create a new stryke project directory with:");
-        println!("  NAME/main.stk      — entry point");
-        println!("  NAME/lib/          — library modules");
-        println!("  NAME/t/            — test directory");
-        println!("  NAME/bench/        — benchmark files");
-        println!("  NAME/.gitignore    — ignore build artifacts");
-        println!();
-        println!("If NAME is omitted, initializes the current directory.");
-        println!();
-        println!("Examples:");
-        println!("  stryke init myapp        # create myapp/ project");
-        println!("  stryke init              # init in current directory");
-        return 0;
-    }
-    let project_dir = if !args.is_empty() {
-        let dir = PathBuf::from(&args[0]);
-        if dir.exists() && !dir.is_dir() {
-            eprintln!(
-                "stryke init: {} already exists and is not a directory",
-                args[0]
-            );
-            return 1;
-        }
-        if let Err(e) = std::fs::create_dir_all(&dir) {
-            eprintln!("stryke init: {}: {}", args[0], e);
-            return 1;
-        }
-        dir
-    } else {
-        PathBuf::from(".")
-    };
-    let name = if !args.is_empty() {
-        args[0].clone()
-    } else {
-        std::env::current_dir()
-            .ok()
-            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
-            .unwrap_or_else(|| "stryke_project".to_string())
-    };
-    // Create main.stk
-    let main_path = project_dir.join("main.stk");
-    if !main_path.exists() {
-        let main_content = format!("#!/usr/bin/env stryke\n\np \"hello from {}!\"\n", name);
-        if let Err(e) = std::fs::write(&main_path, main_content) {
-            eprintln!("stryke init: {}: {}", main_path.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}", main_path.display());
-    }
-    // Create lib/ directory
-    let lib_dir = project_dir.join("lib");
-    if !lib_dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&lib_dir) {
-            eprintln!("stryke init: {}: {}", lib_dir.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}/", lib_dir.display());
-    }
-    // Create t/ directory
-    let test_dir = project_dir.join("t");
-    if !test_dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&test_dir) {
-            eprintln!("stryke init: {}: {}", test_dir.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}/", test_dir.display());
-    }
-    // Create bench/ directory
-    let bench_dir = project_dir.join("bench");
-    if !bench_dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&bench_dir) {
-            eprintln!("stryke init: {}: {}", bench_dir.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}/", bench_dir.display());
-    }
-    // Create a sample test
-    let test_path = test_dir.join("test_main.stk");
-    if !test_path.exists() {
-        let test_content =
-            "#!/usr/bin/env stryke\n\nuse Test\n\nok 1, \"it works\"\n\ndone_testing()\n";
-        if let Err(e) = std::fs::write(&test_path, test_content) {
-            eprintln!("stryke init: {}: {}", test_path.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}", test_path.display());
-    }
-    // Create .gitignore
-    let gi_path = project_dir.join(".gitignore");
-    if !gi_path.exists() {
-        let gi_content = "# stryke build artifacts\n/target/\n*.pec\n";
-        if let Err(e) = std::fs::write(&gi_path, gi_content) {
-            eprintln!("stryke init: {}: {}", gi_path.display(), e);
-            return 1;
-        }
-        eprintln!("  created {}", gi_path.display());
-    }
-    eprintln!(
-        "\x1b[32m✓ Initialized stryke project{}\x1b[0m",
-        if !args.is_empty() {
-            format!(" in {}/", name)
-        } else {
-            String::new()
-        }
-    );
-    eprintln!();
-    eprintln!("  stryke run           # run main.stk");
-    eprintln!("  stryke test          # run tests in t/");
-    eprintln!("  stryke build main.stk  # compile to standalone binary");
-    0
-}
 
 /// `stryke repl [--load FILE]` — explicit REPL entry with optional pre-load.
 fn run_repl_subcommand(args: &[String]) -> i32 {

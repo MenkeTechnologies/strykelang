@@ -37,7 +37,7 @@ clap = { version = "4", default-features = false, features = ["derive", "std", "
 crossbeam = "0.8"
 parking_lot = "0.12"
 dashmap = "6"
-indexmap = "2"
+indexmap = { version = "2", features = ["serde"] }
 thiserror = "2"
 itoa = "1"
 rand = "0.8"
