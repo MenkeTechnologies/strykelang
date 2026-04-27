@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stream merge — k-way merge of pre-sorted streams
+
+fn Rosetta::StreamMerge::two($a, $b) {
+    my @out
+    my $i = 0; my $j = 0
+    my $na = scalar(@$a); my $nb = scalar(@$b)
+    while ($i < $na && $j < $nb) {
+        if ($a->[$i] <= $b->[$j]) {
+            push @out, $a->[$i]; $i += 1
+        } else {
+            push @out, $b->[$j]; $j += 1
+        }
+    }
+    while ($i < $na) { push @out, $a->[$i]; $i += 1 }
+    while ($j < $nb) { push @out, $b->[$j]; $j += 1 }
+    \@out
+}
+
+fn Rosetta::StreamMerge::k_way($streams) {
+    my @result
+    my @cursors
+    for my $i (0..scalar(@$streams)-1) { $cursors[$i] = 0 }
+    while (1) {
+        my $best = -1
+        my $best_v
+        for my $i (0..scalar(@$streams)-1) {
+            my $cur = $cursors[$i]
+            next if $cur >= scalar(@{$streams->[$i]})
+            my $v = $streams->[$i]->[$cur]
+            if ($best == -1 || $v < $best_v) {
+                $best = $i
+                $best_v = $v
+            }
+        }
+        last if $best == -1
+        push @result, $best_v
+        $cursors[$best] += 1
+    }
+    \@result
+}
+
+# Two-stream merge
+my $r2 = Rosetta::StreamMerge::two([1, 4, 7], [2, 3, 5, 8])
+assert_eq join(",", @$r2), "1,2,3,4,5,7,8", "two-way merge"
+
+# Empty-source edge cases
+my $rE1 = Rosetta::StreamMerge::two([], [1, 2, 3])
+assert_eq join(",", @$rE1), "1,2,3", "empty + sorted"
+my $rE2 = Rosetta::StreamMerge::two([1, 2], [])
+assert_eq join(",", @$rE2), "1,2", "sorted + empty"
+
+# k-way
+my $rk = Rosetta::StreamMerge::k_way([[1, 4, 8], [2, 3, 9], [0, 5, 7, 10]])
+assert_eq join(",", @$rk), "0,1,2,3,4,5,7,8,9,10", "3-way merge"
+
+# Single stream
+my $r1 = Rosetta::StreamMerge::k_way([[1, 2, 3, 4]])
+assert_eq join(",", @$r1), "1,2,3,4", "1-way is identity"
+
+# All empty
+my $r0 = Rosetta::StreamMerge::k_way([[], [], []])
+assert_eq scalar(@$r0), 0, "all empty -> empty"
+
+# Duplicates preserved
+my $rd = Rosetta::StreamMerge::two([1, 1, 2], [1, 2, 3])
+assert_eq join(",", @$rd), "1,1,1,2,2,3", "duplicates preserved"
+
+test_run

@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numerical integration via trapezoidal rule
+
+fn Rosetta::Trapezoid::integrate($f, $a, $b, $n) {
+    my $h = ($b - $a) / $n
+    my $sum = ($f->($a) + $f->($b)) / 2
+    for my $i (1..$n-1) {
+        my $x = $a + $i * $h
+        my $v = $f->($x)
+        $sum += $v
+    }
+    $sum * $h
+}
+
+fn Rosetta::Trapezoid::approx_eq($a, $b, $eps) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < $eps
+}
+
+# x^2 from 0 to 1 = 1/3 ≈ 0.3333
+my $sq    = fn ($x) { $x * $x }
+my $r_sq  = Rosetta::Trapezoid::integrate($sq, 0, 1, 1000)
+assert_ok Rosetta::Trapezoid::approx_eq($r_sq, 1.0/3.0, 0.0001), "∫x^2 dx from 0..1 ~ 1/3"
+
+# x^3 from 0 to 1 = 1/4
+my $cu    = fn ($x) { $x ** 3 }
+my $r_cu  = Rosetta::Trapezoid::integrate($cu, 0, 1, 1000)
+assert_ok Rosetta::Trapezoid::approx_eq($r_cu, 0.25, 0.0001), "∫x^3 dx from 0..1 ~ 1/4"
+
+# Constant function: integrate 5 from 2 to 7 = 25
+my $c = fn ($x) { 5 }
+my $r_c = Rosetta::Trapezoid::integrate($c, 2, 7, 10)
+assert_ok Rosetta::Trapezoid::approx_eq($r_c, 25, 1e-9), "constant 5 over [2,7] = 25"
+
+# Linear: integrate 2x from 0 to 4 = 16
+my $lin = fn ($x) { 2 * $x }
+my $r_l = Rosetta::Trapezoid::integrate($lin, 0, 4, 100)
+assert_ok Rosetta::Trapezoid::approx_eq($r_l, 16, 1e-9), "linear 2x over [0,4] = 16 (exact for trapezoid)"
+
+# Sine over [0, pi] = 2
+my $sin_f = fn ($x) { sin($x) }
+my $pi    = 3.141592653589793
+my $r_sin = Rosetta::Trapezoid::integrate($sin_f, 0, $pi, 1000)
+assert_ok Rosetta::Trapezoid::approx_eq($r_sin, 2, 0.001), "∫sin x over [0,π] ~ 2"
+
+# Higher subdivision is more accurate
+my $r10  = Rosetta::Trapezoid::integrate($sq, 0, 1, 10)
+my $r100 = Rosetta::Trapezoid::integrate($sq, 0, 1, 100)
+my $err10  = abs($r10  - 1.0/3.0)
+my $err100 = abs($r100 - 1.0/3.0)
+assert_ok $err100 < $err10, "more subdivisions reduce error"
+
+test_run

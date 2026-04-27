@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rare numbers — n where n + reverse(n) and n - reverse(n) are both perfect squares,
+# n is not a palindrome, last digit non-zero, and n != reverse(n).
+
+fn Rosetta::Rare::reverse_num($n) {
+    my $r = 0
+    my $x = $n
+    while ($x > 0) {
+        $r = $r * 10 + ($x % 10)
+        $x = int($x / 10)
+    }
+    $r
+}
+
+fn Rosetta::Rare::is_perfect_square($n) {
+    return 0 if $n < 0
+    return 1 if $n == 0
+    my $r = int(sqrt($n) + 0.5)
+    $r * $r == $n
+}
+
+fn Rosetta::Rare::is_rare($n) {
+    return 0 if $n < 10
+    return 0 if $n % 10 == 0
+    my $r = Rosetta::Rare::reverse_num($n)
+    return 0 if $r == $n   # palindrome
+    return 0 if $r > $n
+    my $sum  = $n + $r
+    my $diff = $n - $r
+    Rosetta::Rare::is_perfect_square($sum) && Rosetta::Rare::is_perfect_square($diff)
+}
+
+fn Rosetta::Rare::list($limit) {
+    my @res
+    for my $n (10..$limit) {
+        push @res, $n if Rosetta::Rare::is_rare($n)
+    }
+    \@res
+}
+
+# OEIS A035519 — first rare number is 65
+my $r = Rosetta::Rare::list(70)
+assert_eq join(",", @$r), "65", "first rare number is 65"
+
+# 65 + 56 = 121 = 11^2; 65 - 56 = 9 = 3^2
+assert_eq Rosetta::Rare::reverse_num(65), 56, "reverse(65) = 56"
+assert_ok Rosetta::Rare::is_perfect_square(121), "121 = 11^2"
+assert_ok Rosetta::Rare::is_perfect_square(9), "9 = 3^2"
+assert_ok Rosetta::Rare::is_rare(65), "65 is rare"
+
+# Negatives
+assert_ok !Rosetta::Rare::is_rare(11), "11 is palindrome"
+assert_ok !Rosetta::Rare::is_rare(50), "50 ends in 0"
+
+# Reverse helper
+assert_eq Rosetta::Rare::reverse_num(0),     0,    "rev 0"
+assert_eq Rosetta::Rare::reverse_num(7),     7,    "rev 7"
+assert_eq Rosetta::Rare::reverse_num(1234),  4321, "rev 1234"
+assert_eq Rosetta::Rare::reverse_num(1000),  1,    "rev 1000 = 1"
+
+test_run

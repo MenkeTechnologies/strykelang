@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sparkline in Unicode (▁▂▃▄▅▆▇█)
+
+fn Rosetta::Sparkline::render(@values) {
+    my @bars = ("▁", "▂", "▃", "▄", "▅", "▆", "▇", "█")
+    return "" if scalar(@values) == 0
+
+    my $min = $values[0]
+    my $max = $values[0]
+    for my $v (@values) {
+        $min = $v if $v < $min
+        $max = $v if $v > $max
+    }
+
+    my $range = $max - $min
+    my $out = ""
+    for my $v (@values) {
+        if ($range == 0) {
+            $out .= $bars[0]
+        } else {
+            my $idx = int(($v - $min) / $range * 7 + 0.0001)
+            $idx = 7 if $idx > 7
+            $out .= $bars[$idx]
+        }
+    }
+    $out
+}
+
+# Single-element
+assert_eq Rosetta::Sparkline::render(5), "▁", "single value"
+
+# Constant
+assert_eq Rosetta::Sparkline::render(3, 3, 3), "▁▁▁", "constant"
+
+# Min and max present
+my $r = Rosetta::Sparkline::render(1, 8)
+assert_eq $r, "▁█", "min and max"
+
+# Monotonic — strictly increasing produces ascending bars
+my $mono = Rosetta::Sparkline::render(1, 2, 3, 4, 5, 6, 7, 8)
+assert_eq $mono, "▁▂▃▄▅▆▇█", "monotonic 1..8"
+
+# Reverse monotonic
+my $rev = Rosetta::Sparkline::render(8, 7, 6, 5, 4, 3, 2, 1)
+assert_eq $rev, "█▇▆▅▄▃▂▁", "reverse 8..1"
+
+# Negative numbers also work (range still positive)
+my $neg = Rosetta::Sparkline::render(-3, 0, 3)
+assert_eq $neg, "▁▄█", "negatives"
+
+# Mid values produce middle bars; verify length matches input count
+my $r9 = Rosetta::Sparkline::render(0, 1, 2, 3, 4, 5, 6, 7, 8)
+my @chars = ~> $r9 chars
+assert_eq scalar(@chars), 9, "length matches input"
+
+test_run

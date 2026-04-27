@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Validate ISBN-13 check digit
+
+fn Rosetta::ISBN::clean($s) {
+    my $cleaned = $s
+    $cleaned =~ s/[\s-]//g
+    $cleaned
+}
+
+fn Rosetta::ISBN::is_valid_13($raw) {
+    my $s = Rosetta::ISBN::clean($raw)
+    return 0 if length($s) != 13
+    return 0 if $s !~ /^\d{13}$/
+    my @ds = ~> $s chars
+    my $sum = 0
+    for my $i (0..12) {
+        my $d = int($ds[$i])
+        $sum += ($i % 2 == 0) ? $d : $d * 3
+    }
+    $sum % 10 == 0
+}
+
+fn Rosetta::ISBN::is_valid_10($raw) {
+    my $s = Rosetta::ISBN::clean($raw)
+    return 0 if length($s) != 10
+    return 0 if $s !~ /^\d{9}[\dX]$/
+    my @ds = ~> $s chars
+    my $sum = 0
+    for my $i (0..9) {
+        my $d = ($ds[$i] eq "X") ? 10 : int($ds[$i])
+        $sum += $d * (10 - $i)
+    }
+    $sum % 11 == 0
+}
+
+# ISBN-13
+assert_ok  Rosetta::ISBN::is_valid_13("978-0-306-40615-7"), "Wikipedia ISBN-13 sample"
+assert_ok  Rosetta::ISBN::is_valid_13("9783161484100"),     "valid plain"
+assert_ok !Rosetta::ISBN::is_valid_13("9783161484101"),     "wrong check digit"
+assert_ok !Rosetta::ISBN::is_valid_13("978316148410"),      "too short"
+assert_ok !Rosetta::ISBN::is_valid_13("978316148410012"),   "too long"
+assert_ok !Rosetta::ISBN::is_valid_13("978316148410X"),     "non-digit"
+
+# ISBN-10
+assert_ok  Rosetta::ISBN::is_valid_10("0-306-40615-2"),     "ISBN-10 sample"
+assert_ok  Rosetta::ISBN::is_valid_10("0306406152"),        "ISBN-10 stripped"
+assert_ok  Rosetta::ISBN::is_valid_10("097522980X"),        "ISBN-10 ending in X"
+assert_ok !Rosetta::ISBN::is_valid_10("0306406150"),        "wrong ISBN-10 check"
+assert_ok !Rosetta::ISBN::is_valid_10("0975229801"),        "non-X must be digit"
+
+test_run

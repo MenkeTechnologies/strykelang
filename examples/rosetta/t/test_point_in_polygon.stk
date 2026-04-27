@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ray-casting point-in-polygon
+
+fn Rosetta::PointInPolygon::contains($poly, $x, $y) {
+    my $n = scalar(@$poly)
+    my $inside = 0
+    my $j = $n - 1
+    for my $i (0..$n-1) {
+        my $xi = $poly->[$i]->[0]
+        my $yi = $poly->[$i]->[1]
+        my $xj = $poly->[$j]->[0]
+        my $yj = $poly->[$j]->[1]
+        my $crosses = ($yi > $y) != ($yj > $y)
+        if ($crosses) {
+            my $x_int = ($xj - $xi) * ($y - $yi) / ($yj - $yi) + $xi
+            if ($x < $x_int) { $inside = !$inside }
+        }
+        $j = $i
+    }
+    $inside ? 1 : 0
+}
+
+# Square 0,0 -> 4,4
+my $square = [[0, 0], [4, 0], [4, 4], [0, 4]]
+assert_eq Rosetta::PointInPolygon::contains($square, 2, 2), 1, "center inside square"
+assert_eq Rosetta::PointInPolygon::contains($square, 5, 2), 0, "right of square is out"
+assert_eq Rosetta::PointInPolygon::contains($square, -1, 2), 0, "left of square is out"
+assert_eq Rosetta::PointInPolygon::contains($square, 2, 5), 0, "above square is out"
+
+# Triangle (0,0), (4,0), (2,3)
+my $tri = [[0, 0], [4, 0], [2, 3]]
+assert_eq Rosetta::PointInPolygon::contains($tri, 2, 1), 1, "centroid-ish inside triangle"
+assert_eq Rosetta::PointInPolygon::contains($tri, 0, 3), 0, "above-left corner is out"
+assert_eq Rosetta::PointInPolygon::contains($tri, 3.5, 0.1), 1, "near right edge inside"
+
+# Concave polygon (L-shape)
+my $L = [[0, 0], [4, 0], [4, 2], [2, 2], [2, 4], [0, 4]]
+assert_eq Rosetta::PointInPolygon::contains($L, 1, 1), 1, "inside L-bottom"
+assert_eq Rosetta::PointInPolygon::contains($L, 1, 3), 1, "inside L-top"
+assert_eq Rosetta::PointInPolygon::contains($L, 3, 3), 0, "in L-notch is out"
+
+test_run

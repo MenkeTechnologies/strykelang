@@ -14097,7 +14097,10 @@ impl Interpreter {
             "var" => "variance",
             other => other,
         };
-        let args = self.with_topic_default_args(args);
+        // List builtins like `sum`, `min`, `uniq` operate on a list — an empty
+        // input must aggregate to the identity (0/undef), NOT default to $_.
+        // `sum(@empty_after_grep)` was returning $_ before this; that produced
+        // surprising results downstream (e.g. `… |> grep {0} |> sum` = topic).
         match crate::list_builtins::dispatch_by_name(self, canonical, &args, want) {
             Some(r) => r,
             None => Err(PerlError::runtime(

@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Munching squares — values of (x XOR y) on a grid
+
+fn Rosetta::Munching::cell($x, $y) {
+    $x ^ $y
+}
+
+fn Rosetta::Munching::grid($n) {
+    my @rows
+    for my $y (0..$n-1) {
+        my @row
+        for my $x (0..$n-1) {
+            push @row, Rosetta::Munching::cell($x, $y)
+        }
+        push @rows, \@row
+    }
+    \@rows
+}
+
+# 1-bit pattern (XOR of 0/1)
+my $g2 = Rosetta::Munching::grid(2)
+assert_eq $g2->[0]->[0], 0, "(0,0) = 0"
+assert_eq $g2->[0]->[1], 1, "(0,1) = 1"
+assert_eq $g2->[1]->[0], 1, "(1,0) = 1"
+assert_eq $g2->[1]->[1], 0, "(1,1) = 0"
+
+# Diagonal is always 0
+for my $i (0..15) {
+    assert_eq Rosetta::Munching::cell($i, $i), 0, "diagonal $i ^ $i = 0"
+}
+
+# Symmetric: cell(x, y) == cell(y, x)
+for my $x (0..7) {
+    for my $y (0..7) {
+        assert_eq Rosetta::Munching::cell($x, $y), Rosetta::Munching::cell($y, $x),
+            "symmetric ($x,$y)"
+    }
+}
+
+# 8x8 self-similar fractal: any 4x4 sub-block matches the corresponding cell of 2x2 super-grid xor'd
+# Sample: cell(7, 7) = 0
+assert_eq Rosetta::Munching::cell(7, 7), 0, "7^7 = 0"
+assert_eq Rosetta::Munching::cell(6, 1), 7, "6^1 = 7"
+assert_eq Rosetta::Munching::cell(5, 3), 6, "5^3 = 6"
+
+test_run

@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Vigenère cipher with autokey — key = primer + plaintext
+
+fn Rosetta::VigAuto::clean($s) {
+    my $r = uc($s)
+    $r =~ s/[^A-Z]//g
+    $r
+}
+
+fn Rosetta::VigAuto::encrypt($plain, $primer) {
+    my $p = Rosetta::VigAuto::clean($plain)
+    my $k = Rosetta::VigAuto::clean($primer) . $p
+    my @pc = ~> $p chars
+    my @kc = ~> $k chars
+    my $out = ""
+    for my $i (0..scalar(@pc)-1) {
+        my $shift = ord($kc[$i]) - ord("A")
+        my $base  = ord($pc[$i]) - ord("A")
+        $out .= chr(ord("A") + ($base + $shift) % 26)
+    }
+    $out
+}
+
+fn Rosetta::VigAuto::decrypt($cipher, $primer) {
+    my $c = Rosetta::VigAuto::clean($cipher)
+    my $k = Rosetta::VigAuto::clean($primer)
+    my @cc = ~> $c chars
+    my $out = ""
+    for my $i (0..scalar(@cc)-1) {
+        my @kc = ~> $k chars
+        my $shift = ord($kc[$i]) - ord("A")
+        my $base  = ord($cc[$i]) - ord("A")
+        my $p_char = chr(ord("A") + (($base - $shift) % 26 + 26) % 26)
+        $out .= $p_char
+        $k .= $p_char
+    }
+    $out
+}
+
+# Wikipedia Vigenère-autokey worked example: plaintext "ATTACKATDAWN" with primer "QUEENLY"
+# yields ciphertext "QNXEPVYTWTWP" under (P+K) mod 26 with K = primer + plaintext.
+assert_eq Rosetta::VigAuto::encrypt("ATTACKATDAWN", "QUEENLY"),
+    "QNXEPVYTWTWP", "Wikipedia worked example"
+
+assert_eq Rosetta::VigAuto::decrypt("QNXEPVYTWTWP", "QUEENLY"),
+    "ATTACKATDAWN", "decrypt Wikipedia example"
+
+# Round-trip
+my @primers = ("KILT", "STRIKE", "RUST", "ZEBRA")
+my @messages = (
+    "ATTACKATDAWN",
+    "RUNAWAYNOWWHILEYOUSTILLCAN",
+    "THISISATESTOFTHEAUTOKEYVIGENERECIPHER",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+)
+for my $primer (@primers) {
+    for my $msg (@messages) {
+        my $clean = Rosetta::VigAuto::clean($msg)
+        my $enc = Rosetta::VigAuto::encrypt($msg, $primer)
+        my $dec = Rosetta::VigAuto::decrypt($enc, $primer)
+        assert_eq $dec, $clean, "round-trip ($primer) on '$clean'"
+    }
+}
+
+# Encryption with no plaintext-letter input is empty
+assert_eq Rosetta::VigAuto::encrypt("!!!", "KEY"), "", "non-letters strip away"
+
+test_run

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numbers which are squares but not cubes (OEIS A000037 ∩ squares)
+
+fn Rosetta::SqNotCube::is_cube($n) {
+    return 1 if $n == 0
+    my $r = int($n ** (1.0/3.0) + 0.5)
+    $r * $r * $r == $n
+}
+
+fn Rosetta::SqNotCube::list($count) {
+    my @sq_only
+    my @both
+    my $i = 1
+    while (scalar(@sq_only) + scalar(@both) < $count) {
+        my $s = $i * $i
+        if (Rosetta::SqNotCube::is_cube($s)) {
+            push @both, $s
+        } else {
+            push @sq_only, $s
+        }
+        $i += 1
+    }
+    [\@sq_only, \@both]
+}
+
+# First few squares-not-cubes: 4, 9, 16, 25, 36, 49, 81, 100, 121, ... (skip 1, 64, 729...)
+my $r = Rosetta::SqNotCube::list(30)
+my $sq_only = $r->[0]
+my $both    = $r->[1]
+my @first10 = @{$sq_only}[0..9]
+assert_eq join(",", @first10), "4,9,16,25,36,49,81,100,121,144", "first 10 squares-not-cubes"
+
+# Squares that are also cubes (= 6th powers): 1, 64, 729, 4096, 15625, 46656, ...
+assert_eq scalar(@$both) >= 1 ? "ok" : "no", "ok", "found at least one square+cube"
+assert_eq $both->[0], 1, "first square+cube is 1"
+assert_eq $both->[1], 64, "second square+cube is 64"
+
+# Cube test sanity
+assert_ok  Rosetta::SqNotCube::is_cube(27),  "27 is cube"
+assert_ok  Rosetta::SqNotCube::is_cube(125), "125 is cube"
+assert_ok !Rosetta::SqNotCube::is_cube(50),  "50 not cube"
+assert_ok  Rosetta::SqNotCube::is_cube(0),   "0 is cube"
+
+test_run

@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reverse Polish notation (RPN) calculator
+
+fn Rosetta::RPN::eval($expr) {
+    my @stack
+    my @tokens = split /\s+/, $expr
+    for my $tok (@tokens) {
+        if ($tok =~ /^-?\d+(\.\d+)?$/) {
+            push @stack, $tok + 0
+        } else {
+            my $b = pop @stack
+            my $a = pop @stack
+            my $r
+            if    ($tok eq "+") { $r = $a + $b }
+            elsif ($tok eq "-") { $r = $a - $b }
+            elsif ($tok eq "*") { $r = $a * $b }
+            elsif ($tok eq "/") { $r = $a / $b }
+            elsif ($tok eq "^") { $r = $a ** $b }
+            else                { die "unknown op $tok" }
+            push @stack, $r
+        }
+    }
+    $stack[-1]
+}
+
+assert_eq Rosetta::RPN::eval("3 4 +"), 7, "3 4 + = 7"
+assert_eq Rosetta::RPN::eval("5 1 2 + 4 * + 3 -"), 14, "Wikipedia sample"
+assert_eq Rosetta::RPN::eval("2 3 ^"), 8, "2^3 = 8"
+assert_eq Rosetta::RPN::eval("10 2 /"), 5, "10/2"
+assert_eq Rosetta::RPN::eval("-5 3 +"), -2, "negative literal"
+assert_eq Rosetta::RPN::eval("1.5 2.5 +"), 4.0, "floats"
+
+# Larger expression: ((2+3) * 4 - 5) / 3 = 5
+assert_eq Rosetta::RPN::eval("2 3 + 4 * 5 - 3 /"), 5, "compound"
+
+test_run
