@@ -848,6 +848,14 @@ pub fn format_expr(e: &Expr) -> String {
                 format!("{} {} {}", format_expr(from), op, format_expr(to))
             }
         }
+        ExprKind::SliceRange { from, to, step } => {
+            let f = from.as_ref().map(|e| format_expr(e)).unwrap_or_default();
+            let t = to.as_ref().map(|e| format_expr(e)).unwrap_or_default();
+            match step {
+                Some(s) => format!("{}:{}:{}", f, t, format_expr(s)),
+                None => format!("{}:{}", f, t),
+            }
+        }
         ExprKind::FuncCall { name, args } => format!(
             "{}({})",
             name,

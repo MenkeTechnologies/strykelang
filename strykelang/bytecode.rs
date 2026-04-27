@@ -355,6 +355,17 @@ pub enum Op {
     MakeHash(u16), // pop N key-value pairs, push as Hash
     Range,         // stack: [from, to] → Array
     RangeStep,     // stack: [from, to, step] → Array (stepped range)
+    /// Array slice via colon range — `@arr[FROM:TO:STEP]` / `@arr[::-1]`.
+    /// Stack: `[from, to, step]` — each may be `Undef` to mean "omitted" (uses array bounds).
+    /// `u16` is the array name pool index. Endpoints must coerce to integer cleanly; otherwise
+    /// runtime aborts (`die "slice: non-integer endpoint in array slice"`). Pushes the sliced array.
+    ArraySliceRange(u16),
+    /// Hash slice via colon range — `@h{FROM:TO:STEP}` (keys auto-quote like fat comma `=>`).
+    /// Stack: `[from, to, step]` — open ends die (no notion of "all keys" in unordered hash).
+    /// Endpoints stringify to hash keys; expansion uses numeric or magic-string-increment
+    /// depending on whether both ends parse as numbers. `u16` is the hash name pool index.
+    /// Pushes the array of slot values for the expanded keys.
+    HashSliceRange(u16),
     /// Scalar `..` / `...` flip-flop (numeric bounds vs `$.` — [`Interpreter::scalar_flipflop_dot_line`]).
     /// Stack: `[from, to]` (ints); pushes `1` or `0`. `u16` indexes flip-flop slots; `u8` is `1` for `...`
     /// (exclusive: right bound only after `$.` is strictly past the line where the left bound matched).

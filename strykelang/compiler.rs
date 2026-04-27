@@ -17,7 +17,7 @@ use crate::value::PerlValue;
 pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     match &expr.kind {
         // Range `..` in scalar context is flip-flop, in list context is expansion.
-        ExprKind::Range { .. } => true,
+        ExprKind::Range { .. } | ExprKind::SliceRange { .. } => true,
         // Multi-element list: `($a, $b)` returns 2 values in list, last in scalar.
         ExprKind::List(items) => items.len() != 1 || expr_tail_is_list_sensitive(&items[0]),
         ExprKind::QW(ws) => ws.len() != 1,
@@ -71,7 +71,7 @@ pub(crate) fn hash_slice_key_expr_is_multi_key(k: &Expr) -> bool {
     match &k.kind {
         ExprKind::QW(ws) => ws.len() > 1,
         ExprKind::List(el) => el.len() > 1,
-        ExprKind::Range { .. } => true,
+        ExprKind::Range { .. } | ExprKind::SliceRange { .. } => true,
         _ => false,
     }
 }
@@ -88,7 +88,7 @@ pub(crate) fn hash_slice_needs_slice_ops(keys: &[Expr]) -> bool {
 /// `..` / `qw/.../` / `(a,b)` / nested lists always go through slice ops (flattened index specs).
 pub(crate) fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) -> bool {
     match &index.kind {
-        ExprKind::Range { .. } => false,
+        ExprKind::Range { .. } | ExprKind::SliceRange { .. } => false,
         ExprKind::QW(_) => false,
         ExprKind::List(el) => {
             if el.len() == 1 {
@@ -225,10 +225,28 @@ impl Compiler {
     /// Hash-slice key component: `'a'..'c'` inside `@h{...}` / `@$h{...}` is a list-context
     /// range so the VM's hash-slice helpers receive an array to flatten into individual keys.
     fn compile_hash_slice_key_expr(&mut self, key_expr: &Expr) -> Result<(), CompileError> {
-        if matches!(&key_expr.kind, ExprKind::Range { .. }) {
+        if matches!(
+            &key_expr.kind,
+            ExprKind::Range { .. } | ExprKind::SliceRange { .. }
+        ) {
             self.compile_expr_ctx(key_expr, WantarrayCtx::List)
         } else {
             self.compile_expr(key_expr)
+        }
+    }
+
+    /// Push the value of `expr` if present, or `Undef` (the omitted-endpoint sentinel
+    /// used by [`Op::ArraySliceRange`] / [`Op::HashSliceRange`]) if `None`.
+    fn compile_optional_or_undef(
+        &mut self,
+        expr: Option<&Expr>,
+    ) -> Result<(), CompileError> {
+        match expr {
+            Some(e) => self.compile_expr(e),
+            None => {
+                self.emit_op(Op::LoadUndef, 0, None);
+                Ok(())
+            }
         }
     }
 
@@ -2221,7 +2239,9 @@ impl Compiler {
                     // their contents (arrays, ranges), but use default for others so
                     // that `return (1, 2, 3)` in scalar context gives last element.
                     match &expr.kind {
-                        ExprKind::Range { .. } | ExprKind::ArrayVar(_) => {
+                        ExprKind::Range { .. }
+                        | ExprKind::SliceRange { .. }
+                        | ExprKind::ArrayVar(_) => {
                             self.compile_expr_ctx(expr, WantarrayCtx::List)?;
                         }
                         _ => {
@@ -2875,6 +2895,30 @@ impl Compiler {
                     .intern_name(&self.qualify_stash_array_name(array));
                 if indices.is_empty() {
                     self.emit_op(Op::MakeArray(0), line, Some(root));
+                } else if indices.len() == 1 {
+                    match &indices[0].kind {
+                        ExprKind::SliceRange { from, to, step } => {
+                            // Open-ended slice — push (from?, to?, step?); VM resolves
+                            // defaults from array length. Integer-strict; aborts on
+                            // non-integer endpoints.
+                            self.compile_optional_or_undef(from.as_deref())?;
+                            self.compile_optional_or_undef(to.as_deref())?;
+                            self.compile_optional_or_undef(step.as_deref())?;
+                            self.emit_op(Op::ArraySliceRange(arr_idx), line, Some(root));
+                        }
+                        ExprKind::Range { from, to, step, .. } => {
+                            // Closed colon range like `1:3` or `1:3:2` — also strict
+                            // integer (rejects `"a":"c"`, `1.5:5`, etc.).
+                            self.compile_expr(from)?;
+                            self.compile_expr(to)?;
+                            self.compile_optional_or_undef(step.as_deref())?;
+                            self.emit_op(Op::ArraySliceRange(arr_idx), line, Some(root));
+                        }
+                        _ => {
+                            self.compile_array_slice_index_expr(&indices[0])?;
+                            self.emit_op(Op::ArraySlicePart(arr_idx), line, Some(root));
+                        }
+                    }
                 } else {
                     for (ix, index_expr) in indices.iter().enumerate() {
                         self.compile_array_slice_index_expr(index_expr)?;
@@ -2887,6 +2931,30 @@ impl Compiler {
             }
             ExprKind::HashSlice { hash, keys } => {
                 let hash_idx = self.chunk.intern_name(hash);
+                if keys.len() == 1 {
+                    match &keys[0].kind {
+                        ExprKind::SliceRange { from, to, step } => {
+                            // Open-ended hash slice — VM aborts (no "all keys" in
+                            // unordered hash).
+                            self.compile_optional_or_undef(from.as_deref())?;
+                            self.compile_optional_or_undef(to.as_deref())?;
+                            self.compile_optional_or_undef(step.as_deref())?;
+                            self.emit_op(Op::HashSliceRange(hash_idx), line, Some(root));
+                            return Ok(());
+                        }
+                        ExprKind::Range { from, to, step, .. } => {
+                            // Closed colon range like `a:c:1` or `1:3` — endpoints
+                            // stringify to hash keys (auto-quoted barewords already
+                            // resolved during parsing).
+                            self.compile_expr(from)?;
+                            self.compile_expr(to)?;
+                            self.compile_optional_or_undef(step.as_deref())?;
+                            self.emit_op(Op::HashSliceRange(hash_idx), line, Some(root));
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+                }
                 // If any key expression is a range, we need runtime flattening via GetHashSlice.
                 let has_dynamic_keys = keys
                     .iter()
@@ -4779,6 +4847,17 @@ impl Compiler {
                         Some(root),
                     );
                 }
+            }
+
+            ExprKind::SliceRange { .. } => {
+                // Open-ended slice ranges (`:N`, `N:`, `::-1`, `::`) only have meaning
+                // inside slice subscripts (`@arr[...]`, `@h{...}`), where they are
+                // intercepted by the slice arms above. Anywhere else is a hard error —
+                // we have no container length context to resolve open ends.
+                return Err(CompileError::Unsupported(
+                    "open-ended slice range (`:N`/`N:`/`::-1`) is only valid inside `@arr[...]` or `@h{...}` subscripts"
+                        .into(),
+                ));
             }
 
             ExprKind::Repeat { expr, count } => {

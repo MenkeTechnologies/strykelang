@@ -3347,10 +3347,132 @@ pub(crate) fn perl_list_range_expand_stepped(
         if is_roman_numeral(&from_str) && is_roman_numeral(&to_str) {
             return roman_range_stepped(&from_str, &to_str, step_int);
         }
-        
+
         // Fall back to magic string increment/decrement
         perl_list_range_expand_string_magic_stepped(from, to, step_int)
     }
+}
+
+/// Coerce a slice endpoint to a strict integer. Used by [`Op::ArraySliceRange`] —
+/// non-numeric strings, fractional floats, refs, and other non-integer types die.
+/// `where_` is the diagnostic context (`"start"`, `"stop"`, `"step"`).
+pub(crate) fn perl_slice_endpoint_to_strict_int(
+    v: &PerlValue,
+    where_: &str,
+) -> Result<i64, String> {
+    if let Some(n) = v.as_integer() {
+        return Ok(n);
+    }
+    if let Some(f) = v.as_float() {
+        if f.is_finite() && f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+            return Ok(f as i64);
+        }
+        return Err(format!(
+            "array slice {}: non-integer float endpoint {}",
+            where_, f
+        ));
+    }
+    let s = v.as_str_or_empty();
+    if !s.is_empty() {
+        if let Ok(n) = s.trim().parse::<i64>() {
+            return Ok(n);
+        }
+        return Err(format!(
+            "array slice {}: non-integer string endpoint {:?}",
+            where_, s
+        ));
+    }
+    Err(format!(
+        "array slice {}: endpoint must be an integer (got non-numeric value)",
+        where_
+    ))
+}
+
+/// Resolve `from`/`to`/`step` for `@arr[FROM:TO:STEP]` (and open-ended forms) into the
+/// concrete list of array indices. Closed inclusive on both ends. `Undef` endpoints
+/// (the omitted-endpoint sentinel emitted by the compiler) default to:
+/// - `step` → `1`
+/// - `from` → `0` (positive step) or `arr_len-1` (negative step)
+/// - `to`   → `arr_len-1` (positive step) or `0` (negative step)
+///
+/// Negative explicit indices count from the end (Perl semantics: `-1` = last element).
+/// Returns `Err(msg)` for non-integer endpoints or zero step — caller dies with that.
+pub(crate) fn compute_array_slice_indices(
+    arr_len: i64,
+    from: &PerlValue,
+    to: &PerlValue,
+    step: &PerlValue,
+) -> Result<Vec<i64>, String> {
+    let step_i = if step.is_undef() {
+        1i64
+    } else {
+        perl_slice_endpoint_to_strict_int(step, "step")?
+    };
+    if step_i == 0 {
+        return Err("array slice step cannot be 0".into());
+    }
+
+    let normalize = |i: i64| -> i64 {
+        if i < 0 {
+            i + arr_len
+        } else {
+            i
+        }
+    };
+
+    let from_i = if from.is_undef() {
+        if step_i > 0 { 0 } else { arr_len - 1 }
+    } else {
+        normalize(perl_slice_endpoint_to_strict_int(from, "start")?)
+    };
+
+    let to_i = if to.is_undef() {
+        if step_i > 0 { arr_len - 1 } else { 0 }
+    } else {
+        normalize(perl_slice_endpoint_to_strict_int(to, "stop")?)
+    };
+
+    let mut out = Vec::new();
+    if arr_len == 0 {
+        return Ok(out);
+    }
+    if step_i > 0 {
+        let mut i = from_i;
+        while i <= to_i {
+            out.push(i);
+            i += step_i;
+        }
+    } else {
+        let mut i = from_i;
+        while i >= to_i {
+            out.push(i);
+            i += step_i; // step_i is negative
+        }
+    }
+    Ok(out)
+}
+
+/// Resolve `from`/`to`/`step` for `@h{FROM:TO:STEP}` into the concrete list of hash keys.
+/// Both endpoints must be present (open-ended forms are nonsense for unordered hashes
+/// and die). Endpoints stringify to keys; expansion uses the polymorphic stepped-range
+/// machinery (numeric, magic-string-increment, Roman, etc.).
+pub(crate) fn compute_hash_slice_keys(
+    from: &PerlValue,
+    to: &PerlValue,
+    step: &PerlValue,
+) -> Result<Vec<String>, String> {
+    if from.is_undef() || to.is_undef() {
+        return Err(
+            "hash slice range requires both endpoints (open-ended forms not allowed)".into(),
+        );
+    }
+    let step_val = if step.is_undef() {
+        PerlValue::integer(1)
+    } else {
+        step.clone()
+    };
+    let expanded = perl_list_range_expand_stepped(from.clone(), to.clone(), step_val);
+    Ok(expanded.into_iter().map(|v| v.to_string()).collect())
 }
 
 fn perl_list_range_expand_string_magic_stepped(

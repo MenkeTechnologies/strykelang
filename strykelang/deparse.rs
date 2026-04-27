@@ -949,6 +949,19 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
                 deparse_expr_into(buf, s);
             }
         }
+        ExprKind::SliceRange { from, to, step } => {
+            if let Some(f) = from {
+                deparse_expr_into(buf, f);
+            }
+            buf.push(':');
+            if let Some(t) = to {
+                deparse_expr_into(buf, t);
+            }
+            if let Some(s) = step {
+                buf.push(':');
+                deparse_expr_into(buf, s);
+            }
+        }
         ExprKind::FuncCall { name, args } => {
             buf.push_str(name);
             if args.is_empty() {

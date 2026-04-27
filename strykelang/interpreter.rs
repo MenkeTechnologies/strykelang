@@ -446,7 +446,7 @@ impl LogLevelFilter {
 /// True when `@$aref->[IX]` / `IX` needs **list** context on the RHS of `=` (multi-slot slice).
 fn arrow_deref_array_assign_rhs_list_ctx(index: &Expr) -> bool {
     match &index.kind {
-        ExprKind::Range { .. } => true,
+        ExprKind::Range { .. } | ExprKind::SliceRange { .. } => true,
         ExprKind::QW(ws) => ws.len() > 1,
         ExprKind::List(el) => {
             if el.len() > 1 {
@@ -7919,7 +7919,7 @@ impl Interpreter {
         &mut self,
         key_expr: &Expr,
     ) -> Result<Vec<String>, FlowOrError> {
-        let v = if matches!(key_expr.kind, ExprKind::Range { .. }) {
+        let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
             self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
         } else {
             self.eval_expr(key_expr)?
@@ -8396,7 +8396,7 @@ impl Interpreter {
                 let hv = self.eval_expr(container)?;
                 let mut key_vals = Vec::with_capacity(keys.len());
                 for key_expr in keys {
-                    let v = if matches!(key_expr.kind, ExprKind::Range { .. }) {
+                    let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
                         self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
                     } else {
                         self.eval_expr(key_expr)?
@@ -9224,6 +9224,39 @@ impl Interpreter {
                         }
                     }
                 }
+            }
+
+            // SliceRange — open-ended Python-style slice expansion. Reachable from the
+            // tree-walker when slice subscripts are evaluated outside the VM (rare; VM is
+            // the primary execution engine). Only closed forms (`from:to[:step]`) can be
+            // expanded here without container length context; open ends require a slice
+            // op (`Op::ArraySliceRange` / `Op::HashSliceRange`) which knows the container.
+            ExprKind::SliceRange { from, to, step } => {
+                let f = match from {
+                    Some(e) => self.eval_expr(e)?,
+                    None => {
+                        return Err(PerlError::runtime(
+                            "open-ended slice range cannot be evaluated outside slice subscript",
+                            line,
+                        ).into());
+                    }
+                };
+                let t = match to {
+                    Some(e) => self.eval_expr(e)?,
+                    None => {
+                        return Err(PerlError::runtime(
+                            "open-ended slice range cannot be evaluated outside slice subscript",
+                            line,
+                        ).into());
+                    }
+                };
+                let list = if let Some(s) = step {
+                    let sv = self.eval_expr(s)?;
+                    crate::value::perl_list_range_expand_stepped(f, t, sv)
+                } else {
+                    perl_list_range_expand(f, t)
+                };
+                Ok(PerlValue::array(list))
             }
 
             // Repeat
@@ -12964,7 +12997,7 @@ impl Interpreter {
     ) -> Result<Vec<i64>, FlowOrError> {
         let mut out = Vec::new();
         for idx_expr in indices {
-            let v = if matches!(idx_expr.kind, ExprKind::Range { .. }) {
+            let v = if matches!(idx_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
                 self.eval_expr_ctx(idx_expr, WantarrayCtx::List)?
             } else {
                 self.eval_expr(idx_expr)?
@@ -13362,7 +13395,7 @@ impl Interpreter {
                 }
                 let mut key_vals = Vec::with_capacity(keys.len());
                 for key_expr in keys {
-                    let v = if matches!(key_expr.kind, ExprKind::Range { .. }) {
+                    let v = if matches!(key_expr.kind, ExprKind::Range { .. } | ExprKind::SliceRange { .. }) {
                         self.eval_expr_ctx(key_expr, WantarrayCtx::List)?
                     } else {
                         self.eval_expr(key_expr)?
