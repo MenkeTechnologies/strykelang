@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Park-Miller PRNG (minimal standard, MINSTD)
+# x_{n+1} = 16807 * x_n mod (2^31 - 1)
+
+fn Rosetta::ParkMiller::new($seed) {
+    [$seed]
+}
+
+fn Rosetta::ParkMiller::next($state) {
+    my $x = $state->[0]
+    $x = (16807 * $x) % 2147483647
+    $state->[0] = $x
+    $x
+}
+
+# Skip ahead by k steps (used for verification of well-known step values)
+fn Rosetta::ParkMiller::skip($state, $k) {
+    my $r = $state->[0]
+    for my $i (1..$k) {
+        $r = (16807 * $r) % 2147483647
+    }
+    $state->[0] = $r
+    $r
+}
+
+# Reproducible: identical seeds yield identical sequences
+my $a = Rosetta::ParkMiller::new(1)
+my $b = Rosetta::ParkMiller::new(1)
+for my $i (1..100) {
+    my $va = Rosetta::ParkMiller::next($a)
+    my $vb = Rosetta::ParkMiller::next($b)
+    assert_eq $va, $vb, "step $i identical for same seed"
+}
+
+# First 10 outputs from seed=1 (Park-Miller verified reference)
+my $s = Rosetta::ParkMiller::new(1)
+my @first
+for my $i (1..10) { push @first, Rosetta::ParkMiller::next($s) }
+assert_eq join(",", @first),
+    "16807,282475249,1622650073,984943658,1144108930,470211272,101027544,1457850878,1458777923,2007237709",
+    "first 10 from seed=1"
+
+# Famous milestone: x_10000 from seed 1 should be 1043618065
+my $s2 = Rosetta::ParkMiller::new(1)
+my $x10000
+for my $i (1..10000) { $x10000 = Rosetta::ParkMiller::next($s2) }
+assert_eq $x10000, 1043618065, "x_10000 from seed 1 = 1043618065"
+
+# All values are in [1, 2^31 - 2]
+my $s3 = Rosetta::ParkMiller::new(42)
+for my $i (1..1000) {
+    my $v = Rosetta::ParkMiller::next($s3)
+    assert_ok $v >= 1, "value >= 1"
+    assert_ok $v <= 2147483646, "value <= 2^31 - 2"
+}
+
+test_run

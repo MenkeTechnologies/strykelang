@@ -46,7 +46,7 @@ fn take_first_n_from_list() {
 }
 
 #[test]
-fn take_scalar_context_last_of_head_like_list_util() {
+fn take_scalar_context_last_of_head() {
     assert_eq!(eval_string(r#"scalar take(qw(a b c d e), 3)"#), "c");
     assert_eq!(eval_int(r#"defined(scalar take(1, 2, 0)) ? 1 : 0"#), 0);
 }

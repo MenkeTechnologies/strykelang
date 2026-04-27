@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Quaternion type — q = (a, b, c, d) for a + bi + cj + dk
+
+fn Rosetta::Quat::new($a, $b, $c, $d) { [$a, $b, $c, $d] }
+
+fn Rosetta::Quat::add($p, $q) {
+    [$p->[0] + $q->[0], $p->[1] + $q->[1],
+     $p->[2] + $q->[2], $p->[3] + $q->[3]]
+}
+
+fn Rosetta::Quat::subtract($p, $q) {
+    [$p->[0] - $q->[0], $p->[1] - $q->[1],
+     $p->[2] - $q->[2], $p->[3] - $q->[3]]
+}
+
+fn Rosetta::Quat::scale($p, $s) {
+    [$p->[0] * $s, $p->[1] * $s, $p->[2] * $s, $p->[3] * $s]
+}
+
+fn Rosetta::Quat::mul($p, $q) {
+    my $a1 = $p->[0]; my $b1 = $p->[1]; my $c1 = $p->[2]; my $d1 = $p->[3]
+    my $a2 = $q->[0]; my $b2 = $q->[1]; my $c2 = $q->[2]; my $d2 = $q->[3]
+    [
+        $a1*$a2 - $b1*$b2 - $c1*$c2 - $d1*$d2,
+        $a1*$b2 + $b1*$a2 + $c1*$d2 - $d1*$c2,
+        $a1*$c2 - $b1*$d2 + $c1*$a2 + $d1*$b2,
+        $a1*$d2 + $b1*$c2 - $c1*$b2 + $d1*$a2
+    ]
+}
+
+fn Rosetta::Quat::conjugate($p) {
+    [$p->[0], -$p->[1], -$p->[2], -$p->[3]]
+}
+
+fn Rosetta::Quat::norm_sq($p) {
+    $p->[0] ** 2 + $p->[1] ** 2 + $p->[2] ** 2 + $p->[3] ** 2
+}
+
+fn Rosetta::Quat::norm($p) {
+    sqrt(Rosetta::Quat::norm_sq($p))
+}
+
+fn Rosetta::Quat::equal($p, $q) {
+    $p->[0] == $q->[0] && $p->[1] == $q->[1]
+                       && $p->[2] == $q->[2] && $p->[3] == $q->[3]
+}
+
+# Components
+my $q = Rosetta::Quat::new(1, 2, 3, 4)
+assert_eq $q->[0], 1, "real part"
+assert_eq $q->[1], 2, "i coeff"
+
+# Norm: sqrt(1+4+9+16) = sqrt(30)
+assert_eq Rosetta::Quat::norm_sq($q), 30, "norm_sq"
+
+# Conjugate
+my $c = Rosetta::Quat::conjugate($q)
+assert_eq join(",", @$c), "1,-2,-3,-4", "conjugate"
+
+# Addition / subtraction
+my $r = Rosetta::Quat::new(0, 1, 0, 1)
+my $s = Rosetta::Quat::add($q, $r)
+assert_eq join(",", @$s), "1,3,3,5", "addition"
+
+my $d = Rosetta::Quat::subtract($q, $r)
+assert_eq join(",", @$d), "1,1,3,3", "subtraction"
+
+# Scale
+my $s2 = Rosetta::Quat::scale($q, 2)
+assert_eq join(",", @$s2), "2,4,6,8", "scale by 2"
+
+# Multiplication: i*j = k, ie (0,1,0,0) * (0,0,1,0) = (0,0,0,1)
+my $i = Rosetta::Quat::new(0, 1, 0, 0)
+my $j = Rosetta::Quat::new(0, 0, 1, 0)
+my $k = Rosetta::Quat::new(0, 0, 0, 1)
+assert_ok Rosetta::Quat::equal(Rosetta::Quat::mul($i, $j), $k), "i*j = k"
+assert_ok Rosetta::Quat::equal(Rosetta::Quat::mul($j, $k), $i), "j*k = i"
+assert_ok Rosetta::Quat::equal(Rosetta::Quat::mul($k, $i), $j), "k*i = j"
+
+# Anti-commutativity: j*i = -k
+my $jk = Rosetta::Quat::mul($j, $i)
+assert_eq join(",", @$jk), "0,0,0,-1", "j*i = -k"
+
+# i^2 = -1
+my $ii = Rosetta::Quat::mul($i, $i)
+assert_eq join(",", @$ii), "-1,0,0,0", "i^2 = -1"
+
+# q * conj(q) is real and equals norm_sq
+my $qcq = Rosetta::Quat::mul($q, Rosetta::Quat::conjugate($q))
+assert_eq $qcq->[0], 30, "q * q* has real norm_sq"
+assert_eq $qcq->[1], 0,  "q * q* imaginary parts vanish (i)"
+assert_eq $qcq->[2], 0,  "...j"
+assert_eq $qcq->[3], 0,  "...k"
+
+test_run

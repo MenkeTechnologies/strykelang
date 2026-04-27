@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Validate IBAN — country length + ISO 7064 mod-97 check
+
+fn Rosetta::IBAN::country_lengths() {
+    {
+        AD => 24, AE => 23, AL => 28, AT => 20, AZ => 28, BA => 20, BE => 16,
+        BG => 22, BH => 22, BR => 29, CH => 21, CR => 22, CY => 28, CZ => 24,
+        DE => 22, DK => 18, DO => 28, EE => 20, ES => 24, FI => 18, FO => 18,
+        FR => 27, GB => 22, GE => 22, GI => 23, GL => 18, GR => 27, GT => 28,
+        HR => 21, HU => 28, IE => 22, IL => 23, IS => 26, IT => 27, JO => 30,
+        KW => 30, KZ => 20, LB => 28, LI => 21, LT => 20, LU => 20, LV => 21,
+        MC => 27, MD => 24, ME => 22, MK => 19, MR => 27, MT => 31, MU => 30,
+        NL => 18, NO => 15, PK => 24, PL => 28, PS => 29, PT => 25, QA => 29,
+        RO => 24, RS => 22, SA => 24, SE => 24, SI => 19, SK => 24, SM => 27,
+        TN => 24, TR => 26, UA => 29, VG => 24, XK => 20
+    }
+}
+
+fn Rosetta::IBAN::is_valid($iban) {
+    my $s = $iban
+    $s =~ s/\s+//g
+    return 0 if $s !~ /^[A-Z0-9]+$/
+    return 0 if length($s) < 4
+    my $country = substr($s, 0, 2)
+    my $lens = Rosetta::IBAN::country_lengths()
+    return 0 if !exists $lens->{$country}
+    return 0 if length($s) != $lens->{$country}
+
+    # Move first 4 chars to end, then convert letters → digits
+    my $rearr = substr($s, 4) . substr($s, 0, 4)
+    my $digits = ""
+    my @cs = ~> $rearr chars
+    for my $c (@cs) {
+        if ($c =~ /[A-Z]/) {
+            $digits .= ord($c) - ord("A") + 10
+        } else {
+            $digits .= $c
+        }
+    }
+    # Compute digits mod 97 in chunks (numeric overflow-safe)
+    my $rem = 0
+    my @ds = ~> $digits chars
+    for my $d (@ds) {
+        $rem = ($rem * 10 + int($d)) % 97
+    }
+    $rem == 1
+}
+
+# Valid IBANs
+assert_ok Rosetta::IBAN::is_valid("GB82 WEST 1234 5698 7654 32"), "UK example with spaces"
+assert_ok Rosetta::IBAN::is_valid("GB82WEST12345698765432"),       "UK without spaces"
+assert_ok Rosetta::IBAN::is_valid("DE89370400440532013000"),       "DE example"
+assert_ok Rosetta::IBAN::is_valid("FR1420041010050500013M02606"),  "FR example"
+assert_ok Rosetta::IBAN::is_valid("ES9121000418450200051332"),     "ES example"
+
+# Invalid: bad check digit
+assert_ok !Rosetta::IBAN::is_valid("GB82WEST12345698765431"), "wrong check"
+# Invalid: bad length
+assert_ok !Rosetta::IBAN::is_valid("GB82WEST123456987654322"), "too long"
+assert_ok !Rosetta::IBAN::is_valid("GB82WEST1234569876543"),   "too short"
+# Invalid: unknown country
+assert_ok !Rosetta::IBAN::is_valid("ZZ82WEST12345698765432"), "unknown country"
+# Invalid: lowercase letters
+assert_ok !Rosetta::IBAN::is_valid("gb82WEST12345698765432"), "lowercase"
+
+test_run

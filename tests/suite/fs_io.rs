@@ -151,9 +151,8 @@ fn getcwd_contains_chdir_target() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.to_str().expect("utf-8");
-    let code = format!(
-        r#"chdir("{p}"); index(getcwd(), "{p}") >= 0 && index(Cwd::getcwd(), "{p}") >= 0 ? 1 : 0"#
-    );
+    let code =
+        format!(r#"chdir("{p}"); index(getcwd(), "{p}") >= 0 && index(pwd(), "{p}") >= 0 ? 1 : 0"#);
     assert_eq!(eval_int(&code), 1);
     std::fs::remove_dir_all(&dir).ok();
 }

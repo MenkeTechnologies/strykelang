@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Test integerness — does a value represent an integer?
+
+fn Rosetta::Integerness::is_integer($v, $tol) {
+    my $eps = (defined($tol)) ? $tol : 0
+    my $rounded = int($v + ($v >= 0 ? 0.5 : -0.5))
+    my $diff = $v - $rounded
+    $diff = -$diff if $diff < 0
+    $diff <= $eps
+}
+
+# Exact integers
+assert_ok  Rosetta::Integerness::is_integer(0, 0),        "0 is integer"
+assert_ok  Rosetta::Integerness::is_integer(1, 0),        "1 is integer"
+assert_ok  Rosetta::Integerness::is_integer(-7, 0),       "-7 is integer"
+assert_ok  Rosetta::Integerness::is_integer(1000000, 0),  "1e6 is integer"
+
+# Non-integers
+assert_ok !Rosetta::Integerness::is_integer(0.5, 0),      "0.5 is not"
+assert_ok !Rosetta::Integerness::is_integer(-3.14, 0),    "-π is not"
+assert_ok !Rosetta::Integerness::is_integer(1.0001, 0),   "1.0001 is not exactly"
+
+# Tolerance allows close-to-integer
+assert_ok  Rosetta::Integerness::is_integer(1.0001, 0.001),   "near 1 within 0.001"
+assert_ok !Rosetta::Integerness::is_integer(1.01,   0.001),   "0.01 outside tolerance"
+
+# Floats that ARE integers numerically
+assert_ok  Rosetta::Integerness::is_integer(2.0, 0),     "2.0 is integer"
+assert_ok  Rosetta::Integerness::is_integer(-100.0, 0),  "-100.0 is integer"
+
+# Boundary: very large floats
+assert_ok  Rosetta::Integerness::is_integer(1e15, 0),    "1e15 is integer"
+
+# Test the rounding-direction handling for negatives
+assert_ok  Rosetta::Integerness::is_integer(-1, 0),      "-1 (negative)"
+assert_ok !Rosetta::Integerness::is_integer(-1.5, 0),    "-1.5 is not"
+
+# Pi roughly
+assert_ok !Rosetta::Integerness::is_integer(3.14159, 0.0001), "pi rejected at high precision"
+
+test_run

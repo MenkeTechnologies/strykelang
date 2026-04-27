@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Extended Euclidean algorithm — find (g, x, y) with a*x + b*y = g = gcd(a,b)
+
+fn Rosetta::ExtGCD::run($a, $b) {
+    return [$a, 1, 0] if $b == 0
+    my $r = Rosetta::ExtGCD::run($b, $a % $b)
+    my $g = $r->[0]
+    my $x1 = $r->[1]
+    my $y1 = $r->[2]
+    my $x = $y1
+    my $y = $x1 - int($a / $b) * $y1
+    [$g, $x, $y]
+}
+
+fn Rosetta::ExtGCD::mod_inverse($a, $m) {
+    my $r = Rosetta::ExtGCD::run($a, $m)
+    return undef if $r->[0] != 1
+    (($r->[1] % $m) + $m) % $m
+}
+
+# Coefficients identity: a*x + b*y == gcd
+for my $pair ([24, 18], [7, 5], [120, 23], [10, 6], [99, 78], [1, 1], [42, 0]) {
+    my $a = $pair->[0]
+    my $b = $pair->[1]
+    my $r = Rosetta::ExtGCD::run($a, $b)
+    my $g = $r->[0]
+    my $x = $r->[1]
+    my $y = $r->[2]
+    my $combo = $a * $x + $b * $y
+    assert_eq $combo, $g, "Bezout identity holds for ($a, $b)"
+}
+
+# Specific gcd values
+assert_eq Rosetta::ExtGCD::run(24, 18)->[0], 6,  "gcd(24,18) = 6"
+assert_eq Rosetta::ExtGCD::run(7, 5)->[0],   1,  "coprime gcd = 1"
+assert_eq Rosetta::ExtGCD::run(42, 0)->[0],  42, "gcd(a, 0) = a"
+assert_eq Rosetta::ExtGCD::run(0, 42)->[0],  42, "gcd(0, b) = b"
+
+# Modular inverse: 3 * x ≡ 1 mod 11 → x = 4
+assert_eq Rosetta::ExtGCD::mod_inverse(3, 11), 4,  "3^-1 mod 11"
+assert_eq Rosetta::ExtGCD::mod_inverse(7, 26), 15, "7^-1 mod 26 (Caesar/affine cipher)"
+assert_eq Rosetta::ExtGCD::mod_inverse(2, 4), undef, "no inverse when gcd > 1"
+
+# Round-trip: a * a^-1 == 1 mod m
+for my $pair ([3, 11], [7, 26], [5, 12], [11, 17]) {
+    my $a    = $pair->[0]
+    my $m    = $pair->[1]
+    my $inv  = Rosetta::ExtGCD::mod_inverse($a, $m)
+    my $prod = ($a * $inv) % $m
+    assert_eq $prod, 1, "$a * inv mod $m = 1"
+}
+
+test_run

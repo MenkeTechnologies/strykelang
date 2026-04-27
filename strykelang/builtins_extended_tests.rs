@@ -595,7 +595,7 @@ fn test_more_color_builtins() {
 }
 
 #[test]
-fn test_list_util_builtins() {
+fn test_bare_builtins() {
     // List builtins (sum, min, max, uniq, ...) are available globally in stryke.
     assert_eq!(run("sum(1, 2, 3)").expect("run").to_int(), 6);
     assert_eq!(run("product(2, 3, 4)").expect("run").to_int(), 24);

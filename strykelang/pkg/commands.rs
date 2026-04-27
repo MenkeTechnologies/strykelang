@@ -197,7 +197,9 @@ fn default_manifest_for(name: &str) -> Manifest {
 /// the same dep twice updates the version in place rather than duplicating.
 pub fn cmd_add(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) {
-        println!("usage: stryke add NAME[@VER] [--dev | --group=NAME] [--path=DIR] [--features=A,B]");
+        println!(
+            "usage: stryke add NAME[@VER] [--dev | --group=NAME] [--path=DIR] [--features=A,B]"
+        );
         println!();
         println!("Add a dependency to stryke.toml and run `s install` to refresh stryke.lock.");
         println!();

@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Modular arithmetic — Z/nZ ring operations on a base
+
+fn Rosetta::ModRing::new($n, $modulus) {
+    [(($n % $modulus) + $modulus) % $modulus, $modulus]
+}
+
+fn Rosetta::ModRing::value($z) { $z->[0] }
+fn Rosetta::ModRing::modulus($z) { $z->[1] }
+
+fn Rosetta::ModRing::add($a, $b) {
+    Rosetta::ModRing::new($a->[0] + $b->[0], $a->[1])
+}
+
+fn Rosetta::ModRing::subtract($a, $b) {
+    Rosetta::ModRing::new($a->[0] - $b->[0], $a->[1])
+}
+
+fn Rosetta::ModRing::mul($a, $b) {
+    Rosetta::ModRing::new($a->[0] * $b->[0], $a->[1])
+}
+
+fn Rosetta::ModRing::pow($a, $exp) {
+    my $result = 1
+    my $base = $a->[0]
+    my $m = $a->[1]
+    my $e = $exp
+    while ($e > 0) {
+        $result = ($result * $base) % $m if $e % 2 == 1
+        $base = ($base * $base) % $m
+        $e = int($e / 2)
+    }
+    Rosetta::ModRing::new($result, $m)
+}
+
+fn Rosetta::ModRing::equal($a, $b) {
+    $a->[0] == $b->[0] && $a->[1] == $b->[1]
+}
+
+# Construction normalizes
+my $a = Rosetta::ModRing::new(15, 7)
+assert_eq Rosetta::ModRing::value($a), 1, "15 mod 7 = 1"
+
+my $b = Rosetta::ModRing::new(-3, 7)
+assert_eq Rosetta::ModRing::value($b), 4, "-3 mod 7 = 4"
+
+# Wrap-around addition
+my $c = Rosetta::ModRing::add(Rosetta::ModRing::new(5, 7), Rosetta::ModRing::new(4, 7))
+assert_eq Rosetta::ModRing::value($c), 2, "5+4 mod 7 = 2"
+
+# Subtraction
+my $d = Rosetta::ModRing::subtract(Rosetta::ModRing::new(2, 7), Rosetta::ModRing::new(5, 7))
+assert_eq Rosetta::ModRing::value($d), 4, "2-5 mod 7 = 4"
+
+# Multiplication
+my $e = Rosetta::ModRing::mul(Rosetta::ModRing::new(3, 7), Rosetta::ModRing::new(4, 7))
+assert_eq Rosetta::ModRing::value($e), 5, "3*4 mod 7 = 5"
+
+# Fermat's little theorem: a^p ≡ a (mod p) for prime p
+for my $base (2, 3, 5, 6, 10) {
+    for my $p (7, 11, 13) {
+        my $r1 = Rosetta::ModRing::pow(Rosetta::ModRing::new($base, $p), $p)
+        my $r2 = Rosetta::ModRing::new($base, $p)
+        assert_ok Rosetta::ModRing::equal($r1, $r2), "Fermat: $base^$p ≡ $base mod $p"
+    }
+}
+
+# 7^4 ≡ 1 mod 5 (since 7 ≡ 2, and 2^4 = 16 ≡ 1)
+my $f = Rosetta::ModRing::pow(Rosetta::ModRing::new(7, 5), 4)
+assert_eq Rosetta::ModRing::value($f), 1, "7^4 mod 5 = 1"
+
+# Distributivity: (a + b) * c == a*c + b*c
+my $A = Rosetta::ModRing::new(7, 13)
+my $B = Rosetta::ModRing::new(8, 13)
+my $C = Rosetta::ModRing::new(9, 13)
+my $left  = Rosetta::ModRing::mul(Rosetta::ModRing::add($A, $B), $C)
+my $right = Rosetta::ModRing::add(Rosetta::ModRing::mul($A, $C),
+                                   Rosetta::ModRing::mul($B, $C))
+assert_ok Rosetta::ModRing::equal($left, $right), "distributivity holds"
+
+test_run

@@ -103,7 +103,7 @@ fn pany_short_circuit_truth() {
 }
 
 #[test]
-fn bare_uniq_list_util_adjacent_dedup() {
+fn bare_uniq_adjacent_dedup() {
     assert_eq!(eval_string(r#"(1, 1, 2, 3) |> uniq |> join ','"#), "1,2,3");
 }
 
@@ -445,7 +445,7 @@ fn readme_chunked_windowed_join_shapes() {
 }
 
 #[test]
-fn bare_any_all_none_list_util_semantics() {
+fn bare_any_all_none_semantics() {
     assert_eq!(eval_int(r#"any { $_ > 2 } (1, 2, 3)"#), 1);
     assert_eq!(eval_int(r#"any { $_ > 5 } (1, 2, 3)"#), 0);
     assert_eq!(eval_int(r#"all { $_ > 0 } (1, 2, 3)"#), 1);

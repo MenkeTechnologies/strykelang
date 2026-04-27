@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sort using a custom comparator (string length, then lex)
+
+fn Rosetta::CustomSort::sort_by_length(@words) {
+    sort { length($a) <=> length($b) || $a cmp $b } @words
+}
+
+fn Rosetta::CustomSort::sort_by_field($items, $field) {
+    sort { $a->{$field} <=> $b->{$field} } @$items
+}
+
+fn Rosetta::CustomSort::sort_desc(@nums) {
+    sort { $b <=> $a } @nums
+}
+
+fn Rosetta::CustomSort::sort_case_insensitive(@words) {
+    sort { lc($a) cmp lc($b) } @words
+}
+
+# Length-then-lex
+my @words = ("banana", "apple", "fig", "kiwi", "pear", "elderberry", "date")
+my @sorted = Rosetta::CustomSort::sort_by_length(@words)
+assert_eq join(",", @sorted),
+    "fig,date,kiwi,pear,apple,banana,elderberry",
+    "by length then lex"
+
+# Sort hash records by age
+my $people = [
+    { name => "Alice", age => 30 },
+    { name => "Bob",   age => 25 },
+    { name => "Carol", age => 35 },
+    { name => "Dave",  age => 25 }
+]
+my @by_age = Rosetta::CustomSort::sort_by_field($people, "age")
+my @names = map { $_->{name} } @by_age
+# Bob(25), Dave(25) order between them is implementation-defined; check ages
+my @ages = map { $_->{age} } @by_age
+assert_eq join(",", @ages), "25,25,30,35", "ages sorted"
+
+# Descending
+my @desc = Rosetta::CustomSort::sort_desc(3, 1, 4, 1, 5, 9, 2, 6)
+assert_eq join(",", @desc), "9,6,5,4,3,2,1,1", "descending"
+
+# Case-insensitive
+my @ci = Rosetta::CustomSort::sort_case_insensitive("BANANA", "apple", "Cherry", "date")
+assert_eq join(",", @ci), "apple,BANANA,Cherry,date", "case-insensitive lex"
+
+# Inline comparator
+my @words2 = ("aaa", "b", "cc")
+my @by_len_only = sort { length($a) <=> length($b) } @words2
+assert_eq join(",", @by_len_only), "b,cc,aaa", "inline len comparator"
+
+# Spaceship operator on numbers
+my @nums = (10, 2, 33, 4, 100, 5)
+my @sorted_nums = sort { $a <=> $b } @nums
+assert_eq join(",", @sorted_nums), "2,4,5,10,33,100", "numeric spaceship"
+
+# Default sort is string lex (so 100 < 2 < 33...)
+my @lex = sort @nums
+assert_eq join(",", @lex), "10,100,2,33,4,5", "default lex sort"
+
+test_run

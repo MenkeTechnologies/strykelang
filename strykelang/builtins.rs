@@ -1428,25 +1428,23 @@ pub(crate) fn try_builtin(
         "touch" => Some(interp.builtin_touch_execute(args, line)),
         "utime" => Some(interp.builtin_utime_execute(args, line)),
         "umask" => Some(interp.builtin_umask_execute(args, line)),
-        "getcwd" | "Cwd::getcwd" | "pwd" => Some(interp.builtin_getcwd_execute(args, line)),
-        "realpath" | "Cwd::realpath" | "rp" => Some(interp.builtin_realpath_execute(args, line)),
+        "getcwd" | "pwd" => Some(interp.builtin_getcwd_execute(args, line)),
+        "realpath" | "rp" => Some(interp.builtin_realpath_execute(args, line)),
         "canonpath" => Some(builtin_canonpath(args)),
         "pipe" => Some(interp.builtin_pipe_execute(args, line)),
         "prototype" => Some(builtin_prototype(args)),
         "binmode" => Some(interp.builtin_binmode(args, line)),
         "fileno" => Some(interp.builtin_fileno(args, line)),
         "tell" => Some(interp.builtin_tell(args, line)),
-        "builtin::tell" => Some(interp.builtin_tell(args, line)),
         "flock" => Some(interp.builtin_flock(args, line)),
         "getc" => Some(interp.builtin_getc(args, line)),
         "readline" => Some({
             let handle = args.first().map(|v| v.to_string());
             interp.readline_builtin_execute(handle.as_deref())
         }),
-        // Qualified names like `builtin::eof` (and `CORE::eof` after the prefix strip above)
-        // parse as [`ExprKind::FuncCall`], not [`ExprKind::Eof`]; must still see `-n`/`-p`
-        // line-mode EOF state.
-        "eof" | "builtin::eof" => Some(interp.eof_builtin_execute(args, line)),
+        // `eof` is a stryke native builtin — bare-name only. `CORE::eof` is
+        // stripped by the dispatch prelude above so it routes here too.
+        "eof" => Some(interp.eof_builtin_execute(args, line)),
         "sysread" => Some(interp.builtin_sysread(args, line)),
         "syswrite" => Some(interp.builtin_syswrite(args, line)),
         "sysseek" => Some(interp.builtin_sysseek(args, line)),
@@ -4255,8 +4253,8 @@ fn builtin_frequencies(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
 }
 
-/// `ddump EXPR, ...` — Data::Dumper-style pretty printer.  Prints to STDOUT
-/// and returns the formatted string so callers can capture it.
+/// `ddump EXPR, ...` — indented pretty printer for stryke data structures.
+/// Prints to STDOUT and returns the formatted string so callers can capture it.
 fn builtin_ddump(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut buf = String::new();
     for (i, val) in args.iter().enumerate() {
@@ -20427,7 +20425,7 @@ fn builtin_is_regex_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
         compile_re(&first_arg_or_topic(interp, args).to_string()).is_some(),
     ))
 }
-/// `cwd` — Cwd. Returns a string.
+/// `cwd` — current working directory. Returns the absolute path as a string.
 fn builtin_cwd() -> PerlResult<PerlValue> {
     Ok(std::env::current_dir()
         .map(|p| PerlValue::string(p.to_string_lossy().into_owned()))

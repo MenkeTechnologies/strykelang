@@ -470,15 +470,9 @@ fn print_cyberpunk_help() {
     println!(
         "  add NAME[@VER] [...]   {G}//{N} Add a dep to stryke.toml; flags: --dev --group=N --path=DIR --features=A,B"
     );
-    println!(
-        "  remove NAME            {G}//{N} Drop a dep from stryke.toml; reruns install"
-    );
-    println!(
-        "  tree                   {G}//{N} Print resolved dep graph from stryke.lock"
-    );
-    println!(
-        "  info NAME              {G}//{N} Show lockfile entry + store path for a dep"
-    );
+    println!("  remove NAME            {G}//{N} Drop a dep from stryke.toml; reruns install");
+    println!("  tree                   {G}//{N} Print resolved dep graph from stryke.lock");
+    println!("  info NAME              {G}//{N} Show lockfile entry + store path for a dep");
     println!(
         "  pkg <subcommand>       {G}//{N} Dispatcher for the package commands above (init/new/install/add/remove/tree/info)"
     );

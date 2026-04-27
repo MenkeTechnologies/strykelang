@@ -69,10 +69,7 @@ fn no_interop_rejects_my_dollar_a_declaration() {
 #[test]
 fn no_interop_rejects_dollar_a_in_reduce_block() {
     // The original failure mode: users writing Perl-style reduce.
-    assert_rejects_dollar_a_or_b(
-        &no_interop_run("p reduce { $a + $b } 1..10"),
-        "$a",
-    );
+    assert_rejects_dollar_a_or_b(&no_interop_run("p reduce { $a + $b } 1..10"), "$a");
 }
 
 // ── Parser interpolation-path rejection (inside `"…"`) ──
@@ -105,7 +102,9 @@ fn no_interop_rejects_dollar_a_with_subscript_in_string() {
 #[test]
 fn no_interop_allows_longer_names_starting_with_a() {
     // Only exact `$a` / `$b` are blocked; `$apple`, `$abc`, `$ab`, `$a1` are fine.
-    let out = no_interop_run(r#"my $apple = 5; my $abc = 7; my $a1 = 9; print $apple + $abc + $a1, "\n""#);
+    let out = no_interop_run(
+        r#"my $apple = 5; my $abc = 7; my $a1 = 9; print $apple + $abc + $a1, "\n""#,
+    );
     assert!(
         out.status.success(),
         "longer names must not be over-rejected: stderr={}",
@@ -117,7 +116,11 @@ fn no_interop_allows_longer_names_starting_with_a() {
 #[test]
 fn no_interop_allows_longer_names_starting_with_b() {
     let out = no_interop_run(r#"my $bell = 1; my $bus = 2; print $bell + $bus, "\n""#);
-    assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "3\n");
 }
 

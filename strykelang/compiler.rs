@@ -5071,7 +5071,7 @@ impl Compiler {
                             Some(root),
                         );
                     }
-                    "getcwd" | "Cwd::getcwd" => {
+                    "getcwd" => {
                         for arg in args {
                             self.compile_expr(arg)?;
                         }

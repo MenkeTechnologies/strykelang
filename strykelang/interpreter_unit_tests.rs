@@ -81,10 +81,15 @@ fn execute_sets_global_phase_start_run_end() {
 #[test]
 fn qualify_sub_key_preserves_package_qualified_sub_name() {
     let mut i = Interpreter::new();
-    let prog = parse("package JSON::PP; 1").unwrap();
+    let prog = parse("package My::Module; 1").unwrap();
     i.execute(&prog).unwrap();
-    assert_eq!(i.qualify_sub_key("B::GV::SAFENAME"), "B::GV::SAFENAME");
-    assert_eq!(i.qualify_sub_key("safename"), "JSON::PP::safename");
+    // A name that is already qualified is preserved verbatim.
+    assert_eq!(
+        i.qualify_sub_key("Other::Pkg::helper"),
+        "Other::Pkg::helper"
+    );
+    // An unqualified name is qualified by the current package.
+    assert_eq!(i.qualify_sub_key("helper"), "My::Module::helper");
 }
 
 #[test]

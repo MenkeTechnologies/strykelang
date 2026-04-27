@@ -4258,7 +4258,7 @@ fn core_builtins_aggregates_more() {
 }
 
 #[test]
-fn core_builtins_list_util_more() {
+fn core_builtins_more() {
     // uniq
     assert_eq!(rs("join(',', uniq(1, 2, 2, 3, 1, 4))"), "1,2,3,4");
     // sample(N, LIST)
@@ -4268,7 +4268,7 @@ fn core_builtins_list_util_more() {
 }
 
 #[test]
-fn core_builtins_list_util_pairs() {
+fn core_builtins_pairs() {
     // pairs
     assert_eq!(
         rs("my @p = pairs(a => 1, b => 2); join(',', map { $_->[0] . ':' . $_->[1] } @p)"),

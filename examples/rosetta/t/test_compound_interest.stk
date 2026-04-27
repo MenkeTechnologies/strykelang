@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compound interest — A = P (1 + r/n)^(n*t)
+
+fn Rosetta::Compound::amount($principal, $rate, $compounds_per_year, $years) {
+    my $period = $rate / $compounds_per_year
+    my $exp    = $compounds_per_year * $years
+    $principal * (1 + $period) ** $exp
+}
+
+fn Rosetta::Compound::continuous($principal, $rate, $years) {
+    # A = P * e^(r*t)
+    my $e = 2.718281828459045
+    $principal * $e ** ($rate * $years)
+}
+
+fn Rosetta::Compound::approx_eq($a, $b, $eps) {
+    my $d = $a - $b
+    $d = -$d if $d < 0
+    $d < $eps
+}
+
+# Basic: 1500 @ 4.3% compounded quarterly for 6 years = 1938.84 (Wikipedia sample)
+my $a1 = Rosetta::Compound::amount(1500, 0.043, 4, 6)
+assert_ok Rosetta::Compound::approx_eq($a1, 1938.84, 0.01), "1500 * (1.01075)^24"
+
+# Annual compounding, 1000 @ 5% for 10 years
+my $a2 = Rosetta::Compound::amount(1000, 0.05, 1, 10)
+assert_ok Rosetta::Compound::approx_eq($a2, 1628.89, 0.01), "1000 * 1.05^10"
+
+# Monthly compounding, 100 @ 12% for 1 year ~ 112.68
+my $a3 = Rosetta::Compound::amount(100, 0.12, 12, 1)
+assert_ok Rosetta::Compound::approx_eq($a3, 112.68, 0.01), "100 monthly 12%"
+
+# Higher frequency approaches continuous
+my $cts   = Rosetta::Compound::continuous(1000, 0.05, 10)
+my $daily = Rosetta::Compound::amount(1000, 0.05, 365, 10)
+my $delta = $cts - $daily
+$delta = -$delta if $delta < 0
+assert_ok $delta < 1, "daily ≈ continuous (within \$1)"
+
+# Zero rate: amount stays principal
+assert_eq Rosetta::Compound::amount(500, 0, 12, 5), 500, "zero rate"
+
+# Zero years: amount stays principal
+assert_eq Rosetta::Compound::amount(500, 0.1, 12, 0), 500, "zero years"
+
+# Continuous: e^(0.05 * 10) = e^0.5 ≈ 1.648721
+my $c2 = Rosetta::Compound::continuous(1, 0.05, 10)
+assert_ok Rosetta::Compound::approx_eq($c2, 1.648721, 0.0001), "continuous e^0.5"
+
+# Doubling time at 7% continuous ≈ 9.9 years
+my $double = Rosetta::Compound::continuous(1, 0.07, 9.9)
+assert_ok Rosetta::Compound::approx_eq($double, 2.0, 0.01), "rule of 70 sanity"
+
+test_run
