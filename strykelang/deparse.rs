@@ -576,6 +576,21 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             }
             buf.push('.');
         }
+        StmtKind::AdviceDecl {
+            kind,
+            pattern,
+            body,
+        } => {
+            let kw = match kind {
+                crate::ast::AdviceKind::Before => "before",
+                crate::ast::AdviceKind::After => "after",
+                crate::ast::AdviceKind::Around => "around",
+            };
+            let _ = write!(buf, "{} \"{}\" {{\n", kw, pattern);
+            deparse_block_into(buf, body, indent + 1);
+            buf.push_str(&ind);
+            buf.push('}');
+        }
     }
 }
 

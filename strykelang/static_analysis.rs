@@ -463,6 +463,7 @@ impl StaticAnalyzer {
             | StmtKind::ClassDecl { .. }
             | StmtKind::TraitDecl { .. }
             | StmtKind::FormatDecl { .. }
+            | StmtKind::AdviceDecl { .. }
             | StmtKind::UsePerlVersion { .. }
             | StmtKind::UseOverload { .. }
             | StmtKind::Last(_)

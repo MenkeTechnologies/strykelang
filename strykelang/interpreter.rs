@@ -1683,6 +1683,10 @@ impl Interpreter {
         Interpreter {
             scope: self.scope.clone(),
             subs: self.subs.clone(),
+            intercepts: self.intercepts.clone(),
+            next_intercept_id: self.next_intercept_id,
+            intercept_ctx_stack: self.intercept_ctx_stack.clone(),
+            intercept_active_names: self.intercept_active_names.clone(),
             struct_defs: self.struct_defs.clone(),
             enum_defs: self.enum_defs.clone(),
             class_defs: self.class_defs.clone(),
@@ -7880,6 +7884,21 @@ impl Interpreter {
             .into()),
             StmtKind::FormatDecl { .. } => {
                 // Registered in `prepare_program_top_level`; no per-statement runtime effect.
+                Ok(PerlValue::UNDEF)
+            }
+            StmtKind::AdviceDecl {
+                kind,
+                pattern,
+                body,
+            } => {
+                let id = self.next_intercept_id;
+                self.next_intercept_id = id.saturating_add(1);
+                self.intercepts.push(crate::aop::Intercept {
+                    id,
+                    kind: *kind,
+                    pattern: pattern.clone(),
+                    body: body.clone(),
+                });
                 Ok(PerlValue::UNDEF)
             }
             StmtKind::Continue(block) => self.exec_block_smart(block),

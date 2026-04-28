@@ -26056,7 +26056,9 @@ fn builtin_intercept_remove(interp: &mut Interpreter, args: &[PerlValue]) -> Per
     let id = args.first().map(|v| v.to_int()).unwrap_or(0).max(0) as u32;
     let before = interp.intercepts.len();
     interp.intercepts.retain(|i| i.id != id);
-    Ok(PerlValue::integer((before - interp.intercepts.len()) as i64))
+    Ok(PerlValue::integer(
+        (before - interp.intercepts.len()) as i64,
+    ))
 }
 
 /// `intercept_clear()` — drop all registered advice; returns count cleared.

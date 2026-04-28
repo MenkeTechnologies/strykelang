@@ -531,6 +531,24 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
             }
             s
         }
+        StmtKind::AdviceDecl {
+            kind,
+            pattern,
+            body,
+        } => {
+            let kw = match kind {
+                crate::ast::AdviceKind::Before => "before",
+                crate::ast::AdviceKind::After => "after",
+                crate::ast::AdviceKind::Around => "around",
+            };
+            format!(
+                "{} \"{}\" {{\n{}\n{}}}",
+                kw,
+                pattern,
+                format_block_indent(body, depth + 1),
+                prefix
+            )
+        }
     };
     format!("{}{}{}", prefix, lab, body)
 }

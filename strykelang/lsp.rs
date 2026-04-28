@@ -755,7 +755,8 @@ fn collect_sub_fqns_stmt(stmt: &Statement, pkg: &mut String, m: &mut HashMap<Str
         | StmtKind::EnumDecl { .. }
         | StmtKind::ClassDecl { .. }
         | StmtKind::TraitDecl { .. }
-        | StmtKind::FormatDecl { .. } => {}
+        | StmtKind::FormatDecl { .. }
+        | StmtKind::AdviceDecl { .. } => {}
         StmtKind::Foreach {
             body,
             continue_block,
