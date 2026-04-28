@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SHA-256
+
+fn Rosetta::SHA256::compute($s) {
+    $s |> sha256()
+}
+
+assert_eq Rosetta::SHA256::compute("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "sha256('abc')"
+assert_eq Rosetta::SHA256::compute("The quick brown fox jumps over the lazy dog"), "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592", "sha256(fox)"
+
+test_run

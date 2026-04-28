@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: XML
+
+fn Rosetta::XML::stringify($val) {
+    $val |> to_xml()
+}
+
+my $data = {
+    user => {
+        id => 123,
+        name => "Alice",
+        roles => ["admin", "editor"]
+    }
+}
+
+my $xml = Rosetta::XML::stringify($data)
+assert_ok $xml =~ /<id>123<\/id>/, "xml contains id"
+assert_ok $xml =~ /<name>Alice<\/name>/, "xml contains name"
+assert_ok $xml =~ /<item>admin<\/item>/, "xml contains role admin"
+
+test_run

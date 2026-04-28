@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Playfair Cipher
+
+fn Rosetta::Playfair::prepare_key($key) {
+    my $alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ" # No J
+    my $k = $key |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    $k .= $alphabet
+    
+    my %seen
+    my @grid
+    for my $c ($k |> chars()) {
+        if (!exists $seen{$c}) {
+            push @grid, $c
+            $seen{$c} = 1
+        }
+    }
+    \@grid
+}
+
+fn Rosetta::Playfair::find_pos($grid, $char) {
+    for (my $i = 0; $i < 25; $i++) {
+        if ($grid->[$i] eq $char) {
+            return [ $i / 5 | 0, $i % 5 ]
+        }
+    }
+    return [ -1, -1 ]
+}
+
+fn Rosetta::Playfair::codec($text, $key, $mode) {
+    my $grid = Rosetta::Playfair::prepare_key($key)
+    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    
+    # Prepare bigrams
+    my @chars = $t |> chars()
+    my @bigrams
+    for (my $i = 0; $i < scalar(@chars); $i += 2) {
+        my $c1 = $chars[$i]
+        my $c2 = ($i + 1 < scalar(@chars)) ? $chars[$i+1] : "X"
+        if ($c1 eq $c2) {
+            push @bigrams, $c1, "X"
+            $i-- # Reprocess second char
+        } else {
+            push @bigrams, $c1, $c2
+        }
+    }
+    
+    my $res = ""
+    my $shift = ($mode eq "enc") ? 1 : 4 # (pos + 4) % 5 is (pos - 1) % 5
+    
+    for (my $i = 0; $i < scalar(@bigrams); $i += 2) {
+        my $p1 = Rosetta::Playfair::find_pos($grid, $bigrams[$i])
+        my $p2 = Rosetta::Playfair::find_pos($grid, $bigrams[$i+1])
+        my ($r1, $c1) = ($p1->[0], $p1->[1])
+        my ($r2, $c2) = ($p2->[0], $p2->[1])
+        
+        if ($r1 == $r2) {
+            $c1 = ($c1 + $shift) % 5
+            $c2 = ($c2 + $shift) % 5
+        } elsif ($c1 == $c2) {
+            $r1 = ($r1 + $shift) % 5
+            $r2 = ($r2 + $shift) % 5
+        } else {
+            my $tmp = $c1
+            $c1 = $c2
+            $c2 = $tmp
+        }
+        $res .= $grid->[$r1 * 5 + $c1] . $grid->[$r2 * 5 + $c2]
+    }
+    $res
+}
+
+my $key = "Playfair Example"
+my $text = "Hide the gold in the tree stump"
+# Prepared text: HI DE TH EG OL DI NT HE TR EX ES TU MP
+# Encrypted: BM ND ZB XD KY BE JV DM UI XM NO UV IF
+
+my $enc = Rosetta::Playfair::codec($text, $key, "enc")
+assert_eq $enc, "BMODZBXDNABEKUDMUIXMMOUVIF", "encode with Playfair"
+assert_eq Rosetta::Playfair::codec($enc, $key, "dec"), "HIDETHEGOLDINTHETREXESTUMP", "decode with Playfair"
+
+test_run

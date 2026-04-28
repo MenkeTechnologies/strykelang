@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Beaufort cipher
+
+fn Rosetta::Beaufort::codec($text, $key) {
+    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $k = $key |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    return "" if length($k) == 0
+    
+    my @t_chars = $t |> chars()
+    my @k_chars = $k |> chars()
+    my $k_len = scalar(@k_chars)
+    
+    my @res = ~> 0:(scalar(@t_chars)-1) map {
+        my $i = $_
+        my $p_val = ord($t_chars[$i]) - ord("A")
+        my $k_val = ord($k_chars[$i % $k_len]) - ord("A")
+        
+        my $c_val = ($k_val - $p_val) % 26
+        if ($c_val < 0) { $c_val += 26 }
+        chr($c_val + ord("A"))
+    }
+    
+    join("", @res)
+}
+
+my $t = "DEFENDTHEEASTWALLOFTHECASTLE"
+my $key = "FORTIFICATION"
+my $enc = Rosetta::Beaufort::codec($t, $key)
+
+# We will just verify it's reciprocal
+assert_eq Rosetta::Beaufort::codec($enc, $key), $t, "decode with Beaufort is reciprocal"
+assert_eq length($enc), length($t), "same length"
+
+test_run

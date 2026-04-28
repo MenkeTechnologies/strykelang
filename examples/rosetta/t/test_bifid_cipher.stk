@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bifid cipher
+
+fn Rosetta::Bifid::prepare_key($key) {
+    my $alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ" # No J
+    my $k = $key |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    $k .= $alphabet
+    
+    my %seen
+    my @grid
+    for my $c ($k |> chars()) {
+        if (!exists $seen{$c}) {
+            push @grid, $c
+            $seen{$c} = 1
+        }
+    }
+    \@grid
+}
+
+fn Rosetta::Bifid::find_pos($grid, $char) {
+    for (my $i = 0; $i < 25; $i++) {
+        if ($grid->[$i] eq $char) {
+            return [$i / 5 | 0, $i % 5]
+        }
+    }
+    return [-1, -1]
+}
+
+fn Rosetta::Bifid::encode($text, $key) {
+    my $grid = Rosetta::Bifid::prepare_key($key)
+    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my @chars = $t |> chars()
+    
+    my @rows
+    my @cols
+    
+    for my $c (@chars) {
+        my $p = Rosetta::Bifid::find_pos($grid, $c)
+        push @rows, $p->[0]
+        push @cols, $p->[1]
+    }
+    
+    my @combined = (@rows, @cols)
+    my @res
+    for (my $i = 0; $i < scalar(@combined); $i += 2) {
+        my $r = $combined[$i]
+        my $c = $combined[$i+1]
+        push @res, $grid->[$r * 5 + $c]
+    }
+    
+    join("", @res)
+}
+
+fn Rosetta::Bifid::decode($text, $key) {
+    my $grid = Rosetta::Bifid::prepare_key($key)
+    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my @chars = $t |> chars()
+    
+    my @combined
+    for my $c (@chars) {
+        my $p = Rosetta::Bifid::find_pos($grid, $c)
+        push @combined, $p->[0], $p->[1]
+    }
+    
+    my $n = scalar(@combined) / 2
+    my @rows = @combined[0 : $n-1]
+    my @cols = @combined[$n : 2*$n-1]
+    
+    my @res = ~> 0:($n-1) map {
+        my $r = $rows[$_]
+        my $c = $cols[$_]
+        $grid->[$r * 5 + $c]
+    }
+    
+    join("", @res)
+}
+
+my $key = "BIFID"
+my $t = "ATTACKATDAWN"
+my $enc = Rosetta::Bifid::encode($t, $key)
+
+# The expected ciphertext for "ATTACKATDAWN" with key "BIFID"
+assert_eq $enc, "DQEDBXYUAYUG", "encode ATTACKATDAWN with Bifid"
+assert_eq Rosetta::Bifid::decode($enc, $key), $t, "decode with Bifid cipher"
+
+test_run

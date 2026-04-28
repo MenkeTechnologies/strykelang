@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numerical integration/Simpson's rule
+
+fn Rosetta::SimpsonsRule::integrate($f, $a, $b, $n) {
+    if ($n % 2 != 0) { $n++ }
+    my $h = ($b - $a) / $n
+    
+    my $sum = $f->($a) + $f->($b)
+    
+    my $half_n = $n / 2
+    my $half_n_minus_1 = $half_n - 1
+    
+    my @odds = ~> 1:$half_n map { $a + (2*$_ - 1) * $h }
+    my @evens = ()
+    if ($half_n_minus_1 >= 1) {
+        @evens = ~> 1:$half_n_minus_1 map { $a + 2*$_ * $h }
+    }
+    
+    my $sum_odds = ~> @odds map { $f->($_) } reduce { $a + $b }
+    my $sum_evens = 0
+    if (scalar(@evens) > 0) {
+        $sum_evens = ~> @evens map { $f->($_) } reduce { $a + $b }
+    }
+    
+    ($h / 3) * ($sum + 4 * $sum_odds + 2 * $sum_evens)
+}
+
+my $f1 = fn($x) { $x ** 3 }
+my $res1 = Rosetta::SimpsonsRule::integrate($f1, 0, 1, 100)
+assert_ok abs($res1 - 0.25) < 0.0001, "integral of x^3 from 0 to 1 is 1/4"
+
+my $f2 = fn($x) { 3 * $x ** 2 + 2 * $x + 1 }
+my $res2 = Rosetta::SimpsonsRule::integrate($f2, 0, 2, 100)
+assert_ok abs($res2 - 14.0) < 0.0001, "integral of 3x^2+2x+1 from 0 to 2 is 14"
+
+test_run

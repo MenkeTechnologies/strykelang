@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Trie
+
+fn Rosetta::Trie::insert($trie, $word) {
+    my $curr = $trie
+    for my $c ($word |> chars()) {
+        $curr->{$c} = {} if !exists $curr->{$c}
+        $curr = $curr->{$c}
+    }
+    $curr->{_is_end} = 1
+}
+
+fn Rosetta::Trie::search($trie, $word) {
+    my $curr = $trie
+    for my $c ($word |> chars()) {
+        return 0 if !exists $curr->{$c}
+        $curr = $curr->{$c}
+    }
+    return $curr->{_is_end} ? 1 : 0
+}
+
+fn Rosetta::Trie::starts_with($trie, $prefix) {
+    my $curr = $trie
+    for my $c ($prefix |> chars()) {
+        return 0 if !exists $curr->{$c}
+        $curr = $curr->{$c}
+    }
+    return 1
+}
+
+my $trie = {}
+Rosetta::Trie::insert($trie, "apple")
+Rosetta::Trie::insert($trie, "banana")
+
+assert_eq Rosetta::Trie::search($trie, "apple"), 1, "search apple"
+assert_eq Rosetta::Trie::search($trie, "app"), 0, "search app"
+assert_eq Rosetta::Trie::starts_with($trie, "app"), 1, "starts_with app"
+assert_eq Rosetta::Trie::search($trie, "banana"), 1, "search banana"
+assert_eq Rosetta::Trie::search($trie, "band"), 0, "search band"
+assert_eq Rosetta::Trie::starts_with($trie, "ban"), 1, "starts_with ban"
+
+# Parallel check for fun
+my @words = ("apple", "banana", "app", "band")
+my @results = ~> @words map { Rosetta::Trie::search($trie, $_) }
+assert_eq join(",", @results), "1,1,0,0", "parallel search results"
+
+Rosetta::Trie::insert($trie, "app")
+assert_eq Rosetta::Trie::search($trie, "app"), 1, "search app after insert"
+
+test_run

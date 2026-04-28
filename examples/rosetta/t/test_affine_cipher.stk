@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Affine cipher
+
+fn Rosetta::Affine::mod_inverse($a, $m) {
+    $a %= $m
+    for (my $x = 1; $x < $m; $x++) {
+        return $x if ($a * $x) % $m == 1
+    }
+    return -1
+}
+
+fn Rosetta::Affine::encode($text, $a, $b) {
+    my $m = 26
+    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my @chars = $t |> chars()
+    
+    my @res = ~> @chars map {
+        my $x = ord($_) - ord("A")
+        my $e = ($a * $x + $b) % $m
+        chr($e + ord("A"))
+    }
+    
+    join("", @res)
+}
+
+fn Rosetta::Affine::decode($text, $a, $b) {
+    my $m = 26
+    my $a_inv = Rosetta::Affine::mod_inverse($a, $m)
+    return "" if $a_inv == -1
+    
+    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my @chars = $t |> chars()
+    
+    my @res = ~> @chars map {
+        my $x = ord($_) - ord("A")
+        my $d = ($a_inv * ($x - $b)) % $m
+        if ($d < 0) { $d += $m }
+        chr($d + ord("A"))
+    }
+    
+    join("", @res)
+}
+
+my $t = "AFFINECIPHER"
+my $enc = Rosetta::Affine::encode($t, 5, 8)
+assert_eq $enc, "IHHWVCSWFRCP", "encode AFFINECIPHER with a=5, b=8"
+assert_eq Rosetta::Affine::decode($enc, 5, 8), "AFFINECIPHER", "decode AFFINECIPHER"
+
+test_run

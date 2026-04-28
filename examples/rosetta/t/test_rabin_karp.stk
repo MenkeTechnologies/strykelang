@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rabin-Karp string search
+
+fn Rosetta::RabinKarp::solve($text, $pattern) {
+    my $n = length($text)
+    my $m = length($pattern)
+    return () if $m > $n
+    
+    my $prime = 101
+    my $h_pattern = 0
+    my $h_text = 0
+    my $h = 1
+    
+    # h = pow(256, m-1) % q
+    for (my $i = 0; $i < $m - 1; $i++) {
+        $h = ($h * 256) % $prime
+    }
+    
+    my @p_chars = $pattern |> chars()
+    my @t_chars = $text |> chars()
+    
+    for (my $i = 0; $i < $m; $i++) {
+        $h_pattern = (256 * $h_pattern + ord($p_chars[$i])) % $prime
+        $h_text = (256 * $h_text + ord($t_chars[$i])) % $prime
+    }
+    
+    my @matches
+    for (my $i = 0; $i <= $n - $m; $i++) {
+        if ($h_pattern == $h_text) {
+            # Check characters
+            my $match = 1
+            for (my $j = 0; $j < $m; $j++) {
+                if ($t_chars[$i + $j] ne $p_chars[$j]) {
+                    $match = 0
+                    last
+                }
+            }
+            push @matches, $i if $match
+        }
+        
+        if ($i < $n - $m) {
+            $h_text = (256 * ($h_text - ord($t_chars[$i]) * $h) + ord($t_chars[$i + $m])) % $prime
+            if ($h_text < 0) {
+                $h_text += $prime
+            }
+        }
+    }
+    @matches
+}
+
+my $text = "AABAACAADAABAABA"
+my $pattern = "AABA"
+my @res = Rosetta::RabinKarp::solve($text, $pattern)
+assert_eq join(",", @res), "0,9,12", "rabin-karp matches"
+
+# Pipeline to transform results (e.g., 1-based indexing)
+my @one_based = @res |> map { $_ + 1 }
+assert_eq join(",", @one_based), "1,10,13", "1-based matches"
+
+test_run

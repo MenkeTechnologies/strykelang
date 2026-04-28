@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hill Cipher (2x2)
+
+fn Rosetta::Hill::mod_inverse($a, $m) {
+    $a %= $m
+    for (my $x = 1; $x < $m; $x++) {
+        return $x if ($a * $x) % $m == 1
+    }
+    return -1
+}
+
+fn Rosetta::Hill::matrix_mod_inverse($matrix, $mod) {
+    # For 2x2 matrix [[a, b], [c, d]]
+    # inverse is (1/det) * [[d, -b], [-c, a]] mod 26
+    my $a = $matrix->[0]->[0]
+    my $b = $matrix->[0]->[1]
+    my $c = $matrix->[1]->[0]
+    my $d = $matrix->[1]->[1]
+    
+    my $det = ($a * $d - $b * $c) % $mod
+    if ($det < 0) { $det += $mod }
+    
+    my $inv_det = Rosetta::Hill::mod_inverse($det, $mod)
+    return undef if $inv_det == -1
+    
+    my @inv = (
+        [ ($d * $inv_det) % $mod, (-$b * $inv_det) % $mod ],
+        [ (-$c * $inv_det) % $mod, ($a * $inv_det) % $mod ]
+    )
+    
+    # Ensure positive
+    for my $row (@inv) {
+        for (my $j = 0; $j < 2; $j++) {
+            if ($row->[$j] < 0) { $row->[$j] += $mod }
+        }
+    }
+    \@inv
+}
+
+fn Rosetta::Hill::codec($text, $key_matrix, $mod) {
+    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    if (length($t) % 2 != 0) { $t .= "X" }
+    
+    my @chars = $t |> chars() |> map { ord($_) - ord("A") }
+    my @res
+    
+    for (my $i = 0; $i < scalar(@chars); $i += 2) {
+        my $v1 = $chars[$i]
+        my $v2 = $chars[$i+1]
+        
+        my $r1 = ($key_matrix->[0]->[0] * $v1 + $key_matrix->[0]->[1] * $v2) % $mod
+        my $r2 = ($key_matrix->[1]->[0] * $v1 + $key_matrix->[1]->[1] * $v2) % $mod
+        
+        push @res, $r1, $r2
+    }
+    
+    @res |> map { chr($_ + ord("A")) } |> join("")
+}
+
+my $key = [
+    [ 3, 3 ],
+    [ 2, 5 ]
+]
+my $mod = 26
+my $text = "HELP"
+# H=7, E=4, L=11, P=15
+# [3,3; 2,5] * [7; 4] = [21+12; 14+20] = [33; 34] mod 26 = [7; 8] = HI
+# [3,3; 2,5] * [11; 15] = [33+45; 22+75] = [78; 97] mod 26 = [0; 19] = AT
+
+my $enc = Rosetta::Hill::codec($text, $key, $mod)
+assert_eq $enc, "HIAT", "Hill cipher encode HELP"
+
+my $inv_key = Rosetta::Hill::matrix_mod_inverse($key, $mod)
+assert_eq Rosetta::Hill::codec($enc, $inv_key, $mod), "HELP", "Hill cipher decode"
+
+test_run

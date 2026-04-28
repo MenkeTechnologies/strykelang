@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rail Fence Cipher
+
+fn Rosetta::RailFence::encode($text, $rails) {
+    return $text if $rails <= 1
+    my @fence = map { [] } 1:$rails
+    my $rail = 0
+    my $dir = 1
+    
+    for my $char ($text |> chars()) {
+        push @{$fence[$rail]}, $char
+        $rail += $dir
+        if ($rail == $rails - 1 || $rail == 0) {
+            $dir *= -1
+        }
+    }
+    
+    @fence |> map { join("", @$_) } |> join("")
+}
+
+fn Rosetta::RailFence::decode($text, $rails) {
+    return $text if $rails <= 1
+    my $len = length($text)
+    my @fence_pattern = map { [] } 1:$rails
+    my $rail = 0
+    my $dir = 1
+    
+    # Mark the positions
+    for (my $i = 0; $i < $len; $i++) {
+        push @{$fence_pattern[$rail]}, $i
+        $rail += $dir
+        if ($rail == $rails - 1 || $rail == 0) {
+            $dir *= -1
+        }
+    }
+    
+    # Map the text chars to the positions
+    my @res = map { "" } 1:$len
+    my $pos = 0
+    for (my $r = 0; $r < $rails; $r++) {
+        for my $idx (@{$fence_pattern[$r]}) {
+            $res[$idx] = substr($text, $pos++, 1)
+        }
+    }
+    
+    join("", @res)
+}
+
+my $t1 = "REDDITCANBEUSEFUL"
+my $e1 = Rosetta::RailFence::encode($t1, 3)
+assert_eq $e1, "RINSLEDTABUEUDCEF", "encode REDDITCANBEUSEFUL with 3 rails"
+assert_eq Rosetta::RailFence::decode($e1, 3), $t1, "decode REDDITCANBEUSEFUL with 3 rails"
+
+my $t2 = "WEAREDISCOVEREDFLEEATONCE"
+my $e2 = Rosetta::RailFence::encode($t2, 3)
+assert_eq $e2, "WECRLTEERDSOEEFEAOCAIVDEN", "encode WEAREDISCOVEREDFLEEATONCE with 3 rails"
+assert_eq Rosetta::RailFence::decode($e2, 3), $t2, "decode WEAREDISCOVEREDFLEEATONCE with 3 rails"
+
+test_run
