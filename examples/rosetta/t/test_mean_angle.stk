@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Averages/Mean angle
+
+fn Rosetta::MeanAngle::compute(@deg_angles) {
+    my $sum_sin = 0
+    my $sum_cos = 0
+    my $pi = 3.14159265358979323846
+    
+    for my $deg (@deg_angles) {
+        my $rad = $deg * $pi / 180
+        $sum_sin += sin($rad)
+        $sum_cos += cos($rad)
+    }
+    
+    my $mean_rad = atan2($sum_sin, $sum_cos)
+    my $mean_deg = $mean_rad * 180 / $pi
+    
+    # Normalize to [0, 360)
+    while ($mean_deg < 0) { $mean_deg += 360 }
+    while ($mean_deg >= 360) { $mean_deg -= 360 }
+    
+    $mean_deg
+}
+
+assert_near Rosetta::MeanAngle::compute(350, 10), 0, 0.00001, "Mean of 350 and 10"
+assert_near Rosetta::MeanAngle::compute(90, 180, 270), 180, 0.00001, "Mean of 90, 180, 270"
+assert_near Rosetta::MeanAngle::compute(10, 20, 30), 20, 0.00001, "Mean of 10, 20, 30"
+
+test_run

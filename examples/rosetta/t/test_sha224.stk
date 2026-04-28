@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SHA-224
+
+fn Rosetta::SHA224::compute($s) {
+    $s |> sha224()
+}
+
+assert_eq Rosetta::SHA224::compute("abc"), "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7", "sha224 abc"
+
+test_run

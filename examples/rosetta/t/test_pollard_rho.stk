@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pollard's rho algorithm
+
+fn Rosetta::PollardRho::gcd($a, $b) {
+    while ($b) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn Rosetta::PollardRho::solve($n) {
+    return $n if $n % 2 == 0 # Simplification for even
+    
+    my $x = 2
+    my $y = 2
+    my $d = 1
+    my $c = 1
+    
+    my $f = fn($v) { ($v * $v + $c) % $n }
+    
+    while ($d == 1) {
+        $x = $f->($x)
+        $y = $f->($f->($y))
+        $d = Rosetta::PollardRho::gcd(abs($x - $y), $n)
+        
+        if ($d == $n) {
+            # Failure, try different c
+            $c++
+            $x = 2
+            $y = 2
+            $d = 1
+        }
+    }
+    $d
+}
+
+assert_eq Rosetta::PollardRho::solve(8051), 97, "Pollard's rho for 8051"
+assert_eq Rosetta::PollardRho::solve(10403), 101, "Pollard's rho for 10403"
+
+test_run

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rock-paper-scissors
+
+fn Rosetta::RPS::play($p1, $p2) {
+    if ($p1 eq $p2) { return "Tie" }
+    
+    my %wins = (
+        "Rock" => "Scissors",
+        "Paper" => "Rock",
+        "Scissors" => "Paper"
+    )
+    
+    if (exists($wins{$p1}) && $wins{$p1} eq $p2) {
+        "Player 1"
+    } else {
+        "Player 2"
+    }
+}
+
+assert_eq Rosetta::RPS::play("Rock", "Rock"), "Tie", "Tie"
+assert_eq Rosetta::RPS::play("Rock", "Scissors"), "Player 1", "P1 Rock beats Scissors"
+assert_eq Rosetta::RPS::play("Paper", "Scissors"), "Player 2", "P2 Scissors beats Paper"
+assert_eq Rosetta::RPS::play("Scissors", "Rock"), "Player 2", "P2 Rock beats Scissors"
+
+test_run

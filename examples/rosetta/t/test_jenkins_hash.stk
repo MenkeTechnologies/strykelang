@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jenkins hash function
+
+fn Rosetta::Jenkins::hash($text) {
+    my $hash = 0
+    my $mod = 4294967296 # 2^32
+    
+    for my $c ($text |> chars() |> map { ord($_) }) {
+        $hash = ($hash + $c) % $mod
+        $hash = ($hash + ($hash << 10)) % $mod
+        $hash = ($hash ^ ($hash >> 6)) % $mod
+    }
+    
+    $hash = ($hash + ($hash << 3)) % $mod
+    $hash = ($hash ^ ($hash >> 11)) % $mod
+    $hash = ($hash + ($hash << 15)) % $mod
+    
+    $hash
+}
+
+my $t1 = "apple"
+my $h1 = Rosetta::Jenkins::hash($t1)
+assert_ok $h1 > 0, "Jenkins hash for apple is > 0"
+
+my $t2 = "Stryke"
+my $h2 = Rosetta::Jenkins::hash($t2)
+assert_ok $h2 > 0, "Jenkins hash for Stryke is > 0"
+assert_ok $h1 != $h2, "Hashes differ"
+
+test_run

@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SHA-1
+
+fn Rosetta::SHA1::compute($s) {
+    $s |> sha1()
+}
+
+assert_eq Rosetta::SHA1::compute("abc"), "a9993e364706816aba3e25717850c26c9cd0d89d", "sha1 abc"
+assert_eq Rosetta::SHA1::compute("The quick brown fox jumps over the lazy dog"), "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12", "sha1 fox"
+
+test_run

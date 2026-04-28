@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: LZ77 compression
+
+fn Rosetta::LZ77::compress($text, $window_size, $buffer_size) {
+    my @chars = $text |> chars()
+    my $n = scalar(@chars)
+    my @res
+    my $pos = 0
+    
+    while ($pos < $n) {
+        my $best_offset = 0
+        my $best_len = 0
+        
+        my $search_start = max(0, $pos - $window_size)
+        
+        for (my $i = $search_start; $i < $pos; $i++) {
+            my $l = 0
+            while ($pos + $l < $n && $l < $buffer_size && $chars[$i + $l] eq $chars[$pos + $l]) {
+                $l++
+            }
+            if ($l >= $best_len) {
+                $best_len = $l
+                $best_offset = $pos - $i
+            }
+        }
+        
+        my $char = ($pos + $best_len < $n) ? $chars[$pos + $best_len] : ""
+        push @res, [$best_offset, $best_len, $char]
+        $pos += $best_len + 1
+    }
+    \@res
+}
+
+fn Rosetta::LZ77::decompress($compressed) {
+    my @res_chars
+    for my $triple (@$compressed) {
+        my ($offset, $len, $char) = @$triple
+        if ($offset > 0) {
+            my $start = scalar(@res_chars) - $offset
+            for (my $i = 0; $i < $len; $i++) {
+                push @res_chars, $res_chars[$start + $i]
+            }
+        }
+        push @res_chars, $char if $char ne ""
+    }
+    join("", @res_chars)
+}
+
+my $t = "abracadabra"
+my $compressed = Rosetta::LZ77::compress($t, 10, 5)
+# a: (0,0,a)
+# b: (0,0,b)
+# r: (0,0,r)
+# a: (3,1,c) -> match 'a' at offset 3
+# d: (0,0,d)
+# a: (2,1,b) -> match 'a' at offset 2 (pos 6, match pos 4) wait.
+# let's just test round trip
+
+my $back = Rosetta::LZ77::decompress($compressed)
+assert_eq $back, $t, "LZ77 round trip abracadabra"
+
+my $t2 = "banana banda"
+my $compressed2 = Rosetta::LZ77::compress($t2, 20, 10)
+assert_eq Rosetta::LZ77::decompress($compressed2), $t2, "LZ77 round trip banana banda"
+
+test_run

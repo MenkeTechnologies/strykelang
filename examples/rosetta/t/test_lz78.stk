@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: LZ78 compression
+
+fn Rosetta::LZ78::compress($text) {
+    my @chars = $text |> chars()
+    my %dict
+    my @res
+    my $w = ""
+    my $dict_size = 1
+    
+    for my $c (@chars) {
+        my $wc = $w . $c
+        if (exists $dict{$wc}) {
+            $w = $wc
+        } else {
+            my $index = ($w eq "") ? 0 : $dict{$w}
+            push @res, [$index, $c]
+            $dict{$wc} = $dict_size++
+            $w = ""
+        }
+    }
+    
+    if ($w ne "") {
+        # Last part
+        my $last_c = substr($w, -1, 1)
+        my $prefix = substr($w, 0, -1)
+        my $index = ($prefix eq "") ? 0 : $dict{$prefix}
+        push @res, [$index, $last_c]
+    }
+    
+    \@res
+}
+
+fn Rosetta::LZ78::decompress($compressed) {
+    my @dict = ("")
+    my $res = ""
+    for my $pair (@$compressed) {
+        my ($index, $c) = @$pair
+        my $entry = $dict[$index] . $c
+        $res .= $entry
+        push @dict, $entry
+    }
+    $res
+}
+
+my $t = "banana banda"
+my $compressed = Rosetta::LZ78::compress($t)
+my $back = Rosetta::LZ78::decompress($compressed)
+assert_eq $back, $t, "LZ78 round trip banana banda"
+
+my $t2 = "abracadabra"
+my $compressed2 = Rosetta::LZ78::compress($t2)
+assert_eq Rosetta::LZ78::decompress($compressed2), $t2, "LZ78 round trip abracadabra"
+
+test_run

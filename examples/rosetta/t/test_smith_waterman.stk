@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Smith-Waterman algorithm
+
+fn Rosetta::SmithWaterman::solve($s1, $s2, $match, $mismatch, $gap) {
+    my @c1 = $s1 |> chars()
+    my @c2 = $s2 |> chars()
+    my $n1 = scalar(@c1)
+    my $n2 = scalar(@c2)
+    
+    # DP table
+    my @h = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    
+    my $max_score = 0
+    my $max_i = 0
+    my $max_j = 0
+    
+    for (my $i = 1; $i <= $n1; $i++) {
+        for (my $j = 1; $j <= $n2; $j++) {
+            my $score = ($c1[$i-1] eq $c2[$j-1]) ? $match : $mismatch
+            my $diag = $h[$i-1]->[$j-1] + $score
+            my $up = $h[$i-1]->[$j] + $gap
+            my $left = $h[$i]->[$j-1] + $gap
+            
+            my $val = max(0, max($diag, max($up, $left)))
+            $h[$i]->[$j] = $val
+            
+            if ($val > $max_score) {
+                $max_score = $val
+                $max_i = $i
+                $max_j = $j
+            }
+        }
+    }
+    
+    # Backtrack
+    my $res1 = ""
+    my $res2 = ""
+    my $i = $max_i
+    my $j = $max_j
+    
+    while ($i > 0 && $j > 0 && $h[$i]->[$j] > 0) {
+        my $score = ($c1[$i-1] eq $c2[$j-1]) ? $match : $mismatch
+        if ($h[$i]->[$j] == $h[$i-1]->[$j-1] + $score) {
+            $res1 = $c1[$i-1] . $res1
+            $res2 = $c2[$j-1] . $res2
+            $i--; $j--
+        } elsif ($h[$i]->[$j] == $h[$i-1]->[$j] + $gap) {
+            $res1 = $c1[$i-1] . $res1
+            $res2 = "-" . $res2
+            $i--
+        } else {
+            $res1 = "-" . $res1
+            $res2 = $c2[$j-1] . $res2
+            $j--
+        }
+    }
+    
+    ($res1, $res2, $max_score)
+}
+
+my ($a1, $a2, $score) = Rosetta::SmithWaterman::solve("GGTTGACTA", "TGTTACGG", 3, -3, -2)
+assert_eq $score, 13, "Smith-Waterman score"
+assert_eq $a1, "GTTGAC", "Smith-Waterman alignment 1"
+assert_eq $a2, "GTT-AC", "Smith-Waterman alignment 2"
+
+test_run

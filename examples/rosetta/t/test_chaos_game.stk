@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chaos game
+
+fn Rosetta::ChaosGame::generate($iterations) {
+    # Equilateral triangle vertices
+    my @vertices = ([0, 0], [1, 0], [0.5, 0.866])
+    
+    my @points
+    my $curr = [0.5, 0.5] # Start point
+    push @points, $curr
+    
+    for (1:$iterations) {
+        my $v = @vertices[int(rand(3))]
+        my $nx = ($curr->[0] + $v->[0]) / 2.0
+        my $ny = ($curr->[1] + $v->[1]) / 2.0
+        $curr = [$nx, $ny]
+        push @points, $curr
+    }
+    \@points
+}
+
+my $pts = Rosetta::ChaosGame::generate(100)
+assert_eq scalar(@$pts), 101, "101 points generated"
+
+# All points should be within the bounding box [0, 1] x [0, 1]
+my $all_in = 1
+for my $p (@$pts) {
+    if ($p->[0] < 0 || $p->[0] > 1 || $p->[1] < 0 || $p->[1] > 1) {
+        $all_in = 0
+    }
+}
+assert_ok $all_in, "all points within bounds"
+
+test_run

@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Simulated annealing
+
+fn Rosetta::Annealing::dist($p1, $p2) {
+    sqrt(($p1->[0] - $p2->[0])**2 + ($p1->[1] - $p2->[1])**2)
+}
+
+fn Rosetta::Annealing::total_dist($path, $cities) {
+    my $d = 0
+    for (my $i = 0; $i < scalar(@$path) - 1; $i++) {
+        $d += Rosetta::Annealing::dist($cities->[$path->[$i]], $cities->[$path->[$i+1]])
+    }
+    $d += Rosetta::Annealing::dist($cities->[$path->[-1]], $cities->[$path->[0]])
+    $d
+}
+
+fn Rosetta::Annealing::solve($cities, $temp, $cooling) {
+    my $n = scalar(@$cities)
+    my @current_path = 0:($n - 1)
+    @current_path = shuffle(@current_path)
+    my $current_dist = Rosetta::Annealing::total_dist(\@current_path, $cities)
+    
+    my $best_path = [ @current_path ]
+    my $best_dist = $current_dist
+    
+    while ($temp > 0.1) {
+        # Swap two cities
+        my $i = int(rand($n))
+        my $j = int(rand($n))
+        next if $i == $j
+        
+        my @new_path = @current_path
+        ($new_path[$i], $new_path[$j]) = ($new_path[$j], $new_path[$i])
+        
+        my $new_dist = Rosetta::Annealing::total_dist(\@new_path, $cities)
+        
+        my $diff = $new_dist - $current_dist
+        if ($diff < 0 || exp(-$diff / $temp) > rand()) {
+            @current_path = @new_path
+            $current_dist = $new_dist
+            
+            if ($current_dist < $best_dist) {
+                $best_dist = $current_dist
+                $best_path = [ @current_path ]
+            }
+        }
+        $temp *= $cooling
+    }
+    
+    ($best_path, $best_dist)
+}
+
+# 10 cities in a circle
+my @cities
+for (my $i = 0; $i < 10; $i++) {
+    my $angle = 2 * 3.14159 * $i / 10
+    push @cities, [ 100 * cos($angle), 100 * sin($angle) ]
+}
+
+# Optimal path is 0,1,2,3,4,5,6,7,8,9 in some order.
+# Dist should be approx 10 * chord length
+my ($path, $dist) = Rosetta::Annealing::solve(\@cities, 1000.0, 0.9995)
+
+# Chord length for 36 deg is 2 * 100 * sin(18 deg) = 200 * 0.309 = 61.8
+# Total dist ~ 618.
+assert_ok $dist < 800, "Found a reasonably short path ($dist)"
+
+test_run

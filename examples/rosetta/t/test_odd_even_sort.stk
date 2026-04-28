@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sorting algorithms/Odd-even sort
+
+fn Rosetta::OddEvenSort::sort($arr) {
+    my @a = @$arr
+    my $n = scalar(@a)
+    my $sorted = 0
+    
+    while (!$sorted) {
+        $sorted = 1
+        for (my $i = 1; $i <= $n - 2; $i += 2) {
+            if ($a[$i] > $a[$i+1]) {
+                ($a[$i], $a[$i+1]) = ($a[$i+1], $a[$i])
+                $sorted = 0
+            }
+        }
+        for (my $i = 0; $i <= $n - 2; $i += 2) {
+            if ($a[$i] > $a[$i+1]) {
+                ($a[$i], $a[$i+1]) = ($a[$i+1], $a[$i])
+                $sorted = 0
+            }
+        }
+    }
+    \@a
+}
+
+my @data = (9, 2, 4, 1, 5, 8, 3, 0, 7, 6)
+my $res = Rosetta::OddEvenSort::sort(\@data)
+
+assert_eq join(",", @$res), "0,1,2,3,4,5,6,7,8,9", "odd-even sort"
+
+test_run

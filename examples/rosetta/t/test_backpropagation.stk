@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Backpropagation
+
+fn Rosetta::Backprop::sigmoid($x) {
+    1.0 / (1.0 + exp(-$x))
+}
+
+fn Rosetta::Backprop::sigmoid_derivative($x) {
+    $x * (1.0 - $x)
+}
+
+fn Rosetta::Backprop::train($data, $labels, $learning_rate, $epochs) {
+    # 2 input, 2 hidden, 1 output
+    my @w_h = ([rand(), rand()], [rand(), rand()])
+    my @b_h = (rand(), rand())
+    my @w_o = (rand(), rand())
+    my @b_o = rand()
+    
+    for (my $e = 0; $e < $epochs; $e++) {
+        for (my $i = 0; $i < scalar(@$data); $i++) {
+            my $x = $data->[$i]
+            my $y = $labels->[$i]
+            
+            # Forward pass
+            my @h_in
+            my @h_out
+            for (my $j = 0; $j < 2; $j++) {
+                my $sum = $b_h[$j]
+                for (my $k = 0; $k < 2; $k++) {
+                    $sum += $x->[$k] * $w_h[$j]->[$k]
+                }
+                push @h_in, $sum
+                push @h_out, Rosetta::Backprop::sigmoid($sum)
+            }
+            
+            my $o_in = $b_o
+            for (my $j = 0; $j < 2; $j++) {
+                $o_in += $h_out[$j] * $w_o[$j]
+            }
+            my $o_out = Rosetta::Backprop::sigmoid($o_in)
+            
+            # Backward pass
+            my $o_error = $y - $o_out
+            my $o_delta = $o_error * Rosetta::Backprop::sigmoid_derivative($o_out)
+            
+            my @h_delta
+            for (my $j = 0; $j < 2; $j++) {
+                my $h_error = $o_delta * $w_o[$j]
+                push @h_delta, $h_error * Rosetta::Backprop::sigmoid_derivative($h_out[$j])
+            }
+            
+            # Update weights
+            for (my $j = 0; $j < 2; $j++) {
+                $w_o[$j] += $o_delta * $h_out[$j] * $learning_rate
+            }
+            $b_o += $o_delta * $learning_rate
+            
+            for (my $j = 0; $j < 2; $j++) {
+                for (my $k = 0; $k < 2; $k++) {
+                    $w_h[$j]->[$k] += $h_delta[$j] * $x->[$k] * $learning_rate
+                }
+                $b_h[$j] += $h_delta[$j] * $learning_rate
+            }
+        }
+    }
+    
+    { w_h => \@w_h, b_h => \@b_h, w_o => \@w_o, b_o => $b_o }
+}
+
+fn Rosetta::Backprop::predict($model, $x) {
+    my $w_h = $model->{w_h}
+    my $b_h = $model->{b_h}
+    my $w_o = $model->{w_o}
+    my $b_o = $model->{b_o}
+    
+    my @h_out
+    for (my $j = 0; $j < 2; $j++) {
+        my $sum = $b_h->[$j]
+        for (my $k = 0; $k < 2; $k++) {
+            $sum += $x->[$k] * $w_h->[$j]->[$k]
+        }
+        push @h_out, Rosetta::Backprop::sigmoid($sum)
+    }
+    
+    my $o_in = $b_o
+    for (my $j = 0; $j < 2; $j++) {
+        $o_in += $h_out[$j] * $w_o->[$j]
+    }
+    Rosetta::Backprop::sigmoid($o_in)
+}
+
+# XOR problem
+my $data = [ [0,0], [0,1], [1,0], [1,1] ]
+my $labels = [0, 1, 1, 0]
+
+my $model = Rosetta::Backprop::train($data, $labels, 0.5, 10000)
+
+assert_ok Rosetta::Backprop::predict($model, [0, 0]) < 0.1, "XOR(0,0) approx 0"
+assert_ok Rosetta::Backprop::predict($model, [0, 1]) > 0.9, "XOR(0,1) approx 1"
+assert_ok Rosetta::Backprop::predict($model, [1, 0]) > 0.9, "XOR(1,0) approx 1"
+assert_ok Rosetta::Backprop::predict($model, [1, 1]) < 0.1, "XOR(1,1) approx 0"
+
+test_run

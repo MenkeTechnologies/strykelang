@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: K-d tree
+
+fn Rosetta::KDTree::build($points, $depth) {
+    my $n = scalar(@$points)
+    return undef if $n == 0
+    
+    my $k = scalar(@{$points->[0]})
+    my $axis = $depth % $k
+    
+    my @sorted = sort { $a->[$axis] <=> $b->[$axis] } @$points
+    my $mid = $n / 2 | 0
+    
+    my @left = @sorted[0 : $mid - 1]
+    my @right = @sorted[$mid + 1 : $n - 1]
+    
+    {
+        point => $sorted[$mid],
+        left  => Rosetta::KDTree::build(\@left, $depth + 1),
+        right => Rosetta::KDTree::build(\@right, $depth + 1)
+    }
+}
+
+fn Rosetta::KDTree::sq_dist($p1, $p2) {
+    my $d = 0
+    for (my $i = 0; $i < scalar(@$p1); $i++) {
+        $d += ($p1->[$i] - $p2->[$i]) ** 2
+    }
+    $d
+}
+
+fn Rosetta::KDTree::nearest($node, $target, $depth, $best) {
+    return $best if !defined $node
+    
+    my $d = Rosetta::KDTree::sq_dist($node->{point}, $target)
+    my $best_d = Rosetta::KDTree::sq_dist($best, $target)
+    
+    if ($d < $best_d) {
+        $best = $node->{point}
+        $best_d = $d
+    }
+    
+    my $k = scalar(@$target)
+    my $axis = $depth % $k
+    
+    my $nearer
+    my $further
+    if ($target->[$axis] < $node->{point}->[$axis]) {
+        $nearer = $node->{left}
+        $further = $node->{right}
+    } else {
+        $nearer = $node->{right}
+        $further = $node->{left}
+    }
+    
+    $best = Rosetta::KDTree::nearest($nearer, $target, $depth + 1, $best)
+    
+    # Check if we need to check the other side
+    if (($target->[$axis] - $node->{point}->[$axis]) ** 2 < Rosetta::KDTree::sq_dist($best, $target)) {
+        $best = Rosetta::KDTree::nearest($further, $target, $depth + 1, $best)
+    }
+    
+    $best
+}
+
+my @points = ([2,3], [5,4], [9,6], [4,7], [8,1], [7,2])
+my $tree = Rosetta::KDTree::build(\@points, 0)
+
+my $target = [9, 2]
+my $near = Rosetta::KDTree::nearest($tree, $target, 0, $points[0])
+assert_eq join(",", @$near), "8,1", "nearest to (9,2) is (8,1)"
+
+test_run

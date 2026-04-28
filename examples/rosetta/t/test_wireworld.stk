@@ -1,0 +1,127 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wireworld
+
+fn Rosetta::Wireworld::step($grid) {
+    my $h = scalar(@$grid)
+    my $w = scalar(@{$grid->[0]})
+    my @new_grid
+    
+    for (my $y = 0; $y < $h; $y++) {
+        my @row
+        for (my $x = 0; $x < $w; $x++) {
+            my $cell = $grid->[$y]->[$x]
+            if ($cell == 1) { # Electron head
+                push @row, 2 # -> Electron tail
+            } elsif ($cell == 2) { # Electron tail
+                push @row, 3 # -> Conductor
+            } elsif ($cell == 3) { # Conductor
+                # Count neighbors that are heads (1)
+                my $heads = 0
+                for (my $dy = -1; $dy <= 1; $dy++) {
+                    for (my $dx = -1; $dx <= 1; $dx++) {
+                        next if $dx == 0 && $dy == 0
+                        my $nx = $x + $dx
+                        my $ny = $y + $dy
+                        if ($nx >= 0 && $nx < $w && $ny >= 0 && $ny < $h) {
+                            $heads++ if $grid->[$ny]->[$nx] == 1
+                        }
+                    }
+                }
+                if ($heads == 1 || $heads == 2) {
+                    push @row, 1 # -> Electron head
+                } else {
+                    push @row, 3 # -> Stays Conductor
+                }
+            } else { # Empty (0)
+                push @row, 0
+            }
+        }
+        push @new_grid, \@row
+    }
+    \@new_grid
+}
+
+# Example: a simple wire with a head
+# 0: empty, 1: head, 2: tail, 3: conductor
+my $grid = [
+    [0, 0, 0, 0, 0],
+    [1, 2, 3, 3, 3],
+    [0, 0, 0, 0, 0]
+]
+
+# Step 1:
+# head(1,1) -> tail(1,1)
+# tail(1,2) -> conductor(1,2)
+# cond(1,3) -> head(1,3) because neighbor tail(1,2) is... wait.
+# Neighbor of (1,2) is (1,1) which is head. So (1,2) has 1 head neighbor.
+# So (1,2) becomes head.
+
+# Actually:
+# Original: [1, 2, 3, 3, 3]
+# 1 -> 2
+# 2 -> 3
+# 3 at pos 2 has neighbor head at pos 0. wait.
+# Indices: 0, 1, 2, 3, 4
+# Pos 0 is head (1).
+# Pos 1 is tail (2).
+# Pos 2 is cond (3).
+# Pos 2 neighbors: Pos 1 (tail), Pos 3 (cond). No heads.
+# Wait, let's re-run rule.
+# head -> tail
+# tail -> cond
+# cond -> head if 1 or 2 heads neighbors.
+
+# If we have: t H C C C
+# Step 1: C t H C C
+# Step 2: C C t H C
+
+my $g0 = [
+    [3, 3, 3, 3, 3],
+    [1, 2, 3, 3, 3],
+    [3, 3, 3, 3, 3]
+]
+
+my $g1 = Rosetta::Wireworld::step($g0)
+# (1,0) was head -> (1,0) is tail (2)
+# (1,1) was tail -> (1,1) is cond (3)
+# (1,2) was cond. Neighbors: (0,1),(0,2),(0,3),(1,1),(1,3),(2,1),(2,2),(2,3)
+# heads in g0? only (1,0).
+# Neighbors of (1,1): (0,0),(0,1),(0,2),(1,0),(1,2),(2,0),(2,1),(2,2)
+# (1,0) is head. So (1,1) has 1 head neighbor.
+# Wait, (1,1) was tail. tail always becomes cond.
+
+# Correct trace for [1, 2, 3, 3, 3]:
+# Step 1: [2, 3, 1, 3, 3]  -- (1,2) becomes head because (1,1) was NOT head, wait.
+# Pos 2 neighbors: (1,1) is tail, (1,3) is cond.
+# Ah, if we want the head to move:
+# [2, 1, 3, 3, 3] ? No.
+# If [1, 2, 3] -> [2, 3, 3] ? No.
+# head(1) -> tail(2)
+# tail(2) -> cond(3)
+# cond(3) -> head(1) if neighbors has 1 or 2 heads.
+
+# Let's test:
+my $test_g = [
+    [0, 1, 2, 3, 0]
+]
+my $test_g1 = Rosetta::Wireworld::step($test_g)
+# (0,1) was head(1) -> (0,1) is tail(2)
+# (0,2) was tail(2) -> (0,2) is cond(3)
+# (0,3) was cond(3). Neighbor (0,2) is tail. (0,4) is empty.
+# So (0,3) stays 3.
+# (0,0) was empty(0) -> stays 0.
+assert_eq $test_g1->[0]->[1], 2, "head to tail"
+assert_eq $test_g1->[0]->[2], 3, "tail to cond"
+
+my $test_g_head = [
+    [1, 3, 3, 3]
+]
+my $test_g_head1 = Rosetta::Wireworld::step($test_g_head)
+# (0,0) head -> tail(2)
+# (0,1) cond. Neighbor (0,0) is head. -> head(1)
+# (0,2) cond. Neighbor (0,1) is cond. -> cond(3)
+assert_eq $test_g_head1->[0]->[0], 2, "head moves right (tail left)"
+assert_eq $test_g_head1->[0]->[1], 1, "head moves right"
+assert_eq $test_g_head1->[0]->[2], 3, "cond stays cond"
+
+test_run

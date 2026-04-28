@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parsing/Shunting-yard algorithm
+
+fn Rosetta::ShuntingYard::precedence($op) {
+    if ($op eq "^") { return 4 }
+    if ($op eq "*" || $op eq "/") { return 3 }
+    if ($op eq "+" || $op eq "-") { return 2 }
+    return 0
+}
+
+fn Rosetta::ShuntingYard::is_right_assoc($op) {
+    if ($op eq "^") { return 1 }
+    return 0
+}
+
+fn Rosetta::ShuntingYard::solve($infix) {
+    my @tokens = $infix |> split(/\s+/) |> grep { $_ ne "" }
+    my @output
+    my @operators
+    
+    for my $token (@tokens) {
+        if ($token =~ /^[0-9]+$/ || $token =~ /^[a-zA-Z]+$/) {
+            push @output, $token
+        } elsif ($token eq "(") {
+            push @operators, $token
+        } elsif ($token eq ")") {
+            while (scalar(@operators) > 0 && $operators[-1] ne "(") {
+                push @output, pop(@operators)
+            }
+            if (scalar(@operators) > 0 && $operators[-1] eq "(") {
+                pop @operators
+            }
+        } elsif ($token =~ /^[\+\-\*\/\^]$/) {
+            while (scalar(@operators) > 0 && $operators[-1] ne "(") {
+                my $top = $operators[-1]
+                my $p_token = Rosetta::ShuntingYard::precedence($token)
+                my $p_top = Rosetta::ShuntingYard::precedence($top)
+                
+                my $cond1 = (!Rosetta::ShuntingYard::is_right_assoc($token) && $p_token <= $p_top)
+                my $cond2 = (Rosetta::ShuntingYard::is_right_assoc($token) && $p_token < $p_top)
+                
+                if ($cond1 || $cond2) {
+                    push @output, pop(@operators)
+                } else {
+                    last
+                }
+            }
+            push @operators, $token
+        }
+    }
+    
+    while (scalar(@operators) > 0) {
+        push @output, pop(@operators)
+    }
+    
+    join(" ", @output)
+}
+
+my $expr1 = "3 + 4 * 2 / ( 1 - 5 ) ^ 2 ^ 3"
+my $postfix1 = Rosetta::ShuntingYard::solve($expr1)
+assert_eq $postfix1, "3 4 2 * 1 5 - 2 3 ^ ^ / +", "shunting yard expression 1"
+
+my $expr2 = "A * B + C"
+my $postfix2 = Rosetta::ShuntingYard::solve($expr2)
+assert_eq $postfix2, "A B * C +", "shunting yard expression 2"
+
+test_run

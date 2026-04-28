@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gradient descent
+
+fn Rosetta::GradientDescent::solve($df, $start_x, $learning_rate, $epsilon, $max_iter) {
+    my $x = $start_x
+    for my $i (1:$max_iter) {
+        my $grad = $df->($x)
+        my $new_x = $x - $learning_rate * $grad
+        
+        if (abs($new_x - $x) < $epsilon) {
+            return $new_x
+        }
+        $x = $new_x
+    }
+    $x
+}
+
+# Minimize f(x) = x^4 - 3x^3 + 2
+# f'(x) = 4x^3 - 9x^2
+my $df = fn($x) { 4 * $x ** 3 - 9 * $x ** 2 }
+
+# Minima is at x=0 (local) or x=9/4=2.25 (global)
+# From x=4, it should go to 2.25
+my $res = Rosetta::GradientDescent::solve($df, 4, 0.01, 0.0001, 1000)
+assert_ok abs($res - 2.25) < 0.01, "Gradient descent find minima 2.25"
+
+# From x=1, it should go to 2.25
+my $res2 = Rosetta::GradientDescent::solve($df, 1, 0.01, 0.0001, 1000)
+assert_ok abs($res2 - 2.25) < 0.01, "Gradient descent from 1 find minima 2.25"
+
+test_run

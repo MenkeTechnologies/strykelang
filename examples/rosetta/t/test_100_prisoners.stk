@@ -1,57 +1,45 @@
 #!/usr/bin/env stryke
 # Rosetta Code: 100 prisoners
 
-fn Rosetta::Prisoners::play_random() {
-    my @boxes = 1:100
+fn Rosetta::Prisoners::play($optimal) {
+    my @boxes = 0..99
     @boxes = shuffle(@boxes)
     
-    for my $p (0..99) {
+    for (my $p = 0; $p < 100; $p++) {
         my $found = 0
-        my @choices = 0..99
-        @choices = shuffle(@choices)
-        
-        for my $i (0..49) {
-            if ($boxes[$choices[$i]] == $p + 1) {
-                $found = 1
-                last
+        if ($optimal) {
+            my $curr = $p
+            for (my $i = 0; $i < 50; $i++) {
+                if ($boxes[$curr] == $p) {
+                    $found = 1
+                    last
+                }
+                $curr = $boxes[$curr]
+            }
+        } else {
+            my @choices = 0..99
+            @choices = shuffle(@choices)
+            for (my $i = 0; $i < 50; $i++) {
+                if ($boxes[$choices[$i]] == $p) {
+                    $found = 1
+                    last
+                }
             }
         }
-        if (!$found) {
-            return 0
-        }
+        return 0 if !$found
     }
     return 1
 }
 
-fn Rosetta::Prisoners::play_optimal() {
-    my @boxes = 1:100
-    @boxes = shuffle(@boxes)
-    
-    for my $p (0..99) {
-        my $found = 0
-        my $current = $p
-        
-        for my $i (0..49) {
-            my $card = $boxes[$current]
-            if ($card == $p + 1) {
-                $found = 1
-                last
-            }
-            $current = $card - 1
-        }
-        if (!$found) {
-            return 0
-        }
-    }
-    return 1
-}
+# Statistics
+my $num_trials = 1000
 
-my $random_wins = ~> 1:100 map { Rosetta::Prisoners::play_random() } reduce { $a + $b }
-assert_eq $random_wins, 0, "Random strategy wins 0 times out of 100"
+# Random strategy: extremely low probability (2^-100)
+my $random_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(0) } |> reduce { $_0 + $_1 }
+assert_eq $random_wins, 0, "Random strategy wins 0 times"
 
-# Use 1000 trials for optimal to ensure we fall into the statistical window
-my $optimal_wins = ~> 1:1000 map { Rosetta::Prisoners::play_optimal() } reduce { $a + $b }
-# 31.18% of 1000 is ~311.
-assert_ok $optimal_wins > 250 && $optimal_wins < 380, "Optimal strategy wins around 31% of the time"
+# Optimal strategy: ~31%
+my $optimal_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(1) } |> reduce { $_0 + $_1 }
+assert_ok $optimal_wins > 250 && $optimal_wins < 380, "Optimal strategy wins around 31%"
 
 test_run

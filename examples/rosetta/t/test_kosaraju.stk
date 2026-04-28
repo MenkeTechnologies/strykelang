@@ -1,0 +1,85 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kosaraju's algorithm
+
+fn Rosetta::Kosaraju::dfs($graph, $node, $visited, $stack) {
+    $visited->{$node} = 1
+    if (exists $graph->{$node}) {
+        for my $neighbor (@{$graph->{$node}}) {
+            if (!exists $visited->{$neighbor}) {
+                Rosetta::Kosaraju::dfs($graph, $neighbor, $visited, $stack)
+            }
+        }
+    }
+    push @$stack, $node
+}
+
+fn Rosetta::Kosaraju::dfs_collect($graph, $node, $visited, $component) {
+    $visited->{$node} = 1
+    push @$component, $node
+    if (exists $graph->{$node}) {
+        for my $neighbor (@{$graph->{$node}}) {
+            if (!exists $visited->{$neighbor}) {
+                Rosetta::Kosaraju::dfs_collect($graph, $neighbor, $visited, $component)
+            }
+        }
+    }
+}
+
+fn Rosetta::Kosaraju::solve($graph) {
+    # 1. Reverse graph
+    my $rev_graph = {}
+    my $all_nodes = {}
+    for my $u (keys %$graph) {
+        $all_nodes->{$u} = 1
+        for my $v (@{$graph->{$u}}) {
+            $all_nodes->{$v} = 1
+            $rev_graph->{$v} = [] if !exists $rev_graph->{$v}
+            push @{$rev_graph->{$v}}, $u
+        }
+    }
+    
+    # 2. First DFS
+    my $stack = []
+    my $visited = {}
+    for my $node (keys %$all_nodes) {
+        if (!exists $visited->{$node}) {
+            Rosetta::Kosaraju::dfs($graph, $node, $visited, $stack)
+        }
+    }
+    
+    # 3. Second DFS
+    my $visited2 = {}
+    my @sccs
+    while (scalar(@$stack) > 0) {
+        my $node = pop @$stack
+        if (!exists $visited2->{$node}) {
+            my $component = []
+            Rosetta::Kosaraju::dfs_collect($rev_graph, $node, $visited2, $component)
+            # Sort component for deterministic testing
+            my @sorted_comp = sort(@$component)
+            push @sccs, \@sorted_comp
+        }
+    }
+    
+    # Sort SCCs for deterministic testing
+    my @sorted_sccs = sort { join(",", @$_0) cmp join(",", @$_1) } @sccs
+    \@sorted_sccs
+}
+
+my $graph = {
+    "A" => ["B"],
+    "B" => ["C"],
+    "C" => ["A"],
+    "D" => ["B", "E"],
+    "E" => ["D", "F"],
+    "F" => ["E"]
+}
+
+my $sccs = Rosetta::Kosaraju::solve($graph)
+my @scc_strs = ~> @$sccs map { join(",", @$_) }
+
+assert_eq scalar(@scc_strs), 2, "Found 2 SCCs"
+assert_eq $scc_strs[0], "A,B,C", "SCC 1 is A,B,C"
+assert_eq $scc_strs[1], "D,E,F", "SCC 2 is D,E,F"
+
+test_run

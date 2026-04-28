@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Metaphone
+
+fn Rosetta::Metaphone::compute($s) {
+    $s |> metaphone()
+}
+
+assert_eq Rosetta::Metaphone::compute("stryke"), "STRK", "metaphone stryke"
+assert_eq Rosetta::Metaphone::compute("programming"), "PRMN", "metaphone programming"
+assert_eq Rosetta::Metaphone::compute("Kryptonite"), "KRPTNT", "metaphone Kryptonite"
+
+# Parallel map test
+my @words = ("Hello", "World", "Stryke")
+my @codes = ~> @words map { metaphone($_) }
+assert_eq join(",", @codes), "HL,WRLT,STRK", "parallel metaphone"
+
+test_run

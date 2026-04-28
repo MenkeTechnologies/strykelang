@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Manacher's algorithm
+
+fn Rosetta::Manacher::solve($s) {
+    my $len = length($s)
+    return $s if $len <= 1
+    
+    # Preprocess: "aba" -> "^#a#b#a#$"
+    my $t = "^#" . (join("#", $s |> chars())) . "#$"
+    my @t_chars = $t |> chars()
+    my $n = scalar(@t_chars)
+    my @p = map { 0 } 1:$n
+    
+    my $c = 0
+    my $r = 0
+    
+    for (my $i = 1; $i < $n - 1; $i++) {
+        my $i_mirror = 2 * $c - $i
+        
+        if ($i < $r) {
+            $p[$i] = min($r - $i, $p[$i_mirror])
+        }
+        
+        # Attempt to expand palindrome centered at i
+        while ($t_chars[$i + (1 + $p[$i])] eq $t_chars[$i - (1 + $p[$i])]) {
+            $p[$i]++
+        }
+        
+        # If palindrome centered at i expand past r, update c and r
+        if ($i + $p[$i] > $r) {
+            $c = $i
+            $r = $i + $p[$i]
+        }
+    }
+    
+    # Find maximum element in @p
+    my $max_len = 0
+    my $center_index = 0
+    for (my $i = 1; $i < $n - 1; $i++) {
+        if ($p[$i] > $max_len) {
+            $max_len = $p[$i]
+            $center_index = $i
+        }
+    }
+    
+    my $start = ($center_index - $max_len) / 2 | 0
+    substr($s, $start, $max_len)
+}
+
+assert_eq Rosetta::Manacher::solve("babad"), "bab", "Manacher babad"
+assert_eq Rosetta::Manacher::solve("cbbd"), "bb", "Manacher cbbd"
+assert_eq Rosetta::Manacher::solve("racecar"), "racecar", "Manacher racecar"
+assert_eq Rosetta::Manacher::solve("baabcd"), "baab", "Manacher baabcd"
+
+test_run

@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mergesort
+
+fn Rosetta::Mergesort::merge($left, $right) {
+    my @res
+    while (scalar(@$left) > 0 && scalar(@$right) > 0) {
+        if ($left->[0] <= $right->[0]) {
+            push @res, shift @$left
+        } else {
+            push @res, shift @$right
+        }
+    }
+    push @res, @$left
+    push @res, @$right
+    \@res
+}
+
+fn Rosetta::Mergesort::sort($arr) {
+    my $n = scalar(@$arr)
+    return $arr if $n <= 1
+    
+    my $mid = $n / 2 | 0
+    my @left = @$arr[0 : $mid - 1]
+    my @right = @$arr[$mid : $n - 1]
+    
+    my $left_sorted = Rosetta::Mergesort::sort(\@left)
+    my $right_sorted = Rosetta::Mergesort::sort(\@right)
+    
+    Rosetta::Mergesort::merge($left_sorted, $right_sorted)
+}
+
+my $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
+my $sorted = Rosetta::Mergesort::sort($data)
+assert_eq join(",", @$sorted), "-31,0,1,2,2,4,65,83,99,782", "mergesort works"
+
+# Parallel sort test (manual partition)
+my $mid = scalar(@$data) / 2 | 0
+my @l = @$data[0 : $mid - 1]
+my @r = @$data[$mid : scalar(@$data)-1]
+
+# Use ~> to sort halves in parallel
+my @parts = (\@l, \@r)
+my @sorted_parts = ~> @parts map { Rosetta::Mergesort::sort($_) }
+my $final = Rosetta::Mergesort::merge($sorted_parts[0], $sorted_parts[1])
+assert_eq join(",", @$final), "-31,0,1,2,2,4,65,83,99,782", "parallel mergesort works"
+
+test_run

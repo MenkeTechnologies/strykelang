@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SHA-384
+
+fn Rosetta::SHA384::compute($s) {
+    $s |> sha384()
+}
+
+assert_eq Rosetta::SHA384::compute("abc"), "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7", "sha384 abc"
+
+test_run

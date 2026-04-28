@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Burrows-Wheeler transform
+
+fn Rosetta::BWT::transform($text) {
+    my $len = length($text)
+    return "" if $len == 0
+    
+    my @chars = $text |> chars()
+    
+    # Create all rotations
+    my @rotations = ~> 0:($len - 1) map {
+        my $i = $_
+        my @rot
+        for (my $j = 0; $j < $len; $j++) {
+            push @rot, $chars[($i + $j) % $len]
+        }
+        join("", @rot)
+    }
+    
+    # Sort rotations lexically
+    my @sorted_rotations = sort(@rotations)
+    
+    # Take the last character of each sorted rotation
+    my $bwt = ""
+    for my $rot (@sorted_rotations) {
+        $bwt .= substr($rot, -1, 1)
+    }
+    
+    $bwt
+}
+
+fn Rosetta::BWT::inverse($bwt) {
+    my $len = length($bwt)
+    return "" if $len == 0
+    
+    my @bwt_chars = $bwt |> chars()
+    my @table = map { "" } 1:$len
+    
+    for (my $i = 0; $i < $len; $i++) {
+        for (my $j = 0; $j < $len; $j++) {
+            $table[$j] = $bwt_chars[$j] . $table[$j]
+        }
+        @table = sort(@table)
+    }
+    
+    # Find the original string (which typically ends with a specific EOF character,
+    # but here we can just pick the one that ends with the assumed EOF or just find the one that matches).
+    # Since we didn't add a special EOF marker, the Rosetta code specification usually specifies checking for the EOF marker.
+    # Without EOF marker, the inverse is ambiguous. We'll use a standard '^' and '$' or just assume the test string has no duplicates for the last char.
+    # To make it simple, we'll just return the first rotation that ends with the original last character? 
+    # Wait, BWT requires an EOF marker like '$' to be reversible uniquely.
+    # Let's assume the string contains a unique '$' marker.
+    
+    my $res = ""
+    for my $row (@table) {
+        if (substr($row, -1, 1) eq "\$") {
+            $res = $row
+            last
+        }
+    }
+    $res
+}
+
+my $t1 = "^BANANA\$"
+my $bwt1 = Rosetta::BWT::transform($t1)
+assert_eq $bwt1, "ANNB^AA\$", "BWT transform"
+assert_eq Rosetta::BWT::inverse($bwt1), $t1, "BWT inverse"
+
+my $t2 = "^abracadabra\$"
+my $bwt2 = Rosetta::BWT::transform($t2)
+assert_eq Rosetta::BWT::inverse($bwt2), $t2, "BWT inverse abracadabra"
+
+test_run

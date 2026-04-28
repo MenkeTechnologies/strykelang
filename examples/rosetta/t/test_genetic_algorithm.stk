@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Genetic algorithm (Simple)
+
+fn Rosetta::GA::fitness($ind, $target) {
+    my $score = 0
+    my @i = $ind |> chars()
+    my @t = $target |> chars()
+    for (my $k = 0; $k < scalar(@t); $k++) {
+        $score++ if $i[$k] eq $t[$k]
+    }
+    $score
+}
+
+fn Rosetta::GA::solve($target) {
+    my $len = length($target)
+    my @alpha = "a".."z", " "
+    
+    my $best = ""
+    for (1:$len) { $best .= $alpha[int(rand(scalar(@alpha)))] }
+    my $best_f = Rosetta::GA::fitness($best, $target)
+    
+    # Actually let's just do a simple (1+1)-GA or hill climber if full GA is too slow for VM
+    # But Rosetta wants a GA.
+    
+    for (my $g = 0; $g < 5000; $g++) {
+        return $best if $best_f == $len
+        
+        my $new = ""
+        my @b = $best |> chars()
+        for (my $i = 0; $i < $len; $i++) {
+            if (rand() < 0.1) {
+                $new .= $alpha[int(rand(scalar(@alpha)))]
+            } else {
+                $new .= $b[$i]
+            }
+        }
+        
+        my $new_f = Rosetta::GA::fitness($new, $target)
+        if ($new_f > $best_f) {
+            $best = $new
+            $best_f = $new_f
+        }
+    }
+    $best
+}
+
+my $target = "stryke"
+my $res = Rosetta::GA::solve($target)
+assert_eq $res, $target, "GA found target string"
+
+test_run

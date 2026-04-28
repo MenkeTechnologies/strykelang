@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Viterbi algorithm
+
+fn Rosetta::Viterbi::solve($obs, $states, $start_p, $trans_p, $emit_p) {
+    my @V = ({})
+    my %path
+    
+    for my $y (@$states) {
+        $V[0]->{$y} = $start_p->{$y} * $emit_p->{$y}->{$obs->[0]}
+        $path{$y} = [$y]
+    }
+    
+    for (my $t = 1; $t < scalar(@$obs); $t++) {
+        push @V, {}
+        my %newpath
+        
+        for my $y (@$states) {
+            my ($prob, $state) = ( -1, undef )
+            for my $y0 (@$states) {
+                my $cur_p = $V[$t-1]->{$y0} * $trans_p->{$y0}->{$y} * $emit_p->{$y}->{$obs->[$t]}
+                if ($cur_p > $prob) {
+                    $prob = $cur_p
+                    $state = $y0
+                }
+            }
+            $V[$t]->{$y} = $prob
+            $newpath{$y} = [ @{$path{$state}}, $y ]
+        }
+        %path = %newpath
+    }
+    
+    my ($prob, $state) = ( -1, undef )
+    for my $y (@$states) {
+        if ($V[-1]->{$y} > $prob) {
+            $prob = $V[-1]->{$y}
+            $state = $y
+        }
+    }
+    
+    $path{$state}
+}
+
+my @states = ("Healthy", "Fever")
+my @observations = ("normal", "cold", "dizzy")
+my %start_p = ( "Healthy" => 0.6, "Fever" => 0.4 )
+my %trans_p = (
+    "Healthy" => { "Healthy" => 0.7, "Fever" => 0.3 },
+    "Fever"   => { "Healthy" => 0.4, "Fever" => 0.6 }
+)
+my %emit_p = (
+    "Healthy" => { "normal" => 0.5, "cold" => 0.4, "dizzy" => 0.1 },
+    "Fever"   => { "normal" => 0.1, "cold" => 0.3, "dizzy" => 0.6 }
+)
+
+my $res = Rosetta::Viterbi::solve(\@observations, \@states, \%start_p, \%trans_p, \%emit_p)
+assert_eq join(",", @$res), "Healthy,Healthy,Fever", "Viterbi most likely states"
+
+test_run

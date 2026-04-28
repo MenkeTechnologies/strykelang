@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HMAC
+
+fn Rosetta::HMAC::compute($key, $msg) {
+    hmac_sha256($key, $msg)
+}
+
+# Values from Wikipedia or online generator
+assert_eq Rosetta::HMAC::compute("key", "msg"), "2d93cbc1be167bcb1637a4a23cbff01a7878f0c50ee833954ea5221bb1b8c628", "hmac_sha256 key msg"
+
+test_run

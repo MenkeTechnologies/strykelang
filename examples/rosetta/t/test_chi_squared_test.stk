@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chi-squared test
+
+fn Rosetta::ChiSquared::solve($observed, $expected) {
+    # Parallel map to compute terms
+    ~> zip($observed, $expected) map {
+        my $pair = $_0
+        my $obs = $pair->[0]
+        my $exp = $pair->[1]
+        (($obs - $exp) ** 2) / $exp
+    } |> reduce { $_0 + $_1 }
+}
+
+# Example from Wikipedia or common source
+# 6-sided die rolled 60 times. Observed: 5, 8, 9, 12, 7, 19
+# Expected: 10, 10, 10, 10, 10, 10
+my @obs = (5, 8, 9, 12, 7, 19)
+my @exp = (10, 10, 10, 10, 10, 10)
+
+my $chi = Rosetta::ChiSquared::solve(\@obs, \@exp)
+# (5-10)^2/10 = 25/10 = 2.5
+# (8-10)^2/10 = 4/10 = 0.4
+# (9-10)^2/10 = 1/10 = 0.1
+# (12-10)^2/10 = 4/10 = 0.4
+# (7-10)^2/10 = 9/10 = 0.9
+# (19-10)^2/10 = 81/10 = 8.1
+# Sum = 2.5 + 0.4 + 0.1 + 0.4 + 0.9 + 8.1 = 12.4
+assert_eq $chi, 12.4, "Chi-squared value for die rolls"
+
+test_run

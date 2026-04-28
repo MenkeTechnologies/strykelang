@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: TF-IDF
+
+fn Rosetta::TFIDF::tf($term, $doc) {
+    my @words = split(/\s+/, lc($doc))
+    my $count = 0
+    for my $w (@words) {
+        $count++ if $w eq $term
+    }
+    $count
+}
+
+fn Rosetta::TFIDF::idf($term, $docs) {
+    my $num_docs = scalar(@$docs)
+    my $count = 0
+    for my $doc (@$docs) {
+        my @words = split(/\s+/, lc($doc))
+        my $found = 0
+        for my $w (@words) {
+            if ($w eq $term) { $found = 1; last }
+        }
+        $count++ if $found
+    }
+    
+    $count == 0 ? 0 : log($num_docs / $count)
+}
+
+fn Rosetta::TFIDF::solve($term, $doc, $docs) {
+    Rosetta::TFIDF::tf($term, $doc) * Rosetta::TFIDF::idf($term, $docs)
+}
+
+my @documents = (
+    "this document is about stryke",
+    "stryke is a parallel perl interpreter",
+    "parallel programming is fun",
+    "perl and stryke share some syntax"
+)
+
+my $t1 = Rosetta::TFIDF::tf("stryke", $documents[0])
+assert_eq $t1, 1, "tf of stryke in doc 1 is 1"
+
+my $idf1 = Rosetta::TFIDF::idf("stryke", \@documents)
+# stryke appears in 3 out of 4 documents -> log(4/3) -> log(1.3333) -> 0.28768
+assert_ok abs($idf1 - 0.28768) < 0.001, "idf of stryke is approx 0.288"
+
+my $tfidf = Rosetta::TFIDF::solve("stryke", $documents[0], \@documents)
+assert_ok abs($tfidf - 0.28768) < 0.001, "tf-idf of stryke in doc 1"
+
+# Using parallel map to calculate tf-idf for 'parallel' across all docs
+# 'parallel' appears in doc 1 and doc 2.
+my @parallel_scores = ~> @documents map { Rosetta::TFIDF::solve("parallel", $_, \@documents) }
+# idf for parallel: log(4/2) = log(2) = 0.6931
+assert_eq $parallel_scores[0], 0, "tf-idf of parallel in doc 0 is 0"
+assert_ok abs($parallel_scores[1] - 0.6931) < 0.001, "tf-idf of parallel in doc 1 is approx 0.693"
+assert_ok abs($parallel_scores[2] - 0.6931) < 0.001, "tf-idf of parallel in doc 2 is approx 0.693"
+assert_eq $parallel_scores[3], 0, "tf-idf of parallel in doc 3 is 0"
+
+test_run

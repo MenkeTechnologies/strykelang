@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitap algorithm
+
+fn Rosetta::Bitap::solve($text, $pattern) {
+    my $m = length($pattern)
+    return 0 if $m == 0
+    
+    my @p_chars = $pattern |> chars()
+    my @mask = map { ~0 } 0..255
+    
+    for (my $i = 0; $i < $m; $i++) {
+        my $char_code = ord($p_chars[$i])
+        $mask[$char_code] &= ~(1 << $i)
+    }
+    
+    my $r = ~1
+    my @t_chars = $text |> chars()
+    for (my $i = 0; $i < scalar(@t_chars); $i++) {
+        my $char_code = ord($t_chars[$i])
+        $r |= $mask[$char_code]
+        $r <<= 1
+        
+        if (!($r & (1 << $m))) {
+            return $i - $m + 1
+        }
+    }
+    
+    return -1
+}
+
+assert_eq Rosetta::Bitap::solve("hello world", "world"), 6, "Bitap find world"
+assert_eq Rosetta::Bitap::solve("hello world", "word"), -1, "Bitap not find word"
+assert_eq Rosetta::Bitap::solve("stryke is fast", "stryke"), 0, "Bitap find stryke"
+
+test_run

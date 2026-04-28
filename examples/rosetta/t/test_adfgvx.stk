@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: ADFGVX cipher
+
+fn Rosetta::ADFGVX::prepare_grid($key_square) {
+    my %grid
+    my @chars = $key_square |> chars()
+    my @labels = ("A", "D", "F", "G", "V", "X")
+    for (my $i = 0; $i < 6; $i++) {
+        for (my $j = 0; $j < 6; $j++) {
+            my $c = $chars[$i * 6 + $j]
+            $grid{$c} = $labels[$i] . $labels[$j]
+        }
+    }
+    \%grid
+}
+
+fn Rosetta::ADFGVX::encode($text, $key_square, $keyword) {
+    my $grid = Rosetta::ADFGVX::prepare_grid($key_square)
+    my $t = $text |> uc() |> { $_ =~ s/[^A-Z0-9]//gr }
+    
+    my $fractionated = ""
+    for my $c ($t |> chars()) {
+        $fractionated .= $grid->{$c}
+    }
+    
+    # Columnar transposition
+    my @kw = $keyword |> chars()
+    my $n = scalar(@kw)
+    my @cols
+    for (1:$n) { push @cols, "" }
+    
+    my @f_chars = $fractionated |> chars()
+    for (my $i = 0; $i < scalar(@f_chars); $i++) {
+        $cols[$i % $n] .= $f_chars[$i]
+    }
+    
+    # Sort columns by keyword
+    my @indices = sort { $kw[$_0] cmp $kw[$_1] } 0:($n - 1)
+    
+    my $res = ""
+    for my $idx (@indices) {
+        $res .= $cols[$idx]
+    }
+    $res
+}
+
+my $key_sq = "NA1C3H8TB2O5W7PK4M6RS+0GDTLY9IQUVJXFZ" # 36 chars
+my $kw = "PRIVACY"
+my $text = "ATTACK AT 1200"
+# Expected ciphertext: depends on grid and keyword sorting.
+# We'll just test round trip properties or a known small example.
+
+# Simplified 6x6 grid
+my $sq = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+my $enc = Rosetta::ADFGVX::encode("HELLO", $sq, "KEY")
+
+assert_ok length($enc) == 10, "encoded length is twice the text length"
+
+test_run
