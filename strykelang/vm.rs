@@ -1938,7 +1938,10 @@ impl<'a> VM<'a> {
 
         // Helper to pop the active-name guard before bubbling an error.
         // Inlined where used to keep ownership simple.
-        for adv in matching.iter().filter(|i| matches!(i.kind, AdviceKind::Before)) {
+        for adv in matching
+            .iter()
+            .filter(|i| matches!(i.kind, AdviceKind::Before))
+        {
             match self.interp.exec_block(&adv.body) {
                 Ok(_) => {}
                 Err(FlowOrError::Flow(_)) => {}
@@ -1954,68 +1957,69 @@ impl<'a> VM<'a> {
             .find(|i| matches!(i.kind, AdviceKind::Around));
 
         let t0 = std::time::Instant::now();
-        let retval = if let Some(around) = around {
-            self.interp
-                .intercept_ctx_stack
-                .push(crate::aop::InterceptCtx {
-                    name: name.to_string(),
-                    args: args.clone(),
-                    proceeded: false,
-                    retval: PerlValue::UNDEF,
+        let retval =
+            if let Some(around) = around {
+                self.interp
+                    .intercept_ctx_stack
+                    .push(crate::aop::InterceptCtx {
+                        name: name.to_string(),
+                        args: args.clone(),
+                        proceeded: false,
+                        retval: PerlValue::UNDEF,
+                    });
+                let exec_res = self.interp.exec_block(&around.body);
+                let ctx = self.interp.intercept_ctx_stack.pop().unwrap_or_else(|| {
+                    crate::aop::InterceptCtx {
+                        name: name.to_string(),
+                        args: Vec::new(),
+                        proceeded: false,
+                        retval: PerlValue::UNDEF,
+                    }
                 });
-            let exec_res = self.interp.exec_block(&around.body);
-            let ctx = self.interp.intercept_ctx_stack.pop().unwrap_or_else(|| {
-                crate::aop::InterceptCtx {
-                    name: name.to_string(),
-                    args: Vec::new(),
-                    proceeded: false,
-                    retval: PerlValue::UNDEF,
-                }
-            });
-            match exec_res {
-                Ok(_) | Err(FlowOrError::Flow(_)) => {
-                    if ctx.proceeded {
-                        ctx.retval
-                    } else {
-                        PerlValue::UNDEF
+                match exec_res {
+                    Ok(_) | Err(FlowOrError::Flow(_)) => {
+                        if ctx.proceeded {
+                            ctx.retval
+                        } else {
+                            PerlValue::UNDEF
+                        }
+                    }
+                    Err(FlowOrError::Error(e)) => {
+                        self.interp.intercept_active_names.pop();
+                        return Err(e.at_line(line));
                     }
                 }
-                Err(FlowOrError::Error(e)) => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(e.at_line(line));
+            } else if let Some(sub) = sub_opt {
+                match self.interp.call_sub(&sub, args.clone(), want, line) {
+                    Ok(v) => v,
+                    Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                    Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
+                    Err(FlowOrError::Error(e)) => {
+                        self.interp.intercept_active_names.pop();
+                        return Err(e.at_line(line));
+                    }
                 }
-            }
-        } else if let Some(sub) = sub_opt {
-            match self.interp.call_sub(&sub, args.clone(), want, line) {
-                Ok(v) => v,
-                Err(FlowOrError::Flow(Flow::Return(v))) => v,
-                Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
-                Err(FlowOrError::Error(e)) => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(e.at_line(line));
+            } else {
+                // Sub not resolvable — fall back to builtins (matches the non-advice fallback).
+                let saved_wa_call = self.interp.wantarray_kind;
+                self.interp.wantarray_kind = want;
+                let r = crate::builtins::try_builtin(self.interp, name, &args, line);
+                self.interp.wantarray_kind = saved_wa_call;
+                match r {
+                    Some(Ok(v)) => v,
+                    Some(Err(e)) => {
+                        self.interp.intercept_active_names.pop();
+                        return Err(e.at_line(line));
+                    }
+                    None => {
+                        self.interp.intercept_active_names.pop();
+                        return Err(PerlError::runtime(
+                            format!("undefined sub `{}` (advice fallback)", name),
+                            line,
+                        ));
+                    }
                 }
-            }
-        } else {
-            // Sub not resolvable — fall back to builtins (matches the non-advice fallback).
-            let saved_wa_call = self.interp.wantarray_kind;
-            self.interp.wantarray_kind = want;
-            let r = crate::builtins::try_builtin(self.interp, name, &args, line);
-            self.interp.wantarray_kind = saved_wa_call;
-            match r {
-                Some(Ok(v)) => v,
-                Some(Err(e)) => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(e.at_line(line));
-                }
-                None => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(PerlError::runtime(
-                        format!("undefined sub `{}` (advice fallback)", name),
-                        line,
-                    ));
-                }
-            }
-        };
+            };
         let elapsed = t0.elapsed();
 
         // Timing context vars for after-advice (matches zshrs INTERCEPT_MS / INTERCEPT_US).
@@ -2031,7 +2035,10 @@ impl<'a> VM<'a> {
             .scope
             .declare_scalar("INTERCEPT_RESULT", retval.clone());
 
-        for adv in matching.iter().filter(|i| matches!(i.kind, AdviceKind::After)) {
+        for adv in matching
+            .iter()
+            .filter(|i| matches!(i.kind, AdviceKind::After))
+        {
             match self.interp.exec_block(&adv.body) {
                 Ok(_) => {}
                 Err(FlowOrError::Flow(_)) => {}
@@ -2066,11 +2073,7 @@ impl<'a> VM<'a> {
         // common case (no intercepts registered); when the registry is non-empty we still bail
         // out cheaply unless a glob actually matches.
         if !self.interp.intercepts.is_empty()
-            && !self
-                .interp
-                .intercept_active_names
-                .iter()
-                .any(|n| n == name)
+            && !self.interp.intercept_active_names.iter().any(|n| n == name)
             && self
                 .interp
                 .intercepts

@@ -537,6 +537,24 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             s.push('.');
             s
         }
+        StmtKind::AdviceDecl {
+            kind,
+            pattern,
+            body,
+        } => {
+            let kw = match kind {
+                crate::ast::AdviceKind::Before => "before",
+                crate::ast::AdviceKind::After => "after",
+                crate::ast::AdviceKind::Around => "around",
+            };
+            format!(
+                "{} \"{}\" {{\n{}\n{}}}",
+                kw,
+                pattern,
+                convert_block(body, depth + 1),
+                pfx
+            )
+        }
         StmtKind::Tie {
             target,
             class,
