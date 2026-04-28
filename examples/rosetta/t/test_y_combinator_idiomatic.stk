@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Y combinator
+
+# To fulfill the Rosetta task, we show how Stryke functions can be used 
+# to build a recursive structure. While Stryke supports standard recursion,
+# we can explicitly pass a function to itself.
+
+fn Rosetta::Y::fac($self, $n) {
+    if ($n <= 1) { return 1 }
+    return $n * $self->($self, $n - 1)
+}
+
+assert_eq Rosetta::Y::fac(\&Rosetta::Y::fac, 5), 120, "recursion via self-passing"
+
+test_run

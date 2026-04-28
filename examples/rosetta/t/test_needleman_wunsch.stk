@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Needleman-Wunsch algorithm
+
+fn Rosetta::NeedlemanWunsch::solve($s1, $s2, $match, $mismatch, $gap) {
+    my @c1 = $s1 |> chars()
+    my @c2 = $s2 |> chars()
+    my $n1 = scalar(@c1)
+    my $n2 = scalar(@c2)
+    
+    my @f = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    
+    for (my $i = 0; $i <= $n1; $i++) { $f[$i]->[0] = $i * $gap }
+    for (my $j = 0; $j <= $n2; $j++) { $f[0]->[$j] = $j * $gap }
+    
+    for (my $i = 1; $i <= $n1; $i++) {
+        for (my $j = 1; $j <= $n2; $j++) {
+            my $score = ($c1[$i-1] eq $c2[$j-1]) ? $match : $mismatch
+            my $match_v = $f[$i-1]->[$j-1] + $score
+            my $delete = $f[$i-1]->[$j] + $gap
+            my $insert = $f[$i]->[$j-1] + $gap
+            $f[$i]->[$j] = max($match_v, max($delete, $insert))
+        }
+    }
+    
+    my $res1 = ""
+    my $res2 = ""
+    my $i = $n1
+    my $j = $n2
+    
+    while ($i > 0 || $j > 0) {
+        if ($i > 0 && $j > 0) {
+            my $score = ($c1[$i-1] eq $c2[$j-1]) ? $match : $mismatch
+            if ($f[$i]->[$j] == $f[$i-1]->[$j-1] + $score) {
+                $res1 = $c1[$i-1] . $res1
+                $res2 = $c2[$j-1] . $res2
+                $i--; $j--
+                next
+            }
+        }
+        if ($i > 0 && $f[$i]->[$j] == $f[$i-1]->[$j] + $gap) {
+            $res1 = $c1[$i-1] . $res1
+            $res2 = "-" . $res2
+            $i--
+        } else {
+            $res1 = "-" . $res1
+            $res2 = $c2[$j-1] . $res2
+            $j--
+        }
+    }
+    
+    ($res1, $res2, $f[$n1]->[$n2])
+}
+
+my ($a1, $a2, $score) = Rosetta::NeedlemanWunsch::solve("GATTACA", "GCATGCU", 1, -1, -1)
+assert_eq $score, 0, "Needleman-Wunsch score"
+# GATTACA
+# GCA-TGCU
+# G A T T A C A -
+# G C A - T G C U
+# The actual alignment can vary but score should be 0.
+# Let's check score.
+assert_eq length($a1), length($a2), "alignment lengths match"
+
+test_run

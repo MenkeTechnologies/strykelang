@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 100 doors
+
+fn Rosetta::Doors::solve($num_doors) {
+    my @doors = map { 0 } 1:$num_doors
+    
+    for (my $pass = 1; $pass <= $num_doors; $pass++) {
+        # Every pass-th door
+        for (my $i = $pass - 1; $i < $num_doors; $i += $pass) {
+            $doors[$i] = !$doors[$i]
+        }
+    }
+    
+    my @open
+    for (my $i = 0; $i < $num_doors; $i++) {
+        push @open, $i + 1 if $doors[$i]
+    }
+    \@open
+}
+
+fn Rosetta::Doors::optimized($num_doors) {
+    # Optimized: only perfect squares are open
+    ~> 1:$num_doors map {
+        my $root = sqrt($_)
+        $root == int($root) ? $_ : undef
+    } |> grep { defined }
+}
+
+my $res = Rosetta::Doors::solve(100)
+my @opt = Rosetta::Doors::optimized(100)
+
+assert_eq join(",", @$res), "1,4,9,16,25,36,49,64,81,100", "100 doors solve"
+assert_eq join(",", @opt), "1,4,9,16,25,36,49,64,81,100", "100 doors optimized"
+
+test_run

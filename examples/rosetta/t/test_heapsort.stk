@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Heapsort
+
+fn Rosetta::Heapsort::sift_down($arr, $start, $end) {
+    my $root = $start
+    while ($root * 2 + 1 <= $end) {
+        my $child = $root * 2 + 1
+        my $swap = $root
+        
+        if ($arr->[$swap] < $arr->[$child]) {
+            $swap = $child
+        }
+        if ($child + 1 <= $end && $arr->[$swap] < $arr->[$child + 1]) {
+            $swap = $child + 1
+        }
+        
+        if ($swap == $root) {
+            return
+        } else {
+            ($arr->[$root], $arr->[$swap]) = ($arr->[$swap], $arr->[$root])
+            $root = $swap
+        }
+    }
+}
+
+fn Rosetta::Heapsort::heapify($arr, $count) {
+    my $start = ($count - 2) / 2 | 0
+    while ($start >= 0) {
+        Rosetta::Heapsort::sift_down($arr, $start, $count - 1)
+        $start--
+    }
+}
+
+fn Rosetta::Heapsort::sort($arr) {
+    my $count = scalar(@$arr)
+    Rosetta::Heapsort::heapify($arr, $count)
+    
+    my $end = $count - 1
+    while ($end > 0) {
+        ($arr->[0], $arr->[$end]) = ($arr->[$end], $arr->[0])
+        $end--
+        Rosetta::Heapsort::sift_down($arr, 0, $end)
+    }
+    $arr
+}
+
+my $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
+my $sorted = Rosetta::Heapsort::sort($data)
+assert_eq join(",", @$sorted), "-31,0,1,2,2,4,65,83,99,782", "heapsort works"
+
+test_run

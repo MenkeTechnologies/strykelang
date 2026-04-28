@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 9 billion names of God the integer
+
+fn Rosetta::Partitions::solve($n) {
+    # Using the partition function recurrence or DP
+    # p(n) = sum_{k=1}^n (-1)^(k-1) [ p(n - k(3k-1)/2) + p(n - k(3k+1)/2) ]
+    # But for small n, we can use simpler DP:
+    # ways[i] = ways to sum to i
+    
+    my @ways = (1)
+    push @ways, 0 for 1:$n
+    
+    for (my $i = 1; $i <= $n; $i++) {
+        for (my $j = $i; $j <= $n; $j++) {
+            $ways[$j] += $ways[$j - $i]
+        }
+    }
+    $ways[$n]
+}
+
+assert_eq Rosetta::Partitions::solve(1), 1, "p(1)=1"
+assert_eq Rosetta::Partitions::solve(2), 2, "p(2)=2"
+assert_eq Rosetta::Partitions::solve(3), 3, "p(3)=3"
+assert_eq Rosetta::Partitions::solve(4), 5, "p(4)=5"
+assert_eq Rosetta::Partitions::solve(5), 7, "p(5)=7"
+assert_eq Rosetta::Partitions::solve(10), 42, "p(10)=42"
+assert_eq Rosetta::Partitions::solve(25), 1958, "p(25)=1958"
+
+test_run

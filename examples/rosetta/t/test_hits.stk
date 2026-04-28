@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HITS algorithm
+
+fn Rosetta::HITS::solve($links, $epsilon) {
+    # HITS computes Hub and Authority scores
+    my %pages
+    for my $u (keys %$links) {
+        $pages{$u} = 1
+        for my $v (@{$links->{$u}}) {
+            $pages{$v} = 1
+        }
+    }
+    
+    my @all_pages = keys %pages
+    my $n = scalar(@all_pages)
+    
+    my %auth
+    my %hub
+    for my $p (@all_pages) {
+        $auth{$p} = 1.0
+        $hub{$p} = 1.0
+    }
+    
+    while (1) {
+        my $auth_norm = 0
+        my %new_auth
+        for my $p (@all_pages) { $new_auth{$p} = 0 }
+        
+        # Authority update
+        for my $u (keys %$links) {
+            for my $v (@{$links->{$u}}) {
+                $new_auth{$v} += $hub{$u}
+            }
+        }
+        
+        for my $p (@all_pages) { $auth_norm += $new_auth{$p} ** 2 }
+        $auth_norm = sqrt($auth_norm)
+        for my $p (@all_pages) { $new_auth{$p} /= $auth_norm }
+        
+        # Hub update
+        my $hub_norm = 0
+        my %new_hub
+        for my $p (@all_pages) { $new_hub{$p} = 0 }
+        
+        for my $u (keys %$links) {
+            for my $v (@{$links->{$u}}) {
+                $new_hub{$u} += $new_auth{$v}
+            }
+        }
+        
+        for my $p (@all_pages) { $hub_norm += $new_hub{$p} ** 2 }
+        $hub_norm = sqrt($hub_norm)
+        for my $p (@all_pages) { $new_hub{$p} /= $hub_norm }
+        
+        # Convergence check
+        my $diff = 0
+        for my $p (@all_pages) {
+            $diff += abs($new_auth{$p} - $auth{$p}) + abs($new_hub{$p} - $hub{$p})
+        }
+        
+        %auth = %new_auth
+        %hub = %new_hub
+        last if $diff < $epsilon
+    }
+    
+    { auth => \%auth, hub => \%hub }
+}
+
+my $links = {
+    "A" => ["C"],
+    "B" => ["C"],
+    "C" => ["A"]
+}
+
+my $res = Rosetta::HITS::solve($links, 0.0001)
+
+# C should be a strong authority
+assert_ok $res->{auth}->{C} > $res->{auth}->{A}, "C is better authority than A"
+
+# A and B link to C, so they should be strong hubs
+assert_ok $res->{hub}->{A} > $res->{hub}->{C}, "A is better hub than C"
+
+test_run

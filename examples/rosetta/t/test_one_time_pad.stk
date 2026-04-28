@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: One-time pad
+
+fn Rosetta::OTP::generate_pad($len) {
+    # Parallel map to generate random bytes
+    my @res = ~> 1:$len map { int(rand(256)) }
+    \@res
+}
+
+fn Rosetta::OTP::encrypt($text, $pad) {
+    my @chars = $text |> chars() |> map { ord($_) }
+    my @res
+    for (my $i = 0; $i < scalar(@chars); $i++) {
+        push @res, $chars[$i] ^ $pad->[$i]
+    }
+    \@res
+}
+
+fn Rosetta::OTP::decrypt($cipher, $pad) {
+    my @res
+    for (my $i = 0; $i < scalar(@$cipher); $i++) {
+        push @res, chr($cipher->[$i] ^ $pad->[$i])
+    }
+    join("", @res)
+}
+
+my $t = "Rosetta Code"
+my $pad = Rosetta::OTP::generate_pad(length($t))
+my $cipher = Rosetta::OTP::encrypt($t, $pad)
+my $back = Rosetta::OTP::decrypt($cipher, $pad)
+
+assert_eq $back, $t, "OTP round trip"
+assert_eq scalar(@$cipher), length($t), "cipher length matches"
+
+test_run

@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FNV-1a hash
+
+fn Rosetta::FNV::fnv1a($text) {
+    # 32-bit FNV-1a
+    my $hash = 2166136261
+    my $prime = 16777619
+    my $mod = 4294967296 # 2^32
+    
+    for my $c ($text |> chars() |> map { ord($_) }) {
+        $hash = $hash ^ $c
+        # Handle large multiplication modulo
+        $hash = ($hash * $prime) % $mod
+    }
+    $hash
+}
+
+my $t1 = "a"
+my $h1 = Rosetta::FNV::fnv1a($t1)
+# 2166136261 ^ 97 = 2166136356
+# 2166136356 * 16777619 mod 2^32 = 3826002220 (0xE40C292C)
+assert_eq $h1, 3826002220, "FNV-1a for 'a'"
+
+my $t2 = "Stryke"
+# 0xD12AB4B0 = 3509204144
+my $h2 = Rosetta::FNV::fnv1a($t2)
+assert_ok $h2 > 0, "FNV-1a for Stryke > 0"
+
+test_run

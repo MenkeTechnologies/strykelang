@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: H-index
+
+fn Rosetta::HIndex::solve($citations) {
+    # Sort citations in descending order
+    my @sorted = sort { $b <=> $a } @$citations
+    my $h = 0
+    for (my $i = 0; $i < scalar(@sorted); $i++) {
+        if ($sorted[$i] >= $i + 1) {
+            $h = $i + 1
+        } else {
+            last
+        }
+    }
+    $h
+}
+
+my @citations1 = (10, 8, 5, 4, 3)
+assert_eq Rosetta::HIndex::solve(\@citations1), 4, "h-index is 4"
+
+my @citations2 = (25, 8, 5, 3, 3)
+assert_eq Rosetta::HIndex::solve(\@citations2), 3, "h-index is 3"
+
+my @citations3 = (10000, 10000, 10000, 10000, 10000)
+assert_eq Rosetta::HIndex::solve(\@citations3), 5, "h-index is 5"
+
+test_run

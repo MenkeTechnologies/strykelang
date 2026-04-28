@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Suffix tree
+
+fn Rosetta::SuffixTree::build($s) {
+    my $tree = {}
+    my @chars = $s |> chars()
+    my $n = scalar(@chars)
+    
+    for (my $i = 0; $i < $n; $i++) {
+        my $curr = $tree
+        for (my $j = $i; $j < $n; $j++) {
+            my $c = $chars[$j]
+            $curr->{$c} = {} if !exists $curr->{$c}
+            $curr = $curr->{$c}
+        }
+        $curr->{"\$"} = $i # Terminal marker with start index
+    }
+    $tree
+}
+
+fn Rosetta::SuffixTree::has_substring($tree, $sub) {
+    my $curr = $tree
+    for my $c ($sub |> chars()) {
+        return 0 if !exists $curr->{$c}
+        $curr = $curr->{$c}
+    }
+    return 1
+}
+
+my $t = Rosetta::SuffixTree::build("banana")
+# Suffixes:
+# banana
+# anana
+# nana
+# ana
+# na
+# a
+
+assert_ok Rosetta::SuffixTree::has_substring($t, "ana"), "has ana"
+assert_ok Rosetta::SuffixTree::has_substring($t, "nana"), "has nana"
+assert_ok Rosetta::SuffixTree::has_substring($t, "banana"), "has banana"
+assert_ok !Rosetta::SuffixTree::has_substring($t, "band"), "no band"
+
+test_run

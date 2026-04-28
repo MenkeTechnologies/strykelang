@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perceptron
+
+fn Rosetta::Perceptron::train($data, $labels, $learning_rate, $epochs) {
+    my $num_features = scalar(@{$data->[0]})
+    my @weights = map { 0.0 } 1:$num_features
+    my $bias = 0.0
+    
+    for (my $e = 0; $e < $epochs; $e++) {
+        for (my $i = 0; $i < scalar(@$data); $i++) {
+            my $x = $data->[$i]
+            my $y = $labels->[$i]
+            
+            # Dot product
+            my $sum = $bias
+            for (my $j = 0; $j < $num_features; $j++) {
+                $sum += $x->[$j] * $weights[$j]
+            }
+            
+            # Activation (Heaviside step function)
+            my $y_pred = $sum > 0 ? 1 : 0
+            
+            # Update
+            if ($y != $y_pred) {
+                my $error = $y - $y_pred
+                for (my $j = 0; $j < $num_features; $j++) {
+                    $weights[$j] += $error * $learning_rate * $x->[$j]
+                }
+                $bias += $error * $learning_rate
+            }
+        }
+    }
+    
+    { weights => \@weights, bias => $bias }
+}
+
+fn Rosetta::Perceptron::predict($model, $x) {
+    my $weights = $model->{weights}
+    my $bias = $model->{bias}
+    
+    my $sum = $bias
+    for (my $j = 0; $j < scalar(@$weights); $j++) {
+        $sum += $x->[$j] * $weights->[$j]
+    }
+    $sum > 0 ? 1 : 0
+}
+
+# OR Gate
+my $data = [
+    [0, 0],
+    [0, 1],
+    [1, 0],
+    [1, 1]
+]
+my $labels = [0, 1, 1, 1]
+
+my $model = Rosetta::Perceptron::train($data, $labels, 0.1, 100)
+
+assert_eq Rosetta::Perceptron::predict($model, [0, 0]), 0, "OR(0,0) = 0"
+assert_eq Rosetta::Perceptron::predict($model, [0, 1]), 1, "OR(0,1) = 1"
+assert_eq Rosetta::Perceptron::predict($model, [1, 0]), 1, "OR(1,0) = 1"
+assert_eq Rosetta::Perceptron::predict($model, [1, 1]), 1, "OR(1,1) = 1"
+
+# AND Gate
+my $labels_and = [0, 0, 0, 1]
+my $model_and = Rosetta::Perceptron::train($data, $labels_and, 0.1, 100)
+
+assert_eq Rosetta::Perceptron::predict($model_and, [0, 0]), 0, "AND(0,0) = 0"
+assert_eq Rosetta::Perceptron::predict($model_and, [0, 1]), 0, "AND(0,1) = 0"
+assert_eq Rosetta::Perceptron::predict($model_and, [1, 0]), 0, "AND(1,0) = 0"
+assert_eq Rosetta::Perceptron::predict($model_and, [1, 1]), 1, "AND(1,1) = 1"
+
+test_run

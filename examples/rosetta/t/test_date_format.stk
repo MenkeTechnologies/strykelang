@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Date format
+
+fn Rosetta::DateFormat::get_date($t) {
+    my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = gmtime($t)
+    my $full_year = $year + 1900
+    my $month_num = $mon + 1
+    
+    my @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday)
+    my @months = qw(January February March April May June July August September October November December)
+    
+    my $iso = sprintf("%04d-%02d-%02d", $full_year, $month_num, $mday)
+    my $pretty = sprintf("%s, %s %d, %d", $days[$wday], $months[$mon], $mday, $full_year)
+    
+    ($iso, $pretty)
+}
+
+my $ts = 1194696000 # 2007-11-10 12:00:00 UTC
+my ($iso, $pretty) = Rosetta::DateFormat::get_date($ts)
+
+assert_eq $iso, "2007-11-10", "ISO date format"
+assert_eq $pretty, "Saturday, November 10, 2007", "Pretty date format"
+test_run

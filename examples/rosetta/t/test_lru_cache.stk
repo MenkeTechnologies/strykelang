@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: LRU cache
+
+fn Rosetta::LRU::new($capacity) {
+    { capacity => $capacity, map => {}, order => [] }
+}
+
+fn Rosetta::LRU::get($cache, $key) {
+    if (!exists $cache->{map}->{$key}) {
+        return undef
+    }
+    
+    # Move to back (most recently used)
+    my $order = $cache->{order}
+    for (my $i = 0; $i < scalar(@$order); $i++) {
+        if ($order->[$i] eq $key) {
+            splice(@$order, $i, 1)
+            push @$order, $key
+            last
+        }
+    }
+    
+    $cache->{map}->{$key}
+}
+
+fn Rosetta::LRU::put($cache, $key, $val) {
+    my $map = $cache->{map}
+    my $order = $cache->{order}
+    
+    if (exists $map->{$key}) {
+        $map->{$key} = $val
+        # Move to back
+        for (my $i = 0; $i < scalar(@$order); $i++) {
+            if ($order->[$i] eq $key) {
+                splice(@$order, $i, 1)
+                push @$order, $key
+                last
+            }
+        }
+    } else {
+        if (scalar(@$order) >= $cache->{capacity}) {
+            # Evict least recently used (first element)
+            my $lru_key = shift @$order
+            delete $map->{$lru_key}
+        }
+        $map->{$key} = $val
+        push @$order, $key
+    }
+}
+
+my $lru = Rosetta::LRU::new(3)
+Rosetta::LRU::put($lru, "A", 1)
+Rosetta::LRU::put($lru, "B", 2)
+Rosetta::LRU::put($lru, "C", 3)
+
+assert_eq Rosetta::LRU::get($lru, "A"), 1, "get A"
+
+# Cache order is now B, C, A
+Rosetta::LRU::put($lru, "D", 4)
+# Capacity exceeded, B should be evicted
+
+assert_ok !defined(Rosetta::LRU::get($lru, "B")), "B is evicted"
+assert_eq Rosetta::LRU::get($lru, "C"), 3, "get C"
+assert_eq Rosetta::LRU::get($lru, "A"), 1, "get A"
+assert_eq Rosetta::LRU::get($lru, "D"), 4, "get D"
+
+test_run

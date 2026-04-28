@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Run-length encoding
+
+fn Rosetta::RLE::encode($text) {
+    my @chars = $text |> chars()
+    my $n = scalar(@chars)
+    return "" if $n == 0
+    
+    my $res = ""
+    my $count = 1
+    for (my $i = 1; $i < $n; $i++) {
+        if ($chars[$i] eq $chars[$i-1]) {
+            $count++
+        } else {
+            $res .= $count . $chars[$i-1]
+            $count = 1
+        }
+    }
+    $res .= $count . $chars[$n-1]
+    $res
+}
+
+fn Rosetta::RLE::decode($text) {
+    my $res = ""
+    my $count_str = ""
+    for my $c ($text |> chars()) {
+        if ($c =~ /[0-9]/) {
+            $count_str .= $c
+        } else {
+            my $count = $count_str eq "" ? 1 : int($count_str)
+            for (1:$count) { $res .= $c }
+            $count_str = ""
+        }
+    }
+    $res
+}
+
+my $t = "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWBWWWWWWWWWWWWWW"
+my $encoded = Rosetta::RLE::encode($t)
+assert_eq $encoded, "12W1B12W3B24W1B14W", "RLE encoded correctly"
+
+my $decoded = Rosetta::RLE::decode($encoded)
+assert_eq $decoded, $t, "RLE round trip"
+
+test_run

@@ -1,0 +1,85 @@
+#!/usr/bin/env stryke
+# Rosetta Code: RSA cipher
+
+fn Rosetta::RSA::gcd($a, $b) {
+    while ($b) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn Rosetta::RSA::mod_inverse($a, $m) {
+    my ($m0, $x0, $x1) = ($m, 0, 1)
+    return 0 if $m == 1
+    while ($a > 1) {
+        my $q = $a / $m | 0
+        my $t = $m
+        $m = $a % $m
+        $a = $t
+        $t = $x0
+        $x0 = $x1 - $q * $x0
+        $x1 = $t
+    }
+    return $x1 < 0 ? $x1 + $m0 : $x1
+}
+
+fn Rosetta::RSA::mod_pow($base, $exp, $mod) {
+    my $res = 1
+    $base %= $mod
+    while ($exp > 0) {
+        if ($exp % 2 == 1) {
+            $res = ($res * $base) % $mod
+        }
+        $base = ($base * $base) % $mod
+        $exp = $exp / 2 | 0
+    }
+    $res
+}
+
+fn Rosetta::RSA::generate_keys($p, $q) {
+    my $n = $p * $q
+    my $phi = ($p - 1) * ($q - 1)
+    
+    my $e = 3
+    while (Rosetta::RSA::gcd($e, $phi) != 1) {
+        $e += 2
+    }
+    
+    my $d = Rosetta::RSA::mod_inverse($e, $phi)
+    # pub: (e, n), priv: (d, n)
+    ([$e, $n], [$d, $n])
+}
+
+fn Rosetta::RSA::encrypt($m, $pub) {
+    Rosetta::RSA::mod_pow($m, $pub->[0], $pub->[1])
+}
+
+fn Rosetta::RSA::decrypt($c, $priv) {
+    Rosetta::RSA::mod_pow($c, $priv->[0], $priv->[1])
+}
+
+# Use small primes for demo (must not overflow during $base * $base)
+# sqrt(2^63 - 1) is about 3e9. So $base can be up to 3e9.
+# $n should be less than 3e9 if we want simple mod_pow without overflow handling.
+my $p = 61
+my $q = 53
+my ($pub, $priv) = Rosetta::RSA::generate_keys($p, $q)
+
+my $message = 42
+my $cipher = Rosetta::RSA::encrypt($message, $pub)
+my $plain = Rosetta::RSA::decrypt($cipher, $priv)
+
+assert_eq $plain, $message, "RSA round trip for message 42"
+
+# Test with a string (char by char for simplicity)
+my $text = "Stryke"
+my @ciphers = ~> $text chars map { 
+    Rosetta::RSA::encrypt(ord($_), $pub) 
+}
+my $decoded = ~> @ciphers map { 
+    chr(Rosetta::RSA::decrypt($_, $priv)) 
+} |> join("")
+
+assert_eq $decoded, $text, "RSA round trip for string 'Stryke'"
+
+test_run

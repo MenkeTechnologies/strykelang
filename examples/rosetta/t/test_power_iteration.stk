@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Power iteration
+
+fn Rosetta::PowerIteration::dot_product($v1, $v2) {
+    my $sum = 0
+    for (my $i = 0; $i < scalar(@$v1); $i++) {
+        $sum += $v1->[$i] * $v2->[$i]
+    }
+    $sum
+}
+
+fn Rosetta::PowerIteration::matrix_vector_mul($m, $v) {
+    my @res
+    for (my $i = 0; $i < scalar(@$m); $i++) {
+        push @res, Rosetta::PowerIteration::dot_product($m->[$i], $v)
+    }
+    \@res
+}
+
+fn Rosetta::PowerIteration::normalize($v) {
+    my $norm = sqrt(Rosetta::PowerIteration::dot_product($v, $v))
+    my @res = ~> @$v map { $_ / $norm }
+    \@res
+}
+
+fn Rosetta::PowerIteration::solve($matrix, $num_simulations) {
+    my $n = scalar(@$matrix)
+    # Start with a random vector (or all 1s for simplicity)
+    my @v = map { 1.0 } 1:$n
+    my $vec = Rosetta::PowerIteration::normalize(\@v)
+    
+    for (1:$num_simulations) {
+        $vec = Rosetta::PowerIteration::matrix_vector_mul($matrix, $vec)
+        $vec = Rosetta::PowerIteration::normalize($vec)
+    }
+    
+    # Rayleigh quotient for eigenvalue: (v^T M v) / (v^T v)
+    my $Mv = Rosetta::PowerIteration::matrix_vector_mul($matrix, $vec)
+    my $eigenvalue = Rosetta::PowerIteration::dot_product($vec, $Mv) / Rosetta::PowerIteration::dot_product($vec, $vec)
+    
+    ($eigenvalue, $vec)
+}
+
+my $M = [
+    [2, -1,  0],
+    [-1,  2, -1],
+    [0, -1,  2]
+]
+
+my ($eigenval, $eigenvec) = Rosetta::PowerIteration::solve($M, 100)
+# Eigenvalues of this 3x3 matrix are 2 - sqrt(2), 2, 2 + sqrt(2)
+# The dominant eigenvalue is 2 + sqrt(2) approx 3.41421356
+
+assert_ok abs($eigenval - 3.4142) < 0.01, "Dominant eigenvalue of matrix is approx 3.414"
+
+test_run

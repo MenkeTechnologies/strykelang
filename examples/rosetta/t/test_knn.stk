@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: K-nearest neighbors
+
+fn Rosetta::KNN::distance($p1, $p2) {
+    my $sum = 0
+    for (my $i = 0; $i < scalar(@$p1); $i++) {
+        $sum += ($p1->[$i] - $p2->[$i]) ** 2
+    }
+    sqrt($sum)
+}
+
+fn Rosetta::KNN::solve($training_data, $labels, $test_point, $k) {
+    my @distances
+    for (my $i = 0; $i < scalar(@$training_data); $i++) {
+        my $dist = Rosetta::KNN::distance($training_data->[$i], $test_point)
+        push @distances, { idx => $i, dist => $dist }
+    }
+    
+    my @sorted = sort { $a->{dist} <=> $b->{dist} } @distances
+    
+    my %counts
+    my $max_count = 0
+    my $best_label = undef
+    
+    for (my $i = 0; $i < $k; $i++) {
+        my $idx = $sorted[$i]->{idx}
+        my $label = $labels->[$idx]
+        $counts{$label}++
+        if ($counts{$label} > $max_count) {
+            $max_count = $counts{$label}
+            $best_label = $label
+        }
+    }
+    
+    $best_label
+}
+
+my $train = [
+    [1.0, 1.0], [1.2, 1.0], [0.8, 1.2], # Class A
+    [5.0, 5.0], [5.1, 4.9], [4.8, 5.2]  # Class B
+]
+my $labels = ["A", "A", "A", "B", "B", "B"]
+
+my $test1 = [1.0, 1.2]
+my $res1 = Rosetta::KNN::solve($train, $labels, $test1, 3)
+assert_eq $res1, "A", "kNN classification A"
+
+my $test2 = [4.9, 5.0]
+my $res2 = Rosetta::KNN::solve($train, $labels, $test2, 3)
+assert_eq $res2, "B", "kNN classification B"
+
+test_run

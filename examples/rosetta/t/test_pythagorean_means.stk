@@ -2,26 +2,21 @@
 # Rosetta Code: Averages/Pythagorean means
 
 fn Rosetta::PythagoreanMeans::arithmetic(@nums) {
-    my $sum = 0
     my $count = scalar(@nums)
     if ($count == 0) { return 0 }
-    for my $x (@nums) { $sum += $x }
-    $sum / $count
+    (~> @nums reduce { $a + $b }) / $count
 }
 
 fn Rosetta::PythagoreanMeans::geometric(@nums) {
     my $count = scalar(@nums)
     if ($count == 0) { return 0 }
-    my $prod = 1
-    for my $x (@nums) { $prod *= $x }
-    $prod ** (1 / $count)
+    (~> @nums reduce { $a * $b }) ** (1 / $count)
 }
 
 fn Rosetta::PythagoreanMeans::harmonic(@nums) {
     my $count = scalar(@nums)
     if ($count == 0) { return 0 }
-    my $sum_inv = 0
-    for my $x (@nums) { $sum_inv += 1 / $x }
+    my $sum_inv = ~> @nums map { 1 / $_ } |> reduce { $a + $b }
     $count / $sum_inv
 }
 

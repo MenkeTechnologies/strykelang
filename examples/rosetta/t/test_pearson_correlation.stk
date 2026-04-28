@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pearson correlation coefficient
+
+fn Rosetta::Pearson::compute($x, $y) {
+    my $n = scalar(@$x)
+    if ($n != scalar(@$y)) { return undef }
+    if ($n == 0) { return undef }
+
+    my $sum_x = ~> @$x reduce { $a + $b }
+    my $sum_y = ~> @$y reduce { $a + $b }
+    my $sum_x2 = ~> @$x map { $_ * $_ } reduce { $a + $b }
+    my $sum_y2 = ~> @$y map { $_ * $_ } reduce { $a + $b }
+    
+    my $sum_xy = ~> 0..$n-1 map { $x->[$_] * $y->[$_] } reduce { $a + $b }
+
+    my $numerator = $n * $sum_xy - $sum_x * $sum_y
+    my $denominator = sqrt(($n * $sum_x2 - $sum_x ** 2) * ($n * $sum_y2 - $sum_y ** 2))
+    
+    if ($denominator == 0) { return 0 }
+    $numerator / $denominator
+}
+
+my @x = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+my @y = (43, 21, 25, 42, 57, 59, 117, 121, 109, 110)
+
+my $r = Rosetta::Pearson::compute(\@x, \@y)
+assert_near $r, 0.89103, 0.00001, "Pearson correlation of sample data"
+
+my @x2 = (1, 2, 3)
+my @y2 = (1, 2, 3)
+assert_eq Rosetta::Pearson::compute(\@x2, \@y2), 1, "Perfect positive correlation"
+
+my @x3 = (1, 2, 3)
+my @y3 = (3, 2, 1)
+assert_eq Rosetta::Pearson::compute(\@x3, \@y3), -1, "Perfect negative correlation"
+
+test_run

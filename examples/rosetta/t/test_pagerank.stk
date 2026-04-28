@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: PageRank
+
+fn Rosetta::PageRank::solve($links, $d, $epsilon) {
+    my %pages
+    for my $u (keys %$links) {
+        $pages{$u} = 1
+        for my $v (@{$links->{$u}}) {
+            $pages{$v} = 1
+        }
+    }
+    
+    my @all_pages = keys %pages
+    my $n = scalar(@all_pages)
+    my %pr
+    for my $p (@all_pages) { $pr{$p} = 1.0 / $n }
+    
+    my %out_degree
+    for my $p (@all_pages) { $out_degree{$p} = 0 }
+    for my $u (keys %$links) {
+        $out_degree{$u} = scalar(@{$links->{$u}})
+    }
+    
+    while (1) {
+        my %new_pr
+        for my $p (@all_pages) { $new_pr{$p} = (1.0 - $d) / $n }
+        
+        for my $u (@all_pages) {
+            if ($out_degree{$u} > 0) {
+                for my $v (@{$links->{$u}}) {
+                    $new_pr{$v} += $d * $pr{$u} / $out_degree{$u}
+                }
+            } else {
+                # Dangle
+                for my $v (@all_pages) {
+                    $new_pr{$v} += $d * $pr{$u} / $n
+                }
+            }
+        }
+        
+        my $diff = 0
+        for my $p (@all_pages) {
+            $diff += abs($new_pr{$p} - $pr{$p})
+        }
+        
+        %pr = %new_pr
+        last if $diff < $epsilon
+    }
+    \%pr
+}
+
+# Example from Wikipedia
+# A -> B, A -> C
+# B -> C
+# C -> A
+# D -> C
+my $links = {
+    "A" => ["B", "C"],
+    "B" => ["C"],
+    "C" => ["A"],
+    "D" => ["C"]
+}
+
+my $res = Rosetta::PageRank::solve($links, 0.85, 0.0001)
+
+# C should have highest rank because A, B, D all link to it.
+assert_ok $res->{C} > $res->{A}, "C rank > A rank"
+assert_ok $res->{A} > $res->{B}, "A rank > B rank"
+assert_ok $res->{B} > $res->{D}, "B rank > D rank"
+
+test_run

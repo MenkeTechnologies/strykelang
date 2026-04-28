@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Forward-backward algorithm
+
+fn Rosetta::ForwardBackward::solve($obs, $states, $start_p, $trans_p, $emit_p) {
+    my $T = scalar(@$obs)
+    my @fwd = ()
+    
+    # Forward pass
+    my %fwd_0
+    my $sum_fwd_0 = 0
+    for my $s (@$states) {
+        $fwd_0{$s} = $start_p->{$s} * $emit_p->{$s}->{$obs->[0]}
+        $sum_fwd_0 += $fwd_0{$s}
+    }
+    # Normalize to prevent underflow
+    for my $s (@$states) { $fwd_0{$s} /= $sum_fwd_0 }
+    push @fwd, \%fwd_0
+    
+    for (my $t = 1; $t < $T; $t++) {
+        my %fwd_t
+        my $sum_fwd_t = 0
+        for my $curr_s (@$states) {
+            my $sum = 0
+            for my $prev_s (@$states) {
+                $sum += $fwd[-1]->{$prev_s} * $trans_p->{$prev_s}->{$curr_s}
+            }
+            $fwd_t{$curr_s} = $sum * $emit_p->{$curr_s}->{$obs->[$t]}
+            $sum_fwd_t += $fwd_t{$curr_s}
+        }
+        for my $s (@$states) { $fwd_t{$s} /= $sum_fwd_t }
+        push @fwd, \%fwd_t
+    }
+    
+    # Backward pass
+    my @bkw = ()
+    # Initialize backward array to same size
+    for (my $i = 0; $i < $T; $i++) { push @bkw, {} }
+    
+    my $sum_bkw_T = 0
+    for my $s (@$states) {
+        $bkw[$T - 1]->{$s} = 1.0
+        $sum_bkw_T += 1.0
+    }
+    for my $s (@$states) { $bkw[$T - 1]->{$s} /= $sum_bkw_T }
+    
+    for (my $t = $T - 2; $t >= 0; $t--) {
+        my $sum_bkw_t = 0
+        for my $curr_s (@$states) {
+            my $sum = 0
+            for my $next_s (@$states) {
+                $sum += $trans_p->{$curr_s}->{$next_s} * $emit_p->{$next_s}->{$obs->[$t+1]} * $bkw[$t+1]->{$next_s}
+            }
+            $bkw[$t]->{$curr_s} = $sum
+            $sum_bkw_t += $sum
+        }
+        for my $s (@$states) { $bkw[$t]->{$s} /= $sum_bkw_t }
+    }
+    
+    # Posterior probabilities
+    my @posterior = ()
+    for (my $t = 0; $t < $T; $t++) {
+        my %post_t
+        my $sum_post = 0
+        for my $s (@$states) {
+            $post_t{$s} = $fwd[$t]->{$s} * $bkw[$t]->{$s}
+            $sum_post += $post_t{$s}
+        }
+        for my $s (@$states) { $post_t{$s} /= $sum_post }
+        push @posterior, \%post_t
+    }
+    
+    \@posterior
+}
+
+my @states = ("Rain", "NoRain")
+my @obs = ("Umbrella", "Umbrella", "NoUmbrella", "Umbrella", "Umbrella")
+
+my %start_p = ( "Rain" => 0.5, "NoRain" => 0.5 )
+
+my %trans_p = (
+    "Rain"   => { "Rain" => 0.7, "NoRain" => 0.3 },
+    "NoRain" => { "Rain" => 0.3, "NoRain" => 0.7 }
+)
+
+my %emit_p = (
+    "Rain"   => { "Umbrella" => 0.9, "NoUmbrella" => 0.1 },
+    "NoRain" => { "Umbrella" => 0.2, "NoUmbrella" => 0.8 }
+)
+
+my $posteriors = Rosetta::ForwardBackward::solve(\@obs, \@states, \%start_p, \%trans_p, \%emit_p)
+
+# We can check day 1 (index 0), observation Umbrella. Rain should be more likely.
+my $day1_rain = $posteriors->[0]->{"Rain"}
+assert_ok $day1_rain > 0.5, "Rain more likely on day 1 (saw Umbrella)"
+
+# Day 3 (index 2), observation NoUmbrella. NoRain should be more likely.
+my $day3_norain = $posteriors->[2]->{"NoRain"}
+assert_ok $day3_norain > 0.5, "NoRain more likely on day 3 (saw NoUmbrella)"
+
+test_run
