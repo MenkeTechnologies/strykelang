@@ -176,20 +176,21 @@ fn scaffold_project(project_dir: &Path, name: &str) -> i32 {
 }
 
 fn default_manifest_for(name: &str) -> Manifest {
-    let mut m = Manifest::default();
-    m.package = Some(PackageMeta {
-        name: name.to_string(),
-        version: "0.1.0".to_string(),
-        description: String::new(),
-        authors: Vec::new(),
-        license: String::new(),
-        repository: String::new(),
-        edition: "2026".to_string(),
-    });
     let mut bin = IndexMap::new();
     bin.insert(name.to_string(), "main.stk".to_string());
-    m.bin = bin;
-    m
+    Manifest {
+        package: Some(PackageMeta {
+            name: name.to_string(),
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            authors: Vec::new(),
+            license: String::new(),
+            repository: String::new(),
+            edition: "2026".to_string(),
+        }),
+        bin,
+        ..Manifest::default()
+    }
 }
 
 /// `s add NAME[@VER] [--dev|--group=NAME] [--path=...]` — append a dep to

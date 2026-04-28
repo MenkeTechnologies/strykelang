@@ -12088,6 +12088,8 @@ impl Parser {
     /// Used by `--compat` to reject extensions at parse time.
     fn stryke_extension_name(name: &str) -> Option<&str> {
         match name {
+            // ── aop ────────────────────────────────────────────────────────
+            | "proceed" | "intercept_list" | "intercept_remove" | "intercept_clear"
             // ── parallel ────────────────────────────────────────────────────
             | "pmap" | "pmap_on" | "pflat_map" | "pflat_map_on" | "pmap_chunked"
             | "pgrep" | "pfor" | "psort" | "preduce" | "preduce_init" | "pmap_reduce"

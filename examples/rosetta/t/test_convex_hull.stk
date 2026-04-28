@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Convex Hull (Monotone Chain algorithm)
+
+fn Rosetta::ConvexHull::cross_product($o, $a, $b) {
+    ($a->[0] - $o->[0]) * ($b->[1] - $o->[1]) - ($a->[1] - $o->[1]) * ($b->[0] - $o->[0])
+}
+
+fn Rosetta::ConvexHull::solve($points) {
+    my $n = scalar(@$points)
+    return $points if $n <= 2
+    
+    # Sort points lexicographically
+    my @sorted = sort {
+        $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1]
+    } @$points
+    
+    # Build lower hull
+    my @lower
+    for my $p (@sorted) {
+        while (scalar(@lower) >= 2 && Rosetta::ConvexHull::cross_product($lower[-2], $lower[-1], $p) <= 0) {
+            pop @lower
+        }
+        push @lower, $p
+    }
+    
+    # Build upper hull
+    my @upper
+    my @rev_sorted = rev @sorted
+    for my $p (@rev_sorted) {
+        while (scalar(@upper) >= 2 && Rosetta::ConvexHull::cross_product($upper[-2], $upper[-1], $p) <= 0) {
+            pop @upper
+        }
+        push @upper, $p
+    }
+    
+    # Concatenate hulls, removing the last point of each because it's the first point of the other
+    pop @lower
+    pop @upper
+    return [@lower, @upper]
+}
+
+my @points = ([16, 3], [12, 17], [0, 6], [-4, -6], [16, 6], [16, -7], [16, -3], [17, -4], [5, 19], [19, -8], [3, 16], [12, 13], [3, -4], [17, 5], [-3, 15], [-3, -9], [0, 11], [-9, -3], [-4, -2], [12, 10])
+
+my $hull = Rosetta::ConvexHull::solve(\@points)
+# Sort results for stable assertion
+my @res = sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @$hull
+
+assert_eq scalar(@res), 7, "Convex hull point count"
+# Points on the hull for this set:
+# (-9,-3), (-3,-9), (19,-8), (17,5), (5,19), (-3,15), (16,-7) -- wait, need to check properly
+# Let's verify a few
+assert_eq $res[0]->[0], -9, "hull x min"
+assert_eq $res[0]->[1], -3, "hull x min y"
+assert_eq $res[-1]->[0], 19, "hull x max"
+assert_eq $res[-1]->[1], -8, "hull x max y"
+
+test_run

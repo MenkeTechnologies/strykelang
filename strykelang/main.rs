@@ -4207,8 +4207,6 @@ fn run_bench_subcommand(argv0: &str, args: &[String]) -> i32 {
     }
 }
 
-/// `stryke init [NAME]` — scaffold a new stryke project.
-
 /// `stryke repl [--load FILE]` — explicit REPL entry with optional pre-load.
 fn run_repl_subcommand(args: &[String]) -> i32 {
     let mut load_file: Option<String> = None;

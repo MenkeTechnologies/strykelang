@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bresenham's line algorithm
+
+fn Rosetta::Bresenham::solve($x0, $y0, $x1, $y1) {
+    my $dx = abs($x1 - $x0)
+    my $dy = abs($y1 - $y0)
+    my $sx = $x0 < $x1 ? 1 : -1
+    my $sy = $y0 < $y1 ? 1 : -1
+    my $err = $dx - $dy
+    
+    my @points
+    my ($x, $y) = ($x0, $y0)
+    
+    while (1) {
+        push @points, [$x, $y]
+        last if $x == $x1 && $y == $y1
+        
+        my $e2 = 2 * $err
+        if ($e2 > -$dy) {
+            $err -= $dy
+            $x += $sx
+        }
+        if ($e2 < $dx) {
+            $err += $dx
+            $y += $sy
+        }
+    }
+    \@points
+}
+
+my $line = Rosetta::Bresenham::solve(1, 1, 8, 5)
+# Expected points for (1,1) to (8,5)
+# (1,1), (2,2), (3,2), (4,3), (5,3), (6,4), (7,4), (8,5)
+my @s = ~> @$line map { "(" . $_->[0] . "," . $_->[1] . ")" }
+assert_eq join(" ", @s), "(1,1) (2,2) (3,2) (4,3) (5,3) (6,4) (7,4) (8,5)", "line 1,1 to 8,5"
+
+my $line2 = Rosetta::Bresenham::solve(1, 8, 8, 1)
+my @s2 = ~> @$line2 map { "(" . $_->[0] . "," . $_->[1] . ")" }
+assert_eq $s2[0], "(1,8)", "start point"
+assert_eq $s2[-1], "(8,1)", "end point"
+
+test_run

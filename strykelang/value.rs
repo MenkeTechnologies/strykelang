@@ -2918,12 +2918,12 @@ fn is_iso_date(s: &str) -> bool {
         && parts[1].len() == 2
         && parts[1]
             .parse::<u8>()
-            .map(|m| m >= 1 && m <= 12)
+            .map(|m| (1..=12).contains(&m))
             .unwrap_or(false)
         && parts[2].len() == 2
         && parts[2]
             .parse::<u8>()
-            .map(|d| d >= 1 && d <= 31)
+            .map(|d| (1..=31).contains(&d))
             .unwrap_or(false)
 }
 
@@ -2939,7 +2939,7 @@ fn is_year_month(s: &str) -> bool {
         && parts[1].len() == 2
         && parts[1]
             .parse::<u8>()
-            .map(|m| m >= 1 && m <= 12)
+            .map(|m| (1..=12).contains(&m))
             .unwrap_or(false)
 }
 
@@ -3691,7 +3691,7 @@ fn perl_list_range_expand_string_magic_stepped(
             if cur_bound > max_bound {
                 break;
             }
-            if idx % step == 0 {
+            if idx.is_multiple_of(step) {
                 out.push(PerlValue::string(cur.clone()));
             }
             if cur == right {
@@ -3715,7 +3715,7 @@ fn perl_list_range_expand_string_magic_stepped(
             if guard > 50_000_000 {
                 break;
             }
-            if idx % step == 0 {
+            if idx.is_multiple_of(step) {
                 out.push(PerlValue::string(cur.clone()));
             }
             if cur == right {

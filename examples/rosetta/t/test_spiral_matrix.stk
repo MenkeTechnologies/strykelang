@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Spiral Matrix
+
+fn Rosetta::SpiralMatrix::solve($n) {
+    # Initialize n x n matrix with zeros
+    my $matrix = [ map { [ map { 0 } 1..$n ] } 1..$n ]
+    
+    my ($x, $y) = (0, 0)
+    my ($dx, $dy) = (1, 0)
+    
+    for my $i (1..$n*$n) {
+        $matrix->[$y]->[$x] = $i
+        my ($nx, $ny) = ($x + $dx, $y + $dy)
+        
+        if ($nx < 0 || $nx >= $n || $ny < 0 || $ny >= $n || $matrix->[$ny]->[$nx] != 0) {
+            # Rotate direction: (dx, dy) -> (-dy, dx)
+            my $tmp = $dx
+            $dx = -$dy
+            $dy = $tmp
+            ($nx, $ny) = ($x + $dx, $y + $dy)
+        }
+        ($x, $y) = ($nx, $ny)
+    }
+    $matrix
+}
+
+my $m3 = Rosetta::SpiralMatrix::solve(3)
+# 1 2 3
+# 8 9 4
+# 7 6 5
+assert_eq join(",", @{$m3->[0]}), "1,2,3", "3x3 row 0"
+assert_eq join(",", @{$m3->[1]}), "8,9,4", "3x3 row 1"
+assert_eq join(",", @{$m3->[2]}), "7,6,5", "3x3 row 2"
+
+my $m4 = Rosetta::SpiralMatrix::solve(4)
+#  1  2  3  4
+# 12 13 14  5
+# 11 16 15  6
+# 10  9  8  7
+assert_eq join(",", @{$m4->[0]}), "1,2,3,4", "4x4 row 0"
+assert_eq join(",", @{$m4->[1]}), "12,13,14,5", "4x4 row 1"
+assert_eq join(",", @{$m4->[2]}), "11,16,15,6", "4x4 row 2"
+assert_eq join(",", @{$m4->[3]}), "10,9,8,7", "4x4 row 3"
+
+test_run

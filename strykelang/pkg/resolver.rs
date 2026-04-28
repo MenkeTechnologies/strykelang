@@ -276,18 +276,20 @@ mod tests {
     fn resolves_single_path_dep() {
         let dep = make_path_dep("mylib", "1.0.0");
         let project = tempdir("project");
-        let mut m = Manifest::default();
-        m.package = Some(crate::pkg::manifest::PackageMeta {
-            name: "myapp".into(),
-            version: "0.1.0".into(),
-            ..Default::default()
-        });
         let mut deps = IndexMap::new();
         deps.insert(
             "mylib".to_string(),
             DepSpec::path_dep(dep.to_string_lossy().to_string()),
         );
-        m.deps = deps;
+        let m = Manifest {
+            package: Some(crate::pkg::manifest::PackageMeta {
+                name: "myapp".into(),
+                version: "0.1.0".into(),
+                ..Default::default()
+            }),
+            deps,
+            ..Manifest::default()
+        };
 
         let store_root = tempdir("store");
         let store = Store::at(&store_root);
@@ -309,12 +311,14 @@ mod tests {
     #[test]
     fn registry_dep_returns_unimplemented_error() {
         let project = tempdir("project");
-        let mut m = Manifest::default();
-        m.package = Some(crate::pkg::manifest::PackageMeta {
-            name: "myapp".into(),
-            version: "0.1.0".into(),
-            ..Default::default()
-        });
+        let mut m = Manifest {
+            package: Some(crate::pkg::manifest::PackageMeta {
+                name: "myapp".into(),
+                version: "0.1.0".into(),
+                ..Default::default()
+            }),
+            ..Manifest::default()
+        };
         m.deps.insert("http".to_string(), DepSpec::version("1.0"));
 
         let store_root = tempdir("store");
@@ -342,12 +346,14 @@ mod tests {
         std::fs::write(mid.join("stryke.toml"), mid_manifest).unwrap();
 
         let project = tempdir("project");
-        let mut m = Manifest::default();
-        m.package = Some(crate::pkg::manifest::PackageMeta {
-            name: "myapp".into(),
-            version: "0.1.0".into(),
-            ..Default::default()
-        });
+        let mut m = Manifest {
+            package: Some(crate::pkg::manifest::PackageMeta {
+                name: "myapp".into(),
+                version: "0.1.0".into(),
+                ..Default::default()
+            }),
+            ..Manifest::default()
+        };
         m.deps.insert(
             "mid".to_string(),
             DepSpec::path_dep(mid.to_string_lossy().to_string()),

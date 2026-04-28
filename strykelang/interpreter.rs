@@ -2757,10 +2757,7 @@ impl Interpreter {
             .unwrap_or(relpath);
         let logical = stem.replace('/', "::");
 
-        match crate::pkg::commands::resolve_module(&project_root, &logical) {
-            Ok(found) => found,
-            Err(_) => None,
-        }
+        crate::pkg::commands::resolve_module(&project_root, &logical).unwrap_or_default()
     }
 
     /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully
@@ -7891,6 +7888,11 @@ impl Interpreter {
                 pattern,
                 body,
             } => {
+                // Tree-walker registration path: only reached if bytecode compilation
+                // bailed out (extremely rare — production programs always run through
+                // the VM). The body has no compiled bytecode region, so we tag it with
+                // `u16::MAX` and `dispatch_with_advice` will refuse to fire it rather
+                // than silently fall back to the AST tree-walker.
                 let id = self.next_intercept_id;
                 self.next_intercept_id = id.saturating_add(1);
                 self.intercepts.push(crate::aop::Intercept {
@@ -7898,6 +7900,7 @@ impl Interpreter {
                     kind: *kind,
                     pattern: pattern.clone(),
                     body: body.clone(),
+                    body_block_idx: u16::MAX,
                 });
                 Ok(PerlValue::UNDEF)
             }

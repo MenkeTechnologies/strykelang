@@ -810,9 +810,18 @@ intercept_clear();             # drop all
 Semantics:
 - Multiple `before` / `after` advices on the same name all fire (registration order).
 - The first matching `around` wraps; later `around` matches on the same name are skipped (mirrors zshrs `run_intercepts`).
-- `around` without `proceed()` suppresses the original; the call returns `undef`.
+- `around` is AspectJ-style: the block's evaluated value is the call's return. `proceed()` runs the original and returns its value; the block can transform (`proceed() + 100`), forward (`proceed()`), or replace (omit the call and return a value directly).
 - Recursion guard: calling the advised sub from inside its own advice runs the original directly without re-firing advice (no infinite loop).
 - Coverage: user-defined subs only. Builtins (`print`, `pmap`, etc.) are not interceptable in v1.
+- Pattern is a string literal (`"foo"`, `"log_*"`); the leading keyword only commits to advice parsing when followed by a string literal, so `before(...)` as a normal call still works.
+- Advice bodies are lowered to bytecode at compile time and dispatched through the VM (`run_block_region`) — the same path used by `map { }` / `grep { }` blocks. This keeps compile-time name resolution (`our`-qualified scalars, lexical slots) consistent inside advice and outside it. The tree-walker is banned from the advice path; see `tests/tree_walker_absent_aop.rs` for the source-level invariant.
+- Body lowering requires the final statement to be an expression (the same constraint as `map { }` block lowering). Bodies that end in a literal `for`/`while`/`if` block, or contain a literal `return`, are rejected at advice-firing time with a runtime error — rewrite the body so it ends in an expression and avoids early-`return`.
+
+Builtins from inside advice bodies:
+- `proceed()` — only legal inside `around`; runs the original sub with the saved args, returns its value.
+- `intercept_list()` — returns `[[id, kind, pattern], ...]` for all registered advices.
+- `intercept_remove($id)` — removes one by id; returns the count removed (0 or 1).
+- `intercept_clear()` — drops all; returns count cleared.
 
 ---
 

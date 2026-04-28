@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find missing permutation
+
+fn Rosetta::Permutations::generate($arr) {
+    my $n = scalar(@$arr)
+    return [[@$arr]] if $n <= 1
+    my @result
+    for my $i (0..$n-1) {
+        my @rest
+        for my $j (0..$n-1) {
+            push @rest, $arr->[$j] if $j != $i
+        }
+        my $sub = Rosetta::Permutations::generate(\@rest)
+        for my $p (@$sub) {
+            push @result, [$arr->[$i], @$p]
+        }
+    }
+    \@result
+}
+
+fn Rosetta::MissingPermutation::solve(@perms) {
+    my %given
+    $given{$_} = 1 for @perms
+    
+    my @chars = sort(chars($perms[0]))
+    my $all = Rosetta::Permutations::generate(\@chars)
+    
+    my @res
+    for my $p (@$all) {
+        my $s = join("", @$p)
+        push @res, $s if !$given{$s}
+    }
+    @res
+}
+
+my @input = qw(
+    ABCD ABDC ACBD ACDB ADBC ADCB
+    BACD BADC BCAD BCDA BDAC BDCA
+    CABD CADB CBAD CBDA CDAB CDBA
+    DABC DACB DBAC DBCA DCAB
+)
+
+my @missing = Rosetta::MissingPermutation::solve(@input)
+assert_eq join(",", @missing), "DCBA", "missing permutation is DCBA"
+
+my @input2 = qw(ABC ACB BAC BCA CBA)
+my @missing2 = Rosetta::MissingPermutation::solve(@input2)
+assert_eq join(",", @missing2), "CAB", "missing from ABC"
+
+test_run

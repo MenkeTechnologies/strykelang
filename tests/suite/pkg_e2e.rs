@@ -55,13 +55,15 @@ fn full_pipeline_path_dep_resolves_and_locks() {
     );
 
     let project = tempdir("project");
-    let mut manifest = Manifest::default();
-    manifest.package = Some(PackageMeta {
-        name: "myapp".into(),
-        version: "0.1.0".into(),
-        edition: "2026".into(),
-        ..Default::default()
-    });
+    let mut manifest = Manifest {
+        package: Some(PackageMeta {
+            name: "myapp".into(),
+            version: "0.1.0".into(),
+            edition: "2026".into(),
+            ..Default::default()
+        }),
+        ..Manifest::default()
+    };
     manifest.deps.insert(
         "mylib".to_string(),
         DepSpec::path_dep(mylib.to_string_lossy().to_string()),
@@ -98,12 +100,14 @@ fn full_pipeline_path_dep_resolves_and_locks() {
 fn lockfile_is_byte_stable_across_resolves() {
     let mylib = make_path_dep("mylib", "1.0.0", &[("lib/X.stk", "1\n")]);
     let project = tempdir("project");
-    let mut manifest = Manifest::default();
-    manifest.package = Some(PackageMeta {
-        name: "myapp".into(),
-        version: "0.1.0".into(),
-        ..Default::default()
-    });
+    let mut manifest = Manifest {
+        package: Some(PackageMeta {
+            name: "myapp".into(),
+            version: "0.1.0".into(),
+            ..Default::default()
+        }),
+        ..Manifest::default()
+    };
     manifest.deps.insert(
         "mylib".to_string(),
         DepSpec::path_dep(mylib.to_string_lossy().to_string()),
@@ -127,12 +131,14 @@ fn lockfile_is_byte_stable_across_resolves() {
 #[test]
 fn registry_dep_returns_unimplemented_diagnostic() {
     let project = tempdir("project");
-    let mut manifest = Manifest::default();
-    manifest.package = Some(PackageMeta {
-        name: "myapp".into(),
-        version: "0.1.0".into(),
-        ..Default::default()
-    });
+    let mut manifest = Manifest {
+        package: Some(PackageMeta {
+            name: "myapp".into(),
+            version: "0.1.0".into(),
+            ..Default::default()
+        }),
+        ..Manifest::default()
+    };
     manifest
         .deps
         .insert("http".to_string(), DepSpec::version("1.0"));
@@ -154,12 +160,14 @@ fn registry_dep_returns_unimplemented_diagnostic() {
 #[test]
 fn git_dep_returns_unimplemented_diagnostic() {
     let project = tempdir("project");
-    let mut manifest = Manifest::default();
-    manifest.package = Some(PackageMeta {
-        name: "myapp".into(),
-        version: "0.1.0".into(),
-        ..Default::default()
-    });
+    let mut manifest = Manifest {
+        package: Some(PackageMeta {
+            name: "myapp".into(),
+            version: "0.1.0".into(),
+            ..Default::default()
+        }),
+        ..Manifest::default()
+    };
     manifest.deps.insert(
         "lib".to_string(),
         DepSpec::Detailed(stryke::pkg::manifest::DetailedDep {

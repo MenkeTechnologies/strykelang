@@ -3,6 +3,13 @@
   1. Arrays don't share state in closures - Arrays captured by closures are copied, not shared. Use
       arrayref ($tokens = []) instead.
 
+  2. AOP advice bodies require their final statement to be an expression (same constraint
+     as `map { }` block lowering). A literal `for`/`while`/`if` block as the final form, or
+     a literal `return`, fails advice firing with a runtime error. Rewrite to use an
+     expression form (`sum(@xs)` instead of `for ...`, ternary instead of `return`-guarded).
+     Loosening this requires a custom advice-body lowering pass (current path reuses the
+     existing `try_compile_block_region`, which is shared with map/grep).
+
 
 
         Think about what's still on the table. stryke beat LuaJIT with:

@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word ladder
+
+fn Rosetta::WordLadder::solve($start, $end, $words) {
+    return [$start] if $start eq $end
+    
+    my %dict
+    $dict{$_} = 1 for @$words
+    
+    my @queue = ([$start])
+    my %seen = ($start => 1)
+    
+    while (scalar(@queue)) {
+        my $path = shift @queue
+        my $word = $path->[-1]
+        
+        my @chars = chars($word)
+        for (my $i = 0; $i < scalar(@chars); $i++) {
+            my $orig = $chars[$i]
+            for my $c ("a".."z") {
+                next if $c eq $orig
+                $chars[$i] = $c
+                my $next_word = join("", @chars)
+                
+                if ($next_word eq $end) {
+                    my @final_path = (@$path, $end)
+                    return join("->", @final_path)
+                }
+                
+                if ($dict{$next_word} && !$seen{$next_word}) {
+                    $seen{$next_word} = 1
+                    push @queue, [@$path, $next_word]
+                }
+            }
+            $chars[$i] = $orig
+        }
+    }
+    undef
+}
+
+my @word_list = qw(cold cord word ward warm)
+my $res = Rosetta::WordLadder::solve("cold", "warm", \@word_list)
+assert_eq $res, "cold->cord->word->ward->warm", "cold to warm ladder"
+
+my @word_list2 = qw(hot dot dog log cog)
+my $res2 = Rosetta::WordLadder::solve("hot", "dog", \@word_list2)
+assert_eq $res2, "hot->dot->dog", "hot to dog ladder"
+
+test_run

@@ -20,11 +20,20 @@ pub struct RuntimeSubDecl {
 
 /// AOP advice registered at runtime (`before|after|around "<glob>" { ... }`).
 /// Installed via [`Op::RegisterAdvice`] into `Interpreter::intercepts`.
+///
+/// `body_block_idx` indexes [`Chunk::blocks`]. The body is lowered to bytecode
+/// during the fourth-pass block lowering ([`Chunk::block_bytecode_ranges`]) so
+/// `dispatch_with_advice` can run it through the VM (`run_block_region`) — the
+/// same path used by `map { }` / `grep { }` blocks. This keeps advice on the
+/// bytecode dispatch surface, away from the AST tree-walker, so compile-time
+/// name resolution (`our`-qualified scalars, lexical slots) works inside the
+/// advice exactly as it does outside. See `tests/tree_walker_absent_aop.rs`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeAdviceDecl {
     pub kind: AdviceKind,
     pub pattern: String,
     pub body: Block,
+    pub body_block_idx: u16,
 }
 
 /// Stack-based bytecode instruction set for the stryke VM.

@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Aho-Corasick string matching
+
+fn Rosetta::AhoCorasick::build($patterns) {
+    my $trie = [{ next => {}, fail => 0, output => [] }]
+    
+    for my $p (@$patterns) {
+        my $curr = 0
+        my @chars = chars($p)
+        for my $c (@chars) {
+            if (!exists($trie->[$curr]->{next}->{$c})) {
+                push @$trie, { next => {}, fail => 0, output => [] }
+                $trie->[$curr]->{next}->{$c} = scalar(@$trie) - 1
+            }
+            $curr = $trie->[$curr]->{next}->{$c}
+        }
+        push @{$trie->[$curr]->{output}}, $p
+    }
+    
+    my @queue
+    for my $c (keys %{$trie->[0]->{next}}) {
+        push @queue, $trie->[0]->{next}->{$c}
+    }
+    
+    while (scalar(@queue)) {
+        my $u = shift @queue
+        for my $c (keys %{$trie->[$u]->{next}}) {
+            my $v = $trie->[$u]->{next}->{$c}
+            my $f = $trie->[$u]->{fail}
+            while ($f > 0 && !exists($trie->[$f]->{next}->{$c})) {
+                $f = $trie->[$f]->{fail}
+            }
+            if (exists($trie->[$f]->{next}->{$c})) {
+                $f = $trie->[$f]->{next}->{$c}
+            }
+            $trie->[$v]->{fail} = $f
+            push @{$trie->[$v]->{output}}, @{$trie->[$f]->{output}}
+            push @queue, $v
+        }
+    }
+    $trie
+}
+
+fn Rosetta::AhoCorasick::search($trie, $text) {
+    my %results
+    my $curr = 0
+    my @chars = chars($text)
+    for (my $i = 0; $i < scalar(@chars); $i++) {
+        my $c = $chars[$i]
+        while ($curr > 0 && !exists($trie->[$curr]->{next}->{$c})) {
+            $curr = $trie->[$curr]->{fail}
+        }
+        if (exists($trie->[$curr]->{next}->{$c})) {
+            $curr = $trie->[$curr]->{next}->{$c}
+        }
+        for my $p (@{$trie->[$curr]->{output}}) {
+            my $pos = $i - length($p) + 1
+            if (!exists($results{$p})) { $results{$p} = [] }
+            push @{$results{$p}}, $pos
+        }
+    }
+    \%results
+}
+
+# my @patterns = qw(he she his hers)
+# my $trie = Rosetta::AhoCorasick::build(\@patterns)
+# my $res = Rosetta::AhoCorasick::search($trie, "ushers")
+# p "DEBUG: " . dd($res)
+
+my @patterns = qw(he she his hers)
+my $trie = Rosetta::AhoCorasick::build(\@patterns)
+my $res = Rosetta::AhoCorasick::search($trie, "ushers")
+
+assert_eq exists($res->{he}), 1, "found he"
+assert_eq join(",", @{$res->{he}}), "2", "he at 2"
+assert_eq exists($res->{she}), 1, "found she"
+assert_eq join(",", @{$res->{she}}), "1", "she at 1"
+assert_eq exists($res->{hers}), 1, "found hers"
+assert_eq join(",", @{$res->{hers}}), "2", "hers at 2"
+
+my @patterns2 = qw(a ab bc bca c caa)
+my $trie2 = Rosetta::AhoCorasick::build(\@patterns2)
+my $res2 = Rosetta::AhoCorasick::search($trie2, "abccaa")
+
+assert_eq join(",", sort @{$res2->{a}}), "0,4,5", "a positions"
+assert_eq join(",", @{$res2->{bc}}), "1", "bc positions"
+
+test_run

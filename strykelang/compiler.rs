@@ -2390,10 +2390,17 @@ impl Compiler {
                         "too many AOP advice declarations in one chunk".into(),
                     ));
                 }
+                // Register the body as a chunk block so the fourth-pass lowering
+                // (`Compiler::compile_program` / `block_bytecode_ranges`) emits its
+                // bytecode and `run_block_region` can dispatch it. This keeps the
+                // body on the VM bytecode path — the tree-walker (`exec_block`) is
+                // banned for advice. See `tests/tree_walker_absent_aop.rs`.
+                let body_block_idx = self.chunk.add_block(body.clone());
                 self.chunk.runtime_advice_decls.push(RuntimeAdviceDecl {
                     kind: *kind,
                     pattern: pattern.clone(),
                     body: body.clone(),
+                    body_block_idx,
                 });
                 self.chunk.emit(Op::RegisterAdvice(idx as u16), line);
             }

@@ -150,6 +150,9 @@ pub struct WorkspaceConfig {
 impl Manifest {
     /// Parse a `stryke.toml` from a string. Returns a structured diagnostic on
     /// failure (line numbers when the underlying TOML parser provides them).
+    /// Kept as an inherent method (rather than `impl FromStr`) so callers see
+    /// the rich `PkgError::Manifest` variant directly.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> PkgResult<Manifest> {
         toml::from_str::<Manifest>(s)
             .map_err(|e| PkgError::Manifest(format!("stryke.toml: {}", e.message())))
