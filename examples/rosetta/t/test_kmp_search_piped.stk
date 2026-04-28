@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knuth-Morris-Pratt string search (piped)
+
+fn Rosetta::KMP::compute_lps($p) {
+    my @chars = $p |> chars
+    my $m = scalar(@chars)
+    my @lps = ~> 0:$m-1 map { 0 }
+    my $len = 0
+    my $i = 1
+    
+    while ($i < $m) {
+        if ($chars[$i] eq $chars[$len]) {
+            $len++
+            $lps[$i] = $len
+            $i++
+        } else {
+            if ($len != 0) {
+                $len = $lps[$len - 1]
+            } else {
+                $lps[$i] = 0
+                $i++
+            }
+        }
+    }
+    \@lps
+}
+
+fn Rosetta::KMP::search($text, $pattern) {
+    my @t = $text |> chars
+    my @p = $pattern |> chars
+    my $n = scalar(@t)
+    my $m = scalar(@p)
+    return 0 if $m == 0
+    
+    my $lps = Rosetta::KMP::compute_lps($pattern)
+    my @indices
+    
+    my $i = 0
+    my $j = 0
+    while ($i < $n) {
+        if ($p[$j] eq $t[$i]) {
+            $i++; $j++
+        }
+        if ($j == $m) {
+            push @indices, $i - $j
+            $j = $lps->[$j - 1]
+        } elsif ($i < $n && $p[$j] ne $t[$i]) {
+            if ($j != 0) {
+                $j = $lps->[$j - 1]
+            } else {
+                $i++
+            }
+        }
+    }
+    \@indices
+}
+
+my $res = Rosetta::KMP::search("ABABDABACDABABCABAB", "ABABCABAB")
+assert_eq join(",", @$res), "10", "found pattern at 10"
+
+my $res2 = Rosetta::KMP::search("aaaaa", "aa")
+assert_eq join(",", @$res2), "0,1,2,3", "found all overlapping aa"
+
+my $res3 = Rosetta::KMP::search("abc", "def")
+assert_eq scalar(@$res3), 0, "not found"
+
+test_run

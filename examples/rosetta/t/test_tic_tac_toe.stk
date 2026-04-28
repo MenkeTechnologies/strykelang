@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tic-tac-toe
+
+fn Rosetta::TicTacToe::check_win($board) {
+    my @b = @$board
+    my @wins = (
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], # rows
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], # cols
+        [0, 4, 8], [2, 4, 6]             # diags
+    )
+    
+    for my $w (@wins) {
+        if ($b[$w->[0]] ne " " && $b[$w->[0]] eq $b[$w->[1]] && $b[$w->[0]] eq $b[$w->[2]]) {
+            return $b[$w->[0]]
+        }
+    }
+    return undef
+}
+
+fn Rosetta::TicTacToe::is_full($board) {
+    my @b = @$board
+    ~> @b grep { $_ eq " " } |> { scalar == 0 }
+}
+
+my $b1 = ["X", "X", "X", " ", "O", " ", "O", " ", " "]
+assert_eq Rosetta::TicTacToe::check_win($b1), "X", "X wins row 0"
+
+my $b2 = ["O", "X", " ", "O", "X", " ", "O", " ", " "]
+assert_eq Rosetta::TicTacToe::check_win($b2), "O", "O wins col 0"
+
+my $b3 = ["X", "O", "X", "X", "O", "O", "O", "X", "X"]
+assert_eq Rosetta::TicTacToe::check_win($b3), undef, "Draw"
+assert_eq Rosetta::TicTacToe::is_full($b3), 1, "Board is full"
+
+test_run

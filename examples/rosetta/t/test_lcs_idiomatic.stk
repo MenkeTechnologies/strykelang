@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest common subsequence
+
+fn Rosetta::LCS::solve($s1, $s2) {
+    my @c1 = chars($s1)
+    my @c2 = chars($s2)
+    my $n1 = scalar(@c1)
+    my $n2 = scalar(@c2)
+    
+    my @dp = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    
+    for (my $i = 1; $i <= $n1; $i++) {
+        for (my $j = 1; $j <= $n2; $j++) {
+            if ($c1[$i-1] eq $c2[$j-1]) {
+                $dp[$i]->[$j] = $dp[$i-1]->[$j-1] + 1
+            } else {
+                my $v1 = $dp[$i-1]->[$j]
+                my $v2 = $dp[$i]->[$j-1]
+                $dp[$i]->[$j] = $v1 > $v2 ? $v1 : $v2
+            }
+        }
+    }
+    
+    # Backtrack to find the LCS
+    my $res = ""
+    my $i = $n1
+    my $j = $n2
+    while ($i > 0 && $j > 0) {
+        if ($c1[$i-1] eq $c2[$j-1]) {
+            $res = $c1[$i-1] . $res
+            $i--; $j--
+        } elsif ($dp[$i-1]->[$j] > $dp[$i]->[$j-1]) {
+            $i--
+        } else {
+            $j--
+        }
+    }
+    $res
+}
+
+assert_eq Rosetta::LCS::solve("1234", "12245"), "124", "lcs 124"
+assert_eq Rosetta::LCS::solve("thisisatest", "testing123"), "test", "lcs test"
+assert_eq Rosetta::LCS::solve("abc", "def"), "", "no lcs"
+
+test_run

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Flood fill
+
+fn Rosetta::FloodFill::solve($grid, $x, $y, $new_color) {
+    my $target_color = $grid->[$y]->[$x]
+    return $grid if $target_color eq $new_color
+    
+    my $rows = scalar(@$grid)
+    my $cols = scalar(@{$grid->[0]})
+    my @stack = ([$x, $y])
+    
+    while (scalar(@stack)) {
+        my $p = pop @stack
+        my ($px, $py) = @$p
+        
+        if ($px >= 0 && $px < $cols && $py >= 0 && $py < $rows && $grid->[$py]->[$px] eq $target_color) {
+            $grid->[$py]->[$px] = $new_color
+            push @stack, [$px + 1, $py]
+            push @stack, [$px - 1, $py]
+            push @stack, [$px, $py + 1]
+            push @stack, [$px, $py - 1]
+        }
+    }
+    $grid
+}
+
+my $grid = [
+    ["#", "#", "#", "#", "#"],
+    ["#", ".", ".", ".", "#"],
+    ["#", ".", "#", ".", "#"],
+    ["#", ".", ".", ".", "#"],
+    ["#", "#", "#", "#", "#"]
+]
+
+my $res = Rosetta::FloodFill::solve($grid, 1, 1, "F")
+
+# Expect all "." to be "F"
+assert_eq $res->[1]->[1], "F", "filled (1,1)"
+assert_eq $res->[1]->[2], "F", "filled (1,2)"
+assert_eq $res->[2]->[1], "F", "filled (2,1)"
+assert_eq $res->[2]->[2], "#", "kept wall (2,2)"
+assert_eq $res->[2]->[3], "F", "filled (2,3)"
+
+test_run

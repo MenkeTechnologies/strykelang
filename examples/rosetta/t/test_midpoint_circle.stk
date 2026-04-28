@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Midpoint circle algorithm
+
+fn Rosetta::MidpointCircle::solve($xm, $ym, $r) {
+    my $x = -$r
+    my $y = 0
+    my $err = 2 - 2 * $r
+    my %points
+    
+    while ($x < 0) {
+        $points{join(",", $xm - $x, $ym + $y)} = 1
+        $points{join(",", $xm - $y, $ym - $x)} = 1
+        $points{join(",", $xm + $x, $ym - $y)} = 1
+        $points{join(",", $xm + $y, $ym + $x)} = 1
+        
+        $r = $err
+        if ($r <= $y) {
+            $y++
+            $err += $y * 2 + 1
+        }
+        if ($r > $x || $err > $y) {
+            $x++
+            $err += $x * 2 + 1
+        }
+    }
+    \%points
+}
+
+my $pts = Rosetta::MidpointCircle::solve(0, 0, 3)
+
+# For radius 3 at (0,0), we expect points like (3,0), (0,3), (-3,0), (0,-3)
+# and possibly (2,2) etc. depending on implementation
+assert_eq exists($pts->{"3,0"}), 1, "point (3,0) exists"
+assert_eq exists($pts->{"0,3"}), 1, "point (0,3) exists"
+assert_eq exists($pts->{"-3,0"}), 1, "point (-3,0) exists"
+assert_eq exists($pts->{"0,-3"}), 1, "point (0,-3) exists"
+
+test_run
