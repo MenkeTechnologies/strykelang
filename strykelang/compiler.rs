@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::bytecode::{
-    BuiltinId, Chunk, Op, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN, GP_START,
+    BuiltinId, Chunk, Op, RuntimeAdviceDecl, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN,
+    GP_START,
 };
 use crate::interpreter::{assign_rhs_wantarray, Interpreter, WantarrayCtx};
 use crate::sort_fast::detect_sort_block_fast;
@@ -2377,6 +2378,24 @@ impl Compiler {
                     prototype: prototype.clone(),
                 });
                 self.chunk.emit(Op::RuntimeSubDecl(idx as u16), line);
+            }
+            StmtKind::AdviceDecl {
+                kind,
+                pattern,
+                body,
+            } => {
+                let idx = self.chunk.runtime_advice_decls.len();
+                if idx > u16::MAX as usize {
+                    return Err(CompileError::Unsupported(
+                        "too many AOP advice declarations in one chunk".into(),
+                    ));
+                }
+                self.chunk.runtime_advice_decls.push(RuntimeAdviceDecl {
+                    kind: *kind,
+                    pattern: pattern.clone(),
+                    body: body.clone(),
+                });
+                self.chunk.emit(Op::RegisterAdvice(idx as u16), line);
             }
             StmtKind::StructDecl { def } => {
                 if self.chunk.struct_defs.iter().any(|d| d.name == def.name) {

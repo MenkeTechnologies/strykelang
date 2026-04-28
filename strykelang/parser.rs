@@ -813,6 +813,30 @@ impl Parser {
                         line,
                     }
                 }
+                "before"
+                    if matches!(
+                        self.peek_at(1),
+                        Token::SingleString(_) | Token::DoubleString(_)
+                    ) =>
+                {
+                    self.parse_advice_decl(crate::ast::AdviceKind::Before)?
+                }
+                "after"
+                    if matches!(
+                        self.peek_at(1),
+                        Token::SingleString(_) | Token::DoubleString(_)
+                    ) =>
+                {
+                    self.parse_advice_decl(crate::ast::AdviceKind::After)?
+                }
+                "around"
+                    if matches!(
+                        self.peek_at(1),
+                        Token::SingleString(_) | Token::DoubleString(_)
+                    ) =>
+                {
+                    self.parse_advice_decl(crate::ast::AdviceKind::Around)?
+                }
                 "try" => self.parse_try_catch()?,
                 "defer" => self.parse_defer_stmt()?,
                 "tie" => self.parse_tie_stmt()?,
@@ -4193,6 +4217,40 @@ impl Parser {
                 self.peek_line(),
             )),
         }
+    }
+
+    /// `before|after|around "<glob>" { ... }` — register AOP advice.
+    /// The pattern is a glob (`*`, `?`) matched against the called sub's bare name.
+    fn parse_advice_decl(&mut self, kind: crate::ast::AdviceKind) -> PerlResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // before/after/around
+        let pattern = match self.advance() {
+            (Token::SingleString(s), _) | (Token::DoubleString(s), _) => s,
+            (tok, err_line) => {
+                return Err(self.syntax_err(
+                    format!(
+                        "Expected string-literal pattern after `{}`, got {:?}",
+                        match kind {
+                            crate::ast::AdviceKind::Before => "before",
+                            crate::ast::AdviceKind::After => "after",
+                            crate::ast::AdviceKind::Around => "around",
+                        },
+                        tok
+                    ),
+                    err_line,
+                ));
+            }
+        };
+        let body = self.parse_block()?;
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::AdviceDecl {
+                kind,
+                pattern,
+                body,
+            },
+            line,
+        })
     }
 
     /// `struct Name { field => Type, ... ; fn method { } }`

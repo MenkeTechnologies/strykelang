@@ -7,6 +7,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod agent;
+pub mod aop;
 pub mod aot;
 pub mod ast;
 pub mod builtins;

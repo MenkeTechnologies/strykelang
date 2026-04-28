@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ast::{Block, ClassDef, EnumDef, Expr, MatchArm, StructDef, SubSigParam, TraitDef};
+use crate::ast::{
+    AdviceKind, Block, ClassDef, EnumDef, Expr, MatchArm, StructDef, SubSigParam, TraitDef,
+};
 use crate::value::PerlValue;
 
 /// `splice` operand tuple: array expr, offset, length, replacement list (see [`Chunk::splice_expr_entries`]).
@@ -14,6 +16,15 @@ pub struct RuntimeSubDecl {
     pub params: Vec<SubSigParam>,
     pub body: Block,
     pub prototype: Option<String>,
+}
+
+/// AOP advice registered at runtime (`before|after|around "<glob>" { ... }`).
+/// Installed via [`Op::RegisterAdvice`] into `Interpreter::intercepts`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeAdviceDecl {
+    pub kind: AdviceKind,
+    pub pattern: String,
+    pub body: Block,
 }
 
 /// Stack-based bytecode instruction set for the stryke VM.
@@ -781,6 +792,8 @@ pub enum Op {
     DeclareMySyncHash(u16),
     /// Register [`RuntimeSubDecl`] at index (nested `sub`, including inside `BEGIN`).
     RuntimeSubDecl(u16),
+    /// Register [`RuntimeAdviceDecl`] at index — install AOP advice into VM `intercepts` registry.
+    RegisterAdvice(u16),
     /// `tie $x | @arr | %h, 'Class', ...` — stack bottom = class expr, then user args; `argc` = `1 + args.len()`.
     /// `target_kind`: 0 = scalar (`TIESCALAR`), 1 = array (`TIEARRAY`), 2 = hash (`TIEHASH`). `name_idx` = bare name.
     Tie {
@@ -1093,6 +1106,8 @@ pub struct Chunk {
     pub algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Nested / runtime `sub` declarations (see [`Op::RuntimeSubDecl`]).
     pub runtime_sub_decls: Vec<RuntimeSubDecl>,
+    /// AOP advice declarations (see [`Op::RegisterAdvice`]).
+    pub runtime_advice_decls: Vec<RuntimeAdviceDecl>,
     /// Stryke `fn ($a, …)` / hash-destruct params for [`Op::MakeCodeRef`] (second operand is pool index).
     pub code_ref_sigs: Vec<Vec<SubSigParam>>,
     /// `par_lines PATH, fn { } [, progress => EXPR]` — evaluated by interpreter inside VM.
@@ -1179,6 +1194,7 @@ impl Chunk {
             algebraic_match_entries: Vec::new(),
             algebraic_match_subject_bytecode_ranges: Vec::new(),
             runtime_sub_decls: Vec::new(),
+            runtime_advice_decls: Vec::new(),
             code_ref_sigs: Vec::new(),
             par_lines_entries: Vec::new(),
             par_walk_entries: Vec::new(),
