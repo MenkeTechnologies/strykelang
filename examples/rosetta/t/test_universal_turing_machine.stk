@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Universal Turing Machine
+
+fn Rosetta::UTM::solve($state, $tape, $pos, $rules, $halt, $blank) {
+    $blank = "0" if !defined $blank
+    my %tape_h
+    for (my $i = 0; $i < scalar(@$tape); $i++) {
+        $tape_h{$i} = $tape->[$i]
+    }
+    
+    my $curr_state = $state
+    my $curr_pos = $pos
+    
+    while ($curr_state ne $halt) {
+        my $read = exists($tape_h{$curr_pos}) ? $tape_h{$curr_pos} : $blank
+        my $rule = $rules->{$curr_state}->{$read}
+        
+        if (!defined $rule) {
+            # Check for default rule or just halt if no rule
+            return \%tape_h
+        }
+        
+        my ($write, $move, $next_state) = @$rule
+        $tape_h{$curr_pos} = $write
+        
+        if ($move eq "R") {
+            $curr_pos++
+        } elsif ($move eq "L") {
+            $curr_pos--
+        }
+        
+        $curr_state = $next_state
+    }
+    
+    return \%tape_h
+}
+
+# Simple incrementer: increments a binary number (e.g., 111 -> 1000)
+# This is a bit complex for a one-off, let's do a simple 3-state busy beaver.
+my %rules = (
+    a => {
+        "0" => ["1", "R", "b"],
+        "1" => ["1", "L", "c"]
+    },
+    b => {
+        "0" => ["1", "L", "a"],
+        "1" => ["1", "R", "b"]
+    },
+    c => {
+        "0" => ["1", "L", "b"],
+        "1" => ["1", "R", "HALT"]
+    }
+)
+
+my $tape = ["0", "0", "0"]
+my $res = Rosetta::UTM::solve("a", $tape, 0, \%rules, "HALT")
+
+# Busy beaver 3-state 2-symbol should produce 6 ones
+my $count = 0
+for my $v (values %$res) {
+    $count++ if $v eq "1"
+}
+
+assert_eq $count, 6, "3-state busy beaver produces 6 ones"
+
+test_run

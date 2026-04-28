@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mastermind
+
+fn Rosetta::Mastermind::score($secret, $guess) {
+    my @s = @$secret
+    my @g = @$guess
+    my $bulls = 0
+    my $cows = 0
+    
+    my @s_remaining
+    my @g_remaining
+    
+    for (my $i = 0; $i < scalar(@s); $i++) {
+        if ($s[$i] eq $g[$i]) {
+            $bulls++
+        } else {
+            push @s_remaining, $s[$i]
+            push @g_remaining, $g[$i]
+        }
+    }
+    
+    my %s_counts
+    $s_counts{$_}++ for @s_remaining
+    
+    for my $char (@g_remaining) {
+        if ($s_counts{$char} > 0) {
+            $cows++
+            $s_counts{$char}--
+        }
+    }
+    
+    return { bulls => $bulls, cows => $cows }
+}
+
+my $s1 = ["R", "G", "B", "Y"]
+my $g1 = ["R", "B", "G", "W"]
+my $res1 = Rosetta::Mastermind::score($s1, $g1)
+assert_eq $res1->{bulls}, 1, "1 bull"
+assert_eq $res1->{cows}, 2, "2 cows"
+
+my $s2 = ["R", "R", "G", "G"]
+my $g2 = ["G", "G", "R", "R"]
+my $res2 = Rosetta::Mastermind::score($s2, $g2)
+assert_eq $res2->{bulls}, 0, "0 bulls"
+assert_eq $res2->{cows}, 4, "4 cows"
+
+my $s3 = ["A", "B", "C", "D"]
+my $g3 = ["A", "B", "C", "D"]
+my $res3 = Rosetta::Mastermind::score($s3, $g3)
+assert_eq $res3->{bulls}, 4, "4 bulls"
+assert_eq $res3->{cows}, 0, "0 cows"
+
+test_run

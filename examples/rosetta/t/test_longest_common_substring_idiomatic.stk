@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest common substring
+
+fn Rosetta::LongestCommonSubstring::solve($s1, $s2) {
+    my @c1 = chars($s1)
+    my @c2 = chars($s2)
+    my $n1 = scalar(@c1)
+    my $n2 = scalar(@c2)
+    
+    my $max_len = 0
+    my $end_idx = 0
+    
+    my @dp = map { [ map { 0 } 0..$n2 ] } 0..$n1
+    
+    for (my $i = 1; $i <= $n1; $i++) {
+        for (my $j = 1; $j <= $n2; $j++) {
+            if ($c1[$i-1] eq $c2[$j-1]) {
+                $dp[$i]->[$j] = $dp[$i-1]->[$j-1] + 1
+                if ($dp[$i]->[$j] > $max_len) {
+                    $max_len = $dp[$i]->[$j]
+                    $end_idx = $i
+                }
+            }
+        }
+    }
+    
+    return substr($s1, $end_idx - $max_len, $max_len)
+}
+
+assert_eq Rosetta::LongestCommonSubstring::solve("abcabcabc", "abc"), "abc", "overlap abc"
+assert_eq Rosetta::LongestCommonSubstring::solve("thisisatest", "testing123"), "test", "overlap test"
+assert_eq Rosetta::LongestCommonSubstring::solve("1234567", "345"), "345", "overlap 345"
+assert_eq Rosetta::LongestCommonSubstring::solve("hello", "world"), "l", "overlap l"
+assert_eq Rosetta::LongestCommonSubstring::solve("abc", "def"), "", "no overlap"
+
+test_run

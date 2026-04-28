@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Barnsley fern
+
+fn Rosetta::BarnsleyFern::solve($iters) {
+    my ($x, $y) = (0.0, 0.0)
+    my @points
+    
+    for (1..$iters) {
+        my $r = rand()
+        my ($nx, $ny)
+        
+        if ($r < 0.01) {
+            $nx = 0.0
+            $ny = 0.16 * $y
+        } elsif ($r < 0.86) {
+            $nx = 0.85 * $x + 0.04 * $y
+            $ny = -0.04 * $x + 0.85 * $y + 1.6
+        } elsif ($r < 0.93) {
+            $nx = 0.20 * $x - 0.26 * $y
+            $ny = 0.23 * $x + 0.22 * $y + 1.6
+        } else {
+            $nx = -0.15 * $x + 0.28 * $y
+            $ny = 0.26 * $x + 0.24 * $y + 0.44
+        }
+        
+        ($x, $y) = ($nx, $ny)
+        push @points, [$x, $y]
+    }
+    \@points
+}
+
+my $res = Rosetta::BarnsleyFern::solve(1000)
+assert_eq scalar(@$res), 1000, "1000 points generated"
+
+# Check if points are within reasonable bounds
+# x is roughly [-2.18, 2.65], y is [0, 9.99]
+for my $p (@$res) {
+    assert_ok ($p->[0] >= -3.0 && $p->[0] <= 3.0), "x in bounds"
+    assert_ok ($p->[1] >= 0.0 && $p->[1] <= 11.0), "y in bounds"
+}
+
+test_run

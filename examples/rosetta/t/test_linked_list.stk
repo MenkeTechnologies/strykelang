@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Singly-linked list/Element definition
+
+fn Rosetta::LinkedList::new() {
+    return { head => undef, size => 0 }
+}
+
+fn Rosetta::LinkedList::push($list, $val) {
+    my $node = { val => $val, next => undef }
+    if (!defined $list->{head}) {
+        $list->{head} = $node
+    } else {
+        my $curr = $list->{head}
+        while (defined $curr->{next}) {
+            $curr = $curr->{next}
+        }
+        $curr->{next} = $node
+    }
+    $list->{size}++
+}
+
+fn Rosetta::LinkedList::to_array($list) {
+    my @res
+    my $curr = $list->{head}
+    while (defined $curr) {
+        push @res, $curr->{val}
+        $curr = $curr->{next}
+    }
+    \@res
+}
+
+fn Rosetta::LinkedList::delete($list, $val) {
+    my $curr = $list->{head}
+    my $prev = undef
+    while (defined $curr) {
+        if ($curr->{val} eq $val) {
+            if (!defined $prev) {
+                $list->{head} = $curr->{next}
+            } else {
+                $prev->{next} = $curr->{next}
+            }
+            $list->{size}--
+            return 1
+        }
+        $prev = $curr
+        $curr = $curr->{next}
+    }
+    0
+}
+
+my $l = Rosetta::LinkedList::new()
+Rosetta::LinkedList::push($l, "A")
+Rosetta::LinkedList::push($l, "B")
+Rosetta::LinkedList::push($l, "C")
+
+my $arr = Rosetta::LinkedList::to_array($l)
+assert_eq join(",", @$arr), "A,B,C", "linked list to array"
+assert_eq $l->{size}, 3, "size is 3"
+
+Rosetta::LinkedList::delete($l, "B")
+my $arr2 = Rosetta::LinkedList::to_array($l)
+assert_eq join(",", @$arr2), "A,C", "delete B"
+assert_eq $l->{size}, 2, "size is 2"
+
+Rosetta::LinkedList::delete($l, "A")
+my $arr3 = Rosetta::LinkedList::to_array($l)
+assert_eq join(",", @$arr3), "C", "delete A"
+
+test_run
