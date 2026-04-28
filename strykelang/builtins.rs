@@ -1462,6 +1462,10 @@ pub(crate) fn try_builtin(
         "sleep" => Some(builtin_sleep(args)),
         "times" => Some(builtin_times()),
         "time" => Some(builtin_time()),
+        "proceed" => Some(builtin_proceed(interp, line)),
+        "intercept_list" => Some(builtin_intercept_list(interp)),
+        "intercept_remove" => Some(builtin_intercept_remove(interp, args)),
+        "intercept_clear" => Some(builtin_intercept_clear(interp)),
         "localtime" => Some(interp.builtin_localtime(args, line)),
         "gmtime" => Some(interp.builtin_gmtime(args, line)),
         "getlogin" => Some(builtin_getlogin()),
@@ -25976,6 +25980,90 @@ fn builtin_times() -> PerlResult<PerlValue> {
             PerlValue::float(0.0),
         ]))
     }
+}
+
+/// `proceed()` — call the original sub from inside an `around` advice body.
+/// Mirrors zshrs `intercept_proceed` (exec.rs:14926-14952): reads the top frame of
+/// `Interpreter::intercept_ctx_stack`, runs the original synchronously with the
+/// saved args, marks the ctx `proceeded=true`, and returns the retval.
+fn builtin_proceed(interp: &mut Interpreter, line: usize) -> PerlResult<PerlValue> {
+    let ctx_idx = interp
+        .intercept_ctx_stack
+        .len()
+        .checked_sub(1)
+        .ok_or_else(|| {
+            crate::error::PerlError::runtime(
+                "proceed() called outside of an `around` advice block",
+                line,
+            )
+        })?;
+    let name = interp.intercept_ctx_stack[ctx_idx].name.clone();
+    let args = interp.intercept_ctx_stack[ctx_idx].args.clone();
+
+    interp.intercept_active_names.push(name.clone());
+    let result: PerlResult<PerlValue> = if let Some(sub) = interp.resolve_sub_by_name(&name) {
+        let want = interp.wantarray_kind;
+        match interp.call_sub(&sub, args, want, line) {
+            Ok(v) => Ok(v),
+            Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
+                Ok(v)
+            }
+            Err(crate::interpreter::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+            Err(crate::interpreter::FlowOrError::Error(e)) => Err(e.at_line(line)),
+        }
+    } else {
+        match crate::builtins::try_builtin(interp, &name, &args, line) {
+            Some(Ok(v)) => Ok(v),
+            Some(Err(e)) => Err(e.at_line(line)),
+            None => Err(crate::error::PerlError::runtime(
+                format!("proceed: undefined sub `{}`", name),
+                line,
+            )),
+        }
+    };
+    interp.intercept_active_names.pop();
+    let retval = result?;
+    if let Some(ctx) = interp.intercept_ctx_stack.get_mut(ctx_idx) {
+        ctx.proceeded = true;
+        ctx.retval = retval.clone();
+    }
+    Ok(retval)
+}
+
+/// `intercept_list()` — return registered AOP advice as an array of `[id, kind, pattern]` triples.
+fn builtin_intercept_list(interp: &Interpreter) -> PerlResult<PerlValue> {
+    let items: Vec<PerlValue> = interp
+        .intercepts
+        .iter()
+        .map(|i| {
+            let kind = match i.kind {
+                crate::ast::AdviceKind::Before => "before",
+                crate::ast::AdviceKind::After => "after",
+                crate::ast::AdviceKind::Around => "around",
+            };
+            PerlValue::array_ref(Arc::new(RwLock::new(vec![
+                PerlValue::integer(i.id as i64),
+                PerlValue::string(kind.to_string()),
+                PerlValue::string(i.pattern.clone()),
+            ])))
+        })
+        .collect();
+    Ok(PerlValue::array(items))
+}
+
+/// `intercept_remove(id)` — remove advice by id; returns count removed (0 or 1).
+fn builtin_intercept_remove(interp: &mut Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let id = args.first().map(|v| v.to_int()).unwrap_or(0).max(0) as u32;
+    let before = interp.intercepts.len();
+    interp.intercepts.retain(|i| i.id != id);
+    Ok(PerlValue::integer((before - interp.intercepts.len()) as i64))
+}
+
+/// `intercept_clear()` — drop all registered advice; returns count cleared.
+fn builtin_intercept_clear(interp: &mut Interpreter) -> PerlResult<PerlValue> {
+    let n = interp.intercepts.len();
+    interp.intercepts.clear();
+    Ok(PerlValue::integer(n as i64))
 }
 
 /// `time` — Time. Returns an integer.

@@ -37,6 +37,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x04\] Shared State (`mysync`)](#0x04-shared-state-mysync)
 - [\[0x05\] Native Data Scripting](#0x05-native-data-scripting)
 - [\[0x06\] Async / Trace / Timer](#0x06-async--trace--timer)
+- [\[0x06b\] AOP — Before / After / Around Advice](#0x06b-aop--before--after--around-advice)
 - [\[0x07\] CLI Flags](#0x07-cli-flags)
 - [\[0x08\] Supported Perl Features](#0x08-supported-perl-features)
 - [\[0x09\] Architecture](#0x09-architecture)
@@ -773,6 +774,45 @@ every "500ms" tick
 my $g = gen { yield $_ for 1..5 }
 my $next = $g->next  # [value, more]
 ```
+
+---
+
+## [0x06b] AOP — BEFORE / AFTER / AROUND ADVICE
+
+Aspect-oriented advice on user subs. Glob pointcuts, three advice kinds, `proceed()` for around. Same surface as zshrs's `intercept` builtin (`zshrs/src/exec.rs`), adapted to a real language: keyword statements instead of a CLI builtin.
+
+```perl
+# Before — runs before the matched sub. Sees $INTERCEPT_NAME, @INTERCEPT_ARGS.
+before "fetch" { warn "calling fetch with @INTERCEPT_ARGS" }
+
+# After — runs after. Sees $INTERCEPT_RESULT, $INTERCEPT_MS, $INTERCEPT_US.
+after "fetch" { warn "fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms" }
+
+# Around — wraps. Must call proceed() to invoke the original.
+around "expensive" {
+    my $cached = cache_get($INTERCEPT_ARGS[0]);
+    return $cached if defined $cached;
+    my $r = proceed();
+    cache_put($INTERCEPT_ARGS[0], $r);
+    $r
+}
+
+# Glob patterns: *, ?
+before "log_*"  { ... }     # any sub starting with log_
+before "*"       { ... }     # every sub call
+
+# Management
+my @list = intercept_list();   # [[id, kind, pattern], ...]
+intercept_remove($id);         # by id
+intercept_clear();             # drop all
+```
+
+Semantics:
+- Multiple `before` / `after` advices on the same name all fire (registration order).
+- The first matching `around` wraps; later `around` matches on the same name are skipped (mirrors zshrs `run_intercepts`).
+- `around` without `proceed()` suppresses the original; the call returns `undef`.
+- Recursion guard: calling the advised sub from inside its own advice runs the original directly without re-firing advice (no infinite loop).
+- Coverage: user-defined subs only. Builtins (`print`, `pmap`, etc.) are not interceptable in v1.
 
 ---
 

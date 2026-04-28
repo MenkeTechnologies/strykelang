@@ -240,6 +240,24 @@ pub enum StmtKind {
         name: String,
         lines: Vec<String>,
     },
+    /// `before|after|around "<glob>" { ... }` — register AOP advice on user subs.
+    /// Pattern is a glob (`*`, `?`) matched against the called sub's bare name.
+    AdviceDecl {
+        kind: AdviceKind,
+        pattern: String,
+        body: Block,
+    },
+}
+
+/// AOP advice kind for [`StmtKind::AdviceDecl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdviceKind {
+    /// Run before the matched sub; sees `INTERCEPT_NAME` / `INTERCEPT_ARGS`.
+    Before,
+    /// Run after the matched sub; sees `INTERCEPT_MS` / `INTERCEPT_US` and the retval in `$?`.
+    After,
+    /// Wrap the matched sub; must call `proceed()` to invoke the original.
+    Around,
 }
 
 /// Target of `tie` (hash, array, or scalar).

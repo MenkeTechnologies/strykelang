@@ -1,6 +1,7 @@
 //! Interpreter integration tests grouped by area. See `tests/integration.rs` for the harness.
 
 mod algebraic_match;
+mod aop;
 mod aot_build;
 mod bare_regex_slash;
 mod builtins;

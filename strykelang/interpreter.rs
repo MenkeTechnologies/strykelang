@@ -573,6 +573,16 @@ impl IoWrite for IoSharedFileWrite {
 pub struct Interpreter {
     pub scope: Scope,
     pub(crate) subs: HashMap<String, Arc<PerlSub>>,
+    /// AOP advice registry — populated by `Op::RegisterAdvice` from `before|after|around` decls.
+    pub(crate) intercepts: Vec<crate::aop::Intercept>,
+    /// Auto-incremented for the next registered intercept id (1-based; matches zshrs).
+    pub(crate) next_intercept_id: u32,
+    /// Stack of active around-advice contexts; `proceed()` reads the top frame.
+    pub(crate) intercept_ctx_stack: Vec<crate::aop::InterceptCtx>,
+    /// Re-entrancy guard: while running advice for a name, calling that same name from inside
+    /// the body skips advice and runs the original directly. Prevents infinite recursion when
+    /// an advice body uses the same sub it advises.
+    pub(crate) intercept_active_names: Vec<String>,
     pub(crate) file: String,
     /// File handles: name → writer
     pub(crate) output_handles: HashMap<String, Box<dyn IoWrite + Send>>,
@@ -1457,6 +1467,10 @@ impl Interpreter {
         let mut s = Self {
             scope,
             subs: HashMap::new(),
+            intercepts: Vec::new(),
+            next_intercept_id: 1,
+            intercept_ctx_stack: Vec::new(),
+            intercept_active_names: Vec::new(),
             struct_defs: HashMap::new(),
             enum_defs: HashMap::new(),
             class_defs: HashMap::new(),

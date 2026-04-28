@@ -72,6 +72,7 @@ struct ParallelBlockVmShared {
     format_decls: Vec<(String, Vec<String>)>,
     use_overload_entries: Vec<Vec<(String, String)>>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
+    runtime_advice_decls: Arc<Vec<crate::bytecode::RuntimeAdviceDecl>>,
     jit_sub_invoke_threshold: u32,
     op_len_plus_one: usize,
     static_sub_closure_subs: Vec<Option<Arc<PerlSub>>>,
@@ -127,6 +128,7 @@ impl ParallelBlockVmShared {
             format_decls: vm.format_decls.clone(),
             use_overload_entries: vm.use_overload_entries.clone(),
             runtime_sub_decls: Arc::clone(&vm.runtime_sub_decls),
+            runtime_advice_decls: Arc::clone(&vm.runtime_advice_decls),
             jit_sub_invoke_threshold: vm.jit_sub_invoke_threshold,
             op_len_plus_one: n,
             static_sub_closure_subs: vm.static_sub_closure_subs.clone(),
@@ -182,6 +184,7 @@ impl ParallelBlockVmShared {
             format_decls: self.format_decls.clone(),
             use_overload_entries: self.use_overload_entries.clone(),
             runtime_sub_decls: Arc::clone(&self.runtime_sub_decls),
+            runtime_advice_decls: Arc::clone(&self.runtime_advice_decls),
             ip: 0,
             stack: Vec::with_capacity(256),
             call_stack: Vec::with_capacity(32),
@@ -303,6 +306,7 @@ pub struct VM<'a> {
     format_decls: Vec<(String, Vec<String>)>,
     use_overload_entries: Vec<Vec<(String, String)>>,
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
+    runtime_advice_decls: Arc<Vec<crate::bytecode::RuntimeAdviceDecl>>,
     pub(crate) ip: usize,
     stack: Vec<PerlValue>,
     call_stack: Vec<CallFrame>,
@@ -411,6 +415,7 @@ impl<'a> VM<'a> {
             format_decls: chunk.format_decls.clone(),
             use_overload_entries: chunk.use_overload_entries.clone(),
             runtime_sub_decls: Arc::new(chunk.runtime_sub_decls.clone()),
+            runtime_advice_decls: Arc::new(chunk.runtime_advice_decls.clone()),
             ip: 0,
             stack: Vec::with_capacity(256),
             call_stack: Vec::with_capacity(32),
@@ -1888,6 +1893,160 @@ impl<'a> VM<'a> {
         self.interp.subs.get(name).cloned()
     }
 
+    /// AOP: run before-advice → original (or around) → after-advice for `name`.
+    /// Mirrors zshrs `run_intercepts` (exec.rs:14656-14759). Args are popped synchronously
+    /// off the stack; the original is invoked via `Interpreter::call_sub` so the retval is
+    /// available to after-advice and to the around block (via `proceed`).
+    #[cold]
+    fn dispatch_with_advice(
+        &mut self,
+        name: &str,
+        closure_sub_hint: Option<Arc<PerlSub>>,
+        argc: usize,
+        want: WantarrayCtx,
+        preserve_arrays: bool,
+    ) -> PerlResult<()> {
+        use crate::ast::AdviceKind;
+
+        let line = self.line();
+
+        let args = if preserve_arrays {
+            self.pop_call_operands_preserved(argc)
+        } else {
+            self.pop_call_operands_flattened(argc)
+        };
+
+        let sub_opt = closure_sub_hint.or_else(|| self.interp.resolve_sub_by_name(name));
+
+        let matching: Vec<crate::aop::Intercept> = self
+            .interp
+            .intercepts
+            .iter()
+            .filter(|i| crate::aop::glob_match(&i.pattern, name))
+            .cloned()
+            .collect();
+
+        // Context vars visible to advice bodies (mirrors zshrs INTERCEPT_NAME / INTERCEPT_ARGS).
+        self.interp
+            .scope
+            .declare_scalar("INTERCEPT_NAME", PerlValue::string(name.to_string()));
+        self.interp
+            .scope
+            .declare_array("INTERCEPT_ARGS", args.clone());
+
+        self.interp.intercept_active_names.push(name.to_string());
+
+        // Helper to pop the active-name guard before bubbling an error.
+        // Inlined where used to keep ownership simple.
+        for adv in matching.iter().filter(|i| matches!(i.kind, AdviceKind::Before)) {
+            match self.interp.exec_block(&adv.body) {
+                Ok(_) => {}
+                Err(FlowOrError::Flow(_)) => {}
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
+                }
+            }
+        }
+
+        let around = matching
+            .iter()
+            .find(|i| matches!(i.kind, AdviceKind::Around));
+
+        let t0 = std::time::Instant::now();
+        let retval = if let Some(around) = around {
+            self.interp
+                .intercept_ctx_stack
+                .push(crate::aop::InterceptCtx {
+                    name: name.to_string(),
+                    args: args.clone(),
+                    proceeded: false,
+                    retval: PerlValue::UNDEF,
+                });
+            let exec_res = self.interp.exec_block(&around.body);
+            let ctx = self.interp.intercept_ctx_stack.pop().unwrap_or_else(|| {
+                crate::aop::InterceptCtx {
+                    name: name.to_string(),
+                    args: Vec::new(),
+                    proceeded: false,
+                    retval: PerlValue::UNDEF,
+                }
+            });
+            match exec_res {
+                Ok(_) | Err(FlowOrError::Flow(_)) => {
+                    if ctx.proceeded {
+                        ctx.retval
+                    } else {
+                        PerlValue::UNDEF
+                    }
+                }
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
+                }
+            }
+        } else if let Some(sub) = sub_opt {
+            match self.interp.call_sub(&sub, args.clone(), want, line) {
+                Ok(v) => v,
+                Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
+                }
+            }
+        } else {
+            // Sub not resolvable — fall back to builtins (matches the non-advice fallback).
+            let saved_wa_call = self.interp.wantarray_kind;
+            self.interp.wantarray_kind = want;
+            let r = crate::builtins::try_builtin(self.interp, name, &args, line);
+            self.interp.wantarray_kind = saved_wa_call;
+            match r {
+                Some(Ok(v)) => v,
+                Some(Err(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
+                }
+                None => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(PerlError::runtime(
+                        format!("undefined sub `{}` (advice fallback)", name),
+                        line,
+                    ));
+                }
+            }
+        };
+        let elapsed = t0.elapsed();
+
+        // Timing context vars for after-advice (matches zshrs INTERCEPT_MS / INTERCEPT_US).
+        self.interp.scope.declare_scalar(
+            "INTERCEPT_MS",
+            PerlValue::float(elapsed.as_secs_f64() * 1000.0),
+        );
+        self.interp.scope.declare_scalar(
+            "INTERCEPT_US",
+            PerlValue::integer(elapsed.as_micros() as i64),
+        );
+        self.interp
+            .scope
+            .declare_scalar("INTERCEPT_RESULT", retval.clone());
+
+        for adv in matching.iter().filter(|i| matches!(i.kind, AdviceKind::After)) {
+            match self.interp.exec_block(&adv.body) {
+                Ok(_) => {}
+                Err(FlowOrError::Flow(_)) => {}
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
+                }
+            }
+        }
+
+        self.interp.intercept_active_names.pop();
+        self.push(retval);
+        Ok(())
+    }
+
     fn vm_dispatch_user_call(
         &mut self,
         name_idx: u16,
@@ -1901,6 +2060,26 @@ impl<'a> VM<'a> {
         let name = name_owned.as_str();
         let argc = argc_u8 as usize;
         let want = WantarrayCtx::from_byte(wa_byte);
+
+        // AOP advice path: at least one matching intercept and no re-entrancy guard for `name`.
+        // Mirrors zshrs `run_intercepts` (exec.rs:14656-14759). The fast-path skip below is the
+        // common case (no intercepts registered); when the registry is non-empty we still bail
+        // out cheaply unless a glob actually matches.
+        if !self.interp.intercepts.is_empty()
+            && !self
+                .interp
+                .intercept_active_names
+                .iter()
+                .any(|n| n == name)
+            && self
+                .interp
+                .intercepts
+                .iter()
+                .any(|i| crate::aop::glob_match(&i.pattern, name))
+        {
+            let preserve = Self::call_preserve_operand_arrays(name);
+            return self.dispatch_with_advice(&name_owned, closure_sub_hint, argc, want, preserve);
+        }
 
         if let Some((entry_ip, stack_args)) = entry_opt {
             let saved_wa = self.interp.wantarray_kind;
@@ -8062,6 +8241,18 @@ impl<'a> VM<'a> {
                         };
                         sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
                         self.interp.subs.insert(key, Arc::new(sub));
+                        Ok(())
+                    }
+                    Op::RegisterAdvice(idx) => {
+                        let rd = &self.runtime_advice_decls[*idx as usize];
+                        let id = self.interp.next_intercept_id;
+                        self.interp.next_intercept_id = id.saturating_add(1);
+                        self.interp.intercepts.push(crate::aop::Intercept {
+                            id,
+                            kind: rd.kind,
+                            pattern: rd.pattern.clone(),
+                            body: rd.body.clone(),
+                        });
                         Ok(())
                     }
                     Op::Tie {
