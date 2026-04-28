@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: K-means clustering
+
+fn Rosetta::KMeans::distance($p1, $p2) {
+    my $sum = 0
+    for (my $i = 0; $i < scalar(@$p1); $i++) {
+        my $diff = $p1->[$i] - $p2->[$i]
+        $sum += $diff * $diff
+    }
+    sqrt($sum)
+}
+
+fn Rosetta::KMeans::solve($points, $k, $max_iters) {
+    # Initialize centroids (pick distant points for stability in this small example)
+    my @centroids = ([@{$points->[0]}], [@{$points->[3]}])
+    my $n = scalar(@$points)
+    my @assignments = ~> 0..$n-1 map { -1 }
+    
+    for (1..$max_iters) {
+        my $changed = 0
+        
+        # Assignment step
+        my @new_assignments = map {
+            my $p_idx = $_
+            my $min_dist = 1e18
+            my $best_c = -1
+            for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
+                my $d = Rosetta::KMeans::distance($points->[$p_idx], $centroids[$c_idx])
+                if ($d < $min_dist) {
+                    $min_dist = $d
+                    $best_c = $c_idx
+                }
+            }
+            $best_c
+        } 0..$n-1
+        
+        for (my $i = 0; $i < $n; $i++) {
+            if ($new_assignments[$i] != $assignments[$i]) {
+                $changed = 1
+                $assignments[$i] = $new_assignments[$i]
+            }
+        }
+        last if !$changed
+        
+        # Update step
+        my @counts = map { 0 } 0..$k-1
+        my @sums = map { [ map { 0 } 0..scalar(@{$points->[0]})-1 ] } 0..$k-1
+        
+        for (my $i = 0; $i < $n; $i++) {
+            my $c_idx = $assignments[$i]
+            $counts[$c_idx]++
+            for (my $d = 0; $d < scalar(@{$points->[0]}); $d++) {
+                $sums[$c_idx]->[$d] += $points->[$i]->[$d]
+            }
+        }
+        
+        for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
+            if ($counts[$c_idx] > 0) {
+                my @new_c
+                for (my $d = 0; $d < scalar(@{$points->[0]}); $d++) {
+                    push @new_c, $sums[$c_idx]->[$d] / $counts[$c_idx]
+                }
+                $centroids[$c_idx] = \@new_c
+            }
+        }
+    }
+    
+    return { centroids => \@centroids, assignments => \@assignments }
+}
+
+my @points = (
+    [1.0, 1.0], [1.5, 2.0], [3.0, 4.0], [5.0, 7.0], [3.5, 5.0], [4.5, 5.0], [3.5, 4.5]
+)
+
+my $res = Rosetta::KMeans::solve(\@points, 2, 10)
+my $assignments = $res->{assignments}
+
+# Check if points are grouped reasonably
+# [1.0, 1.0], [1.5, 2.0] should be in one cluster
+# [5.0, 7.0] should be in another
+assert_eq $assignments->[0], $assignments->[1], "point 0 and 1 same cluster"
+assert_eq $assignments->[0] != $assignments->[3], 1, "point 0 and 3 different clusters"
+
+test_run

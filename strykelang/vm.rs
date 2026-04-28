@@ -1936,19 +1936,17 @@ impl<'a> VM<'a> {
 
         self.interp.intercept_active_names.push(name.to_string());
 
-        // Helper to pop the active-name guard before bubbling an error.
-        // Inlined where used to keep ownership simple.
+        // Run all matching `before` advices via the bytecode VM (`run_block_region`).
+        // We never fall back to `interp.exec_block` here — the advice body must use the
+        // same name resolution as the surrounding bytecode (see the source-level test
+        // in `tests/tree_walker_absent_aop.rs`).
         for adv in matching
             .iter()
             .filter(|i| matches!(i.kind, AdviceKind::Before))
         {
-            match self.interp.exec_block(&adv.body) {
-                Ok(_) => {}
-                Err(FlowOrError::Flow(_)) => {}
-                Err(FlowOrError::Error(e)) => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(e.at_line(line));
-                }
+            if let Err(e) = self.run_advice_body_bytecode(adv, line) {
+                self.interp.intercept_active_names.pop();
+                return Err(e);
             }
         }
 
@@ -1957,69 +1955,59 @@ impl<'a> VM<'a> {
             .find(|i| matches!(i.kind, AdviceKind::Around));
 
         let t0 = std::time::Instant::now();
-        let retval =
-            if let Some(around) = around {
-                self.interp
-                    .intercept_ctx_stack
-                    .push(crate::aop::InterceptCtx {
-                        name: name.to_string(),
-                        args: args.clone(),
-                        proceeded: false,
-                        retval: PerlValue::UNDEF,
-                    });
-                let exec_res = self.interp.exec_block(&around.body);
-                let ctx = self.interp.intercept_ctx_stack.pop().unwrap_or_else(|| {
-                    crate::aop::InterceptCtx {
-                        name: name.to_string(),
-                        args: Vec::new(),
-                        proceeded: false,
-                        retval: PerlValue::UNDEF,
-                    }
+        let retval = if let Some(around) = around {
+            self.interp
+                .intercept_ctx_stack
+                .push(crate::aop::InterceptCtx {
+                    name: name.to_string(),
+                    args: args.clone(),
+                    proceeded: false,
+                    retval: PerlValue::UNDEF,
                 });
-                match exec_res {
-                    Ok(_) | Err(FlowOrError::Flow(_)) => {
-                        if ctx.proceeded {
-                            ctx.retval
-                        } else {
-                            PerlValue::UNDEF
-                        }
-                    }
-                    Err(FlowOrError::Error(e)) => {
-                        self.interp.intercept_active_names.pop();
-                        return Err(e.at_line(line));
-                    }
+            let exec_res = self.run_advice_body_bytecode(around, line);
+            let _ctx = self.interp.intercept_ctx_stack.pop();
+            // AspectJ-style: the around block's evaluated value is the call's return.
+            // If the user wants to forward the original's value, they say `proceed()`
+            // as the last expression; if they want to transform, `proceed() + 1`; if
+            // they want to replace, just emit a value without calling proceed.
+            match exec_res {
+                Ok(v) => v,
+                Err(e) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e);
                 }
-            } else if let Some(sub) = sub_opt {
-                match self.interp.call_sub(&sub, args.clone(), want, line) {
-                    Ok(v) => v,
-                    Err(FlowOrError::Flow(Flow::Return(v))) => v,
-                    Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
-                    Err(FlowOrError::Error(e)) => {
-                        self.interp.intercept_active_names.pop();
-                        return Err(e.at_line(line));
-                    }
+            }
+        } else if let Some(sub) = sub_opt {
+            match self.interp.call_sub(&sub, args.clone(), want, line) {
+                Ok(v) => v,
+                Err(FlowOrError::Flow(Flow::Return(v))) => v,
+                Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
                 }
-            } else {
-                // Sub not resolvable — fall back to builtins (matches the non-advice fallback).
-                let saved_wa_call = self.interp.wantarray_kind;
-                self.interp.wantarray_kind = want;
-                let r = crate::builtins::try_builtin(self.interp, name, &args, line);
-                self.interp.wantarray_kind = saved_wa_call;
-                match r {
-                    Some(Ok(v)) => v,
-                    Some(Err(e)) => {
-                        self.interp.intercept_active_names.pop();
-                        return Err(e.at_line(line));
-                    }
-                    None => {
-                        self.interp.intercept_active_names.pop();
-                        return Err(PerlError::runtime(
-                            format!("undefined sub `{}` (advice fallback)", name),
-                            line,
-                        ));
-                    }
+            }
+        } else {
+            // Sub not resolvable — fall back to builtins (matches the non-advice fallback).
+            let saved_wa_call = self.interp.wantarray_kind;
+            self.interp.wantarray_kind = want;
+            let r = crate::builtins::try_builtin(self.interp, name, &args, line);
+            self.interp.wantarray_kind = saved_wa_call;
+            match r {
+                Some(Ok(v)) => v,
+                Some(Err(e)) => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(e.at_line(line));
                 }
-            };
+                None => {
+                    self.interp.intercept_active_names.pop();
+                    return Err(PerlError::runtime(
+                        format!("undefined sub `{}` (advice fallback)", name),
+                        line,
+                    ));
+                }
+            }
+        };
         let elapsed = t0.elapsed();
 
         // Timing context vars for after-advice (matches zshrs INTERCEPT_MS / INTERCEPT_US).
@@ -2039,19 +2027,55 @@ impl<'a> VM<'a> {
             .iter()
             .filter(|i| matches!(i.kind, AdviceKind::After))
         {
-            match self.interp.exec_block(&adv.body) {
-                Ok(_) => {}
-                Err(FlowOrError::Flow(_)) => {}
-                Err(FlowOrError::Error(e)) => {
-                    self.interp.intercept_active_names.pop();
-                    return Err(e.at_line(line));
-                }
+            if let Err(e) = self.run_advice_body_bytecode(adv, line) {
+                self.interp.intercept_active_names.pop();
+                return Err(e);
             }
         }
 
         self.interp.intercept_active_names.pop();
         self.push(retval);
         Ok(())
+    }
+
+    /// Dispatch one advice body through the VM bytecode helper (`run_block_region`),
+    /// the same path used by `map { }` / `grep { }` blocks. Always returns the body's
+    /// final value on success. The body is required to have a lowered bytecode region
+    /// (`Chunk::block_bytecode_ranges[idx]`) — the compiler's fourth pass populates
+    /// this for every chunk block, so the only reason it would be missing is if the
+    /// body contains a construct the lowering rejects (e.g. a literal `return`); in
+    /// that case we error out loudly rather than silently fall back to the
+    /// tree-walker. See `tests/tree_walker_absent_aop.rs`.
+    #[inline]
+    fn run_advice_body_bytecode(
+        &mut self,
+        adv: &crate::aop::Intercept,
+        line: usize,
+    ) -> PerlResult<PerlValue> {
+        let idx = adv.body_block_idx as usize;
+        let range = self
+            .block_bytecode_ranges
+            .get(idx)
+            .copied()
+            .flatten()
+            .ok_or_else(|| {
+                PerlError::runtime(
+                    format!(
+                        "AOP {} advice body for `{}` could not be lowered to bytecode \
+                         (likely contains a construct unsupported by block lowering, \
+                         e.g. a literal `return`); rewrite the body without it",
+                        match adv.kind {
+                            crate::ast::AdviceKind::Before => "before",
+                            crate::ast::AdviceKind::After => "after",
+                            crate::ast::AdviceKind::Around => "around",
+                        },
+                        adv.pattern,
+                    ),
+                    line,
+                )
+            })?;
+        let mut op_count: u64 = 0;
+        self.run_block_region(range.0, range.1, &mut op_count)
     }
 
     fn vm_dispatch_user_call(
@@ -8255,6 +8279,7 @@ impl<'a> VM<'a> {
                             kind: rd.kind,
                             pattern: rd.pattern.clone(),
                             body: rd.body.clone(),
+                            body_block_idx: rd.body_block_idx,
                         });
                         Ok(())
                     }

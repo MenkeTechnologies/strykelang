@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tree traversal
+
+fn Rosetta::Tree::preorder($node) {
+    return () if !defined $node
+    my @res = ($node->{val})
+    push @res, grep { defined } Rosetta::Tree::preorder($node->{left})
+    push @res, grep { defined } Rosetta::Tree::preorder($node->{right})
+    @res
+}
+
+fn Rosetta::Tree::inorder($node) {
+    return () if !defined $node
+    my @res
+    push @res, grep { defined } Rosetta::Tree::inorder($node->{left})
+    push @res, $node->{val}
+    push @res, grep { defined } Rosetta::Tree::inorder($node->{right})
+    @res
+}
+
+fn Rosetta::Tree::postorder($node) {
+    return () if !defined $node
+    my @res
+    push @res, grep { defined } Rosetta::Tree::postorder($node->{left})
+    push @res, grep { defined } Rosetta::Tree::postorder($node->{right})
+    push @res, $node->{val}
+    @res
+}
+
+fn Rosetta::Tree::levelorder($node) {
+    return () if !defined $node
+    my @queue = ($node)
+    my @res
+    while (scalar(@queue)) {
+        my $curr = shift @queue
+        push @res, $curr->{val}
+        push @queue, $curr->{left} if defined $curr->{left}
+        push @queue, $curr->{right} if defined $curr->{right}
+    }
+    @res
+}
+
+# Building the tree:
+#     1
+#    / \
+#   2   3
+#  / \
+# 4   5
+my $tree = {
+    val => 1,
+    left => {
+        val => 2,
+        left => { val => 4 },
+        right => { val => 5 }
+    },
+    right => { val => 3 }
+}
+
+my @pre = Rosetta::Tree::preorder($tree)
+assert_eq join(",", @pre), "1,2,4,5,3", "preorder"
+
+my @in = Rosetta::Tree::inorder($tree)
+assert_eq join(",", @in), "4,2,5,1,3", "inorder"
+
+my @post = Rosetta::Tree::postorder($tree)
+assert_eq join(",", @post), "4,5,2,3,1", "postorder"
+
+my @level = Rosetta::Tree::levelorder($tree)
+assert_eq join(",", @level), "1,2,3,4,5", "levelorder"
+
+test_run

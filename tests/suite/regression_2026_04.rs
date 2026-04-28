@@ -764,6 +764,7 @@ fn udf_cannot_shadow_reserved_keyword_use() {
 }
 
 #[test]
+#[allow(non_snake_case)]
 fn udf_cannot_shadow_reserved_keyword_BEGIN() {
     assert_eq!(parse_err_kind("fn BEGIN { 0 }"), ErrorKind::Syntax);
 }

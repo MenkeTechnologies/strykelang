@@ -622,8 +622,9 @@ mod tests {
 
     #[test]
     fn format_value_float() {
-        let f = format_value(&PerlValue::float(3.14));
-        assert!(f.starts_with("3.14"));
+        // Use a non-PI-approximation literal to dodge clippy::approx_constant.
+        let f = format_value(&PerlValue::float(2.71));
+        assert!(f.starts_with("2.71"));
     }
 
     #[test]

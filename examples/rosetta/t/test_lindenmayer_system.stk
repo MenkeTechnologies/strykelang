@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: L-system
+
+fn Rosetta::LSystem::solve($axiom, $rules, $iters) {
+    my $curr = $axiom
+    for (1..$iters) {
+        my $next = ""
+        my @chars = chars($curr)
+        for my $c (@chars) {
+            $next .= exists($rules->{$c}) ? $rules->{$c} : $c
+        }
+        $curr = $next
+    }
+    $curr
+}
+
+# Algae curve
+my %rules = (A => "AB", B => "A")
+assert_eq Rosetta::LSystem::solve("A", \%rules, 0), "A", "Algae n=0"
+assert_eq Rosetta::LSystem::solve("A", \%rules, 1), "AB", "Algae n=1"
+assert_eq Rosetta::LSystem::solve("A", \%rules, 2), "ABA", "Algae n=2"
+assert_eq Rosetta::LSystem::solve("A", \%rules, 3), "ABAAB", "Algae n=3"
+assert_eq Rosetta::LSystem::solve("A", \%rules, 4), "ABAABABA", "Algae n=4"
+
+# Fibonacci word is related
+# A -> B, B -> BA
+my %fib_rules = (A => "B", B => "BA")
+assert_eq Rosetta::LSystem::solve("A", \%fib_rules, 1), "B", "Fib n=1"
+assert_eq Rosetta::LSystem::solve("A", \%fib_rules, 2), "BA", "Fib n=2"
+assert_eq Rosetta::LSystem::solve("A", \%fib_rules, 3), "BAB", "Fib n=3"
+assert_eq Rosetta::LSystem::solve("A", \%fib_rules, 4), "BABBA", "Fib n=4"
+
+test_run

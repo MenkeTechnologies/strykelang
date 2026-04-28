@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.9.12 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3200+ builtins</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.9.14 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3200+ builtins</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -503,6 +503,35 @@ pipeline(
 
 # streaming — bounded crossbeam channels, concurrent stages
 par_pipeline_stream([\&amp;stage1, \&amp;stage2, \&amp;stage3], \@input)</pre>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>AOP — before / after / around advice</h2>
+        <p>Aspect-oriented advice on user subs. Glob pointcuts, three advice kinds, AspectJ-style around with <code>proceed()</code>. Same surface as zshrs's <code>intercept</code>, adapted as keyword statements instead of a CLI builtin.</p>
+<pre># before — sees $INTERCEPT_NAME, @INTERCEPT_ARGS
+before "fetch" { warn "calling fetch with @INTERCEPT_ARGS" }
+
+# after  — sees $INTERCEPT_RESULT, $INTERCEPT_MS, $INTERCEPT_US
+after "fetch" { warn "fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms" }
+
+# around — block's value is the call's return; proceed() runs original
+around "expensive" {
+    my $cached = cache_get($INTERCEPT_ARGS[0])
+    return $cached if defined $cached
+    my $r = proceed()
+    cache_put($INTERCEPT_ARGS[0], $r)
+    $r
+}
+
+# Glob pointcuts: *, ?
+before "log_*" { ... }
+before "*"     { trace($INTERCEPT_NAME) }
+
+# Management
+intercept_list();   # [[id, kind, pattern], ...]
+intercept_remove($id);
+intercept_clear();</pre>
+        <p>The leading keyword only commits to advice parsing when followed by a string literal, so <code>before(...)</code> as a normal sub call still works. The first matching <code>around</code> wraps; <code>before</code>/<code>after</code> on the same name all fire in registration order. Re-entrancy guard prevents infinite loops when an advice body calls the advised sub. Coverage: user-defined subs only.</p>
       </section>
 
       <section class="tutorial-section">

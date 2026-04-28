@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix chain multiplication
+
+fn Rosetta::MatrixChain::solve(@dims) {
+    my $n = scalar(@dims) - 1
+    my $m = []
+    my $s = []
+    
+    # Initialize matrices
+    for my $i (0..$n) {
+        $m->[$i] = [ ~> 0..$n map { 0 } ]
+        $s->[$i] = [ ~> 0..$n map { 0 } ]
+    }
+    
+    # L is chain length
+    for my $L (2..$n) {
+        for my $i (1..$n - $L + 1) {
+            my $j = $i + $L - 1
+            $m->[$i]->[$j] = 1e18
+            for my $k ($i..$j - 1) {
+                my $q = $m->[$i]->[$k] + $m->[$k + 1]->[$j] + $dims[$i - 1] * $dims[$k] * $dims[$j]
+                if ($q < $m->[$i]->[$j]) {
+                    $m->[$i]->[$j] = $q
+                    $s->[$i]->[$j] = $k
+                }
+            }
+        }
+    }
+    
+    fn Rosetta::MatrixChain::format_order($s, $i, $j) {
+        if ($i == $j) {
+            return "A" . $i
+        } else {
+            return "(" . Rosetta::MatrixChain::format_order($s, $i, $s->[$i]->[$j]) . Rosetta::MatrixChain::format_order($s, $s->[$i]->[$j] + 1, $j) . ")"
+        }
+    }
+    
+    my $optimal_order = Rosetta::MatrixChain::format_order($s, 1, $n)
+    return { cost => $m->[1]->[$n], order => $optimal_order }
+}
+
+# Example: A1 (10x30), A2 (30x5), A3 (5x60)
+my @dims = (10, 30, 5, 60)
+my $res = Rosetta::MatrixChain::solve(@dims)
+# p "DEBUG: " . dd($res)
+
+assert_eq $res->{cost}, 4500, "Min cost for (10x30, 30x5, 5x60)"
+assert_eq $res->{order}, "((A1A2)A3)", "Optimal order for (10x30, 30x5, 5x60)"
+
+# Another example: 40, 20, 30, 10, 30
+my $res2 = Rosetta::MatrixChain::solve(40, 20, 30, 10, 30)
+assert_eq $res2->{cost}, 26000, "Min cost for (40x20, 20x30, 30x10, 10x30)"
+assert_eq $res2->{order}, "((A1(A2A3))A4)", "Optimal order for dims 40, 20, 30, 10, 30"
+
+test_run

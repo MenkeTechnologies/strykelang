@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Z-algorithm
+
+fn Rosetta::ZAlgorithm::compute($s) {
+    my @chars = chars($s)
+    my $n = scalar(@chars)
+    my @z = ~> 0:$n-1 map { 0 }
+    my ($l, $r) = (0, 0)
+    
+    for (my $i = 1; $i < $n; $i++) {
+        if ($i <= $r) {
+            my $min = $z[$i - $l] < $r - $i + 1 ? $z[$i - $l] : $r - $i + 1
+            $z[$i] = $min
+        }
+        while ($i + $z[$i] < $n && $chars[$z[$i]] eq $chars[$i + $z[$i]]) {
+            $z[$i]++
+        }
+        if ($i + $z[$i] - 1 > $r) {
+            $l = $i
+            $r = $i + $z[$i] - 1
+        }
+    }
+    \@z
+}
+
+fn Rosetta::ZAlgorithm::search($text, $pattern) {
+    my $concat = $pattern . "\$" . $text
+    my $z = Rosetta::ZAlgorithm::compute($concat)
+    my $plen = length($pattern)
+    my @indices
+    for (my $i = 0; $i < scalar(@$z); $i++) {
+        if ($z->[$i] == $plen) {
+            push @indices, $i - $plen - 1
+        }
+    }
+    \@indices
+}
+
+my $z1 = Rosetta::ZAlgorithm::compute("aabcaabx")
+# p "DEBUG: " . join(",", @$z1)
+assert_eq join(",", @$z1), "0,1,0,0,3,1,0,0", "Z-array for aabcaabx"
+
+my $matches = Rosetta::ZAlgorithm::search("baabaa", "aab")
+assert_eq join(",", @$matches), "1", "Pattern aab in baabaa"
+
+my $matches2 = Rosetta::ZAlgorithm::search("ababa", "aba")
+assert_eq join(",", @$matches2), "0,2", "Pattern aba in ababa"
+
+test_run

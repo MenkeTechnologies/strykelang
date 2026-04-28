@@ -69,7 +69,10 @@ impl Lockfile {
         }
     }
 
-    /// Parse from a string.
+    /// Parse from a string. Kept as an inherent method (rather than `impl FromStr`)
+    /// so the error type can be the rich `PkgError::Lockfile` rather than the
+    /// trait's restricted single-type associate.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> PkgResult<Lockfile> {
         toml::from_str::<Lockfile>(s)
             .map_err(|e| PkgError::Lockfile(format!("stryke.lock: {}", e.message())))

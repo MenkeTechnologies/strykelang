@@ -2478,6 +2478,15 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "assert_dies" | "adies" => "`assert_dies` (alias `adies`) — assert that a block throws an error. Passes if the block dies, fails if it returns normally.\n\n```perl\nassert_dies { die \"boom\" } \"should throw\"\nadies { 1 / 0 }\n```",
         "test_run" | "run_tests" => "`test_run` (alias `run_tests`) — print a test summary with pass/fail counts and exit with code 1 if any test failed. Call at the end of a test file to report results.\n\n```perl\n# ... assertions above ...\ntest_run   # prints summary, exits 1 on failure\n```",
 
+        // ── AOP (aspect-oriented advice on user subs) ──
+        "before" => "`before \"<glob>\" { ... }` — register advice that runs *before* every call to a sub whose name matches the glob pattern. Inside the body, `$INTERCEPT_NAME` holds the called sub's name and `@INTERCEPT_ARGS` holds the args.\n\nThe leading keyword only commits to advice parsing when followed by a string literal, so `before(...)` as a normal sub call still parses normally. Multiple `before` advices on the same name all fire in registration order. The advice cannot suppress the call (use `around` for that) and its return value is discarded.\n\n```perl\nbefore \"fetch\" { warn \"calling fetch with @INTERCEPT_ARGS\" }\nbefore \"log_*\" { $log_count++ }     # glob: any sub starting with log_\nbefore \"*\"      { trace($INTERCEPT_NAME) }   # every sub call\n```\n\nBodies are lowered to bytecode and dispatched through the VM (`run_block_region`), so `our $x` and other compile-time name resolutions work the same inside advice as outside it. The body's final statement must be an expression (same constraint as `map { }` block lowering); a literal `for`/`while`/`if` block or a literal `return` will be rejected at firing time.",
+        "after" => "`after \"<glob>\" { ... }` — register advice that runs *after* every call to a sub whose name matches the glob pattern. The body sees the call's return in `$INTERCEPT_RESULT`, the wall-clock duration in `$INTERCEPT_MS` (millis, float) and `$INTERCEPT_US` (micros, integer), the called name in `$INTERCEPT_NAME`, and the args in `@INTERCEPT_ARGS`.\n\nMultiple `after` advices on the same name all fire in registration order. The advice's return value is discarded — the call's return is whatever the original sub (or a matching `around`) produced.\n\n```perl\nafter \"fetch\" { warn \"fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms\" }\nafter \"*\"     { log_call($INTERCEPT_NAME, $INTERCEPT_US) }\n```",
+        "around" => "`around \"<glob>\" { ... }` — register advice that *wraps* every call to a sub whose name matches the glob pattern. Use `proceed()` to invoke the original; the around block's evaluated value is the call's return (AspectJ-style).\n\nThe first matching `around` on a given name wraps; later `around` matches are skipped (mirrors zshrs `run_intercepts`). If `proceed()` is not called, the original sub never runs and the around block's value replaces it. The block can transform (`proceed() + 100`), forward (just `proceed()`), or replace (omit `proceed()` and emit a value).\n\n```perl\naround \"expensive\" {\n    my $cached = cache_get($INTERCEPT_ARGS[0])\n    return $cached if defined $cached\n    my $r = proceed()\n    cache_put($INTERCEPT_ARGS[0], $r)\n    $r\n}\n\naround \"flaky\" { my $r = eval { proceed() }; $@ ? retry_default() : $r }\n```\n\nRecursion guard: calling the advised sub from inside its own advice runs the original directly without re-firing advice — no infinite loop.",
+        "proceed" => "`proceed()` — invoke the original sub with the saved args from inside an `around` advice block. Returns the original's value. Calling `proceed` outside an `around` block is a runtime error.\n\nThe re-entrancy guard ensures `proceed` runs the original directly without re-firing any matching `around` advice for the same name, so transformation chains can't infinite-loop.\n\n```perl\naround \"target\" {\n    my $r = proceed()\n    $r * 2     # double whatever target returned\n}\n\naround \"target\" { proceed() // \"default\" }   # forward, with fallback\n```",
+        "intercept_list" => "`intercept_list()` — return the registered AOP advice as an array of `[id, kind, pattern]` triples (each element is an arrayref).\n\n```perl\nbefore \"foo\" { ... }\nafter  \"bar*\" { ... }\nfor my $row (intercept_list()) {\n    my ($id, $kind, $pat) = @$row\n    p \"id=$id kind=$kind pattern=$pat\"\n}\n```",
+        "intercept_remove" => "`intercept_remove($id)` — remove a single AOP advice by its id (from `intercept_list`). Returns the count removed (0 or 1).\n\n```perl\nbefore \"foo\" { ... }\nmy ($id, $kind, $pat) = @{ (intercept_list())[0] }\nintercept_remove($id)\np scalar intercept_list()   # 0\n```",
+        "intercept_clear" => "`intercept_clear()` — drop all registered AOP advice. Returns the count cleared.\n\n```perl\nbefore \"a\" { ... }\nafter  \"b\" { ... }\np intercept_clear()         # 2\np scalar intercept_list()   # 0\n```",
+
         _ => return None,
     };
     Some(md)
@@ -3104,6 +3113,18 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         "Error Handling",
         &[
             "try", "catch", "finally", "eval", "die", "warn", "croak", "confess",
+        ],
+    ),
+    (
+        "AOP / Advice",
+        &[
+            "before",
+            "after",
+            "around",
+            "proceed",
+            "intercept_list",
+            "intercept_remove",
+            "intercept_clear",
         ],
     ),
     (

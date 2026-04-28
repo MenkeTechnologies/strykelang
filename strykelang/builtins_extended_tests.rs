@@ -51,7 +51,8 @@ fn test_statistics_builtins() {
 
 #[test]
 fn test_geometry_builtins() {
-    assert!(run("area_circle(1)").expect("run").to_number() > 3.14);
+    // Use std::f64::consts::PI rather than the literal 3.14 to dodge clippy::approx_constant.
+    assert!(run("area_circle(1)").expect("run").to_number() > std::f64::consts::PI - 0.01);
     assert_eq!(run("area_triangle(10, 5)").expect("run").to_number(), 25.0);
     assert_eq!(run("area_rectangle(10, 5)").expect("run").to_number(), 50.0);
     assert_eq!(

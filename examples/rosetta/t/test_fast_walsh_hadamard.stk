@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fast Walsh-Hadamard Transform
+
+fn Rosetta::FWHT::transform($a) {
+    my @res = @$a
+    my $n = scalar(@res)
+    my $h = 1
+    while ($h < $n) {
+        for (my $i = 0; $i < $n; $i += $h * 2) {
+            for (my $j = $i; $j < $i + $h; $j++) {
+                my $x = $res[$j]
+                my $y = $res[$j + $h]
+                $res[$j] = $x + $y
+                $res[$j + $h] = $x - $y
+            }
+        }
+        $h *= 2
+    }
+    \@res
+}
+
+fn Rosetta::FWHT::inverse($a) {
+    my $res = Rosetta::FWHT::transform($a)
+    my $n = scalar(@$res)
+    ~> @$res map { $_ / $n }
+}
+
+my @data = (1, 0, 1, 0, 0, 1, 1, 0)
+my $transformed = Rosetta::FWHT::transform(\@data)
+my @inv = Rosetta::FWHT::inverse($transformed)
+
+# Compare with epsilon for floats
+for (my $i = 0; $i < scalar(@data); $i++) {
+    assert_eq abs($inv[$i] - $data[$i]) < 1e-9, 1, "index $i recovered"
+}
+
+my @data2 = (1, 2, 3, 4)
+my $t2 = Rosetta::FWHT::transform(\@data2)
+# H2 * [1,2,3,4]^T = [1+2+3+4, 1-2+3-4, 1+2-3-4, 1-2-3+4]^T = [10, -2, -4, 0]
+assert_eq $t2->[0], 10, "t2[0]"
+assert_eq $t2->[1], -2, "t2[1]"
+assert_eq $t2->[2], -4, "t2[2]"
+assert_eq $t2->[3], 0, "t2[3]"
+
+test_run

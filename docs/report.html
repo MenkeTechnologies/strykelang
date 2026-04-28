@@ -453,6 +453,7 @@
         <div class="feature-card"><h4>Single Cargo Package</h4><p>Stryke is one crate, three binaries (<code>stryke</code>/<code>st</code>/<code>s</code>) and a library. No workspace, no internal sub-crates &mdash; rebuilds are smaller, dependency graph is shallow, embedders see a flat API.</p></div>
         <div class="feature-card"><h4>Build-Time Reflection</h4><p><code>build.rs</code> scans the dispatcher source and generates <code>%builtins</code>, <code>%aliases</code>, <code>%descriptions</code>. Source is the single truth; LSP descriptions can&rsquo;t drift from the actual dispatcher.</p></div>
         <div class="feature-card"><h4>Pipe-Forward + Thread Macro</h4><p><code>|&gt;</code> and <code>~&gt;</code> aren&rsquo;t cosmetic &mdash; they&rsquo;re first-class parser productions that compile into streaming-iterator opcodes. Reading left-to-right is the point; allocation-free chains are the dividend.</p></div>
+        <div class="feature-card"><h4>AOP at the Call Site</h4><p><code>before</code> / <code>after</code> / <code>around</code> register advice into a single <code>Vec&lt;Intercept&gt;</code> on the interpreter. <code>vm_dispatch_user_call</code> takes a one-line glob-match guard before the existing fast-path, so calls with no intercepts pay zero overhead. Around is AspectJ-style: the block&rsquo;s value is the call&rsquo;s return; <code>proceed()</code> invokes the original. Same surface as zshrs <code>intercept</code> &mdash; one design across CLI and language.</p></div>
       </div>
 
     </main>

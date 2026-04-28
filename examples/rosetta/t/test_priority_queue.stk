@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Priority queue
+
+fn Rosetta::PriorityQueue::new() {
+    return { items => [] }
+}
+
+fn Rosetta::PriorityQueue::push($pq, $item, $priority) {
+    push @{$pq->{items}}, { item => $item, priority => $priority }
+    # Keep it sorted by priority descending
+    @{$pq->{items}} = sort { $b->{priority} <=> $a->{priority} } @{$pq->{items}}
+}
+
+fn Rosetta::PriorityQueue::pop($pq) {
+    my $val = shift @{$pq->{items}}
+    return $val->{item}
+}
+
+fn Rosetta::PriorityQueue::size($pq) {
+    scalar(@{$pq->{items}})
+}
+
+my $pq = Rosetta::PriorityQueue::new()
+Rosetta::PriorityQueue::push($pq, "Clear drains", 3)
+Rosetta::PriorityQueue::push($pq, "Feed cat", 4)
+Rosetta::PriorityQueue::push($pq, "Make tea", 5)
+Rosetta::PriorityQueue::push($pq, "Solve P=NP", 10)
+
+assert_eq Rosetta::PriorityQueue::size($pq), 4, "PQ size is 4"
+assert_eq Rosetta::PriorityQueue::pop($pq), "Solve P=NP", "Highest priority first"
+assert_eq Rosetta::PriorityQueue::pop($pq), "Make tea", "Second highest"
+assert_eq Rosetta::PriorityQueue::pop($pq), "Feed cat", "Third"
+assert_eq Rosetta::PriorityQueue::pop($pq), "Clear drains", "Last"
+assert_eq Rosetta::PriorityQueue::size($pq), 0, "PQ is empty"
+
+test_run

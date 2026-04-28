@@ -22,6 +22,10 @@ type ScopeCaptureWithAtomics = (
     Vec<(String, AtomicHash)>,
 );
 
+/// Storage for hashes promoted to shared Arc-backed RwLocks (see [`Frame::shared_hashes`]).
+/// Aliased to keep the field declaration readable (clippy::type_complexity).
+type SharedHashEntry = (String, Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>);
+
 /// Arrays installed by [`crate::interpreter::Interpreter::new`] on the outer frame. They must not be
 /// copied into [`Scope::capture`] / [`Scope::restore_capture`] for closures, or the restored copy
 /// would shadow the live handles (stale `@INC`, `%ENV`, topic `@_`, etc.).
@@ -83,10 +87,7 @@ struct Frame {
     /// so mutations through either path are visible. Re-declaration removes the entry.
     shared_arrays: Vec<(String, Arc<parking_lot::RwLock<Vec<PerlValue>>>)>,
     /// Hashes promoted to shared Arc-backed storage by `\%hash`.
-    shared_hashes: Vec<(
-        String,
-        Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
-    )>,
+    shared_hashes: Vec<SharedHashEntry>,
     /// Thread-safe arrays from `mysync @a`
     atomic_arrays: Vec<(String, AtomicArray)>,
     /// Thread-safe hashes from `mysync %h`

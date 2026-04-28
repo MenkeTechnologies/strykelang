@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sieve of Sundaram (using pipes)
+
+fn Rosetta::SieveSundaram::solve($n) {
+    return (2) if $n < 3
+    my $k = int(($n - 1) / 2)
+    my @marked = ~> 0:$k map { 0 }
+    
+    # Nested iteration for marking
+    for my $i (1..$k) {
+        my $start_j = $i
+        my $max_j = int(($k - $i) / (1 + 2 * $i))
+        last if $max_j < $start_j
+        
+        for my $j ($start_j..$max_j) {
+            my $idx = $i + $j + 2 * $i * $j
+            $marked[$idx] = 1
+        }
+    }
+    
+    # 2 is a special case, then map unmarked indices to 2i + 1
+    my @p = ~> 1:$k grep { !$marked[$_] }
+    my @primes = (2, ~> @p map { 2 * $_ + 1 })
+    return \@primes
+}
+
+my $res = Rosetta::SieveSundaram::solve(100)
+assert_eq join(",", @$res), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97", "Sieve of Sundaram up to 100"
+
+test_run

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Elementary Cellular Automaton
+
+fn Rosetta::ElementaryCellularAutomaton::solve($rule, $initial, $steps) {
+    my $curr = $initial
+    my @results = (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
+    
+    for (1..$steps-1) {
+        my $len = scalar(@$curr)
+        my $prev_gen = $curr
+        $curr = [ map {
+            my $i = $_
+            my $p = $prev_gen->[($i - 1 + $len) % $len]
+            my $c = $prev_gen->[$i]
+            my $a = $prev_gen->[($i + 1) % $len]
+            ($rule >> (($p << 2) | ($c << 1) | $a)) & 1
+        } 0..$len-1 ]
+        push @results, (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
+    }
+    \@results
+}
+
+# Rule 30
+my @initial = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
+my $res = Rosetta::ElementaryCellularAutomaton::solve(30, \@initial, 10)
+
+# Verify some lines of Rule 30
+# Line 0: .........#.........
+# Line 1: ........###........
+# Line 2: .......##..#.......
+# Line 3: ......##.####......
+
+assert_eq $res->[0], "         #         ", "Rule 30 step 0"
+assert_eq $res->[1], "        ###        ", "Rule 30 step 1"
+assert_eq $res->[2], "       ##  #       ", "Rule 30 step 2"
+assert_eq $res->[3], "      ## ####      ", "Rule 30 step 3"
+
+# Rule 90 (Sierpinski)
+my @initial90 = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
+my $res90 = Rosetta::ElementaryCellularAutomaton::solve(90, \@initial90, 5)
+assert_eq $res90->[1], "        # #        ", "Rule 90 step 1"
+assert_eq $res90->[2], "       #   #       ", "Rule 90 step 2"
+
+test_run

@@ -586,7 +586,7 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
                 crate::ast::AdviceKind::After => "after",
                 crate::ast::AdviceKind::Around => "around",
             };
-            let _ = write!(buf, "{} \"{}\" {{\n", kw, pattern);
+            let _ = writeln!(buf, "{} \"{}\" {{", kw, pattern);
             deparse_block_into(buf, body, indent + 1);
             buf.push_str(&ind);
             buf.push('}');

@@ -21,8 +21,13 @@ pub struct Intercept {
     pub kind: AdviceKind,
     /// Glob pointcut matched against the called sub's bare name.
     pub pattern: String,
-    /// Advice body (parsed AST; executed via `Interpreter::exec_block`).
+    /// Advice body (parsed AST; kept for `intercept_list` introspection and
+    /// as a last-resort fallback when bytecode lowering was not possible).
     pub body: Block,
+    /// Index into `Chunk::blocks` for the body's compiled bytecode. The VM
+    /// dispatches the body via `run_block_region(start, end, …)` using
+    /// `Chunk::block_bytecode_ranges[body_block_idx]`.
+    pub body_block_idx: u16,
 }
 
 /// Per-call advice context — pushed when entering an `around` block, popped on exit.

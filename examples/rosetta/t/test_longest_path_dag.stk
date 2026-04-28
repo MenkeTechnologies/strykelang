@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Longest path in a DAG
+
+fn Rosetta::LongestPathDAG::solve($nodes, $edges) {
+    # 1. Calculate in-degrees
+    my %in_degree
+    my %adj
+    for my $n (@$nodes) {
+        $in_degree{$n} = 0
+        $adj{$n} = []
+    }
+    for my $e (@$edges) {
+        my ($u, $v, $w) = @$e
+        push @{$adj{$u}}, [$v, $w]
+        $in_degree{$v}++
+    }
+    
+    # 2. Topological Sort (Kahn's)
+    my @queue
+    for my $n (@$nodes) {
+        push @queue, $n if $in_degree{$n} == 0
+    }
+    
+    my @topo
+    while (scalar(@queue)) {
+        my $u = shift @queue
+        push @topo, $u
+        for my $edge (@{$adj{$u}}) {
+            my $v = $edge->[0]
+            $in_degree{$v}--
+            push @queue, $v if $in_degree{$v} == 0
+        }
+    }
+    
+    # 3. Longest Path using Topo Order
+    my %dist
+    for my $n (@$nodes) { $dist{$n} = -1e18 }
+    
+    # Initialize sources with 0
+    for my $n (@$nodes) {
+        my $is_source = 1
+        for my $e (@$edges) {
+            if ($e->[1] eq $n) { $is_source = 0; last }
+        }
+        $dist{$n} = 0 if $is_source
+    }
+    
+    for my $u (@topo) {
+        next if $dist{$u} == -1e18
+        for my $edge (@{$adj{$u}}) {
+            my ($v, $w) = @$edge
+            if ($dist{$v} < $dist{$u} + $w) {
+                $dist{$v} = $dist{$u} + $w
+            }
+        }
+    }
+    
+    my $max_path = 0
+    for my $n (@$nodes) {
+        $max_path = $dist{$n} if $dist{$n} > $max_path
+    }
+    $max_path
+}
+
+my @nodes = ("A", "B", "C", "D", "E")
+my @edges = (
+    ["A", "B", 3], ["A", "C", 2],
+    ["B", "D", 4], ["C", "D", 2], ["C", "E", 3],
+    ["D", "E", 1]
+)
+# A->B->D->E: 3+4+1 = 8
+# A->C->E: 2+3 = 5
+# A->C->D->E: 2+2+1 = 5
+
+assert_eq Rosetta::LongestPathDAG::solve(\@nodes, \@edges), 8, "longest path is 8"
+
+test_run

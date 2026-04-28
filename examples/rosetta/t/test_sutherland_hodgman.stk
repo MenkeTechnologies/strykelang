@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sutherland-Hodgman polygon clipping
+
+fn Rosetta::SutherlandHodgman::is_inside($p, $cp1, $cp2) {
+    return ($cp2->[0] - $cp1->[0]) * ($p->[1] - $cp1->[1]) > ($cp2->[1] - $cp1->[1]) * ($p->[0] - $cp1->[0])
+}
+
+fn Rosetta::SutherlandHodgman::intersection($cp1, $cp2, $s, $e) {
+    my $dc = [$cp1->[0] - $cp2->[0], $cp1->[1] - $cp2->[1]]
+    my $dp = [$s->[0] - $e->[0], $s->[1] - $e->[1]]
+    my $n1 = $cp1->[0] * $cp2->[1] - $cp1->[1] * $cp2->[0]
+    my $n2 = $s->[0] * $e->[1] - $s->[1] * $e->[0]
+    my $n3 = 1.0 / ($dc->[0] * $dp->[1] - $dc->[1] * $dp->[0])
+    return [($n1 * $dp->[0] - $n2 * $dc->[0]) * $n3, ($n1 * $dp->[1] - $n2 * $dc->[1]) * $n3]
+}
+
+fn Rosetta::SutherlandHodgman::clip($subject_poly, $clip_poly) {
+    my $output_list = $subject_poly
+    my $cp1 = $clip_poly->[-1]
+    
+    for my $cp2 (@$clip_poly) {
+        my $input_list = $output_list
+        $output_list = []
+        my $s = $input_list->[-1]
+        
+        for my $e (@$input_list) {
+            if (Rosetta::SutherlandHodgman::is_inside($e, $cp1, $cp2)) {
+                if (!Rosetta::SutherlandHodgman::is_inside($s, $cp1, $cp2)) {
+                    push @$output_list, Rosetta::SutherlandHodgman::intersection($cp1, $cp2, $s, $e)
+                }
+                push @$output_list, $e
+            } elsif (Rosetta::SutherlandHodgman::is_inside($s, $cp1, $cp2)) {
+                push @$output_list, Rosetta::SutherlandHodgman::intersection($cp1, $cp2, $s, $e)
+            }
+            $s = $e
+        }
+        $cp1 = $cp2
+    }
+    $output_list
+}
+
+my $subject = [[50, 150], [200, 50], [350, 150], [350, 300], [250, 300], [200, 250], [150, 350], [100, 250], [100, 200]]
+my $clip = [[100, 100], [300, 100], [300, 300], [100, 300]]
+
+my $result = Rosetta::SutherlandHodgman::clip($subject, $clip)
+
+# Result should be a polygon with clipped vertices.
+# We'll check the count and a few points.
+assert_eq scalar(@$result), 10, "Clipped polygon vertex count"
+
+# Check if all points are within [100, 300]
+for my $p (@$result) {
+    # Using epsilon for float comparison might be safer but here we just check bounds
+    my $x_in = ($p->[0] >= 99.9 && $p->[0] <= 300.1)
+    my $y_in = ($p->[1] >= 99.9 && $p->[1] <= 300.1)
+    assert_eq "$x_in", "1", "x coordinate $p->[0] in range"
+    assert_eq "$y_in", "1", "y coordinate $p->[1] in range"
+}
+
+test_run

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.9.12 · 3276 topics · 33 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.9.14 · 3283 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -183,6 +183,7 @@
         <li><a href="#ch-arrays-hashes">Arrays &amp; Hashes</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-control-flow">Control Flow</a> <span class="chapter-count">17</span></li>
         <li><a href="#ch-error-handling">Error Handling</a> <span class="chapter-count">8</span></li>
+        <li><a href="#ch-aop-advice">AOP / Advice</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-declarations">Declarations</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-cluster-distributed">Cluster / Distributed</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-datetime">Datetime</a> <span class="chapter-count">15</span></li>
@@ -4637,6 +4638,85 @@ fn process($input) { validate($input) }
 fn main { process({}) }   # full trace: main -&gt; process -&gt; validate
 </code></pre>
         <p>The trace output shows: <code>missing required field &#39;name&#39; at script.pl line 2.\n\tmain::validate called at line 4\n\t...</code>.</p>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-aop-advice">
+      <h2>AOP / Advice</h2>
+      <p class="chapter-meta">7 topics</p>
+      <article class="doc-entry" id="doc-before">
+        <h3><a class="doc-anchor" href="#doc-before">#</a> <code>before</code></h3>
+        <p><code>before &quot;&lt;glob&gt;&quot; { ... }</code> — register advice that runs *before* every call to a sub whose name matches the glob pattern. Inside the body, <code>$INTERCEPT_NAME</code> holds the called sub&#39;s name and <code>@INTERCEPT_ARGS</code> holds the args.</p>
+        <p>The leading keyword only commits to advice parsing when followed by a string literal, so <code>before(...)</code> as a normal sub call still parses normally. Multiple <code>before</code> advices on the same name all fire in registration order. The advice cannot suppress the call (use <code>around</code> for that) and its return value is discarded.</p>
+        <pre><code class="lang-perl">before &quot;fetch&quot; { warn &quot;calling fetch with @INTERCEPT_ARGS&quot; }
+before &quot;log_*&quot; { $log_count++ }     # glob: any sub starting with log_
+before &quot;*&quot;      { trace($INTERCEPT_NAME) }   # every sub call
+</code></pre>
+        <p>Bodies are lowered to bytecode and dispatched through the VM (<code>run_block_region</code>), so <code>our $x</code> and other compile-time name resolutions work the same inside advice as outside it. The body&#39;s final statement must be an expression (same constraint as <code>map { }</code> block lowering); a literal <code>for</code>/<code>while</code>/<code>if</code> block or a literal <code>return</code> will be rejected at firing time.</p>
+      </article>
+      <article class="doc-entry" id="doc-after">
+        <h3><a class="doc-anchor" href="#doc-after">#</a> <code>after</code></h3>
+        <p><code>after &quot;&lt;glob&gt;&quot; { ... }</code> — register advice that runs *after* every call to a sub whose name matches the glob pattern. The body sees the call&#39;s return in <code>$INTERCEPT_RESULT</code>, the wall-clock duration in <code>$INTERCEPT_MS</code> (millis, float) and <code>$INTERCEPT_US</code> (micros, integer), the called name in <code>$INTERCEPT_NAME</code>, and the args in <code>@INTERCEPT_ARGS</code>.</p>
+        <p>Multiple <code>after</code> advices on the same name all fire in registration order. The advice&#39;s return value is discarded — the call&#39;s return is whatever the original sub (or a matching <code>around</code>) produced.</p>
+        <pre><code class="lang-perl">after &quot;fetch&quot; { warn &quot;fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms&quot; }
+after &quot;*&quot;     { log_call($INTERCEPT_NAME, $INTERCEPT_US) }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-around">
+        <h3><a class="doc-anchor" href="#doc-around">#</a> <code>around</code></h3>
+        <p><code>around &quot;&lt;glob&gt;&quot; { ... }</code> — register advice that *wraps* every call to a sub whose name matches the glob pattern. Use <code>proceed()</code> to invoke the original; the around block&#39;s evaluated value is the call&#39;s return (AspectJ-style).</p>
+        <p>The first matching <code>around</code> on a given name wraps; later <code>around</code> matches are skipped (mirrors zshrs <code>run_intercepts</code>). If <code>proceed()</code> is not called, the original sub never runs and the around block&#39;s value replaces it. The block can transform (<code>proceed() + 100</code>), forward (just <code>proceed()</code>), or replace (omit <code>proceed()</code> and emit a value).</p>
+        <pre><code class="lang-perl">around &quot;expensive&quot; {
+    my $cached = cache_get($INTERCEPT_ARGS[0])
+    return $cached if defined $cached
+    my $r = proceed()
+    cache_put($INTERCEPT_ARGS[0], $r)
+    $r
+}
+
+around &quot;flaky&quot; { my $r = eval { proceed() }; $@ ? retry_default() : $r }
+</code></pre>
+        <p>Recursion guard: calling the advised sub from inside its own advice runs the original directly without re-firing advice — no infinite loop.</p>
+      </article>
+      <article class="doc-entry" id="doc-proceed">
+        <h3><a class="doc-anchor" href="#doc-proceed">#</a> <code>proceed</code></h3>
+        <p><code>proceed()</code> — invoke the original sub with the saved args from inside an <code>around</code> advice block. Returns the original&#39;s value. Calling <code>proceed</code> outside an <code>around</code> block is a runtime error.</p>
+        <p>The re-entrancy guard ensures <code>proceed</code> runs the original directly without re-firing any matching <code>around</code> advice for the same name, so transformation chains can&#39;t infinite-loop.</p>
+        <pre><code class="lang-perl">around &quot;target&quot; {
+    my $r = proceed()
+    $r * 2     # double whatever target returned
+}
+
+around &quot;target&quot; { proceed() // &quot;default&quot; }   # forward, with fallback
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-intercept-list">
+        <h3><a class="doc-anchor" href="#doc-intercept-list">#</a> <code>intercept_list</code></h3>
+        <p><code>intercept_list()</code> — return the registered AOP advice as an array of <code>[id, kind, pattern]</code> triples (each element is an arrayref).</p>
+        <pre><code class="lang-perl">before &quot;foo&quot; { ... }
+after  &quot;bar*&quot; { ... }
+for my $row (intercept_list()) {
+    my ($id, $kind, $pat) = @$row
+    p &quot;id=$id kind=$kind pattern=$pat&quot;
+}
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-intercept-remove">
+        <h3><a class="doc-anchor" href="#doc-intercept-remove">#</a> <code>intercept_remove</code></h3>
+        <p><code>intercept_remove($id)</code> — remove a single AOP advice by its id (from <code>intercept_list</code>). Returns the count removed (0 or 1).</p>
+        <pre><code class="lang-perl">before &quot;foo&quot; { ... }
+my ($id, $kind, $pat) = @{ (intercept_list())[0] }
+intercept_remove($id)
+p scalar intercept_list()   # 0
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-intercept-clear">
+        <h3><a class="doc-anchor" href="#doc-intercept-clear">#</a> <code>intercept_clear</code></h3>
+        <p><code>intercept_clear()</code> — drop all registered AOP advice. Returns the count cleared.</p>
+        <pre><code class="lang-perl">before &quot;a&quot; { ... }
+after  &quot;b&quot; { ... }
+p intercept_clear()         # 2
+p scalar intercept_list()   # 0
+</code></pre>
       </article>
     </section>
     <section class="tutorial-section" id="ch-declarations">

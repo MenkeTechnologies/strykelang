@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bellman-Ford algorithm
+
+fn Rosetta::BellmanFord::solve($nodes, $edges, $source) {
+    my %distance
+    my %predecessor
+    for my $n (@$nodes) {
+        $distance{"$n"} = 1e9
+        $predecessor{"$n"} = undef
+    }
+    $distance{"$source"} = 0
+    
+    my $count = scalar(@$nodes)
+    for (1..$count-1) {
+        for my $edge (@$edges) {
+            my ($u, $v, $w) = @$edge
+            if ($distance{"$u"} != 1e9 && $distance{"$u"} + $w < $distance{"$v"}) {
+                $distance{"$v"} = $distance{"$u"} + $w
+                $predecessor{"$v"} = "$u"
+            }
+        }
+    }
+    
+    # Check for negative cycles
+    for my $edge (@$edges) {
+        my ($u, $v, $w) = @$edge
+        if ($distance{"$u"} != 1e9 && $distance{"$u"} + $w < $distance{"$v"}) {
+            return undef
+        }
+    }
+    
+    return \%distance
+}
+
+my @nodes = (1, 2, 3, 4, 5)
+my @edges = (
+    [1, 2, 10], [1, 3, 3], [2, 3, 1], [2, 4, 2],
+    [3, 2, 4], [3, 4, 8], [3, 5, 2], [4, 5, 7], [5, 4, 9]
+)
+
+my $dist = Rosetta::BellmanFord::solve(\@nodes, \@edges, 1)
+
+assert_eq $dist->{1}, 0, "dist 1"
+assert_eq $dist->{2}, 7, "dist 2"
+assert_eq $dist->{3}, 3, "dist 3"
+assert_eq $dist->{4}, 9, "dist 4"
+assert_eq $dist->{5}, 5, "dist 5"
+
+# Negative cycle test
+my @edges2 = ([1, 2, 1], [2, 3, 1], [3, 1, -3])
+my $res2 = Rosetta::BellmanFord::solve([1, 2, 3], \@edges2, 1)
+assert_eq $res2, undef, "negative cycle detected"
+
+test_run
