@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bloom Filter
+
+fn Rosetta::BloomFilter::create($size) {
+    my @bitset = map { 0 } 1:$size
+    { size => $size, bitset => \@bitset }
+}
+
+fn Rosetta::BloomFilter::hashes($s, $size) {
+    # djb2
+    my $h1 = 5381
+    for my $c ($s |> chars()) {
+        $h1 = (($h1 << 5) + $h1) + ord($c)
+    }
+    
+    # sdbm
+    my $h2 = 0
+    for my $c ($s |> chars()) {
+        $h2 = ord($c) + ($h2 << 6) + ($h2 << 16) - $h2
+    }
+    
+    # Return multiple indices
+    (abs($h1) % $size, abs($h2) % $size)
+}
+
+fn Rosetta::BloomFilter::add($item, $bf) {
+    my @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
+    for my $i (@indices) {
+        $bf->{bitset}->[$i] = 1
+    }
+}
+
+fn Rosetta::BloomFilter::check($item, $bf) {
+    my @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
+    for my $i (@indices) {
+        return 0 if $bf->{bitset}->[$i] == 0
+    }
+    return 1
+}
+
+my $bf = Rosetta::BloomFilter::create(1000)
+"hello" |> Rosetta::BloomFilter::add($bf)
+"world" |> Rosetta::BloomFilter::add($bf)
+"stryke" |> Rosetta::BloomFilter::add($bf)
+
+assert_eq Rosetta::BloomFilter::check("hello", $bf), 1, "check hello"
+assert_eq Rosetta::BloomFilter::check("world", $bf), 1, "check world"
+assert_eq Rosetta::BloomFilter::check("stryke", $bf), 1, "check stryke"
+assert_eq Rosetta::BloomFilter::check("perl", $bf), 0, "check perl (not in set)"
+
+# Test with pipelines and ~>
+my @test_words = ("hello", "world", "stryke", "python", "ruby", "java")
+my @results = ~> @test_words map { Rosetta::BloomFilter::check($_, $bf) }
+assert_eq join(",", @results), "1,1,1,0,0,0", "parallel check results"
+
+test_run

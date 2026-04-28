@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: MD5
+
+fn Rosetta::MD5::compute($s) {
+    $s |> md5()
+}
+
+assert_eq Rosetta::MD5::compute("abc"), "900150983cd24fb0d6963f7d28e17f72", "md5('abc')"
+assert_eq Rosetta::MD5::compute("The quick brown fox jumps over the lazy dog"), "9e107d9d372bb6826bd81d3542a419d6", "md5(fox)"
+
+# Parallel map test
+my @texts = ("apple", "banana", "cherry")
+my @hashes = ~> @texts map { md5($_) }
+assert_eq $hashes[0], "1f3870be274f6c49b3e31a0c6728957f", "md5('apple')"
+
+test_run

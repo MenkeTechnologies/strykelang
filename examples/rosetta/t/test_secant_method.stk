@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Secant method
+
+fn Rosetta::SecantMethod::solve($f, $x0, $x1, $epsilon, $max_iter) {
+    my $f0 = $f->($x0)
+    my $f1 = $f->($x1)
+    
+    for my $i (1:$max_iter) {
+        if (abs($f1 - $f0) < $epsilon) {
+            return $x1
+        }
+        
+        my $x2 = $x1 - $f1 * ($x1 - $x0) / ($f1 - $f0)
+        my $f2 = $f->($x2)
+        
+        if (abs($x2 - $x1) < $epsilon) {
+            return $x2
+        }
+        
+        $x0 = $x1
+        $f0 = $f1
+        $x1 = $x2
+        $f1 = $f2
+    }
+    $x1
+}
+
+my $f = fn($x) { $x ** 3 - 20 }
+my $root = Rosetta::SecantMethod::solve($f, 2, 3, 0.0001, 100)
+# Cube root of 20 is approx 2.7144176
+assert_ok abs($root - 2.7144176) < 0.0001, "root of x^3 - 20"
+
+my $g = fn($x) { cos($x) - $x ** 3 }
+my $root2 = Rosetta::SecantMethod::solve($g, 0, 1, 0.0001, 100)
+# Root of cos(x) = x^3 is approx 0.865474
+assert_ok abs($root2 - 0.865474) < 0.0001, "root of cos(x) - x^3"
+
+test_run

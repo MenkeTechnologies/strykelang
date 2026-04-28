@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kolakoski sequence
+
+fn Rosetta::Kolakoski::gen($n) {
+    if ($n <= 0) { return () }
+    if ($n == 1) { return (1) }
+    if ($n == 2) { return (1, 2) }
+    
+    my @res = (1, 2, 2)
+    my $p = 2
+    while (scalar(@res) < $n) {
+        my $val = $res[-1] == 1 ? 2 : 1
+        my $count = $res[$p++]
+        for (my $i = 0; $i < $count; $i++) {
+            push @res, $val
+        }
+    }
+    
+    # Trim to exactly n using an idiomatic pipeline
+    @res |> take($n)
+}
+
+my @k10 = Rosetta::Kolakoski::gen(10)
+assert_eq join(",", @k10), "1,2,2,1,1,2,1,2,2,1", "kolakoski(10)"
+
+my @k20 = Rosetta::Kolakoski::gen(20)
+assert_eq join(",", @k20), "1,2,2,1,1,2,1,2,2,1,2,2,1,1,2,1,1,2,2,1", "kolakoski(20)"
+
+# Verify first 100 elements sum to a reasonable value
+my $sum = ~> Rosetta::Kolakoski::gen(100) reduce { $a + $b }
+# Symbols are 1 and 2, so sum should be between 100 and 200.
+# For Kolakoski(1,2), the density of 1s is 0.5, so sum should be around 150.
+assert_ok $sum > 130 && $sum < 170, "sum of first 100 elements is reasonable"
+
+test_run

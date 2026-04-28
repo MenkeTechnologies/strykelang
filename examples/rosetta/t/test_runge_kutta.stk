@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Runge-Kutta 4th order
+
+fn Rosetta::RungeKutta::solve($f, $x, $y, $h, $steps) {
+    my @res = ([$x, $y])
+    for my $i (1:$steps) {
+        my $k1 = $h * $f->($x, $y)
+        my $k2 = $h * $f->($x + $h/2, $y + $k1/2)
+        my $k3 = $h * $f->($x + $h/2, $y + $k2/2)
+        my $k4 = $h * $f->($x + $h, $y + $k3)
+        
+        $y += ($k1 + 2*$k2 + 2*$k3 + $k4) / 6
+        $x += $h
+        push @res, [$x, $y]
+    }
+    @res
+}
+
+# y' = x * sqrt(y)
+my $f = fn($x, $y) { $x * sqrt($y) }
+my $h = 0.1
+my $steps = 100 # from 0 to 10
+my @results = Rosetta::RungeKutta::solve($f, 0, 1, $h, $steps)
+
+# Exact solution: y(x) = (1/16) * (x^2 + 4)^2
+fn Rosetta::RungeKutta::exact($x) {
+    0.0625 * ($x * $x + 4) ** 2
+}
+
+# Check a few points
+for my $step (0, 10, 50, 100) {
+    my $p = $results[$step]
+    my $x = $p->[0]
+    my $y = $p->[1]
+    my $exact_y = Rosetta::RungeKutta::exact($x)
+    assert_ok abs($y - $exact_y) < 0.0001, "RK4 at x=$x: $y vs exact $exact_y"
+}
+
+test_run

@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: RC4
+
+fn Rosetta::RC4::ksa($key) {
+    my @key_bytes = $key |> chars() |> map { ord($_) }
+    my $key_len = scalar(@key_bytes)
+    my @s = 0:255
+    
+    my $j = 0
+    for (my $i = 0; $i < 256; $i++) {
+        $j = ($j + $s[$i] + $key_bytes[$i % $key_len]) % 256
+        # Swap
+        my $tmp = $s[$i]
+        $s[$i] = $s[$j]
+        $s[$j] = $tmp
+    }
+    \@s
+}
+
+fn Rosetta::RC4::prga($s, $len) {
+    my $i = 0
+    my $j = 0
+    my @keystream
+    for (my $k = 0; $k < $len; $k++) {
+        $i = ($i + 1) % 256
+        $j = ($j + $s->[$i]) % 256
+        
+        # Swap
+        my $tmp = $s->[$i]
+        $s->[$i] = $s->[$j]
+        $s->[$j] = $tmp
+        
+        my $t = ($s->[$i] + $s->[$j]) % 256
+        push @keystream, $s->[$t]
+    }
+    @keystream
+}
+
+fn Rosetta::RC4::solve($key, $data) {
+    my $s = Rosetta::RC4::ksa($key)
+    my @data_bytes = $data |> chars() |> map { ord($_) }
+    my @keystream = Rosetta::RC4::prga($s, scalar(@data_bytes))
+    
+    my @res
+    for (my $i = 0; $i < scalar(@data_bytes); $i++) {
+        push @res, $data_bytes[$i] ^ $keystream[$i]
+    }
+    @res
+}
+
+# Test with Wikipedia example
+# Key "Key", Data "Plaintext"
+my @encrypted = Rosetta::RC4::solve("Key", "Plaintext")
+# Hex output: BB F3 16 E8 D9 40 AF 0A D3
+my @hex = @encrypted |> map { sprintf("%02X", $_) }
+assert_eq join(" ", @hex), "BB F3 16 E8 D9 40 AF 0A D3", "RC4 Wikipedia example"
+
+# Round trip
+fn Rosetta::RC4::to_string(@bytes) {
+    @bytes |> map { chr($_) } |> join("")
+}
+
+my $original = "Stryke is fast!"
+my @cipher = Rosetta::RC4::solve("secret", $original)
+my @plain_bytes = Rosetta::RC4::solve("secret", Rosetta::RC4::to_string(@cipher))
+assert_eq Rosetta::RC4::to_string(@plain_bytes), $original, "RC4 round trip"
+
+test_run

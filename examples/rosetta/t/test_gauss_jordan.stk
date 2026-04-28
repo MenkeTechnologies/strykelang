@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gauss-Jordan elimination
+
+fn Rosetta::GaussJordan::solve($matrix, $vector) {
+    my $n = scalar(@$matrix)
+    # Augmented matrix
+    my @m = ~> 0:$n-1 map {
+        my $i = $_
+        [ @{$matrix->[$i]}, $vector->[$i] ]
+    }
+    
+    for my $i (0:$n-1) {
+        # Pivot
+        my $max = $i
+        for my $j ($i+1 : $n-1) {
+            if (abs($m[$j]->[$i]) > abs($m[$max]->[$i])) {
+                $max = $j
+            }
+        }
+        # Swap rows
+        ($m[$i], $m[$max]) = ($m[$max], $m[$i])
+        
+        my $pivot = $m[$i]->[$i]
+        
+        for my $j (0:$n-1) {
+            if ($i != $j) {
+                my $factor = $m[$j]->[$i] / $pivot
+                for my $k ($i : $n) {
+                    $m[$j]->[$k] -= $factor * $m[$i]->[$k]
+                }
+            }
+        }
+    }
+    
+    ~> 0:$n-1 map { $m[$_]->[$n] / $m[$_]->[$_] }
+}
+
+my $M = [
+    [ 2,  1, -1],
+    [-3, -1,  2],
+    [-2,  1,  2]
+]
+my $V = [ 8, -11, -3 ]
+
+my @sol = Rosetta::GaussJordan::solve($M, $V)
+assert_eq join(",", ~> @sol map { round($_) }), "2,3,-1", "Gauss-Jordan solution"
+
+test_run

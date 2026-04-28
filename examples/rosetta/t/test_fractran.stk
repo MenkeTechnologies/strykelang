@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fractran
+
+fn Rosetta::Fractran::run($fractions, $n, $max_iters) {
+    my @res = ($n)
+    for my $iter (1:$max_iters) {
+        my $next_n = -1
+        for my $frac (@$fractions) {
+            my $num = $frac->[0]
+            my $den = $frac->[1]
+            
+            if (($n * $num) % $den == 0) {
+                $next_n = ($n * $num) / $den
+                last
+            }
+        }
+        if ($next_n != -1) {
+            $n = $next_n
+            push @res, $n
+        } else {
+            last
+        }
+    }
+    @res
+}
+
+# Program to generate primes. The primes p are generated such that n = 2^p
+my $primes_prog = [
+    [17, 91], [78, 85], [19, 51], [23, 38], [29, 33],
+    [77, 29], [95, 23], [77, 19], [1, 17],  [11, 13],
+    [13, 11], [15, 2],  [1, 7],   [55, 1]
+]
+
+# Get the first 1000 steps
+my @seq = Rosetta::Fractran::run($primes_prog, 2, 1000)
+
+# Filter out powers of 2
+my @powers_of_2 = ~> @seq grep { 
+    my $v = $_
+    # Check if $v is a power of 2 > 1
+    if ($v > 1) {
+        ($v & ($v - 1)) == 0
+    } else {
+        0
+    }
+}
+
+# The primes are log2 of these powers of 2
+my @primes = ~> @powers_of_2 map { log($_) / log(2) |> round() }
+
+assert_ok scalar(@primes) >= 4, "Found at least 4 primes (including starting 1)"
+assert_eq $primes[1], 2, "First prime is 2"
+assert_eq $primes[2], 3, "Second prime is 3"
+assert_eq $primes[3], 5, "Third prime is 5"
+
+test_run
