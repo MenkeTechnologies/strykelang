@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reservoir sampling — Algorithm R
+
+fn Rosetta::Reservoir::sample($stream, $k) {
+    my @reservoir
+    my $i = 0
+    for my $x (@$stream) {
+        if ($i < $k) {
+            push @reservoir, $x
+        } else {
+            my $j = int(rand($i + 1))
+            if ($j < $k) {
+                $reservoir[$j] = $x
+            }
+        }
+        $i++
+    }
+    \@reservoir
+}
+
+my @stream = (1..100)
+my $sample = Rosetta::Reservoir::sample(\@stream, 10)
+
+assert_eq scalar(@$sample), 10, "reservoir size = k"
+for my $v (@$sample) {
+    assert_ok($v >= 1 && $v <= 100, "sample value $v in original range")
+}
+
+# Stream smaller than k -> reservoir is the whole stream
+my @small = (1, 2, 3)
+my $whole = Rosetta::Reservoir::sample(\@small, 10)
+assert_eq scalar(@$whole), 3, "stream smaller than k returns full stream"
+assert_eq join(",", sort { $a <=> $b } @$whole), "1,2,3", "small stream contents preserved"
+
+# k = 0 returns empty
+my $empty = Rosetta::Reservoir::sample(\@stream, 0)
+assert_eq scalar(@$empty), 0, "k=0 returns empty reservoir"
+
+test_run

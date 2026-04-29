@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Coin change — minimum number of coins to make a target amount
+
+fn Rosetta::CoinChange::min_coins($coins, $amount) {
+    my $inf = $amount + 1
+    my @dp = ($inf) x ($amount + 1)
+    $dp[0] = 0
+    for my $a (1..$amount) {
+        for my $c (@$coins) {
+            if ($c <= $a && $dp[$a - $c] + 1 < $dp[$a]) {
+                $dp[$a] = $dp[$a - $c] + 1
+            }
+        }
+    }
+    $dp[$amount] >= $inf ? -1 : $dp[$amount]
+}
+
+assert_eq Rosetta::CoinChange::min_coins([1, 2, 5], 11), 3, "11 = 5+5+1 (3 coins)"
+assert_eq Rosetta::CoinChange::min_coins([2], 3), -1, "no way to make 3 from {2}"
+assert_eq Rosetta::CoinChange::min_coins([1], 0), 0, "0 amount needs 0 coins"
+assert_eq Rosetta::CoinChange::min_coins([1, 3, 4], 6), 2, "6 = 3+3 (2 coins) beats 4+1+1"
+assert_eq Rosetta::CoinChange::min_coins([186, 419, 83, 408], 6249), 20, "classic LeetCode case"
+
+Rosetta::CoinChange::min_coins([1,2,5], 11) |> assert_eq(3, "pipe 11 -> 3")
+
+test_run

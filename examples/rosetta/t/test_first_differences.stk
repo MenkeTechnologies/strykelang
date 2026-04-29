@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: First differences — output[i] = input[i] - input[i-1].
+# Showcases stryke's `_<` (previous topic) primitive: each map iter binds
+# `_` to the current element and `_<` to the previous one (the value
+# `_` held before this iter's set_topic shift). The very first iter has
+# `_<` undef, so it's filtered out. World-first compositional notation
+# — Python needs `zip(xs, xs[1:])`, Ruby needs `each_cons(2)`, Clojure
+# needs `(map - (rest xs) xs)`. Stryke needs `_ - _<`.
+
+fn Rosetta::Diff::successive(@xs) {
+    return () if scalar(@xs) < 2
+    my @out
+    for my $i (1 .. scalar(@xs) - 1) {
+        push @out, $xs[$i] - $xs[$i - 1]
+    }
+    @out
+}
+
+# Classic example.
+my @r1 = Rosetta::Diff::successive(1, 4, 9, 16, 25, 36)
+assert_eq join(",", @r1), "3,5,7,9,11", "squares → odd numbers"
+
+# Constant series → all zeros.
+my @r2 = Rosetta::Diff::successive(7, 7, 7, 7, 7)
+assert_eq join(",", @r2), "0,0,0,0", "constant → zeros"
+
+# Strictly decreasing.
+my @r3 = Rosetta::Diff::successive(10, 8, 5, 1)
+assert_eq join(",", @r3), "-2,-3,-4", "strictly decreasing"
+
+# Single element → empty differences.
+my @r4 = Rosetta::Diff::successive(42)
+assert_eq scalar(@r4), 0, "single element → empty"
+
+# Geometric series (powers of 2): differences are also powers of 2.
+my @r5 = Rosetta::Diff::successive(1, 2, 4, 8, 16, 32)
+assert_eq join(",", @r5), "1,2,4,8,16", "powers of 2 → powers of 2"
+
+test_run

@@ -24,7 +24,10 @@ type ScopeCaptureWithAtomics = (
 
 /// Storage for hashes promoted to shared Arc-backed RwLocks (see [`Frame::shared_hashes`]).
 /// Aliased to keep the field declaration readable (clippy::type_complexity).
-type SharedHashEntry = (String, Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>);
+type SharedHashEntry = (
+    String,
+    Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
+);
 
 /// Arrays installed by [`crate::interpreter::Interpreter::new`] on the outer frame. They must not be
 /// copied into [`Scope::capture`] / [`Scope::restore_capture`] for closures, or the restored copy
@@ -299,6 +302,13 @@ pub struct Scope {
     /// are exempt. Requires at least two frames (captured + block locals); use [`Self::push_frame`]
     /// before running a block body on a worker.
     parallel_guard: bool,
+    /// Highest positional slot index ever activated by [`Self::set_closure_args`].
+    /// Once a slot is touched, every subsequent frame shifts that slot's outer
+    /// chain (`_N<`, `_N<<`, ...) even if the new frame has fewer args. This
+    /// is what makes `_N<<<<` reach 4 frames up consistently — intermediate
+    /// frames with no slot N still propagate the chain (with `undef` if they
+    /// didn't bind that slot themselves).
+    max_active_slot: usize,
 }
 
 impl Default for Scope {
@@ -313,6 +323,7 @@ impl Scope {
             frames: Vec::with_capacity(32),
             frame_pool: Vec::with_capacity(32),
             parallel_guard: false,
+            max_active_slot: 0,
         };
         s.frames.push(Frame::new());
         s
@@ -1084,51 +1095,120 @@ impl Scope {
         Ok(())
     }
 
+    /// Topic-slot key for slot N at chain level L (0 = current, 1..4 = outer
+    /// frames). Slot 0's canonical form is bare `_` / `_<` / `_<<` / ... so
+    /// direct `$_ = …` assignments and existing `$_<` consumers see the
+    /// expected key. The `_0<+` form is the alias, written in lockstep by
+    /// `declare_topic_slot`. For slot N ≥ 1 the canonical key is `_N<+`.
+    #[inline]
+    fn topic_slot_key(slot: usize, level: usize) -> String {
+        debug_assert!(level <= 4);
+        if slot == 0 {
+            if level == 0 {
+                "_".to_string()
+            } else {
+                format!("_{}", "<".repeat(level))
+            }
+        } else if level == 0 {
+            format!("_{}", slot)
+        } else {
+            format!("_{}{}", slot, "<".repeat(level))
+        }
+    }
+
+    /// Mirror key for slot 0 (`_0` / `_0<` / `_0<<` / ...) — the explicit-zero
+    /// alias of the bare form. Returns `None` for slot N ≥ 1 (no alias).
+    #[inline]
+    fn topic_slot_alias_key(slot: usize, level: usize) -> Option<String> {
+        if slot != 0 {
+            return None;
+        }
+        Some(if level == 0 {
+            "_0".to_string()
+        } else {
+            format!("_0{}", "<".repeat(level))
+        })
+    }
+
+    /// Write a value at slot N, level L. For slot 0 also writes the bare-`_`
+    /// mirror at the same level so `_<<<<` ≡ `_0<<<<` resolve to the same
+    /// scalar. This is what makes the world-first multi-level implicit-param
+    /// matrix work — see `lexer.rs` for the lexing side and the user-visible
+    /// rule "_< ≡ $_< ≡ _0< ≡ $_0<".
+    #[inline]
+    fn declare_topic_slot(&mut self, slot: usize, level: usize, val: PerlValue) {
+        self.declare_scalar(&Self::topic_slot_key(slot, level), val.clone());
+        if let Some(alias) = Self::topic_slot_alias_key(slot, level) {
+            self.declare_scalar(&alias, val);
+        }
+    }
+
     /// Set the topic variable `$_` and its numeric alias `$_0` together.
     /// Use this for single-arg closures (map, grep, etc.) so both `$_` and `$_0` work.
     /// This declares them in the current scope (not global), suitable for sub calls.
     ///
-    /// Also sets outer topic aliases: `$_<` = previous `$_`, `$_<<` = previous `$_<`, etc.
-    /// This allows nested blocks (e.g. `fan` inside `>{}`) to access enclosing topic values.
+    /// Also shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`)
+    /// down one level so nested blocks can peek up to 4 frames out. ALL
+    /// previously-activated positional slots shift in lockstep — a
+    /// `map { }` iteration inside an enclosing 3-arg sub will rotate
+    /// slots 0..2's chains so `_1<<<<` and `_2<<<<` keep their meaning
+    /// "the Nth positional arg of the closure 4 frames up". Slots beyond
+    /// the high-water mark are skipped.
     #[inline]
     pub fn set_topic(&mut self, val: PerlValue) {
-        // Shift existing outer topics down one level before setting new topic.
-        // We support up to 4 levels: $_<, $_<<, $_<<<, $_<<<<
-        // First, read current values (in reverse order to avoid overwriting what we read).
-        let old_3lt = self.get_scalar("_<<<");
-        let old_2lt = self.get_scalar("_<<");
-        let old_1lt = self.get_scalar("_<");
-        let old_topic = self.get_scalar("_");
-
-        // Now set the new values
-        self.declare_scalar("_", val.clone());
-        self.declare_scalar("_0", val);
-        // Set outer topics only if there was a previous topic
-        if !old_topic.is_undef() {
-            self.declare_scalar("_<", old_topic);
-        }
-        if !old_1lt.is_undef() {
-            self.declare_scalar("_<<", old_1lt);
-        }
-        if !old_2lt.is_undef() {
-            self.declare_scalar("_<<<", old_2lt);
-        }
-        if !old_3lt.is_undef() {
-            self.declare_scalar("_<<<<", old_3lt);
+        self.shift_slot_chain(0, val);
+        for slot in 1..=self.max_active_slot {
+            self.shift_slot_chain(slot, PerlValue::UNDEF);
         }
     }
 
-    /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all args.
-    /// Also sets `$_` to the first argument (if any), shifting outer topics like [`set_topic`].
+    /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all
+    /// args. Also sets `$_` to the first argument (if any) and shifts the
+    /// outer-topic chain on EVERY positional slot ever activated, so a 4-deep
+    /// nested block can read `_2<<<<` to reach the third positional argument
+    /// from 4 frames up. (Stryke-only — no other language has nested implicit
+    /// positionals.)
+    ///
+    /// The shift fires on slots `0..=max(args.len()-1, max_active_slot)`. A
+    /// frame that binds fewer args than the high-water mark still rotates the
+    /// older slots (the new "current" for an unbound slot is `undef`, so old
+    /// values march through `_N<<<<` and eventually fall off the end).
     #[inline]
     pub fn set_closure_args(&mut self, args: &[PerlValue]) {
-        if let Some(first) = args.first() {
-            // Use set_topic to properly shift the topic stack
-            self.set_topic(first.clone());
+        let n = args.len();
+        if n == 0 {
+            return;
         }
-        for (i, val) in args.iter().enumerate() {
-            self.declare_scalar(&format!("_{}", i), val.clone());
+        let high = n.saturating_sub(1).max(self.max_active_slot);
+        for slot in 0..=high {
+            let val = args.get(slot).cloned().unwrap_or(PerlValue::UNDEF);
+            self.shift_slot_chain(slot, val);
         }
+        if n > 0 && n - 1 > self.max_active_slot {
+            self.max_active_slot = n - 1;
+        }
+    }
+
+    /// Shift slot N's outer-topic chain by one level and install `val` as the
+    /// new current value. Internal helper for [`set_topic`] / [`set_closure_args`].
+    ///
+    /// Writes ALL 5 levels unconditionally — even when the previous values
+    /// are `undef` — so chain semantics stay intact across frames that don't
+    /// bind every active slot. Without the unconditional write, a stale value
+    /// at `_N<` would persist across multiple "no slot N here" frames and
+    /// `_N<<<<` would never reach 4 frames back.
+    #[inline]
+    fn shift_slot_chain(&mut self, slot: usize, val: PerlValue) {
+        let l3 = self.get_scalar(&Self::topic_slot_key(slot, 3));
+        let l2 = self.get_scalar(&Self::topic_slot_key(slot, 2));
+        let l1 = self.get_scalar(&Self::topic_slot_key(slot, 1));
+        let cur = self.get_scalar(&Self::topic_slot_key(slot, 0));
+
+        self.declare_topic_slot(slot, 0, val);
+        self.declare_topic_slot(slot, 1, cur);
+        self.declare_topic_slot(slot, 2, l1);
+        self.declare_topic_slot(slot, 3, l2);
+        self.declare_topic_slot(slot, 4, l3);
     }
 
     /// Set the canonical sort/reduce binding pair: `$a` / `$b` (Perl-isms) AND

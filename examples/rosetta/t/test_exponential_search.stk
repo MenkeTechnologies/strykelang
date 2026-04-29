@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Exponential (galloping) search on a sorted array
+# Doubles the index until we bracket the target, then binary-search.
+
+fn Rosetta::ExpSearch::binary($arr, $target, $lo, $hi) {
+    while ($lo <= $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        if ($arr->[$mid] == $target) { return $mid }
+        if ($arr->[$mid] < $target) {
+            $lo = $mid + 1
+        } else {
+            $hi = $mid - 1
+        }
+    }
+    -1
+}
+
+fn Rosetta::ExpSearch::find($arr, $target) {
+    my $n = scalar(@$arr)
+    return -1 if $n == 0
+    return 0 if $arr->[0] == $target
+    my $i = 1
+    while ($i < $n && $arr->[$i] <= $target) {
+        $i *= 2
+    }
+    my $hi = $i < $n - 1 ? $i : $n - 1
+    Rosetta::ExpSearch::binary($arr, $target, int($i / 2), $hi)
+}
+
+my @sorted = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
+assert_eq Rosetta::ExpSearch::find(\@sorted, 64), 6, "find 64 -> idx 6"
+assert_eq Rosetta::ExpSearch::find(\@sorted, 1), 0, "first element"
+assert_eq Rosetta::ExpSearch::find(\@sorted, 2048), 11, "last element"
+assert_eq Rosetta::ExpSearch::find(\@sorted, 100), -1, "missing"
+assert_eq Rosetta::ExpSearch::find(\@sorted, 0), -1, "below range"
+assert_eq Rosetta::ExpSearch::find(\@sorted, 9999), -1, "above range"
+assert_eq Rosetta::ExpSearch::find([], 5), -1, "empty"
+assert_eq Rosetta::ExpSearch::find([42], 42), 0, "single match"
+assert_eq Rosetta::ExpSearch::find([42], 7), -1, "single miss"
+
+# Dense run
+my @dense = (10..30)
+assert_eq Rosetta::ExpSearch::find(\@dense, 25), 15, "dense find 25"
+assert_eq Rosetta::ExpSearch::find(\@dense, 30), 20, "dense last"
+
+\@sorted |> Rosetta::ExpSearch::find(256) |> assert_eq(8, "pipe find 256 -> idx 8")
+
+test_run

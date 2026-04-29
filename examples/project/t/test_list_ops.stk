@@ -83,9 +83,10 @@ assert_eq split_regex(), "a,b,c", "split regex"
 assert_eq split_limit(), 2, "split limit"
 assert_eq split_limit_rest(), "b,c,d", "split limit rest"
 assert_eq split_no_match(), 1, "split no match"
-# stryke split behavior differs from Perl for empty strings
-assert_eq split_empty_string(), 1, "split empty string"
-assert_eq split_trailing_empty(), 3, "split trailing empty"
+# Perl-correct semantics (vm.rs::Op::Split): empty input → empty list,
+# trailing empty fields stripped when LIMIT is omitted/zero.
+assert_eq split_empty_string(), 0, "split empty string"
+assert_eq split_trailing_empty(), 2, "split trailing empty"
 assert_eq split_multiple_delim(), "a|b|c", "split multiple delim"
 assert_eq split_at_start(), 3, "split at start"
 

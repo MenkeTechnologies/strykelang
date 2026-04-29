@@ -361,26 +361,56 @@ my @r = @huge |> pmap_on $cluster heavy
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-**Outer topic `$_<`** — inside nested blocks (`fan`, `fan_cap`, `map`, `grep`, `>{}`), `$_` is rebound per iteration. Use `$_<` to access the **previous** topic, `$_<<` for two levels up, up to `$_<<<<` (4 levels). This is a stryke extension — stock Perl 5 has no equivalent.
+**Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every closure iter shifts an outer-topic chain across all positional slots, up to 4 frames back. Read the previous topic with `_<`, two back with `_<<`, up to four back with `_<<<<`. Same for every positional slot: `_1<<`, `_2<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
+
+The matrix:
+
+```
+slot 0 — bare `_` aliases `_0`, FOUR equivalent spellings per level:
+  current  _   ≡ $_   ≡ _0   ≡ $_0
+  1 up     _<  ≡ $_<  ≡ _0<  ≡ $_0<
+  2 up     _<< ≡ $_<< ≡ _0<< ≡ $_0<<
+  3 up     _<<< ≡ $_<<< ≡ _0<<< ≡ $_0<<<
+  4 up     _<<<< ≡ $_<<<< ≡ _0<<<< ≡ $_0<<<<
+
+slot N ≥ 1 — two spellings per level:
+  current  _N   ≡ $_N
+  1 up     _N<  ≡ $_N<       (e.g. _1< == $_1<)
+  ...
+  4 up     _N<<<< ≡ $_N<<<<
+```
+
+The `<` glyph is iconic: "back/before/earlier" is universal in math and ASCII (`<-`, `<<`, version comparison). `_` is "the topic" (Perl `$_`, Ruby `_1`, Scala `_`). Composition tells you the meaning at sight.
 
 ```perl
-~> 10 >{fan `p "outer topic is $_< and inner topic is $_"`}
+# Rolling difference — no temp var, no naming.
+~> @prices map { _ - _< }
+# Python: [prices[i]-prices[i-1] for i in range(1,len(prices))] — 41 chars
+# Ruby:   prices.each_cons(2).map { |a,b| b-a }              — 38 chars
+# stryke: ~> @prices map { _ - _< }                          — 24 chars
 
+# 3-arg sub, reach back 4 closures from inside nested maps:
+fn deep($_0, $_1, $_2) {
+    ~> 1:1 map { ~> 1:1 map { ~> 1:1 map { ~> 1:1 map {
+        # _N<<<< reads the Nth positional of `deep`
+        _0<<<< . "," . _1<<<< . "," . _2<<<<      # "alpha,beta,gamma"
+    } } } }
+}
+deep("alpha", "beta", "gamma")
+
+# Cartesian-style sum across two arrays, golf form:
+~> @outer pmap { ~> @inner pmap { _< + _ } } sum
+# (`_<` rolls through previous topics across iter boundaries — same primitive
+# powers running totals, moving averages, deltas)
+
+# fan / fan_cap also rebind topic per worker:
 $_ = 100
-my @r = fan_cap 3 { $_< }  # each worker sees outer topic → (100, 100, 100)
-
-$_ = 100
-my @r = fan_cap 2 {
-    my $outer = $_<  # 100
-    my $cr = fn { $outer + $_< }  # $_< inside sub = caller's $_
-    $cr->($_)  # fan sets $_ = 0, 1
-}  # @r = (100, 101)
-
-$_ = 50; ~> 10 >{ $_ + $_< }  # 60 — thread sub stage accesses outer topic
-
-$_ = "outer"
-fan_cap 1 { $_ = "inner"; "$_< $_" }  # "outer inner" — interpolation works
+my @r = fan_cap 3 { $_< }                      # (100, 100, 100)
+fan_cap 1 { $_ = "inner"; "$_< $_" }           # "outer inner"
+$_ = 50; ~> 10 >{ $_ + $_< }                   # 60
 ```
+
+Implementation: `strykelang/scope.rs::set_closure_args` shifts every active slot's chain on each frame entry; `strykelang/lexer.rs` lexes `_<+` and `_N<+` (bare and `$`-prefixed) as single tokens. Regression tests in `tests/suite/language_extensions.rs` (`nested_positional_outer_topic_reaches_4_frames_up`, `slot_0_has_four_equivalent_spellings_at_every_level`, `slot_n_two_spellings_per_level`).
 
 ---
 

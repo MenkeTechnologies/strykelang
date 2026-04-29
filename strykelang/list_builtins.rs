@@ -1071,7 +1071,9 @@ fn pairgrep_map(
             let mut out = Vec::new();
             let mut i = 0;
             while i + 1 < flat.len() {
-                interp.scope.set_sort_pair(flat[i].clone(), flat[i + 1].clone());
+                interp
+                    .scope
+                    .set_sort_pair(flat[i].clone(), flat[i + 1].clone());
                 let produced = interp.call_sub(&code, vec![], WantarrayCtx::List, 0)?;
                 if let Some(items) = produced.as_array_vec() {
                     out.extend(items);

@@ -1166,9 +1166,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
         } => {
             // Re-emit the parens for list-repeat so `(0) x 5` round-trips as
             // list-repeat rather than collapsing to scalar `0 x 5`.
-            if *list_repeat
-                && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_))
-            {
+            if *list_repeat && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_)) {
                 format!("({}) x {}", convert_expr(expr), convert_expr(count))
             } else {
                 format!("{} x {}", convert_expr(expr), convert_expr(count))

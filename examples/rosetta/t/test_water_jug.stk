@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Water jug problem via BFS
+# Two jugs of capacity (cap_a, cap_b). Reach target volume in either jug.
+# Returns shortest move sequence as list of (a, b) states.
+
+fn Rosetta::WaterJug::solve($cap_a, $cap_b, $target) {
+    return [] if $target == 0
+    return undef if $target > $cap_a && $target > $cap_b
+    my @queue = ([0, 0])
+    my %visited = ("0,0" => 1)
+    my %parent
+    while (scalar(@queue)) {
+        my $state = shift @queue
+        my ($a, $b) = ($state->[0], $state->[1])
+        if ($a == $target || $b == $target) {
+            my @path
+            my $cur = "$a,$b"
+            while (defined $cur) {
+                my ($ca, $cb) = split(",", $cur)
+                unshift @path, [int($ca), int($cb)]
+                $cur = $parent{$cur}
+            }
+            return \@path
+        }
+        my @nexts = (
+            [$cap_a, $b],
+            [$a, $cap_b],
+            [0, $b],
+            [$a, 0],
+        )
+        my $tx = $a + $b > $cap_b ? $cap_b : $a + $b
+        push @nexts, [$a - ($tx - $b), $tx]
+        my $ty = $a + $b > $cap_a ? $cap_a : $a + $b
+        push @nexts, [$ty, $b - ($ty - $a)]
+        for my $nxt (@nexts) {
+            my $key = $nxt->[0] . "," . $nxt->[1]
+            next if $visited{$key}
+            $visited{$key} = 1
+            $parent{$key} = "$a,$b"
+            push @queue, $nxt
+        }
+    }
+    undef
+}
+
+my $path = Rosetta::WaterJug::solve(5, 3, 4)
+assert_ok defined($path), "(5,3) target 4 has solution"
+assert_eq $path->[0][0], 0, "starts at (0,0) -> a"
+assert_eq $path->[0][1], 0, "starts at (0,0) -> b"
+my $last = $path->[-1]
+assert_ok($last->[0] == 4 || $last->[1] == 4, "last state contains target 4")
+# Optimal length: 7 states (6 moves) for the classic 5/3/4 puzzle
+assert_eq scalar(@$path), 7, "shortest path length 7"
+
+# Impossible: target larger than both jugs
+my $imp = Rosetta::WaterJug::solve(3, 5, 7)
+assert_ok !defined($imp), "target > both -> undef"
+
+# Trivial: target 0
+my $zero = Rosetta::WaterJug::solve(3, 5, 0)
+assert_eq scalar(@$zero), 0, "target 0 -> empty path"
+
+# (4, 9) target 6 -> classic
+my $p2 = Rosetta::WaterJug::solve(4, 9, 6)
+assert_ok defined($p2), "(4,9) target 6 has solution"
+my $last2 = $p2->[-1]
+assert_ok($last2->[0] == 6 || $last2->[1] == 6, "ends with 6 in some jug")
+
+test_run
