@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+require "./HighScoreBoard.stk"
+
+%SCORES = ()
+Exercism::HighScoreBoard::set_player_scores("Alice", 100, "Bob", 50)
+assert_eq Exercism::HighScoreBoard::get_player_score("Alice"), 100, "get Alice"
+assert_eq Exercism::HighScoreBoard::get_player_score("Bob"),    50, "get Bob"
+
+Exercism::HighScoreBoard::increase_player_scores("Alice", 10, "Bob", 5)
+assert_eq Exercism::HighScoreBoard::get_player_score("Alice"), 110, "increase Alice"
+assert_eq Exercism::HighScoreBoard::get_player_score("Bob"),    55, "increase Bob"
+
+assert_eq join(",", Exercism::HighScoreBoard::sort_players_by_name()),  "Alice,Bob", "sort by name"
+assert_eq join(",", Exercism::HighScoreBoard::sort_players_by_score()), "Alice,Bob", "sort by score desc"
+
+Exercism::HighScoreBoard::delete_player("Bob")
+assert_eq join(",", Exercism::HighScoreBoard::sort_players_by_name()), "Alice", "after delete"
+
+test_run

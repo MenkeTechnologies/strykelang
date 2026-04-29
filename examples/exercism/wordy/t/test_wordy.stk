@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+require "./Wordy.stk"
+
+assert_eq Exercism::Wordy::answer("What is 5?"),                                 5,    "just a number"
+assert_eq Exercism::Wordy::answer("What is 5 plus 13?"),                         18,   "addition"
+assert_eq Exercism::Wordy::answer("What is 7 minus 5?"),                         2,    "subtraction"
+assert_eq Exercism::Wordy::answer("What is 6 multiplied by 4?"),                 24,   "multiplication"
+assert_eq Exercism::Wordy::answer("What is 25 divided by 5?"),                   5,    "division"
+assert_eq Exercism::Wordy::answer("What is 1 plus 1 plus 1?"),                   3,    "chain plus"
+assert_eq Exercism::Wordy::answer("What is 1 plus 5 minus -2?"),                 8,    "minus negative"
+assert_eq Exercism::Wordy::answer("What is -3 plus 7?"),                         4,    "negative starting"
+assert_eq Exercism::Wordy::answer("What is 2 multiplied by -2 multiplied by 3?"),-12,  "chain mult"
+
+fn err { eval { Exercism::Wordy::answer($_[0]); 0 } || $@ }
+assert_ok err("Who is the President of the United States?") =~ /unknown operation/, "non-question"
+assert_ok err("What is 1 plus plus 2?")                     =~ /syntax/,            "two ops in a row"
+
+test_run

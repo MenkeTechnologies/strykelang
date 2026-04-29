@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: L-System
+
+fn Rosetta::LSystem::generate($axiom, $rules, $iterations) {
+    my $current = $axiom
+    for (my $i = 0; $i < $iterations; $i++) {
+        my $next = ""
+        my @chars = split //, $current
+        for my $c (@chars) {
+            $next .= exists $rules->{$c} ? $rules->{$c} : $c
+        }
+        $current = $next
+    }
+    $current
+}
+
+# Algae system: A -> AB, B -> A
+my $algae_rules = { A => "AB", B => "A" }
+assert_eq Rosetta::LSystem::generate("A", $algae_rules, 0), "A", "Algae n=0"
+assert_eq Rosetta::LSystem::generate("A", $algae_rules, 1), "AB", "Algae n=1"
+assert_eq Rosetta::LSystem::generate("A", $algae_rules, 2), "ABA", "Algae n=2"
+assert_eq Rosetta::LSystem::generate("A", $algae_rules, 3), "ABAAB", "Algae n=3"
+assert_eq Rosetta::LSystem::generate("A", $algae_rules, 4), "ABAABABA", "Algae n=4"
+
+# Koch curve: F -> F+F-F-F+F
+my $koch_rules = { F => "F+F-F-F+F" }
+my $k1 = Rosetta::LSystem::generate("F", $koch_rules, 1)
+assert_eq $k1, "F+F-F-F+F", "Koch n=1"
+my $k2 = Rosetta::LSystem::generate("F", $koch_rules, 2)
+assert_eq length($k2), 49, "Koch n=2 length"
+
+test_run

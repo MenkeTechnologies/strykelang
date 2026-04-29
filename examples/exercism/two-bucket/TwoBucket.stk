@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+fn Exercism::TwoBucket::measure($cap1, $cap2, $goal, $start) {
+    die "no solution" if $goal > $cap1 && $goal > $cap2
+    die "no solution" if $goal % _gcd($cap1, $cap2) != 0
+    my @caps  = ($cap1, $cap2)
+    my @order = $start eq "one" ? (0, 1) : (1, 0)
+    my @b = (0, 0)
+    $b[$order[0]] = $caps[$order[0]]
+    my $moves = 1
+    while ($b[0] != $goal && $b[1] != $goal) {
+        if ($b[$order[0]] == 0)                       { $b[$order[0]] = $caps[$order[0]] }
+        elsif ($b[$order[1]] == $caps[$order[1]])     { $b[$order[1]] = 0 }
+        else {
+            my $space = $caps[$order[1]] - $b[$order[1]]
+            my $xfer  = $b[$order[0]] < $space ? $b[$order[0]] : $space
+            $b[$order[0]] -= $xfer
+            $b[$order[1]] += $xfer
+        }
+        $moves++
+    }
+    my ($goal_b, $other_b) = $b[0] == $goal ? ("one", $b[1]) : ("two", $b[0])
+    { moves => $moves, goalBucket => $goal_b, otherBucket => $other_b }
+}
+
+fn _gcd($a, $b) { $b == 0 ? $a : _gcd($b, $a % $b) }

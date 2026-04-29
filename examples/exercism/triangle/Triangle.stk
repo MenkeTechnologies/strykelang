@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+fn Exercism::Triangle::kind($a, $b, $c) {
+    for my $s ($a, $b, $c) {
+        die "TriangleError" if $s <= 0
+    }
+    die "TriangleError" if $a + $b <= $c || $a + $c <= $b || $b + $c <= $a
+    return "equilateral" if $a == $b && $b == $c
+    return "isosceles"   if $a == $b || $b == $c || $a == $c
+    "scalene"
+}

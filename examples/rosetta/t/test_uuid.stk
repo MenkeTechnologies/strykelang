@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Generate a UUID
+
+fn Rosetta::UUID::generate() {
+    uuid()
+}
+
+my $u1 = Rosetta::UUID::generate()
+my $u2 = Rosetta::UUID::generate()
+
+assert_ok defined($u1), "uuid 1 defined"
+assert_ok defined($u2), "uuid 2 defined"
+assert_ok $u1 ne $u2, "uuids are different"
+
+# Check format: 8-4-4-4-12 hex digits
+my $p = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+assert_ok $u1 =~ /$p/i, "uuid 1 format"
+assert_ok $u2 =~ /$p/i, "uuid 2 format"
+
+test_run

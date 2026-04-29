@@ -172,22 +172,40 @@ impl PerlIterator for FsWalkIterator {
     }
 }
 
-/// Wraps a source iterator, applying `scalar reverse` (char-reverse) to each string.
+/// Reverses the source iterator's *sequence* of items. Drains lazily on the
+/// first `next_item` call — `rev` cannot stream, since the last item must
+/// be produced first.
+///
+/// Don't be tempted to per-item `chars().rev()` here: that's `scalar reverse`
+/// at the item level, not list reversal. `~> $s chars rev` and friends rely
+/// on this reversing the sequence (`a,b,c,d` → `d,c,b,a`).
 pub struct RevIterator {
     source: Arc<dyn PerlIterator>,
+    drained: Mutex<Option<Vec<PerlValue>>>,
 }
 
 impl RevIterator {
     pub fn new(source: Arc<dyn PerlIterator>) -> Self {
-        Self { source }
+        Self {
+            source,
+            drained: Mutex::new(None),
+        }
     }
 }
 
 impl PerlIterator for RevIterator {
     fn next_item(&self) -> Option<PerlValue> {
-        let item = self.source.next_item()?;
-        let s = item.to_string();
-        Some(PerlValue::string(s.chars().rev().collect()))
+        let mut g = self.drained.lock();
+        if g.is_none() {
+            let mut buf = Vec::new();
+            while let Some(v) = self.source.next_item() {
+                buf.push(v);
+            }
+            *g = Some(buf);
+        }
+        // Pop yields items in reverse order (last → first), which IS the
+        // reversal we want.
+        g.as_mut().and_then(|v| v.pop())
     }
 }
 

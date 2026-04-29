@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/CollatzConjecture.stk"
+require "./CollatzConjecture.stk"
 
 assert_eq Exercism::CollatzConjecture::steps(1),       0, "zero steps for one"
 assert_eq Exercism::CollatzConjecture::steps(16),      4, "divide if even"

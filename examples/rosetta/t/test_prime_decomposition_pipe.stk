@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prime Decomposition (Factorization) (using pipes)
+
+fn Rosetta::PrimeFactors::compute($n) {
+    my $temp = $n
+    my @factors
+    
+    # Check 2 separately
+    while ($temp % 2 == 0) {
+        push @factors, 2
+        $temp /= 2
+    }
+    
+    # Check odd numbers
+    my $limit = int(sqrt($temp))
+    if ($temp > 1) {
+        for (my $i = 3; $i <= $limit; $i += 2) {
+            while ($temp % $i == 0) {
+                push @factors, $i
+                $temp /= $i
+            }
+            $limit = int(sqrt($temp))
+        }
+    }
+    
+    if ($temp > 1) { push @factors, $temp }
+    
+    @factors
+}
+
+# Test with various numbers
+12 |> Rosetta::PrimeFactors::compute() |> join("*") |> assert_eq("2*2*3", "12 = 2*2*3")
+100 |> Rosetta::PrimeFactors::compute() |> join("*") |> assert_eq("2*2*5*5", "100 = 2*2*5*5")
+17 |> Rosetta::PrimeFactors::compute() |> join("*") |> assert_eq("17", "17 is prime")
+84 |> Rosetta::PrimeFactors::compute() |> join("*") |> assert_eq("2*2*3*7", "84 = 2*2*3*7")
+
+# Verify list of factors for a larger number
+my @f = Rosetta::PrimeFactors::compute(123456)
+# 123456 = 2^6 * 3 * 643
+assert_eq join(",", @f), "2,2,2,2,2,2,3,643", "factors of 123456"
+
+test_run

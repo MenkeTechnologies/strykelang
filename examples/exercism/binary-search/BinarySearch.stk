@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+fn Exercism::BinarySearch::binary_search($arr, $target) {
+    my ($lo, $hi) = (0, len(@$arr) - 1)
+    while ($lo <= $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        return $mid if $arr->[$mid] == $target
+        if ($target < $arr->[$mid]) { $hi = $mid - 1 } else { $lo = $mid + 1 }
+    }
+    die "value not in array"
+}

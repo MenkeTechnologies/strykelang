@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+my %_D = (north => [0,1,0], east => [1,0,1], south => [0,-1,2], west => [-1,0,3])
+my @_DIRS = ("north","east","south","west")
+
+fn Exercism::RobotSimulator::new($x, $y, $dir) {
+    die "Invalid direction: $dir" unless exists $_D{$dir}
+    { x => $x, y => $y, direction => $dir }
+}
+
+fn Exercism::RobotSimulator::turn_right($r) { $r->{direction} = $_DIRS[($_D{$r->{direction}}[2] + 1) % 4]; $r }
+fn Exercism::RobotSimulator::turn_left($r)  { $r->{direction} = $_DIRS[($_D{$r->{direction}}[2] + 3) % 4]; $r }
+fn Exercism::RobotSimulator::advance($r)    { $r->{x} += $_D{$r->{direction}}[0]; $r->{y} += $_D{$r->{direction}}[1]; $r }
+
+fn Exercism::RobotSimulator::execute($r, $cmds) {
+    my %do = (R => \&Exercism::RobotSimulator::turn_right, L => \&Exercism::RobotSimulator::turn_left, A => \&Exercism::RobotSimulator::advance)
+    $do{$_}->($r) for chars($cmds)
+    $r
+}

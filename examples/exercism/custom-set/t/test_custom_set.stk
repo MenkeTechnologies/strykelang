@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+require "./CustomSet.stk"
+
+fn j { join(",", sort @{$_[0]}) }
+
+assert_ok  Exercism::CustomSet::is_empty_set([]),                  "empty set"
+assert_ok !Exercism::CustomSet::is_empty_set([1]),                 "non-empty"
+
+assert_ok  Exercism::CustomSet::set_contains([1,2,3], 1),          "contains 1"
+assert_ok !Exercism::CustomSet::set_contains([1,2,3], 4),          "not contains 4"
+
+assert_ok  Exercism::CustomSet::is_subset([], [1,2,3]),            "empty is subset"
+assert_ok  Exercism::CustomSet::is_subset([1,2], [1,2,3]),         "subset proper"
+assert_ok !Exercism::CustomSet::is_subset([1,4], [1,2,3]),         "not subset"
+
+assert_ok  Exercism::CustomSet::is_disjoint_set([1,2], [3,4]),     "disjoint"
+assert_ok !Exercism::CustomSet::is_disjoint_set([1,2], [2,3]),     "not disjoint"
+
+assert_ok  Exercism::CustomSet::is_equal_set([1,2,3], [3,2,1]),    "same elements"
+assert_ok !Exercism::CustomSet::is_equal_set([1,2,3], [1,2,4]),    "different"
+
+assert_eq j(Exercism::CustomSet::add_set_element([1,2], 3)),       "1,2,3", "add new"
+assert_eq j(Exercism::CustomSet::add_set_element([1,2], 1)),       "1,2",   "add existing no-op"
+
+assert_eq j(Exercism::CustomSet::set_intersection([1,2,3], [2,3,4])), "2,3", "intersection"
+assert_eq j(Exercism::CustomSet::set_difference([1,2,3], [2])),    "1,3",  "difference"
+assert_eq j(Exercism::CustomSet::set_union([1,2,3], [3,4,5])),     "1,2,3,4,5", "union"
+
+test_run

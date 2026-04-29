@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./Series.stk"
+
+fn j { join("|", @{Exercism::Series::slices({ series => $_[0], sliceLength => $_[1] })}) }
+
+assert_eq j("01234", 1), "0|1|2|3|4",         "slices of one"
+assert_eq j("12", 2),    "12",                "slice length equal to series"
+assert_eq j("35", 1),    "3|5",               "slices of two"
+assert_eq j("9142", 2),  "91|14|42",          "slices of two"
+assert_eq j("01234", 2), "01|12|23|34",       "slices of two"
+assert_eq j("01234", 3), "012|123|234",       "slices of three"
+assert_eq j("01234567", 4), "0123|1234|2345|3456|4567", "slices of four"
+assert_eq j("01234", 5),    "01234",          "slices of five"
+
+for my $cs ([{series=>"", sliceLength=>1}, qr/series cannot be empty/],
+            [{series=>"a", sliceLength=>2}, qr/slice length cannot be greater/],
+            [{series=>"01234", sliceLength=>0}, qr/slice length cannot be zero/],
+            [{series=>"01234", sliceLength=>-1}, qr/slice length cannot be negative/]) {
+    my ($args, $re) = @$cs
+    my $err = eval { Exercism::Series::slices($args); 0 } || $@
+    assert_ok $err =~ $re, "validation: $err"
+}
+
+test_run

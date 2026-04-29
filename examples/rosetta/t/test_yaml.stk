@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: YAML
+
+fn Rosetta::YAML::process($data) {
+    my $yml = yaml_encode($data)
+    my $decoded = yaml_decode($yml)
+    $decoded
+}
+
+my $data = {
+    name => "Stryke",
+    features => ["Parallel", "Fast", "Concise"],
+    version => 1.0,
+    meta => {
+        license => "MIT",
+        active => 1
+    }
+}
+
+my $res = Rosetta::YAML::process($data)
+
+assert_eq $res->{name}, "Stryke", "yaml name"
+assert_eq $res->{features}->[0], "Parallel", "yaml feature 0"
+assert_eq $res->{features}->[1], "Fast", "yaml feature 1"
+assert_eq $res->{version}, 1, "yaml version"
+assert_eq $res->{meta}->{license}, "MIT", "yaml license"
+assert_eq $res->{meta}->{active}, 1, "yaml active"
+
+# Test complex string
+my $complex = "---\n- a\n- b\n- c\n"
+my $list = yaml_decode($complex)
+assert_eq cnt($list), 3, "yaml list count"
+assert_eq $list->[1], "b", "yaml list element 1"
+
+test_run

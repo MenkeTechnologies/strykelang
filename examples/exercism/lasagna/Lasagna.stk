@@ -1,0 +1,6 @@
+#!/usr/bin/env stryke
+fn Exercism::Lasagna::expected_minutes_in_oven  { 40 }
+fn Exercism::Lasagna::remaining_minutes_in_oven { Exercism::Lasagna::expected_minutes_in_oven() - _0 }
+fn Exercism::Lasagna::preparation_time_in_minutes { _0 * 2 }
+fn Exercism::Lasagna::total_time_in_minutes      { Exercism::Lasagna::preparation_time_in_minutes(_0) + _1 }
+fn Exercism::Lasagna::oven_alarm                 { "Ding!" }

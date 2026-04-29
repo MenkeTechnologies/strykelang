@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Treap
+
+# Treap implementation using hashes for nodes
+# node = { key => K, priority => P, left => L, right => R }
+
+fn Rosetta::Treap::split($node, $key) {
+    return [undef, undef] if !defined $node
+    
+    if ($node->{key} < $key) {
+        my $res = Rosetta::Treap::split($node->{right}, $key)
+        $node->{right} = $res->[0]
+        return [$node, $res->[1]]
+    } else {
+        my $res = Rosetta::Treap::split($node->{left}, $key)
+        $node->{left} = $res->[1]
+        return [$res->[0], $node]
+    }
+}
+
+fn Rosetta::Treap::merge($l, $r) {
+    return $l if !defined $r
+    return $r if !defined $l
+    
+    if ($l->{priority} > $r->{priority}) {
+        $l->{right} = Rosetta::Treap::merge($l->{right}, $r)
+        return $l
+    } else {
+        $r->{left} = Rosetta::Treap::merge($l, $r->{left})
+        return $r
+    }
+}
+
+fn Rosetta::Treap::insert($root, $key, $priority) {
+    my $p = defined $priority ? $priority : rand()
+    my $res = Rosetta::Treap::split($root, $key)
+    my $l = $res->[0]
+    my $r = $res->[1]
+    my $new_node = { key => $key, priority => $p, left => undef, right => undef }
+    Rosetta::Treap::merge(Rosetta::Treap::merge($l, $new_node), $r)
+}
+
+fn Rosetta::Treap::find($node, $key) {
+    return 0 if !defined $node
+    return 1 if $node->{key} == $key
+    if ($key < $node->{key}) {
+        return Rosetta::Treap::find($node->{left}, $key)
+    } else {
+        return Rosetta::Treap::find($node->{right}, $key)
+    }
+}
+
+fn Rosetta::Treap::to_list($node, $list) {
+    return if !defined $node
+    Rosetta::Treap::to_list($node->{left}, $list)
+    push @$list, $node->{key}
+    Rosetta::Treap::to_list($node->{right}, $list)
+}
+
+my $root = undef
+my @keys = (5, 2, 8, 1, 9, 3, 7)
+for my $k (@keys) {
+    $root = Rosetta::Treap::insert($root, $k)
+}
+
+assert_eq Rosetta::Treap::find($root, 5), 1, "find 5"
+assert_eq Rosetta::Treap::find($root, 4), 0, "not find 4"
+assert_eq Rosetta::Treap::find($root, 9), 1, "find 9"
+
+my @sorted
+Rosetta::Treap::to_list($root, \@sorted)
+assert_eq join(",", @sorted), "1,2,3,5,7,8,9", "treap in-order traversal is sorted"
+
+test_run

@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Power function
+
+fn Rosetta::Math::pow($base, $exp) {
+    pow($base, $exp)
+}
+
+2 |> Rosetta::Math::pow(10) |> assert_eq(1024, "2^10")
+3 |> Rosetta::Math::pow(3) |> assert_eq(27, "3^3")
+10 |> Rosetta::Math::pow(0) |> assert_eq(1, "10^0")
+
+test_run

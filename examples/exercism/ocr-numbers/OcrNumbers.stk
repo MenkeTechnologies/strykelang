@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+my %_DIG = (
+    " _ | ||_|   " => "0",
+    "     |  |   " => "1",
+    " _  _||_    " => "2",
+    " _  _| _|   " => "3",
+    "   |_|  |   " => "4",
+    " _ |_  _|   " => "5",
+    " _ |_ |_|   " => "6",
+    " _   |  |   " => "7",
+    " _ |_||_|   " => "8",
+    " _ |_| _|   " => "9",
+)
+
+fn Exercism::OcrNumbers::convert($rows) {
+    my @lines = @$rows
+    die "Number of input lines is not a multiple of four" if len(@lines) % 4 != 0
+    for my $l (@lines) {
+        die "Number of input columns is not a multiple of three" if length($l) % 3 != 0
+    }
+    my @groups
+    for my $i (0..int(len(@lines) / 4) - 1) {
+        my @block = @lines[$i*4 .. $i*4 + 3]
+        my $w = length($block[0])
+        my @digits
+        for my $col (0..int($w / 3) - 1) {
+            my $cell = join "", map { substr($_, $col * 3, 3) } @block
+            push @digits, $_DIG{$cell} // "?"
+        }
+        push @groups, join("", @digits)
+    }
+    join ",", @groups
+}

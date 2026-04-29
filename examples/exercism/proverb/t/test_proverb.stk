@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+require "./Proverb.stk"
+
+assert_eq Exercism::Proverb::proverb(["nail","shoe"], ""),
+    "For want of a nail the shoe was lost.\nAnd all for the want of a nail.",
+    "one consequence"
+
+assert_eq Exercism::Proverb::proverb(["nail","shoe","horse"], ""),
+    "For want of a nail the shoe was lost.\nFor want of a shoe the horse was lost.\nAnd all for the want of a nail.",
+    "two consequences"
+
+assert_eq Exercism::Proverb::proverb(["nail","shoe","horse","rider"], ""),
+    "For want of a nail the shoe was lost.\nFor want of a shoe the horse was lost.\nFor want of a horse the rider was lost.\nAnd all for the want of a nail.",
+    "three consequences"
+
+assert_eq Exercism::Proverb::proverb(["key","value"], ""),
+    "For want of a key the value was lost.\nAnd all for the want of a key.",
+    "new items"
+
+assert_eq Exercism::Proverb::proverb(["nail","shoe","horse","rider","message","battle","kingdom"], ""),
+    "For want of a nail the shoe was lost.\nFor want of a shoe the horse was lost.\nFor want of a horse the rider was lost.\nFor want of a rider the message was lost.\nFor want of a message the battle was lost.\nFor want of a battle the kingdom was lost.\nAnd all for the want of a nail.",
+    "whole proverb"
+
+assert_eq Exercism::Proverb::proverb(["nail","shoe","horse","rider","message","battle","kingdom"], "horseshoe"),
+    "For want of a nail the shoe was lost.\nFor want of a shoe the horse was lost.\nFor want of a horse the rider was lost.\nFor want of a rider the message was lost.\nFor want of a message the battle was lost.\nFor want of a battle the kingdom was lost.\nAnd all for the want of a horseshoe nail.",
+    "whole proverb with qualifier"
+
+test_run

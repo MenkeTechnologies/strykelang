@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+my %_USED
+
+fn Exercism::RobotName::_random() {
+    my $letters = join "", map { chr(ord("A") + int(rand 26)) } 1..2
+    my $digits  = sprintf("%03d", int(rand 1000))
+    "$letters$digits"
+}
+
+fn Exercism::RobotName::new() {
+    my $name
+    do { $name = Exercism::RobotName::_random() } while exists $_USED{$name}
+    $_USED{$name} = 1
+    { name => $name }
+}
+
+fn Exercism::RobotName::name { $_[0]->{name} }
+
+fn Exercism::RobotName::reset_name($r) {
+    delete $_USED{$r->{name}}
+    my $name
+    do { $name = Exercism::RobotName::_random() } while exists $_USED{$name}
+    $_USED{$name} = 1
+    $r->{name} = $name
+    $r
+}

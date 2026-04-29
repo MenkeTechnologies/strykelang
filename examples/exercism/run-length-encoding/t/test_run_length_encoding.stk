@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./RunLengthEncoding.stk"
+
+# encode
+assert_eq Exercism::RunLengthEncoding::encode(""),                    "",                              "empty"
+assert_eq Exercism::RunLengthEncoding::encode("XYZ"),                 "XYZ",                           "no runs"
+assert_eq Exercism::RunLengthEncoding::encode("AABBBCCCC"),           "2A3B4C",                        "letters with runs"
+assert_eq Exercism::RunLengthEncoding::encode("WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB"), "12WB12W3B24WB", "complex with runs"
+assert_eq Exercism::RunLengthEncoding::encode("  hsqq qww  "),        "2 hs2q q2w2 ",                  "whitespace runs"
+assert_eq Exercism::RunLengthEncoding::encode("aabbbcccc"),           "2a3b4c",                        "lowercase runs"
+
+# decode
+assert_eq Exercism::RunLengthEncoding::decode(""),                    "",                              "decode empty"
+assert_eq Exercism::RunLengthEncoding::decode("XYZ"),                 "XYZ",                           "decode no runs"
+assert_eq Exercism::RunLengthEncoding::decode("2A3B4C"),              "AABBBCCCC",                     "decode runs"
+assert_eq Exercism::RunLengthEncoding::decode("2 hs2q q2w2 "),        "  hsqq qww  ",                  "decode whitespace"
+assert_eq Exercism::RunLengthEncoding::decode("2a3b4c"),              "aabbbcccc",                     "decode lowercase"
+assert_eq Exercism::RunLengthEncoding::decode("12WB12W3B24WB"),       "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB", "decode complex"
+
+# round-trip
+my $orig = "zzz ZZ  zZ"
+assert_eq Exercism::RunLengthEncoding::decode(Exercism::RunLengthEncoding::encode($orig)), $orig, "round-trip"
+
+test_run

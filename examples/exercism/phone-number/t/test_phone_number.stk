@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+require "./PhoneNumber.stk"
+
+assert_eq Exercism::PhoneNumber::clean_number("(223) 456-7890"),  "2234567890", "cleans the number"
+assert_eq Exercism::PhoneNumber::clean_number("223.456.7890"),    "2234567890", "cleans dotted"
+assert_eq Exercism::PhoneNumber::clean_number("223 456   7890"),  "2234567890", "cleans spaces"
+assert_eq Exercism::PhoneNumber::clean_number("12234567890"),     "2234567890", "11-digit with country 1"
+assert_eq Exercism::PhoneNumber::clean_number("+1 (223) 456-7890"), "2234567890", "with country code"
+
+fn err { eval { Exercism::PhoneNumber::clean_number($_[0]); 0 } || $@ }
+
+assert_ok err("123456789")    =~ /incorrect number/, "9 digits"
+assert_ok err("321234567890") =~ /more than 11/,    "12 digits"
+assert_ok err("22234567890")  =~ /11 digits must start with 1/, "11-digit non-1"
+assert_ok err("(123) 456-7890") =~ /area code cannot start with one/,  "area starts with 1"
+assert_ok err("(023) 456-7890") =~ /area code cannot start with zero/, "area starts with 0"
+assert_ok err("223-056-7890") =~ /exchange code cannot start with zero/, "exch starts 0"
+assert_ok err("223-156-7890") =~ /exchange code cannot start with one/,  "exch starts 1"
+assert_ok err("523-abc-7890") =~ /letters not permitted/, "letters"
+assert_ok err("523-@:!-7890") =~ /punctuations not permitted/, "punctuation"
+
+test_run

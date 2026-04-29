@@ -2903,6 +2903,24 @@ impl Compiler {
                 let idx = self
                     .chunk
                     .intern_name(&self.qualify_stash_array_name(array));
+                // Stryke string-slice sugar: `$s[from:to]` / `$s[from:to:step]`
+                // returns a substring (or stepped pick) when the target is a
+                // scalar string. Compile to ArraySliceRange — the VM handles
+                // the scalar-string case when the array is empty.
+                if let ExprKind::Range {
+                    from,
+                    to,
+                    exclusive,
+                    step,
+                } = &index.kind
+                {
+                    self.compile_expr(from)?;
+                    self.compile_expr(to)?;
+                    self.compile_optional_or_undef(step.as_deref())?;
+                    let _ = exclusive; // ArraySliceRange semantics treat to as inclusive
+                    self.emit_op(Op::ArraySliceRange(idx), line, Some(root));
+                    return Ok(());
+                }
                 self.compile_expr(index)?;
                 self.emit_op(Op::GetArrayElem(idx), line, Some(root));
             }

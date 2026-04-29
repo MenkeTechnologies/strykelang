@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+fn Exercism::Proverb::proverb($items, $qual) {
+    return "" unless len(@$items)
+    my $tail = length($qual) ? "$qual " : ""
+    my @lines = map {
+        my $cur = $items->[$_]
+        my $nxt = $items->[$_ + 1]
+        "For want of a $cur the $nxt was lost.\n"
+    } 0..len(@$items) - 2
+    join("", @lines) . "And all for the want of a $tail$items->[0]."
+}

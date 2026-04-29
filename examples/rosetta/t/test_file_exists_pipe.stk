@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Check if a file exists
+
+fn Rosetta::FileExists::check($path) {
+    -e $path
+}
+
+"I.md" |> Rosetta::FileExists::check() |> assert_ok("I.md exists")
+"non_existent_file.txt" |> Rosetta::FileExists::check() |> assert_false("non_existent_file.txt does not exist")
+
+test_run

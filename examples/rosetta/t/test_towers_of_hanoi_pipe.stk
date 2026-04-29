@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Towers of Hanoi (using pipes)
+
+fn Rosetta::TowersOfHanoi::move($n, $from, $to, $via, $moves) {
+    if ($n > 0) {
+        Rosetta::TowersOfHanoi::move($n - 1, $from, $via, $to, $moves)
+        push(@$moves, "$from -> $to")
+        Rosetta::TowersOfHanoi::move($n - 1, $via, $to, $from, $moves)
+    }
+}
+
+fn Rosetta::TowersOfHanoi::solve($n) {
+    my @moves = ()
+    Rosetta::TowersOfHanoi::move($n, 1, 3, 2, \@moves)
+    @moves
+}
+
+my @res = Rosetta::TowersOfHanoi::solve(3)
+
+assert_eq len(@res), 7, "3 disks take 7 moves"
+assert_eq $res[0], "1 -> 3", "first move"
+assert_eq $res[6], "1 -> 3", "last move"
+
+test_run

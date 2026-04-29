@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Read a file line by line
+
+fn Rosetta::ReadFile::setup($path) {
+    open my $fh, '>', $path or die "Could not write"
+    print $fh "line 1\nline 2\nline 3\n"
+    close $fh
+}
+
+fn Rosetta::ReadFile::read_lines($path) {
+    open my $fh, '<', $path or die "Could not open"
+    my @lines = <$fh>
+    close $fh
+    @lines
+}
+
+my $tmp_file = "/tmp/stryke_test_read_lines.txt"
+$tmp_file |> Rosetta::ReadFile::setup()
+my @res = $tmp_file |> Rosetta::ReadFile::read_lines()
+
+$res[0] |> assert_eq("line 1\n", "Line 1")
+$res[1] |> assert_eq("line 2\n", "Line 2")
+$res[2] |> assert_eq("line 3\n", "Line 3")
+(len @res) |> assert_eq(3, "Three lines")
+
+unlink $tmp_file
+
+test_run

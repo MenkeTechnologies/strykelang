@@ -1,0 +1,5 @@
+#!/usr/bin/env stryke
+fn Exercism::InventoryManagement::create_inventory     { Exercism::InventoryManagement::add_items({}, _0) }
+fn Exercism::InventoryManagement::add_items($i, $xs)   { $i->{$_}++ for @$xs; $i }
+fn Exercism::InventoryManagement::remove_items($i, $xs){ for (@$xs) { $i->{$_}-- if $i->{$_} } $i }
+fn Exercism::InventoryManagement::delete_item($i, $k)  { delete $i->{$k}; $i }

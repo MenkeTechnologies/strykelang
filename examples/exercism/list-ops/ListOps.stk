@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+fn Exercism::ListOps::append    { [@{$_[0]}, @{$_[1]}] }
+fn Exercism::ListOps::concat    { [map { @$_ } @{$_[0]}] }
+fn Exercism::ListOps::filter    { my ($f, $l) = @_; [grep { $f->($_) } @$l] }
+fn Exercism::ListOps::list_length { len(@{$_[0]}) }
+fn Exercism::ListOps::map_op    { my ($f, $l) = @_; [map { $f->($_) } @$l] }
+fn Exercism::ListOps::foldl     { my ($f, $l, $a) = @_; my $r = $a; $r = $f->($r, $_) for @$l; $r }
+fn Exercism::ListOps::foldr     { my ($f, $l, $a) = @_; my $r = $a; $r = $f->($_, $r) for rev(@$l); $r }
+fn Exercism::ListOps::reverse_op { [rev @{$_[0]}] }

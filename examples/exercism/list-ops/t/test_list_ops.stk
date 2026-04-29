@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./ListOps.stk"
+
+fn j { join(",", @{$_[0]}) }
+
+assert_eq j(Exercism::ListOps::append([1,2], [3,4])),    "1,2,3,4",   "append"
+assert_eq j(Exercism::ListOps::append([], [1])),         "1",         "append empty"
+assert_eq j(Exercism::ListOps::concat([[1,2],[3,4]])),   "1,2,3,4",   "concat lists"
+assert_eq j(Exercism::ListOps::concat([])),              "",          "concat empty"
+assert_eq j(Exercism::ListOps::filter(fn($x) { $x % 2 }, [1,2,3,4,5])), "1,3,5", "filter odd"
+assert_eq Exercism::ListOps::list_length([1,2,3,4]),     4,           "length"
+assert_eq Exercism::ListOps::list_length([]),            0,           "length empty"
+assert_eq j(Exercism::ListOps::map_op(fn($x) { $x + 1 }, [1,3,5,7])), "2,4,6,8", "map +1"
+assert_eq Exercism::ListOps::foldl(fn($a,$b) { $a + $b }, [1,2,3,4], 0),  10, "foldl sum"
+assert_eq Exercism::ListOps::foldl(fn($a,$b) { $a / $b }, [1,2,3,4], 24), 1,  "foldl div"
+assert_eq Exercism::ListOps::foldr(fn($a,$b) { $a + $b }, [1,2,3,4], 0),  10, "foldr sum"
+assert_eq Exercism::ListOps::foldr(fn($a,$b) { $a / $b }, [1,2,3,4], 24), 9,  "foldr div"
+assert_eq j(Exercism::ListOps::reverse_op([1,3,5,7])),   "7,5,3,1",   "reverse"
+
+test_run

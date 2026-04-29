@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./SimpleCipher.stk"
+
+# fixed-key cipher
+my $c = Exercism::SimpleCipher::new("abcdefghij")
+assert_eq Exercism::SimpleCipher::encode($c, "aaaaaaaaaa"), "abcdefghij", "encode"
+assert_eq Exercism::SimpleCipher::decode($c, "abcdefghij"), "aaaaaaaaaa", "decode"
+assert_eq Exercism::SimpleCipher::encode($c, "Hello, World!"), "hfnnphzgvr", "strips non-alpha and lowercases"
+
+# round-trip with random key
+my $r = Exercism::SimpleCipher::new()
+assert_ok length($r->{key}) >= 1, "random key has length"
+assert_ok $r->{key} !~ /[A-Z0-9]/, "random key all-lowercase"
+assert_eq Exercism::SimpleCipher::decode($r, Exercism::SimpleCipher::encode($r, "hellothereworld")), "hellothereworld", "round-trip random"
+
+# bad keys
+my $err = eval { Exercism::SimpleCipher::new(""); 0 } || $@
+assert_ok $err =~ /ArgumentError/, "empty key"
+$err = eval { Exercism::SimpleCipher::new("abcDEF"); 0 } || $@
+assert_ok $err =~ /ArgumentError/, "uppercase key"
+$err = eval { Exercism::SimpleCipher::new("abc1"); 0 } || $@
+assert_ok $err =~ /ArgumentError/, "digit in key"
+
+test_run

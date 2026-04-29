@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abundant, deficient and perfect numbers (idiomatic)
+
+fn Rosetta::ADPNumbers::sum_proper_divisors($n) {
+    if ($n < 2) { return 0 }
+    my $limit = int($n / 2)
+    my @divs = ~> 1:$limit grep { $n % _ == 0 }
+    sum(@divs)
+}
+
+fn Rosetta::ADPNumbers::classify($n) {
+    my $sum = Rosetta::ADPNumbers::sum_proper_divisors($n)
+    $sum == $n ? "perfect" : ($sum > $n ? "abundant" : "deficient")
+}
+
+assert_eq Rosetta::ADPNumbers::classify(6), "perfect", "6 is perfect"
+assert_eq Rosetta::ADPNumbers::classify(28), "perfect", "28 is perfect"
+assert_eq Rosetta::ADPNumbers::classify(12), "abundant", "12 is abundant"
+assert_eq Rosetta::ADPNumbers::classify(18), "abundant", "18 is abundant"
+assert_eq Rosetta::ADPNumbers::classify(8), "deficient", "8 is deficient"
+assert_eq Rosetta::ADPNumbers::classify(13), "deficient", "13 is deficient"
+
+test_run

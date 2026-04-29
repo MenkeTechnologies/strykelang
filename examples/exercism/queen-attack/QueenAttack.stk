@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+fn Exercism::QueenAttack::can_attack($w, $b) {
+    my ($wr, $wc) = @$w
+    my ($br, $bc) = @$b
+    die "queens can't share a position" if $wr == $br && $wc == $bc
+    return 1 if $wr == $br
+    return 1 if $wc == $bc
+    return 1 if abs($wr - $br) == abs($wc - $bc)
+    0
+}

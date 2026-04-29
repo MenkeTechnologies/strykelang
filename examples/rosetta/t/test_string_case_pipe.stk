@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String case (Idiomatic)
+
+fn Rosetta::StringCase::to_upper($str) {
+    $str |> uc
+}
+
+fn Rosetta::StringCase::to_lower($str) {
+    $str |> lc
+}
+
+"alpha" |> Rosetta::StringCase::to_upper() |> assert_eq("ALPHA", "Uppercase")
+"BETA" |> Rosetta::StringCase::to_lower() |> assert_eq("beta", "Lowercase")
+
+test_run

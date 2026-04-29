@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+fn Exercism::Knapsack::maximum_value($items, $cap) {
+    my @dp = (0) x ($cap + 1)
+    for my $it (@$items) {
+        my $w = $it->{weight}
+        my $v = $it->{value}
+        for my $c (rev($w..$cap)) {
+            $dp[$c] = max($dp[$c], $dp[$c - $w] + $v)
+        }
+    }
+    $dp[$cap]
+}

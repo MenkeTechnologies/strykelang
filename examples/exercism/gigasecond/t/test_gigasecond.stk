@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Gigasecond.stk"
+require "./Gigasecond.stk"
 
 assert_eq Exercism::Gigasecond::add_gigasecond("2011-04-25"),          "2043-01-01T01:46:40", "date only specification of time"
 assert_eq Exercism::Gigasecond::add_gigasecond("1977-06-13"),          "2009-02-19T01:46:40", "second test for date only specification of time"

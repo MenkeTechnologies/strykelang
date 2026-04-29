@@ -1,0 +1,5 @@
+#!/usr/bin/env stryke
+fn Exercism::MicroBlog::truncate_post {
+    my @c = chars(_0)
+    join "", @c[0..min(4, len(@c)-1)]
+}

@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Harmonic series (using pipes)
+
+fn Rosetta::Harmonic::compute($n) {
+    ~> 1:$n map { 1 / _ } |> sum()
+}
+
+assert_eq Rosetta::Harmonic::compute(1), 1, "H1"
+my $h2 = Rosetta::Harmonic::compute(2)
+assert_near $h2, 1.5, 0.0001, "H2"
+my $h4 = Rosetta::Harmonic::compute(4)
+assert_near $h4, 2.0833, 0.001, "H4"
+
+test_run

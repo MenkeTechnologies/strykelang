@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./QueenAttack.stk"
+
+assert_eq Exercism::QueenAttack::can_attack([2,4],[6,6]),  0, "no attack"
+assert_eq Exercism::QueenAttack::can_attack([2,4],[2,7]),  1, "same row"
+assert_eq Exercism::QueenAttack::can_attack([5,4],[2,4]),  1, "same column"
+assert_eq Exercism::QueenAttack::can_attack([2,2],[0,4]),  1, "diagonal NE"
+assert_eq Exercism::QueenAttack::can_attack([2,2],[3,1]),  1, "diagonal SW"
+assert_eq Exercism::QueenAttack::can_attack([2,2],[1,1]),  1, "diagonal NW"
+assert_eq Exercism::QueenAttack::can_attack([1,7],[0,6]),  1, "diagonal close"
+
+my $err = eval { Exercism::QueenAttack::can_attack([2,4],[2,4]); 0 } || $@
+assert_ok $err =~ /share a position/, "same square"
+
+test_run

@@ -8422,6 +8422,64 @@ impl Interpreter {
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;
+                // Stryke (non-compat) string-slice sugar: when the index is
+                // a `from:to[:step]` range AND the target is a string, return
+                // a substring with optional step. Mirrors Python `s[1:10:2]`.
+                // Detect this BEFORE collapsing the range to an int.
+                if !crate::compat_mode() && self.scope.scalar_binding_exists(array) {
+                    if let ExprKind::Range {
+                        from,
+                        to,
+                        exclusive,
+                        step,
+                    } = &index.kind
+                    {
+                        let aname_check = self.stash_array_name_for_package(array);
+                        let prefer_scalar =
+                            array == "_" || self.scope.get_array(&aname_check).is_empty();
+                        if prefer_scalar {
+                            let s = self.scope.get_scalar(array).to_string();
+                            if !s.is_empty() {
+                                let n = s.chars().count() as i64;
+                                let mut from_i = self.eval_expr(from)?.to_int();
+                                let mut to_i = self.eval_expr(to)?.to_int();
+                                let step_i = match step {
+                                    Some(e) => self.eval_expr(e)?.to_int(),
+                                    None => 1,
+                                };
+                                if from_i < 0 {
+                                    from_i += n
+                                }
+                                if to_i < 0 {
+                                    to_i += n
+                                }
+                                if *exclusive {
+                                    to_i -= 1
+                                }
+                                let chars: Vec<char> = s.chars().collect();
+                                let mut out = String::new();
+                                if step_i > 0 {
+                                    let mut i = from_i;
+                                    while i <= to_i && i < n {
+                                        if i >= 0 {
+                                            out.push(chars[i as usize]);
+                                        }
+                                        i += step_i;
+                                    }
+                                } else if step_i < 0 {
+                                    let mut i = from_i;
+                                    while i >= to_i && i >= 0 {
+                                        if i < n {
+                                            out.push(chars[i as usize]);
+                                        }
+                                        i += step_i;
+                                    }
+                                }
+                                return Ok(PerlValue::string(out));
+                            }
+                        }
+                    }
+                }
                 let idx = self.eval_expr(index)?.to_int();
                 let aname = self.stash_array_name_for_package(array);
                 if let Some(obj) = self.tied_arrays.get(&aname).cloned() {
@@ -8433,6 +8491,30 @@ impl Interpreter {
                     if let Some(sub) = self.subs.get(&full).cloned() {
                         let arg_vals = vec![obj, PerlValue::integer(idx)];
                         return self.call_sub(&sub, arg_vals, ctx, line);
+                    }
+                }
+                // Stryke (non-compat) sugar: `$name[i]` indexes by Unicode
+                // char when `@name` is missing/empty but `$name` is a
+                // non-empty string. So `$s[0]` is the first grapheme of
+                // `$s`. NB: `$_[0]` keeps Perl's `@_`-access semantics
+                // because `@_` is populated inside any sub call; the
+                // bareword `_[0]` parses to the same AST node, so both
+                // forms behave alike — use `substr(_, 0, 1)` for char-of-
+                // topic when inside a sub. Compat mode = Perl semantics.
+                if !crate::compat_mode() && self.scope.scalar_binding_exists(array) {
+                    let prefer_scalar = self.scope.get_array(&aname).is_empty();
+                    if prefer_scalar {
+                        let s = self.scope.get_scalar(array).to_string();
+                        if !s.is_empty() {
+                            let n = s.chars().count() as i64;
+                            let i = if idx < 0 { idx + n } else { idx };
+                            if i >= 0 && i < n {
+                                if let Some(c) = s.chars().nth(i as usize) {
+                                    return Ok(PerlValue::string(c.to_string()));
+                                }
+                            }
+                            return Ok(PerlValue::UNDEF);
+                        }
                     }
                 }
                 Ok(self.scope.get_array_element(&aname, idx))
@@ -11244,6 +11326,11 @@ impl Interpreter {
                     self.wantarray_kind = saved;
                     if let Some(items) = v.as_array_vec() {
                         items
+                    } else if v.is_iterator() {
+                        // `~> ... rev |> join ""` produces an Iterator from
+                        // the lazy stages; drain it before joining, otherwise
+                        // it stringifies as "Iterator".
+                        v.into_iterator().collect_all()
                     } else {
                         vec![v]
                     }
@@ -12510,6 +12597,17 @@ impl Interpreter {
                     }
                 } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     PerlValue::integer(if a == b { 1 } else { 0 })
+                } else if !crate::compat_mode() && both_non_numeric_strings_iv(&lv, &rv) {
+                    // Stryke (non-compat) sugar: `==` falls back to string
+                    // compare when both operands are non-numeric strings, so
+                    // `"G" == "G"` is true (Perl's `0 == 0` numeric is also
+                    // true here, but `"G" == "T"` is false in stryke vs
+                    // also-true in Perl). See `Op::NumEq` in vm.rs.
+                    PerlValue::integer(if lv.to_string() == rv.to_string() {
+                        1
+                    } else {
+                        0
+                    })
                 } else {
                     PerlValue::integer(if lv.to_number() == rv.to_number() {
                         1
@@ -12521,6 +12619,12 @@ impl Interpreter {
             BinOp::NumNe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     PerlValue::integer(if a != b { 1 } else { 0 })
+                } else if !crate::compat_mode() && both_non_numeric_strings_iv(&lv, &rv) {
+                    PerlValue::integer(if lv.to_string() != rv.to_string() {
+                        1
+                    } else {
+                        0
+                    })
                 } else {
                     PerlValue::integer(if lv.to_number() != rv.to_number() {
                         1
@@ -19138,6 +19242,22 @@ impl Interpreter {
             .clone();
         crate::run_line_body(&chunk, self, line_str, is_last_input_line)
     }
+}
+
+/// Mirrors `vm.rs::both_non_numeric_strings`. Used by the tree-walker's
+/// `==` / `!=` to decide whether to fall back to string compare in
+/// stryke non-compat mode.
+fn both_non_numeric_strings_iv(a: &PerlValue, b: &PerlValue) -> bool {
+    if !a.is_string_like() || !b.is_string_like() {
+        return false;
+    }
+    let sa = a.to_string();
+    let sb = b.to_string();
+    let looks = |s: &str| {
+        let t = s.trim();
+        !t.is_empty() && t.parse::<f64>().is_ok()
+    };
+    !looks(&sa) && !looks(&sb)
 }
 
 fn par_walk_invoke_entry(

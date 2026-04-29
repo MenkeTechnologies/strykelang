@@ -358,7 +358,7 @@ pub(crate) fn try_builtin(
         "dirname" | "dn" => Some(builtin_dirname(args)),
         "fileparse" => Some(builtin_fileparse(interp, args, line)),
         "gethostname" | "hn" => Some(builtin_gethostname()),
-        "spurt" | "spew" | "write_file" | "wf" => Some(builtin_spurt(args, line)),
+        "spurt" | "spit" | "spew" | "write_file" | "wf" => Some(builtin_spurt(args, line)),
         "collect" => Some(interp.builtin_collect_execute(args, line)),
         "take" | "head" | "hd" => {
             if name == "take"
@@ -788,9 +788,7 @@ pub(crate) fn try_builtin(
         "assert_near" | "anear" => Some(builtin_assert_near(args, line)),
         "assert_dies" | "adies" => Some(builtin_assert_dies(interp, args, line)),
         "test_run" | "run_tests" => Some(builtin_test_run(interp, args, line)),
-        "test_skip" | "skip_test" | "skip_assert" => {
-            Some(builtin_test_skip(interp, args, line))
-        }
+        "test_skip" | "skip_test" | "skip_assert" => Some(builtin_test_skip(interp, args, line)),
         // ── Git builtins (libgit2, no fork) ──
         "git_log" | "glog" => Some(builtin_git_log(interp, args, line)),
         "git_diff" | "gdiff" => Some(builtin_git_diff(interp, args, line)),
@@ -20154,7 +20152,7 @@ fn builtin_group_consecutive(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut last: Option<String> = None;
     for v in xs {
         let s = v.to_string();
-        if last.as_deref() == Some(&s) {
+        if last.as_deref() == Some(s.as_str()) {
             group.push(v);
         } else {
             if !group.is_empty() {

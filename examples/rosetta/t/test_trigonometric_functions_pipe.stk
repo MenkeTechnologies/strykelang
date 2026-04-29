@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Trigonometric functions
+
+fn Rosetta::Trig::sin($x) {
+    sin($x)
+}
+
+fn Rosetta::Trig::cos($x) {
+    cos($x)
+}
+
+fn Rosetta::Trig::tan($x) {
+    tan($x)
+}
+
+my $pi = 3.14159265358979323846
+
+0 |> Rosetta::Trig::sin() |> assert_near(0, 1e-9, "sin(0)")
+$pi |> Rosetta::Trig::sin() |> assert_near(0, 1e-9, "sin(pi)")
+0 |> Rosetta::Trig::cos() |> assert_near(1, 1e-9, "cos(0)")
+($pi / 2) |> Rosetta::Trig::cos() |> assert_near(0, 1e-9, "cos(pi/2)")
+
+test_run

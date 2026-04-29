@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+require "./LinkedList.stk"
+
+my $d = Exercism::LinkedList::new()
+assert_eq Exercism::LinkedList::count($d), 0, "empty count"
+
+Exercism::LinkedList::push($d, 1)
+Exercism::LinkedList::push($d, 2)
+Exercism::LinkedList::push($d, 3)
+assert_eq Exercism::LinkedList::count($d), 3, "after pushes"
+assert_eq Exercism::LinkedList::pop($d),   3, "pop 3"
+assert_eq Exercism::LinkedList::pop($d),   2, "pop 2"
+assert_eq Exercism::LinkedList::shift($d), 1, "shift 1"
+assert_eq Exercism::LinkedList::count($d), 0, "empty again"
+
+Exercism::LinkedList::unshift($d, "a")
+Exercism::LinkedList::unshift($d, "b")
+assert_eq Exercism::LinkedList::shift($d), "b", "shift order"
+assert_eq Exercism::LinkedList::pop($d),   "a", "pop after unshift"
+
+test_run

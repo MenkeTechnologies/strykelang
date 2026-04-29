@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+require "./AtbashCipher.stk"
+
+# encode
+assert_eq Exercism::AtbashCipher::encode_atbash("yes"),                    "bvh",                   "encode yes"
+assert_eq Exercism::AtbashCipher::encode_atbash("no"),                     "ml",                    "encode no"
+assert_eq Exercism::AtbashCipher::encode_atbash("OMG"),                    "lnt",                   "encode OMG"
+assert_eq Exercism::AtbashCipher::encode_atbash("O M G"),                  "lnt",                   "encode spaces"
+assert_eq Exercism::AtbashCipher::encode_atbash("mindblowingly"),          "nrmwy oldrm tob",       "encode long word"
+assert_eq Exercism::AtbashCipher::encode_atbash("Testing,1 2 3, testing."),"gvhgr mt123 gvhgr mt",  "encode numbers"
+assert_eq Exercism::AtbashCipher::encode_atbash("Truth is fiction."),      "gifgs rhurx grlm",      "encode sentence"
+assert_eq Exercism::AtbashCipher::encode_atbash("The quick brown fox jumps over the lazy dog."), "gsvjf rxpyi ldmul cqfnk hlevi gsvoz abwlt", "encode all the letters"
+
+# decode
+assert_eq Exercism::AtbashCipher::decode_atbash("vcvix rhn"),         "exercism",                  "decode exercism"
+assert_eq Exercism::AtbashCipher::decode_atbash("zmlyh gzxov rhlug vmzhg vkkrm thglm v"), "anobstacleisoftenasteppingstone", "decode a sentence"
+assert_eq Exercism::AtbashCipher::decode_atbash("gvhgr mt123 gvhgr mt"),    "testing123testing",     "decode numbers"
+assert_eq Exercism::AtbashCipher::decode_atbash("gsvjf rxpyi ldmul cqfnk hlevi gsvoz abwlt"), "thequickbrownfoxjumpsoverthelazydog", "decode all the letters"
+
+test_run

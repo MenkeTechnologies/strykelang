@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Accumulate.stk"
+require "./Accumulate.stk"
 
 my $sq  = fn($x) { $x * $x }
 my $up  = fn($x) { uc $x }

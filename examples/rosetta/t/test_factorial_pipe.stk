@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Factorial (using pipes)
+
+fn Rosetta::Factorial::solve($n) {
+    if ($n <= 1) { return 1 }
+    ~> 1:$n |> reduce { $a * $b }
+}
+
+assert_eq Rosetta::Factorial::solve(0), 1, "0! is 1"
+assert_eq Rosetta::Factorial::solve(1), 1, "1! is 1"
+assert_eq Rosetta::Factorial::solve(5), 120, "5! is 120"
+assert_eq Rosetta::Factorial::solve(10), 3628800, "10! is 3628800"
+
+test_run

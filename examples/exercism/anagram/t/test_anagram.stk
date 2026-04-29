@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./Anagram.stk"
+
+fn j { join(",", @{Exercism::Anagram::match_anagrams($_[0], $_[1])}) }
+
+assert_eq j("diaper",  ["hello","world","zombies","pants"]),      "",                 "no matches"
+assert_eq j("solemn",  ["lemons","cherry","melons"]),             "lemons,melons",    "detects two anagrams"
+assert_eq j("listen",  ["enlists","google","inlets","banana"]),   "inlets",           "detects multiple anagrams with different case"
+assert_eq j("BANANA",  ["BANANA","Banana","banana"]),             "",                 "does not detect anagram subsets"
+assert_eq j("Orchestra", ["cashregister","Carthorse","radishes"]),"Carthorse",        "anagram is case-insensitive"
+assert_eq j("Orchestra", ["cashregister","carthorse","radishes"]),"carthorse",        "case-insensitive cands"
+assert_eq j("mass",    ["last"]),                                 "",                 "different length is not anagram"
+assert_eq j("Ether",   ["Earthquakes"]),                          "",                 "diff length, share letter"
+assert_eq j("good",    ["dog","goody"]),                          "",                 "no matches with diff length"
+
+test_run

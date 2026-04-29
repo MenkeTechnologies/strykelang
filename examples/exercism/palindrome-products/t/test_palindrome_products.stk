@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./PalindromeProducts.stk"
+
+assert_eq Exercism::PalindromeProducts::smallest(1, 9)->{value},   1,   "smallest 1..9 value"
+assert_eq Exercism::PalindromeProducts::largest(1, 9)->{value},    9,   "largest 1..9 value"
+assert_eq Exercism::PalindromeProducts::smallest(10, 99)->{value}, 121, "smallest 10..99 value"
+assert_eq Exercism::PalindromeProducts::largest(10, 99)->{value},  9009, "largest 10..99 value"
+assert_eq Exercism::PalindromeProducts::smallest(100, 999)->{value}, 10201, "smallest 100..999 value"
+assert_eq Exercism::PalindromeProducts::largest(100, 999)->{value},  906609, "largest 100..999 value"
+
+my $err = eval { Exercism::PalindromeProducts::smallest(99, 10); 0 } || $@
+assert_ok $err =~ /min must be <= max/, "error on bad range"
+
+test_run

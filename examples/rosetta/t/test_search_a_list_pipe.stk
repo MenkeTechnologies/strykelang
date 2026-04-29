@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Search a list (Idiomatic)
+
+fn Rosetta::SearchList::contains($haystack, $needle) {
+    contains_elem($needle, $haystack)
+}
+
+my @haystack = ("Zig", "Zag", "Wally", "Ronald", "Bush", "Krusty", "Charlie", "Bush", "Bo", "Maz")
+my $ref = \@haystack
+
+$ref |> Rosetta::SearchList::contains("Bush") |> assert_ok("Contains Bush")
+$ref |> Rosetta::SearchList::contains("Ronald") |> assert_ok("Contains Ronald")
+assert_ok !($ref |> Rosetta::SearchList::contains("Clinton")), "Does not contain Clinton"
+
+test_run

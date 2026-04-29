@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+fn Exercism::Bob::hey($s) {
+    $s = $s =~ s/\s+//gr
+    return "Fine. Be that way!"        if length($s) == 0
+    my $shouting  = $s =~ /[A-Z]/ && $s !~ /[a-z]/
+    my $question  = $s =~ /\?$/
+    return "Calm down, I know what I'm doing!" if $shouting && $question
+    return "Whoa, chill out!"                  if $shouting
+    return "Sure."                             if $question
+    "Whatever."
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+fn Exercism::PigLatin::_trans($w) {
+    $w = lc $w
+    return "${w}ay" if $w =~ /^([aeiou]|xr|yt)/
+    return "$2$1ay" if $w =~ /^([^aeiouy]+)(y.+)/
+    return "$2$1ay" if $w =~ /^([^aeiou]*qu)(.+)/
+    return "$2$1ay" if $w =~ /^([^aeiou]+)(.+)/
+    "${w}ay"
+}
+
+fn Exercism::PigLatin::translate($s) {
+    join " ", map { Exercism::PigLatin::_trans($_) } split /\s+/, $s
+}

@@ -240,12 +240,13 @@ fn dispatch_ok(r: crate::error::PerlResult<PerlValue>) -> ExecResult {
 
 /// Perl list context for these subs is a return **list** of one scalar (possibly `undef`).
 #[inline]
-fn aggregate_wantarray(v: PerlValue, want: WantarrayCtx) -> PerlValue {
-    if want == WantarrayCtx::List {
-        PerlValue::array(vec![v])
-    } else {
-        v
-    }
+/// Scalar reducers (`sum`, `product`, `min`, `max`, …) collapse a list to one
+/// number. Perl's `List::Util` returns a *scalar* regardless of caller context;
+/// wrapping the result in a 1-element array in list context broke arithmetic
+/// (`0 + sum(...)` would numify the array ref to 1, while string interpolation
+/// happened to print the wrapped scalar). Always return the scalar.
+fn aggregate_wantarray(v: PerlValue, _want: WantarrayCtx) -> PerlValue {
+    v
 }
 
 enum MinMax {
@@ -1384,7 +1385,11 @@ mod tests {
     }
 
     #[test]
-    fn sum_product_min_max_list_context_returns_one_element_array() {
+    fn sum_product_min_max_list_context_returns_scalar() {
+        // Mirrors Perl's `List::Util` — these reducers always return a scalar,
+        // independent of caller context. Wrapping in a 1-element array (the
+        // previous behavior) broke arithmetic on the result; see
+        // `aggregate_wantarray` for the rationale.
         let mut i = Interpreter::new();
         let args_sum = [
             PerlValue::integer(1),
@@ -1392,9 +1397,8 @@ mod tests {
             PerlValue::integer(3),
         ];
         let ls = call_native(&mut i, "sum", &args_sum, WantarrayCtx::List);
-        let asum = ls.as_array_vec().expect("sum list");
-        assert_eq!(asum.len(), 1);
-        assert_eq!(asum[0].to_int(), 6);
+        assert!(ls.as_array_vec().is_none(), "sum should not wrap in array");
+        assert_eq!(ls.to_int(), 6);
 
         let lp = call_native(
             &mut i,
@@ -1402,9 +1406,11 @@ mod tests {
             &[PerlValue::integer(2), PerlValue::integer(4)],
             WantarrayCtx::List,
         );
-        let ap = lp.as_array_vec().expect("product list");
-        assert_eq!(ap.len(), 1);
-        assert_eq!(ap[0].to_int(), 8);
+        assert!(
+            lp.as_array_vec().is_none(),
+            "product should not wrap in array"
+        );
+        assert_eq!(lp.to_int(), 8);
 
         let lmn = call_native(
             &mut i,
@@ -1412,14 +1418,14 @@ mod tests {
             &[PerlValue::integer(9), PerlValue::integer(2)],
             WantarrayCtx::List,
         );
-        assert_eq!(lmn.as_array_vec().unwrap()[0].to_int(), 2);
+        assert_eq!(lmn.to_int(), 2);
         let lmx = call_native(
             &mut i,
             "max",
             &[PerlValue::integer(9), PerlValue::integer(2)],
             WantarrayCtx::List,
         );
-        assert_eq!(lmx.as_array_vec().unwrap()[0].to_int(), 9);
+        assert_eq!(lmx.to_int(), 9);
     }
 
     #[test]

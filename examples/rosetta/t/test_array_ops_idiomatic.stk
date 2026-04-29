@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Set operations (Union and Difference)
+
+fn Rosetta::Set::union($a, $b) {
+    # Combine and unique
+    (@$a, @$b) |> uniq()
+}
+
+fn Rosetta::Set::difference($a, $b) {
+    # Elements in a that are not in b
+    my %hb; foreach my $v (@$b) { $hb{$v} = 1 }
+    @$a |> grep { my $v = _; !$hb{$v} }
+}
+
+my $a = [1, 2, 3, 4]
+my $b = [3, 4, 5, 6]
+
+my @u = Rosetta::Set::union($a, $b)
+my @d = Rosetta::Set::difference($a, $b)
+
+assert_eq join(",", sort(@u)), "1,2,3,4,5,6", "set union"
+assert_eq join(",", sort(@d)), "1,2", "set difference"
+
+# Using pipelines directly
+my @u_p = (@$a, @$b) |> uniq() |> sort()
+assert_eq join(",", @u_p), "1,2,3,4,5,6", "pipeline union"
+
+test_run

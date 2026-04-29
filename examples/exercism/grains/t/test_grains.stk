@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+require "./Grains.stk"
+
+assert_eq Exercism::Grains::grains_on_square(1),  1,                "square 1"
+assert_eq Exercism::Grains::grains_on_square(2),  2,                "square 2"
+assert_eq Exercism::Grains::grains_on_square(3),  4,                "square 3"
+assert_eq Exercism::Grains::grains_on_square(4),  8,                "square 4"
+assert_eq Exercism::Grains::grains_on_square(16), 32768,            "square 16"
+assert_eq Exercism::Grains::grains_on_square(32), 2147483648,       "square 32"
+# Square 64 is 2**63 — at i64 max, stryke's float yields ~9.22e18.
+assert_ok abs(Exercism::Grains::grains_on_square(64) - 9.22337203685478e18) / 9.22337203685478e18 < 1e-10, "square 64 ~= 2^63"
+# Total = 2^64 - 1 — float-precision compare.
+assert_ok abs(Exercism::Grains::total_grains() - 1.84467440737096e19) / 1.84467440737096e19 < 1e-10, "total ~= 2^64-1"
+
+# Validation
+my $err = eval { Exercism::Grains::grains_on_square(0); 0 } || $@
+assert_ok $err =~ /between 1 and 64/, "square 0 is invalid"
+$err = eval { Exercism::Grains::grains_on_square(65); 0 } || $@
+assert_ok $err =~ /between 1 and 64/, "square 65 is invalid"
+$err = eval { Exercism::Grains::grains_on_square(-1); 0 } || $@
+assert_ok $err =~ /between 1 and 64/, "negative square is invalid"
+
+test_run

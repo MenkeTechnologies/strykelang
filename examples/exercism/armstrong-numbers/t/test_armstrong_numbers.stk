@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/ArmstrongNumbers.stk"
+require "./ArmstrongNumbers.stk"
 
 assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(0),       "Zero is an Armstrong number"
 assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(5),       "Single-digit numbers are Armstrong numbers"

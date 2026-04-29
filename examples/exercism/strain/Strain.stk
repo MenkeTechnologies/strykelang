@@ -1,0 +1,3 @@
+#!/usr/bin/env stryke
+fn Exercism::Strain::keep    { my ($l, $f) = @_; [grep { $f->($_) } @$l] }
+fn Exercism::Strain::discard { my ($l, $f) = @_; [grep { !$f->($_) } @$l] }

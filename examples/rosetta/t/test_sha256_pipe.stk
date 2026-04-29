@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SHA-256
+
+fn Rosetta::Hash::sha256($str) {
+    sha256($str)
+}
+
+"Rosetta Code" |> Rosetta::Hash::sha256() |> assert_eq("e6f9ed0d22b4a06ba71d2b1de43371b2bc14dfc7698150cf6bdb4b7ff3ee8bba", "SHA-256 of 'Rosetta Code'")
+
+test_run

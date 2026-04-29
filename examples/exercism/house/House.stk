@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+my @_PARTS = (
+    ["house",                            "Jack built"],
+    ["malt",                             "lay in"],
+    ["rat",                              "ate"],
+    ["cat",                              "killed"],
+    ["dog",                              "worried"],
+    ["cow with the crumpled horn",       "tossed"],
+    ["maiden all forlorn",               "milked"],
+    ["man all tattered and torn",        "kissed"],
+    ["priest all shaven and shorn",      "married"],
+    ["rooster that crowed in the morn",  "woke"],
+    ["farmer sowing his corn",           "kept"],
+    ["horse and the hound and the horn", "belonged to"],
+)
+
+fn Exercism::House::_phrase($idx) {
+    my @rev = rev(map { $_PARTS[$_] } 0..$idx)
+    join " the ", map {
+        my $p = $_
+        len(@$p) == 1 ? $p->[0] : join(" that ", @$p)
+    } @rev
+}
+
+fn Exercism::House::recite($from, $to) {
+    join "\n", map { "This is the " . Exercism::House::_phrase($_ - 1) . "." } $from..$to
+}

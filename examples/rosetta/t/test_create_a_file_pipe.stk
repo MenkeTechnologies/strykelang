@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Create a file
+
+fn Rosetta::CreateFile::create($path) {
+    open my $fh, '>', $path or die "Could not create file"
+    print $fh "test string for Rosetta Code\n"
+    close $fh
+}
+
+fn Rosetta::CreateFile::check_and_cleanup($path) {
+    my $exists = -e $path
+    unlink $path
+    $exists
+}
+
+my $tmp_file = "/tmp/stryke_test_create_file.txt"
+$tmp_file |> Rosetta::CreateFile::create()
+my $exists = $tmp_file |> Rosetta::CreateFile::check_and_cleanup()
+
+$exists |> assert_ok("File was created and exists")
+
+test_run

@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/PrimeFactors.stk"
+require "./PrimeFactors.stk"
 
 fn j { join(",", @{Exercism::PrimeFactors::factors(_0)}) }
 

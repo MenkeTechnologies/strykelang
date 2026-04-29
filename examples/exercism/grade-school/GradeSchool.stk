@@ -1,0 +1,12 @@
+fn Exercism::GradeSchool::new { { roster => {} } }
+fn Exercism::GradeSchool::add($s, $student, $g) {
+    $s->{roster}{$student} = $g unless exists $s->{roster}{$student}
+    $s
+}
+
+fn Exercism::GradeSchool::roster($s, $g) {
+    my @gs
+    if (defined $g) { @gs = ($g) }
+    else { my %seen; @gs = grep { !$seen{$_}++ } sort { $a <=> $b } values %{$s->{roster}} }
+    [map { my $gr = $_; [sort grep { $s->{roster}{$_} == $gr } keys %{$s->{roster}}] } @gs]
+}

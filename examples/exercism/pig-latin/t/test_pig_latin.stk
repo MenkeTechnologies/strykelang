@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+require "./PigLatin.stk"
+
+# vowel-start rules
+assert_eq Exercism::PigLatin::translate("apple"),    "appleay",  "starts with a"
+assert_eq Exercism::PigLatin::translate("ear"),      "earay",    "starts with e"
+assert_eq Exercism::PigLatin::translate("igloo"),    "iglooay",  "starts with i"
+assert_eq Exercism::PigLatin::translate("object"),   "objectay", "starts with o"
+assert_eq Exercism::PigLatin::translate("under"),    "underay",  "starts with u"
+assert_eq Exercism::PigLatin::translate("equal"),    "equalay",  "vowel & qu"
+# consonant rules
+assert_eq Exercism::PigLatin::translate("pig"),      "igpay",    "starts with consonant"
+assert_eq Exercism::PigLatin::translate("koala"),    "oalakay",  "k start"
+assert_eq Exercism::PigLatin::translate("xenon"),    "enonxay",  "x start (not xr)"
+assert_eq Exercism::PigLatin::translate("qat"),      "atqay",    "qu mid"
+# digraphs
+assert_eq Exercism::PigLatin::translate("chair"),    "airchay",  "ch digraph"
+assert_eq Exercism::PigLatin::translate("queen"),    "eenquay",  "qu start"
+assert_eq Exercism::PigLatin::translate("square"),   "aresquay", "consonant + qu"
+assert_eq Exercism::PigLatin::translate("therapy"),  "erapythay","th digraph"
+assert_eq Exercism::PigLatin::translate("thrush"),   "ushthray", "thr digraph"
+assert_eq Exercism::PigLatin::translate("school"),   "oolschay", "sch digraph"
+# y rules
+assert_eq Exercism::PigLatin::translate("yttria"),   "yttriaay", "yt start"
+assert_eq Exercism::PigLatin::translate("xray"),     "xrayay",   "xr start"
+assert_eq Exercism::PigLatin::translate("rhythm"),   "ythmrhay", "y as vowel after consonants"
+# multiple words
+assert_eq Exercism::PigLatin::translate("quick fast run"), "ickquay astfay unray", "phrase"
+
+test_run

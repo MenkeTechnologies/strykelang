@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Coprime
+
+fn Rosetta::Math::is_coprime($a, $b) {
+    gcd($a, $b) == 1
+}
+
+assert_eq Rosetta::Math::is_coprime(10, 21), 1, "10 and 21 are coprime"
+assert_eq Rosetta::Math::is_coprime(10, 15), 0, "10 and 15 are not coprime (common factor 5)"
+assert_eq Rosetta::Math::is_coprime(7, 13), 1, "7 and 13 are coprime (both prime)"
+assert_eq Rosetta::Math::is_coprime(1, 99), 1, "1 is coprime to any number"
+
+# Using pipeline
+my @pairs = ([10, 21], [10, 15], [7, 13])
+my @res = @pairs |> map { Rosetta::Math::is_coprime(_->[0], _->[1]) }
+assert_eq join(",", @res), "1,0,1", "coprime pipeline"
+
+test_run

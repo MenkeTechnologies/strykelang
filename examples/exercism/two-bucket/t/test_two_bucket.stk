@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+require "./TwoBucket.stk"
+
+my $r = Exercism::TwoBucket::measure(3, 5, 1, "one")
+assert_eq $r->{moves},       4,     "3,5,1 from one moves"
+assert_eq $r->{goalBucket}, "one",  "3,5,1 from one bucket"
+assert_eq $r->{otherBucket}, 5,     "3,5,1 from one other"
+
+$r = Exercism::TwoBucket::measure(3, 5, 1, "two")
+assert_eq $r->{moves},       8,     "3,5,1 from two moves"
+assert_eq $r->{goalBucket}, "two",  "3,5,1 from two bucket"
+assert_eq $r->{otherBucket}, 3,     "3,5,1 from two other"
+
+$r = Exercism::TwoBucket::measure(2, 3, 3, "one")
+assert_eq $r->{moves},       2,     "2,3,3 one moves"
+assert_eq $r->{goalBucket}, "two",  "2,3,3 one bucket"
+assert_eq $r->{otherBucket}, 2,     "2,3,3 one other"
+
+my $err = eval { Exercism::TwoBucket::measure(6, 15, 5, "one"); 0 } || $@
+assert_ok $err =~ /no solution/, "no solution"
+
+test_run

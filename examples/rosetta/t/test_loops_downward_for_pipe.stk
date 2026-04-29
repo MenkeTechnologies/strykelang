@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Loops/Downward for
+
+fn Rosetta::Loops::downward($start, $end) {
+    ~> $start:$end rev map { _ }
+}
+
+my @res = Rosetta::Loops::downward(1, 5)
+@res[0] |> assert_eq(5, "first is 5")
+@res[4] |> assert_eq(1, "last is 1")
+(len @res) |> assert_eq(5, "length is 5")
+
+test_run

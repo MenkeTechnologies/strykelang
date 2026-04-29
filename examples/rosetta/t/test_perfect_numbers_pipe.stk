@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perfect numbers (idiomatic)
+
+fn Rosetta::PerfectNumbers::sum_proper_divisors($n) {
+    if ($n < 2) { return 0 }
+    my $limit = int($n / 2)
+    ~> 1:$limit grep { $n % _ == 0 } |> reduce { _0 + _1 }
+}
+
+fn Rosetta::PerfectNumbers::is_perfect($n) {
+    $n == Rosetta::PerfectNumbers::sum_proper_divisors($n)
+}
+
+fn Rosetta::PerfectNumbers::find_up_to($max) {
+    ~> 2:$max grep { Rosetta::PerfectNumbers::is_perfect(_) }
+}
+
+assert_ok Rosetta::PerfectNumbers::is_perfect(6), "6 is perfect"
+assert_ok Rosetta::PerfectNumbers::is_perfect(28), "28 is perfect"
+assert_ok Rosetta::PerfectNumbers::is_perfect(496), "496 is perfect"
+assert_ok !Rosetta::PerfectNumbers::is_perfect(12), "12 is not perfect"
+
+my @perfects = Rosetta::PerfectNumbers::find_up_to(500)
+assert_eq join(",", @perfects), "6,28,496", "perfect numbers up to 500"
+
+test_run

@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+fn Exercism::CircularBuffer::new       { { cap => _0, buf => [], count => 0 } }
+fn Exercism::CircularBuffer::clear($b) { $b->{buf} = []; $b->{count} = 0; $b }
+
+fn Exercism::CircularBuffer::write($b, $v) {
+    die "buffer is full" if $b->{count} >= $b->{cap}
+    push @{$b->{buf}}, $v
+    $b->{count}++
+    $b
+}
+
+fn Exercism::CircularBuffer::read($b) {
+    die "buffer is empty" if $b->{count} == 0
+    $b->{count}--
+    shift @{$b->{buf}}
+}
+
+fn Exercism::CircularBuffer::overwrite($b, $v) {
+    if ($b->{count} >= $b->{cap}) { shift @{$b->{buf}}; $b->{count}-- }
+    push @{$b->{buf}}, $v
+    $b->{count}++
+    $b
+}

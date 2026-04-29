@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+our @LANGS
+
+fn Exercism::LanguageList::add_language    { push @LANGS, _0 }
+fn Exercism::LanguageList::remove_language { pop @LANGS }
+fn Exercism::LanguageList::first_language  { $LANGS[0] }
+fn Exercism::LanguageList::last_language   { $LANGS[-1] }
+fn Exercism::LanguageList::get_languages   { map { $LANGS[_ - 1] } @_ }
+fn Exercism::LanguageList::has_language    { my $l = _0; !!(fi { _ eq $l } @LANGS) }

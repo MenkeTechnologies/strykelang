@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+require "./LanguageList.stk"
+
+# add
+@LANGS = ()
+Exercism::LanguageList::add_language("Perl")
+assert_eq join(",", @LANGS), "Perl", "add Perl"
+Exercism::LanguageList::add_language("Raku")
+Exercism::LanguageList::add_language("Ruby")
+assert_eq join(",", @LANGS), "Perl,Raku,Ruby", "add three"
+
+# remove
+Exercism::LanguageList::remove_language()
+assert_eq join(",", @LANGS), "Perl,Raku", "remove last"
+
+# first / last
+@LANGS = ("Perl", "Raku", "Ruby")
+assert_eq Exercism::LanguageList::first_language(), "Perl", "first"
+assert_eq Exercism::LanguageList::last_language(),  "Ruby", "last"
+
+# get_languages
+@LANGS = ("Perl", "Raku", "Ruby", "Python")
+assert_eq join(",", Exercism::LanguageList::get_languages(2, 4)), "Raku,Python", "get 2nd and 4th"
+
+# has_language
+assert_ok  Exercism::LanguageList::has_language("Perl"),   "has Perl"
+assert_ok  Exercism::LanguageList::has_language("Python"), "has Python"
+assert_ok !Exercism::LanguageList::has_language("Java"),   "missing Java"
+
+test_run

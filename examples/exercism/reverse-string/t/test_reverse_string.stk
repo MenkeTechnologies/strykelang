@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/ReverseString.stk"
+require "./ReverseString.stk"
 
 assert_eq Exercism::ReverseString::str_reverse(""),          "",            "an empty string"
 assert_eq Exercism::ReverseString::str_reverse("robot"),     "tobor",       "a word"

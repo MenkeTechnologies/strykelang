@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: TOML
+
+fn Rosetta::TOML::test($data) {
+    my $toml = toml_encode($data)
+    my $decoded = toml_decode($toml)
+    $decoded
+}
+
+my $data = {
+    title => "TOML Example",
+    owner => {
+        name => "Stryke User",
+        dob => "1970-01-01T00:00:00Z"
+    },
+    database => {
+        server => "192.168.1.1",
+        ports => [ 8001, 8001, 8002 ],
+        connection_max => 5000,
+        enabled => 1
+    }
+}
+
+my $res = Rosetta::TOML::test($data)
+
+assert_eq $res->{title}, "TOML Example", "toml title"
+assert_eq $res->{owner}->{name}, "Stryke User", "toml owner name"
+assert_eq $res->{database}->{server}, "192.168.1.1", "toml db server"
+assert_eq cnt($res->{database}->{ports}), 3, "toml db ports count"
+assert_eq $res->{database}->{connection_max}, 5000, "toml db max"
+assert_eq $res->{database}->{enabled}, 1, "toml db enabled"
+
+test_run

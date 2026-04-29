@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Circular buffer
+
+fn Rosetta::Buffer::new($size) {
+    {
+        data => [ (undef) x $size ],
+        size => $size,
+        head => 0,
+        tail => 0,
+        full => 0
+    }
+}
+
+fn Rosetta::Buffer::put($b, $val) {
+    $b->{data}->[$b->{head}] = $val
+    $b->{head} = ($b->{head} + 1) % $b->{size}
+    if ($b->{full}) {
+        $b->{tail} = ($b->{tail} + 1) % $b->{size}
+    }
+    if ($b->{head} == $b->{tail}) {
+        $b->{full} = 1
+    }
+}
+
+fn Rosetta::Buffer::get($b) {
+    return undef if !$b->{full} && $b->{head} == $b->{tail}
+    
+    my $val = $b->{data}->[$b->{tail}]
+    $b->{data}->[$b->{tail}] = undef
+    $b->{tail} = ($b->{tail} + 1) % $b->{size}
+    $b->{full} = 0
+    $val
+}
+
+my $buf = Rosetta::Buffer::new(3)
+
+Rosetta::Buffer::put($buf, 1)
+Rosetta::Buffer::put($buf, 2)
+Rosetta::Buffer::put($buf, 3)
+
+assert_eq Rosetta::Buffer::get($buf), 1, "get 1"
+assert_eq Rosetta::Buffer::get($buf), 2, "get 2"
+
+Rosetta::Buffer::put($buf, 4)
+Rosetta::Buffer::put($buf, 5)
+
+# Buffer should have 3, 4, 5
+assert_eq Rosetta::Buffer::get($buf), 3, "get 3"
+assert_eq Rosetta::Buffer::get($buf), 4, "get 4"
+assert_eq Rosetta::Buffer::get($buf), 5, "get 5"
+assert_eq Rosetta::Buffer::get($buf), undef, "buffer empty"
+
+# Overwrite test
+Rosetta::Buffer::put($buf, 6)
+Rosetta::Buffer::put($buf, 7)
+Rosetta::Buffer::put($buf, 8)
+Rosetta::Buffer::put($buf, 9) # Overwrites 6
+
+assert_eq Rosetta::Buffer::get($buf), 7, "get 7 (6 was overwritten)"
+assert_eq Rosetta::Buffer::get($buf), 8, "get 8"
+assert_eq Rosetta::Buffer::get($buf), 9, "get 9"
+
+test_run

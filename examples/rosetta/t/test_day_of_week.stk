@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Day of the week
+# Find years between 2008 and 2121 where December 25th is a Sunday.
+
+# Zeller's congruence
+fn Rosetta::Date::day_of_week($y, $m, $d) {
+    my $year = $y
+    my $month = $m
+    if ($month < 3) {
+        $month += 12
+        $year -= 1
+    }
+    my $k = $year % 100
+    my $j = int($year / 100)
+    
+    # h = (d + 13(m+1)/5 + k + k/4 + j/4 + 5j) % 7
+    # h is 0 = Saturday, 1 = Sunday, 2 = Monday, ...
+    my $h = ($d + int(13 * ($month + 1) / 5) + $k + int($k / 4) + int($j / 4) + 5 * $j) % 7
+    
+    # Convert to Sunday=0, Monday=1, ...
+    # Zeller's 1=Sunday, 2=Monday, ..., 6=Friday, 0=Saturday
+    # Sunday is 1 in this h formula
+    $h
+}
+
+fn Rosetta::Date::is_sunday($y, $m, $d) {
+    Rosetta::Date::day_of_week($y, $m, $d) == 1
+}
+
+my @years = 2008:2121 |> grep { Rosetta::Date::is_sunday(_, 12, 25) }
+my $res = join(",", @years)
+
+# Expected years for Dec 25 being Sunday between 2008 and 2121:
+# 2011, 2016, 2022, 2033, 2039, 2044, 2050, 2061, 2067, 2072, 2078, 2089, 2095, 2101, 2107, 2112, 2118
+assert_eq $res, "2011,2016,2022,2033,2039,2044,2050,2061,2067,2072,2078,2089,2095,2101,2107,2112,2118", "Years where Dec 25 is Sunday"
+
+test_run

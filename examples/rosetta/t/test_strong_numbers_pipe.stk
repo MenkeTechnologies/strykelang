@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Strong numbers (using pipes)
+
+fn Rosetta::StrongNumbers::is_strong($n) {
+    my $sum = "$n" |> split(//) |> map { fact(_) } |> sum()
+    $sum == $n
+}
+
+assert_ok Rosetta::StrongNumbers::is_strong(1), "1 is strong"
+assert_ok Rosetta::StrongNumbers::is_strong(2), "2 is strong"
+assert_ok Rosetta::StrongNumbers::is_strong(145), "145 is strong"
+assert_ok Rosetta::StrongNumbers::is_strong(40585), "40585 is strong"
+assert_ok !Rosetta::StrongNumbers::is_strong(123), "123 is not strong"
+
+test_run

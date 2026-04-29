@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Determine if a string has all unique characters
+
+fn Rosetta::UniqueChars::check_iterative($str) {
+    my @chars = split //, $str
+    my %seen
+    for my $c (@chars) {
+        return 0 if $seen{$c}
+        $seen{$c} = 1
+    }
+    1
+}
+
+fn Rosetta::UniqueChars::check_idiomatic($str) {
+    my $len = $str |> split("") |> cnt
+    my $uniq_len = $str |> split("") |> uniq |> cnt
+    $len == $uniq_len
+}
+
+assert_eq Rosetta::UniqueChars::check_iterative(""), 1, "empty string iterative"
+assert_eq Rosetta::UniqueChars::check_iterative("a"), 1, "single char iterative"
+assert_eq Rosetta::UniqueChars::check_iterative("ab"), 1, "two unique iterative"
+assert_eq Rosetta::UniqueChars::check_iterative("aba"), 0, "has duplicates iterative"
+assert_eq Rosetta::UniqueChars::check_iterative("abcdefghijklmnopqrstuvwxyz"), 1, "alphabet iterative"
+assert_eq Rosetta::UniqueChars::check_iterative("abcdefghijklmnopqrstuvwxyza"), 0, "alphabet dup iterative"
+
+assert_eq Rosetta::UniqueChars::check_idiomatic(""), 1, "empty string idiomatic"
+assert_eq Rosetta::UniqueChars::check_idiomatic("a"), 1, "single char idiomatic"
+assert_eq Rosetta::UniqueChars::check_idiomatic("ab"), 1, "two unique idiomatic"
+assert_eq Rosetta::UniqueChars::check_idiomatic("aba"), 0, "has duplicates idiomatic"
+assert_eq Rosetta::UniqueChars::check_idiomatic("abcdefghijklmnopqrstuvwxyz"), 1, "alphabet idiomatic"
+assert_eq Rosetta::UniqueChars::check_idiomatic("abcdefghijklmnopqrstuvwxyza"), 0, "alphabet dup idiomatic"
+
+test_run

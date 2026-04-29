@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+require "./RobotSimulator.stk"
+
+fn rs { my $r = $_[0]; "$r->{x},$r->{y},$r->{direction}" }
+
+my $r = Exercism::RobotSimulator::new(0, 0, "north")
+assert_eq rs($r), "0,0,north", "initial state"
+
+Exercism::RobotSimulator::turn_right($r)
+assert_eq rs($r), "0,0,east",  "turn right"
+Exercism::RobotSimulator::turn_right($r)
+assert_eq rs($r), "0,0,south", "turn right twice"
+
+$r = Exercism::RobotSimulator::new(0, 0, "north")
+Exercism::RobotSimulator::turn_left($r)
+assert_eq rs($r), "0,0,west",  "turn left"
+
+$r = Exercism::RobotSimulator::new(0, 0, "north")
+Exercism::RobotSimulator::advance($r)
+assert_eq rs($r), "0,1,north", "advance north"
+
+$r = Exercism::RobotSimulator::new(0, 0, "north")
+Exercism::RobotSimulator::execute($r, "RAALAL")
+assert_eq rs($r), "2,1,west", "execute multi"
+
+$r = Exercism::RobotSimulator::new(7, 3, "north")
+Exercism::RobotSimulator::execute($r, "RAALAL")
+assert_eq rs($r), "9,4,west", "execute from non-origin"
+
+my $err = eval { Exercism::RobotSimulator::new(0, 0, "northeast"); 0 } || $@
+assert_ok $err =~ /Invalid direction/, "invalid direction"
+
+test_run

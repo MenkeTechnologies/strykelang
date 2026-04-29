@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+require "./InventoryManagement.stk"
+
+fn sig {
+    my $h = _0
+    join(",", map { "$_=$h->{$_}" } sort keys %$h)
+}
+
+# create
+assert_eq sig(Exercism::InventoryManagement::create_inventory([])),                       "",          "empty inventory"
+assert_eq sig(Exercism::InventoryManagement::create_inventory(["coal"])),                 "coal=1",    "one item"
+assert_eq sig(Exercism::InventoryManagement::create_inventory(["coal","coal","gold","silver","silver","silver"])), "coal=2,gold=1,silver=3", "multiple items"
+
+# add
+my $inv = { coal => 1 }
+Exercism::InventoryManagement::add_items($inv, ["coal","gold"])
+assert_eq sig($inv), "coal=2,gold=1", "add to existing"
+
+# remove
+$inv = { coal => 2, gold => 1 }
+Exercism::InventoryManagement::remove_items($inv, ["coal"])
+assert_eq sig($inv), "coal=1,gold=1", "remove one"
+Exercism::InventoryManagement::remove_items($inv, ["coal","coal"])
+# Removing past zero should leave at zero
+assert_eq $inv->{coal}, 0, "remove past zero leaves zero"
+
+# delete
+$inv = { coal => 2, gold => 1 }
+Exercism::InventoryManagement::delete_item($inv, "coal")
+assert_eq sig($inv), "gold=1", "delete removes key"
+
+test_run

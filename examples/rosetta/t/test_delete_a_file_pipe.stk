@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Delete a file
+
+fn Rosetta::DeleteFile::delete($path) {
+    unlink $path
+}
+
+my $tmp_file = "/tmp/stryke_test_delete_file.txt"
+
+# Setup
+open my $fh, '>', $tmp_file or die "Could not setup file"
+print $fh "temp"
+close $fh
+
+(-e $tmp_file) |> assert_ok("File exists before deletion")
+
+# Delete
+$tmp_file |> Rosetta::DeleteFile::delete()
+
+(!-e $tmp_file) |> assert_ok("File no longer exists after deletion")
+
+test_run

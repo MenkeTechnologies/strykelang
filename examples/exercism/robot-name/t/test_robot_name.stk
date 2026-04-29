@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+require "./RobotName.stk"
+
+my $r = Exercism::RobotName::new()
+my $n1 = Exercism::RobotName::name($r)
+assert_ok $n1 =~ /^[A-Z]{2}\d{3}$/, "name format"
+assert_eq Exercism::RobotName::name($r), $n1, "name persists"
+
+Exercism::RobotName::reset_name($r)
+my $n2 = Exercism::RobotName::name($r)
+assert_ok $n2 =~ /^[A-Z]{2}\d{3}$/, "reset name format"
+assert_ok $n1 ne $n2, "reset gives a different name"
+
+# Many bots get unique names
+my %seen
+for my $i (1..50) {
+    my $b = Exercism::RobotName::new()
+    my $n = Exercism::RobotName::name($b)
+    assert_ok !exists $seen{$n}, "robot $i unique"
+    $seen{$n} = 1
+}
+
+test_run

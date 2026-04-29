@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+fn Exercism::Wordy::answer($q) {
+    die "unknown operation"  unless $q =~ /^What is/
+    $q =~ s/^What is\s*//
+    $q =~ s/\?$//
+    die "syntax error" if $q eq ""
+    my @t = split /\s+/, $q
+    die "syntax error" unless @t[0] =~ /^-?\d+$/
+    my $r = shift @t + 0
+    while (@t) {
+        my $w = shift @t
+        if ($w eq "plus")          { $r += shift(@t) + 0 }
+        elsif ($w eq "minus")      { $r -= shift(@t) + 0 }
+        elsif ($w eq "multiplied") { shift @t; $r *= shift(@t) + 0 }
+        elsif ($w eq "divided")    { shift @t; $r = int($r / (shift(@t) + 0)) }
+        elsif ($w =~ /^-?\d+$/)    { die "syntax error" }
+        else                       { die "unknown operation" }
+    }
+    $r
+}

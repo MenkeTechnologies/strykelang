@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+my @_ANIM = (
+    { name => "fly",    flavor => "",                                                    reason => "I don't know why she swallowed the fly. Perhaps she'll die." },
+    { name => "spider", flavor => "It wriggled and jiggled and tickled inside her.",     reason => "She swallowed the spider to catch the fly." },
+    { name => "bird",   flavor => "How absurd to swallow a bird!",                       reason => "She swallowed the bird to catch the spider that wriggled and jiggled and tickled inside her." },
+    { name => "cat",    flavor => "Imagine that, to swallow a cat!",                     reason => "She swallowed the cat to catch the bird." },
+    { name => "dog",    flavor => "What a hog, to swallow a dog!",                       reason => "She swallowed the dog to catch the cat." },
+    { name => "goat",   flavor => "Just opened her throat and swallowed a goat!",        reason => "She swallowed the goat to catch the dog." },
+    { name => "cow",    flavor => "I don't know how she swallowed a cow!",               reason => "She swallowed the cow to catch the goat." },
+    { name => "horse",  flavor => "She's dead, of course!",                              reason => "" },
+)
+
+fn Exercism::FoodChain::verse($n) {
+    my $a = $_ANIM[$n - 1]
+    my @lines = ("I know an old lady who swallowed a $a->{name}.")
+    if ($n == len(@_ANIM)) { return join "\n", @lines, $a->{flavor} }
+    push @lines, $a->{flavor} if $a->{flavor}
+    for my $i (rev(1..$n - 1)) {
+        push @lines, $_ANIM[$i]->{reason}
+    }
+    push @lines, $_ANIM[0]->{reason}
+    join "\n", @lines
+}
+
+fn Exercism::FoodChain::verses($from, $to) { join "\n\n", map { Exercism::FoodChain::verse($_) } $from..$to }

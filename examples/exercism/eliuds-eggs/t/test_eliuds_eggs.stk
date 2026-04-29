@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+require "./EliudsEggs.stk"
+
+assert_eq Exercism::EliudsEggs::egg_count(0),         0, "0 eggs"
+assert_eq Exercism::EliudsEggs::egg_count(16),        1, "1 egg (16)"
+assert_eq Exercism::EliudsEggs::egg_count(89),        4, "4 eggs (89)"
+assert_eq Exercism::EliudsEggs::egg_count(2000000000),13, "13 eggs (2,000,000,000)"
+
+test_run

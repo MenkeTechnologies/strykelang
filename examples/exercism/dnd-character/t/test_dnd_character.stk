@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+require "./DndCharacter.stk"
+
+# modifier rules
+assert_eq Exercism::DndCharacter::modifier(3),  -4, "modifier 3"
+assert_eq Exercism::DndCharacter::modifier(8),  -1, "modifier 8"
+assert_eq Exercism::DndCharacter::modifier(10),  0, "modifier 10"
+assert_eq Exercism::DndCharacter::modifier(11),  0, "modifier 11"
+assert_eq Exercism::DndCharacter::modifier(15),  2, "modifier 15"
+assert_eq Exercism::DndCharacter::modifier(18),  4, "modifier 18"
+
+# ability — drops lowest of 4d6, sums highest 3 → range 3..18
+for my $i (1..50) {
+    my $a = Exercism::DndCharacter::ability()
+    assert_ok $a >= 3 && $a <= 18, "ability $a in 3..18"
+}
+
+# new — all six abilities + hitpoints
+my $c = Exercism::DndCharacter::new()
+for my $k ("strength","dexterity","constitution","intelligence","wisdom","charisma") {
+    assert_ok $c->{$k} >= 3 && $c->{$k} <= 18, "$k in range"
+}
+assert_eq $c->{hitpoints}, 10 + Exercism::DndCharacter::modifier($c->{constitution}), "hitpoints"
+
+test_run

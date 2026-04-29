@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/NucleotideCount.stk"
+require "./NucleotideCount.stk"
 
 fn sig { my $c = _0; join(",", map { "$_=$c->{$_}" } sort keys %$c) }
 

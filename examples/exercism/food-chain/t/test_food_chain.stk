@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./FoodChain.stk"
+
+assert_ok Exercism::FoodChain::verse(1) =~ /^I know an old lady who swallowed a fly\./,    "verse 1 starts"
+assert_ok Exercism::FoodChain::verse(1) =~ /Perhaps she'll die\.$/,                         "verse 1 ends"
+assert_ok Exercism::FoodChain::verse(2) =~ /spider/,                                        "verse 2 has spider"
+assert_ok Exercism::FoodChain::verse(8) =~ /horse/,                                         "verse 8 has horse"
+assert_ok Exercism::FoodChain::verse(8) =~ /She's dead, of course!$/,                       "verse 8 ends"
+
+# 8 verses joined
+my $all = Exercism::FoodChain::verses(1, 8)
+assert_ok $all =~ /horse/, "all verses include last"
+assert_ok $all =~ /fly/,   "all verses include first"
+
+test_run

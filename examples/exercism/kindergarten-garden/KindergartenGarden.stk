@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+my @_KIDS = ("Alice","Bob","Charlie","David","Eve","Fred","Ginny","Harriet","Ileana","Joseph","Kincaid","Larry")
+my %_PLANT = (G=>"grass", C=>"clover", R=>"radishes", V=>"violets")
+
+fn Exercism::KindergartenGarden::plants($diagram, $student) {
+    my @rows = split /\n/, $diagram
+    my %pos
+    @pos{@_KIDS} = map { $_ * 2 } 0..len(@_KIDS) - 1
+    my $p = $pos{$student}
+    [map { my $row = $_; $_PLANT{substr($row, $p, 1)}, $_PLANT{substr($row, $p + 1, 1)} } @rows]
+}

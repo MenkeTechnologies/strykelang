@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hello world/Web server
+
+fn Rosetta::Web::start($port) {
+    # spawn the server so we can test it
+    spawn {
+        serve($port, sub {
+            my ($req) = @_
+            "Hello World!"
+        })
+    }
+}
+
+my $port = 18081
+Rosetta::Web::start($port)
+
+# Give the server a moment to start
+sleep 0.1
+
+my $res = fetch("http://localhost:$port")
+assert_eq $res, "Hello World!", "web server returned hello world"
+
+test_run

@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gzip compression
+
+fn Rosetta::Gzip::compress($data) {
+    gzip($data)
+}
+
+fn Rosetta::Gzip::decompress($data) {
+    gunzip($data)
+}
+
+my $original = "This is some data to compress with gzip in Stryke."
+my $compressed = $original |> Rosetta::Gzip::compress()
+my $decompressed = $compressed |> Rosetta::Gzip::decompress()
+
+$decompressed |> assert_eq($original, "Decompressed matches original")
+(len $compressed) |> assert_ok("Compressed data has length")
+
+test_run

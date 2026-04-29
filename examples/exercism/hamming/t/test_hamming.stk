@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Hamming.stk"
+require "./Hamming.stk"
 
 assert_eq Exercism::Hamming::hamming_distance("", ""),                        0, "empty strands"
 assert_eq Exercism::Hamming::hamming_distance("A", "A"),                      0, "single letter identical strands"

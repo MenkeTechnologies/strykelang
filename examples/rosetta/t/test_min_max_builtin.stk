@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Min/Max of a list
+
+fn Rosetta::List::min_max(@list) {
+    (min(@list), max(@list))
+}
+
+my @data = (3, 1, 4, 1, 5, 9, 2, 6, 5)
+my ($min, $max) = Rosetta::List::min_max(@data)
+
+assert_eq $min, 1, "min is 1"
+assert_eq $max, 9, "max is 9"
+
+# Using pipelines
+my $min_p = @data |> min()
+my $max_p = @data |> max()
+
+assert_eq $min_p, 1, "min_p is 1"
+assert_eq $max_p, 9, "max_p is 9"
+
+# Empty list behavior (usually returns undef or inf/-inf depending on language)
+# In Stryke/Perl, min() with no args might be undef.
+# my $e = min()
+# assert_eq defined $e, 0, "min of empty is undef"
+
+test_run

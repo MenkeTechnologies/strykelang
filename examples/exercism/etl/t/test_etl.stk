@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+require "./Etl.stk"
+
+fn sig {
+    my $h = _0
+    join(",", map { "$_=$h->{$_}" } sort keys %$h)
+}
+
+assert_eq sig(Exercism::Etl::transform({1 => ["A"]})),                        "a=1",                       "single letter"
+assert_eq sig(Exercism::Etl::transform({1 => ["A","E","I","O","U"]})),        "a=1,e=1,i=1,o=1,u=1",       "single score with multiple letters"
+assert_eq sig(Exercism::Etl::transform({1 => ["A","E"], 2 => ["D","G"]})),    "a=1,d=2,e=1,g=2",           "multiple scores with multiple letters"
+my $sc = Exercism::Etl::transform({
+    1 => ["A","E","I","O","U","L","N","R","S","T"],
+    2 => ["D","G"],
+    3 => ["B","C","M","P"],
+    4 => ["F","H","V","W","Y"],
+    5 => ["K"],
+    8 => ["J","X"],
+    10 => ["Q","Z"]
+})
+assert_eq $sc->{a}, 1,  "real-world a"
+assert_eq $sc->{q}, 10, "real-world q"
+assert_eq $sc->{f}, 4,  "real-world f"
+assert_eq $sc->{k}, 5,  "real-world k"
+
+test_run

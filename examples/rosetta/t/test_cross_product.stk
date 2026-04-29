@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Vector cross product
+
+fn Rosetta::Vector::cross_product($a, $b) {
+    [
+        $a->[1] * $b->[2] - $a->[2] * $b->[1],
+        $a->[2] * $b->[0] - $a->[0] * $b->[2],
+        $a->[0] * $b->[1] - $a->[1] * $b->[0]
+    ]
+}
+
+my $v1 = [1, 2, 3]
+my $v2 = [4, 5, 6]
+my $res = Rosetta::Vector::cross_product($v1, $v2)
+
+assert_eq $res->[0], -3, "cross product x"
+assert_eq $res->[1], 6,  "cross product y"
+assert_eq $res->[2], -3, "cross product z"
+
+# Test with zero vector
+my $zero = [0, 0, 0]
+my $res2 = Rosetta::Vector::cross_product($v1, $zero)
+assert_eq join(",", @$res2), "0,0,0", "cross product with zero"
+
+test_run

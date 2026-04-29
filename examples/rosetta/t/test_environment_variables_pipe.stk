@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Environment variables
+
+fn Rosetta::Env::get($name) {
+    env_get($name)
+}
+
+fn Rosetta::Env::set($name, $val) {
+    # Stryke %ENV is typically read-only or environment-bound
+    # but we can try to use a builtin if it exists.
+    # For Rosetta, reading is usually the main task.
+    $ENV{$name}
+}
+
+"PATH" |> Rosetta::Env::get() |> assert_ok("PATH is set")
+$ENV{PATH} |> assert_ok("%ENV{PATH} is set")
+
+test_run
