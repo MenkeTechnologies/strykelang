@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./KindergartenGarden.stk"
+
+fn j { join(",", @{$_[0]}) }
+
+my $d = "VRCGVVRVCGGCCGVRGCVCGCGV\nVRCCCGCRRGVCGCRVVCVGCGCV"
+assert_eq j(Exercism::KindergartenGarden::plants($d, "Alice")),   "violets,radishes,violets,radishes",  "Alice"
+assert_eq j(Exercism::KindergartenGarden::plants($d, "Bob")),     "clover,grass,clover,clover",          "Bob"
+assert_eq j(Exercism::KindergartenGarden::plants($d, "Charlie")), "violets,violets,clover,grass",        "Charlie"
+assert_eq j(Exercism::KindergartenGarden::plants($d, "Larry")),   "grass,violets,clover,violets",        "Larry"
+
+test_run

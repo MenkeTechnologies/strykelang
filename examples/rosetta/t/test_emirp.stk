@@ -1,22 +1,22 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Emirp
+# Rosetta Code: Emirp primes
 
-fn Rosetta::Emirp::check($n) {
-    if (is_prime($n)) {
-        my $rev = int(join("", rev(chars(str($n)))))
-        if ($rev != $n) {
-            return is_prime($rev)
-        }
-    }
-    0
+fn Rosetta::Prime::is_emirp($n) {
+    return 0 if !is_prime($n)
+    my $r = rev("$n")
+    return 0 if $r == $n # Not a palindrome
+    is_prime($r)
 }
 
-assert_ok Rosetta::Emirp::check(13), "13 is emirp"
-assert_ok Rosetta::Emirp::check(17), "17 is emirp"
-assert_ok Rosetta::Emirp::check(31), "31 is emirp"
-assert_eq Rosetta::Emirp::check(2), 0, "2 is not emirp"
-assert_eq Rosetta::Emirp::check(19), 0, "19 is not emirp"
+my @emirps = 1:500 |> grep { Rosetta::Prime::is_emirp(_) }
+my $res = join(",", @emirps)
 
-13 |> Rosetta::Emirp::check |> assert_ok("pipe emirp check")
+# Expected emirps up to 500:
+# 13, 17, 31, 37, 71, 73, 79, 97, 107, 113, 149, 157, 167, 179, 199, 311, 337, 347, 359, 389
+assert_eq $res, "13,17,31,37,71,73,79,97,107,113,149,157,167,179,199,311,337,347,359,389", "emirps up to 500"
+
+# Using pipeline for first 10 emirps
+my @first10 = ~> 1:1000 grep { Rosetta::Prime::is_emirp(_) } |> take(10)
+assert_eq join(",", @first10), "13,17,31,37,71,73,79,97,107,113", "first 10 emirps"
 
 test_run

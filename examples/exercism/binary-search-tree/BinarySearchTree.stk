@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+fn Exercism::BinarySearchTree::new() { { root => undef } }
+
+fn Exercism::BinarySearchTree::_node($v) { { data => $v, left => undef, right => undef } }
+
+fn Exercism::BinarySearchTree::_insert($node, $v) {
+    return Exercism::BinarySearchTree::_node($v) unless defined $node
+    if ($v <= $node->{data}) { $node->{left}  = Exercism::BinarySearchTree::_insert($node->{left},  $v) }
+    else                     { $node->{right} = Exercism::BinarySearchTree::_insert($node->{right}, $v) }
+    $node
+}
+
+fn Exercism::BinarySearchTree::add($t, $v) {
+    $t->{root} = Exercism::BinarySearchTree::_insert($t->{root}, $v)
+    $t
+}
+
+fn Exercism::BinarySearchTree::_inorder($node) {
+    return () unless defined $node
+    (Exercism::BinarySearchTree::_inorder($node->{left}), $node->{data}, Exercism::BinarySearchTree::_inorder($node->{right}))
+}
+
+fn Exercism::BinarySearchTree::sort_tree($t) { [Exercism::BinarySearchTree::_inorder($t->{root})] }

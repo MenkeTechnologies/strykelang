@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./Lasagna.stk"
+
+assert_eq Exercism::Lasagna::expected_minutes_in_oven(),   40, "expected oven minutes"
+assert_eq Exercism::Lasagna::remaining_minutes_in_oven(30), 10, "remaining minutes"
+assert_eq Exercism::Lasagna::preparation_time_in_minutes(2), 4,  "prep time 2 layers"
+assert_eq Exercism::Lasagna::preparation_time_in_minutes(5), 10, "prep time 5 layers"
+assert_eq Exercism::Lasagna::total_time_in_minutes(3, 20),  26, "total time"
+assert_eq Exercism::Lasagna::oven_alarm(),                 "Ding!", "alarm"
+
+test_run

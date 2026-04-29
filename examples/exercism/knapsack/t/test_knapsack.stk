@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+require "./Knapsack.stk"
+
+assert_eq Exercism::Knapsack::maximum_value([], 10),                                                       0,    "empty"
+assert_eq Exercism::Knapsack::maximum_value([{weight=>5, value=>10}], 4),                                  0,    "no fit"
+assert_eq Exercism::Knapsack::maximum_value([{weight=>5, value=>10}], 5),                                  10,   "exact"
+assert_eq Exercism::Knapsack::maximum_value([{weight=>5, value=>10}, {weight=>4, value=>40}], 8),          40,   "best one"
+assert_eq Exercism::Knapsack::maximum_value([{weight=>5, value=>10}, {weight=>4, value=>40}, {weight=>6, value=>30}, {weight=>4, value=>50}], 10), 90, "knapsack normal"
+assert_eq Exercism::Knapsack::maximum_value([{weight=>2, value=>5}, {weight=>2, value=>5}, {weight=>2, value=>5}, {weight=>2, value=>5}], 10), 20, "fits all"
+
+test_run

@@ -9385,9 +9385,39 @@ impl Parser {
                         line,
                     })
                 } else {
-                    // `fore EXPR, LIST` — comma form
+                    // Two surface forms share this branch:
+                    //   `fore EXPR, LIST` — comma form (explicit per-item EXPR + list)
+                    //   `ep LIST`         — list-only form: print each item with `say $_`
+                    // We disambiguate by peeking after the first parsed expression:
+                    // if the next token is a comma we're in the EXPR-then-LIST form;
+                    // otherwise the first parse *was* the LIST and we default the
+                    // block to `say $_` (only for `ep` — `fore`/`e` keep their
+                    // explicit-expression contract).
                     let expr = self.parse_assign_expr()?;
                     let expr = Self::lift_bareword_to_topic_call(expr);
+                    if !matches!(self.peek(), Token::Comma) && name == "ep" {
+                        let block = vec![Statement {
+                            label: None,
+                            kind: StmtKind::Expression(Expr {
+                                kind: ExprKind::Say {
+                                    handle: None,
+                                    args: vec![Expr {
+                                        kind: ExprKind::ScalarVar("_".into()),
+                                        line,
+                                    }],
+                                },
+                                line,
+                            }),
+                            line,
+                        }];
+                        return Ok(Expr {
+                            kind: ExprKind::ForEachExpr {
+                                block,
+                                list: Box::new(expr),
+                            },
+                            line,
+                        });
+                    }
                     self.expect(&Token::Comma)?;
                     let list_parts = self.parse_list_until_terminator()?;
                     let list_expr = if list_parts.len() == 1 {
@@ -12421,7 +12451,7 @@ impl Parser {
             | "files" | "filesf" | "f" | "fr" | "dirs" | "d" | "dr" | "sym_links"
             | "sockets" | "pipes" | "block_devices" | "char_devices" | "exe" | "executables"
             | "basename" | "dirname" | "fileparse" | "realpath" | "canonpath"
-            | "copy" | "move" | "spurt" | "read_bytes" | "which"
+            | "copy" | "move" | "spurt" | "spit" | "read_bytes" | "which"
             | "getcwd" | "touch" | "gethostname" | "uname"
             // ── data / network ──────────────────────────────────────────────
             | "csv_read" | "csv_write" | "dataframe" | "sqlite"

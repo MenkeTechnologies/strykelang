@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Acronym.stk"
+require "./Acronym.stk"
 
 assert_eq Exercism::Acronym::abbreviate("Portable Network Graphics"),         "PNG",      "basic"
 assert_eq Exercism::Acronym::abbreviate("Ruby on Rails"),                     "ROR",      "lowercase words"

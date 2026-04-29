@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/SumOfMultiples.stk"
+require "./SumOfMultiples.stk"
 
 fn sm { Exercism::SumOfMultiples::sum_of_multiples({ factors => $_[0], limit => $_[1] }) }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
 fn Exercism::RnaTranscription::to_rna($s) {
     my %m = (G=>"C", C=>"G", T=>"A", A=>"U")
-    join "", map { $m{$_} } split //, $s
+    ~> $s chars map { $m{$_} } |> join ""
 }

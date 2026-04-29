@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+fn Exercism::Etl::transform($map) {
+    my $out = {}
+    for my $score (keys %$map) {
+        $out->{lc $_} = $score + 0 for @{$map->{$score}}
+    }
+    $out
+}

@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+require "./Allergies.stk"
+
+# allergic_to
+assert_ok !Exercism::Allergies::allergic_to("eggs", 0),       "not allergic to anything"
+assert_ok  Exercism::Allergies::allergic_to("eggs", 1),       "allergic only to eggs"
+assert_ok  Exercism::Allergies::allergic_to("eggs", 3),       "allergic to eggs and peanuts"
+assert_ok  Exercism::Allergies::allergic_to("eggs", 5),       "allergic to eggs and shellfish, not peanuts"
+assert_ok !Exercism::Allergies::allergic_to("peanuts", 5),    "not allergic to peanuts"
+assert_ok  Exercism::Allergies::allergic_to("cats", 192),     "allergic to cats and something else"
+
+# list
+fn lst { join(",", @{Exercism::Allergies::list_allergies(_0)}) }
+assert_eq lst(0),    "",                                                                "no allergies"
+assert_eq lst(1),    "eggs",                                                            "just eggs"
+assert_eq lst(2),    "peanuts",                                                         "just peanuts"
+assert_eq lst(3),    "eggs,peanuts",                                                    "eggs and peanuts"
+assert_eq lst(248),  "strawberries,tomatoes,chocolate,pollen,cats",                     "strawberries through cats"
+assert_eq lst(255),  "eggs,peanuts,shellfish,strawberries,tomatoes,chocolate,pollen,cats", "everything"
+assert_eq lst(509),  "eggs,shellfish,strawberries,tomatoes,chocolate,pollen,cats",      "ignore non-allergen score components"
+
+test_run

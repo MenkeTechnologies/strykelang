@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of cubes (using pipes)
+
+fn Rosetta::SumOfCubes::compute($n) {
+    ~> 1:$n map { _ ** 3 } |> sum()
+}
+
+# Formula: (n * (n+1) / 2) ** 2
+assert_eq Rosetta::SumOfCubes::compute(1), 1, "1^3 = 1"
+assert_eq Rosetta::SumOfCubes::compute(5), 225, "1^3+2^3+3^3+4^3+5^3 = 225"
+assert_eq Rosetta::SumOfCubes::compute(10), 3025, "Sum of cubes 1..10 = 3025"
+
+test_run

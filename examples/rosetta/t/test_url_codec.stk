@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL encoding and decoding
+
+fn Rosetta::URL::test($str) {
+    my $enc = url_encode($str)
+    my $dec = url_decode($enc)
+    $dec
+}
+
+my $str = "http://rosettacode.org/wiki/URL_encoding"
+assert_eq Rosetta::URL::test($str), $str, "codec roundtrip 1"
+
+my $special = "a b c / @ # $ % ^ & * ( )"
+assert_eq Rosetta::URL::test($special), $special, "codec roundtrip special"
+
+# Manual verification of encoding
+assert_eq url_encode("foo bar"), "foo%20bar", "url_encode space"
+assert_eq url_decode("foo%20bar"), "foo bar", "url_decode percent"
+
+test_run

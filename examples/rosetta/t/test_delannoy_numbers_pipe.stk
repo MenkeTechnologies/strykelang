@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Delannoy numbers (using memoization)
+
+my %memo
+
+fn Rosetta::Delannoy::compute($m, $n) {
+    if ($m == 0 || $n == 0) { return 1 }
+    my $key = "$m,$n"
+    if (exists $memo{$key}) { return $memo{$key} }
+    
+    my $res = Rosetta::Delannoy::compute($m - 1, $n) +
+              Rosetta::Delannoy::compute($m, $n - 1) +
+              Rosetta::Delannoy::compute($m - 1, $n - 1)
+    
+    $memo{$key} = $res
+    $res
+}
+
+assert_eq Rosetta::Delannoy::compute(3, 3), 63, "D(3,3) = 63"
+assert_eq Rosetta::Delannoy::compute(0, 0), 1, "D(0,0) = 1"
+assert_eq Rosetta::Delannoy::compute(1, 1), 3, "D(1,1) = 3"
+assert_eq Rosetta::Delannoy::compute(2, 2), 13, "D(2,2) = 13"
+
+test_run

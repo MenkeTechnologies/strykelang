@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+fn Exercism::PhoneNumber::clean_number($s) {
+    die "letters not permitted\n"      if $s =~ /[a-z]/i
+    die "punctuations not permitted\n" if $s =~ m([^0-9() \.+-])
+    $s = $s =~ s/\D//gr
+    my $len = length $s
+    die "incorrect number of digits\n" if $len < 10
+    die "more than 11 digits\n"        if $len > 11
+    if ($len == 11) {
+        die "11 digits must start with 1\n" unless substr($s, 0, 1) eq "1"
+        $s = substr($s, 1)
+    }
+    my $area = substr($s, 0, 1)
+    my $exch = substr($s, 3, 1)
+    die "area code cannot start with zero\n"     if $area eq "0"
+    die "area code cannot start with one\n"      if $area eq "1"
+    die "exchange code cannot start with zero\n" if $exch eq "0"
+    die "exchange code cannot start with one\n"  if $exch eq "1"
+    $s
+}

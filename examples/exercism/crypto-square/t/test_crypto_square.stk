@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+require "./CryptoSquare.stk"
+
+assert_eq Exercism::CryptoSquare::cipher(""),                          "",                              "empty"
+assert_eq Exercism::CryptoSquare::cipher("A"),                         "a",                             "single char"
+assert_eq Exercism::CryptoSquare::cipher("@1"),                        "1",                             "single non-letter"
+assert_eq Exercism::CryptoSquare::cipher("If man was meant to stay on the ground, god would have given us roots."),
+    "imtgdvs fearwer mayoogo anouuio ntnnlvt wttddes aohghn  sseoau ",
+    "long sentence"
+assert_eq Exercism::CryptoSquare::cipher("Have a nice day. Feed the dog & chill out!"),
+    "haptcl aefeh icduo vego  edno  ydlu ",
+    "punctuation"
+assert_eq Exercism::CryptoSquare::cipher("Madness, and then illumination."),
+    "msemo aanin dnin  nthu  esla  sdic ",
+    "another"
+
+test_run

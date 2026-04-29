@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+fn Exercism::CustomSet::is_empty_set($s)         { len(@$s) == 0 }
+fn Exercism::CustomSet::set_contains($s, $x)     { (grep { $_ eq $x } @$s) ? 1 : 0 }
+fn Exercism::CustomSet::is_subset($a, $b)        { my %h = map { ($_, 1) } @$b; !grep { !exists $h{$_} } @$a }
+fn Exercism::CustomSet::is_disjoint_set($a, $b)  { my %h = map { ($_, 1) } @$a; !grep { exists $h{$_} } @$b }
+fn Exercism::CustomSet::is_equal_set($a, $b)     { len(@$a) == len(@$b) && Exercism::CustomSet::is_subset($a, $b) }
+fn Exercism::CustomSet::add_set_element($s, $x)  { Exercism::CustomSet::set_contains($s, $x) ? $s : [@$s, $x] }
+fn Exercism::CustomSet::set_intersection($a, $b) { my %h = map { ($_, 1) } @$b; [grep { exists $h{$_} } @$a] }
+fn Exercism::CustomSet::set_difference($a, $b)   { my %h = map { ($_, 1) } @$b; [grep { !exists $h{$_} } @$a] }
+fn Exercism::CustomSet::set_union($a, $b)        { my %h; [grep { !$h{$_}++ } @$a, @$b] }

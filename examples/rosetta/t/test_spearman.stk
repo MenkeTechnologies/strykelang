@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Spearman's rank correlation coefficient
+
+fn Rosetta::Stats::rank(@data) {
+    my $n = cnt(@data)
+    my @indices = sort { $data[$a] <=> $data[$b] } 0:($n - 1)
+    
+    my @ranks = (0) x $n
+    my $i = 0
+    while ($i < $n) {
+        my $j = $i
+        while ($j < $n - 1 && $data[$indices[$j+1]] == $data[$indices[$j]]) {
+            $j++
+        }
+        
+        # Average rank for ties
+        my $avg_rank = ($i + $j) / 2.0 + 1
+        for (my $k = $i; $k <= $j; $k++) {
+            $ranks[$indices[$k]] = $avg_rank
+        }
+        $i = $j + 1
+    }
+    \@ranks
+}
+
+fn Rosetta::Stats::pearson($x, $y) {
+    my $n = cnt(@$x)
+    my $mx = avg(@$x)
+    my $my = avg(@$y)
+    
+    my $num = 0
+    my $dx2 = 0
+    my $dy2 = 0
+    
+    for (my $i = 0; $i < $n; $i++) {
+        my $dx = $x->[$i] - $mx
+        my $dy = $y->[$i] - $my
+        $num += $dx * $dy
+        $dx2 += $dx * $dx
+        $dy2 += $dy * $dy
+    }
+    
+    return 0 if $dx2 == 0 || $dy2 == 0
+    $num / sqrt($dx2 * $dy2)
+}
+
+fn Rosetta::Stats::spearman($x, $y) {
+    my $rx = Rosetta::Stats::rank(@$x)
+    my $ry = Rosetta::Stats::rank(@$y)
+    Rosetta::Stats::pearson($rx, $ry)
+}
+
+my $x = [10, 20, 30, 40, 50]
+my $y = [2, 1, 4, 3, 5]
+
+# Ranks of x: 1, 2, 3, 4, 5
+# Ranks of y: 2, 1, 4, 3, 5
+# Pearson of ranks: 0.8
+my $rho = Rosetta::Stats::spearman($x, $y)
+assert_ok abs($rho - 0.8) < 1e-10, "Spearman rho for (1..5) example"
+
+# Perfect correlation
+my $x2 = [1, 2, 3]
+my $y2 = [10, 20, 30]
+assert_ok abs(Rosetta::Stats::spearman($x2, $y2) - 1.0) < 1e-10, "Perfect Spearman correlation"
+
+# Perfect inverse correlation
+my $y3 = [30, 20, 10]
+assert_ok abs(Rosetta::Stats::spearman($x2, $y3) - (-1.0)) < 1e-10, "Perfect inverse Spearman correlation"
+
+test_run

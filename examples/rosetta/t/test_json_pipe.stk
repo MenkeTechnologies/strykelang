@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: JSON
+
+fn Rosetta::JSON::serialize($data) {
+    json_encode($data)
+}
+
+fn Rosetta::JSON::deserialize($json) {
+    json_decode($json)
+}
+
+my $data = {"foo" => [1, 2, 3], "bar" => 42}
+my $json = $data |> Rosetta::JSON::serialize()
+
+my $decoded = $json |> Rosetta::JSON::deserialize()
+
+$decoded->{bar} |> assert_eq(42, "bar is 42")
+$decoded->{foo}[1] |> assert_eq(2, "foo[1] is 2")
+
+test_run

@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+fn Exercism::LargestSeriesProduct::largest_product($digits, $window) {
+    die "span must not be negative"               if $window < 0
+    die "digits input must only contain digits"   if $digits =~ /\D/
+    my @d = chars($digits)
+    die "span must be smaller than string length" if $window > len(@d)
+    return 1 if $window == 0
+    my @prods = map {
+        my $i = $_
+        my $p = 1
+        $p *= $d[$i + $_] for 0..$window - 1
+        $p
+    } 0..len(@d) - $window
+    max(@prods)
+}

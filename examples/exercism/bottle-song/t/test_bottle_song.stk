@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./BottleSong.stk"
+
+my $v10 = Exercism::BottleSong::recite({ start_bottles => 10, take_down => 1 })
+assert_ok $v10 =~ /^Ten green bottles hanging on the wall,/, "verse 10 first"
+assert_ok $v10 =~ /Nine green bottles hanging on the wall\.$/, "verse 10 next is nine"
+
+my $v1 = Exercism::BottleSong::recite({ start_bottles => 1, take_down => 1 })
+assert_ok $v1 =~ /^One green bottle hanging on the wall,/, "verse 1 singular"
+assert_ok $v1 =~ /no green bottles hanging on the wall\.$/, "verse 1 next is no green bottles"
+
+my $two = Exercism::BottleSong::recite({ start_bottles => 5, take_down => 2 })
+assert_ok $two =~ /^Five green bottles/, "two verses start"
+assert_ok $two =~ /Four green bottles/, "two verses cont"
+
+test_run

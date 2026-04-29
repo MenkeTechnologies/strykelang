@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+fn Exercism::SimpleLinkedList::new        { { data => _0, next => _1 } }
+fn Exercism::SimpleLinkedList::data       { _0->{data} }
+fn Exercism::SimpleLinkedList::next       { _0->{next} }
+
+fn Exercism::SimpleLinkedList::from_array($vs) {
+    my $h
+    $h = Exercism::SimpleLinkedList::new($_, $h) for rev(@$vs)
+    $h
+}
+
+fn Exercism::SimpleLinkedList::to_array($n) {
+    my @o
+    while (defined $n) { push @o, $n->{data}; $n = $n->{next} }
+    \@o
+}
+
+fn Exercism::SimpleLinkedList::reverse_list($n) {
+    my $p
+    while (defined $n) { my $x = $n->{next}; $n->{next} = $p; $p = $n; $n = $x }
+    $p
+}

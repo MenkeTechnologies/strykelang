@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prime counting function (using pipes)
+
+fn Rosetta::PrimeCounting::is_prime($n) {
+    if ($n < 2) { return 0 }
+    if ($n == 2) { return 1 }
+    if ($n % 2 == 0) { return 0 }
+    my $limit = int(sqrt($n))
+    for (my $i = 3; $i <= $limit; $i += 2) {
+        if ($n % $i == 0) { return 0 }
+    }
+    return 1
+}
+
+fn Rosetta::PrimeCounting::pi($n) {
+    ~> 1:$n grep { Rosetta::PrimeCounting::is_prime(_) } |> len()
+}
+
+assert_eq Rosetta::PrimeCounting::pi(10), 4, "pi(10) = 4 (2, 3, 5, 7)"
+assert_eq Rosetta::PrimeCounting::pi(100), 25, "pi(100) = 25"
+assert_eq Rosetta::PrimeCounting::pi(1000), 168, "pi(1000) = 168"
+
+test_run

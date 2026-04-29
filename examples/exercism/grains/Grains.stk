@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+fn Exercism::Grains::grains_on_square($n) {
+    die "square must be between 1 and 64" if $n < 1 || $n > 64
+    2 ** ($n - 1)
+}
+
+fn Exercism::Grains::total_grains() {
+    ~> 1:64 map {Exercism::Grains::grains_on_square} sum
+}

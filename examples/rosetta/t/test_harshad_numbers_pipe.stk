@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Harshad numbers (using pipes)
+
+fn Rosetta::Harshad::is_harshad($n) {
+    if ($n == 0) { return 0 }
+    my $sum_digits = "$n" |> split(//) |> sum()
+    $n % $sum_digits == 0
+}
+
+assert_ok Rosetta::Harshad::is_harshad(1), "1 is Harshad"
+assert_ok Rosetta::Harshad::is_harshad(10), "10 is Harshad"
+assert_ok Rosetta::Harshad::is_harshad(12), "12 is Harshad"
+assert_ok Rosetta::Harshad::is_harshad(18), "18 is Harshad"
+assert_ok Rosetta::Harshad::is_harshad(20), "20 is Harshad"
+assert_ok !Rosetta::Harshad::is_harshad(11), "11 is not Harshad"
+
+test_run

@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+require "./AffineCipher.stk"
+
+# encode
+assert_eq Exercism::AffineCipher::encode("test", 5, 7), "ybty",       "encode no spaces"
+assert_eq Exercism::AffineCipher::encode("yes", 5, 7),  "xbt",        "encode short"
+assert_eq Exercism::AffineCipher::encode("OMG", 17, 18),"swxtj",      "encode short cap"
+assert_eq Exercism::AffineCipher::encode("mindblowingly", 15, 13), "rzcwa gnxzc dgt", "encode long word"
+assert_eq Exercism::AffineCipher::encode("Truth is fiction.", 3, 7),  "udsrq ipt okc", "encode mixed case"
+assert_eq Exercism::AffineCipher::encode("The quick brown fox jumps over the lazy dog.", 17, 33), "swxtj nvdat rurqx fxupb iqznb avbur", "encode all letters"
+
+# decode
+assert_eq Exercism::AffineCipher::decode("ybty", 5, 7),       "test",   "decode short"
+assert_eq Exercism::AffineCipher::decode("xbt", 5, 7),        "yes",    "decode short cap"
+assert_eq Exercism::AffineCipher::decode("rzcwa gnxzc dgt", 15, 13), "mindblowingly", "decode long"
+assert_eq Exercism::AffineCipher::decode("swxtj nvdat rurqx fxupb iqznb avbur", 17, 33), "thequickbrownfoxjumpsoverthelazydog", "decode all letters"
+
+# error
+my $err = eval { Exercism::AffineCipher::encode("x", 6, 7); 0 } || $@
+assert_ok $err =~ /coprime/, "non-coprime errors"
+
+test_run

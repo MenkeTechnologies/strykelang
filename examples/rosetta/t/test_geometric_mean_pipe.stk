@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Averages/Geometric mean (using pipes)
+
+fn Rosetta::Stats::geometric_mean(@data) {
+    my $n = len(@data)
+    if ($n == 0) { return 0 }
+    
+    # G = exp( (sum of ln(x_i)) / n )
+    my $log_sum = @data |> map { log(_) } |> sum()
+    return exp($log_sum / $n)
+}
+
+my @data = (1, 2, 3, 4, 5)
+# (1*2*3*4*5)^(1/5) = 120^(0.2) approx 2.60517
+assert_near Rosetta::Stats::geometric_mean(@data), 2.60517, 0.0001, "Geometric mean of (1, 2, 3, 4, 5)"
+
+my @data2 = (2, 8)
+# sqrt(16) = 4
+assert_near Rosetta::Stats::geometric_mean(@data2), 4, 0.000001, "Geometric mean of (2, 8)"
+
+test_run

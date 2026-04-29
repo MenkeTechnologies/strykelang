@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./Strain.stk"
+
+fn j { join(",", @{$_[0]}) }
+
+assert_eq j(Exercism::Strain::keep([],       fn($n) { $n < 10 })),                "",       "keep empty"
+assert_eq j(Exercism::Strain::keep([1,2,3],  fn($n) { 1 })),                      "1,2,3",  "keep all"
+assert_eq j(Exercism::Strain::keep([1,2,3],  fn($n) { 0 })),                      "",       "keep none"
+assert_eq j(Exercism::Strain::keep([1,2,3,4,5,6,7,8,9,10], fn($n) { $n % 2 == 0 })), "2,4,6,8,10", "keep even"
+assert_eq j(Exercism::Strain::discard([],    fn($n) { $n < 10 })),                "",       "discard empty"
+assert_eq j(Exercism::Strain::discard([1,2,3], fn($n) { 1 })),                    "",       "discard all"
+assert_eq j(Exercism::Strain::discard([1,2,3], fn($n) { 0 })),                    "1,2,3",  "discard none"
+assert_eq j(Exercism::Strain::discard([1,2,3,4,5], fn($n) { $n % 2 == 0 })),      "1,3,5",  "discard even"
+
+test_run

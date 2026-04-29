@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ulam numbers
+
+fn Rosetta::Ulam::generate($count) {
+    my @ulams = (1, 2)
+    my %is_ulam = (1 => 1, 2 => 1)
+    my $next = 3
+    
+    while (len(@ulams) < $count) {
+        my $ways = 0
+        for my $u1 (@ulams) {
+            last if 2 * $u1 >= $next
+            my $u2 = $next - $u1
+            if (exists $is_ulam{$u2} && $u1 != $u2) {
+                $ways++
+                last if $ways > 1
+            }
+        }
+        
+        if ($ways == 1) {
+            push @ulams, $next
+            $is_ulam{$next} = 1
+        }
+        $next++
+    }
+    \@ulams
+}
+
+my $ulams = Rosetta::Ulam::generate(10)
+assert_eq join(",", @$ulams), "1,2,3,4,6,8,11,13,16,18", "first 10 Ulam numbers"
+
+my $u25 = Rosetta::Ulam::generate(25)
+assert_eq $u25->[-1], 97, "25th Ulam number is 97"
+
+test_run

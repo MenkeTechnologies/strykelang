@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mutually recursive functions
+
+fn Rosetta::MutualRecursion::F($n) {
+    $n == 0 ? 1 : $n - Rosetta::MutualRecursion::M(Rosetta::MutualRecursion::F($n - 1))
+}
+
+fn Rosetta::MutualRecursion::M($n) {
+    $n == 0 ? 0 : $n - Rosetta::MutualRecursion::F(Rosetta::MutualRecursion::M($n - 1))
+}
+
+my @f_vals = ~> 0:5 map { Rosetta::MutualRecursion::F(_) }
+my @m_vals = ~> 0:5 map { Rosetta::MutualRecursion::M(_) }
+
+@f_vals[0] |> assert_eq(1, "F(0) is 1")
+@m_vals[0] |> assert_eq(0, "M(0) is 0")
+@f_vals[5] |> assert_eq(3, "F(5) is 3")
+@m_vals[5] |> assert_eq(3, "M(5) is 3")
+
+test_run

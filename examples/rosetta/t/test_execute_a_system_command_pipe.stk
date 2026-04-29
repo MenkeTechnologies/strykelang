@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute a system command
+
+fn Rosetta::System::exec($cmd) {
+    qx{$cmd} |> trim
+}
+
+"echo 'hello from shell'" |> Rosetta::System::exec() |> assert_eq("hello from shell", "Executes echo")
+
+# Using backticks directly
+my $res = `echo 'direct backticks'` |> trim
+$res |> assert_eq("direct backticks", "Backticks work")
+
+test_run

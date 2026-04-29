@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: JortSort (using pipes)
+
+fn Rosetta::JortSort::check(@arr) {
+    my @sorted = sort { _0 <=> _1 } @arr
+    join(",", @arr) eq join(",", @sorted)
+}
+
+my @a1 = (1, 2, 3, 4, 5)
+assert_ok Rosetta::JortSort::check(@a1), "1,2,3,4,5 is sorted"
+
+my @a2 = (1, 3, 2, 4, 5)
+assert_ok !Rosetta::JortSort::check(@a2), "1,3,2,4,5 is NOT sorted"
+
+my @a3 = (5, 4, 3, 2, 1)
+assert_ok !Rosetta::JortSort::check(@a3), "5,4,3,2,1 is NOT sorted"
+
+my @a4 = (1)
+assert_ok Rosetta::JortSort::check(@a4), "single element is sorted"
+
+my @a5 = ()
+assert_ok Rosetta::JortSort::check(@a5), "empty array is sorted"
+
+test_run

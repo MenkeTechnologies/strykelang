@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Isogram.stk"
+require "./Isogram.stk"
 
 assert_ok  Exercism::Isogram::is_isogram(""),                     "empty string"
 assert_ok  Exercism::Isogram::is_isogram("isogram"),              "isogram with only lower case characters"

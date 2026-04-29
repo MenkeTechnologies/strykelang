@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+fn Exercism::BeerSong::verse($n) {
+    if ($n < 1) {
+        "No more bottles of beer on the wall, no more bottles of beer.\nGo to the store and buy some more, 99 bottles of beer on the wall."
+    } elsif ($n == 1) {
+        "1 bottle of beer on the wall, 1 bottle of beer.\nTake it down and pass it around, no more bottles of beer on the wall."
+    } else {
+        my $next = $n - 1
+        my $plural = $next > 1 ? "s" : ""
+        "$n bottles of beer on the wall, $n bottles of beer.\nTake one down and pass it around, $next bottle$plural of beer on the wall."
+    }
+}
+
+fn Exercism::BeerSong::sing($args) {
+    my $top    = $args->{bottles}
+    my $bottom = $top - $args->{verses} + 1
+    join "\n\n", map { Exercism::BeerSong::verse($_) } rev($bottom..$top)
+}

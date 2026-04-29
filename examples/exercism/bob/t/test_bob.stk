@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+require "./Bob.stk"
+
+assert_eq Exercism::Bob::hey("Tom-ay-to, tom-aaaah-to."),         "Whatever.",                          "stating something"
+assert_eq Exercism::Bob::hey("WATCH OUT!"),                       "Whoa, chill out!",                   "shouting"
+assert_eq Exercism::Bob::hey("FCECDFCAAB"),                       "Whoa, chill out!",                   "shouting gibberish"
+assert_eq Exercism::Bob::hey("Does this cryogenic chamber make me look fat?"), "Sure.",                  "asking a question"
+assert_eq Exercism::Bob::hey("You are, what, like 15?"),          "Sure.",                              "asking a numeric question"
+assert_eq Exercism::Bob::hey("fffbbcbeab?"),                      "Sure.",                              "asking gibberish"
+assert_eq Exercism::Bob::hey("4?"),                               "Sure.",                              "talking forcefully"
+assert_eq Exercism::Bob::hey("ZOMG THE %^*@#\$(*^ ZOMBIES ARE COMING!!11!!1!"), "Whoa, chill out!",      "shouting with special chars"
+assert_eq Exercism::Bob::hey("1, 2, 3"),                          "Whatever.",                          "talking forcefully numeric"
+assert_eq Exercism::Bob::hey("1, 2, 3 GO!"),                      "Whoa, chill out!",                   "shouting numbers"
+assert_eq Exercism::Bob::hey("\nNo,\nI am\nnot!"),                "Whatever.",                          "multi-line statement"
+assert_eq Exercism::Bob::hey("4!"),                               "Whatever.",                          "ending with exclamation"
+assert_eq Exercism::Bob::hey("I HATE YOU"),                       "Whoa, chill out!",                   "no exclamation but capitalized"
+assert_eq Exercism::Bob::hey("WHAT'S GOING ON?"),                 "Calm down, I know what I'm doing!",  "shouting a question"
+assert_eq Exercism::Bob::hey(""),                                 "Fine. Be that way!",                 "saying nothing"
+assert_eq Exercism::Bob::hey("    "),                             "Fine. Be that way!",                 "prolonged silence"
+assert_eq Exercism::Bob::hey("\t\t\t\t\t\t\t\t\t\t"),             "Fine. Be that way!",                 "alternate silence"
+
+test_run

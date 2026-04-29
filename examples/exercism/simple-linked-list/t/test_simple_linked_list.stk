@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+require "./SimpleLinkedList.stk"
+
+my $l = Exercism::SimpleLinkedList::from_array([1,2,3])
+assert_eq Exercism::SimpleLinkedList::data($l), 1, "head data"
+assert_eq Exercism::SimpleLinkedList::data(Exercism::SimpleLinkedList::next($l)), 2, "next data"
+
+assert_eq join(",", @{Exercism::SimpleLinkedList::to_array($l)}), "1,2,3", "to_array"
+
+my $r = Exercism::SimpleLinkedList::reverse_list($l)
+assert_eq join(",", @{Exercism::SimpleLinkedList::to_array($r)}), "3,2,1", "reverse"
+
+# Empty
+my $e = Exercism::SimpleLinkedList::from_array([])
+assert_eq join(",", @{Exercism::SimpleLinkedList::to_array($e)}), "", "empty"
+
+test_run

@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/RotationalCipher.stk"
+require "./RotationalCipher.stk"
 
 assert_eq Exercism::RotationalCipher::caesar_cipher("a", 0),   "a",   "rotate a by 0"
 assert_eq Exercism::RotationalCipher::caesar_cipher("a", 1),   "b",   "rotate a by 1"

@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SQLite
+
+fn Rosetta::DB::test() {
+    # Open in-memory database
+    my $db = sqlite(":memory:")
+    
+    # Create table
+    my $n = $db->exec("CREATE TABLE tasks (id INTEGER PRIMARY KEY, name TEXT, difficulty INT)")
+    
+    # Insert data with positional parameters
+    $db->exec("INSERT INTO tasks (name, difficulty) VALUES (?, ?)", "Hello World", 1)
+    $db->exec("INSERT INTO tasks (name, difficulty) VALUES (?, ?)", "Quicksort", 5)
+    $db->exec("INSERT INTO tasks (name, difficulty) VALUES (?, ?)", "N-Queens", 7)
+    
+    # Query data
+    my $rows = $db->query("SELECT * FROM tasks WHERE difficulty > ?", 3)
+    
+    $rows
+}
+
+my $res = Rosetta::DB::test()
+
+# Should have 2 rows: Quicksort and N-Queens
+assert_eq cnt($res), 2, "sqlite row count"
+assert_eq $res->[0]->{name}, "Quicksort", "sqlite row 0 name"
+assert_eq $res->[1]->{name}, "N-Queens", "sqlite row 1 name"
+
+# Test last_insert_rowid if supported (I saw it in native_data.rs)
+my $db = sqlite(":memory:")
+$db->exec("CREATE TABLE t(a)")
+$db->exec("INSERT INTO t VALUES (1)")
+my $id = $db->last_insert_rowid()
+assert_eq $id, 1, "last_insert_rowid"
+
+test_run

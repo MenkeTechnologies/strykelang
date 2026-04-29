@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+my %_M = ("[" => "]", "(" => ")", "{" => "}")
+
+fn Exercism::MatchingBrackets::has_matching_brackets($s) {
+    my @stk
+    for my $c (chars($s)) {
+        if (exists $_M{$c}) { push @stk, $c }
+        elsif ($c =~ /[\])}]/) {
+            return 0 unless @stk && $c eq $_M{pop @stk}
+        }
+    }
+    len(@stk) == 0 ? 1 : 0
+}

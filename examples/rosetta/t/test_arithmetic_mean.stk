@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Averages/Arithmetic mean
+
+fn Rosetta::Stats::mean(@data) {
+    return 0 if !@_
+    sum(@data) / cnt(@data)
+}
+
+my @data = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+assert_eq Rosetta::Stats::mean(@data), 5.5, "mean of 1..10"
+
+# Using native avg builtin
+assert_eq avg(@data), 5.5, "avg builtin"
+
+# Using pipeline
+my $m = @data |> avg()
+assert_eq $m, 5.5, "piped avg"
+
+# Empty list
+assert_eq Rosetta::Stats::mean(), 0, "mean of empty list"
+
+test_run

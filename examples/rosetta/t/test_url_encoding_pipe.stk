@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL encoding
+
+fn Rosetta::URL::encode($str) {
+    uri_escape($str)
+}
+
+fn Rosetta::URL::decode($str) {
+    uri_unescape($str)
+}
+
+my $url = "http://rosettacode.org/wiki/Main Page"
+my $encoded = $url |> Rosetta::URL::encode()
+$encoded |> assert_eq("http%3A%2F%2Frosettacode%2Eorg%2Fwiki%2FMain%20Page", "Encoded URL")
+
+$encoded |> Rosetta::URL::decode() |> assert_eq($url, "Decoded URL")
+
+test_run

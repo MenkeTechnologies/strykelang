@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+require "./Clock.stk"
+
+assert_eq Exercism::Clock::time(Exercism::Clock::new(8, 0)),    "08:00", "8:00"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(11, 9)),   "11:09", "11:09"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(24, 0)),   "00:00", "midnight wrap"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(25, 0)),   "01:00", "wrap > 24"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(100, 0)),  "04:00", "many wraps"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(1, 60)),   "02:00", "minutes overflow"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(0, 160)),  "02:40", "many minutes"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(-1, 15)),  "23:15", "negative hour"
+assert_eq Exercism::Clock::time(Exercism::Clock::new(0, -160)), "21:20", "negative minutes"
+
+# add / subtract
+my $c = Exercism::Clock::new(10, 0)
+assert_eq Exercism::Clock::time(Exercism::Clock::add_minutes($c, 3)),  "10:03", "add 3 min"
+assert_eq Exercism::Clock::time(Exercism::Clock::add_minutes($c, 60)), "11:00", "add 60 min"
+assert_eq Exercism::Clock::time(Exercism::Clock::subtract_minutes($c, 30)), "09:30", "subtract 30 min"
+
+# equals
+assert_ok  Exercism::Clock::equals(Exercism::Clock::new(15, 37), Exercism::Clock::new(15, 37)), "equals"
+assert_ok !Exercism::Clock::equals(Exercism::Clock::new(15, 37), Exercism::Clock::new(15, 36)), "not equals"
+
+test_run

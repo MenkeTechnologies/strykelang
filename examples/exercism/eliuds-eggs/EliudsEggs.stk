@@ -1,0 +1,2 @@
+#!/usr/bin/env stryke
+fn Exercism::EliudsEggs::egg_count { ~> sprintf("%b", _) chars sum }

@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Magnitude of a vector (using pipes)
+
+fn Rosetta::Magnitude::compute(@v) {
+    @v |> map { _ ** 2 } |> sum() |> sqrt()
+}
+
+assert_eq Rosetta::Magnitude::compute(3, 4), 5, "mag(3,4) = 5"
+assert_eq Rosetta::Magnitude::compute(1, 2, 2), 3, "mag(1,2,2) = 3"
+assert_eq Rosetta::Magnitude::compute(5), 5, "mag(5) = 5"
+assert_eq Rosetta::Magnitude::compute(0, 0, 0), 0, "mag(0,0,0) = 0"
+
+test_run

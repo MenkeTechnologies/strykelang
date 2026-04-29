@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+require "./PythagoreanTriplet.stk"
+
+fn fmt { join("|", map { join(",", @$_) } @{$_[0]}) }
+
+assert_ok  Exercism::PythagoreanTriplet::is_pythagorean(3, 4, 5),   "3-4-5 is pyth"
+assert_ok  Exercism::PythagoreanTriplet::is_pythagorean(5, 12, 13), "5-12-13"
+assert_ok !Exercism::PythagoreanTriplet::is_pythagorean(2, 3, 4),   "2-3-4 not"
+
+assert_eq fmt(Exercism::PythagoreanTriplet::triplets_with_sum(12)),  "3,4,5",          "sum 12"
+assert_eq fmt(Exercism::PythagoreanTriplet::triplets_with_sum(108)), "27,36,45",       "sum 108"
+assert_eq fmt(Exercism::PythagoreanTriplet::triplets_with_sum(1000)),"200,375,425",    "sum 1000"
+
+assert_eq fmt(Exercism::PythagoreanTriplet::triplets_in_range(1, 20)), "3,4,5|5,12,13|6,8,10|8,15,17|9,12,15", "range 1..20"
+
+test_run

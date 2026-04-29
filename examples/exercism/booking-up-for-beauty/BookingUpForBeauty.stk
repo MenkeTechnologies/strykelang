@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+fn Exercism::BookingUpForBeauty::schedule($iso) {
+    my $epoch = datetime_parse_rfc3339("${iso}Z")
+    datetime_format_tz($epoch, "UTC", "%a %b %e %T %Y")
+}
+
+fn Exercism::BookingUpForBeauty::has_passed($iso) {
+    my $epoch = datetime_parse_rfc3339("${iso}Z")
+    $epoch < time
+}
+
+fn Exercism::BookingUpForBeauty::is_afternoon_appointment($iso) {
+    my $epoch = datetime_parse_rfc3339("${iso}Z")
+    my $h = datetime_format_tz($epoch, "UTC", "%H") + 0
+    $h >= 12 && $h < 18
+}
+
+fn Exercism::BookingUpForBeauty::description($iso) {
+    "You have an appointment on " . Exercism::BookingUpForBeauty::schedule($iso) . "."
+}
+
+fn Exercism::BookingUpForBeauty::anniversary_date() {
+    my $year = datetime_format_tz(time, "UTC", "%Y") + 0
+    "$year-09-15"
+}

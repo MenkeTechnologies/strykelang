@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+require "./GradeSchool.stk"
+
+fn fmt { join("|", map { join(",", @$_) } @{$_[0]}) }
+
+my $s = Exercism::GradeSchool::new()
+assert_eq fmt(Exercism::GradeSchool::roster($s)), "", "empty roster"
+
+Exercism::GradeSchool::add($s, "Aimee", 2)
+assert_eq fmt(Exercism::GradeSchool::roster($s, 2)), "Aimee", "single student"
+
+Exercism::GradeSchool::add($s, "Blair", 2)
+Exercism::GradeSchool::add($s, "James", 2)
+Exercism::GradeSchool::add($s, "Paul",  2)
+assert_eq fmt(Exercism::GradeSchool::roster($s, 2)), "Aimee,Blair,James,Paul", "multiple in same grade"
+
+Exercism::GradeSchool::add($s, "Anna",   1)
+Exercism::GradeSchool::add($s, "Barb",   1)
+Exercism::GradeSchool::add($s, "Charlie",1)
+assert_eq fmt(Exercism::GradeSchool::roster($s, 1)), "Anna,Barb,Charlie", "grade 1"
+assert_eq fmt(Exercism::GradeSchool::roster($s)),    "Anna,Barb,Charlie|Aimee,Blair,James,Paul", "full roster"
+
+test_run

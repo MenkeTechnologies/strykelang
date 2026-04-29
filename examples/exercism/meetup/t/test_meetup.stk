@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+require "./Meetup.stk"
+
+assert_eq Exercism::Meetup::meetup("First Monday of March 2013"),  "2013-03-04", "first Monday"
+assert_eq Exercism::Meetup::meetup("First Friday of June 2013"),   "2013-06-07", "first Friday"
+assert_eq Exercism::Meetup::meetup("Second Monday of March 2013"), "2013-03-11", "second Monday"
+assert_eq Exercism::Meetup::meetup("Third Tuesday of December 2013"), "2013-12-17", "third Tuesday"
+assert_eq Exercism::Meetup::meetup("Fourth Sunday of March 2013"), "2013-03-24", "fourth Sunday"
+assert_eq Exercism::Meetup::meetup("Last Monday of March 2013"),   "2013-03-25", "last Monday"
+assert_eq Exercism::Meetup::meetup("Teenth Monday of April 2013"), "2013-04-15", "teenth"
+
+test_run

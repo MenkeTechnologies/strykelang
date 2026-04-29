@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+fn Exercism::Clock::new($h, $m) {
+    my $total = $h * 60 + $m
+    $total = $total % 1440
+    $total += 1440 if $total < 0
+    { hour => int($total / 60), minute => $total % 60 }
+}
+
+fn Exercism::Clock::time($c)        { sprintf("%02d:%02d", $c->{hour}, $c->{minute}) }
+fn Exercism::Clock::add_minutes($c, $n)      { Exercism::Clock::new($c->{hour}, $c->{minute} + $n) }
+fn Exercism::Clock::subtract_minutes($c, $n) { Exercism::Clock::add_minutes($c, -$n) }
+fn Exercism::Clock::equals($a, $b) { $a->{hour} == $b->{hour} && $a->{minute} == $b->{minute} ? 1 : 0 }

@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Skewness
+
+fn Rosetta::Stats::skewness(@data) {
+    my $n = cnt(@data)
+    return 0 if $n < 3
+    
+    my $mu = avg(@data)
+    my $std = sqrt(@data |> map { (_ - $mu) ** 2 } |> avg())
+    
+    return 0 if $std == 0
+    
+    my $m3 = @data |> map { (_ - $mu) ** 3 } |> avg()
+    $m3 / ($std ** 3)
+}
+
+my @data = (2, 4, 6, 3, 1)
+# m2 = 2.96. m3 = 2.016. skewness = 2.016 / (2.96^1.5) approx 0.39587.
+my $skew = Rosetta::Stats::skewness(@data)
+assert_ok abs($skew - 0.39587) < 0.001, "skewness of (2, 4, 6, 3, 1)"
+
+# Symmetric distribution
+my @sym = (1, 2, 3)
+assert_ok abs(Rosetta::Stats::skewness(@sym)) < 1e-10, "skewness of (1, 2, 3) is 0"
+
+test_run

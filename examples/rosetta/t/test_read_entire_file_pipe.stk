@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Read entire file
+
+fn Rosetta::ReadEntireFile::read($path) {
+    slurp($path)
+}
+
+my $tmp_file = "/tmp/stryke_test_read_entire_file.txt"
+my $expected = "Line 1\nLine 2\nLine 3\n"
+
+# Setup
+open my $fh, '>', $tmp_file or die "Could not setup file"
+print $fh $expected
+close $fh
+
+# Read using our function
+my $actual = $tmp_file |> Rosetta::ReadEntireFile::read()
+$actual |> assert_eq($expected, "Slurped content matches")
+
+unlink $tmp_file
+
+test_run

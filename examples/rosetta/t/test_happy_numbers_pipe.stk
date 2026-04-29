@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Happy Numbers (using pipes)
+
+fn Rosetta::HappyNumbers::sum_sq_digits($n) {
+    "$n" |> chars() |> map { _ ** 2 } |> sum()
+}
+
+fn Rosetta::HappyNumbers::is_happy($n) {
+    my %seen
+    my $curr = $n
+    while ($curr != 1 && !$seen{$curr}) {
+        $seen{$curr} = 1
+        $curr = Rosetta::HappyNumbers::sum_sq_digits($curr)
+    }
+    $curr == 1
+}
+
+fn Rosetta::HappyNumbers::solve($count) {
+    my @happy
+    my $n = 1
+    while (len(@happy) < $count) {
+        if (Rosetta::HappyNumbers::is_happy($n)) {
+            push @happy, $n
+        }
+        $n++
+    }
+    @happy
+}
+
+assert_ok Rosetta::HappyNumbers::is_happy(1), "1 is happy"
+assert_ok Rosetta::HappyNumbers::is_happy(7), "7 is happy"
+assert_ok Rosetta::HappyNumbers::is_happy(19), "19 is happy"
+assert_ok !Rosetta::HappyNumbers::is_happy(4), "4 is not happy"
+
+my @first8 = Rosetta::HappyNumbers::solve(8)
+assert_eq join(",", @first8), "1,7,10,13,19,23,28,31", "first 8 happy numbers"
+
+test_run

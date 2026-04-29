@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+require "./WordCount.stk"
+
+fn sig {
+    my $h = _0
+    join(",", map { "$_=$h->{$_}" } sort keys %$h)
+}
+
+assert_eq sig(Exercism::WordCount::count_words("word")),
+    "word=1", "single word"
+assert_eq sig(Exercism::WordCount::count_words("one of each")),
+    "each=1,of=1,one=1", "list of words"
+assert_eq sig(Exercism::WordCount::count_words("one fish two fish red fish blue fish")),
+    "blue=1,fish=4,one=1,red=1,two=1", "multiple occurrences"
+assert_eq sig(Exercism::WordCount::count_words("one,two,three,four,five,six,seven,eight,nine,ten")),
+    "eight=1,five=1,four=1,nine=1,one=1,seven=1,six=1,ten=1,three=1,two=1", "csv-style"
+assert_eq sig(Exercism::WordCount::count_words("car: carpet as java: javascript!!&@\$%^&")),
+    "as=1,car=1,carpet=1,java=1,javascript=1", "with quotation"
+assert_eq sig(Exercism::WordCount::count_words("First: don't laugh. Then: don't cry.")),
+    "cry=1,don't=2,first=1,laugh=1,then=1", "contractions counted as one word"
+test_run

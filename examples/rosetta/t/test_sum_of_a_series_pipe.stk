@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sum of a series (using pipes)
+
+fn Rosetta::Series::sum_reciprocal_squares($n) {
+    ~> 1:$n map { 1 / (_ * _) } |> sum()
+}
+
+my $res = Rosetta::Series::sum_reciprocal_squares(1000)
+# PI^2 / 6 is approx 1.644934
+assert_near $res, 1.6439, 0.001, "Sum of 1/n^2 for n=1..1000"
+
+test_run

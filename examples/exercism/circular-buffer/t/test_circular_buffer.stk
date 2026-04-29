@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+require "./CircularBuffer.stk"
+
+# read empty errors
+my $b = Exercism::CircularBuffer::new(1)
+my $err = eval { Exercism::CircularBuffer::read($b); 0 } || $@
+assert_ok $err =~ /empty/, "empty read errors"
+
+# write & read
+Exercism::CircularBuffer::write($b, 1)
+assert_eq Exercism::CircularBuffer::read($b), 1, "write/read"
+
+# write full errors
+Exercism::CircularBuffer::write($b, 2)
+$err = eval { Exercism::CircularBuffer::write($b, 3); 0 } || $@
+assert_ok $err =~ /full/, "full write errors"
+
+# clear
+Exercism::CircularBuffer::clear($b)
+$err = eval { Exercism::CircularBuffer::read($b); 0 } || $@
+assert_ok $err =~ /empty/, "clear → empty"
+
+# overwrite when full
+my $b2 = Exercism::CircularBuffer::new(2)
+Exercism::CircularBuffer::write($b2, 1)
+Exercism::CircularBuffer::write($b2, 2)
+Exercism::CircularBuffer::overwrite($b2, 3)
+assert_eq Exercism::CircularBuffer::read($b2), 2, "overwrite drops oldest"
+assert_eq Exercism::CircularBuffer::read($b2), 3, "remaining"
+
+test_run

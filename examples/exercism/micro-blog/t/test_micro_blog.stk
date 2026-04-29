@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+require "./MicroBlog.stk"
+
+assert_eq Exercism::MicroBlog::truncate_post("Hi"),                "Hi",       "English short"
+assert_eq Exercism::MicroBlog::truncate_post("Hello there"),       "Hello",    "English long"
+assert_eq Exercism::MicroBlog::truncate_post("brühe"),             "brühe",    "German short"
+assert_eq Exercism::MicroBlog::truncate_post("Bärteppich"),        "Bärte",    "German long"
+assert_eq Exercism::MicroBlog::truncate_post("Добър"),             "Добър",    "Bulgarian short"
+assert_eq Exercism::MicroBlog::truncate_post("Добър ден"),         "Добър",    "Bulgarian long"
+assert_eq Exercism::MicroBlog::truncate_post(""),                  "",         "empty"
+assert_eq Exercism::MicroBlog::truncate_post("世界你好"),           "世界你好", "Chinese short"
+assert_eq Exercism::MicroBlog::truncate_post("こんにちは世界"),      "こんにちは", "Japanese long"
+
+test_run

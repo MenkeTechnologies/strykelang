@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Pangram.stk"
+require "./Pangram.stk"
 
 assert_ok !Exercism::Pangram::is_pangram(""),                                                                "empty sentence"
 assert_ok  Exercism::Pangram::is_pangram("the quick brown fox jumps over the lazy dog"),                     "perfect lower case"

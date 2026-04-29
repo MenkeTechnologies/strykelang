@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+require "./BinarySearchTree.stk"
+
+my $t = Exercism::BinarySearchTree::new()
+Exercism::BinarySearchTree::add($t, 4)
+Exercism::BinarySearchTree::add($t, 2)
+Exercism::BinarySearchTree::add($t, 6)
+Exercism::BinarySearchTree::add($t, 1)
+Exercism::BinarySearchTree::add($t, 3)
+Exercism::BinarySearchTree::add($t, 5)
+Exercism::BinarySearchTree::add($t, 7)
+assert_eq join(",", @{Exercism::BinarySearchTree::sort_tree($t)}), "1,2,3,4,5,6,7", "sorted inorder"
+
+# duplicates go left
+my $t2 = Exercism::BinarySearchTree::new()
+Exercism::BinarySearchTree::add($t2, 5)
+Exercism::BinarySearchTree::add($t2, 5)
+Exercism::BinarySearchTree::add($t2, 5)
+assert_eq join(",", @{Exercism::BinarySearchTree::sort_tree($t2)}), "5,5,5", "duplicates"
+
+test_run

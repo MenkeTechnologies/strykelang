@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primality test - trial division (using pipes)
+
+fn Rosetta::Primality::is_prime($n) {
+    if ($n < 2) { return 0 }
+    if ($n == 2) { return 1 }
+    if ($n % 2 == 0) { return 0 }
+    
+    my $limit = int(sqrt($n))
+    if ($limit < 3) { return 1 }
+    
+    # Check odd numbers from 3 to sqrt(n)
+    my @candidates = (3, 5 .. $limit) # This might not be right syntax for step
+    # Better: generate range and filter
+    3:$limit |> grep { _ % 2 != 0 } |> all { $n % _ != 0 }
+}
+
+assert_ok Rosetta::Primality::is_prime(2), "2 is prime"
+assert_ok Rosetta::Primality::is_prime(3), "3 is prime"
+assert_ok !Rosetta::Primality::is_prime(4), "4 is not prime"
+assert_ok Rosetta::Primality::is_prime(17), "17 is prime"
+assert_ok !Rosetta::Primality::is_prime(25), "25 is not prime"
+assert_ok Rosetta::Primality::is_prime(97), "97 is prime"
+assert_ok !Rosetta::Primality::is_prime(100), "100 is not prime"
+
+test_run

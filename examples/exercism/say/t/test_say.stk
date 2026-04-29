@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+require "./Say.stk"
+
+assert_eq Exercism::Say::say_number(0),       "zero",                  "zero"
+assert_eq Exercism::Say::say_number(1),       "one",                   "one"
+assert_eq Exercism::Say::say_number(14),      "fourteen",              "teen"
+assert_eq Exercism::Say::say_number(20),      "twenty",                "twenty"
+assert_eq Exercism::Say::say_number(22),      "twenty-two",            "twenty-two"
+assert_eq Exercism::Say::say_number(100),     "one hundred",           "hundred"
+assert_eq Exercism::Say::say_number(123),     "one hundred twenty-three", "hundred twenty-three"
+assert_eq Exercism::Say::say_number(1000),    "one thousand",          "thousand"
+assert_eq Exercism::Say::say_number(1234),    "one thousand two hundred thirty-four", "complex thousand"
+assert_eq Exercism::Say::say_number(1000000), "one million",           "million"
+assert_eq Exercism::Say::say_number(1002345), "one million two thousand three hundred forty-five", "complex million"
+assert_eq Exercism::Say::say_number(1000000000), "one billion",        "billion"
+assert_eq Exercism::Say::say_number(987654321123), "nine hundred eighty-seven billion six hundred fifty-four million three hundred twenty-one thousand one hundred twenty-three", "huge"
+
+my $err = eval { Exercism::Say::say_number(-1); 0 } || $@
+assert_ok $err =~ /out of range/, "negative"
+$err = eval { Exercism::Say::say_number(1000000000000); 0 } || $@
+assert_ok $err =~ /out of range/, "too big"
+
+test_run

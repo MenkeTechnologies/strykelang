@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+require "./Triangle.stk"
+
+assert_eq Exercism::Triangle::kind(2, 2, 2),       "equilateral", "all sides equal"
+assert_eq Exercism::Triangle::kind(10, 10, 10),    "equilateral", "all sides equal big"
+assert_eq Exercism::Triangle::kind(0.5, 0.5, 0.5), "equilateral", "all sides equal float"
+assert_eq Exercism::Triangle::kind(3, 4, 4),       "isosceles",   "last two equal"
+assert_eq Exercism::Triangle::kind(4, 3, 4),       "isosceles",   "first and last equal"
+assert_eq Exercism::Triangle::kind(4, 4, 3),       "isosceles",   "first two equal"
+assert_eq Exercism::Triangle::kind(10, 10, 2),     "isosceles",   "isosceles"
+assert_eq Exercism::Triangle::kind(0.5, 0.4, 0.5), "isosceles",   "isosceles float"
+assert_eq Exercism::Triangle::kind(3, 4, 5),       "scalene",     "no equal sides"
+assert_eq Exercism::Triangle::kind(10, 11, 12),    "scalene",     "all sides different"
+assert_eq Exercism::Triangle::kind(5, 4, 2),       "scalene",     "scalene small"
+assert_eq Exercism::Triangle::kind(0.5, 0.4, 0.6), "scalene",     "scalene float"
+
+# Validation
+fn err {
+    eval { Exercism::Triangle::kind($_[0], $_[1], $_[2]); 0 } || $@
+}
+assert_ok err(0, 0, 0)         =~ /TriangleError/, "all zero"
+assert_ok err(3, 4, -5)        =~ /TriangleError/, "negative side"
+assert_ok err(1, 1, 3)         =~ /TriangleError/, "violates triangle inequality"
+assert_ok err(7, 3, 2)         =~ /TriangleError/, "violates inequality 2"
+assert_ok err(1, 1, 2)         =~ /TriangleError/, "degenerate"
+assert_ok err(2, 4, 2)         =~ /TriangleError/, "another degenerate"
+
+test_run

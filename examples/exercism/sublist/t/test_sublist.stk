@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+require "./Sublist.stk"
+
+assert_eq Exercism::Sublist::compare([], []),                         "equal",     "empty equal"
+assert_eq Exercism::Sublist::compare([], [1,2,3]),                    "sublist",   "empty is sublist"
+assert_eq Exercism::Sublist::compare([1,2,3], []),                    "superlist", "non-empty is superlist of empty"
+assert_eq Exercism::Sublist::compare([1,2,3], [1,2,3]),               "equal",     "same elements"
+assert_eq Exercism::Sublist::compare([1,2,3], [1,2,3,4,5]),           "sublist",   "sublist at start"
+assert_eq Exercism::Sublist::compare([3,4,5], [1,2,3,4,5]),           "sublist",   "sublist at end"
+assert_eq Exercism::Sublist::compare([3,4], [1,2,3,4,5]),             "sublist",   "sublist mid"
+assert_eq Exercism::Sublist::compare([1,2,3,4,5], [2,3,4]),           "superlist", "superlist mid"
+assert_eq Exercism::Sublist::compare([1,2,4], [1,2,3,4,5]),           "unequal",   "non-matching"
+assert_eq Exercism::Sublist::compare([1,2,3], [1,2,4]),               "unequal",   "different last"
+
+test_run

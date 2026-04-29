@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Regular expressions
+
+fn Rosetta::Regex::match($str, $re) {
+    $str =~ /$re/
+}
+
+fn Rosetta::Regex::extract($str, $re) {
+    regex_extract($str, $re)
+}
+
+fn Rosetta::Regex::replace($str, $re, $sub) {
+    regex_replace_str($str, $re, $sub)
+}
+
+my $string = "hello 123 world"
+
+$string |> Rosetta::Regex::match('\d+') |> assert_ok("Matches digits")
+$string |> Rosetta::Regex::extract('(\d+)') |> assert_eq("123", "Extracts digits")
+$string |> Rosetta::Regex::replace('\d+', '999') |> assert_eq("hello 999 world", "Replaces digits")
+
+test_run

@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+my @_O = ("zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen")
+my @_T = ("","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety")
+my @_S = ("","thousand","million","billion")
+
+fn Exercism::Say::_u100($n) {
+    return $_O[$n] if $n < 20
+    my $t = $_T[int($n/10)]
+    my $r = $n % 10
+    $r == 0 ? $t : "$t-$_O[$r]"
+}
+
+fn Exercism::Say::_u1000($n) {
+    return Exercism::Say::_u100($n) if $n < 100
+    my $h = $_O[int($n/100)]
+    my $r = $n % 100
+    $r == 0 ? "$h hundred" : "$h hundred " . Exercism::Say::_u100($r)
+}
+
+fn Exercism::Say::say_number($n) {
+    die "input out of range" if $n < 0 || $n > 999_999_999_999
+    return "zero" if $n == 0
+    my @p
+    my $i = 0
+    while ($n > 0) {
+        my $c = $n % 1000
+        if ($c > 0) {
+            my $w = Exercism::Say::_u1000($c)
+            unshift @p, $_S[$i] ? "$w $_S[$i]" : $w
+        }
+        $n = int($n / 1000)
+        $i++
+    }
+    join " ", @p
+}

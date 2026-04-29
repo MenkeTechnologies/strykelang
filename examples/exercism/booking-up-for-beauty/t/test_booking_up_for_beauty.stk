@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+require "./BookingUpForBeauty.stk"
+
+# schedule format
+my $r = Exercism::BookingUpForBeauty::schedule("2019-03-22T13:10:00")
+assert_ok $r =~ /^Fri Mar 22 13:10:00 2019$/, "schedule format: $r"
+
+# has_passed: 2000 vs 2099
+assert_ok  Exercism::BookingUpForBeauty::has_passed("2000-01-01T01:00:00"), "past"
+assert_ok !Exercism::BookingUpForBeauty::has_passed("2099-01-01T01:00:00"), "future"
+
+# afternoon
+assert_ok  Exercism::BookingUpForBeauty::is_afternoon_appointment("2019-04-22T13:10:00"), "afternoon"
+assert_ok !Exercism::BookingUpForBeauty::is_afternoon_appointment("2019-04-22T08:10:00"), "morning"
+assert_ok !Exercism::BookingUpForBeauty::is_afternoon_appointment("2019-04-22T19:10:00"), "evening"
+
+# description
+my $d = Exercism::BookingUpForBeauty::description("2019-03-22T13:10:00")
+assert_ok $d =~ /^You have an appointment on Fri Mar 22 13:10:00 2019\.$/, "description: $d"
+
+# anniversary
+my $a = Exercism::BookingUpForBeauty::anniversary_date()
+assert_ok $a =~ /^\d{4}-09-15$/, "anniversary date format"
+
+test_run

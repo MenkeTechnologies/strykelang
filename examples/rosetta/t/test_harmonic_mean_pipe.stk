@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Averages/Harmonic mean (using pipes)
+
+fn Rosetta::Stats::harmonic_mean(@data) {
+    my $n = len(@data)
+    if ($n == 0) { return 0 }
+    
+    # H = n / (sum of 1/x_i)
+    my $reciprocal_sum = @data |> map { 1 / _ } |> sum()
+    return $n / $reciprocal_sum
+}
+
+my @data = (1, 2, 4)
+# 3 / (1/1 + 1/2 + 1/4) = 3 / (1.75) = 1.7142857...
+assert_near Rosetta::Stats::harmonic_mean(@data), 1.7142857, 0.0001, "Harmonic mean of (1, 2, 4)"
+
+my @range = (1..10)
+# Harmonic mean of 1..10 is approx 3.41417
+assert_near Rosetta::Stats::harmonic_mean(@range), 3.41417, 0.0001, "Harmonic mean of 1..10"
+
+test_run

@@ -93,5 +93,8 @@ fn compat_bigint_equality_with_string() {
 #[test]
 fn compat_bigint_truthiness() {
     assert_eq!(run_compat("my $x = 2 ** 100; print $x ? 1 : 0"), "1");
-    assert_eq!(run_compat("my $x = 0; $x = 2 ** 100 - 2 ** 100; print $x ? 1 : 0"), "0");
+    assert_eq!(
+        run_compat("my $x = 0; $x = 2 ** 100 - 2 ** 100; print $x ? 1 : 0"),
+        "0"
+    );
 }

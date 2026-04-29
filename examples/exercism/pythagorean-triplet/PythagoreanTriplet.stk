@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+fn Exercism::PythagoreanTriplet::is_pythagorean($a, $b, $c) {
+    $a * $a + $b * $b == $c * $c
+}
+
+fn Exercism::PythagoreanTriplet::triplets_in_range($min, $max) {
+    my @out
+    for my $a ($min..$max) {
+        for my $b ($a..$max) {
+            my $c2 = $a * $a + $b * $b
+            my $c = int(sqrt($c2) + 0.5)
+            push @out, [$a, $b, $c] if $c <= $max && $c >= $b && $c * $c == $c2
+        }
+    }
+    \@out
+}
+
+fn Exercism::PythagoreanTriplet::triplets_with_sum($sum) {
+    my @out
+    for my $a (1..int($sum / 3)) {
+        for my $b ($a..int(($sum - $a) / 2)) {
+            my $c = $sum - $a - $b
+            push @out, [$a, $b, $c] if $a * $a + $b * $b == $c * $c
+        }
+    }
+    \@out
+}

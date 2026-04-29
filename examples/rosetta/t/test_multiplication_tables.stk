@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiplication tables
+
+fn Rosetta::Math::multiplication_table($n) {
+    # Generate the header
+    my $header = "   " . (1:$n |> map { sprintf("%4d", _) } |> join(""))
+    
+    # Generate each row
+    my @rows = 1:$n |> map {
+        my $row_num = _
+        my $cells = 1:$n |> map { sprintf("%4d", $row_num * _) } |> join("")
+        sprintf("%2d:", $row_num) . $cells
+    }
+    
+    $header . "\n" . join("\n", @rows)
+}
+
+my $table = Rosetta::Math::multiplication_table(5)
+# p $table
+
+my @lines = $table |> split("\n")
+assert_eq cnt(@lines), 6, "table has 6 lines (header + 5 rows)"
+assert_eq $lines[0] =~ /1   2   3   4   5/, 1, "header row correct"
+assert_eq $lines[1] =~ /1:   1   2   3   4   5/, 1, "row 1 correct"
+assert_eq $lines[5] =~ /5:   5  10  15  20  25/, 1, "row 5 correct"
+
+test_run

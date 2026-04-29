@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String matching
+
+fn Rosetta::StringMatching::starts($str, $sub) {
+    starts_with($str, $sub)
+}
+
+fn Rosetta::StringMatching::ends($str, $sub) {
+    ends_with($str, $sub)
+}
+
+fn Rosetta::StringMatching::contains($str, $sub) {
+    index($str, $sub) >= 0
+}
+
+my $string = "abcd"
+
+$string |> Rosetta::StringMatching::starts("ab") |> assert_ok("Starts with ab")
+$string |> Rosetta::StringMatching::ends("cd") |> assert_ok("Ends with cd")
+$string |> Rosetta::StringMatching::contains("bc") |> assert_ok("Contains bc")
+
+assert_ok(!($string |> Rosetta::StringMatching::starts("cd")), "Does not start with cd")
+assert_ok(!($string |> Rosetta::StringMatching::contains("xy")), "Does not contain xy")
+
+test_run

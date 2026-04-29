@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Armstrong numbers (using pipes)
+
+fn Rosetta::ArmstrongNumbers::is_armstrong($n) {
+    my $len = len("$n")
+    my $sum = "$n" |> split(//) |> map { $_ ** $len } |> sum()
+    $sum == $n
+}
+
+fn Rosetta::ArmstrongNumbers::solve($max) {
+    ~> 1:$max grep { Rosetta::ArmstrongNumbers::is_armstrong($_) }
+}
+
+my @res = Rosetta::ArmstrongNumbers::solve(500)
+
+assert_eq len(@res), 13, "There are 13 Armstrong numbers up to 500"
+assert_eq $res[0], 1, "1 is an Armstrong number"
+assert_eq $res[9], 153, "153 is an Armstrong number"
+assert_eq $res[10], 370, "370 is an Armstrong number"
+assert_eq $res[11], 371, "371 is an Armstrong number"
+assert_eq $res[12], 407, "407 is an Armstrong number"
+
+test_run

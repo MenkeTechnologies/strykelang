@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+require "./RomanNumerals.stk"
+
+assert_eq Exercism::RomanNumerals::to_roman(1),    "I",        "1"
+assert_eq Exercism::RomanNumerals::to_roman(2),    "II",       "2"
+assert_eq Exercism::RomanNumerals::to_roman(3),    "III",      "3"
+assert_eq Exercism::RomanNumerals::to_roman(4),    "IV",       "4"
+assert_eq Exercism::RomanNumerals::to_roman(5),    "V",        "5"
+assert_eq Exercism::RomanNumerals::to_roman(6),    "VI",       "6"
+assert_eq Exercism::RomanNumerals::to_roman(9),    "IX",       "9"
+assert_eq Exercism::RomanNumerals::to_roman(27),   "XXVII",    "27"
+assert_eq Exercism::RomanNumerals::to_roman(48),   "XLVIII",   "48"
+assert_eq Exercism::RomanNumerals::to_roman(59),   "LIX",      "59"
+assert_eq Exercism::RomanNumerals::to_roman(93),   "XCIII",    "93"
+assert_eq Exercism::RomanNumerals::to_roman(141),  "CXLI",     "141"
+assert_eq Exercism::RomanNumerals::to_roman(163),  "CLXIII",   "163"
+assert_eq Exercism::RomanNumerals::to_roman(402),  "CDII",     "402"
+assert_eq Exercism::RomanNumerals::to_roman(575),  "DLXXV",    "575"
+assert_eq Exercism::RomanNumerals::to_roman(911),  "CMXI",     "911"
+assert_eq Exercism::RomanNumerals::to_roman(1024), "MXXIV",    "1024"
+assert_eq Exercism::RomanNumerals::to_roman(3000), "MMM",      "3000"
+
+test_run

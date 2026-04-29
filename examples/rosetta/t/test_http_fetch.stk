@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HTTP
+
+fn Rosetta::HTTP::get($url) {
+    fetch($url)
+}
+
+my $url = "http://httpbin.org/get"
+my $res = Rosetta::HTTP::get($url)
+
+assert_ok defined($res), "fetch returned something"
+assert_ok $res =~ /httpbin\.org/, "response contains expected domain"
+
+# Parallel fetch example
+my @urls = (
+    "http://httpbin.org/get?a=1",
+    "http://httpbin.org/get?b=2",
+    "http://httpbin.org/get?c=3"
+)
+
+# Use fetch_async to get tasks, then await them
+my @tasks = map { fetch_async(_) } @urls
+my @results = map { await _ } @tasks
+
+assert_eq cnt(@results), 3, "parallel fetch got 3 results"
+assert_ok $results[0] =~ /"a": "1"/, "result 0 has a=1"
+assert_ok $results[1] =~ /"b": "2"/, "result 1 has b=2"
+assert_ok $results[2] =~ /"c": "3"/, "result 2 has c=3"
+
+test_run

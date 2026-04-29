@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Write entire file
+
+fn Rosetta::WriteEntireFile::write($content, $path) {
+    spurt($path, $content)
+}
+
+my $tmp_file = "/tmp/stryke_test_write_entire_file.txt"
+my $content = "Hello, Rosetta Code!\nThis is the entire file.\n"
+
+# Write the content
+$content |> Rosetta::WriteEntireFile::write($tmp_file)
+
+# Verify
+my $read_back = slurp($tmp_file)
+$read_back |> assert_eq($content, "File content matches")
+
+unlink $tmp_file
+
+test_run

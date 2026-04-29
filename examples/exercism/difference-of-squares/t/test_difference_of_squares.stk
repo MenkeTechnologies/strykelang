@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/DifferenceOfSquares.stk"
+require "./DifferenceOfSquares.stk"
 
 assert_eq Exercism::DifferenceOfSquares::square_of_sum(1),          1,        "square of sum 1"
 assert_eq Exercism::DifferenceOfSquares::square_of_sum(5),          225,      "square of sum 5"

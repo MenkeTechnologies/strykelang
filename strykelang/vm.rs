@@ -2921,6 +2921,34 @@ impl<'a> VM<'a> {
                     Op::GetArrayElem(idx) => {
                         let index = self.pop().to_int();
                         let n = names[*idx as usize].as_str();
+                        // Stryke (non-compat) sugar: `$s[i]` indexes by
+                        // Unicode char when `@s` is missing or empty but
+                        // `$s` is a non-empty string. NB: `$_[0]` keeps
+                        // Perl's `@_`-access semantics because `@_` is
+                        // populated inside any sub; the bareword `_[0]`
+                        // parses to the same AST so it behaves identically.
+                        // Use `substr(_, 0, 1)` for char-of-topic inside
+                        // a sub. Compat mode = Perl semantics.
+                        if !crate::compat_mode() && self.interp.scope.scalar_binding_exists(n) {
+                            let prefer_scalar = self.interp.scope.get_array(n).is_empty();
+                            if prefer_scalar {
+                                let s = self.interp.scope.get_scalar(n).to_string();
+                                if !s.is_empty() {
+                                    let cnt = s.chars().count() as i64;
+                                    let i = if index < 0 { index + cnt } else { index };
+                                    let v = if i >= 0 && i < cnt {
+                                        s.chars()
+                                            .nth(i as usize)
+                                            .map(|c| PerlValue::string(c.to_string()))
+                                            .unwrap_or(PerlValue::UNDEF)
+                                    } else {
+                                        PerlValue::UNDEF
+                                    };
+                                    self.push(v);
+                                    return Ok(());
+                                }
+                            }
+                        }
                         let val = self.interp.scope.get_array_element(n, index);
                         self.push(val);
                         Ok(())
@@ -3656,6 +3684,11 @@ impl<'a> VM<'a> {
                                     && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
                                 Ok(PerlValue::integer(if eq { 1 } else { 0 }))
                             } else {
+                                if !crate::compat_mode() && both_non_numeric_strings(a, b) {
+                                    let sa = a.to_string();
+                                    let sb = b.to_string();
+                                    return Ok(PerlValue::integer(if sa == sb { 1 } else { 0 }));
+                                }
                                 Ok(int_cmp(a, b, |x, y| x == y, |x, y| x == y))
                             }
                         })
@@ -3664,6 +3697,16 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::NumNe, a, b, |a, b| {
+                            // Stryke (non-compat) sugar: when both operands are
+                            // non-numeric strings, fall back to `ne`. In Perl,
+                            // `"G" != "T"` is `0 != 0` = false; in stryke we
+                            // want char/string compare. Compat mode keeps
+                            // Perl semantics.
+                            if !crate::compat_mode() && both_non_numeric_strings(a, b) {
+                                let sa = a.to_string();
+                                let sb = b.to_string();
+                                return Ok(PerlValue::integer(if sa != sb { 1 } else { 0 }));
+                            }
                             Ok(int_cmp(a, b, |x, y| x != y, |x, y| x != y))
                         })
                     }
@@ -4926,6 +4969,49 @@ impl<'a> VM<'a> {
                         let line = self.line();
                         let name = names[*arr_idx as usize].as_str();
                         let arr_len = self.interp.scope.array_len(name) as i64;
+                        // Stryke string-slice sugar: when `@name` is empty
+                        // (or doesn't exist) but `$name` is a non-empty
+                        // string, treat `$name[from:to:step]` as Python-style
+                        // substring slice. Returns a *string*, not an array.
+                        if !crate::compat_mode()
+                            && arr_len == 0
+                            && self.interp.scope.scalar_binding_exists(name)
+                        {
+                            let s = self.interp.scope.get_scalar(name).to_string();
+                            if !s.is_empty() {
+                                let chars: Vec<char> = s.chars().collect();
+                                let n = chars.len() as i64;
+                                let mut from_i = from.to_int();
+                                let mut to_i = to.to_int();
+                                let step_i = if step.is_undef() { 1 } else { step.to_int() };
+                                if from_i < 0 {
+                                    from_i += n
+                                }
+                                if to_i < 0 {
+                                    to_i += n
+                                }
+                                let mut out = String::new();
+                                if step_i > 0 {
+                                    let mut i = from_i;
+                                    while i <= to_i && i < n {
+                                        if i >= 0 {
+                                            out.push(chars[i as usize]);
+                                        }
+                                        i += step_i;
+                                    }
+                                } else if step_i < 0 {
+                                    let mut i = from_i;
+                                    while i >= to_i && i >= 0 {
+                                        if i < n {
+                                            out.push(chars[i as usize]);
+                                        }
+                                        i += step_i;
+                                    }
+                                }
+                                self.push(PerlValue::string(out));
+                                return Ok(());
+                            }
+                        }
                         let indices = match crate::value::compute_array_slice_indices(
                             arr_len, &from, &to, &step,
                         ) {
@@ -9424,6 +9510,29 @@ impl<'a> VM<'a> {
 
 /// Integer fast-path comparison helper.
 #[inline]
+/// True when both values are non-numeric strings — used by `==` / `!=` in
+/// stryke non-compat mode to decide whether to fall back to string compare.
+/// "Numeric string" matches `looks_like_number` semantics (digits, optional
+/// sign, optional decimal/exponent). Non-string values (refs, undef) are
+/// excluded so `==` on objects keeps its overload-driven behavior.
+fn both_non_numeric_strings(a: &PerlValue, b: &PerlValue) -> bool {
+    if !a.is_string_like() || !b.is_string_like() {
+        return false;
+    }
+    let sa = a.to_string();
+    let sb = b.to_string();
+    !looks_numeric(&sa) && !looks_numeric(&sb)
+}
+
+#[inline]
+fn looks_numeric(s: &str) -> bool {
+    let t = s.trim();
+    if t.is_empty() {
+        return false;
+    }
+    t.parse::<f64>().is_ok()
+}
+
 fn int_cmp(
     a: &PerlValue,
     b: &PerlValue,

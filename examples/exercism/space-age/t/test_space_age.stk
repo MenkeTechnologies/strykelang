@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+require "./SpaceAge.stk"
+
+assert_eq Exercism::SpaceAge::on_planet("earth",   1000000000), 31.69, "earth"
+assert_eq Exercism::SpaceAge::on_planet("mercury", 2134835688), 280.88, "mercury"
+assert_eq Exercism::SpaceAge::on_planet("venus",   189839836),  9.78,  "venus"
+assert_eq Exercism::SpaceAge::on_planet("mars",    2329871239), 39.25, "mars"
+assert_eq Exercism::SpaceAge::on_planet("jupiter", 901876382),  2.41,  "jupiter"
+assert_eq Exercism::SpaceAge::on_planet("saturn",  3000000000), 3.23,  "saturn"
+assert_eq Exercism::SpaceAge::on_planet("uranus",  3210123456), 1.21,  "uranus"
+assert_eq Exercism::SpaceAge::on_planet("neptune", 8210123456), 1.58,  "neptune"
+
+test_run

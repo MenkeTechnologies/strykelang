@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pangram (using pipes)
+
+fn Rosetta::Pangram::is_pangram($text) {
+    my $len = $text |> lc() |> chars() |> grep { _ =~ /[a-z]/ } |> uniq() |> len()
+    $len == 26
+}
+
+assert_ok Rosetta::Pangram::is_pangram("The quick brown fox jumps over the lazy dog"), "Standard pangram"
+assert_ok Rosetta::Pangram::is_pangram("Pack my box with five dozen liquor jugs"), "Another pangram"
+assert_ok !Rosetta::Pangram::is_pangram("Hello World"), "Not a pangram"
+
+test_run

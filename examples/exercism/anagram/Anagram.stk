@@ -1,0 +1,6 @@
+#!/usr/bin/env stryke
+fn Exercism::Anagram::match_anagrams($target, $cands) {
+    my $lc = lc $target
+    my $sig = ~> $lc chars sort |> join ""
+    [grep { lc($_) ne $lc && (~> $_ lc chars sort |> join "") eq $sig } @$cands]
+}

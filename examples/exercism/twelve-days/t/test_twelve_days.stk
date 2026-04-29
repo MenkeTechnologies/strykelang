@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+require "./TwelveDays.stk"
+
+assert_eq Exercism::TwelveDays::verse(1),
+    "On the first day of Christmas my true love gave to me: a Partridge in a Pear Tree.",
+    "first day"
+
+assert_eq Exercism::TwelveDays::verse(2),
+    "On the second day of Christmas my true love gave to me: two Turtle Doves, and a Partridge in a Pear Tree.",
+    "second day"
+
+assert_eq Exercism::TwelveDays::verse(3),
+    "On the third day of Christmas my true love gave to me: three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.",
+    "third day"
+
+assert_eq Exercism::TwelveDays::verse(12),
+    "On the twelfth day of Christmas my true love gave to me: twelve Drummers Drumming, eleven Pipers Piping, ten Lords-a-Leaping, nine Ladies Dancing, eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.",
+    "twelfth day"
+
+# verses range
+my $v = Exercism::TwelveDays::verses(1, 2)
+assert_ok $v =~ /^On the first day/m, "verses includes first"
+assert_ok $v =~ /^On the second day/m, "verses includes second"
+
+test_run

@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/Leap.stk"
+require "./Leap.stk"
 
 assert_ok !Exercism::Leap::is_leap_year(2015), "year not divisible by 4 in common year"
 assert_ok !Exercism::Leap::is_leap_year(1970), "year divisible by 2, not divisible by 4"

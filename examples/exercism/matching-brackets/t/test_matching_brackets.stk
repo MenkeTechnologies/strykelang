@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+require "./MatchingBrackets.stk"
+
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets(""),                       "empty"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("{}"),                     "simple"
+assert_ok !Exercism::MatchingBrackets::has_matching_brackets("{"),                      "unclosed"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("[](){}"),                 "sequential"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("([{}])"),                 "nested"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("(({[]}))"),               "deeply nested"
+assert_ok !Exercism::MatchingBrackets::has_matching_brackets("([)]"),                   "interleaved"
+assert_ok !Exercism::MatchingBrackets::has_matching_brackets("[)"),                     "wrong close"
+assert_ok !Exercism::MatchingBrackets::has_matching_brackets("[("),                     "missing close"
+assert_ok !Exercism::MatchingBrackets::has_matching_brackets("}{"),                     "wrong order"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("\\left(\\dfrac{2}{3}\\right)"), "with extra chars"
+assert_ok  Exercism::MatchingBrackets::has_matching_brackets("(((185 + 223.85) * 15) - 543)/2"), "math expr"
+
+test_run
