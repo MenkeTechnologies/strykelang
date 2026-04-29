@@ -2713,8 +2713,14 @@ fn regex_quotemeta_span_treats_metachar_as_literal() {
 }
 
 #[test]
-fn split_slash_slash_includes_empty_fields_around_chars() {
-    assert_eq!(eval_string(r#"join "-", split //, "ab""#), "-a-b-");
+fn split_slash_slash_splits_into_chars_no_boundary_empties() {
+    // Perl: `split //, "ab"` → ("a","b") — no leading or trailing empty fields
+    // when LIMIT is omitted/zero. The old impl emitted `-a-b-`; the canonical
+    // Perl 5 result is `a-b`. See `vm.rs::Op::Split`.
+    assert_eq!(eval_string(r#"join "-", split //, "ab""#), "a-b");
+    // With LIMIT < 0, Perl preserves the trailing empty (the end-of-string
+    // match position). No leading empty is ever emitted for `split //`.
+    assert_eq!(eval_string(r#"join "-", split //, "ab", -1"#), "a-b-");
 }
 
 #[test]
@@ -3027,7 +3033,10 @@ fn sprintf_alternate_form_octal_and_hex_snapshot() {
 
 #[test]
 fn split_slash_s_plus_splits_on_whitespace_runs() {
-    assert_eq!(eval_string(r#"join "-", split /\s+/, "  a b ""#), "-a-b-");
+    // Perl 5: `split /\s+/, "  a b "` → ("","a","b") — leading empty kept (the
+    // whitespace at index 0 produces a real empty field) but trailing empties
+    // are stripped when LIMIT is omitted. So `join "-"` is `-a-b`.
+    assert_eq!(eval_string(r#"join "-", split /\s+/, "  a b ""#), "-a-b");
 }
 
 #[test]

@@ -269,13 +269,48 @@ fn log_one_and_exp_zero() {
 
 #[test]
 fn split_empty_pattern_splits_characters() {
-    // Leading empty field matches Perl-style `split //` on non-empty strings.
-    assert_eq!(eval_string(r#"join("|", split //, "xy")"#), "|x|y|");
+    // Perl 5: `split //, "xy"` → ("x","y") — no leading or trailing empties
+    // when LIMIT is omitted/zero. (Previously stryke emitted `|x|y|` from the
+    // raw regex engine; we now match Perl exactly. See `vm.rs::Op::Split`.)
+    assert_eq!(eval_string(r#"join("|", split //, "xy")"#), "x|y");
+    // LIMIT < 0 preserves the end-of-string match as a trailing empty.
+    assert_eq!(
+        eval_string(r#"join("|", split //, "xy", -1)"#),
+        "x|y|"
+    );
+    // Empty input → empty list.
+    assert_eq!(eval_string(r#"scalar(split //, "")"#), "0");
 }
 
 #[test]
 fn split_limit_one_returns_whole_string() {
     assert_eq!(eval_string(r#"join("-", split(",", "a,b,c", 1))"#), "a,b,c");
+}
+
+#[test]
+fn split_negative_limit_keeps_trailing_empties() {
+    // LIMIT < 0 ⇒ no truncation, trailing empties preserved (Perl 5).
+    assert_eq!(
+        eval_string(r#"join("|", split(/,/, "a,b,,", -1))"#),
+        "a|b||"
+    );
+    // Default / 0 ⇒ trailing empties stripped.
+    assert_eq!(eval_string(r#"join("|", split(/,/, "a,b,,"))"#), "a|b");
+}
+
+#[test]
+fn list_repetition_replicates_a_paren_list() {
+    // `(EXPR) x N` is list repetition (Perl). `EXPR x N` (no parens) is scalar
+    // string repetition. The parser distinguishes via paren-close position; see
+    // `parser.rs` `Token::X` and `compiler.rs` `ExprKind::Repeat`.
+    assert_eq!(eval_string(r#"join(",", (0) x 5)"#), "0,0,0,0,0");
+    assert_eq!(eval_string(r#"join(",", (0, 1) x 3)"#), "0,1,0,1,0,1");
+    assert_eq!(eval_string(r#"scalar(() x 5)"#), "0"); // empty list
+    assert_eq!(eval_string(r#"join(",", (1, 2, 3) x 1)"#), "1,2,3");
+    // Scalar string repetition unchanged — no parens, no list-repeat.
+    assert_eq!(eval_string(r#""ab" x 3"#), "ababab");
+    // qw(...) is intrinsically a list constructor, no extra parens needed.
+    assert_eq!(eval_string(r#"join(",", qw(a b c) x 2)"#), "a,b,c,a,b,c");
 }
 
 #[test]

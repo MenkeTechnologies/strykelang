@@ -129,6 +129,14 @@ pub struct Parser {
     /// When true, we're parsing a module (via `use`/`require`), not user code.
     /// Modules are allowed to shadow builtins; user code is not (unless `--compat`).
     pub parsing_module: bool,
+    /// `self.pos` immediately after consuming a paren-list close (`(EXPR)`,
+    /// `(EXPR, …)`, `()`) or `qw(…)` in `parse_primary`. The `x` operator
+    /// reads this at parse time to distinguish `(LIST) x N` (list repetition)
+    /// from `EXPR x N` (scalar string repetition). The compare is exact: any
+    /// postfix consumption (`->method()`, `[idx]`, …) advances `self.pos`
+    /// past this checkpoint, so list-repeat fires only when `x` is the very
+    /// next token after the closing paren.
+    list_construct_close_pos: Option<usize>,
 }
 
 impl Parser {
@@ -154,6 +162,7 @@ impl Parser {
             suppress_colon_range: 0,
             thread_last_mode: false,
             parsing_module: false,
+            list_construct_close_pos: None,
         }
     }
 
@@ -6936,12 +6945,20 @@ impl Parser {
                 Token::Percent if self.peek_line() == self.prev_line() => BinOp::Mod,
                 Token::X => {
                     let line = left.line;
+                    // List-repeat fires when the LHS was just closed by a
+                    // list-constructor paren (`(EXPR)`, `(LIST)`, `()`) or
+                    // `qw(...)`. `parse_primary` records the post-close
+                    // position; an exact match against `self.pos` here means
+                    // no postfix consumed any tokens between the close and
+                    // the `x`, so the LHS is intrinsically a list construct.
+                    let list_repeat = self.list_construct_close_pos == Some(self.pos);
                     self.advance();
                     let right = self.parse_regex_bind()?;
                     left = Expr {
                         kind: ExprKind::Repeat {
                             expr: Box::new(left),
                             count: Box::new(right),
+                            list_repeat,
                         },
                         line,
                     };
@@ -7946,6 +7963,9 @@ impl Parser {
             }
             Token::QW(words) => {
                 self.advance();
+                // `qw(a b c) x N` is list-repeat in Perl even without explicit
+                // outer parens — `qw(...)` is itself a list constructor.
+                self.list_construct_close_pos = Some(self.pos);
                 Ok(Expr {
                     kind: ExprKind::QW(words),
                     line,
@@ -8164,6 +8184,9 @@ impl Parser {
                 self.advance();
                 if matches!(self.peek(), Token::RParen) {
                     self.advance();
+                    // Empty `() x 3` is a no-op list repeat — record the close
+                    // position so `Token::X` knows the LHS was a list literal.
+                    self.list_construct_close_pos = Some(self.pos);
                     return Ok(Expr {
                         kind: ExprKind::List(vec![]),
                         line,
@@ -8177,6 +8200,11 @@ impl Parser {
                 self.no_pipe_forward_depth = saved_no_pipe;
                 let expr = expr?;
                 self.expect(&Token::RParen)?;
+                // Mark this paren as a list-constructor for the `x` operator
+                // (parse_multiplication compares `self.pos` at the X token to
+                // this checkpoint). Function-call parens (`f(args)`) don't
+                // reach this branch; they're parsed by the call machinery.
+                self.list_construct_close_pos = Some(self.pos);
                 Ok(expr)
             }
             Token::LBracket => {

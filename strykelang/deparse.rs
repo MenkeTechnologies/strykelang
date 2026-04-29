@@ -945,8 +945,22 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             deparse_expr_into(buf, else_expr);
             buf.push(')');
         }
-        ExprKind::Repeat { expr, count } => {
+        ExprKind::Repeat {
+            expr,
+            count,
+            list_repeat,
+        } => {
+            // List-repeat needs to round-trip the parens that triggered it;
+            // otherwise the deparsed source would re-parse as scalar repeat.
+            let need_parens = *list_repeat
+                && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_));
+            if need_parens {
+                buf.push('(');
+            }
             deparse_expr_into(buf, expr);
+            if need_parens {
+                buf.push(')');
+            }
             buf.push_str(" x ");
             deparse_expr_into(buf, count);
         }
