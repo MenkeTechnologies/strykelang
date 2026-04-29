@@ -5,9 +5,17 @@
 //!
 //! Cache location: `~/.cache/stryke/scripts.db`
 //!
-//! Invalidation: mtime mismatch → recompile, update cache.
+//! Invalidation:
+//!   - source mtime mismatch → recompile, update cache
+//!   - stryke version mismatch → cache miss
+//!   - pointer width mismatch → cache miss
+//!   - cache entry older than the running stryke binary's mtime → cache miss
+//!     (any rebuild of stryke invalidates every cached script — guards
+//!      against stale bytecode after compiler/parser/VM changes that don't
+//!      bump CARGO_PKG_VERSION).
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::SystemTime;
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -133,12 +141,14 @@ impl ScriptCache {
         Ok(())
     }
 
-    /// Check cache for a script. Returns cached bundle if mtime matches.
+    /// Check cache for a script. Returns cached bundle if mtime matches AND the
+    /// cache entry is not older than the current stryke binary (so a recompile
+    /// of stryke invalidates every cached script automatically).
     pub fn get(&self, path: &str, mtime_secs: i64, mtime_nsecs: i64) -> Option<CachedScript> {
-        let (program_blob, chunk_blob, version, ptr_width) = self
+        let (program_blob, chunk_blob, version, ptr_width, cached_at) = self
             .conn
             .query_row(
-                "SELECT program_blob, chunk_blob, stryke_version, pointer_width
+                "SELECT program_blob, chunk_blob, stryke_version, pointer_width, cached_at
                  FROM scripts
                  WHERE path = ?1 AND mtime_secs = ?2 AND mtime_nsecs = ?3",
                 params![path, mtime_secs, mtime_nsecs],
@@ -148,6 +158,7 @@ impl ScriptCache {
                         row.get::<_, Vec<u8>>(1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
                     ))
                 },
             )
@@ -160,6 +171,14 @@ impl ScriptCache {
         }
         if ptr_width != std::mem::size_of::<usize>() as i64 {
             return None;
+        }
+        // Bytecode predates the running stryke binary → recompile. Catches
+        // edits to compiler.rs / parser.rs / vm.rs that don't bump the
+        // version string.
+        if let Some(bin_mtime) = current_binary_mtime_secs() {
+            if cached_at < bin_mtime {
+                return None;
+            }
         }
 
         let program_decompressed = zstd::stream::decode_all(&program_blob[..]).ok()?;
@@ -311,6 +330,18 @@ pub fn file_mtime(path: &Path) -> Option<(i64, i64)> {
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(path).ok()?;
     Some((meta.mtime(), meta.mtime_nsec()))
+}
+
+/// Mtime of the currently-running stryke binary, in unix epoch seconds.
+/// Cached for the lifetime of the process — `current_exe()` does a syscall
+/// per call and the binary doesn't move out from under us.
+fn current_binary_mtime_secs() -> Option<i64> {
+    static BIN_MTIME: OnceLock<Option<i64>> = OnceLock::new();
+    *BIN_MTIME.get_or_init(|| {
+        let exe = std::env::current_exe().ok()?;
+        let (secs, _) = file_mtime(&exe)?;
+        Some(secs)
+    })
 }
 
 /// Default path for the script cache db.

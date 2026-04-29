@@ -1497,6 +1497,14 @@ pub(crate) fn try_builtin(
         "chroot" => Some(builtin_chroot(args, line)),
         "pack" => Some(crate::pack::perl_pack(args, line)),
         "unpack" => Some(crate::pack::perl_unpack(args, line)),
+        // `unpack_first(FMT, STR)` is the stryke spelling of Perl's
+        // `scalar unpack(FMT, STR)` — returns the first decoded element.
+        // Useful under `--no-interop` where `scalar` is rejected.
+        "unpack_first" | "unpack1" | "up1" => Some(crate::pack::perl_unpack(args, line).map(|v| {
+            v.as_array_vec()
+                .and_then(|items| items.into_iter().next())
+                .unwrap_or(PerlValue::UNDEF)
+        })),
         "vec" => Some(builtin_vec(args, line)),
         "dump" => Some(builtin_dump()),
         "reset" => Some(Ok(PerlValue::integer(1))),

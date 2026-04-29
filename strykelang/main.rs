@@ -4458,4 +4458,3 @@ mod cli_argv_tests {
         assert_eq!(b, args(&["stryke", "~> 1 p"]));
     }
 }
-

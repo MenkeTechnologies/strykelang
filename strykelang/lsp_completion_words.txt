@@ -3140,7 +3140,10 @@ spider
 spinner
 spinner_start
 spinner_stop
+spl_last
 splice
+splice1
+splice_last
 spline
 split
 split_at
@@ -3489,6 +3492,8 @@ unlz4
 unlzma
 unlzw
 unpack
+unpack1
+unpack_first
 unquote
 unshift
 unsnappy
@@ -3502,6 +3507,7 @@ unxz
 unzip
 unzip_archive
 unzip_pairs
+up1
 upcase_each
 upda
 update_at

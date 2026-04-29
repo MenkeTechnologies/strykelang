@@ -1145,6 +1145,65 @@ impl Parser {
         )
     }
 
+    /// Token classes whose precedence sits below a Perl-style named unary
+    /// operator. When one of these is the next token after a unary keyword
+    /// (`length`, `len`, `cnt`, …), the keyword takes no explicit argument
+    /// and the surrounding expression continues. Mirrors the `parse_one_arg_or_default`
+    /// boundary set; kept as a separate predicate so other parse paths can
+    /// reuse it without committing to default-to-`$_` semantics.
+    fn peek_is_named_unary_terminator(&self) -> bool {
+        matches!(
+            self.peek(),
+            Token::Semicolon
+                | Token::RBrace
+                | Token::RParen
+                | Token::RBracket
+                | Token::Eof
+                | Token::Comma
+                | Token::FatArrow
+                | Token::PipeForward
+                | Token::Question
+                | Token::Colon
+                | Token::NumEq
+                | Token::NumNe
+                | Token::NumLt
+                | Token::NumGt
+                | Token::NumLe
+                | Token::NumGe
+                | Token::Spaceship
+                | Token::StrEq
+                | Token::StrNe
+                | Token::StrLt
+                | Token::StrGt
+                | Token::StrLe
+                | Token::StrGe
+                | Token::StrCmp
+                | Token::LogAnd
+                | Token::LogOr
+                | Token::LogAndWord
+                | Token::LogOrWord
+                | Token::DefinedOr
+                | Token::Range
+                | Token::RangeExclusive
+                | Token::Assign
+                | Token::PlusAssign
+                | Token::MinusAssign
+                | Token::MulAssign
+                | Token::DivAssign
+                | Token::ModAssign
+                | Token::PowAssign
+                | Token::DotAssign
+                | Token::AndAssign
+                | Token::OrAssign
+                | Token::XorAssign
+                | Token::DefinedOrAssign
+                | Token::ShiftLeftAssign
+                | Token::ShiftRightAssign
+                | Token::BitAndAssign
+                | Token::BitOrAssign
+        )
+    }
+
     fn maybe_postfix_modifier(&mut self, expr: Expr) -> PerlResult<Statement> {
         let line = expr.line;
         // Implicit semicolon: modifier keyword on a new line starts a new statement.
@@ -1559,6 +1618,9 @@ impl Parser {
                 | "sockets"
                 | "sort"
                 | "splice"
+                | "splice_last"
+                | "splice1"
+                | "spl_last"
                 | "split"
                 | "sprintf"
                 | "sqrt"
@@ -9102,6 +9164,40 @@ impl Parser {
                     line,
                 })
             }
+            // `splice_last(@a, off[, n])` is the stryke spelling of Perl's
+            // `scalar splice(@a, off, n)` — returns the LAST removed element
+            // (or undef if nothing was removed). Desugars to `tail(splice(...))`
+            // so the array is still mutated in place.
+            "splice_last" | "splice1" | "spl_last" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
+                let args = self.parse_builtin_args()?;
+                let mut iter = args.into_iter();
+                let array = Box::new(
+                    iter.next()
+                        .ok_or_else(|| self.syntax_err("splice_last requires arguments", line))?,
+                );
+                let offset = iter.next().map(Box::new);
+                let length = iter.next().map(Box::new);
+                let replacement: Vec<Expr> = iter.collect();
+                let splice_expr = Expr {
+                    kind: ExprKind::Splice {
+                        array,
+                        offset,
+                        length,
+                        replacement,
+                    },
+                    line,
+                };
+                Ok(Expr {
+                    kind: ExprKind::FuncCall {
+                        name: "tail".to_string(),
+                        args: vec![splice_expr],
+                    },
+                    line,
+                })
+            }
             "delete" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
@@ -10496,17 +10592,40 @@ impl Parser {
                         line,
                     });
                 }
-                let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
-                if progress.is_some() {
-                    return Err(self.syntax_err(
-                        "`progress =>` is not supported for list_count / list_size / count / cnt",
-                        line,
-                    ));
-                }
+                // `len(EXPR)` / `cnt(EXPR)` / `count(EXPR)` with a tight `(` —
+                // the parens are function-call syntax, not a parenthesized
+                // list: stop the argument at `)` so `len(@a) % 2 == 1` is
+                // `(len(@a)) % 2 == 1`, not `len(@a % 2 == 1)`. Empty parens
+                // `len()` collapse to a zero-arg call (use the piped operand
+                // or `$_`). Bare `len` followed by a low-precedence operator
+                // (`==`, `&&`, `?`, …) also defaults to a zero-arg call so
+                // `{ len == 0 }` works as a block predicate on the topic.
+                let args = if matches!(self.peek(), Token::LParen) {
+                    self.advance();
+                    if matches!(self.peek(), Token::RParen) {
+                        self.advance();
+                        Vec::new()
+                    } else {
+                        let inner = self.parse_expression()?;
+                        self.expect(&Token::RParen)?;
+                        vec![inner]
+                    }
+                } else if self.peek_is_named_unary_terminator() {
+                    Vec::new()
+                } else {
+                    let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                    if progress.is_some() {
+                        return Err(self.syntax_err(
+                            "`progress =>` is not supported for list_count / list_size / count / cnt",
+                            line,
+                        ));
+                    }
+                    vec![list]
+                };
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
                         name: name.clone(),
-                        args: vec![list],
+                        args,
                     },
                     line,
                 })
@@ -12095,7 +12214,9 @@ impl Parser {
             // ── array / list ────────────────────────────────────────────
             "map" | "grep" | "sort" | "reverse" | "join" | "split"
             | "push" | "pop" | "shift" | "unshift" | "splice"
+            | "splice_last" | "splice1" | "spl_last"
             | "pack" | "unpack"
+            | "unpack_first" | "unpack1" | "up1"
             // ── hash ────────────────────────────────────────────────────
             | "keys" | "values" | "each"
             // ── string ──────────────────────────────────────────────────

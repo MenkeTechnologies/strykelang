@@ -95,7 +95,7 @@ parse_batch2! {
     parse_batch2_083 => "$h{key};";
     parse_batch2_084 => "keys %h;";
     parse_batch2_085 => "values %h;";
-    parse_batch2_086 => "scalar @a;";
+    parse_batch2_086 => "len @a;";
     parse_batch2_087 => "scalar %h;";
     parse_batch2_088 => "defined $x;";
     parse_batch2_089 => "wantarray;";

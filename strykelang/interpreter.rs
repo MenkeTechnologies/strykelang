@@ -14013,10 +14013,7 @@ impl Interpreter {
     /// Evaluate `inner` and return an array ref, auto-vivifying when the result is undef
     /// and `inner` denotes a writable lvalue (scalar var, hash element, array element).
     /// Mirrors Perl 5: `push @{$h{k}}, $x` creates `$h{k}` as an arrayref on demand.
-    fn eval_or_autoviv_array_ref(
-        &mut self,
-        inner: &Expr,
-    ) -> Result<PerlValue, FlowOrError> {
+    fn eval_or_autoviv_array_ref(&mut self, inner: &Expr) -> Result<PerlValue, FlowOrError> {
         let line = inner.line;
         let val = self.eval_expr(inner)?;
         if !val.is_undef() {
