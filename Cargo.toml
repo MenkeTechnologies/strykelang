@@ -136,6 +136,7 @@ jaq-core = "3"
 jaq-json = { version = "2", features = ["serde"] }
 jaq-std = "3"
 num-traits = "0.2"
+num-bigint = "0.4"
 inferno = { version = "0.12", default-features = false }
 lsp-server = "0.7.9"
 lsp-types = "0.97.0"

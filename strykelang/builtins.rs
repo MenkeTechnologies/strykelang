@@ -788,6 +788,9 @@ pub(crate) fn try_builtin(
         "assert_near" | "anear" => Some(builtin_assert_near(args, line)),
         "assert_dies" | "adies" => Some(builtin_assert_dies(interp, args, line)),
         "test_run" | "run_tests" => Some(builtin_test_run(interp, args, line)),
+        "test_skip" | "skip_test" | "skip_assert" => {
+            Some(builtin_test_skip(interp, args, line))
+        }
         // ── Git builtins (libgit2, no fork) ──
         "git_log" | "glog" => Some(builtin_git_log(interp, args, line)),
         "git_diff" | "gdiff" => Some(builtin_git_diff(interp, args, line)),
@@ -9659,6 +9662,7 @@ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
 static TEST_PASS: AtomicUsize = AtomicUsize::new(0);
 static TEST_FAIL: AtomicUsize = AtomicUsize::new(0);
+static TEST_SKIP: AtomicUsize = AtomicUsize::new(0);
 
 fn test_pass(msg: &str) {
     TEST_PASS.fetch_add(1, AtomicOrdering::Relaxed);
@@ -9668,6 +9672,11 @@ fn test_pass(msg: &str) {
 fn test_fail(msg: &str, detail: &str) {
     TEST_FAIL.fetch_add(1, AtomicOrdering::Relaxed);
     eprintln!("  \x1b[31m✗\x1b[0m {} — {}", msg, detail);
+}
+
+fn test_skip(msg: &str) {
+    TEST_SKIP.fetch_add(1, AtomicOrdering::Relaxed);
+    eprintln!("  \x1b[33m↷\x1b[0m skipped: {}", msg);
 }
 
 fn assert_label(_interp: &Interpreter, args: &[PerlValue], default: &str) -> String {
@@ -9935,20 +9944,54 @@ fn builtin_test_run(
 ) -> PerlResult<PerlValue> {
     let pass = TEST_PASS.load(AtomicOrdering::Relaxed);
     let fail = TEST_FAIL.load(AtomicOrdering::Relaxed);
-    let total = pass + fail;
+    let skip = TEST_SKIP.load(AtomicOrdering::Relaxed);
+    let total = pass + fail + skip;
     eprintln!();
     if fail == 0 {
-        eprintln!("\x1b[32m  ✓ All {} tests passed\x1b[0m", total);
+        if skip == 0 {
+            eprintln!("\x1b[32m  ✓ All {} tests passed\x1b[0m", total);
+        } else {
+            eprintln!(
+                "\x1b[32m  ✓ {} passed\x1b[0m, \x1b[33m{} skipped\x1b[0m (of {})",
+                pass, skip, total
+            );
+        }
     } else {
-        eprintln!("\x1b[31m  ✗ {} of {} tests failed\x1b[0m", fail, total);
+        eprintln!(
+            "\x1b[31m  ✗ {} of {} tests failed\x1b[0m{}",
+            fail,
+            total,
+            if skip > 0 {
+                format!(" (\x1b[33m{} skipped\x1b[0m)", skip)
+            } else {
+                String::new()
+            },
+        );
     }
     // Reset for next run
     TEST_PASS.store(0, AtomicOrdering::Relaxed);
     TEST_FAIL.store(0, AtomicOrdering::Relaxed);
+    TEST_SKIP.store(0, AtomicOrdering::Relaxed);
     if fail > 0 {
         std::process::exit(1);
     }
     Ok(PerlValue::integer(if fail == 0 { 1 } else { 0 }))
+}
+
+/// `test_skip MSG` — mark the surrounding assertion as skipped (yellow `↷`).
+/// Pair with postfix `if`/`unless` to gate on a condition:
+/// `test_skip "needs --compat" unless compat_mode`.
+fn builtin_test_skip(
+    _interp: &Interpreter,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
+    let msg = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "skipped".to_string());
+    test_skip(&msg);
+    Ok(PerlValue::UNDEF)
 }
 
 // ── Network interface builtins ──────────────────────────────────────────

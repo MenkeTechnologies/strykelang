@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.10.1 · 3285 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.10.1 · 3288 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -200,7 +200,7 @@
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2615</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2618</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -6478,7 +6478,7 @@ test_run   # prints summary, exits 1 on failure
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2615 topics</p>
+      <p class="chapter-meta">2618 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -23412,6 +23412,22 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p    # files larger than 1 KiB
 @list |&gt; map skewness |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-skip-assert">
+        <h3><a class="doc-anchor" href="#doc-skip-assert">#</a> <code>skip_assert</code></h3>
+        <p><code>skip_assert</code> — testing framework builtin. Alias for <code>test_skip</code>.</p>
+        <pre><code class="lang-perl">my $result = skip_assert $x 
+# or in a pipeline:
+@list |&gt; map skip_assert |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-skip-test">
+        <h3><a class="doc-anchor" href="#doc-skip-test">#</a> <code>skip_test</code></h3>
+        <p><code>skip_test</code> — testing framework builtin. Alias for <code>test_skip</code>.</p>
+        <pre><code class="lang-perl">my $result = skip_test $x 
+# or in a pipeline:
+@list |&gt; map skip_test |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-skip-while">
         <h3><a class="doc-anchor" href="#doc-skip-while">#</a> <code>skip_while</code></h3>
         <p><code>skip_while { COND } LIST</code> — skip leading elements while the predicate is true (alias for <code>drop_while</code>).</p>
@@ -24723,6 +24739,14 @@ p $means{b}  # 3.5
         <pre><code class="lang-perl">my $result = tempplanck $x 
 # or in a pipeline:
 @list |&gt; map tempplanck |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-test-skip">
+        <h3><a class="doc-anchor" href="#doc-test-skip">#</a> <code>test_skip</code></h3>
+        <p><code>test_skip</code> — testing framework builtin.</p>
+        <pre><code class="lang-perl">my $result = test_skip $x 
+# or in a pipeline:
+@list |&gt; map test_skip |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-text-after">

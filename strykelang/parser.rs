@@ -12540,7 +12540,7 @@ impl Parser {
             | "assert_true" | "assert_false"
             | "assert_gt" | "assert_lt" | "assert_ge" | "assert_le"
             | "assert_match" | "assert_contains" | "assert_near" | "assert_dies"
-            | "test_run"
+            | "test_run" | "run_tests" | "test_skip" | "skip_test" | "skip_assert"
             // ── system info ─────────────────────────────────────────────────
             | "mounts" | "du" | "du_tree" | "process_list"
             | "thread_count" | "pool_info" | "par_bench"

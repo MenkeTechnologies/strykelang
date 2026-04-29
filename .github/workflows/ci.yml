@@ -103,6 +103,16 @@ jobs:
         run: ./target/release/s test examples/project/t
       - name: Run stryke test on rosetta project
         run: ./target/release/s test examples/rosetta/t
+      - name: Run stryke test on exercism project
+        # Each exercise is its own dir with `t/test_*.stk` inside.
+        # `s test` doesn't recurse, so loop one exercise at a time.
+        run: |
+          set -e
+          fail=0
+          for d in "${{ github.workspace }}"/examples/exercism/*/; do
+            ./target/release/s test "$d/t" || fail=$((fail+1))
+          done
+          test "$fail" -eq 0
 
   release-build:
     name: Release Build

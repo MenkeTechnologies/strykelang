@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
-my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
-require "$dir/ScrabbleScore.stk"
+require "./ScrabbleScore.stk"
 
 assert_eq Exercism::ScrabbleScore::scrabble_score("a"),         1,  "lowercase letter"
 assert_eq Exercism::ScrabbleScore::scrabble_score("A"),         1,  "uppercase letter"

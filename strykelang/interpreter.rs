@@ -11259,7 +11259,14 @@ impl Interpreter {
                 string,
                 limit,
             } => {
-                let pat = self.eval_expr(pattern)?.to_string();
+                let pat_val = self.eval_expr(pattern)?;
+                // For a regex value, pull the *source* (not the Display form,
+                // which wraps an empty regex as `(?:)` and would defeat the
+                // empty-pattern branch below).  Mirrors the VM's Split path.
+                let pat = pat_val
+                    .regex_src_and_flags()
+                    .map(|(s, _)| s)
+                    .unwrap_or_else(|| pat_val.to_string());
                 let s = self.eval_expr(string)?.to_string();
                 // Perl semantics for the limit field:
                 //   omitted / 0  → no truncation, *strip* trailing empty fields.

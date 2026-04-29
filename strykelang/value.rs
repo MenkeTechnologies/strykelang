@@ -1,5 +1,6 @@
 use crossbeam::channel::{Receiver, Sender};
 use indexmap::IndexMap;
+use num_bigint::BigInt;
 use parking_lot::{Mutex, RwLock};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -533,6 +534,9 @@ impl PerlDataFrame {
 #[derive(Debug, Clone)]
 pub(crate) enum HeapObject {
     Integer(i64),
+    /// Arbitrary-precision integer — produced by `--compat` arithmetic when an
+    /// `i64` op overflows. Native stryke (no `--compat`) never creates this.
+    BigInt(Arc<BigInt>),
     Float(f64),
     String(String),
     Bytes(Arc<Vec<u8>>),
@@ -1048,7 +1052,7 @@ impl PerlValue {
     pub fn is_integer_like(&self) -> bool {
         nanbox::as_imm_int32(self.0).is_some()
             || matches!(
-                self.with_heap(|h| matches!(h, HeapObject::Integer(_))),
+                self.with_heap(|h| matches!(h, HeapObject::Integer(_) | HeapObject::BigInt(_))),
                 Some(true)
             )
     }
@@ -1079,6 +1083,39 @@ impl PerlValue {
         } else {
             Self::from_heap(Arc::new(HeapObject::Integer(n)))
         }
+    }
+
+    /// Wrap a `BigInt`. If it fits in `i64`, demotes to a regular integer so
+    /// downstream consumers don't have to special-case BigInt for small values.
+    pub fn bigint(n: BigInt) -> Self {
+        use num_traits::ToPrimitive;
+        if let Some(i) = n.to_i64() {
+            return Self::integer(i);
+        }
+        Self::from_heap(Arc::new(HeapObject::BigInt(Arc::new(n))))
+    }
+
+    /// Returns the inner `BigInt` as `Arc` (zero-copy) when this value is a
+    /// boxed `BigInt`; `None` otherwise. Use [`Self::to_bigint`] to coerce
+    /// from `i64`/`f64`/strings.
+    pub fn as_bigint(&self) -> Option<Arc<BigInt>> {
+        self.with_heap(|h| match h {
+            HeapObject::BigInt(b) => Some(Arc::clone(b)),
+            _ => None,
+        })
+        .flatten()
+    }
+
+    /// Coerce any numeric value into a `BigInt`. Floats truncate. Used by
+    /// arithmetic promotion paths under `--compat` when one side overflowed.
+    pub fn to_bigint(&self) -> BigInt {
+        if let Some(b) = self.as_bigint() {
+            return (*b).clone();
+        }
+        if let Some(i) = self.as_integer() {
+            return BigInt::from(i);
+        }
+        BigInt::from(self.to_number() as i64)
     }
 
     #[inline]
@@ -1231,6 +1268,7 @@ impl PerlValue {
         matches!(
             unsafe { self.heap_ref() },
             HeapObject::Integer(_)
+                | HeapObject::BigInt(_)
                 | HeapObject::Float(_)
                 | HeapObject::String(_)
                 | HeapObject::Bytes(_)
@@ -1248,6 +1286,10 @@ impl PerlValue {
         }
         self.with_heap(|h| match h {
             HeapObject::Integer(n) => Some(*n),
+            HeapObject::BigInt(b) => {
+                use num_traits::ToPrimitive;
+                b.to_i64()
+            }
             _ => None,
         })
         .flatten()
@@ -1777,6 +1819,10 @@ impl PerlValue {
             HeapObject::ErrnoDual { code, msg } => *code != 0 || !msg.is_empty(),
             HeapObject::String(s) => !s.is_empty() && s != "0",
             HeapObject::Bytes(b) => !b.is_empty(),
+            HeapObject::BigInt(b) => {
+                use num_traits::Zero;
+                !b.is_zero()
+            }
             HeapObject::Array(a) => !a.is_empty(),
             HeapObject::Hash(h) => !h.is_empty(),
             HeapObject::Atomic(arc) => arc.lock().is_true(),
@@ -1931,6 +1977,10 @@ impl PerlValue {
         }
         match unsafe { self.heap_ref() } {
             HeapObject::Integer(n) => *n as f64,
+            HeapObject::BigInt(b) => {
+                use num_traits::ToPrimitive;
+                b.to_f64().unwrap_or(f64::INFINITY)
+            }
             HeapObject::Float(f) => *f,
             HeapObject::ErrnoDual { code, .. } => *code as f64,
             HeapObject::String(s) => parse_number(s),
@@ -1970,6 +2020,10 @@ impl PerlValue {
         }
         match unsafe { self.heap_ref() } {
             HeapObject::Integer(n) => *n,
+            HeapObject::BigInt(b) => {
+                use num_traits::ToPrimitive;
+                b.to_i64().unwrap_or(i64::MAX)
+            }
             HeapObject::Float(f) => *f as i64,
             HeapObject::ErrnoDual { code, .. } => *code as i64,
             HeapObject::String(s) => parse_number(s) as i64,
@@ -2041,6 +2095,7 @@ impl PerlValue {
             HeapObject::Iterator(_) => "Iterator".to_string(),
             HeapObject::ErrnoDual { .. } => "Errno".to_string(),
             HeapObject::Integer(_) => "INTEGER".to_string(),
+            HeapObject::BigInt(_) => "INTEGER".to_string(),
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
     }
@@ -2131,6 +2186,9 @@ impl PerlValue {
         match (unsafe { self.heap_ref() }, unsafe { other.heap_ref() }) {
             (HeapObject::String(a), HeapObject::String(b)) => a == b,
             (HeapObject::Integer(a), HeapObject::Integer(b)) => a == b,
+            (HeapObject::BigInt(a), HeapObject::BigInt(b)) => a == b,
+            (HeapObject::BigInt(a), HeapObject::Integer(b))
+            | (HeapObject::Integer(b), HeapObject::BigInt(a)) => a.as_ref() == &BigInt::from(*b),
             (HeapObject::Float(a), HeapObject::Float(b)) => a == b,
             (HeapObject::Array(a), HeapObject::Array(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.struct_field_eq(y))
@@ -2273,6 +2331,7 @@ impl fmt::Display for PerlValue {
         }
         match unsafe { self.heap_ref() } {
             HeapObject::Integer(n) => write!(f, "{n}"),
+            HeapObject::BigInt(b) => write!(f, "{b}"),
             HeapObject::Float(val) => write!(f, "{}", format_float(*val)),
             HeapObject::ErrnoDual { msg, .. } => f.write_str(msg),
             HeapObject::String(s) => f.write_str(s),
@@ -2461,8 +2520,87 @@ pub fn set_member_key(v: &PerlValue) -> String {
         HeapObject::Iterator(_) => "iter".to_string(),
         HeapObject::ErrnoDual { code, msg } => format!("e:{code}:{msg}"),
         HeapObject::Integer(n) => format!("i:{n}"),
+        HeapObject::BigInt(b) => format!("bi:{b}"),
         HeapObject::Float(fl) => format!("f:{}", fl.to_bits()),
     }
+}
+
+/// `--compat`-aware integer multiply. In compat mode, promotes to `BigInt` on
+/// overflow. In native mode, wraps (preserves current behavior). Either side
+/// already being a `BigInt` forces the BigInt path.
+#[inline]
+pub fn compat_mul(a: &PerlValue, b: &PerlValue) -> PerlValue {
+    if a.as_bigint().is_some() || b.as_bigint().is_some() {
+        return PerlValue::bigint(a.to_bigint() * b.to_bigint());
+    }
+    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+        return PerlValue::float(a.to_number() * b.to_number());
+    };
+    if crate::compat_mode() {
+        match x.checked_mul(y) {
+            Some(r) => PerlValue::integer(r),
+            None => PerlValue::bigint(BigInt::from(x) * BigInt::from(y)),
+        }
+    } else {
+        PerlValue::integer(x.wrapping_mul(y))
+    }
+}
+
+#[inline]
+pub fn compat_add(a: &PerlValue, b: &PerlValue) -> PerlValue {
+    if a.as_bigint().is_some() || b.as_bigint().is_some() {
+        return PerlValue::bigint(a.to_bigint() + b.to_bigint());
+    }
+    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+        return PerlValue::float(a.to_number() + b.to_number());
+    };
+    if crate::compat_mode() {
+        match x.checked_add(y) {
+            Some(r) => PerlValue::integer(r),
+            None => PerlValue::bigint(BigInt::from(x) + BigInt::from(y)),
+        }
+    } else {
+        PerlValue::integer(x.wrapping_add(y))
+    }
+}
+
+#[inline]
+pub fn compat_sub(a: &PerlValue, b: &PerlValue) -> PerlValue {
+    if a.as_bigint().is_some() || b.as_bigint().is_some() {
+        return PerlValue::bigint(a.to_bigint() - b.to_bigint());
+    }
+    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+        return PerlValue::float(a.to_number() - b.to_number());
+    };
+    if crate::compat_mode() {
+        match x.checked_sub(y) {
+            Some(r) => PerlValue::integer(r),
+            None => PerlValue::bigint(BigInt::from(x) - BigInt::from(y)),
+        }
+    } else {
+        PerlValue::integer(x.wrapping_sub(y))
+    }
+}
+
+/// `**` (exponentiation) — under `--compat`, uses `BigInt` directly when the
+/// exponent is non-negative so `2 ** 100` works. Falls through to `f64::powf`
+/// for negative or non-integer exponents (matches Perl's behavior).
+#[inline]
+pub fn compat_pow(a: &PerlValue, b: &PerlValue) -> PerlValue {
+    let (Some(base), Some(exp)) = (a.as_integer(), b.as_integer()) else {
+        return PerlValue::float(a.to_number().powf(b.to_number()));
+    };
+    if !crate::compat_mode() {
+        // Native: do whatever the existing path does — fall back to float
+        // (matches Perl's default i64-overflow-to-NV behavior).
+        return PerlValue::float((base as f64).powf(exp as f64));
+    }
+    if exp < 0 {
+        return PerlValue::float((base as f64).powf(exp as f64));
+    }
+    use num_traits::Pow;
+    let result = BigInt::from(base).pow(exp as u32);
+    PerlValue::bigint(result)
 }
 
 pub fn set_from_elements<I: IntoIterator<Item = PerlValue>>(items: I) -> PerlValue {
