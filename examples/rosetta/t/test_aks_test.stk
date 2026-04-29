@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: AKS test for primes
+
+fn Rosetta::AKS::coefficients($p) {
+    my @c = (1)
+    for my $i (1..$p) {
+        my @next
+        push @next, $c[0]
+        for my $j (1..$i-1) {
+            push @next, $c[$j] - $c[$j-1]
+        }
+        push @next, -1 * $c[$i-1]
+        @c = @next
+    }
+    @c
+}
+
+fn Rosetta::AKS::is_prime($p) {
+    return 0 if $p < 2
+    my @c = Rosetta::AKS::coefficients($p)
+    for my $i (1..$p-1) {
+        if ($c[$i] % $p != 0) {
+            return 0
+        }
+    }
+    1
+}
+
+# Display expansions 0..7
+for my $p (0..7) {
+    my @c = Rosetta::AKS::coefficients($p)
+    # p "p=$p: (x-1)^$p = " . join(" ", @c)
+}
+
+# Generate primes under 35
+my @primes
+for my $p (2..34) {
+    if (Rosetta::AKS::is_prime($p)) {
+        push @primes, $p
+    }
+}
+assert_eq join(",", @primes), "2,3,5,7,11,13,17,19,23,29,31", "primes under 35"
+
+# Stretch: primes under 50
+my @primes50
+for my $p (2..50) {
+    if (Rosetta::AKS::is_prime($p)) {
+        push @primes50, $p
+    }
+}
+assert_eq join(",", @primes50), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47", "primes under 50"
+
+# Piped version
+7 |> Rosetta::AKS::is_prime |> assert_ok("7 is prime via AKS")
+9 |> Rosetta::AKS::is_prime |> ~> fn { !$_ } |> assert_ok("9 is not prime via AKS")
+
+test_run
