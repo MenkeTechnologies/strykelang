@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/CollatzConjecture.stk"
+
+assert_eq Exercism::CollatzConjecture::steps(1),       0, "zero steps for one"
+assert_eq Exercism::CollatzConjecture::steps(16),      4, "divide if even"
+assert_eq Exercism::CollatzConjecture::steps(12),      9, "even and odd steps"
+assert_eq Exercism::CollatzConjecture::steps(1000000), 152, "large number of even and odd steps"
+
+# Negative / zero: must die
+my $err = eval { Exercism::CollatzConjecture::steps(0); 0 } || $@
+assert_ok $err, "zero is an error"
+$err = eval { Exercism::CollatzConjecture::steps(-15); 0 } || $@
+assert_ok $err, "negative value is an error"
+
+test_run

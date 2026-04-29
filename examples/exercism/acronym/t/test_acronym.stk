@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/Acronym.stk"
+
+assert_eq Exercism::Acronym::abbreviate("Portable Network Graphics"),         "PNG",      "basic"
+assert_eq Exercism::Acronym::abbreviate("Ruby on Rails"),                     "ROR",      "lowercase words"
+assert_eq Exercism::Acronym::abbreviate("First In, First Out"),               "FIFO",     "punctuation"
+assert_eq Exercism::Acronym::abbreviate("GNU Image Manipulation Program"),    "GIMP",     "all caps word"
+assert_eq Exercism::Acronym::abbreviate("Complementary metal-oxide semiconductor"), "CMOS", "punctuation without whitespace"
+assert_eq Exercism::Acronym::abbreviate("Rolling On The Floor Laughing So Hard That My Dogs Came Over And Licked Me"), "ROTFLSHTMDCOALM", "very long abbreviation"
+assert_eq Exercism::Acronym::abbreviate("Something - I made up from thin air"), "SIMUFTA", "consecutive delimiters"
+assert_eq Exercism::Acronym::abbreviate("Halley's Comet"),                    "HC",       "apostrophes"
+assert_eq Exercism::Acronym::abbreviate("The Road _Not_ Taken"),              "TRNT",    "underscore emphasis"
+
+test_run

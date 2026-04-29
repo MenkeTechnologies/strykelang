@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Apply a callback to an array
+
+fn Rosetta::Callback::apply($cb, @arr) {
+    @arr |> map { $cb->(_) }
+}
+
+my @vals = (1, 2, 3)
+my $square = fn ($x) { $x * $x }
+
+my @res = Rosetta::Callback::apply($square, @vals)
+assert_eq join(",", @res), "1,4,9", "callback applied"
+
+# Using builtin map directly
+my @res2 = (10, 20) |> map { _ + 5 }
+assert_eq join(",", @res2), "15,25", "piped map"
+
+# Piped version
+\@vals |> ~> fn { Rosetta::Callback::apply($square, @$_) } |> join(",") |> assert_eq("1,4,9", "piped apply")
+
+test_run

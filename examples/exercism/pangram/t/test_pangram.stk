@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/Pangram.stk"
+
+assert_ok !Exercism::Pangram::is_pangram(""),                                                                "empty sentence"
+assert_ok  Exercism::Pangram::is_pangram("the quick brown fox jumps over the lazy dog"),                     "perfect lower case"
+assert_ok  Exercism::Pangram::is_pangram("the 1 quick brown fox jumps over the 2 lazy dogs"),                "pangram with only lower case"
+assert_ok !Exercism::Pangram::is_pangram("a quick movement of the enemy will jeopardize five gunboats"),     "missing the letter 'x'"
+assert_ok !Exercism::Pangram::is_pangram("five boxing wizards jump quickly at it"),                          "missing the letter 'h'"
+assert_ok  Exercism::Pangram::is_pangram("the quick brown fox jumps over with 5 lazy dogs"),                 "pangram with underscores"
+assert_ok  Exercism::Pangram::is_pangram("Pack my box with five dozen liquor jugs"),                         "pangram with mixed case"
+assert_ok  Exercism::Pangram::is_pangram("\"Five quacking Zephyrs jolt my wax bed.\""),                      "pangram with non letter characters"
+assert_ok  Exercism::Pangram::is_pangram("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),                                      "upper and lower case versions of same letter should not be counted separately"
+
+test_run

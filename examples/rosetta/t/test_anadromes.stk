@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anadromes
+
+fn Rosetta::Anadromes::find(@words) {
+    my %dict
+    for my $w (@words) { $dict{$w} = 1 }
+    
+    my @anadromes
+    for my $w (@words) {
+        my $rev = rev($w)
+        if ($rev ne $w && exists $dict{$rev}) {
+            push @anadromes, "$w-$rev"
+            delete $dict{$w}
+            delete $dict{$rev}
+        }
+    }
+    @anadromes
+}
+
+my @list = ("stop", "pots", "stressed", "desserts", "hello", "world", "raw", "war")
+my @res = Rosetta::Anadromes::find(@list)
+
+assert_eq len(@res), 3, "found 3 pairs"
+assert_eq join(",", sort @res), "raw-war,stop-pots,stressed-desserts", "anadromes pairs"
+
+# Piped version
+@list |> Rosetta::Anadromes::find |> len |> assert_eq(3, "piped anadromes count")
+
+test_run

@@ -1,0 +1,2 @@
+#!/usr/bin/env stryke
+fn Exercism::Isogram::is_isogram { lc(_0) !~ /([a-z]).*\1/ }

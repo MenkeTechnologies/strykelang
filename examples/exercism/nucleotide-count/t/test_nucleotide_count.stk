@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/NucleotideCount.stk"
+
+fn sig { my $c = _0; join(",", map { "$_=$c->{$_}" } sort keys %$c) }
+
+assert_eq sig(Exercism::NucleotideCount::count_nucleotides("")),        "A=0,C=0,G=0,T=0", "empty strand"
+assert_eq sig(Exercism::NucleotideCount::count_nucleotides("G")),       "A=0,C=0,G=1,T=0", "single nucleotide"
+assert_eq sig(Exercism::NucleotideCount::count_nucleotides("GGGGGGG")), "A=0,C=0,G=7,T=0", "repeated nucleotide"
+assert_eq sig(Exercism::NucleotideCount::count_nucleotides("AGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGTCTGATAGCAGC")), "A=20,C=12,G=17,T=21", "multiple nucleotides"
+
+my $err = eval { Exercism::NucleotideCount::count_nucleotides("AGXXACT"); 0 } || $@
+assert_ok $err =~ /Invalid nucleotide/, "invalid nucleotides"
+
+test_run

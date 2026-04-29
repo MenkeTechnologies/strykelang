@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Algebraic data types
+
+struct ADT_Leaf {}
+struct ADT_Node { val, left, right }
+
+fn Rosetta::ADT::depth($tree) {
+    if (ref($tree) eq "ADT_Leaf") {
+        0
+    } else {
+        my $ld = Rosetta::ADT::depth($tree->left)
+        my $rd = Rosetta::ADT::depth($tree->right)
+        1 + ($ld > $rd ? $ld : $rd)
+    }
+}
+
+fn Rosetta::ADT::sum($tree) {
+    if (ref($tree) eq "ADT_Leaf") {
+        0
+    } else {
+        $tree->val + Rosetta::ADT::sum($tree->left) + Rosetta::ADT::sum($tree->right)
+    }
+}
+
+my $tree = ADT_Node(10, 
+    ADT_Node(20, ADT_Leaf(), ADT_Leaf()),
+    ADT_Node(30, ADT_Leaf(), ADT_Leaf())
+)
+
+assert_eq Rosetta::ADT::depth($tree), 2, "tree depth"
+assert_eq Rosetta::ADT::sum($tree), 60, "tree sum"
+
+# Piped version
+$tree |> Rosetta::ADT::sum |> assert_eq(60, "piped sum")
+
+test_run

@@ -1,0 +1,2 @@
+#!/usr/bin/env stryke
+fn Exercism::ReverseString::str_reverse { ~> _0 >{split //, $_} rev |> join "" }

@@ -1,0 +1,10 @@
+#!/usr/bin/env stryke
+fn Exercism::PrimeFactors::factors($n) {
+    my @f
+    my $d = 2
+    while ($n > 1) {
+        while ($n % $d == 0) { push @f, $d; $n /= $d }
+        $d++
+    }
+    \@f
+}

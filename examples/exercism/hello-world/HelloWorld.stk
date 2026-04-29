@@ -1,0 +1,2 @@
+#!/usr/bin/env stryke
+fn Exercism::HelloWorld::hello { "Hello, World!" }

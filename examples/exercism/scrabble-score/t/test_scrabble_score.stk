@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/ScrabbleScore.stk"
+
+assert_eq Exercism::ScrabbleScore::scrabble_score("a"),         1,  "lowercase letter"
+assert_eq Exercism::ScrabbleScore::scrabble_score("A"),         1,  "uppercase letter"
+assert_eq Exercism::ScrabbleScore::scrabble_score("f"),         4,  "valuable letter"
+assert_eq Exercism::ScrabbleScore::scrabble_score("at"),        2,  "short word"
+assert_eq Exercism::ScrabbleScore::scrabble_score("zoo"),       12, "short, valuable word"
+assert_eq Exercism::ScrabbleScore::scrabble_score("street"),    6,  "medium word"
+assert_eq Exercism::ScrabbleScore::scrabble_score("quirky"),    22, "medium, valuable word"
+assert_eq Exercism::ScrabbleScore::scrabble_score("OxyphenButazone"), 41, "long, mixed-case word"
+assert_eq Exercism::ScrabbleScore::scrabble_score("pinata"),    8,  "english-like word"
+assert_eq Exercism::ScrabbleScore::scrabble_score(""),          0,  "empty input"
+assert_eq Exercism::ScrabbleScore::scrabble_score("abcdefghijklmnopqrstuvwxyz"), 87, "entire alphabet"
+
+test_run

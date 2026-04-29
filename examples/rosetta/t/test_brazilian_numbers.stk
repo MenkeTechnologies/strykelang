@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Brazilian numbers
+
+fn Rosetta::Brazilian::check($n) {
+    if ($n < 7) { return 0 }
+    for my $b (2..$n-2) {
+        my $temp = $n
+        my $digit = $temp % $b
+        my $all_same = 1
+        while ($temp > 0) {
+            if ($temp % $b != $digit) {
+                $all_same = 0
+                last
+            }
+            $temp = int($temp / $b)
+        }
+        if ($all_same) { return 1 }
+    }
+    0
+}
+
+my @brazilian
+my $i = 1
+while (len(@brazilian) < 20) {
+    if (Rosetta::Brazilian::check($i)) {
+        push @brazilian, $i
+    }
+    $i = $i + 1
+}
+
+# 7, 8, 10, 12, 13, 14, 15, 16, 18, 20, 21, 22, 24, 26, 27, 28, 30, 31, 32, 33
+assert_eq $brazilian[0], 7, "1st Brazilian"
+assert_eq $brazilian[1], 8, "2nd Brazilian"
+assert_eq $brazilian[19], 33, "20th Brazilian"
+
+# Piped version
+7 |> Rosetta::Brazilian::check |> assert_ok("7 is Brazilian")
+6 |> Rosetta::Brazilian::check |> ~> fn { !$_ } |> assert_ok("6 is not Brazilian")
+
+test_run

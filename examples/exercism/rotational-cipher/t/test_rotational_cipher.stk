@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/RotationalCipher.stk"
+
+assert_eq Exercism::RotationalCipher::caesar_cipher("a", 0),   "a",   "rotate a by 0"
+assert_eq Exercism::RotationalCipher::caesar_cipher("a", 1),   "b",   "rotate a by 1"
+assert_eq Exercism::RotationalCipher::caesar_cipher("a", 26),  "a",   "rotate a by 26"
+assert_eq Exercism::RotationalCipher::caesar_cipher("m", 13),  "z",   "rotate m by 13"
+assert_eq Exercism::RotationalCipher::caesar_cipher("n", 13),  "a",   "rotate n by 13"
+assert_eq Exercism::RotationalCipher::caesar_cipher("OMG", 5), "TRL", "rotate capital letters"
+assert_eq Exercism::RotationalCipher::caesar_cipher("O M G", 5), "T R L", "rotate spaces"
+assert_eq Exercism::RotationalCipher::caesar_cipher("Testing 1 2 3 testing", 4), "Xiwxmrk 1 2 3 xiwxmrk", "rotate numbers"
+assert_eq Exercism::RotationalCipher::caesar_cipher("Let's eat, Grandma!", 21), "Gzo'n zvo, Bmviyhv!", "rotate punctuation"
+
+test_run

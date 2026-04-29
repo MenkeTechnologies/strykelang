@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Blum integer
+
+fn Rosetta::Blum::is_prime($n) {
+    return 0 if $n < 2
+    my $d = 2
+    while ($d * $d <= $n) {
+        if ($n % $d == 0) { return 0 }
+        $d = $d + 1
+    }
+    1
+}
+
+fn Rosetta::Blum::check($n) {
+    my @factors
+    my $temp = $n
+    my $d = 2
+    while ($d * $d <= $temp) {
+        while ($temp % $d == 0) {
+            push @factors, $d
+            $temp = int($temp / $d)
+        }
+        $d = $d + 1
+    }
+    if ($temp > 1) { push @factors, $temp }
+    
+    return 0 if len(@factors) != 2
+    my ($p, $q) = @factors
+    if ($p == $q) { return 0 }
+    $p % 4 == 3 && $q % 4 == 3
+}
+
+my @blum
+for my $i (1..100) {
+    if (Rosetta::Blum::check($i)) {
+        push @blum, $i
+    }
+}
+
+# Blum integers under 100: 21, 33, 57, 69, 77, 93
+assert_eq join(",", @blum), "21,33,57,69,77,93", "blum integers under 100"
+
+# Piped version
+21 |> Rosetta::Blum::check |> assert_ok("21 is Blum")
+9 |> Rosetta::Blum::check |> ~> fn { !$_ } |> assert_ok("9 is not Blum (3*3, not distinct)")
+
+test_run

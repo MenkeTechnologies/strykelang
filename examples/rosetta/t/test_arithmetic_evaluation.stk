@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arithmetic evaluation
+
+fn Rosetta::Eval::expr($tokens_ref, $pos_ref) {
+    my $res = Rosetta::Eval::term($tokens_ref, $pos_ref)
+    while ($$pos_ref < len(@$tokens_ref)) {
+        my $op = $tokens_ref->[$$pos_ref]
+        if ($op eq "+" || $op eq "-") {
+            $$pos_ref = $$pos_ref + 1
+            my $rhs = Rosetta::Eval::term($tokens_ref, $pos_ref)
+            $res = ($op eq "+" ? $res + $rhs : $res - $rhs)
+        } else {
+            last
+        }
+    }
+    $res
+}
+
+fn Rosetta::Eval::term($tokens_ref, $pos_ref) {
+    my $res = Rosetta::Eval::factor($tokens_ref, $pos_ref)
+    while ($$pos_ref < len(@$tokens_ref)) {
+        my $op = $tokens_ref->[$$pos_ref]
+        if ($op eq "*" || $op eq "/") {
+            $$pos_ref = $$pos_ref + 1
+            my $rhs = Rosetta::Eval::factor($tokens_ref, $pos_ref)
+            $res = ($op eq "*" ? $res * $rhs : $res / $rhs)
+        } else {
+            last
+        }
+    }
+    $res
+}
+
+fn Rosetta::Eval::factor($tokens_ref, $pos_ref) {
+    my $tok = $tokens_ref->[$$pos_ref]
+    $$pos_ref = $$pos_ref + 1
+    if ($tok eq "(") {
+        my $res = Rosetta::Eval::expr($tokens_ref, $pos_ref)
+        $$pos_ref = $$pos_ref + 1
+        return $res
+    }
+    $tok + 0
+}
+
+fn Rosetta::Eval::solve($s) {
+    my @tokens = ~> $s s/([\(\)\+\-\*\/])/ $1 /g |> trim |> split(/\s+/)
+    my $pos = 0
+    Rosetta::Eval::expr(\@tokens, \$pos)
+}
+
+assert_eq Rosetta::Eval::solve("1 + 2 * 3"), 7, "1+2*3"
+assert_eq Rosetta::Eval::solve("(1 + 2) * 3"), 9, "(1+2)*3"
+assert_eq Rosetta::Eval::solve("10 / 2 + 5"), 10, "10/2+5"
+assert_eq Rosetta::Eval::solve("1 - 2 - 3"), -4, "1-2-3"
+assert_eq Rosetta::Eval::solve("2 * (3 + 4) / 2"), 7, "2*(3+4)/2"
+
+# Piped version
+"(3 + 5) * 10" |> Rosetta::Eval::solve |> assert_eq(80, "piped eval")
+
+test_run

@@ -1,0 +1,6 @@
+#!/usr/bin/env stryke
+fn Exercism::ArmstrongNumbers::is_armstrong_number($n) {
+    my @d = chars("$n")
+    my $k = len(@d)
+    $n == 0 + sum(map { $_ ** $k } @d)
+}

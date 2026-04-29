@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Archimedean spiral
+
+fn Rosetta::Spiral::generate($a, $b, $points, $step) {
+    my @coords
+    for my $i (0..$points-1) {
+        my $theta = $i * $step
+        my $r = $a + $b * $theta
+        my $x = $r * cos($theta)
+        my $y = $r * sin($theta)
+        push @coords, [$x, $y]
+    }
+    \@coords
+}
+
+fn Rosetta::Spiral::approx_eq($v1, $v2) {
+    abs($v1 - $v2) < 1e-10
+}
+
+my $coords = Rosetta::Spiral::generate(0, 5, 100, 0.1)
+assert_eq len(@$coords), 100, "generated 100 points"
+
+# theta=0: r=0+5*0=0, x=0, y=0
+assert_ok Rosetta::Spiral::approx_eq($coords->[0]->[0], 0), "start x"
+assert_ok Rosetta::Spiral::approx_eq($coords->[0]->[1], 0), "start y"
+
+# theta=pi/2 (~1.57): r=5*pi/2 = 2.5*pi (~7.85), x=0, y=7.85
+my $idx = int(pi / 2 / 0.1 + 0.5)
+my $p_pi2 = $coords->[$idx]
+# theta = $idx * 0.1
+my $t = $idx * 0.1
+my $expected_r = 5 * $t
+my $expected_y = $expected_r * sin($t)
+assert_ok Rosetta::Spiral::approx_eq($p_pi2->[1], $expected_y), "y at theta~pi/2"
+
+# Piped version
+100 |> ~> fn { Rosetta::Spiral::generate(0, 5, $_, 0.1) } |> len |> assert_eq(100, "piped spiral length")
+
+test_run
