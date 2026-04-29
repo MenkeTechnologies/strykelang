@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Geometric series — closed form a*(1 - r^n)/(1 - r) for r != 1.
+# Includes the |r| < 1 limit a/(1 - r) and the divergent r >= 1 case.
+
+fn Rosetta::Geom::partial_sum($_0, $r, $n) {
+    return $_0 * $n if $r == 1
+    $_0 * (1 - $r ** $n) / (1 - $r)
+}
+
+fn Rosetta::Geom::limit($_0, $r) {
+    die "diverges (|r| >= 1)" if abs($r) >= 1
+    $_0 / (1 - $r)
+}
+
+# 1 + 1/2 + 1/4 + 1/8 + ... → 2. Partial of n=10 → 2 - 1/512 ~ 1.998046875.
+assert_eq Rosetta::Geom::partial_sum(1, 0.5, 10), 1.998046875, "partial 10 of (1, 1/2)"
+
+# Limit form: same series → 2.
+assert_eq Rosetta::Geom::limit(1, 0.5), 2, "limit (1, 1/2) = 2"
+
+# r = 1 falls through to the linear sum a*n.
+assert_eq Rosetta::Geom::partial_sum(7, 1, 5), 35, "r=1 → a*n"
+
+# Negative ratio still works: 1 - 1/2 + 1/4 - 1/8 + ... → 1 / (1 - (-1/2)) = 2/3.
+my $alt = Rosetta::Geom::limit(1, -0.5)
+assert_ok abs($alt - 2.0 / 3.0) < 1e-12, "alternating limit"
+
+test_run

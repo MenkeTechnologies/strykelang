@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ternary logic — Kleene's strong 3-valued logic.
+# Values: T (true=1), F (false=0), M (maybe=-1).
+# Operators: NOT, AND, OR, IFF, IMPL.
+
+fn Rosetta::Ternary::neg($_0) {
+    -$_0
+}
+
+fn Rosetta::Ternary::conj($_0, $_1) {
+    $_0 < $_1 ? $_0 : $_1
+}
+
+fn Rosetta::Ternary::disj($_0, $_1) {
+    $_0 > $_1 ? $_0 : $_1
+}
+
+fn Rosetta::Ternary::iff($_0, $_1) {
+    $_0 * $_1
+}
+
+fn Rosetta::Ternary::imp($_0, $_1) {
+    Rosetta::Ternary::disj(Rosetta::Ternary::neg($_0), $_1)
+}
+
+# Truth-table sanity for NEG.
+assert_eq Rosetta::Ternary::neg(1), -1, "neg T = F"
+assert_eq Rosetta::Ternary::neg(-1), 1, "neg F = T"
+assert_eq Rosetta::Ternary::neg(0), 0, "neg M = M"
+
+# CONJ (AND): T∧T=T, T∧F=F, T∧M=M, F∧M=F, M∧M=M.
+assert_eq Rosetta::Ternary::conj(1, 1),   1, "T and T"
+assert_eq Rosetta::Ternary::conj(1, -1), -1, "T and F"
+assert_eq Rosetta::Ternary::conj(1, 0),   0, "T and M"
+assert_eq Rosetta::Ternary::conj(-1, 0), -1, "F and M"
+assert_eq Rosetta::Ternary::conj(0, 0),   0, "M and M"
+
+# DISJ (OR): T∨F=T, T∨M=T, F∨M=M, F∨F=F.
+assert_eq Rosetta::Ternary::disj(1, -1),  1, "T or F"
+assert_eq Rosetta::Ternary::disj(1, 0),   1, "T or M"
+assert_eq Rosetta::Ternary::disj(-1, 0),  0, "F or M"
+assert_eq Rosetta::Ternary::disj(-1, -1),-1, "F or F"
+
+# IMP: T → F = F, T → T = T, F → anything = T.
+assert_eq Rosetta::Ternary::imp(1, -1), -1, "T imp F = F"
+assert_eq Rosetta::Ternary::imp(1, 1),   1, "T imp T = T"
+assert_eq Rosetta::Ternary::imp(-1, 0),  1, "F imp M = T"
+
+# IFF: T iff T = T, T iff F = F, M iff anything = M.
+assert_eq Rosetta::Ternary::iff(1, 1),   1, "T iff T"
+assert_eq Rosetta::Ternary::iff(1, -1), -1, "T iff F"
+assert_eq Rosetta::Ternary::iff(0, 1),   0, "M iff T"
+assert_eq Rosetta::Ternary::iff(0, 0),   0, "M iff M"
+
+test_run

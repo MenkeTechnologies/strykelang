@@ -885,10 +885,7 @@ fn reduce_like(
         vec![]
     };
     for b in items.iter().skip(1) {
-        let _ = interp.scope.set_scalar("a", acc.clone());
-        let _ = interp.scope.set_scalar("b", b.clone());
-        let _ = interp.scope.set_scalar("_0", acc.clone());
-        let _ = interp.scope.set_scalar("_1", b.clone());
+        interp.scope.set_sort_pair(acc.clone(), b.clone());
         acc = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
         if reductions {
             chain.push(acc.clone());
@@ -1057,10 +1054,7 @@ fn pairgrep_map(
             while i + 1 < flat.len() {
                 let a = flat[i].clone();
                 let b = flat[i + 1].clone();
-                let _ = interp.scope.set_scalar("a", a.clone());
-                let _ = interp.scope.set_scalar("b", b.clone());
-                let _ = interp.scope.set_scalar("_0", a.clone());
-                let _ = interp.scope.set_scalar("_1", b.clone());
+                interp.scope.set_sort_pair(a.clone(), b.clone());
                 let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
                 if v.is_true() {
                     out.push(a);
@@ -1077,10 +1071,7 @@ fn pairgrep_map(
             let mut out = Vec::new();
             let mut i = 0;
             while i + 1 < flat.len() {
-                let _ = interp.scope.set_scalar("a", flat[i].clone());
-                let _ = interp.scope.set_scalar("b", flat[i + 1].clone());
-                let _ = interp.scope.set_scalar("_0", flat[i].clone());
-                let _ = interp.scope.set_scalar("_1", flat[i + 1].clone());
+                interp.scope.set_sort_pair(flat[i].clone(), flat[i + 1].clone());
                 let produced = interp.call_sub(&code, vec![], WantarrayCtx::List, 0)?;
                 if let Some(items) = produced.as_array_vec() {
                     out.extend(items);
@@ -1099,10 +1090,7 @@ fn pairgrep_map(
             while i + 1 < flat.len() {
                 let a = flat[i].clone();
                 let b = flat[i + 1].clone();
-                let _ = interp.scope.set_scalar("a", a.clone());
-                let _ = interp.scope.set_scalar("b", b.clone());
-                let _ = interp.scope.set_scalar("_0", a.clone());
-                let _ = interp.scope.set_scalar("_1", b.clone());
+                interp.scope.set_sort_pair(a.clone(), b.clone());
                 let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
                 if v.is_true() {
                     if want == WantarrayCtx::Scalar {

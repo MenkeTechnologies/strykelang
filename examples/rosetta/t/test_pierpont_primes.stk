@@ -24,7 +24,7 @@ fn Rosetta::Pierpont::generate($count) {
         }
         $two *= 2
     }
-    my @primes = sort { $a <=> $b } grep { Rosetta::Pierpont::is_prime($_) } @candidates
+    my @primes = sort { _0 <=> _1 } grep { Rosetta::Pierpont::is_prime($_) } @candidates
     my @uniq
     my $last = -1
     for my $p (@primes) {

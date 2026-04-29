@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Boolean values — Perl-flavored truthiness.
+# Falsy in Perl/stryke: undef, 0, "0", "". Everything else is truthy.
+
+fn Rosetta::Bools::is_truthy($v) {
+    $v ? 1 : 0
+}
+
+fn Rosetta::Bools::to_string($v) {
+    $v ? "true" : "false"
+}
+
+# Falsy bag.
+assert_eq Rosetta::Bools::is_truthy(undef),  0, "undef is false"
+assert_eq Rosetta::Bools::is_truthy(0),      0, "0 is false"
+assert_eq Rosetta::Bools::is_truthy("0"),    0, "'0' is false"
+assert_eq Rosetta::Bools::is_truthy(""),     0, "empty string is false"
+
+# Truthy bag — including the famous gotcha "0.0" (a non-canonical-zero string).
+assert_eq Rosetta::Bools::is_truthy(1),       1, "1 is true"
+assert_eq Rosetta::Bools::is_truthy(-1),      1, "negative number is true"
+assert_eq Rosetta::Bools::is_truthy("false"), 1, "non-empty string is true"
+assert_eq Rosetta::Bools::is_truthy("0.0"),   1, "'0.0' is true (string ne '0')"
+assert_eq Rosetta::Bools::is_truthy(" "),     1, "single space is true"
+assert_eq Rosetta::Bools::is_truthy([]),      1, "empty arrayref is true"
+assert_eq Rosetta::Bools::is_truthy({}),      1, "empty hashref is true"
+
+# Stringification helper.
+assert_eq Rosetta::Bools::to_string(1),     "true",  "1 → true"
+assert_eq Rosetta::Bools::to_string(""),    "false", "'' → false"
+assert_eq Rosetta::Bools::to_string("yes"), "true",  "'yes' → true"
+
+test_run

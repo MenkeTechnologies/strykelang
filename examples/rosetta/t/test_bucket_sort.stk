@@ -24,7 +24,7 @@ fn Rosetta::BucketSort::solve($arr, $bucket_count) {
     my @res
     for my $b (@$buckets) {
         # Sort each bucket (using built-in sort)
-        my @sorted_b = sort { $a <=> $b } @$b
+        my @sorted_b = sort { _0 <=> _1 } @$b
         push @res, @sorted_b
     }
     \@res

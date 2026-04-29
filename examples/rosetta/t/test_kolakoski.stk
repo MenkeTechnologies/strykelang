@@ -27,7 +27,7 @@ my @k20 = Rosetta::Kolakoski::gen(20)
 assert_eq join(",", @k20), "1,2,2,1,1,2,1,2,2,1,2,2,1,1,2,1,1,2,2,1", "kolakoski(20)"
 
 # Verify first 100 elements sum to a reasonable value
-my $sum = ~> Rosetta::Kolakoski::gen(100) reduce { $a + $b }
+my $sum = ~> Rosetta::Kolakoski::gen(100) reduce { _0 + _1 }
 # Symbols are 1 and 2, so sum should be between 100 and 200.
 # For Kolakoski(1,2), the density of 1s is 0.5, so sum should be around 150.
 assert_ok $sum > 130 && $sum < 170, "sum of first 100 elements is reasonable"

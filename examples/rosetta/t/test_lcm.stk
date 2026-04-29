@@ -20,7 +20,7 @@ fn Rosetta::LCM::compute($a, $b) {
 }
 
 fn Rosetta::LCM::multi(@nums) {
-    @nums |> reduce { Rosetta::LCM::compute($a, $b) }
+    @nums |> reduce { Rosetta::LCM::compute(_0, _1) }
 }
 
 assert_eq Rosetta::LCM::compute(12, 18), 36, "lcm(12, 18)"

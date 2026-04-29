@@ -2,7 +2,7 @@
 # Rosetta Code: Harshad (Niven) Numbers
 
 fn Rosetta::Harshad::digit_sum($n) {
-    "$n" |> chars |> map { int($_) } |> reduce { $a + $b }
+    "$n" |> chars |> map { int($_) } |> reduce { _0 + _1 }
 }
 
 fn Rosetta::Harshad::check($n) {

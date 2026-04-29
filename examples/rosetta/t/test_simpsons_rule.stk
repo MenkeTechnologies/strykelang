@@ -16,10 +16,10 @@ fn Rosetta::SimpsonsRule::integrate($f, $a, $b, $n) {
         @evens = ~> 1:$half_n_minus_1 map { $a + 2*$_ * $h }
     }
     
-    my $sum_odds = ~> @odds map { $f->($_) } reduce { $a + $b }
+    my $sum_odds = ~> @odds map { $f->($_) } reduce { _0 + _1 }
     my $sum_evens = 0
     if (scalar(@evens) > 0) {
-        $sum_evens = ~> @evens map { $f->($_) } reduce { $a + $b }
+        $sum_evens = ~> @evens map { $f->($_) } reduce { _0 + _1 }
     }
     
     ($h / 3) * ($sum + 4 * $sum_odds + 2 * $sum_evens)

@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Munchausen numbers (a.k.a. own digits / Münchhausen numbers).
+# n is Munchausen iff n = sum(d^d) over its decimal digits, with 0^0 := 0.
+# OEIS A046253 in base 10: 0, 1, 3435, 438579088.
+
+fn Rosetta::Munchausen::digit_self_power($d) {
+    return 0 if $d == 0
+    my $r = 1
+    for (1 .. $d) { $r *= $d }
+    $r
+}
+
+fn Rosetta::Munchausen::is($n) {
+    my @digits = "$n" |> chars
+    my $sum = ~> @digits map { Rosetta::Munchausen::digit_self_power($_ + 0) } reduce { $_0 + $_1 }
+    $sum == $n
+}
+
+assert_ok Rosetta::Munchausen::is(0),         "0 is Munchausen (0^0 := 0)"
+assert_ok Rosetta::Munchausen::is(1),         "1 = 1^1"
+assert_ok Rosetta::Munchausen::is(3435),      "3435 = 3^3 + 4^4 + 3^3 + 5^5"
+assert_ok !Rosetta::Munchausen::is(2),        "2 != 2^2"
+assert_ok !Rosetta::Munchausen::is(100),      "100 is not"
+assert_ok !Rosetta::Munchausen::is(3434),     "3434 is not"
+
+# Find first 3 Munchausen numbers under 10000 — should be 0, 1, 3435.
+my @found = ~> 0:9999 grep { Rosetta::Munchausen::is($_) }
+assert_eq join(",", @found), "0,1,3435", "first three under 10k"
+
+test_run

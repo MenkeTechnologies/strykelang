@@ -20,8 +20,8 @@ my $out = Rosetta::Sattolo::shuffle(\@input)
 assert_eq scalar(@$out), 10, "length preserved"
 
 # Same multiset
-my @sorted_in  = sort { $a <=> $b } @input
-my @sorted_out = sort { $a <=> $b } @$out
+my @sorted_in  = sort { _0 <=> _1 } @input
+my @sorted_out = sort { _0 <=> _1 } @$out
 assert_eq join(",", @sorted_out), join(",", @sorted_in), "same elements (multiset)"
 
 # Sattolo property: NO element ends in its original position (a single n-cycle)

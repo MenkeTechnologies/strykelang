@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Long multiplication — schoolbook multiply on digit-string operands.
+# Avoids native int overflow by working at the digit level; result returned as a string.
+
+fn Rosetta::LongMul::digits($s) {
+    my @d = $s |> chars
+    my @r = reverse(@d)
+    [map { $_ + 0 } @r]
+}
+
+fn Rosetta::LongMul::strip_leading_zeros($s) {
+    $s =~ s/^0+(\d)/$1/r
+}
+
+fn Rosetta::LongMul::multiply($_0, $_1) {
+    my $sa = "$_0"
+    my $sb = "$_1"
+    my $da = Rosetta::LongMul::digits($sa)
+    my $db = Rosetta::LongMul::digits($sb)
+    my $la = scalar(@$da)
+    my $lb = scalar(@$db)
+    my @prod
+    for my $i (0 .. $la + $lb - 1) { $prod[$i] = 0 }
+    for my $i (0 .. $la - 1) {
+        for my $j (0 .. $lb - 1) {
+            $prod[$i + $j] += $da->[$i] * $db->[$j]
+            $prod[$i + $j + 1] += int($prod[$i + $j] / 10)
+            $prod[$i + $j] = $prod[$i + $j] % 10
+        }
+    }
+    while (scalar(@prod) > 1 && $prod[-1] == 0) { pop @prod }
+    join("", reverse(@prod))
+}
+
+assert_eq Rosetta::LongMul::multiply("0",     "0"),      "0",       "0 * 0"
+assert_eq Rosetta::LongMul::multiply("12",    "34"),     "408",     "12 * 34"
+assert_eq Rosetta::LongMul::multiply("999",   "999"),    "998001",  "999^2"
+assert_eq Rosetta::LongMul::multiply("12345", "67890"),  "838102050",  "five-digit"
+# 2^64 = 18446744073709551616.
+assert_eq Rosetta::LongMul::multiply("4294967296", "4294967296"),
+    "18446744073709551616", "2^32 * 2^32"
+
+test_run

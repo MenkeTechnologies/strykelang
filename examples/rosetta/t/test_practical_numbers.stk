@@ -12,7 +12,7 @@ fn Rosetta::Practical::divisors($n) {
         }
         $i += 1
     }
-    [sort { $a <=> $b } @d]
+    [sort { _0 <=> _1 } @d]
 }
 
 fn Rosetta::Practical::is_practical($n) {

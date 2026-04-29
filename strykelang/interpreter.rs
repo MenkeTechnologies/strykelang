@@ -116,10 +116,7 @@ pub(crate) fn merge_preduce_init_partials(
     local_interp
         .scope
         .declare_array("_", vec![a.clone(), b.clone()]);
-    let _ = local_interp.scope.set_scalar("a", a.clone());
-    let _ = local_interp.scope.set_scalar("b", b.clone());
-    let _ = local_interp.scope.set_scalar("_0", a);
-    let _ = local_interp.scope.set_scalar("_1", b);
+    local_interp.scope.set_sort_pair(a, b);
     match local_interp.exec_block(block) {
         Ok(val) => val,
         Err(_) => PerlValue::UNDEF,
@@ -152,10 +149,7 @@ pub(crate) fn fold_preduce_init_step(
     local_interp
         .scope
         .declare_array("_", vec![acc.clone(), item.clone()]);
-    let _ = local_interp.scope.set_scalar("a", acc.clone());
-    let _ = local_interp.scope.set_scalar("b", item.clone());
-    let _ = local_interp.scope.set_scalar("_0", acc);
-    let _ = local_interp.scope.set_scalar("_1", item);
+    local_interp.scope.set_sort_pair(acc, item);
     match local_interp.exec_block(block) {
         Ok(val) => val,
         Err(_) => PerlValue::UNDEF,
@@ -10134,10 +10128,7 @@ impl Interpreter {
                         };
                         let sub = sub.clone();
                         items.sort_by(|a, b| {
-                            let _ = self.scope.set_scalar("a", a.clone());
-                            let _ = self.scope.set_scalar("b", b.clone());
-                            let _ = self.scope.set_scalar("_0", a.clone());
-                            let _ = self.scope.set_scalar("_1", b.clone());
+                            self.scope.set_sort_pair(a.clone(), b.clone());
                             match self.call_sub(&sub, vec![], ctx, line) {
                                 Ok(v) => {
                                     let n = v.to_int();
@@ -10159,10 +10150,7 @@ impl Interpreter {
                         } else {
                             let cmp_block = cmp_block.clone();
                             items.sort_by(|a, b| {
-                                let _ = self.scope.set_scalar("a", a.clone());
-                                let _ = self.scope.set_scalar("b", b.clone());
-                                let _ = self.scope.set_scalar("_0", a.clone());
-                                let _ = self.scope.set_scalar("_1", b.clone());
+                                self.scope.set_sort_pair(a.clone(), b.clone());
                                 match self.exec_block(&cmp_block) {
                                     Ok(v) => {
                                         let n = v.to_int();
@@ -10829,10 +10817,7 @@ impl Interpreter {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
-                            let _ = local_interp.scope.set_scalar("a", a.clone());
-                            let _ = local_interp.scope.set_scalar("b", b.clone());
-                            let _ = local_interp.scope.set_scalar("_0", a.clone());
-                            let _ = local_interp.scope.set_scalar("_1", b.clone());
+                            local_interp.scope.set_sort_pair(a.clone(), b.clone());
                             match local_interp.exec_block(&cmp_block) {
                                 Ok(v) => {
                                     let n = v.to_int();
@@ -10873,10 +10858,7 @@ impl Interpreter {
                     let mut local_interp = Interpreter::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
-                    let _ = local_interp.scope.set_scalar("a", acc.clone());
-                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                    let _ = local_interp.scope.set_scalar("_0", acc);
-                    let _ = local_interp.scope.set_scalar("_1", b);
+                    local_interp.scope.set_sort_pair(acc, b);
                     acc = match local_interp.exec_block(&block) {
                         Ok(val) => val,
                         Err(_) => PerlValue::UNDEF,
@@ -10919,10 +10901,7 @@ impl Interpreter {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        let _ = local_interp.scope.set_scalar("a", a.clone());
-                        let _ = local_interp.scope.set_scalar("b", b.clone());
-                        let _ = local_interp.scope.set_scalar("_0", a);
-                        let _ = local_interp.scope.set_scalar("_1", b);
+                        local_interp.scope.set_sort_pair(a, b);
                         match local_interp.exec_block(&block) {
                             Ok(val) => val,
                             Err(_) => PerlValue::UNDEF,
@@ -11031,10 +11010,7 @@ impl Interpreter {
                         let mut local_interp = Interpreter::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
-                        let _ = local_interp.scope.set_scalar("a", a.clone());
-                        let _ = local_interp.scope.set_scalar("b", b.clone());
-                        let _ = local_interp.scope.set_scalar("_0", a);
-                        let _ = local_interp.scope.set_scalar("_1", b);
+                        local_interp.scope.set_sort_pair(a, b);
                         match local_interp.exec_block_no_scope(&reduce_block) {
                             Ok(val) => val,
                             Err(_) => PerlValue::UNDEF,
@@ -16527,10 +16503,7 @@ impl Interpreter {
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.enable_parallel_guard();
-                                    let _ = local_interp.scope.set_scalar("a", a.clone());
-                                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    let _ = local_interp.scope.set_scalar("_0", a.clone());
-                                    let _ = local_interp.scope.set_scalar("_1", b.clone());
+                                    local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                     local_interp.scope_push_hook();
                                     let ord =
                                         match local_interp.exec_block_no_scope(&cmp_block.body) {
@@ -16611,10 +16584,7 @@ impl Interpreter {
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.enable_parallel_guard();
-                            let _ = local_interp.scope.set_scalar("a", a.clone());
-                            let _ = local_interp.scope.set_scalar("b", b.clone());
-                            let _ = local_interp.scope.set_scalar("_0", a);
-                            let _ = local_interp.scope.set_scalar("_1", b);
+                            local_interp.scope.set_sort_pair(a, b);
                             match local_interp.exec_block(&block) {
                                 Ok(val) => val,
                                 Err(_) => PerlValue::UNDEF,
@@ -16702,10 +16672,7 @@ impl Interpreter {
                             let mut local_interp = Interpreter::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
-                            let _ = local_interp.scope.set_scalar("a", a.clone());
-                            let _ = local_interp.scope.set_scalar("b", b.clone());
-                            let _ = local_interp.scope.set_scalar("_0", a);
-                            let _ = local_interp.scope.set_scalar("_1", b);
+                            local_interp.scope.set_sort_pair(a, b);
                             match local_interp.exec_block_no_scope(&reduce_block) {
                                 Ok(val) => val,
                                 Err(_) => PerlValue::UNDEF,
@@ -17043,10 +17010,7 @@ impl Interpreter {
         if let Some(ref env) = cmp.closure_env {
             self.scope.restore_capture(env);
         }
-        let _ = self.scope.set_scalar("a", a.clone());
-        let _ = self.scope.set_scalar("b", b.clone());
-        let _ = self.scope.set_scalar("_0", a.clone());
-        let _ = self.scope.set_scalar("_1", b.clone());
+        self.scope.set_sort_pair(a.clone(), b.clone());
         let ord = match self.exec_block_no_scope(&cmp.body) {
             Ok(v) => {
                 let n = v.to_int();

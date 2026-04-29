@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Climbing stairs — count distinct ways to climb n steps when
+# taking 1 or 2 steps at a time. Equivalent to Fibonacci(n+1).
+
+fn Rosetta::ClimbStairs::count($n) {
+    return 1 if $n <= 1
+    my ($_0, $_1) = (1, 2)
+    for (3 .. $n) { ($_0, $_1) = ($_1, $_0 + $_1) }
+    $_1
+}
+
+# Variant: 1, 2, or 3 steps at a time (tribonacci-like).
+fn Rosetta::ClimbStairs::count_3($n) {
+    return 1 if $n == 0
+    return 1 if $n == 1
+    return 2 if $n == 2
+    my ($_0, $_1, $c) = (1, 1, 2)
+    for (3 .. $n) { ($_0, $_1, $c) = ($_1, $c, $_0 + $_1 + $c) }
+    $c
+}
+
+# Fibonacci shifted: ways(0..10) = 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89.
+my @ways = ~> 0:10 map { Rosetta::ClimbStairs::count($_) }
+assert_eq join(",", @ways),
+    "1,1,2,3,5,8,13,21,34,55,89",
+    "ways(0..10)"
+
+assert_eq Rosetta::ClimbStairs::count(20), 10946, "ways(20)"
+
+# Tribonacci-shaped: ways_3(0..6) = 1, 1, 2, 4, 7, 13, 24.
+my @ways3 = ~> 0:6 map { Rosetta::ClimbStairs::count_3($_) }
+assert_eq join(",", @ways3),
+    "1,1,2,4,7,13,24",
+    "ways_3(0..6)"
+
+test_run

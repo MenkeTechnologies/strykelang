@@ -2,13 +2,13 @@
 # Rosetta Code: Standard Deviation
 
 fn Rosetta::StandardDeviation::mean(@nums) {
-    my $sum = @nums |> reduce { $a + $b }
+    my $sum = @nums |> reduce { _0 + _1 }
     $sum / scalar(@nums)
 }
 
 fn Rosetta::StandardDeviation::compute(@nums) {
     my $m = Rosetta::StandardDeviation::mean(@nums)
-    my $sum_sq_diff = @nums |> map { ($_ - $m) ** 2 } |> reduce { $a + $b }
+    my $sum_sq_diff = @nums |> map { ($_ - $m) ** 2 } |> reduce { _0 + _1 }
     ($sum_sq_diff / scalar(@nums)) ** 0.5
 }
 

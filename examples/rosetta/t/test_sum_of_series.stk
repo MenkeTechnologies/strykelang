@@ -3,7 +3,7 @@
 
 fn sum_series {
     my $m = $_[0]
-    ~> (1..$m) map { 1 / ($_ * $_) } reduce { $a + $b }
+    ~> (1..$m) map { 1 / ($_ * $_) } reduce { _0 + _1 }
 }
 
 my $res = sum_series(1000)

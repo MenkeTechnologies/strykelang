@@ -6,7 +6,7 @@ fn Rosetta::Factorial::compute($n) {
 }
 
 fn Rosetta::Factorial::compute_iter($n) {
-    $n < 1 ? 1 : (~> 1:$n reduce { $a * $b })
+    $n < 1 ? 1 : (~> 1:$n reduce { _0 * _1 })
 }
 
 assert_eq Rosetta::Factorial::compute(0), 1, "factorial(0)"

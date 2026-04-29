@@ -5,7 +5,7 @@ fn extract_ranges(@nums) {
     if (!@nums) {
         ""
     } else {
-        @nums = sort { $a <=> $b } @nums
+        @nums = sort { _0 <=> _1 } @nums
         
         my @ranges
         my $start = $nums[0]

@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Maximum subarray sum (Kadane's algorithm).
+# Returns max sum over all contiguous slices, plus the slice's [start, end).
+
+fn Rosetta::MaxSub::sum(@xs) {
+    return 0 if scalar(@xs) == 0
+    my $best     = $xs[0]
+    my $cur      = $xs[0]
+    for my $i (1 .. scalar(@xs) - 1) {
+        $cur  = $cur + $xs[$i] > $xs[$i] ? $cur + $xs[$i] : $xs[$i]
+        $best = $cur > $best ? $cur : $best
+    }
+    $best
+}
+
+fn Rosetta::MaxSub::with_indices(@xs) {
+    return [0, 0, 0] if scalar(@xs) == 0
+    my $best   = $xs[0]
+    my $cur    = $xs[0]
+    my $start  = 0
+    my $end    = 1
+    my $tstart = 0
+    for my $i (1 .. scalar(@xs) - 1) {
+        if ($cur + $xs[$i] < $xs[$i]) {
+            $cur = $xs[$i]
+            $tstart = $i
+        } else {
+            $cur += $xs[$i]
+        }
+        if ($cur > $best) {
+            $best = $cur
+            $start = $tstart
+            $end = $i + 1
+        }
+    }
+    [$best, $start, $end]
+}
+
+# Canonical Rosetta example: [-2, 1, -3, 4, -1, 2, 1, -5, 4] → max sum 6 over [4, -1, 2, 1].
+assert_eq Rosetta::MaxSub::sum(-2, 1, -3, 4, -1, 2, 1, -5, 4),  6, "Kadane canonical"
+assert_eq Rosetta::MaxSub::sum(1, 2, 3, 4),                    10, "all positive"
+assert_eq Rosetta::MaxSub::sum(-1, -2, -3),                    -1, "all negative → least-negative"
+my @empty = ()
+assert_eq Rosetta::MaxSub::sum(@empty),                         0, "empty → 0"
+assert_eq Rosetta::MaxSub::sum(5),                              5, "single element"
+
+# Verify slice indices on the canonical example.
+my $r = Rosetta::MaxSub::with_indices(-2, 1, -3, 4, -1, 2, 1, -5, 4)
+assert_eq $r->[0], 6, "best sum"
+assert_eq $r->[1], 3, "start index"
+assert_eq $r->[2], 7, "end index"
+
+test_run

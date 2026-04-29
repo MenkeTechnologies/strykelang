@@ -1275,6 +1275,17 @@ impl Parser {
 
     /// Identifiers that start a [`parse_named_expr`] arm (builtins / special forms), not a bare sub call.
     fn bareword_stmt_may_be_sub(name: &str) -> bool {
+        // `_0`, `_1`, …, `_N` are scalar topic-aliases for `$_0`, `$_1`, …
+        // (see `parse_named_expr`'s `_ =>` arm). They MUST NOT be treated as
+        // zero-arg sub calls when they appear as a standalone statement
+        // expression (e.g. the last line of an `fn` body) — that would emit
+        // `Op::Call("_0", 0)` instead of `Op::GetScalar("_0")` and fail at
+        // runtime with "Undefined subroutine &_0".
+        if name.len() > 1 && name.starts_with('_')
+            && name[1..].bytes().all(|b| b.is_ascii_digit())
+        {
+            return false;
+        }
         !matches!(
             name,
             "__FILE__"
@@ -11430,6 +11441,19 @@ impl Parser {
                         kind: ExprKind::ScalarVar("_".to_string()),
                         line,
                     });
+                }
+                // Bare `_0`, `_1`, …, `_N` → positional closure args (`$_0`, `$_1`, …).
+                // Lets `reduce { _0 + _1 }`, `sort { _0 <=> _1 }`, and any block that
+                // refers to its k-th positional arg drop the sigil. Picked over
+                // Perl's `$a` / `$b` because that pair is inconsistent (no `$c`).
+                if name.starts_with('_') && name.len() > 1 {
+                    let rest = &name[1..];
+                    if rest.bytes().all(|b| b.is_ascii_digit()) {
+                        return Ok(Expr {
+                            kind: ExprKind::ScalarVar(name.clone()),
+                            line,
+                        });
+                    }
                 }
                 // Function call with optional parens
                 if matches!(self.peek(), Token::LParen) {

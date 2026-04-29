@@ -5,7 +5,7 @@ fn sum_of_squares {
     my @nums = @_
     if (scalar(@nums) == 0) { 0 }
     else {
-        my $res = @nums |> map { $_ * $_ } |> reduce { $a + $b }
+        my $res = @nums |> map { $_ * $_ } |> reduce { _0 + _1 }
         $res
     }
 }

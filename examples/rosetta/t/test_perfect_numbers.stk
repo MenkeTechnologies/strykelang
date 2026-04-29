@@ -13,7 +13,7 @@ fn Rosetta::PerfectNumbers::divisors($n) {
             }
         }
     }
-    @divs = sort { $a <=> $b } @divs # Sort the divisors numerically
+    @divs = sort { _0 <=> _1 } @divs # Sort the divisors numerically
     \@divs # Return the sorted list of proper divisors
 }
 

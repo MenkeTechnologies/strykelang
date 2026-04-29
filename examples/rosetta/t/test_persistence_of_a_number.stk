@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiplicative persistence — number of times you must replace
+# n with the product of its digits before reaching a single digit.
+# OEIS A031346: 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+
+fn Rosetta::Persistence::digits_of($n) {
+    "$n" |> chars
+}
+
+fn Rosetta::Persistence::digit_product($n) {
+    ~> Rosetta::Persistence::digits_of($n) reduce { $_0 * ($_1 + 0) }
+}
+
+fn Rosetta::Persistence::multiplicative($n) {
+    my $count = 0
+    my $cur = $n
+    while ($cur >= 10) {
+        $cur = Rosetta::Persistence::digit_product($cur)
+        $count += 1
+    }
+    $count
+}
+
+fn Rosetta::Persistence::additive($n) {
+    my $count = 0
+    my $cur = $n
+    while ($cur >= 10) {
+        $cur = ~> Rosetta::Persistence::digits_of($cur) reduce { $_0 + ($_1 + 0) }
+        $count += 1
+    }
+    $count
+}
+
+# 39 → 3*9=27 → 2*7=14 → 1*4=4 → persistence 3.
+assert_eq Rosetta::Persistence::multiplicative(39),    3, "mult-persistence(39)"
+assert_eq Rosetta::Persistence::multiplicative(7),     0, "single digit"
+assert_eq Rosetta::Persistence::multiplicative(25),    2, "25 → 10 → 0"
+assert_eq Rosetta::Persistence::multiplicative(77),    4, "77 → 49 → 36 → 18 → 8"
+# 277777788888899 has known persistence 11 — too big for portable int math; skip.
+
+# 39 → 3+9=12 → 1+2=3 → additive persistence 2.
+assert_eq Rosetta::Persistence::additive(39), 2, "add-persistence(39)"
+assert_eq Rosetta::Persistence::additive(199), 3, "199 → 19 → 10 → 1"
+assert_eq Rosetta::Persistence::additive(0),  0, "0 is single digit"
+
+test_run

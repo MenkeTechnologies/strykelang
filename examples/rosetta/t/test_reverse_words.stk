@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reverse the words of a string (preserve internal whitespace as
+# a single space between tokens). Distinct from `reverse_string` which flips
+# characters.
+
+fn Rosetta::ReverseWords::flip($s) {
+    ~> $s split(/\s+/) |> grep { length($_) > 0 } |> reverse |> join(" ")
+}
+
+# Per-word reverse (each word reversed in place; word order preserved).
+fn Rosetta::ReverseWords::flip_each($s) {
+    ~> $s split(/\s+/) |> grep { length($_) > 0 } |> map { scalar reverse $_ } |> join(" ")
+}
+
+assert_eq Rosetta::ReverseWords::flip("the quick brown fox"),
+    "fox brown quick the", "four-word reverse"
+assert_eq Rosetta::ReverseWords::flip("hello"),
+    "hello", "single word unchanged"
+assert_eq Rosetta::ReverseWords::flip(""),
+    "", "empty stays empty"
+assert_eq Rosetta::ReverseWords::flip("  many   spaces   between  "),
+    "between spaces many", "collapses internal whitespace"
+
+assert_eq Rosetta::ReverseWords::flip_each("hello world"),
+    "olleh dlrow", "each word reversed in place"
+assert_eq Rosetta::ReverseWords::flip_each("a bb ccc"),
+    "a bb ccc", "palindromes per word"
+
+test_run

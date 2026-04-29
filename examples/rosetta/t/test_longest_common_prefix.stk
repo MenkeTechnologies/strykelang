@@ -22,7 +22,7 @@ fn Rosetta::LongestCommonPrefix::solve(@strings) {
     if (scalar(@strings) == 0) {
         ""
     } else {
-        @strings |> reduce { Rosetta::LongestCommonPrefix::common($a, $b) }
+        @strings |> reduce { Rosetta::LongestCommonPrefix::common(_0, _1) }
     }
 }
 

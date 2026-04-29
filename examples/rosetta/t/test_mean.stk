@@ -5,7 +5,7 @@ fn Rosetta::Mean::arithmetic(@nums) {
     if (!@nums) {
         0
     } else {
-        (@nums |> reduce { $a + $b }) / scalar(@nums)
+        (@nums |> reduce { _0 + _1 }) / scalar(@nums)
     }
 }
 
@@ -13,7 +13,7 @@ fn Rosetta::Mean::geometric(@nums) {
     if (!@nums) {
         0
     } else {
-        my $product = @nums |> reduce { $a * $b }
+        my $product = @nums |> reduce { _0 * _1 }
         $product ** (1 / scalar(@nums))
     }
 }
@@ -22,7 +22,7 @@ fn Rosetta::Mean::harmonic(@nums) {
     if (!@nums) {
         0
     } else {
-        my $sum = @nums |> map { 1 / $_ } |> reduce { $a + $b }
+        my $sum = @nums |> map { 1 / $_ } |> reduce { _0 + _1 }
         scalar(@nums) / $sum
     }
 }

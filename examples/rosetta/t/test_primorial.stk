@@ -35,7 +35,7 @@ fn primorial($n) {
             }
             $p++
         }
-        @primes |> reduce { $a * $b }
+        @primes |> reduce { _0 * _1 }
     }
 }
 

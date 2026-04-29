@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Peano numbers — successor-only encoding of N.
+# Zero is `[]`. Successor is `[ inner ]`. Add and multiply by structural recursion.
+
+fn Rosetta::Peano::zero() {
+    []
+}
+
+fn Rosetta::Peano::succ($n) {
+    [$n]
+}
+
+fn Rosetta::Peano::is_zero($n) {
+    scalar(@$n) == 0 ? 1 : 0
+}
+
+fn Rosetta::Peano::pred($n) {
+    die "pred(0) is undefined" if Rosetta::Peano::is_zero($n)
+    $n->[0]
+}
+
+fn Rosetta::Peano::from_int($k) {
+    my $n = Rosetta::Peano::zero()
+    for (1 .. $k) { $n = Rosetta::Peano::succ($n) }
+    $n
+}
+
+fn Rosetta::Peano::to_int($n) {
+    my $count = 0
+    my $cur = $n
+    while (!Rosetta::Peano::is_zero($cur)) {
+        $count += 1
+        $cur = Rosetta::Peano::pred($cur)
+    }
+    $count
+}
+
+fn Rosetta::Peano::add($_0, $_1) {
+    return $_1 if Rosetta::Peano::is_zero($_0)
+    Rosetta::Peano::succ(Rosetta::Peano::add(Rosetta::Peano::pred($_0), $_1))
+}
+
+fn Rosetta::Peano::mul($_0, $_1) {
+    return Rosetta::Peano::zero() if Rosetta::Peano::is_zero($_0)
+    Rosetta::Peano::add($_1, Rosetta::Peano::mul(Rosetta::Peano::pred($_0), $_1))
+}
+
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::zero()), 0, "zero → 0"
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::from_int(7)), 7, "round-trip 7"
+
+my $three = Rosetta::Peano::from_int(3)
+my $four  = Rosetta::Peano::from_int(4)
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::add($three, $four)), 7, "3 + 4 = 7"
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::mul($three, $four)), 12, "3 * 4 = 12"
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::add(Rosetta::Peano::zero(), $four)), 4, "0 + 4 = 4"
+assert_eq Rosetta::Peano::to_int(Rosetta::Peano::mul(Rosetta::Peano::zero(), $four)), 0, "0 * 4 = 0"
+
+test_run

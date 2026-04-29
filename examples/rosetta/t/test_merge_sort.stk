@@ -3,7 +3,7 @@
 # Using built-in sort to demonstrate sorting concept
 
 fn numeric_sort(@arr) {
-    sort { $a <=> $b } @arr
+    sort { _0 <=> _1 } @arr
 }
 
 my @sorted = numeric_sort(38, 27, 43, 3, 9, 82, 10)

@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Out-shuffle (a.k.a. perfect riffle).
+# Split a deck of 2n cards into halves H1 = [0..n-1], H2 = [n..2n-1] and
+# interleave: card[2i] = H1[i], card[2i+1] = H2[i]. Repeat until the deck
+# returns to its original order; report the iteration count.
+
+fn Rosetta::Riffle::out_shuffle($deck) {
+    my $n = scalar(@$deck) / 2
+    my @result
+    for my $i (0 .. $n - 1) {
+        push @result, $deck->[$i]
+        push @result, $deck->[$i + $n]
+    }
+    \@result
+}
+
+fn Rosetta::Riffle::iterations_to_restore($size) {
+    my @original = (0 .. $size - 1)
+    my $cur = [@original]
+    my $count = 0
+    while (1) {
+        $cur = Rosetta::Riffle::out_shuffle($cur)
+        $count += 1
+        my $same = 1
+        for my $i (0 .. $size - 1) {
+            if ($cur->[$i] != $original[$i]) { $same = 0; last }
+        }
+        return $count if $same
+    }
+}
+
+# Out-shuffle on [0,1,2,3,4,5] → [0,3,1,4,2,5].
+my $shuffled = Rosetta::Riffle::out_shuffle([0,1,2,3,4,5])
+assert_eq join(",", @$shuffled), "0,3,1,4,2,5", "size 6"
+
+# OEIS A002326 (multiplicative order of 2 mod (n-1) for even n) — known counts:
+# size 8 → 3, size 24 → 11, size 52 → 8 (a 52-card deck).
+assert_eq Rosetta::Riffle::iterations_to_restore(8),  3,  "size 8 → 3"
+assert_eq Rosetta::Riffle::iterations_to_restore(24), 11, "size 24 → 11"
+assert_eq Rosetta::Riffle::iterations_to_restore(52), 8,  "size 52 (poker deck) → 8"
+
+test_run

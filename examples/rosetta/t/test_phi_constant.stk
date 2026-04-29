@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Phi (golden ratio) — solve x^2 = x + 1, i.e. x = (1+sqrt(5))/2.
+# Compute by repeated continued-fraction expansion: phi = 1 + 1/(1 + 1/(1 + ...)).
+
+fn Rosetta::Phi::sqrt_form() {
+    (1 + sqrt(5)) / 2
+}
+
+fn Rosetta::Phi::continued_fraction($depth) {
+    my $x = 1.0
+    for (1 .. $depth) { $x = 1 + 1 / $x }
+    $x
+}
+
+fn Rosetta::Phi::fibonacci_ratio($n) {
+    my ($_0, $_1) = (1, 1)
+    for (1 .. $n) { ($_0, $_1) = ($_1, $_0 + $_1) }
+    $_1 / $_0
+}
+
+my $phi = Rosetta::Phi::sqrt_form()
+assert_ok abs($phi - 1.6180339887) < 1e-9, "phi ~ 1.618033988..."
+assert_ok abs($phi * $phi - $phi - 1) < 1e-12, "phi^2 - phi - 1 == 0"
+
+my $cf = Rosetta::Phi::continued_fraction(50)
+assert_ok abs($cf - $phi) < 1e-9, "continued fraction converges to phi"
+
+my $fr = Rosetta::Phi::fibonacci_ratio(40)
+assert_ok abs($fr - $phi) < 1e-7, "F(n+1)/F(n) → phi"
+
+test_run

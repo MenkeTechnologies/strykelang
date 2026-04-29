@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Shannon entropy of a string in bits per symbol.
+# H = -sum_i p_i * log2(p_i), summed over distinct chars.
+
+fn Rosetta::Entropy::shannon($s) {
+    return 0.0 if length($s) == 0
+    my %count
+    for my $c ($s |> chars) {
+        $count{$c} = ($count{$c} // 0) + 1
+    }
+    my $n = length($s)
+    my $h = 0.0
+    for my $c (keys %count) {
+        my $p = $count{$c} / $n
+        $h -= $p * log($p) / log(2)
+    }
+    $h
+}
+
+# All-distinct n-char string → entropy = log2(n).
+assert_ok abs(Rosetta::Entropy::shannon("abcd") - 2.0) < 1e-12, "log2(4) = 2 bits"
+assert_ok abs(Rosetta::Entropy::shannon("a") - 0.0) < 1e-12, "single char → 0"
+
+# Constant string → entropy = 0 regardless of length.
+assert_eq Rosetta::Entropy::shannon("aaaaaaaa"), 0, "constant → 0"
+assert_eq Rosetta::Entropy::shannon(""),         0, "empty → 0"
+
+# Canonical example: 1223334444 → ~1.846439 bits.
+my $h = Rosetta::Entropy::shannon("1223334444")
+assert_ok abs($h - 1.8464393446710154) < 1e-9, "1223334444"
+
+test_run

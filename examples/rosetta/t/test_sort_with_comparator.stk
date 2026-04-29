@@ -2,7 +2,7 @@
 # Rosetta Code: Sort using a custom comparator (string length, then lex)
 
 fn Rosetta::CustomSort::sort_by_length(@words) {
-    sort { length($a) <=> length($b) || $a cmp $b } @words
+    sort { length(_0) <=> length(_1) || _0 cmp _1 } @words
 }
 
 fn Rosetta::CustomSort::sort_by_field($items, $field) {
@@ -10,11 +10,11 @@ fn Rosetta::CustomSort::sort_by_field($items, $field) {
 }
 
 fn Rosetta::CustomSort::sort_desc(@nums) {
-    sort { $b <=> $a } @nums
+    sort { _1 <=> _0 } @nums
 }
 
 fn Rosetta::CustomSort::sort_case_insensitive(@words) {
-    sort { lc($a) cmp lc($b) } @words
+    sort { lc(_0) cmp lc(_1) } @words
 }
 
 # Length-then-lex
@@ -47,12 +47,12 @@ assert_eq join(",", @ci), "apple,BANANA,Cherry,date", "case-insensitive lex"
 
 # Inline comparator
 my @words2 = ("aaa", "b", "cc")
-my @by_len_only = sort { length($a) <=> length($b) } @words2
+my @by_len_only = sort { length(_0) <=> length(_1) } @words2
 assert_eq join(",", @by_len_only), "b,cc,aaa", "inline len comparator"
 
 # Spaceship operator on numbers
 my @nums = (10, 2, 33, 4, 100, 5)
-my @sorted_nums = sort { $a <=> $b } @nums
+my @sorted_nums = sort { _0 <=> _1 } @nums
 assert_eq join(",", @sorted_nums), "2,4,5,10,33,100", "numeric spaceship"
 
 # Default sort is string lex (so 100 < 2 < 33...)
