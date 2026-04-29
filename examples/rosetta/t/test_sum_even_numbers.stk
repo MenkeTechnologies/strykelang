@@ -3,7 +3,7 @@
 
 fn Rosetta::SumEven::compute($list) {
     my @evens = ~> @$list grep { $_ % 2 == 0 }
-    if (scalar(@evens) == 0) {
+    if (len(@evens) == 0) {
         0
     } else {
         ~> @evens reduce { _0 + _1 }

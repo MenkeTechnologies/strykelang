@@ -3,13 +3,13 @@
 
 fn Rosetta::Ulam::generate($n) {
     my @u = (1, 2)
-    while (scalar(@u) < $n) {
+    while (len(@u) < $n) {
         my $next = $u[-1] + 1
         my $found = 0
         while (!$found) {
             my $ways = 0
-            for my $i (0..scalar(@u)-2) {
-                for my $j ($i+1..scalar(@u)-1) {
+            for my $i (0..len(@u)-2) {
+                for my $j ($i+1..len(@u)-1) {
                     if ($u[$i] + $u[$j] == $next) {
                         $ways++
                     }

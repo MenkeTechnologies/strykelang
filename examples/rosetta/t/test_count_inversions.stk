@@ -3,7 +3,7 @@
 # An inversion is a pair (i, j) with i < j and arr[i] > arr[j].
 
 fn Rosetta::Inversions::merge_count($a) {
-    my $n = scalar(@$a)
+    my $n = len(@$a)
     return [[@$a], 0] if $n <= 1
     my $mid = int($n / 2)
     my @left = @$a[0..$mid - 1]
@@ -15,16 +15,16 @@ fn Rosetta::Inversions::merge_count($a) {
     my $count = $l->[1] + $r->[1]
     my @merged
     my ($i, $j) = (0, 0)
-    while ($i < scalar(@ml) && $j < scalar(@mr)) {
+    while ($i < len(@ml) && $j < len(@mr)) {
         if ($ml[$i] <= $mr[$j]) {
             push @merged, $ml[$i++]
         } else {
             push @merged, $mr[$j++]
-            $count += scalar(@ml) - $i
+            $count += len(@ml) - $i
         }
     }
-    while ($i < scalar(@ml)) { push @merged, $ml[$i++] }
-    while ($j < scalar(@mr)) { push @merged, $mr[$j++] }
+    while ($i < len(@ml)) { push @merged, $ml[$i++] }
+    while ($j < len(@mr)) { push @merged, $mr[$j++] }
     [\@merged, $count]
 }
 

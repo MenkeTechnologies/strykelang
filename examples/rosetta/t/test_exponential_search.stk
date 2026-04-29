@@ -16,7 +16,7 @@ fn Rosetta::ExpSearch::binary($arr, $target, $lo, $hi) {
 }
 
 fn Rosetta::ExpSearch::find($arr, $target) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return -1 if $n == 0
     return 0 if $arr->[0] == $target
     my $i = 1

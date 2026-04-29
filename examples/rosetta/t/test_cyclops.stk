@@ -4,7 +4,7 @@
 fn Rosetta::Cyclops::check($n) {
     my $s = sprintf("%d", $n)
     my @c = chars($s)
-    my $len = scalar(@c)
+    my $len = len(@c)
     if ($len % 2 == 0) {
         return 0
     }

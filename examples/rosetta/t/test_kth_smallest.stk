@@ -16,7 +16,7 @@ fn Rosetta::KthSmall::heapify_down($h, $i, $n) {
 }
 
 fn Rosetta::KthSmall::find($arr, $k) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return undef if $k < 1 || $k > $n
     my @h = @$arr
     my $start = int($n / 2) - 1

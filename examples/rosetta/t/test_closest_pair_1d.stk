@@ -2,7 +2,7 @@
 # Rosetta Code: Closest pair (1D) — sort and scan adjacent differences in O(n log n)
 
 fn Rosetta::ClosestPair::find(@pts) {
-    my $n = scalar(@pts)
+    my $n = len(@pts)
     return undef if $n < 2
     my @sorted = sort { _0 <=> _1 } @pts
     my $best_d = abs($sorted[1] - $sorted[0])

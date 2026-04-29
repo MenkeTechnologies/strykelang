@@ -42,7 +42,7 @@ fn Rosetta::Bifid::encode($text, $key) {
     
     my @combined = (@rows, @cols)
     my @res
-    for (my $i = 0; $i < scalar(@combined); $i += 2) {
+    for (my $i = 0; $i < len(@combined); $i += 2) {
         my $r = $combined[$i]
         my $c = $combined[$i+1]
         push @res, $grid->[$r * 5 + $c]
@@ -62,7 +62,7 @@ fn Rosetta::Bifid::decode($text, $key) {
         push @combined, $p->[0], $p->[1]
     }
     
-    my $n = scalar(@combined) / 2
+    my $n = len(@combined) / 2
     my @rows = @combined[0 : $n-1]
     my @cols = @combined[$n : 2*$n-1]
     

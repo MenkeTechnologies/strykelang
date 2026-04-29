@@ -5,9 +5,9 @@ fn Rosetta::Combinations::generate($k, @arr) {
     my @result
     if ($k == 0) {
         @result = ([])
-    } elsif ($k > scalar(@arr)) {
+    } elsif ($k > len(@arr)) {
         @result = ()
-    } elsif ($k == scalar(@arr)) {
+    } elsif ($k == len(@arr)) {
         @result = ([@arr])
     } else {
         my $first = shift @arr
@@ -30,16 +30,16 @@ fn Rosetta::Combinations::count($n, $k) {
 }
 
 my @c2 = Rosetta::Combinations::generate(2, 1, 2, 3, 4)
-assert_eq scalar(@c2), 6, "C(4,2) = 6"
+assert_eq len(@c2), 6, "C(4,2) = 6"
 
 my @c3 = Rosetta::Combinations::generate(3, 1, 2, 3, 4, 5)
-assert_eq scalar(@c3), 10, "C(5,3) = 10"
+assert_eq len(@c3), 10, "C(5,3) = 10"
 
 my @c0 = Rosetta::Combinations::generate(0, 1, 2, 3)
-assert_eq scalar(@c0), 1, "C(n,0) = 1"
+assert_eq len(@c0), 1, "C(n,0) = 1"
 
 my @cn = Rosetta::Combinations::generate(3, 1, 2, 3)
-assert_eq scalar(@cn), 1, "C(n,n) = 1"
+assert_eq len(@cn), 1, "C(n,n) = 1"
 
 assert_eq Rosetta::Combinations::count(4, 2), 6, "count C(4,2)"
 assert_eq Rosetta::Combinations::count(10, 3), 120, "count C(10,3)"

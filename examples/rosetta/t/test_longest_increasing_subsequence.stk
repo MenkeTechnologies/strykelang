@@ -3,7 +3,7 @@
 
 fn Rosetta::LIS::solve($arr_ref) {
     my @arr = @$arr_ref
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     if ($n == 0) { return 0 }
     my @tails = (0) x $n
     my $size = 0

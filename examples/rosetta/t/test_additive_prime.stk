@@ -3,7 +3,7 @@
 
 fn Rosetta::AdditivePrime::sum_digits($n) {
     my @digits = ~> "$n" chars map { int($_) }
-    if (scalar(@digits) == 0) { return 0 }
+    if (len(@digits) == 0) { return 0 }
     @digits |> reduce { _0 + _1 }
 }
 

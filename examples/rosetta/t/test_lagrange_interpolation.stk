@@ -3,7 +3,7 @@
 # Given (x_i, y_i) pairs, evaluate L(x) at a query point.
 
 fn Rosetta::Lagrange::eval($pts, $x) {
-    my $n = scalar(@$pts)
+    my $n = len(@$pts)
     my $sum = 0.0
     for my $i (0..$n-1) {
         my $xi = $pts->[$i][0]

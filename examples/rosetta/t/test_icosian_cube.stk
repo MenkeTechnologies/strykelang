@@ -5,7 +5,7 @@ fn Rosetta::IcosianCube::solve($adj, $start, $visited, $path) {
     push @$path, $start
     $visited->{$start} = 1
     
-    if (scalar(@$path) == 8) {
+    if (len(@$path) == 8) {
         return $path
     }
     
@@ -26,6 +26,6 @@ my $cube_adj = [
 
 my $path = Rosetta::IcosianCube::solve($cube_adj, 0, {}, [])
 assert_ok defined($path), "Hamiltonian path on cube exists"
-assert_eq scalar(@$path), 8, "path length is 8"
+assert_eq len(@$path), 8, "path length is 8"
 
 test_run

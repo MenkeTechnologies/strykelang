@@ -4,7 +4,7 @@
 fn Rosetta::UTM::solve($state, $tape, $pos, $rules, $halt, $blank) {
     $blank = "0" if !defined $blank
     my %tape_h
-    for (my $i = 0; $i < scalar(@$tape); $i++) {
+    for (my $i = 0; $i < len(@$tape); $i++) {
         $tape_h{$i} = $tape->[$i]
     }
     

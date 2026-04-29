@@ -13,7 +13,7 @@ my $json_str = '{"foo": 1, "bar": [1, 2, 3], "baz": {"a": "b"}}'
 my $obj = Rosetta::JSON::parse($json_str)
 
 assert_eq $obj->{foo}, 1, "json foo"
-assert_eq scalar(@{$obj->{bar}}), 3, "json bar size"
+assert_eq len(@{$obj->{bar}}), 3, "json bar size"
 assert_eq $obj->{baz}->{a}, "b", "json baz a"
 
 my $back = Rosetta::JSON::stringify($obj)

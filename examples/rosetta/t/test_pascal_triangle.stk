@@ -4,7 +4,7 @@
 fn Rosetta::PascalTriangle::next_row($prev) {
     my @p = @$prev
     my @mid
-    for my $i (0..scalar(@p)-2) {
+    for my $i (0..len(@p)-2) {
         push @mid, $p[$i] + $p[$i+1]
     }
     my @res = (1, @mid, 1)

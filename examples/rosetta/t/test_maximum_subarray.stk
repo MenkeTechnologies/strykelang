@@ -3,10 +3,10 @@
 # Returns max sum over all contiguous slices, plus the slice's [start, end).
 
 fn Rosetta::MaxSub::sum(@xs) {
-    return 0 if scalar(@xs) == 0
+    return 0 if len(@xs) == 0
     my $best     = $xs[0]
     my $cur      = $xs[0]
-    for my $i (1 .. scalar(@xs) - 1) {
+    for my $i (1 .. len(@xs) - 1) {
         $cur  = $cur + $xs[$i] > $xs[$i] ? $cur + $xs[$i] : $xs[$i]
         $best = $cur > $best ? $cur : $best
     }
@@ -14,13 +14,13 @@ fn Rosetta::MaxSub::sum(@xs) {
 }
 
 fn Rosetta::MaxSub::with_indices(@xs) {
-    return [0, 0, 0] if scalar(@xs) == 0
+    return [0, 0, 0] if len(@xs) == 0
     my $best   = $xs[0]
     my $cur    = $xs[0]
     my $start  = 0
     my $end    = 1
     my $tstart = 0
-    for my $i (1 .. scalar(@xs) - 1) {
+    for my $i (1 .. len(@xs) - 1) {
         if ($cur + $xs[$i] < $xs[$i]) {
             $cur = $xs[$i]
             $tstart = $i

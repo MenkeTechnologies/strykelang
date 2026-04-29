@@ -8,7 +8,7 @@ fn Rosetta::OneHundredDoors::solve($n) {
     ~> 1:$n pgrep {
         my $door = $_
         my @divs = grep { $door % $_ == 0 } 1:$door
-        scalar(@divs) % 2 == 1
+        len(@divs) % 2 == 1
     }
 }
 

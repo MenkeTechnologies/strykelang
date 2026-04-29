@@ -26,7 +26,7 @@ fn stooge_sort_recursive {
 fn stooge_sort {
     my $list = $_[0]
     my @data = @$list
-    my $n = scalar(@data)
+    my $n = len(@data)
     if ($n < 2) {
         return \@data
     }

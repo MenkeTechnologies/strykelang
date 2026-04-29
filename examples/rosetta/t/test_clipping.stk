@@ -3,8 +3,8 @@
 
 fn Rosetta::Clipping::solve($subject, $clip) {
     my $output = $subject
-    for my $i (0..scalar(@$clip)-1) {
-        my $j = ($i + 1) % scalar(@$clip)
+    for my $i (0..len(@$clip)-1) {
+        my $j = ($i + 1) % len(@$clip)
         my $edge_start = $clip->[$i]
         my $edge_end = $clip->[$j]
         

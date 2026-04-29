@@ -9,7 +9,7 @@ fn Rosetta::BeadSort::sort($list) {
     }
     
     my @beads = ()
-    for my $i (0..scalar(@arr)-1) {
+    for my $i (0..len(@arr)-1) {
         $beads[$i] = []
         for my $j (0..$arr[$i]-1) {
             $beads[$i][$j] = 1
@@ -18,21 +18,21 @@ fn Rosetta::BeadSort::sort($list) {
     
     for my $j (0..$max-1) {
         my $sum = 0
-        for my $i (0..scalar(@arr)-1) {
+        for my $i (0..len(@arr)-1) {
             if ($beads[$i][$j]) {
                 $sum++
                 $beads[$i][$j] = 0
             }
         }
         if ($sum > 0) {
-            for my $i (scalar(@arr)-$sum .. scalar(@arr)-1) {
+            for my $i (len(@arr)-$sum .. len(@arr)-1) {
                 $beads[$i][$j] = 1
             }
         }
     }
     
     my @res = ()
-    for my $i (0..scalar(@arr)-1) {
+    for my $i (0..len(@arr)-1) {
         my $sum = 0
         for my $j (0..$max-1) {
             if ($beads[$i][$j]) { $sum++ }

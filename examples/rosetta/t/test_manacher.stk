@@ -8,7 +8,7 @@ fn Rosetta::Manacher::solve($s) {
     # Preprocess: "aba" -> "^#a#b#a#$"
     my $t = "^#" . (join("#", $s |> chars())) . "#$"
     my @t_chars = $t |> chars()
-    my $n = scalar(@t_chars)
+    my $n = len(@t_chars)
     my @p = map { 0 } 1:$n
     
     my $c = 0

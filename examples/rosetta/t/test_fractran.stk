@@ -48,7 +48,7 @@ my @powers_of_2 = ~> @seq grep {
 # The primes are log2 of these powers of 2
 my @primes = ~> @powers_of_2 map { log($_) / log(2) |> round() }
 
-assert_ok scalar(@primes) >= 4, "Found at least 4 primes (including starting 1)"
+assert_ok len(@primes) >= 4, "Found at least 4 primes (including starting 1)"
 assert_eq $primes[1], 2, "First prime is 2"
 assert_eq $primes[2], 3, "Second prime is 3"
 assert_eq $primes[3], 5, "Third prime is 5"

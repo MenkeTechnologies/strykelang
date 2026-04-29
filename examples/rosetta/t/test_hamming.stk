@@ -16,7 +16,7 @@ fn Rosetta::Hamming::check($n) {
 fn Rosetta::Hamming::generate($count) {
     my @h
     my $n = 1
-    while (scalar(@h) < $count) {
+    while (len(@h) < $count) {
         if (Rosetta::Hamming::check($n)) {
             push @h, $n
         }

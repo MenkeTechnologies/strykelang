@@ -2,8 +2,8 @@
 # Rosetta Code: Matrix Transpose (Manual)
 
 fn Rosetta::MatrixTranspose::solve($m) {
-    my $rows = scalar(@$m)
-    my $cols = scalar(@{$m->[0]})
+    my $rows = len(@$m)
+    my $cols = len(@{$m->[0]})
     my @res
     for my $j (0..$cols-1) {
         my @new_row
@@ -19,8 +19,8 @@ my $m = [[1, 2, 3], [4, 5, 6]]
 my $tr = Rosetta::MatrixTranspose::solve($m)
 
 # Expected: [[1, 4], [2, 5], [3, 6]]
-assert_eq scalar(@$tr), 3, "transpose rows"
-assert_eq scalar(@{$tr->[0]}), 2, "transpose cols"
+assert_eq len(@$tr), 3, "transpose rows"
+assert_eq len(@{$tr->[0]}), 2, "transpose cols"
 assert_eq $tr->[0]->[1], 4, "tr[0][1]"
 assert_eq $tr->[2]->[0], 3, "tr[2][0]"
 

@@ -10,7 +10,7 @@ fn Rosetta::AhoCorasick::build($patterns) {
         for my $c (@chars) {
             if (!exists($trie->[$curr]->{next}->{$c})) {
                 push @$trie, { next => {}, fail => 0, output => [] }
-                $trie->[$curr]->{next}->{$c} = scalar(@$trie) - 1
+                $trie->[$curr]->{next}->{$c} = len(@$trie) - 1
             }
             $curr = $trie->[$curr]->{next}->{$c}
         }
@@ -22,7 +22,7 @@ fn Rosetta::AhoCorasick::build($patterns) {
         push @queue, $trie->[0]->{next}->{$c}
     }
     
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $u = shift @queue
         for my $c (keys %{$trie->[$u]->{next}}) {
             my $v = $trie->[$u]->{next}->{$c}
@@ -45,7 +45,7 @@ fn Rosetta::AhoCorasick::search($trie, $text) {
     my %results
     my $curr = 0
     my @chars = chars($text)
-    for (my $i = 0; $i < scalar(@chars); $i++) {
+    for (my $i = 0; $i < len(@chars); $i++) {
         my $c = $chars[$i]
         while ($curr > 0 && !exists($trie->[$curr]->{next}->{$c})) {
             $curr = $trie->[$curr]->{fail}

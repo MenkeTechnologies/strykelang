@@ -29,7 +29,7 @@ fn primorial($n) {
     } else {
         my @primes
         my $p = 2
-        while (scalar(@primes) < $n) {
+        while (len(@primes) < $n) {
             if (Rosetta::IsPrime::is_prime($p)) {
                 push @primes, $p
             }

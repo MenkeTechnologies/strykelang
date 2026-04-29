@@ -44,7 +44,7 @@ my @z20 = zeckendorf(20)
 join(",", @z20) |> assert_eq("2,5,13", "zeckendorf(20)")
 
 my @z0 = zeckendorf(0)
-assert_eq(scalar(@z0), 0, "zeckendorf(0)")
+assert_eq(len(@z0), 0, "zeckendorf(0)")
 
 my @z8 = zeckendorf(8)
 join(",", @z8) |> assert_eq("8", "zeckendorf(8)")

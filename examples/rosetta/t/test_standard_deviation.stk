@@ -3,13 +3,13 @@
 
 fn Rosetta::StandardDeviation::mean(@nums) {
     my $sum = @nums |> reduce { _0 + _1 }
-    $sum / scalar(@nums)
+    $sum / len(@nums)
 }
 
 fn Rosetta::StandardDeviation::compute(@nums) {
     my $m = Rosetta::StandardDeviation::mean(@nums)
     my $sum_sq_diff = @nums |> map { ($_ - $m) ** 2 } |> reduce { _0 + _1 }
-    ($sum_sq_diff / scalar(@nums)) ** 0.5
+    ($sum_sq_diff / len(@nums)) ** 0.5
 }
 
 my @data = (2, 4, 4, 4, 5, 5, 7, 9)

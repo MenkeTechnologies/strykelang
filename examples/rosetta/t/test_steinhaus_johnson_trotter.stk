@@ -3,7 +3,7 @@
 # Generate all permutations of 1..n by adjacent transpositions.
 
 fn Rosetta::SJT::mobile_index($a, $dir) {
-    my $n = scalar(@$a)
+    my $n = len(@$a)
     my $best = -1
     my $best_val = -1
     for my $i (0..$n-1) {
@@ -45,7 +45,7 @@ fn Rosetta::SJT::all($n) {
 #  2 3 1
 #  2 1 3
 my $p3 = Rosetta::SJT::all(3)
-assert_eq scalar(@$p3), 6, "3! = 6"
+assert_eq len(@$p3), 6, "3! = 6"
 my @sigs = map { join("", @$_) } @$p3
 assert_eq $sigs[0], "123", "first perm"
 assert_eq $sigs[1], "132", "swap last 2"
@@ -56,7 +56,7 @@ assert_eq $sigs[5], "213", "final swap"
 
 # Adjacent transposition property: each consecutive pair differs in exactly one swap
 fn Rosetta::SJT::diff_count($x, $y) {
-    my $n = scalar(@$x)
+    my $n = len(@$x)
     my $d = 0
     for my $i (0..$n-1) {
         $d++ if $x->[$i] != $y->[$i]
@@ -64,7 +64,7 @@ fn Rosetta::SJT::diff_count($x, $y) {
     $d
 }
 my $p4 = Rosetta::SJT::all(4)
-assert_eq scalar(@$p4), 24, "4! = 24"
+assert_eq len(@$p4), 24, "4! = 24"
 for my $i (1..23) {
     my $d = Rosetta::SJT::diff_count($p4->[$i-1], $p4->[$i])
     assert_eq $d, 2, "consecutive perms differ in 2 positions (adjacent swap)"
@@ -75,11 +75,11 @@ my %seen
 for my $perm (@$p4) {
     $seen{join(",", @$perm)} = 1
 }
-assert_eq scalar(keys %seen), 24, "all 24 perms distinct"
+assert_eq len(keys %seen), 24, "all 24 perms distinct"
 
 # n = 1 -> [[1]]
 my $p1 = Rosetta::SJT::all(1)
-assert_eq scalar(@$p1), 1, "1! = 1"
+assert_eq len(@$p1), 1, "1! = 1"
 assert_eq $p1->[0][0], 1, "single perm = [1]"
 
 test_run

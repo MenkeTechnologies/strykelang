@@ -2,8 +2,8 @@
 # Rosetta Code: Pearson correlation coefficient
 
 fn Rosetta::Pearson::compute($x, $y) {
-    my $n = scalar(@$x)
-    if ($n != scalar(@$y)) { return undef }
+    my $n = len(@$x)
+    if ($n != len(@$y)) { return undef }
     if ($n == 0) { return undef }
 
     my $sum_x = ~> @$x reduce { _0 + _1 }

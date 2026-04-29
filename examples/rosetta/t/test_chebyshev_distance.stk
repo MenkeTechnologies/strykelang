@@ -2,7 +2,7 @@
 # Rosetta Code: Chebyshev (L-infinity) distance — chess king metric
 
 fn Rosetta::Chebyshev::distance($u, $v) {
-    my $n = scalar(@$u)
+    my $n = len(@$u)
     my $best = 0
     for my $i (0..$n-1) {
         my $d = abs($u->[$i] - $v->[$i])

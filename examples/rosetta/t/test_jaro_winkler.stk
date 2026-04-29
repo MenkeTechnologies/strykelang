@@ -57,7 +57,7 @@ fn Rosetta::JaroWinkler::solve($s1, $s2) {
     my $l = 0
     my @c1 = $s1 |> chars()
     my @c2 = $s2 |> chars()
-    my $min_len = min(min(scalar(@c1), scalar(@c2)), 4)
+    my $min_len = min(min(len(@c1), len(@c2)), 4)
     
     for (my $i = 0; $i < $min_len; $i++) {
         if ($c1[$i] eq $c2[$i]) {

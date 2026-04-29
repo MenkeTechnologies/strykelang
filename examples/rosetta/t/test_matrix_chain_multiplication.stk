@@ -2,7 +2,7 @@
 # Rosetta Code: Matrix chain multiplication
 
 fn Rosetta::MatrixChain::solve($dims) {
-    my $n = scalar(@$dims) - 1
+    my $n = len(@$dims) - 1
     my @m
     for (my $i = 0; $i < $n; $i++) {
         my @row

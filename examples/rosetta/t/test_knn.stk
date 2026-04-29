@@ -3,7 +3,7 @@
 
 fn Rosetta::KNN::distance($p1, $p2) {
     my $sum = 0
-    for (my $i = 0; $i < scalar(@$p1); $i++) {
+    for (my $i = 0; $i < len(@$p1); $i++) {
         $sum += ($p1->[$i] - $p2->[$i]) ** 2
     }
     sqrt($sum)
@@ -11,7 +11,7 @@ fn Rosetta::KNN::distance($p1, $p2) {
 
 fn Rosetta::KNN::solve($training_data, $labels, $test_point, $k) {
     my @distances
-    for (my $i = 0; $i < scalar(@$training_data); $i++) {
+    for (my $i = 0; $i < len(@$training_data); $i++) {
         my $dist = Rosetta::KNN::distance($training_data->[$i], $test_point)
         push @distances, { idx => $i, dist => $dist }
     }

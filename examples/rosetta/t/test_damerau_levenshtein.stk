@@ -5,8 +5,8 @@
 fn Rosetta::DamerauLevenshtein::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
-    my $n = scalar(@c1)
-    my $m = scalar(@c2)
+    my $n = len(@c1)
+    my $m = len(@c2)
 
     my @d
     for my $i (0..$n) {

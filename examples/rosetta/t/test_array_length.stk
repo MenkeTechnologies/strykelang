@@ -2,7 +2,7 @@
 # Rosetta Code: Array Length
 
 fn Rosetta::ArrayLength::get(@arr) {
-    scalar(@arr)
+    len(@arr)
 }
 
 fn Rosetta::ArrayLength::last_index(@arr) {

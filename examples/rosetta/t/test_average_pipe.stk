@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
-# Rosetta Code: Averages/Arithmetic mean (using sum and scalar with pipes)
+# Rosetta Code: Averages/Arithmetic mean (using sum and len with pipes)
 
 fn Rosetta::Average::solve(@arr) {
-    sum(@arr) / scalar(@arr)
+    sum(@arr) / len(@arr)
 }
 
 my @data = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
@@ -10,7 +10,7 @@ assert_eq Rosetta::Average::solve(@data), 5.5, "average of 1..10"
 
 # Using parallel reduction for sum if it were a huge array
 fn Rosetta::Average::solve_parallel(@arr) {
-    (~> @arr reduce { _0 + _1 }) |> { $_ / scalar(@arr) }
+    (~> @arr reduce { _0 + _1 }) |> { $_ / len(@arr) }
 }
 
 assert_eq Rosetta::Average::solve_parallel(@data), 5.5, "parallel average of 1..10"

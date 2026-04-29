@@ -2,7 +2,7 @@
 # Rosetta Code: Linear regression
 
 fn Rosetta::LinearRegression::solve($points) {
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     my $sum_x = ~> @$points map { $_->[0] } |> reduce { $_0 + $_1 }
     my $sum_y = ~> @$points map { $_->[1] } |> reduce { $_0 + $_1 }
     my $avg_x = $sum_x / $n

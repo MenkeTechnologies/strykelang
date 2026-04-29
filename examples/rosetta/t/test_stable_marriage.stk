@@ -16,7 +16,7 @@ fn Rosetta::StableMarriage::solve($guys_pref, $girls_pref) {
     }
     
     my $proposals = {}
-    while (scalar(@free_guys) > 0) {
+    while (len(@free_guys) > 0) {
         my $guy = shift @free_guys
         my $pref_list = $guys_pref->{$guy}
         my $idx = $proposals->{$guy} || 0

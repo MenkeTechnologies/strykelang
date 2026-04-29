@@ -18,7 +18,7 @@ fn Rosetta::SimpsonsRule::integrate($f, $a, $b, $n) {
     
     my $sum_odds = ~> @odds map { $f->($_) } reduce { _0 + _1 }
     my $sum_evens = 0
-    if (scalar(@evens) > 0) {
+    if (len(@evens) > 0) {
         $sum_evens = ~> @evens map { $f->($_) } reduce { _0 + _1 }
     }
     

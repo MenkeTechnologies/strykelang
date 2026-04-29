@@ -21,7 +21,7 @@ fn Rosetta::SelfReferential::solve($start) {
             return \@seq
         }
         push @seq, $curr
-        $seen{$curr} = scalar(@seq) - 1
+        $seen{$curr} = len(@seq) - 1
     }
 }
 

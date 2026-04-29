@@ -2,7 +2,7 @@
 # Rosetta Code: Ray-casting point-in-polygon
 
 fn Rosetta::PointInPolygon::contains($poly, $x, $y) {
-    my $n = scalar(@$poly)
+    my $n = len(@$poly)
     my $inside = 0
     my $j = $n - 1
     for my $i (0..$n-1) {

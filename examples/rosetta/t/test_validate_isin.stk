@@ -18,7 +18,7 @@ fn Rosetta::ISIN::is_valid($isin) {
     # Luhn check on digit string (right-to-left, every 2nd digit doubled)
     my @ds = ~> $digits chars
     my $sum = 0
-    my $n = scalar(@ds)
+    my $n = len(@ds)
     for my $i (0..$n-1) {
         my $d = int($ds[$n - 1 - $i])
         if ($i % 2 == 1) {

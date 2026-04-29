@@ -4,8 +4,8 @@
 fn Rosetta::DiceCoefficient::get_bigrams($s) {
     my @chars = ~> $s chars
     my $bg = {}
-    if (scalar(@chars) < 2) { return $bg }
-    for my $i (0..scalar(@chars)-2) {
+    if (len(@chars) < 2) { return $bg }
+    for my $i (0..len(@chars)-2) {
         my $b = $chars[$i] . $chars[$i+1]
         $bg->{$b} = ($bg->{$b} || 0) + 1
     }

@@ -4,18 +4,18 @@
 # For wider windows, fall back to indexed access.
 
 fn Rosetta::MovAvg::two(@xs) {
-    return () if scalar(@xs) < 2
+    return () if len(@xs) < 2
     my @out
-    for my $i (1 .. scalar(@xs) - 1) {
+    for my $i (1 .. len(@xs) - 1) {
         push @out, ($xs[$i] + $xs[$i - 1]) / 2
     }
     @out
 }
 
 fn Rosetta::MovAvg::n($xs_ref, $n) {
-    return () if $n < 1 || scalar(@$xs_ref) < $n
+    return () if $n < 1 || len(@$xs_ref) < $n
     my @out
-    for my $i ($n - 1 .. scalar(@$xs_ref) - 1) {
+    for my $i ($n - 1 .. len(@$xs_ref) - 1) {
         my $sum = 0
         for my $j (0 .. $n - 1) { $sum += $xs_ref->[$i - $j] }
         push @out, $sum / $n
@@ -37,6 +37,6 @@ assert_eq join(",", @c), "7,7,7", "constant → constant"
 
 # Single element → empty (no window fits).
 my @s = Rosetta::MovAvg::two(42)
-assert_eq scalar(@s), 0, "single element → empty 2-window"
+assert_eq len(@s), 0, "single element → empty 2-window"
 
 test_run

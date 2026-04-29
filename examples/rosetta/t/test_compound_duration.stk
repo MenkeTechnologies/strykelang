@@ -16,7 +16,7 @@ fn Rosetta::CompoundDuration::fmt($seconds) {
     if ($m > 0) { push @parts, "$m min" }
     if ($curr_s > 0) { push @parts, "$curr_s sec" }
     
-    if (scalar(@parts) == 0) { return "0 sec" }
+    if (len(@parts) == 0) { return "0 sec" }
     join(", ", @parts)
 }
 

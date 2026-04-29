@@ -17,7 +17,7 @@ fn Rosetta::PriorityQueue::pop($pq) {
 }
 
 fn Rosetta::PriorityQueue::size($pq) {
-    scalar(@{$pq->{items}})
+    len(@{$pq->{items}})
 }
 
 my $pq = Rosetta::PriorityQueue::new()

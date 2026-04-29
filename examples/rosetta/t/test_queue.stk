@@ -15,7 +15,7 @@ fn Rosetta::Queue::dequeue($q) {
 }
 
 fn Rosetta::Queue::is_empty($q) {
-    scalar(@$q) == 0
+    len(@$q) == 0
 }
 
 my $q = Rosetta::Queue::new()

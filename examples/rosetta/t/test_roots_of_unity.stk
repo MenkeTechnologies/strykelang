@@ -20,13 +20,13 @@ fn Rosetta::RootsUnity::approx_eq($a, $b) {
 
 # 1st root of unity is just 1
 my $r1 = Rosetta::RootsUnity::compute(1)
-assert_eq scalar(@$r1), 1, "n=1: 1 root"
+assert_eq len(@$r1), 1, "n=1: 1 root"
 assert_ok Rosetta::RootsUnity::approx_eq($r1->[0]->[0], 1), "real part is 1"
 assert_ok Rosetta::RootsUnity::approx_eq($r1->[0]->[1], 0), "imag part is 0"
 
 # 2nd roots: 1, -1
 my $r2 = Rosetta::RootsUnity::compute(2)
-assert_eq scalar(@$r2), 2, "n=2: 2 roots"
+assert_eq len(@$r2), 2, "n=2: 2 roots"
 assert_ok Rosetta::RootsUnity::approx_eq($r2->[1]->[0], -1), "second is -1"
 
 # 4th roots: 1, i, -1, -i

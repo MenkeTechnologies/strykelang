@@ -7,7 +7,7 @@ fn Rosetta::Brainfuck::execute($code) {
     my @stack
 
     # Precompute jumps
-    for (my $i = 0; $i < scalar(@chars); $i++) {
+    for (my $i = 0; $i < len(@chars); $i++) {
         if ($chars[$i] eq "[") {
             push @stack, $i
         } elsif ($chars[$i] eq "]") {
@@ -26,7 +26,7 @@ fn Rosetta::Brainfuck::execute($code) {
     my $pc = 0
     my $output = ""
 
-    while ($pc < scalar(@chars)) {
+    while ($pc < len(@chars)) {
         my $c = $chars[$pc]
 
         if ($c eq ">") {

@@ -19,7 +19,7 @@ fn Rosetta::Stack::peek($stack) {
 }
 
 fn Rosetta::Stack::empty($stack) {
-    scalar(@$stack) == 0
+    len(@$stack) == 0
 }
 
 my $s = Rosetta::Stack::new()

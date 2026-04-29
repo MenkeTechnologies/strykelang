@@ -2532,7 +2532,15 @@ impl Parser {
             // Type/ref functions
             "defined" | "def" => ExprKind::Defined(Box::new(arg)),
             "ref" => ExprKind::Ref(Box::new(arg)),
-            "scalar" => ExprKind::ScalarContext(Box::new(arg)),
+            "scalar" => {
+                if crate::no_interop_mode() {
+                    return Err(self.syntax_err(
+                        "stryke uses `len` (also `cnt` / `count`) instead of `scalar` (--no-interop)",
+                        line,
+                    ));
+                }
+                ExprKind::ScalarContext(Box::new(arg))
+            }
             // Array/hash functions
             "keys" => ExprKind::Keys(Box::new(arg)),
             "values" => ExprKind::Values(Box::new(arg)),
@@ -8605,6 +8613,12 @@ impl Parser {
             "scalar" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
+                }
+                if crate::no_interop_mode() {
+                    return Err(self.syntax_err(
+                        "stryke uses `len` (also `cnt` / `count`) instead of `scalar` (--no-interop)",
+                        line,
+                    ));
                 }
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {

@@ -3,7 +3,7 @@
 
 fn Rosetta::KMP::prefix($p) {
     my @chars = ~> $p chars
-    my $m = scalar(@chars)
+    my $m = len(@chars)
     my @pi = (0)
     my $k = 0
     for my $q (1..$m-1) {
@@ -21,8 +21,8 @@ fn Rosetta::KMP::prefix($p) {
 fn Rosetta::KMP::search($t, $p) {
     my @t_chars = ~> $t chars
     my @p_chars = ~> $p chars
-    my $n = scalar(@t_chars)
-    my $m = scalar(@p_chars)
+    my $n = len(@t_chars)
+    my $m = len(@p_chars)
     if ($m == 0) { return 0 }
     
     my $pi_ref = Rosetta::KMP::prefix($p)

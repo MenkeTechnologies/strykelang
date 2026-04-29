@@ -3,7 +3,7 @@
 
 fn Rosetta::RadixSort::sort($list) {
     my @arr = @$list
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     if ($n < 2) { return \@arr }
     
     my $max = $arr[0]

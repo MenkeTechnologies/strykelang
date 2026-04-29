@@ -21,7 +21,7 @@ fn Rosetta::HappyNumbers::check($n) {
 fn Rosetta::HappyNumbers::generate($count) {
     my @happy
     my $n = 1
-    while (scalar(@happy) < $count) {
+    while (len(@happy) < $count) {
         if (Rosetta::HappyNumbers::check($n)) {
             push @happy, $n
         }

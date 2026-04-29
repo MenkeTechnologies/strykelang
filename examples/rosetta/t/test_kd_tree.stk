@@ -2,10 +2,10 @@
 # Rosetta Code: K-d tree
 
 fn Rosetta::KDTree::build($points, $depth) {
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     return undef if $n == 0
     
-    my $k = scalar(@{$points->[0]})
+    my $k = len(@{$points->[0]})
     my $axis = $depth % $k
     
     my @sorted = sort { _0->[$axis] <=> _1->[$axis] } @$points
@@ -23,7 +23,7 @@ fn Rosetta::KDTree::build($points, $depth) {
 
 fn Rosetta::KDTree::sq_dist($p1, $p2) {
     my $d = 0
-    for (my $i = 0; $i < scalar(@$p1); $i++) {
+    for (my $i = 0; $i < len(@$p1); $i++) {
         $d += ($p1->[$i] - $p2->[$i]) ** 2
     }
     $d
@@ -40,7 +40,7 @@ fn Rosetta::KDTree::nearest($node, $target, $depth, $best) {
         $best_d = $d
     }
     
-    my $k = scalar(@$target)
+    my $k = len(@$target)
     my $axis = $depth % $k
     
     my $nearer

@@ -10,7 +10,7 @@ fn Rosetta::BellmanFord::solve($nodes, $edges, $source) {
     }
     $distance{"$source"} = 0
     
-    my $count = scalar(@$nodes)
+    my $count = len(@$nodes)
     for (1..$count-1) {
         for my $edge (@$edges) {
             my ($u, $v, $w) = @$edge

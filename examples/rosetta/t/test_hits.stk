@@ -12,7 +12,7 @@ fn Rosetta::HITS::solve($links, $epsilon) {
     }
     
     my @all_pages = keys %pages
-    my $n = scalar(@all_pages)
+    my $n = len(@all_pages)
     
     my %auth
     my %hub

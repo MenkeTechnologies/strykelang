@@ -4,7 +4,7 @@
 fn Rosetta::Luhn::solve($num_str) {
     # Reverse string into digits array
     my @digits = $num_str |> chars() |> rev()
-    my $len = scalar(@digits)
+    my $len = len(@digits)
     
     # Map index 0..len-1 to doubled/adjusted values, then sum
     my $sum = ~> 0..$len-1 map {

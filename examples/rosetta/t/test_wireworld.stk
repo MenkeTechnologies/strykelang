@@ -2,8 +2,8 @@
 # Rosetta Code: Wireworld
 
 fn Rosetta::Wireworld::step($grid) {
-    my $h = scalar(@$grid)
-    my $w = scalar(@{$grid->[0]})
+    my $h = len(@$grid)
+    my $w = len(@{$grid->[0]})
     my @new_grid
     
     for (my $y = 0; $y < $h; $y++) {

@@ -6,7 +6,7 @@ fn Rosetta::FFT::c_sub($a, $b) { [$a->[0] - $b->[0], $a->[1] - $b->[1]] }
 fn Rosetta::FFT::c_mul($a, $b) { [$a->[0] * $b->[0] - $a->[1] * $b->[1], $a->[0] * $b->[1] + $a->[1] * $b->[0]] }
 
 fn Rosetta::FFT::compute($x) {
-    my $n = scalar(@$x)
+    my $n = len(@$x)
     if ($n <= 1) { return $x }
     
     my @even; my @odd

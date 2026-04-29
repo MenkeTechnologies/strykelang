@@ -6,7 +6,7 @@ fn Rosetta::BFS::solve($graph, $start) {
     my %visited = ($start => 1)
     my @order = ()
     
-    while (scalar(@queue) > 0) {
+    while (len(@queue) > 0) {
         my $u = shift @queue
         push @order, $u
         for my $v (@{$graph->{$u}}) {

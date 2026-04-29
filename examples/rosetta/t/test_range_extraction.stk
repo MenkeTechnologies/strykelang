@@ -2,7 +2,7 @@
 # Rosetta Code: Range extraction — compress sorted ints into "a-b,c,..." form
 
 fn Rosetta::RangeExtraction::extract(@nums) {
-    my $n = scalar(@nums)
+    my $n = len(@nums)
     return "" if $n == 0
     my @groups
     my $i = 0

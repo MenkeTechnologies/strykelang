@@ -4,8 +4,8 @@
 fn Rosetta::LongestCommonSubstring::solve($s1, $s2) {
     my @c1 = chars($s1)
     my @c2 = chars($s2)
-    my $n1 = scalar(@c1)
-    my $n2 = scalar(@c2)
+    my $n1 = len(@c1)
+    my $n2 = len(@c2)
     
     my $max_len = 0
     my $end_idx = 0

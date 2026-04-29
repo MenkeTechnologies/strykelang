@@ -3,7 +3,7 @@
 # Minimizes sum of euclidean distances from points to median.
 
 fn Rosetta::GeoMedian::weiszfeld($pts, $iters) {
-    my $n = scalar(@$pts)
+    my $n = len(@$pts)
     my $cx = 0
     my $cy = 0
     for my $p (@$pts) { $cx += $p->[0]; $cy += $p->[1] }

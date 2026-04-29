@@ -4,8 +4,8 @@
 fn Rosetta::LCSSubstring::solve($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
-    my $m = scalar(@c1)
-    my $n = scalar(@c2)
+    my $m = len(@c1)
+    my $n = len(@c2)
     my @table = ()
     for my $i (0..$m) {
         $table[$i] = []

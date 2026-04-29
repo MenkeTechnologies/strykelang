@@ -7,7 +7,7 @@ fn Rosetta::Bipartite::check($adj) {
         next if exists $color{$start}
         my @q = ([$start, 0])
         $color{$start} = 0
-        while (scalar @q) {
+        while (len(@q)) {
             my $curr = shift @q
             my ($u, $c) = @$curr
             for my $v (@{$adj->{$u}}) {

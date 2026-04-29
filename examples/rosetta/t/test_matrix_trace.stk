@@ -3,7 +3,7 @@
 
 fn algo_trace($m) {
     my $sum = 0.0
-    for my $i (0..scalar(@$m)-1) { $sum = $sum + $m->[$i]->[$i] }
+    for my $i (0..len(@$m)-1) { $sum = $sum + $m->[$i]->[$i] }
     $sum
 }
 

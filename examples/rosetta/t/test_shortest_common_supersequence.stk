@@ -5,8 +5,8 @@
 fn Rosetta::SCS::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
-    my $n = scalar(@c1)
-    my $m = scalar(@c2)
+    my $n = len(@c1)
+    my $m = len(@c2)
 
     # LCS table: lcs[i][j] = length of LCS of s1[0..i-1] and s2[0..j-1]
     my @lcs
@@ -54,9 +54,9 @@ fn Rosetta::SCS::is_supersequence($scs, $sub) {
     my @ss = ~> $scs chars
     my $i = 0
     for my $c (@ss) {
-        if ($i < scalar(@cs) && $c eq $cs[$i]) { $i += 1 }
+        if ($i < len(@cs) && $c eq $cs[$i]) { $i += 1 }
     }
-    $i == scalar(@cs)
+    $i == len(@cs)
 }
 
 # "abcbdab" + "bdcaba" -> common SCS length 9 (e.g. "abdcabdab")

@@ -3,7 +3,7 @@
 
 fn Rosetta::InterpSearch::find($arr, $target) {
     my $lo = 0
-    my $hi = scalar(@$arr) - 1
+    my $hi = len(@$arr) - 1
     while ($lo <= $hi
             && $target >= $arr->[$lo]
             && $target <= $arr->[$hi]) {

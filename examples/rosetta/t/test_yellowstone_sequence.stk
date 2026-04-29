@@ -16,7 +16,7 @@ fn Rosetta::Yellowstone::generate($count) {
     my @seq = (1, 2, 3)
     my %used
     $used{1} = 1; $used{2} = 1; $used{3} = 1
-    while (scalar(@seq) < $count) {
+    while (len(@seq) < $count) {
         my $prev = $seq[-1]
         my $prev2 = $seq[-2]
         my $n = 4

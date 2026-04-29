@@ -7,7 +7,7 @@ fn Rosetta::Game2048::slide_row($row) {
     
     my @res
     my $i = 0
-    my $len = scalar(@non_zero)
+    my $len = len(@non_zero)
     while ($i < $len) {
         if ($i + 1 < $len && $non_zero[$i] == $non_zero[$i+1]) {
             push @res, $non_zero[$i] * 2
@@ -17,7 +17,7 @@ fn Rosetta::Game2048::slide_row($row) {
             $i = $i + 1
         }
     }
-    while (scalar(@res) < 4) { push @res, 0 }
+    while (len(@res) < 4) { push @res, 0 }
     \@res
 }
 

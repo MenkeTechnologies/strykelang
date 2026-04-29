@@ -14,7 +14,7 @@ fn Rosetta::ArithmeticNumbers::check($n) {
     my @divs = @$divs_ref
     my $sum = 0
     for my $d (@divs) { $sum += $d }
-    my $count = scalar(@divs)
+    my $count = len(@divs)
     $sum % $count == 0
 }
 

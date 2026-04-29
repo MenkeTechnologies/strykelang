@@ -5,7 +5,7 @@ fn Rosetta::GA::fitness($ind, $target) {
     my $score = 0
     my @i = $ind |> chars()
     my @t = $target |> chars()
-    for (my $k = 0; $k < scalar(@t); $k++) {
+    for (my $k = 0; $k < len(@t); $k++) {
         $score++ if $i[$k] eq $t[$k]
     }
     $score
@@ -16,7 +16,7 @@ fn Rosetta::GA::solve($target) {
     my @alpha = "a".."z", " "
     
     my $best = ""
-    for (1:$len) { $best .= $alpha[int(rand(scalar(@alpha)))] }
+    for (1:$len) { $best .= $alpha[int(rand(len(@alpha)))] }
     my $best_f = Rosetta::GA::fitness($best, $target)
     
     # Actually let's just do a simple (1+1)-GA or hill climber if full GA is too slow for VM
@@ -29,7 +29,7 @@ fn Rosetta::GA::solve($target) {
         my @b = $best |> chars()
         for (my $i = 0; $i < $len; $i++) {
             if (rand() < 0.1) {
-                $new .= $alpha[int(rand(scalar(@alpha)))]
+                $new .= $alpha[int(rand(len(@alpha)))]
             } else {
                 $new .= $b[$i]
             }

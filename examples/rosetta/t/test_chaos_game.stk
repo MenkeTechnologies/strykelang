@@ -20,7 +20,7 @@ fn Rosetta::ChaosGame::generate($iterations) {
 }
 
 my $pts = Rosetta::ChaosGame::generate(100)
-assert_eq scalar(@$pts), 101, "101 points generated"
+assert_eq len(@$pts), 101, "101 points generated"
 
 # All points should be within the bounding box [0, 1] x [0, 1]
 my $all_in = 1

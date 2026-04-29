@@ -24,7 +24,7 @@ assert_eq $h->{t}, 2, "'t' appears 2 times"
 
 # All 26 letters in pangram.
 my $pangram = Rosetta::CountLetters::tally("The quick brown fox jumps over the lazy dog")
-assert_eq scalar(keys %$pangram), 26, "pangram has all 26 letters"
+assert_eq len(keys %$pangram), 26, "pangram has all 26 letters"
 
 # Most common in "abracadabra" is 'a'.
 assert_eq Rosetta::CountLetters::most_common("abracadabra"), "a", "abracadabra → a"

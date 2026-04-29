@@ -28,13 +28,13 @@ fn Rosetta::MaxConsPrime::run($limit) {
     # Prefix sums
     my @ps
     $ps[0] = 0
-    for my $i (0..scalar(@$primes)-1) {
+    for my $i (0..len(@$primes)-1) {
         $ps[$i + 1] = $ps[$i] + $primes->[$i]
     }
 
     my $best_sum = 0
     my $best_len = 0
-    my $n = scalar(@$primes)
+    my $n = len(@$primes)
     for my $i (0..$n-1) {
         for my $j ($i + 1..$n) {
             my $sum = $ps[$j] - $ps[$i]

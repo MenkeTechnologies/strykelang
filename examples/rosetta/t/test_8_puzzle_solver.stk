@@ -7,7 +7,7 @@ fn Rosetta::EightPuzzle::solve($start) {
     my %seen
     $seen{join(",", @$start)} = 1
     
-    while (scalar(@q) > 0) {
+    while (len(@q) > 0) {
         my $curr = shift @q
         my $s = $curr->{state}
         
@@ -43,6 +43,6 @@ fn Rosetta::EightPuzzle::solve($start) {
 my $start = [1, 2, 3, 4, 5, 6, 7, 0, 8]
 my $path = Rosetta::EightPuzzle::solve($start)
 assert_ok defined($path), "8-puzzle solved"
-assert_eq scalar(@$path), 1, "solved in 1 step"
+assert_eq len(@$path), 1, "solved in 1 step"
 
 test_run

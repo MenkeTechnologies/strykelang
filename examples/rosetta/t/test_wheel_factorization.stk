@@ -40,8 +40,8 @@ assert_eq join(",", @{Rosetta::Wheel::factor(1024)}), "2,2,2,2,2,2,2,2,2,2", "10
 assert_eq join(",", @{Rosetta::Wheel::factor(999983)}), "999983", "999983 is prime"
 
 # Edge cases
-assert_eq scalar(@{Rosetta::Wheel::factor(0)}), 0, "0 -> empty"
-assert_eq scalar(@{Rosetta::Wheel::factor(1)}), 0, "1 -> empty"
+assert_eq len(@{Rosetta::Wheel::factor(0)}), 0, "0 -> empty"
+assert_eq len(@{Rosetta::Wheel::factor(1)}), 0, "1 -> empty"
 
 # Recompose check
 for my $n (12, 100, 999, 12345, 65536, 1000000) {

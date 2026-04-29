@@ -9,7 +9,7 @@ fn Rosetta::OddWordProblem::process($s) {
     my $clean = $s =~ s/\.$//r
     my @words = split /\s+/, $clean
     my @res
-    for my $i (0..scalar(@words)-1) {
+    for my $i (0..len(@words)-1) {
         if ($i % 2 == 1) {
             push @res, Rosetta::OddWordProblem::reverse($words[$i])
         } else {

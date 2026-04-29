@@ -33,8 +33,8 @@ fn Rosetta::ZhangSuen::black_neighbors($ns) {
 
 fn Rosetta::ZhangSuen::thin($img) {
     my @grid = map { [@$_] } @$img
-    my $rows = scalar(@grid)
-    my $cols = scalar(@{$grid[0]})
+    my $rows = len(@grid)
+    my $cols = len(@{$grid[0]})
     my $changed = 1
     while ($changed) {
         $changed = 0

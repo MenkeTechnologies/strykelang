@@ -2,7 +2,7 @@
 # Rosetta Code: ABC Problem
 
 fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
-    if (scalar(@$chars_ref) == 0) {
+    if (len(@$chars_ref) == 0) {
         return 1
     }
     
@@ -10,7 +10,7 @@ fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
     my @blocks = @$blocks_ref
     my $c = shift @chars
     
-    for my $i (0..scalar(@blocks)-1) {
+    for my $i (0..len(@blocks)-1) {
         if (index($blocks[$i], $c) >= 0) {
             my @remaining = @blocks
             splice(@remaining, $i, 1)

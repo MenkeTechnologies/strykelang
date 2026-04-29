@@ -2,7 +2,7 @@
 # Rosetta Code: Permutations - Lexicographic (Manual)
 
 fn Rosetta::LexPerms::next_step($p) {
-    my $len = scalar(@$p)
+    my $len = len(@$p)
     my $i = $len - 2
     while ($i >= 0 && $p->[$i] >= $p->[$i+1]) { $i = $i - 1 }
     if ($i < 0) { return undef }

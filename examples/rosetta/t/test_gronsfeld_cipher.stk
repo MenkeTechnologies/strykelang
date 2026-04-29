@@ -8,9 +8,9 @@ fn Rosetta::Gronsfeld::encode($text, $key) {
     
     my @t_chars = $t |> chars()
     my @k_digits = $k |> chars() |> map { int($_) }
-    my $k_len = scalar(@k_digits)
+    my $k_len = len(@k_digits)
     
-    my @res = ~> 0:(scalar(@t_chars)-1) map {
+    my @res = ~> 0:(len(@t_chars)-1) map {
         my $i = $_
         my $p_val = ord($t_chars[$i]) - ord("A")
         my $shift = $k_digits[$i % $k_len]
@@ -29,9 +29,9 @@ fn Rosetta::Gronsfeld::decode($text, $key) {
     
     my @t_chars = $t |> chars()
     my @k_digits = $k |> chars() |> map { int($_) }
-    my $k_len = scalar(@k_digits)
+    my $k_len = len(@k_digits)
     
-    my @res = ~> 0:(scalar(@t_chars)-1) map {
+    my @res = ~> 0:(len(@t_chars)-1) map {
         my $i = $_
         my $c_val = ord($t_chars[$i]) - ord("A")
         my $shift = $k_digits[$i % $k_len]

@@ -3,7 +3,7 @@
 
 fn Rosetta::CocktailSort::sort($list) {
     my @arr = @$list
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     my $swapped = 1
     my $start = 0
     my $end = $n - 1

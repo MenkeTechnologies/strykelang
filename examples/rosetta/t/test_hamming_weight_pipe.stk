@@ -4,7 +4,7 @@
 fn Rosetta::HammingWeight::solve($n) {
     # Convert to binary string and count '1's
     # Using printf + chars + grep pipe
-    sprintf("%b", $n) |> chars() |> grep { $_ eq "1" } |> scalar()
+    sprintf("%b", $n) |> chars() |> grep { $_ eq "1" } |> len()
 }
 
 assert_eq Rosetta::HammingWeight::solve(0), 0, "weight of 0"

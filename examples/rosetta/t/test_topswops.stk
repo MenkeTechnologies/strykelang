@@ -17,7 +17,7 @@ fn Rosetta::Topswops::flip($perm) {
 }
 
 fn Rosetta::Topswops::permutations($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return [[@$arr]] if $n <= 1
     my @result
     for my $i (0..$n-1) {

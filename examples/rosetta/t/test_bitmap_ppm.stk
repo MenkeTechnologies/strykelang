@@ -32,8 +32,8 @@ fn Rosetta::BitmapPPM::parse($str) {
 my $ppm = "P3\n# comment\n2 2\n255\n255 0 0 0 255 0\n0 0 255 255 255 255\n"
 my $img = Rosetta::BitmapPPM::parse($ppm)
 
-assert_eq scalar(@$img), 2, "img height"
-assert_eq scalar(@{$img->[0]}), 2, "img width"
+assert_eq len(@$img), 2, "img height"
+assert_eq len(@{$img->[0]}), 2, "img width"
 assert_eq $img->[0]->[0]->{r}, 255, "pixel 0,0 red"
 assert_eq $img->[0]->[1]->{g}, 255, "pixel 0,1 green"
 assert_eq $img->[1]->[0]->{b}, 255, "pixel 1,0 blue"

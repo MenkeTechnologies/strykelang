@@ -14,7 +14,7 @@ fn Rosetta::Mertens::moebius($n) {
         }
         if ($has_square) { 0 }
         else {
-            my $num_factors = scalar(@factors)
+            my $num_factors = len(@factors)
             if ($num_factors % 2 == 0) { 1 }
             else { -1 }
         }

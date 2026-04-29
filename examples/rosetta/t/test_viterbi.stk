@@ -10,7 +10,7 @@ fn Rosetta::Viterbi::solve($obs, $states, $start_p, $trans_p, $emit_p) {
         $path{$y} = [$y]
     }
     
-    for (my $t = 1; $t < scalar(@$obs); $t++) {
+    for (my $t = 1; $t < len(@$obs); $t++) {
         push @V, {}
         my %newpath
         

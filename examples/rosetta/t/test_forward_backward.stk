@@ -2,7 +2,7 @@
 # Rosetta Code: Forward-backward algorithm
 
 fn Rosetta::ForwardBackward::solve($obs, $states, $start_p, $trans_p, $emit_p) {
-    my $T = scalar(@$obs)
+    my $T = len(@$obs)
     my @fwd = ()
     
     # Forward pass

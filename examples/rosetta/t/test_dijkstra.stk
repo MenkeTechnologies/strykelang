@@ -12,9 +12,9 @@ fn Rosetta::Dijkstra::solve($graph, $start) {
     $dist->{$start} = 0
     
     my @q = @nodes
-    while (scalar(@q) > 0) {
+    while (len(@q) > 0) {
         my $u_idx = 0
-        for my $i (1..scalar(@q)-1) {
+        for my $i (1..len(@q)-1) {
             if ($dist->{$q[$i]} < $dist->{$q[$u_idx]}) {
                 $u_idx = $i
             }

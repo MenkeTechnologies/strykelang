@@ -2,7 +2,7 @@
 # Rosetta Code: Polygon centroid via signed area (works for non-self-intersecting polygons)
 
 fn Rosetta::Centroid::compute($poly) {
-    my $n = scalar(@$poly)
+    my $n = len(@$poly)
     my $cx = 0.0
     my $cy = 0.0
     my $area = 0.0

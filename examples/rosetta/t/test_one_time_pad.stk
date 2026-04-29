@@ -10,7 +10,7 @@ fn Rosetta::OTP::generate_pad($len) {
 fn Rosetta::OTP::encrypt($text, $pad) {
     my @chars = $text |> chars() |> map { ord($_) }
     my @res
-    for (my $i = 0; $i < scalar(@chars); $i++) {
+    for (my $i = 0; $i < len(@chars); $i++) {
         push @res, $chars[$i] ^ $pad->[$i]
     }
     \@res
@@ -18,7 +18,7 @@ fn Rosetta::OTP::encrypt($text, $pad) {
 
 fn Rosetta::OTP::decrypt($cipher, $pad) {
     my @res
-    for (my $i = 0; $i < scalar(@$cipher); $i++) {
+    for (my $i = 0; $i < len(@$cipher); $i++) {
         push @res, chr($cipher->[$i] ^ $pad->[$i])
     }
     join("", @res)
@@ -30,6 +30,6 @@ my $cipher = Rosetta::OTP::encrypt($t, $pad)
 my $back = Rosetta::OTP::decrypt($cipher, $pad)
 
 assert_eq $back, $t, "OTP round trip"
-assert_eq scalar(@$cipher), length($t), "cipher length matches"
+assert_eq len(@$cipher), length($t), "cipher length matches"
 
 test_run

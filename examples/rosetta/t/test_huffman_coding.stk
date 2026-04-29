@@ -7,7 +7,7 @@ fn Rosetta::HuffmanCoding::build_tree($freqs) {
         push @nodes, { char => $char, freq => $freqs->{$char} }
     }
     
-    while (scalar(@nodes) > 1) {
+    while (len(@nodes) > 1) {
         # Sort by freq
         @nodes = sort { $a->{freq} <=> $b->{freq} } @nodes
         my $left = shift @nodes

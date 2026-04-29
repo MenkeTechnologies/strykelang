@@ -4,7 +4,7 @@
 fn Rosetta::CountSubstring::solve($text, $sub) {
     # Using split to count occurrences
     my @parts = $text |> split($sub)
-    scalar(@parts) - 1
+    len(@parts) - 1
 }
 
 assert_eq Rosetta::CountSubstring::solve("the three truths", "th"), 3, "count 'th' in 'the three truths'"

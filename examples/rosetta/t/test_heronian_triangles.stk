@@ -38,6 +38,6 @@ fn Rosetta::Heronian::generate($max_p) {
 
 # Just a small check as this is computationally intensive
 my $res = Rosetta::Heronian::generate(25)
-assert_ok scalar(@$res) > 0, "found at least one Heronian triangle"
+assert_ok len(@$res) > 0, "found at least one Heronian triangle"
 
 test_run

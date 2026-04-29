@@ -9,7 +9,7 @@ fn Rosetta::WelshPowell::color($nodes, $edges) {
         $adj{$e->[1]}{$e->[0]} = 1
     }
     my @ordered = sort {
-        scalar(keys %{$adj{$_1}}) <=> scalar(keys %{$adj{$_0}})
+        len(keys %{$adj{$_1}}) <=> len(keys %{$adj{$_0}})
     } @$nodes
     my %color
     my $next = 0
@@ -43,13 +43,13 @@ fn Rosetta::WelshPowell::valid($colors, $edges) {
 my $tri_c = Rosetta::WelshPowell::color(["A","B","C"], [["A","B"],["B","C"],["A","C"]])
 assert_ok Rosetta::WelshPowell::valid($tri_c, [["A","B"],["B","C"],["A","C"]]), "K3 valid"
 my %used = map { $_ => 1 } values %$tri_c
-assert_eq scalar(keys %used), 3, "K3 needs 3 distinct colors"
+assert_eq len(keys %used), 3, "K3 needs 3 distinct colors"
 
 # Bipartite (path) -> 2 colors
 my $path_c = Rosetta::WelshPowell::color(["1","2","3","4"], [["1","2"],["2","3"],["3","4"]])
 assert_ok Rosetta::WelshPowell::valid($path_c, [["1","2"],["2","3"],["3","4"]]), "path valid"
 my %used2 = map { $_ => 1 } values %$path_c
-assert_eq scalar(keys %used2), 2, "path is 2-colorable"
+assert_eq len(keys %used2), 2, "path is 2-colorable"
 
 # Empty graph -> all color 0
 my $iso = Rosetta::WelshPowell::color(["X","Y","Z"], [])
@@ -63,6 +63,6 @@ my @star_e = map { ["H", $_] } @$leaves
 my $star_c = Rosetta::WelshPowell::color(["H", @$leaves], \@star_e)
 assert_ok Rosetta::WelshPowell::valid($star_c, \@star_e), "star valid"
 my %used3 = map { $_ => 1 } values %$star_c
-assert_eq scalar(keys %used3), 2, "star is 2-colorable"
+assert_eq len(keys %used3), 2, "star is 2-colorable"
 
 test_run

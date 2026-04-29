@@ -3,7 +3,7 @@
 
 fn Rosetta::LZ77::compress($text, $window_size, $buffer_size) {
     my @chars = $text |> chars()
-    my $n = scalar(@chars)
+    my $n = len(@chars)
     my @res
     my $pos = 0
     
@@ -36,7 +36,7 @@ fn Rosetta::LZ77::decompress($compressed) {
     for my $triple (@$compressed) {
         my ($offset, $len, $char) = @$triple
         if ($offset > 0) {
-            my $start = scalar(@res_chars) - $offset
+            my $start = len(@res_chars) - $offset
             for (my $i = 0; $i < $len; $i++) {
                 push @res_chars, $res_chars[$start + $i]
             }

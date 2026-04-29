@@ -18,7 +18,7 @@ fn Rosetta::Zumkeller::divisors($n) {
 fn Rosetta::Zumkeller::can_split($divs, $target, $idx, $cache) {
     return 1 if $target == 0
     return 0 if $target < 0
-    return 0 if $idx >= scalar(@$divs)
+    return 0 if $idx >= len(@$divs)
     my $key = "$idx:$target"
     return $cache->{$key} if exists $cache->{$key}
     my $with    = Rosetta::Zumkeller::can_split($divs, $target - $divs->[$idx], $idx + 1, $cache)

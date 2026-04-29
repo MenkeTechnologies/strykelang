@@ -3,7 +3,7 @@
 
 fn Rosetta::KMP::compute_lps($p) {
     my @chars = $p |> chars
-    my $m = scalar(@chars)
+    my $m = len(@chars)
     my @lps = ~> 0:$m-1 map { 0 }
     my $len = 0
     my $i = 1
@@ -28,8 +28,8 @@ fn Rosetta::KMP::compute_lps($p) {
 fn Rosetta::KMP::search($text, $pattern) {
     my @t = $text |> chars
     my @p = $pattern |> chars
-    my $n = scalar(@t)
-    my $m = scalar(@p)
+    my $n = len(@t)
+    my $m = len(@p)
     return 0 if $m == 0
     
     my $lps = Rosetta::KMP::compute_lps($pattern)
@@ -62,6 +62,6 @@ my $res2 = Rosetta::KMP::search("aaaaa", "aa")
 assert_eq join(",", @$res2), "0,1,2,3", "found all overlapping aa"
 
 my $res3 = Rosetta::KMP::search("abc", "def")
-assert_eq scalar(@$res3), 0, "not found"
+assert_eq len(@$res3), 0, "not found"
 
 test_run

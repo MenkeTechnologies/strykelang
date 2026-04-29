@@ -14,7 +14,7 @@ fn Rosetta::WordBreak::can_break($s, $dict) {
             0
         }
     }
-    scalar(@valid) > 0
+    len(@valid) > 0
 }
 
 my %dict = ( "stryke" => 1, "is" => 1, "fast" => 1, "language" => 1 )

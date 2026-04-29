@@ -17,7 +17,7 @@ fn Rosetta::NinetyNineBottles::solve() {
 my $song = Rosetta::NinetyNineBottles::solve()
 my @verses = $song |> split("\n\n")
 
-assert_eq scalar(@verses), 100, "100 verses generated"
+assert_eq len(@verses), 100, "100 verses generated"
 assert_eq index($verses[0], "99 bottles of beer on the wall") >= 0, 1, "first verse starts with 99"
 assert_eq index($verses[99], "No more bottles of beer on the wall") >= 0, 1, "last verse starts with No more"
 

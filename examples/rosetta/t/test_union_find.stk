@@ -44,7 +44,7 @@ fn Rosetta::UF::components($uf) {
     for my $i (0..$uf->{n}-1) {
         $seen{Rosetta::UF::find($uf, $i)} = 1
     }
-    scalar(keys %seen)
+    len(keys %seen)
 }
 
 my $uf = Rosetta::UF::new(10)

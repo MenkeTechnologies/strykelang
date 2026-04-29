@@ -25,6 +25,6 @@ print "Sierpinski Triangle (8 rows):\n"
 my $rows = Rosetta::Sierpinski::generate(8)
 for my $r (@$rows) { print "$r\n" }
 
-assert_eq scalar(@$rows), 8, "8 rows generated"
+assert_eq len(@$rows), 8, "8 rows generated"
 
 test_run

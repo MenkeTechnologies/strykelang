@@ -5,7 +5,7 @@
 
 fn Rosetta::Ternary::find($arr, $target) {
     my $lo = 0
-    my $hi = scalar(@$arr) - 1
+    my $hi = len(@$arr) - 1
     while ($lo <= $hi) {
         my $third = int(($hi - $lo) / 3)
         my $m1 = $lo + $third

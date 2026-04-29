@@ -3,7 +3,7 @@
 
 fn Rosetta::OddEvenSort::sort($arr) {
     my @a = @$arr
-    my $n = scalar(@a)
+    my $n = len(@a)
     my $sorted = 0
     
     while (!$sorted) {

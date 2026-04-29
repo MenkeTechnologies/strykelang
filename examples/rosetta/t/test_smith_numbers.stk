@@ -11,7 +11,7 @@ fn Rosetta::SmithNumbers::sum_digits($n) {
 fn Rosetta::SmithNumbers::check($n) {
     # Must be composite
     my @factors = prime_factors($n)
-    if (scalar(@factors) < 2) {
+    if (len(@factors) < 2) {
         0
     } else {
         my $sum_n = Rosetta::SmithNumbers::sum_digits($n)

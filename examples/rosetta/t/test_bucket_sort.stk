@@ -2,7 +2,7 @@
 # Rosetta Code: Bucket sort
 
 fn Rosetta::BucketSort::solve($arr, $bucket_count) {
-    return $arr if scalar(@$arr) <= 1
+    return $arr if len(@$arr) <= 1
     
     my $min = $arr->[0]
     my $max = $arr->[0]

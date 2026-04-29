@@ -7,8 +7,8 @@ fn Rosetta::Jaro::distance($s1, $s2) {
     return 1.0 if $s1 eq $s2
     my @_0 = $s1 |> chars
     my @_1 = $s2 |> chars
-    my $la = scalar(@_0)
-    my $lb = scalar(@_1)
+    my $la = len(@_0)
+    my $lb = len(@_1)
     return 0.0 if $la == 0 || $lb == 0
     my $win = int(($la > $lb ? $la : $lb) / 2) - 1
     $win = 0 if $win < 0

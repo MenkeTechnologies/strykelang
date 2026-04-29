@@ -25,7 +25,7 @@ fn Rosetta::TreeTraversal::postorder($n) {
 fn Rosetta::TreeTraversal::levelorder($n) {
     my $q = [$n]
     my $res = []
-    while (scalar(@$q)) {
+    while (len(@$q)) {
         my $c = shift @$q
         push @$res, $c->{val}
         if ($c->{left}) { push @$q, $c->{left} }

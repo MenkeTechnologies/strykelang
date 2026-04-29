@@ -9,7 +9,7 @@ fn Rosetta::TPK::f($x) {
 
 fn Rosetta::TPK::process($nums, $threshold) {
     my @results
-    for (my $i = scalar(@$nums) - 1; $i >= 0; $i -= 1) {
+    for (my $i = len(@$nums) - 1; $i >= 0; $i -= 1) {
         my $x = $nums->[$i]
         my $y = Rosetta::TPK::f($x)
         if ($y > $threshold) {

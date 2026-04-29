@@ -10,7 +10,7 @@ fn Rosetta::Mastermind::score($secret, $guess) {
     my @s_remaining
     my @g_remaining
     
-    for (my $i = 0; $i < scalar(@s); $i++) {
+    for (my $i = 0; $i < len(@s); $i++) {
         if ($s[$i] eq $g[$i]) {
             $bulls++
         } else {

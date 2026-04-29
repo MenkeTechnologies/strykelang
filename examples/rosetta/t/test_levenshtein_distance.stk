@@ -4,8 +4,8 @@
 fn Rosetta::Levenshtein::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
-    my $len1 = scalar(@c1)
-    my $len2 = scalar(@c2)
+    my $len1 = len(@c1)
+    my $len2 = len(@c2)
     
     my @d
     for my $i (0..$len1) { $d[$i] = [] }

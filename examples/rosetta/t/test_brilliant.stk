@@ -18,7 +18,7 @@ fn Rosetta::BrilliantNumbers::get_factors($n) {
 
 fn Rosetta::BrilliantNumbers::check($n) {
     my @f = Rosetta::BrilliantNumbers::get_factors($n)
-    if (scalar(@f) != 2) {
+    if (len(@f) != 2) {
         0
     } else {
         length("$f[0]") == length("$f[1]")

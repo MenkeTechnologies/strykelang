@@ -38,11 +38,11 @@ fn Rosetta::PermutationsSwapping::generate($n) {
 }
 
 my $p3 = Rosetta::PermutationsSwapping::generate(3)
-assert_eq scalar(@$p3), 6, "3! = 6 perms"
+assert_eq len(@$p3), 6, "3! = 6 perms"
 
 # Steinhaus-Johnson-Trotter properties:
 # Each permutation differs from previous by 1 swap.
-for my $i (1..scalar(@$p3)-1) {
+for my $i (1..len(@$p3)-1) {
     my $prev = $p3->[$i-1]
     my $curr = $p3->[$i]
     my $diff = 0

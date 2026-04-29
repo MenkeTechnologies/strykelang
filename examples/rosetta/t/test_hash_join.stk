@@ -42,27 +42,27 @@ my $joined = Rosetta::HashJoin::join_on($A, $B, "name", "name")
 
 # Popeye has no match → not in output. Glory has 1 match. Jonah has 2. Alan has 2 (×2 rows in A) = 4.
 # Total = 1 + 2 + 2 + 2 = 7
-assert_eq scalar(@$joined), 7, "7 joined rows total"
+assert_eq len(@$joined), 7, "7 joined rows total"
 
 # Check that Glory's row exists with both age and nemesis
 my @glory = grep { $_->{name} eq "Glory" } @$joined
-assert_eq scalar(@glory), 1, "exactly one Glory row"
+assert_eq len(@glory), 1, "exactly one Glory row"
 assert_eq $glory[0]->{age}, 28, "Glory age 28"
 assert_eq $glory[0]->{nemesis}, "Buffy", "Glory's nemesis"
 
 # Alan with age 18 has 2 nemeses
 my @alan18 = grep { $_->{name} eq "Alan" && $_->{age} == 18 } @$joined
-assert_eq scalar(@alan18), 2, "Alan(18) joined twice"
+assert_eq len(@alan18), 2, "Alan(18) joined twice"
 
 # No-match exclusion
 my @popeye = grep { $_->{name} eq "Popeye" } @$joined
-assert_eq scalar(@popeye), 0, "Popeye dropped"
+assert_eq len(@popeye), 0, "Popeye dropped"
 
 # Empty inputs
 my $r0 = Rosetta::HashJoin::join_on([], $B, "name", "name")
-assert_eq scalar(@$r0), 0, "empty left"
+assert_eq len(@$r0), 0, "empty left"
 
 my $r1 = Rosetta::HashJoin::join_on($A, [], "name", "name")
-assert_eq scalar(@$r1), 0, "empty right"
+assert_eq len(@$r1), 0, "empty right"
 
 test_run

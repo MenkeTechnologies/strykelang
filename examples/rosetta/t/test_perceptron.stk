@@ -2,12 +2,12 @@
 # Rosetta Code: Perceptron
 
 fn Rosetta::Perceptron::train($data, $labels, $learning_rate, $epochs) {
-    my $num_features = scalar(@{$data->[0]})
+    my $num_features = len(@{$data->[0]})
     my @weights = map { 0.0 } 1:$num_features
     my $bias = 0.0
     
     for (my $e = 0; $e < $epochs; $e++) {
-        for (my $i = 0; $i < scalar(@$data); $i++) {
+        for (my $i = 0; $i < len(@$data); $i++) {
             my $x = $data->[$i]
             my $y = $labels->[$i]
             
@@ -39,7 +39,7 @@ fn Rosetta::Perceptron::predict($model, $x) {
     my $bias = $model->{bias}
     
     my $sum = $bias
-    for (my $j = 0; $j < scalar(@$weights); $j++) {
+    for (my $j = 0; $j < len(@$weights); $j++) {
         $sum += $x->[$j] * $weights->[$j]
     }
     $sum > 0 ? 1 : 0

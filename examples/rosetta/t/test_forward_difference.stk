@@ -2,7 +2,7 @@
 # Rosetta Code: Forward difference
 
 fn Rosetta::ForwardDifference::solve(@arr) {
-    my $len = scalar(@arr)
+    my $len = len(@arr)
     if ($len < 2) {
         return []
     } else {

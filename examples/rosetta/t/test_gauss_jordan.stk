@@ -2,7 +2,7 @@
 # Rosetta Code: Gauss-Jordan elimination
 
 fn Rosetta::GaussJordan::solve($matrix, $vector) {
-    my $n = scalar(@$matrix)
+    my $n = len(@$matrix)
     # Augmented matrix
     my @m = ~> 0:$n-1 map {
         my $i = $_

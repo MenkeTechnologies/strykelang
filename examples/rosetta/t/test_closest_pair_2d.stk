@@ -6,7 +6,7 @@ fn Rosetta::ClosestPair2D::distance($p1, $p2) {
 }
 
 fn Rosetta::ClosestPair2D::brute_force($points) {
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     my $min_d = 1e18
     my @best_pair = ()
     
@@ -24,7 +24,7 @@ fn Rosetta::ClosestPair2D::brute_force($points) {
 }
 
 fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
-    my $n = scalar(@$points_x)
+    my $n = len(@$points_x)
     if ($n <= 3) {
         return Rosetta::ClosestPair2D::brute_force($points_x)
     }
@@ -58,7 +58,7 @@ fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
         }
     }
     
-    my $strip_len = scalar(@strip)
+    my $strip_len = len(@strip)
     for (my $i = 0; $i < $strip_len; $i++) {
         for (my $j = $i + 1; $j < $strip_len && ($strip[$j]->[1] - $strip[$i]->[1]) < $d; $j++) {
             my $strip_d = Rosetta::ClosestPair2D::distance($strip[$i], $strip[$j])

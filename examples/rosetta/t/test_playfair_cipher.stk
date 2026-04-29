@@ -33,9 +33,9 @@ fn Rosetta::Playfair::codec($text, $key, $mode) {
     # Prepare bigrams
     my @chars = $t |> chars()
     my @bigrams
-    for (my $i = 0; $i < scalar(@chars); $i += 2) {
+    for (my $i = 0; $i < len(@chars); $i += 2) {
         my $c1 = $chars[$i]
-        my $c2 = ($i + 1 < scalar(@chars)) ? $chars[$i+1] : "X"
+        my $c2 = ($i + 1 < len(@chars)) ? $chars[$i+1] : "X"
         if ($c1 eq $c2) {
             push @bigrams, $c1, "X"
             $i-- # Reprocess second char
@@ -47,7 +47,7 @@ fn Rosetta::Playfair::codec($text, $key, $mode) {
     my $res = ""
     my $shift = ($mode eq "enc") ? 1 : 4 # (pos + 4) % 5 is (pos - 1) % 5
     
-    for (my $i = 0; $i < scalar(@bigrams); $i += 2) {
+    for (my $i = 0; $i < len(@bigrams); $i += 2) {
         my $p1 = Rosetta::Playfair::find_pos($grid, $bigrams[$i])
         my $p2 = Rosetta::Playfair::find_pos($grid, $bigrams[$i+1])
         my ($r1, $c1) = ($p1->[0], $p1->[1])

@@ -20,10 +20,10 @@ fn Rosetta::Combinations::generate($n, $k) {
 }
 
 my $c52 = Rosetta::Combinations::generate(5, 2)
-assert_eq scalar(@$c52), 10, "5 choose 2 = 10"
+assert_eq len(@$c52), 10, "5 choose 2 = 10"
 
 # Combinations of 3 from 5
 my $c53 = Rosetta::Combinations::generate(5, 3)
-assert_eq scalar(@$c53), 10, "5 choose 3 = 10"
+assert_eq len(@$c53), 10, "5 choose 3 = 10"
 
 test_run

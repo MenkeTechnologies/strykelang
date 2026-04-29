@@ -4,7 +4,7 @@
 fn Rosetta::BinarySearch::find($list, $target) {
     my @arr = @$list
     my $low = 0
-    my $high = scalar(@arr) - 1
+    my $high = len(@arr) - 1
     
     while ($low <= $high) {
         my $mid = int(($low + $high) / 2)

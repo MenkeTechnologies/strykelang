@@ -6,9 +6,9 @@ fn Rosetta::RomanDecode::roman_decode($str) {
     my @chars = $str |> chars
     my $res = 0
     my $i = 0
-    while ($i < scalar(@chars)) {
+    while ($i < len(@chars)) {
         my $v1 = $vals{@chars[$i]}
-        my $v2 = ($i + 1 < scalar(@chars)) ? $vals{@chars[$i+1]} : 0
+        my $v2 = ($i + 1 < len(@chars)) ? $vals{@chars[$i+1]} : 0
         
         if ($v2 > $v1) {
             $res = $res + ($v2 - $v1)
