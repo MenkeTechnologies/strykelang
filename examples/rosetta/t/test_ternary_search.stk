@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ternary search
+#   - integer ternary search on a sorted array
+#   - real ternary search to maximize a unimodal function
+
+fn Rosetta::Ternary::find($arr, $target) {
+    my $lo = 0
+    my $hi = scalar(@$arr) - 1
+    while ($lo <= $hi) {
+        my $third = int(($hi - $lo) / 3)
+        my $m1 = $lo + $third
+        my $m2 = $hi - $third
+        if ($arr->[$m1] == $target) { return $m1 }
+        if ($arr->[$m2] == $target) { return $m2 }
+        if ($target < $arr->[$m1]) {
+            $hi = $m1 - 1
+        } elsif ($target > $arr->[$m2]) {
+            $lo = $m2 + 1
+        } else {
+            $lo = $m1 + 1
+            $hi = $m2 - 1
+        }
+    }
+    -1
+}
+
+# f($x) = -($x - 3)^2 + 9, peak at x = 3, value 9
+fn Rosetta::Ternary::peak_quad($lo, $hi, $eps) {
+    while ($hi - $lo > $eps) {
+        my $m1 = $lo + ($hi - $lo) / 3.0
+        my $m2 = $hi - ($hi - $lo) / 3.0
+        my $f1 = -(($m1 - 3) ** 2) + 9
+        my $f2 = -(($m2 - 3) ** 2) + 9
+        if ($f1 < $f2) {
+            $lo = $m1
+        } else {
+            $hi = $m2
+        }
+    }
+    ($lo + $hi) / 2.0
+}
+
+my @sorted = (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21)
+assert_eq Rosetta::Ternary::find(\@sorted, 11), 5, "find 11 -> idx 5"
+assert_eq Rosetta::Ternary::find(\@sorted, 1), 0, "first"
+assert_eq Rosetta::Ternary::find(\@sorted, 21), 10, "last"
+assert_eq Rosetta::Ternary::find(\@sorted, 4), -1, "missing -> -1"
+assert_eq Rosetta::Ternary::find([], 5), -1, "empty -> -1"
+assert_eq Rosetta::Ternary::find([42], 42), 0, "single match"
+assert_eq Rosetta::Ternary::find([42], 7), -1, "single miss"
+
+# Real-valued unimodal peak
+my $x_star = Rosetta::Ternary::peak_quad(0.0, 6.0, 1e-7)
+assert_ok abs($x_star - 3.0) < 1e-5, "peak of -(x-3)^2 + 9 at x=3"
+
+test_run

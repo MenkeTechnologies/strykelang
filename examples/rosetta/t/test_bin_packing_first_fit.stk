@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bin packing — First Fit and First Fit Decreasing
+
+fn Rosetta::BinPacking::first_fit($items, $cap) {
+    my @bins
+    for my $sz (@$items) {
+        my $placed = 0
+        for my $b (@bins) {
+            if ($b->{used} + $sz <= $cap) {
+                push @{$b->{items}}, $sz
+                $b->{used} += $sz
+                $placed = 1
+                last
+            }
+        }
+        if (!$placed) {
+            push @bins, { used => $sz, items => [$sz] }
+        }
+    }
+    \@bins
+}
+
+fn Rosetta::BinPacking::first_fit_decreasing($items, $cap) {
+    my @sorted = sort { $_1 <=> $_0 } @$items
+    Rosetta::BinPacking::first_fit(\@sorted, $cap)
+}
+
+# Items 4,8,1,4,2,1 with capacity 10
+my $bins = Rosetta::BinPacking::first_fit([4, 8, 1, 4, 2, 1], 10)
+assert_eq scalar(@$bins), 2, "first-fit packs into 2 bins"
+assert_eq $bins->[0]{used}, 10, "bin 0 holds 4+1+4+1 = 10"
+assert_eq $bins->[1]{used}, 10, "bin 1 holds 8+2 = 10"
+
+# FFD typically does as well or better
+my $ffd = Rosetta::BinPacking::first_fit_decreasing([4, 8, 1, 4, 2, 1], 10)
+assert_eq scalar(@$ffd), 2, "FFD also packs into 2 bins"
+
+# Each item exceeds half-capacity -> one item per bin
+my $solo = Rosetta::BinPacking::first_fit([7, 8, 9], 10)
+assert_eq scalar(@$solo), 3, "each big item gets its own bin"
+
+# Empty input -> 0 bins
+my $none = Rosetta::BinPacking::first_fit([], 10)
+assert_eq scalar(@$none), 0, "no items -> 0 bins"
+
+test_run

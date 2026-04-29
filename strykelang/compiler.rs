@@ -3057,7 +3057,7 @@ impl Compiler {
                             self.compile_expr(left)?;
                         }
                         let j = self.emit_op(Op::JumpIfFalseKeep(0), line, Some(root));
-                        self.emit_op(Op::Pop, line, Some(root));
+                        // JumpIfFalseKeep already pops on fall-through, so no explicit Pop needed
                         if matches!(right.kind, ExprKind::Regex(..)) {
                             self.compile_boolean_rvalue_condition(right)?;
                             self.emit_op(Op::RegexBoolToScalar, line, Some(root));
@@ -3088,7 +3088,7 @@ impl Compiler {
                     BinOp::DefinedOr => {
                         self.compile_expr(left)?;
                         let j = self.emit_op(Op::JumpIfDefinedKeep(0), line, Some(root));
-                        self.emit_op(Op::Pop, line, Some(root));
+                        // JumpIfDefinedKeep already pops on fall-through, so no explicit Pop needed
                         self.compile_expr(right)?;
                         self.chunk.patch_jump_here(j);
                         return Ok(());

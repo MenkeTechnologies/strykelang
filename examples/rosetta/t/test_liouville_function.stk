@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Liouville function lambda(n) = (-1)^Omega(n)
+# Omega counts prime factors with multiplicity.
+
+fn Rosetta::Liouville::lambda($n) {
+    return 1 if $n == 1
+    return 0 if $n < 1
+    my $count = 0
+    my $m = $n
+    my $p = 2
+    while ($p * $p <= $m) {
+        while ($m % $p == 0) {
+            $m = int($m / $p)
+            $count++
+        }
+        $p++
+    }
+    $count++ if $m > 1
+    $count % 2 == 0 ? 1 : -1
+}
+
+# OEIS A008836
+my @expected = (1, -1, -1, 1, -1, 1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, -1, -1)
+for my $i (0..19) {
+    assert_eq Rosetta::Liouville::lambda($i + 1), $expected[$i], "lambda(" . ($i + 1) . ") = " . $expected[$i]
+}
+
+# Squares are perfect: lambda(k^2) = 1
+for my $k (1..10) {
+    assert_eq Rosetta::Liouville::lambda($k * $k), 1, "lambda($k^2) = 1"
+}
+
+# Prime: Omega = 1, lambda = -1
+for my $p (2, 3, 5, 7, 11, 13, 17, 19, 23) {
+    assert_eq Rosetta::Liouville::lambda($p), -1, "lambda($p) = -1 (prime)"
+}
+
+# Liouville summatory L(n) = sum lambda(k) for k=1..n
+my $L = 0
+for my $n (1..100) { $L += Rosetta::Liouville::lambda($n) }
+assert_eq $L, -2, "L(100) = -2"
+
+test_run

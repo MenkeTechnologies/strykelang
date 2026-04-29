@@ -952,8 +952,8 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
         } => {
             // List-repeat needs to round-trip the parens that triggered it;
             // otherwise the deparsed source would re-parse as scalar repeat.
-            let need_parens = *list_repeat
-                && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_));
+            let need_parens =
+                *list_repeat && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_));
             if need_parens {
                 buf.push('(');
             }

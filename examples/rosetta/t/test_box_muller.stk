@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Box-Muller transform — sample standard normal pairs
+
+fn Rosetta::BoxMuller::pair($u1, $u2) {
+    my $pi = 4 * atan2(1, 1)
+    my $r = sqrt(-2 * log($u1))
+    my $theta = 2 * $pi * $u2
+    [$r * cos($theta), $r * sin($theta)]
+}
+
+fn Rosetta::BoxMuller::sample($n) {
+    my @out
+    while (scalar(@out) < $n) {
+        my $u1 = rand()
+        my $u2 = rand()
+        $u1 = 1e-12 if $u1 <= 0
+        my $z = Rosetta::BoxMuller::pair($u1, $u2)
+        push @out, $z->[0]
+        push @out, $z->[1] if scalar(@out) < $n
+    }
+    \@out
+}
+
+# Identity check on a known input pair
+my $z = Rosetta::BoxMuller::pair(0.5, 0.0)
+# u2=0 -> theta=0 -> cos=1 sin=0 -> z0 = sqrt(-2 ln 0.5), z1 = 0
+my $expected_z0 = sqrt(-2 * log(0.5))
+assert_ok abs($z->[0] - $expected_z0) < 1e-9, "z0 = sqrt(-2 ln 0.5)"
+assert_ok abs($z->[1]) < 1e-9, "z1 = 0 when theta = 0"
+
+# Statistical sanity on a sample of 5000
+srand(42)
+my $sample = Rosetta::BoxMuller::sample(5000)
+assert_eq scalar(@$sample), 5000, "5000 samples"
+
+my $mean = 0.0
+for my $x (@$sample) { $mean += $x }
+$mean /= 5000
+assert_ok abs($mean) < 0.1, "sample mean near 0 (got $mean)"
+
+my $var = 0.0
+for my $x (@$sample) { $var += ($x - $mean) ** 2 }
+$var /= 5000
+assert_ok abs($var - 1.0) < 0.1, "sample variance near 1 (got $var)"
+
+# Roughly 68% within 1 sigma
+my $within = 0
+for my $x (@$sample) { $within++ if abs($x) < 1.0 }
+my $frac = $within / 5000
+assert_ok abs($frac - 0.6827) < 0.05, "~68% within 1 sigma (got $frac)"
+
+test_run

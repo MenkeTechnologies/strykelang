@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jump search on a sorted array
+
+fn Rosetta::JumpSearch::find($arr, $target) {
+    my $n = scalar(@$arr)
+    return -1 if $n == 0
+    my $step = int(sqrt($n)) || 1
+    my $prev = 0
+    while ($prev < $n && $arr->[($prev + $step - 1) < $n - 1 ? $prev + $step - 1 : $n - 1] < $target) {
+        $prev += $step
+        return -1 if $prev >= $n
+    }
+    my $hi = ($prev + $step - 1) < $n - 1 ? $prev + $step - 1 : $n - 1
+    for my $i ($prev..$hi) {
+        return $i if $arr->[$i] == $target
+    }
+    -1
+}
+
+my @sorted = (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29)
+assert_eq Rosetta::JumpSearch::find(\@sorted, 11), 5, "find 11 -> idx 5"
+assert_eq Rosetta::JumpSearch::find(\@sorted, 1), 0, "find first"
+assert_eq Rosetta::JumpSearch::find(\@sorted, 29), 14, "find last"
+assert_eq Rosetta::JumpSearch::find(\@sorted, 2), -1, "missing -> -1"
+assert_eq Rosetta::JumpSearch::find(\@sorted, 30), -1, "above range -> -1"
+assert_eq Rosetta::JumpSearch::find(\@sorted, 0), -1, "below range -> -1"
+assert_eq Rosetta::JumpSearch::find([], 5), -1, "empty -> -1"
+assert_eq Rosetta::JumpSearch::find([42], 42), 0, "single match"
+assert_eq Rosetta::JumpSearch::find([42], 7), -1, "single miss"
+
+# Pipe form
+\@sorted |> Rosetta::JumpSearch::find(15) |> assert_eq(7, "pipe find 15 -> idx 7")
+
+test_run

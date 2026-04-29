@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Boyer-Moore-Horspool string search
+
+fn Rosetta::Horspool::shift_table($pat) {
+    my $m = length($pat)
+    my %tbl
+    for my $i (0..$m-2) {
+        $tbl{substr($pat, $i, 1)} = $m - 1 - $i
+    }
+    \%tbl
+}
+
+fn Rosetta::Horspool::find($text, $pat) {
+    my $n = length($text)
+    my $m = length($pat)
+    return 0 if $m == 0
+    return -1 if $n < $m
+    my $tbl = Rosetta::Horspool::shift_table($pat)
+    my $i = $m - 1
+    while ($i < $n) {
+        my $k = 0
+        while ($k < $m && substr($pat, $m - 1 - $k, 1) eq substr($text, $i - $k, 1)) {
+            $k++
+        }
+        if ($k == $m) { return $i - $m + 1 }
+        my $c = substr($text, $i, 1)
+        my $shift = exists $tbl->{$c} ? $tbl->{$c} : $m
+        $i += $shift
+    }
+    -1
+}
+
+assert_eq Rosetta::Horspool::find("the quick brown fox", "quick"), 4, "find 'quick'"
+assert_eq Rosetta::Horspool::find("ABABDABACDABABCABAB", "ABABCABAB"), 10, "find at offset 10"
+assert_eq Rosetta::Horspool::find("abcdef", "a"), 0, "single char first"
+assert_eq Rosetta::Horspool::find("abcdef", "f"), 5, "single char last"
+assert_eq Rosetta::Horspool::find("abcdef", "z"), -1, "char not present"
+assert_eq Rosetta::Horspool::find("abcdef", ""), 0, "empty pattern -> 0"
+assert_eq Rosetta::Horspool::find("", "abc"), -1, "empty text -> -1"
+assert_eq Rosetta::Horspool::find("abc", "abcd"), -1, "pattern longer than text"
+assert_eq Rosetta::Horspool::find("aaaaaa", "aaa"), 0, "leading run match"
+assert_eq Rosetta::Horspool::find("xyzxyzxyz", "xyz"), 0, "leftmost of repeats"
+
+# Pipe form
+"the quick brown fox" |> Rosetta::Horspool::find("brown") |> assert_eq(10, "pipe find 'brown'")
+
+test_run

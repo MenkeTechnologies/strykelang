@@ -1282,17 +1282,38 @@ impl Parser {
         }
     }
 
+    /// Bare names that resolve to the topic-slot scalar matrix:
+    /// `_`, `_0`, `_1`, …, `_N`, plus `_<+`, `_N<+` for the 4-deep outer chain.
+    /// These must NOT be treated as zero-arg sub calls — they're scalar var refs.
+    pub(crate) fn is_underscore_topic_slot(name: &str) -> bool {
+        if name == "_" {
+            return true;
+        }
+        if !name.starts_with('_') || name.len() < 2 {
+            return false;
+        }
+        let bytes = name.as_bytes();
+        let mut i = 1;
+        // Optional digit run (positional slot index).
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        // Then any number of `<` chevrons (1..4 in practice, lexer caps at 4).
+        let chevrons_start = i;
+        while i < bytes.len() && bytes[i] == b'<' {
+            i += 1;
+        }
+        // Must be one of: `_`, `_N`, `_<+`, `_N<+`. No other trailing chars.
+        i == bytes.len() && (i > 1 || chevrons_start > 1)
+    }
+
     /// Identifiers that start a [`parse_named_expr`] arm (builtins / special forms), not a bare sub call.
     fn bareword_stmt_may_be_sub(name: &str) -> bool {
-        // `_0`, `_1`, …, `_N` are scalar topic-aliases for `$_0`, `$_1`, …
-        // (see `parse_named_expr`'s `_ =>` arm). They MUST NOT be treated as
-        // zero-arg sub calls when they appear as a standalone statement
-        // expression (e.g. the last line of an `fn` body) — that would emit
-        // `Op::Call("_0", 0)` instead of `Op::GetScalar("_0")` and fail at
-        // runtime with "Undefined subroutine &_0".
-        if name.len() > 1 && name.starts_with('_')
-            && name[1..].bytes().all(|b| b.is_ascii_digit())
-        {
+        // Topic-slot scalar names (`_`, `_N`, `_<+`, `_N<+`) are scalar
+        // variables, not zero-arg sub calls. Without this guard, the
+        // statement-position parser would emit `Op::Call("_0", 0)` and fail
+        // at runtime with "Undefined subroutine &_0".
+        if Self::is_underscore_topic_slot(name) {
             return false;
         }
         !matches!(
@@ -11464,24 +11485,16 @@ impl Parser {
                 }
                 // Bare `_` in expression position → topic variable `$_`.
                 // Allows concise blocks: `map { _ * 2 }`, `fi { _ > 5 }`.
-                if name == "_" {
+                // Also handles the outer-topic chain: `_<`, `_<<`, `_<<<`,
+                // `_<<<<` for 1..4 frames up — and the positional matrix:
+                // `_0<<<<`, `_1<<<<`, `_N<<<<` (N positionals × 5 levels).
+                // `_0` is canonically aliased to `_` at every level (see
+                // `Scope::set_closure_args`).
+                if Self::is_underscore_topic_slot(&name) {
                     return Ok(Expr {
-                        kind: ExprKind::ScalarVar("_".to_string()),
+                        kind: ExprKind::ScalarVar(name.clone()),
                         line,
                     });
-                }
-                // Bare `_0`, `_1`, …, `_N` → positional closure args (`$_0`, `$_1`, …).
-                // Lets `reduce { _0 + _1 }`, `sort { _0 <=> _1 }`, and any block that
-                // refers to its k-th positional arg drop the sigil. Picked over
-                // Perl's `$a` / `$b` because that pair is inconsistent (no `$c`).
-                if name.starts_with('_') && name.len() > 1 {
-                    let rest = &name[1..];
-                    if rest.bytes().all(|b| b.is_ascii_digit()) {
-                        return Ok(Expr {
-                            kind: ExprKind::ScalarVar(name.clone()),
-                            line,
-                        });
-                    }
                 }
                 // Function call with optional parens
                 if matches!(self.peek(), Token::LParen) {

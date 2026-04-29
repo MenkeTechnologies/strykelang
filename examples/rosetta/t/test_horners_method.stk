@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Horner's rule for polynomial evaluation
+# coeffs[0] is the constant term, coeffs[i] is x^i
+
+fn Rosetta::Horner::eval($coeffs, $x) {
+    my $acc = 0
+    for my $c (rev @$coeffs) {
+        $acc = $acc * $x + $c
+    }
+    $acc
+}
+
+# 1 + 2x + 3x^2 at x=2 -> 1 + 4 + 12 = 17
+assert_eq Rosetta::Horner::eval([1, 2, 3], 2), 17, "1 + 2x + 3x^2 at x=2 = 17"
+
+# Constant polynomial
+assert_eq Rosetta::Horner::eval([7], 99), 7, "constant 7"
+
+# Empty -> 0
+assert_eq Rosetta::Horner::eval([], 5), 0, "empty -> 0"
+
+# Linear: 5 - 3x at x=4 -> 5 - 12 = -7
+assert_eq Rosetta::Horner::eval([5, -3], 4), -7, "5 - 3x at x=4"
+
+# x^3 at x=2 -> 8
+assert_eq Rosetta::Horner::eval([0, 0, 0, 1], 2), 8, "x^3 at x=2"
+
+# x = 0 -> constant term
+assert_eq Rosetta::Horner::eval([42, 11, 5, 8], 0), 42, "x=0 -> constant term"
+
+# Pipe form
+[1, 2, 3] |> Rosetta::Horner::eval(2) |> assert_eq(17, "pipe Horner = 17")
+
+test_run

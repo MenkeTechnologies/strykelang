@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lagrange polynomial interpolation
+# Given (x_i, y_i) pairs, evaluate L(x) at a query point.
+
+fn Rosetta::Lagrange::eval($pts, $x) {
+    my $n = scalar(@$pts)
+    my $sum = 0.0
+    for my $i (0..$n-1) {
+        my $xi = $pts->[$i][0]
+        my $yi = $pts->[$i][1]
+        my $term = $yi
+        for my $j (0..$n-1) {
+            next if $j == $i
+            my $xj = $pts->[$j][0]
+            $term = $term * ($x - $xj) / ($xi - $xj)
+        }
+        $sum += $term
+    }
+    $sum
+}
+
+fn Rosetta::Lagrange::close($x, $y) { abs($x - $y) < 1e-9 }
+
+# Linear: y = 2x + 1 -> at x=3 expect 7
+my $line = [[0, 1], [4, 9]]
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($line, 3), 7), "linear interp at x=3 = 7"
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($line, 0), 1), "linear at known x=0"
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($line, 4), 9), "linear at known x=4"
+
+# Quadratic: y = x^2 sampled at 0, 1, 2 — interpolate at 3 -> expect 9
+my $quad = [[0, 0], [1, 1], [2, 4]]
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($quad, 3), 9), "x^2 extrapolated at 3 = 9"
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($quad, 1.5), 2.25), "x^2 at x=1.5 = 2.25"
+
+# Cubic y = x^3 sampled at 0,1,2,3 — interpolate at 4 -> 64
+my $cubic = [[0, 0], [1, 1], [2, 8], [3, 27]]
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($cubic, 4), 64), "x^3 at x=4 = 64"
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($cubic, 2.5), 15.625), "x^3 at 2.5"
+
+# Single point -> constant function
+my $solo = [[5, 42]]
+assert_ok Rosetta::Lagrange::close(Rosetta::Lagrange::eval($solo, 99), 42), "single point => constant"
+
+test_run

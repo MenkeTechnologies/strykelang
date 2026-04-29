@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Integer partition function p(n)
+# Number of ways to write n as an unordered sum of positive integers.
+
+fn Rosetta::Partition::p($n) {
+    return 1 if $n == 0
+    return 0 if $n < 0
+    my @dp = (0) x ($n + 1)
+    $dp[0] = 1
+    for my $i (1..$n) {
+        for my $j ($i..$n) {
+            $dp[$j] += $dp[$j - $i]
+        }
+    }
+    $dp[$n]
+}
+
+# OEIS A000041
+my @expected = (1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627)
+for my $n (0..20) {
+    assert_eq Rosetta::Partition::p($n), $expected[$n], "p($n) = " . $expected[$n]
+}
+
+# Some larger known values
+assert_eq Rosetta::Partition::p(30), 5604, "p(30) = 5604"
+assert_eq Rosetta::Partition::p(50), 204226, "p(50) = 204226"
+
+# Out of range
+assert_eq Rosetta::Partition::p(-3), 0, "negative -> 0"
+
+# Pipe form
+10 |> Rosetta::Partition::p |> assert_eq(42, "pipe p(10) = 42")
+
+test_run

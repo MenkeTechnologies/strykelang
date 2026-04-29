@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Legendre symbol via Euler's criterion
+# (a/p) = a^((p-1)/2) mod p, mapped {0,1,p-1} -> {0,1,-1}
+# Defined for odd prime p
+
+fn Rosetta::Legendre::pow_mod($base, $exp, $mod) {
+    return 0 if $mod == 1
+    my $r = 1
+    $base = $base % $mod
+    while ($exp > 0) {
+        if ($exp & 1) { $r = ($r * $base) % $mod }
+        $exp = $exp >> 1
+        $base = ($base * $base) % $mod
+    }
+    $r
+}
+
+fn Rosetta::Legendre::symbol($k, $p) {
+    return 0 if $k % $p == 0
+    my $r = Rosetta::Legendre::pow_mod($k, int(($p - 1) / 2), $p)
+    $r == $p - 1 ? -1 : $r
+}
+
+# Quadratic residues mod 7: 1, 2, 4 (squares of 1,2,3,4,5,6 mod 7)
+assert_eq Rosetta::Legendre::symbol(1, 7), 1, "(1/7) = 1"
+assert_eq Rosetta::Legendre::symbol(2, 7), 1, "(2/7) = 1"
+assert_eq Rosetta::Legendre::symbol(3, 7), -1, "(3/7) = -1"
+assert_eq Rosetta::Legendre::symbol(4, 7), 1, "(4/7) = 1"
+assert_eq Rosetta::Legendre::symbol(5, 7), -1, "(5/7) = -1"
+assert_eq Rosetta::Legendre::symbol(6, 7), -1, "(6/7) = -1"
+assert_eq Rosetta::Legendre::symbol(7, 7), 0, "(7/7) = 0"
+
+# Mod 11 residues: 1, 3, 4, 5, 9
+assert_eq Rosetta::Legendre::symbol(3, 11), 1, "(3/11) = 1 (residue)"
+assert_eq Rosetta::Legendre::symbol(2, 11), -1, "(2/11) = -1 (non-residue)"
+assert_eq Rosetta::Legendre::symbol(9, 11), 1, "(9/11) = 1 (3^2)"
+
+# Larger prime
+assert_eq Rosetta::Legendre::symbol(7, 13), -1, "(7/13) = -1"
+assert_eq Rosetta::Legendre::symbol(10, 13), 1, "(10/13) = 1"
+
+# Multiplicativity: (ab/p) = (a/p)*(b/p)
+my $a = Rosetta::Legendre::symbol(2, 13)
+my $b = Rosetta::Legendre::symbol(7, 13)
+my $ab = Rosetta::Legendre::symbol(14, 13)
+my $prod = $a * $b
+assert_eq $ab, $prod, "Legendre multiplicative mod 13"
+
+test_run

@@ -16,8 +16,8 @@ assert_eq slurp_missing(), 1, "slurp missing"
 
 assert_eq spew_and_read(), "hello world", "spew and read"
 assert_eq spew_overwrite(), "second", "spew overwrite"
-# split includes trailing empty, so 4 not 3
-assert_eq spew_multiline(), 4, "spew multiline"
+# Perl-correct: trailing empty stripped when LIMIT omitted, 3 lines.
+assert_eq spew_multiline(), 3, "spew multiline"
 assert_eq spew_empty(), 0, "spew empty"
 
 # ══════════════════════════════════════════════════════════════════════════════

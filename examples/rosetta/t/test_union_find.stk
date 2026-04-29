@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Disjoint set / Union-Find with path compression and union-by-rank
+
+fn Rosetta::UF::new($n) {
+    my @parent = (0..$n-1)
+    my @rank = (0) x $n
+    { parent => \@parent, rank => \@rank, n => $n }
+}
+
+fn Rosetta::UF::find($uf, $x) {
+    my $par = $uf->{parent}
+    my $r = $x
+    while ($par->[$r] != $r) {
+        $r = $par->[$r]
+    }
+    # Path compression
+    my $cur = $x
+    while ($par->[$cur] != $r) {
+        my $nxt = $par->[$cur]
+        $par->[$cur] = $r
+        $cur = $nxt
+    }
+    $r
+}
+
+fn Rosetta::UF::union($uf, $a, $b) {
+    my $ra = Rosetta::UF::find($uf, $a)
+    my $rb = Rosetta::UF::find($uf, $b)
+    return 0 if $ra == $rb
+    my $rank = $uf->{rank}
+    if ($rank->[$ra] < $rank->[$rb]) {
+        $uf->{parent}[$ra] = $rb
+    } elsif ($rank->[$ra] > $rank->[$rb]) {
+        $uf->{parent}[$rb] = $ra
+    } else {
+        $uf->{parent}[$rb] = $ra
+        $rank->[$ra]++
+    }
+    1
+}
+
+fn Rosetta::UF::components($uf) {
+    my %seen
+    for my $i (0..$uf->{n}-1) {
+        $seen{Rosetta::UF::find($uf, $i)} = 1
+    }
+    scalar(keys %seen)
+}
+
+my $uf = Rosetta::UF::new(10)
+assert_eq Rosetta::UF::components($uf), 10, "10 singletons"
+
+Rosetta::UF::union($uf, 0, 1)
+Rosetta::UF::union($uf, 2, 3)
+Rosetta::UF::union($uf, 4, 5)
+assert_eq Rosetta::UF::components($uf), 7, "3 unions -> 7 components"
+
+Rosetta::UF::union($uf, 0, 3)   # merges {0,1} and {2,3}
+assert_eq Rosetta::UF::components($uf), 6, "merged -> 6"
+assert_eq Rosetta::UF::find($uf, 1), Rosetta::UF::find($uf, 2), "1 and 2 same root"
+assert_ok Rosetta::UF::find($uf, 1) != Rosetta::UF::find($uf, 4), "1 and 4 different roots"
+
+# Idempotent union returns 0
+my $merged = Rosetta::UF::union($uf, 0, 1)
+assert_eq $merged, 0, "redundant union is no-op"
+
+# Connect everything
+for my $i (0..8) {
+    Rosetta::UF::union($uf, $i, $i+1)
+}
+assert_eq Rosetta::UF::components($uf), 1, "everything connected -> 1"
+
+test_run

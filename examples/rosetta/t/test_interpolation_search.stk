@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Interpolation search on uniformly distributed sorted array
+
+fn Rosetta::InterpSearch::find($arr, $target) {
+    my $lo = 0
+    my $hi = scalar(@$arr) - 1
+    while ($lo <= $hi
+            && $target >= $arr->[$lo]
+            && $target <= $arr->[$hi]) {
+        if ($lo == $hi) {
+            return $arr->[$lo] == $target ? $lo : -1
+        }
+        my $span = $arr->[$hi] - $arr->[$lo]
+        return -1 if $span == 0
+        my $pos = $lo + int((($hi - $lo) * ($target - $arr->[$lo])) / $span)
+        if ($arr->[$pos] == $target) {
+            return $pos
+        } elsif ($arr->[$pos] < $target) {
+            $lo = $pos + 1
+        } else {
+            $hi = $pos - 1
+        }
+    }
+    -1
+}
+
+my @evens = (0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
+assert_eq Rosetta::InterpSearch::find(\@evens, 14), 7, "find 14 -> idx 7"
+assert_eq Rosetta::InterpSearch::find(\@evens, 0), 0, "first"
+assert_eq Rosetta::InterpSearch::find(\@evens, 30), 15, "last"
+assert_eq Rosetta::InterpSearch::find(\@evens, 5), -1, "5 not present"
+assert_eq Rosetta::InterpSearch::find(\@evens, -1), -1, "below range"
+assert_eq Rosetta::InterpSearch::find(\@evens, 100), -1, "above range"
+
+# Non-uniform but still sorted
+my @nu = (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
+assert_eq Rosetta::InterpSearch::find(\@nu, 50), 5, "non-uniform find 50"
+assert_eq Rosetta::InterpSearch::find(\@nu, 1000), 9, "non-uniform last"
+assert_eq Rosetta::InterpSearch::find(\@nu, 7), -1, "non-uniform miss"
+
+assert_eq Rosetta::InterpSearch::find([], 5), -1, "empty -> -1"
+assert_eq Rosetta::InterpSearch::find([42], 42), 0, "single match"
+
+test_run

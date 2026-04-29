@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Convex hull — Graham scan
+
+fn Rosetta::Graham::cross($o, $u, $v) {
+    ($u->[0] - $o->[0]) * ($v->[1] - $o->[1]) - ($u->[1] - $o->[1]) * ($v->[0] - $o->[0])
+}
+
+fn Rosetta::Graham::hull($points) {
+    my $n = scalar(@$points)
+    return [@$points] if $n < 3
+
+    # Pivot: lowest y, then lowest x
+    my $piv = 0
+    for my $i (1..$n-1) {
+        if ($points->[$i][1] < $points->[$piv][1]
+            || ($points->[$i][1] == $points->[$piv][1]
+                && $points->[$i][0] < $points->[$piv][0])) {
+            $piv = $i
+        }
+    }
+    my $px = $points->[$piv][0]
+    my $py = $points->[$piv][1]
+
+    # Sort remaining by polar angle around pivot, ties broken by distance
+    my @rest = grep { $_->[0] != $px || $_->[1] != $py } @$points
+    my @sorted = sort {
+        my $cx = ($_0->[0] - $px) * ($_1->[1] - $py) - ($_0->[1] - $py) * ($_1->[0] - $px)
+        if ($cx == 0) {
+            (($_0->[0]-$px)**2 + ($_0->[1]-$py)**2)
+                <=> (($_1->[0]-$px)**2 + ($_1->[1]-$py)**2)
+        } else {
+            $cx > 0 ? -1 : 1
+        }
+    } @rest
+
+    my @stack = ([$px, $py])
+    for my $pt (@sorted) {
+        while (scalar(@stack) >= 2
+                && Rosetta::Graham::cross($stack[-2], $stack[-1], $pt) <= 0) {
+            pop @stack
+        }
+        push @stack, $pt
+    }
+    \@stack
+}
+
+my $pts = [[0,0], [3,0], [3,3], [0,3], [1,1], [2,2], [1,2]]
+my $h = Rosetta::Graham::hull($pts)
+my @sig = map { $_->[0] . "," . $_->[1] } @$h
+my $sorted = join("|", sort @sig)
+assert_eq $sorted, "0,0|0,3|3,0|3,3", "Graham hull of 7 pts = 4 corners"
+
+my $tri = [[0,0], [4,0], [2,3], [2,1]]
+my $h2 = Rosetta::Graham::hull($tri)
+assert_eq scalar(@$h2), 3, "triangle hull = 3 vertices"
+
+my $tiny = [[0,0], [1,1]]
+my $h3 = Rosetta::Graham::hull($tiny)
+assert_eq scalar(@$h3), 2, "two points: returned as-is"
+
+test_run

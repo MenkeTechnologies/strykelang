@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jacobi symbol (k/m) where m is odd positive
+
+fn Rosetta::Jacobi::symbol($k, $m) {
+    return 0 if $m <= 0 || $m % 2 == 0
+    $k = $k % $m
+    $k += $m if $k < 0
+    my $result = 1
+    while ($k != 0) {
+        while ($k % 2 == 0) {
+            $k = int($k / 2)
+            my $r = $m % 8
+            if ($r == 3 || $r == 5) {
+                $result = -$result
+            }
+        }
+        ($k, $m) = ($m, $k)
+        if ($k % 4 == 3 && $m % 4 == 3) {
+            $result = -$result
+        }
+        $k = $k % $m
+    }
+    $m == 1 ? $result : 0
+}
+
+# Known values
+assert_eq Rosetta::Jacobi::symbol(1001, 9907), -1, "(1001/9907) = -1"
+assert_eq Rosetta::Jacobi::symbol(19, 45), 1, "(19/45) = 1"
+assert_eq Rosetta::Jacobi::symbol(8, 21), -1, "(8/21) = -1"
+assert_eq Rosetta::Jacobi::symbol(5, 21), 1, "(5/21) = 1"
+assert_eq Rosetta::Jacobi::symbol(2, 7), 1, "(2/7) = 1"
+assert_eq Rosetta::Jacobi::symbol(2, 5), -1, "(2/5) = -1"
+assert_eq Rosetta::Jacobi::symbol(2, 11), -1, "(2/11) = -1"
+
+# Multiplicativity in upper argument: (ab/n) = (a/n)*(b/n)
+my $kk = 7
+my $kk2 = 11
+my $mm = 15
+my $lhs = Rosetta::Jacobi::symbol($kk * $kk2, $mm)
+my $s1 = Rosetta::Jacobi::symbol($kk, $mm)
+my $s2 = Rosetta::Jacobi::symbol($kk2, $mm)
+my $rhs = $s1 * $s2
+assert_eq $lhs, $rhs, "Jacobi multiplicative in numerator"
+
+# (a/1) = 1 always
+assert_eq Rosetta::Jacobi::symbol(7, 1), 1, "(7/1) = 1"
+
+# 0 / m = 0 for m > 1
+assert_eq Rosetta::Jacobi::symbol(0, 9), 0, "(0/9) = 0"
+
+# Even denominator -> 0 (not defined)
+assert_eq Rosetta::Jacobi::symbol(3, 8), 0, "even m -> 0 (sentinel)"
+
+test_run

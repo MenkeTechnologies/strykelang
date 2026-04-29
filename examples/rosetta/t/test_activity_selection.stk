@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Activity selection — greedy by earliest finish time
+
+fn Rosetta::Activity::select($activities) {
+    my @sorted = sort { $_0->[1] <=> $_1->[1] } @$activities
+    my @chosen
+    my $last_finish = -1e18
+    for my $act (@sorted) {
+        if ($act->[0] >= $last_finish) {
+            push @chosen, $act
+            $last_finish = $act->[1]
+        }
+    }
+    \@chosen
+}
+
+# Classic CLRS example
+my $acts = [
+    [1, 4],   [3, 5],   [0, 6],
+    [5, 7],   [3, 9],   [5, 9],
+    [6, 10],  [8, 11],  [8, 12],
+    [2, 14],  [12, 16]
+]
+my $picks = Rosetta::Activity::select($acts)
+my $sig = join("|", map { $_->[0] . "," . $_->[1] } @$picks)
+assert_eq $sig, "1,4|5,7|8,11|12,16", "CLRS activity selection (4 chosen)"
+
+# Empty input
+my $empty = Rosetta::Activity::select([])
+assert_eq scalar(@$empty), 0, "empty -> empty"
+
+# All overlapping -> first only
+my $overlap = [[0, 10], [1, 9], [2, 8]]
+my $only = Rosetta::Activity::select($overlap)
+assert_eq scalar(@$only), 1, "all overlap -> 1 chosen"
+assert_eq $only->[0][1], 8, "earliest-finish (8) wins"
+
+# 3 disjoint -> all 3
+my $disjoint = Rosetta::Activity::select([[1,2], [2,3], [3,4]])
+assert_eq scalar(@$disjoint), 3, "3 disjoint -> all 3"
+
+test_run

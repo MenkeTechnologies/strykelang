@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pick's theorem — area = I + B/2 - 1
+# I = interior lattice points, B = boundary lattice points
+
+fn Rosetta::Pick::gcd($a, $b) {
+    $a = abs($a)
+    $b = abs($b)
+    while ($b != 0) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn Rosetta::Pick::shoelace($poly) {
+    my $n = scalar(@$poly)
+    my $sum = 0
+    for my $i (0..$n-1) {
+        my $j = ($i + 1) % $n
+        $sum += $poly->[$i][0] * $poly->[$j][1] - $poly->[$j][0] * $poly->[$i][1]
+    }
+    abs($sum) / 2
+}
+
+fn Rosetta::Pick::boundary($poly) {
+    my $n = scalar(@$poly)
+    my $b = 0
+    for my $i (0..$n-1) {
+        my $j = ($i + 1) % $n
+        my $dx = abs($poly->[$j][0] - $poly->[$i][0])
+        my $dy = abs($poly->[$j][1] - $poly->[$i][1])
+        $b += Rosetta::Pick::gcd($dx, $dy)
+    }
+    $b
+}
+
+# Pick's theorem: I = A - B/2 + 1
+fn Rosetta::Pick::interior($poly) {
+    my $a = Rosetta::Pick::shoelace($poly)
+    my $b = Rosetta::Pick::boundary($poly)
+    $a - $b / 2 + 1
+}
+
+# Unit square: A=1, B=4, I=0
+my $sq = [[0,0], [1,0], [1,1], [0,1]]
+assert_eq Rosetta::Pick::shoelace($sq), 1, "unit square area"
+assert_eq Rosetta::Pick::boundary($sq), 4, "unit square boundary"
+assert_eq Rosetta::Pick::interior($sq), 0, "unit square interior"
+
+# 4x4 square: A=16, B=16, I=9
+my $big = [[0,0], [4,0], [4,4], [0,4]]
+assert_eq Rosetta::Pick::shoelace($big), 16, "4x4 area"
+assert_eq Rosetta::Pick::boundary($big), 16, "4x4 boundary"
+assert_eq Rosetta::Pick::interior($big), 9, "4x4 interior"
+
+# Right triangle (0,0)-(4,0)-(0,3): A=6, B=gcd(4,0)+gcd(4,3)+gcd(0,3)=4+1+3=8, I=6-4+1=3
+my $tri = [[0,0], [4,0], [0,3]]
+assert_eq Rosetta::Pick::shoelace($tri), 6, "right tri area"
+assert_eq Rosetta::Pick::boundary($tri), 8, "right tri boundary"
+assert_eq Rosetta::Pick::interior($tri), 3, "right tri interior"
+
+test_run

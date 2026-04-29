@@ -274,10 +274,7 @@ fn split_empty_pattern_splits_characters() {
     // raw regex engine; we now match Perl exactly. See `vm.rs::Op::Split`.)
     assert_eq!(eval_string(r#"join("|", split //, "xy")"#), "x|y");
     // LIMIT < 0 preserves the end-of-string match as a trailing empty.
-    assert_eq!(
-        eval_string(r#"join("|", split //, "xy", -1)"#),
-        "x|y|"
-    );
+    assert_eq!(eval_string(r#"join("|", split //, "xy", -1)"#), "x|y|");
     // Empty input → empty list.
     assert_eq!(eval_string(r#"scalar(split //, "")"#), "0");
 }

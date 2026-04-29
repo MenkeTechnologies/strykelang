@@ -914,15 +914,21 @@ impl Lexer {
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let ident = self.read_package_qualified_identifier();
-                // `$_<`, `$_<<`, … — outer topic (stryke extension); only for bare `_`.
-                if ident == "_" {
+                // `$_<`, `$_<<`, … — outer topic chain (stryke extension). Also
+                // applies to positional slots: `$_0<<<<`, `$_1<<<<`, etc. The
+                // canonical scope key is `_<<<<` (slot 0) or `_N<<<<` (slot N).
+                let is_topic_slot = ident == "_"
+                    || (ident.len() > 1
+                        && ident.starts_with('_')
+                        && ident[1..].bytes().all(|b| b.is_ascii_digit()));
+                if is_topic_slot {
                     let mut lts = String::new();
                     while self.peek() == Some('<') {
                         self.advance();
                         lts.push('<');
                     }
                     if !lts.is_empty() {
-                        return format!("_{}", lts);
+                        return format!("{}{}", ident, lts);
                     }
                 }
                 ident
@@ -1544,7 +1550,25 @@ impl Lexer {
 
             // Identifiers and keywords
             c if c.is_alphabetic() || c == '_' => {
-                let ident = self.read_identifier();
+                let mut ident = self.read_identifier();
+
+                // Outer-topic chain in bare form: `_<<<<` (slot 0) and
+                // `_N<<<<` (slot N). Greedy consume `<` chevrons immediately
+                // following `_` or `_<digits>`. This is what makes
+                // `_<` ≡ `$_<` ≡ `_0<` ≡ `$_0<` work without a sigil.
+                // Stryke power-user note: `_ < 5` (with whitespace) still
+                // tokenizes as topic-then-less-than; only `_<` with no
+                // intervening space becomes a topic-slot identifier.
+                let is_topic_slot = ident == "_"
+                    || (ident.len() > 1
+                        && ident.starts_with('_')
+                        && ident[1..].bytes().all(|b| b.is_ascii_digit()));
+                if is_topic_slot {
+                    while self.peek() == Some('<') {
+                        self.advance();
+                        ident.push('<');
+                    }
+                }
 
                 // Special multi-char constructs
                 match ident.as_str() {

@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fibonacci search on a sorted array
+
+fn Rosetta::FibSearch::min($x, $y) { $x < $y ? $x : $y }
+
+fn Rosetta::FibSearch::find($arr, $target) {
+    my $n = scalar(@$arr)
+    return -1 if $n == 0
+
+    my $fb_2 = 0
+    my $fb_1 = 1
+    my $fb = $fb_1 + $fb_2
+    while ($fb < $n) {
+        $fb_2 = $fb_1
+        $fb_1 = $fb
+        $fb = $fb_1 + $fb_2
+    }
+
+    my $offset = -1
+    while ($fb > 1) {
+        my $i = Rosetta::FibSearch::min($offset + $fb_2, $n - 1)
+        if ($arr->[$i] < $target) {
+            $fb = $fb_1
+            $fb_1 = $fb_2
+            $fb_2 = $fb - $fb_1
+            $offset = $i
+        } elsif ($arr->[$i] > $target) {
+            $fb = $fb_2
+            $fb_1 = $fb_1 - $fb_2
+            $fb_2 = $fb - $fb_1
+        } else {
+            return $i
+        }
+    }
+    if ($fb_1 && $offset + 1 < $n && $arr->[$offset + 1] == $target) {
+        return $offset + 1
+    }
+    -1
+}
+
+my @sorted = (10, 22, 35, 40, 45, 50, 80, 82, 85, 90, 100, 235)
+assert_eq Rosetta::FibSearch::find(\@sorted, 85), 8, "find 85 -> idx 8"
+assert_eq Rosetta::FibSearch::find(\@sorted, 10), 0, "first"
+assert_eq Rosetta::FibSearch::find(\@sorted, 235), 11, "last"
+assert_eq Rosetta::FibSearch::find(\@sorted, 25), -1, "missing -> -1"
+assert_eq Rosetta::FibSearch::find(\@sorted, 5), -1, "below range"
+assert_eq Rosetta::FibSearch::find(\@sorted, 999), -1, "above range"
+assert_eq Rosetta::FibSearch::find([], 5), -1, "empty -> -1"
+assert_eq Rosetta::FibSearch::find([42], 42), 0, "single match"
+assert_eq Rosetta::FibSearch::find([42], 7), -1, "single miss"
+
+# Power-of-fib aligned size
+my @fib_size = (1..21)
+assert_eq Rosetta::FibSearch::find(\@fib_size, 13), 12, "fib-size find 13 -> idx 12"
+assert_eq Rosetta::FibSearch::find(\@fib_size, 1), 0, "fib-size first"
+assert_eq Rosetta::FibSearch::find(\@fib_size, 21), 20, "fib-size last"
+
+\@sorted |> Rosetta::FibSearch::find(50) |> assert_eq(5, "pipe find 50 -> idx 5")
+
+test_run

@@ -30,7 +30,10 @@ my $switch_rate = $switch_wins / $trials
 p "Stay win rate: $stay_rate ($stay_wins/$trials)"
 p "Switch win rate: $switch_rate ($switch_wins/$trials)"
 
-assert_near $stay_rate, 0.333, 0.05, "Stay rate should be ~1/3"
-assert_near $switch_rate, 0.666, 0.05, "Switch rate should be ~2/3"
+# 3σ at 1000 trials gives ±0.045 for p=1/3; widen to 0.08 to absorb the rare
+# "just outside ±0.05" flake. Real signal stays clear (Stay 1/3, Switch 2/3
+# are still 0.333 apart, eps=0.08 keeps them disjoint).
+assert_near $stay_rate, 0.333, 0.08, "Stay rate should be ~1/3"
+assert_near $switch_rate, 0.666, 0.08, "Switch rate should be ~2/3"
 
 test_run

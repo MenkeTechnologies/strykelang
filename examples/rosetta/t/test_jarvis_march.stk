@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Convex hull — Jarvis march (gift wrapping)
+
+fn Rosetta::Jarvis::cross($o, $u, $v) {
+    ($u->[0] - $o->[0]) * ($v->[1] - $o->[1]) - ($u->[1] - $o->[1]) * ($v->[0] - $o->[0])
+}
+
+fn Rosetta::Jarvis::hull($points) {
+    my $n = scalar(@$points)
+    return [@$points] if $n < 3
+
+    my $start = 0
+    for my $i (1..$n-1) {
+        if ($points->[$i][0] < $points->[$start][0]
+            || ($points->[$i][0] == $points->[$start][0]
+                && $points->[$i][1] < $points->[$start][1])) {
+            $start = $i
+        }
+    }
+
+    my @hull
+    my $p = $start
+    my $guard = 0
+    while (1) {
+        last if ++$guard > $n + 1
+        push @hull, $points->[$p]
+        my $q = ($p + 1) % $n
+        for my $i (0..$n-1) {
+            if (Rosetta::Jarvis::cross($points->[$p], $points->[$i], $points->[$q]) < 0) {
+                $q = $i
+            }
+        }
+        $p = $q
+        last if $p == $start
+    }
+    \@hull
+}
+
+my $pts = [[0,0], [1,1], [2,2], [3,0], [0,3], [3,3], [1,2]]
+my $h = Rosetta::Jarvis::hull($pts)
+my @sig = map { $_->[0] . "," . $_->[1] } @$h
+my $sorted = join("|", sort @sig)
+assert_eq $sorted, "0,0|0,3|3,0|3,3", "convex hull of square+interior = 4 corners"
+
+my $tri = [[0,0], [4,0], [2,3], [2,1]]
+my $h2 = Rosetta::Jarvis::hull($tri)
+assert_eq scalar(@$h2), 3, "triangle hull excludes interior point"
+
+my $small = [[0,0], [1,0]]
+my $h3 = Rosetta::Jarvis::hull($small)
+assert_eq scalar(@$h3), 2, "two points: hull is themselves"
+
+test_run

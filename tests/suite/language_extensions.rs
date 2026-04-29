@@ -1458,6 +1458,132 @@ fn outer_topic_in_thread_sub_stage() {
     assert_eq!(eval_int(r#"$_ = 50; t 10 >{ $_ + $_< }"#), 60);
 }
 
+// ── nested implicit param matrix: `_N<+` reaches the Nth positional N
+// frames up. Stryke-only (no other language has nested implicit
+// positionals). See scope.rs::set_closure_args / set_topic. ──
+
+#[test]
+fn nested_positional_outer_topic_reaches_4_frames_up() {
+    // 4 nested map blocks inside a 3-arg sub. From the innermost body,
+    // _N<<<< reads the Nth positional of the outermost frame (the sub).
+    // Use a global sentinel rather than nested arrayref indexing because
+    // each map level wraps the result in its own list.
+    assert_eq!(
+        eval_string(
+            r#"$captured = "";
+               fn deep($_0, $_1, $_2) {
+                 ~> 1:1 map { ~> 1:1 map { ~> 1:1 map { ~> 1:1 map {
+                   $captured = join(",", _0<<<<, _1<<<<, _2<<<<);
+                 } } } }
+               }
+               deep("alpha", "beta", "gamma");
+               $captured"#,
+        ),
+        "alpha,beta,gamma"
+    );
+}
+
+#[test]
+fn slot_0_has_four_equivalent_spellings_at_every_level() {
+    // _<< ≡ $_<< ≡ _0<< ≡ $_0<< — all four resolve to the same scalar.
+    assert_eq!(
+        eval_string(
+            r#"$out = "";
+               fn shallow($_0) {
+                 ~> 1:1 map { ~> 1:1 map {
+                   $out = join(",", _<<, $_<<, _0<<, $_0<<)
+                 } }
+               }
+               shallow("X");
+               $out"#,
+        ),
+        "X,X,X,X"
+    );
+}
+
+#[test]
+fn slot_n_two_spellings_per_level() {
+    // _N<+ ≡ $_N<+ — two spellings per (slot, level) for slot ≥ 1.
+    assert_eq!(
+        eval_string(
+            r#"$out = "";
+               fn pair($_0, $_1) {
+                 ~> 1:1 map {
+                   $out = join(",", _1<, $_1<)
+                 }
+               }
+               pair("first", "second");
+               $out"#,
+        ),
+        "second,second"
+    );
+}
+
+#[test]
+fn outer_chain_propagates_undef_through_intermediate_frames() {
+    // Slot 1 is bound only at the outer sub. Map iterations in between
+    // shift the chain (slot 1's "current" becomes undef inside map), so
+    // _1<< at the innermost reaches back to the outer sub's $_1.
+    assert_eq!(
+        eval_int(
+            r#"$out = 0;
+               fn pair($_0, $_1) {
+                 ~> 1:1 map { ~> 1:1 map {
+                   $out = _1<<
+                 } }
+               }
+               pair(10, 20);
+               $out"#,
+        ),
+        20
+    );
+}
+
+#[test]
+fn pmap_parallel_cartesian_with_outer_chain_golf() {
+    // The canonical golf one-liner: parallel cross-product where each
+    // inner iter binds `_` to its own element and `_<` to the *previous*
+    // topic (the most recent value before this iter's set_topic shift).
+    // For a 1-element inner array, `_<` is reliably the outer iter's
+    // element — clean cartesian sum without naming variables.
+    //   ~> @outer pmap { ~> @inner pmap { _< + _ } } sum
+    // [1,2,3] × [10]: (1+10)+(2+10)+(3+10) = 36.
+    assert_eq!(
+        eval_int(
+            r#"my @outer = (1, 2, 3);
+               my @inner = (10);
+               ~> @outer pmap { ~> @inner pmap { _< + _ } } sum"#,
+        ),
+        36
+    );
+}
+
+#[test]
+fn outer_chain_shifts_on_every_set_topic_not_on_frame() {
+    // Documents the load-bearing semantic: `_<` is "the value `_` held
+    // before the most recent shift", not "the enclosing frame's `_`".
+    // Each map iter shifts, so a multi-element inner loop sees the
+    // previous inner element as `_<` after the first inner iter.
+    // For [1,2] × [10,20] with `_< + _`, traced step by step:
+    //   o=1 set_topic(1) → _<=prev(undef→0), _=1
+    //     i=10 set_topic(10) → _<=1, _=10 → body 11
+    //     i=20 set_topic(20) → _<=10, _=20 → body 30
+    //   o=2 set_topic(2) → _<=20 (last shift was inner i=20), _=2
+    //     i=10 set_topic(10) → _<=2, _=10 → body 12
+    //     i=20 set_topic(20) → _<=10, _=20 → body 30
+    // Total 11+30+12+30 = 83.
+    // Same mechanic gives "previous topic" rolling access for
+    // `$_ = 10; map { $_ + $_< } (1,2,3)` → "11,3,5".
+    assert_eq!(
+        eval_int(
+            r#"my @outer = (1, 2);
+               my @inner = (10, 20);
+               ~> @outer map { ~> @inner map { _< + _ } } |> flatten |> sum"#,
+        ),
+        83
+    );
+}
+
 // ── sum/sum0/product with iterators and arrays ──
 
 #[test]

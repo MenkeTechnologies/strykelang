@@ -8676,8 +8676,7 @@ impl<'a> VM<'a> {
                             if n < chars.len() {
                                 let mut head: Vec<String> =
                                     chars.iter().take(n.saturating_sub(1)).cloned().collect();
-                                let tail: String =
-                                    s.chars().skip(n.saturating_sub(1)).collect();
+                                let tail: String = s.chars().skip(n.saturating_sub(1)).collect();
                                 head.push(tail);
                                 head
                             } else if n == chars.len() {
