@@ -4687,6 +4687,7 @@ dependencies = [
  "nix 0.31.2",
  "notify",
  "nu-ansi-term",
+ "num-bigint",
  "num-traits",
  "once_cell",
  "os_pipe",

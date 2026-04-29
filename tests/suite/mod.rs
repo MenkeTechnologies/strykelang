@@ -4,6 +4,7 @@ mod algebraic_match;
 mod aop;
 mod aot_build;
 mod bare_regex_slash;
+mod bigint_compat;
 mod builtins;
 mod class_oop;
 mod cli_compat_mode;

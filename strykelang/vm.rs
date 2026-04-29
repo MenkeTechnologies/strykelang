@@ -3490,39 +3490,21 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Add, a, b, |a, b| {
-                            Ok(
-                                if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                                    PerlValue::integer(x.wrapping_add(y))
-                                } else {
-                                    PerlValue::float(a.to_number() + b.to_number())
-                                },
-                            )
+                            Ok(crate::value::compat_add(a, b))
                         })
                     }
                     Op::Sub => {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Sub, a, b, |a, b| {
-                            Ok(
-                                if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                                    PerlValue::integer(x.wrapping_sub(y))
-                                } else {
-                                    PerlValue::float(a.to_number() - b.to_number())
-                                },
-                            )
+                            Ok(crate::value::compat_sub(a, b))
                         })
                     }
                     Op::Mul => {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Mul, a, b, |a, b| {
-                            Ok(
-                                if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                                    PerlValue::integer(x.wrapping_mul(y))
-                                } else {
-                                    PerlValue::float(a.to_number() * b.to_number())
-                                },
-                            )
+                            Ok(crate::value::compat_mul(a, b))
                         })
                     }
                     Op::Div => {
@@ -3571,21 +3553,7 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::Pow, a, b, |a, b| {
-                            Ok(
-                                if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                                    if let Some(r) = (y >= 0)
-                                        .then(|| u32::try_from(y).ok())
-                                        .flatten()
-                                        .and_then(|yu| x.checked_pow(yu))
-                                    {
-                                        PerlValue::integer(r)
-                                    } else {
-                                        PerlValue::float(a.to_number().powf(b.to_number()))
-                                    }
-                                } else {
-                                    PerlValue::float(a.to_number().powf(b.to_number()))
-                                },
-                            )
+                            Ok(crate::value::compat_pow(a, b))
                         })
                     }
                     Op::Negate => {
@@ -5530,11 +5498,7 @@ impl<'a> VM<'a> {
                     Op::AddAssignSlotSlot(dst, src) => {
                         let a = self.interp.scope.get_scalar_slot(*dst);
                         let b = self.interp.scope.get_scalar_slot(*src);
-                        let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_add(y))
-                        } else {
-                            PerlValue::float(a.to_number() + b.to_number())
-                        };
+                        let result = crate::value::compat_add(&a, &b);
                         self.interp.scope.set_scalar_slot(*dst, result.clone());
                         self.push(result);
                         Ok(())
@@ -5542,22 +5506,14 @@ impl<'a> VM<'a> {
                     Op::AddAssignSlotSlotVoid(dst, src) => {
                         let a = self.interp.scope.get_scalar_slot(*dst);
                         let b = self.interp.scope.get_scalar_slot(*src);
-                        let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_add(y))
-                        } else {
-                            PerlValue::float(a.to_number() + b.to_number())
-                        };
+                        let result = crate::value::compat_add(&a, &b);
                         self.interp.scope.set_scalar_slot(*dst, result);
                         Ok(())
                     }
                     Op::SubAssignSlotSlot(dst, src) => {
                         let a = self.interp.scope.get_scalar_slot(*dst);
                         let b = self.interp.scope.get_scalar_slot(*src);
-                        let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_sub(y))
-                        } else {
-                            PerlValue::float(a.to_number() - b.to_number())
-                        };
+                        let result = crate::value::compat_sub(&a, &b);
                         self.interp.scope.set_scalar_slot(*dst, result.clone());
                         self.push(result);
                         Ok(())
@@ -5565,11 +5521,7 @@ impl<'a> VM<'a> {
                     Op::MulAssignSlotSlot(dst, src) => {
                         let a = self.interp.scope.get_scalar_slot(*dst);
                         let b = self.interp.scope.get_scalar_slot(*src);
-                        let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-                            PerlValue::integer(x.wrapping_mul(y))
-                        } else {
-                            PerlValue::float(a.to_number() * b.to_number())
-                        };
+                        let result = crate::value::compat_mul(&a, &b);
                         self.interp.scope.set_scalar_slot(*dst, result.clone());
                         self.push(result);
                         Ok(())
