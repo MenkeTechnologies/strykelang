@@ -10,7 +10,7 @@ fn Rosetta::LeonardoV2::compute($n) {
 }
 
 fn Rosetta::LeonardoV2::list($max) {
-    ~> 0:$max map { Rosetta::LeonardoV2::compute($_) }
+    ~> 0:$max map { Rosetta::LeonardoV2::compute(_) }
 }
 
 assert_eq Rosetta::LeonardoV2::compute(0), 1, "L(0)"

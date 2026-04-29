@@ -2,7 +2,7 @@
 # Rosetta Code: Word lengths (using pipes)
 
 fn Rosetta::WordLengths::solve($text) {
-    $text |> trim() |> split(/\s+/) |> map { length($_) }
+    $text |> trim() |> split(/\s+/) |> map { length(_) }
 }
 
 my @lengths = Rosetta::WordLengths::solve("The quick brown fox")

@@ -2,7 +2,7 @@
 # Rosetta Code: Sum Even Numbers
 
 fn Rosetta::SumEven::compute($list) {
-    my @evens = ~> @$list grep { $_ % 2 == 0 }
+    my @evens = ~> @$list grep { _ % 2 == 0 }
     if (len(@evens) == 0) {
         0
     } else {

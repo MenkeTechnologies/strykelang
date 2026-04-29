@@ -33,7 +33,7 @@ fn Rosetta::Practical::is_practical($n) {
 }
 
 fn Rosetta::Practical::list($limit) {
-    1:$limit |> grep { Rosetta::Practical::is_practical($_) }
+    1:$limit |> grep { Rosetta::Practical::is_practical(_) }
 }
 
 # OEIS A005153 first terms: 1, 2, 4, 6, 8, 12, 16, 18, 20, 24, 28, 30, 32, 36, 40, 42

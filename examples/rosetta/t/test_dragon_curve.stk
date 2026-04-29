@@ -2,7 +2,7 @@
 # Rosetta Code: Dragon curve (Heighway dragon)
 
 fn Rosetta::DragonCurve::step($s) {
-    my $inverted = ~> split("", $s) map { $_ eq "R" ? "L" : "R" } |> join("")
+    my $inverted = ~> split("", $s) map { _ eq "R" ? "L" : "R" } |> join("")
     my $reversed = reverse($inverted)
     $s . "R" . $reversed
 }

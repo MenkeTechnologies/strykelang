@@ -4,8 +4,8 @@
 fn Rosetta::MatrixTranspose::solve($m) {
     my $cols = len(@{$m->[0]})
     ~> 0..$cols-1 map {
-        my $j = $_
-        [ ~> @$m map { $_->[$j] } ]
+        my $j = _
+        [ ~> @$m map { _->[$j] } ]
     }
 }
 

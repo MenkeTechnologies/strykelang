@@ -24,7 +24,7 @@ assert_eq Rosetta::Quadrants::classify(3, -4),   "Q4",     "(+,-)"
 
 # Walking the unit square: every quadrant + every axis touch.
 my @points = ([1,1], [-1,1], [-1,-1], [1,-1], [0,1], [1,0])
-my @labels = ~> @points map { Rosetta::Quadrants::classify($_->[0], $_->[1]) }
+my @labels = ~> @points map { Rosetta::Quadrants::classify(_->[0], _->[1]) }
 assert_eq join(",", @labels), "Q1,Q2,Q3,Q4,y-axis,x-axis", "tour around origin"
 
 test_run

@@ -13,7 +13,7 @@ fn Rosetta::CaesarCipher::shift($c, $shift) {
 }
 
 fn Rosetta::CaesarCipher::encrypt($text, $shift) {
-    ~> $text chars map { Rosetta::CaesarCipher::shift($_, $shift) } |> join("")
+    ~> $text chars map { Rosetta::CaesarCipher::shift(_, $shift) } |> join("")
 }
 
 fn Rosetta::CaesarCipher::decrypt($text, $shift) {

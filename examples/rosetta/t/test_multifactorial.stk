@@ -12,7 +12,7 @@ fn Rosetta::Multifactorial::compute($n, $k) {
 }
 
 fn Rosetta::Multifactorial::row($k, $count) {
-    1:$count |> map { Rosetta::Multifactorial::compute($_, $k) }
+    1:$count |> map { Rosetta::Multifactorial::compute(_, $k) }
 }
 
 assert_eq Rosetta::Multifactorial::compute(5, 1), 120, "5! = 120"

@@ -5,13 +5,13 @@
 
 fn Rosetta::Running::total(@xs) {
     my $acc = 0
-    ~> @xs map { $acc += $_; $acc }
+    ~> @xs map { $acc += _; $acc }
 }
 
 # Variant: rolling product.
 fn Rosetta::Running::product(@xs) {
     my $acc = 1
-    ~> @xs map { $acc *= $_; $acc }
+    ~> @xs map { $acc *= _; $acc }
 }
 
 # Cumulative sum 1..5: 1, 3, 6, 10, 15 (the triangular numbers).

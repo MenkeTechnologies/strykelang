@@ -3,13 +3,13 @@
 
 fn Rosetta::ROT13::solve($text) {
     ~> $text chars map {
-        my $o = ord($_)
+        my $o = ord(_)
         if ($o >= 65 && $o <= 90) {
             chr((($o - 65 + 13) % 26) + 65)
         } elsif ($o >= 97 && $o <= 122) {
             chr((($o - 97 + 13) % 26) + 97)
         } else {
-            $_
+            _
         }
     } |> join("")
 }

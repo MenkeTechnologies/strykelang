@@ -3,7 +3,7 @@
 
 fn Rosetta::DigitFifthPowers::sum($n) {
     my $sum = 0
-    my @digits = ~> "$n" chars map { int($_) }
+    my @digits = ~> "$n" chars map { int(_) }
     for my $d (@digits) { $sum += $d ** 5 }
     $sum
 }

@@ -3,7 +3,7 @@
 
 fn Rosetta::MontyHall::simulate($trials, $switch) {
     my @results = ~> 1:$trials pmap {
-        srand($_ + now_ns)
+        srand(_ + now_ns)
         my $prize_door = int(rand(3))
         my $chosen_door = int(rand(3))
         

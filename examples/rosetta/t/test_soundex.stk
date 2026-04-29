@@ -19,7 +19,7 @@ fn Rosetta::Soundex::compute($name) {
     
     my @rest_codes = ~> @chars[1..$#chars] map {
         $codes{$_} ? $codes{$_} : ""
-    } |> grep { $_ ne "" }
+    } |> grep { _ ne "" }
     
     my @unique
     my $prev = $first_code

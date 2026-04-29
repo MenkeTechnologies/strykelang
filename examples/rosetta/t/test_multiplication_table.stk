@@ -5,7 +5,7 @@ fn Rosetta::MultiplicationTable::generate($n) {
     my @indices = (1..$n)
     my @rows
     for my $i (@indices) {
-        my @row = @indices |> map { $i * $_ }
+        my @row = @indices |> map { $i * _ }
         push @rows, \@row
     }
     \@rows

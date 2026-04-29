@@ -17,7 +17,7 @@ fn Rosetta::Wilson::is_wilson($p) {
 }
 
 fn Rosetta::Wilson::list($limit) {
-    2:$limit |> grep { Rosetta::Wilson::is_wilson($_) }
+    2:$limit |> grep { Rosetta::Wilson::is_wilson(_) }
 }
 
 # All three known Wilson primes within 1000

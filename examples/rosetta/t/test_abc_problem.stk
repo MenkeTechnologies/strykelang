@@ -24,7 +24,7 @@ fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
 
 fn Rosetta::ABCProblem::check($word, @blocks) {
     my @chars = ~> $word lc chars
-    my @b_list = ~> @blocks map { lc(_) }
+    my @b_list = ~> @blocks map { lc }
     Rosetta::ABCProblem::check_recursive(\@chars, \@b_list)
 }
 

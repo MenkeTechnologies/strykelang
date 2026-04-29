@@ -3,7 +3,7 @@
 
 fn Rosetta::SumDigits::compute($n) {
     my $sum = 0
-    my @digits = ~> $n abs >{ sprintf("%d", $_) } chars
+    my @digits = ~> $n abs >{ sprintf("%d", _) } chars
     for my $d (@digits) { $sum = $sum + int($d) }
     $sum
 }

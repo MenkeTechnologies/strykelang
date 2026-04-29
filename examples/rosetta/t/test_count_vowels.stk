@@ -2,7 +2,7 @@
 # Rosetta Code: Count Vowels
 
 fn Rosetta::CountVowels::solve($s) {
-    ~> $s chars grep { $_ =~ /[aeiouAEIOU]/ } len
+    ~> $s chars grep { _ =~ /[aeiouAEIOU]/ } len
 }
 
 assert_eq Rosetta::CountVowels::solve("alphabet"), 3, "alphabet has 3 vowels"

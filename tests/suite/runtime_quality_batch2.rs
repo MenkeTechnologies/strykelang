@@ -313,13 +313,13 @@ fn float_sum_sprintf_one_decimal() {
 }
 
 #[test]
-fn list_assign_third_slot_stays_defined_after_partial_rhs() {
+fn list_assign_third_slot_is_undef_after_partial_rhs() {
     assert_eq!(
         eval_int(
             r#"my ($a, $b, $c) = (9, 8);
                defined $c ? 1 : 0"#,
         ),
-        1
+        0
     );
 }
 
@@ -423,7 +423,10 @@ fn parenthesized_base_exponent_positive_square() {
 
 #[test]
 fn pack_signed_long_roundtrip() {
-    assert_eq!(eval_int(r#"unpack_first("l", pack("l", -123456))"#), -123456);
+    assert_eq!(
+        eval_int(r#"unpack_first("l", pack("l", -123456))"#),
+        -123456
+    );
 }
 
 #[test]

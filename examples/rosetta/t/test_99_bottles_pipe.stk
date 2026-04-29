@@ -11,7 +11,7 @@ fn Rosetta::NinetyNineBottles::verse($n) {
 
 fn Rosetta::NinetyNineBottles::solve() {
     # Range 0 to 99, reverse it, map to verse, join with double newline
-    ~> 0:99 rev map { Rosetta::NinetyNineBottles::verse($_) } |> join("\n\n")
+    ~> 0:99 rev map { Rosetta::NinetyNineBottles::verse } |> join("\n\n")
 }
 
 my $song = Rosetta::NinetyNineBottles::solve()

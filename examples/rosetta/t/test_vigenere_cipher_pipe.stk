@@ -2,12 +2,12 @@
 # Rosetta Code: Vigenère cipher (using pipes)
 
 fn Rosetta::Vigenere::solve($text, $key, $mode) {
-    my @text_chars = $text |> uc() |> chars() |> grep { $_ =~ /[A-Z]/ }
-    my @key_chars  = $key |> uc() |> chars() |> grep { $_ =~ /[A-Z]/ }
+    my @text_chars = $text |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
+    my @key_chars  = $key |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
     my $key_len = len(@key_chars)
     
     ~> 0:$#text_chars map {
-        my $i = $_
+        my $i = _
         my $p = ord($text_chars[$i]) - 65
         my $k = ord($key_chars[$i % $key_len]) - 65
         my $c

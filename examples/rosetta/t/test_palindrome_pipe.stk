@@ -3,7 +3,7 @@
 
 fn Rosetta::Palindrome::is_palindrome($s) {
     # Clean string: lowercase and remove non-alphanumeric
-    my $clean = $s |> lc() |> { $_ =~ s/[^a-z0-9]//gr }
+    my $clean = $s |> lc() |> { _ =~ s/[^a-z0-9]//gr }
     $clean eq ($clean |> rev())
 }
 

@@ -23,7 +23,7 @@ fn Rosetta::Wieferich::is_wieferich($p) {
 }
 
 fn Rosetta::Wieferich::list($limit) {
-    2:$limit |> grep { Rosetta::Wieferich::is_wieferich($_) }
+    2:$limit |> grep { Rosetta::Wieferich::is_wieferich(_) }
 }
 
 # Both known Wieferich primes < 5000

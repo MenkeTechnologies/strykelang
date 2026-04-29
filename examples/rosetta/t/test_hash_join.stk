@@ -45,17 +45,17 @@ my $joined = Rosetta::HashJoin::join_on($A, $B, "name", "name")
 assert_eq len(@$joined), 7, "7 joined rows total"
 
 # Check that Glory's row exists with both age and nemesis
-my @glory = grep { $_->{name} eq "Glory" } @$joined
+my @glory = grep { _->{name} eq "Glory" } @$joined
 assert_eq len(@glory), 1, "exactly one Glory row"
 assert_eq $glory[0]->{age}, 28, "Glory age 28"
 assert_eq $glory[0]->{nemesis}, "Buffy", "Glory's nemesis"
 
 # Alan with age 18 has 2 nemeses
-my @alan18 = grep { $_->{name} eq "Alan" && $_->{age} == 18 } @$joined
+my @alan18 = grep { _->{name} eq "Alan" && _->{age} == 18 } @$joined
 assert_eq len(@alan18), 2, "Alan(18) joined twice"
 
 # No-match exclusion
-my @popeye = grep { $_->{name} eq "Popeye" } @$joined
+my @popeye = grep { _->{name} eq "Popeye" } @$joined
 assert_eq len(@popeye), 0, "Popeye dropped"
 
 # Empty inputs

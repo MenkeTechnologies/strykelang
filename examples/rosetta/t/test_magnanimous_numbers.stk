@@ -26,7 +26,7 @@ fn Rosetta::Magnanimous::is_magnanimous($n) {
 }
 
 fn Rosetta::Magnanimous::list($limit) {
-    0:$limit |> grep { Rosetta::Magnanimous::is_magnanimous($_) }
+    0:$limit |> grep { Rosetta::Magnanimous::is_magnanimous(_) }
 }
 
 # OEIS A252996 begins: 0,1,2,3,4,5,6,7,8,9,11,12,14,16,20,21,23,25,29,30,32,...

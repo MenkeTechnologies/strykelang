@@ -7,7 +7,7 @@
 
 fn Rosetta::Chudnovsky::factorial($n) {
     my $r = 1.0
-    for (2 .. $n) { $r *= $_ }
+    for (2 .. $n) { $r *= _ }
     $r
 }
 

@@ -3,7 +3,7 @@
 
 fn Rosetta::LuckyNumbers::generate($max) {
     # Start with odd numbers only
-    my @l = grep { $_ % 2 == 1 } (1..$max)
+    my @l = grep { _ % 2 == 1 } (1..$max)
     my $idx = 1
     
     while ($idx < len(@l)) {

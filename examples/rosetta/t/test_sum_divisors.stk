@@ -2,7 +2,7 @@
 # Rosetta Code: Sum of divisors
 
 fn Rosetta::SumDivisors::get($n) {
-    my @res = 1:$n |> grep { $n % $_ == 0 }
+    my @res = 1:$n |> grep { $n % _ == 0 }
     @res
 }
 

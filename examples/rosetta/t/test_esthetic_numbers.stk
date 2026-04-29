@@ -18,7 +18,7 @@ fn Rosetta::Esthetic::is_esthetic($n, $base) {
 }
 
 fn Rosetta::Esthetic::list($lo, $hi, $base) {
-    $lo:$hi |> grep { Rosetta::Esthetic::is_esthetic($_, $base) }
+    $lo:$hi |> grep { Rosetta::Esthetic::is_esthetic(_, $base) }
 }
 
 # Base 10 esthetic numbers, OEIS A033075: 1,2,3,4,5,6,7,8,9,10,12,21,23,32,34,...

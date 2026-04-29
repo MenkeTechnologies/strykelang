@@ -2,11 +2,11 @@
 # Rosetta Code: Filter even numbers (using grep and pipes)
 
 fn Rosetta::EvenNumbers::solve(@arr) {
-    @arr |> grep { $_ % 2 == 0 }
+    @arr |> grep { _ % 2 == 0 }
 }
 
 fn Rosetta::EvenNumbers::solve_parallel(@arr) {
-    ~> @arr pgrep { $_ % 2 == 0 }
+    ~> @arr pgrep { _ % 2 == 0 }
 }
 
 my @input = 1:10

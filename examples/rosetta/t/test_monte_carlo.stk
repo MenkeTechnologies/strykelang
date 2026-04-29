@@ -17,7 +17,7 @@ fn Rosetta::MonteCarlo::pi_parallel($samples, $workers) {
     my $chunk = int($samples / $workers)
     my @results = ~> 1:$workers pmap {
         my $inside = 0
-        srand($_ + now_ns)
+        srand(_ + now_ns)
         for my $i (1..$chunk) {
             my $x = rand()
             my $y = rand()
@@ -41,7 +41,7 @@ my $pi_par = Rosetta::MonteCarlo::pi_parallel(100000, 4)
 assert_ok $pi_par > 3.1 && $pi_par < 3.2, "Parallel MC Pi is approximately Pi: $pi_par"
 
 # Pipeline version: using the dedicated pmap_reduce builtin
-my $inside_pipe = 0 + (1:10000 |> pmap_reduce { srand($_ + now_ns); my $x = rand(); my $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
+my $inside_pipe = 0 + (1:10000 |> pmap_reduce { srand(_ + now_ns); my $x = rand(); my $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
 my $pi_pipe = 4.0 * $inside_pipe / 10000
 assert_ok $pi_pipe > 3.0 && $pi_pipe < 3.3, "Pipeline MC Pi is approximately Pi: $pi_pipe"
 

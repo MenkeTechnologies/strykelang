@@ -19,7 +19,7 @@ fn Rosetta::LoopsFor::demo() {
     
     # For loop with step (using threading for filter)
     "3. Even numbers 2 to 10:" |> p
-    for my $n (~> (1..10) grep { $_ % 2 == 0 }) {
+    for my $n (~> (1..10) grep { _ % 2 == 0 }) {
         "   $n" |> p
     }
     

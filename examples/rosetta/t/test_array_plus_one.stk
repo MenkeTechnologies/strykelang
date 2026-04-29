@@ -2,7 +2,7 @@
 # Rosetta Code: Array plus one (using map and pipe)
 
 fn Rosetta::ArrayPlusOne::solve(@arr) {
-    ~> @arr map { $_ + 1 }
+    ~> @arr map { _ + 1 }
 }
 
 my @input = (1, 2, 3, 4, 5)

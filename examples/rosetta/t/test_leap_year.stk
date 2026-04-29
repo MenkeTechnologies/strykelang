@@ -6,7 +6,7 @@ fn Rosetta::LeapYear::check($year) {
 }
 
 fn Rosetta::LeapYear::in_range($start, $end) {
-    $start:$end |> filter { Rosetta::LeapYear::check($_) }
+    $start:$end |> filter { Rosetta::LeapYear::check(_) }
 }
 
 assert_ok Rosetta::LeapYear::check(2000), "2000 is leap (div by 400)"

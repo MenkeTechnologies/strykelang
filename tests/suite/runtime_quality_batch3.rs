@@ -308,7 +308,7 @@ fn defined_array_index_after_pop_stays_defined_slot() {
                pop @a;
                defined $a[0] ? 1 : 0"#,
         ),
-        1
+        0
     );
 }
 

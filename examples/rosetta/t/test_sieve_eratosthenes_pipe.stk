@@ -16,7 +16,7 @@ fn Rosetta::Sieve::solve($n) {
     }
     
     # Use pipe to filter indices where value is 1
-    ~> 0:$n grep { $primes[$_] }
+    ~> 0:$n grep { $primes[_] }
 }
 
 my @p = Rosetta::Sieve::solve(30)

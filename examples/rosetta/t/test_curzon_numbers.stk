@@ -21,7 +21,7 @@ fn Rosetta::Curzon::is_curzon($n, $k) {
 }
 
 fn Rosetta::Curzon::list($limit, $k) {
-    1:$limit |> grep { Rosetta::Curzon::is_curzon($_, $k) }
+    1:$limit |> grep { Rosetta::Curzon::is_curzon(_, $k) }
 }
 
 my @c2 = Rosetta::Curzon::list(60, 2)

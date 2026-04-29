@@ -13,7 +13,7 @@ fn Rosetta::PascalsTriangleRow::solve($n) {
     my @right = (0)
     for my $v (@prev) { push @right, $v }
 
-    ~> zip(\@left, \@right) map { $_->[0] + $_->[1] }
+    ~> zip(\@left, \@right) map { _->[0] + _->[1] }
 }
 
 assert_eq join(",", Rosetta::PascalsTriangleRow::solve(0)), "1", "row 0"

@@ -19,7 +19,7 @@ fn Rosetta::PowerIteration::matrix_vector_mul($m, $v) {
 
 fn Rosetta::PowerIteration::normalize($v) {
     my $norm = sqrt(Rosetta::PowerIteration::dot_product($v, $v))
-    my @res = ~> @$v map { $_ / $norm }
+    my @res = ~> @$v map { _ / $norm }
     \@res
 }
 

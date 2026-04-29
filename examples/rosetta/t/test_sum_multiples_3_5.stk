@@ -2,7 +2,7 @@
 # Rosetta Code: Sum of multiples of 3 and 5 below n (Project Euler #1)
 
 fn Rosetta::SumMultiples::brute($n) {
-    1:$n-1 |> grep { $_ % 3 == 0 || $_ % 5 == 0 } |> sum()
+    1:$n-1 |> grep { _ % 3 == 0 || _ % 5 == 0 } |> sum()
 }
 
 # Closed form: sum(k=1..floor(n/d)) = d * k*(k+1)/2

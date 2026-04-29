@@ -23,7 +23,7 @@ assert_eq join(",", @s27[-4:-1]), "8,4,2,1", "hailstone(27) last 4"
 
 # Find longest sequence under 10,000 for faster test (Rosetta says 100k)
 # We'll do 10,000 here to be safe with timeouts, but use ~> for speed.
-my $longest = ~> 1:10000 map { [ $_, len(Rosetta::Hailstone::seq($_)) ] }
+my $longest = ~> 1:10000 map { [ _, len(Rosetta::Hailstone::seq(_)) ] }
             |> reduce { $_0->[1] > $_1->[1] ? $_0 : $_1 }
 
 # For < 10,000, n=6171 has length 262

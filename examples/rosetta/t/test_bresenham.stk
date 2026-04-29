@@ -35,7 +35,7 @@ my @s = ~> @$line map { "(" . _->[0] . "," . _->[1] . ")" }
 assert_eq join(" ", @s), "(1,1) (2,2) (3,2) (4,3) (5,3) (6,4) (7,4) (8,5)", "line 1,1 to 8,5"
 
 my $line2 = Rosetta::Bresenham::solve(1, 8, 8, 1)
-my @s2 = ~> @$line2 map { "(" . $_->[0] . "," . $_->[1] . ")" }
+my @s2 = ~> @$line2 map { "(" . _->[0] . "," . _->[1] . ")" }
 assert_eq $s2[0], "(1,8)", "start point"
 assert_eq $s2[-1], "(8,1)", "end point"
 

@@ -7,9 +7,9 @@ fn Rosetta::MatrixAdd::matrix_add {
     my $rows = len(@$m1)
     my $cols = len(@{$m1->[0]})
     my @res = ~> 0..$rows-1 map {
-        my $i = $_
+        my $i = _
         my @row = map {
-            my $j = $_
+            my $j = _
             $m1->[$i][$j] + $m2->[$i][$j]
         } (0..$cols-1)
         \@row

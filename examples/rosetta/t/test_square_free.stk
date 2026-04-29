@@ -20,7 +20,7 @@ fn is_square_free($n) {
 }
 
 fn square_free_list($max) {
-    ~> 1..$max filter { is_square_free($_) }
+    ~> 1..$max filter { is_square_free(_) }
 }
 
 assert_ok is_square_free(1), "1 is square-free"

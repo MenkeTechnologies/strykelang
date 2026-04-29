@@ -12,13 +12,13 @@ fn Rosetta::OrderedWords::is_ordered($word) {
 }
 
 fn Rosetta::OrderedWords::longest(@words) {
-    my @ordered = grep { Rosetta::OrderedWords::is_ordered($_) } @words
+    my @ordered = grep { Rosetta::OrderedWords::is_ordered(_) } @words
     my $maxlen = 0
     for my $w (@ordered) {
         my $l = length($w)
         $maxlen = $l if $l > $maxlen
     }
-    [grep { length($_) == $maxlen } @ordered]
+    [grep { length(_) == $maxlen } @ordered]
 }
 
 assert_ok  Rosetta::OrderedWords::is_ordered("abbey"),    "abbey is ordered"

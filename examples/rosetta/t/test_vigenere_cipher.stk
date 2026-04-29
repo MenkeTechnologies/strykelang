@@ -2,24 +2,24 @@
 # Rosetta Code: Vigenere Cipher
 
 fn Rosetta::VigenereCipher::encrypt($text, $key) {
-    my @tc = ~> $text uc chars grep { $_ =~ /[A-Z]/ }
-    my @kc = ~> $key uc chars grep { $_ =~ /[A-Z]/ }
+    my @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
+    my @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
     my $klen = len(@kc)
     
     0..len(@tc)-1 |> map {
-        my $i = $_
+        my $i = _
         my $shift = ord($kc[$i % $klen]) - 65
         chr((ord($tc[$i]) - 65 + $shift) % 26 + 65)
     } |> join ""
 }
 
 fn Rosetta::VigenereCipher::decrypt($text, $key) {
-    my @tc = ~> $text uc chars grep { $_ =~ /[A-Z]/ }
-    my @kc = ~> $key uc chars grep { $_ =~ /[A-Z]/ }
+    my @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
+    my @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
     my $klen = len(@kc)
     
     0..len(@tc)-1 |> map {
-        my $i = $_
+        my $i = _
         my $shift = ord($kc[$i % $klen]) - 65
         chr((ord($tc[$i]) - 65 - $shift + 26) % 26 + 65)
     } |> join ""

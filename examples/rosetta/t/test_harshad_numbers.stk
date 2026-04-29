@@ -16,7 +16,7 @@ assert_ok Rosetta::HarshadNumbers::check(18), "18 is harshad (1+8=9, 18%9=0)"
 assert_ok Rosetta::HarshadNumbers::check(1729), "1729 is harshad (1+7+2+9=19, 1729%19=0)"
 assert_ok !Rosetta::HarshadNumbers::check(19), "19 is not harshad"
 
-my @first_20 = ~> 1:100 grep { Rosetta::HarshadNumbers::check($_) }
+my @first_20 = ~> 1:100 grep { Rosetta::HarshadNumbers::check(_) }
 # Harshad numbers: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 18, 20...
 # Index 0:1, 1:2, 2:3, 3:4, 4:5, 5:6, 6:7, 7:8, 8:9, 9:10, 10:12, 11:18
 assert_eq $first_20[11], 18, "12th harshad number is 18"

@@ -2,8 +2,8 @@
 # Rosetta Code: Beaufort cipher
 
 fn Rosetta::Beaufort::codec($text, $key) {
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
-    my $k = $key |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    my $k = $key |> uc() |> { _ =~ s/[^A-Z]//gr }
     return "" if length($k) == 0
     
     my @t_chars = $t |> chars()
@@ -11,7 +11,7 @@ fn Rosetta::Beaufort::codec($text, $key) {
     my $k_len = len(@k_chars)
     
     my @res = ~> 0:(len(@t_chars)-1) map {
-        my $i = $_
+        my $i = _
         my $p_val = ord($t_chars[$i]) - ord("A")
         my $k_val = ord($k_chars[$i % $k_len]) - ord("A")
         

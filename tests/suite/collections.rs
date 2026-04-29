@@ -57,19 +57,13 @@ fn splice_remove_insert() {
         eval_string(r#"my @a = (1,2,3,4,5); join(",", splice @a, 1, 2)"#),
         "2,3"
     );
-    assert_eq!(
-        eval_int("my @a = (1,2,3,4,5); splice @a, 1, 2; len(@a)"),
-        3
-    );
+    assert_eq!(eval_int("my @a = (1,2,3,4,5); splice @a, 1, 2; len(@a)"), 3);
 }
 
 #[test]
 fn map_grep() {
     assert_eq!(eval_int("my @a = map { $_ * 2 } (1,2,3); $a[2]"), 6);
-    assert_eq!(
-        eval_int("my @a = grep { $_ > 2 } (1,2,3,4,5); len(@a)"),
-        3
-    );
+    assert_eq!(eval_int("my @a = grep { $_ > 2 } (1,2,3,4,5); len(@a)"), 3);
 }
 
 #[test]

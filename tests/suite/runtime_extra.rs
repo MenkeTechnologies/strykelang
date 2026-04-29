@@ -340,10 +340,7 @@ fn anon_sub_returns_from_block() {
 #[test]
 fn sub_returns_first_arg_shift_with_extra_args() {
     // `shift @_` reads the first arg; trailing varargs are ignored without a slurpy.
-    assert_eq!(
-        eval_int("fn add { my $a = shift @_; $a } add(1, 2, 3)"),
-        1
-    );
+    assert_eq!(eval_int("fn add { my $a = shift @_; $a } add(1, 2, 3)"), 1);
 }
 
 #[test]

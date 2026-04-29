@@ -33,7 +33,7 @@ fn Rosetta::Verhoeff::generate_tables() {
 
 fn Rosetta::Verhoeff::validate($number) {
     my ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
-    my @digits = $number |> chars() |> rev() |> map { int($_) }
+    my @digits = $number |> chars() |> rev() |> map { int(_) }
     
     my $c = 0
     for (my $i = 0; $i < len(@digits); $i++) {
@@ -45,7 +45,7 @@ fn Rosetta::Verhoeff::validate($number) {
 
 fn Rosetta::Verhoeff::generate_checksum($number) {
     my ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
-    my @digits = $number |> chars() |> rev() |> map { int($_) }
+    my @digits = $number |> chars() |> rev() |> map { int(_) }
     
     my $c = 0
     for (my $i = 0; $i < len(@digits); $i++) {

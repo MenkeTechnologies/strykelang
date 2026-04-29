@@ -23,7 +23,7 @@ fn Rosetta::FactorialZeros::solve_pipe($n) {
     }
     
     # Map each power to int($n / power) and sum
-    my $sum = ~> @powers map { int($n / $_) } |> sum()
+    my $sum = ~> @powers map { int($n / _) } |> sum()
     $sum || 0
 }
 

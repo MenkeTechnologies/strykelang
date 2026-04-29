@@ -59,7 +59,7 @@ assert_eq $iso->{Z}, 0, "isolated Z=0"
 
 # Star: hub + 5 leaves -> 2 colors (hub one, leaves another)
 my $leaves = ["L1","L2","L3","L4","L5"]
-my @star_e = map { ["H", $_] } @$leaves
+my @star_e = map { ["H", _] } @$leaves
 my $star_c = Rosetta::WelshPowell::color(["H", @$leaves], \@star_e)
 assert_ok Rosetta::WelshPowell::valid($star_c, \@star_e), "star valid"
 my %used3 = map { $_ => 1 } values %$star_c

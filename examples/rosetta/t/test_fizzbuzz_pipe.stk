@@ -9,7 +9,7 @@ fn Rosetta::FizzBuzz::compute($n) {
 }
 
 fn Rosetta::FizzBuzz::solve($max) {
-    ~> 1:$max pmap { Rosetta::FizzBuzz::compute($_) }
+    ~> 1:$max pmap { Rosetta::FizzBuzz::compute(_) }
 }
 
 my @res = Rosetta::FizzBuzz::solve(15)

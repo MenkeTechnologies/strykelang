@@ -2,11 +2,11 @@
 # Rosetta Code: Bacon's cipher
 
 fn Rosetta::Bacon::encode($text) {
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
     my @chars = $t |> chars()
     
     my @res = ~> @chars map {
-        my $v = ord($_) - ord("A")
+        my $v = ord(_) - ord("A")
         my $bin = sprintf("%05b", $v)
         $bin =~ tr/01/ab/r
     }
@@ -15,7 +15,7 @@ fn Rosetta::Bacon::encode($text) {
 }
 
 fn Rosetta::Bacon::decode($text) {
-    my $t = $text |> lc() |> { $_ =~ s/[^ab]//gr }
+    my $t = $text |> lc() |> { _ =~ s/[^ab]//gr }
     
     my @res
     for (my $i = 0; $i < length($t); $i += 5) {

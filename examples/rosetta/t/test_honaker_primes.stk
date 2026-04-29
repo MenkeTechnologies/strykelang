@@ -29,10 +29,10 @@ fn Rosetta::Honaker::find($count) {
 
 # OEIS A033548: 131, 263, 457, 1039, 1049, 1051, 1093, 1129, 1163, 1217, ...
 my $first5 = Rosetta::Honaker::find(5)
-my @primes = map { $_->[1] } @$first5
+my @primes = map { _->[1] } @$first5
 assert_eq join(",", @primes), "131,263,457,1039,1049", "first 5 Honaker primes"
 
-my @indices = map { $_->[0] } @$first5
+my @indices = map { _->[0] } @$first5
 assert_eq join(",", @indices), "32,56,88,175,176", "their indices"
 
 # Verify: digit_sum(131) = 5, digit_sum(32) = 5

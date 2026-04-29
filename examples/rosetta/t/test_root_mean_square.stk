@@ -6,7 +6,7 @@ fn root_mean_square {
     if (len(@nums) == 0) {
         0
     } else {
-        ~> @nums map { $_ * $_ } reduce { _0 + _1 } |> { $_ / len(@nums) } |> sqrt
+        ~> @nums map { _ * _ } reduce { _0 + _1 } |> { _ / len(@nums) } |> sqrt
     }
 }
 

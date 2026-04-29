@@ -16,7 +16,7 @@ fn Rosetta::PythagoreanMeans::geometric(@nums) {
 fn Rosetta::PythagoreanMeans::harmonic(@nums) {
     my $count = len(@nums)
     if ($count == 0) { return 0 }
-    my $sum_inv = ~> @nums map { 1 / $_ } |> reduce { _0 + _1 }
+    my $sum_inv = ~> @nums map { 1 / _ } |> reduce { _0 + _1 }
     $count / $sum_inv
 }
 

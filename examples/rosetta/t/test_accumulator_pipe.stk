@@ -15,6 +15,6 @@ my $acc2 = Rosetta::Accumulator::make(100)
 assert_eq $acc2(50), 150, "acc2(50) -> 150"
 
 # Using pipes with accumulator
-(1, 2, 3) |> map { $acc($_) } |> join(",") |> assert_eq("11,13,16", "piped accumulator")
+(1, 2, 3) |> map { $acc(_) } |> join(",") |> assert_eq("11,13,16", "piped accumulator")
 
 test_run

@@ -24,11 +24,11 @@ my $text = "The quick brown fox jumps over the lazy dog"
 
 my $w10 = Rosetta::WordWrap::solve($text, 10)
 my @lines10 = $w10 |> split /\n/
-assert_ok (grep { length($_) <= 10 } @lines10) == len(@lines10), "all lines <= 10"
+assert_ok (grep { length(_) <= 10 } @lines10) == len(@lines10), "all lines <= 10"
 
 my $w20 = Rosetta::WordWrap::solve($text, 20)
 my @lines20 = $w20 |> split /\n/
-assert_ok (grep { length($_) <= 20 } @lines20) == len(@lines20), "all lines <= 20"
+assert_ok (grep { length(_) <= 20 } @lines20) == len(@lines20), "all lines <= 20"
 
 my $w80 = Rosetta::WordWrap::solve($text, 80)
 assert_eq $w80, $text, "width >= text keeps single line"

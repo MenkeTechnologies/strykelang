@@ -9,7 +9,7 @@ fn Rosetta::ElementaryCellularAutomaton::solve($rule, $initial, $steps) {
         my $len = len(@$curr)
         my $prev_gen = $curr
         $curr = [ map {
-            my $i = $_
+            my $i = _
             my $p = $prev_gen->[($i - 1 + $len) % $len]
             my $c = $prev_gen->[$i]
             my $a = $prev_gen->[($i + 1) % $len]

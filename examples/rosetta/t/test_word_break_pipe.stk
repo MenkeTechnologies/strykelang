@@ -6,7 +6,7 @@ fn Rosetta::WordBreak::can_break($s, $dict) {
     
     # Try every prefix of $s
     my @valid = ~> 1:length($s) grep {
-        my $len = $_
+        my $len = _
         my $prefix = substr($s, 0, $len)
         if (exists $dict->{$prefix}) {
             Rosetta::WordBreak::can_break(substr($s, $len), $dict)

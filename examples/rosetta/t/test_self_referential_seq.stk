@@ -6,7 +6,7 @@ fn Rosetta::SelfReferential::next($n) {
     my %counts
     "$n" |> chars() |> map { $counts{$_}++ }
     
-    ~> keys %counts sort map { $counts{$_} . $_ } |> join("")
+    ~> keys %counts sort map { $counts{$_} . _ } |> join("")
 }
 
 fn Rosetta::SelfReferential::solve($start) {

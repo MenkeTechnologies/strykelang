@@ -38,7 +38,7 @@ fn Rosetta::Jarvis::hull($points) {
 
 my $pts = [[0,0], [1,1], [2,2], [3,0], [0,3], [3,3], [1,2]]
 my $h = Rosetta::Jarvis::hull($pts)
-my @sig = map { $_->[0] . "," . $_->[1] } @$h
+my @sig = map { _->[0] . "," . _->[1] } @$h
 my $sorted = join("|", sort @sig)
 assert_eq $sorted, "0,0|0,3|3,0|3,3", "convex hull of square+interior = 4 corners"
 

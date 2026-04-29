@@ -298,10 +298,7 @@ fn transliterate_lowercase_to_upper_range() {
 
 #[test]
 fn sub_adds_two_via_return() {
-    assert_eq!(
-        eval_int("fn sum2 ($a, $b) { $a + $b } sum2(11, 31)"),
-        42
-    );
+    assert_eq!(eval_int("fn sum2 ($a, $b) { $a + $b } sum2(11, 31)"), 42);
 }
 
 #[test]

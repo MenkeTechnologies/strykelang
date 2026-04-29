@@ -20,13 +20,13 @@ fn Rosetta::Pell::companion($n) {
 }
 
 # OEIS A000129 first 12.
-my @pell = ~> 0:11 map { Rosetta::Pell::nth($_) }
+my @pell = ~> 0:11 map { Rosetta::Pell::nth(_) }
 assert_eq join(",", @pell),
     "0,1,2,5,12,29,70,169,408,985,2378,5741",
     "P(0..11)"
 
 # OEIS A002203 first 7 (Pell-Lucas / companion Pell numbers).
-my @comp = ~> 0:6 map { Rosetta::Pell::companion($_) }
+my @comp = ~> 0:6 map { Rosetta::Pell::companion(_) }
 assert_eq join(",", @comp),
     "2,2,6,14,34,82,198",
     "Q(0..6)"

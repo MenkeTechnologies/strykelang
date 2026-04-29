@@ -18,7 +18,7 @@ fn Rosetta::Pell::compute($n) {
 }
 
 fn Rosetta::Pell::list($max) {
-    ~> 0:$max map { Rosetta::Pell::compute($_) }
+    ~> 0:$max map { Rosetta::Pell::compute(_) }
 }
 
 assert_eq Rosetta::Pell::compute(0), 0, "P0"

@@ -6,7 +6,7 @@ fn Rosetta::LeapYear::solve($year) {
 }
 
 fn Rosetta::LeapYear::filter(@years) {
-    ~> @years grep { Rosetta::LeapYear::solve($_) }
+    ~> @years grep { Rosetta::LeapYear::solve(_) }
 }
 
 assert_eq Rosetta::LeapYear::solve(2000), 1, "2000 is leap year"

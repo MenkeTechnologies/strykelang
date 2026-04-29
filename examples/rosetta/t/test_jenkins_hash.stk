@@ -5,7 +5,7 @@ fn Rosetta::Jenkins::hash($text) {
     my $hash = 0
     my $mod = 4294967296 # 2^32
     
-    for my $c ($text |> chars() |> map { ord($_) }) {
+    for my $c ($text |> chars() |> map { ord(_) }) {
         $hash = ($hash + $c) % $mod
         $hash = ($hash + ($hash << 10)) % $mod
         $hash = ($hash ^ ($hash >> 6)) % $mod

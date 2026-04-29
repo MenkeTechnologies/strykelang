@@ -10,13 +10,13 @@ fn Rosetta::Variance::mean(@xs) {
 
 fn Rosetta::Variance::population(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { ($_ - $m) ** 2 } reduce { $_0 + $_1 }
+    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { $_0 + $_1 }
     $ss / len(@xs)
 }
 
 fn Rosetta::Variance::sample(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { ($_ - $m) ** 2 } reduce { $_0 + $_1 }
+    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { $_0 + $_1 }
     $ss / (len(@xs) - 1)
 }
 

@@ -32,9 +32,9 @@ my $people = [
     { name => "Dave",  age => 25 }
 ]
 my @by_age = Rosetta::CustomSort::sort_by_field($people, "age")
-my @names = map { $_->{name} } @by_age
+my @names = map { _->{name} } @by_age
 # Bob(25), Dave(25) order between them is implementation-defined; check ages
-my @ages = map { $_->{age} } @by_age
+my @ages = map { _->{age} } @by_age
 assert_eq join(",", @ages), "25,25,30,35", "ages sorted"
 
 # Descending

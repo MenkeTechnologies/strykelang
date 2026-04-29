@@ -2,16 +2,16 @@
 # Rosetta Code: Gronsfeld cipher
 
 fn Rosetta::Gronsfeld::encode($text, $key) {
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
-    my $k = $key |> { $_ =~ s/[^0-9]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    my $k = $key |> { _ =~ s/[^0-9]//gr }
     return "" if length($k) == 0
     
     my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map { int($_) }
+    my @k_digits = $k |> chars() |> map { int(_) }
     my $k_len = len(@k_digits)
     
     my @res = ~> 0:(len(@t_chars)-1) map {
-        my $i = $_
+        my $i = _
         my $p_val = ord($t_chars[$i]) - ord("A")
         my $shift = $k_digits[$i % $k_len]
         
@@ -23,16 +23,16 @@ fn Rosetta::Gronsfeld::encode($text, $key) {
 }
 
 fn Rosetta::Gronsfeld::decode($text, $key) {
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
-    my $k = $key |> { $_ =~ s/[^0-9]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    my $k = $key |> { _ =~ s/[^0-9]//gr }
     return "" if length($k) == 0
     
     my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map { int($_) }
+    my @k_digits = $k |> chars() |> map { int(_) }
     my $k_len = len(@k_digits)
     
     my @res = ~> 0:(len(@t_chars)-1) map {
-        my $i = $_
+        my $i = _
         my $c_val = ord($t_chars[$i]) - ord("A")
         my $shift = $k_digits[$i % $k_len]
         

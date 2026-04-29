@@ -67,8 +67,8 @@ fn Rosetta::Bifid::decode($text, $key) {
     my @cols = @combined[$n : 2*$n-1]
     
     my @res = ~> 0:($n-1) map {
-        my $r = $rows[$_]
-        my $c = $cols[$_]
+        my $r = $rows[_]
+        my $c = $cols[_]
         $grid->[$r * 5 + $c]
     }
     
