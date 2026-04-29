@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Geometric median (Fermat-Weber point) via Weiszfeld's algorithm
+# Minimizes sum of euclidean distances from points to median.
+
+fn Rosetta::GeoMedian::weiszfeld($pts, $iters) {
+    my $n = scalar(@$pts)
+    my $cx = 0
+    my $cy = 0
+    for my $p (@$pts) { $cx += $p->[0]; $cy += $p->[1] }
+    $cx /= $n
+    $cy /= $n
+    for my $i (1..$iters) {
+        my $num_x = 0
+        my $num_y = 0
+        my $den = 0
+        for my $p (@$pts) {
+            my $dx = $p->[0] - $cx
+            my $dy = $p->[1] - $cy
+            my $d = sqrt($dx * $dx + $dy * $dy)
+            $d = 1e-9 if $d < 1e-9
+            $num_x += $p->[0] / $d
+            $num_y += $p->[1] / $d
+            $den += 1.0 / $d
+        }
+        $cx = $num_x / $den
+        $cy = $num_y / $den
+    }
+    [$cx, $cy]
+}
+
+fn Rosetta::GeoMedian::close($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Single point: median is itself
+my $solo = Rosetta::GeoMedian::weiszfeld([[5, 7]], 1)
+assert_ok Rosetta::GeoMedian::close($solo->[0], 5, 1e-9), "single x"
+assert_ok Rosetta::GeoMedian::close($solo->[1], 7, 1e-9), "single y"
+
+# Two points: median is midpoint
+my $pair = Rosetta::GeoMedian::weiszfeld([[0, 0], [4, 0]], 50)
+assert_ok Rosetta::GeoMedian::close($pair->[0], 2, 1e-3), "two-point x = 2"
+assert_ok Rosetta::GeoMedian::close($pair->[1], 0, 1e-3), "two-point y = 0"
+
+# Equilateral triangle: median is centroid (Fermat point for triangle with all angles < 120°)
+my $tri = Rosetta::GeoMedian::weiszfeld([[0, 0], [4, 0], [2, 3.464]], 100)
+assert_ok Rosetta::GeoMedian::close($tri->[0], 2, 1e-3), "tri x ~ 2"
+assert_ok Rosetta::GeoMedian::close($tri->[1], 1.155, 1e-2), "tri y ~ 1.155 (incenter/centroid)"
+
+# Symmetric square: median at center
+my $sq = Rosetta::GeoMedian::weiszfeld([[0, 0], [10, 0], [10, 10], [0, 10]], 100)
+assert_ok Rosetta::GeoMedian::close($sq->[0], 5, 1e-3), "square center x"
+assert_ok Rosetta::GeoMedian::close($sq->[1], 5, 1e-3), "square center y"
+
+# Pulled by outlier — but less than the centroid (mean)
+my $pulled = Rosetta::GeoMedian::weiszfeld([[0,0], [1,0], [0,1], [100,100]], 200)
+assert_ok($pulled->[0] < 30, "geomedian shifted less than mean (~25.25)")
+
+test_run

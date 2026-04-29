@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Scytale cipher (column transposition)
+
+fn Rosetta::Scytale::pad($s, $rows) {
+    my $len = length($s)
+    my $rem = $len % $rows
+    if ($rem != 0) {
+        $s = $s . ("_" x ($rows - $rem))
+    }
+    $s
+}
+
+fn Rosetta::Scytale::encode($plain, $rows) {
+    my $padded = Rosetta::Scytale::pad($plain, $rows)
+    my $len = length($padded)
+    my $cols = int($len / $rows)
+    my $out = ""
+    for my $r (0..$rows-1) {
+        for my $c (0..$cols-1) {
+            $out .= substr($padded, $c * $rows + $r, 1)
+        }
+    }
+    $out
+}
+
+fn Rosetta::Scytale::decode($cipher, $rows) {
+    my $len = length($cipher)
+    my $cols = int($len / $rows)
+    my $out = ""
+    for my $c (0..$cols-1) {
+        for my $r (0..$rows-1) {
+            $out .= substr($cipher, $r * $cols + $c, 1)
+        }
+    }
+    $out
+}
+
+# Encode "HELLOWORLD" on 4-row scytale
+my $enc = Rosetta::Scytale::encode("HELLOWORLD", 4)
+assert_eq length($enc), 12, "encoded length is padded to multiple of rows"
+my $dec = Rosetta::Scytale::decode($enc, 4)
+assert_eq substr($dec, 0, 10), "HELLOWORLD", "round-trip recovers plaintext"
+
+# Round-trip a longer message
+my $msg = "ATTACKATDAWN"
+for my $r (2, 3, 4, 6) {
+    my $c = Rosetta::Scytale::encode($msg, $r)
+    my $d = Rosetta::Scytale::decode($c, $r)
+    assert_eq substr($d, 0, length($msg)), $msg, "round-trip rows=$r"
+}
+
+# Single-row scytale = identity (one column = whole message)
+my $single = Rosetta::Scytale::encode("ABCDEF", 1)
+assert_eq $single, "ABCDEF", "1-row encode is identity"
+
+test_run

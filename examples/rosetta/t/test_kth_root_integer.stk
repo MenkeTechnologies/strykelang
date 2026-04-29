@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Integer k-th root — floor(n^(1/k)) via Newton's method on integers.
+
+fn Rosetta::IntRoot::ipow($base, $exp) {
+    my $r = 1
+    for my $i (1..$exp) { $r *= $base }
+    $r
+}
+
+fn Rosetta::IntRoot::kth($n, $k) {
+    return 0 if $n == 0
+    return $n if $k == 1
+    my $x = 1
+    while (Rosetta::IntRoot::ipow($x + 1, $k) <= $n) {
+        $x++
+        # Double if jumping fast (early exponential phase)
+        if (Rosetta::IntRoot::ipow($x * 2, $k) <= $n) {
+            $x *= 2
+        }
+    }
+    # Refine downward if we overshot via the doubling step
+    while (Rosetta::IntRoot::ipow($x, $k) > $n) {
+        $x--
+    }
+    $x
+}
+
+# Square root
+assert_eq Rosetta::IntRoot::kth(0, 2), 0, "isqrt(0) = 0"
+assert_eq Rosetta::IntRoot::kth(1, 2), 1, "isqrt(1) = 1"
+assert_eq Rosetta::IntRoot::kth(15, 2), 3, "isqrt(15) = 3"
+assert_eq Rosetta::IntRoot::kth(16, 2), 4, "isqrt(16) = 4"
+assert_eq Rosetta::IntRoot::kth(100, 2), 10, "isqrt(100) = 10"
+assert_eq Rosetta::IntRoot::kth(99, 2), 9, "isqrt(99) = 9"
+
+# Cube root
+assert_eq Rosetta::IntRoot::kth(27, 3), 3, "icbrt(27) = 3"
+assert_eq Rosetta::IntRoot::kth(26, 3), 2, "icbrt(26) = 2"
+assert_eq Rosetta::IntRoot::kth(1000, 3), 10, "icbrt(1000) = 10"
+
+# Higher roots
+assert_eq Rosetta::IntRoot::kth(1024, 10), 2, "10th root of 1024 = 2"
+assert_eq Rosetta::IntRoot::kth(243, 5), 3, "5th root of 243 = 3"
+assert_eq Rosetta::IntRoot::kth(244, 5), 3, "5th root of 244 = 3"
+assert_eq Rosetta::IntRoot::kth(242, 5), 2, "5th root of 242 = 2"
+
+# k = 1 is identity
+assert_eq Rosetta::IntRoot::kth(42, 1), 42, "k=1 identity"
+
+# Large
+assert_eq Rosetta::IntRoot::kth(1000000, 2), 1000, "isqrt(1e6) = 1000"
+assert_eq Rosetta::IntRoot::kth(999999, 2), 999, "isqrt(999999) = 999"
+
+test_run

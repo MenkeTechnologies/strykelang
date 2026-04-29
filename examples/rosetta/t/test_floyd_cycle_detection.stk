@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Floyd's tortoise & hare cycle detection
+# Returns [lambda, mu] where lambda = cycle length, mu = cycle start.
+
+fn Rosetta::Floyd::detect($f_seq, $x0) {
+    my $tort = $f_seq->{$x0}
+    my $hare = $f_seq->{$f_seq->{$x0}}
+    while ($tort ne $hare) {
+        $tort = $f_seq->{$tort}
+        $hare = $f_seq->{$f_seq->{$hare}}
+    }
+    my $mu = 0
+    $tort = $x0
+    while ($tort ne $hare) {
+        $tort = $f_seq->{$tort}
+        $hare = $f_seq->{$hare}
+        $mu++
+    }
+    my $lam = 1
+    $hare = $f_seq->{$tort}
+    while ($tort ne $hare) {
+        $hare = $f_seq->{$hare}
+        $lam++
+    }
+    [$lam, $mu]
+}
+
+# 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 2 (lam=4, mu=2)
+my %f = (0 => 1, 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 2)
+my $r = Rosetta::Floyd::detect(\%f, 0)
+assert_eq $r->[0], 4, "lambda = 4"
+assert_eq $r->[1], 2, "mu = 2"
+
+# Pure cycle: A -> B -> C -> A (lam=3, mu=0)
+my %g = ("A" => "B", "B" => "C", "C" => "A")
+my $r2 = Rosetta::Floyd::detect(\%g, "A")
+assert_eq $r2->[0], 3, "pure cycle lambda = 3"
+assert_eq $r2->[1], 0, "pure cycle mu = 0"
+
+# Self-loop (lam=1, mu=0)
+my %h = (1 => 1)
+my $r3 = Rosetta::Floyd::detect(\%h, 1)
+assert_eq $r3->[0], 1, "self loop lambda = 1"
+assert_eq $r3->[1], 0, "self loop mu = 0"
+
+# Tail then 2-cycle: 0->1->2->3->2 (lam=2, mu=2)
+my %i_ = (0 => 1, 1 => 2, 2 => 3, 3 => 2)
+my $r4 = Rosetta::Floyd::detect(\%i_, 0)
+assert_eq $r4->[0], 2, "2-cycle lambda = 2"
+assert_eq $r4->[1], 2, "2-cycle mu = 2"
+
+# Long tail into a small cycle
+my %j = (1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6, 6 => 7, 7 => 5)
+my $r5 = Rosetta::Floyd::detect(\%j, 1)
+assert_eq $r5->[0], 3, "long-tail lambda = 3"
+assert_eq $r5->[1], 4, "long-tail mu = 4"
+
+test_run

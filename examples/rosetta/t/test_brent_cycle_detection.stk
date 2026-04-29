@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Brent's algorithm for cycle detection in functional iteration
+
+fn Rosetta::Brent::detect($f_seq, $x0) {
+    # $f_seq is a hashref { v => next_v } describing iteration f(x)
+    my $power = 1
+    my $lam = 1
+    my $tort = $x0
+    my $hare = $f_seq->{$x0}
+    while ($tort ne $hare) {
+        if ($power == $lam) {
+            $tort = $hare
+            $power *= 2
+            $lam = 0
+        }
+        $hare = $f_seq->{$hare}
+        $lam++
+    }
+    # Find mu (start of cycle)
+    $tort = $x0
+    $hare = $x0
+    for my $i (1..$lam) { $hare = $f_seq->{$hare} }
+    my $mu = 0
+    while ($tort ne $hare) {
+        $tort = $f_seq->{$tort}
+        $hare = $f_seq->{$hare}
+        $mu++
+    }
+    [$lam, $mu]
+}
+
+# Iteration: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 2 (cycle of length 4: 2->3->4->5->2)
+my %f = (0 => 1, 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 2)
+my $r = Rosetta::Brent::detect(\%f, 0)
+assert_eq $r->[0], 4, "cycle length lambda = 4"
+assert_eq $r->[1], 2, "cycle starts at index mu = 2"
+
+# Pure cycle from start: A -> B -> C -> A (lam=3, mu=0)
+my %g = ("A" => "B", "B" => "C", "C" => "A")
+my $r2 = Rosetta::Brent::detect(\%g, "A")
+assert_eq $r2->[0], 3, "pure cycle lambda = 3"
+assert_eq $r2->[1], 0, "pure cycle mu = 0"
+
+# Self-loop (lam=1)
+my %h = (1 => 1)
+my $r3 = Rosetta::Brent::detect(\%h, 1)
+assert_eq $r3->[0], 1, "self loop lambda = 1"
+assert_eq $r3->[1], 0, "self loop mu = 0"
+
+# Tail then 2-cycle: 0->1->2->3->2 (lam=2, mu=2)
+my %i_ = (0 => 1, 1 => 2, 2 => 3, 3 => 2)
+my $r4 = Rosetta::Brent::detect(\%i_, 0)
+assert_eq $r4->[0], 2, "2-cycle lambda = 2"
+assert_eq $r4->[1], 2, "2-cycle mu = 2"
+
+test_run

@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Friendly numbers — pairs (m, n) with sigma(m)/m == sigma(n)/n
+# (Same abundancy index.) Solitary numbers have a unique index.
+
+fn Rosetta::Friendly::sigma($n) {
+    my $s = 0
+    for my $d (1..$n) {
+        $s += $d if $n % $d == 0
+    }
+    $s
+}
+
+fn Rosetta::Friendly::gcd($a, $b) {
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn Rosetta::Friendly::abundancy($n) {
+    my $s = Rosetta::Friendly::sigma($n)
+    my $g = Rosetta::Friendly::gcd($s, $n)
+    [int($s / $g), int($n / $g)]
+}
+
+# Group 1..n by abundancy index, return groups with size > 1
+fn Rosetta::Friendly::groups($n) {
+    my %by_idx
+    for my $i (1..$n) {
+        my $idx = Rosetta::Friendly::abundancy($i)
+        my $key = "$idx->[0]/$idx->[1]"
+        $by_idx{$key} = [] unless exists $by_idx{$key}
+        push @{$by_idx{$key}}, $i
+    }
+    my %big
+    for my $k (keys %by_idx) {
+        $big{$k} = $by_idx{$k} if scalar(@{$by_idx{$k}}) > 1
+    }
+    \%big
+}
+
+# 6 is perfect: sigma(6) = 1+2+3+6 = 12 = 2*6, abundancy = 2/1
+assert_eq join("/", @{Rosetta::Friendly::abundancy(6)}), "2/1", "abundancy(6) = 2/1"
+
+# 28 is also perfect: same abundancy 2/1
+assert_eq join("/", @{Rosetta::Friendly::abundancy(28)}), "2/1", "abundancy(28) = 2/1"
+
+# Smallest friendly pair: (30, 140) — abundancy 12/5
+assert_eq join("/", @{Rosetta::Friendly::abundancy(30)}), "12/5", "abundancy(30) = 12/5"
+assert_eq join("/", @{Rosetta::Friendly::abundancy(140)}), "12/5", "abundancy(140) = 12/5"
+
+# (240, 3110400) share abundancy ... too large for trial division — verify abundancy(80) and (200) instead
+# (80, 200) share abundancy 117/40? Actually check (24, 91963648) — out of range too
+# Just confirm (30, 140) come up in groups search up to 200
+my $groups = Rosetta::Friendly::groups(200)
+my $found = 0
+for my $key (keys %$groups) {
+    my @members = @{$groups->{$key}}
+    my %m = map { $_ => 1 } @members
+    if (exists $m{30} && exists $m{140}) {
+        $found = 1
+    }
+}
+assert_ok $found, "30 and 140 in same group"
+
+# Solitary by virtue of abundancy 1/1: just {1}
+my $abu_1 = Rosetta::Friendly::abundancy(1)
+assert_eq join("/", @$abu_1), "1/1", "abundancy(1) = 1/1"
+
+test_run

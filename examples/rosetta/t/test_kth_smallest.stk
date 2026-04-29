@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: K-th smallest via min-heap
+# A different approach from quickselect — explicit heap-based selection.
+
+fn Rosetta::KthSmall::heapify_down($h, $i, $n) {
+    while (1) {
+        my $l = 2 * $i + 1
+        my $r = 2 * $i + 2
+        my $smallest = $i
+        $smallest = $l if $l < $n && $h->[$l] < $h->[$smallest]
+        $smallest = $r if $r < $n && $h->[$r] < $h->[$smallest]
+        last if $smallest == $i
+        ($h->[$i], $h->[$smallest]) = ($h->[$smallest], $h->[$i])
+        $i = $smallest
+    }
+}
+
+fn Rosetta::KthSmall::find($arr, $k) {
+    my $n = scalar(@$arr)
+    return undef if $k < 1 || $k > $n
+    my @h = @$arr
+    my $start = int($n / 2) - 1
+    for my $i (~> 0:$start rev) {
+        Rosetta::KthSmall::heapify_down(\@h, $i, $n)
+    }
+    my $size = $n
+    my $kth
+    for my $i (1..$k) {
+        $kth = $h[0]
+        $h[0] = $h[$size - 1]
+        $size--
+        Rosetta::KthSmall::heapify_down(\@h, 0, $size)
+    }
+    $kth
+}
+
+my @data = (7, 2, 9, 4, 5, 1, 8, 3, 6)
+assert_eq Rosetta::KthSmall::find(\@data, 1), 1, "1st smallest = 1"
+assert_eq Rosetta::KthSmall::find(\@data, 5), 5, "5th smallest = 5"
+assert_eq Rosetta::KthSmall::find(\@data, 9), 9, "9th smallest = 9"
+
+# Duplicates
+my @dups = (3, 1, 3, 1, 2, 2)
+assert_eq Rosetta::KthSmall::find(\@dups, 1), 1, "1st with dups = 1"
+assert_eq Rosetta::KthSmall::find(\@dups, 3), 2, "3rd with dups = 2"
+assert_eq Rosetta::KthSmall::find(\@dups, 6), 3, "6th = 3"
+
+# Out of range
+assert_ok !defined(Rosetta::KthSmall::find(\@data, 0)), "k=0 -> undef"
+assert_ok !defined(Rosetta::KthSmall::find(\@data, 99)), "k=99 -> undef"
+
+# Single element
+assert_eq Rosetta::KthSmall::find([42], 1), 42, "single -> 42"
+
+# Already sorted
+my @sorted = (1, 2, 3, 4, 5)
+for my $k (1..5) {
+    assert_eq Rosetta::KthSmall::find(\@sorted, $k), $k, "sorted: kth = k"
+}
+
+# Negative numbers
+my @neg = (-5, -1, 0, 3, -8, 7)
+assert_eq Rosetta::KthSmall::find(\@neg, 1), -8, "smallest with negatives"
+assert_eq Rosetta::KthSmall::find(\@neg, 6), 7, "largest with negatives"
+
+test_run

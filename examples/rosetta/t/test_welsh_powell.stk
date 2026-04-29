@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Welsh-Powell graph coloring (greedy by descending degree)
+
+fn Rosetta::WelshPowell::color($nodes, $edges) {
+    my %adj
+    for my $n (@$nodes) { $adj{$n} = {} }
+    for my $e (@$edges) {
+        $adj{$e->[0]}{$e->[1]} = 1
+        $adj{$e->[1]}{$e->[0]} = 1
+    }
+    my @ordered = sort {
+        scalar(keys %{$adj{$_1}}) <=> scalar(keys %{$adj{$_0}})
+    } @$nodes
+    my %color
+    my $next = 0
+    for my $n (@ordered) {
+        next if exists $color{$n}
+        $color{$n} = $next
+        for my $m (@ordered) {
+            next if exists $color{$m}
+            my $conflict = 0
+            for my $k (keys %color) {
+                if ($color{$k} == $next && exists $adj{$m}{$k}) {
+                    $conflict = 1
+                    last
+                }
+            }
+            $color{$m} = $next unless $conflict
+        }
+        $next++
+    }
+    \%color
+}
+
+fn Rosetta::WelshPowell::valid($colors, $edges) {
+    for my $e (@$edges) {
+        return 0 if $colors->{$e->[0]} == $colors->{$e->[1]}
+    }
+    1
+}
+
+# Triangle K3 -> needs 3 colors
+my $tri_c = Rosetta::WelshPowell::color(["A","B","C"], [["A","B"],["B","C"],["A","C"]])
+assert_ok Rosetta::WelshPowell::valid($tri_c, [["A","B"],["B","C"],["A","C"]]), "K3 valid"
+my %used = map { $_ => 1 } values %$tri_c
+assert_eq scalar(keys %used), 3, "K3 needs 3 distinct colors"
+
+# Bipartite (path) -> 2 colors
+my $path_c = Rosetta::WelshPowell::color(["1","2","3","4"], [["1","2"],["2","3"],["3","4"]])
+assert_ok Rosetta::WelshPowell::valid($path_c, [["1","2"],["2","3"],["3","4"]]), "path valid"
+my %used2 = map { $_ => 1 } values %$path_c
+assert_eq scalar(keys %used2), 2, "path is 2-colorable"
+
+# Empty graph -> all color 0
+my $iso = Rosetta::WelshPowell::color(["X","Y","Z"], [])
+assert_eq $iso->{X}, 0, "isolated X=0"
+assert_eq $iso->{Y}, 0, "isolated Y=0"
+assert_eq $iso->{Z}, 0, "isolated Z=0"
+
+# Star: hub + 5 leaves -> 2 colors (hub one, leaves another)
+my $leaves = ["L1","L2","L3","L4","L5"]
+my @star_e = map { ["H", $_] } @$leaves
+my $star_c = Rosetta::WelshPowell::color(["H", @$leaves], \@star_e)
+assert_ok Rosetta::WelshPowell::valid($star_c, \@star_e), "star valid"
+my %used3 = map { $_ => 1 } values %$star_c
+assert_eq scalar(keys %used3), 2, "star is 2-colorable"
+
+test_run

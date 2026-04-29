@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Golden section search for unimodal extremum
+
+fn Rosetta::Golden::min($f, $a, $b, $eps) {
+    my $phi = (sqrt(5) - 1) / 2          # 1/golden_ratio
+    my $c = $b - $phi * ($b - $a)
+    my $d = $a + $phi * ($b - $a)
+    while (abs($b - $a) > $eps) {
+        if ($f->($c) < $f->($d)) {
+            $b = $d
+        } else {
+            $a = $c
+        }
+        $c = $b - $phi * ($b - $a)
+        $d = $a + $phi * ($b - $a)
+    }
+    ($a + $b) / 2
+}
+
+fn Rosetta::Golden::max($f, $a, $b, $eps) {
+    Rosetta::Golden::min(sub { -$f->($_[0]) }, $a, $b, $eps)
+}
+
+fn Rosetta::Golden::close($x, $y, $eps) { abs($x - $y) < $eps }
+
+# (x - 3)^2 has minimum at x = 3
+my $m1 = Rosetta::Golden::min(sub { ($_[0] - 3) ** 2 }, 0, 6, 1e-7)
+assert_ok Rosetta::Golden::close($m1, 3, 1e-5), "min of (x-3)^2 at x ~ 3 ($m1)"
+
+# -(x - 5)^2 + 9 has maximum at x = 5
+my $m2 = Rosetta::Golden::max(sub { -(($_[0] - 5) ** 2) + 9 }, 0, 10, 1e-7)
+assert_ok Rosetta::Golden::close($m2, 5, 1e-5), "max of -(x-5)^2+9 at x ~ 5 ($m2)"
+
+# x^4 - 14x^3 + 60x^2 - 70x — local min around x ~ 0.78
+# Restrict bracket: 0..2
+my $m3 = Rosetta::Golden::min(sub {
+    $_[0]**4 - 14 * $_[0]**3 + 60 * $_[0]**2 - 70 * $_[0]
+}, 0, 2, 1e-7)
+assert_ok Rosetta::Golden::close($m3, 0.7809, 1e-3), "quartic local min ~ 0.7809 ($m3)"
+
+# Convex parabola
+my $m4 = Rosetta::Golden::min(sub { $_[0] * $_[0] + 4 }, -10, 10, 1e-7)
+assert_ok Rosetta::Golden::close($m4, 0, 1e-5), "x^2 + 4 minimized at x = 0 ($m4)"
+
+# Cosine on [0, pi] — max at 0 (we restrict bracket to find max in interior)
+my $pi = 4 * atan2(1, 1)
+my $m5 = Rosetta::Golden::min(sub { -cos($_[0]) }, 0.1, $pi - 0.1, 1e-7)
+assert_ok Rosetta::Golden::close($m5, 0.1, 1e-3), "min of -cos near left edge of bracket"
+
+test_run

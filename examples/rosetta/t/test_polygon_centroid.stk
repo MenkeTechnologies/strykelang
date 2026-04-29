@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polygon centroid via signed area (works for non-self-intersecting polygons)
+
+fn Rosetta::Centroid::compute($poly) {
+    my $n = scalar(@$poly)
+    my $cx = 0.0
+    my $cy = 0.0
+    my $area = 0.0
+    for my $i (0..$n - 1) {
+        my $j = ($i + 1) % $n
+        my $cross = $poly->[$i][0] * $poly->[$j][1] - $poly->[$j][0] * $poly->[$i][1]
+        $area += $cross
+        $cx += ($poly->[$i][0] + $poly->[$j][0]) * $cross
+        $cy += ($poly->[$i][1] + $poly->[$j][1]) * $cross
+    }
+    $area /= 2.0
+    return [0, 0] if $area == 0
+    [$cx / (6 * $area), $cy / (6 * $area)]
+}
+
+fn Rosetta::Centroid::close($x, $y) { abs($x - $y) < 1e-9 }
+
+# Unit square centered at origin
+my $sq = [[-1, -1], [1, -1], [1, 1], [-1, 1]]
+my $c = Rosetta::Centroid::compute($sq)
+assert_ok Rosetta::Centroid::close($c->[0], 0), "centered square cx = 0"
+assert_ok Rosetta::Centroid::close($c->[1], 0), "centered square cy = 0"
+
+# Square with corner at origin
+my $off = [[0, 0], [4, 0], [4, 4], [0, 4]]
+my $co = Rosetta::Centroid::compute($off)
+assert_ok Rosetta::Centroid::close($co->[0], 2), "0..4 square cx = 2"
+assert_ok Rosetta::Centroid::close($co->[1], 2), "0..4 square cy = 2"
+
+# Right triangle: centroid = (sum_x/3, sum_y/3)
+my $tri = [[0, 0], [3, 0], [0, 3]]
+my $ct = Rosetta::Centroid::compute($tri)
+assert_ok Rosetta::Centroid::close($ct->[0], 1), "tri cx = 1"
+assert_ok Rosetta::Centroid::close($ct->[1], 1), "tri cy = 1"
+
+# Pentagon
+my $pent = [[0, 0], [4, 0], [5, 3], [2, 5], [-1, 3]]
+my $cp = Rosetta::Centroid::compute($pent)
+assert_ok($cp->[0] > 1.5 && $cp->[0] < 2.5, "pentagon cx in interior x-range")
+assert_ok($cp->[1] > 1.5 && $cp->[1] < 2.5, "pentagon cy in interior y-range")
+
+# CW polygon yields the same centroid (sign cancels)
+my $cw = [[0, 0], [0, 4], [4, 4], [4, 0]]
+my $cc = Rosetta::Centroid::compute($cw)
+assert_ok Rosetta::Centroid::close($cc->[0], 2), "CW square cx = 2"
+assert_ok Rosetta::Centroid::close($cc->[1], 2), "CW square cy = 2"
+
+test_run

@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ear-clipping polygon triangulation (simple polygon, CCW)
+
+fn Rosetta::EarClip::cross($o, $u, $v) {
+    ($u->[0] - $o->[0]) * ($v->[1] - $o->[1]) - ($u->[1] - $o->[1]) * ($v->[0] - $o->[0])
+}
+
+fn Rosetta::EarClip::point_in_tri($p, $a, $b, $c) {
+    my $d1 = Rosetta::EarClip::cross($a, $b, $p)
+    my $d2 = Rosetta::EarClip::cross($b, $c, $p)
+    my $d3 = Rosetta::EarClip::cross($c, $a, $p)
+    my $has_neg = $d1 < 0 || $d2 < 0 || $d3 < 0
+    my $has_pos = $d1 > 0 || $d2 > 0 || $d3 > 0
+    !($has_neg && $has_pos)
+}
+
+fn Rosetta::EarClip::triangulate($poly) {
+    my @pts = map { [$_->[0], $_->[1]] } @$poly
+    my $n = scalar(@pts)
+    return [] if $n < 3
+    my @indices = (0..$n - 1)
+    my @tris
+    my $guard = 0
+    while (scalar(@indices) > 3) {
+        last if ++$guard > 1000
+        my $found = 0
+        my $m = scalar(@indices)
+        for my $ii (0..$m - 1) {
+            my $prev = $indices[($ii - 1 + $m) % $m]
+            my $cur = $indices[$ii]
+            my $next = $indices[($ii + 1) % $m]
+            my $a = $pts[$prev]
+            my $b = $pts[$cur]
+            my $c = $pts[$next]
+            next if Rosetta::EarClip::cross($a, $b, $c) <= 0   # not convex
+            my $is_ear = 1
+            for my $jj (0..$m - 1) {
+                next if $jj == ($ii - 1 + $m) % $m || $jj == $ii || $jj == ($ii + 1) % $m
+                if (Rosetta::EarClip::point_in_tri($pts[$indices[$jj]], $a, $b, $c)) {
+                    $is_ear = 0
+                    last
+                }
+            }
+            if ($is_ear) {
+                push @tris, [$prev, $cur, $next]
+                splice(@indices, $ii, 1)
+                $found = 1
+                last
+            }
+        }
+        last unless $found
+    }
+    push @tris, [@indices] if scalar(@indices) == 3
+    \@tris
+}
+
+# Triangle -> single tri
+my $tri = [[0,0], [1,0], [0,1]]
+my $t1 = Rosetta::EarClip::triangulate($tri)
+assert_eq scalar(@$t1), 1, "triangle -> 1 tri"
+
+# Square -> 2 tris
+my $sq = [[0,0], [4,0], [4,4], [0,4]]
+my $t2 = Rosetta::EarClip::triangulate($sq)
+assert_eq scalar(@$t2), 2, "square -> 2 tris"
+
+# Pentagon -> 3 tris (n - 2)
+my $pent = [[0,0], [4,0], [5,3], [2,5], [-1,3]]
+my $t3 = Rosetta::EarClip::triangulate($pent)
+assert_eq scalar(@$t3), 3, "pentagon -> 3 tris"
+
+# L-shape (concave hexagon) -> 4 tris
+my $L = [[0,0], [4,0], [4,2], [2,2], [2,4], [0,4]]
+my $t4 = Rosetta::EarClip::triangulate($L)
+assert_eq scalar(@$t4), 4, "L-shape -> 4 tris"
+
+# All triangles use only original vertex indices, in range
+for my $t (@$t4) {
+    for my $ix (@$t) {
+        assert_ok($ix >= 0 && $ix < 6, "L-shape tri index in range")
+    }
+}
+
+test_run
