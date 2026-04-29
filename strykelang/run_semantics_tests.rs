@@ -73,7 +73,7 @@ fn range_array_slice_reverse_range_index() {
 #[test]
 fn range_sub_call_args_flatten_range() {
     assert_eq!(
-        ri(r#"fn foo { return scalar @_; }
+        ri(r#"fn foo { return len @_; }
                foo(1..10);"#),
         10
     );
@@ -227,12 +227,12 @@ fn ucfirst_lcfirst() {
 
 #[test]
 fn split_space_default() {
-    assert_eq!(ri(r#"scalar split(" ", "a b c");"#), 3);
+    assert_eq!(ri(r#"len split(" ", "a b c");"#), 3);
 }
 
 #[test]
 fn grep_block_list() {
-    assert_eq!(ri(r#"scalar grep { $_ > 2 } (1, 2, 3, 4);"#), 2);
+    assert_eq!(ri(r#"len grep { $_ > 2 } (1, 2, 3, 4);"#), 2);
 }
 
 #[test]
@@ -242,7 +242,7 @@ fn map_block_double() {
 
 #[test]
 fn qw_word_list() {
-    assert_eq!(ri("scalar qw(a b c d);"), 4);
+    assert_eq!(ri("len qw(a b c d);"), 4);
 }
 
 #[test]
@@ -518,7 +518,7 @@ fn splice_offset_length_perl_rules() {
         "1 2 3|4 5"
     );
     assert_eq!(
-        rs("my @a = (1,2,3); my @r = splice(@a, 100); join(' ', @a) . '|' . scalar @r;"),
+        rs("my @a = (1,2,3); my @r = splice(@a, 100); join(' ', @a) . '|' . len @r;"),
         "1 2 3|0"
     );
 }
@@ -538,7 +538,7 @@ fn perl_compat_regression_ref_deref_splice_qq_scalar_deref_subscript() {
     assert_eq!(ri(r#"my @a=(1,2,3); my $r=\@a; $r->[1]=42; $a[1]"#), 42);
 
     assert_eq!(
-        rs(r#"my @a=(1,2,3); my @rem=splice(@a,100); join(" ",@a)."|".scalar @rem"#),
+        rs(r#"my @a=(1,2,3); my @rem=splice(@a,100); join(" ",@a)."|".len @rem"#),
         "1 2 3|0"
     );
     assert_eq!(
@@ -634,17 +634,17 @@ fn diamond_operator_parses() {
 
 #[test]
 fn stat_returns_thirteen_fields_in_scalar_context() {
-    assert_eq!(ri(r#"scalar stat "Cargo.toml";"#), 13);
+    assert_eq!(ri(r#"len stat "Cargo.toml";"#), 13);
 }
 
 #[test]
 fn stat_missing_path_is_empty_list() {
-    assert_eq!(ri(r#"scalar stat "/no/such/path/stryke-test-xyz";"#), 0);
+    assert_eq!(ri(r#"len stat "/no/such/path/stryke-test-xyz";"#), 0);
 }
 
 #[test]
 fn glob_finds_rs_sources_under_src() {
-    let n = ri(r#"scalar glob "strykelang/*.rs";"#);
+    let n = ri(r#"len glob "strykelang/*.rs";"#);
     assert!(
         n > 0,
         "glob strykelang/*.rs should match at least one file, got {n}"
@@ -662,7 +662,7 @@ fn glob_par_plain_list_context_count() {
 
 #[test]
 fn glob_par_finds_rs_sources_under_src() {
-    let n = ri(r#"scalar glob_par "strykelang/*.rs";"#);
+    let n = ri(r#"len glob_par "strykelang/*.rs";"#);
     assert!(
         n > 0,
         "glob_par strykelang/*.rs should match at least one file, got {n}"
@@ -682,7 +682,7 @@ fn glob_par_plain_matches_count() {
 
 #[test]
 fn glob_par_matches_count() {
-    let program = crate::parse(r#"scalar glob_par "strykelang/*.rs";"#).expect("parse");
+    let program = crate::parse(r#"len glob_par "strykelang/*.rs";"#).expect("parse");
     let mut interp = crate::interpreter::Interpreter::new();
     let n = interp.execute(&program).expect("execute").to_int();
     assert!(n > 0, "glob_par should match at least one file, got {n}");
@@ -753,7 +753,7 @@ fn readdir_list_context_returns_all_remaining_entries() {
         r#"opendir H, "{pd}" or die;
         my @f = readdir H;
         closedir H;
-        (scalar grep {{ $_ eq "a.txt" }} @f) && (scalar grep {{ $_ eq "b.txt" }} @f) ? 1 : 0"#,
+        (len grep {{ $_ eq "a.txt" }} @f) && (len grep {{ $_ eq "b.txt" }} @f) ? 1 : 0"#,
     );
     assert_eq!(ri(&script), 1);
     let _ = std::fs::remove_dir_all(&base);
@@ -887,7 +887,7 @@ fn perl_compat_array_assign_flattens_hash_to_key_value_list() {
     assert_eq!(
         ri(r#"my %h = ("p", 10, "q", 20);
         my @a = %h;
-        scalar @a;"#),
+        len @a;"#),
         4
     );
 }
@@ -952,7 +952,7 @@ fn perl_compat_sysseek_then_tell_on_open_file() {
 fn perl_compat_scalar_values_hash() {
     assert_eq!(
         ri(r#"my %g = ("x", 9, "y", 8);
-        scalar values %g;"#),
+        len values %g;"#),
         2
     );
 }
@@ -1002,7 +1002,7 @@ fn perl_compat_truncate_shortens_file_by_path() {
 
 #[test]
 fn perl_compat_split_comma_with_limit() {
-    assert_eq!(ri(r#"scalar split(",", "u,v,w,x", 2);"#), 2);
+    assert_eq!(ri(r#"len split(",", "u,v,w,x", 2);"#), 2);
 }
 
 #[test]
@@ -1062,7 +1062,7 @@ fn perl_compat_glob_txt_in_directory() {
     let script = format!(
         r#"my $dir = "{d}";
         my @g = glob("$dir/*.txt");
-        scalar @g;"#
+        len @g;"#
     );
     assert_eq!(ri(&script), 2);
     let _ = std::fs::remove_dir_all(&base);
@@ -1221,7 +1221,7 @@ fn perl_compat_scalar_at_aref_is_array_length() {
     assert_eq!(
         ri(r#"no strict 'vars';
         my $r = [7, 8, 9, 0];
-        scalar @$r;"#,),
+        len @$r;"#,),
         4
     );
 }
@@ -1231,7 +1231,7 @@ fn perl_compat_scalar_at_aref_empty_ref_is_zero() {
     assert_eq!(
         ri(r#"no strict 'vars';
         my $e = [];
-        scalar @$e;"#,),
+        len @$e;"#,),
         0
     );
 }
@@ -1241,7 +1241,7 @@ fn perl_compat_scalar_braced_aref_is_length() {
     assert_eq!(
         ri(r#"no strict 'vars';
         my $r = [1, 2, 3];
-        scalar @{$r};"#,),
+        len @{$r};"#,),
         3
     );
 }
@@ -1251,7 +1251,7 @@ fn perl_compat_scalar_braced_sub_return_aref_count() {
     assert_eq!(
         ri(r#"no strict 'vars';
         fn row { [0, 0, 0, 0, 0, 0] }
-        scalar @{row()};"#,),
+        len @{row()};"#,),
         6
     );
 }
@@ -1272,7 +1272,7 @@ fn perl_compat_join_receives_scalar_at_aref_as_one_field() {
     assert_eq!(
         rs(r#"no strict 'vars';
         my $v = [2, 4, 6];
-        join "x", scalar @$v;"#,),
+        join "x", len @$v;"#,),
         "3"
     );
 }
@@ -1281,7 +1281,7 @@ fn perl_compat_join_receives_scalar_at_aref_as_one_field() {
 fn perl_compat_scalar_named_array_length() {
     assert_eq!(
         ri(r#"my @w = (0, 0, 0, 0, 0);
-        scalar @w;"#,),
+        len @w;"#,),
         5
     );
 }
@@ -1332,10 +1332,7 @@ fn perl_compat_stat_size_and_missing_list() {
         $st[7];"#,
     );
     assert_eq!(ri(&sz), 6);
-    assert_eq!(
-        ri(r#"my @st = stat("stryke___no___stat___"); scalar @st;"#),
-        0
-    );
+    assert_eq!(ri(r#"my @st = stat("stryke___no___stat___"); len @st;"#), 0);
     let _ = std::fs::remove_file(&path);
 }
 
@@ -1472,7 +1469,7 @@ fn glob_par_progress_optional_runs() {
     // Relative to crate root (same as `glob_par "src/*.rs"` tests). Absolute patterns are not
     // fully handled by `glob_par`’s recursive walker yet.
     let pat = format!("{sub}/*.rs");
-    let n = ri(&format!(r#"scalar glob_par "{pat}", progress => 0;"#));
+    let n = ri(&format!(r#"len glob_par "{pat}", progress => 0;"#));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(
         n >= 1,
@@ -1651,7 +1648,7 @@ fn collect_after_map_pipe_chain() {
 fn collect_after_grep_pipe_chain() {
     assert_eq!(
         ri(r#"my @x = (1, 2, 3, 4) |> grep { $_ % 2 == 0 } |> collect;
-               scalar @x;"#,),
+               len @x;"#,),
         2
     );
 }
@@ -1703,7 +1700,7 @@ fn pipeline_parallel_pgrep_pmap_psort() {
             ->pmap(fn { $_ + 10 })
             ->psort(fn { $a <=> $b })
             ->collect();
-        scalar @r;
+        len @r;
     "#;
     assert_eq!(ri(s), 2);
 }
@@ -1736,7 +1733,7 @@ fn pipeline_user_sub_in_chain() {
 fn pipeline_grep_alias_matches_filter() {
     let s = r#"
         my @r = pipeline(1, 2, 3, 4)->grep(fn { $_ % 2 == 0 })->collect();
-        scalar @r;
+        len @r;
     "#;
     assert_eq!(ri(s), 2);
 }
@@ -1972,7 +1969,7 @@ fn isa_visible_from_main_after_package_blocks() {
         package C;
         our @ISA = ("P");
         package main;
-        scalar @C::ISA
+        len @C::ISA
         "#),
         1
     );
@@ -2684,7 +2681,7 @@ fn perl_compat_scalar_splice_aref_two_arg_empties_target() {
         rs(r#"no strict 'vars';
         my $v = [1, 2, 3];
         my $s = scalar splice @$v;
-        $s . "|" . scalar(@$v)"#),
+        $s . "|" . len(@$v)"#),
         "3|0"
     );
 }
@@ -2845,7 +2842,7 @@ fn perl_compat_keys_values_sort_on_hashref() {
 #[test]
 fn perl_compat_scalar_keys_on_hashref() {
     assert_eq!(
-        ri(r#"no strict 'vars'; my $h = { u => 1, v => 2, w => 3 }; scalar keys %$h"#),
+        ri(r#"no strict 'vars'; my $h = { u => 1, v => 2, w => 3 }; len keys %$h"#),
         3
     );
 }
@@ -2855,7 +2852,7 @@ fn perl_compat_grep_map_blocks_receive_aref_list() {
     assert_eq!(
         ri(r#"no strict 'vars';
         my $v = [1, 2, 3, 4];
-        scalar grep { $_ > 1 } @$v"#),
+        len grep { $_ > 1 } @$v"#),
         3
     );
     assert_eq!(
@@ -2937,7 +2934,7 @@ fn perl_compat_keys_list_from_hashref() {
         ri(r#"no strict 'vars';
         my $h = { "p" => 1, "q" => 2 };
         my @k = keys %$h;
-        scalar @k"#),
+        len @k"#),
         2
     );
 }
@@ -3061,7 +3058,7 @@ fn perl_compat_empty_hashref_or_default_fills_key() {
 #[test]
 fn perl_compat_empty_aref_push() {
     assert_eq!(
-        ri(r#"no strict 'vars'; my $v = []; push @$v, 1, 2; scalar @$v"#),
+        ri(r#"no strict 'vars'; my $v = []; push @$v, 1, 2; len @$v"#),
         2
     );
 }
@@ -3069,7 +3066,7 @@ fn perl_compat_empty_aref_push() {
 #[test]
 fn perl_compat_empty_hashref_assign_then_key_count() {
     assert_eq!(
-        ri(r#"no strict 'vars'; my $h = {}; $h->{x} = 1; scalar keys %$h"#),
+        ri(r#"no strict 'vars'; my $h = {}; $h->{x} = 1; len keys %$h"#),
         1
     );
 }
@@ -4262,7 +4259,7 @@ fn core_builtins_more() {
     // uniq
     assert_eq!(rs("join(',', uniq(1, 2, 2, 3, 1, 4))"), "1,2,3,4");
     // sample(N, LIST)
-    assert_eq!(rs("my @s = sample(2, 1, 2, 3); scalar @s"), "2");
+    assert_eq!(rs("my @s = sample(2, 1, 2, 3); len @s"), "2");
     // shuffle
     assert!(run("defined(shuffle(1, 2, 3))").expect("run").is_true());
 }

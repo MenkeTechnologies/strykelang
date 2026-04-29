@@ -40,6 +40,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x06b\] AOP — Before / After / Around Advice](#0x06b-aop--before--after--around-advice)
 - [\[0x07\] CLI Flags](#0x07-cli-flags)
 - [\[0x08\] Supported Perl Features](#0x08-supported-perl-features)
+- [\[0x08a\] `--no-interop` Mode](#0x08a---no-interop-mode)
 - [\[0x09\] Architecture](#0x09-architecture)
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
@@ -871,6 +872,7 @@ stryke-specific long flags:
 | `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`stryke --flame x.stk > flame.svg`) |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a-no-interop-mode) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server-stryke-lsp)) |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
@@ -918,11 +920,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 | Category | Functions |
 | --- | --- |
-| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `rev` (scalar reverse), `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `scalar`, `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `tally`, `count_by`, `pluck`, `grep_v` |
+| Array | `push`, `pop`, `shift`, `unshift`, `splice`, `splice_last` (last removed — `--no-interop` replacement for `scalar splice`), `rev` (string / list reverse), `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `len`/`cnt`/`count` (element count — replaces `scalar @a`), `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `tally`, `count_by`, `pluck`, `grep_v`, `head`, `tail`, `first` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists`, `select_keys`, `top`, `deep_clone`/`dclone`, `deep_merge`/`dmerge`, `deep_equal`/`deq` |
 | Functional | `compose`/`comp`, `partial`, `curry`, `memoize`/`memo`, `once`, `constantly`, `complement`, `juxt`, `fnil` |
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case` |
-| Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `vec` |
+| Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `unpack_first` / `unpack1` / `up1` (first decoded element — `--no-interop` replacement for `scalar unpack`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
 | I/O | `print`, `p`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->p/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
@@ -1621,6 +1623,37 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
 ---
 
+## [0x08a] `--no-interop` MODE
+
+`--no-interop` is the **idiomatic-stryke-only** mode: every Perl-ism that has a stryke replacement becomes a parse-time error so codebases stay on the stryke side of the language. Cargo-cult Perl idioms can't sneak in, and grep'ing for `\bscalar\b` / `\bsub\b` / `\bsay\b` in your sources stays signal-only.
+
+| Perl-ism | Rejected with | Use instead |
+|---|---|---|
+| `sub NAME { … }` / `sub { … }` | `stryke uses 'fn' instead of 'sub' (--no-interop)` | `fn NAME { … }` / `fn { … }` |
+| `say EXPR` | `stryke uses 'p' instead of 'say' (--no-interop)` | `p EXPR` |
+| `reverse EXPR` | `stryke uses 'rev' instead of 'reverse' (--no-interop)` | `rev EXPR` (works for both strings and lists) |
+| `$a` / `$b` outside `sort`/`reduce` blocks | `stryke uses '$_0' / '$_1' instead of '$a' (--no-interop)` | `$_0` / `$_1` positional block params |
+| `scalar EXPR` (any form) | `stryke uses 'len' (also 'cnt' / 'count') instead of 'scalar' (--no-interop)` | see the `scalar` mapping below |
+
+### `scalar` mapping under `--no-interop`
+
+`scalar` was overloaded with at least four distinct semantics in Perl. Under `--no-interop` each idiom has its own verb so the meaning is explicit at the call site:
+
+| Perl idiom | What it does | Stryke spelling |
+|---|---|---|
+| `scalar @a` / `scalar(@$ref)` / `scalar @{$r}` | element count | `len @a` / `len(@$ref)` / `len @{$r}` (aliases `cnt`, `count`) — compiles to `Op::ArrayLen` / `Op::ArrayDerefLen` fast path |
+| `scalar keys %h` / `scalar values %h` | key / value count | `len keys %h` / `len values %h` |
+| `scalar grep { … } @a` / `scalar split(…)` / `scalar qw(…)` | match / part / element count | `len grep { … } @a` / `len split(…)` / `len qw(…)` |
+| `scalar reverse $s` | string reverse (vs. list reverse) | `rev $s` |
+| `scalar unpack(FMT, STR)` | first decoded element | `unpack_first(FMT, STR)` (aliases `unpack1`, `up1`) — equivalent to `head(unpack(…))` |
+| `scalar splice(@a, off, n)` | last removed element | `splice_last(@a, off, n)` (aliases `splice1`, `spl_last`) — desugars to `tail(splice(@a, off, n))`, mutates in place |
+| `scalar \`cmd\`` | joined stdout as string | already the default — stryke backticks return a single string regardless of context, so no spelling change needed |
+| `scalar %h` (Perl's hash-fill diagnostic, e.g. `"3/8"`) | dead semantics — never load-bearing | use `len keys %h` for the count |
+
+Default mode (no `--no-interop`) still accepts every Perl-ism listed above for compat with stock `.pm` / `.pl` sources.
+
+---
+
 ## [0x09] ARCHITECTURE
 
 ```
@@ -1834,7 +1867,14 @@ stryke my_app.stk              # cold: parse + compile + save to SQLite
 stryke my_app.stk              # warm: load from SQLite + dispatch (skips lex/parse/compile)
 ```
 
-**Cache invalidation:** mtime-based. Edit the script → cache miss → recompile. No stale bytecode.
+**Cache invalidation:** four conditions all evict a stored entry — no stale bytecode is ever served.
+
+| Condition | Trigger |
+|---|---|
+| Source `mtime` mismatch | Edit the `.stk` file → cache miss → recompile |
+| `stryke_version` mismatch | Cargo version bump in `Cargo.toml` |
+| Pointer-width mismatch | Cross-build between 32- and 64-bit targets |
+| Binary `mtime` newer than cached entry | Rebuild stryke (any `cargo build` advances `target/debug/stryke`'s mtime) → every cached script invalidates automatically. Catches edits to `compiler.rs` / `parser.rs` / `vm.rs` that don't bump `CARGO_PKG_VERSION` |
 
 **Built-in inspection** — no SQL required:
 
@@ -1869,7 +1909,7 @@ PATH                                                      PROG KB    BC KB
 - Bypassed for `-e` / `-E` one-liners (overhead > benefit for tiny scripts)
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes
 
-**Format:** zstd-compressed bincode of `(Program, Chunk)` stored in SQLite with schema versioning and pointer-width checks. Upgrading stryke or switching architectures triggers automatic recompile.
+**Format:** zstd-compressed bincode of `(Program, Chunk)` stored in SQLite with schema versioning and pointer-width checks. Upgrading stryke, recompiling stryke, or switching architectures all trigger automatic recompile of every cached script.
 
 **Inspired by zshrs:** same SQLite bytecode cache architecture that enables sub-30ms shell startup with millions of cached plugins.
 

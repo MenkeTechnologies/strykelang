@@ -141,10 +141,7 @@ fn splice_remove_middle_join() {
 
 #[test]
 fn splice_leaves_remainder() {
-    assert_eq!(
-        ri(r#"my @a = (1, 2, 3, 4); splice @a, 1, 2; scalar @a;"#),
-        2
-    );
+    assert_eq!(ri(r#"my @a = (1, 2, 3, 4); splice @a, 1, 2; len @a;"#), 2);
 }
 
 #[test]
@@ -159,12 +156,12 @@ fn empty_pop_undef() {
 
 #[test]
 fn grep_empty_list() {
-    assert_eq!(ri("my @a = grep { $_ > 0 } (); scalar @a;"), 0);
+    assert_eq!(ri("my @a = grep { $_ > 0 } (); len @a;"), 0);
 }
 
 #[test]
 fn map_empty_list() {
-    assert_eq!(ri("my @a = map { $_ * 2 } (); scalar @a;"), 0);
+    assert_eq!(ri("my @a = map { $_ * 2 } (); len @a;"), 0);
 }
 
 #[test]
@@ -189,12 +186,12 @@ fn delete_hash_key() {
 
 #[test]
 fn scalar_empty_array() {
-    assert_eq!(ri("my @a = (); scalar @a;"), 0);
+    assert_eq!(ri("my @a = (); len @a;"), 0);
 }
 
 #[test]
 fn values_hash_count() {
-    assert_eq!(ri(r#"my %h = (a => 1, b => 2); scalar values %h;"#), 2);
+    assert_eq!(ri(r#"my %h = (a => 1, b => 2); len values %h;"#), 2);
 }
 
 #[test]
@@ -318,7 +315,7 @@ fn oct_zero_string() {
 
 #[test]
 fn split_limit() {
-    assert_eq!(ri(r#"scalar split(":", "a:b:c:d", 2);"#), 2);
+    assert_eq!(ri(r#"len split(":", "a:b:c:d", 2);"#), 2);
 }
 
 #[test]

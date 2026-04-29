@@ -1186,9 +1186,9 @@ fn test_extended_misc_batch10() {
         run("phonetic_digit('123')").expect("run").to_string(),
         "one two three"
     );
-    assert_eq!(run("scalar random_color()").expect("run").to_int(), 3);
+    assert_eq!(run("len random_color()").expect("run").to_int(), 3);
     assert_eq!(
-        run("scalar reservoir_sample(2, 1, 2, 3, 4, 5)")
+        run("len reservoir_sample(2, 1, 2, 3, 4, 5)")
             .expect("run")
             .to_int(),
         2

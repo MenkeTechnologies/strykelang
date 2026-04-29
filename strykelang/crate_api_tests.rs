@@ -97,7 +97,7 @@ fn run_concat_and_repeat() {
 
 #[test]
 fn run_list_and_scalar_context_array() {
-    assert_eq!(run_int("scalar (1, 2, 3)"), 3);
+    assert_eq!(run_int("len (1, 2, 3)"), 3);
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn try_vm_execute_do_block_propagates_list_context_to_grep() {
     let p = parse(
         r#"my @l = (1, 2, 3, 2, 1)
         my @u = do { my %seen; grep { !$seen{$_}++ } @l }
-        scalar @u"#,
+        len @u"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -367,7 +367,7 @@ fn try_vm_execute_array_assign_flattens_hash() {
     let p = parse(
         r#"my %h = ("u", 1, "v", 2)
         my @a = %h
-        scalar @a"#,
+        len @a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -582,7 +582,7 @@ fn try_vm_execute_truncate_path_shortens_file() {
 
 #[test]
 fn try_vm_execute_split_with_limit() {
-    let p = parse(r#"scalar split(",", "aa,bb,cc,dd", 2)"#).expect("parse");
+    let p = parse(r#"len split(",", "aa,bb,cc,dd", 2)"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "split with LIMIT should compile on VM");
@@ -681,7 +681,7 @@ fn try_vm_execute_glob_lists_matching_files_in_dir() {
     let src = format!(
         r#"my $dir = "{d}";
         my @g = glob("$dir/*.txt");
-        scalar @g;"#
+        len @g;"#
     );
     let p = parse(&src).expect("parse");
     let mut i = Interpreter::new();
@@ -913,7 +913,7 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
 
 #[test]
 fn try_vm_execute_stat_missing_path_empty_list() {
-    let p = parse(r#"my @st = stat("stryke___stat___no_such___file"); scalar @st"#).expect("parse");
+    let p = parse(r#"my @st = stat("stryke___stat___no_such___file"); len @st"#).expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat missing path should compile on VM");
@@ -2549,7 +2549,7 @@ fn try_vm_execute_keys_values_hashref_scalar_context() {
         r#"no strict 'vars'
         my $h = { x => 1, y => 2, z => 3 }
         my $r = $h
-        (scalar keys $r) + (scalar values $r)"#,
+        (len keys $r) + (len values $r)"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -2598,14 +2598,14 @@ fn try_vm_compile_scalar_at_aref_uses_array_deref_len() {
             &parse(
                 r#"no strict 'vars'
                 my $a = [1, 2, 3]
-                scalar @$a"#,
+                len @$a"#,
             )
             .expect("parse"),
         )
         .expect("compile");
     assert!(
         chunk.ops.iter().any(|o| matches!(o, Op::ArrayDerefLen)),
-        "expected ArrayDerefLen for scalar @$a, got {:?}",
+        "expected ArrayDerefLen for len @$a, got {:?}",
         chunk.ops
     );
     assert!(
@@ -2613,7 +2613,7 @@ fn try_vm_compile_scalar_at_aref_uses_array_deref_len() {
             .ops
             .iter()
             .any(|o| matches!(o, Op::SymbolicDeref(b) if *b == 1)),
-        "scalar @$a should not use SymbolicDeref(Array), got {:?}",
+        "len @$a should not use SymbolicDeref(Array), got {:?}",
         chunk.ops
     );
 }
@@ -2623,12 +2623,12 @@ fn try_vm_execute_scalar_at_aref_is_length() {
     let p = parse(
         r#"no strict 'vars'
         my $a = [10, 20, 30]
-        scalar @$a"#,
+        len @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "scalar @$a should compile on VM");
+    assert!(out.is_some(), "len @$a should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
 }
 
@@ -2637,14 +2637,14 @@ fn try_vm_execute_scalar_at_aref_empty_is_zero() {
     let p = parse(
         r#"no strict 'vars'
         my $a = []
-        scalar @$a"#,
+        len @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
-        "scalar @$a on empty array ref should compile on VM"
+        "len @$a on empty array ref should compile on VM"
     );
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
 }
@@ -2658,14 +2658,14 @@ fn try_vm_compile_scalar_braced_aref_uses_array_deref_len() {
             &parse(
                 r#"no strict 'vars'
                 my $a = [9, 8]
-                scalar @{$a}"#,
+                len @{$a}"#,
             )
             .expect("parse"),
         )
         .expect("compile");
     assert!(
         chunk.ops.iter().any(|o| matches!(o, Op::ArrayDerefLen)),
-        "expected ArrayDerefLen for scalar @{{$a}}, got {:?}",
+        "expected ArrayDerefLen for len @{{$a}}, got {:?}",
         chunk.ops
     );
 }
@@ -2675,12 +2675,12 @@ fn try_vm_execute_scalar_braced_aref_is_length() {
     let p = parse(
         r#"no strict 'vars'
         my $a = [1, 2, 3, 4, 5]
-        scalar @{$a}"#,
+        len @{$a}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "scalar @{{$a}} should compile on VM");
+    assert!(out.is_some(), "len @{{$a}} should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 5);
 }
 
@@ -2689,14 +2689,14 @@ fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
     let p = parse(
         r#"no strict 'vars'
         fn mk { [1, 2, 3, 4] }
-        scalar @{mk()}"#,
+        len @{mk()}"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
-        "scalar @{{sub()}} array deref should compile on VM"
+        "len @{{sub()}} array deref should compile on VM"
     );
     assert_eq!(out.unwrap().expect("vm").to_int(), 4);
 }
@@ -2831,19 +2831,19 @@ fn try_vm_compile_scalar_named_array_emits_array_len_not_get_array() {
         .compile_program(
             &parse(
                 r#"my @t = (9, 8)
-                scalar @t"#,
+                len @t"#,
             )
             .expect("parse"),
         )
         .expect("compile");
     assert!(
         chunk.ops.iter().any(|o| matches!(o, Op::ArrayLen(_))),
-        "expected ArrayLen for scalar @t, got {:?}",
+        "expected ArrayLen for len @t, got {:?}",
         chunk.ops
     );
     assert!(
         !chunk.ops.iter().any(|o| matches!(o, Op::GetArray(_))),
-        "scalar @t should not load full array via GetArray, got {:?}",
+        "len @t should not load full array via GetArray, got {:?}",
         chunk.ops
     );
 }
@@ -2852,12 +2852,12 @@ fn try_vm_compile_scalar_named_array_emits_array_len_not_get_array() {
 fn try_vm_execute_scalar_named_array_length() {
     let p = parse(
         r#"my @u = (1, 2, 3, 4)
-        scalar @u"#,
+        len @u"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
-    assert!(out.is_some(), "scalar @u should compile on VM");
+    assert!(out.is_some(), "len @u should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 4);
 }
 
@@ -2866,14 +2866,14 @@ fn try_vm_execute_join_scalar_at_aref_single_argument() {
     let p = parse(
         r#"no strict 'vars'
         my $a = [10, 20, 30, 40, 50]
-        join "-", scalar @$a"#,
+        join "-", len @$a"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
-        "join with scalar @$a should compile on VM (one list element)"
+        "join with len @$a should compile on VM (one list element)"
     );
     assert_eq!(out.unwrap().expect("vm").to_string(), "5");
 }
@@ -3256,7 +3256,7 @@ fn try_vm_execute_grep_block_aref() {
     let p = parse(
         r#"no strict 'vars'
         my $v = [1, 2, 3, 4]
-        scalar grep { $_ > 1 } @$v"#,
+        len grep { $_ > 1 } @$v"#,
     )
     .expect("parse");
     let mut i = Interpreter::new();
@@ -5101,7 +5101,7 @@ fn run_length_uc_lc() {
 
 #[test]
 fn run_array_push_pop_shift() {
-    assert_eq!(run_int("my @a = (1, 2); push @a, 3; scalar @a"), 3);
+    assert_eq!(run_int("my @a = (1, 2); push @a, 3; len @a"), 3);
     assert_eq!(run_int("my @b = (7, 8, 9); pop @b"), 9);
     assert_eq!(run_int("my @c = (7, 8, 9); shift @c"), 7);
 }
@@ -5122,7 +5122,7 @@ fn run_join_reverse_sort_numbers() {
 
 #[test]
 fn run_hash_keys_values() {
-    assert_eq!(run_int(r#"my %h = (a => 1, b => 2); scalar keys %h"#), 2);
+    assert_eq!(run_int(r#"my %h = (a => 1, b => 2); len keys %h"#), 2);
 }
 
 #[test]

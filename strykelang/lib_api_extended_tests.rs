@@ -180,7 +180,7 @@ fn test_csv_dataframe() {
     let pcr_code = format!(
         r#"
         my @rows = par_csv_read('{}');
-        scalar(@rows);
+        len(@rows);
     "#,
         path_str
     );

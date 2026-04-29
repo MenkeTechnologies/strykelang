@@ -47,7 +47,7 @@ fn test_builtin_split() {
     // Split empty string — Perl 5 returns the empty list; trailing-empty
     // strip applies (LIMIT 0 / omitted), and there are no fields anyway.
     // Old stryke incorrectly returned [""]; fixed in vm.rs::Op::Split.
-    assert_eq!(run("scalar split(',', '')").expect("run").to_int(), 0);
+    assert_eq!(run("len split(',', '')").expect("run").to_int(), 0);
 
     // Split with limit
     assert_eq!(

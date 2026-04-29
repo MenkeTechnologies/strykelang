@@ -5131,8 +5131,38 @@ impl Compiler {
                         self.emit_op(Op::CallBuiltin(BuiltinId::Pipe as u16, 2), line, Some(root));
                     }
                     "uniq" | "distinct" | "flatten" | "set" | "with_index" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "sum" | "sum0" | "product"
-                    | "min" | "max" | "mean" | "median" | "mode" | "stddev" | "variance" => {
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "sum" | "sum0"
+                    | "product" | "min" | "max" | "mean" | "median" | "mode" | "stddev"
+                    | "variance" => {
+                        // Fast path for `len @arr` / `cnt @arr` / `count @arr` and the deref
+                        // variants `len @$ref` / `len @{$ref}`: emit the same direct length op
+                        // (`ArrayLen` / `ArrayDerefLen`) that `scalar @arr` uses, so the
+                        // idiomatic stryke spelling is no slower than the Perl-compat one.
+                        if matches!(
+                            name.as_str(),
+                            "count" | "cnt" | "size" | "len" | "list_count" | "list_size"
+                        ) && args.len() == 1
+                        {
+                            match &args[0].kind {
+                                ExprKind::ArrayVar(arr_name) => {
+                                    self.check_strict_array_access(arr_name, line)?;
+                                    let idx = self
+                                        .chunk
+                                        .intern_name(&self.qualify_stash_array_name(arr_name));
+                                    self.emit_op(Op::ArrayLen(idx), line, Some(root));
+                                    return Ok(());
+                                }
+                                ExprKind::Deref {
+                                    expr,
+                                    kind: Sigil::Array,
+                                } => {
+                                    self.compile_expr(expr)?;
+                                    self.emit_op(Op::ArrayDerefLen, line, Some(root));
+                                    return Ok(());
+                                }
+                                _ => {}
+                            }
+                        }
                         for arg in args {
                             self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                         }
