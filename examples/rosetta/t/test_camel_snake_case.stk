@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Camel case and snake case
+
+fn Case::to_camel($s) {
+    my @parts = ~> $s trim |> s/([a-z0-9])([A-Z])/$1_$2/g |> split(/[\s._-]+/)
+    return "" if !@parts
+    my $res = lc(shift @parts)
+    for my $p (@parts) {
+        $res .= ucfirst(lc($p))
+    }
+    $res
+}
+
+fn Case::to_snake($s) {
+    ~> $s trim 
+       |> s/([a-z])([0-9])/$1_$2/g 
+       |> s/([0-9])([a-z])/$1_$2/g 
+       |> s/([a-z0-9])([A-Z])/$1_$2/g 
+       |> s/[\s._-]+/_/g 
+       |> s/_+/_/g 
+       |> lc
+}
+
+my @test_cases = (
+    "snakeCase",
+    "snake_case",
+    "variable_10_case",
+    "variable10Case",
+    "ɛrgo rE tHis",
+    "hurry-up-joe!",
+    "c://my-docs/happy_Flag-Day/12.doc",
+    "  spaces  "
+)
+
+for my $t (@test_cases) {
+    my $camel = Case::to_camel($t);
+    my $snake = Case::to_snake($t);
+    p "Input: '$t'";
+    p "  Camel: '$camel'";
+    p "  Snake: '$snake'";
+}
+
+assert_eq Case::to_camel("snake_case"), "snakeCase", "snake_case -> snakeCase"
+assert_eq Case::to_snake("snakeCase"), "snake_case", "snakeCase -> snake_case"
+assert_eq Case::to_camel("variable_10_case"), "variable10Case", "variable_10_case -> variable10Case"
+assert_eq Case::to_snake("variable10Case"), "variable_10_case", "variable10Case -> variable_10_case"
+assert_eq Case::to_camel("ɛrgo rE tHis"), "ɛrgoRETHis", "ɛrgo rE tHis -> ɛrgoRETHis"
+assert_eq Case::to_snake("ɛrgo rE tHis"), "ɛrgo_r_e_t_his", "ɛrgo rE tHis -> snake"
+assert_eq Case::to_camel("  spaces  "), "spaces", "spaces -> camel"
+assert_eq Case::to_snake("  spaces  "), "spaces", "spaces -> snake"
+assert_eq Case::to_camel("hurry-up-joe!"), "hurryUpJoe!", "hurry-up-joe! -> camel"
+assert_eq Case::to_snake("hurry-up-joe!"), "hurry_up_joe!", "hurry-up-joe! -> snake"
+assert_eq Case::to_camel("c://my-docs/happy_Flag-Day/12.doc"), "c://myDocs/happyFlagDay/12Doc", "complex -> camel"
+assert_eq Case::to_snake("c://my-docs/happy_Flag-Day/12.doc"), "c://my_docs/happy_flag_day/12_doc", "complex -> snake"
+
+test_run

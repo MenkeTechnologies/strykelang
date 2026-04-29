@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Achilles numbers
+
+fn Rosetta::Achilles::is_powerful($n) {
+    return 0 if $n < 1
+    return 1 if $n == 1
+    my %counts
+    my $d = 2
+    my $temp = $n
+    while ($d * $d <= $temp) {
+        while ($temp % $d == 0) {
+            $counts{$d}++
+            $temp = int($temp / $d)
+        }
+        $d++
+    }
+    $counts{$temp}++ if $temp > 1
+    
+    for my $v (values %counts) {
+        return 0 if $v < 2
+    }
+    1
+}
+
+fn Rosetta::Achilles::is_perfect_power($n) {
+    return 1 if $n == 1
+    my $limit_b = int(log($n) / log(2) + 0.5)
+    for my $b (2..$limit_b) {
+        my $a = int($n**(1/$b) + 0.5)
+        if ($a**$b == $n) {
+            return 1
+        }
+    }
+    0
+}
+
+fn Rosetta::Achilles::is_achilles($n) {
+    Rosetta::Achilles::is_powerful($n) && !Rosetta::Achilles::is_perfect_power($n)
+}
+
+my @achilles
+my $i = 1
+while (len(@achilles) < 50) {
+    if (Rosetta::Achilles::is_achilles($i)) {
+        push @achilles, $i
+    }
+    $i++
+}
+
+# The first few Achilles numbers are 72, 108, 200, 288, 392, 432, 500, 648, 675, 800
+assert_eq $achilles[0], 72, "1st Achilles"
+assert_eq $achilles[1], 108, "2nd Achilles"
+assert_eq $achilles[9], 800, "10th Achilles"
+assert_eq len(@achilles), 50, "Found 50 Achilles numbers"
+
+# Piped version
+72 |> Rosetta::Achilles::is_achilles |> assert_ok("72 is Achilles")
+36 |> Rosetta::Achilles::is_achilles |> ~> fn { !$_ } |> assert_ok("36 is not Achilles")
+
+test_run
