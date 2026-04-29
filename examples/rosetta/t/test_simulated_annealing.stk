@@ -7,7 +7,7 @@ fn Rosetta::Annealing::dist($p1, $p2) {
 
 fn Rosetta::Annealing::total_dist($path, $cities) {
     my $d = 0
-    for (my $i = 0; $i < scalar(@$path) - 1; $i++) {
+    for (my $i = 0; $i < len(@$path) - 1; $i++) {
         $d += Rosetta::Annealing::dist($cities->[$path->[$i]], $cities->[$path->[$i+1]])
     }
     $d += Rosetta::Annealing::dist($cities->[$path->[-1]], $cities->[$path->[0]])
@@ -15,7 +15,7 @@ fn Rosetta::Annealing::total_dist($path, $cities) {
 }
 
 fn Rosetta::Annealing::solve($cities, $temp, $cooling) {
-    my $n = scalar(@$cities)
+    my $n = len(@$cities)
     my @current_path = 0:($n - 1)
     @current_path = shuffle(@current_path)
     my $current_dist = Rosetta::Annealing::total_dist(\@current_path, $cities)

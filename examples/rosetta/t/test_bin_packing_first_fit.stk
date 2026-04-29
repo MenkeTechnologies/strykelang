@@ -27,20 +27,20 @@ fn Rosetta::BinPacking::first_fit_decreasing($items, $cap) {
 
 # Items 4,8,1,4,2,1 with capacity 10
 my $bins = Rosetta::BinPacking::first_fit([4, 8, 1, 4, 2, 1], 10)
-assert_eq scalar(@$bins), 2, "first-fit packs into 2 bins"
+assert_eq len(@$bins), 2, "first-fit packs into 2 bins"
 assert_eq $bins->[0]{used}, 10, "bin 0 holds 4+1+4+1 = 10"
 assert_eq $bins->[1]{used}, 10, "bin 1 holds 8+2 = 10"
 
 # FFD typically does as well or better
 my $ffd = Rosetta::BinPacking::first_fit_decreasing([4, 8, 1, 4, 2, 1], 10)
-assert_eq scalar(@$ffd), 2, "FFD also packs into 2 bins"
+assert_eq len(@$ffd), 2, "FFD also packs into 2 bins"
 
 # Each item exceeds half-capacity -> one item per bin
 my $solo = Rosetta::BinPacking::first_fit([7, 8, 9], 10)
-assert_eq scalar(@$solo), 3, "each big item gets its own bin"
+assert_eq len(@$solo), 3, "each big item gets its own bin"
 
 # Empty input -> 0 bins
 my $none = Rosetta::BinPacking::first_fit([], 10)
-assert_eq scalar(@$none), 0, "no items -> 0 bins"
+assert_eq len(@$none), 0, "no items -> 0 bins"
 
 test_run

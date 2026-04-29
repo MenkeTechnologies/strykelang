@@ -2,7 +2,7 @@
 # Rosetta Code: Compare a list of strings (Manual)
 
 fn Rosetta::CompareStrings::all_equal($list) {
-    if (scalar(@$list) <= 1) { return 1 }
+    if (len(@$list) <= 1) { return 1 }
     my $first = $list->[0]
     for my $s (@$list) {
         if ($s ne $first) { return 0 }
@@ -11,8 +11,8 @@ fn Rosetta::CompareStrings::all_equal($list) {
 }
 
 fn Rosetta::CompareStrings::all_increasing($list) {
-    if (scalar(@$list) <= 1) { return 1 }
-    for my $i (0..scalar(@$list)-2) {
+    if (len(@$list) <= 1) { return 1 }
+    for my $i (0..len(@$list)-2) {
         if ($list->[$i] ge $list->[$i+1]) { return 0 }
     }
     1

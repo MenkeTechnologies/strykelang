@@ -7,8 +7,8 @@ fn Rosetta::Nbonacci::generate($n, $count) {
     for my $i (1..$n-1) { push @seq, 0 }
     push @seq, 1
     
-    while (scalar(@seq) < $count) {
-        my $len = scalar(@seq)
+    while (len(@seq) < $count) {
+        my $len = len(@seq)
         my $sum = 0
         for my $i ($len - $n .. $len - 1) {
             $sum += $seq[$i]

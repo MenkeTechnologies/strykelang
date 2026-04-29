@@ -14,7 +14,7 @@ fn Rosetta::ProperDivisors::get($n) {
 # sum of proper divisors
 fn Rosetta::ProperDivisors::sum($n) {
     my $divs = Rosetta::ProperDivisors::get($n)
-    if (scalar(@$divs) == 0) { return 0 }
+    if (len(@$divs) == 0) { return 0 }
     ~> @$divs reduce { _0 + _1 }
 }
 

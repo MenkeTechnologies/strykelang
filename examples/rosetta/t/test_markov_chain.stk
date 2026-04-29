@@ -4,7 +4,7 @@
 fn Rosetta::MarkovChain::build($text) {
     my @words = split(" ", $text)
     my %chain
-    for my $i (0..scalar(@words)-2) {
+    for my $i (0..len(@words)-2) {
         my $w1 = $words[$i]
         my $w2 = $words[$i+1]
         if (!exists $chain{$w1}) { $chain{$w1} = [] }
@@ -19,7 +19,7 @@ fn Rosetta::MarkovChain::generate($chain, $start, $len) {
     for my $i (1..$len-1) {
         if (!exists $chain->{$curr}) { last }
         my $opts = $chain->{$curr}
-        $curr = $opts->[int(rand(scalar(@$opts)))]
+        $curr = $opts->[int(rand(len(@$opts)))]
         push @res, $curr
     }
     join(" ", @res)
@@ -29,7 +29,7 @@ my $input = "the quick brown fox jumps over the lazy dog and the quick cat the q
 my $chain = Rosetta::MarkovChain::build($input)
 
 my $gen = Rosetta::MarkovChain::generate($chain, "the", 5)
-assert_ok scalar(split(" ", $gen)) >= 3, "generated some words"
+assert_ok len(split(" ", $gen)) >= 3, "generated some words"
 assert_ok $gen =~ /^the/, "starts with the"
 
 test_run

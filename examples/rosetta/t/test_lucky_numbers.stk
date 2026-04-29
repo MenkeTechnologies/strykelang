@@ -6,12 +6,12 @@ fn Rosetta::LuckyNumbers::generate($max) {
     my @l = grep { $_ % 2 == 1 } (1..$max)
     my $idx = 1
     
-    while ($idx < scalar(@l)) {
+    while ($idx < len(@l)) {
         my $skip = $l[$idx]
-        if ($skip > scalar(@l)) { last }
+        if ($skip > len(@l)) { last }
         
         my @next_nums
-        for (my $i = 0; $i < scalar(@l); $i++) {
+        for (my $i = 0; $i < len(@l); $i++) {
             if (($i + 1) % $skip != 0) {
                 push @next_nums, $l[$i]
             }

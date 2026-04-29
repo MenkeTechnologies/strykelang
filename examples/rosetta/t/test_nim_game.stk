@@ -16,7 +16,7 @@ fn Rosetta::Nim::is_losing(@piles) {
 fn Rosetta::Nim::winning_move(@piles) {
     my $x = Rosetta::Nim::nim_sum(@piles)
     return undef if $x == 0
-    for my $i (0..scalar(@piles)-1) {
+    for my $i (0..len(@piles)-1) {
         my $target = $piles[$i] ^ $x
         if ($target < $piles[$i]) {
             return [$i, $piles[$i] - $target]

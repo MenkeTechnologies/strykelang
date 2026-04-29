@@ -5,19 +5,19 @@
 
 fn Rosetta::Variance::mean(@xs) {
     my $sum = ~> @xs reduce { $_0 + $_1 }
-    $sum / scalar(@xs)
+    $sum / len(@xs)
 }
 
 fn Rosetta::Variance::population(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
     my $ss = ~> @xs map { ($_ - $m) ** 2 } reduce { $_0 + $_1 }
-    $ss / scalar(@xs)
+    $ss / len(@xs)
 }
 
 fn Rosetta::Variance::sample(@xs) {
     my $m = Rosetta::Variance::mean(@xs)
     my $ss = ~> @xs map { ($_ - $m) ** 2 } reduce { $_0 + $_1 }
-    $ss / (scalar(@xs) - 1)
+    $ss / (len(@xs) - 1)
 }
 
 fn Rosetta::Variance::stddev(@xs) {

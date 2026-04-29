@@ -3,7 +3,7 @@
 
 fn Rosetta::PowerIteration::dot_product($v1, $v2) {
     my $sum = 0
-    for (my $i = 0; $i < scalar(@$v1); $i++) {
+    for (my $i = 0; $i < len(@$v1); $i++) {
         $sum += $v1->[$i] * $v2->[$i]
     }
     $sum
@@ -11,7 +11,7 @@ fn Rosetta::PowerIteration::dot_product($v1, $v2) {
 
 fn Rosetta::PowerIteration::matrix_vector_mul($m, $v) {
     my @res
-    for (my $i = 0; $i < scalar(@$m); $i++) {
+    for (my $i = 0; $i < len(@$m); $i++) {
         push @res, Rosetta::PowerIteration::dot_product($m->[$i], $v)
     }
     \@res
@@ -24,7 +24,7 @@ fn Rosetta::PowerIteration::normalize($v) {
 }
 
 fn Rosetta::PowerIteration::solve($matrix, $num_simulations) {
-    my $n = scalar(@$matrix)
+    my $n = len(@$matrix)
     # Start with a random vector (or all 1s for simplicity)
     my @v = map { 1.0 } 1:$n
     my $vec = Rosetta::PowerIteration::normalize(\@v)

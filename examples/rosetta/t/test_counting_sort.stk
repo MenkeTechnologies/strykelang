@@ -10,7 +10,7 @@ fn Rosetta::CountingSort::sort($list, $min, $max) {
     }
     
     my @res = ()
-    for my $i (0..scalar(@count)-1) {
+    for my $i (0..len(@count)-1) {
         my $c = $count[$i]
         while ($c > 0) {
             push @res, $i + $min

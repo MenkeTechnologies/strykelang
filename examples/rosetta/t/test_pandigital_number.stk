@@ -8,7 +8,7 @@ fn Rosetta::Pandigital::check($n) {
     for my $d (@c) {
         if ($d =~ /[0-9]/) { $digits{$d} = 1 }
     }
-    scalar(keys %digits) == 10
+    len(keys %digits) == 10
 }
 
 assert_ok Rosetta::Pandigital::check(1023456789), "1023456789 is pandigital"

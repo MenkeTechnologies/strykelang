@@ -6,15 +6,15 @@ fn Rosetta::AStar::heuristic($node, $end) {
 }
 
 fn Rosetta::AStar::solve($grid, $start, $end) {
-    my $rows = scalar(@$grid)
-    my $cols = scalar(@{$grid->[0]})
+    my $rows = len(@$grid)
+    my $cols = len(@{$grid->[0]})
     my $open = [[$start->[0], $start->[1], 0, Rosetta::AStar::heuristic($start, $end)]] # r, c, g, f
     my %closed
     
-    while (scalar(@$open) > 0) {
+    while (len(@$open) > 0) {
         # find node with min f
         my $best_idx = 0
-        for my $i (1..scalar(@$open)-1) {
+        for my $i (1..len(@$open)-1) {
             if ($open->[$i][3] < $open->[$best_idx][3]) {
                 $best_idx = $i
             }

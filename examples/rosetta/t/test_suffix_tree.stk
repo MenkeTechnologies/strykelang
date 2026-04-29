@@ -4,7 +4,7 @@
 fn Rosetta::SuffixTree::build($s) {
     my $tree = {}
     my @chars = $s |> chars()
-    my $n = scalar(@chars)
+    my $n = len(@chars)
     
     for (my $i = 0; $i < $n; $i++) {
         my $curr = $tree

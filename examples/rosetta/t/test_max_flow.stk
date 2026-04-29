@@ -2,7 +2,7 @@
 # Rosetta Code: Max flow (Edmonds-Karp)
 
 fn Rosetta::MaxFlow::solve($capacity, $source, $sink) {
-    my $n = scalar(@$capacity)
+    my $n = len(@$capacity)
     my @flow = ~> 0:$n-1 map { [ map { 0 } 1:$n ] }
     my $max_flow = 0
     
@@ -12,7 +12,7 @@ fn Rosetta::MaxFlow::solve($capacity, $source, $sink) {
         $parent[$source] = $source
         
         my $found_path = 0
-        while (scalar(@queue) > 0) {
+        while (len(@queue) > 0) {
             my $u = shift @queue
             if ($u == $sink) {
                 $found_path = 1

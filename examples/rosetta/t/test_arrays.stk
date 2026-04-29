@@ -11,7 +11,7 @@ fn Rosetta::Arrays::demo() {
     my @mixed = (42, "text", 3.14, "more")
     
     "1. Array Creation:" |> p
-    ("   Empty array: " . scalar(@empty) . " elements") |> p
+    ("   Empty array: " . len(@empty) . " elements") |> p
     ("   Numbers: " . join(", ", @numbers)) |> p
     ("   Strings: " . join(", ", @strings)) |> p
     ("   Mixed: " . join(", ", @mixed)) |> p
@@ -37,7 +37,7 @@ fn Rosetta::Arrays::demo() {
     ("   Slice [2..4]: " . join(", ", @slice)) |> p
     
     # Array length/size
-    my $length = scalar(@numbers)
+    my $length = len(@numbers)
     my $last_index = $#numbers
     
     "5. Array Size:" |> p

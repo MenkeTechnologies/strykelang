@@ -5,11 +5,11 @@ fn Rosetta::FloodFill::solve($grid, $x, $y, $new_color) {
     my $target_color = $grid->[$y]->[$x]
     return $grid if $target_color eq $new_color
     
-    my $rows = scalar(@$grid)
-    my $cols = scalar(@{$grid->[0]})
+    my $rows = len(@$grid)
+    my $cols = len(@{$grid->[0]})
     my @stack = ([$x, $y])
     
-    while (scalar(@stack)) {
+    while (len(@stack)) {
         my $p = pop @stack
         my ($px, $py) = @$p
         

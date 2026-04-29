@@ -16,6 +16,6 @@ my %res = Rosetta::WordCount::solve($t)
 
 assert_eq $res{"hello"}, 2, "hello count"
 assert_eq $res{"world"}, 3, "world count"
-assert_eq scalar(keys %res), 2, "unique words"
+assert_eq len(keys %res), 2, "unique words"
 
 test_run

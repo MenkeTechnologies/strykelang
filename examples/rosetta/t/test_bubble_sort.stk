@@ -2,7 +2,7 @@
 # Rosetta Code: Bubble Sort
 
 fn Rosetta::BubbleSort::sort(@arr) {
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     for my $i (0..$n-2) {
         for my $j (0..$n-2-$i) {
             if ($arr[$j] > $arr[$j+1]) {

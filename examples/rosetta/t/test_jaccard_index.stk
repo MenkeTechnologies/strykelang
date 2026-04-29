@@ -13,7 +13,7 @@ fn Rosetta::JaccardIndex::compute($a_ref, $b_ref) {
         if (exists $set_b{$k}) { $intersection++ }
     }
     
-    my $union = scalar(@keys_a)
+    my $union = len(@keys_a)
     my @keys_b = keys %set_b
     for my $k (@keys_b) {
         if (!exists $set_a{$k}) { $union++ }

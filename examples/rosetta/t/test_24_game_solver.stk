@@ -10,9 +10,9 @@ fn Rosetta::Game24::eval_op($a, $b, $op) {
 }
 
 fn Rosetta::Game24::perms(@list) {
-    if (scalar(@list) <= 1) { return [\@list] }
+    if (len(@list) <= 1) { return [\@list] }
     my @res
-    for my $i (0..scalar(@list)-1) {
+    for my $i (0..len(@list)-1) {
         my @rest = @list
         my $item = splice(@rest, $i, 1)
         my $sub_ref = Rosetta::Game24::perms(@rest)

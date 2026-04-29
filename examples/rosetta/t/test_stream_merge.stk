@@ -4,7 +4,7 @@
 fn Rosetta::StreamMerge::two($a, $b) {
     my @out
     my $i = 0; my $j = 0
-    my $na = scalar(@$a); my $nb = scalar(@$b)
+    my $na = len(@$a); my $nb = len(@$b)
     while ($i < $na && $j < $nb) {
         if ($a->[$i] <= $b->[$j]) {
             push @out, $a->[$i]; $i += 1
@@ -20,13 +20,13 @@ fn Rosetta::StreamMerge::two($a, $b) {
 fn Rosetta::StreamMerge::k_way($streams) {
     my @result
     my @cursors
-    for my $i (0..scalar(@$streams)-1) { $cursors[$i] = 0 }
+    for my $i (0..len(@$streams)-1) { $cursors[$i] = 0 }
     while (1) {
         my $best = -1
         my $best_v
-        for my $i (0..scalar(@$streams)-1) {
+        for my $i (0..len(@$streams)-1) {
             my $cur = $cursors[$i]
-            next if $cur >= scalar(@{$streams->[$i]})
+            next if $cur >= len(@{$streams->[$i]})
             my $v = $streams->[$i]->[$cur]
             if ($best == -1 || $v < $best_v) {
                 $best = $i
@@ -60,7 +60,7 @@ assert_eq join(",", @$r1), "1,2,3,4", "1-way is identity"
 
 # All empty
 my $r0 = Rosetta::StreamMerge::k_way([[], [], []])
-assert_eq scalar(@$r0), 0, "all empty -> empty"
+assert_eq len(@$r0), 0, "all empty -> empty"
 
 # Duplicates preserved
 my $rd = Rosetta::StreamMerge::two([1, 1, 2], [1, 2, 3])

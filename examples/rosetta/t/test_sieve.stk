@@ -26,6 +26,6 @@ my $primes30 = Rosetta::Sieve::compute(30)
 assert_eq join(",", @$primes30), "2,3,5,7,11,13,17,19,23,29", "sieve 30"
 
 my $primes100 = Rosetta::Sieve::compute(100)
-assert_eq scalar(@$primes100), 25, "sieve 100 count"
+assert_eq len(@$primes100), 25, "sieve 100 count"
 
 test_run

@@ -36,7 +36,7 @@ fn Rosetta::Verhoeff::validate($number) {
     my @digits = $number |> chars() |> rev() |> map { int($_) }
     
     my $c = 0
-    for (my $i = 0; $i < scalar(@digits); $i++) {
+    for (my $i = 0; $i < len(@digits); $i++) {
         $c = $d->[$c]->[$p->[$i % 8]->[$digits[$i]]]
     }
     
@@ -48,7 +48,7 @@ fn Rosetta::Verhoeff::generate_checksum($number) {
     my @digits = $number |> chars() |> rev() |> map { int($_) }
     
     my $c = 0
-    for (my $i = 0; $i < scalar(@digits); $i++) {
+    for (my $i = 0; $i < len(@digits); $i++) {
         $c = $d->[$c]->[$p->[($i + 1) % 8]->[$digits[$i]]]
     }
     

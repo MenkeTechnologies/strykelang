@@ -2,7 +2,7 @@
 # Rosetta Code: Longest increasing subsequence — O(n log n) patience sort
 
 fn Rosetta::LisFast::lower_bound($tails, $x) {
-    my ($lo, $hi) = (0, scalar(@$tails))
+    my ($lo, $hi) = (0, len(@$tails))
     while ($lo < $hi) {
         my $mid = int(($lo + $hi) / 2)
         if ($tails->[$mid] < $x) {
@@ -18,17 +18,17 @@ fn Rosetta::LisFast::length_only($arr) {
     my @tails
     for my $x (@$arr) {
         my $i = Rosetta::LisFast::lower_bound(\@tails, $x)
-        if ($i == scalar(@tails)) {
+        if ($i == len(@tails)) {
             push @tails, $x
         } else {
             $tails[$i] = $x
         }
     }
-    scalar(@tails)
+    len(@tails)
 }
 
 fn Rosetta::LisFast::sequence($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return [] if $n == 0
     my @tails
     my @tail_idx
@@ -36,7 +36,7 @@ fn Rosetta::LisFast::sequence($arr) {
     for my $i (0..$n - 1) {
         my $x = $arr->[$i]
         my $pos = Rosetta::LisFast::lower_bound(\@tails, $x)
-        if ($pos == scalar(@tails)) {
+        if ($pos == len(@tails)) {
             push @tails, $x
             push @tail_idx, $i
         } else {
@@ -74,9 +74,9 @@ assert_eq Rosetta::LisFast::length_only([1, 2, 2, 3]), 3, "with dup -> 3"
 
 # Reconstruct one valid sequence
 my $seq = Rosetta::LisFast::sequence([10, 22, 9, 33, 21, 50, 41, 60])
-assert_eq scalar(@$seq), 5, "reconstructed LIS length = 5"
+assert_eq len(@$seq), 5, "reconstructed LIS length = 5"
 # Validate it is strictly increasing
-for my $i (1..scalar(@$seq) - 1) {
+for my $i (1..len(@$seq) - 1) {
     assert_ok($seq->[$i] > $seq->[$i - 1], "seq[$i] > seq[" . ($i - 1) . "]")
 }
 

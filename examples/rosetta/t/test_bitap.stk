@@ -15,7 +15,7 @@ fn Rosetta::Bitap::solve($text, $pattern) {
     
     my $r = ~1
     my @t_chars = $text |> chars()
-    for (my $i = 0; $i < scalar(@t_chars); $i++) {
+    for (my $i = 0; $i < len(@t_chars); $i++) {
         my $char_code = ord($t_chars[$i])
         $r |= $mask[$char_code]
         $r <<= 1

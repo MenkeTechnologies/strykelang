@@ -24,10 +24,10 @@ fn is_non_decreasing_digits($n) {
     my @digits = ~> "$n" chars map { int($_) }
     my $valid = 1
     my $i = 1
-    while ($i < scalar(@digits)) {
+    while ($i < len(@digits)) {
         if ($digits[$i] < $digits[$i-1]) {
             $valid = 0
-            $i = scalar(@digits)
+            $i = len(@digits)
         }
         $i++
     }

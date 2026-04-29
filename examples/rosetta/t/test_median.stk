@@ -3,11 +3,11 @@
 
 fn Rosetta::Median::median {
     my $list = $_[0]
-    if (scalar(@$list) == 0) {
+    if (len(@$list) == 0) {
         0
     } else {
         my @sorted = sort { _0 <=> _1 } @$list
-        my $len = scalar(@sorted)
+        my $len = len(@sorted)
         my $mid = int($len / 2)
         if ($len % 2 == 0) {
             ($sorted[$mid - 1] + $sorted[$mid]) / 2

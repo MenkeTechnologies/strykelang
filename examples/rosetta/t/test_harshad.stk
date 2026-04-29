@@ -16,7 +16,7 @@ fn Rosetta::Harshad::check($n) {
 fn Rosetta::Harshad::generate($count) {
     my @harshad
     my $n = 1
-    while (scalar(@harshad) < $count) {
+    while (len(@harshad) < $count) {
         if (Rosetta::Harshad::check($n)) {
             push @harshad, $n
         }

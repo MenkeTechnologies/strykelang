@@ -17,7 +17,7 @@ fn Rosetta::SelectionSampling::solve($n, $max) {
 my $n = 3
 my $max = 10
 my $res = Rosetta::SelectionSampling::solve($n, $max)
-assert_eq scalar(@$res), 3, "Sample size is 3"
+assert_eq len(@$res), 3, "Sample size is 3"
 # Verify elements are in range and unique
 my %seen
 for my $x (@$res) {

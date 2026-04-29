@@ -4,18 +4,18 @@
 fn Rosetta::Ludic::generate($n) {
     my @ludics = (1)
     my @nums = (2..$n)
-    while (scalar(@nums) > 0) {
+    while (len(@nums) > 0) {
         my $skip = shift @nums
         push @ludics, $skip
-        if (scalar(@nums) == 0) { last }
+        if (len(@nums) == 0) { last }
         my @next_nums = ()
-        for my $i (0..scalar(@nums)-1) {
+        for my $i (0..len(@nums)-1) {
             if (($i + 1) % $skip != 0) {
                 push @next_nums, $nums[$i]
             }
         }
         @nums = @next_nums
-        if (scalar(@ludics) > 100) { last }
+        if (len(@ludics) > 100) { last }
     }
     \@ludics
 }

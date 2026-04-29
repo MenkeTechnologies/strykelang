@@ -2,12 +2,12 @@
 # Rosetta Code: Maximum subarray sum
 
 fn Rosetta::MaxSubarray::sum(@arr) {
-    if (scalar(@arr) == 0) {
+    if (len(@arr) == 0) {
         0
     } else {
         my $max_so_far = $arr[0]
         my $curr_max = $arr[0]
-        for my $i (1..scalar(@arr)-1) {
+        for my $i (1..len(@arr)-1) {
             my $x = $arr[$i]
             $curr_max = $x > $curr_max + $x ? $x : $curr_max + $x
             $max_so_far = $curr_max > $max_so_far ? $curr_max : $max_so_far

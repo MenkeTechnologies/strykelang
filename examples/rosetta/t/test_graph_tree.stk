@@ -3,14 +3,14 @@
 
 fn Rosetta::GraphTree::check($adj) {
     my @nodes = keys %$adj
-    return 1 if scalar(@nodes) == 0
+    return 1 if len(@nodes) == 0
     
     my %visited
     my @q = ($nodes[0])
     $visited{$nodes[0]} = 1
     my $edges = 0
     
-    while (scalar @q) {
+    while (len(@q)) {
         my $u = shift @q
         for my $v (@{$adj->{$u}}) {
             $edges = $edges + 1
@@ -21,7 +21,7 @@ fn Rosetta::GraphTree::check($adj) {
         }
     }
     
-    scalar(keys %visited) == scalar(@nodes) && ($edges / 2) == (scalar(@nodes) - 1)
+    len(keys %visited) == len(@nodes) && ($edges / 2) == (len(@nodes) - 1)
 }
 
 my $tree = { A => ["B", "C"], B => ["A"], C => ["A"] }

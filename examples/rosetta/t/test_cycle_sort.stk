@@ -3,7 +3,7 @@
 
 fn Rosetta::CycleSort::sort($list) {
     my @arr = @$list
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     
     for my $cycle_start (0..$n-2) {
         my $item = $arr[$cycle_start]

@@ -48,7 +48,7 @@ assert_eq $row, " 32: SPC |  33: ! |  34: \" |  35: #", "row 32..35"
 # Table contains all 96 printable cells (32..127)
 my $tbl = Rosetta::Ascii::table()
 my @lines = split /\n/, $tbl
-assert_eq scalar(@lines), 16, "16 rows"
+assert_eq len(@lines), 16, "16 rows"
 
 # Every code 32..127 appears exactly once in the table
 for my $code (32..127) {

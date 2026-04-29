@@ -3,7 +3,7 @@
 
 fn Rosetta::Quickselect::solve($arr, $k) {
     my @a = @$arr
-    my $n = scalar(@a)
+    my $n = len(@a)
     return undef if $k < 0 || $k >= $n
     
     my $left = 0

@@ -72,6 +72,6 @@ for my $i (1..6) { push @first6, Rosetta::SubGen::next($f) }
 # but assert that the 6 outputs are distinct (extremely likely for any decent generator).
 my %seen
 for my $v (@first6) { $seen{$v} = 1 }
-assert_eq scalar(keys %seen), 6, "first 6 outputs distinct"
+assert_eq len(keys %seen), 6, "first 6 outputs distinct"
 
 test_run

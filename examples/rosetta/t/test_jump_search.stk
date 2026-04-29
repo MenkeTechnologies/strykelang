@@ -2,7 +2,7 @@
 # Rosetta Code: Jump search on a sorted array
 
 fn Rosetta::JumpSearch::find($arr, $target) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return -1 if $n == 0
     my $step = int(sqrt($n)) || 1
     my $prev = 0

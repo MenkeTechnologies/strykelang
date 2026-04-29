@@ -2,7 +2,7 @@
 # Rosetta Code: Combinations with repetitions
 
 fn Rosetta::CombinationsWithRep::backtrack($n, $k, $start, $curr_ref, $res_ref) {
-    if (scalar(@$curr_ref) == $k) {
+    if (len(@$curr_ref) == $k) {
         push @$res_ref, [@$curr_ref]
         return
     }
@@ -21,6 +21,6 @@ fn Rosetta::CombinationsWithRep::generate($n, $k) {
 
 # 3 items, choose 2 with rep: 00, 01, 02, 11, 12, 22 (6 total)
 my $c = Rosetta::CombinationsWithRep::generate(3, 2)
-assert_eq scalar(@$c), 6, "3 choose 2 with rep is 6"
+assert_eq len(@$c), 6, "3 choose 2 with rep is 6"
 
 test_run

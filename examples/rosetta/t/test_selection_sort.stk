@@ -2,7 +2,7 @@
 # Rosetta Code: Selection Sort
 
 fn Rosetta::SelectionSort::sort(@arr) {
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     for my $i (0..$n-2) {
         my $min_idx = $i
         for my $j ($i+1..$n-1) {

@@ -3,7 +3,7 @@
 
 fn Rosetta::CountInFactors::solve($n) {
     my @f = prime_factors($n)
-    if (scalar(@f) == 0) { return "$n" }
+    if (len(@f) == 0) { return "$n" }
     join(" * ", @f)
 }
 

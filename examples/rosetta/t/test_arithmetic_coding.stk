@@ -9,7 +9,7 @@ fn Rosetta::ArithmeticCoding::get_probs($text) {
     my @sorted_chars = sort(keys %count)
     my %probs
     my $curr = 0
-    my $total = scalar(@chars)
+    my $total = len(@chars)
     for my $c (@sorted_chars) {
         my $p = $count{$c} / $total
         $probs{$c} = { low => $curr, high => $curr + $p }

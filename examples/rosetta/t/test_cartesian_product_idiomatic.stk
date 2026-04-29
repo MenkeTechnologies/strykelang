@@ -19,13 +19,13 @@ my $s1 = [1, 2]
 my $s2 = [3, 4]
 my $cp = Rosetta::CartesianProduct::solve([$s1, $s2])
 # [1,3], [1,4], [2,3], [2,4]
-assert_eq scalar(@$cp), 4, "4 elements in CP"
+assert_eq len(@$cp), 4, "4 elements in CP"
 assert_eq join(",", @{$cp->[0]}), "1,3", "first element"
 assert_eq join(",", @{$cp->[-1]}), "2,4", "last element"
 
 # Parallel map test
 my @sets = ([1,2], [3,4], [5,6])
 my $cp3 = Rosetta::CartesianProduct::solve(\@sets)
-assert_eq scalar(@$cp3), 8, "2^3 = 8 elements in CP"
+assert_eq len(@$cp3), 8, "2^3 = 8 elements in CP"
 
 test_run

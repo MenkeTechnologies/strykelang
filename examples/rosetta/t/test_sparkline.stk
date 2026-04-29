@@ -3,7 +3,7 @@
 
 fn Rosetta::Sparkline::render(@values) {
     my @bars = ("▁", "▂", "▃", "▄", "▅", "▆", "▇", "█")
-    return "" if scalar(@values) == 0
+    return "" if len(@values) == 0
 
     my $min = $values[0]
     my $max = $values[0]
@@ -51,6 +51,6 @@ assert_eq $neg, "▁▄█", "negatives"
 # Mid values produce middle bars; verify length matches input count
 my $r9 = Rosetta::Sparkline::render(0, 1, 2, 3, 4, 5, 6, 7, 8)
 my @chars = ~> $r9 chars
-assert_eq scalar(@chars), 9, "length matches input"
+assert_eq len(@chars), 9, "length matches input"
 
 test_run

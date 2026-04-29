@@ -21,7 +21,7 @@ fn Rosetta::Reservoir::sample($stream, $k) {
 my @stream = (1..100)
 my $sample = Rosetta::Reservoir::sample(\@stream, 10)
 
-assert_eq scalar(@$sample), 10, "reservoir size = k"
+assert_eq len(@$sample), 10, "reservoir size = k"
 for my $v (@$sample) {
     assert_ok($v >= 1 && $v <= 100, "sample value $v in original range")
 }
@@ -29,11 +29,11 @@ for my $v (@$sample) {
 # Stream smaller than k -> reservoir is the whole stream
 my @small = (1, 2, 3)
 my $whole = Rosetta::Reservoir::sample(\@small, 10)
-assert_eq scalar(@$whole), 3, "stream smaller than k returns full stream"
+assert_eq len(@$whole), 3, "stream smaller than k returns full stream"
 assert_eq join(",", sort { $a <=> $b } @$whole), "1,2,3", "small stream contents preserved"
 
 # k = 0 returns empty
 my $empty = Rosetta::Reservoir::sample(\@stream, 0)
-assert_eq scalar(@$empty), 0, "k=0 returns empty reservoir"
+assert_eq len(@$empty), 0, "k=0 returns empty reservoir"
 
 test_run

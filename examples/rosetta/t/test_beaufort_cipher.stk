@@ -8,9 +8,9 @@ fn Rosetta::Beaufort::codec($text, $key) {
     
     my @t_chars = $t |> chars()
     my @k_chars = $k |> chars()
-    my $k_len = scalar(@k_chars)
+    my $k_len = len(@k_chars)
     
-    my @res = ~> 0:(scalar(@t_chars)-1) map {
+    my @res = ~> 0:(len(@t_chars)-1) map {
         my $i = $_
         my $p_val = ord($t_chars[$i]) - ord("A")
         my $k_val = ord($k_chars[$i % $k_len]) - ord("A")

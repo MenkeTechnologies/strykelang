@@ -44,7 +44,7 @@ fn Rosetta::Hill::codec($text, $key_matrix, $mod) {
     my @chars = $t |> chars() |> map { ord($_) - ord("A") }
     my @res
     
-    for (my $i = 0; $i < scalar(@chars); $i += 2) {
+    for (my $i = 0; $i < len(@chars); $i += 2) {
         my $v1 = $chars[$i]
         my $v2 = $chars[$i+1]
         

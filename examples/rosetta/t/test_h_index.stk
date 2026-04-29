@@ -5,7 +5,7 @@ fn Rosetta::HIndex::solve($citations) {
     # Sort citations in descending order
     my @sorted = sort { _1 <=> _0 } @$citations
     my $h = 0
-    for (my $i = 0; $i < scalar(@sorted); $i++) {
+    for (my $i = 0; $i < len(@sorted); $i++) {
         if ($sorted[$i] >= $i + 1) {
             $h = $i + 1
         } else {

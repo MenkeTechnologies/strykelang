@@ -27,7 +27,7 @@ fn Rosetta::AliquotSequence::generate($start, $max_len) {
         if ($curr > 0) {
             my $next = Rosetta::AliquotSequence::sum_divisors($curr)
             my $already_seen = 0
-            for my $j (0..scalar(@res)-1) {
+            for my $j (0..len(@res)-1) {
                 if ($res[$j] == $next) { $already_seen = 1 }
             }
             push @res, $next

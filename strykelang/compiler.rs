@@ -5459,13 +5459,30 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    self.compile_expr(aref_expr)?;
-                    for v in values {
-                        self.emit_op(Op::Dup, line, Some(root));
-                        self.compile_expr_ctx(v, WantarrayCtx::List)?;
-                        self.emit_op(Op::PushArrayDeref, line, Some(root));
+                    // Autovivifiable inner shapes (`$x`, `$h{k}`, `$a[i]`) need lvalue
+                    // resolution: when the slot is undef, `push @{...}` must create a new
+                    // arrayref and store it back. Routed through PushExpr where
+                    // `try_eval_array_deref_container` handles autoviv.
+                    let needs_autoviv = matches!(
+                        &aref_expr.kind,
+                        ExprKind::ScalarVar(_)
+                            | ExprKind::HashElement { .. }
+                            | ExprKind::ArrayElement { .. }
+                    );
+                    if needs_autoviv {
+                        let pool = self
+                            .chunk
+                            .add_push_expr_entry(array.as_ref().clone(), values.clone());
+                        self.emit_op(Op::PushExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_expr(aref_expr)?;
+                        for v in values {
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.compile_expr_ctx(v, WantarrayCtx::List)?;
+                            self.emit_op(Op::PushArrayDeref, line, Some(root));
+                        }
+                        self.emit_op(Op::ArrayDerefLen, line, Some(root));
                     }
-                    self.emit_op(Op::ArrayDerefLen, line, Some(root));
                 } else {
                     let pool = self
                         .chunk
@@ -5482,8 +5499,19 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    self.compile_expr(aref_expr)?;
-                    self.emit_op(Op::PopArrayDeref, line, Some(root));
+                    let needs_autoviv = matches!(
+                        &aref_expr.kind,
+                        ExprKind::ScalarVar(_)
+                            | ExprKind::HashElement { .. }
+                            | ExprKind::ArrayElement { .. }
+                    );
+                    if needs_autoviv {
+                        let pool = self.chunk.add_pop_expr_entry(array.as_ref().clone());
+                        self.emit_op(Op::PopExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_expr(aref_expr)?;
+                        self.emit_op(Op::PopArrayDeref, line, Some(root));
+                    }
                 } else {
                     let pool = self.chunk.add_pop_expr_entry(array.as_ref().clone());
                     self.emit_op(Op::PopExpr(pool), line, Some(root));
@@ -5498,8 +5526,19 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    self.compile_expr(aref_expr)?;
-                    self.emit_op(Op::ShiftArrayDeref, line, Some(root));
+                    let needs_autoviv = matches!(
+                        &aref_expr.kind,
+                        ExprKind::ScalarVar(_)
+                            | ExprKind::HashElement { .. }
+                            | ExprKind::ArrayElement { .. }
+                    );
+                    if needs_autoviv {
+                        let pool = self.chunk.add_shift_expr_entry(array.as_ref().clone());
+                        self.emit_op(Op::ShiftExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_expr(aref_expr)?;
+                        self.emit_op(Op::ShiftArrayDeref, line, Some(root));
+                    }
                 } else {
                     let pool = self.chunk.add_shift_expr_entry(array.as_ref().clone());
                     self.emit_op(Op::ShiftExpr(pool), line, Some(root));
@@ -5524,7 +5563,13 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    if values.len() > u8::MAX as usize {
+                    let needs_autoviv = matches!(
+                        &aref_expr.kind,
+                        ExprKind::ScalarVar(_)
+                            | ExprKind::HashElement { .. }
+                            | ExprKind::ArrayElement { .. }
+                    );
+                    if needs_autoviv || values.len() > u8::MAX as usize {
                         let pool = self
                             .chunk
                             .add_unshift_expr_entry(array.as_ref().clone(), values.clone());

@@ -4,7 +4,7 @@
 fn Rosetta::SternBrocot::stern_brocot($n) {
     my @sb = (1, 1)
     my $i = 0
-    while (scalar(@sb) < $n) {
+    while (len(@sb) < $n) {
         my $a = $sb[$i]
         my $b = $sb[$i+1]
         push @sb, $a + $b, $b

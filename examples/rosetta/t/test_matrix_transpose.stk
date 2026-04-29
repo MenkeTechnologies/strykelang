@@ -3,8 +3,8 @@
 
 fn Rosetta::Transpose::transpose {
     my $m = $_[0]
-    my $rows = scalar(@$m)
-    my $cols = scalar(@{$m->[0]})
+    my $rows = len(@$m)
+    my $cols = len(@{$m->[0]})
     my @res
     for my $j (0..$cols-1) {
         my @new_row

@@ -5,7 +5,7 @@ fn Rosetta::AnagramsDeranged::is_derangement($s1, $s2) {
     if (length($s1) != length($s2)) { return 0 }
     my @a1 = ~> $s1 chars
     my @a2 = ~> $s2 chars
-    for my $i (0..scalar(@a1)-1) {
+    for my $i (0..len(@a1)-1) {
         if ($a1[$i] eq $a2[$i]) { return 0 }
     }
     1
@@ -30,9 +30,9 @@ fn Rosetta::AnagramsDeranged::solve($words) {
     
     for my $key (keys %groups) {
         my @list = @{$groups{$key}}
-        if (scalar(@list) > 1) {
-            for my $i (0..scalar(@list)-2) {
-                for my $j ($i+1..scalar(@list)-1) {
+        if (len(@list) > 1) {
+            for my $i (0..len(@list)-2) {
+                for my $j ($i+1..len(@list)-1) {
                     if (Rosetta::AnagramsDeranged::is_derangement($list[$i], $list[$j])) {
                         my $len = length($list[$i])
                         if ($len >= $max_len) {

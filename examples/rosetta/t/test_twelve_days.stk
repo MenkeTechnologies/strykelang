@@ -57,6 +57,6 @@ my $all = Rosetta::TwelveDays::all()
 my @lines = split /\n/, $all
 # 12 verses, each verse has (1 + day_count) lines, plus 11 blank separator lines
 # total content lines = sum(1+i, i=1..12) = 12 + 78 = 90, plus 11 blanks = 101
-assert_eq scalar(@lines), 101, "complete song line count"
+assert_eq len(@lines), 101, "complete song line count"
 
 test_run

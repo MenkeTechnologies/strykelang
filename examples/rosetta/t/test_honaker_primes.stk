@@ -15,7 +15,7 @@ fn Rosetta::Honaker::find($count) {
     my @result
     my $idx = 0
     my $n = 2
-    while (scalar(@result) < $count) {
+    while (len(@result) < $count) {
         if (is_prime($n)) {
             $idx += 1
             if (Rosetta::Honaker::digit_sum($n) == Rosetta::Honaker::digit_sum($idx)) {

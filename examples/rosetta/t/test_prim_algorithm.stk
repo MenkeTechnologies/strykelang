@@ -14,7 +14,7 @@ fn Rosetta::Prim::solve($n, $edges) {
     my @mst = ()
     my $total_w = 0
     
-    while (scalar(keys %visited) < $n) {
+    while (len(keys %visited) < $n) {
         my $min_edge = undef
         my $min_w = 1e18
         

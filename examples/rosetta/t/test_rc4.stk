@@ -3,7 +3,7 @@
 
 fn Rosetta::RC4::ksa($key) {
     my @key_bytes = $key |> chars() |> map { ord($_) }
-    my $key_len = scalar(@key_bytes)
+    my $key_len = len(@key_bytes)
     my @s = 0:255
     
     my $j = 0
@@ -39,10 +39,10 @@ fn Rosetta::RC4::prga($s, $len) {
 fn Rosetta::RC4::solve($key, $data) {
     my $s = Rosetta::RC4::ksa($key)
     my @data_bytes = $data |> chars() |> map { ord($_) }
-    my @keystream = Rosetta::RC4::prga($s, scalar(@data_bytes))
+    my @keystream = Rosetta::RC4::prga($s, len(@data_bytes))
     
     my @res
-    for (my $i = 0; $i < scalar(@data_bytes); $i++) {
+    for (my $i = 0; $i < len(@data_bytes); $i++) {
         push @res, $data_bytes[$i] ^ $keystream[$i]
     }
     @res

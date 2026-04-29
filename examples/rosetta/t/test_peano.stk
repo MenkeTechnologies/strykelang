@@ -11,7 +11,7 @@ fn Rosetta::Peano::succ($n) {
 }
 
 fn Rosetta::Peano::is_zero($n) {
-    scalar(@$n) == 0 ? 1 : 0
+    len(@$n) == 0 ? 1 : 0
 }
 
 fn Rosetta::Peano::pred($n) {

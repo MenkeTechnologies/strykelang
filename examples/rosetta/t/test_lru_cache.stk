@@ -12,7 +12,7 @@ fn Rosetta::LRU::get($cache, $key) {
     
     # Move to back (most recently used)
     my $order = $cache->{order}
-    for (my $i = 0; $i < scalar(@$order); $i++) {
+    for (my $i = 0; $i < len(@$order); $i++) {
         if ($order->[$i] eq $key) {
             splice(@$order, $i, 1)
             push @$order, $key
@@ -30,7 +30,7 @@ fn Rosetta::LRU::put($cache, $key, $val) {
     if (exists $map->{$key}) {
         $map->{$key} = $val
         # Move to back
-        for (my $i = 0; $i < scalar(@$order); $i++) {
+        for (my $i = 0; $i < len(@$order); $i++) {
             if ($order->[$i] eq $key) {
                 splice(@$order, $i, 1)
                 push @$order, $key
@@ -38,7 +38,7 @@ fn Rosetta::LRU::put($cache, $key, $val) {
             }
         }
     } else {
-        if (scalar(@$order) >= $cache->{capacity}) {
+        if (len(@$order) >= $cache->{capacity}) {
             # Evict least recently used (first element)
             my $lru_key = shift @$order
             delete $map->{$lru_key}

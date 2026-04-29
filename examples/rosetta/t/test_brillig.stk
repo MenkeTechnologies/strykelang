@@ -24,7 +24,7 @@ my $stanza = "'Twas brillig, and the slithy toves\n"
 my %real = map { ($_, 1) } qw(twas and the did in were all);
 
 my $words = Rosetta::Brillig::words($stanza)
-assert_eq scalar(@$words), 23, "23 word tokens in opening stanza"
+assert_eq len(@$words), 23, "23 word tokens in opening stanza"
 
 my $nonsense = Rosetta::Brillig::nonsense($stanza, \%real)
 my $expected = [sort qw(brillig slithy toves gyre gimble wabe mimsy borogoves mome raths outgrabe)]

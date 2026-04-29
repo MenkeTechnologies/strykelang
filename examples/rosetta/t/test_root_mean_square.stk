@@ -3,10 +3,10 @@
 
 fn root_mean_square {
     my @nums = @_
-    if (scalar(@nums) == 0) {
+    if (len(@nums) == 0) {
         0
     } else {
-        ~> @nums map { $_ * $_ } reduce { _0 + _1 } |> { $_ / scalar(@nums) } |> sqrt
+        ~> @nums map { $_ * $_ } reduce { _0 + _1 } |> { $_ / len(@nums) } |> sqrt
     }
 }
 

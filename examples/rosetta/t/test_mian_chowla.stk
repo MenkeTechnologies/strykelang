@@ -3,20 +3,20 @@
 
 fn mian_chowla($n) {
     my @a = (1)
-    while (scalar(@a) < $n) {
+    while (len(@a) < $n) {
         my $next = $a[-1] + 1
         my $found = 0
         while (!$found) {
             my %sums
             my $valid = 1
             my @temp = (@a, $next)
-            for my $i (0..scalar(@temp)-1) {
-                for my $j ($i..scalar(@temp)-1) {
+            for my $i (0..len(@temp)-1) {
+                for my $j ($i..len(@temp)-1) {
                     my $s = $temp[$i] + $temp[$j]
                     if (exists $sums{$s}) {
                         $valid = 0
-                        $i = scalar(@temp) # break
-                        $j = scalar(@temp) # break
+                        $i = len(@temp) # break
+                        $j = len(@temp) # break
                     }
                     $sums{$s} = 1
                 }

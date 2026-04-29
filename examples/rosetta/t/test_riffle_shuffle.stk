@@ -5,7 +5,7 @@
 # returns to its original order; report the iteration count.
 
 fn Rosetta::Riffle::out_shuffle($deck) {
-    my $n = scalar(@$deck) / 2
+    my $n = len(@$deck) / 2
     my @result
     for my $i (0 .. $n - 1) {
         push @result, $deck->[$i]

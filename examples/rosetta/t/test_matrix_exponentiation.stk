@@ -2,9 +2,9 @@
 # Rosetta Code: Matrix exponentiation
 
 fn Rosetta::MatrixPow::mul($a, $b) {
-    my $m = scalar(@$a)
-    my $n = scalar(@{$a->[0]})
-    my $p = scalar(@{$b->[0]})
+    my $m = len(@$a)
+    my $n = len(@{$a->[0]})
+    my $p = len(@{$b->[0]})
     my @res = ()
     for my $i (0..$m-1) {
         $res[$i] = []
@@ -20,7 +20,7 @@ fn Rosetta::MatrixPow::mul($a, $b) {
 }
 
 fn Rosetta::MatrixPow::compute($a, $n) {
-    my $size = scalar(@$a)
+    my $size = len(@$a)
     my @res = ()
     for my $i (0..$size-1) {
         $res[$i] = []

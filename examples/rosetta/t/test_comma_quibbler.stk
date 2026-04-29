@@ -2,7 +2,7 @@
 # Rosetta Code: Comma quibbler
 
 fn Rosetta::CommaQuibbler::quibble(@list) {
-    my $len = scalar(@list)
+    my $len = len(@list)
     if ($len == 0) {
         "{}"
     } elsif ($len == 1) {

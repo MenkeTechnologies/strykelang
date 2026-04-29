@@ -15,7 +15,7 @@ fn Rosetta::Hailstone::seq($n) {
 }
 
 my @s27 = Rosetta::Hailstone::seq(27)
-assert_eq scalar(@s27), 112, "hailstone(27) length"
+assert_eq len(@s27), 112, "hailstone(27) length"
 assert_eq $s27[0], 27, "hailstone(27) starts with 27"
 assert_eq $s27[-1], 1, "hailstone(27) ends with 1"
 assert_eq join(",", @s27[0:3]), "27,82,41,124", "hailstone(27) first 4"
@@ -23,7 +23,7 @@ assert_eq join(",", @s27[-4:-1]), "8,4,2,1", "hailstone(27) last 4"
 
 # Find longest sequence under 10,000 for faster test (Rosetta says 100k)
 # We'll do 10,000 here to be safe with timeouts, but use ~> for speed.
-my $longest = ~> 1:10000 map { [ $_, scalar(Rosetta::Hailstone::seq($_)) ] }
+my $longest = ~> 1:10000 map { [ $_, len(Rosetta::Hailstone::seq($_)) ] }
             |> reduce { $_0->[1] > $_1->[1] ? $_0 : $_1 }
 
 # For < 10,000, n=6171 has length 262

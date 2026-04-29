@@ -12,7 +12,7 @@ fn Rosetta::Pick::gcd($a, $b) {
 }
 
 fn Rosetta::Pick::shoelace($poly) {
-    my $n = scalar(@$poly)
+    my $n = len(@$poly)
     my $sum = 0
     for my $i (0..$n-1) {
         my $j = ($i + 1) % $n
@@ -22,7 +22,7 @@ fn Rosetta::Pick::shoelace($poly) {
 }
 
 fn Rosetta::Pick::boundary($poly) {
-    my $n = scalar(@$poly)
+    my $n = len(@$poly)
     my $b = 0
     for my $i (0..$n-1) {
         my $j = ($i + 1) % $n

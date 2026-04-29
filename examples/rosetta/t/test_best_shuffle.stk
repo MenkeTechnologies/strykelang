@@ -4,7 +4,7 @@
 fn Rosetta::BestShuffle::shuffle($str) {
     my @a = $str |> chars
     my @b = $str |> chars
-    my $len = scalar(@a)
+    my $len = len(@a)
     
     for my $i (0..$len-1) {
         for my $j (0..$len-1) {
@@ -22,7 +22,7 @@ fn Rosetta::BestShuffle::count_matches($s1, $s2) {
     my @a = $s1 |> chars
     my @b = $s2 |> chars
     my $m = 0
-    for my $i (0..scalar(@a)-1) {
+    for my $i (0..len(@a)-1) {
         if ($a[$i] eq $b[$i]) { $m = $m + 1 }
     }
     $m

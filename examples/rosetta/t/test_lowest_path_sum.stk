@@ -2,9 +2,9 @@
 # Rosetta Code: Lowest path sum in a 2D matrix (move right or down).
 
 fn Rosetta::LowestPath::sum($grid) {
-    my $rows = scalar(@$grid)
+    my $rows = len(@$grid)
     return 0 if $rows == 0
-    my $cols = scalar(@{$grid->[0]})
+    my $cols = len(@{$grid->[0]})
 
     my @dp
     for my $r (0..$rows-1) {

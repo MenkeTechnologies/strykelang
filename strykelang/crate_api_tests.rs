@@ -2565,12 +2565,15 @@ fn try_vm_execute_keys_values_hashref_scalar_context() {
 fn try_vm_compile_push_aref_uses_push_array_deref() {
     use crate::bytecode::Op;
     use crate::compiler::Compiler;
+    // `push @{EXPR}` where EXPR is not an autovivifiable lvalue (here a literal
+    // arrayref) takes the inline `PushArrayDeref` fast path. The autoviv-routed
+    // PushExpr path is reserved for `$x` / `$h{k}` / `$a[i]` where undef must
+    // promote to an arrayref on demand.
     let chunk = Compiler::new()
         .compile_program(
             &parse(
                 r#"no strict 'vars'
-                my $a = [1]
-                push @$a, 2, 3"#,
+                push @{[1]}, 2, 3"#,
             )
             .expect("parse"),
         )
@@ -2582,7 +2585,7 @@ fn try_vm_compile_push_aref_uses_push_array_deref() {
     );
     assert!(
         !chunk.ops.iter().any(|o| matches!(o, Op::PushExpr(_))),
-        "push @$a should not use PushExpr pool"
+        "push @{{[1]}} should not use PushExpr pool"
     );
 }
 

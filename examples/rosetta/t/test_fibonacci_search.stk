@@ -4,7 +4,7 @@
 fn Rosetta::FibSearch::min($x, $y) { $x < $y ? $x : $y }
 
 fn Rosetta::FibSearch::find($arr, $target) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return -1 if $n == 0
 
     my $fb_2 = 0

@@ -3,7 +3,7 @@
 
 fn Rosetta::SelfDescriptive::check($n) {
     my @digits = ~> "$n" chars
-    my $len = scalar(@digits)
+    my $len = len(@digits)
     my @counts = (0) x $len
     for my $d (@digits) {
         if ($d < $len) {

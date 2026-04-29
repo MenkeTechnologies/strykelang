@@ -9,7 +9,7 @@ fn algo_mag($v) {
 
 fn algo_dot($v1, $v2) {
     my $sum = 0.0
-    for my $i (0..scalar(@$v1)-1) { $sum = $sum + $v1->[$i] * $v2->[$i] }
+    for my $i (0..len(@$v1)-1) { $sum = $sum + $v1->[$i] * $v2->[$i] }
     $sum
 }
 

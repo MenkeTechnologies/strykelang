@@ -3,7 +3,7 @@
 
 fn Rosetta::RLE::encode($text) {
     my @chars = $text |> chars()
-    my $n = scalar(@chars)
+    my $n = len(@chars)
     return "" if $n == 0
     
     my $res = ""

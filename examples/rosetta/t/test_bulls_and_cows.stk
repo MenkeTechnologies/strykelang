@@ -8,7 +8,7 @@ fn Rosetta::BullsAndCows::get_score($secret, $guess) {
     my $cows = 0
     
     my %s_count; my %g_count
-    for my $i (0..scalar(@s)-1) {
+    for my $i (0..len(@s)-1) {
         if ($s[$i] eq $g[$i]) {
             $bulls = $bulls + 1
         } else {

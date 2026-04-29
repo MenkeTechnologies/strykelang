@@ -8,11 +8,11 @@ my @sorted = sort { _0 <=> _1 } @data
 
 # Verify order
 my $ok = 1
-for (my $i = 0; $i < scalar(@sorted) - 1; $i++) {
+for (my $i = 0; $i < len(@sorted) - 1; $i++) {
     if ($sorted[$i] > $sorted[$i+1]) { $ok = 0 }
 }
 
 assert_ok $ok, "Parallel QuickSort result is sorted"
-assert_eq scalar(@sorted), 100, "Parallel QuickSort preserved all elements"
+assert_eq len(@sorted), 100, "Parallel QuickSort preserved all elements"
 
 test_run

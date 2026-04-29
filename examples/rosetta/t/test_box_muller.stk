@@ -10,13 +10,13 @@ fn Rosetta::BoxMuller::pair($u1, $u2) {
 
 fn Rosetta::BoxMuller::sample($n) {
     my @out
-    while (scalar(@out) < $n) {
+    while (len(@out) < $n) {
         my $u1 = rand()
         my $u2 = rand()
         $u1 = 1e-12 if $u1 <= 0
         my $z = Rosetta::BoxMuller::pair($u1, $u2)
         push @out, $z->[0]
-        push @out, $z->[1] if scalar(@out) < $n
+        push @out, $z->[1] if len(@out) < $n
     }
     \@out
 }
@@ -31,7 +31,7 @@ assert_ok abs($z->[1]) < 1e-9, "z1 = 0 when theta = 0"
 # Statistical sanity on a sample of 5000
 srand(42)
 my $sample = Rosetta::BoxMuller::sample(5000)
-assert_eq scalar(@$sample), 5000, "5000 samples"
+assert_eq len(@$sample), 5000, "5000 samples"
 
 my $mean = 0.0
 for my $x (@$sample) { $mean += $x }

@@ -2,7 +2,7 @@
 # Rosetta Code: Permutations
 
 fn Rosetta::Permutations::generate($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return [[@$arr]] if $n <= 1
     my @result
     for my $i (0..$n-1) {
@@ -23,21 +23,21 @@ fn Rosetta::Permutations::factorial($n) {
 }
 
 my $p2 = Rosetta::Permutations::generate([1, 2])
-assert_eq scalar(@$p2), 2, "2! = 2"
+assert_eq len(@$p2), 2, "2! = 2"
 
 my $p3 = Rosetta::Permutations::generate([1, 2, 3])
-assert_eq scalar(@$p3), 6, "3! = 6"
+assert_eq len(@$p3), 6, "3! = 6"
 
 my $p4 = Rosetta::Permutations::generate([1, 2, 3, 4])
-assert_eq scalar(@$p4), 24, "4! = 24"
+assert_eq len(@$p4), 24, "4! = 24"
 
 my $p1 = Rosetta::Permutations::generate([42])
-assert_eq scalar(@$p1), 1, "1! = 1"
+assert_eq len(@$p1), 1, "1! = 1"
 assert_eq $p1->[0]->[0], 42, "single element perm"
 
 # Empty input -> single empty permutation
 my $p0 = Rosetta::Permutations::generate([])
-assert_eq scalar(@$p0), 1, "0! = 1 (one empty permutation)"
+assert_eq len(@$p0), 1, "0! = 1 (one empty permutation)"
 
 # All p3 entries are distinct and sorted strings cover (123, 132, 213, 231, 312, 321)
 my @joined = sort map { join("", @$_) } @$p3
@@ -52,7 +52,7 @@ for my $n (1, 2, 3, 4, 5) {
     my @input = (1..$n)
     my $perms = Rosetta::Permutations::generate(\@input)
     my $expected = Rosetta::Permutations::factorial($n)
-    assert_eq scalar(@$perms), $expected, "n=$n: perm count = n!"
+    assert_eq len(@$perms), $expected, "n=$n: perm count = n!"
 }
 
 test_run

@@ -25,12 +25,12 @@ fn Rosetta::ADFGVX::encode($text, $key_square, $keyword) {
     
     # Columnar transposition
     my @kw = $keyword |> chars()
-    my $n = scalar(@kw)
+    my $n = len(@kw)
     my @cols
     for (1:$n) { push @cols, "" }
     
     my @f_chars = $fractionated |> chars()
-    for (my $i = 0; $i < scalar(@f_chars); $i++) {
+    for (my $i = 0; $i < len(@f_chars); $i++) {
         $cols[$i % $n] .= $f_chars[$i]
     }
     

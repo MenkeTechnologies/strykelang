@@ -2,7 +2,7 @@
 # Rosetta Code: LU Decomposition
 
 fn Rosetta::LUDecomposition::solve($A) {
-    my $n = scalar(@$A)
+    my $n = len(@$A)
     my @L; my @U
     for my $i (0..$n-1) {
         my @l_row; my @u_row

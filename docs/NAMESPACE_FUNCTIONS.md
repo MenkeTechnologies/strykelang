@@ -24,7 +24,7 @@ fn MyProject::Utils::sum($x, $y) { $x + $y }
 ## Calling namespaced functions
 
 ```perl
-fn Stats::mean(@vals) { sum(@vals) / scalar(@vals) }
+fn Stats::mean(@vals) { sum(@vals) / lene(@vals) }
 fn Stats::median(@vals) {
     my @s = sort { $a <=> $b } @vals
     $s[@s / 2]

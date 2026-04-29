@@ -7,7 +7,7 @@ fn Rosetta::MoveToFront::mtf_encode($str) {
     my @chars = $str |> chars
     for my $c (@chars) {
         my $idx = 0
-        for my $i (0..scalar(@alpha)-1) {
+        for my $i (0..len(@alpha)-1) {
             if ($alpha[$i] eq $c) { $idx = $i; last }
         }
         push @res, $idx

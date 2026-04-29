@@ -5,16 +5,16 @@
 fn Rosetta::Lyndon::generate($n, $k) {
     my @result
     my @w = (-1)
-    while (scalar(@w) > 0) {
+    while (len(@w) > 0) {
         $w[-1] += 1
-        my $m = scalar(@w)
+        my $m = len(@w)
         push @result, [@w] if $m == $n
         # Repeat the prefix to reach length n
-        while (scalar(@w) < $n) {
-            push @w, $w[scalar(@w) - $m]
+        while (len(@w) < $n) {
+            push @w, $w[len(@w) - $m]
         }
         # Remove trailing 'k-1's
-        while (scalar(@w) > 0 && $w[-1] == $k - 1) {
+        while (len(@w) > 0 && $w[-1] == $k - 1) {
             pop @w
         }
     }
@@ -40,7 +40,7 @@ assert_eq join(",", @s4), "aaab,aabb,abbb", "Lyndon length-4 binary"
 
 # Length 5 binary: aaaab, aaabb, aabab, aabbb, ababb, abbbb
 my $b5 = Rosetta::Lyndon::generate(5, 2)
-assert_eq scalar(@$b5), 6, "Lyndon length-5 binary count"
+assert_eq len(@$b5), 6, "Lyndon length-5 binary count"
 
 # Length 3 ternary: alphabet abc, expected: aab, aac, abb, abc, acb, acc, bbc, bcc
 my $t3 = Rosetta::Lyndon::generate(3, 3)
@@ -48,16 +48,16 @@ my @st3 = sort map { Rosetta::Lyndon::to_string($_) } @$t3
 assert_eq join(",", @st3), "aab,aac,abb,abc,acb,acc,bbc,bcc", "Lyndon length-3 ternary"
 
 # Necklace counting formula: for n=4, k=2 → 3 (matches output above)
-assert_eq scalar(@$b4), 3, "ternary 3"
+assert_eq len(@$b4), 3, "ternary 3"
 
 # Empty alphabet edge: length n, k=1 — only "aaa...a" but that's not strictly Lyndon (it's a power).
 # Duval generates only proper Lyndon words; for k=1 the result is empty when n>1.
 my $k1n3 = Rosetta::Lyndon::generate(3, 1)
-assert_eq scalar(@$k1n3), 0, "k=1, n=3: no Lyndon words"
+assert_eq len(@$k1n3), 0, "k=1, n=3: no Lyndon words"
 
 # Each generated word's lex rotations are all >=
 fn Rosetta::Lyndon::is_strict_lyndon($word) {
-    my $n = scalar(@$word)
+    my $n = len(@$word)
     return 1 if $n == 1
     my $orig = join(",", @$word)
     for my $i (1..$n-1) {

@@ -12,7 +12,7 @@ fn Rosetta::CartesianProduct::compute($a_ref, $b_ref) {
 }
 
 my $p = Rosetta::CartesianProduct::compute([1, 2], ["a", "b"])
-assert_eq scalar(@$p), 4, "2x2 product has 4 elements"
+assert_eq len(@$p), 4, "2x2 product has 4 elements"
 assert_eq $p->[0][0], 1, "first element x"
 assert_eq $p->[0][1], "a", "first element y"
 assert_eq $p->[3][1], "b", "last element y"

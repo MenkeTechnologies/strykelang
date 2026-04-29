@@ -2,7 +2,7 @@
 # Rosetta Code: Equilibrium index
 
 fn Rosetta::EquilibriumIndex::sum_list(@list) {
-    if (scalar(@list) == 0) {
+    if (len(@list) == 0) {
         0
     } else {
         ~> @list reduce { _0 + _1 }
@@ -11,7 +11,7 @@ fn Rosetta::EquilibriumIndex::sum_list(@list) {
 
 fn Rosetta::EquilibriumIndex::solve(@arr) {
     my @res
-    my $n = scalar(@arr)
+    my $n = len(@arr)
     for my $i (0..$n-1) {
         my $ls = 0
         if ($i > 0) {

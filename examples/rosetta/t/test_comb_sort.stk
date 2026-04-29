@@ -3,7 +3,7 @@
 
 fn Rosetta::CombSort::sort($list) {
     my @arr = @$list
-    my $len = scalar(@arr)
+    my $len = len(@arr)
     my $gap = $len
     my $swapped = 1
     

@@ -73,18 +73,18 @@ assert_eq join("|", @flat), "1,2,3|4,5|6,7|8", "Wikipedia SCCs"
 # Single-node graph
 my $single = { "x" => [] }
 my $r1 = Rosetta::Tarjan::run($single)
-assert_eq scalar(@$r1), 1, "single node = 1 SCC"
+assert_eq len(@$r1), 1, "single node = 1 SCC"
 assert_eq $r1->[0]->[0], "x", "the node"
 
 # Disconnected pair: each its own SCC
 my $disc = { "a" => [], "b" => [] }
 my $r2 = Rosetta::Tarjan::run($disc)
-assert_eq scalar(@$r2), 2, "disconnected = 2 SCCs"
+assert_eq len(@$r2), 2, "disconnected = 2 SCCs"
 
 # Cycle of 4: one SCC of 4
 my $cycle = { "a" => ["b"], "b" => ["c"], "c" => ["d"], "d" => ["a"] }
 my $r3 = Rosetta::Tarjan::run($cycle)
-assert_eq scalar(@$r3), 1, "cycle = 1 SCC"
-assert_eq scalar(@{$r3->[0]}), 4, "cycle SCC has 4 members"
+assert_eq len(@$r3), 1, "cycle = 1 SCC"
+assert_eq len(@{$r3->[0]}), 4, "cycle SCC has 4 members"
 
 test_run

@@ -3,7 +3,7 @@
 
 fn Shoelace::algo_area($p) {
     my $sum = 0.0
-    my $n = scalar(@$p)
+    my $n = len(@$p)
     for my $i (0..$n-1) {
         my $j = ($i + 1) % $n
         $sum = $sum + $p->[$i]->[0] * $p->[$j]->[1]

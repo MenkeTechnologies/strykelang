@@ -32,7 +32,7 @@ fn Rosetta::Heapsort::heapify($arr, $count) {
 }
 
 fn Rosetta::Heapsort::sort($arr) {
-    my $count = scalar(@$arr)
+    my $count = len(@$arr)
     Rosetta::Heapsort::heapify($arr, $count)
     
     my $end = $count - 1

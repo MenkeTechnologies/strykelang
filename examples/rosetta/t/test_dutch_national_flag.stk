@@ -3,7 +3,7 @@
 
 fn Rosetta::DNF::sort($arr_ref) {
     my @arr = @$arr_ref
-    my ($low, $mid, $high) = (0, 0, scalar(@arr) - 1)
+    my ($low, $mid, $high) = (0, 0, len(@arr) - 1)
     while ($mid <= $high) {
         if ($arr[$mid] == 0) {
             ($arr[$low], $arr[$mid]) = ($arr[$mid], $arr[$low])

@@ -2,7 +2,7 @@
 # Rosetta Code: Perfect shuffle
 
 fn Rosetta::PerfectShuffle::shuffle($deck) {
-    my $len = scalar(@$deck)
+    my $len = len(@$deck)
     my $mid = int($len / 2)
     
     my @left = @{$deck}[0..$mid-1]

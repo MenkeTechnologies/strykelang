@@ -16,7 +16,7 @@ fn Rosetta::Kahn::sort($edges, $nodes) {
     }
     my @queue = grep { $in_deg{$_} == 0 } @$nodes
     my @order
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $u = shift @queue
         push @order, $u
         for my $v (@{$adj{$u}}) {
@@ -24,13 +24,13 @@ fn Rosetta::Kahn::sort($edges, $nodes) {
             push @queue, $v if $in_deg{$v} == 0
         }
     }
-    return undef if scalar(@order) != scalar(@$nodes)
+    return undef if len(@order) != len(@$nodes)
     \@order
 }
 
 fn Rosetta::Kahn::valid($order, $edges) {
     my %pos
-    for my $i (0..scalar(@$order)-1) { $pos{$order->[$i]} = $i }
+    for my $i (0..len(@$order)-1) { $pos{$order->[$i]} = $i }
     for my $e (@$edges) {
         return 0 if $pos{$e->[0]} >= $pos{$e->[1]}
     }
@@ -42,7 +42,7 @@ my $edges = [["A","B"], ["A","C"], ["B","D"], ["C","D"], ["D","E"], ["F","E"]]
 my $nodes = ["A","B","C","D","E","F"]
 my $order = Rosetta::Kahn::sort($edges, $nodes)
 assert_ok defined($order), "DAG has a topological order"
-assert_eq scalar(@$order), 6, "all 6 nodes in order"
+assert_eq len(@$order), 6, "all 6 nodes in order"
 assert_ok Rosetta::Kahn::valid($order, $edges), "every edge u->v has pos(u) < pos(v)"
 
 # Linear chain
@@ -56,7 +56,7 @@ assert_ok !defined($cyc), "cycle returns undef"
 # Already-isolated nodes (no edges) -> any permutation
 my $iso = Rosetta::Kahn::sort([], ["X","Y","Z"])
 assert_ok defined($iso), "no edges -> some order"
-assert_eq scalar(@$iso), 3, "all 3 nodes present"
+assert_eq len(@$iso), 3, "all 3 nodes present"
 
 # Self-loop -> cycle -> undef
 my $loop = Rosetta::Kahn::sort([["A","A"]], ["A"])

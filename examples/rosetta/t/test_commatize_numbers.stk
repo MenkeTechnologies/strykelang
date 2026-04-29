@@ -11,12 +11,12 @@ fn Rosetta::Commatize::insert($n) {
     }
     my @parts = split /\./, $s
     my $whole = $parts[0]
-    my $frac  = scalar(@parts) > 1 ? "." . $parts[1] : ""
+    my $frac  = len(@parts) > 1 ? "." . $parts[1] : ""
     # Walk reversed digits with a true digit count (chars skips split's empty boundaries).
     my @digits = $whole |> chars
     my @rev = reverse(@digits)
     my @grouped
-    for my $i (0 .. scalar(@rev) - 1) {
+    for my $i (0 .. len(@rev) - 1) {
         push @grouped, "," if $i > 0 && $i % 3 == 0
         push @grouped, $rev[$i]
     }

@@ -2,7 +2,7 @@
 # Rosetta Code: Fenwick tree
 
 fn Rosetta::Fenwick::update($tree, $idx, $val) {
-    my $n = scalar(@$tree) - 1
+    my $n = len(@$tree) - 1
     $idx++ # 1-based internal
     while ($idx <= $n) {
         $tree->[$idx] += $val

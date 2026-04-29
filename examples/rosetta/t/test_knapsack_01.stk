@@ -2,7 +2,7 @@
 # Rosetta Code: Knapsack problem/0-1
 
 fn Rosetta::Knapsack01::solve($items, $capacity) {
-    my $n = scalar(@$items)
+    my $n = len(@$items)
     my @dp
     # Initialize DP table
     for (my $i = 0; $i <= $n; $i++) {

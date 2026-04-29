@@ -22,7 +22,7 @@ assert_eq join(",", @$r2), "1,2,3,4", "disjoint -> union"
 
 # Identical sets — empty result
 my $r3 = Rosetta::SymDiff::compute([1, 2, 3], [1, 2, 3])
-assert_eq scalar(@$r3), 0, "identical -> empty"
+assert_eq len(@$r3), 0, "identical -> empty"
 
 # A subset of B
 my $r4 = Rosetta::SymDiff::compute([2, 3], [1, 2, 3, 4])

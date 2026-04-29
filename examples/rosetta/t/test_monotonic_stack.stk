@@ -2,11 +2,11 @@
 # Rosetta Code: Monotonic stack — next greater element to the right
 
 fn Rosetta::MonoStack::next_greater($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     my @result = (-1) x $n
     my @stack
     for my $i (0..$n - 1) {
-        while (scalar(@stack) > 0 && $arr->[$stack[-1]] < $arr->[$i]) {
+        while (len(@stack) > 0 && $arr->[$stack[-1]] < $arr->[$i]) {
             my $idx = pop @stack
             $result[$idx] = $arr->[$i]
         }
@@ -16,14 +16,14 @@ fn Rosetta::MonoStack::next_greater($arr) {
 }
 
 fn Rosetta::MonoStack::previous_smaller($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     my @result = (-1) x $n
     my @stack
     for my $i (0..$n - 1) {
-        while (scalar(@stack) > 0 && $arr->[$stack[-1]] >= $arr->[$i]) {
+        while (len(@stack) > 0 && $arr->[$stack[-1]] >= $arr->[$i]) {
             pop @stack
         }
-        $result[$i] = scalar(@stack) > 0 ? $arr->[$stack[-1]] : -1
+        $result[$i] = len(@stack) > 0 ? $arr->[$stack[-1]] : -1
         push @stack, $i
     }
     \@result
@@ -47,7 +47,7 @@ assert_eq join(",", @$solo), "-1", "single -> -1"
 
 # Empty
 my $empty = Rosetta::MonoStack::next_greater([])
-assert_eq scalar(@$empty), 0, "empty -> empty"
+assert_eq len(@$empty), 0, "empty -> empty"
 
 # Previous smaller
 my $ps = Rosetta::MonoStack::previous_smaller([3, 1, 4, 1, 5, 9, 2, 6])

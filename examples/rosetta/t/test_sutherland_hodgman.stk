@@ -46,7 +46,7 @@ my $result = Rosetta::SutherlandHodgman::clip($subject, $clip)
 
 # Result should be a polygon with clipped vertices.
 # We'll check the count and a few points.
-assert_eq scalar(@$result), 10, "Clipped polygon vertex count"
+assert_eq len(@$result), 10, "Clipped polygon vertex count"
 
 # Check if all points are within [100, 300]
 for my $p (@$result) {

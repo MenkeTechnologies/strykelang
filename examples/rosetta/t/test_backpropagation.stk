@@ -17,7 +17,7 @@ fn Rosetta::Backprop::train($data, $labels, $learning_rate, $epochs) {
     my @b_o = rand()
     
     for (my $e = 0; $e < $epochs; $e++) {
-        for (my $i = 0; $i < scalar(@$data); $i++) {
+        for (my $i = 0; $i < len(@$data); $i++) {
             my $x = $data->[$i]
             my $y = $labels->[$i]
             

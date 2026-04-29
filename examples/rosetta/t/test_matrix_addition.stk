@@ -4,8 +4,8 @@
 fn Rosetta::MatrixAdd::matrix_add {
     my $m1 = $_[0]
     my $m2 = $_[1]
-    my $rows = scalar(@$m1)
-    my $cols = scalar(@{$m1->[0]})
+    my $rows = len(@$m1)
+    my $cols = len(@{$m1->[0]})
     my @res = ~> 0..$rows-1 map {
         my $i = $_
         my @row = map {

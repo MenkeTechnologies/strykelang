@@ -27,12 +27,11 @@ fn Rosetta::Friendly::groups($n) {
     for my $i (1..$n) {
         my $idx = Rosetta::Friendly::abundancy($i)
         my $key = "$idx->[0]/$idx->[1]"
-        $by_idx{$key} = [] unless exists $by_idx{$key}
         push @{$by_idx{$key}}, $i
     }
     my %big
     for my $k (keys %by_idx) {
-        $big{$k} = $by_idx{$k} if scalar(@{$by_idx{$k}}) > 1
+        $big{$k} = $by_idx{$k} if len(@{$by_idx{$k}}) > 1
     }
     \%big
 }

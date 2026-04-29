@@ -12,10 +12,10 @@ fn Rosetta::AStarManual::solve($start, $goal, $grid) {
     $g_score{$sk} = 0
     $f_score{$sk} = Rosetta::AStarManual::dist($start, $goal)
     
-    while (scalar(@open) > 0) {
+    while (len(@open) > 0) {
         # Find node in open with lowest f_score
         my $mi = 0
-        for my $i (1..scalar(@open)-1) {
+        for my $i (1..len(@open)-1) {
             my $ki = join(",", @{$open[$i]})
             my $kmi = join(",", @{$open[$mi]})
             if ($f_score{$ki} < $f_score{$kmi}) { $mi = $i }
@@ -63,6 +63,6 @@ my $grid = [
 
 my $path = Rosetta::AStarManual::solve([0,0], [4,4], $grid)
 assert_ok defined($path), "A* path found"
-assert_eq scalar(@$path), 9, "A* path length is 9"
+assert_eq len(@$path), 9, "A* path length is 9"
 
 test_run

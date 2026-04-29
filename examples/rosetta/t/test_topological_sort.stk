@@ -19,7 +19,7 @@ fn Rosetta::TopologicalSort::topological_sort($graph) {
     }
     
     my @sorted = ()
-    while (scalar(@queue) > 0) {
+    while (len(@queue) > 0) {
         my $u = shift @queue
         push @sorted, $u
         for my $v (@{$graph->{$u}}) {
@@ -28,7 +28,7 @@ fn Rosetta::TopologicalSort::topological_sort($graph) {
         }
     }
     
-    if (scalar(@sorted) != scalar(@nodes)) {
+    if (len(@sorted) != len(@nodes)) {
         return undef # Cycle detected
     }
     \@sorted
@@ -48,7 +48,7 @@ assert_ok defined($res), "Topological sort exists"
 
 # Verify order
 my %pos
-for my $i (0..scalar(@$res)-1) { $pos{$res->[$i]} = $i }
+for my $i (0..len(@$res)-1) { $pos{$res->[$i]} = $i }
 assert_ok $pos{A} < $pos{C}, "A < C"
 assert_ok $pos{B} < $pos{C}, "B < C"
 assert_ok $pos{C} < $pos{E}, "C < E"

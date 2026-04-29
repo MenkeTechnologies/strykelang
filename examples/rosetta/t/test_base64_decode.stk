@@ -10,7 +10,7 @@ fn Rosetta::Base64Decode::custom($str) {
     my @chars = $str |> chars
     my @res
     my $i = 0
-    my $len = scalar(@chars)
+    my $len = len(@chars)
     while ($i < $len) {
         if ($chars[$i] eq "=") { last }
         

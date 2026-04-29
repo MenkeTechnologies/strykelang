@@ -4,7 +4,7 @@
 fn Rosetta::DNAMutation::mutate($dna, $prob) {
     my @bases = ("A", "C", "G", "T")
     my @seq = ~> $dna chars
-    for my $i (0..scalar(@seq)-1) {
+    for my $i (0..len(@seq)-1) {
         if (rand() < $prob) {
             my $new_base = $bases[int(rand(4))]
             $seq[$i] = $new_base

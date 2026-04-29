@@ -23,7 +23,7 @@ fn Rosetta::HeapSort::sift_down($arr_ref, $start, $end) {
 }
 
 fn Rosetta::HeapSort::heapify($arr_ref) {
-    my $count = scalar(@$arr_ref)
+    my $count = len(@$arr_ref)
     my $start = int(($count - 2) / 2)
     while ($start >= 0) {
         Rosetta::HeapSort::sift_down($arr_ref, $start, $count - 1)
@@ -33,7 +33,7 @@ fn Rosetta::HeapSort::heapify($arr_ref) {
 
 fn Rosetta::HeapSort::sort($list) {
     my @arr = @$list
-    my $count = scalar(@arr)
+    my $count = len(@arr)
     if ($count < 2) { return \@arr }
     
     Rosetta::HeapSort::heapify(\@arr)

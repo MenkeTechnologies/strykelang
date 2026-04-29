@@ -16,7 +16,7 @@ fn Rosetta::FloydTriangle::generate($n) {
 }
 
 my $res = Rosetta::FloydTriangle::generate(5)
-assert_eq scalar(@$res), 5, "5 rows"
+assert_eq len(@$res), 5, "5 rows"
 assert_eq join(",", @{$res->[0]}), "1", "row 1"
 assert_eq join(",", @{$res->[1]}), "2,3", "row 2"
 assert_eq join(",", @{$res->[4]}), "11,12,13,14,15", "row 5"

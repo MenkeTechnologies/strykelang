@@ -5,7 +5,7 @@ fn Rosetta::CosineSimilarity::compute($v1, $v2) {
     my $dot = 0
     my $mag1 = 0
     my $mag2 = 0
-    for my $i (0..scalar(@$v1)-1) {
+    for my $i (0..len(@$v1)-1) {
         $dot += $v1->[$i] * $v2->[$i]
         $mag1 += $v1->[$i] ** 2
         $mag2 += $v2->[$i] ** 2

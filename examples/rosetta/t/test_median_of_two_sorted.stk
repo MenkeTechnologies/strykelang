@@ -2,13 +2,13 @@
 # Rosetta Code: Median of two sorted arrays — O(log min(m,n)) binary search
 
 fn Rosetta::Median2::find($a, $b) {
-    if (scalar(@$a) > scalar(@$b)) {
+    if (len(@$a) > len(@$b)) {
         my $tmp = $a
         $a = $b
         $b = $tmp
     }
-    my $m = scalar(@$a)
-    my $n = scalar(@$b)
+    my $m = len(@$a)
+    my $n = len(@$b)
     my $half = int(($m + $n + 1) / 2)
     my $lo = 0
     my $hi = $m

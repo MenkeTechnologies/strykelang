@@ -8,7 +8,7 @@ fn Rosetta::Kolakoski::gen($n) {
     
     my @res = (1, 2, 2)
     my $p = 2
-    while (scalar(@res) < $n) {
+    while (len(@res) < $n) {
         my $val = $res[-1] == 1 ? 2 : 1
         my $count = $res[$p++]
         for (my $i = 0; $i < $count; $i++) {

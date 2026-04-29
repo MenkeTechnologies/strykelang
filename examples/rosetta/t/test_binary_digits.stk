@@ -29,7 +29,7 @@ fn Rosetta::BinaryDigits::decode($s) {
 fn Rosetta::BinaryDigits::count_ones($n) {
     my $bin = Rosetta::BinaryDigits::encode($n)
     my @ones = grep { $_ eq "1" } chars($bin)
-    scalar(@ones)
+    len(@ones)
 }
 
 assert_eq Rosetta::BinaryDigits::encode(0), "0", "binary 0"

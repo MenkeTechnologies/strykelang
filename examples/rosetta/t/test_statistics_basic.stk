@@ -2,17 +2,17 @@
 # Rosetta Code: Statistics/Basic
 
 fn Rosetta::Statistics::mean(@nums) {
-    if (scalar(@nums) == 0) {
+    if (len(@nums) == 0) {
         0
     } else {
         my $sum = 0
         for my $x (@nums) { $sum += $x }
-        $sum / scalar(@nums)
+        $sum / len(@nums)
     }
 }
 
 fn Rosetta::Statistics::variance(@nums) {
-    if (scalar(@nums) < 1) {
+    if (len(@nums) < 1) {
         0
     } else {
         my $m = Rosetta::Statistics::mean(@nums)
@@ -21,7 +21,7 @@ fn Rosetta::Statistics::variance(@nums) {
             my $diff = $x - $m
             $sum_sq_diff += $diff * $diff
         }
-        $sum_sq_diff / scalar(@nums)
+        $sum_sq_diff / len(@nums)
     }
 }
 

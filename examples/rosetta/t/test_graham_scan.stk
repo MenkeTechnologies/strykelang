@@ -6,7 +6,7 @@ fn Rosetta::Graham::cross($o, $u, $v) {
 }
 
 fn Rosetta::Graham::hull($points) {
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     return [@$points] if $n < 3
 
     # Pivot: lowest y, then lowest x
@@ -35,7 +35,7 @@ fn Rosetta::Graham::hull($points) {
 
     my @stack = ([$px, $py])
     for my $pt (@sorted) {
-        while (scalar(@stack) >= 2
+        while (len(@stack) >= 2
                 && Rosetta::Graham::cross($stack[-2], $stack[-1], $pt) <= 0) {
             pop @stack
         }
@@ -52,10 +52,10 @@ assert_eq $sorted, "0,0|0,3|3,0|3,3", "Graham hull of 7 pts = 4 corners"
 
 my $tri = [[0,0], [4,0], [2,3], [2,1]]
 my $h2 = Rosetta::Graham::hull($tri)
-assert_eq scalar(@$h2), 3, "triangle hull = 3 vertices"
+assert_eq len(@$h2), 3, "triangle hull = 3 vertices"
 
 my $tiny = [[0,0], [1,1]]
 my $h3 = Rosetta::Graham::hull($tiny)
-assert_eq scalar(@$h3), 2, "two points: returned as-is"
+assert_eq len(@$h3), 2, "two points: returned as-is"
 
 test_run

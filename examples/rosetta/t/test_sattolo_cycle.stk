@@ -4,7 +4,7 @@
 
 fn Rosetta::Sattolo::shuffle($arr) {
     my @a = @$arr
-    my $n = scalar(@a)
+    my $n = len(@a)
     for (my $i = $n - 1; $i > 0; $i -= 1) {
         my $j = int(rand($i))      # 0 <= j < i  (strict, never j == i)
         my $tmp = $a[$i]
@@ -17,7 +17,7 @@ fn Rosetta::Sattolo::shuffle($arr) {
 # Length is preserved
 my @input = (1..10)
 my $out = Rosetta::Sattolo::shuffle(\@input)
-assert_eq scalar(@$out), 10, "length preserved"
+assert_eq len(@$out), 10, "length preserved"
 
 # Same multiset
 my @sorted_in  = sort { _0 <=> _1 } @input
@@ -35,7 +35,7 @@ assert_eq $any_fixed, 0, "Sattolo: no fixed points"
 # we should visit all n positions before returning to 0.
 fn Rosetta::Sattolo::cycle_length($perm, $orig) {
     my %pos
-    for my $i (0..scalar(@$orig)-1) { $pos{$orig->[$i]} = $i }
+    for my $i (0..len(@$orig)-1) { $pos{$orig->[$i]} = $i }
     my $start = $perm->[0]
     my $count = 1
     my $cur   = $start

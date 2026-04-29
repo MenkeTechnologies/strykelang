@@ -18,7 +18,7 @@ fn Rosetta::Carmichael::get_factors($n) {
 fn Rosetta::Carmichael::check($n) {
     my $factors_ref = Rosetta::Carmichael::get_factors($n)
     my @factors = @$factors_ref
-    if (scalar(@factors) < 2) {
+    if (len(@factors) < 2) {
         0
     } else {
         # Check if square-free

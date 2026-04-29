@@ -3,7 +3,7 @@
 
 fn Rosetta::TwoSum::find($arr, $target) {
     my %seen
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     for my $i (0..$n-1) {
         my $need = $target - $arr->[$i]
         if (exists $seen{$need}) {

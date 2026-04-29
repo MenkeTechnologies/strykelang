@@ -50,7 +50,7 @@ fn Rosetta::Kosaraju::solve($graph) {
     # 3. Second DFS
     my $visited2 = {}
     my @sccs
-    while (scalar(@$stack) > 0) {
+    while (len(@$stack) > 0) {
         my $node = pop @$stack
         if (!exists $visited2->{$node}) {
             my $component = []
@@ -78,7 +78,7 @@ my $graph = {
 my $sccs = Rosetta::Kosaraju::solve($graph)
 my @scc_strs = ~> @$sccs map { join(",", @$_) }
 
-assert_eq scalar(@scc_strs), 2, "Found 2 SCCs"
+assert_eq len(@scc_strs), 2, "Found 2 SCCs"
 assert_eq $scc_strs[0], "A,B,C", "SCC 1 is A,B,C"
 assert_eq $scc_strs[1], "D,E,F", "SCC 2 is D,E,F"
 

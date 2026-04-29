@@ -4,17 +4,17 @@
 
 fn Rosetta::PythMean::arithmetic(@xs) {
     my $sum = ~> @xs reduce { $_0 + $_1 }
-    $sum / scalar(@xs)
+    $sum / len(@xs)
 }
 
 fn Rosetta::PythMean::geometric(@xs) {
     my $prod = ~> @xs reduce { $_0 * $_1 }
-    $prod ** (1.0 / scalar(@xs))
+    $prod ** (1.0 / len(@xs))
 }
 
 fn Rosetta::PythMean::harmonic(@xs) {
     my $recip_sum = ~> @xs map { 1.0 / $_ } reduce { $_0 + $_1 }
-    scalar(@xs) / $recip_sum
+    len(@xs) / $recip_sum
 }
 
 my @nums = 1:10

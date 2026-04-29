@@ -6,7 +6,7 @@ fn Rosetta::Jarvis::cross($o, $u, $v) {
 }
 
 fn Rosetta::Jarvis::hull($points) {
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     return [@$points] if $n < 3
 
     my $start = 0
@@ -44,10 +44,10 @@ assert_eq $sorted, "0,0|0,3|3,0|3,3", "convex hull of square+interior = 4 corner
 
 my $tri = [[0,0], [4,0], [2,3], [2,1]]
 my $h2 = Rosetta::Jarvis::hull($tri)
-assert_eq scalar(@$h2), 3, "triangle hull excludes interior point"
+assert_eq len(@$h2), 3, "triangle hull excludes interior point"
 
 my $small = [[0,0], [1,0]]
 my $h3 = Rosetta::Jarvis::hull($small)
-assert_eq scalar(@$h3), 2, "two points: hull is themselves"
+assert_eq len(@$h3), 2, "two points: hull is themselves"
 
 test_run

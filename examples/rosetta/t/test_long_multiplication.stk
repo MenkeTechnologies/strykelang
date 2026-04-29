@@ -17,8 +17,8 @@ fn Rosetta::LongMul::multiply($_0, $_1) {
     my $sb = "$_1"
     my $da = Rosetta::LongMul::digits($sa)
     my $db = Rosetta::LongMul::digits($sb)
-    my $la = scalar(@$da)
-    my $lb = scalar(@$db)
+    my $la = len(@$da)
+    my $lb = len(@$db)
     my @prod
     for my $i (0 .. $la + $lb - 1) { $prod[$i] = 0 }
     for my $i (0 .. $la - 1) {
@@ -28,7 +28,7 @@ fn Rosetta::LongMul::multiply($_0, $_1) {
             $prod[$i + $j] = $prod[$i + $j] % 10
         }
     }
-    while (scalar(@prod) > 1 && $prod[-1] == 0) { pop @prod }
+    while (len(@prod) > 1 && $prod[-1] == 0) { pop @prod }
     join("", reverse(@prod))
 }
 

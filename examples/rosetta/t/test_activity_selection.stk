@@ -27,16 +27,16 @@ assert_eq $sig, "1,4|5,7|8,11|12,16", "CLRS activity selection (4 chosen)"
 
 # Empty input
 my $empty = Rosetta::Activity::select([])
-assert_eq scalar(@$empty), 0, "empty -> empty"
+assert_eq len(@$empty), 0, "empty -> empty"
 
 # All overlapping -> first only
 my $overlap = [[0, 10], [1, 9], [2, 8]]
 my $only = Rosetta::Activity::select($overlap)
-assert_eq scalar(@$only), 1, "all overlap -> 1 chosen"
+assert_eq len(@$only), 1, "all overlap -> 1 chosen"
 assert_eq $only->[0][1], 8, "earliest-finish (8) wins"
 
 # 3 disjoint -> all 3
 my $disjoint = Rosetta::Activity::select([[1,2], [2,3], [3,4]])
-assert_eq scalar(@$disjoint), 3, "3 disjoint -> all 3"
+assert_eq len(@$disjoint), 3, "3 disjoint -> all 3"
 
 test_run

@@ -9,7 +9,7 @@ fn Rosetta::WaterJug::solve($cap_a, $cap_b, $target) {
     my @queue = ([0, 0])
     my %visited = ("0,0" => 1)
     my %parent
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $state = shift @queue
         my ($a, $b) = ($state->[0], $state->[1])
         if ($a == $target || $b == $target) {
@@ -50,7 +50,7 @@ assert_eq $path->[0][1], 0, "starts at (0,0) -> b"
 my $last = $path->[-1]
 assert_ok($last->[0] == 4 || $last->[1] == 4, "last state contains target 4")
 # Optimal length: 7 states (6 moves) for the classic 5/3/4 puzzle
-assert_eq scalar(@$path), 7, "shortest path length 7"
+assert_eq len(@$path), 7, "shortest path length 7"
 
 # Impossible: target larger than both jugs
 my $imp = Rosetta::WaterJug::solve(3, 5, 7)
@@ -58,7 +58,7 @@ assert_ok !defined($imp), "target > both -> undef"
 
 # Trivial: target 0
 my $zero = Rosetta::WaterJug::solve(3, 5, 0)
-assert_eq scalar(@$zero), 0, "target 0 -> empty path"
+assert_eq len(@$zero), 0, "target 0 -> empty path"
 
 # (4, 9) target 6 -> classic
 my $p2 = Rosetta::WaterJug::solve(4, 9, 6)

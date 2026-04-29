@@ -4,9 +4,9 @@
 
 fn Rosetta::TrianglePath::max_sum($triangle) {
     my @rows = map { [@$_] } @$triangle
-    my $n = scalar(@rows)
+    my $n = len(@rows)
     for (my $i = $n - 2; $i >= 0; $i -= 1) {
-        my $rlen = scalar(@{$rows[$i]})
+        my $rlen = len(@{$rows[$i]})
         for my $j (0..$rlen-1) {
             my $a = $rows[$i+1][$j]
             my $b = $rows[$i+1][$j+1]

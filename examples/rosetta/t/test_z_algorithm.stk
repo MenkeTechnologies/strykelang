@@ -3,7 +3,7 @@
 
 fn Rosetta::ZAlgorithm::compute($s) {
     my @chars = chars($s)
-    my $n = scalar(@chars)
+    my $n = len(@chars)
     my @z = ~> 0:$n-1 map { 0 }
     my ($l, $r) = (0, 0)
     
@@ -28,7 +28,7 @@ fn Rosetta::ZAlgorithm::search($text, $pattern) {
     my $z = Rosetta::ZAlgorithm::compute($concat)
     my $plen = length($pattern)
     my @indices
-    for (my $i = 0; $i < scalar(@$z); $i++) {
+    for (my $i = 0; $i < len(@$z); $i++) {
         if ($z->[$i] == $plen) {
             push @indices, $i - $plen - 1
         }

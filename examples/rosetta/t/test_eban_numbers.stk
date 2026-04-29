@@ -46,7 +46,7 @@ assert_eq join(",", @under_100),
 my @under_1000 = Rosetta::Eban::list(1, 999)
 # Same set as under 100 — there are NO eban numbers in [100..999] because every
 # hundreds-name contains "hundred", which contains 'e'.
-assert_eq scalar(@under_1000), 19, "still 19 eban numbers under 1000"
+assert_eq len(@under_1000), 19, "still 19 eban numbers under 1000"
 
 assert_ok Rosetta::Eban::is_eban(2),  "2 is eban"
 assert_ok Rosetta::Eban::is_eban(66), "66 is eban"

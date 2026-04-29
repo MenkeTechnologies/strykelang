@@ -51,7 +51,7 @@ if (Rosetta::Solve::solve($grid)) {
             $row{$grid->[$i]->[$j]} = 1
             $col{$grid->[$j]->[$i]} = 1
         }
-        if (scalar(keys %row) != 4 || scalar(keys %col) != 4) { $ok = 0 }
+        if (len(keys %row) != 4 || len(keys %col) != 4) { $ok = 0 }
     }
     assert_ok $ok, "Sudoku 4x4 solved correctly"
 } else {

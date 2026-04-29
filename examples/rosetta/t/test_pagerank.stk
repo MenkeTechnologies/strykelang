@@ -11,14 +11,14 @@ fn Rosetta::PageRank::solve($links, $d, $epsilon) {
     }
     
     my @all_pages = keys %pages
-    my $n = scalar(@all_pages)
+    my $n = len(@all_pages)
     my %pr
     for my $p (@all_pages) { $pr{$p} = 1.0 / $n }
     
     my %out_degree
     for my $p (@all_pages) { $out_degree{$p} = 0 }
     for my $u (keys %$links) {
-        $out_degree{$u} = scalar(@{$links->{$u}})
+        $out_degree{$u} = len(@{$links->{$u}})
     }
     
     while (1) {

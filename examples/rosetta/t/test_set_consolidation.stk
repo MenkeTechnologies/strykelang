@@ -11,16 +11,16 @@ fn Rosetta::Consolidate::consolidate($list) {
     while ($changed) {
         $changed = 0
         my @res
-        for my $i (0..scalar(@sets)-1) {
+        for my $i (0..len(@sets)-1) {
             my $s = $sets[$i]
             next unless defined $s
-            for my $j ($i+1..scalar(@sets)-1) {
+            for my $j ($i+1..len(@sets)-1) {
                 my $t = $sets[$j]
                 next unless defined $t
                 
                 # Manual intersection check
                 my $intersect = $s & $t
-                if (scalar($intersect->values) > 0) {
+                if (len($intersect->values) > 0) {
                     $sets[$i] = $s | $t
                     $s = $sets[$i]
                     $sets[$j] = undef
@@ -40,11 +40,11 @@ fn Rosetta::Consolidate::consolidate($list) {
 my @input = ([1, 2], [3, 4], [2, 3])
 my $res = Rosetta::Consolidate::consolidate(\@input)
 # Expected: {1, 2, 3, 4}
-assert_eq scalar(@$res), 1, "consolidated to 1 set"
-assert_eq scalar($res->[0]->values), 4, "consolidated set size 4"
+assert_eq len(@$res), 1, "consolidated to 1 set"
+assert_eq len($res->[0]->values), 4, "consolidated set size 4"
 
 my @input2 = ([1, 2], [3, 4], [5, 6])
 my $res2 = Rosetta::Consolidate::consolidate(\@input2)
-assert_eq scalar(@$res2), 3, "consolidated to 3 sets"
+assert_eq len(@$res2), 3, "consolidated to 3 sets"
 
 test_run

@@ -3,7 +3,7 @@
 
 fn Rosetta::GraphDegree::get($adj, $node) {
     if (!exists $adj->{$node}) { return 0 }
-    scalar(@{$adj->{$node}})
+    len(@{$adj->{$node}})
 }
 
 my $graph = {

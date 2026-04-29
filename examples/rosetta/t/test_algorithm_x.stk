@@ -10,7 +10,7 @@ fn Rosetta::AlgorithmX::check($rows_ref, $num_cols) {
             $seen{$col} = 1
         }
     }
-    scalar(keys %seen) == $num_cols
+    len(keys %seen) == $num_cols
 }
 
 my @r1 = (0, 1)

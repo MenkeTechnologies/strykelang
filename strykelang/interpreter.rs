@@ -14005,9 +14005,47 @@ impl Interpreter {
             kind: Sigil::Array,
         } = &e.kind
         {
-            return Ok(Some(self.eval_expr(inner)?));
+            return Ok(Some(self.eval_or_autoviv_array_ref(inner)?));
         }
         Ok(None)
+    }
+
+    /// Evaluate `inner` and return an array ref, auto-vivifying when the result is undef
+    /// and `inner` denotes a writable lvalue (scalar var, hash element, array element).
+    /// Mirrors Perl 5: `push @{$h{k}}, $x` creates `$h{k}` as an arrayref on demand.
+    fn eval_or_autoviv_array_ref(
+        &mut self,
+        inner: &Expr,
+    ) -> Result<PerlValue, FlowOrError> {
+        let line = inner.line;
+        let val = self.eval_expr(inner)?;
+        if !val.is_undef() {
+            return Ok(val);
+        }
+        let new_ref = PerlValue::array_ref(Arc::new(RwLock::new(Vec::new())));
+        match &inner.kind {
+            ExprKind::ScalarVar(name) => {
+                self.scope
+                    .set_scalar(name, new_ref.clone())
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                Ok(new_ref)
+            }
+            ExprKind::HashElement { hash, key } => {
+                let k = self.eval_expr(key)?.to_string();
+                self.scope
+                    .set_hash_element(hash, &k, new_ref.clone())
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                Ok(new_ref)
+            }
+            ExprKind::ArrayElement { array, index } => {
+                let i = self.eval_expr(index)?.to_int();
+                self.scope
+                    .set_array_element(array, i, new_ref.clone())
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                Ok(new_ref)
+            }
+            _ => Ok(val),
+        }
     }
 
     /// Current package (`main` when `__PACKAGE__` is unset or empty).

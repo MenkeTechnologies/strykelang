@@ -6,7 +6,7 @@ fn Rosetta::ElementaryCellularAutomaton::solve($rule, $initial, $steps) {
     my @results = (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
     
     for (1..$steps-1) {
-        my $len = scalar(@$curr)
+        my $len = len(@$curr)
         my $prev_gen = $curr
         $curr = [ map {
             my $i = $_

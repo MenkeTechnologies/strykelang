@@ -22,7 +22,7 @@ fn Rosetta::LongestPathDAG::solve($nodes, $edges) {
     }
     
     my @topo
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $u = shift @queue
         push @topo, $u
         for my $edge (@{$adj{$u}}) {

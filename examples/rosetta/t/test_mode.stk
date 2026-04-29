@@ -3,7 +3,7 @@
 
 fn Rosetta::Mode::compute($list) {
     my $result
-    if (scalar(@$list) == 0) {
+    if (len(@$list) == 0) {
         $result = []
     } else {
         my %counts

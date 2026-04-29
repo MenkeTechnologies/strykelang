@@ -21,7 +21,7 @@ assert_eq join(",", @t), "1,3,6,10,15", "cumulative 1..5 → triangular"
 # Empty input → empty.
 my @empty_input = ()
 my @e = Rosetta::Running::total(@empty_input)
-assert_eq scalar(@e), 0, "empty input"
+assert_eq len(@e), 0, "empty input"
 
 # Single element passes through.
 my @s = Rosetta::Running::total(42)

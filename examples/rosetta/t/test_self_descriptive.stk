@@ -4,7 +4,7 @@
 fn Rosetta::SelfDescriptive::check($n) {
     my $s = str($n)
     my @chars = split //, $s
-    my $len = scalar(@chars)
+    my $len = len(@chars)
 
     for my $i (0..$len-1) {
         my $digit_at_pos_i = int(substr($s, $i, 1))

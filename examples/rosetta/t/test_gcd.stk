@@ -11,7 +11,7 @@ fn Rosetta::GCD::compute($a, $b) {
 
 # gcd of multiple numbers
 fn Rosetta::GCD::multi(@nums) {
-    if (scalar(@nums) == 0) { return 0 }
+    if (len(@nums) == 0) { return 0 }
     my $res = shift @nums
     for my $n (@nums) {
         $res = Rosetta::GCD::compute($res, $n)

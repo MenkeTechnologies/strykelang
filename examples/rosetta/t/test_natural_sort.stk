@@ -22,7 +22,7 @@ fn Rosetta::NatSort::tokens($s) {
 fn Rosetta::NatSort::compare($_0, $_1) {
     my $ta = Rosetta::NatSort::tokens($_0)
     my $tb = Rosetta::NatSort::tokens($_1)
-    my $len = scalar(@$ta) < scalar(@$tb) ? scalar(@$ta) : scalar(@$tb)
+    my $len = len(@$ta) < len(@$tb) ? len(@$ta) : len(@$tb)
     for my $i (0 .. $len - 1) {
         my ($va, $ka) = ($ta->[$i][0], $ta->[$i][1])
         my ($vb, $kb) = ($tb->[$i][0], $tb->[$i][1])
@@ -34,7 +34,7 @@ fn Rosetta::NatSort::compare($_0, $_1) {
             return $c if $c != 0
         }
     }
-    scalar(@$ta) <=> scalar(@$tb)
+    len(@$ta) <=> len(@$tb)
 }
 
 fn Rosetta::NatSort::sort(@xs) {

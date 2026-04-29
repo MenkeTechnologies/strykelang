@@ -3,7 +3,7 @@
 
 fn Rosetta::KMeans::distance($p1, $p2) {
     my $sum = 0
-    for (my $i = 0; $i < scalar(@$p1); $i++) {
+    for (my $i = 0; $i < len(@$p1); $i++) {
         my $diff = $p1->[$i] - $p2->[$i]
         $sum += $diff * $diff
     }
@@ -13,7 +13,7 @@ fn Rosetta::KMeans::distance($p1, $p2) {
 fn Rosetta::KMeans::solve($points, $k, $max_iters) {
     # Initialize centroids (pick distant points for stability in this small example)
     my @centroids = ([@{$points->[0]}], [@{$points->[3]}])
-    my $n = scalar(@$points)
+    my $n = len(@$points)
     my @assignments = ~> 0..$n-1 map { -1 }
     
     for (1..$max_iters) {
@@ -44,12 +44,12 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
         
         # Update step
         my @counts = map { 0 } 0..$k-1
-        my @sums = map { [ map { 0 } 0..scalar(@{$points->[0]})-1 ] } 0..$k-1
+        my @sums = map { [ map { 0 } 0..len(@{$points->[0]})-1 ] } 0..$k-1
         
         for (my $i = 0; $i < $n; $i++) {
             my $c_idx = $assignments[$i]
             $counts[$c_idx]++
-            for (my $d = 0; $d < scalar(@{$points->[0]}); $d++) {
+            for (my $d = 0; $d < len(@{$points->[0]}); $d++) {
                 $sums[$c_idx]->[$d] += $points->[$i]->[$d]
             }
         }
@@ -57,7 +57,7 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
         for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
             if ($counts[$c_idx] > 0) {
                 my @new_c
-                for (my $d = 0; $d < scalar(@{$points->[0]}); $d++) {
+                for (my $d = 0; $d < len(@{$points->[0]}); $d++) {
                     push @new_c, $sums[$c_idx]->[$d] / $counts[$c_idx]
                 }
                 $centroids[$c_idx] = \@new_c

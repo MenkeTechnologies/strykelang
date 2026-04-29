@@ -3,7 +3,7 @@
 
 fn Rosetta::EuclideanDistance::compute($v1, $v2) {
     my $sum_sq = 0
-    for my $i (0..scalar(@$v1)-1) {
+    for my $i (0..len(@$v1)-1) {
         $sum_sq += ($v1->[$i] - $v2->[$i]) ** 2
     }
     sqrt($sum_sq)

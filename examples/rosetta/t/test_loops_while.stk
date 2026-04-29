@@ -24,7 +24,7 @@ fn Rosetta::LoopsWhile::demo() {
     "3. Process array elements:" |> p
     my @items = ("first", "second", "third")
     my $index = 0
-    while ($index < scalar(@items)) {
+    while ($index < len(@items)) {
         "   Item $index: $items[$index]" |> p
         $index++
     }

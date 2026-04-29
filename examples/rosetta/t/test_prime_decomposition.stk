@@ -20,7 +20,7 @@ fn is_prime_via_factors($n) {
         0
     } else {
         my @f = Rosetta::PrimeFactors::prime_factors($n)
-        scalar(@f) == 1 && $f[0] == $n
+        len(@f) == 1 && $f[0] == $n
     }
 }
 
@@ -34,7 +34,7 @@ my @f17 = Rosetta::PrimeFactors::prime_factors(17)
 assert_eq join("*", @f17), "17", "17 is prime"
 
 my @f1 = Rosetta::PrimeFactors::prime_factors(1)
-assert_eq scalar(@f1), 0, "1 has no prime factors"
+assert_eq len(@f1), 0, "1 has no prime factors"
 
 my @f84 = Rosetta::PrimeFactors::prime_factors(84)
 assert_eq join("*", @f84), "2*2*3*7", "84 = 2*2*3*7"

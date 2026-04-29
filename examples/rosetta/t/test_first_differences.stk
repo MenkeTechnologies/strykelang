@@ -8,9 +8,9 @@
 # needs `(map - (rest xs) xs)`. Stryke needs `_ - _<`.
 
 fn Rosetta::Diff::successive(@xs) {
-    return () if scalar(@xs) < 2
+    return () if len(@xs) < 2
     my @out
-    for my $i (1 .. scalar(@xs) - 1) {
+    for my $i (1 .. len(@xs) - 1) {
         push @out, $xs[$i] - $xs[$i - 1]
     }
     @out
@@ -30,7 +30,7 @@ assert_eq join(",", @r3), "-2,-3,-4", "strictly decreasing"
 
 # Single element → empty differences.
 my @r4 = Rosetta::Diff::successive(42)
-assert_eq scalar(@r4), 0, "single element → empty"
+assert_eq len(@r4), 0, "single element → empty"
 
 # Geometric series (powers of 2): differences are also powers of 2.
 my @r5 = Rosetta::Diff::successive(1, 2, 4, 8, 16, 32)

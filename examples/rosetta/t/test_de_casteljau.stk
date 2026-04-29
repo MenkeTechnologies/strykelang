@@ -4,7 +4,7 @@
 
 fn Rosetta::DeCasteljau::eval($pts, $t) {
     my @work = map { [$_->[0], $_->[1]] } @$pts
-    my $n = scalar(@work)
+    my $n = len(@work)
     my $omt = 1 - $t
     while ($n > 1) {
         for my $i (0..$n-2) {

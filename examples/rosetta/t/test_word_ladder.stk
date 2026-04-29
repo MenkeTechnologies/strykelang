@@ -10,12 +10,12 @@ fn Rosetta::WordLadder::solve($start, $end, $words) {
     my @queue = ([$start])
     my %seen = ($start => 1)
     
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $path = shift @queue
         my $word = $path->[-1]
         
         my @chars = chars($word)
-        for (my $i = 0; $i < scalar(@chars); $i++) {
+        for (my $i = 0; $i < len(@chars); $i++) {
             my $orig = $chars[$i]
             for my $c ("a".."z") {
                 next if $c eq $orig

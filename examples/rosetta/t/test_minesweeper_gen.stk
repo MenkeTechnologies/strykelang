@@ -39,8 +39,8 @@ fn Rosetta::MinesweeperGen::generate($w, $h, $num) {
 }
 
 my $b = Rosetta::MinesweeperGen::generate(5, 5, 5)
-assert_eq scalar(@$b), 5, "board height"
-assert_eq scalar(@{$b->[0]}), 5, "board width"
+assert_eq len(@$b), 5, "board height"
+assert_eq len(@{$b->[0]}), 5, "board width"
 
 # Verify mine count
 my $m_count = 0

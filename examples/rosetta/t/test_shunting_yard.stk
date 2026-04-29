@@ -24,14 +24,14 @@ fn Rosetta::ShuntingYard::solve($infix) {
         } elsif ($token eq "(") {
             push @operators, $token
         } elsif ($token eq ")") {
-            while (scalar(@operators) > 0 && $operators[-1] ne "(") {
+            while (len(@operators) > 0 && $operators[-1] ne "(") {
                 push @output, pop(@operators)
             }
-            if (scalar(@operators) > 0 && $operators[-1] eq "(") {
+            if (len(@operators) > 0 && $operators[-1] eq "(") {
                 pop @operators
             }
         } elsif ($token =~ /^[\+\-\*\/\^]$/) {
-            while (scalar(@operators) > 0 && $operators[-1] ne "(") {
+            while (len(@operators) > 0 && $operators[-1] ne "(") {
                 my $top = $operators[-1]
                 my $p_token = Rosetta::ShuntingYard::precedence($token)
                 my $p_top = Rosetta::ShuntingYard::precedence($top)
@@ -49,7 +49,7 @@ fn Rosetta::ShuntingYard::solve($infix) {
         }
     }
     
-    while (scalar(@operators) > 0) {
+    while (len(@operators) > 0) {
         push @output, pop(@operators)
     }
     

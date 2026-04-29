@@ -2,7 +2,7 @@
 # Rosetta Code: Cholesky Decomposition
 
 fn Rosetta::Cholesky::decompose($A) {
-    my $n = scalar(@$A)
+    my $n = len(@$A)
     my @L
     for my $i (0..$n-1) {
         my @row

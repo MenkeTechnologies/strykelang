@@ -2,8 +2,8 @@
 # Rosetta Code: Polynomial arithmetic
 
 fn Rosetta::Polynomial::add($p1, $p2) {
-    my $n1 = scalar(@$p1)
-    my $n2 = scalar(@$p2)
+    my $n1 = len(@$p1)
+    my $n2 = len(@$p2)
     my $n = max($n1, $n2)
     my @res
     for (my $i = 0; $i < $n; $i++) {
@@ -15,8 +15,8 @@ fn Rosetta::Polynomial::add($p1, $p2) {
 }
 
 fn Rosetta::Polynomial::mul($p1, $p2) {
-    my $n1 = scalar(@$p1)
-    my $n2 = scalar(@$p2)
+    my $n1 = len(@$p1)
+    my $n2 = len(@$p2)
     my $n = $n1 + $n2 - 1
     my @res = map { 0 } 1:$n
     

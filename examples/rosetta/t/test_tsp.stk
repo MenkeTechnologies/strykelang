@@ -2,7 +2,7 @@
 # Rosetta Code: Traveling Salesman Problem (Small)
 
 fn Rosetta::TSP::perms($arr) {
-    my $n = scalar(@$arr)
+    my $n = len(@$arr)
     return [[@$arr]] if $n <= 1
     my @result
     for (my $i = 0; $i < $n; $i++) {
@@ -19,14 +19,14 @@ fn Rosetta::TSP::perms($arr) {
 }
 
 fn Rosetta::TSP::solve($dist_matrix) {
-    my $n = scalar(@$dist_matrix)
+    my $n = len(@$dist_matrix)
     my @cities = 1:($n - 1)
     my $all_perms = Rosetta::TSP::perms(\@cities)
     
     my $min_dist = 1e18
     for my $p (@$all_perms) {
         my $d = $dist_matrix->[0]->[$p->[0]]
-        for (my $i = 0; $i < scalar(@$p) - 1; $i++) {
+        for (my $i = 0; $i < len(@$p) - 1; $i++) {
             $d += $dist_matrix->[$p->[$i]]->[$p->[$i + 1]]
         }
         $d += $dist_matrix->[$p->[-1]]->[0]

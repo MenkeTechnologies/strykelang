@@ -18,12 +18,12 @@ fn Rosetta::PrimeFactors::prime_factors($n) {
 fn is_sphenic($n) {
     my $factors_ref = Rosetta::PrimeFactors::prime_factors($n)
     my @factors = @$factors_ref
-    if (scalar(@factors) != 3) {
+    if (len(@factors) != 3) {
         0
     } else {
         my %counts
         for my $f (@factors) { $counts{$f}++ }
-        scalar(keys %counts) == 3
+        len(keys %counts) == 3
     }
 }
 

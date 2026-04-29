@@ -4,7 +4,7 @@
 fn Rosetta::Keith::check($n) {
     my $s = "$n"
     my @digits = ~> $s chars map { int($_) }
-    my $len = scalar(@digits)
+    my $len = len(@digits)
     if ($len < 2) {
         0
     } else {
@@ -12,7 +12,7 @@ fn Rosetta::Keith::check($n) {
         my $last = $seq[-1]
         while ($last < $n) {
             my $sum = 0
-            my $curr_len = scalar(@seq)
+            my $curr_len = len(@seq)
             for my $i ($curr_len - $len .. $curr_len - 1) {
                 $sum += $seq[$i]
             }

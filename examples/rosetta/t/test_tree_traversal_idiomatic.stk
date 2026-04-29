@@ -31,7 +31,7 @@ fn Rosetta::Tree::levelorder($node) {
     return () if !defined $node
     my @queue = ($node)
     my @res
-    while (scalar(@queue)) {
+    while (len(@queue)) {
         my $curr = shift @queue
         push @res, $curr->{val}
         push @queue, $curr->{left} if defined $curr->{left}

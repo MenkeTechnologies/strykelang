@@ -3,7 +3,7 @@
 
 fn Rosetta::FWHT::transform($a) {
     my @res = @$a
-    my $n = scalar(@res)
+    my $n = len(@res)
     my $h = 1
     while ($h < $n) {
         for (my $i = 0; $i < $n; $i += $h * 2) {
@@ -21,7 +21,7 @@ fn Rosetta::FWHT::transform($a) {
 
 fn Rosetta::FWHT::inverse($a) {
     my $res = Rosetta::FWHT::transform($a)
-    my $n = scalar(@$res)
+    my $n = len(@$res)
     ~> @$res map { $_ / $n }
 }
 
@@ -30,7 +30,7 @@ my $transformed = Rosetta::FWHT::transform(\@data)
 my @inv = Rosetta::FWHT::inverse($transformed)
 
 # Compare with epsilon for floats
-for (my $i = 0; $i < scalar(@data); $i++) {
+for (my $i = 0; $i < len(@data); $i++) {
     assert_eq abs($inv[$i] - $data[$i]) < 1e-9, 1, "index $i recovered"
 }
 

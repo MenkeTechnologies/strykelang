@@ -3,7 +3,7 @@
 
 fn Rosetta::BalancedNumbers::sum_digits($n) {
     my @digits = ~> "$n" chars map { int($_) }
-    if (scalar(@digits) == 0) {
+    if (len(@digits) == 0) {
         0
     } else {
         @digits |> reduce { _0 + _1 }

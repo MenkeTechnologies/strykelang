@@ -17,8 +17,8 @@ fn Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols) {
 }
 
 fn Rosetta::GameOfLife::step($grid) {
-    my $rows = scalar(@$grid)
-    my $cols = scalar(@{$grid->[0]})
+    my $rows = len(@$grid)
+    my $cols = len(@{$grid->[0]})
     my @next = ()
     for my $r (0..$rows-1) {
         $next[$r] = []

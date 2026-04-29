@@ -30,7 +30,7 @@ fn Rosetta::BarnsleyFern::solve($iters) {
 }
 
 my $res = Rosetta::BarnsleyFern::solve(1000)
-assert_eq scalar(@$res), 1000, "1000 points generated"
+assert_eq len(@$res), 1000, "1000 points generated"
 
 # Check if points are within reasonable bounds
 # x is roughly [-2.18, 2.65], y is [0, 9.99]

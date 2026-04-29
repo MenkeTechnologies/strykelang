@@ -13,7 +13,7 @@ fn Rosetta::VigAuto::encrypt($plain, $primer) {
     my @pc = ~> $p chars
     my @kc = ~> $k chars
     my $out = ""
-    for my $i (0..scalar(@pc)-1) {
+    for my $i (0..len(@pc)-1) {
         my $shift = ord($kc[$i]) - ord("A")
         my $base  = ord($pc[$i]) - ord("A")
         $out .= chr(ord("A") + ($base + $shift) % 26)
@@ -26,7 +26,7 @@ fn Rosetta::VigAuto::decrypt($cipher, $primer) {
     my $k = Rosetta::VigAuto::clean($primer)
     my @cc = ~> $c chars
     my $out = ""
-    for my $i (0..scalar(@cc)-1) {
+    for my $i (0..len(@cc)-1) {
         my @kc = ~> $k chars
         my $shift = ord($kc[$i]) - ord("A")
         my $base  = ord($cc[$i]) - ord("A")

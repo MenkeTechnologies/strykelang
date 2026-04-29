@@ -3,7 +3,7 @@
 
 fn Rosetta::WaterCollected::solve($towers_ref) {
     my @towers = @$towers_ref
-    my $n = scalar(@towers)
+    my $n = len(@towers)
     if ($n < 3) { return 0 }
     
     my @left_max = ()

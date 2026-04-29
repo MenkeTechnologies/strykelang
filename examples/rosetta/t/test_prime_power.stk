@@ -6,7 +6,7 @@ fn Rosetta::PrimePower::check($n) {
         0
     } else {
         my @f = prime_factors($n)
-        if (scalar(@f) == 0) {
+        if (len(@f) == 0) {
             0
         } else {
             my $p = $f[0]
