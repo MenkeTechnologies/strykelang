@@ -197,7 +197,7 @@ fn intercept_list_returns_registrations() {
         before "foo" { 0 }
         after "bar*" { 0 }
         my @list = intercept_list();
-        scalar(@list)
+        len(@list)
     "#,
     );
     assert_eq!(out, 2);

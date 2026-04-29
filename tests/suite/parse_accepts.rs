@@ -343,7 +343,7 @@ fn accepts_push_pop_shift_unshift_splice() {
 
 #[test]
 fn accepts_scalar_aggregate() {
-    p("scalar @a");
+    p("len(@a)");
     p("scalar %h");
 }
 
@@ -703,7 +703,7 @@ fn accepts_bare_uniq_any_all_none() {
     p(r#"(1, 2) |> drop_while { 0 } |> join ','"#);
     p(r#"(1, 2) |> tap { 1 } |> join ','"#);
     p(r#"(1, 2) |> peek { 1 } |> join ','"#);
-    p(r#"scalar with_index((1, 2))"#);
+    p(r#"list_count(with_index((1, 2)))"#);
     p(r#"(1, 2, 3) |> with_index"#);
     p(r#"any { $_ > 1 } (1, 2, 3)"#);
     p(r#"all { $_ > 0 } (1, 2)"#);

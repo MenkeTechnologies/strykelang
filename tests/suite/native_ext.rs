@@ -266,7 +266,7 @@ fn par_pipeline_stream_take() {
             ->map(fn { $_ * 2 })
             ->take(5)
             ->collect();
-        scalar @r"#,
+        len(@r)"#,
     );
     assert_eq!(result.trim(), "5");
 }
@@ -383,7 +383,7 @@ fn par_find_files_matches_glob_pattern() {
     fs::write(dir.join("b.rs"), "2").unwrap();
     fs::write(dir.join("sub/c.txt"), "3").unwrap();
     let p = dir.to_str().unwrap();
-    let code = format!(r#"my @f = par_find_files("{p}", "*.txt"); scalar @f"#);
+    let code = format!(r#"my @f = par_find_files("{p}", "*.txt"); len(@f)"#);
     assert_eq!(eval_int(&code), 2);
     fs::remove_dir_all(&dir).ok();
 }

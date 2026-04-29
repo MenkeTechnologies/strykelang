@@ -3,7 +3,7 @@ use stryke::error::ErrorKind;
 
 #[test]
 fn parallel_map() {
-    let result = eval("my @a = pmap { $_ * 2 } (1,2,3,4,5); scalar @a");
+    let result = eval("my @a = pmap { $_ * 2 } (1,2,3,4,5); len(@a)");
     assert_eq!(result.to_int(), 5);
 }
 
@@ -60,7 +60,7 @@ fn parallel_grep_preserves_input_order() {
 
 #[test]
 fn parallel_grep() {
-    let result = eval("my @a = pgrep { $_ % 2 == 0 } (1,2,3,4,5,6); scalar @a");
+    let result = eval("my @a = pgrep { $_ % 2 == 0 } (1,2,3,4,5,6); len(@a)");
     assert_eq!(result.to_int(), 3);
 }
 
@@ -74,17 +74,17 @@ fn parallel_grep_progress_flag_runs() {
 
 #[test]
 fn parallel_map_empty_list() {
-    assert_eq!(eval_int(r#"scalar pmap { $_ } ()"#), 0);
+    assert_eq!(eval_int(r#"len pmap { $_ } ()"#), 0);
 }
 
 #[test]
 fn parallel_grep_empty_list() {
-    assert_eq!(eval_int(r#"scalar pgrep { 1 } ()"#), 0);
+    assert_eq!(eval_int(r#"len pgrep { 1 } ()"#), 0);
 }
 
 #[test]
 fn parallel_sort_empty_list() {
-    assert_eq!(eval_int(r#"scalar psort ()"#), 0);
+    assert_eq!(eval_int(r#"len psort ()"#), 0);
 }
 
 /// Regression: blockless `psort` as a thread-macro stage must build a `PSortExpr`,
@@ -322,11 +322,11 @@ fn thread_stage_chunk_by_runs_of_consecutive_equal_keys() {
     use crate::common::eval_int;
     // `(1,1,2,2,3,1) chunk_by { $_ }` → 4 runs: [1,1], [2,2], [3], [1].
     assert_eq!(
-        eval_int(r#"my @r = ~> (1,1,2,2,3,1) chunk_by { $_ }; scalar @r"#),
+        eval_int(r#"my @r = ~> (1,1,2,2,3,1) chunk_by { $_ }; len(@r)"#),
         4
     );
     assert_eq!(
-        eval_int(r#"my @r = (1,1,2,2,3,1) |> chunk_by { $_ }; scalar @r"#),
+        eval_int(r#"my @r = (1,1,2,2,3,1) |> chunk_by { $_ }; len(@r)"#),
         4
     );
 }
@@ -336,9 +336,9 @@ fn thread_stage_group_by_does_not_error() {
     use crate::common::eval_string;
     // Lock the routing, not the exact return shape (which is intentionally
     // group-key-keyed and may evolve). Just confirm it doesn't raise.
-    let r = eval_string(r#"my @r = ~> (1,2,3,4,5) group_by { $_ % 2 }; scalar @r"#);
+    let r = eval_string(r#"my @r = ~> (1,2,3,4,5) group_by { $_ % 2 }; len(@r)"#);
     assert!(!r.is_empty());
-    let r = eval_string(r#"my @r = (1,2,3,4,5) |> group_by { $_ % 2 }; scalar @r"#);
+    let r = eval_string(r#"my @r = (1,2,3,4,5) |> group_by { $_ % 2 }; len(@r)"#);
     assert!(!r.is_empty());
 }
 
@@ -347,9 +347,9 @@ fn thread_stage_zip_with_pairs_lists() {
     use crate::common::eval_int;
     // `zip_with { ... }` over a list of arrayrefs — verify routing doesn't error
     // and produces a non-empty result.
-    let n = crate::common::eval_int(r#"my @r = ~> ([1,2,3]) zip_with { [$_] }; scalar @r"#);
+    let n = crate::common::eval_int(r#"my @r = ~> ([1,2,3]) zip_with { [$_] }; len(@r)"#);
     assert!(n > 0);
-    let n = eval_int(r#"my @r = ([1,2,3]) |> zip_with { [$_] }; scalar @r"#);
+    let n = eval_int(r#"my @r = ([1,2,3]) |> zip_with { [$_] }; len(@r)"#);
     assert!(n > 0);
 }
 
@@ -495,7 +495,7 @@ fn parallel_grep_drops_items_when_block_errors() {
 #[test]
 fn parallel_grep_mixed_errors_and_successes() {
     assert_eq!(
-        eval_int(r#"my @a = pgrep { $_ == 2 ? 1/0 : $_ > 0 } (1, 2, 3); scalar @a"#),
+        eval_int(r#"my @a = pgrep { $_ == 2 ? 1/0 : $_ > 0 } (1, 2, 3); len(@a)"#),
         2,
     );
 }
@@ -551,7 +551,7 @@ fn parallel_mysync_increment_in_pmap_chunked() {
 #[test]
 fn parallel_mysync_array_push_in_pmap() {
     assert_eq!(
-        eval_int(r#"mysync @a; pmap { push @a, $_ } (1, 2, 3); scalar @a"#),
+        eval_int(r#"mysync @a; pmap { push @a, $_ } (1, 2, 3); len(@a)"#),
         3
     );
 }
@@ -690,7 +690,7 @@ fn fan_cap_collects_return_values_in_index_order() {
 
 #[test]
 fn fan_cap_zero_iterations_yields_empty_list() {
-    assert_eq!(eval_int(r#"my @a = fan_cap 0 { die "no" }; scalar @a"#), 0);
+    assert_eq!(eval_int(r#"my @a = fan_cap 0 { die "no" }; len(@a)"#), 0);
 }
 
 #[test]

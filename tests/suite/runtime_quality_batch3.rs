@@ -46,7 +46,7 @@ fn json_encode_decode_null_is_undef() {
 
 #[test]
 fn json_encode_array_decodes_to_list_count() {
-    assert_eq!(eval_int(r#"scalar @{[json_decode("[1,2,3]")]}"#), 3);
+    assert_eq!(eval_int(r#"len(@{[json_decode("[1,2,3]")]})"#), 3);
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn array_single_subscript_second_elem() {
 
 #[test]
 fn anon_sub_invoked_with_arrow() {
-    assert_eq!(eval_int(r#"(fn { my $x = shift @_; $x * 3 })->(4)"#), 12);
+    assert_eq!(eval_int(r#"(fn ($x) { $x * 3 })->(4)"#), 12);
 }
 
 #[test]

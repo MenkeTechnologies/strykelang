@@ -16,7 +16,7 @@ fn stryke_exe() -> &'static str {
 fn bare_package_array_diamond_list_context_slurps_piped_stdin() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"@a = <>; print scalar(@a)"#])
+        .args(["-e", r#"@a = <>; print len(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -40,7 +40,7 @@ fn bare_package_array_diamond_list_context_slurps_piped_stdin() {
 fn diamond_list_context_slurps_piped_stdin() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = <>; print scalar(@a)"#])
+        .args(["-e", r#"my @a = <>; print len(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -64,7 +64,7 @@ fn diamond_list_context_slurps_piped_stdin() {
 fn stdin_angle_bracket_list_context_slurps_piped_stdin() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = <STDIN>; print scalar(@a)"#])
+        .args(["-e", r#"my @a = <STDIN>; print len(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -136,7 +136,7 @@ fn reverse_diamond_list_context_slurps_then_reverses_line_order() {
 fn empty_stdin_diamond_list_context_yields_zero_lines() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = <>; print scalar(@a)"#])
+        .args(["-e", r#"my @a = <>; print len(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -344,7 +344,7 @@ fn reverse_stdin_list_context_matches_diamond() {
 fn my_l_array_slurp_diamond_matches_scalar_count() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @l = <>; print scalar(@l)"#])
+        .args(["-e", r#"my @l = <>; print len(@l)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -369,7 +369,7 @@ fn my_l_array_slurp_diamond_matches_scalar_count() {
 fn grep_diamond_list_operand_slurps_stdin() {
     let exe = stryke_exe();
     let mut child = Command::new(exe)
-        .args(["-e", r#"my @a = grep { 1 } <>; print scalar(@a)"#])
+        .args(["-e", r#"my @a = grep { 1 } <>; print len(@a)"#])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

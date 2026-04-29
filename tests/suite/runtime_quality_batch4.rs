@@ -21,7 +21,7 @@ fn pack_x_skips_bytes_before_unsigned_char() {
 #[test]
 fn unpack_big_endian_n_word() {
     assert_eq!(
-        eval_int(r#"scalar unpack 'N', pack 'N', 0x01020304"#),
+        eval_int(r#"unpack_first("N", pack("N", 0x01020304))"#),
         0x01020304
     );
 }
@@ -124,7 +124,7 @@ fn logical_and_assign_short_circuits_on_falsy() {
 
 #[test]
 fn sub_scalar_underscore_counts_arguments() {
-    assert_eq!(eval_int(r#"fn narg { scalar @_ } narg(1, 2, 3, 4)"#), 4);
+    assert_eq!(eval_int(r#"fn narg { len(@_) } narg(1, 2, 3, 4)"#), 4);
 }
 
 #[test]
@@ -438,7 +438,7 @@ fn regex_digit_class() {
 
 #[test]
 fn bare_builtin_pairs_four_elements_two_objects() {
-    assert_eq!(eval_int(r#"scalar pairs(1, 2, 3, 4)"#), 2);
+    assert_eq!(eval_int(r#"list_count(pairs(1, 2, 3, 4))"#), 2);
 }
 
 #[test]

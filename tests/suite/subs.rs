@@ -3,7 +3,7 @@ use crate::common::*;
 #[test]
 fn basic_sub() {
     assert_eq!(
-        eval_int("fn add { my $a = shift @_; my $b = shift @_; return $a + $b; } add(3, 4)"),
+        eval_int("fn add ($a, $b) { $a + $b } add(3, 4)"),
         7
     );
 }
@@ -11,7 +11,9 @@ fn basic_sub() {
 #[test]
 fn recursive_fibonacci() {
     assert_eq!(
-        eval_int("fn fib_n { my $n = shift @_; return $n if $n <= 1; return fib_n($n-1) + fib_n($n-2); } fib_n(10)"),
+        eval_int(
+            "fn fib_n ($n) { return $n if $n <= 1; fib_n($n-1) + fib_n($n-2) } fib_n(10)"
+        ),
         55
     );
 }
@@ -33,11 +35,11 @@ fn return_exits_sub_before_following_statement() {
 #[test]
 fn return_with_postfix_if() {
     assert_eq!(
-        eval_int("fn foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(5)"),
+        eval_int("fn foo ($n) { return 0 if $n <= 0; $n } foo(5)"),
         5
     );
     assert_eq!(
-        eval_int("fn foo { my $n = shift @_; return 0 if $n <= 0; return $n; } foo(-1)"),
+        eval_int("fn foo ($n) { return 0 if $n <= 0; $n } foo(-1)"),
         0
     );
 }
@@ -45,7 +47,7 @@ fn return_with_postfix_if() {
 #[test]
 fn sub_with_prototype_two_scalars_uses_at_underscore() {
     assert_eq!(
-        eval_int("fn add2 ($$) { return $_0 + $_1; } add2(40, 2)"),
+        eval_int("fn add2 ($$) { $_0 + $_1 } add2(40, 2)"),
         42
     );
 }
@@ -79,7 +81,7 @@ fn sub_stryke_signature_array_destruct() {
     );
     assert_eq!(
         eval_int(
-            r#"fn head3 ([ $a, $b, @rest ]) { $a + $b + scalar(@rest) }
+            r#"fn head3 ([ $a, $b, @rest ]) { $a + $b + len(@rest) }
                head3([1, 2, 30, 40])"#
         ),
         5
@@ -92,7 +94,7 @@ fn my_destructure_arrayref() {
         eval_int(
             r#"my $aref = [10, 32, 5];
                my [$x, $y, @rest] = $aref;
-               $x + $y + scalar(@rest)"#
+               $x + $y + len(@rest)"#
         ),
         43
     );

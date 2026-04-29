@@ -299,7 +299,7 @@ fn transliterate_lowercase_to_upper_range() {
 #[test]
 fn sub_adds_two_via_return() {
     assert_eq!(
-        eval_int("fn sum2 { my $a = shift @_; my $b = shift @_; return $a + $b; } sum2(11, 31)"),
+        eval_int("fn sum2 ($a, $b) { $a + $b } sum2(11, 31)"),
         42
     );
 }
@@ -308,8 +308,8 @@ fn sub_adds_two_via_return() {
 fn sub_calls_sub() {
     assert_eq!(
         eval_int(
-            "fn incr { my $x = shift @_; return $x + 1; } \
-             fn twice { my $y = shift @_; return incr($y) + incr($y); } \
+            "fn incr ($x) { $x + 1 } \
+             fn twice ($y) { incr($y) + incr($y) } \
              twice(5)",
         ),
         12

@@ -30,7 +30,7 @@ fn pe_compat_mode_udf_shadowing_works() {
 fn pe_no_compat_mode_extensions_work() {
     let exe = env!("CARGO_BIN_EXE_st");
     let out = Command::new(exe)
-        .args(["-e", "print scalar collect(1, 2, 3);"])
+        .args(["-e", "print len collect(1, 2, 3);"])
         .output()
         .expect("spawn stryke");
 

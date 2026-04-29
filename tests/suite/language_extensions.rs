@@ -130,7 +130,7 @@ fn flatten_one_level_peels_arrays_and_arefs() {
         eval_string(r#"(1, [2, 3]) |> flatten |> join ','"#),
         "1,2,3"
     );
-    assert_eq!(eval_int(r#"scalar flatten(1, [2, 3])"#), 3);
+    assert_eq!(eval_int(r#"list_count(flatten(1, [2, 3]))"#), 3);
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn bare_shuffle_list_context_permutation() {
         eval_int(
             r#"no strict 'vars';
             my @s = shuffle(7, 8, 9, 10);
-            scalar @s"#
+            len(@s)"#
         ),
         4
     );
@@ -148,7 +148,7 @@ fn bare_shuffle_list_context_permutation() {
             r#"no strict 'vars';
             my @in = (7, 8, 9, 10);
             my @s = shuffle @in;
-            scalar @s"#
+            len(@s)"#
         ),
         4
     );
@@ -160,7 +160,10 @@ fn bare_shuffle_list_context_permutation() {
 
 #[test]
 fn bare_chunked_list_context_and_last_arg_is_size() {
-    assert_eq!(eval_int(r#"scalar ((1, 2, 3, 4) |> chunked 2)"#), 2);
+    assert_eq!(
+        eval_int(r#"my @r = (1, 2, 3, 4) |> chunked 2; len(@r)"#),
+        2
+    );
     assert_eq!(
         eval_string(r#"(1, 2, 3, 4) |> chunked 2 |> map { join ",", @$_ } |> join "-""#),
         "1,2-3,4"
@@ -169,23 +172,35 @@ fn bare_chunked_list_context_and_last_arg_is_size() {
         eval_int(
             r#"no strict 'vars';
             my @in = (1, 2, 3, 4, 5);
-            scalar (@in |> chunked 2)"#
+            my @r = @in |> chunked 2;
+            len(@r)"#
         ),
         3
     );
-    assert_eq!(eval_int(r#"scalar ((10, 20, 30) |> chunked 2)"#), 2);
+    assert_eq!(
+        eval_int(r#"my @r = (10, 20, 30) |> chunked 2; len(@r)"#),
+        2
+    );
 }
 
 #[test]
 fn chunked_edge_cases_pipe_multi_array_and_n_zero() {
-    assert_eq!(eval_int(r#"scalar ((1, 2, 3) |> chunked 0)"#), 0);
     assert_eq!(
-        eval_int(r#"no strict 'vars'; my @e = (); scalar (@e |> chunked 4)"#),
+        eval_int(r#"my @r = (1, 2, 3) |> chunked 0; len(@r)"#),
         0
     );
-    assert_eq!(eval_int(r#"scalar ((1, 2, 3) |> chunked 10)"#), 1);
     assert_eq!(
-        eval_string(r#"(1, 2, 3, 4) |> chunked 2 |> map { scalar @$_ } |> join "/""#),
+        eval_int(
+            r#"no strict 'vars'; my @e = (); my @r = @e |> chunked 4; len(@r)"#
+        ),
+        0
+    );
+    assert_eq!(
+        eval_int(r#"my @r = (1, 2, 3) |> chunked 10; len(@r)"#),
+        1
+    );
+    assert_eq!(
+        eval_string(r#"(1, 2, 3, 4) |> chunked 2 |> map { len(@$_) } |> join "/""#),
         "2/2"
     );
     assert_eq!(
@@ -197,7 +212,8 @@ fn chunked_edge_cases_pipe_multi_array_and_n_zero() {
             r#"no strict 'vars';
             my @a = (1, 2);
             my @b = (3, 4);
-            scalar ((@a, @b) |> chunked 2)"#
+            my @r = (@a, @b) |> chunked 2;
+            len(@r)"#
         ),
         2
     );
@@ -209,12 +225,18 @@ fn chunked_edge_cases_pipe_multi_array_and_n_zero() {
 
 #[test]
 fn windowed_sliding_pairs_like_example() {
-    assert_eq!(eval_int(r#"scalar ((1, 2, 3) |> windowed 2)"#), 2);
+    assert_eq!(
+        eval_int(r#"my @r = (1, 2, 3) |> windowed 2; len(@r)"#),
+        2
+    );
     assert_eq!(
         eval_string(r#"(1, 2, 3) |> windowed 2 |> map { join ",", @$_ } |> join "-""#),
         "1,2-2,3"
     );
-    assert_eq!(eval_int(r#"scalar ((5, 6, 7) |> windowed 2)"#), 2);
+    assert_eq!(
+        eval_int(r#"my @r = (5, 6, 7) |> windowed 2; len(@r)"#),
+        2
+    );
 }
 
 #[test]
@@ -224,19 +246,27 @@ fn windowed_pipe_alternate_list_and_empty_array_operand() {
         "9,8-8,7"
     );
     assert_eq!(
-        eval_int(r#"no strict 'vars'; my @e = (); scalar (@e |> windowed 3)"#),
+        eval_int(
+            r#"no strict 'vars'; my @e = (); my @r = @e |> windowed 3; len(@r)"#
+        ),
         0
     );
 }
 
 #[test]
 fn windowed_no_partial_tail_empty_when_n_exceeds_len() {
-    assert_eq!(eval_int(r#"scalar ((1, 2, 3) |> windowed 3)"#), 1);
+    assert_eq!(
+        eval_int(r#"my @r = (1, 2, 3) |> windowed 3; len(@r)"#),
+        1
+    );
     assert_eq!(
         eval_string(r#"(1, 2, 3) |> windowed 3 |> map { join "-", @$_ } |> join ',' "#),
         "1-2-3"
     );
-    assert_eq!(eval_int(r#"scalar ((1, 2) |> windowed 4)"#), 0);
+    assert_eq!(
+        eval_int(r#"my @r = (1, 2) |> windowed 4; len(@r)"#),
+        0
+    );
     assert_eq!(
         eval_string(r#"(1, 2) |> windowed 4 |> map { join ",", @$_ } |> join "-""#),
         ""
@@ -245,7 +275,10 @@ fn windowed_no_partial_tail_empty_when_n_exceeds_len() {
 
 #[test]
 fn windowed_zero_size_yields_no_windows() {
-    assert_eq!(eval_int(r#"scalar ((9, 8) |> windowed 0)"#), 0);
+    assert_eq!(
+        eval_int(r#"my @r = (9, 8) |> windowed 0; len(@r)"#),
+        0
+    );
     assert_eq!(
         eval_string(r#"(9, 8) |> windowed 0 |> map { join ",", @$_ } |> join "-""#),
         ""
@@ -254,12 +287,12 @@ fn windowed_zero_size_yields_no_windows() {
 
 #[test]
 fn windowed_unary_call_is_empty_list_until_piped() {
-    assert_eq!(eval_int(r#"scalar windowed(2)"#), 0);
+    assert_eq!(eval_int(r#"list_count(windowed(2))"#), 0);
 }
 
 #[test]
 fn chunked_unary_call_empty_without_list() {
-    assert_eq!(eval_int(r#"scalar chunked(3)"#), 0);
+    assert_eq!(eval_int(r#"list_count(chunked(3))"#), 0);
 }
 
 #[test]
@@ -271,7 +304,7 @@ fn list_count_and_list_size_use_list_context_like_flatten_scalar() {
         eval_int(r#"no strict 'vars'; my @a = (5, 6, 7); list_count(@a, 8)"#),
         4
     );
-    assert_eq!(eval_int(r#"scalar flatten(1, 2, [3, 4])"#), 4);
+    assert_eq!(eval_int(r#"list_count(flatten(1, 2, [3, 4]))"#), 4);
     assert_eq!(eval_int(r#"list_count(1, 2, [3, 4])"#), 4);
     assert_eq!(eval_int(r#"(1, 2, 3) |> list_count"#), 3);
     assert_eq!(eval_int(r#"(1, 2, 3) |> count"#), 3);
@@ -365,9 +398,18 @@ fn take_while_drop_while_and_with_index_pairs() {
         eval_string(r#"(10, 20) |> with_index |> map { join ",", @$_ } |> join '/'"#),
         "10,0/20,1"
     );
-    assert_eq!(eval_int(r#"scalar with_index((7, 8, 9))"#), 3);
-    assert_eq!(eval_int(r#"scalar take_while { 1 } (5, 6)"#), 2);
-    assert_eq!(eval_int(r#"scalar drop_while { $_ < 0 } (1, 2)"#), 2);
+    assert_eq!(
+        eval_int(r#"my @r = with_index((7, 8, 9)); len(@r)"#),
+        3
+    );
+    assert_eq!(
+        eval_int(r#"my @r = take_while { 1 } (5, 6); len(@r)"#),
+        2
+    );
+    assert_eq!(
+        eval_int(r#"my @r = drop_while { $_ < 0 } (1, 2); len(@r)"#),
+        2
+    );
 }
 
 #[test]
@@ -384,7 +426,7 @@ fn tap_peek_pass_through_and_pipe() {
         eval_string(r#"(7, 8, 9) |> tap { 1 } |> join ','"#),
         "7,8,9"
     );
-    assert_eq!(eval_int(r#"scalar tap { 1 } (1, 2, 3)"#), 3);
+    assert_eq!(eval_int(r#"list_count(tap { 1 } (1, 2, 3))"#), 3);
     assert_eq!(
         eval_string(
             r#"join ',', pipeline(1, 2, 3)->peek(fn { 1 })->map(fn { $_ * 2 })->collect()"#
@@ -487,8 +529,14 @@ fn chunk_by_and_group_by_split_consecutive_runs_by_key() {
         ),
         "1,3/2,4/5"
     );
-    assert_eq!(eval_int(r#"scalar chunk_by { $_ } (1, 2, 3)"#), 3);
-    assert_eq!(eval_int(r#"scalar chunk_by { 0 } (1, 2, 3)"#), 1);
+    assert_eq!(
+        eval_int(r#"my @r = chunk_by { $_ } (1, 2, 3); len(@r)"#),
+        3
+    );
+    assert_eq!(
+        eval_int(r#"my @r = chunk_by { 0 } (1, 2, 3); len(@r)"#),
+        1
+    );
 }
 
 /// Every list-oriented builtin that participates in `|>` special-casing should accept a piped LHS.
@@ -986,8 +1034,8 @@ fn pipe_stddev_variance_mode() {
 #[test]
 fn sample_returns_correct_count() {
     // sample N returns N elements
-    assert_eq!(eval_int(r#"my @s = sample 3, 1..10; scalar @s"#), 3);
-    assert_eq!(eval_int(r#"my @s = sample 5, 1..20; scalar @s"#), 5);
+    assert_eq!(eval_int(r#"my @s = sample 3, 1..10; len(@s)"#), 3);
+    assert_eq!(eval_int(r#"my @s = sample 5, 1..20; len(@s)"#), 5);
 }
 
 #[test]
