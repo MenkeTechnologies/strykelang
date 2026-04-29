@@ -66,7 +66,7 @@ my $g = {
 }
 
 my $sccs = Rosetta::Tarjan::run($g)
-my @sorted = sort { join(",", @$a) cmp join(",", @$b) } @$sccs
+my @sorted = sort { join(",", @$_0) cmp join(",", @$_1) } @$sccs
 my @flat = map { join(",", @$_) } @sorted
 assert_eq join("|", @flat), "1,2,3|4,5|6,7|8", "Wikipedia SCCs"
 

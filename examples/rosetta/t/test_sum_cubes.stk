@@ -5,7 +5,7 @@ fn Rosetta::SumCubes::sum_cubes($n) {
     if ($n < 1) {
         0
     } else {
-        1..$n |> map { $_**3 } |> reduce { $a + $b }
+        1..$n |> map { $_**3 } |> reduce { _0 + _1 }
     }
 }
 

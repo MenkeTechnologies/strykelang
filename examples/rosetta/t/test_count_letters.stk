@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count letters / character frequency table.
+# Case-insensitive; counts only ASCII letters [a-z], skipping spaces / punctuation.
+
+fn Rosetta::CountLetters::tally($text) {
+    my %counts
+    for my $c (lc($text) |> chars) {
+        next unless $c =~ /[a-z]/
+        $counts{$c} = ($counts{$c} // 0) + 1
+    }
+    \%counts
+}
+
+fn Rosetta::CountLetters::most_common($text) {
+    my $h = Rosetta::CountLetters::tally($text)
+    my @entries = sort { $h->{$_1} <=> $h->{$_0} || $_0 cmp $_1 } keys %$h
+    $entries[0]
+}
+
+my $h = Rosetta::CountLetters::tally("The Quick Brown Fox Jumps Over The Lazy Dog")
+assert_eq $h->{e}, 3, "'e' appears 3 times"
+assert_eq $h->{o}, 4, "'o' appears 4 times"
+assert_eq $h->{t}, 2, "'t' appears 2 times"
+
+# All 26 letters in pangram.
+my $pangram = Rosetta::CountLetters::tally("The quick brown fox jumps over the lazy dog")
+assert_eq scalar(keys %$pangram), 26, "pangram has all 26 letters"
+
+# Most common in "abracadabra" is 'a'.
+assert_eq Rosetta::CountLetters::most_common("abracadabra"), "a", "abracadabra → a"
+
+test_run

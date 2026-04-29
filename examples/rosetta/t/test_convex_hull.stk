@@ -43,7 +43,7 @@ my @points = ([16, 3], [12, 17], [0, 6], [-4, -6], [16, 6], [16, -7], [16, -3], 
 
 my $hull = Rosetta::ConvexHull::solve(\@points)
 # Sort results for stable assertion
-my @res = sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @$hull
+my @res = sort { _0->[0] <=> _1->[0] || _0->[1] <=> _1->[1] } @$hull
 
 assert_eq scalar(@res), 7, "Convex hull point count"
 # Points on the hull for this set:

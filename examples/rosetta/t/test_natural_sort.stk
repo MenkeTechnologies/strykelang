@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Natural sort — split strings into alternating non-digit and
+# digit chunks, compare digit chunks numerically. So "img2" < "img10".
+
+fn Rosetta::NatSort::tokens($s) {
+    my @parts
+    my $cur = ""
+    my $is_digit = 0
+    for my $c ($s |> chars) {
+        my $cd = ($c =~ /\d/) ? 1 : 0
+        if (length($cur) > 0 && $cd != $is_digit) {
+            push @parts, $is_digit ? [$cur + 0, "n"] : [$cur, "s"]
+            $cur = ""
+        }
+        $cur .= $c
+        $is_digit = $cd
+    }
+    push @parts, $is_digit ? [$cur + 0, "n"] : [$cur, "s"] if length($cur) > 0
+    \@parts
+}
+
+fn Rosetta::NatSort::compare($_0, $_1) {
+    my $ta = Rosetta::NatSort::tokens($_0)
+    my $tb = Rosetta::NatSort::tokens($_1)
+    my $len = scalar(@$ta) < scalar(@$tb) ? scalar(@$ta) : scalar(@$tb)
+    for my $i (0 .. $len - 1) {
+        my ($va, $ka) = ($ta->[$i][0], $ta->[$i][1])
+        my ($vb, $kb) = ($tb->[$i][0], $tb->[$i][1])
+        if ($ka eq "n" && $kb eq "n") {
+            return -1 if $va < $vb
+            return 1 if $va > $vb
+        } else {
+            my $c = $va cmp $vb
+            return $c if $c != 0
+        }
+    }
+    scalar(@$ta) <=> scalar(@$tb)
+}
+
+fn Rosetta::NatSort::sort(@xs) {
+    sort { Rosetta::NatSort::compare($_0, $_1) } @xs
+}
+
+# Canonical Rosetta example: ["img12", "img10", "img2", "img1"] → img1, img2, img10, img12.
+my @sorted = Rosetta::NatSort::sort("img12", "img10", "img2", "img1")
+assert_eq join(",", @sorted), "img1,img2,img10,img12", "image filenames"
+
+# Lexicographic sort would give a different (wrong) order:
+my @lex = sort qw(img12 img10 img2 img1)
+assert_eq join(",", @lex), "img1,img10,img12,img2", "lex sort differs"
+
+# Pure-numeric strings sort numerically.
+my @nums = Rosetta::NatSort::sort("100", "9", "21", "5")
+assert_eq join(",", @nums), "5,9,21,100", "numeric strings"
+
+# Mixed: prefix changes win over digit value.
+my @mix = Rosetta::NatSort::sort("v1.10", "v1.2", "v1.9", "v2.0")
+assert_eq join(",", @mix), "v1.2,v1.9,v1.10,v2.0", "version-like strings"
+
+test_run

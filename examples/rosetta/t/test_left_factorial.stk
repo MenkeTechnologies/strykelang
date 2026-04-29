@@ -3,7 +3,7 @@
 
 fn Rosetta::LeftFactorial::factorial($n) {
     if ($n < 2) { 1 }
-    else { 1:$n |> reduce { $a * $b } }
+    else { 1:$n |> reduce { _0 * _1 } }
 }
 
 fn Rosetta::LeftFactorial::compute($n) {

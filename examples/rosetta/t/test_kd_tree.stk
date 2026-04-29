@@ -8,7 +8,7 @@ fn Rosetta::KDTree::build($points, $depth) {
     my $k = scalar(@{$points->[0]})
     my $axis = $depth % $k
     
-    my @sorted = sort { $a->[$axis] <=> $b->[$axis] } @$points
+    my @sorted = sort { _0->[$axis] <=> _1->[$axis] } @$points
     my $mid = $n / 2 | 0
     
     my @left = @sorted[0 : $mid - 1]

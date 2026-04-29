@@ -4,7 +4,7 @@
 fn Rosetta::ClosestPair::find(@pts) {
     my $n = scalar(@pts)
     return undef if $n < 2
-    my @sorted = sort { $a <=> $b } @pts
+    my @sorted = sort { _0 <=> _1 } @pts
     my $best_d = abs($sorted[1] - $sorted[0])
     my $best_a = $sorted[0]
     my $best_b = $sorted[1]

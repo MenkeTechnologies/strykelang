@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cantor pairing — bijection N x N → N.
+# pair(x,y) = (x+y)(x+y+1)/2 + y, inverted via the triangular root w.
+
+fn Rosetta::Cantor::pair($x, $y) {
+    int(($x + $y) * ($x + $y + 1) / 2) + $y
+}
+
+fn Rosetta::Cantor::unpair($z) {
+    my $w = int((sqrt(8 * $z + 1) - 1) / 2)
+    my $t = int($w * ($w + 1) / 2)
+    my $y = $z - $t
+    my $x = $w - $y
+    [$x, $y]
+}
+
+# pair(0,0) = 0; pair(1,2) = 8; pair(3,4) = 32; pair(5,9) = 114.
+assert_eq Rosetta::Cantor::pair(0, 0),  0, "pair(0,0)"
+assert_eq Rosetta::Cantor::pair(1, 2),  8, "pair(1,2)"
+assert_eq Rosetta::Cantor::pair(3, 4), 32, "pair(3,4)"
+assert_eq Rosetta::Cantor::pair(5, 9),114, "pair(5,9)"
+
+# Round-trip every (x, y) with x + y <= 6.
+my $ok = 1
+for my $x (0..6) {
+    for my $y (0..6 - $x) {
+        my $z = Rosetta::Cantor::pair($x, $y)
+        my $u = Rosetta::Cantor::unpair($z)
+        $ok = 0 unless $u->[0] == $x && $u->[1] == $y
+    }
+}
+assert_eq $ok, 1, "round-trip x+y <= 6"
+
+# unpair is the inverse — pair(x', y') == z again.
+my $rt = Rosetta::Cantor::unpair(114)
+assert_eq Rosetta::Cantor::pair($rt->[0], $rt->[1]), 114, "pair . unpair = id"
+
+test_run

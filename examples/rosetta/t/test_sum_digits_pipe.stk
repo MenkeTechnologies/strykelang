@@ -2,7 +2,7 @@
 # Rosetta Code: Sum digits (using split, map, and reduce with pipes)
 
 fn Rosetta::SumDigits::solve($n) {
-    $n |> split("") |> map { int($_) } |> reduce { $a + $b }
+    $n |> split("") |> map { int($_) } |> reduce { _0 + _1 }
 }
 
 assert_eq Rosetta::SumDigits::solve(12345), 15, "sum digits of 12345"

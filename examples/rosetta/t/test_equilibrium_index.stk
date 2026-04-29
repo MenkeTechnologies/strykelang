@@ -5,7 +5,7 @@ fn Rosetta::EquilibriumIndex::sum_list(@list) {
     if (scalar(@list) == 0) {
         0
     } else {
-        ~> @list reduce { $a + $b }
+        ~> @list reduce { _0 + _1 }
     }
 }
 

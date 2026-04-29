@@ -6,7 +6,7 @@ fn Rosetta::APlusB::add($a, $b) {
 }
 
 fn Rosetta::APlusB::sum_list(@nums) {
-    ~> @nums reduce { $a + $b }
+    ~> @nums reduce { _0 + _1 }
 }
 
 assert_eq Rosetta::APlusB::add(2, 3), 5, "2+3=5"

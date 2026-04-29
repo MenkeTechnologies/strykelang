@@ -1131,6 +1131,21 @@ impl Scope {
         }
     }
 
+    /// Set the canonical sort/reduce binding pair: `$a` / `$b` (Perl-isms) AND
+    /// `$_0` / `$_1` (the stryke positional aliases — preferred under
+    /// `--no-interop` because the `$a`/`$b` pair is inconsistent — there is
+    /// no `$c`). The bareword forms `_0` / `_1` resolve to `$_0` / `$_1` via
+    /// the parser, so blocks like `sort { _0 <=> _1 }` and `reduce { _0 + _1 }`
+    /// just work. Use this helper anywhere the legacy code wrote two adjacent
+    /// `set_scalar("a", …); set_scalar("b", …)` lines.
+    #[inline]
+    pub fn set_sort_pair(&mut self, a: PerlValue, b: PerlValue) {
+        let _ = self.set_scalar("a", a.clone());
+        let _ = self.set_scalar("b", b.clone());
+        let _ = self.set_scalar("_0", a);
+        let _ = self.set_scalar("_1", b);
+    }
+
     /// Register a `defer { BLOCK }` closure to run when this scope exits.
     #[inline]
     pub fn push_defer(&mut self, coderef: PerlValue) {

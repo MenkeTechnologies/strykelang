@@ -6614,10 +6614,7 @@ impl<'a> VM<'a> {
                                 if sort_err.is_some() {
                                     return std::cmp::Ordering::Equal;
                                 }
-                                let _ = self.interp.scope.set_scalar("a", a.clone());
-                                let _ = self.interp.scope.set_scalar("b", b.clone());
-                                let _ = self.interp.scope.set_scalar("_0", a.clone());
-                                let _ = self.interp.scope.set_scalar("_1", b.clone());
+                                self.interp.scope.set_sort_pair(a.clone(), b.clone());
                                 match self.run_block_region(start, end, op_count) {
                                     Ok(v) => {
                                         let n = v.to_int();
@@ -6643,10 +6640,7 @@ impl<'a> VM<'a> {
                         } else {
                             let block = self.blocks[idx].clone();
                             items.sort_by(|a, b| {
-                                let _ = self.interp.scope.set_scalar("a", a.clone());
-                                let _ = self.interp.scope.set_scalar("b", b.clone());
-                                let _ = self.interp.scope.set_scalar("_0", a.clone());
-                                let _ = self.interp.scope.set_scalar("_1", b.clone());
+                                self.interp.scope.set_sort_pair(a.clone(), b.clone());
                                 match self.interp.exec_block(&block) {
                                     Ok(v) => {
                                         let n = v.to_int();
@@ -6697,10 +6691,7 @@ impl<'a> VM<'a> {
                         };
                         let interp = &mut self.interp;
                         items.sort_by(|a, b| {
-                            let _ = interp.scope.set_scalar("a", a.clone());
-                            let _ = interp.scope.set_scalar("b", b.clone());
-                            let _ = interp.scope.set_scalar("_0", a.clone());
-                            let _ = interp.scope.set_scalar("_1", b.clone());
+                            interp.scope.set_sort_pair(a.clone(), b.clone());
                             match interp.call_sub(sub.as_ref(), vec![], want, line) {
                                 Ok(v) => {
                                     let n = v.to_int();
@@ -7399,10 +7390,7 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
-                                let _ = local_interp.scope.set_scalar("a", acc.clone());
-                                let _ = local_interp.scope.set_scalar("b", b.clone());
-                                let _ = local_interp.scope.set_scalar("_0", acc);
-                                let _ = local_interp.scope.set_scalar("_1", b);
+                                local_interp.scope.set_sort_pair(acc.clone(), b.clone());
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 acc = match vm.run_block_region(start, end, &mut op_count) {
@@ -7416,10 +7404,7 @@ impl<'a> VM<'a> {
                                 let mut local_interp = Interpreter::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
-                                let _ = local_interp.scope.set_scalar("a", acc.clone());
-                                let _ = local_interp.scope.set_scalar("b", b.clone());
-                                let _ = local_interp.scope.set_scalar("_0", acc);
-                                let _ = local_interp.scope.set_scalar("_1", b);
+                                local_interp.scope.set_sort_pair(acc.clone(), b.clone());
                                 acc = match local_interp.exec_block(&block) {
                                     Ok(val) => val,
                                     Err(_) => PerlValue::UNDEF,
@@ -7458,10 +7443,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a.clone());
-                                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    let _ = local_interp.scope.set_scalar("_0", a);
-                                    let _ = local_interp.scope.set_scalar("_1", b);
+                                    local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     match vm.run_block_region(start, end, &mut op_count) {
@@ -7484,10 +7466,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a.clone());
-                                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    let _ = local_interp.scope.set_scalar("_0", a);
-                                    let _ = local_interp.scope.set_scalar("_1", b);
+                                    local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                     match local_interp.exec_block(&block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
@@ -7605,10 +7584,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a.clone());
-                                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    let _ = local_interp.scope.set_scalar("_0", a);
-                                    let _ = local_interp.scope.set_scalar("_1", b);
+                                    local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                     let mut vm = shared.worker_vm(&mut local_interp);
                                     let mut op_count = 0u64;
                                     match vm.run_block_region(
@@ -7644,10 +7620,7 @@ impl<'a> VM<'a> {
                                     let mut local_interp = Interpreter::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
-                                    let _ = local_interp.scope.set_scalar("a", a.clone());
-                                    let _ = local_interp.scope.set_scalar("b", b.clone());
-                                    let _ = local_interp.scope.set_scalar("_0", a);
-                                    let _ = local_interp.scope.set_scalar("_1", b);
+                                    local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                     match local_interp.exec_block_no_scope(&reduce_block) {
                                         Ok(val) => val,
                                         Err(_) => PerlValue::UNDEF,
@@ -7984,10 +7957,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("a", a.clone());
-                                let _ = local_interp.scope.set_scalar("b", b.clone());
-                                let _ = local_interp.scope.set_scalar("_0", a.clone());
-                                let _ = local_interp.scope.set_scalar("_1", b.clone());
+                                local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -8014,10 +7984,7 @@ impl<'a> VM<'a> {
                                     .scope
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
-                                let _ = local_interp.scope.set_scalar("a", a.clone());
-                                let _ = local_interp.scope.set_scalar("b", b.clone());
-                                let _ = local_interp.scope.set_scalar("_0", a.clone());
-                                let _ = local_interp.scope.set_scalar("_1", b.clone());
+                                local_interp.scope.set_sort_pair(a.clone(), b.clone());
                                 local_interp.scope_push_hook();
                                 let ord = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => {

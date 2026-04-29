@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pell numbers — P(0)=0, P(1)=1, P(n)=2*P(n-1) + P(n-2).
+# OEIS A000129: 0, 1, 2, 5, 12, 29, 70, 169, 408, 985, 2378, 5741, ...
+
+fn Rosetta::Pell::nth($n) {
+    return 0 if $n == 0
+    return 1 if $n == 1
+    my ($_0, $_1) = (0, 1)
+    for (2 .. $n) { ($_0, $_1) = ($_1, 2 * $_1 + $_0) }
+    $_1
+}
+
+# Companion Pell-Lucas numbers: Q(0)=Q(1)=2, Q(n)=2*Q(n-1)+Q(n-2).
+fn Rosetta::Pell::companion($n) {
+    return 2 if $n == 0
+    return 2 if $n == 1
+    my ($_0, $_1) = (2, 2)
+    for (2 .. $n) { ($_0, $_1) = ($_1, 2 * $_1 + $_0) }
+    $_1
+}
+
+# OEIS A000129 first 12.
+my @pell = ~> 0:11 map { Rosetta::Pell::nth($_) }
+assert_eq join(",", @pell),
+    "0,1,2,5,12,29,70,169,408,985,2378,5741",
+    "P(0..11)"
+
+# OEIS A002203 first 7 (Pell-Lucas / companion Pell numbers).
+my @comp = ~> 0:6 map { Rosetta::Pell::companion($_) }
+assert_eq join(",", @comp),
+    "2,2,6,14,34,82,198",
+    "Q(0..6)"
+
+# Identity check: P(n)^2 - 2 * P(n-1) * P(n+1) = (-1)^n in some forms;
+# simpler check: P(n+1) = P(n) + P(n) + P(n-1).
+for my $n (1 .. 10) {
+    my $lhs = Rosetta::Pell::nth($n + 1)
+    my $rhs = 2 * Rosetta::Pell::nth($n) + Rosetta::Pell::nth($n - 1)
+    assert_eq $lhs, $rhs, "recurrence at n=$n"
+}
+
+test_run

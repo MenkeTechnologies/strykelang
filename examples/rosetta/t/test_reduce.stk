@@ -2,23 +2,23 @@
 # Rosetta Code: Reduce (Fold)
 
 fn Rosetta::Reduce::sum(@nums) {
-    @nums |> reduce { $a + $b }
+    @nums |> reduce { _0 + _1 }
 }
 
 fn Rosetta::Reduce::product(@nums) {
-    @nums |> reduce { $a * $b }
+    @nums |> reduce { _0 * _1 }
 }
 
 fn Rosetta::Reduce::max(@nums) {
-    @nums |> reduce { $a > $b ? $a : $b }
+    @nums |> reduce { _0 > _1 ? _0 : _1 }
 }
 
 fn Rosetta::Reduce::min(@nums) {
-    @nums |> reduce { $a < $b ? $a : $b }
+    @nums |> reduce { _0 < _1 ? _0 : _1 }
 }
 
 fn Rosetta::Reduce::concat_strings(@strs) {
-    @strs |> reduce { "$a$b" }
+    @strs |> reduce { _0 . _1 }
 }
 
 assert_eq Rosetta::Reduce::sum(1, 2, 3, 4, 5), 15, "sum 1..5"
@@ -32,7 +32,7 @@ assert_eq Rosetta::Reduce::min(3, 1, 4, 1, 5, 9), 1, "min"
 
 assert_eq Rosetta::Reduce::concat_strings("a", "b", "c"), "abc", "concat strings"
 
-my $sum_sq = 1..5 |> map { $_ * $_ } |> reduce { $a + $b }
+my $sum_sq = 1..5 |> map { $_ * $_ } |> reduce { _0 + _1 }
 assert_eq $sum_sq, 55, "sum of squares 1..5"
 
 test_run

@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zeller's congruence — day-of-week from Y/M/D (Gregorian calendar).
+# Returns 0 = Saturday, 1 = Sunday, ..., 6 = Friday (Zeller's standard mapping).
+
+fn Rosetta::Zeller::day_of_week($y, $m, $d) {
+    my ($yy, $mm) = ($y, $m)
+    if ($mm < 3) { $mm += 12; $yy -= 1 }
+    my $K = $yy % 100
+    my $J = int($yy / 100)
+    (($d + int(13 * ($mm + 1) / 5) + $K + int($K / 4) + int($J / 4) + 5 * $J) % 7)
+}
+
+fn Rosetta::Zeller::name($code) {
+    my @names = ("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+    $names[$code]
+}
+
+# Known anchors:
+# 1969-07-20 was a Sunday (Apollo 11 moon landing).
+assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(1969, 7, 20)),
+    "Sunday", "moon landing was Sunday"
+
+# 2000-01-01 was a Saturday.
+assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(2000, 1, 1)),
+    "Saturday", "Y2K dawn was Saturday"
+
+# 2026-04-28 (today's date in stryke world per CLAUDE.md) — Tuesday.
+assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(2026, 4, 28)),
+    "Tuesday", "2026-04-28 is Tuesday"
+
+# 1776-07-04 was a Thursday (US Declaration of Independence).
+assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(1776, 7, 4)),
+    "Thursday", "Declaration of Independence was Thursday"
+
+# Leap-year boundary: 2000-02-29 was a Tuesday.
+assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(2000, 2, 29)),
+    "Tuesday", "2000-02-29 was Tuesday"
+
+test_run

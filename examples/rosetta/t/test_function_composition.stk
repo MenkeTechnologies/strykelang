@@ -6,7 +6,7 @@ fn Rosetta::Compose::compose($f, $g) {
 }
 
 fn Rosetta::Compose::pipeline(@fns) {
-    @fns |> reduce { Rosetta::Compose::compose($a, $b) }
+    @fns |> reduce { Rosetta::Compose::compose(_0, _1) }
 }
 
 my $inc = fn ($x) { $x + 1 }

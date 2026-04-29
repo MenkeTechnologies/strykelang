@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jaro distance — string similarity in [0, 1].
+# Match window = floor(max(|s1|, |s2|) / 2) - 1.
+# d = (m/|s1| + m/|s2| + (m-t)/m) / 3, with m = matches, t = transpositions/2.
+
+fn Rosetta::Jaro::distance($s1, $s2) {
+    return 1.0 if $s1 eq $s2
+    my @_0 = $s1 |> chars
+    my @_1 = $s2 |> chars
+    my $la = scalar(@_0)
+    my $lb = scalar(@_1)
+    return 0.0 if $la == 0 || $lb == 0
+    my $win = int(($la > $lb ? $la : $lb) / 2) - 1
+    $win = 0 if $win < 0
+
+    my @b_match = map { 0 } 1 .. $lb
+    my @a_match = map { 0 } 1 .. $la
+    my $matches = 0
+    for my $i (0 .. $la - 1) {
+        my $start = $i - $win
+        my $end   = $i + $win
+        $start = 0 if $start < 0
+        $end   = $lb - 1 if $end > $lb - 1
+        for my $j ($start .. $end) {
+            next if $b_match[$j]
+            next unless $_0[$i] eq $_1[$j]
+            $a_match[$i] = 1
+            $b_match[$j] = 1
+            $matches += 1
+            last
+        }
+    }
+    return 0.0 if $matches == 0
+
+    my $k = 0
+    my $trans = 0
+    for my $i (0 .. $la - 1) {
+        next unless $a_match[$i]
+        $k += 1 until $b_match[$k]
+        $trans += 1 if $_0[$i] ne $_1[$k]
+        $k += 1
+    }
+    $trans = $trans / 2
+    ($matches / $la + $matches / $lb + ($matches - $trans) / $matches) / 3
+}
+
+# Reference values from Wikipedia / canonical Rosetta Code page.
+assert_ok abs(Rosetta::Jaro::distance("MARTHA", "MARHTA") - 0.9444444444444445) < 1e-9, "MARTHA/MARHTA"
+assert_ok abs(Rosetta::Jaro::distance("DIXON",  "DICKSONX") - 0.7666666666666666) < 1e-9, "DIXON/DICKSONX"
+assert_ok abs(Rosetta::Jaro::distance("JELLYFISH", "SMELLYFISH") - 0.8962962962962963) < 1e-9, "JELLYFISH/SMELLYFISH"
+assert_eq Rosetta::Jaro::distance("CRATE", "CRATE"), 1.0, "identical → 1"
+assert_eq Rosetta::Jaro::distance("CRATE", ""),      0.0, "empty → 0"
+assert_eq Rosetta::Jaro::distance("",      "CRATE"), 0.0, "empty → 0 (rev)"
+assert_eq Rosetta::Jaro::distance("ABC",   "XYZ"),   0.0, "no match"
+
+test_run

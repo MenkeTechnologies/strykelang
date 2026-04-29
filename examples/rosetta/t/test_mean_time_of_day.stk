@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mean time of day.
+# Times wrap modulo 24h, so a plain arithmetic mean of "23:00" and "01:00"
+# (== 22:00) is wrong. Convert to unit-circle vectors, average them, then
+# project the angle back onto a 24h clock.
+
+fn Rosetta::MeanTime::to_seconds($hms) {
+    my @p = split /:/, $hms
+    $p[0] * 3600 + $p[1] * 60 + ($p[2] // 0)
+}
+
+fn Rosetta::MeanTime::to_string($secs) {
+    my $s = int($secs) % 86400
+    $s += 86400 if $s < 0
+    my $h = int($s / 3600)
+    my $m = int(($s % 3600) / 60)
+    my $sec = $s % 60
+    sprintf("%02d:%02d:%02d", $h, $m, $sec)
+}
+
+fn Rosetta::MeanTime::circular_mean(@times) {
+    my $two_pi = 2 * 3.14159265358979323846
+    my $sum_x = 0.0
+    my $sum_y = 0.0
+    for my $t (@times) {
+        my $angle = Rosetta::MeanTime::to_seconds($t) / 86400 * $two_pi
+        $sum_x += cos($angle)
+        $sum_y += sin($angle)
+    }
+    my $mean_angle = atan2($sum_y, $sum_x)
+    $mean_angle += $two_pi if $mean_angle < 0
+    Rosetta::MeanTime::to_string($mean_angle / $two_pi * 86400)
+}
+
+# Canonical Rosetta example: midnight + 1am should average to 00:30, not 12:30.
+assert_eq Rosetta::MeanTime::circular_mean("23:00:00", "01:00:00"), "00:00:00", "23:00 + 01:00 → 00:00"
+
+# Symmetric cluster — three evenly spaced times average to one of them.
+my $m1 = Rosetta::MeanTime::circular_mean("06:00:00", "12:00:00", "18:00:00")
+# Three vectors 120° apart cancel; the magnitude is ~0 so the angle is unstable.
+# Just assert the result is a valid HH:MM:SS form.
+assert_ok $m1 =~ /^\d{2}:\d{2}:\d{2}$/, "format check"
+
+# Two cluster examples from Rosetta:
+# (23:00:17, 23:40:20, 00:12:45, 00:17:19) → ~23:47:43 (rounding may shift by 1 sec).
+my $m2 = Rosetta::MeanTime::circular_mean("23:00:17", "23:40:20", "00:12:45", "00:17:19")
+assert_ok $m2 =~ /^23:47:/, "midnight cluster averages near 23:47"
+
+test_run

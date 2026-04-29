@@ -4,7 +4,7 @@
 
 # Test with a randomized list
 my @data = ~> 1..100 map { int(rand(1000)) }
-my @sorted = sort { $a <=> $b } @data
+my @sorted = sort { _0 <=> _1 } @data
 
 # Verify order
 my $ok = 1

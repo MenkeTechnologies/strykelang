@@ -6,12 +6,12 @@ fn Rosetta::Pearson::compute($x, $y) {
     if ($n != scalar(@$y)) { return undef }
     if ($n == 0) { return undef }
 
-    my $sum_x = ~> @$x reduce { $a + $b }
-    my $sum_y = ~> @$y reduce { $a + $b }
-    my $sum_x2 = ~> @$x map { $_ * $_ } reduce { $a + $b }
-    my $sum_y2 = ~> @$y map { $_ * $_ } reduce { $a + $b }
+    my $sum_x = ~> @$x reduce { _0 + _1 }
+    my $sum_y = ~> @$y reduce { _0 + _1 }
+    my $sum_x2 = ~> @$x map { $_ * $_ } reduce { _0 + _1 }
+    my $sum_y2 = ~> @$y map { $_ * $_ } reduce { _0 + _1 }
     
-    my $sum_xy = ~> 0..$n-1 map { $x->[$_] * $y->[$_] } reduce { $a + $b }
+    my $sum_xy = ~> 0..$n-1 map { $x->[$_] * $y->[$_] } reduce { _0 + _1 }
 
     my $numerator = $n * $sum_xy - $sum_x * $sum_y
     my $denominator = sqrt(($n * $sum_x2 - $sum_x ** 2) * ($n * $sum_y2 - $sum_y ** 2))

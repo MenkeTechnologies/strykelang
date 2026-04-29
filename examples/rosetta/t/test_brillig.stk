@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 'Twas brillig — extract the famous Jabberwocky vocabulary.
+# Find non-overlapping `\w+` matches in a poem fragment, lowercase them, and
+# count distinct nonsense words from the canonical opening stanza.
+
+fn Rosetta::Brillig::words($poem) {
+    ~> $poem |> lc |> sub { my @w = $_[0] =~ /\w+/g; \@w } |> sub { $_[0] }
+}
+
+fn Rosetta::Brillig::nonsense($poem, $real_dict) {
+    my %seen
+    for my $w (@{ Rosetta::Brillig::words($poem) }) {
+        next if exists $real_dict->{$w}
+        $seen{$w} = 1
+    }
+    [sort keys %seen]
+}
+
+my $stanza = "'Twas brillig, and the slithy toves\n"
+           . "Did gyre and gimble in the wabe;\n"
+           . "All mimsy were the borogoves,\n"
+           . "And the mome raths outgrabe.";
+
+my %real = map { ($_, 1) } qw(twas and the did in were all);
+
+my $words = Rosetta::Brillig::words($stanza)
+assert_eq scalar(@$words), 23, "23 word tokens in opening stanza"
+
+my $nonsense = Rosetta::Brillig::nonsense($stanza, \%real)
+my $expected = [sort qw(brillig slithy toves gyre gimble wabe mimsy borogoves mome raths outgrabe)]
+assert_eq join(",", @$nonsense), join(",", @$expected),
+    "11 distinct nonsense words"
+
+test_run

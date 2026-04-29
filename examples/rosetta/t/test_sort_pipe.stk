@@ -12,7 +12,7 @@ my @psorted = @data |> psort
 assert_eq join(",", @psorted), "1,2,3,4,5,6,7,8,9", "parallel sort"
 
 # Custom sort (descending)
-my @desc = @data |> sort { $b <=> $a }
+my @desc = @data |> sort { _1 <=> _0 }
 assert_eq join(",", @desc), "9,8,7,6,5,4,3,2,1", "descending sort"
 
 # Pipe sort into reverse

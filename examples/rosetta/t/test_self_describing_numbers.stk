@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Self-describing numbers.
+# A self-describing number m has digits d_0, d_1, ..., d_{k-1} such that
+# digit d_i counts the number of i's in the decimal representation of m.
+# OEIS A046043: 1210, 2020, 21200, 3211000, 42101000.
+
+fn Rosetta::SelfDescribing::is($n) {
+    my @digits = "$n" |> chars
+    my $len = scalar(@digits)
+    for my $i (0 .. $len - 1) {
+        my $expected = $digits[$i] + 0
+        my $actual = scalar(grep { $_ + 0 == $i } @digits)
+        return 0 unless $actual == $expected
+    }
+    1
+}
+
+fn Rosetta::SelfDescribing::find_below($limit) {
+    ~> 0:$limit grep { Rosetta::SelfDescribing::is($_) }
+}
+
+assert_ok Rosetta::SelfDescribing::is(1210),     "1210 is self-describing"
+assert_ok Rosetta::SelfDescribing::is(2020),     "2020 is self-describing"
+assert_ok Rosetta::SelfDescribing::is(21200),    "21200 is self-describing"
+assert_ok !Rosetta::SelfDescribing::is(1211),    "1211 is not"
+assert_ok !Rosetta::SelfDescribing::is(1234),    "1234 is not"
+
+my @below_3000 = Rosetta::SelfDescribing::find_below(3000)
+assert_eq join(",", @below_3000), "1210,2020", "below 3000"
+
+test_run

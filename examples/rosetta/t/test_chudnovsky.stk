@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chudnovsky algorithm for pi.
+# 1/pi = 12 * sum_{k=0..} (-1)^k * (6k)! * (545140134 k + 13591409) /
+#                          ((3k)! * (k!)^3 * 640320^(3k + 1.5))
+# Pure-float version converges fast enough that the first few terms reach
+# double-precision pi.
+
+fn Rosetta::Chudnovsky::factorial($n) {
+    my $r = 1.0
+    for (2 .. $n) { $r *= $_ }
+    $r
+}
+
+fn Rosetta::Chudnovsky::approx($terms) {
+    my $sum = 0.0
+    my $C = 426880 * sqrt(10005)
+    for my $k (0 .. $terms - 1) {
+        my $num = (-1) ** $k * Rosetta::Chudnovsky::factorial(6 * $k)
+                * (545140134 * $k + 13591409)
+        my $den = Rosetta::Chudnovsky::factorial(3 * $k)
+                * (Rosetta::Chudnovsky::factorial($k) ** 3)
+                * (640320 ** (3 * $k))
+        $sum += $num / $den
+    }
+    $C / $sum
+}
+
+# 1 term already gets pi to ~13 digits.
+my $pi1 = Rosetta::Chudnovsky::approx(1)
+assert_ok abs($pi1 - 3.14159265358979323846) < 1e-13, "1 term → 13+ digits"
+
+# 2 terms: even tighter, still well within double precision.
+my $pi2 = Rosetta::Chudnovsky::approx(2)
+assert_ok abs($pi2 - 3.14159265358979323846) < 1e-15, "2 terms → near float epsilon"
+
+# Sanity: matches std::f64::consts::PI to within rounding.
+my $delta = abs($pi2 - 3.14159265358979)
+assert_ok $delta < 1e-13, "sanity: matches std PI"
+
+test_run

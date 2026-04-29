@@ -6,7 +6,7 @@ fn Rosetta::Median::median {
     if (scalar(@$list) == 0) {
         0
     } else {
-        my @sorted = sort { $a <=> $b } @$list
+        my @sorted = sort { _0 <=> _1 } @$list
         my $len = scalar(@sorted)
         my $mid = int($len / 2)
         if ($len % 2 == 0) {

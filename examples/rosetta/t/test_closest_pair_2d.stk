@@ -73,8 +73,8 @@ fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
 }
 
 fn Rosetta::ClosestPair2D::solve($points) {
-    my @points_x = sort { $a->[0] <=> $b->[0] } @$points
-    my @points_y = sort { $a->[1] <=> $b->[1] } @$points
+    my @points_x = sort { _0->[0] <=> _1->[0] } @$points
+    my @points_y = sort { _0->[1] <=> _1->[1] } @$points
     
     Rosetta::ClosestPair2D::solve_rec(\@points_x, \@points_y)
 }

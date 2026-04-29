@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pythagorean means — arithmetic, geometric, harmonic.
+# AM >= GM >= HM for any positive list, with equality iff all values equal.
+
+fn Rosetta::PythMean::arithmetic(@xs) {
+    my $sum = ~> @xs reduce { $_0 + $_1 }
+    $sum / scalar(@xs)
+}
+
+fn Rosetta::PythMean::geometric(@xs) {
+    my $prod = ~> @xs reduce { $_0 * $_1 }
+    $prod ** (1.0 / scalar(@xs))
+}
+
+fn Rosetta::PythMean::harmonic(@xs) {
+    my $recip_sum = ~> @xs map { 1.0 / $_ } reduce { $_0 + $_1 }
+    scalar(@xs) / $recip_sum
+}
+
+my @nums = 1:10
+my $am = Rosetta::PythMean::arithmetic(@nums)
+my $gm = Rosetta::PythMean::geometric(@nums)
+my $hm = Rosetta::PythMean::harmonic(@nums)
+
+assert_ok abs($am - 5.5) < 1e-12, "AM(1..10) == 5.5"
+assert_ok abs($gm - 4.52872868812) < 1e-7, "GM(1..10) ~ 4.5287..."
+assert_ok abs($hm - 3.41417152198) < 1e-7, "HM(1..10) ~ 3.4141..."
+
+# Pythagorean inequality — strict for distinct positive numbers.
+assert_ok $am > $gm, "AM > GM"
+assert_ok $gm > $hm, "GM > HM"
+
+# All-equal case — all three means coincide.
+my @flat = (7, 7, 7, 7)
+assert_eq Rosetta::PythMean::arithmetic(@flat), 7, "AM(7,7,7,7) = 7"
+assert_ok abs(Rosetta::PythMean::geometric(@flat) - 7) < 1e-12, "GM = 7"
+assert_ok abs(Rosetta::PythMean::harmonic(@flat) - 7) < 1e-12, "HM = 7"
+
+test_run

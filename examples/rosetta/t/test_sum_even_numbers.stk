@@ -6,7 +6,7 @@ fn Rosetta::SumEven::compute($list) {
     if (scalar(@evens) == 0) {
         0
     } else {
-        ~> @evens reduce { $a + $b }
+        ~> @evens reduce { _0 + _1 }
     }
 }
 

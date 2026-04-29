@@ -8,7 +8,7 @@ fn Rosetta::Frobenius::two($a, $b) {
 }
 
 fn Rosetta::Frobenius::dp(@coins) {
-    my @sorted = sort { $a <=> $b } @coins
+    my @sorted = sort { _0 <=> _1 } @coins
     return -1 if $sorted[0] == 1
     my $bound = 1
     for my $c (@coins) { $bound *= $c }

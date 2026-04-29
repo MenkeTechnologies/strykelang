@@ -6,7 +6,7 @@ fn Rosetta::BalancedNumbers::sum_digits($n) {
     if (scalar(@digits) == 0) {
         0
     } else {
-        @digits |> reduce { $a + $b }
+        @digits |> reduce { _0 + _1 }
     }
 }
 

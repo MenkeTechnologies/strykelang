@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cartesian quadrants — classify (x, y) into Q1..Q4 or report
+# axis/origin. Convention: Q1 = (+,+), Q2 = (-,+), Q3 = (-,-), Q4 = (+,-).
+
+fn Rosetta::Quadrants::classify($x, $y) {
+    return "origin" if $x == 0 && $y == 0
+    return "x-axis" if $y == 0
+    return "y-axis" if $x == 0
+    return "Q1" if $x > 0 && $y > 0
+    return "Q2" if $x < 0 && $y > 0
+    return "Q3" if $x < 0 && $y < 0
+    "Q4"
+}
+
+assert_eq Rosetta::Quadrants::classify(0, 0),    "origin", "origin"
+assert_eq Rosetta::Quadrants::classify(5, 0),    "x-axis", "+x axis"
+assert_eq Rosetta::Quadrants::classify(-5, 0),   "x-axis", "-x axis"
+assert_eq Rosetta::Quadrants::classify(0, 5),    "y-axis", "+y axis"
+assert_eq Rosetta::Quadrants::classify(0, -5),   "y-axis", "-y axis"
+assert_eq Rosetta::Quadrants::classify(3, 4),    "Q1",     "(+,+)"
+assert_eq Rosetta::Quadrants::classify(-3, 4),   "Q2",     "(-,+)"
+assert_eq Rosetta::Quadrants::classify(-3, -4),  "Q3",     "(-,-)"
+assert_eq Rosetta::Quadrants::classify(3, -4),   "Q4",     "(+,-)"
+
+# Walking the unit square: every quadrant + every axis touch.
+my @points = ([1,1], [-1,1], [-1,-1], [1,-1], [0,1], [1,0])
+my @labels = ~> @points map { Rosetta::Quadrants::classify($_->[0], $_->[1]) }
+assert_eq join(",", @labels), "Q1,Q2,Q3,Q4,y-axis,x-axis", "tour around origin"
+
+test_run
