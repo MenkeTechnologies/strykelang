@@ -7,7 +7,7 @@ fn Rosetta::FNV::fnv1a($text) {
     my $prime = 16777619
     my $mod = 4294967296 # 2^32
     
-    for my $c ($text |> chars() |> map { ord($_) }) {
+    for my $c ($text |> chars() |> map { ord(_) }) {
         $hash = $hash ^ $c
         # Handle large multiplication modulo
         $hash = ($hash * $prime) % $mod

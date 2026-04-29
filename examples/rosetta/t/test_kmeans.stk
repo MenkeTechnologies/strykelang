@@ -21,7 +21,7 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
         
         # Assignment step
         my @new_assignments = map {
-            my $p_idx = $_
+            my $p_idx = _
             my $min_dist = 1e18
             my $best_c = -1
             for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
@@ -65,7 +65,7 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
         }
     }
     
-    return { centroids => \@centroids, assignments => \@assignments }
+    { centroids => \@centroids, assignments => \@assignments }
 }
 
 my @points = (

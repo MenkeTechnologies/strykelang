@@ -151,7 +151,7 @@ fn anon_sub_stryke_signature() {
 #[test]
 fn coderef_invocation_with_arrow() {
     assert_eq!(
-        eval_int(r#"fn dbl { $_0 * 2 } my $r = \&dbl; $r->(21)"#),
+        eval_int(r#"fn dbl { _ * 2 } my $r = \&dbl; $r->(21)"#),
         42,
     );
 }

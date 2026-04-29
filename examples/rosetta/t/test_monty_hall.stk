@@ -14,7 +14,7 @@ fn Rosetta::MontyHall::simulate($trials, $switch) {
         }
     }
     my $s = sum(@results)
-    return $s
+    $s
 }
 
 my $trials = 1000

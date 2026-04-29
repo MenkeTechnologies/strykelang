@@ -9,7 +9,7 @@ fn Rosetta::BWT::transform($text) {
     
     # Create all rotations
     my @rotations = ~> 0:($len - 1) map {
-        my $i = $_
+        my $i = _
         my @rot
         for (my $j = 0; $j < $len; $j++) {
             push @rot, $chars[($i + $j) % $len]

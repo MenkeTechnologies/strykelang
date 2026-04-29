@@ -2,7 +2,7 @@
 # Rosetta Code: Priority queue
 
 fn Rosetta::PriorityQueue::new() {
-    return { items => [] }
+    { items => [] }
 }
 
 fn Rosetta::PriorityQueue::push($pq, $item, $priority) {
@@ -13,7 +13,7 @@ fn Rosetta::PriorityQueue::push($pq, $item, $priority) {
 
 fn Rosetta::PriorityQueue::pop($pq) {
     my $val = shift @{$pq->{items}}
-    return $val->{item}
+    $val->{item}
 }
 
 fn Rosetta::PriorityQueue::size($pq) {

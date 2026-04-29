@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pigeonhole sort — O(n + range) for small integer ranges
+
+fn Rosetta::Pigeonhole::sort($arr) {
+    return [] if len(@$arr) == 0
+    my $min = min(@$arr)
+    my $max = max(@$arr)
+    my @holes = (0) x ($max - $min + 1)
+    $holes[_ - $min]++ for @$arr
+    my @out
+    for my $i (0..len(@holes) - 1) {
+        push @out, $i + $min for 1..$holes[$i]
+    }
+    \@out
+}
+
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([3, 1, 4, 1, 5, 9, 2, 6])}), "1,1,2,3,4,5,6,9", "classic"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([5, 4, 3, 2, 1])}), "1,2,3,4,5", "reverse sorted"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([1, 2, 3, 4, 5])}), "1,2,3,4,5", "already sorted"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([7])}), "7", "single"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([])}), "", "empty"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([2, 2, 2, 2])}), "2,2,2,2", "all equal"
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([-3, 0, 5, -1, 2])}), "-3,-1,0,2,5", "negatives"
+
+# Range bigger than length
+assert_eq join(",", @{Rosetta::Pigeonhole::sort([100, 1, 50])}), "1,50,100", "wide range"
+
+test_run

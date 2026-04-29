@@ -2,23 +2,23 @@
 # Rosetta Code: Filter
 
 fn Rosetta::Filter::positive(@nums) {
-    @nums |> filter { $_ > 0 }
+    @nums |> filter { _ > 0 }
 }
 
 fn Rosetta::Filter::by_predicate($pred, @nums) {
-    @nums |> filter { $pred->($_) }
+    @nums |> filter { $pred->(_) }
 }
 
 my @pos = Rosetta::Filter::positive(-2, -1, 0, 1, 2, 3)
 assert_eq join(",", @pos), "1,2,3", "filter positive"
 
-my @evens = 1:10 |> filter { $_ % 2 == 0 }
+my @evens = 1:10 |> filter { _ % 2 == 0 }
 assert_eq join(",", @evens), "2,4,6,8,10", "filter evens with pipe"
 
-my @gt5 = 1:10 |> filter { $_ > 5 }
+my @gt5 = 1:10 |> filter { _ > 5 }
 assert_eq join(",", @gt5), "6,7,8,9,10", "filter > 5"
 
-my @squares = 1:10 |> map { $_ * $_ } |> filter { $_ > 20 }
+my @squares = 1:10 |> map { _ * _ } |> filter { _ > 20 }
 assert_eq join(",", @squares), "25,36,49,64,81,100", "map then filter"
 
 my $is_p = fn ($n) {

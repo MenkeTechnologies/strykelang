@@ -11,20 +11,20 @@ fn Rosetta::ContinuedFraction::compute($gen, $n) {
         $i = $i - 1
     }
     my $ab0 = $gen->(0)
-    return $ab0->[0] + $res
+    $ab0->[0] + $res
 }
 
 # sqrt(2): [1; 2, 2, 2, ...]
 my $sqrt2_gen = fn ($i) {
     if ($i == 0) { return [1, 1] }
-    return [2, 1]
+    [2, 1]
 }
 
 # e: [2; 1, 2, 1, 1, 4, 1, 1, 6, ...]
 my $e_gen = fn ($i) {
     if ($i == 0) { return [2, 1] }
     if ($i % 3 == 2) { return [2 * ($i + 1) / 3, 1] }
-    return [1, 1]
+    [1, 1]
 }
 
 my $v_sqrt2 = Rosetta::ContinuedFraction::compute($sqrt2_gen, 20)

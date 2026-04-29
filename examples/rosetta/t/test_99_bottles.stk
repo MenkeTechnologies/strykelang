@@ -16,7 +16,7 @@ fn Rosetta::NinetyNineBottles::verse($n) {
 }
 
 fn Rosetta::NinetyNineBottles::song($from, $to) {
-    ~> $from:$to map { Rosetta::NinetyNineBottles::verse($_) } join("\n\n")
+    ~> $from:$to map { Rosetta::NinetyNineBottles::verse } join("\n\n")
 }
 
 assert_eq Rosetta::NinetyNineBottles::bottles(99), "99 bottles", "bottles(99)"

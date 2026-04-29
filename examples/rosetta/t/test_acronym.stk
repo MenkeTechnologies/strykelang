@@ -2,7 +2,7 @@
 # Rosetta Code: Acronym
 
 fn Rosetta::Acronym::compute($s) {
-    $s |> split /[\s-]+/ |> map { substr($_, 0, 1) } |> join "" |> uc
+    $s |> split /[\s-]+/ |> map { substr(_, 0, 1) } |> join "" |> uc
 }
 
 assert_eq Rosetta::Acronym::compute("Portable Network Graphics"), "PNG", "PNG"

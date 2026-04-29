@@ -78,7 +78,7 @@ fn Rosetta::Truth::parse_atom($tokens, $pos, $env) {
         Rosetta::Truth::consume($tokens, $pos)   # consume ")"
         return $v
     }
-    return $env->{$t} ? 1 : 0
+    $env->{$t} ? 1 : 0
 }
 
 fn Rosetta::Truth::table($expr, $vars) {

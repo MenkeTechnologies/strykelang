@@ -1,0 +1,112 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Skip list — probabilistic ordered map with O(log n) lookups
+# (Pugh 1990). For determinism we use a linear-congruential coin so tests pass.
+
+fn Rosetta::SkipList::new($max_lvl) {
+    {
+        max_lvl => $max_lvl,
+        head => { k => undef, fwd => [(undef) x $max_lvl], lvl => $max_lvl - 1 },
+        level => 0,
+        seed => 12345,
+    }
+}
+
+fn Rosetta::SkipList::coin($sl) {
+    $sl->{seed} = ($sl->{seed} * 1103515245 + 12345) & 0x7fffffff
+    ($sl->{seed} >> 16) & 1
+}
+
+fn Rosetta::SkipList::random_level($sl) {
+    my $lvl = 0
+    while ($lvl < $sl->{max_lvl} - 1 && Rosetta::SkipList::coin($sl)) {
+        $lvl++
+    }
+    $lvl
+}
+
+fn Rosetta::SkipList::insert($sl, $key) {
+    my @update = (undef) x $sl->{max_lvl}
+    my $cur = $sl->{head}
+    for my $i (~> 0:$sl->{level} rev) {
+        while (defined($cur->{fwd}[$i]) && $cur->{fwd}[$i]{k} < $key) {
+            $cur = $cur->{fwd}[$i]
+        }
+        $update[$i] = $cur
+    }
+    $cur = $cur->{fwd}[0]
+    if (defined($cur) && $cur->{k} == $key) { return }
+    my $lvl = Rosetta::SkipList::random_level($sl)
+    if ($lvl > $sl->{level}) {
+        for my $i ($sl->{level} + 1..$lvl) {
+            $update[$i] = $sl->{head}
+        }
+        $sl->{level} = $lvl
+    }
+    my $node = { k => $key, fwd => [(undef) x ($lvl + 1)], lvl => $lvl }
+    for my $i (0..$lvl) {
+        $node->{fwd}[$i] = $update[$i]{fwd}[$i]
+        $update[$i]{fwd}[$i] = $node
+    }
+}
+
+fn Rosetta::SkipList::contains($sl, $key) {
+    my $cur = $sl->{head}
+    for my $i (~> 0:$sl->{level} rev) {
+        while (defined($cur->{fwd}[$i]) && $cur->{fwd}[$i]{k} < $key) {
+            $cur = $cur->{fwd}[$i]
+        }
+    }
+    $cur = $cur->{fwd}[0]
+    defined($cur) && $cur->{k} == $key ? 1 : 0
+}
+
+fn Rosetta::SkipList::sorted_keys($sl) {
+    my @out
+    my $cur = $sl->{head}{fwd}[0]
+    while (defined $cur) {
+        push @out, $cur->{k}
+        $cur = $cur->{fwd}[0]
+    }
+    \@out
+}
+
+# Build skiplist from random insertion order
+my $sl = Rosetta::SkipList::new(16)
+for my $k (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14) {
+    Rosetta::SkipList::insert($sl, $k)
+}
+
+# Inorder via level-0 chain returns sorted
+my $sorted = Rosetta::SkipList::sorted_keys($sl)
+assert_eq join(",", @$sorted), "3,5,8,11,14,17,23,29,32,41,50,67,76,88,99", "level-0 chain is sorted"
+
+# Lookups
+assert_ok Rosetta::SkipList::contains($sl, 23), "contains 23"
+assert_ok Rosetta::SkipList::contains($sl, 99), "contains 99"
+assert_ok Rosetta::SkipList::contains($sl, 3), "contains 3"
+assert_ok !Rosetta::SkipList::contains($sl, 100), "missing 100"
+assert_ok !Rosetta::SkipList::contains($sl, 0), "missing 0"
+assert_ok !Rosetta::SkipList::contains($sl, 22), "missing 22 (between 17 and 23)"
+
+# Duplicate insert is a no-op
+my $before = len(@{Rosetta::SkipList::sorted_keys($sl)})
+Rosetta::SkipList::insert($sl, 50)
+my $after = len(@{Rosetta::SkipList::sorted_keys($sl)})
+assert_eq $after, $before, "duplicate insert no-op"
+
+# Empty skiplist behaviors
+my $empty = Rosetta::SkipList::new(8)
+assert_eq len(@{Rosetta::SkipList::sorted_keys($empty)}), 0, "empty skiplist"
+assert_ok !Rosetta::SkipList::contains($empty, 42), "empty contains nothing"
+
+# Insert 1..100 sequentially — should still produce sorted output
+my $big = Rosetta::SkipList::new(16)
+for my $k (1..100) {
+    Rosetta::SkipList::insert($big, $k)
+}
+my $bk = Rosetta::SkipList::sorted_keys($big)
+assert_eq len(@$bk), 100, "100 inserts -> 100 keys"
+assert_eq $bk->[0], 1, "min = 1"
+assert_eq $bk->[-1], 100, "max = 100"
+
+test_run

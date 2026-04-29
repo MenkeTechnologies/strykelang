@@ -14,7 +14,7 @@ fn Rosetta::TicTacToe::check_win($board) {
             return $b[$w->[0]]
         }
     }
-    return undef
+    undef
 }
 
 fn Rosetta::TicTacToe::is_full($board) {

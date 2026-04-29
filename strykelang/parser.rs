@@ -5622,7 +5622,14 @@ impl Parser {
     fn parse_return(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'return'
-        let val = if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof) {
+        // No-value return: terminator tokens AND any postfix statement-modifier
+        // keyword (`if`/`unless`/`while`/`until`/`for`/`foreach`). Without this
+        // the postfix-modifier check below never fires for valueless returns —
+        // `parse_assign_expr` would see `if` and look it up as a sub call,
+        // producing the misleading "Undefined subroutine &if" error.
+        let val = if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof)
+            || self.peek_is_postfix_stmt_modifier_keyword()
+        {
             None
         } else {
             // Only parse up to the assign level to avoid consuming postfix if/unless
@@ -8630,7 +8637,57 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let a = self.parse_one_arg_or_default()?;
+                // Named-unary precedence: `defined X && Y` is `(defined X) && Y`,
+                // not `defined(X && Y)`. The default `parse_one_arg_or_default`
+                // path is greedy (calls `parse_assign_expr_stop_at_pipe`), which
+                // would let `&&` bind into the argument and silently make
+                // `defined $h{k} && $h{k} > 0`-style guards always-true when the
+                // hash element existed. `parse_named_unary_arg` stops at shift
+                // level so logical operators stay outside.
+                let a = if matches!(
+                    self.peek(),
+                    Token::Semicolon
+                        | Token::RBrace
+                        | Token::RParen
+                        | Token::RBracket
+                        | Token::Eof
+                        | Token::Comma
+                        | Token::FatArrow
+                        | Token::PipeForward
+                        | Token::Question
+                        | Token::Colon
+                        | Token::NumEq | Token::NumNe | Token::NumLt | Token::NumGt
+                        | Token::NumLe | Token::NumGe | Token::Spaceship
+                        | Token::StrEq | Token::StrNe | Token::StrLt | Token::StrGt
+                        | Token::StrLe | Token::StrGe | Token::StrCmp
+                        | Token::LogAnd | Token::LogOr | Token::LogNot
+                        | Token::LogAndWord | Token::LogOrWord | Token::LogNotWord
+                        | Token::DefinedOr
+                        | Token::Range | Token::RangeExclusive
+                        | Token::Assign | Token::PlusAssign | Token::MinusAssign
+                        | Token::MulAssign | Token::DivAssign | Token::ModAssign
+                        | Token::PowAssign | Token::DotAssign | Token::AndAssign
+                        | Token::OrAssign | Token::XorAssign | Token::DefinedOrAssign
+                        | Token::ShiftLeftAssign | Token::ShiftRightAssign
+                        | Token::BitAndAssign | Token::BitOrAssign
+                ) {
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: self.peek_line(),
+                    }
+                } else if matches!(self.peek(), Token::LParen)
+                    && matches!(self.peek_at(1), Token::RParen)
+                {
+                    let pl = self.peek_line();
+                    self.advance();
+                    self.advance();
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: pl,
+                    }
+                } else {
+                    self.parse_named_unary_arg()?
+                };
                 Ok(Expr {
                     kind: ExprKind::Defined(Box::new(a)),
                     line,
@@ -13615,6 +13672,25 @@ impl Parser {
             Ok(expr)
         } else {
             self.parse_assign_expr_stop_at_pipe()
+        }
+    }
+
+    /// Bare argument for a Perl-5 named unary operator (`defined`, `length`,
+    /// `abs`, `scalar`, `ref`, `keys`, `values`, etc.). Named unary precedence
+    /// sits between shift (`<<`/`>>`) and comparison (`<`/`>`), so we parse
+    /// only down to shift level. The surrounding `&&` / `||` / `==` / `<` /
+    /// equality / logical / ternary stay outside the unary's argument.
+    /// Without this `defined $x && Y` mis-parsed as `defined($x && Y)` and
+    /// silently returned true whenever `$x` was defined — see the skip-list
+    /// debugging write-up. Same scope rule for `length` etc.
+    fn parse_named_unary_arg(&mut self) -> PerlResult<Expr> {
+        if matches!(self.peek(), Token::LParen) {
+            self.advance();
+            let expr = self.parse_expression()?;
+            self.expect(&Token::RParen)?;
+            Ok(expr)
+        } else {
+            self.parse_shift()
         }
     }
 

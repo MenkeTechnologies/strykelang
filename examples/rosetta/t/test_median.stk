@@ -2,7 +2,7 @@
 # Rosetta Code: Median
 
 fn Rosetta::Median::median {
-    my $list = $_[0]
+    my $list = _[0]
     if (len(@$list) == 0) {
         0
     } else {

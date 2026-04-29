@@ -25,7 +25,7 @@ fn Rosetta::Bitap::solve($text, $pattern) {
         }
     }
     
-    return -1
+    -1
 }
 
 assert_eq Rosetta::Bitap::solve("hello world", "world"), 6, "Bitap find world"

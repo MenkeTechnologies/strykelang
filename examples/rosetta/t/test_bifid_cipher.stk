@@ -3,7 +3,7 @@
 
 fn Rosetta::Bifid::prepare_key($key) {
     my $alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ" # No J
-    my $k = $key |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my $k = $key |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
     $k .= $alphabet
     
     my %seen
@@ -23,12 +23,12 @@ fn Rosetta::Bifid::find_pos($grid, $char) {
             return [$i / 5 | 0, $i % 5]
         }
     }
-    return [-1, -1]
+    [-1, -1]
 }
 
 fn Rosetta::Bifid::encode($text, $key) {
     my $grid = Rosetta::Bifid::prepare_key($key)
-    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
     my @chars = $t |> chars()
     
     my @rows
@@ -53,7 +53,7 @@ fn Rosetta::Bifid::encode($text, $key) {
 
 fn Rosetta::Bifid::decode($text, $key) {
     my $grid = Rosetta::Bifid::prepare_key($key)
-    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
     my @chars = $t |> chars()
     
     my @combined

@@ -37,7 +37,7 @@ fn Rosetta::Solve::solve($grid) {
 fn get_test_grids {
     my @g1 = ([0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0])
     my @g2 = ([0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0])
-    return (\@g1, \@g2)
+    (\@g1, \@g2)
 }
 
 my @grids = get_test_grids()

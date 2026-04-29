@@ -25,7 +25,7 @@ assert_eq Rosetta::Abs::sign(-10), -1, "sign negative"
 assert_eq Rosetta::Abs::sign(0), 0, "sign zero"
 
 my @nums = (-5, -3, 0, 2, 4)
-my @absolutes = @nums |> map { abs($_) }
+my @absolutes = @nums |> map { abs(_) }
 assert_eq join(",", @absolutes), "5,3,0,2,4", "map abs"
 
 test_run

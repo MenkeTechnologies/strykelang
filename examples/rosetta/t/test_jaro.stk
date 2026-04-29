@@ -23,7 +23,7 @@ fn Rosetta::Jaro::distance($s1, $s2) {
         $end   = $lb - 1 if $end > $lb - 1
         for my $j ($start .. $end) {
             next if $b_match[$j]
-            next unless $_0[$i] eq $_1[$j]
+            next unless _0[$i] eq _1[$j]
             $a_match[$i] = 1
             $b_match[$j] = 1
             $matches += 1
@@ -37,7 +37,7 @@ fn Rosetta::Jaro::distance($s1, $s2) {
     for my $i (0 .. $la - 1) {
         next unless $a_match[$i]
         $k += 1 until $b_match[$k]
-        $trans += 1 if $_0[$i] ne $_1[$k]
+        $trans += 1 if _0[$i] ne _1[$k]
         $k += 1
     }
     $trans = $trans / 2

@@ -15,7 +15,7 @@ fn Rosetta::EarClip::point_in_tri($p, $a, $b, $c) {
 }
 
 fn Rosetta::EarClip::triangulate($poly) {
-    my @pts = map { [$_->[0], $_->[1]] } @$poly
+    my @pts = map { [_->[0], _->[1]] } @$poly
     my $n = len(@pts)
     return [] if $n < 3
     my @indices = (0..$n - 1)

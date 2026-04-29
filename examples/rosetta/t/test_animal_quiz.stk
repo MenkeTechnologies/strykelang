@@ -9,7 +9,7 @@ fn Rosetta::AnimalQuiz::solve($root, $answers) {
     my $curr = $root
     for my $ans (@$answers) {
         if (!defined $curr->{yes}) {
-            return $curr->{q} # Found animal
+            $curr->{q} # Found animal
         }
         if ($ans eq "yes") {
             $curr = $curr->{yes}

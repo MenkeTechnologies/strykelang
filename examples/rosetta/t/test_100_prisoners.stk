@@ -28,7 +28,7 @@ fn Rosetta::Prisoners::play($optimal) {
         }
         return 0 if !$found
     }
-    return 1
+    1
 }
 
 # Statistics

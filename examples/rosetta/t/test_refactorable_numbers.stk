@@ -4,7 +4,7 @@
 fn is_refactorable($n) {
     my $c = num_divisors($n)
     if ($c == 0) { return 0 }
-    return $n % $c == 0
+    $n % $c == 0
 }
 
 # The first few refactorable numbers are: 1, 2, 8, 9, 12, 18, 24, 36, 40, 56, 60, 72, 80, 84, 88, 96

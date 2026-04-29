@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Xorshift PRNG (Marsaglia 2003) — 32-bit state, period 2^32 - 1
+
+fn Rosetta::Xorshift::new($seed) {
+    my $s = $seed & 0xFFFFFFFF
+    $s = 1 if $s == 0
+    { state => $s }
+}
+
+fn Rosetta::Xorshift::next($rng) {
+    my $x = $rng->{state}
+    $x = ($x ^ ($x << 13)) & 0xFFFFFFFF
+    $x = ($x ^ ($x >> 17)) & 0xFFFFFFFF
+    $x = ($x ^ ($x << 5))  & 0xFFFFFFFF
+    $rng->{state} = $x
+    $x
+}
+
+fn Rosetta::Xorshift::range($rng, $lo, $hi) {
+    my $r = Rosetta::Xorshift::next($rng)
+    $lo + ($r % ($hi - $lo + 1))
+}
+
+# Reproducibility: same seed -> same stream
+my $a = Rosetta::Xorshift::new(2463534242)
+my $b = Rosetta::Xorshift::new(2463534242)
+for my $i (1..20) {
+    assert_eq Rosetta::Xorshift::next($a), Rosetta::Xorshift::next($b), "iter $i identical"
+}
+
+# Different seeds diverge quickly
+my $c = Rosetta::Xorshift::new(1)
+my $d = Rosetta::Xorshift::new(2)
+my $diff = 0
+for (1..5) {
+    $diff++ if Rosetta::Xorshift::next($c) != Rosetta::Xorshift::next($d)
+}
+assert_eq $diff, 5, "different seeds diverge within 5 steps"
+
+# Range bounded
+my $rng = Rosetta::Xorshift::new(42)
+for (1..50) {
+    my $v = Rosetta::Xorshift::range($rng, 0, 9)
+    assert_ok($v >= 0 && $v <= 9, "range produces 0..9")
+}
+
+# Seed 0 normalised to 1 (xorshift is fixed-point at 0)
+my $z = Rosetta::Xorshift::new(0)
+assert_eq $z->{state}, 1, "seed 0 normalised to 1"
+
+# Spread / uniformity sanity: 10000 samples in 0..9 should fill all buckets
+my $r2 = Rosetta::Xorshift::new(2024)
+my %hist
+for (1..10000) {
+    my $v = Rosetta::Xorshift::range($r2, 0, 9)
+    $hist{$v}++
+}
+assert_eq len(keys %hist), 10, "all 10 buckets filled"
+for my $k (keys %hist) {
+    assert_ok($hist{$k} > 700 && $hist{$k} < 1300, "bucket $k roughly 1000")
+}
+
+test_run

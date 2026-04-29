@@ -14,8 +14,8 @@ fn Rosetta::Anagrams::check($a, $b) {
 fn Rosetta::Anagrams::find($word, @words) {
     my $key = Rosetta::Anagrams::sort_chars($word)
     my @res = ~> @words grep {
-        my $sc = Rosetta::Anagrams::sort_chars($_)
-        $sc eq $key && lc($_) ne lc($word)
+        my $sc = Rosetta::Anagrams::sort_chars(_)
+        $sc eq $key && lc(_) ne lc($word)
     }
     \@res
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Singly-linked list/Element definition
 
 fn Rosetta::LinkedList::new() {
-    return { head => undef, size => 0 }
+    { head => undef, size => 0 }
 }
 
 fn Rosetta::LinkedList::push($list, $val) {

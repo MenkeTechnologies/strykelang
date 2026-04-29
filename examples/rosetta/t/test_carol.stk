@@ -6,7 +6,7 @@ fn Rosetta::Carol::compute($n) {
 }
 
 fn Rosetta::Carol::list($max_n) {
-    ~> 1:$max_n map { Rosetta::Carol::compute($_) }
+    ~> 1:$max_n map { Rosetta::Carol::compute(_) }
 }
 
 assert_eq Rosetta::Carol::compute(1), -1, "C1"

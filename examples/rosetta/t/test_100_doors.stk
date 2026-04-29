@@ -6,15 +6,15 @@ fn Rosetta::OneHundredDoors::solve($n) {
     # It is toggled for every divisor it has.
     # Numbers with an odd number of divisors are perfect squares.
     ~> 1:$n pgrep {
-        my $door = $_
-        my @divs = grep { $door % $_ == 0 } 1:$door
+        my $door = _
+        my @divs = grep { $door % _ == 0 } 1:$door
         len(@divs) % 2 == 1
     }
 }
 
 fn Rosetta::OneHundredDoors::solve_optimized($n) {
     ~> 1:$n pgrep {
-        my $s = sqrt($_)
+        my $s = sqrt(_)
         $s == int($s)
     }
 }

@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fibonacci coding — encode positive int as a bit-string
+# whose Zeckendorf representation ends with "11".
+
+fn Rosetta::FibCoding::fibs_up_to($n) {
+    return [1] if $n < 2
+    my @f = (1, 2)
+    while ($f[-1] + $f[-2] <= $n) {
+        push @f, $f[-1] + $f[-2]
+    }
+    \@f
+}
+
+fn Rosetta::FibCoding::encode($n) {
+    return undef if $n < 1
+    my $fibs = Rosetta::FibCoding::fibs_up_to($n)
+    my @bits = (0) x len(@$fibs)
+    my $rem = $n
+    for my $i (~> 0:len(@$fibs) - 1 rev) {
+        if ($fibs->[$i] <= $rem) {
+            $bits[$i] = 1
+            $rem -= $fibs->[$i]
+        }
+    }
+    join("", @bits) . "1"
+}
+
+fn Rosetta::FibCoding::decode($s) {
+    return undef unless $s =~ /^[01]+1$/
+    my $core = substr($s, 0, length($s) - 1)
+    return undef if $core =~ /11/
+    my @f = (1, 2)
+    while (len(@f) < length($core)) {
+        push @f, $f[-1] + $f[-2]
+    }
+    my $n = 0
+    for my $i (0..length($core) - 1) {
+        if (substr($core, $i, 1) eq "1") {
+            $n += $f[$i]
+        }
+    }
+    $n
+}
+
+# Known encodings — every fib coding ends with "11"; bit position i (0-indexed)
+# represents F_{i+2} where F_2=1, F_3=2, F_4=3, F_5=5, F_6=8.
+assert_eq Rosetta::FibCoding::encode(1), "11", "1 -> 11"
+assert_eq Rosetta::FibCoding::encode(2), "011", "2 -> 011"
+assert_eq Rosetta::FibCoding::encode(3), "0011", "3 -> 0011"
+assert_eq Rosetta::FibCoding::encode(4), "1011", "4 = 1+3 -> 1011"
+assert_eq Rosetta::FibCoding::encode(5), "00011", "5 -> 00011"
+assert_eq Rosetta::FibCoding::encode(6), "10011", "6 = 1+5 -> 10011"
+assert_eq Rosetta::FibCoding::encode(7), "01011", "7 = 2+5 -> 01011"
+assert_eq Rosetta::FibCoding::encode(8), "000011", "8 -> 000011"
+assert_eq Rosetta::FibCoding::encode(11), "001011", "11 = 3+8 -> 001011"
+
+# Round-trip
+for my $n (1, 2, 5, 13, 50, 100, 999, 12345) {
+    my $enc = Rosetta::FibCoding::encode($n)
+    my $dec = Rosetta::FibCoding::decode($enc)
+    assert_eq $dec, $n, "round-trip $n via $enc"
+}
+
+# Invalid decode
+assert_ok !defined(Rosetta::FibCoding::decode("110")), "trailing zero invalid"
+assert_ok !defined(Rosetta::FibCoding::decode("1110")), "no terminator"
+
+# Edge cases
+assert_ok !defined(Rosetta::FibCoding::encode(0)), "0 not encodable"
+assert_ok !defined(Rosetta::FibCoding::encode(-1)), "negative not encodable"
+
+test_run

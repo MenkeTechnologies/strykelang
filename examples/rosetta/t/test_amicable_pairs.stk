@@ -3,7 +3,7 @@
 
 fn Rosetta::AmicablePairs::sum_divisors($n) {
     if ($n < 2) {
-        return 0
+        0
     }
     my $sum = 0
     my $limit = int($n / 2)
@@ -17,7 +17,7 @@ fn Rosetta::AmicablePairs::sum_divisors($n) {
 
 fn Rosetta::AmicablePairs::check($val1, $val2) {
     if ($val1 == $val2) {
-        return 0
+        0
     }
     my $sa = Rosetta::AmicablePairs::sum_divisors($val1)
     my $sb = Rosetta::AmicablePairs::sum_divisors($val2)

@@ -33,7 +33,7 @@ fn Rosetta::Dijkstra::solve($graph, $start) {
             }
         }
     }
-    return [$dist, $prev]
+    [$dist, $prev]
 }
 
 my $graph = {

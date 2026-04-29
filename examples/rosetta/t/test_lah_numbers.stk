@@ -22,7 +22,7 @@ fn Rosetta::Lah::value($n, $k) {
     # C(n-1,k-1) = (n-1)! / ((k-1)! * (n-k)!)
     $num   *= Rosetta::Lah::factorial($n - 1)
     $denom *= Rosetta::Lah::factorial($k - 1) * Rosetta::Lah::factorial($n - $k)
-    return int($num / $denom)
+    int($num / $denom)
 }
 
 # Row 0: 1

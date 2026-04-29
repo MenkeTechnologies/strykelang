@@ -62,7 +62,7 @@ fn Rosetta::Kosaraju::solve($graph) {
     }
     
     # Sort SCCs for deterministic testing
-    my @sorted_sccs = sort { join(",", @$_0) cmp join(",", @$_1) } @sccs
+    my @sorted_sccs = sort { join(",", @_0) cmp join(",", @$_1) } @sccs
     \@sorted_sccs
 }
 

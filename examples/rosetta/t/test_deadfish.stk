@@ -19,6 +19,6 @@ fn Rosetta::Deadfish::execute($cmd) {
 assert_eq join(",", @{ Rosetta::Deadfish::execute("iissso") }), "0", "iissso"
 assert_eq join(",", @{ Rosetta::Deadfish::execute("diissisdo") }), "288", "diissisdo"
 
-"iissso" |> Rosetta::Deadfish::execute |> map { join(",", @$_) } |> assert_eq("0", "pipe deadfish")
+"iissso" |> Rosetta::Deadfish::execute |> { join(",", @$_) } |> assert_eq("0", "pipe deadfish")
 
 test_run

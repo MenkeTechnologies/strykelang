@@ -4,7 +4,7 @@
 # count distinct nonsense words from the canonical opening stanza.
 
 fn Rosetta::Brillig::words($poem) {
-    ~> $poem |> lc |> sub { my @w = $_[0] =~ /\w+/g; \@w } |> sub { $_[0] }
+    ~> $poem |> lc |> sub { my @w = _[0] =~ /\w+/g; \@w } |> sub { _[0] }
 }
 
 fn Rosetta::Brillig::nonsense($poem, $real_dict) {
@@ -21,7 +21,7 @@ my $stanza = "'Twas brillig, and the slithy toves\n"
            . "All mimsy were the borogoves,\n"
            . "And the mome raths outgrabe.";
 
-my %real = map { ($_, 1) } qw(twas and the did in were all);
+my %real = map { (_, 1) } qw(twas and the did in were all);
 
 my $words = Rosetta::Brillig::words($stanza)
 assert_eq len(@$words), 23, "23 word tokens in opening stanza"

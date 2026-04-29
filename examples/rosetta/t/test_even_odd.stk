@@ -10,11 +10,11 @@ fn Rosetta::EvenOdd::is_odd($n) {
 }
 
 fn Rosetta::EvenOdd::evens(@nums) {
-    @nums |> filter { Rosetta::EvenOdd::is_even($_) }
+    @nums |> filter { Rosetta::EvenOdd::is_even(_) }
 }
 
 fn Rosetta::EvenOdd::odds(@nums) {
-    @nums |> filter { Rosetta::EvenOdd::is_odd($_) }
+    @nums |> filter { Rosetta::EvenOdd::is_odd(_) }
 }
 
 assert_ok Rosetta::EvenOdd::is_even(0), "0 is even"

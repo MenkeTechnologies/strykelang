@@ -17,7 +17,7 @@ fn Rosetta::Padovan::compute($n) {
 }
 
 fn Rosetta::Padovan::list($max_n) {
-    ~> 0..$max_n map { Rosetta::Padovan::compute($_) }
+    ~> 0..$max_n map { Rosetta::Padovan::compute(_) }
 }
 
 assert_eq Rosetta::Padovan::compute(0), 1, "P0"

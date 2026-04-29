@@ -24,7 +24,7 @@ fn Rosetta::SuffixTree::has_substring($tree, $sub) {
         return 0 if !exists $curr->{$c}
         $curr = $curr->{$c}
     }
-    return 1
+    1
 }
 
 my $t = Rosetta::SuffixTree::build("banana")

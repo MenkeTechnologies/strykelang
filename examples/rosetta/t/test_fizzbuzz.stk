@@ -15,7 +15,7 @@ fn Rosetta::FizzBuzz::compute($n) {
 
 fn Rosetta::FizzBuzz::list($max) {
     # Using thread macro and pmap for a parallel fizzbuzz
-    ~> 1:$max pmap { Rosetta::FizzBuzz::compute($_) }
+    ~> 1:$max pmap { Rosetta::FizzBuzz::compute(_) }
 }
 
 assert_eq Rosetta::FizzBuzz::compute(1), 1, "fizzbuzz(1)"
