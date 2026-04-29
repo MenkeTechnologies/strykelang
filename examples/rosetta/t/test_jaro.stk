@@ -13,8 +13,8 @@ fn Rosetta::Jaro::distance($s1, $s2) {
     my $win = int(($la > $lb ? $la : $lb) / 2) - 1
     $win = 0 if $win < 0
 
-    my @b_match = map { 0 } 1 .. $lb
-    my @a_match = map { 0 } 1 .. $la
+    my @b_match = (0) x $lb
+    my @a_match = (0) x $la
     my $matches = 0
     for my $i (0 .. $la - 1) {
         my $start = $i - $win

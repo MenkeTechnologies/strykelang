@@ -185,6 +185,11 @@ pub enum Op {
     /// [`Interpreter::list_separator`] (`$"`), push one string. Used for `@a` in `"` / `qq`.
     ArrayStringifyListSep,
     StringRepeat,
+    /// Pop count (top), pop list (below — flattened to `Vec<PerlValue>` via
+    /// [`PerlValue::as_array_vec`] or wrapped as a 1-elt list), push the list
+    /// repeated `count` times. Backs `(LIST) x N` / `qw(...) x N`. See
+    /// `compiler.rs` `ExprKind::Repeat` for the parser-level discrimination.
+    ListRepeat,
     /// Pop string, apply `\U` / `\L` / `\u` / `\l` / `\Q` / `\E` case escapes, push result.
     ProcessCaseEscapes,
 

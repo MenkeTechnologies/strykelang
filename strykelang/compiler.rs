@@ -4883,10 +4883,22 @@ impl Compiler {
                 ));
             }
 
-            ExprKind::Repeat { expr, count } => {
-                self.compile_expr(expr)?;
-                self.compile_expr(count)?;
-                self.emit_op(Op::StringRepeat, line, Some(root));
+            ExprKind::Repeat {
+                expr,
+                count,
+                list_repeat,
+            } => {
+                if *list_repeat {
+                    // List context for the LHS so `(EXPR)` and `qw(...)` flatten
+                    // into the array we'll replicate.
+                    self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                    self.compile_expr(count)?;
+                    self.emit_op(Op::ListRepeat, line, Some(root));
+                } else {
+                    self.compile_expr(expr)?;
+                    self.compile_expr(count)?;
+                    self.emit_op(Op::StringRepeat, line, Some(root));
+                }
             }
 
             // ── Function calls ──

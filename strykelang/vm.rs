@@ -3650,6 +3650,20 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::string(val.to_string().repeat(n)));
                         Ok(())
                     }
+                    Op::ListRepeat => {
+                        let n = self.pop().to_int().max(0) as usize;
+                        let val = self.pop();
+                        // Flatten to a Vec<PerlValue>: an array value gives its
+                        // items; a scalar (e.g. `(0) x 5` after the LHS evaluates
+                        // through scalar-collapse paths) wraps as a 1-elt list.
+                        let items: Vec<PerlValue> = val.as_array_vec().unwrap_or_else(|| vec![val]);
+                        let mut out = Vec::with_capacity(items.len().saturating_mul(n));
+                        for _ in 0..n {
+                            out.extend(items.iter().cloned());
+                        }
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
                     Op::ProcessCaseEscapes => {
                         let val = self.pop();
                         let s = val.to_string();
@@ -8628,38 +8642,86 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Split) => {
                 let mut iter = args.into_iter();
-                let pat = iter
-                    .next()
-                    .unwrap_or(PerlValue::string(" ".into()))
-                    .to_string();
+                let pat_val = iter.next().unwrap_or(PerlValue::string(" ".into()));
+                // Prefer the regex source over the Display form: `qr//`'s Display is
+                // `(?:)` (matches everywhere), which is NOT the same as Perl's empty-
+                // pattern semantics ("split between every character"). Pulling the
+                // source out via `regex_src_and_flags` lets us treat `//` as truly
+                // empty so the char-split branch fires.
+                let pat = pat_val
+                    .regex_src_and_flags()
+                    .map(|(s, _)| s)
+                    .unwrap_or_else(|| pat_val.to_string());
                 let s = iter.next().unwrap_or(PerlValue::UNDEF).to_string();
-                let lim = iter.next().map(|v| v.to_int() as usize);
+                // Perl LIMIT semantics:
+                //   omitted / 0  → no truncation, strip trailing empties.
+                //   > 0          → at most LIMIT fields, keep empties up to limit.
+                //   < 0          → no truncation, keep all empties.
+                let lim_signed: Option<i64> = iter.next().map(|v| v.to_int());
 
-                // Special case: empty pattern splits into characters (Perl behavior)
-                let parts: Vec<PerlValue> = if pat.is_empty() {
-                    let chars: Vec<PerlValue> = s
-                        .chars()
-                        .map(|c| PerlValue::string(c.to_string()))
-                        .collect();
-                    if let Some(l) = lim {
-                        chars.into_iter().take(l).collect()
-                    } else {
-                        chars
+                let mut parts: Vec<String> = if pat.is_empty() {
+                    // Empty pattern → "split between every character" (Perl). The
+                    // regex engine would also match at the boundaries, producing
+                    // spurious empties; `s.chars()` is the right primitive.
+                    let chars: Vec<String> = s.chars().map(|c| c.to_string()).collect();
+                    match lim_signed {
+                        // LIMIT > 0 (Perl):
+                        //   n < |chars|        → first n-1 chars then the tail in one field
+                        //                        (`split //, "abcde", 3` → ("a","b","cde")).
+                        //   n == |chars|       → chars exactly, no trailing empty.
+                        //   n > |chars|        → chars + "" (Perl emits the end-of-string
+                        //                        match as a final empty when LIMIT permits).
+                        Some(l) if l > 0 => {
+                            let n = l as usize;
+                            if n < chars.len() {
+                                let mut head: Vec<String> =
+                                    chars.iter().take(n.saturating_sub(1)).cloned().collect();
+                                let tail: String =
+                                    s.chars().skip(n.saturating_sub(1)).collect();
+                                head.push(tail);
+                                head
+                            } else if n == chars.len() {
+                                chars
+                            } else {
+                                let mut v = chars;
+                                v.push(String::new());
+                                v
+                            }
+                        }
+                        // LIMIT < 0 → chars + trailing empty.
+                        Some(l) if l < 0 => {
+                            let mut v = chars;
+                            v.push(String::new());
+                            v
+                        }
+                        // No limit / 0 → just the chars; the trailing-empty strip
+                        // below is a no-op (`chars()` never emits one).
+                        _ => chars,
                     }
                 } else {
                     let re =
                         regex::Regex::new(&pat).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-                    if let Some(l) = lim {
-                        re.splitn(&s, l)
-                            .map(|p| PerlValue::string(p.to_string()))
-                            .collect()
-                    } else {
-                        re.split(&s)
-                            .map(|p| PerlValue::string(p.to_string()))
-                            .collect()
+                    match lim_signed {
+                        Some(l) if l > 0 => {
+                            re.splitn(&s, l as usize).map(|p| p.to_string()).collect()
+                        }
+                        _ => re.split(&s).map(|p| p.to_string()).collect(),
                     }
                 };
-                Ok(PerlValue::array(parts))
+
+                // Trailing-empty strip: Perl strips ONLY when LIMIT is omitted or
+                // zero. Positive LIMIT keeps trailing empties (capped at LIMIT).
+                // Negative LIMIT also keeps them.
+                let strip_trailing = matches!(lim_signed, None | Some(0));
+                if strip_trailing {
+                    while parts.last().is_some_and(|p| p.is_empty()) {
+                        parts.pop();
+                    }
+                }
+
+                Ok(PerlValue::array(
+                    parts.into_iter().map(PerlValue::string).collect(),
+                ))
             }
             Some(BuiltinId::Sprintf) => {
                 // sprintf arg list is Perl list context; flatten ranges / arrays / reverse

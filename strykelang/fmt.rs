@@ -844,8 +844,18 @@ pub fn format_expr(e: &Expr) -> String {
             format_expr(then_expr),
             format_expr(else_expr)
         ),
-        ExprKind::Repeat { expr, count } => {
-            format!("{} x {}", format_expr(expr), format_expr(count))
+        ExprKind::Repeat {
+            expr,
+            count,
+            list_repeat,
+        } => {
+            if *list_repeat
+                && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_))
+            {
+                format!("({}) x {}", format_expr(expr), format_expr(count))
+            } else {
+                format!("{} x {}", format_expr(expr), format_expr(count))
+            }
         }
         ExprKind::Range {
             from,

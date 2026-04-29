@@ -9347,19 +9347,28 @@ impl Interpreter {
                 Ok(PerlValue::array(list))
             }
 
-            // Repeat
-            ExprKind::Repeat { expr, count } => {
-                let val = self.eval_expr(expr)?;
+            // Repeat — see `ast.rs` `ExprKind::Repeat` for the list/scalar split.
+            ExprKind::Repeat {
+                expr,
+                count,
+                list_repeat,
+            } => {
                 let n = self.eval_expr(count)?.to_int().max(0) as usize;
-                if let Some(s) = val.as_str() {
-                    Ok(PerlValue::string(s.repeat(n)))
-                } else if let Some(a) = val.as_array_vec() {
-                    let mut result = Vec::with_capacity(a.len() * n);
+                if *list_repeat {
+                    // `(LIST) x N` — evaluate the LHS in list context, replicate.
+                    let saved = self.wantarray_kind;
+                    self.wantarray_kind = WantarrayCtx::List;
+                    let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
+                    self.wantarray_kind = saved;
+                    let items: Vec<PerlValue> = val.as_array_vec().unwrap_or_else(|| vec![val]);
+                    let mut result = Vec::with_capacity(items.len() * n);
                     for _ in 0..n {
-                        result.extend(a.iter().cloned());
+                        result.extend(items.iter().cloned());
                     }
                     Ok(PerlValue::array(result))
                 } else {
+                    // `EXPR x N` — scalar string repetition.
+                    let val = self.eval_expr(expr)?;
                     Ok(PerlValue::string(val.to_string().repeat(n)))
                 }
             }
@@ -11252,24 +11261,45 @@ impl Interpreter {
             } => {
                 let pat = self.eval_expr(pattern)?.to_string();
                 let s = self.eval_expr(string)?.to_string();
-                let lim = if let Some(l) = limit {
-                    self.eval_expr(l)?.to_int() as usize
-                } else {
-                    0
-                };
+                // Perl semantics for the limit field:
+                //   omitted / 0  → no truncation, *strip* trailing empty fields.
+                //   > 0          → at most LIMIT fields, keep empties up to limit.
+                //   < 0          → no truncation, *keep* all empties.
+                // Stryke previously parsed limit as `usize`, which folded a
+                // user-supplied -1 into a giant positive number and made the
+                // strip / keep decision ambiguous. Use `i64` so the sign is
+                // preserved.
+                let lim_opt: Option<i64> = limit
+                    .as_ref()
+                    .map(|l| self.eval_expr(l).map(|v| v.to_int()))
+                    .transpose()?;
                 let re = self.compile_regex(&pat, "", line)?;
-                let parts: Vec<PerlValue> = if lim > 0 {
-                    re.splitn_strings(&s, lim)
-                        .into_iter()
-                        .map(PerlValue::string)
-                        .collect()
-                } else {
-                    re.split_strings(&s)
-                        .into_iter()
-                        .map(PerlValue::string)
-                        .collect()
+                let mut parts: Vec<String> = match lim_opt {
+                    Some(l) if l > 0 => re.splitn_strings(&s, l as usize),
+                    _ => re.split_strings(&s),
                 };
-                Ok(PerlValue::array(parts))
+
+                // Zero-width patterns (`split //, $s`) are defined by Perl as
+                // "split between every character" — the regex engine, however,
+                // also matches the empty string at position 0, producing a
+                // spurious leading empty field that Perl does not emit. Strip
+                // it before the trailing-empty rule kicks in.
+                if pat.is_empty() && parts.first().is_some_and(|p| p.is_empty()) {
+                    parts.remove(0);
+                }
+                // Trailing-empty strip: Perl strips ONLY when LIMIT is omitted
+                // or zero. Positive LIMIT keeps trailing empties; negative
+                // LIMIT also keeps them.
+                let strip_trailing = matches!(lim_opt, None | Some(0));
+                if strip_trailing {
+                    while parts.last().is_some_and(|p| p.is_empty()) {
+                        parts.pop();
+                    }
+                }
+
+                Ok(PerlValue::array(
+                    parts.into_iter().map(PerlValue::string).collect(),
+                ))
             }
 
             // Numeric

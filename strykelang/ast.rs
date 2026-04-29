@@ -831,10 +831,18 @@ pub enum ExprKind {
         else_expr: Box<Expr>,
     },
 
-    // String repetition: "abc" x 3
+    // Repetition operator `EXPR x N`.
+    //
+    // Perl distinguishes scalar string repetition (`"ab" x 3` → `"ababab"`) from
+    // list repetition (`(0) x 3` → `(0,0,0)`, `qw(a b) x 2` → `(a,b,a,b)`). The
+    // discriminator at parse time is the LHS shape: a top-level paren-list (or
+    // `qw(...)`) immediately before `x` is list-repeat; everything else is
+    // scalar-repeat. The parser sets `list_repeat=true` only in that case;
+    // `f(args) x N` (function-call parens, not list parens) stays scalar.
     Repeat {
         expr: Box<Expr>,
         count: Box<Expr>,
+        list_repeat: bool,
     },
 
     // Range: `1..10` / `1...10` — in scalar context, `...` is the exclusive flip-flop (Perl `sed`-style).

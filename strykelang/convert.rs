@@ -1159,8 +1159,20 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 format!("{} {} {}", convert_expr(from), op, convert_expr(to))
             }
         }
-        ExprKind::Repeat { expr, count } => {
-            format!("{} x {}", convert_expr(expr), convert_expr(count))
+        ExprKind::Repeat {
+            expr,
+            count,
+            list_repeat,
+        } => {
+            // Re-emit the parens for list-repeat so `(0) x 5` round-trips as
+            // list-repeat rather than collapsing to scalar `0 x 5`.
+            if *list_repeat
+                && !matches!(expr.kind, ExprKind::List(_) | ExprKind::QW(_))
+            {
+                format!("({}) x {}", convert_expr(expr), convert_expr(count))
+            } else {
+                format!("{} x {}", convert_expr(expr), convert_expr(count))
+            }
         }
 
         // ── Calls ────────────────────────────────────────────────────────
