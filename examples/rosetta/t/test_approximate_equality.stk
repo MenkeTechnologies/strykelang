@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Approximate equality
+
+fn Rosetta::Approx::check($a, $b, $eps) {
+    abs($a - $b) < $eps
+}
+
+assert_ok Rosetta::Approx::check(3.14, 3.1415, 0.01), "3.14 eq 3.1415 (0.01)"
+assert_ok !Rosetta::Approx::check(3.14, 3.1415, 0.0001), "3.14 not eq 3.1415 (0.0001)"
+
+# Piped version
+[3.14, 3.1415, 0.01] |> ~> fn { Rosetta::Approx::check($_->[0], $_->[1], $_->[2]) } |> assert_ok("piped approx ok")
+
+test_run

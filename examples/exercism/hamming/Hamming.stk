@@ -1,0 +1,5 @@
+#!/usr/bin/env stryke
+fn Exercism::Hamming::hamming_distance($a, $b) {
+    die "left and right strands must be of equal length" if length($a) != length($b)
+    ~> 0:length($a)-1 grep { substr($a,_,1) ne substr($b,_,1) } |> len
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/TwoFer.stk"
+
+assert_eq Exercism::TwoFer::two_fer(),         "One for you, one for me.",   "no name given"
+assert_eq Exercism::TwoFer::two_fer("Alice"),  "One for Alice, one for me.", "a name given"
+assert_eq Exercism::TwoFer::two_fer("Bob"),    "One for Bob, one for me.",   "another name given"
+
+test_run

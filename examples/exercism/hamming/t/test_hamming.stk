@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/Hamming.stk"
+
+assert_eq Exercism::Hamming::hamming_distance("", ""),                        0, "empty strands"
+assert_eq Exercism::Hamming::hamming_distance("A", "A"),                      0, "single letter identical strands"
+assert_eq Exercism::Hamming::hamming_distance("G", "T"),                      1, "single letter different strands"
+assert_eq Exercism::Hamming::hamming_distance("GGACTGAAATCTG", "GGACTGAAATCTG"), 0, "long identical strands"
+assert_eq Exercism::Hamming::hamming_distance("GGACGGATTCTG", "AGGACGGATTCT"), 9, "long different strands"
+
+# Length-mismatch errors
+my $err = eval { Exercism::Hamming::hamming_distance("AATG", "AAA"); 0 } || $@
+assert_ok $err =~ /strands must be of equal length/, "disallow first strand longer"
+$err = eval { Exercism::Hamming::hamming_distance("ATA", "AGTG"); 0 } || $@
+assert_ok $err =~ /strands must be of equal length/, "disallow second strand longer"
+$err = eval { Exercism::Hamming::hamming_distance("", "G"); 0 } || $@
+assert_ok $err =~ /strands must be of equal length/, "disallow empty first strand"
+$err = eval { Exercism::Hamming::hamming_distance("G", ""); 0 } || $@
+assert_ok $err =~ /strands must be of equal length/, "disallow empty second strand"
+
+test_run

@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/ArmstrongNumbers.stk"
+
+assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(0),       "Zero is an Armstrong number"
+assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(5),       "Single-digit numbers are Armstrong numbers"
+assert_ok !Exercism::ArmstrongNumbers::is_armstrong_number(10),      "There are no two-digit Armstrong numbers"
+assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(153),     "Three-digit Armstrong number"
+assert_ok !Exercism::ArmstrongNumbers::is_armstrong_number(100),     "Three-digit non-Armstrong"
+assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(9474),    "Four-digit Armstrong"
+assert_ok !Exercism::ArmstrongNumbers::is_armstrong_number(9475),    "Four-digit non-Armstrong"
+assert_ok  Exercism::ArmstrongNumbers::is_armstrong_number(9926315), "Seven-digit Armstrong"
+assert_ok !Exercism::ArmstrongNumbers::is_armstrong_number(9926314), "Seven-digit non-Armstrong"
+
+test_run

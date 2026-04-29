@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Average loop length
+
+fn Rosetta::AverageLoop::analytical($n) {
+    my $sum = 0
+    my $prod = 1
+    for my $i (1..$n) {
+        $prod = $prod * ($n - $i + 1) / $n
+        $sum = $sum + $prod
+    }
+    $sum
+}
+
+fn Rosetta::AverageLoop::approx_eq($a, $b) { abs($a - $b) < 1e-10 }
+
+assert_ok Rosetta::AverageLoop::approx_eq(Rosetta::AverageLoop::analytical(1), 1.0), "N=1"
+assert_ok Rosetta::AverageLoop::approx_eq(Rosetta::AverageLoop::analytical(2), 1.5), "N=2"
+assert_ok Rosetta::AverageLoop::approx_eq(Rosetta::AverageLoop::analytical(3), 1.0 + 2/3 + 2/9), "N=3"
+
+# Piped version
+2 |> Rosetta::AverageLoop::analytical |> assert_eq(1.5, "piped N=2")
+
+test_run

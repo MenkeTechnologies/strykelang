@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Assertions
+
+# Stryke provides built-in assertion subroutines for testing.
+# These are commonly used in .stk test files.
+
+my $x = 42
+
+# assert_eq checks for equality
+assert_eq $x, 42, "x should be 42"
+
+# assert_ok checks for truthiness
+assert_ok $x > 0, "x should be positive"
+
+# Piped version of assertions
+$x |> assert_eq(42, "piped equality assertion")
+
+# For runtime assertions in production code, 'die' is used:
+fn Rosetta::Assertions::validate($val) {
+    $val == 42 or die "Value must be 42"
+    1
+}
+
+assert_ok Rosetta::Assertions::validate(42), "manual validation"
+
+test_run

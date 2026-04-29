@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+fn Exercism::ScrabbleScore::scrabble_score($s) {
+    my %v
+    for my $row (
+        [1,  qw(A E I O U L N R S T)],
+        [2,  qw(D G)],
+        [3,  qw(B C M P)],
+        [4,  qw(F H V W Y)],
+        [5,  qw(K)],
+        [8,  qw(J X)],
+        [10, qw(Q Z)],
+    ) {
+        my ($pts, @ls) = @$row
+        $v{$_} = $pts for @ls
+    }
+    0 + sum(map { $v{$_} // 0 } chars(uc $s))
+}

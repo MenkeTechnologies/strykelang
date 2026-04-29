@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Angle difference between two bearings
+
+fn Rosetta::Angles::diff($b1, $b2) {
+    # Shortest signed distance from b1 to b2 in degrees [-180, 180)
+    my $d = ($b2 - $b1 + 180) % 360
+    # Handle the fact that % can be negative in some languages, 
+    # but in Stryke we checked -3 % 3 == 0. 
+    # Let's check a case like -190 % 360.
+    if ($d < 0) { $d += 360 }
+    $d - 180
+}
+
+assert_eq Rosetta::Angles::diff(20, 350), -30, "20 to 350"
+assert_eq Rosetta::Angles::diff(350, 20), 30, "350 to 20"
+assert_eq Rosetta::Angles::diff(0, 180), -180, "0 to 180"
+assert_eq Rosetta::Angles::diff(180, 0), -180, "180 to 0"
+assert_eq Rosetta::Angles::diff(45, 135), 90, "45 to 135"
+assert_eq Rosetta::Angles::diff(135, 45), -90, "135 to 45"
+
+# Additional cases from Rosetta Code
+assert_eq Rosetta::Angles::diff(359, 1), 2, "359 to 1"
+assert_eq Rosetta::Angles::diff(1, 359), -2, "1 to 359"
+
+# Piped version
+[20, 350] |> ~> fn { Rosetta::Angles::diff($_->[0], $_->[1]) } |> assert_eq(-30, "piped diff")
+
+test_run

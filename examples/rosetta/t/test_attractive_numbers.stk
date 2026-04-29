@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Attractive numbers
+
+fn Rosetta::Attractive::count_prime_factors($n) {
+    return 0 if $n < 2
+    my $count = 0
+    my $temp = $n
+    my $d = 2
+    while ($d * $d <= $temp) {
+        while ($temp % $d == 0) {
+            $count = $count + 1
+            $temp = int($temp / $d)
+        }
+        $d = $d + 1
+    }
+    if ($temp > 1) {
+        $count = $count + 1
+    }
+    $count
+}
+
+fn Rosetta::Attractive::is_prime($n) {
+    return 0 if $n < 2
+    my $d = 2
+    while ($d * $d <= $n) {
+        if ($n % $d == 0) { return 0 }
+        $d = $d + 1
+    }
+    1
+}
+
+fn Rosetta::Attractive::check($n) {
+    my $c = Rosetta::Attractive::count_prime_factors($n)
+    Rosetta::Attractive::is_prime($c)
+}
+
+my @attractive
+for my $i (1..100) {
+    if (Rosetta::Attractive::check($i)) {
+        push @attractive, $i
+    }
+}
+
+assert_eq $attractive[0], 4, "4 is attractive (2*2 -> 2 factors)"
+assert_eq $attractive[1], 6, "6 is attractive (2*3 -> 2 factors)"
+assert_eq $attractive[2], 8, "8 is attractive (2*2*2 -> 3 factors)"
+assert_eq $attractive[9], 20, "20 is attractive (2*2*5 -> 3 factors)"
+
+# Piped version
+20 |> Rosetta::Attractive::check |> assert_ok("piped attractive")
+
+test_run

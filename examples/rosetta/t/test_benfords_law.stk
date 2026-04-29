@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Benford's law
+
+fn Rosetta::Benford::first_digit($n) {
+    my $s = "$n"
+    $s =~ s/^[0\W]+//; # remove leading zeros and non-digits
+    return -1 if length($s) == 0
+    substr($s, 0, 1) + 0
+}
+
+fn Rosetta::Benford::analyze(@nums) {
+    my %counts
+    my $total = 0
+    for my $n (@nums) {
+        my $d = Rosetta::Benford::first_digit($n)
+        if ($d > 0) {
+            $counts{$d} = ($counts{$d} || 0) + 1
+            $total = $total + 1
+        }
+    }
+    
+    my %freqs
+    for my $d (1..9) {
+        $freqs{$d} = ($counts{$d} || 0) / $total
+    }
+    \%freqs
+}
+
+# First 100 Fibonacci numbers
+my @fibs = (1, 1)
+for my $i (2..99) {
+    push @fibs, $fibs[$i-1] + $fibs[$i-2]
+}
+
+my $res = Rosetta::Benford::analyze(@fibs)
+
+# Ideal distribution: P(d) = log10(1 + 1/d)
+# P(1) = 0.301, P(2) = 0.176, P(3) = 0.125
+assert_ok abs($res->{1} - 0.301) < 0.05, "Benford 1 freq"
+assert_ok abs($res->{2} - 0.176) < 0.05, "Benford 2 freq"
+
+# Piped version
+\@fibs |> ~> fn { Rosetta::Benford::analyze(@$_) } |> ~> fn { $_->{1} } |> ~> fn { abs($_ - 0.301) < 0.05 } |> assert_ok("piped Benford")
+
+test_run

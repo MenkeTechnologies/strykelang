@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/RnaTranscription.stk"
+
+assert_eq Exercism::RnaTranscription::to_rna(""),             "",             "Empty RNA sequence"
+assert_eq Exercism::RnaTranscription::to_rna("C"),            "G",            "C -> G"
+assert_eq Exercism::RnaTranscription::to_rna("G"),            "C",            "G -> C"
+assert_eq Exercism::RnaTranscription::to_rna("T"),            "A",            "T -> A"
+assert_eq Exercism::RnaTranscription::to_rna("A"),            "U",            "A -> U"
+assert_eq Exercism::RnaTranscription::to_rna("ACGTGGTCTTAA"), "UGCACCAGAAUU", "RNA complement"
+
+test_run

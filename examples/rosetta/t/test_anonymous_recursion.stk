@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anonymous recursion
+
+# Factorial using __SUB__
+my $fac = fn ($n) {
+    $n <= 1 ? 1 : $n * __SUB__->($n - 1)
+}
+
+assert_eq $fac->(5), 120, "factorial(5) anonymously"
+assert_eq $fac->(10), 3628800, "factorial(10) anonymously"
+
+# Fibonacci using __SUB__
+my $fib = fn ($n) {
+    $n <= 1 ? $n : __SUB__->($n - 1) + __SUB__->($n - 2)
+}
+assert_eq $fib->(10), 55, "fibonacci(10) anonymously"
+
+# Piped version
+5 |> ~> fn { $fac->($_) } |> assert_eq(120, "piped anonymous factorial")
+
+test_run

@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arithmetic derivative
+
+fn Rosetta::AD::compute($n) {
+    if ($n < 2) { return 0 }
+    my $temp = $n
+    my $res = 0
+    my $d = 2
+    while ($d * $d <= $temp) {
+        while ($temp % $d == 0) {
+            $res = $res + int($n / $d)
+            $temp = int($temp / $d)
+        }
+        $d = $d + 1
+    }
+    if ($temp > 1) {
+        $res = $res + int($n / $temp)
+    }
+    $res
+}
+
+my @vals
+for my $i (0..10) {
+    push @vals, Rosetta::AD::compute($i)
+}
+# D(0)=0, D(1)=0, D(2)=1, D(3)=1, D(4)=4, D(5)=1, D(6)=5, D(7)=1, D(8)=12, D(9)=6, D(10)=7
+assert_eq join(",", @vals), "0,0,1,1,4,1,5,1,12,6,7", "AD 0..10"
+
+# D(10!)
+# 10! = 3628800
+# D(10!) = 10! * sum(e_i / p_i)
+# 10! = 2^8 * 3^4 * 5^2 * 7^1
+# D(10!) = 3628800 * (8/2 + 4/3 + 2/5 + 1/7)
+# = 3628800 * (4 + 1.333... + 0.4 + 0.1428...)
+# = 3628800 * (4 + 4/3 + 2/5 + 1/7)
+# = 3628800 * (420/105 + 140/105 + 42/105 + 15/105) * 4/4 ... wait
+# Let's just use the function.
+assert_eq Rosetta::AD::compute(3628800), 21323520, "D(10!)"
+
+# Piped version
+7 |> Rosetta::AD::compute |> assert_eq(1, "piped D(7)")
+
+test_run

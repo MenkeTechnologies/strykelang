@@ -1,0 +1,7 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/HelloWorld.stk"
+
+assert_eq Exercism::HelloWorld::hello(), "Hello, World!", "say Hi!"
+
+test_run

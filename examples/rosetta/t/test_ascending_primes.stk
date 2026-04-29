@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ascending primes
+
+fn Rosetta::Ascending::is_prime($n) {
+    return 0 if $n < 2
+    my $d = 2
+    while ($d * $d <= $n) {
+        return 0 if $n % $d == 0
+        $d = $d + 1
+    }
+    1
+}
+
+fn Rosetta::Ascending::is_ascending($n) {
+    my @digits = $n |> chars
+    return 1 if len(@digits) < 2
+    for my $i (0..len(@digits)-2) {
+        if ($digits[$i] >= $digits[$i+1]) {
+            return 0
+        }
+    }
+    1
+}
+
+my @ascending
+for my $i (2..500) {
+    if (Rosetta::Ascending::is_ascending($i) && Rosetta::Ascending::is_prime($i)) {
+        push @ascending, $i
+    }
+}
+
+# 2, 3, 5, 7, 13, 17, 19, 23, 29, 37, 47, 59, 67, 79, 89, 127, 137, 139, 149, 157, 167, 179, 239, 257, 269, 271 ... wait
+assert_eq $ascending[0], 2, "1st ascending prime"
+assert_eq $ascending[4], 13, "5th ascending prime"
+assert_eq $ascending[15], 127, "16th ascending prime"
+
+# Piped version
+127 |> Rosetta::Ascending::is_ascending |> assert_ok("127 is ascending")
+127 |> Rosetta::Ascending::is_prime |> assert_ok("127 is prime")
+
+test_run

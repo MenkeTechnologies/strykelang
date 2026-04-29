@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/SumOfMultiples.stk"
+
+fn sm { Exercism::SumOfMultiples::sum_of_multiples({ factors => $_[0], limit => $_[1] }) }
+
+assert_eq sm([3, 5], 1),           0,     "no multiples within limit"
+assert_eq sm([3, 5], 4),           3,     "one factor has multiples within limit"
+assert_eq sm([3], 7),              9,     "more than one multiple within limit"
+assert_eq sm([3, 5], 10),          23,    "more than one factor with multiples within limit"
+assert_eq sm([3, 5], 100),         2318,  "each multiple is only counted once"
+assert_eq sm([3, 5], 1000),        233168,"a much larger limit"
+assert_eq sm([7, 13, 17], 20),     51,    "three factors"
+assert_eq sm([4, 6], 15),          30,    "factors not relatively prime"
+assert_eq sm([5, 6, 8], 150),      4419,  "some pairs of factors relatively prime"
+assert_eq sm([5, 25], 51),         275,   "one factor is a multiple of another"
+assert_eq sm([43, 47], 10000),     2203160,"much larger factors"
+assert_eq sm([1], 100),            4950,  "all numbers are multiples of 1"
+assert_eq sm([], 10000),           0,     "no factors means an empty sum"
+assert_eq sm([0], 1),              0,     "the only multiple of 0 is 0"
+assert_eq sm([0, 1], 4),           6,     "the factor 0 does not affect the sum"
+assert_eq sm([3, 5], 10000),       23331668,"solutions using include-exclude and bruteforce"
+
+test_run

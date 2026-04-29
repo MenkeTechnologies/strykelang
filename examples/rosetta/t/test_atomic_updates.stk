@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Atomic updates
+
+mysync $counter = 0
+mysync @shared_list
+mysync $sum = 0
+
+fan 1000 { $counter++ }
+assert_eq($counter, 1000, "atomic counter incremented 1000 times")
+
+pmap { push @shared_list, $_ } 1:100
+assert_eq(scalar(@shared_list), 100, "atomic array push from pmap")
+
+pmap { $sum += $_ } 1:10
+assert_eq($sum, 55, "atomic sum via pmap")
+
+test_run

@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Associative array
+
+# Creation
+my %h = ("apple", 1, "banana", 2)
+assert_eq $h{"apple"}, 1, "hash access apple"
+assert_eq $h{"banana"}, 2, "hash access banana"
+
+# Iteration
+my @k = sort keys %h
+assert_eq join(",", @k), "apple,banana", "hash keys"
+
+my @v = sort values %h
+assert_eq join(",", @v), "1,2", "hash values"
+
+# Merging
+my %other = ("cherry", 3)
+for my $key (keys %other) {
+    $h{$key} = $other{$key}
+}
+assert_eq $h{"cherry"}, 3, "merged cherry"
+assert_eq scalar(keys %h), 3, "hash size after merge"
+
+# Piped version
+%h |> keys |> len |> assert_eq(3, "piped hash keys length")
+
+test_run

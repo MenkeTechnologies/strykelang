@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+my $dir = __FILE__ =~ s{/t/[^/]+$}{}r
+require "$dir/Raindrops.stk"
+
+assert_eq Exercism::Raindrops::raindrop(1),    "1",            "the sound for 1 is 1"
+assert_eq Exercism::Raindrops::raindrop(3),    "Pling",        "the sound for 3 is Pling"
+assert_eq Exercism::Raindrops::raindrop(5),    "Plang",        "the sound for 5 is Plang"
+assert_eq Exercism::Raindrops::raindrop(7),    "Plong",        "the sound for 7 is Plong"
+assert_eq Exercism::Raindrops::raindrop(6),    "Pling",        "the sound for 6 is Pling as it has a factor 3"
+assert_eq Exercism::Raindrops::raindrop(8),    "8",            "8 has no factors 3, 5, or 7"
+assert_eq Exercism::Raindrops::raindrop(9),    "Pling",        "the sound for 9 is Pling as it has a factor 3"
+assert_eq Exercism::Raindrops::raindrop(10),   "Plang",        "the sound for 10 is Plang"
+assert_eq Exercism::Raindrops::raindrop(14),   "Plong",        "14 is a multiple of 7"
+assert_eq Exercism::Raindrops::raindrop(15),   "PlingPlang",   "15 has factors 3 and 5"
+assert_eq Exercism::Raindrops::raindrop(21),   "PlingPlong",   "21 has factors 3 and 7"
+assert_eq Exercism::Raindrops::raindrop(25),   "Plang",        "25 has a factor 5"
+assert_eq Exercism::Raindrops::raindrop(27),   "Pling",        "27 has a factor 3"
+assert_eq Exercism::Raindrops::raindrop(35),   "PlangPlong",   "35 has factors 5 and 7"
+assert_eq Exercism::Raindrops::raindrop(49),   "Plong",        "49 has a factor 7"
+assert_eq Exercism::Raindrops::raindrop(52),   "52",           "52 has no factors 3, 5, or 7"
+assert_eq Exercism::Raindrops::raindrop(105),  "PlingPlangPlong", "105 has factors 3, 5, and 7"
+assert_eq Exercism::Raindrops::raindrop(3125), "Plang",        "3125 has a factor 5"
+
+test_run

@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Anaprimes
+
+fn Rosetta::Anaprimes::is_prime($n) {
+    return 0 if $n < 2
+    my $d = 2
+    while ($d * $d <= $n) {
+        return 0 if $n % $d == 0
+        $d++
+    }
+    1
+}
+
+fn Rosetta::Anaprimes::get_perms($s) {
+    my @chars = $s |> chars
+    if (len(@chars) <= 1) { return ($s) }
+    
+    my %perms
+    for my $i (0..len(@chars)-1) {
+        my $c = $chars[$i]
+        my @rest = @chars
+        splice(@rest, $i, 1)
+        my @sub = Rosetta::Anaprimes::get_perms(join("", @rest))
+        for my $p (@sub) {
+            $perms{$c . $p} = 1
+        }
+    }
+    keys %perms
+}
+
+fn Rosetta::Anaprimes::is_anaprime($n) {
+    return 0 if !Rosetta::Anaprimes::is_prime($n)
+    my @perms = Rosetta::Anaprimes::get_perms($n . "")
+    for my $p (@perms) {
+        my $val = int($p)
+        if ($val != $n && Rosetta::Anaprimes::is_prime($val)) {
+            return 1
+        }
+    }
+    0
+}
+
+my @anaprimes
+for my $i (1..100) {
+    if (Rosetta::Anaprimes::is_anaprime($i)) {
+        push @anaprimes, $i
+    }
+}
+
+# Primes under 100: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97
+# Anaprimes under 100:
+# 13 (31), 17 (71), 31 (13), 37 (73), 71 (17), 73 (37), 79 (97), 97 (79)
+assert_eq join(",", @anaprimes), "13,17,31,37,71,73,79,97", "anaprimes under 100"
+
+# Piped version
+13 |> Rosetta::Anaprimes::is_anaprime |> assert_ok("13 is anaprime")
+19 |> Rosetta::Anaprimes::is_anaprime |> ~> fn { !$_ } |> assert_ok("19 is not anaprime")
+
+test_run

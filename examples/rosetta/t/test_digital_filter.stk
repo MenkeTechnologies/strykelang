@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Apply a digital filter
+
+fn Rosetta::DigitalFilter::apply($b_ref, $a_ref, $x_ref) {
+    my @b = @$b_ref
+    my @a = @$a_ref
+    my @x = @$x_ref
+    my @y
+    
+    for my $n (0..len(@x)-1) {
+        my $val = 0
+        for my $i (0..len(@b)-1) {
+            if ($n - $i >= 0) {
+                $val += $b[$i] * $x[$n - $i]
+            }
+        }
+        for my $j (1..len(@a)-1) {
+            if ($n - $j >= 0) {
+                $val -= $a[$j] * $y[$n - $j]
+            }
+        }
+        push @y, $val / $a[0]
+    }
+    \@y
+}
+
+fn Rosetta::DigitalFilter::vec_approx_eq($v1_ref, $v2_ref) {
+    my @v1 = @$v1_ref
+    my @v2 = @$v2_ref
+    return 0 if len(@v1) != len(@v2)
+    for my $i (0..len(@v1)-1) {
+        return 0 if abs($v1[$i] - $v2[$i]) > 1e-10
+    }
+    1
+}
+
+# Example: Simple Moving Average (2-point)
+# y[n] = (x[n] + x[n-1]) / 2
+my $b = [0.5, 0.5]
+my $a = [1.0]
+my $x = [10.0, 20.0, 30.0]
+my $y = Rosetta::DigitalFilter::apply($b, $a, $x)
+# n=0: 0.5*10 / 1 = 5
+# n=1: (0.5*20 + 0.5*10) / 1 = 15
+# n=2: (0.5*30 + 0.5*20) / 1 = 25
+assert_ok Rosetta::DigitalFilter::vec_approx_eq($y, [5.0, 15.0, 25.0]), "SMA-2 check"
+
+# Piped version
+$x |> ~> fn { Rosetta::DigitalFilter::apply($b, $a, $_) } |> ~> fn { Rosetta::DigitalFilter::vec_approx_eq($_, [5.0, 15.0, 25.0]) } |> assert_ok("piped digital filter")
+
+test_run

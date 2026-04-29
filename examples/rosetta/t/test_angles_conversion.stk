@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Angles (geometric), normalization and conversion
+
+fn Rosetta::Angles::norm360($a) {
+    my $res = $a % 360
+    $res < 0 ? $res + 360 : $res
+}
+
+fn Rosetta::Angles::norm180($a) {
+    my $res = ($a + 180) % 360
+    if ($res < 0) { $res += 360 }
+    $res - 180
+}
+
+fn Rosetta::Angles::deg2rad($d) { $d * pi / 180 }
+fn Rosetta::Angles::rad2deg($r) { $r * 180 / pi }
+fn Rosetta::Angles::deg2grad($d) { $d * 10 / 9 }
+fn Rosetta::Angles::grad2deg($g) { $g * 9 / 10 }
+
+assert_eq Rosetta::Angles::norm360(400), 40, "400 -> 40"
+assert_eq Rosetta::Angles::norm360(-40), 320, "-40 -> 320"
+assert_eq Rosetta::Angles::norm180(200), -160, "200 -> -160"
+assert_eq Rosetta::Angles::norm180(-200), 160, "-200 -> 160"
+
+fn Rosetta::Angles::approx_eq($a, $b) { abs($a - $b) < 1e-10 }
+
+assert_ok Rosetta::Angles::approx_eq(Rosetta::Angles::deg2rad(180), pi), "180 deg -> pi rad"
+assert_ok Rosetta::Angles::approx_eq(Rosetta::Angles::rad2deg(pi/2), 90), "pi/2 rad -> 90 deg"
+assert_eq Rosetta::Angles::deg2grad(90), 100, "90 deg -> 100 grad"
+assert_eq Rosetta::Angles::grad2deg(200), 180, "200 grad -> 180 deg"
+
+# Piped version
+90 |> Rosetta::Angles::deg2grad |> assert_eq(100, "piped deg2grad")
+
+test_run

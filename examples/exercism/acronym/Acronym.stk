@@ -1,0 +1,4 @@
+#!/usr/bin/env stryke
+fn Exercism::Acronym::abbreviate {
+    uc join "", map { substr($_, 0, 1) } _0 =~ /\b[^a-z]?\K[a-z][\w']*/gi
+}

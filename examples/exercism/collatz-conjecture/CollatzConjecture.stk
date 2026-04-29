@@ -1,0 +1,7 @@
+#!/usr/bin/env stryke
+fn Exercism::CollatzConjecture::steps($n) {
+    die "Only positive integers are allowed" if $n < 1
+    my $c = 0
+    ($n = $n % 2 ? 3 * $n + 1 : $n / 2, $c++) while $n > 1
+    $c
+}
