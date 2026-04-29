@@ -28,7 +28,7 @@ fn partition_false_bucket() {
 #[test]
 fn partition_all_true() {
     assert_eq!(
-        eval_string(r#"my ($y, $n) = partition { 1 } "a","b","c"; scalar @$y"#),
+        eval_string(r#"my ($y, $n) = partition { 1 } "a","b","c"; len(@$y)"#),
         "3",
     );
 }
@@ -36,7 +36,7 @@ fn partition_all_true() {
 #[test]
 fn partition_all_false() {
     assert_eq!(
-        eval_string(r#"my ($y, $n) = partition { 0 } "a","b"; scalar @$n"#),
+        eval_string(r#"my ($y, $n) = partition { 0 } "a","b"; len(@$n)"#),
         "2",
     );
 }
@@ -45,7 +45,7 @@ fn partition_all_false() {
 fn partition_single_item() {
     // partition with a single-element list
     assert_eq!(
-        eval_int(r#"my @a = (42); my ($y, $n) = partition { $_ > 10 } @a; scalar @$y"#),
+        eval_int(r#"my @a = (42); my ($y, $n) = partition { $_ > 10 } @a; len(@$y)"#),
         1,
     );
 }
@@ -111,7 +111,7 @@ fn frequencies_pipe_forward() {
 
 #[test]
 fn frequencies_empty_list() {
-    assert_eq!(eval_int(r#"my $f = frequencies(); scalar keys %$f"#), 0,);
+    assert_eq!(eval_int(r#"my $f = frequencies(); len(keys %$f)"#), 0,);
 }
 
 // ── min_by / max_by ─────────────────────────────────────────────────
@@ -280,7 +280,7 @@ fn read_lines_scalar_context_count() {
     let path = dir.join(format!("stryke_test_rlc_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, "one\ntwo\nthree\n").unwrap();
-    let code = format!(r#"my @l = read_lines("{ps}"); scalar @l"#);
+    let code = format!(r#"my @l = read_lines("{ps}"); len(@l)"#);
     let got = eval_int(&code);
     let _ = fs::remove_file(&path);
     assert_eq!(got, 3);
@@ -292,7 +292,7 @@ fn read_lines_no_trailing_newline() {
     let path = dir.join(format!("stryke_test_rlnt_{}.txt", std::process::id()));
     let ps = path.to_string_lossy().replace('\\', "/");
     fs::write(&path, "first\nsecond").unwrap();
-    let code = format!(r#"my @l = read_lines("{ps}"); scalar @l"#);
+    let code = format!(r#"my @l = read_lines("{ps}"); len(@l)"#);
     let got = eval_int(&code);
     let _ = fs::remove_file(&path);
     assert_eq!(got, 2);
@@ -416,14 +416,14 @@ fn glob_match_prefix_star() {
 #[test]
 fn which_all_returns_array() {
     // sh should be findable on any Unix
-    let got = eval_string(r#"my @w = which_all("sh"); scalar @w > 0 ? "found" : "empty""#);
+    let got = eval_string(r#"my @w = which_all("sh"); len(@w) > 0 ? "found" : "empty""#);
     assert_eq!(got, "found");
 }
 
 #[test]
 fn which_all_nonexistent_returns_empty() {
     assert_eq!(
-        eval_int(r#"my @w = which_all("__stryke_nonexistent_cmd_xyz__"); scalar @w"#),
+        eval_int(r#"my @w = which_all("__stryke_nonexistent_cmd_xyz__"); len(@w)"#),
         0,
     );
 }

@@ -1499,11 +1499,13 @@ pub(crate) fn try_builtin(
         "unpack" => Some(crate::pack::perl_unpack(args, line)),
         // `unpack_first(FMT, STR)` is the stryke spelling of Perl's
         // `scalar unpack(FMT, STR)` — returns the first decoded element.
-        // Useful under `--no-interop` where `scalar` is rejected.
+        // `perl_unpack` already collapses a single-element result to the
+        // bare value, so peel arrays only when there are 2+ values.
         "unpack_first" | "unpack1" | "up1" => Some(crate::pack::perl_unpack(args, line).map(|v| {
-            v.as_array_vec()
-                .and_then(|items| items.into_iter().next())
-                .unwrap_or(PerlValue::UNDEF)
+            match v.as_array_vec() {
+                Some(items) => items.into_iter().next().unwrap_or(PerlValue::UNDEF),
+                None => v,
+            }
         })),
         "vec" => Some(builtin_vec(args, line)),
         "dump" => Some(builtin_dump()),

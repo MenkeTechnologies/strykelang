@@ -73,7 +73,7 @@ fn map_doubles() {
 #[test]
 fn keys_in_scalar_context_is_count() {
     assert_eq!(
-        eval_int(r#"my %h = (a => 1, b => 2, c => 3); scalar keys %h"#),
+        eval_int(r#"my %h = (a => 1, b => 2, c => 3); len(keys %h)"#),
         3
     );
 }

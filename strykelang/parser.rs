@@ -10600,6 +10600,11 @@ impl Parser {
                 // or `$_`). Bare `len` followed by a low-precedence operator
                 // (`==`, `&&`, `?`, …) also defaults to a zero-arg call so
                 // `{ len == 0 }` works as a block predicate on the topic.
+                // Bare `len EXPR` (no parens, e.g. `len @arr`) goes through
+                // the greedy list-arg parser; this means `len @a + len @b`
+                // is `len(@a + len(@b))` (returning the length of the sum
+                // string), not `(len @a) + (len @b)`. Use explicit parens
+                // when combining `len` with `+`, `-`, comparisons, etc.
                 let args = if matches!(self.peek(), Token::LParen) {
                     self.advance();
                     if matches!(self.peek(), Token::RParen) {

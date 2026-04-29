@@ -51,7 +51,7 @@ fn do_block_returns_last_expression() {
 fn do_block_propagates_list_context_to_last_expression() {
     assert_eq!(
         eval_int(
-            r#"my @l=(1,2,3,2,1); my @u = do { my %seen; grep { !$seen{$_}++ } @l }; scalar @u"#,
+            r#"my @l=(1,2,3,2,1); my @u = do { my %seen; grep { !$seen{$_}++ } @l }; len(@u)"#,
         ),
         3
     );

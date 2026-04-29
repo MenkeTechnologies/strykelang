@@ -5,7 +5,7 @@ use crate::common::*;
 #[test]
 fn pack_unpack_n_roundtrip_scalar() {
     assert_eq!(
-        eval_int(r#"scalar unpack 'N', pack 'N', 305419896"#),
+        eval_int(r#"unpack_first("N", pack("N", 305419896))"#),
         305419896
     );
 }
@@ -13,7 +13,7 @@ fn pack_unpack_n_roundtrip_scalar() {
 #[test]
 fn pack_unpack_v_roundtrip_le() {
     assert_eq!(
-        eval_int(r#"scalar unpack 'V', pack 'V', 0x04030201"#),
+        eval_int(r#"unpack_first("V", pack("V", 0x04030201))"#),
         0x04030201
     );
 }
@@ -52,7 +52,7 @@ fn unpack_n_star_multiple_words() {
     let code = r#"
         my $b = pack 'N*', 100, 200;
         my @u = unpack 'N*', $b;
-        scalar @u == 2 && $u[0] == 100 && $u[1] == 200 ? 1 : 0
+        len(@u) == 2 && $u[0] == 100 && $u[1] == 200 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -68,7 +68,7 @@ fn pack_n2_two_words_big_endian() {
 
 #[test]
 fn pack_q_preserves_negative() {
-    assert_eq!(eval_int(r#"scalar unpack 'q', pack 'q', -999"#), -999);
+    assert_eq!(eval_int(r#"unpack_first("q", pack("q", -999))"#), -999);
 }
 
 #[test]

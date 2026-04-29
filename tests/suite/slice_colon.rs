@@ -199,12 +199,12 @@ fn array_slice_double_dot_matches_colon() {
 
 #[test]
 fn array_slice_empty_array_full_returns_empty() {
-    assert_eq!(eval_int(r#"my @a=(); my @r = @a[::]; scalar @r"#), 0);
+    assert_eq!(eval_int(r#"my @a=(); my @r = @a[::]; len(@r)"#), 0);
 }
 
 #[test]
 fn array_slice_empty_array_reversed_returns_empty() {
-    assert_eq!(eval_int(r#"my @a=(); my @r = @a[::-1]; scalar @r"#), 0);
+    assert_eq!(eval_int(r#"my @a=(); my @r = @a[::-1]; len(@r)"#), 0);
 }
 
 #[test]

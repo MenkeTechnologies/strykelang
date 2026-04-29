@@ -9,7 +9,7 @@ fn addition_with_line_comment_between_operands() {
 
 #[test]
 fn qw_assigns_word_list_to_array() {
-    assert_eq!(eval_int("my @a = qw(x y z); scalar @a"), 3);
+    assert_eq!(eval_int("my @a = qw(x y z); len(@a)"), 3);
 }
 
 #[test]

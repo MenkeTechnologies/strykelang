@@ -120,7 +120,7 @@ fn bare_mean_and_mode_stats() {
     let p = parse(r#"mean(2, 4, 10) == mean(2, 4, 10)"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert!(v.is_true());
-    let p2 = parse(r#"my @m = mode(1, 2, 2, 3, 3); scalar @m + $m[0] + $m[1]"#).expect("parse");
+    let p2 = parse(r#"my @m = mode(1, 2, 2, 3, 3); len(@m) + $m[0] + $m[1]"#).expect("parse");
     let v2 = interp.execute(&p2).expect("run");
     assert_eq!(v2.to_int(), 2 + 2 + 3);
 }
@@ -145,7 +145,7 @@ fn bare_builtin_mesh_interleaves_array_refs() {
 fn bare_builtin_zip_shortest_pairs_rows_by_min_length() {
     let mut interp = Interpreter::new();
     let p = parse(
-        "my @z = zip_shortest([1, 2, 3], [10, 20]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + $z[1]->[1]",
+        "my @z = zip_shortest([1, 2, 3], [10, 20]); len(@z) + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + $z[1]->[1]",
     )
     .expect("parse");
     let v = interp.execute(&p).expect("run");
@@ -156,7 +156,7 @@ fn bare_builtin_zip_shortest_pairs_rows_by_min_length() {
 fn bare_builtin_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
     let mut interp = Interpreter::new();
     let p = parse(
-        "my @z = zip_longest([1, 2], [10]); scalar @z + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + ($z[1]->[1] + 0)",
+        "my @z = zip_longest([1, 2], [10]); len(@z) + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + ($z[1]->[1] + 0)",
     )
     .expect("parse");
     let v = interp.execute(&p).expect("run");

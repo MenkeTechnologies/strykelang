@@ -20,7 +20,7 @@ fn numeric_equality_coerces_string_operand() {
 
 #[test]
 fn empty_array_in_list_context() {
-    assert_eq!(eval_int("my @a = (); scalar @a"), 0);
+    assert_eq!(eval_int("my @a = (); len(@a)"), 0);
 }
 
 #[test]
@@ -30,5 +30,5 @@ fn string_repeat_zero_is_empty() {
 
 #[test]
 fn empty_hash_has_zero_keys() {
-    assert_eq!(eval_int(r#"my %h = (); scalar keys %h"#), 0);
+    assert_eq!(eval_int(r#"my %h = (); len(keys %h)"#), 0);
 }

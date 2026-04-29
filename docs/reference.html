@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.9.15 · 3283 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.10.0 · 3285 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -180,7 +180,7 @@
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
         <li><a href="#ch-file-i-o">File I/O</a> <span class="chapter-count">35</span></li>
         <li><a href="#ch-strings">Strings</a> <span class="chapter-count">26</span></li>
-        <li><a href="#ch-arrays-hashes">Arrays &amp; Hashes</a> <span class="chapter-count">19</span></li>
+        <li><a href="#ch-arrays-hashes">Arrays &amp; Hashes</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-control-flow">Control Flow</a> <span class="chapter-count">17</span></li>
         <li><a href="#ch-error-handling">Error Handling</a> <span class="chapter-count">8</span></li>
         <li><a href="#ch-aop-advice">AOP / Advice</a> <span class="chapter-count">7</span></li>
@@ -190,7 +190,7 @@
         <li><a href="#ch-math">Math</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-file-system">File System</a> <span class="chapter-count">34</span></li>
         <li><a href="#ch-process">Process</a> <span class="chapter-count">21</span></li>
-        <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">3</span></li>
+        <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-charts-svg">Charts (SVG)</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-audio">Audio</a> <span class="chapter-count">4</span></li>
@@ -4122,7 +4122,7 @@ p pos($s)     # 0
     </section>
     <section class="tutorial-section" id="ch-arrays-hashes">
       <h2>Arrays &amp; Hashes</h2>
-      <p class="chapter-meta">19 topics</p>
+      <p class="chapter-meta">20 topics</p>
       <article class="doc-entry" id="doc-push">
         <h3><a class="doc-anchor" href="#doc-push">#</a> <code>push</code></h3>
         <p><code>push @array, LIST</code> — appends one or more elements to the end of an array and returns the new length. This is the primary way to grow arrays in stryke and works identically to Perl&#39;s builtin. You can push scalars, lists, or even the result of a pipeline. In stryke, <code>push</code> is O(1) amortized thanks to the underlying Rust <code>Vec</code>.</p>
@@ -4173,6 +4173,15 @@ my @removed = splice @a, 1, 2, 8, 9
 @removed |&gt; e p  # 2 3
 splice @a, 2     # remove from index 2 onward
 @a |&gt; e p        # 1 8
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-splice-last">
+        <h3><a class="doc-anchor" href="#doc-splice-last">#</a> <code>splice_last</code></h3>
+        <p><code>splice_last @array, OFFSET [, LENGTH [, LIST]]</code> — same shape as <code>splice</code>, but returns the **last** removed element instead of the full removed list (or <code>undef</code> if nothing was removed). The stryke spelling of Perl&#39;s <code>scalar splice(@a, off, n)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. The array is still mutated in place, exactly like <code>splice</code>. Aliases: <code>splice1</code>, <code>spl_last</code>. Desugars to <code>tail(splice(...))</code> so any list-context property of <code>splice</code> is preserved.</p>
+        <pre><code class="lang-perl">my @a = 10:50:10
+my $last = splice_last @a, 1, 2   # removes (20, 30), returns 30
+@a |&gt; e p                          # 10 40 50
+my $popped = splice_last @b, 0, 0  # removes nothing, returns undef
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-keys">
@@ -5719,7 +5728,7 @@ for (@procs) { p &quot;_-&gt;{pid} _-&gt;{name}&quot; }
     </section>
     <section class="tutorial-section" id="ch-pack-binary">
       <h2>Pack / Binary</h2>
-      <p class="chapter-meta">3 topics</p>
+      <p class="chapter-meta">4 topics</p>
       <article class="doc-entry" id="doc-pack">
         <h3><a class="doc-anchor" href="#doc-pack">#</a> <code>pack</code></h3>
         <p>Convert a list of values into a binary string according to a template. Each template character specifies how one value is encoded: <code>N</code> for 32-bit big-endian unsigned, <code>n</code> for 16-bit, <code>a</code> for raw bytes, <code>Z</code> for null-terminated string, etc. This is essential for constructing binary protocols, file formats, and <code>sockaddr</code> structures.</p>
@@ -5736,6 +5745,14 @@ spurt(&quot;data.bin&quot;, $header)
 p &quot;v$version, $count records&quot;
 my ($port, $addr) = unpack(&quot;n a4&quot;, $sockaddr)
 p inet_ntoa($addr) . &quot;:$port&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-unpack-first">
+        <h3><a class="doc-anchor" href="#doc-unpack-first">#</a> <code>unpack_first</code></h3>
+        <p><code>unpack_first(FMT, STR)</code> — decode the binary string and return the **first** decoded element (or <code>undef</code> if the format yields nothing). The stryke spelling of Perl&#39;s <code>scalar unpack(FMT, STR)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. Aliases: <code>unpack1</code>, <code>up1</code>. Equivalent to <code>head(unpack(FMT, STR))</code> but spelled as a single verb.</p>
+        <pre><code class="lang-perl">my $first_byte = unpack_first(&quot;C&quot;, $bytes)
+my $port       = unpack1(&quot;n&quot;, $sockaddr)
+my $magic_word = up1(&quot;N&quot;, $header)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-vec">

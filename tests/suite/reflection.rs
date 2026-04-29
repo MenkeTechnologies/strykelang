@@ -37,9 +37,9 @@ fn builtins_values_are_category_strings() {
 /// Together they partition `%builtins` exactly.
 #[test]
 fn perl_compats_and_extensions_partition_builtins() {
-    let n_b = eval_int(r#"scalar keys %stryke::builtins"#);
-    let n_pc = eval_int(r#"scalar keys %stryke::perl_compats"#);
-    let n_e = eval_int(r#"scalar keys %stryke::extensions"#);
+    let n_b = eval_int(r#"len(keys %stryke::builtins)"#);
+    let n_pc = eval_int(r#"len(keys %stryke::perl_compats)"#);
+    let n_e = eval_int(r#"len(keys %stryke::extensions)"#);
     assert_eq!(
         n_b,
         n_pc + n_e,
@@ -116,8 +116,8 @@ fn descriptions_cover_documented_names() {
         eval_int(r#"exists $stryke::descriptions{definitely_not_a_builtin_xyz} ? 1 : 0"#),
         0,
     );
-    let n_desc = eval_int(r#"scalar keys %stryke::descriptions"#);
-    let n_all = eval_int(r#"scalar keys %stryke::all"#);
+    let n_desc = eval_int(r#"len(keys %stryke::descriptions)"#);
+    let n_all = eval_int(r#"len(keys %stryke::all)"#);
     assert!(
         n_desc > 0 && n_desc <= n_all,
         "%descriptions ({n_desc}) should be between 1 and |%all| ({n_all}) — \
@@ -130,7 +130,7 @@ fn descriptions_cover_documented_names() {
 #[test]
 fn categories_inverted_index_returns_name_arrayrefs() {
     // Expected category tags from the section comments.
-    let n_parallel = eval_int(r#"scalar @{ $stryke::categories{parallel} }"#);
+    let n_parallel = eval_int(r#"len(@{ $stryke::categories{parallel} })"#);
     assert!(
         n_parallel >= 20,
         "expected ≥20 parallel ops, got {n_parallel}",
@@ -143,7 +143,7 @@ fn categories_inverted_index_returns_name_arrayrefs() {
         my @from_b = grep { $stryke::builtins{$_} eq "string" } keys %stryke::builtins;
         my $n = 0;
         for my $k (@from_b) { $n++ unless $from_c{$k}; }
-        $n += scalar(keys %from_c) - scalar(@from_b);
+        $n += len(keys %from_c) - len(@from_b);
         $n
         "#,
     );
@@ -206,8 +206,8 @@ fn short_aliases_mirror_long_names() {
     assert_eq!(eval_string(r#"$a{tj}"#), "to_json");
     // %d and %c/%p use arrayref values — spot-check non-empty.
     assert!(eval_int(r#"length($d{pmap}) > 0 ? 1 : 0"#) == 1);
-    assert!(eval_int(r#"scalar @{ $c{parallel} } > 0 ? 1 : 0"#) == 1);
-    assert!(eval_int(r#"scalar @{ $p{to_json} } > 0 ? 1 : 0"#) == 1);
+    assert!(eval_int(r#"len(@{ $c{parallel} }) > 0 ? 1 : 0"#) == 1);
+    assert!(eval_int(r#"len(@{ $p{to_json} }) > 0 ? 1 : 0"#) == 1);
 }
 
 /// Every `try_builtin` dispatch primary must land in either `is_perl5_core`
@@ -239,11 +239,11 @@ fn every_dispatch_primary_is_categorized() {
 /// Catastrophic-regression floors on each hash.
 #[test]
 fn reflection_hashes_have_reasonable_sizes() {
-    assert!(eval_int(r#"scalar keys %stryke::builtins"#) >= 200);
-    assert!(eval_int(r#"scalar keys %stryke::perl_compats"#) >= 80);
-    assert!(eval_int(r#"scalar keys %stryke::extensions"#) >= 100);
-    assert!(eval_int(r#"scalar keys %stryke::aliases"#) >= 100);
-    assert!(eval_int(r#"scalar keys %stryke::descriptions"#) >= 10);
-    assert!(eval_int(r#"scalar keys %stryke::categories"#) >= 10);
-    assert!(eval_int(r#"scalar keys %stryke::primaries"#) >= 100);
+    assert!(eval_int(r#"len(keys %stryke::builtins)"#) >= 200);
+    assert!(eval_int(r#"len(keys %stryke::perl_compats)"#) >= 80);
+    assert!(eval_int(r#"len(keys %stryke::extensions)"#) >= 100);
+    assert!(eval_int(r#"len(keys %stryke::aliases)"#) >= 100);
+    assert!(eval_int(r#"len(keys %stryke::descriptions)"#) >= 10);
+    assert!(eval_int(r#"len(keys %stryke::categories)"#) >= 10);
+    assert!(eval_int(r#"len(keys %stryke::primaries)"#) >= 100);
 }

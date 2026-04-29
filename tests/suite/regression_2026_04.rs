@@ -376,7 +376,7 @@ fn recursive_sum_with_shift() {
         eval_int(
             r#"
             fn Test::List::sum(@nums) {
-                if (scalar(@nums) == 0) { 0 }
+                if (len(@nums) == 0) { 0 }
                 else {
                     my $first = shift @nums
                     $first + Test::List::sum(@nums)
@@ -396,7 +396,7 @@ fn recursive_with_empty_array_param() {
         eval_int(
             r#"
             fn Test::Count::len(@arr) {
-                if (scalar(@arr) == 0) { 0 }
+                if (len(@arr) == 0) { 0 }
                 else {
                     shift @arr
                     1 + Test::Count::len(@arr)
@@ -416,7 +416,7 @@ fn recursive_sum_with_index() {
         eval_int(
             r#"
             fn Test::List::sum_from($arr, $i) {
-                if ($i >= scalar(@$arr)) { 0 }
+                if ($i >= len(@$arr)) { 0 }
                 else { $arr->[$i] + Test::List::sum_from($arr, $i + 1) }
             }
             my @nums = (1, 2, 3, 4, 5)
@@ -458,7 +458,7 @@ fn empty_array_return() {
             r#"
             fn Test::Arr::empty_list { () }
             my @arr = Test::Arr::empty_list()
-            scalar(@arr)
+            len(@arr)
             "#
         ),
         0
@@ -552,7 +552,7 @@ fn bracket_subscript_after_method_call_still_works_same_line() {
 
 #[test]
 fn return_array_var_yields_list_context_elements() {
-    // Pre-fix: `return @x` would yield `3` (scalar @x = length); after fix,
+    // Pre-fix: `return @x` would yield `3` (len(@x) = length); after fix,
     // the caller sees the actual three elements.
     assert_eq!(
         eval_string(
@@ -569,7 +569,7 @@ fn return_array_var_yields_list_context_elements() {
             r#"
             fn make_list { my @x = (10, 20, 30); return @x }
             my @r = make_list()
-            scalar @r
+            len(@r)
             "#
         ),
         3
@@ -607,7 +607,7 @@ fn return_array_var_via_recursive_call() {
                 return @out
             }
             my @r = my_doubler(1, 2, 3, 4)
-            scalar @r
+            len(@r)
             "#
         ),
         4

@@ -71,7 +71,7 @@ fn parse_and_run_string_returns_last_statement_value() {
 #[test]
 fn parse_and_run_string_preserves_subroutine_definitions() {
     let mut interp = Interpreter::new();
-    parse_and_run_string("fn api_t { return 40 + 2; }", &mut interp).expect("define");
+    parse_and_run_string("fn api_t { 40 + 2 }", &mut interp).expect("define");
     let v = parse_and_run_string("api_t()", &mut interp).expect("call");
     assert_eq!(v.to_int(), 42);
 }

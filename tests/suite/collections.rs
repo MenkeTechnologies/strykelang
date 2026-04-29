@@ -9,7 +9,7 @@ fn scalar_variables() {
 #[test]
 fn array_variables() {
     assert_eq!(eval_int("my @a = (1,2,3); $a[1]"), 2);
-    assert_eq!(eval_int("my @a = (1,2,3); scalar @a"), 3);
+    assert_eq!(eval_int("my @a = (1,2,3); len(@a)"), 3);
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn hash_fat_arrow() {
 fn push_pop() {
     assert_eq!(eval_int("my @a = (1,2,3); push @a, 4; $a[3]"), 4);
     assert_eq!(eval_int("my @a = (1,2,3); pop @a"), 3);
-    assert_eq!(eval_int("my @a = (1,2,3); pop @a; scalar @a"), 2);
+    assert_eq!(eval_int("my @a = (1,2,3); pop @a; len(@a)"), 2);
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn splice_remove_insert() {
         "2,3"
     );
     assert_eq!(
-        eval_int("my @a = (1,2,3,4,5); splice @a, 1, 2; scalar @a"),
+        eval_int("my @a = (1,2,3,4,5); splice @a, 1, 2; len(@a)"),
         3
     );
 }
@@ -67,7 +67,7 @@ fn splice_remove_insert() {
 fn map_grep() {
     assert_eq!(eval_int("my @a = map { $_ * 2 } (1,2,3); $a[2]"), 6);
     assert_eq!(
-        eval_int("my @a = grep { $_ > 2 } (1,2,3,4,5); scalar @a"),
+        eval_int("my @a = grep { $_ > 2 } (1,2,3,4,5); len(@a)"),
         3
     );
 }
@@ -96,7 +96,7 @@ fn array_slice() {
 
 #[test]
 fn range_operator() {
-    assert_eq!(eval_int("my @a = (1..5); scalar @a"), 5);
+    assert_eq!(eval_int("my @a = (1..5); len(@a)"), 5);
     assert_eq!(eval_int("my @a = (1..5); $a[4]"), 5);
 }
 
@@ -115,7 +115,7 @@ fn hash_delete_exists() {
 #[test]
 fn hash_keys_values() {
     assert_eq!(
-        eval_int("my %h = (a => 1, b => 2, c => 3); scalar keys %h"),
+        eval_int("my %h = (a => 1, b => 2, c => 3); len(keys %h)"),
         3
     );
 }
@@ -156,7 +156,7 @@ fn set_builtin_slurpy_and_methods() {
         ),
         "amz"
     );
-    assert_eq!(eval_int(r#"scalar ((1, 1, 2, 3) |> set)"#), 3);
+    assert_eq!(eval_int(r#"len(((1, 1, 2, 3) |> set))"#), 3);
     assert_eq!(
         eval_int(
             r#"my $u = set(1, 2, 3);

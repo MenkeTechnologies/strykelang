@@ -13,7 +13,7 @@ fn localtime_list_nine_elements() {
     assert_eq!(
         eval_int(
             r#"my @t = localtime(0);
-               scalar @t"#,
+               len(@t)"#,
         ),
         9
     );
@@ -33,7 +33,7 @@ fn gmtime_list_nine_elements() {
     assert_eq!(
         eval_int(
             r#"my @t = gmtime(0);
-               scalar @t"#,
+               len(@t)"#,
         ),
         9
     );
@@ -47,29 +47,29 @@ fn gmtime_scalar_mentions_utc_year() {
 
 #[test]
 fn pack_unsigned_short_roundtrip_capital_s() {
-    assert_eq!(eval_int(r#"scalar unpack 'S', pack 'S', 0xFE01"#), 0xFE01);
+    assert_eq!(eval_int(r#"unpack_first("S", pack("S", 0xFE01))"#), 0xFE01);
 }
 
 #[test]
 fn pack_signed_short_negative_roundtrip() {
-    assert_eq!(eval_int(r#"scalar unpack 's', pack 's', -3"#), -3);
+    assert_eq!(eval_int(r#"unpack_first("s", pack("s", -3))"#), -3);
 }
 
 #[test]
 fn pack_f_unpack_f_approximate() {
-    let s = eval_string(r#"sprintf("%.4f", scalar unpack 'f', pack 'f', 1.25)"#);
+    let s = eval_string(r#"sprintf("%.4f", unpack_first("f", pack("f", 1.25)))"#);
     assert_eq!(s, "1.2500");
 }
 
 #[test]
 fn pack_d_unpack_d_pi_slice() {
-    let s = eval_string(r#"sprintf("%.5f", scalar unpack 'd', pack 'd', 3.14159265)"#);
+    let s = eval_string(r#"sprintf("%.5f", unpack_first("d", pack("d", 3.14159265)))"#);
     assert_eq!(s, "3.14159");
 }
 
 #[test]
 fn pack_i_unpack_i_roundtrip() {
-    assert_eq!(eval_int(r#"scalar unpack 'i', pack 'i', -404"#), -404);
+    assert_eq!(eval_int(r#"unpack_first("i", pack("i", -404))"#), -404);
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn keys_on_hash_deref_of_ref() {
     assert_eq!(
         eval_int(
             r#"my $r = { a => 3, b => 4 };
-               scalar keys %$r"#,
+               len(keys %$r)"#,
         ),
         2
     );
@@ -262,7 +262,7 @@ fn defined_ampersand_sub() {
 #[test]
 fn pack_unsigned_long_roundtrip() {
     assert_eq!(
-        eval_int(r#"scalar unpack 'L', pack 'L', 305419896"#),
+        eval_int(r#"unpack_first("L", pack("L", 305419896))"#),
         305419896
     );
 }
@@ -423,10 +423,10 @@ fn parenthesized_base_exponent_positive_square() {
 
 #[test]
 fn pack_signed_long_roundtrip() {
-    assert_eq!(eval_int(r#"scalar unpack 'l', pack 'l', -123456"#), -123456);
+    assert_eq!(eval_int(r#"unpack_first("l", pack("l", -123456))"#), -123456);
 }
 
 #[test]
 fn pack_capital_i_small_value() {
-    assert_eq!(eval_int(r#"scalar unpack 'I', pack 'I', 123456"#), 123456);
+    assert_eq!(eval_int(r#"unpack_first("I", pack("I", 123456))"#), 123456);
 }

@@ -58,12 +58,12 @@ fn splice_returns_removed_elements_as_list_joined() {
 
 #[test]
 fn grep_empty_input_yields_empty() {
-    assert_eq!(eval_int("my @a = grep { $_ > 0 } (); scalar @a"), 0);
+    assert_eq!(eval_int("my @a = grep { $_ > 0 } (); len(@a)"), 0);
 }
 
 #[test]
 fn map_empty_input_yields_empty() {
-    assert_eq!(eval_int("my @a = map { $_ * 2 } (); scalar @a"), 0);
+    assert_eq!(eval_int("my @a = map { $_ * 2 } (); len(@a)"), 0);
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn foreach_iterates_hash_keys() {
 #[test]
 fn values_hash_returns_all_stored_values() {
     assert_eq!(
-        eval_int(r#"my %h = (a => 10, b => 20, c => 30); my @v = values %h; scalar @v"#),
+        eval_int(r#"my %h = (a => 10, b => 20, c => 30); my @v = values %h; len(@v)"#),
         3,
     );
 }
@@ -339,9 +339,9 @@ fn anon_sub_returns_from_block() {
 
 #[test]
 fn sub_returns_first_arg_shift_with_extra_args() {
-    // Explicit `return` — bare trailing `$a` after `my` is not the block result in this engine.
+    // `shift @_` reads the first arg; trailing varargs are ignored without a slurpy.
     assert_eq!(
-        eval_int("fn add { my $a = shift @_; return $a; } add(1, 2, 3)"),
+        eval_int("fn add { my $a = shift @_; $a } add(1, 2, 3)"),
         1
     );
 }
@@ -394,7 +394,7 @@ fn postfix_for_accumulates() {
 
 #[test]
 fn range_float_endpoints_coerce() {
-    assert_eq!(eval_int("my @a = (1..3); scalar @a"), 3);
+    assert_eq!(eval_int("my @a = (1..3); len(@a)"), 3);
 }
 
 #[test]

@@ -145,12 +145,12 @@ fn vec_two_bit_field() {
 
 #[test]
 fn pack_n_unsigned_big_endian_roundtrip() {
-    assert_eq!(eval_int(r#"scalar unpack 'n', pack 'n', 0x1234"#), 0x1234);
+    assert_eq!(eval_int(r#"unpack_first("n", pack("n", 0x1234))"#), 0x1234);
 }
 
 #[test]
 fn pack_v_unsigned_le_roundtrip() {
-    assert_eq!(eval_int(r#"scalar unpack 'v', pack 'v', 0x3412"#), 0x3412);
+    assert_eq!(eval_int(r#"unpack_first("v", pack("v", 0x3412))"#), 0x3412);
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn unpack_h_star_hex_digits_uppercase() {
 
 #[test]
 fn pack_w_ber_integer_small() {
-    assert_eq!(eval_int(r#"scalar unpack 'w', pack 'w', 127"#), 127);
+    assert_eq!(eval_int(r#"unpack_first("w", pack("w", 127))"#), 127);
 }
 
 // ── aggregates: slices, `$#`, `delete` list ──
@@ -448,7 +448,7 @@ fn splice_negative_offset_removes_second_to_last() {
 #[test]
 fn array_copy_is_independent_for_push() {
     assert_eq!(
-        eval_int(r#"my @a = (1); my @b = @a; push @b, 2; scalar @a + scalar @b"#),
+        eval_int(r#"my @a = (1); my @b = @a; push @b, 2; len(@a) + len(@b)"#),
         3
     );
 }
@@ -469,7 +469,7 @@ fn wantarray_true_in_list_assignment() {
         eval_int(
             r#"fn L { wantarray ? 7 : 0 }
                my @x = L();
-               scalar @x"#,
+               len(@x)"#,
         ),
         1
     );
@@ -510,7 +510,7 @@ fn map_expr_comma_doubles() {
 
 #[test]
 fn keys_empty_hash_scalar_zero() {
-    assert_eq!(eval_int(r#"my %h; scalar keys %h"#), 0);
+    assert_eq!(eval_int(r#"my %h; len(keys %h)"#), 0);
 }
 
 #[test]
