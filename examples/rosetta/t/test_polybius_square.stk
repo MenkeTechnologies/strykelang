@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polybius square (5x5 grid, I/J share a cell)
+
+fn Rosetta::Polybius::build() {
+    my @grid
+    my $alpha = "ABCDEFGHIKLMNOPQRSTUVWXYZ"   # no J
+    for my $r (0..4) {
+        my @row
+        for my $c (0..4) {
+            push @row, substr($alpha, $r * 5 + $c, 1)
+        }
+        push @grid, \@row
+    }
+    \@grid
+}
+
+fn Rosetta::Polybius::encode($plain) {
+    my $grid = Rosetta::Polybius::build()
+    my $alpha = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+    my $out = ""
+    my $up = uc($plain)
+    for my $i (0..length($up)-1) {
+        my $ch = substr($up, $i, 1)
+        $ch = "I" if $ch eq "J"
+        my $idx = index($alpha, $ch)
+        next if $idx < 0
+        my $r = int($idx / 5) + 1
+        my $c = ($idx % 5) + 1
+        $out .= "$r$c"
+    }
+    $out
+}
+
+fn Rosetta::Polybius::decode($cipher) {
+    my $grid = Rosetta::Polybius::build()
+    my $out = ""
+    my $i = 0
+    while ($i + 1 < length($cipher)) {
+        my $r = int(substr($cipher, $i, 1)) - 1
+        my $c = int(substr($cipher, $i + 1, 1)) - 1
+        $out .= $grid->[$r][$c]
+        $i += 2
+    }
+    $out
+}
+
+# Single letters
+assert_eq Rosetta::Polybius::encode("A"), "11", "A -> 11"
+assert_eq Rosetta::Polybius::encode("Z"), "55", "Z -> 55"
+assert_eq Rosetta::Polybius::encode("K"), "25", "K -> 25"
+assert_eq Rosetta::Polybius::encode("J"), "24", "J merged with I -> 24"
+
+# Round-trip
+my $enc = Rosetta::Polybius::encode("HELLO")
+assert_eq $enc, "2315313134", "HELLO encoded"
+assert_eq Rosetta::Polybius::decode($enc), "HELLO", "HELLO round-trip"
+
+# Non-alpha characters skipped
+assert_eq Rosetta::Polybius::encode("HI THERE"), "23244423154215", "spaces ignored"
+
+# Lowercase normalised
+assert_eq Rosetta::Polybius::encode("abc"), "111213", "lowercase encoded same as upper"
+
+test_run

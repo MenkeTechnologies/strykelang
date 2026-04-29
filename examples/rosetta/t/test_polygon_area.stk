@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polygon area (signed and unsigned via shoelace)
+
+fn Rosetta::PolyArea::signed($poly) {
+    my $n = scalar(@$poly)
+    return 0 if $n < 3
+    my $sum = 0
+    for my $i (0..$n - 1) {
+        my $j = ($i + 1) % $n
+        $sum += $poly->[$i][0] * $poly->[$j][1] - $poly->[$j][0] * $poly->[$i][1]
+    }
+    $sum / 2
+}
+
+fn Rosetta::PolyArea::unsigned($poly) {
+    abs(Rosetta::PolyArea::signed($poly))
+}
+
+fn Rosetta::PolyArea::ccw($poly) {
+    Rosetta::PolyArea::signed($poly) > 0
+}
+
+# Unit square (CCW)
+my $sq_ccw = [[0,0], [1,0], [1,1], [0,1]]
+assert_eq Rosetta::PolyArea::signed($sq_ccw), 1, "CCW unit square signed = +1"
+assert_eq Rosetta::PolyArea::unsigned($sq_ccw), 1, "unsigned = 1"
+assert_ok Rosetta::PolyArea::ccw($sq_ccw), "CCW orientation"
+
+# Same square CW
+my $sq_cw = [[0,0], [0,1], [1,1], [1,0]]
+assert_eq Rosetta::PolyArea::signed($sq_cw), -1, "CW unit square signed = -1"
+assert_eq Rosetta::PolyArea::unsigned($sq_cw), 1, "unsigned same"
+assert_ok !Rosetta::PolyArea::ccw($sq_cw), "CW not CCW"
+
+# Right triangle (3-4-5)
+my $tri = [[0,0], [3,0], [0,4]]
+assert_eq Rosetta::PolyArea::unsigned($tri), 6, "3-4 right triangle area = 6"
+
+# Pentagon
+my $pent = [[0,0], [4,0], [5,3], [2,5], [-1,3]]
+my $area = Rosetta::PolyArea::unsigned($pent)
+assert_eq $area, 21, "pentagon area = 21 (shoelace)"
+
+# Self-intersecting bowtie has zero NET signed area when symmetric
+my $bow = [[0,0], [2,2], [2,0], [0,2]]
+assert_eq Rosetta::PolyArea::signed($bow), 0, "symmetric bowtie net = 0"
+
+# Degenerate
+assert_eq Rosetta::PolyArea::unsigned([]), 0, "empty -> 0"
+assert_eq Rosetta::PolyArea::unsigned([[0,0]]), 0, "single point -> 0"
+assert_eq Rosetta::PolyArea::unsigned([[0,0], [1,1]]), 0, "two points -> 0"
+
+# Pipe form
+[[0,0],[3,0],[0,4]] |> Rosetta::PolyArea::unsigned |> assert_eq(6, "pipe triangle area")
+
+test_run

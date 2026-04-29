@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Median of two sorted arrays — O(log min(m,n)) binary search
+
+fn Rosetta::Median2::find($a, $b) {
+    if (scalar(@$a) > scalar(@$b)) {
+        my $tmp = $a
+        $a = $b
+        $b = $tmp
+    }
+    my $m = scalar(@$a)
+    my $n = scalar(@$b)
+    my $half = int(($m + $n + 1) / 2)
+    my $lo = 0
+    my $hi = $m
+    my $inf = 1e18
+    while ($lo <= $hi) {
+        my $i = int(($lo + $hi) / 2)
+        my $j = $half - $i
+        my $a_left = $i == 0 ? -$inf : $a->[$i - 1]
+        my $a_right = $i == $m ? $inf : $a->[$i]
+        my $b_left = $j == 0 ? -$inf : $b->[$j - 1]
+        my $b_right = $j == $n ? $inf : $b->[$j]
+        if ($a_left <= $b_right && $b_left <= $a_right) {
+            if (($m + $n) % 2 == 1) {
+                return $a_left > $b_left ? $a_left : $b_left
+            }
+            my $left_max = $a_left > $b_left ? $a_left : $b_left
+            my $right_min = $a_right < $b_right ? $a_right : $b_right
+            return ($left_max + $right_min) / 2.0
+        }
+        if ($a_left > $b_right) {
+            $hi = $i - 1
+        } else {
+            $lo = $i + 1
+        }
+    }
+    undef
+}
+
+fn Rosetta::Median2::close($x, $y) { abs($x - $y) < 1e-9 }
+
+# Even total
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1, 3], [2, 4]), 2.5), "[1,3] [2,4] -> 2.5"
+
+# Odd total
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1, 3], [2]), 2), "[1,3] [2] -> 2"
+
+# Empty + non-empty
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([], [1, 2, 3, 4]), 2.5), "[] [1..4] -> 2.5"
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([5], []), 5), "[5] [] -> 5"
+
+# Disjoint ranges
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1, 2, 3], [10, 11, 12]), 6.5), "disjoint -> 6.5"
+
+# Identical
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1, 2, 3], [1, 2, 3]), 2), "duplicates [1,2,3] x2 -> 2"
+
+# Single elements
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1], [2]), 1.5), "[1] [2] -> 1.5"
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find([3], [3]), 3), "[3] [3] -> 3"
+
+# Larger arrays
+my $big_a = [1, 5, 9, 13, 17]
+my $big_b = [2, 6, 10, 14, 18]
+assert_ok Rosetta::Median2::close(Rosetta::Median2::find($big_a, $big_b), 9.5), "5+5 elements -> 9.5"
+
+test_run

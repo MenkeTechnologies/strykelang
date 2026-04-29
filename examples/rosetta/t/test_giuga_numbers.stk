@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Giuga numbers — composites n such that for every prime divisor p, p | (n/p - 1)
+# Equivalently: sum_{p|n} 1/p - 1/n is an integer
+# Known: 30, 858, 1722, 66198, ...
+
+fn Rosetta::Giuga::primes_of($n) {
+    my @ps
+    my $p = 2
+    while ($p * $p <= $n) {
+        if ($n % $p == 0) {
+            push @ps, $p
+            while ($n % $p == 0) { $n = int($n / $p) }
+        }
+        $p++
+    }
+    push @ps, $n if $n > 1
+    \@ps
+}
+
+fn Rosetta::Giuga::is_giuga($n) {
+    return 0 if $n < 4
+    my $primes = Rosetta::Giuga::primes_of($n)
+    return 0 if scalar(@$primes) < 2
+    # Composite check: at least 2 distinct primes OR repeated prime power
+    # For Giuga we also need n squarefree (no repeated prime factor).
+    my $prod = 1
+    for my $p (@$primes) { $prod *= $p }
+    return 0 if $prod != $n
+    for my $p (@$primes) {
+        my $q = int($n / $p) - 1
+        return 0 if $q % $p != 0
+    }
+    1
+}
+
+# 30 is the smallest Giuga number
+assert_ok Rosetta::Giuga::is_giuga(30), "30 is Giuga"
+assert_ok Rosetta::Giuga::is_giuga(858), "858 is Giuga"
+assert_ok Rosetta::Giuga::is_giuga(1722), "1722 is Giuga"
+
+# Counter-checks
+assert_ok !Rosetta::Giuga::is_giuga(2), "2 is prime, not Giuga"
+assert_ok !Rosetta::Giuga::is_giuga(6), "6 not Giuga"
+assert_ok !Rosetta::Giuga::is_giuga(12), "12 not Giuga (not squarefree)"
+assert_ok !Rosetta::Giuga::is_giuga(60), "60 not Giuga"
+assert_ok !Rosetta::Giuga::is_giuga(100), "100 not Giuga"
+
+# All squares are NOT Giuga (not squarefree)
+for my $n (4, 9, 25, 49, 121) {
+    assert_ok !Rosetta::Giuga::is_giuga($n), "$n^2 not Giuga"
+}
+
+# 30 = 2 * 3 * 5, all distinct primes; check the divisibility property
+my $primes_30 = Rosetta::Giuga::primes_of(30)
+assert_eq join(",", @$primes_30), "2,3,5", "primes(30) = 2,3,5"
+
+# 30/2 - 1 = 14, divisible by 2
+# 30/3 - 1 = 9, divisible by 3
+# 30/5 - 1 = 5, divisible by 5
+assert_ok((30 / 2 - 1) % 2 == 0, "(30/2-1) % 2 == 0")
+assert_ok((30 / 3 - 1) % 3 == 0, "(30/3-1) % 3 == 0")
+assert_ok((30 / 5 - 1) % 5 == 0, "(30/5-1) % 5 == 0")
+
+# Search up to 900: should find 30 and 858
+my @found
+for my $i (4..900) {
+    push @found, $i if Rosetta::Giuga::is_giuga($i)
+}
+assert_eq join(",", @found), "30,858", "Giuga numbers up to 900"
+
+test_run

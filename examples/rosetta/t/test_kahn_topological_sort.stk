@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kahn's algorithm — topological sort by repeatedly removing
+# nodes with zero in-degree.
+
+fn Rosetta::Kahn::sort($edges, $nodes) {
+    my %in_deg
+    my %adj
+    for my $n (@$nodes) {
+        $in_deg{$n} = 0
+        $adj{$n} = []
+    }
+    for my $e (@$edges) {
+        my ($u, $v) = ($e->[0], $e->[1])
+        push @{$adj{$u}}, $v
+        $in_deg{$v}++
+    }
+    my @queue = grep { $in_deg{$_} == 0 } @$nodes
+    my @order
+    while (scalar(@queue)) {
+        my $u = shift @queue
+        push @order, $u
+        for my $v (@{$adj{$u}}) {
+            $in_deg{$v}--
+            push @queue, $v if $in_deg{$v} == 0
+        }
+    }
+    return undef if scalar(@order) != scalar(@$nodes)
+    \@order
+}
+
+fn Rosetta::Kahn::valid($order, $edges) {
+    my %pos
+    for my $i (0..scalar(@$order)-1) { $pos{$order->[$i]} = $i }
+    for my $e (@$edges) {
+        return 0 if $pos{$e->[0]} >= $pos{$e->[1]}
+    }
+    1
+}
+
+# DAG with 6 nodes, classic topo example
+my $edges = [["A","B"], ["A","C"], ["B","D"], ["C","D"], ["D","E"], ["F","E"]]
+my $nodes = ["A","B","C","D","E","F"]
+my $order = Rosetta::Kahn::sort($edges, $nodes)
+assert_ok defined($order), "DAG has a topological order"
+assert_eq scalar(@$order), 6, "all 6 nodes in order"
+assert_ok Rosetta::Kahn::valid($order, $edges), "every edge u->v has pos(u) < pos(v)"
+
+# Linear chain
+my $chain = Rosetta::Kahn::sort([["1","2"],["2","3"],["3","4"]], ["1","2","3","4"])
+assert_eq join(",", @$chain), "1,2,3,4", "linear chain order"
+
+# Cycle -> undef
+my $cyc = Rosetta::Kahn::sort([["A","B"],["B","C"],["C","A"]], ["A","B","C"])
+assert_ok !defined($cyc), "cycle returns undef"
+
+# Already-isolated nodes (no edges) -> any permutation
+my $iso = Rosetta::Kahn::sort([], ["X","Y","Z"])
+assert_ok defined($iso), "no edges -> some order"
+assert_eq scalar(@$iso), 3, "all 3 nodes present"
+
+# Self-loop -> cycle -> undef
+my $loop = Rosetta::Kahn::sort([["A","A"]], ["A"])
+assert_ok !defined($loop), "self-loop is a cycle"
+
+test_run

@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Collatz — find the n <= N producing the longest hailstone sequence
+
+fn Rosetta::CollatzMax::length($n) {
+    my $count = 1
+    while ($n > 1) {
+        if ($n % 2 == 0) {
+            $n = int($n / 2)
+        } else {
+            $n = 3 * $n + 1
+        }
+        $count++
+    }
+    $count
+}
+
+fn Rosetta::CollatzMax::peak($n) {
+    my $max = $n
+    while ($n > 1) {
+        if ($n % 2 == 0) {
+            $n = int($n / 2)
+        } else {
+            $n = 3 * $n + 1
+        }
+        $max = $n if $n > $max
+    }
+    $max
+}
+
+fn Rosetta::CollatzMax::longest_under($limit) {
+    my $best_n = 1
+    my $best_len = 1
+    for my $i (1..$limit) {
+        my $l = Rosetta::CollatzMax::length($i)
+        if ($l > $best_len) {
+            $best_len = $l
+            $best_n = $i
+        }
+    }
+    [$best_n, $best_len]
+}
+
+# Length tests (sequence count INCLUDES start and 1)
+assert_eq Rosetta::CollatzMax::length(1), 1, "len(1) = 1"
+assert_eq Rosetta::CollatzMax::length(2), 2, "len(2) = 2 (2,1)"
+assert_eq Rosetta::CollatzMax::length(3), 8, "len(3) = 8"
+assert_eq Rosetta::CollatzMax::length(27), 112, "len(27) = 112"
+
+# Longest under 100 -> n=97 (length 119)
+my $r1 = Rosetta::CollatzMax::longest_under(100)
+assert_eq $r1->[0], 97, "longest under 100: n=97"
+assert_eq $r1->[1], 119, "longest under 100: len=119"
+
+# Longest under 1000 -> n=871 (length 179)
+my $r2 = Rosetta::CollatzMax::longest_under(1000)
+assert_eq $r2->[0], 871, "longest under 1000: n=871"
+assert_eq $r2->[1], 179, "longest under 1000: len=179"
+
+# Peak: 27 -> 9232
+assert_eq Rosetta::CollatzMax::peak(27), 9232, "peak(27) = 9232"
+assert_eq Rosetta::CollatzMax::peak(3), 16, "peak(3) = 16"
+assert_eq Rosetta::CollatzMax::peak(1), 1, "peak(1) = 1"
+
+# Powers of 2 just halve down: peak = self, length = log2(n) + 1
+assert_eq Rosetta::CollatzMax::length(8), 4, "len(8) = 4 (8,4,2,1)"
+assert_eq Rosetta::CollatzMax::peak(8), 8, "peak(8) = 8"
+assert_eq Rosetta::CollatzMax::length(1024), 11, "len(1024) = 11"
+
+test_run

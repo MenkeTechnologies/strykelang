@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ramer-Douglas-Peucker polyline simplification
+
+fn Rosetta::RDP::perp_dist($pt, $a, $b) {
+    my $dx = $b->[0] - $a->[0]
+    my $dy = $b->[1] - $a->[1]
+    my $len = sqrt($dx * $dx + $dy * $dy)
+    return sqrt(($pt->[0] - $a->[0]) ** 2 + ($pt->[1] - $a->[1]) ** 2) if $len == 0
+    abs($dy * $pt->[0] - $dx * $pt->[1] + $b->[0] * $a->[1] - $b->[1] * $a->[0]) / $len
+}
+
+fn Rosetta::RDP::simplify($pts, $eps) {
+    my $n = scalar(@$pts)
+    return [@$pts] if $n < 3
+    my $max_d = 0
+    my $idx = 0
+    for my $i (1..$n - 2) {
+        my $d = Rosetta::RDP::perp_dist($pts->[$i], $pts->[0], $pts->[$n - 1])
+        if ($d > $max_d) {
+            $max_d = $d
+            $idx = $i
+        }
+    }
+    if ($max_d > $eps) {
+        my @left_pts = @$pts[0..$idx]
+        my @right_pts = @$pts[$idx..$n - 1]
+        my $l = Rosetta::RDP::simplify(\@left_pts, $eps)
+        my $r = Rosetta::RDP::simplify(\@right_pts, $eps)
+        my @combined = @$l[0..scalar(@$l) - 2]
+        push @combined, @$r
+        \@combined
+    } else {
+        [$pts->[0], $pts->[$n - 1]]
+    }
+}
+
+# Straight line stays as endpoints
+my $line = [[0,0], [1,1], [2,2], [3,3], [4,4]]
+my $sl = Rosetta::RDP::simplify($line, 0.5)
+assert_eq scalar(@$sl), 2, "collinear -> 2 endpoints"
+assert_eq $sl->[0][0], 0, "first x"
+assert_eq $sl->[1][0], 4, "last x"
+
+# Sharp triangle preserved
+my $tri = [[0,0], [2,3], [4,0]]
+my $st = Rosetta::RDP::simplify($tri, 0.5)
+assert_eq scalar(@$st), 3, "triangle peak preserved"
+
+# Tiny noise on a line gets smoothed
+my $noisy = [[0,0], [1,0.01], [2,0.02], [3,-0.01], [4,0]]
+my $sm = Rosetta::RDP::simplify($noisy, 0.1)
+assert_eq scalar(@$sm), 2, "small noise smoothed to endpoints"
+
+# Larger noise preserved
+my $big_noise = [[0,0], [1,1], [2,0]]
+my $sb = Rosetta::RDP::simplify($big_noise, 0.5)
+assert_eq scalar(@$sb), 3, "big spike preserved"
+
+# Two points stay
+my $two = [[0,0], [5,5]]
+my $st2 = Rosetta::RDP::simplify($two, 0.1)
+assert_eq scalar(@$st2), 2, "2 input -> 2 output"
+
+# eps = 0 keeps everything except strictly collinear interior
+my $exact = [[0,0], [1,1], [2,2], [3,5]]
+my $sx = Rosetta::RDP::simplify($exact, 0)
+assert_ok scalar(@$sx) >= 3, "eps=0 keeps non-collinear bend"
+
+test_run

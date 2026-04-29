@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wheel factorization (mod 30 — 2*3*5)
+# Skip multiples of 2, 3, 5 by stepping through residues coprime to 30.
+
+fn Rosetta::Wheel::factor($n) {
+    my @factors
+    return \@factors if $n < 2
+    my @small = (2, 3, 5)
+    for my $p (@small) {
+        while ($n % $p == 0) {
+            push @factors, $p
+            $n = int($n / $p)
+        }
+    }
+    my @increments = (4, 2, 4, 2, 4, 6, 2, 6)
+    my $k = 7
+    my $idx = 0
+    while ($k * $k <= $n) {
+        while ($n % $k == 0) {
+            push @factors, $k
+            $n = int($n / $k)
+        }
+        $k += $increments[$idx]
+        $idx = ($idx + 1) % 8
+    }
+    push @factors, $n if $n > 1
+    \@factors
+}
+
+# Small primes
+assert_eq join(",", @{Rosetta::Wheel::factor(2)}), "2", "2 -> 2"
+assert_eq join(",", @{Rosetta::Wheel::factor(7)}), "7", "7 -> 7"
+assert_eq join(",", @{Rosetta::Wheel::factor(13)}), "13", "13 -> 13"
+assert_eq join(",", @{Rosetta::Wheel::factor(97)}), "97", "97 -> 97"
+
+# Composites
+assert_eq join(",", @{Rosetta::Wheel::factor(360)}), "2,2,2,3,3,5", "360 = 2^3 * 3^2 * 5"
+assert_eq join(",", @{Rosetta::Wheel::factor(2310)}), "2,3,5,7,11", "2310 = 2*3*5*7*11"
+assert_eq join(",", @{Rosetta::Wheel::factor(1024)}), "2,2,2,2,2,2,2,2,2,2", "1024 = 2^10"
+assert_eq join(",", @{Rosetta::Wheel::factor(999983)}), "999983", "999983 is prime"
+
+# Edge cases
+assert_eq scalar(@{Rosetta::Wheel::factor(0)}), 0, "0 -> empty"
+assert_eq scalar(@{Rosetta::Wheel::factor(1)}), 0, "1 -> empty"
+
+# Recompose check
+for my $n (12, 100, 999, 12345, 65536, 1000000) {
+    my $factors = Rosetta::Wheel::factor($n)
+    my $prod = 1
+    for my $f (@$factors) { $prod *= $f }
+    assert_eq $prod, $n, "factor product = $n"
+}
+
+# All factors are prime
+my $f = Rosetta::Wheel::factor(123456)
+for my $p (@$f) {
+    my $is_prime = 1
+    for my $d (2..int(sqrt($p))) {
+        if ($p % $d == 0) { $is_prime = 0; last }
+    }
+    assert_ok $is_prime, "factor $p of 123456 is prime"
+}
+
+test_run

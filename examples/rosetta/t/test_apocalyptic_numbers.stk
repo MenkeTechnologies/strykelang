@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Apocalyptic numbers — n such that 2^n contains "666"
+
+fn Rosetta::Apoc::pow2($n) {
+    my $s = "1"
+    for my $i (1..$n) {
+        # Multiply $s (decimal string) by 2
+        my $carry = 0
+        my $result = ""
+        for my $j (~> 0:length($s)-1 rev) {
+            my $d = int(substr($s, $j, 1)) * 2 + $carry
+            $result = ($d % 10) . $result
+            $carry = int($d / 10)
+        }
+        $result = $carry . $result if $carry
+        $s = $result
+    }
+    $s
+}
+
+fn Rosetta::Apoc::is_apocalyptic($n) {
+    index(Rosetta::Apoc::pow2($n), "666") >= 0
+}
+
+# OEIS A007356: 157, 192, 218, 220, 222, 224, 226, 243, 245, 247, ...
+my @first_ten = (157, 192, 218, 220, 222, 224, 226, 243, 245, 247)
+for my $n (@first_ten) {
+    assert_ok Rosetta::Apoc::is_apocalyptic($n), "$n is apocalyptic"
+}
+
+# Confirm a few that AREN'T (small powers)
+for my $n (1, 2, 3, 5, 10, 50, 100, 156) {
+    assert_ok !Rosetta::Apoc::is_apocalyptic($n), "$n is NOT apocalyptic"
+}
+
+# 2^157 must contain "666"
+my $big = Rosetta::Apoc::pow2(157)
+assert_ok index($big, "666") >= 0, "2^157 string contains '666'"
+
+# 2^10 = 1024
+assert_eq Rosetta::Apoc::pow2(10), "1024", "2^10 = 1024"
+
+# 2^0 = 1
+assert_eq Rosetta::Apoc::pow2(0), "1", "2^0 = 1"
+
+# 2^20 = 1048576
+assert_eq Rosetta::Apoc::pow2(20), "1048576", "2^20 = 1048576"
+
+test_run

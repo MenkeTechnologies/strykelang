@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Line segment intersection (proper, no collinear-overlap case)
+# Returns intersection point [x, y] or undef.
+
+fn Rosetta::SegInt::orient($a, $b, $c) {
+    my $cx = ($b->[0] - $a->[0]) * ($c->[1] - $a->[1]) - ($b->[1] - $a->[1]) * ($c->[0] - $a->[0])
+    return 0 if $cx == 0
+    $cx > 0 ? 1 : -1
+}
+
+fn Rosetta::SegInt::intersect($p1, $p2, $p3, $p4) {
+    my $o1 = Rosetta::SegInt::orient($p1, $p2, $p3)
+    my $o2 = Rosetta::SegInt::orient($p1, $p2, $p4)
+    my $o3 = Rosetta::SegInt::orient($p3, $p4, $p1)
+    my $o4 = Rosetta::SegInt::orient($p3, $p4, $p2)
+    if ($o1 * $o2 >= 0 || $o3 * $o4 >= 0) {
+        return undef
+    }
+    my $denom = ($p1->[0] - $p2->[0]) * ($p3->[1] - $p4->[1]) - ($p1->[1] - $p2->[1]) * ($p3->[0] - $p4->[0])
+    return undef if $denom == 0
+    my $t = (($p1->[0] - $p3->[0]) * ($p3->[1] - $p4->[1]) - ($p1->[1] - $p3->[1]) * ($p3->[0] - $p4->[0])) / $denom
+    [
+        $p1->[0] + $t * ($p2->[0] - $p1->[0]),
+        $p1->[1] + $t * ($p2->[1] - $p1->[1]),
+    ]
+}
+
+fn Rosetta::SegInt::close($x, $y) { abs($x - $y) < 1e-9 }
+
+# Crossing X
+my $hit = Rosetta::SegInt::intersect([0, 0], [4, 4], [0, 4], [4, 0])
+assert_ok defined($hit), "crossing X intersects"
+assert_ok Rosetta::SegInt::close($hit->[0], 2), "X intersection x=2"
+assert_ok Rosetta::SegInt::close($hit->[1], 2), "X intersection y=2"
+
+# Parallel non-overlapping
+my $miss = Rosetta::SegInt::intersect([0, 0], [4, 0], [0, 1], [4, 1])
+assert_ok !defined($miss), "parallel segments do not intersect"
+
+# Touching at endpoint -> not a proper crossing
+my $touch = Rosetta::SegInt::intersect([0, 0], [2, 2], [2, 2], [4, 0])
+assert_ok !defined($touch), "endpoint touch is not a proper intersection"
+
+# Disjoint
+my $far = Rosetta::SegInt::intersect([0, 0], [1, 1], [5, 5], [6, 6])
+assert_ok !defined($far), "disjoint collinear -> none"
+
+# Diagonal across square
+my $diag = Rosetta::SegInt::intersect([0, 0], [10, 10], [0, 5], [10, 5])
+assert_ok defined($diag), "diagonal hits horizontal"
+assert_ok Rosetta::SegInt::close($diag->[0], 5), "x=5"
+assert_ok Rosetta::SegInt::close($diag->[1], 5), "y=5"
+
+# Real-coords
+my $real = Rosetta::SegInt::intersect([1.5, 2.5], [4.5, 7.5], [1.5, 7.5], [4.5, 2.5])
+assert_ok defined($real), "real-coord intersection"
+assert_ok Rosetta::SegInt::close($real->[0], 3.0), "real x=3.0"
+assert_ok Rosetta::SegInt::close($real->[1], 5.0), "real y=5.0"
+
+test_run

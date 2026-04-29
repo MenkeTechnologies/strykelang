@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Prufer sequence — encode/decode labeled trees on n nodes (1..n)
+
+fn Rosetta::Prufer::encode($edges, $n) {
+    my %adj
+    for my $i (1..$n) { $adj{$i} = {} }
+    my %deg
+    for my $e (@$edges) {
+        my ($u, $v) = ($e->[0], $e->[1])
+        $adj{$u}{$v} = 1
+        $adj{$v}{$u} = 1
+        $deg{$u}++
+        $deg{$v}++
+    }
+    my @seq
+    for my $i (1..$n - 2) {
+        my $leaf
+        for my $k (1..$n) {
+            if ($deg{$k} == 1) {
+                $leaf = $k
+                last
+            }
+        }
+        my @neigh = keys %{$adj{$leaf}}
+        my $u = $neigh[0]
+        push @seq, $u
+        delete $adj{$leaf}{$u}
+        delete $adj{$u}{$leaf}
+        $deg{$leaf}--
+        $deg{$u}--
+    }
+    \@seq
+}
+
+fn Rosetta::Prufer::decode($seq, $n) {
+    my %deg
+    for my $i (1..$n) { $deg{$i} = 1 }
+    for my $x (@$seq) { $deg{$x}++ }
+    my @edges
+    my @work = @$seq
+    for my $x (@work) {
+        my $leaf
+        for my $k (1..$n) {
+            if ($deg{$k} == 1) {
+                $leaf = $k
+                last
+            }
+        }
+        push @edges, [$leaf, $x]
+        $deg{$leaf}--
+        $deg{$x}--
+    }
+    my $u
+    my $v
+    for my $k (1..$n) {
+        if ($deg{$k} == 1) {
+            if (!defined $u) { $u = $k } else { $v = $k }
+        }
+    }
+    push @edges, [$u, $v]
+    \@edges
+}
+
+# n = 4 path 1-2-3-4: edges (1,2),(2,3),(3,4) -> Prufer = [2,3]
+my $p1 = Rosetta::Prufer::encode([[1,2],[2,3],[3,4]], 4)
+assert_eq join(",", @$p1), "2,3", "path 1-2-3-4 -> [2,3]"
+
+# Decode [2,3] -> 3 edges
+my $e1 = Rosetta::Prufer::decode([2, 3], 4)
+assert_eq scalar(@$e1), 3, "n=4 -> n-1=3 edges"
+
+# Star centered on 1, n=5: edges (1,2),(1,3),(1,4),(1,5) -> Prufer = [1,1,1]
+my $p2 = Rosetta::Prufer::encode([[1,2],[1,3],[1,4],[1,5]], 5)
+assert_eq join(",", @$p2), "1,1,1", "star on 1 -> [1,1,1]"
+
+# Round trip: known sequence for a 6-node tree
+my $tree = [[1,4],[2,4],[3,5],[4,5],[5,6]]
+my $p3 = Rosetta::Prufer::encode($tree, 6)
+assert_eq scalar(@$p3), 4, "n=6 -> n-2=4 codes"
+my $back = Rosetta::Prufer::decode($p3, 6)
+assert_eq scalar(@$back), 5, "n=6 -> 5 edges back"
+
+# Edge count is always n-1
+for my $n (3, 5, 7, 10) {
+    my $seq = (1) x ($n - 2)
+    my $edges = Rosetta::Prufer::decode([(1) x ($n - 2)], $n)
+    assert_eq scalar(@$edges), $n - 1, "decode of n=$n gives n-1 edges"
+}
+
+test_run

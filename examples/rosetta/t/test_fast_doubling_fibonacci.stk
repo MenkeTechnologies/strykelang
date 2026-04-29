@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fast doubling Fibonacci — F(2k) = F(k) * (2*F(k+1) - F(k)),
+#                                          F(2k+1) = F(k+1)^2 + F(k)^2
+
+fn Rosetta::FastFib::pair($n) {
+    return [0, 1] if $n == 0
+    my $r = Rosetta::FastFib::pair(int($n / 2))
+    my ($a, $b) = ($r->[0], $r->[1])
+    my $c = $a * (2 * $b - $a)
+    my $d = $a * $a + $b * $b
+    if ($n % 2 == 0) {
+        [$c, $d]
+    } else {
+        [$d, $c + $d]
+    }
+}
+
+fn Rosetta::FastFib::fib($n) {
+    Rosetta::FastFib::pair($n)->[0]
+}
+
+# OEIS A000045
+my @expected = (0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181)
+for my $i (0..19) {
+    assert_eq Rosetta::FastFib::fib($i), $expected[$i], "F($i) = $expected[$i]"
+}
+
+# Larger: F(40), F(50)
+assert_eq Rosetta::FastFib::fib(40), 102334155, "F(40)"
+assert_eq Rosetta::FastFib::fib(50), 12586269025, "F(50)"
+
+# F(2k) identity sanity check via fast-doubling formula
+for my $k (5, 8, 13, 21) {
+    my $fk = Rosetta::FastFib::fib($k)
+    my $fk1 = Rosetta::FastFib::fib($k + 1)
+    my $f2k = Rosetta::FastFib::fib(2 * $k)
+    assert_eq $f2k, $fk * (2 * $fk1 - $fk), "F(2*$k) identity"
+}
+
+# Pipe form
+20 |> Rosetta::FastFib::fib |> assert_eq(6765, "pipe F(20) = 6765")
+
+test_run
