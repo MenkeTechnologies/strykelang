@@ -11,7 +11,7 @@ fn is_pronic($n) {
 }
 
 fn pronic_list($max) {
-    ~> 0..$max filter { is_pronic($_) }
+    ~> 0..$max filter { is_pronic(_) }
 }
 
 assert_ok is_pronic(0), "0 is pronic (0*1)"

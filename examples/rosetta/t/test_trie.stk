@@ -41,7 +41,7 @@ assert_eq Rosetta::Trie::starts_with($trie, "ban"), 1, "starts_with ban"
 
 # Parallel check for fun
 my @words = ("apple", "banana", "app", "band")
-my @results = ~> @words map { Rosetta::Trie::search($trie, $_) }
+my @results = ~> @words map { Rosetta::Trie::search($trie, _) }
 assert_eq join(",", @results), "1,1,0,0", "parallel search results"
 
 Rosetta::Trie::insert($trie, "app")

@@ -6,7 +6,7 @@ fn Rosetta::ProperDivisors::get($n) {
         ([])
     } else {
         my $limit = int($n / 2)
-        my @divs = ~> 1:$limit grep { $n % $_ == 0 }
+        my @divs = ~> 1:$limit grep { $n % _ == 0 }
         \@divs
     }
 }

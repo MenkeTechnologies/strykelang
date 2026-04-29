@@ -2,7 +2,7 @@
 # Rosetta Code: Additive primes
 
 fn Rosetta::AdditivePrime::sum_digits($n) {
-    my @digits = ~> "$n" chars map { int($_) }
+    my @digits = ~> "$n" chars map { int(_) }
     if (len(@digits) == 0) { return 0 }
     @digits |> reduce { _0 + _1 }
 }

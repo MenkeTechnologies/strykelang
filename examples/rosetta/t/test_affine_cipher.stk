@@ -11,11 +11,11 @@ fn Rosetta::Affine::mod_inverse($a, $m) {
 
 fn Rosetta::Affine::encode($text, $a, $b) {
     my $m = 26
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
     my @chars = $t |> chars()
     
     my @res = ~> @chars map {
-        my $x = ord($_) - ord("A")
+        my $x = ord(_) - ord("A")
         my $e = ($a * $x + $b) % $m
         chr($e + ord("A"))
     }
@@ -28,11 +28,11 @@ fn Rosetta::Affine::decode($text, $a, $b) {
     my $a_inv = Rosetta::Affine::mod_inverse($a, $m)
     return "" if $a_inv == -1
     
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
     my @chars = $t |> chars()
     
     my @res = ~> @chars map {
-        my $x = ord($_) - ord("A")
+        my $x = ord(_) - ord("A")
         my $d = ($a_inv * ($x - $b)) % $m
         if ($d < 0) { $d += $m }
         chr($d + ord("A"))

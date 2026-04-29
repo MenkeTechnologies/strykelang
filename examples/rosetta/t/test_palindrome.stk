@@ -3,7 +3,7 @@
 
 fn Rosetta::IsPalindrome::is_palindrome($s) {
     my $clean = ~> $s lc s/[^a-z0-9]//gr
-    my $rev = ~> $clean >{split //, $_} rev |> join ""
+    my $rev = ~> $clean >{split //, _} rev |> join ""
     $clean eq $rev
 }
 

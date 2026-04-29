@@ -12,7 +12,7 @@ fn Rosetta::Padovan::nth($n) {
 }
 
 fn Rosetta::Padovan::sequence($count) {
-    ~> 0:$count - 1 map { Rosetta::Padovan::nth($_) }
+    ~> 0:$count - 1 map { Rosetta::Padovan::nth(_) }
 }
 
 # OEIS A000931 first 12.

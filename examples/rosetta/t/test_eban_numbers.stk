@@ -35,7 +35,7 @@ fn Rosetta::Eban::is_eban($n) {
 }
 
 fn Rosetta::Eban::list($lo, $hi) {
-    $lo:$hi |> grep { Rosetta::Eban::is_eban($_) }
+    $lo:$hi |> grep { Rosetta::Eban::is_eban(_) }
 }
 
 my @under_100 = Rosetta::Eban::list(1, 99)

@@ -16,7 +16,7 @@ assert_eq Rosetta::CharacterCodes::to_code("z"), 122, "ord('z') is 122"
 assert_eq Rosetta::CharacterCodes::to_char(122), "z", "chr(122) is 'z'"
 
 my $str = "abc"
-my @codes = ~> $str chars map { Rosetta::CharacterCodes::to_code($_) }
+my @codes = ~> $str chars map { Rosetta::CharacterCodes::to_code(_) }
 assert_eq join(",", @codes), "97,98,99", "abc -> 97,98,99"
 
 test_run

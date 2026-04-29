@@ -6,7 +6,7 @@ fn word_frequency {
     my $counts = {}
     my $l = lc($s)
     my @words = split(/[^a-z]+/, $l)
-    ~> @words grep { $_ ne "" } map { $counts->{$_} = $counts->{$_} + 1 }
+    ~> @words grep { _ ne "" } map { $counts->{$_} = $counts->{$_} + 1 }
     $counts
 }
 

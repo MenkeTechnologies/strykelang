@@ -4,10 +4,10 @@
 fn Rosetta::InvertedIndex::create(@docs) {
     my %index
     ~> 0:$#docs map {
-        my $id = $_
+        my $id = _
         my $text = $docs[$id]
         # Clean and split into unique words
-        my @words = $text |> lc() |> split(/\W+/) |> grep { $_ ne "" }
+        my @words = $text |> lc() |> split(/\W+/) |> grep { _ ne "" }
         my %seen
         for my $w (@words) {
             if (!$seen{$w}++) {

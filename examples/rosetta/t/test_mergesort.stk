@@ -40,7 +40,7 @@ my @r = @$data[$mid : len(@$data)-1]
 
 # Use ~> to sort halves in parallel
 my @parts = (\@l, \@r)
-my @sorted_parts = ~> @parts map { Rosetta::Mergesort::sort($_) }
+my @sorted_parts = ~> @parts map { Rosetta::Mergesort::sort(_) }
 my $final = Rosetta::Mergesort::merge($sorted_parts[0], $sorted_parts[1])
 assert_eq join(",", @$final), "-31,0,1,2,2,4,65,83,99,782", "parallel mergesort works"
 

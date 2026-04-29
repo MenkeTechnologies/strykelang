@@ -28,7 +28,7 @@ fn Rosetta::BinaryDigits::decode($s) {
 
 fn Rosetta::BinaryDigits::count_ones($n) {
     my $bin = Rosetta::BinaryDigits::encode($n)
-    my @ones = grep { $_ eq "1" } chars($bin)
+    my @ones = grep { _ eq "1" } chars($bin)
     len(@ones)
 }
 

@@ -6,11 +6,11 @@ fn Rosetta::ReverseString::string($s) {
 }
 
 fn Rosetta::ReverseString::words($s) {
-    ~> $s >{split /\s+/, $_} rev |> join " "
+    ~> $s >{split /\s+/, _} rev |> join " "
 }
 
 fn Rosetta::ReverseString::each_word($s) {
-    $s |> split /\s+/ |> map { Rosetta::ReverseString::string($_) } |> join " "
+    $s |> split /\s+/ |> map { Rosetta::ReverseString::string(_) } |> join " "
 }
 
 assert_eq Rosetta::ReverseString::string("hello"), "olleh", "reverse hello"

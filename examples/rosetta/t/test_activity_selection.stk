@@ -22,7 +22,7 @@ my $acts = [
     [2, 14],  [12, 16]
 ]
 my $picks = Rosetta::Activity::select($acts)
-my $sig = join("|", map { $_->[0] . "," . $_->[1] } @$picks)
+my $sig = join("|", map { _->[0] . "," . _->[1] } @$picks)
 assert_eq $sig, "1,4|5,7|8,11|12,16", "CLRS activity selection (4 chosen)"
 
 # Empty input

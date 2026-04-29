@@ -9,14 +9,14 @@ fn Rosetta::SelfDescribing::is($n) {
     my $len = len(@digits)
     for my $i (0 .. $len - 1) {
         my $expected = $digits[$i] + 0
-        my $actual = len(grep { $_ + 0 == $i } @digits)
+        my $actual = len(grep { _ + 0 == $i } @digits)
         return 0 unless $actual == $expected
     }
     1
 }
 
 fn Rosetta::SelfDescribing::find_below($limit) {
-    ~> 0:$limit grep { Rosetta::SelfDescribing::is($_) }
+    ~> 0:$limit grep { Rosetta::SelfDescribing::is(_) }
 }
 
 assert_ok Rosetta::SelfDescribing::is(1210),     "1210 is self-describing"

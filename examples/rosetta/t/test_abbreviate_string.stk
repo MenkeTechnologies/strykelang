@@ -2,7 +2,7 @@
 # Rosetta Code: Abbreviate a string
 
 fn Rosetta::AbbreviateString::compute($s) {
-    $s |> split /\s+/ |> map { substr($_, 0, 1) } |> join "" |> uc
+    $s |> split /\s+/ |> map { substr(_, 0, 1) } |> join "" |> uc
 }
 
 assert_eq Rosetta::AbbreviateString::compute("Portable Network Graphics"), "PNG", "PNG"

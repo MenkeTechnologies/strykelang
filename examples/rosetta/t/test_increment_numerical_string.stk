@@ -43,7 +43,7 @@ fn Rosetta::IncrementString::demo() {
     }
     
     # Threading example
-    my $result = ~> "2023" >{ $_ + 1 }
+    my $result = ~> "2023" >{ _ + 1 }
 }
 
 Rosetta::IncrementString::demo()

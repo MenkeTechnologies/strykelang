@@ -16,9 +16,9 @@ fn card_suit($c) {
 }
 
 fn analyze_hand(@cards) {
-    my @raw_vals = ~> @cards map { card_value($_) }
+    my @raw_vals = ~> @cards map { card_value(_) }
     my @vals = sort { _0 <=> _1 } @raw_vals
-    my @suits = ~> @cards map { card_suit($_) }
+    my @suits = ~> @cards map { card_suit(_) }
     
     my $is_flush = 0
     my %suit_counts

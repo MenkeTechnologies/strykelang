@@ -15,7 +15,7 @@ fn Rosetta::Pisano::period($m) {
 }
 
 # OEIS A001175 first 10.
-my @pi = ~> 1:10 map { Rosetta::Pisano::period($_) }
+my @pi = ~> 1:10 map { Rosetta::Pisano::period(_) }
 assert_eq join(",", @pi),
     "1,3,8,6,20,24,16,12,24,60",
     "Pisano periods 1..10"

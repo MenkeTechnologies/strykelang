@@ -6,7 +6,7 @@ fn Rosetta::HammingDistance::compute($s1, $s2) {
     my @c2 = ~> $s2 chars
     
     0..len(@c1)-1 |> grep {
-        my $i = $_
+        my $i = _
         $c1[$i] ne $c2[$i]
     } |> len
 }

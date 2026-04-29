@@ -3,7 +3,7 @@
 
 fn middle_three_digits {
     my $n = $_[0]
-    my $s = ~> $n abs >{ sprintf("%d", $_) }
+    my $s = ~> $n abs >{ sprintf("%d", _) }
     my $len = length($s)
     
     if ($len < 3 || $len % 2 == 0) {

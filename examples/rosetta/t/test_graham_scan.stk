@@ -22,7 +22,7 @@ fn Rosetta::Graham::hull($points) {
     my $py = $points->[$piv][1]
 
     # Sort remaining by polar angle around pivot, ties broken by distance
-    my @rest = grep { $_->[0] != $px || $_->[1] != $py } @$points
+    my @rest = grep { _->[0] != $px || _->[1] != $py } @$points
     my @sorted = sort {
         my $cx = ($_0->[0] - $px) * ($_1->[1] - $py) - ($_0->[1] - $py) * ($_1->[0] - $px)
         if ($cx == 0) {
@@ -46,7 +46,7 @@ fn Rosetta::Graham::hull($points) {
 
 my $pts = [[0,0], [3,0], [3,3], [0,3], [1,1], [2,2], [1,2]]
 my $h = Rosetta::Graham::hull($pts)
-my @sig = map { $_->[0] . "," . $_->[1] } @$h
+my @sig = map { _->[0] . "," . _->[1] } @$h
 my $sorted = join("|", sort @sig)
 assert_eq $sorted, "0,0|0,3|3,0|3,3", "Graham hull of 7 pts = 4 corners"
 

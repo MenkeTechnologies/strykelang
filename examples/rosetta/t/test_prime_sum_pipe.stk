@@ -11,7 +11,7 @@ fn Rosetta::PrimeSum::is_prime($n) {
 }
 
 fn Rosetta::PrimeSum::solve($max) {
-    ~> 1:$max pgrep { Rosetta::PrimeSum::is_prime($_) } |> sum()
+    ~> 1:$max pgrep { Rosetta::PrimeSum::is_prime(_) } |> sum()
 }
 
 assert_eq Rosetta::PrimeSum::solve(10), 17, "sum of primes up to 10 (2,3,5,7)"

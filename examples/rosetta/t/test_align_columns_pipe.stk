@@ -3,14 +3,14 @@
 
 fn Rosetta::AlignColumns::solve($text, $align) {
     # Split into lines and words
-    my @lines = $text |> split("\n") |> map { [ $_ |> split(/\$/) ] }
+    my @lines = $text |> split("\n") |> map { [ _ |> split(/\$/) ] }
     
     # Find max width for each column
     my %widths
     ~> @lines for {
-        my $row = $_
+        my $row = _
         0..$#$row |> map {
-            my $col = $_
+            my $col = _
             my $w = length($row->[$col])
             $widths{$col} = $w if $w > $widths{$col}
         }
@@ -18,9 +18,9 @@ fn Rosetta::AlignColumns::solve($text, $align) {
     
     # Format lines
     ~> @lines map {
-        my $row = $_
+        my $row = _
         0..$#$row |> map {
-            my $col = $_
+            my $col = _
             my $val = $row->[$col]
             my $w = $widths{$col}
             if ($align eq "left") {

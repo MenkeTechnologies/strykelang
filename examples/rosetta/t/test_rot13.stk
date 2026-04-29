@@ -2,10 +2,10 @@
 # Rosetta Code: Rot-13
 
 fn Rosetta::Rot13::rot13($s) {
-    ~> $s >{split //, $_} map {
-        $_ =~ /[A-Ma-m]/ ? chr(ord($_) + 13)
-      : $_ =~ /[N-Zn-z]/ ? chr(ord($_) - 13)
-      : $_
+    ~> $s >{split //, _} map {
+        _ =~ /[A-Ma-m]/ ? chr(ord(_) + 13)
+      : _ =~ /[N-Zn-z]/ ? chr(ord(_) - 13)
+      : _
     } |> join ""
 }
 

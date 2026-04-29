@@ -20,7 +20,7 @@ fn Rosetta::ClimbStairs::count_3($n) {
 }
 
 # Fibonacci shifted: ways(0..10) = 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89.
-my @ways = ~> 0:10 map { Rosetta::ClimbStairs::count($_) }
+my @ways = ~> 0:10 map { Rosetta::ClimbStairs::count(_) }
 assert_eq join(",", @ways),
     "1,1,2,3,5,8,13,21,34,55,89",
     "ways(0..10)"
@@ -28,7 +28,7 @@ assert_eq join(",", @ways),
 assert_eq Rosetta::ClimbStairs::count(20), 10946, "ways(20)"
 
 # Tribonacci-shaped: ways_3(0..6) = 1, 1, 2, 4, 7, 13, 24.
-my @ways3 = ~> 0:6 map { Rosetta::ClimbStairs::count_3($_) }
+my @ways3 = ~> 0:6 map { Rosetta::ClimbStairs::count_3(_) }
 assert_eq join(",", @ways3),
     "1,1,2,4,7,13,24",
     "ways_3(0..6)"

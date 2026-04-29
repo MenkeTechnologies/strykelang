@@ -29,13 +29,13 @@ fn Rosetta::Lyndon::to_string($word) {
 
 # Lyndon words of length n=1..4 over alphabet 2 (binary)
 my $b3 = Rosetta::Lyndon::generate(3, 2)
-my @s3 = map { Rosetta::Lyndon::to_string($_) } @$b3
+my @s3 = map { Rosetta::Lyndon::to_string(_) } @$b3
 @s3 = sort @s3
 assert_eq join(",", @s3), "aab,abb", "Lyndon length-3 binary"
 
 # Length 4 binary: aaab, aabb, abbb
 my $b4 = Rosetta::Lyndon::generate(4, 2)
-my @s4 = sort map { Rosetta::Lyndon::to_string($_) } @$b4
+my @s4 = sort map { Rosetta::Lyndon::to_string(_) } @$b4
 assert_eq join(",", @s4), "aaab,aabb,abbb", "Lyndon length-4 binary"
 
 # Length 5 binary: aaaab, aaabb, aabab, aabbb, ababb, abbbb
@@ -44,7 +44,7 @@ assert_eq len(@$b5), 6, "Lyndon length-5 binary count"
 
 # Length 3 ternary: alphabet abc, expected: aab, aac, abb, abc, acb, acc, bbc, bcc
 my $t3 = Rosetta::Lyndon::generate(3, 3)
-my @st3 = sort map { Rosetta::Lyndon::to_string($_) } @$t3
+my @st3 = sort map { Rosetta::Lyndon::to_string(_) } @$t3
 assert_eq join(",", @st3), "aab,aac,abb,abc,acb,acc,bbc,bcc", "Lyndon length-3 ternary"
 
 # Necklace counting formula: for n=4, k=2 → 3 (matches output above)

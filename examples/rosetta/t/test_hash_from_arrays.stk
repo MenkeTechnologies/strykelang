@@ -14,7 +14,7 @@ fn Rosetta::HashFromArrays::build($keys, $vals) {
 fn Rosetta::HashFromArrays::zip_build($keys, $vals) {
     my $n = len(@$keys)
     my %h
-    ~> 0:$n-1 map { $h{$keys->[$_]} = $vals->[$_] }
+    ~> 0:$n-1 map { $h{$keys->[_]} = $vals->[_] }
     \%h
 }
 

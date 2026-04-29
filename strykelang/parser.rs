@@ -5622,11 +5622,11 @@ impl Parser {
     fn parse_return(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'return'
-        // No-value return: terminator tokens AND any postfix statement-modifier
-        // keyword (`if`/`unless`/`while`/`until`/`for`/`foreach`). Without this
-        // the postfix-modifier check below never fires for valueless returns —
-        // `parse_assign_expr` would see `if` and look it up as a sub call,
-        // producing the misleading "Undefined subroutine &if" error.
+                        // No-value return: terminator tokens AND any postfix statement-modifier
+                        // keyword (`if`/`unless`/`while`/`until`/`for`/`foreach`). Without this
+                        // the postfix-modifier check below never fires for valueless returns —
+                        // `parse_assign_expr` would see `if` and look it up as a sub call,
+                        // producing the misleading "Undefined subroutine &if" error.
         let val = if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof)
             || self.peek_is_postfix_stmt_modifier_keyword()
         {
@@ -8656,20 +8656,45 @@ impl Parser {
                         | Token::PipeForward
                         | Token::Question
                         | Token::Colon
-                        | Token::NumEq | Token::NumNe | Token::NumLt | Token::NumGt
-                        | Token::NumLe | Token::NumGe | Token::Spaceship
-                        | Token::StrEq | Token::StrNe | Token::StrLt | Token::StrGt
-                        | Token::StrLe | Token::StrGe | Token::StrCmp
-                        | Token::LogAnd | Token::LogOr | Token::LogNot
-                        | Token::LogAndWord | Token::LogOrWord | Token::LogNotWord
+                        | Token::NumEq
+                        | Token::NumNe
+                        | Token::NumLt
+                        | Token::NumGt
+                        | Token::NumLe
+                        | Token::NumGe
+                        | Token::Spaceship
+                        | Token::StrEq
+                        | Token::StrNe
+                        | Token::StrLt
+                        | Token::StrGt
+                        | Token::StrLe
+                        | Token::StrGe
+                        | Token::StrCmp
+                        | Token::LogAnd
+                        | Token::LogOr
+                        | Token::LogNot
+                        | Token::LogAndWord
+                        | Token::LogOrWord
+                        | Token::LogNotWord
                         | Token::DefinedOr
-                        | Token::Range | Token::RangeExclusive
-                        | Token::Assign | Token::PlusAssign | Token::MinusAssign
-                        | Token::MulAssign | Token::DivAssign | Token::ModAssign
-                        | Token::PowAssign | Token::DotAssign | Token::AndAssign
-                        | Token::OrAssign | Token::XorAssign | Token::DefinedOrAssign
-                        | Token::ShiftLeftAssign | Token::ShiftRightAssign
-                        | Token::BitAndAssign | Token::BitOrAssign
+                        | Token::Range
+                        | Token::RangeExclusive
+                        | Token::Assign
+                        | Token::PlusAssign
+                        | Token::MinusAssign
+                        | Token::MulAssign
+                        | Token::DivAssign
+                        | Token::ModAssign
+                        | Token::PowAssign
+                        | Token::DotAssign
+                        | Token::AndAssign
+                        | Token::OrAssign
+                        | Token::XorAssign
+                        | Token::DefinedOrAssign
+                        | Token::ShiftLeftAssign
+                        | Token::ShiftRightAssign
+                        | Token::BitAndAssign
+                        | Token::BitOrAssign
                 ) {
                     Expr {
                         kind: ExprKind::ScalarVar("_".into()),

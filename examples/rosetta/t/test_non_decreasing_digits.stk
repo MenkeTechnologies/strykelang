@@ -2,7 +2,7 @@
 # Rosetta Code: Non-decreasing digits
 
 fn is_non_decreasing($n) {
-    my @digits = ~> "$n" chars map { int($_) }
+    my @digits = ~> "$n" chars map { int(_) }
     my $valid = 1
     for my $i (1..len(@digits)-1) {
         if ($digits[$i] < $digits[$i-1]) {

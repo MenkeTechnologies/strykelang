@@ -5,7 +5,7 @@ fn Rosetta::GaussJordan::solve($matrix, $vector) {
     my $n = len(@$matrix)
     # Augmented matrix
     my @m = ~> 0:$n-1 map {
-        my $i = $_
+        my $i = _
         [ @{$matrix->[$i]}, $vector->[$i] ]
     }
     
@@ -32,7 +32,7 @@ fn Rosetta::GaussJordan::solve($matrix, $vector) {
         }
     }
     
-    ~> 0:$n-1 map { $m[$_]->[$n] / $m[$_]->[$_] }
+    ~> 0:$n-1 map { $m[_]->[$n] / $m[_]->[_] }
 }
 
 my $M = [
@@ -43,6 +43,6 @@ my $M = [
 my $V = [ 8, -11, -3 ]
 
 my @sol = Rosetta::GaussJordan::solve($M, $V)
-assert_eq join(",", ~> @sol map { round($_) }), "2,3,-1", "Gauss-Jordan solution"
+assert_eq join(",", ~> @sol map { round(_) }), "2,3,-1", "Gauss-Jordan solution"
 
 test_run

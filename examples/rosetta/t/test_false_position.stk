@@ -20,7 +20,7 @@ fn Rosetta::FalsePosition::solve($f, $a, $b, $tol) {
 }
 
 # x^2 - 2 = 0 in [1, 2]
-my $f = fn { $_ * $_ - 2 }
+my $f = fn { _ * _ - 2 }
 my $root = Rosetta::FalsePosition::solve($f, 1.0, 2.0, 0.0001)
 assert_near $root, sqrt(2), 0.001, "False position root of x^2-2"
 

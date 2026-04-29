@@ -19,7 +19,7 @@ fn Rosetta::TicTacToe::check_win($board) {
 
 fn Rosetta::TicTacToe::is_full($board) {
     my @b = @$board
-    ~> @b grep { $_ eq " " } |> { len == 0 }
+    ~> @b grep { _ eq " " } |> { len == 0 }
 }
 
 my $b1 = ["X", "X", "X", " ", "O", " ", "O", " ", " "]

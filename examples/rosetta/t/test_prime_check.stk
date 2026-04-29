@@ -22,7 +22,7 @@ fn Rosetta::PrimeCheck::check($n) {
 }
 
 fn Rosetta::PrimeCheck::list($max) {
-    2:$max |> grep { Rosetta::PrimeCheck::check($_) }
+    2:$max |> grep { Rosetta::PrimeCheck::check(_) }
 }
 
 assert_ok Rosetta::PrimeCheck::check(2), "2 is prime"

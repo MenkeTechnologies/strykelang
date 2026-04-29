@@ -6,7 +6,7 @@ fn Rosetta::StarNumbers::nth($n) {
 }
 
 fn Rosetta::StarNumbers::list($count) {
-    1:$count |> map { Rosetta::StarNumbers::nth($_) }
+    1:$count |> map { Rosetta::StarNumbers::nth(_) }
 }
 
 assert_eq Rosetta::StarNumbers::nth(1), 1, "S(1) = 1"

@@ -15,7 +15,7 @@ fn Rosetta::LongPrimes::is_long($p) {
 }
 
 fn Rosetta::LongPrimes::list($limit) {
-    2:$limit |> grep { Rosetta::LongPrimes::is_long($_) }
+    2:$limit |> grep { Rosetta::LongPrimes::is_long(_) }
 }
 
 # OEIS A001913: 7, 17, 19, 23, 29, 47, 59, 61, 97, 109, 113, 131, 149, 167, 179, 181, ...

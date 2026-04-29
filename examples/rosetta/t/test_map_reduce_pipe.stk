@@ -2,7 +2,7 @@
 # Rosetta Code: Parallel Map-Reduce (using pipes)
 
 fn Rosetta::PMapReduce::solve($max) {
-    (1..$max) |> pmap { $_ * $_ } |> sum()
+    (1..$max) |> pmap { _ * _ } |> sum()
 }
 
 # sum of squares 1..4 = 1+4+9+16 = 30

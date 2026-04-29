@@ -8,7 +8,7 @@ fn Rosetta::Luhn::solve($num_str) {
     
     # Map index 0..len-1 to doubled/adjusted values, then sum
     my $sum = ~> 0..$len-1 map {
-        my $i = $_
+        my $i = _
         my $d = int($digits[$i])
         if ($i % 2 == 1) {
             $d *= 2

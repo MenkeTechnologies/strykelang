@@ -22,7 +22,7 @@ fn Rosetta::IsPrime::is_prime($n) {
 
 fn Rosetta::IsPalindrome::is_palindrome($n) {
     my $s = "$n"
-    my $rev = ~> $s >{split //, $_} rev |> join("")
+    my $rev = ~> $s >{split //, _} rev |> join("")
     $s eq $rev
 }
 

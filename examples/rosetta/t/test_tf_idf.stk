@@ -48,7 +48,7 @@ assert_ok abs($tfidf - 0.28768) < 0.001, "tf-idf of stryke in doc 1"
 
 # Using parallel map to calculate tf-idf for 'parallel' across all docs
 # 'parallel' appears in doc 1 and doc 2.
-my @parallel_scores = ~> @documents map { Rosetta::TFIDF::solve("parallel", $_, \@documents) }
+my @parallel_scores = ~> @documents map { Rosetta::TFIDF::solve("parallel", _, \@documents) }
 # idf for parallel: log(4/2) = log(2) = 0.6931
 assert_eq $parallel_scores[0], 0, "tf-idf of parallel in doc 0 is 0"
 assert_ok abs($parallel_scores[1] - 0.6931) < 0.001, "tf-idf of parallel in doc 1 is approx 0.693"

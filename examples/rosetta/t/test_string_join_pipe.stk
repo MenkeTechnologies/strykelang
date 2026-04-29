@@ -7,7 +7,7 @@ my $j1 = @words |> join(" ")
 assert_eq $j1, "Stryke is fast", "join with space"
 
 # Join with comma and uppercase
-my $res = @words |> map { uc($_) } |> join(",")
+my $res = @words |> map { uc(_) } |> join(",")
 assert_eq $res, "STRYKE,IS,FAST", "map uc |> join ,"
 
 # Reverse words and join

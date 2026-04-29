@@ -2,7 +2,7 @@
 # Rosetta Code: Spy numbers
 
 fn is_spy($n) {
-    my @digits = ~> "$n" chars map { int($_) }
+    my @digits = ~> "$n" chars map { int(_) }
     my $sum = 0
     my $prod = 1
     for my $d (@digits) {

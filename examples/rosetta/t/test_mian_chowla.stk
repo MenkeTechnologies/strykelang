@@ -35,6 +35,6 @@ fn mian_chowla($n) {
 my $res = mian_chowla(5)
 assert_eq join(",", @$res), "1,2,4,8,13", "Mian-Chowla first 5"
 
-5 |> mian_chowla |> map { $_->[4] } |> assert_eq(13, "pipe Mian-Chowla")
+5 |> mian_chowla |> map { _->[4] } |> assert_eq(13, "pipe Mian-Chowla")
 
 test_run

@@ -15,7 +15,7 @@ fn Rosetta::EggDropping::binomial($n, $k) {
 
 fn Rosetta::EggDropping::max_floors($drops, $eggs) {
     # The max floors for d drops and e eggs is sum_{i=1..e} binom(d, i)
-    ~> 1:$eggs map { Rosetta::EggDropping::binomial($drops, $_) } |> sum()
+    ~> 1:$eggs map { Rosetta::EggDropping::binomial($drops, _) } |> sum()
 }
 
 assert_eq Rosetta::EggDropping::max_floors(6, 2), 21, "max floors for 6 drops, 2 eggs"

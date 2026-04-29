@@ -21,8 +21,8 @@ fn Rosetta::Doors::solve($num_doors) {
 fn Rosetta::Doors::optimized($num_doors) {
     # Optimized: only perfect squares are open
     ~> 1:$num_doors map {
-        my $root = sqrt($_)
-        $root == int($root) ? $_ : undef
+        my $root = sqrt(_)
+        $root == int($root) ? _ : undef
     } |> grep { defined }
 }
 

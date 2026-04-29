@@ -3,13 +3,13 @@
 
 fn Rosetta::LinearRegression::solve($points) {
     my $n = len(@$points)
-    my $sum_x = ~> @$points map { $_->[0] } |> reduce { $_0 + $_1 }
-    my $sum_y = ~> @$points map { $_->[1] } |> reduce { $_0 + $_1 }
+    my $sum_x = ~> @$points map { _->[0] } |> reduce { $_0 + $_1 }
+    my $sum_y = ~> @$points map { _->[1] } |> reduce { $_0 + $_1 }
     my $avg_x = $sum_x / $n
     my $avg_y = $sum_y / $n
     
-    my $num = ~> @$points map { ($_->[0] - $avg_x) * ($_->[1] - $avg_y) } |> reduce { $_0 + $_1 }
-    my $den = ~> @$points map { ($_->[0] - $avg_x) ** 2 } |> reduce { $_0 + $_1 }
+    my $num = ~> @$points map { (_->[0] - $avg_x) * (_->[1] - $avg_y) } |> reduce { $_0 + $_1 }
+    my $den = ~> @$points map { (_->[0] - $avg_x) ** 2 } |> reduce { $_0 + $_1 }
     
     my $m = $num / $den
     my $c = $avg_y - $m * $avg_x

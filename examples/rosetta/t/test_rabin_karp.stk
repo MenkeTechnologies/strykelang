@@ -54,7 +54,7 @@ my @res = Rosetta::RabinKarp::solve($text, $pattern)
 assert_eq join(",", @res), "0,9,12", "rabin-karp matches"
 
 # Pipeline to transform results (e.g., 1-based indexing)
-my @one_based = @res |> map { $_ + 1 }
+my @one_based = @res |> map { _ + 1 }
 assert_eq join(",", @one_based), "1,10,13", "1-based matches"
 
 test_run

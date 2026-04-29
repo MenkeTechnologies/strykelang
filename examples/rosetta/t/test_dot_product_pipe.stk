@@ -2,7 +2,7 @@
 # Rosetta Code: Dot product (using zip, map, and reduce with pipes)
 
 fn Rosetta::DotProduct::solve($a, $b) {
-    zip(@$a, @$b) |> map { $_->[0] * $_->[1] } |> sum()
+    zip(@$a, @$b) |> map { _->[0] * _->[1] } |> sum()
 }
 
 my @vec1 = (1, 3, -5)

@@ -11,7 +11,7 @@ assert_eq Rosetta::Metaphone::compute("Kryptonite"), "KRPTNT", "metaphone Krypto
 
 # Parallel map test
 my @words = ("Hello", "World", "Stryke")
-my @codes = ~> @words map { metaphone($_) }
+my @codes = ~> @words map { metaphone(_) }
 assert_eq join(",", @codes), "HL,WRLT,STRK", "parallel metaphone"
 
 test_run

@@ -12,7 +12,7 @@ fn Rosetta::FibonacciWord::compute($n) {
 }
 
 fn Rosetta::FibonacciWord::list($max) {
-    ~> 1:$max map { Rosetta::FibonacciWord::compute($_) }
+    ~> 1:$max map { Rosetta::FibonacciWord::compute(_) }
 }
 
 assert_eq Rosetta::FibonacciWord::compute(1), "1", "FW 1"

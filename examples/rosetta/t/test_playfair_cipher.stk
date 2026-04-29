@@ -3,7 +3,7 @@
 
 fn Rosetta::Playfair::prepare_key($key) {
     my $alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ" # No J
-    my $k = $key |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my $k = $key |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
     $k .= $alphabet
     
     my %seen
@@ -28,7 +28,7 @@ fn Rosetta::Playfair::find_pos($grid, $char) {
 
 fn Rosetta::Playfair::codec($text, $key, $mode) {
     my $grid = Rosetta::Playfair::prepare_key($key)
-    my $t = $text |> uc() |> { $_ =~ s/J/I/gr } |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
     
     # Prepare bigrams
     my @chars = $t |> chars()

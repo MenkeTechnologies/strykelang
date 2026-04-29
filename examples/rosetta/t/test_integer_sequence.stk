@@ -3,7 +3,7 @@
 
 fn Rosetta::IntegerSequence::from($start) {
     my @seq
-    push @seq, $_ for $start:$start+99
+    push @seq, _ for $start:$start+99
     @seq
 }
 
@@ -29,7 +29,7 @@ assert_eq len(@nat), 100, "100 naturals"
 my @r = Rosetta::IntegerSequence::range_inclusive(5, 10)
 assert_eq join(",", @r), "5,6,7,8,9,10", "range 5..10"
 
-my @squares = 1:10 |> map { $_ * $_ }
+my @squares = 1:10 |> map { _ * _ }
 assert_eq join(",", @squares), "1,4,9,16,25,36,49,64,81,100", "first 10 squares"
 
 test_run

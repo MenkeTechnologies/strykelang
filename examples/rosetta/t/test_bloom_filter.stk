@@ -50,7 +50,7 @@ assert_eq Rosetta::BloomFilter::check("perl", $bf), 0, "check perl (not in set)"
 
 # Test with pipelines and ~>
 my @test_words = ("hello", "world", "stryke", "python", "ruby", "java")
-my @results = ~> @test_words map { Rosetta::BloomFilter::check($_, $bf) }
+my @results = ~> @test_words map { Rosetta::BloomFilter::check(_, $bf) }
 assert_eq join(",", @results), "1,1,1,0,0,0", "parallel check results"
 
 test_run

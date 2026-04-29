@@ -2,7 +2,7 @@
 # Rosetta Code: Smith numbers
 
 fn Rosetta::SmithNumbers::sum_digits($n) {
-    my @digits = ~> "$n" chars map { int($_) }
+    my @digits = ~> "$n" chars map { int(_) }
     my $sum = 0
     for my $d (@digits) { $sum += $d }
     $sum

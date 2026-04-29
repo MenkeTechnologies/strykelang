@@ -6,7 +6,7 @@ fn Rosetta::Tetrahedral::compute($n) {
 }
 
 fn Rosetta::Tetrahedral::list($max_n) {
-    ~> 1:$max_n map { Rosetta::Tetrahedral::compute($_) }
+    ~> 1:$max_n map { Rosetta::Tetrahedral::compute(_) }
 }
 
 assert_eq Rosetta::Tetrahedral::compute(1), 1, "T1"

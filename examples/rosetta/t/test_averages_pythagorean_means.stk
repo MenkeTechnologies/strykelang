@@ -13,7 +13,7 @@ fn Rosetta::PythMean::geometric(@xs) {
 }
 
 fn Rosetta::PythMean::harmonic(@xs) {
-    my $recip_sum = ~> @xs map { 1.0 / $_ } reduce { $_0 + $_1 }
+    my $recip_sum = ~> @xs map { 1.0 / _ } reduce { $_0 + $_1 }
     len(@xs) / $recip_sum
 }
 

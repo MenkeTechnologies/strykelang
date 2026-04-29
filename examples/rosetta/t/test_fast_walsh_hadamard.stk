@@ -22,7 +22,7 @@ fn Rosetta::FWHT::transform($a) {
 fn Rosetta::FWHT::inverse($a) {
     my $res = Rosetta::FWHT::transform($a)
     my $n = len(@$res)
-    ~> @$res map { $_ / $n }
+    ~> @$res map { _ / $n }
 }
 
 my @data = (1, 0, 1, 0, 0, 1, 1, 0)

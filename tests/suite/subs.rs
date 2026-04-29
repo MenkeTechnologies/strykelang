@@ -2,18 +2,13 @@ use crate::common::*;
 
 #[test]
 fn basic_sub() {
-    assert_eq!(
-        eval_int("fn add ($a, $b) { $a + $b } add(3, 4)"),
-        7
-    );
+    assert_eq!(eval_int("fn add ($a, $b) { $a + $b } add(3, 4)"), 7);
 }
 
 #[test]
 fn recursive_fibonacci() {
     assert_eq!(
-        eval_int(
-            "fn fib_n ($n) { return $n if $n <= 1; fib_n($n-1) + fib_n($n-2) } fib_n(10)"
-        ),
+        eval_int("fn fib_n ($n) { return $n if $n <= 1; fib_n($n-1) + fib_n($n-2) } fib_n(10)"),
         55
     );
 }
@@ -46,10 +41,7 @@ fn return_with_postfix_if() {
 
 #[test]
 fn sub_with_prototype_two_scalars_uses_at_underscore() {
-    assert_eq!(
-        eval_int("fn add2 ($$) { $_0 + $_1 } add2(40, 2)"),
-        42
-    );
+    assert_eq!(eval_int("fn add2 ($$) { $_0 + $_1 } add2(40, 2)"), 42);
 }
 
 #[test]
@@ -150,8 +142,5 @@ fn anon_sub_stryke_signature() {
 
 #[test]
 fn coderef_invocation_with_arrow() {
-    assert_eq!(
-        eval_int(r#"fn dbl { _ * 2 } my $r = \&dbl; $r->(21)"#),
-        42,
-    );
+    assert_eq!(eval_int(r#"fn dbl { _ * 2 } my $r = \&dbl; $r->(21)"#), 42,);
 }

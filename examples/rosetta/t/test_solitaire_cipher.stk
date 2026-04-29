@@ -61,7 +61,7 @@ fn Rosetta::Solitaire::step($deck) {
 }
 
 fn Rosetta::Solitaire::encrypt($text, $deck) {
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
     my @res
     for my $c ($t |> chars()) {
         my $p_val = ord($c) - ord("A") + 1

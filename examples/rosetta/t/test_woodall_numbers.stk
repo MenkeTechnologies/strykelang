@@ -6,7 +6,7 @@ fn woodall($n) {
 }
 
 fn woodall_list($max_n) {
-    ~> 1..$max_n map { woodall($_) }
+    ~> 1..$max_n map { woodall(_) }
 }
 
 assert_eq woodall(1), 1, "W1"

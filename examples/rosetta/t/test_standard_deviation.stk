@@ -8,7 +8,7 @@ fn Rosetta::StandardDeviation::mean(@nums) {
 
 fn Rosetta::StandardDeviation::compute(@nums) {
     my $m = Rosetta::StandardDeviation::mean(@nums)
-    my $sum_sq_diff = @nums |> map { ($_ - $m) ** 2 } |> reduce { _0 + _1 }
+    my $sum_sq_diff = @nums |> map { (_ - $m) ** 2 } |> reduce { _0 + _1 }
     ($sum_sq_diff / len(@nums)) ** 0.5
 }
 

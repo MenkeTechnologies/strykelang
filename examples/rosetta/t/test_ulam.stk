@@ -29,6 +29,6 @@ fn Rosetta::Ulam::generate($n) {
 my $res = Rosetta::Ulam::generate(10)
 assert_eq join(",", @$res), "1,2,3,4,6,8,11,13,16,18", "Ulam first 10"
 
-10 |> Rosetta::Ulam::generate |> { $_->[9] } |> assert_eq(18, "pipe Ulam(10)")
+10 |> Rosetta::Ulam::generate |> { _->[9] } |> assert_eq(18, "pipe Ulam(10)")
 
 test_run

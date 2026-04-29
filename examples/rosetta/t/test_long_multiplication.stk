@@ -5,7 +5,7 @@
 fn Rosetta::LongMul::digits($s) {
     my @d = $s |> chars
     my @r = reverse(@d)
-    [map { $_ + 0 } @r]
+    [map { _ + 0 } @r]
 }
 
 fn Rosetta::LongMul::strip_leading_zeros($s) {

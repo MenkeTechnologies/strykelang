@@ -18,7 +18,7 @@ fn Rosetta::Perrin::compute($n) {
 }
 
 fn Rosetta::Perrin::list($max) {
-    ~> 0:$max map { Rosetta::Perrin::compute($_) }
+    ~> 0:$max map { Rosetta::Perrin::compute(_) }
 }
 
 assert_eq Rosetta::Perrin::compute(0), 3, "P0"

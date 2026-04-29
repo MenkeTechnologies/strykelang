@@ -5,12 +5,12 @@ fn Rosetta::StringCase::upper($s) { ~> $s uc }
 fn Rosetta::StringCase::lower($s) { ~> $s lc }
 
 fn Rosetta::StringCase::title($s) {
-    ~> $s >{split /\s+/, $_} map { ucfirst(lc($_)) } |> join " "
+    ~> $s >{split /\s+/, _} map { ucfirst(lc(_)) } |> join " "
 }
 
 fn Rosetta::StringCase::swap($s) {
     ~> $s chars map {
-        $_ eq uc($_) ? lc($_) : uc($_)
+        _ eq uc(_) ? lc(_) : uc(_)
     } |> join ""
 }
 

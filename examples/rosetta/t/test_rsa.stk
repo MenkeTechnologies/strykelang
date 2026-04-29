@@ -74,10 +74,10 @@ assert_eq $plain, $message, "RSA round trip for message 42"
 # Test with a string (char by char for simplicity)
 my $text = "Stryke"
 my @ciphers = ~> $text chars map { 
-    Rosetta::RSA::encrypt(ord($_), $pub) 
+    Rosetta::RSA::encrypt(ord(_), $pub) 
 }
 my $decoded = ~> @ciphers map { 
-    chr(Rosetta::RSA::decrypt($_, $priv)) 
+    chr(Rosetta::RSA::decrypt(_, $priv)) 
 } |> join("")
 
 assert_eq $decoded, $text, "RSA round trip for string 'Stryke'"

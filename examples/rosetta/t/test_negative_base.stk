@@ -15,7 +15,7 @@ fn Rosetta::NegativeBase::encode($n, $b) {
         push @digits, $r
     }
     @digits = rev @digits
-    join("", map { $_ < 10 ? "$_" : chr(ord("A") + $_ - 10) } @digits)
+    join("", map { _ < 10 ? "$_" : chr(ord("A") + _ - 10) } @digits)
 }
 
 fn Rosetta::NegativeBase::decode($s, $b) {
