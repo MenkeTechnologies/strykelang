@@ -35,7 +35,7 @@ fn Rosetta::BloomFilter::check($item, $bf) {
     for my $i (@indices) {
         return 0 if $bf->{bitset}->[$i] == 0
     }
-    return 1
+    1
 }
 
 my $bf = Rosetta::BloomFilter::create(1000)

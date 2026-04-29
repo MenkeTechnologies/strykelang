@@ -3,7 +3,7 @@
 
 fn Rosetta::Keith::check($n) {
     my $s = "$n"
-    my @digits = ~> $s chars map { int($_) }
+    my @digits = ~> $s chars map { int(_) }
     my $len = len(@digits)
     if ($len < 2) {
         0

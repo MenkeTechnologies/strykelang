@@ -1,0 +1,85 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tournament sort — selection sort using a binary "tournament"
+# tree to find the minimum in O(log n) per output element.
+
+fn Rosetta::Tournament::next_pow2($n) {
+    my $p = 1
+    while ($p < $n) { $p *= 2 }
+    $p
+}
+
+fn Rosetta::Tournament::sort($arr) {
+    my $n = len(@$arr)
+    return [] if $n == 0
+    return [@$arr] if $n == 1
+    my $size = Rosetta::Tournament::next_pow2($n)
+    my $inf = 1e18
+    # Tree stored in array of length 2*size; leaves at [size..2*size-1].
+    my @tree = ($inf) x (2 * $size)
+    for my $i (0..$n - 1) {
+        $tree[$size + $i] = $arr->[$i]
+    }
+    # Build internal nodes (min of children).
+    for my $i (~> 1:$size - 1 rev) {
+        my $l = $tree[2 * $i]
+        my $r = $tree[2 * $i + 1]
+        $tree[$i] = $l < $r ? $l : $r
+    }
+    my @out
+    for (1..$n) {
+        my $min = $tree[1]
+        push @out, $min
+        # Find the leaf carrying the min and replace with +inf.
+        my $j = 1
+        while ($j < $size) {
+            if ($tree[2 * $j] == $min) {
+                $j = 2 * $j
+            } else {
+                $j = 2 * $j + 1
+            }
+        }
+        $tree[$j] = $inf
+        # Propagate up.
+        my $p = int($j / 2)
+        while ($p >= 1) {
+            my $l = $tree[2 * $p]
+            my $r = $tree[2 * $p + 1]
+            $tree[$p] = $l < $r ? $l : $r
+            $p = int($p / 2)
+        }
+    }
+    \@out
+}
+
+my $r1 = Rosetta::Tournament::sort([5, 3, 8, 1, 9, 2, 7])
+assert_eq join(",", @$r1), "1,2,3,5,7,8,9", "7 elems"
+my $r2 = Rosetta::Tournament::sort([1, 2, 3])
+assert_eq join(",", @$r2), "1,2,3", "already sorted"
+my $r3 = Rosetta::Tournament::sort([3, 2, 1])
+assert_eq join(",", @$r3), "1,2,3", "reversed"
+my $r4 = Rosetta::Tournament::sort([42])
+assert_eq join(",", @$r4), "42", "single"
+my $r5 = Rosetta::Tournament::sort([])
+assert_eq join(",", @$r5), "", "empty"
+my $r6 = Rosetta::Tournament::sort([4, 4, 4, 4])
+assert_eq join(",", @$r6), "4,4,4,4", "all equal"
+my $r7 = Rosetta::Tournament::sort([2, 1])
+assert_eq join(",", @$r7), "1,2", "two elems"
+
+# Larger arbitrary input matches native sort
+my @big = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+my @native = sort { _0 <=> _1 } @big
+my $rb = Rosetta::Tournament::sort(\@big)
+assert_eq join(",", @$rb), join(",", @native), "15-elem matches native sort"
+
+# Negatives + duplicates
+my $rn = Rosetta::Tournament::sort([-5, 3, -5, 0, 3, 1])
+assert_eq join(",", @$rn), "-5,-5,0,1,3,3", "negatives + dups"
+
+# Helper sanity
+assert_eq Rosetta::Tournament::next_pow2(1), 1, "next_pow2(1)"
+assert_eq Rosetta::Tournament::next_pow2(7), 8, "next_pow2(7)"
+assert_eq Rosetta::Tournament::next_pow2(8), 8, "next_pow2(8) exact"
+assert_eq Rosetta::Tournament::next_pow2(100), 128, "next_pow2(100)"
+
+test_run

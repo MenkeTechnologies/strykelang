@@ -32,7 +32,7 @@ fn Rosetta::UTM::solve($state, $tape, $pos, $rules, $halt, $blank) {
         $curr_state = $next_state
     }
     
-    return \%tape_h
+    \%tape_h
 }
 
 # Simple incrementer: increments a binary number (e.g., 111 -> 1000)

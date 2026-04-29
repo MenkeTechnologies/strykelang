@@ -7,7 +7,7 @@ fn Rosetta::Adler32::compute($text) {
     my $mod = 65521
     
     # Calculate checksum
-    for my $c ($text |> chars() |> map { ord($_) }) {
+    for my $c ($text |> chars() |> map { ord(_) }) {
         $a = ($a + $c) % $mod
         $b = ($b + $a) % $mod
     }

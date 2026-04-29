@@ -5,12 +5,12 @@ fn Rosetta::ShuntingYard::precedence($op) {
     if ($op eq "^") { return 4 }
     if ($op eq "*" || $op eq "/") { return 3 }
     if ($op eq "+" || $op eq "-") { return 2 }
-    return 0
+    0
 }
 
 fn Rosetta::ShuntingYard::is_right_assoc($op) {
     if ($op eq "^") { return 1 }
-    return 0
+    0
 }
 
 fn Rosetta::ShuntingYard::solve($infix) {

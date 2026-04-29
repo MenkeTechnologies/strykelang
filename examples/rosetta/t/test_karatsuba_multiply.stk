@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Karatsuba multiplication — recursive divide-and-conquer.
+# For non-negative ints. Splits each number at half its bit-length, does
+# 3 sub-multiplies + adds instead of 4.
+
+fn Rosetta::Karatsuba::digits($n) {
+    return 1 if $n == 0
+    my $d = 0
+    while ($n > 0) { $d++; $n = int($n / 10) }
+    $d
+}
+
+fn Rosetta::Karatsuba::pow10($k) {
+    my $r = 1
+    for (1..$k) { $r *= 10 }
+    $r
+}
+
+fn Rosetta::Karatsuba::mul($x, $y) {
+    return $x * $y if $x < 10 || $y < 10
+    my $n = Rosetta::Karatsuba::digits($x)
+    my $m = Rosetta::Karatsuba::digits($y)
+    my $half = int(($n > $m ? $n : $m) / 2)
+    my $base = Rosetta::Karatsuba::pow10($half)
+    my $high1 = int($x / $base)
+    my $low1 = $x - $high1 * $base
+    my $high2 = int($y / $base)
+    my $low2 = $y - $high2 * $base
+    my $z0 = Rosetta::Karatsuba::mul($low1, $low2)
+    my $z2 = Rosetta::Karatsuba::mul($high1, $high2)
+    my $z1 = Rosetta::Karatsuba::mul($low1 + $high1, $low2 + $high2) - $z2 - $z0
+    $z2 * Rosetta::Karatsuba::pow10(2 * $half) + $z1 * $base + $z0
+}
+
+# Random-ish products
+assert_eq Rosetta::Karatsuba::mul(0, 12345), 0, "0 * x = 0"
+assert_eq Rosetta::Karatsuba::mul(7, 9), 63, "single-digit"
+assert_eq Rosetta::Karatsuba::mul(123, 456), 56088, "3-digit * 3-digit"
+assert_eq Rosetta::Karatsuba::mul(1234, 5678), 7006652, "4-digit"
+assert_eq Rosetta::Karatsuba::mul(99, 99), 9801, "99 * 99"
+assert_eq Rosetta::Karatsuba::mul(100, 100), 10000, "100 * 100"
+
+# Match against native multiplication for a range of values
+for my $a (1, 7, 42, 137, 999, 12345) {
+    for my $b (1, 3, 50, 200, 7777) {
+        assert_eq Rosetta::Karatsuba::mul($a, $b), $a * $b, "$a * $b matches native"
+    }
+}
+
+# Helper sanity
+assert_eq Rosetta::Karatsuba::digits(0), 1, "digits(0) = 1"
+assert_eq Rosetta::Karatsuba::digits(9), 1, "digits(9) = 1"
+assert_eq Rosetta::Karatsuba::digits(100), 3, "digits(100) = 3"
+assert_eq Rosetta::Karatsuba::pow10(0), 1, "10^0"
+assert_eq Rosetta::Karatsuba::pow10(4), 10000, "10^4"
+
+test_run

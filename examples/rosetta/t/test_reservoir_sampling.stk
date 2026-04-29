@@ -30,7 +30,7 @@ for my $v (@$sample) {
 my @small = (1, 2, 3)
 my $whole = Rosetta::Reservoir::sample(\@small, 10)
 assert_eq len(@$whole), 3, "stream smaller than k returns full stream"
-assert_eq join(",", sort { $a <=> $b } @$whole), "1,2,3", "small stream contents preserved"
+assert_eq join(",", sort { _0 <=> _1 } @$whole), "1,2,3", "small stream contents preserved"
 
 # k = 0 returns empty
 my $empty = Rosetta::Reservoir::sample(\@stream, 0)

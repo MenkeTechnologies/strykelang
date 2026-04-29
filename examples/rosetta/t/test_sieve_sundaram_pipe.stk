@@ -21,7 +21,7 @@ fn Rosetta::SieveSundaram::solve($n) {
     # 2 is a special case, then map unmarked indices to 2i + 1
     my @p = ~> 1:$k grep { !$marked[$_] }
     my @primes = (2, ~> @p map { 2 * $_ + 1 })
-    return \@primes
+    \@primes
 }
 
 my $res = Rosetta::SieveSundaram::solve(100)

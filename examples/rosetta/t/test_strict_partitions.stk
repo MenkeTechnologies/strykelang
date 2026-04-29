@@ -12,7 +12,7 @@ fn Rosetta::StrictPart::count($n) {
             $dp[$i] += $dp[$i - $part]
         }
     }
-    return $dp[$n]
+    $dp[$n]
 }
 
 # Enumerate all strict partitions of n (lists of distinct positive parts).

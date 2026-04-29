@@ -36,7 +36,7 @@ my @seq = Rosetta::Fractran::run($primes_prog, 2, 1000)
 
 # Filter out powers of 2
 my @powers_of_2 = ~> @seq grep { 
-    my $v = $_
+    my $v = _
     # Check if $v is a power of 2 > 1
     if ($v > 1) {
         ($v & ($v - 1)) == 0
@@ -46,7 +46,7 @@ my @powers_of_2 = ~> @seq grep {
 }
 
 # The primes are log2 of these powers of 2
-my @primes = ~> @powers_of_2 map { log($_) / log(2) |> round() }
+my @primes = ~> @powers_of_2 map { log(_) / log(2) |> round() }
 
 assert_ok len(@primes) >= 4, "Found at least 4 primes (including starting 1)"
 assert_eq $primes[1], 2, "First prime is 2"

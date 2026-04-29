@@ -16,7 +16,7 @@ fn Rosetta::ADFGVX::prepare_grid($key_square) {
 
 fn Rosetta::ADFGVX::encode($text, $key_square, $keyword) {
     my $grid = Rosetta::ADFGVX::prepare_grid($key_square)
-    my $t = $text |> uc() |> { $_ =~ s/[^A-Z0-9]//gr }
+    my $t = $text |> uc() |> { _ =~ s/[^A-Z0-9]//gr }
     
     my $fractionated = ""
     for my $c ($t |> chars()) {
@@ -35,7 +35,7 @@ fn Rosetta::ADFGVX::encode($text, $key_square, $keyword) {
     }
     
     # Sort columns by keyword
-    my @indices = sort { $kw[$_0] cmp $kw[$_1] } 0:($n - 1)
+    my @indices = sort { $kw[_0] cmp $kw[_1] } 0:($n - 1)
     
     my $res = ""
     for my $idx (@indices) {

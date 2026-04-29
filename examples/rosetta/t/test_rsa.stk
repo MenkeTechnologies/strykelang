@@ -20,7 +20,7 @@ fn Rosetta::RSA::mod_inverse($a, $m) {
         $x0 = $x1 - $q * $x0
         $x1 = $t
     }
-    return $x1 < 0 ? $x1 + $m0 : $x1
+    $x1 < 0 ? $x1 + $m0 : $x1
 }
 
 fn Rosetta::RSA::mod_pow($base, $exp, $mod) {

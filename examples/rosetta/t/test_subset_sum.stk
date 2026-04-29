@@ -16,7 +16,7 @@ fn Rosetta::SubsetSum::solve($numbers, $target) {
         %possible = %new_possible
         return $possible{$target} if exists $possible{$target}
     }
-    return exists $possible{$target} ? $possible{$target} : undef
+    exists $possible{$target} ? $possible{$target} : undef
 }
 
 my @set = (3, 34, 4, 12, 5, 2)

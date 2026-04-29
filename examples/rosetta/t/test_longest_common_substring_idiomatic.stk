@@ -24,7 +24,7 @@ fn Rosetta::LongestCommonSubstring::solve($s1, $s2) {
         }
     }
     
-    return substr($s1, $end_idx - $max_len, $max_len)
+    substr($s1, $end_idx - $max_len, $max_len)
 }
 
 assert_eq Rosetta::LongestCommonSubstring::solve("abcabcabc", "abc"), "abc", "overlap abc"

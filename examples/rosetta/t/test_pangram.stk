@@ -3,7 +3,7 @@
 
 fn Rosetta::Pangram::check($s) {
     my $lower = lc($s)
-    my @missing = ~> 'a'..'z' grep { index($lower, $_) < 0 }
+    my @missing = ~> 'a'..'z' grep { index($lower, _) < 0 }
     len(@missing) == 0
 }
 

@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Circle sort — recursive divide-and-swap from outside in
+
+fn Rosetta::Circle::pass($arr, $lo, $hi) {
+    return 0 if $lo == $hi
+    my $swaps = 0
+    my $h = $hi
+    my $l = $lo
+    while ($l < $h) {
+        if ($arr->[$l] > $arr->[$h]) {
+            ($arr->[$l], $arr->[$h]) = ($arr->[$h], $arr->[$l])
+            $swaps++
+        }
+        $l++
+        $h--
+    }
+    if ($l == $h && $arr->[$l] > $arr->[$h + 1]) {
+        ($arr->[$l], $arr->[$h + 1]) = ($arr->[$h + 1], $arr->[$l])
+        $swaps++
+    }
+    my $mid = int(($hi - $lo) / 2)
+    $swaps += Rosetta::Circle::pass($arr, $lo, $lo + $mid)
+    $swaps += Rosetta::Circle::pass($arr, $lo + $mid + 1, $hi)
+    $swaps
+}
+
+fn Rosetta::Circle::sort($arr) {
+    my @work = @$arr
+    return \@work if len(@work) < 2
+    my $guard = 0
+    while (1) {
+        last if ++$guard > 100
+        my $s = Rosetta::Circle::pass(\@work, 0, len(@work) - 1)
+        last if $s == 0
+    }
+    \@work
+}
+
+assert_eq join(",", @{Rosetta::Circle::sort([6, 7, 8, 9, 2, 5, 3, 4, 1])}), "1,2,3,4,5,6,7,8,9", "9 elements"
+assert_eq join(",", @{Rosetta::Circle::sort([5, 4, 3, 2, 1])}), "1,2,3,4,5", "5 elements reversed"
+assert_eq join(",", @{Rosetta::Circle::sort([1])}), "1", "single"
+assert_eq join(",", @{Rosetta::Circle::sort([])}), "", "empty"
+assert_eq join(",", @{Rosetta::Circle::sort([3, 1])}), "1,3", "two elements"
+assert_eq join(",", @{Rosetta::Circle::sort([2, 2, 2])}), "2,2,2", "all equal"
+
+# Stress
+my @big = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+my @sorted = sort { $_0 <=> $_1 } @big
+my $r = Rosetta::Circle::sort(\@big)
+assert_eq join(",", @$r), join(",", @sorted), "15-element stress"
+
+test_run

@@ -23,7 +23,7 @@ fn Rosetta::Playfair::find_pos($grid, $char) {
             return [ $i / 5 | 0, $i % 5 ]
         }
     }
-    return [ -1, -1 ]
+    [ -1, -1 ]
 }
 
 fn Rosetta::Playfair::codec($text, $key, $mode) {

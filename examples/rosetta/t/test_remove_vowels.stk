@@ -4,7 +4,7 @@
 fn Rosetta::RemoveVowels::remove_vowels($str) {
     my $modified_str = $str;
     $modified_str =~ tr/aeiouAEIOU//d;
-    return $modified_str;
+    $modified_str;
 }
 
 assert_eq Rosetta::RemoveVowels::remove_vowels("Hello World"), "Hll Wrld", "remove from hello world"

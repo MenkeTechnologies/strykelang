@@ -29,7 +29,7 @@ fn Rosetta::Mastermind::score($secret, $guess) {
         }
     }
     
-    return { bulls => $bulls, cows => $cows }
+    { bulls => $bulls, cows => $cows }
 }
 
 my $s1 = ["R", "G", "B", "Y"]

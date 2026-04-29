@@ -18,14 +18,9 @@ fn Rosetta::BullsAndCows::get_score($secret, $guess) {
     }
     
     for my $k (keys %g_count) {
-        if (exists $s_count{$k}) {
-            my $m = $s_count{$k}
-            if ($g_count{$k} < $m) { $m = $g_count{$k} }
-            $cows = $cows + $m
-        }
+        $cows = $cows + min($s_count{$k}, $g_count{$k}) if exists $s_count{$k}
     }
-    
-    return [$bulls, $cows]
+    [$bulls, $cows]
 }
 
 my $score1 = Rosetta::BullsAndCows::get_score(1234, 1234)

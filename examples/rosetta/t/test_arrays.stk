@@ -45,8 +45,8 @@ fn Rosetta::Arrays::demo() {
     "   Last index: $last_index" |> p
     
     # Array operations with threading (proper multi-stage use)
-    my @doubled = ~> @numbers map { $_ * 2 }
-    my @filtered = ~> @numbers grep { $_ > 3 }
+    my @doubled = ~> @numbers map { _ * 2 }
+    my @filtered = ~> @numbers grep { _ > 3 }
     
     "6. Array Operations:" |> p
     ("   Doubled: " . join(", ", @doubled)) |> p

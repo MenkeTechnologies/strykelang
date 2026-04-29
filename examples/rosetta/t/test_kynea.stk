@@ -6,7 +6,7 @@ fn Rosetta::Kynea::compute($n) {
 }
 
 fn Rosetta::Kynea::list($max_n) {
-    ~> 1:$max_n map { Rosetta::Kynea::compute($_) }
+    ~> 1:$max_n map { Rosetta::Kynea::compute(_) }
 }
 
 assert_eq Rosetta::Kynea::compute(1), 7, "K1"

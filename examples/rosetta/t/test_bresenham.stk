@@ -31,7 +31,7 @@ fn Rosetta::Bresenham::solve($x0, $y0, $x1, $y1) {
 my $line = Rosetta::Bresenham::solve(1, 1, 8, 5)
 # Expected points for (1,1) to (8,5)
 # (1,1), (2,2), (3,2), (4,3), (5,3), (6,4), (7,4), (8,5)
-my @s = ~> @$line map { "(" . $_->[0] . "," . $_->[1] . ")" }
+my @s = ~> @$line map { "(" . _->[0] . "," . _->[1] . ")" }
 assert_eq join(" ", @s), "(1,1) (2,2) (3,2) (4,3) (5,3) (6,4) (7,4) (8,5)", "line 1,1 to 8,5"
 
 my $line2 = Rosetta::Bresenham::solve(1, 8, 8, 1)

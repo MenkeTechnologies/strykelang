@@ -2,7 +2,7 @@
 # Rosetta Code: RC4
 
 fn Rosetta::RC4::ksa($key) {
-    my @key_bytes = $key |> chars() |> map { ord($_) }
+    my @key_bytes = $key |> chars() |> map { ord(_) }
     my $key_len = len(@key_bytes)
     my @s = 0:255
     
@@ -38,7 +38,7 @@ fn Rosetta::RC4::prga($s, $len) {
 
 fn Rosetta::RC4::solve($key, $data) {
     my $s = Rosetta::RC4::ksa($key)
-    my @data_bytes = $data |> chars() |> map { ord($_) }
+    my @data_bytes = $data |> chars() |> map { ord(_) }
     my @keystream = Rosetta::RC4::prga($s, len(@data_bytes))
     
     my @res
@@ -52,12 +52,12 @@ fn Rosetta::RC4::solve($key, $data) {
 # Key "Key", Data "Plaintext"
 my @encrypted = Rosetta::RC4::solve("Key", "Plaintext")
 # Hex output: BB F3 16 E8 D9 40 AF 0A D3
-my @hex = @encrypted |> map { sprintf("%02X", $_) }
+my @hex = @encrypted |> map { sprintf("%02X", _) }
 assert_eq join(" ", @hex), "BB F3 16 E8 D9 40 AF 0A D3", "RC4 Wikipedia example"
 
 # Round trip
 fn Rosetta::RC4::to_string(@bytes) {
-    @bytes |> map { chr($_) } |> join("")
+    @bytes |> map { chr(_) } |> join("")
 }
 
 my $original = "Stryke is fast!"

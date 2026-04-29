@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pollard's p-1 factoring algorithm
+
+fn Rosetta::PollardPm1::gcd($a, $b) {
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn Rosetta::PollardPm1::pow_mod($b, $e, $m) {
+    my $r = 1
+    $b = $b % $m
+    while ($e > 0) {
+        if ($e & 1) { $r = ($r * $b) % $m }
+        $e = $e >> 1
+        $b = ($b * $b) % $m
+    }
+    $r
+}
+
+fn Rosetta::PollardPm1::factor($n, $b_max) {
+    return $n if $n <= 1
+    return 2 if $n % 2 == 0
+    my $a = 2
+    for my $j (2..$b_max) {
+        $a = Rosetta::PollardPm1::pow_mod($a, $j, $n)
+        my $g = Rosetta::PollardPm1::gcd($a - 1, $n)
+        if ($g > 1 && $g < $n) {
+            return $g
+        }
+        return undef if $g == $n
+    }
+    undef
+}
+
+# 5959 = 59 * 101. p=59, p-1=58=2*29 (smooth). B>=29 should find it.
+my $f1 = Rosetta::PollardPm1::factor(5959, 30)
+assert_ok defined($f1), "5959 found a factor"
+assert_ok($f1 == 59 || $f1 == 101), "5959 -> 59 or 101 (got $f1)"
+assert_eq 5959 % $f1, 0, "factor divides n"
+
+# 8051 = 83 * 97. 97-1 = 96 = 2^5 * 3, B>=5 enough
+my $f2 = Rosetta::PollardPm1::factor(8051, 10)
+assert_ok defined($f2), "8051 found"
+assert_eq 8051 % $f2, 0, "factor divides 8051"
+
+# 12_259 = 13 * 23 * 41. Smallest p=13, p-1=12=2^2*3
+my $f3 = Rosetta::PollardPm1::factor(12259, 5)
+assert_ok defined($f3), "12259 found"
+assert_eq 12259 % $f3, 0, "factor divides 12259"
+
+# Even — falls through to 2 fast-path
+assert_eq Rosetta::PollardPm1::factor(100, 10), 2, "even -> 2"
+
+# 6 = 2 * 3
+assert_eq Rosetta::PollardPm1::factor(6, 5), 2, "6 -> 2"
+
+# Pollard p-1 fails on a "rough" number whose p-1 has a large prime — we
+# expect undef when the algorithm runs out of B without splitting.
+assert_ok !defined(Rosetta::PollardPm1::factor(13, 5)), "prime 13 -> undef (no factor)"
+
+test_run

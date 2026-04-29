@@ -11,7 +11,7 @@ fn Rosetta::Catalan::compute($n) {
 }
 
 fn Rosetta::Catalan::list($max) {
-    ~> 0:$max map { Rosetta::Catalan::compute($_) }
+    ~> 0:$max map { Rosetta::Catalan::compute(_) }
 }
 
 assert_eq Rosetta::Catalan::compute(0), 1, "C0"

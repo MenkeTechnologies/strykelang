@@ -22,7 +22,7 @@ fn Rosetta::Mean::harmonic(@nums) {
     if (!@nums) {
         0
     } else {
-        my $sum = @nums |> map { 1 / $_ } |> reduce { _0 + _1 }
+        my $sum = @nums |> map { 1 / _ } |> reduce { _0 + _1 }
         len(@nums) / $sum
     }
 }

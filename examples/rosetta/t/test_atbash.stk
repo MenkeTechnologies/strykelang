@@ -3,9 +3,9 @@
 
 fn Rosetta::Atbash::cipher($s) {
     ~> $s chars map {
-        $_ =~ /[A-Z]/ ? chr(90 - (ord($_) - 65))
-      : $_ =~ /[a-z]/ ? chr(122 - (ord($_) - 97))
-      : $_
+        _ =~ /[A-Z]/ ? chr(90 - (ord(_) - 65))
+      : _ =~ /[a-z]/ ? chr(122 - (ord(_) - 97))
+      : _
     } |> join ""
 }
 

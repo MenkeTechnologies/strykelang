@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Baby-step giant-step — discrete logarithm
+# Solve g^x ≡ h (mod p) for x where 0 <= x < p
+
+fn Rosetta::BSGS::pow_mod($b, $e, $m) {
+    my $r = 1
+    $b = $b % $m
+    while ($e > 0) {
+        if ($e & 1) { $r = ($r * $b) % $m }
+        $e = $e >> 1
+        $b = ($b * $b) % $m
+    }
+    $r
+}
+
+fn Rosetta::BSGS::isqrt($n) {
+    my $x = int(sqrt($n))
+    while (($x + 1) * ($x + 1) <= $n) { $x++ }
+    while ($x * $x > $n) { $x-- }
+    $x
+}
+
+fn Rosetta::BSGS::find($g, $h, $p) {
+    my $m = Rosetta::BSGS::isqrt($p) + 1
+    # Baby steps: store g^j for j = 0..m-1 keyed by value -> j.
+    my %tbl
+    my $cur = 1
+    for my $j (0..$m - 1) {
+        $tbl{$cur} = $j unless exists $tbl{$cur}
+        $cur = ($cur * $g) % $p
+    }
+    # Giant step factor: g^(-m) mod p = (g^m)^(p-2) mod p (Fermat, p prime).
+    my $g_to_m = Rosetta::BSGS::pow_mod($g, $m, $p)
+    my $factor = Rosetta::BSGS::pow_mod($g_to_m, $p - 2, $p)
+    my $gamma = $h % $p
+    for my $i (0..$m - 1) {
+        return $i * $m + $tbl{$gamma} if exists $tbl{$gamma}
+        $gamma = ($gamma * $factor) % $p
+    }
+    undef
+}
+
+# 7^x = 13 (mod 23) — 7 is a primitive root of 23, x = 10
+my $x1 = Rosetta::BSGS::find(7, 13, 23)
+assert_eq Rosetta::BSGS::pow_mod(7, $x1, 23), 13, "7^x = 13 (mod 23) check"
+
+# 3^x = 13 (mod 17), x = 4
+my $x2 = Rosetta::BSGS::find(3, 13, 17)
+assert_eq Rosetta::BSGS::pow_mod(3, $x2, 17), 13, "3^x = 13 (mod 17) check"
+
+# 2^x = 13 (mod 29) — 2 is a primitive root of 29
+my $x3 = Rosetta::BSGS::find(2, 13, 29)
+assert_eq Rosetta::BSGS::pow_mod(2, $x3, 29), 13, "2^x = 13 (mod 29) check"
+
+# Trivial: g^0 = 1, x = 0
+my $x4 = Rosetta::BSGS::find(7, 1, 23)
+assert_eq Rosetta::BSGS::pow_mod(7, $x4, 23), 1, "g^0 = 1 found"
+
+# Identity g^1 = g
+my $x5 = Rosetta::BSGS::find(11, 11, 47)
+assert_eq Rosetta::BSGS::pow_mod(11, $x5, 47), 11, "g^1 = g found"
+
+# isqrt sanity
+assert_eq Rosetta::BSGS::isqrt(0), 0, "isqrt(0)"
+assert_eq Rosetta::BSGS::isqrt(15), 3, "isqrt(15)=3"
+assert_eq Rosetta::BSGS::isqrt(100), 10, "isqrt(100)=10"
+
+test_run

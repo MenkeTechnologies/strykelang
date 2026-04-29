@@ -24,27 +24,27 @@ fn Rosetta::RegulaFalsi::find($f, $a, $b, $eps, $max_iter) {
 fn Rosetta::RegulaFalsi::close($x, $y) { abs($x - $y) < 1e-6 }
 
 # x^2 - 2 = 0  has root sqrt(2)
-my $sqrt2 = Rosetta::RegulaFalsi::find(sub { $_[0] * $_[0] - 2 }, 1, 2, 1e-9, 100)
+my $sqrt2 = Rosetta::RegulaFalsi::find(fn { _ * _ - 2 }, 1, 2, 1e-9, 100)
 assert_ok Rosetta::RegulaFalsi::close($sqrt2, sqrt(2)), "sqrt(2) ~ $sqrt2"
 
 # x^3 - x - 2 = 0 has a real root ~1.5214
-my $cubic = Rosetta::RegulaFalsi::find(sub { $_[0] ** 3 - $_[0] - 2 }, 1, 2, 1e-9, 200)
+my $cubic = Rosetta::RegulaFalsi::find(fn { _ ** 3 - _ - 2 }, 1, 2, 1e-9, 200)
 assert_ok Rosetta::RegulaFalsi::close($cubic, 1.5213797068), "x^3-x-2 root ~ $cubic"
 
 # cos(x) - x = 0 has unique root ~0.7390851
-my $dottie = Rosetta::RegulaFalsi::find(sub { cos($_[0]) - $_[0] }, 0, 1, 1e-9, 200)
+my $dottie = Rosetta::RegulaFalsi::find(fn { cos(_) - _ }, 0, 1, 1e-9, 200)
 assert_ok Rosetta::RegulaFalsi::close($dottie, 0.7390851332), "Dottie ~ $dottie"
 
 # Already-bracketed exact root
-my $linear = Rosetta::RegulaFalsi::find(sub { 2 * $_[0] - 6 }, 0, 10, 1e-9, 100)
+my $linear = Rosetta::RegulaFalsi::find(fn { 2 * _ - 6 }, 0, 10, 1e-9, 100)
 assert_ok Rosetta::RegulaFalsi::close($linear, 3), "linear root = 3"
 
 # Bracket with same sign -> undef
-my $no_sign = Rosetta::RegulaFalsi::find(sub { $_[0] * $_[0] + 1 }, -1, 1, 1e-9, 50)
+my $no_sign = Rosetta::RegulaFalsi::find(fn { _ * _ + 1 }, -1, 1, 1e-9, 50)
 assert_ok !defined($no_sign), "no sign change -> undef"
 
 # Negative root: x^2 - 3 = 0 -> -sqrt(3)
-my $neg = Rosetta::RegulaFalsi::find(sub { $_[0] * $_[0] - 3 }, -2, 0, 1e-9, 200)
+my $neg = Rosetta::RegulaFalsi::find(fn { _ * _ - 3 }, -2, 0, 1e-9, 200)
 assert_ok Rosetta::RegulaFalsi::close($neg, -sqrt(3)), "-sqrt(3) ~ $neg"
 
 test_run

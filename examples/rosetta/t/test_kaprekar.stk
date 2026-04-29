@@ -23,7 +23,7 @@ fn Rosetta::Kaprekar::check($n) {
 }
 
 fn Rosetta::Kaprekar::generate($max) {
-    1:$max |> grep { Rosetta::Kaprekar::check($_) }
+    1:$max |> grep { Rosetta::Kaprekar::check(_) }
 }
 
 assert_ok Rosetta::Kaprekar::check(1), "1 is kaprekar"

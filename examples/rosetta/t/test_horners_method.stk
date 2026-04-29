@@ -3,11 +3,8 @@
 # coeffs[0] is the constant term, coeffs[i] is x^i
 
 fn Rosetta::Horner::eval($coeffs, $x) {
-    my $acc = 0
-    for my $c (rev @$coeffs) {
-        $acc = $acc * $x + $c
-    }
-    $acc
+    return 0 if len(@$coeffs) == 0
+    ~> @$coeffs rev reduce { _0 * $x + _1 }
 }
 
 # 1 + 2x + 3x^2 at x=2 -> 1 + 4 + 12 = 17

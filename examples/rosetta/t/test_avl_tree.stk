@@ -1,0 +1,112 @@
+#!/usr/bin/env stryke
+# Rosetta Code: AVL tree — self-balancing BST with rotations on imbalance > 1
+
+fn Rosetta::AVL::height($node) {
+    defined($node) ? $node->{h} : 0
+}
+
+fn Rosetta::AVL::balance($node) {
+    return 0 if !defined $node
+    Rosetta::AVL::height($node->{l}) - Rosetta::AVL::height($node->{r})
+}
+
+fn Rosetta::AVL::recompute($n) {
+    my $lh = Rosetta::AVL::height($n->{l})
+    my $rh = Rosetta::AVL::height($n->{r})
+    $n->{h} = 1 + ($lh > $rh ? $lh : $rh)
+}
+
+fn Rosetta::AVL::rotate_right($y) {
+    my $x = $y->{l}
+    my $t2 = $x->{r}
+    $x->{r} = $y
+    $y->{l} = $t2
+    Rosetta::AVL::recompute($y)
+    Rosetta::AVL::recompute($x)
+    $x
+}
+
+fn Rosetta::AVL::rotate_left($x) {
+    my $y = $x->{r}
+    my $t2 = $y->{l}
+    $y->{l} = $x
+    $x->{r} = $t2
+    Rosetta::AVL::recompute($x)
+    Rosetta::AVL::recompute($y)
+    $y
+}
+
+fn Rosetta::AVL::insert($node, $key) {
+    return { k => $key, l => undef, r => undef, h => 1 } if !defined $node
+    return $node if $key == $node->{k}
+    if ($key < $node->{k}) {
+        $node->{l} = Rosetta::AVL::insert($node->{l}, $key)
+    } else {
+        $node->{r} = Rosetta::AVL::insert($node->{r}, $key)
+    }
+    Rosetta::AVL::recompute($node)
+    my $bf = Rosetta::AVL::balance($node)
+    return Rosetta::AVL::rotate_right($node) if $bf > 1 && $key < $node->{l}{k}
+    return Rosetta::AVL::rotate_left($node)  if $bf < -1 && $key > $node->{r}{k}
+    if ($bf > 1 && $key > $node->{l}{k}) {
+        $node->{l} = Rosetta::AVL::rotate_left($node->{l})
+        return Rosetta::AVL::rotate_right($node)
+    }
+    if ($bf < -1 && $key < $node->{r}{k}) {
+        $node->{r} = Rosetta::AVL::rotate_right($node->{r})
+        return Rosetta::AVL::rotate_left($node)
+    }
+    $node
+}
+
+fn Rosetta::AVL::contains($node, $key) {
+    return 0 if !defined $node
+    return 1 if $node->{k} == $key
+    return Rosetta::AVL::contains($node->{l}, $key) if $key < $node->{k}
+    Rosetta::AVL::contains($node->{r}, $key)
+}
+
+fn Rosetta::AVL::inorder($node, $out) {
+    if (!defined $node) { return }
+    Rosetta::AVL::inorder($node->{l}, $out)
+    push @$out, $node->{k}
+    Rosetta::AVL::inorder($node->{r}, $out)
+}
+
+fn Rosetta::AVL::sorted($root) {
+    my @out
+    Rosetta::AVL::inorder($root, \@out)
+    \@out
+}
+
+# Build, in-order traversal returns sorted
+my $root
+for my $v (10, 20, 30, 40, 50, 25) {
+    $root = Rosetta::AVL::insert($root, $v)
+}
+assert_eq join(",", @{Rosetta::AVL::sorted($root)}), "10,20,25,30,40,50", "inorder is sorted"
+assert_ok Rosetta::AVL::contains($root, 25), "contains 25"
+assert_ok !Rosetta::AVL::contains($root, 99), "missing 99"
+
+# Height invariant: |bf| <= 1 at every node
+fn Rosetta::AVL::is_balanced($node) {
+    return 1 if !defined $node
+    return 0 if abs(Rosetta::AVL::balance($node)) > 1
+    Rosetta::AVL::is_balanced($node->{l}) && Rosetta::AVL::is_balanced($node->{r})
+}
+assert_ok Rosetta::AVL::is_balanced($root), "balanced after 6 inserts"
+
+# Insert sequential 1..100 — naive BST would be O(n) deep; AVL stays O(log n)
+my $r2
+for my $v (1..100) {
+    $r2 = Rosetta::AVL::insert($r2, $v)
+}
+assert_eq len(@{Rosetta::AVL::sorted($r2)}), 100, "100 keys all inserted"
+assert_ok Rosetta::AVL::is_balanced($r2), "balanced after 100 sequential inserts"
+assert_ok Rosetta::AVL::height($r2) <= 8, "height after 100 keys <= 8 (log2(100) ~ 6.6)"
+
+# Duplicate insert is a no-op (same key)
+my $r3 = Rosetta::AVL::insert($r2, 50)
+assert_eq len(@{Rosetta::AVL::sorted($r3)}), 100, "dup insert doesn't add"
+
+test_run

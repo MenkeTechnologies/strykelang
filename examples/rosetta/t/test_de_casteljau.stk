@@ -3,7 +3,7 @@
 # Evaluate a Bezier curve at parameter t in [0, 1].
 
 fn Rosetta::DeCasteljau::eval($pts, $t) {
-    my @work = map { [$_->[0], $_->[1]] } @$pts
+    my @work = map { [_->[0], _->[1]] } @$pts
     my $n = len(@work)
     my $omt = 1 - $t
     while ($n > 1) {

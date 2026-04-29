@@ -4,7 +4,7 @@
 fn Rosetta::MinHash::hash($s, $seed) {
     # Simple hash function variant
     my $hash = $seed
-    for my $c ($s |> chars() |> map { ord($_) }) {
+    for my $c ($s |> chars() |> map { ord(_) }) {
         $hash = (($hash * 31) + $c) % 4294967296
     }
     $hash

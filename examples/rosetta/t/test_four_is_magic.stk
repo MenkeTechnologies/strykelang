@@ -28,7 +28,7 @@ fn Rosetta::FourIsMagic::number_to_words($n) {
     if ($n == 21) { return "twentyone" }
     if ($n == 22) { return "twentytwo" }
     
-    return "too_big"
+    "too_big"
 }
 
 fn Rosetta::FourIsMagic::solve($n) {

@@ -29,7 +29,7 @@ fn Rosetta::BellmanFord::solve($nodes, $edges, $source) {
         }
     }
     
-    return \%distance
+    \%distance
 }
 
 my @nodes = (1, 2, 3, 4, 5)

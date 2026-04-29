@@ -16,7 +16,7 @@ fn Rosetta::Trie::search($trie, $word) {
         return 0 if !exists $curr->{$c}
         $curr = $curr->{$c}
     }
-    return $curr->{_is_end} ? 1 : 0
+    $curr->{_is_end} ? 1 : 0
 }
 
 fn Rosetta::Trie::starts_with($trie, $prefix) {
@@ -25,7 +25,7 @@ fn Rosetta::Trie::starts_with($trie, $prefix) {
         return 0 if !exists $curr->{$c}
         $curr = $curr->{$c}
     }
-    return 1
+    1
 }
 
 my $trie = {}
