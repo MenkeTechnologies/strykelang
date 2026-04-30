@@ -1803,6 +1803,9 @@ impl Lexer {
                     "s" => {
                         // `s` followed by terminators is a bareword, not substitution.
                         // Must check AFTER skipping whitespace to handle `s => "val"`.
+                        // NOTE: `,` is intentionally NOT a terminator here — Perl allows
+                        // `s,PAT,REPL,FLAGS` (comma as the substitution delimiter), as in
+                        // `perl -pe 's,\bt\b,b,g'`. Same for `tr,y` below.
                         let start_pos = self.pos;
                         self.skip_whitespace_only();
                         if let Some(d) = self.peek() {
@@ -1811,7 +1814,7 @@ impl Lexer {
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
-                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                            if matches!(d, ';' | ')' | ']' | '}' | '>' | ':' | '\n') {
                                 self.pos = start_pos;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
@@ -1895,8 +1898,10 @@ impl Lexer {
                         }
                         // `tr` / `y` followed by terminators is a bareword, not transliteration.
                         // Check BEFORE skipping whitespace to catch newlines (implicit semicolon).
+                        // NOTE: `,` is intentionally NOT a terminator here — Perl allows
+                        // `tr,FROM,TO,FLAGS` (comma as the transliteration delimiter).
                         if let Some(d) = self.peek() {
-                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                            if matches!(d, ';' | ')' | ']' | '}' | '>' | ':' | '\n') {
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }

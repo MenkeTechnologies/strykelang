@@ -1341,6 +1341,26 @@ impl Parser {
         }
     }
 
+    /// Map an operator-keyword token (the lexer converts `eq`, `ne`, …, `and`,
+    /// `or`, `not`, `x` to dedicated tokens) back to its identifier spelling.
+    /// Used in hash-key contexts where the bareword form is the user's intent.
+    pub(crate) fn operator_keyword_to_ident_str(tok: &Token) -> Option<&'static str> {
+        Some(match tok {
+            Token::StrEq => "eq",
+            Token::StrNe => "ne",
+            Token::StrLt => "lt",
+            Token::StrGt => "gt",
+            Token::StrLe => "le",
+            Token::StrGe => "ge",
+            Token::StrCmp => "cmp",
+            Token::LogAndWord => "and",
+            Token::LogOrWord => "or",
+            Token::LogNotWord => "not",
+            Token::X => "x",
+            _ => return None,
+        })
+    }
+
     /// Bare names that resolve to the topic-slot scalar matrix:
     /// `_`, `_0`, `_1`, …, `_N`, plus `_<+`, `_N<+` for the 4-deep outer chain.
     /// These must NOT be treated as zero-arg sub calls — they're scalar var refs.
@@ -7322,8 +7342,17 @@ impl Parser {
             }
             // Unary `+EXPR` — Perl uses this to disambiguate barewords in hash subscripts (`$h{+Foo}`)
             // and for scalar context; treat as a no-op on the parsed operand.
+            // Special case: `+{ ... }` forces hashref interpretation (Perl idiom),
+            // even when the body is a list-yielding expression like `+{ map { ... } @arr }`.
+            // Without this, `{ map { ... } @arr }` falls back to block/CodeRef parsing
+            // because the body doesn't fit `KEY => VAL` shape.
             Token::Plus => {
                 self.advance();
+                if matches!(self.peek(), Token::LBrace) {
+                    let line = self.peek_line();
+                    self.advance(); // consume {
+                    return self.parse_forced_hashref_body(line);
+                }
                 self.parse_unary()
             }
             Token::LogNot => {
@@ -8566,7 +8595,10 @@ impl Parser {
         // Fat-arrow auto-quoting: ANY bareword (including keywords/builtins)
         // before `=>` is treated as a string key, matching Perl 5 semantics.
         // e.g. `(print => 1, pr => "x", sort => 3)` are all valid hash pairs.
-        if matches!(self.peek(), Token::FatArrow) {
+        // Stryke exception: topic-slot barewords (`_`, `_<`, `_0`, `_0<`, …) are
+        // scalar references to the topic / positional / outer-topic chain — they
+        // must evaluate as the topic value, not the literal name.
+        if matches!(self.peek(), Token::FatArrow) && !Self::is_underscore_topic_slot(&name) {
             return Ok(Expr {
                 kind: ExprKind::String(name),
                 line,
@@ -11781,8 +11813,12 @@ impl Parser {
             }
             _ => {
                 // Generic function call
-                // Check for fat arrow (bareword string in hash)
-                if matches!(self.peek(), Token::FatArrow) {
+                // Check for fat arrow (bareword string in hash) — except for
+                // topic-slot barewords (`_`, `_<`, `_0`, `_0<`, …), which must
+                // resolve to the topic value, not the literal name.
+                if matches!(self.peek(), Token::FatArrow)
+                    && !Self::is_underscore_topic_slot(&name)
+                {
                     return Ok(Expr {
                         kind: ExprKind::String(name),
                         line,
@@ -13953,15 +13989,30 @@ impl Parser {
     /// Parse a hash subscript key inside `{…}`.
     ///
     /// Perl auto-quotes a single bareword before `}`, even for keywords:
-    /// `$h{print}`, `$r->{f}` etc. all yield the string key.
+    /// `$h{print}`, `$r->{f}` etc. all yield the string key. Stryke also
+    /// auto-quotes the string-comparison and word-logical operator tokens
+    /// (`eq`, `ne`, `lt`, `gt`, `le`, `ge`, `cmp`, `and`, `or`, `not`, `x`)
+    /// here — the lexer eagerly converts those identifiers to operator tokens,
+    /// but inside `{…}` followed by `}` they're plainly hash keys.
+    /// Stryke exception: topic-slot barewords (`_`, `_<`, `_0`, `_0<`, …)
+    /// resolve to the topic value, not the literal name — `$h{_<}` ≡ `$h{$_<}`.
     fn parse_hash_subscript_key(&mut self) -> PerlResult<Expr> {
         let line = self.peek_line();
         if let Token::Ident(ref k) = self.peek().clone() {
-            if matches!(self.peek_at(1), Token::RBrace) {
+            if matches!(self.peek_at(1), Token::RBrace) && !Self::is_underscore_topic_slot(k) {
                 let s = k.clone();
                 self.advance();
                 return Ok(Expr {
                     kind: ExprKind::String(s),
+                    line,
+                });
+            }
+        }
+        if matches!(self.peek_at(1), Token::RBrace) {
+            if let Some(s) = Self::operator_keyword_to_ident_str(self.peek()) {
+                self.advance();
+                return Ok(Expr {
+                    kind: ExprKind::String(s.to_string()),
                     line,
                 });
             }
@@ -14407,6 +14458,44 @@ impl Parser {
             }
         }
         Ok(args)
+    }
+
+    /// Body of `+{ ... }` — Perl's force-hashref idiom. The opening `+` and `{`
+    /// have already been consumed. Tries the normal `KEY => VAL, …` shape first
+    /// (so `+{ a => 1, b => 2 }` is identical to `{ a => 1, b => 2 }`); on
+    /// failure falls back to "single list-yielding expression treated as a
+    /// flat key/value spread" so `+{ map { (k, v) } LIST }` works without
+    /// the user needing a temp `my %h = ...; \%h` shuffle.
+    fn parse_forced_hashref_body(&mut self, line: usize) -> PerlResult<Expr> {
+        let saved = self.pos;
+        if let Ok(pairs) = self.try_parse_hash_ref() {
+            return Ok(Expr {
+                kind: ExprKind::HashRef(pairs),
+                line,
+            });
+        }
+        // Empty `+{}` is the empty hashref.
+        self.pos = saved;
+        if matches!(self.peek(), Token::RBrace) {
+            self.advance();
+            return Ok(Expr {
+                kind: ExprKind::HashRef(vec![]),
+                line,
+            });
+        }
+        // Single expression — eval as list, flatten into key/value pairs via the
+        // existing __HASH_SPREAD__ sentinel that `ExprKind::HashRef` already
+        // handles in [`Interpreter::eval_expr`].
+        let inner = self.parse_expression()?;
+        self.expect(&Token::RBrace)?;
+        let sentinel_key = Expr {
+            kind: ExprKind::String("__HASH_SPREAD__".into()),
+            line,
+        };
+        Ok(Expr {
+            kind: ExprKind::HashRef(vec![(sentinel_key, inner)]),
+            line,
+        })
     }
 
     fn try_parse_hash_ref(&mut self) -> PerlResult<Vec<(Expr, Expr)>> {

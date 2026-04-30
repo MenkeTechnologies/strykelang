@@ -540,6 +540,13 @@ impl Compiler {
 
     /// Look up a scalar's slot index in the current scope layer (if slots are enabled).
     fn scalar_slot(&self, name: &str) -> Option<u8> {
+        // `$a` / `$b` are sort/reduce magic globals — `set_sort_pair` writes by
+        // name, so any user `my $a`/`my $b` slot binding would silently miss the
+        // per-iteration value. Force name-based access (paired with the guard in
+        // [`Self::assign_scalar_slot`] which never allocates a slot for them).
+        if name == "a" || name == "b" {
+            return None;
+        }
         if let Some(layer) = self.scope_stack.last() {
             if layer.use_slots {
                 return layer.scalar_slots.get(name).copied();
@@ -669,7 +676,17 @@ impl Compiler {
 
     /// Assign a new slot index for a scalar in the current scope layer.
     /// Returns the slot index if slots are enabled, None otherwise.
+    ///
+    /// `$a` and `$b` are special: they're the sort/reduce magic globals.
+    /// `set_sort_pair` writes by NAME, so allocating a slot for a user
+    /// `my $a`/`my $b` would make the sort comparator's slot-based reads
+    /// silently miss the per-iteration value. Force name-based access for
+    /// these two regardless of any `my` declaration. Slot lookups also
+    /// gate on this in [`Self::scalar_slot`].
     fn assign_scalar_slot(&mut self, name: &str) -> Option<u8> {
+        if name == "a" || name == "b" {
+            return None;
+        }
         if let Some(layer) = self.scope_stack.last_mut() {
             if layer.use_slots && layer.next_scalar_slot < 255 {
                 let slot = layer.next_scalar_slot;
@@ -4780,10 +4797,10 @@ impl Compiler {
             } => {
                 self.compile_boolean_rvalue_condition(condition)?;
                 let jump_else = self.emit_op(Op::JumpIfFalse(0), line, Some(root));
-                self.compile_expr(then_expr)?;
+                self.compile_expr_ctx(then_expr, ctx)?;
                 let jump_end = self.emit_op(Op::Jump(0), line, Some(root));
                 self.chunk.patch_jump_here(jump_else);
-                self.compile_expr(else_expr)?;
+                self.compile_expr_ctx(else_expr, ctx)?;
                 self.chunk.patch_jump_here(jump_end);
             }
 
@@ -6676,6 +6693,21 @@ impl Compiler {
             ExprKind::HashRef(pairs) => {
                 // `{ K => V, ... }` — keys are scalar, values are list context so ranges and
                 // slurpy constructs on the value side flatten into the built hash.
+                // Special case: a single pair with the `__HASH_SPREAD__` sentinel key is
+                // emitted by `parse_forced_hashref_body` (`+{ EXPR }`) and by the `{ %h }`
+                // hash-spread short-form. Compile the value in list context and let
+                // [`Op::MakeHashRef`] pair up the resulting list at runtime — the slow
+                // path's [`Interpreter::eval_expr`] HashRef arm handles this too via the
+                // same sentinel string.
+                if pairs.len() == 1 {
+                    if let ExprKind::String(ref k) = pairs[0].0.kind {
+                        if k == "__HASH_SPREAD__" {
+                            self.compile_expr_ctx(&pairs[0].1, WantarrayCtx::List)?;
+                            self.emit_op(Op::MakeHashRef, line, Some(root));
+                            return Ok(());
+                        }
+                    }
+                }
                 for (k, v) in pairs {
                     self.compile_expr(k)?;
                     self.compile_expr_ctx(v, WantarrayCtx::List)?;

@@ -9284,16 +9284,18 @@ impl Interpreter {
                 Ok(new_val)
             }
 
-            // Ternary
+            // Ternary — propagate wantarray context to both branches so
+            // `($a, $b) = $c ? (1, 2) : (3, 4)` evaluates the chosen branch
+            // in list context.
             ExprKind::Ternary {
                 condition,
                 then_expr,
                 else_expr,
             } => {
                 if self.eval_boolean_rvalue_condition(condition)? {
-                    self.eval_expr(then_expr)
+                    self.eval_expr_ctx(then_expr, ctx)
                 } else {
-                    self.eval_expr(else_expr)
+                    self.eval_expr_ctx(else_expr, ctx)
                 }
             }
 

@@ -894,10 +894,45 @@ impl Scope {
                 if let Some(arc) = val.as_capture_cell() {
                     return arc.read().clone();
                 }
+                // Topic-slot chain fallback: `_<`, `_<<`, … (and the `_N<+` /
+                // `_0<+` aliases) collapse to the current topic when the chain
+                // value at this frame is undef BUT a chain entry exists (set
+                // by an earlier `set_topic` shift whose pre-shift value was
+                // undef). This matches the power-user expectation that the
+                // outer-map's body sees `_<` as the iteration key, not as
+                // surprise-undef from the absent caller-side topic. The
+                // fallback only fires when the chain WAS established — at
+                // file scope (or other never-shifted contexts) `_<` stays
+                // undef, preserving the existing fan-closure invariants.
+                if val.is_undef() && Self::is_topic_chain_name(name) {
+                    return self.get_scalar("_");
+                }
                 return val.clone();
             }
         }
         PerlValue::UNDEF
+    }
+
+    /// True for the topic-chain names that should fall back to `_` when undef:
+    /// `_<`, `_<<`, `_<<<`, `_<<<<` and the `_0<+` / `_N<+` aliases.
+    #[inline]
+    fn is_topic_chain_name(name: &str) -> bool {
+        let bytes = name.as_bytes();
+        if bytes.is_empty() || bytes[0] != b'_' {
+            return false;
+        }
+        let mut i = 1;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        // Must have at least one `<` after the optional digit run.
+        if i >= bytes.len() || bytes[i] != b'<' {
+            return false;
+        }
+        while i < bytes.len() && bytes[i] == b'<' {
+            i += 1;
+        }
+        i == bytes.len()
     }
 
     /// True if any frame has a lexical scalar binding for `name` (`my` / `our` / assignment).
@@ -1148,14 +1183,34 @@ impl Scope {
     /// This declares them in the current scope (not global), suitable for sub calls.
     ///
     /// Also shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`)
-    /// down one level so nested blocks can peek up to 4 frames out. ALL
-    /// previously-activated positional slots shift in lockstep — a
-    /// `map { }` iteration inside an enclosing 3-arg sub will rotate
-    /// slots 0..2's chains so `_1<<<<` and `_2<<<<` keep their meaning
-    /// "the Nth positional arg of the closure 4 frames up". Slots beyond
-    /// the high-water mark are skipped.
+    /// down one level so nested blocks can peek up to 4 frames out — but only
+    /// the FIRST set_topic in a given frame shifts the chain. Subsequent calls
+    /// (the next iteration of `map`/`grep`/etc.) only refresh `_` and `_0` so
+    /// `_<` keeps pointing at the **outer** scope's topic, not the previous
+    /// iteration's value. Without this guard, a 2-deep `map { map { _< } }`
+    /// would see iter-1's value as `_<` on iter-2 instead of the outer key.
+    /// ALL previously-activated positional slots shift in lockstep on the
+    /// first call — a `map { }` iteration inside an enclosing 3-arg sub will
+    /// rotate slots 0..2's chains so `_1<<<<` and `_2<<<<` keep their meaning
+    /// "the Nth positional arg of the closure 4 frames up". Slots beyond the
+    /// high-water mark are skipped.
     #[inline]
     pub fn set_topic(&mut self, val: PerlValue) {
+        // If `_<` is already bound in the topmost frame, this is iteration
+        // re-entry — refresh `_` / `_0` only; preserve the chain so the
+        // enclosing scope's topic stays visible across iterations.
+        if self
+            .frames
+            .last()
+            .map(|f| f.has_scalar("_<"))
+            .unwrap_or(false)
+        {
+            self.declare_topic_slot(0, 0, val);
+            for slot in 1..=self.max_active_slot {
+                self.declare_topic_slot(slot, 0, PerlValue::UNDEF);
+            }
+            return;
+        }
         self.shift_slot_chain(0, val);
         for slot in 1..=self.max_active_slot {
             self.shift_slot_chain(slot, PerlValue::UNDEF);
