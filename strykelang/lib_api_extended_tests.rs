@@ -56,12 +56,12 @@ fn test_compat_mode_toggle() {
 }
 
 #[test]
-fn test_sqlite_cache_save_load() {
+fn test_rkyv_cache_save_load() {
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
-    let db_path = dir.path().join("test.db");
-    let cache = script_cache::ScriptCache::open(&db_path).unwrap();
+    let cache_path = dir.path().join("scripts.rkyv");
+    let cache = script_cache::ScriptCache::open(&cache_path).unwrap();
 
     let script_path = dir.path().join("test.stk");
     fs::write(&script_path, "p 42").unwrap();

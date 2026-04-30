@@ -3585,10 +3585,10 @@ fn builtin_sqlite(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Bytecode cache builtins — inspect/manage ~/.cache/stryke/scripts.db
+// Bytecode cache builtins — inspect/manage ~/.cache/stryke/scripts.rkyv
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// `cacheview` / `cv` — View cached scripts in SQLite bytecode cache.
+/// `cacheview` / `cv` — View cached scripts in the rkyv bytecode cache.
 ///
 /// Usage:
 ///   cacheview()            — list all cached scripts with stats
@@ -3598,12 +3598,9 @@ fn builtin_cacheview(args: &[PerlValue]) -> PerlResult<PerlValue> {
     use crate::script_cache;
 
     let cache = match script_cache::CACHE.as_ref() {
-        Some(c) => match c.lock() {
-            Ok(g) => g,
-            Err(_) => return Err(PerlError::runtime("cacheview: cache lock poisoned", 0)),
-        },
+        Some(c) => c,
         None => {
-            println!("Bytecode cache disabled (STRYKE_SQLITE_CACHE=0)");
+            println!("Bytecode cache disabled (STRYKE_CACHE=0)");
             return Ok(PerlValue::UNDEF);
         }
     };

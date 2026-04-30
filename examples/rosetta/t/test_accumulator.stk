@@ -3,7 +3,7 @@
 
 fn Rosetta::Accumulator::make($sum) {
     fn {
-        my $n = _[0]
+        my $n = $_[0]
         $sum += $n
         $sum
     }

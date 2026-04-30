@@ -822,12 +822,12 @@ pub struct Interpreter {
     pub vm_jit_enabled: bool,
     /// When true, [`crate::try_vm_execute`] prints bytecode disassembly to stderr before running the VM.
     pub disasm_bytecode: bool,
-    /// Sideband: precompiled [`crate::bytecode::Chunk`] loaded from SQLite cache hit. When
+    /// Sideband: precompiled [`crate::bytecode::Chunk`] loaded from a bytecode cache hit. When
     /// `Some`, [`crate::try_vm_execute`] uses it directly and skips `compile_program`. Consumed
     /// (`.take()`) on first read so re-entry compiles normally.
     pub cached_chunk: Option<crate::bytecode::Chunk>,
-    /// Sideband: script path for SQLite cache save after compilation (mtime-based).
-    pub sqlite_cache_script_path: Option<std::path::PathBuf>,
+    /// Sideband: script path for bytecode cache save after compilation (mtime-based).
+    pub cache_script_path: Option<std::path::PathBuf>,
     /// Set while stepping a `gen { }` body (`yield`).
     pub(crate) in_generator: bool,
     /// `-n`/`-p` driver: prelude only; body runs per line in [`Self::process_line_vm`].
@@ -1584,7 +1584,7 @@ impl Interpreter {
             ),
             disasm_bytecode: false,
             cached_chunk: None,
-            sqlite_cache_script_path: None,
+            cache_script_path: None,
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: None,
@@ -1794,7 +1794,7 @@ impl Interpreter {
             disasm_bytecode: self.disasm_bytecode,
             // Sideband cache fields belong to the top-level driver, not line-mode workers.
             cached_chunk: None,
-            sqlite_cache_script_path: None,
+            cache_script_path: None,
             in_generator: false,
             line_mode_skip_main: false,
             line_mode_chunk: self.line_mode_chunk.clone(),
@@ -8441,21 +8441,31 @@ impl Interpreter {
                             Some(e) => self.eval_expr(e)?.to_int(),
                             None => 1,
                         };
-                        if from_i < 0 { from_i += n }
-                        if to_i < 0   { to_i   += n }
-                        if *exclusive { to_i -= 1 }
+                        if from_i < 0 {
+                            from_i += n
+                        }
+                        if to_i < 0 {
+                            to_i += n
+                        }
+                        if *exclusive {
+                            to_i -= 1
+                        }
                         let chars: Vec<char> = s.chars().collect();
                         let mut out = String::new();
                         if step_i > 0 {
                             let mut i = from_i;
                             while i <= to_i && i < n {
-                                if i >= 0 { out.push(chars[i as usize]); }
+                                if i >= 0 {
+                                    out.push(chars[i as usize]);
+                                }
                                 i += step_i;
                             }
                         } else if step_i < 0 {
                             let mut i = from_i;
                             while i >= to_i && i >= 0 {
-                                if i < n { out.push(chars[i as usize]); }
+                                if i < n {
+                                    out.push(chars[i as usize]);
+                                }
                                 i += step_i;
                             }
                         }
@@ -9227,24 +9237,12 @@ impl Interpreter {
                             rhs.append_to(&mut s);
                             PerlValue::string(s)
                         }
-                        BinOp::Pow => {
-                            PerlValue::float(old.to_number().powf(rhs.to_number()))
-                        }
-                        BinOp::BitAnd => {
-                            PerlValue::integer(old.to_int() & rhs.to_int())
-                        }
-                        BinOp::BitOr => {
-                            PerlValue::integer(old.to_int() | rhs.to_int())
-                        }
-                        BinOp::BitXor => {
-                            PerlValue::integer(old.to_int() ^ rhs.to_int())
-                        }
-                        BinOp::ShiftLeft => {
-                            PerlValue::integer(old.to_int() << rhs.to_int())
-                        }
-                        BinOp::ShiftRight => {
-                            PerlValue::integer(old.to_int() >> rhs.to_int())
-                        }
+                        BinOp::Pow => PerlValue::float(old.to_number().powf(rhs.to_number())),
+                        BinOp::BitAnd => PerlValue::integer(old.to_int() & rhs.to_int()),
+                        BinOp::BitOr => PerlValue::integer(old.to_int() | rhs.to_int()),
+                        BinOp::BitXor => PerlValue::integer(old.to_int() ^ rhs.to_int()),
+                        BinOp::ShiftLeft => PerlValue::integer(old.to_int() << rhs.to_int()),
+                        BinOp::ShiftRight => PerlValue::integer(old.to_int() >> rhs.to_int()),
                         _ => PerlValue::float(old.to_number() + rhs.to_number()),
                     })?);
                 }
@@ -12704,7 +12702,7 @@ impl Interpreter {
                     }
                 } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     PerlValue::integer(if a == b { 1 } else { 0 })
-                } else if !crate::compat_mode() && both_non_numeric_strings_iv(&lv, &rv) {
+                } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
                     // Stryke (non-compat) sugar: `==` falls back to string
                     // compare when both operands are non-numeric strings, so
                     // `"G" == "G"` is true (Perl's `0 == 0` numeric is also
@@ -12726,7 +12724,7 @@ impl Interpreter {
             BinOp::NumNe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     PerlValue::integer(if a != b { 1 } else { 0 })
-                } else if !crate::compat_mode() && both_non_numeric_strings_iv(&lv, &rv) {
+                } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
                     PerlValue::integer(if lv.to_string() != rv.to_string() {
                         1
                     } else {

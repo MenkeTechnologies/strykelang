@@ -47,7 +47,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
-- [\[0x0F\] Bytecode Cache (SQLite)](#0x0f-bytecode-cache-sqlite)
+- [\[0x0F\] Bytecode Cache (rkyv)](#0x0f-bytecode-cache-rkyv)
 - [\[0x10\] Distributed `pmap_on` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
 - [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
 - [\[0x10b\] Agent/Controller Architecture](#0x10b-agentcontroller-architecture)
@@ -231,7 +231,7 @@ stryke prun *.stk                            # run multiple files in parallel
 stryke -j 4 *.stk                             # run multiple files in parallel (4 threads)
 stryke convert app.pl                        # convert Perl to stryke syntax with |> pipes
 stryke deconvert app.stk                     # convert stryke back to Perl syntax
-STRYKE_BC_CACHE=1 stryke app.stk             # warm starts skip parse + compile ([0x0F])
+stryke app.stk                                # warm starts skip parse + compile via ~/.cache/stryke/scripts.rkyv ([0x0F])
 ```
 
 > **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `stryke` runs it directly. `stryke 'p 42'` and `stryke -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `stryke -lane 'p $F[0]'`).
@@ -989,7 +989,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
 - **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)): `stryke build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
-- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-pec)): `STRYKE_BC_CACHE=1` skips parse + compile on warm starts via on-disk `.pec` bundles.
+- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-rkyv)): single rkyv shard at `~/.cache/stryke/scripts.rkyv` — `mmap` + zero-copy `ArchivedHashMap` lookup skips lex/parse/compile on warm starts. Disable with `STRYKE_CACHE=0`.
 - **Language server** ([\[0x11\]](#0x11-language-server-stryke-lsp)): `stryke lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
@@ -1858,13 +1858,13 @@ p fib 50             # 12586269025
 
 ---
 
-## [0x0F] BYTECODE CACHE (SQLite)
+## [0x0F] BYTECODE CACHE (rkyv)
 
-stryke stores compiled bytecode in a SQLite database at `~/.cache/stryke/scripts.db`. The first run of a script parses + compiles + persists to SQLite. Every subsequent run skips **lex, parse, and compile** entirely — just deserialize and dispatch to the VM.
+stryke stores compiled bytecode in a single rkyv shard at `~/.cache/stryke/scripts.rkyv`. The first run of a script parses + compiles + persists into the shard. Every subsequent run `mmap`s the shard, validates the archived root once, looks up the entry by canonical path in the zero-copy `ArchivedHashMap`, and skips **lex, parse, and compile** entirely.
 
 ```sh
-stryke my_app.stk              # cold: parse + compile + save to SQLite
-stryke my_app.stk              # warm: load from SQLite + dispatch (skips lex/parse/compile)
+stryke my_app.stk              # cold: parse + compile + write into the shard
+stryke my_app.stk              # warm: mmap shard + lookup + dispatch (skips lex/parse/compile)
 ```
 
 **Cache invalidation:** four conditions all evict a stored entry — no stale bytecode is ever served.
@@ -1876,7 +1876,7 @@ stryke my_app.stk              # warm: load from SQLite + dispatch (skips lex/pa
 | Pointer-width mismatch | Cross-build between 32- and 64-bit targets |
 | Binary `mtime` newer than cached entry | Rebuild stryke (any `cargo build` advances `target/debug/stryke`'s mtime) → every cached script invalidates automatically. Catches edits to `compiler.rs` / `parser.rs` / `vm.rs` that don't bump `CARGO_PKG_VERSION` |
 
-**Built-in inspection** — no SQL required:
+**Built-in inspection:**
 
 ```stk
 cacheview()                    # list all cached scripts with stats
@@ -1893,7 +1893,7 @@ cache_clear()                  # wipe the cache
 ```
 $ stryke -e 'cacheview()'
 stryke bytecode cache
-  path: ~/.cache/stryke/scripts.db
+  path: ~/.cache/stryke/scripts.rkyv
   scripts: 103 (612.45 KB)
 
 PATH                                                      PROG KB    BC KB
@@ -1904,14 +1904,14 @@ PATH                                                      PROG KB    BC KB
 
 **Tuning:**
 
-- `STRYKE_SQLITE_CACHE=0` — disable caching entirely
+- `STRYKE_CACHE=0` — disable caching entirely
 - Cache is enabled by default for file-based scripts
 - Bypassed for `-e` / `-E` one-liners (overhead > benefit for tiny scripts)
 - Bypassed for `-n` / `-p` / `--lint` / `--check` / `--ast` / `--fmt` / `--profile` modes
 
-**Format:** zstd-compressed bincode of `(Program, Chunk)` stored in SQLite with schema versioning and pointer-width checks. Upgrading stryke, recompiling stryke, or switching architectures all trigger automatic recompile of every cached script.
+**Format:** rkyv-archived `ScriptShard { header, entries: HashMap<path, ScriptEntry> }`. Entries hold per-script `(mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs, program_blob, chunk_blob)`. Inner blobs use bincode for now (`PerlValue`'s `Arc`-shared graph isn't trivially zero-copy archivable yet — phase 2 will derive `Archive` directly on `Chunk` / `Program` for full zero-copy load). Writes go through `flock` on `scripts.rkyv.lock` and atomic rename of a tmp file.
 
-**Inspired by zshrs:** same SQLite bytecode cache architecture that enables sub-30ms shell startup with millions of cached plugins.
+**Aligned with zshrs:** same rkyv shard pattern (`zshrs/src/daemon/shard.rs`) — `mmap` + `check_archived_root` + zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards with a daemon; stryke uses a single global shard since scripts are individually invoked.
 
 ---
 

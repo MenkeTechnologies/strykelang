@@ -4995,19 +4995,27 @@ impl<'a> VM<'a> {
                             let mut from_i = from.to_int();
                             let mut to_i = to.to_int();
                             let step_i = if step.is_undef() { 1 } else { step.to_int() };
-                            if from_i < 0 { from_i += n }
-                            if to_i < 0   { to_i   += n }
+                            if from_i < 0 {
+                                from_i += n
+                            }
+                            if to_i < 0 {
+                                to_i += n
+                            }
                             let mut out = String::new();
                             if step_i > 0 {
                                 let mut i = from_i;
                                 while i <= to_i && i < n {
-                                    if i >= 0 { out.push(chars[i as usize]); }
+                                    if i >= 0 {
+                                        out.push(chars[i as usize]);
+                                    }
                                     i += step_i;
                                 }
                             } else if step_i < 0 {
                                 let mut i = from_i;
                                 while i >= to_i && i >= 0 {
-                                    if i < n { out.push(chars[i as usize]); }
+                                    if i < n {
+                                        out.push(chars[i as usize]);
+                                    }
                                     i += step_i;
                                 }
                             }
