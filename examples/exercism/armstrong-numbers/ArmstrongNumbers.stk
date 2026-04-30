@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
 fn Exercism::ArmstrongNumbers::is_armstrong_number($n) {
     my $k = length "$n"
-    $n == ~> "$n" chars map { $_ ** $k } sum
+    $n == ~> "$n" chars map { _ ** $k } sum
 }

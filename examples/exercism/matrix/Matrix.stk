@@ -8,5 +8,5 @@ fn Exercism::Matrix::row($self, $idx) {
 
 fn Exercism::Matrix::column($self, $idx) {
     my @rows = split /\n/, $self->{string}
-    [map { (split / /, $_)[$idx - 1] } @rows]
+    [map { (split / /, _)[$idx - 1] } @rows]
 }

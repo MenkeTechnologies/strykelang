@@ -6,5 +6,5 @@ fn Exercism::Series::slices($args) {
     die "slice length cannot be negative" if $len < 0
     die "series cannot be empty"          if $s eq ""
     die "slice length cannot be greater than series length" if $len > length($s)
-    [map { substr($s, $_, $len) } 0..length($s) - $len]
+    [map { substr($s, _, $len) } 0..length($s) - $len]
 }

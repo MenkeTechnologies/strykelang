@@ -3,11 +3,10 @@ fn Exercism::Sieve::find_primes($limit) {
     return [] if $limit < 2
     my @sieve = (1) x ($limit + 1)
     $sieve[0] = $sieve[1] = 0
-    for my $i (2..int(sqrt($limit))) {
-        if ($sieve[$i]) {
-            my $j = $i * $i
-            while ($j <= $limit) { $sieve[$j] = 0; $j += $i }
-        }
+    for my $i (2..int sqrt $limit) {
+        next unless $sieve[$i]
+        my $j = $i * $i
+        while ($j <= $limit) { $sieve[$j] = 0; $j += $i }
     }
-    [grep { $sieve[$_] } 2..$limit]
+    [grep { $sieve[_] } 2..$limit]
 }

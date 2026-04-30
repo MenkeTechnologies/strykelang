@@ -5,7 +5,7 @@ fn Exercism::SimpleLinkedList::next       { _0->{next} }
 
 fn Exercism::SimpleLinkedList::from_array($vs) {
     my $h
-    $h = Exercism::SimpleLinkedList::new($_, $h) for rev(@$vs)
+    $h = Exercism::SimpleLinkedList::new(_, $h) for rev(@$vs)
     $h
 }
 
