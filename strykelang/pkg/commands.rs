@@ -52,7 +52,7 @@ fn print_new_help() {
     println!("  NAME/benches/             benchmark files (run with `s bench`)");
     println!("  NAME/bin/                 additional executables");
     println!("  NAME/examples/            example programs");
-    println!("  NAME/.gitignore           ignores target/, *.stkc, *.pec");
+    println!("  NAME/.gitignore           ignores target/");
 }
 
 fn print_init_help() {
@@ -156,7 +156,7 @@ fn scaffold_project(project_dir: &Path, name: &str) -> i32 {
 
     let gi = project_dir.join(".gitignore");
     if !gi.exists() {
-        let body = "# stryke build artifacts\n/target/\n*.stkc\n*.pec\n";
+        let body = "# stryke build artifacts\n/target/\n";
         if let Err(e) = std::fs::write(&gi, body) {
             eprintln!("s init: write {}: {}", gi.display(), e);
             return 1;

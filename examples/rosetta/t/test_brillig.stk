@@ -4,7 +4,7 @@
 # count distinct nonsense words from the canonical opening stanza.
 
 fn Rosetta::Brillig::words($poem) {
-    ~> $poem |> lc |> sub { my @w = _[0] =~ /\w+/g; \@w } |> sub { _[0] }
+    ~> $poem |> lc |> sub { my @w = $_[0] =~ /\w+/g; \@w } |> sub { $_[0] }
 }
 
 fn Rosetta::Brillig::nonsense($poem, $real_dict) {

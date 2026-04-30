@@ -7909,7 +7909,11 @@ impl Parser {
                         _ => false,
                     };
                     if !close_match {
-                        let want = if matches!(opener, Token::LogNot) { "!" } else { "~" };
+                        let want = if matches!(opener, Token::LogNot) {
+                            "!"
+                        } else {
+                            "~"
+                        };
                         return Err(self.syntax_err(
                             format!("expected closing `{}` for string subscript", want),
                             self.peek_line(),
@@ -11792,11 +11796,13 @@ impl Parser {
                 // `_0` is canonically aliased to `_` at every level (see
                 // `Scope::set_closure_args`).
                 //
-                // Stryke string-index sugar: `_[N]` (bareword, no sigil)
-                // means substr-of-topic, not `@_[N]`. The sigil form
-                // `$_[N]` keeps Perl's `@_`-access semantics. We dispatch
-                // here, before the generic ArrayElement path, so the AST
-                // for `_[N]` carries a `topic_string` flag.
+                // Stryke string-index sugar: `_[N]` (bareword, no sigil) is
+                // an alias for `_!N!` — char-of-topic substring. The sigil
+                // form `$_[N]` keeps Perl's `@_`-access semantics (first
+                // positional arg). We dispatch here, before the generic
+                // ArrayElement path, so the AST for `_[N]` carries the
+                // synthetic `__topicstr__$NAME` flag the interpreter / VM
+                // strip and route to char-of-string.
                 if Self::is_underscore_topic_slot(&name) {
                     if matches!(self.peek(), Token::LBracket) && self.peek_line() == line {
                         self.advance(); // [

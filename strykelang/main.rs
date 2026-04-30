@@ -1800,7 +1800,7 @@ fn main() {
     let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
 
-    // SQLite bytecode cache — mtime-based, skips lex/parse/compile on 2+ runs.
+    // rkyv bytecode cache — mtime-based, skips lex/parse/compile on 2+ runs.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
     let cache_eligible = !cli.line_mode
         && !cli.print_mode
@@ -1894,7 +1894,7 @@ fn main() {
     // Hand the cache sidebands to the interpreter so `try_vm_execute` either runs the
     // pre-compiled chunk (cache hit) or saves the freshly-compiled one (cache miss).
     interp.cached_chunk = cached_chunk;
-    interp.sqlite_cache_script_path = if needs_cache_save {
+    interp.cache_script_path = if needs_cache_save {
         Some(script_path.to_path_buf())
     } else {
         None
@@ -2011,7 +2011,7 @@ fn main() {
 /// the target machine's `perl` (which may not exist) is not consulted. `-I` at build time
 /// is not yet supported (v1); drop everything into the `rust { ... }` block instead.
 fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>) -> i32 {
-    // AOT binaries don't use SQLite cache — they're self-contained and parse/compile on every run.
+    // AOT binaries don't use the rkyv cache — they're self-contained and parse/compile on every run.
     let program = match stryke::parse_with_file(&embedded.source, &embedded.name) {
         Ok(p) => p,
         Err(e) => {

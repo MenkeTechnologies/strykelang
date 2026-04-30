@@ -265,11 +265,11 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 
 /// Try to compile and run via bytecode VM. Returns None if compilation fails.
 ///
-/// **SQLite bytecode cache.** When `interp.cached_chunk` is populated (from a SQLite
-/// cache hit), this function skips `compile_program` entirely and runs the preloaded
-/// chunk. On cache miss the compiler runs normally and, if `interp.sqlite_cache_script_path`
-/// is set, the fresh chunk + program are persisted to SQLite so the next run skips
-/// lex/parse/compile entirely.
+/// **rkyv bytecode cache.** When `interp.cached_chunk` is populated (from a cache
+/// hit), this function skips `compile_program` entirely and runs the preloaded
+/// chunk. On cache miss the compiler runs normally and, if `interp.cache_script_path`
+/// is set, the fresh chunk + program are persisted to the rkyv shard so the next
+/// run skips lex/parse/compile entirely.
 pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut Interpreter,
@@ -278,7 +278,7 @@ pub fn try_vm_execute(
         return Some(Err(e));
     }
 
-    // Fast path: chunk loaded from SQLite cache hit. Consume the slot with `.take()` so a
+    // Fast path: chunk loaded from the bytecode cache hit. Consume the slot with `.take()` so a
     // subsequent re-entry (e.g. nested `do FILE`) does not reuse a stale chunk.
     if let Some(chunk) = interp.cached_chunk.take() {
         return Some(run_compiled_chunk(chunk, interp));
@@ -304,16 +304,16 @@ pub fn try_vm_execute(
         }
     };
 
-    // Save to SQLite cache (mtime-based, skips lex/parse/compile on 2+ runs)
-    if let Some(path) = interp.sqlite_cache_script_path.take() {
+    // Save to the bytecode cache (mtime-based, skips lex/parse/compile on 2+ runs)
+    if let Some(path) = interp.cache_script_path.take() {
         let _ = script_cache::try_save(&path, program, &chunk);
     }
     Some(run_compiled_chunk(chunk, interp))
 }
 
 /// Shared execution tail used by both the cache-hit and compile paths in
-/// [`try_vm_execute`]. Pulled out so the `.pec` fast path does not duplicate the
-/// flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
+/// [`try_vm_execute`]. Pulled out so the rkyv-cache fast path does not duplicate
+/// the flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
 fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlResult<PerlValue> {
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
@@ -807,6 +807,9 @@ mod builtins_extended_tests;
 
 #[cfg(test)]
 mod lib_api_extended_tests;
+
+#[cfg(test)]
+mod cache_bench;
 
 #[cfg(test)]
 mod parallel_api_tests;
