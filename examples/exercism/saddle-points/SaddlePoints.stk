@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 fn Exercism::SaddlePoints::saddle_points($m) {
-    my $rows = len(@$m)
+    my $rows = 0 + @$m
     return [] if $rows == 0
-    my $cols = len(@{$m->[0]})
-    my @row_max = map { max(@{$m->[$_]}) } 0..$rows - 1
+    my $cols = 0 + @{$m->[0]}
+    my @row_max = map { my $r = $m->[$_]; max(@$r) } 0..$rows - 1
     my @col_min = map {
         my $c = $_
         min(map { $m->[$_][$c] } 0..$rows - 1)

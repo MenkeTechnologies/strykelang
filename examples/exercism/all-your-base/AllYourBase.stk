@@ -2,16 +2,11 @@
 fn Exercism::AllYourBase::rebase($digits, $bin, $bout) {
     die "input base must be >= 2"  if $bin  < 2
     die "output base must be >= 2" if $bout < 2
-    for my $d (@$digits) {
-        die "all digits must satisfy 0 <= d < input base" if $d < 0 || $d >= $bin
-    }
+    die "all digits must satisfy 0 <= d < input base" if grep { $_ < 0 || $_ >= $bin } @$digits
     my $sum = 0
     $sum = $sum * $bin + $_ for @$digits
     return [0] if $sum == 0
     my @out
-    while ($sum > 0) {
-        unshift @out, $sum % $bout
-        $sum = int($sum / $bout)
-    }
+    while ($sum > 0) { unshift @out, $sum % $bout; $sum = int($sum / $bout) }
     \@out
 }

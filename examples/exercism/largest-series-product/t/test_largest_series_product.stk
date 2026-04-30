@@ -7,7 +7,7 @@ assert_eq Exercism::LargestSeriesProduct::largest_product("0123456789", 3),     
 assert_eq Exercism::LargestSeriesProduct::largest_product("1027839564", 3),         270,   "another three"
 assert_eq Exercism::LargestSeriesProduct::largest_product("0123456789", 5),         15120, "five-digit"
 assert_eq Exercism::LargestSeriesProduct::largest_product("73167176531330624919225119674426574742355349194934", 6), 23520, "long input"
-assert_eq Exercism::LargestSeriesProduct::largest_product("52677741234314237566414902593461595376319419139427824987755201922298806378723", 10), 28350000, "long input 10"
+assert_eq Exercism::LargestSeriesProduct::largest_product("52677741234314237566414902593461595376319419139427824987755201922298806378723", 10), 39513600, "long input 10"
 assert_eq Exercism::LargestSeriesProduct::largest_product("12345", 1),              5,     "one-digit"
 assert_eq Exercism::LargestSeriesProduct::largest_product("",       0),             1,     "empty zero-window"
 assert_eq Exercism::LargestSeriesProduct::largest_product("123",    0),             1,     "zero-window"

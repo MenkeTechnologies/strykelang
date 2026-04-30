@@ -8,10 +8,10 @@ assert_eq Exercism::CryptoSquare::cipher("If man was meant to stay on the ground
     "imtgdvs fearwer mayoogo anouuio ntnnlvt wttddes aohghn  sseoau ",
     "long sentence"
 assert_eq Exercism::CryptoSquare::cipher("Have a nice day. Feed the dog & chill out!"),
-    "haptcl aefeh icduo vego  edno  ydlu ",
+    "hifei acedl veeol eddgo aatcu nyhht",
     "punctuation"
 assert_eq Exercism::CryptoSquare::cipher("Madness, and then illumination."),
-    "msemo aanin dnin  nthu  esla  sdic ",
+    "msemo aanin dnin  ndla  etlt  shui ",
     "another"
 
 test_run

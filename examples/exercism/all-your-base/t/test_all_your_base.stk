@@ -3,14 +3,14 @@ require "./AllYourBase.stk"
 
 fn j { join(",", @{Exercism::AllYourBase::rebase($_[0], $_[1], $_[2])}) }
 
-assert_eq j([1,1,0,1,1], 2, 10),         "27",         "binary to decimal"
-assert_eq j([2,1,0,1,2], 3, 10),         "201",        "trinary to decimal"
-assert_eq j([1,2,3], 10, 2),             "1,1,1,1,0,1,1,1",  "decimal to binary"
-assert_eq j([3], 10, 2),                 "1,1",        "1 digit"
-assert_eq j([0], 10, 2),                 "0",          "zero in"
-assert_eq j([0,0,0], 10, 2),             "0",          "leading zeros"
-assert_eq j([2,1,0,1,2], 3, 16),         "c,9",        "trinary to hex"
-assert_eq j([1,12,9], 16, 10),           "297",        "hex-style to decimal"
+assert_eq j([1,1,0,1,1], 2, 10),         "2,7",          "binary to decimal"
+assert_eq j([2,1,0,1,2], 3, 10),         "1,9,4",        "trinary to decimal"
+assert_eq j([1,2,3], 10, 2),             "1,1,1,1,0,1,1","decimal to binary"
+assert_eq j([3], 10, 2),                 "1,1",          "1 digit"
+assert_eq j([0], 10, 2),                 "0",            "zero in"
+assert_eq j([0,0,0], 10, 2),             "0",            "leading zeros"
+assert_eq j([2,1,0,1,2], 3, 16),         "12,2",         "trinary to hex (digit list)"
+assert_eq j([1,12,9], 16, 10),           "4,5,7",        "hex-style to decimal"
 
 my $err = eval { Exercism::AllYourBase::rebase([2], 1, 10); 0 } || $@
 assert_ok $err =~ /input base/, "input base must be >= 2"

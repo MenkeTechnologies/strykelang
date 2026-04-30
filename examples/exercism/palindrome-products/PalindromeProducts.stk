@@ -1,28 +1,18 @@
 #!/usr/bin/env stryke
 fn Exercism::PalindromeProducts::_pal { "$_[0]" eq join("", rev chars("$_[0]")) }
 
-fn Exercism::PalindromeProducts::smallest($min, $max) {
+fn Exercism::PalindromeProducts::_search($min, $max, $want_largest) {
     die "min must be <= max" if $min > $max
     my $best
     for my $a ($min..$max) {
         for my $b ($a..$max) {
             my $p = $a * $b
-            next if defined $best && $p >= $best->{value}
+            next if defined $best && ($want_largest ? $p <= $best->{value} : $p >= $best->{value})
             $best = { value => $p, factors => [$a, $b] } if Exercism::PalindromeProducts::_pal($p)
         }
     }
     $best // { value => undef, factors => [] }
 }
 
-fn Exercism::PalindromeProducts::largest($min, $max) {
-    die "min must be <= max" if $min > $max
-    my $best
-    for my $a ($min..$max) {
-        for my $b ($a..$max) {
-            my $p = $a * $b
-            next if defined $best && $p <= $best->{value}
-            $best = { value => $p, factors => [$a, $b] } if Exercism::PalindromeProducts::_pal($p)
-        }
-    }
-    $best // { value => undef, factors => [] }
-}
+fn Exercism::PalindromeProducts::smallest($min, $max) { Exercism::PalindromeProducts::_search($min, $max, 0) }
+fn Exercism::PalindromeProducts::largest($min, $max)  { Exercism::PalindromeProducts::_search($min, $max, 1) }

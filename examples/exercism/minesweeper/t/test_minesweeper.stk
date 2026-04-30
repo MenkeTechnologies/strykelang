@@ -20,7 +20,7 @@ assert_eq j(Exercism::Minesweeper::annotate(["**"," "])),
     "two corner mines"
 
 assert_eq j(Exercism::Minesweeper::annotate(["* * *"," * * "])),
-    "*3*3*\n3*5*3",
+    "*3*3*\n2*3*2",
     "many mines"
 
 test_run

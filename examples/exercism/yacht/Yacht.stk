@@ -2,11 +2,11 @@
 my %_NUM = (ones=>1, twos=>2, threes=>3, fours=>4, fives=>5, sixes=>6)
 
 fn Exercism::Yacht::score($dice, $cat) {
-    my @d = sort { $a <=> $b } @$dice
+    my @d = sort { _0 <=> _1 } @$dice
     my %cnt; $cnt{$_}++ for @d
     return $cat eq "yacht"          ? (len(keys %cnt) == 1 ? 50 : 0)
          : exists $_NUM{$cat}       ? ($cnt{$_NUM{$cat}} // 0) * $_NUM{$cat}
-         : $cat eq "full house"     ? (len(keys %cnt) == 2 && (sort { $a <=> $b } values %cnt)[0] == 2 ? sum(@d) : 0)
+         : $cat eq "full house"     ? (len(keys %cnt) == 2 && (sort { _0 <=> _1 } values %cnt)[0] == 2 ? sum(@d) : 0)
          : $cat eq "four of a kind" ? (max(values %cnt) >= 4 ? (grep { $cnt{$_} >= 4 } keys %cnt)[0] * 4 : 0)
          : $cat eq "little straight"? (join(",", @d) eq "1,2,3,4,5" ? 30 : 0)
          : $cat eq "big straight"   ? (join(",", @d) eq "2,3,4,5,6" ? 30 : 0)

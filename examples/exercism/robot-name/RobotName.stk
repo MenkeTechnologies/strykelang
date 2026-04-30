@@ -1,26 +1,18 @@
 #!/usr/bin/env stryke
 my %_USED
 
-fn Exercism::RobotName::_random() {
+fn Exercism::RobotName::_random {
     my $letters = join "", map { chr(ord("A") + int(rand 26)) } 1..2
-    my $digits  = sprintf("%03d", int(rand 1000))
-    "$letters$digits"
+    sprintf("%s%03d", $letters, int(rand 1000))
 }
 
-fn Exercism::RobotName::new() {
-    my $name
-    do { $name = Exercism::RobotName::_random() } while exists $_USED{$name}
-    $_USED{$name} = 1
-    { name => $name }
+fn Exercism::RobotName::_unique {
+    my $n = Exercism::RobotName::_random()
+    while ($_USED{$n}) { $n = Exercism::RobotName::_random() }
+    $_USED{$n} = 1
+    $n
 }
 
-fn Exercism::RobotName::name { $_[0]->{name} }
-
-fn Exercism::RobotName::reset_name($r) {
-    delete $_USED{$r->{name}}
-    my $name
-    do { $name = Exercism::RobotName::_random() } while exists $_USED{$name}
-    $_USED{$name} = 1
-    $r->{name} = $name
-    $r
-}
+fn Exercism::RobotName::new        { { name => Exercism::RobotName::_unique() } }
+fn Exercism::RobotName::name       { _0->{name} }
+fn Exercism::RobotName::reset_name { my $r = _0; delete $_USED{$r->{name}}; $r->{name} = Exercism::RobotName::_unique(); $r }

@@ -7873,6 +7873,57 @@ impl Parser {
                         }
                     };
                 }
+                Token::LogNot | Token::BitNot => {
+                    // Stryke universal string-subscript sugar — paired `!…!`
+                    // OR paired `~…~`: `$VAR!N!`, `$VAR~N~`, `$VAR!1:5:2!`,
+                    // `_!N!`, `_~from:to:step~`. Returns substring of the
+                    // scalar (Unicode chars).  Distinct from `[N]` which has
+                    // Perl's `@VAR[N]` / `$_[N]` semantics. Both forms work on
+                    // any scalar (named or topic) without colliding: `!` and
+                    // `~` after a value have no current postfix meaning (`!=`
+                    // / `!~` are pre-merged binary tokens; `~` is prefix-only
+                    // bit-not). The opening and closing delimiter must match.
+                    //
+                    // Implementation: rewrite to ArrayElement with a
+                    // synthetic name `__topicstr__$NAME`. The interpreter
+                    // and VM strip the prefix and dispatch to char-of-string
+                    // (and slice-of-string for Range indices).
+                    if !matches!(expr.kind, ExprKind::ScalarVar(_)) {
+                        break;
+                    }
+                    if self.peek_line() > self.prev_line() {
+                        break;
+                    }
+                    let opener = self.peek().clone();
+                    let line = expr.line;
+                    let name = if let ExprKind::ScalarVar(ref n) = expr.kind {
+                        n.clone()
+                    } else {
+                        unreachable!()
+                    };
+                    self.advance(); // consume opening `!` or `~`
+                    let index = self.parse_expression()?;
+                    let close_match = match (&opener, self.peek()) {
+                        (Token::LogNot, Token::LogNot) => true,
+                        (Token::BitNot, Token::BitNot) => true,
+                        _ => false,
+                    };
+                    if !close_match {
+                        let want = if matches!(opener, Token::LogNot) { "!" } else { "~" };
+                        return Err(self.syntax_err(
+                            format!("expected closing `{}` for string subscript", want),
+                            self.peek_line(),
+                        ));
+                    }
+                    self.advance(); // consume closing delimiter
+                    expr = Expr {
+                        kind: ExprKind::ArrayElement {
+                            array: format!("__topicstr__{}", name),
+                            index: Box::new(index),
+                        },
+                        line,
+                    };
+                }
                 _ => break,
             }
         }
@@ -11740,7 +11791,25 @@ impl Parser {
                 // `_0<<<<`, `_1<<<<`, `_N<<<<` (N positionals × 5 levels).
                 // `_0` is canonically aliased to `_` at every level (see
                 // `Scope::set_closure_args`).
+                //
+                // Stryke string-index sugar: `_[N]` (bareword, no sigil)
+                // means substr-of-topic, not `@_[N]`. The sigil form
+                // `$_[N]` keeps Perl's `@_`-access semantics. We dispatch
+                // here, before the generic ArrayElement path, so the AST
+                // for `_[N]` carries a `topic_string` flag.
                 if Self::is_underscore_topic_slot(&name) {
+                    if matches!(self.peek(), Token::LBracket) && self.peek_line() == line {
+                        self.advance(); // [
+                        let index = self.parse_expression()?;
+                        self.expect(&Token::RBracket)?;
+                        return Ok(Expr {
+                            kind: ExprKind::ArrayElement {
+                                array: format!("__topicstr__{}", name),
+                                index: Box::new(index),
+                            },
+                            line,
+                        });
+                    }
                     return Ok(Expr {
                         kind: ExprKind::ScalarVar(name.clone()),
                         line,

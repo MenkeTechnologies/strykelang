@@ -2,10 +2,10 @@
 require "./OcrNumbers.stk"
 
 assert_eq Exercism::OcrNumbers::convert([
-    "    ",
-    "  | ",
-    "  | ",
-    "    ",
+    "   ",
+    "  |",
+    "  |",
+    "   ",
 ]), "1", "one"
 
 assert_eq Exercism::OcrNumbers::convert([
@@ -23,29 +23,29 @@ assert_eq Exercism::OcrNumbers::convert([
 ]), "3", "three"
 
 assert_eq Exercism::OcrNumbers::convert([
-    " _  _ ",
+    "    _ ",
     "  | _|",
     "  ||_ ",
     "      ",
 ]), "12", "twelve"
 
 assert_eq Exercism::OcrNumbers::convert([
-    " _  _  _  _  _  _  _  _  _ ",
-    "  ||_|  | _||_| _||_|  ||_|",
-    "  ||_|  ||_  _|  | _|  | _|",
-    "                           ",
+    "    _  _     _  _  _  _  _  _ ",
+    "  | _| _||_||_ |_   ||_||_|| |",
+    "  ||_  _|  | _||_|  ||_| _||_|",
+    "                              ",
 ]), "1234567890", "all digits"
 
 # Multiple rows
 assert_eq Exercism::OcrNumbers::convert([
-    "    ",
-    "  | ",
-    "  | ",
-    "    ",
-    " _  ",
-    " _| ",
-    "|_  ",
-    "    ",
+    "   ",
+    "  |",
+    "  |",
+    "   ",
+    " _ ",
+    " _|",
+    "|_ ",
+    "   ",
 ]), "1,2", "stacked"
 
 my $err = eval { Exercism::OcrNumbers::convert(["   "]); 0 } || $@
