@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Elias gamma coding — universal code for positive ints.
+# Encode N: write floor(log2 N) zeros, then the binary repr of N (which
+# starts with 1). So 1 → "1", 2 → "010", 3 → "011", 4 → "00100", 5 → "00101", ...
+
+fn Rosetta::EliasGamma::log2_floor($n) {
+    my $r = 0
+    my $x = $n
+    while ($x > 1) { $x = $x >> 1; $r++ }
+    $r
+}
+
+fn Rosetta::EliasGamma::to_binary($n) {
+    return "0" if $n == 0
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = ($x & 1) . $s
+        $x = $x >> 1
+    }
+    $s
+}
+
+fn Rosetta::EliasGamma::encode($n) {
+    return undef if $n < 1
+    my $bits = Rosetta::EliasGamma::log2_floor($n)
+    ("0" x $bits) . Rosetta::EliasGamma::to_binary($n)
+}
+
+fn Rosetta::EliasGamma::encode_list($xs) {
+    join("", ~> 0:len(@$xs) - 1 |> map { Rosetta::EliasGamma::encode($xs->[_0]) })
+}
+
+fn Rosetta::EliasGamma::decode_one($s, $pos_ref) {
+    my $i = $$pos_ref
+    return undef if $i >= length($s)
+    # Count leading zeros.
+    my $zeros = 0
+    while ($i + $zeros < length($s) && substr($s, $i + $zeros, 1) eq "0") { $zeros++ }
+    my $total = 2 * $zeros + 1
+    return undef if $i + $total > length($s)
+    my $bits = substr($s, $i + $zeros, $zeros + 1)
+    my $val = 0
+    for my $c (split(//, $bits)) { $val = $val * 2 + ($c eq "1" ? 1 : 0) }
+    $$pos_ref = $i + $total
+    $val
+}
+
+fn Rosetta::EliasGamma::decode_list($s) {
+    my $pos = 0
+    my @out
+    while ($pos < length($s)) {
+        my $v = Rosetta::EliasGamma::decode_one($s, \$pos)
+        last if !defined $v
+        push @out, $v
+    }
+    \@out
+}
+
+# Reference table from the Wikipedia Elias gamma article.
+my @canonical = (
+    [1,  "1"],
+    [2,  "010"],
+    [3,  "011"],
+    [4,  "00100"],
+    [5,  "00101"],
+    [6,  "00110"],
+    [7,  "00111"],
+    [8,  "0001000"],
+    [9,  "0001001"],
+    [15, "0001111"],
+    [16, "000010000"],
+    [17, "000010001"],
+    [255, "000000011111111"]
+)
+for my $pair (@canonical) {
+    my ($n, $expected) = @$pair
+    assert_eq Rosetta::EliasGamma::encode($n), $expected, "encode($n)"
+}
+
+# Round-trip
+my @nums = (1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144)
+my $stream = Rosetta::EliasGamma::encode_list(\@nums)
+my $back = Rosetta::EliasGamma::decode_list($stream)
+assert_eq join(",", @$back), join(",", @nums), "round trip Fibonacci-ish"
+
+# Single-value round trip
+for my $n (1, 17, 100, 1000, 65536) {
+    my $enc = Rosetta::EliasGamma::encode($n)
+    my $pos = 0
+    my $dec = Rosetta::EliasGamma::decode_one($enc, \$pos)
+    assert_eq $dec, $n, "single $n round-trip"
+}
+
+# Helper sanity
+assert_eq Rosetta::EliasGamma::log2_floor(1), 0, "log2 1"
+assert_eq Rosetta::EliasGamma::log2_floor(7), 2, "log2 7"
+assert_eq Rosetta::EliasGamma::log2_floor(256), 8, "log2 256"
+assert_eq Rosetta::EliasGamma::to_binary(1), "1", "binary 1"
+assert_eq Rosetta::EliasGamma::to_binary(13), "1101", "binary 13"
+
+test_run

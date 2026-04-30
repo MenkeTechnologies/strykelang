@@ -1,0 +1,140 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hopcroft-Karp algorithm for maximum bipartite matching.
+# O(E·sqrt(V)). Graph is given as adjacency for the U-side: u → list of
+# adjacent v's. Returns the matching as a hash u → v (only matched u's).
+
+# pair_u[u] = v if u is matched, else undef. pair_v{v} = u if v matched, else undef.
+my $INF = 1 << 30
+
+fn Rosetta::HK::bfs($adj, $u_n, $pair_u, $pair_v, $dist) {
+    my @queue
+    for my $u (~> 1:$u_n) {
+        if (!defined $pair_u->[$u]) {
+            $dist->[$u] = 0
+            push @queue, $u
+        } else {
+            $dist->[$u] = $INF
+        }
+    }
+    my $found = 0
+    while (len(@queue) > 0) {
+        my $u = shift @queue
+        for my $v (@{$adj->[$u]}) {
+            my $pair = $pair_v->{$v}
+            if (!defined $pair) {
+                $found = 1
+            } elsif ($dist->[$pair] == $INF) {
+                $dist->[$pair] = $dist->[$u] + 1
+                push @queue, $pair
+            }
+        }
+    }
+    $found
+}
+
+fn Rosetta::HK::dfs($adj, $u, $pair_u, $pair_v, $dist) {
+    for my $v (@{$adj->[$u]}) {
+        my $pair = $pair_v->{$v}
+        my $ok = 0
+        if (!defined $pair) {
+            $ok = 1
+        } elsif ($dist->[$pair] == $dist->[$u] + 1) {
+            $ok = Rosetta::HK::dfs($adj, $pair, $pair_u, $pair_v, $dist)
+        }
+        if ($ok) {
+            $pair_v->{$v} = $u
+            $pair_u->[$u] = $v
+            return 1
+        }
+    }
+    $dist->[$u] = $INF
+    0
+}
+
+fn Rosetta::HK::match($u_count, $adj_in) {
+    # adj_in is hashref u_index => arrayref of v-keys.
+    # 1-based u indexing internally; v indexed by hash key.
+    my @adj
+    push @adj, []   # slot 0
+    for my $u (~> 1:$u_count) {
+        my $list = $adj_in->{$u} // []
+        push @adj, $list
+    }
+    my @pair_u = ~> 0:$u_count |> map { undef }
+    my %pair_v
+    my @dist = ~> 0:$u_count |> map { $INF }
+    while (Rosetta::HK::bfs(\@adj, $u_count, \@pair_u, \%pair_v, \@dist)) {
+        for my $u (~> 1:$u_count) {
+            if (!defined $pair_u[$u]) {
+                Rosetta::HK::dfs(\@adj, $u, \@pair_u, \%pair_v, \@dist)
+            }
+        }
+    }
+    my %matching
+    for my $u (~> 1:$u_count) {
+        $matching{$u} = $pair_u[$u] if defined $pair_u[$u]
+    }
+    \%matching
+}
+
+fn Rosetta::HK::size($m) { len(keys %$m) }
+
+# K_{3,3} (complete bipartite): max matching = 3
+my $adj1 = {
+    1 => ["a", "b", "c"],
+    2 => ["a", "b", "c"],
+    3 => ["a", "b", "c"]
+}
+my $m1 = Rosetta::HK::match(3, $adj1)
+assert_eq Rosetta::HK::size($m1), 3, "K_3,3 max matching = 3"
+
+# Bipartite path: 1-a-2-b-3-c (alternating). Max matching = 3 (1→a, 2→b, 3→c).
+my $adj2 = {
+    1 => ["a"],
+    2 => ["a", "b"],
+    3 => ["b", "c"]
+}
+my $m2 = Rosetta::HK::match(3, $adj2)
+assert_eq Rosetta::HK::size($m2), 3, "path-like K_{3,3} subgraph"
+
+# Forces augmenting paths: u1→v1, u2→v1,v2, u3→v2 — max = 3 won't fit, max = 2
+# Wait — 3 u's, 2 v's used, max possible = 2. Let's verify.
+my $adj3 = {
+    1 => ["a"],
+    2 => ["a", "b"],
+    3 => ["b"]
+}
+my $m3 = Rosetta::HK::match(3, $adj3)
+assert_eq Rosetta::HK::size($m3), 2, "3 u's, 2 v's"
+
+# König / DAG: u1-a, u2-a, u2-b, u3-b -> matching = 2
+my $adj4 = {
+    1 => ["a"],
+    2 => ["a", "b"],
+    3 => ["b"]
+}
+my $m4 = Rosetta::HK::match(3, $adj4)
+assert_eq Rosetta::HK::size($m4), 2, "duplicate of adj3"
+
+# Larger: 6 u's, 6 v's, custom edge set.
+my $adj5 = {
+    1 => ["a", "b"],
+    2 => ["a", "c"],
+    3 => ["b", "d"],
+    4 => ["c", "e"],
+    5 => ["d", "f"],
+    6 => ["e", "f"]
+}
+my $m5 = Rosetta::HK::match(6, $adj5)
+assert_eq Rosetta::HK::size($m5), 6, "6x6 perfect matching"
+
+# Disconnected: u1-a, u2-b, u3 isolated → matching = 2
+my $adj6 = {
+    1 => ["a"],
+    2 => ["b"],
+    3 => []
+}
+my $m6 = Rosetta::HK::match(3, $adj6)
+assert_eq Rosetta::HK::size($m6), 2, "isolated u3"
+
+test_run

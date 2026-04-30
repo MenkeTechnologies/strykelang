@@ -1,0 +1,153 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 2-SAT — decide satisfiability of a conjunction of
+# 2-literal disjunctions. Reduces to: build the implication graph
+# (a∨b ⇒ ¬a→b and ¬b→a), find SCCs, then a satisfying assignment
+# exists iff x and ¬x are not in the same SCC. Variable x is true
+# iff its SCC is later in the topological order than ¬x's.
+
+# Variables 1..n; literal +x means x, -x means ¬x.
+# Encoded as node 2*(x-1) for x and 2*(x-1)+1 for ¬x.
+
+fn Rosetta::TwoSat::lit_node($lit) {
+    my $v = $lit < 0 ? -$lit : $lit
+    my $base = 2 * ($v - 1)
+    $lit > 0 ? $base : $base + 1
+}
+
+fn Rosetta::TwoSat::neg($node) { $node ^ 1 }
+
+fn Rosetta::TwoSat::build_graph($n_vars, $clauses) {
+    my $n = 2 * $n_vars
+    my @adj
+    my @rev
+    for my $i (~> 1:$n) {
+        push @adj, []
+        push @rev, []
+    }
+    for my $c (@$clauses) {
+        my ($a, $b) = @$c
+        my $na = Rosetta::TwoSat::lit_node($a)
+        my $nb = Rosetta::TwoSat::lit_node($b)
+        my $not_a = Rosetta::TwoSat::neg($na)
+        my $not_b = Rosetta::TwoSat::neg($nb)
+        # ¬a → b and ¬b → a
+        push @{$adj[$not_a]}, $nb
+        push @{$rev[$nb]}, $not_a
+        push @{$adj[$not_b]}, $na
+        push @{$rev[$na]}, $not_b
+    }
+    { adj => \@adj, rev => \@rev, n => $n }
+}
+
+fn Rosetta::TwoSat::dfs1($adj, $u, $visited, $order) {
+    my @stack = ([$u, 0])
+    while (len(@stack) > 0) {
+        my $top = $stack[-1]
+        my ($v, $idx) = @$top
+        if (!$visited->[$v]) { $visited->[$v] = 1 }
+        my $children = $adj->[$v]
+        if ($idx < len(@$children)) {
+            $top->[1]++
+            my $w = $children->[$idx]
+            push @stack, [$w, 0] if !$visited->[$w]
+        } else {
+            push @$order, $v
+            pop @stack
+        }
+    }
+}
+
+fn Rosetta::TwoSat::dfs2($rev, $u, $comp, $cid) {
+    my @stack = ($u)
+    while (len(@stack) > 0) {
+        my $v = pop @stack
+        next if defined $comp->[$v]
+        $comp->[$v] = $cid
+        for my $w (@{$rev->[$v]}) {
+            push @stack, $w if !defined $comp->[$w]
+        }
+    }
+}
+
+fn Rosetta::TwoSat::scc($g) {
+    my $n = $g->{n}
+    my @visited = ~> 1:$n |> map { 0 }
+    my @order
+    for my $u (~> 0:$n - 1) {
+        Rosetta::TwoSat::dfs1($g->{adj}, $u, \@visited, \@order) if !$visited[$u]
+    }
+    my @comp = ~> 1:$n |> map { undef }
+    my $cid = 0
+    for (my $i = $n - 1; $i >= 0; $i--) {
+        my $u = $order[$i]
+        if (!defined $comp[$u]) {
+            Rosetta::TwoSat::dfs2($g->{rev}, $u, \@comp, $cid)
+            $cid++
+        }
+    }
+    \@comp
+}
+
+fn Rosetta::TwoSat::solve($n_vars, $clauses) {
+    my $g = Rosetta::TwoSat::build_graph($n_vars, $clauses)
+    my $comp = Rosetta::TwoSat::scc($g)
+    my @assign
+    for my $v (~> 1:$n_vars) {
+        my $pos = 2 * ($v - 1)
+        my $neg = $pos + 1
+        return undef if $comp->[$pos] == $comp->[$neg]
+        # Variable is true iff its positive node has a later (higher
+        # number) component in the reverse topological order.
+        push @assign, $comp->[$pos] > $comp->[$neg] ? 1 : 0
+    }
+    \@assign
+}
+
+fn Rosetta::TwoSat::satisfies($assignment, $clauses) {
+    for my $c (@$clauses) {
+        my ($a, $b) = @$c
+        my $va = $a > 0 ? $assignment->[$a - 1] : !$assignment->[-$a - 1]
+        my $vb = $b > 0 ? $assignment->[$b - 1] : !$assignment->[-$b - 1]
+        return 0 if !$va && !$vb
+    }
+    1
+}
+
+# Satisfiable: (x1 ∨ x2) ∧ (¬x1 ∨ x2)
+my $cl1 = [[1, 2], [-1, 2]]
+my $r1 = Rosetta::TwoSat::solve(2, $cl1)
+assert_ok defined $r1, "satisfiable case yields assignment"
+assert_eq Rosetta::TwoSat::satisfies($r1, $cl1), 1, "x1∨x2 ∧ ¬x1∨x2 satisfied"
+
+# Unsatisfiable: (x1 ∨ x1) ∧ (¬x1 ∨ ¬x1) — forces x1 ∧ ¬x1
+my $cl2 = [[1, 1], [-1, -1]]
+my $r2 = Rosetta::TwoSat::solve(1, $cl2)
+assert_ok !defined $r2, "x ∧ ¬x is unsatisfiable"
+
+# Larger satisfiable case
+my $cl3 = [[1, 2], [-1, 3], [2, -3], [-2, 3], [3, 1]]
+my $r3 = Rosetta::TwoSat::solve(3, $cl3)
+assert_ok defined $r3, "5-clause/3-var case satisfiable"
+assert_eq Rosetta::TwoSat::satisfies($r3, $cl3), 1, "5-clause assignment satisfies all"
+
+# Forced assignment: (x1 ∨ x1) forces x1=true
+my $cl4 = [[1, 1]]
+my $r4 = Rosetta::TwoSat::solve(1, $cl4)
+assert_eq $r4->[0], 1, "forced x1 = true"
+
+# Equivalence chain: x1↔x2↔x3 all true via implications
+my $cl5 = [[1, 1], [-1, 2], [-2, 3]]
+my $r5 = Rosetta::TwoSat::solve(3, $cl5)
+assert_eq $r5->[0], 1, "chain x1 = true"
+assert_eq $r5->[1], 1, "chain x2 = true"
+assert_eq $r5->[2], 1, "chain x3 = true"
+
+# Helper sanity
+assert_eq Rosetta::TwoSat::lit_node(1), 0, "lit 1 = node 0"
+assert_eq Rosetta::TwoSat::lit_node(-1), 1, "lit -1 = node 1"
+assert_eq Rosetta::TwoSat::lit_node(2), 2, "lit 2 = node 2"
+assert_eq Rosetta::TwoSat::lit_node(-3), 5, "lit -3 = node 5"
+assert_eq Rosetta::TwoSat::neg(0), 1, "neg(0) = 1"
+assert_eq Rosetta::TwoSat::neg(7), 6, "neg(7) = 6"
+
+test_run

@@ -1,0 +1,149 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HyperLogLog cardinality estimator. Uses the leading-zero
+# count of m-bucketed hash values plus the harmonic-mean correction
+# (Flajolet-Fusy-Gandouet-Meunier 2007). Constants used here are the
+# canonical ones for m = 2^p (2 ≤ p ≤ 16).
+
+fn Rosetta::HLL::u32($x) { $x & 0xFFFFFFFF }
+
+fn Rosetta::HLL::rotl32($x, $r) {
+    Rosetta::HLL::u32(($x << $r) | ($x >> (32 - $r)))
+}
+
+# MurmurHash3_x86_32 — uniform high bits, the canonical HLL hash.
+fn Rosetta::HLL::hash32($s) {
+    my @bytes = $s |> chars() |> map { ord(_) }
+    my $len = len(@bytes)
+    my $nblocks = int($len / 4)
+    my $h1 = 0
+    my $c1 = 0xcc9e2d51
+    my $c2 = 0x1b873593
+    for my $i (~> 0:$nblocks - 1) {
+        my $b = $i * 4
+        my $k1 = $bytes[$b] | ($bytes[$b + 1] << 8) | ($bytes[$b + 2] << 16) | ($bytes[$b + 3] << 24)
+        $k1 = Rosetta::HLL::u32($k1 * $c1)
+        $k1 = Rosetta::HLL::rotl32($k1, 15)
+        $k1 = Rosetta::HLL::u32($k1 * $c2)
+        $h1 = Rosetta::HLL::u32($h1 ^ $k1)
+        $h1 = Rosetta::HLL::rotl32($h1, 13)
+        $h1 = Rosetta::HLL::u32($h1 * 5 + 0xe6546b64)
+    }
+    my $tail_start = $nblocks * 4
+    my $rem = $len - $tail_start
+    my $k1 = 0
+    if ($rem == 3) { $k1 ^= ($bytes[$tail_start + 2] << 16) }
+    if ($rem >= 2) { $k1 ^= ($bytes[$tail_start + 1] << 8) }
+    if ($rem >= 1) {
+        $k1 ^= $bytes[$tail_start]
+        $k1 = Rosetta::HLL::u32($k1 * $c1)
+        $k1 = Rosetta::HLL::rotl32($k1, 15)
+        $k1 = Rosetta::HLL::u32($k1 * $c2)
+        $h1 = Rosetta::HLL::u32($h1 ^ $k1)
+    }
+    $h1 = Rosetta::HLL::u32($h1 ^ $len)
+    $h1 = Rosetta::HLL::u32($h1 ^ ($h1 >> 16))
+    $h1 = Rosetta::HLL::u32($h1 * 0x85ebca6b)
+    $h1 = Rosetta::HLL::u32($h1 ^ ($h1 >> 13))
+    $h1 = Rosetta::HLL::u32($h1 * 0xc2b2ae35)
+    $h1 = Rosetta::HLL::u32($h1 ^ ($h1 >> 16))
+    $h1
+}
+
+# Number of leading zeros in the trailing (32 - p) bits of $w, plus one.
+fn Rosetta::HLL::rho($w, $bits) {
+    my $r = 1
+    my $mask = 1 << ($bits - 1)
+    while ($mask > 0 && ($w & $mask) == 0) {
+        $r++
+        $mask >>= 1
+    }
+    $r
+}
+
+fn Rosetta::HLL::alpha($m) {
+    if ($m == 16)   { return 0.673 }
+    if ($m == 32)   { return 0.697 }
+    if ($m == 64)   { return 0.709 }
+    0.7213 / (1 + 1.079 / $m)
+}
+
+fn Rosetta::HLL::new($p) {
+    my $m = 1 << $p
+    my @reg = ~> 1:$m |> map { 0 }
+    { p => $p, m => $m, reg => \@reg }
+}
+
+fn Rosetta::HLL::add($hll, $key) {
+    my $h = Rosetta::HLL::hash32($key)
+    my $idx = $h >> (32 - $hll->{p})
+    my $tail_bits = 32 - $hll->{p}
+    my $tail_mask = (1 << $tail_bits) - 1
+    my $w = $h & $tail_mask
+    my $rho = Rosetta::HLL::rho($w, $tail_bits)
+    if ($rho > $hll->{reg}[$idx]) {
+        $hll->{reg}[$idx] = $rho
+    }
+}
+
+fn Rosetta::HLL::estimate($hll) {
+    my $m = $hll->{m}
+    my $sum = 0
+    my $zeros = 0
+    for my $r (@{$hll->{reg}}) {
+        $sum += 1 / (2 ** $r)
+        $zeros++ if $r == 0
+    }
+    my $raw = Rosetta::HLL::alpha($m) * $m * $m / $sum
+    if ($raw <= 2.5 * $m && $zeros > 0) {
+        return $m * log($m / $zeros)
+    }
+    # Large-range correction omitted; with 32-bit hash on m ≤ 4096 the
+    # raw estimate is already accurate up to ~10^7.
+    $raw
+}
+
+# Helper sanity
+assert_eq Rosetta::HLL::rho(0,        4),  5,  "rho(0)=tail+1"
+assert_eq Rosetta::HLL::rho(1,        4),  4,  "rho(0001)=4 (3 leading zeros + 1)"
+assert_eq Rosetta::HLL::rho(0b1000,   4),  1,  "rho(1000)=1"
+assert_eq Rosetta::HLL::rho(0b0100,   4),  2,  "rho(0100)=2"
+
+# Small set: 100 distinct keys with p=8 (m=256). HLL standard error is
+# 1.04 / sqrt(m) ≈ 6.5%. Allow ±25% for the small-cardinality range.
+my $hll = Rosetta::HLL::new(8)
+for my $i (~> 1:100) { Rosetta::HLL::add($hll, "key_$i") }
+my $est = Rosetta::HLL::estimate($hll)
+assert_ok $est > 75 && $est < 130, "100 unique within ±30%"
+
+# Add duplicates: estimate should not change much.
+for my $i (~> 1:100) { Rosetta::HLL::add($hll, "key_$i") }
+my $est2 = Rosetta::HLL::estimate($hll)
+assert_ok abs($est2 - $est) < 0.001, "duplicates do not change estimate"
+
+# Larger set: 1000 distinct, p=10 (m=1024).
+my $hll2 = Rosetta::HLL::new(10)
+for my $i (~> 1:1000) { Rosetta::HLL::add($hll2, "user_$i") }
+my $est3 = Rosetta::HLL::estimate($hll2)
+assert_ok $est3 > 800 && $est3 < 1200, "1000 unique within ±20%"
+
+# Two HLLs over different sets, estimates of each ~ correct.
+my $hll_a = Rosetta::HLL::new(10)
+my $hll_b = Rosetta::HLL::new(10)
+for my $i (~> 1:500) { Rosetta::HLL::add($hll_a, "a_$i") }
+for my $i (~> 1:500) { Rosetta::HLL::add($hll_b, "b_$i") }
+my $ea = Rosetta::HLL::estimate($hll_a)
+my $eb = Rosetta::HLL::estimate($hll_b)
+assert_ok $ea > 400 && $ea < 600, "set A ≈ 500"
+assert_ok $eb > 400 && $eb < 600, "set B ≈ 500"
+
+# Empty HLL estimates 0
+my $empty = Rosetta::HLL::new(8)
+assert_eq Rosetta::HLL::estimate($empty), 0, "empty estimates 0"
+
+# Single element: estimate near 1
+my $one = Rosetta::HLL::new(8)
+Rosetta::HLL::add($one, "lonely")
+my $est_one = Rosetta::HLL::estimate($one)
+assert_ok $est_one >= 0.9 && $est_one <= 1.5, "single near 1"
+
+test_run

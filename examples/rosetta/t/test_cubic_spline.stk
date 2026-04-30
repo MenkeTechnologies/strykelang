@@ -1,0 +1,97 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Natural cubic spline interpolation. Given (x_i, y_i)
+# samples, find piecewise cubics S_i(x) on [x_i, x_{i+1}] such that
+# S, S', S'' are continuous and S''(x_0) = S''(x_n) = 0.
+
+fn Rosetta::CubicSpline::build($xs, $ys) {
+    my $n = len(@$xs) - 1
+    my @h
+    for my $i (~> 0:$n - 1) { push @h, $xs->[$i + 1] - $xs->[$i] }
+    my @alpha = ~> 0:$n |> map { 0 }
+    for my $i (~> 1:$n - 1) {
+        $alpha[$i] = (3 / $h[$i]) * ($ys->[$i + 1] - $ys->[$i]) - (3 / $h[$i - 1]) * ($ys->[$i] - $ys->[$i - 1])
+    }
+    my @l = ~> 0:$n |> map { 0 }
+    my @mu = ~> 0:$n |> map { 0 }
+    my @z = ~> 0:$n |> map { 0 }
+    $l[0] = 1
+    for my $i (~> 1:$n - 1) {
+        $l[$i] = 2 * ($xs->[$i + 1] - $xs->[$i - 1]) - $h[$i - 1] * $mu[$i - 1]
+        $mu[$i] = $h[$i] / $l[$i]
+        $z[$i] = ($alpha[$i] - $h[$i - 1] * $z[$i - 1]) / $l[$i]
+    }
+    $l[$n] = 1
+    p "DEBUG z: " . join(",", @z)
+    p "DEBUG mu: " . join(",", @mu)
+    my @cc = ~> 0:$n |> map { 0 }
+    my @bb = ~> 0:$n - 1 |> map { 0 }
+    my @dd = ~> 0:$n - 1 |> map { 0 }
+    for (my $j = $n - 1; $j >= 0; $j--) {
+        $cc[$j] = $z[$j] - $mu[$j] * $cc[$j + 1]
+        $bb[$j] = ($ys->[$j + 1] - $ys->[$j]) / $h[$j] - $h[$j] * ($cc[$j + 1] + 2 * $cc[$j]) / 3
+        $dd[$j] = ($cc[$j + 1] - $cc[$j]) / (3 * $h[$j])
+    }
+    { xs => $xs, ys => $ys, b => \@bb, c => \@cc, d => \@dd, n => $n }
+}
+
+fn Rosetta::CubicSpline::evaluate($spl, $x) {
+    my $n = $spl->{n}
+    # Find segment by binary search.
+    my ($lo, $hi) = (0, $n - 1)
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi + 1) / 2)
+        if ($spl->{xs}[$mid] <= $x) { $lo = $mid }
+        else                         { $hi = $mid - 1 }
+    }
+    my $i = $lo
+    my $dx = $x - $spl->{xs}[$i]
+    $spl->{ys}[$i] + $spl->{b}[$i] * $dx + $spl->{c}[$i] * $dx * $dx + $spl->{d}[$i] * $dx * $dx * $dx
+}
+
+fn Rosetta::CubicSpline::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Spline through (0,0), (1,1), (2,4), (3,9) — y = x² interpolation.
+my $xs = [0, 1, 2, 3]
+my $ys = [0, 1, 4, 9]
+my $spl = Rosetta::CubicSpline::build($xs, $ys)
+# Spline must pass through every knot exactly.
+for my $i (~> 0:3) {
+    my $v = Rosetta::CubicSpline::evaluate($spl, $xs->[$i])
+    assert_ok Rosetta::CubicSpline::approx($v, $ys->[$i], 1e-9),
+        "knot $i: spline = y_$i"
+}
+# Mid-segment evaluation: should approximate x² closely.
+my $mid = Rosetta::CubicSpline::evaluate($spl, 1.5)
+assert_ok Rosetta::CubicSpline::approx($mid, 2.25, 0.5), "spline(1.5) ≈ 2.25"
+
+# Sin interpolation — natural spline through samples should approximate
+# sin(x) reasonably well over [0, π].
+my $pi = atan2(0, -1)
+my @xs_sin
+for my $k (~> 0:8) { push @xs_sin, $k * $pi / 8 }
+my @ys_sin = map { sin(_0) } @xs_sin
+my $sp_sin = Rosetta::CubicSpline::build(\@xs_sin, \@ys_sin)
+for my $t (0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0) {
+    my $v = Rosetta::CubicSpline::evaluate($sp_sin, $t)
+    assert_ok Rosetta::CubicSpline::approx($v, sin($t), 0.01),
+        "spline(sin) at $t close to true"
+}
+
+# Natural BC: second derivative is 0 at endpoints — verify c[0] and c[n] = 0.
+assert_ok abs($spl->{c}[0]) < 1e-9, "natural BC c[0] = 0"
+# c is length n+1, last entry is c[n].
+my $c_last_idx = $spl->{n}
+my @c_arr = @{$spl->{c}}
+assert_ok abs($c_arr[$c_last_idx]) < 1e-9, "natural BC c[n] = 0"
+
+# Linear interpolation for points lying on a line — spline collapses to line.
+my $line_xs = [0, 1, 2, 3]
+my $line_ys = [0, 2, 4, 6]
+my $sp_line = Rosetta::CubicSpline::build($line_xs, $line_ys)
+for my $x (0.5, 1.5, 2.5) {
+    my $v = Rosetta::CubicSpline::evaluate($sp_line, $x)
+    assert_ok Rosetta::CubicSpline::approx($v, 2 * $x, 1e-9),
+        "linear spline at $x = 2x"
+}
+
+test_run

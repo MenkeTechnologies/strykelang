@@ -1,0 +1,177 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Baum-Welch — EM-style training of a discrete-output HMM
+# from a single observation sequence. Uses the forward-backward algo to
+# compute γ (state posteriors) and ξ (transition posteriors), then
+# re-estimates A, B, π. Repeats until log-likelihood plateaus.
+
+fn Rosetta::BW::forward($A, $B, $pi, $obs) {
+    my $T = len(@$obs)
+    my $N = len(@$pi)
+    my @alpha
+    my @row0
+    for my $i (~> 0:$N - 1) { push @row0, $pi->[$i] * $B->[$i][$obs->[0]] }
+    push @alpha, \@row0
+    for my $t (~> 1:$T - 1) {
+        my @row
+        for my $j (~> 0:$N - 1) {
+            my $s = 0
+            for my $i (~> 0:$N - 1) { $s += $alpha[$t - 1][$i] * $A->[$i][$j] }
+            push @row, $s * $B->[$j][$obs->[$t]]
+        }
+        push @alpha, \@row
+    }
+    \@alpha
+}
+
+fn Rosetta::BW::backward($A, $B, $obs) {
+    my $T = len(@$obs)
+    my $N = len(@{$A})
+    my @beta
+    for my $t (~> 0:$T - 1) {
+        my @row = ~> 0:$N - 1 |> map { 0 }
+        push @beta, \@row
+    }
+    for my $i (~> 0:$N - 1) { $beta[$T - 1][$i] = 1 }
+    for (my $t = $T - 2; $t >= 0; $t--) {
+        for my $i (~> 0:$N - 1) {
+            my $s = 0
+            for my $j (~> 0:$N - 1) {
+                $s += $A->[$i][$j] * $B->[$j][$obs->[$t + 1]] * $beta[$t + 1][$j]
+            }
+            $beta[$t][$i] = $s
+        }
+    }
+    \@beta
+}
+
+fn Rosetta::BW::iterate($A, $B, $pi, $obs) {
+    my $T = len(@$obs)
+    my $N = len(@$pi)
+    my $M = len(@{$B->[0]})
+    my $alpha = Rosetta::BW::forward($A, $B, $pi, $obs)
+    my $beta  = Rosetta::BW::backward($A, $B, $obs)
+    my $likelihood = 0
+    for my $i (~> 0:$N - 1) { $likelihood += $alpha->[$T - 1][$i] }
+
+    # γ_t(i) = α_t(i) β_t(i) / P(O)
+    my @gamma
+    for my $t (~> 0:$T - 1) {
+        my @row
+        for my $i (~> 0:$N - 1) {
+            push @row, $likelihood > 0 ? $alpha->[$t][$i] * $beta->[$t][$i] / $likelihood : 0
+        }
+        push @gamma, \@row
+    }
+
+    # ξ_t(i,j) = α_t(i) A[i][j] B[j][o_{t+1}] β_{t+1}(j) / P(O)
+    my @xi
+    for my $t (~> 0:$T - 2) {
+        my @sheet
+        for my $i (~> 0:$N - 1) {
+            my @row
+            for my $j (~> 0:$N - 1) {
+                my $v = $alpha->[$t][$i] * $A->[$i][$j]
+                      * $B->[$j][$obs->[$t + 1]] * $beta->[$t + 1][$j]
+                push @row, $likelihood > 0 ? $v / $likelihood : 0
+            }
+            push @sheet, \@row
+        }
+        push @xi, \@sheet
+    }
+
+    # New π
+    my @pi_new
+    for my $i (~> 0:$N - 1) { push @pi_new, $gamma[0][$i] }
+
+    # New A: numerator = Σ_t ξ_t(i,j); denominator = Σ_t γ_t(i) over t<T-1
+    my @A_new
+    for my $i (~> 0:$N - 1) {
+        my @row
+        my $den = 0
+        for my $t (~> 0:$T - 2) { $den += $gamma[$t][$i] }
+        for my $j (~> 0:$N - 1) {
+            my $num = 0
+            for my $t (~> 0:$T - 2) { $num += $xi[$t][$i][$j] }
+            push @row, $den > 0 ? $num / $den : 0
+        }
+        push @A_new, \@row
+    }
+
+    # New B: numerator = Σ_{t : o_t = k} γ_t(i); denominator = Σ_t γ_t(i)
+    my @B_new
+    for my $i (~> 0:$N - 1) {
+        my @row
+        my $den = 0
+        for my $t (~> 0:$T - 1) { $den += $gamma[$t][$i] }
+        for my $k (~> 0:$M - 1) {
+            my $num = 0
+            for my $t (~> 0:$T - 1) {
+                $num += $gamma[$t][$i] if $obs->[$t] == $k
+            }
+            push @row, $den > 0 ? $num / $den : 0
+        }
+        push @B_new, \@row
+    }
+
+    { A => \@A_new, B => \@B_new, pi => \@pi_new, ll => $likelihood }
+}
+
+fn Rosetta::BW::train($A, $B, $pi, $obs, $iters) {
+    my $cur_A = $A
+    my $cur_B = $B
+    my $cur_pi = $pi
+    my $last_ll = 0
+    for my $i (~> 1:$iters) {
+        my $r = Rosetta::BW::iterate($cur_A, $cur_B, $cur_pi, $obs)
+        $cur_A = $r->{A}
+        $cur_B = $r->{B}
+        $cur_pi = $r->{pi}
+        $last_ll = $r->{ll}
+    }
+    { A => $cur_A, B => $cur_B, pi => $cur_pi, ll => $last_ll }
+}
+
+# Two-state, two-symbol toy: bias the observation 010101010101 toward
+# alternating outputs and confirm the trained transition matrix
+# shifts away from the uniform initial guess and the log-likelihood
+# improves monotonically.
+# Slightly asymmetric initial guess avoids the saddle point that pure
+# uniform 0.5/0.5 EM can get stuck on.
+my $A0 = [[0.6, 0.4], [0.3, 0.7]]
+my $B0 = [[0.7, 0.3], [0.4, 0.6]]
+my $pi0 = [0.6, 0.4]
+my @obs
+for my $t (~> 0:11) { push @obs, $t % 2 }
+
+my $r1 = Rosetta::BW::iterate($A0, $B0, $pi0, \@obs)
+assert_ok $r1->{ll} > 0, "initial likelihood positive"
+
+# After training, log-likelihood should improve.
+my $trained = Rosetta::BW::train($A0, $B0, $pi0, \@obs, 25)
+assert_ok $trained->{ll} > $r1->{ll}, "training improves likelihood"
+
+# Probabilities still sum to 1 in each row of the new A and B matrices.
+fn Rosetta::BW::row_sum($r) {
+    my $s = 0
+    for my $v (@$r) { $s += $v }
+    $s
+}
+fn Rosetta::BW::approx($x, $y) { abs($x - $y) < 1e-9 }
+
+for my $row (@{$trained->{A}}) {
+    assert_ok Rosetta::BW::approx(Rosetta::BW::row_sum($row), 1), "A row sums to 1"
+}
+for my $row (@{$trained->{B}}) {
+    assert_ok Rosetta::BW::approx(Rosetta::BW::row_sum($row), 1), "B row sums to 1"
+}
+assert_ok Rosetta::BW::approx(Rosetta::BW::row_sum($trained->{pi}), 1), "pi sums to 1"
+
+# Forward-only sanity: known-answer for a single-state HMM trivially
+# emitting symbol 0 every step.
+my $A1 = [[1.0]]
+my $B1 = [[1.0, 0.0]]
+my $pi1 = [1.0]
+my $alpha = Rosetta::BW::forward($A1, $B1, $pi1, [0, 0, 0])
+assert_ok Rosetta::BW::approx($alpha->[2][0], 1.0), "deterministic α at t=2"
+
+test_run

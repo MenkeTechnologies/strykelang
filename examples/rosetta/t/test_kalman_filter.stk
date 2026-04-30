@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 1D Kalman filter — predict + update for a noisy sensor
+# tracking a constant or constant-velocity scalar quantity.
+
+fn Rosetta::Kalman::new($x0, $p0, $q, $r) {
+    { x => $x0, p => $p0, q => $q, r => $r }
+}
+
+fn Rosetta::Kalman::predict($k) {
+    # Constant-state model: state stays put; only uncertainty grows.
+    $k->{p} = $k->{p} + $k->{q}
+}
+
+fn Rosetta::Kalman::update($k, $z) {
+    my $kg = $k->{p} / ($k->{p} + $k->{r})
+    $k->{x} = $k->{x} + $kg * ($z - $k->{x})
+    $k->{p} = (1 - $kg) * $k->{p}
+    $kg
+}
+
+fn Rosetta::Kalman::step($k, $z) {
+    Rosetta::Kalman::predict($k)
+    Rosetta::Kalman::update($k, $z)
+    $k->{x}
+}
+
+fn Rosetta::Kalman::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Track a constant true value (=10.0) given noisy measurements.
+# Mock noisy stream around 10 using a deterministic offset list.
+my @measurements = (9.5, 10.4, 9.8, 10.1, 9.9, 10.2, 9.7, 10.3, 10.0, 9.95)
+my $kf = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
+my @ests
+for my $z (@measurements) {
+    my $est = Rosetta::Kalman::step($kf, $z)
+    push @ests, $est
+}
+
+# Final estimate should be close to the true mean (≈ 9.99).
+my $mean = 0
+for my $z (@measurements) { $mean += $z }
+$mean /= len(@measurements)
+assert_ok Rosetta::Kalman::approx($ests[-1], $mean, 0.1), "filter converges near sample mean"
+
+# Variance should be shrinking with each update.
+my @ps
+my $kf2 = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
+for my $z (@measurements) {
+    Rosetta::Kalman::step($kf2, $z)
+    push @ps, $kf2->{p}
+}
+for my $i (1..len(@ps) - 1) {
+    assert_ok $ps[$i] < $ps[$i - 1], "variance shrinks at step $i"
+}
+
+# Kalman gain on the first update with x0=0, p0=1, r=0.1: K = 1 / (1.0001 + 0.1) ≈ 0.909
+my $kf3 = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
+Rosetta::Kalman::predict($kf3)
+my $k1 = Rosetta::Kalman::update($kf3, 10.0)
+assert_ok Rosetta::Kalman::approx($k1, 0.909009, 1e-3), "first Kalman gain ≈ 0.909"
+# After update with z=10 from x=0: x becomes ≈ 9.09
+assert_ok Rosetta::Kalman::approx($kf3->{x}, 9.09009, 1e-3), "post-update state ≈ 9.09"
+
+# Steady-state behavior: with q small and r constant, the filter should
+# eventually converge to a stable Kalman gain. Verify the difference
+# between consecutive gains shrinks toward zero.
+my $kf4 = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
+my @gains
+for my $i (~> 1:200) {
+    Rosetta::Kalman::predict($kf4)
+    push @gains, Rosetta::Kalman::update($kf4, 10.0)
+}
+assert_ok abs($gains[-1] - $gains[-2]) < 1e-4, "gain reaches steady state"
+
+# Pure measurement (q=0, r→0): Kalman gain → 1, output equals measurement.
+my $kf5 = Rosetta::Kalman::new(0.0, 1.0, 0, 0.0001)
+my $est5 = Rosetta::Kalman::step($kf5, 5.0)
+assert_ok Rosetta::Kalman::approx($est5, 5.0, 1e-3), "near-zero measurement noise → trust z"
+
+test_run

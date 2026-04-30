@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Catmull-Rom spline. Centripetal/uniform/chordal variant
+# selectable by alpha (0=uniform, 0.5=centripetal, 1=chordal). Returns
+# samples along the spline through control points P1..Pn-1 using P0..Pn
+# as the surrounding tangent context.
+
+fn Rosetta::CatmullRom::tj($ti, $pi, $pj, $alpha) {
+    my $dx = $pj->[0] - $pi->[0]
+    my $dy = $pj->[1] - $pi->[1]
+    my $d2 = $dx * $dx + $dy * $dy
+    $ti + ($d2 ** ($alpha / 2))
+}
+
+fn Rosetta::CatmullRom::segment($p0, $p1, $p2, $p3, $alpha, $samples) {
+    my $t0 = 0
+    my $t1 = Rosetta::CatmullRom::tj($t0, $p0, $p1, $alpha)
+    my $t2 = Rosetta::CatmullRom::tj($t1, $p1, $p2, $alpha)
+    my $t3 = Rosetta::CatmullRom::tj($t2, $p2, $p3, $alpha)
+    my @out
+    for my $k (~> 0:$samples - 1) {
+        my $t = $t1 + ($t2 - $t1) * ($k / ($samples - 1))
+        my @a1
+        my @a2
+        my @a3
+        $a1[0] = ($t1 - $t) / ($t1 - $t0) * $p0->[0] + ($t - $t0) / ($t1 - $t0) * $p1->[0]
+        $a1[1] = ($t1 - $t) / ($t1 - $t0) * $p0->[1] + ($t - $t0) / ($t1 - $t0) * $p1->[1]
+        $a2[0] = ($t2 - $t) / ($t2 - $t1) * $p1->[0] + ($t - $t1) / ($t2 - $t1) * $p2->[0]
+        $a2[1] = ($t2 - $t) / ($t2 - $t1) * $p1->[1] + ($t - $t1) / ($t2 - $t1) * $p2->[1]
+        $a3[0] = ($t3 - $t) / ($t3 - $t2) * $p2->[0] + ($t - $t2) / ($t3 - $t2) * $p3->[0]
+        $a3[1] = ($t3 - $t) / ($t3 - $t2) * $p2->[1] + ($t - $t2) / ($t3 - $t2) * $p3->[1]
+        my @b1
+        my @b2
+        $b1[0] = ($t2 - $t) / ($t2 - $t0) * $a1[0] + ($t - $t0) / ($t2 - $t0) * $a2[0]
+        $b1[1] = ($t2 - $t) / ($t2 - $t0) * $a1[1] + ($t - $t0) / ($t2 - $t0) * $a2[1]
+        $b2[0] = ($t3 - $t) / ($t3 - $t1) * $a2[0] + ($t - $t1) / ($t3 - $t1) * $a3[0]
+        $b2[1] = ($t3 - $t) / ($t3 - $t1) * $a2[1] + ($t - $t1) / ($t3 - $t1) * $a3[1]
+        my $cx = ($t2 - $t) / ($t2 - $t1) * $b1[0] + ($t - $t1) / ($t2 - $t1) * $b2[0]
+        my $cy = ($t2 - $t) / ($t2 - $t1) * $b1[1] + ($t - $t1) / ($t2 - $t1) * $b2[1]
+        push @out, [$cx, $cy]
+    }
+    \@out
+}
+
+fn Rosetta::CatmullRom::close($x, $y) { abs($x - $y) < 1e-9 }
+
+# Endpoints of a centripetal Catmull-Rom segment must equal P1 and P2.
+my $p0 = [0, 0]
+my $p1 = [1, 1]
+my $p2 = [3, 2]
+my $p3 = [4, 4]
+my $seg = Rosetta::CatmullRom::segment($p0, $p1, $p2, $p3, 0.5, 11)
+assert_eq len(@$seg), 11, "11 samples"
+assert_ok Rosetta::CatmullRom::close($seg->[0][0], 1), "first sample at P1.x"
+assert_ok Rosetta::CatmullRom::close($seg->[0][1], 1), "first sample at P1.y"
+assert_ok Rosetta::CatmullRom::close($seg->[10][0], 3), "last sample at P2.x"
+assert_ok Rosetta::CatmullRom::close($seg->[10][1], 2), "last sample at P2.y"
+
+# Collinear points should yield linear interpolation between P1 and P2 regardless of alpha.
+my $cl0 = [0, 0]
+my $cl1 = [1, 1]
+my $cl2 = [2, 2]
+my $cl3 = [3, 3]
+my $linseg = Rosetta::CatmullRom::segment($cl0, $cl1, $cl2, $cl3, 0.5, 5)
+for my $i (~> 0:4) {
+    my $t = $i / 4
+    my $expected_x = 1 + 1 * $t
+    my $expected_y = 1 + 1 * $t
+    assert_ok Rosetta::CatmullRom::close($linseg->[$i][0], $expected_x), "collinear x sample $i"
+    assert_ok Rosetta::CatmullRom::close($linseg->[$i][1], $expected_y), "collinear y sample $i"
+}
+
+# Symmetric S-curve: alpha=0 uniform variant
+my $sym0 = [-1, 0]
+my $sym1 = [0, 1]
+my $sym2 = [1, 1]
+my $sym3 = [2, 0]
+my $u = Rosetta::CatmullRom::segment($sym0, $sym1, $sym2, $sym3, 0, 5)
+assert_eq len(@$u), 5, "uniform 5 samples"
+assert_ok Rosetta::CatmullRom::close($u->[0][0], 0), "uniform start x"
+assert_ok Rosetta::CatmullRom::close($u->[4][0], 1), "uniform end x"
+
+test_run

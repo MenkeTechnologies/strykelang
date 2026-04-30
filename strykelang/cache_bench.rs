@@ -15,7 +15,6 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 
 use crate::ast::Program;
@@ -55,12 +54,6 @@ fn sqlite_open(path: &Path) -> Connection {
     .unwrap();
     conn
 }
-
-#[derive(Serialize, Deserialize)]
-struct ProgramWire(Program);
-
-#[derive(Serialize, Deserialize)]
-struct ChunkWire(Chunk);
 
 fn sqlite_put(conn: &Connection, path: &str, mtime_s: i64, mtime_ns: i64, p: &Program, c: &Chunk) {
     let pb = bincode::serialize(p).unwrap();

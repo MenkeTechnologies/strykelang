@@ -308,6 +308,60 @@ fn splice_aref_void_removes_without_returning_list() {
     );
 }
 
+// ── splice on a promoted-shared array (regression for index-out-of-bounds panic
+// when `\@arr` had been taken before splicing the bare `@arr`) ──
+
+#[test]
+fn splice_after_taking_array_ref_offset_equals_len() {
+    // `\@arr` promotes @arr to shared Arc-backed storage. After the
+    // promotion, bare `@arr` operations must route through the shared
+    // path; otherwise `splice @arr, 8` (offset == len) used to panic
+    // with "range end index 8 out of range for slice of length 0".
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my @arr = (1, 2, 3, 4, 5, 6, 7, 8);
+            my $r = \@arr;
+            splice @arr, 8;
+            join ",", @arr"#
+        ),
+        "1,2,3,4,5,6,7,8"
+    );
+}
+
+#[test]
+fn splice_after_taking_array_ref_truncates_correctly() {
+    // After taking `\@arr`, splicing from a smaller offset should
+    // still actually truncate via the shared path (not silently
+    // become a no-op).
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my @arr = (1, 2, 3, 4, 5, 6, 7, 8);
+            my $r = \@arr;
+            splice @arr, 5;
+            join ",", @arr"#
+        ),
+        "1,2,3,4,5"
+    );
+}
+
+#[test]
+fn splice_after_taking_array_ref_keeps_ref_in_sync() {
+    // The shared Arc must be the same one the ref sees, so after
+    // splicing through the bare name the ref reflects the new state.
+    assert_eq!(
+        eval_string(
+            r#"no strict 'vars';
+            my @arr = (1, 2, 3, 4, 5);
+            my $r = \@arr;
+            splice @arr, 2;
+            join ",", @$r"#
+        ),
+        "1,2"
+    );
+}
+
 // ── Sub::Util (native stub: return coderef for CPAN bootstrap) ──
 
 #[test]

@@ -1,0 +1,123 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hungarian algorithm — minimum-cost assignment in a
+# bipartite graph (n×n cost matrix). O(n³). Implements Kuhn-Munkres
+# via the row/column-potential formulation; assignment built from the
+# tight subgraph.
+
+fn Rosetta::Hungarian::solve($cost) {
+    my $n = len(@$cost)
+    my $INF = 1e18
+    # u, v are dual potentials; p maps column j to its assigned row;
+    # way records the alternating-tree predecessor for column reconstruction.
+    my @u = ~> 0:$n |> map { 0 }
+    my @v = ~> 0:$n |> map { 0 }
+    my @p = ~> 0:$n |> map { 0 }
+    my @way = ~> 0:$n |> map { 0 }
+
+    for my $i (~> 1:$n) {
+        $p[0] = $i
+        my $j0 = 0
+        my @minv = ~> 0:$n |> map { $INF }
+        my @used = ~> 0:$n |> map { 0 }
+        while (1) {
+            $used[$j0] = 1
+            my $i0 = $p[$j0]
+            my $delta = $INF
+            my $j1
+            for my $j (~> 1:$n) {
+                next if $used[$j]
+                my $cur = $cost->[$i0 - 1][$j - 1] - $u[$i0] - $v[$j]
+                if ($cur < $minv[$j]) {
+                    $minv[$j] = $cur
+                    $way[$j] = $j0
+                }
+                if ($minv[$j] < $delta) {
+                    $delta = $minv[$j]
+                    $j1 = $j
+                }
+            }
+            for my $j (~> 0:$n) {
+                if ($used[$j]) {
+                    $u[$p[$j]] += $delta
+                    $v[$j] -= $delta
+                } else {
+                    $minv[$j] -= $delta
+                }
+            }
+            $j0 = $j1
+            last if $p[$j0] == 0
+        }
+        while ($j0 != 0) {
+            my $j1 = $way[$j0]
+            $p[$j0] = $p[$j1]
+            $j0 = $j1
+        }
+    }
+
+    # Build assignment: row i → column p^-1(i)
+    my @assign = ~> 0:$n - 1 |> map { -1 }
+    for my $j (~> 1:$n) {
+        $assign[$p[$j] - 1] = $j - 1
+    }
+    my $total = 0
+    for my $i (~> 0:$n - 1) {
+        $total += $cost->[$i][$assign[$i]]
+    }
+    { assign => \@assign, cost => $total }
+}
+
+# 3×3 known case from the classic Hungarian example.
+# Workers a/b/c; jobs 1/2/3. Costs:
+#     j1  j2  j3
+# a:   4   1   3
+# b:   2   0   5
+# c:   3   2   2
+# Optimum: a→j2 (1), b→j1 (2), c→j3 (2). Total = 5.
+my $r1 = Rosetta::Hungarian::solve([
+    [4, 1, 3],
+    [2, 0, 5],
+    [3, 2, 2]
+])
+assert_eq $r1->{cost}, 5, "3x3 minimum cost = 5"
+assert_eq $r1->{assign}[0], 1, "a → j2"
+assert_eq $r1->{assign}[1], 0, "b → j1"
+assert_eq $r1->{assign}[2], 2, "c → j3"
+
+# Identity matrix: optimal assigns each row to its own diagonal.
+my $id = [
+    [0, 5, 5],
+    [5, 0, 5],
+    [5, 5, 0]
+]
+my $r2 = Rosetta::Hungarian::solve($id)
+assert_eq $r2->{cost}, 0, "identity diagonal optimal"
+assert_eq join(",", @{$r2->{assign}}), "0,1,2", "diagonal assignment"
+
+# 4×4 worked example
+# Optimum is 13 with assignment 0→1, 1→0, 2→3, 3→2.
+my $r3 = Rosetta::Hungarian::solve([
+    [82, 83, 69, 92],
+    [77, 37, 49, 92],
+    [11, 69,  5, 86],
+    [ 8,  9, 98, 23]
+])
+assert_eq $r3->{cost}, 140, "4x4 cost"
+# Verify each row gets exactly one column and each column once.
+my %cols
+for my $c (@{$r3->{assign}}) { $cols{$c}++ }
+assert_eq len(keys %cols), 4, "4 distinct columns"
+for my $c (~> 0:3) { assert_eq $cols{$c}, 1, "column $c used once" }
+
+# Single 1×1
+my $r4 = Rosetta::Hungarian::solve([[7]])
+assert_eq $r4->{cost}, 7, "1x1"
+assert_eq $r4->{assign}[0], 0, "1x1 assigns 0→0"
+
+# 2×2 swap
+# Costs: [[5, 1], [1, 5]] — swap is optimal (1+1=2)
+my $r5 = Rosetta::Hungarian::solve([[5, 1], [1, 5]])
+assert_eq $r5->{cost}, 2, "2x2 swap optimal"
+assert_eq $r5->{assign}[0], 1, "swap a→j2"
+assert_eq $r5->{assign}[1], 0, "swap b→j1"
+
+test_run

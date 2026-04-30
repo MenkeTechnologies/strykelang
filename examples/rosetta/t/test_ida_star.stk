@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+# Rosetta Code: IDA* — iterative-deepening A*. Iterates depth-bounded
+# DFS, where the bound is the smallest f-value (g + h) that exceeded
+# the previous bound. Uses O(d) memory instead of A*'s exponential
+# fringe storage; ideal for puzzles with large state space and an
+# admissible heuristic.
+
+# 8-puzzle solver. State is an arrayref of 9 tiles, 0 = blank.
+fn Rosetta::IDA::manhattan($state) {
+    my $h = 0
+    for my $i (~> 0:8) {
+        my $v = $state->[$i]
+        next if $v == 0
+        my $tgt = $v
+        my $dr = abs(int($i / 3) - int($tgt / 3))
+        my $dc = abs(($i % 3) - ($tgt % 3))
+        $h += $dr + $dc
+    }
+    $h
+}
+
+fn Rosetta::IDA::neighbors($state) {
+    my $blank
+    for my $i (~> 0:8) { if ($state->[$i] == 0) { $blank = $i; last } }
+    my @moves
+    my @offs
+    push @offs, [$blank - 3, "U"] if int($blank / 3) > 0
+    push @offs, [$blank + 3, "D"] if int($blank / 3) < 2
+    push @offs, [$blank - 1, "L"] if $blank % 3 > 0
+    push @offs, [$blank + 1, "R"] if $blank % 3 < 2
+    for my $o (@offs) {
+        my ($swap_idx, $name) = @$o
+        my @new = @$state
+        ($new[$blank], $new[$swap_idx]) = ($new[$swap_idx], $new[$blank])
+        push @moves, [\@new, $name]
+    }
+    \@moves
+}
+
+fn Rosetta::IDA::state_key($state) { join(",", @$state) }
+
+fn Rosetta::IDA::dfs($state, $g, $bound, $path, $visited) {
+    my $h = Rosetta::IDA::manhattan($state)
+    my $f = $g + $h
+    return ["found", $g] if $h == 0
+    return ["over", $f] if $f > $bound
+    my $min = 1e18
+    my $key = Rosetta::IDA::state_key($state)
+    $visited->{$key} = 1
+    for my $nb (@{Rosetta::IDA::neighbors($state)}) {
+        my ($next, $move) = @$nb
+        my $nk = Rosetta::IDA::state_key($next)
+        next if $visited->{$nk}
+        push @$path, $move
+        my $r = Rosetta::IDA::dfs($next, $g + 1, $bound, $path, $visited)
+        return $r if $r->[0] eq "found"
+        $min = $r->[1] if $r->[1] < $min
+        pop @$path
+    }
+    delete $visited->{$key}
+    ["over", $min]
+}
+
+fn Rosetta::IDA::search($start) {
+    my $bound = Rosetta::IDA::manhattan($start)
+    my @path
+    while (1) {
+        my %visited
+        my $r = Rosetta::IDA::dfs($start, 0, $bound, \@path, \%visited)
+        return { path => \@path, cost => $r->[1] } if $r->[0] eq "found"
+        return { path => undef, cost => undef } if $r->[1] == 1e18
+        $bound = $r->[1]
+    }
+}
+
+# Identity = goal: solver returns immediately, empty path.
+my $r0 = Rosetta::IDA::search([0, 1, 2, 3, 4, 5, 6, 7, 8])
+assert_eq len(@{$r0->{path}}), 0, "goal state, 0 moves"
+assert_eq $r0->{cost}, 0, "goal cost = 0"
+
+# One-move case: blank just needs to slide right.
+my $r1 = Rosetta::IDA::search([1, 0, 2, 3, 4, 5, 6, 7, 8])
+assert_eq $r1->{cost}, 1, "one-move solution"
+
+# Three-move case (5 needs to move from index 2 to index 5; blank rolls back)
+my $r2 = Rosetta::IDA::search([1, 2, 5, 3, 4, 0, 6, 7, 8])
+assert_eq $r2->{cost}, 3, "blank at 5, solved in 3 moves"
+
+# Moderate case — solver finds optimum, which equals or exceeds manhattan h.
+my $r3 = Rosetta::IDA::search([1, 2, 0, 4, 5, 3, 7, 8, 6])
+my $h3 = Rosetta::IDA::manhattan([1, 2, 0, 4, 5, 3, 7, 8, 6])
+assert_ok $r3->{cost} >= $h3, "cost >= heuristic lower bound (admissibility)"
+assert_ok $r3->{cost} <= 30, "moderate puzzle solved in ≤ 30 moves"
+
+# Helper sanity (manhattan ignores blank, only counts misplaced tiles)
+assert_eq Rosetta::IDA::manhattan([0, 1, 2, 3, 4, 5, 6, 7, 8]), 0, "h=0 at goal"
+assert_eq Rosetta::IDA::manhattan([1, 0, 2, 3, 4, 5, 6, 7, 8]), 1, "h=1 (only 1 is one slot away)"
+
+# Neighbors count: corner blank has 2 moves; edge has 3; center has 4.
+my $nc = len(@{Rosetta::IDA::neighbors([0, 1, 2, 3, 4, 5, 6, 7, 8])})
+assert_eq $nc, 2, "blank in corner: 2 neighbors"
+my $ne = len(@{Rosetta::IDA::neighbors([1, 0, 2, 3, 4, 5, 6, 7, 8])})
+assert_eq $ne, 3, "blank on edge: 3 neighbors"
+my $nm = len(@{Rosetta::IDA::neighbors([1, 2, 3, 4, 0, 5, 6, 7, 8])})
+assert_eq $nm, 4, "blank in center: 4 neighbors"
+
+test_run

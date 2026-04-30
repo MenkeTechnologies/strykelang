@@ -5503,11 +5503,7 @@ impl Interpreter {
         };
         let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
         let rep_vals: Vec<PerlValue> = args.iter().skip(3).cloned().collect();
-        let arr = self.scope.get_array_mut(&arr_name)?;
-        let removed: Vec<PerlValue> = arr.drain(off..end).collect();
-        for (i, v) in rep_vals.into_iter().enumerate() {
-            arr.insert(off + i, v);
-        }
+        let removed = self.scope.splice_in_place(&arr_name, off, end, rep_vals)?;
         Ok(match self.wantarray_kind {
             WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
             WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
@@ -18516,14 +18512,10 @@ impl Interpreter {
         if let Some(name) = aref.as_array_binding_name() {
             let arr_len = self.scope.array_len(&name);
             let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
-            let arr = self
+            let removed = self
                 .scope
-                .get_array_mut(&name)
+                .splice_in_place(&name, off, end, rep_vals)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            let removed: Vec<PerlValue> = arr.drain(off..end).collect();
-            for (i, v) in rep_vals.into_iter().enumerate() {
-                arr.insert(off + i, v);
-            }
             return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
@@ -18542,14 +18534,10 @@ impl Interpreter {
             }
             let arr_len = self.scope.array_len(&s);
             let (off, end) = splice_compute_range(arr_len, &offset_val, &length_val);
-            let arr = self
+            let removed = self
                 .scope
-                .get_array_mut(&s)
+                .splice_in_place(&s, off, end, rep_vals)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            let removed: Vec<PerlValue> = arr.drain(off..end).collect();
-            for (i, v) in rep_vals.into_iter().enumerate() {
-                arr.insert(off + i, v);
-            }
             return Ok(match ctx {
                 WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
                 WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
@@ -18605,14 +18593,10 @@ impl Interpreter {
         for r in replacement {
             rep_vals.push(self.eval_expr(r)?);
         }
-        let arr = self
+        let removed = self
             .scope
-            .get_array_mut(&arr_name)
+            .splice_in_place(&arr_name, off, end, rep_vals)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-        let removed: Vec<PerlValue> = arr.drain(off..end).collect();
-        for (i, v) in rep_vals.into_iter().enumerate() {
-            arr.insert(off + i, v);
-        }
         Ok(match ctx {
             WantarrayCtx::Scalar => removed.last().cloned().unwrap_or(PerlValue::UNDEF),
             WantarrayCtx::List | WantarrayCtx::Void => PerlValue::array(removed),
