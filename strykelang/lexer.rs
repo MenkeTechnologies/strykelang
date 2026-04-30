@@ -25,6 +25,16 @@ pub struct Lexer {
     /// Tracks whether the last token was a term (value/variable/close-delim)
     /// to disambiguate `/` as division vs regex and `{` as hash-ref vs block.
     last_was_term: bool,
+    /// Tracks whether the last token was a method-call arrow (`->`). After
+    /// `->`, identifiers `s` / `tr` / `y` / `q` / `qq` / `qw` / `qr` / `m`
+    /// are method names — never substitution / transliteration / quote-like
+    /// operators. Without this gate, `$obj->y` followed by `,` would consume
+    /// `, …, …` as a transliteration body.
+    last_was_arrow: bool,
+    /// Snapshot of [`Self::last_was_arrow`] taken at the start of each
+    /// [`Self::next_token`] call so identifier-decoding logic can read the
+    /// previous-token state without racing against its own writes.
+    prev_arrow: bool,
     /// Source path for [`PerlError`] (e.g. real script or required `.pm` path).
     error_file: String,
     /// When > 0, the lexer treats `m` followed by `/` as a plain identifier
@@ -44,6 +54,8 @@ impl Lexer {
             pos: 0,
             line: 1,
             last_was_term: false,
+            last_was_arrow: false,
+            prev_arrow: false,
             error_file: file.into(),
             suppress_m_regex: 0,
         }
@@ -51,6 +63,63 @@ impl Lexer {
 
     fn syntax_err(&self, message: impl Into<String>, line: usize) -> PerlError {
         PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
+    }
+
+    /// Used by the `s` / `tr` / `y` lexer arms when the identifier is followed
+    /// by `,`. Returns `true` only when the rest of the statement looks like a
+    /// genuine `s,PAT,REPL,FLAGS` / `tr,FROM,TO,FLAGS` shape — at least 2 more
+    /// commas before the next statement terminator (`;`, newline, EOF, or
+    /// closing brace/paren/bracket from the enclosing context). Without this
+    /// gate, `struct Pt { x, y, z }` would consume `y, z }` as a transliteration
+    /// body, and `$obj->y, ...` would eat the rest of the call.
+    fn lookahead_is_comma_delim_subst(&self) -> bool {
+        let mut commas = 0usize;
+        let mut depth_paren = 0i32;
+        let mut depth_bracket = 0i32;
+        let mut depth_brace = 0i32;
+        let mut i = self.pos;
+        while i < self.input.len() {
+            let c = self.input[i];
+            match c {
+                '\\' => {
+                    i += 2; // skip escaped char (regex backslash escapes are common in pat/repl)
+                    continue;
+                }
+                '(' => depth_paren += 1,
+                ')' => {
+                    if depth_paren == 0 {
+                        break;
+                    }
+                    depth_paren -= 1;
+                }
+                '[' => depth_bracket += 1,
+                ']' => {
+                    if depth_bracket == 0 {
+                        break;
+                    }
+                    depth_bracket -= 1;
+                }
+                '{' => depth_brace += 1,
+                '}' => {
+                    if depth_brace == 0 {
+                        break;
+                    }
+                    depth_brace -= 1;
+                }
+                ';' | '\n' => break,
+                ',' if depth_paren == 0 && depth_bracket == 0 && depth_brace == 0 => {
+                    commas += 1;
+                    if commas >= 3 {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        // Need 3 total commas: `s,P,R,F` / `tr,F,T,F` (FLAGS may be empty,
+        // but the third comma must still be present).
+        commas >= 3
     }
 
     fn peek(&self) -> Option<char> {
@@ -1000,6 +1069,15 @@ impl Lexer {
             return Ok(Token::Eof);
         }
 
+        // `last_was_arrow` is consumed at most once per token: the s/tr/y/q/qq
+        // /qw/qr/m guards check whether the IMMEDIATELY previous token was
+        // `->`. Reset here; the Arrow / ArrowBrace return paths re-arm it
+        // for the next `next_token` call. We snapshot before the reset so
+        // identifier-decoding logic below can read the previous-token state
+        // via `self.prev_arrow` (set up via a one-shot field swap).
+        self.prev_arrow = self.last_was_arrow;
+        self.last_was_arrow = false;
+
         let ch = self.input[self.pos];
         match ch {
             // Variables
@@ -1215,6 +1293,10 @@ impl Lexer {
                         return Ok(Token::ThreadArrowLast);
                     }
                     self.last_was_term = false;
+                    // Arm the arrow flag so the next identifier (e.g. `y`,
+                    // `s`, `tr`, `m`, `q…`) decodes as a method name, not
+                    // a substitution / transliteration / quote-like body.
+                    self.last_was_arrow = true;
                     return Ok(Token::Arrow);
                 }
                 self.last_was_term = false;
@@ -1603,6 +1685,11 @@ impl Lexer {
                         return Ok(Token::FormatDecl { name: fname, lines });
                     }
                     "qw" => {
+                        // After `->`, `qw` is a method name, not a quote-word list.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `qw` followed by `=>` is an autoquoted hash key, not qw().
                         let start_pos = self.pos;
                         self.skip_whitespace_only();
@@ -1624,6 +1711,11 @@ impl Lexer {
                         return Ok(tok);
                     }
                     "qq" | "q" => {
+                        // After `->`, `q` / `qq` are method names, not quote operators.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `q` / `qq` followed by `=>` is an autoquoted hash key, not a quote operator.
                         // Also treat as identifier if followed by terminators like `;`, `,`, `)`, etc.
                         // Must check AFTER skipping whitespace to handle `q => 5`.
@@ -1665,6 +1757,11 @@ impl Lexer {
                         return Ok(Token::SingleString(s));
                     }
                     "qx" => {
+                        // After `->`, `qx` is a method name, not a backtick command.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `qx` followed by `=>` is an autoquoted hash key.
                         let start_pos = self.pos;
                         self.skip_whitespace_only();
@@ -1695,6 +1792,11 @@ impl Lexer {
                         return Ok(Token::BacktickString(s));
                     }
                     "qr" => {
+                        // After `->`, `qr` is a method name, not a quoted regex.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `qr` followed by `=>` is an autoquoted hash key.
                         let start_pos = self.pos;
                         self.skip_whitespace_only();
@@ -1726,6 +1828,11 @@ impl Lexer {
                         return Ok(Token::Regex(pattern, flags, delim));
                     }
                     "m" => {
+                        // After `->`, `m` is a method name, not a regex match.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `m` followed by terminators is a bareword, not match operator.
                         // Must check AFTER skipping whitespace to handle `m => "val"`.
                         let start_pos = self.pos;
@@ -1801,11 +1908,19 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "s" => {
+                        // `$obj->s` / `$obj->s(...)` — after `->`, `s` is a method name.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // `s` followed by terminators is a bareword, not substitution.
                         // Must check AFTER skipping whitespace to handle `s => "val"`.
-                        // NOTE: `,` is intentionally NOT a terminator here — Perl allows
-                        // `s,PAT,REPL,FLAGS` (comma as the substitution delimiter), as in
-                        // `perl -pe 's,\bt\b,b,g'`. Same for `tr,y` below.
+                        // `,` is treated as a terminator UNLESS the lookahead shows the
+                        // full `s,PAT,REPL,FLAGS` shape (≥ 2 more commas before the
+                        // statement ends) — that gates the comma-delim case to genuine
+                        // substitutions like `perl -pe 's,\bt\b,b,g'` while leaving
+                        // bareword `s` alone in struct fields, list literals, and
+                        // function args.
                         let start_pos = self.pos;
                         self.skip_whitespace_only();
                         if let Some(d) = self.peek() {
@@ -1815,6 +1930,11 @@ impl Lexer {
                                 return Ok(Token::Ident(ident));
                             }
                             if matches!(d, ';' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                                self.pos = start_pos;
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if d == ',' && !self.lookahead_is_comma_delim_subst() {
                                 self.pos = start_pos;
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
@@ -1885,6 +2005,12 @@ impl Lexer {
                         return Ok(Token::Ident(ident));
                     }
                     "tr" | "y" => {
+                        // `$obj->tr` / `$obj->y` — after `->`, this is a method name,
+                        // not transliteration.
+                        if self.prev_arrow {
+                            self.last_was_term = true;
+                            return Ok(Token::Ident(ident));
+                        }
                         // After `::`, treat as package-qualified identifier, not transliteration.
                         // e.g. `Foo::y(...)` is a function call, not `y///`.
                         if self.pos >= ident.len() + 2 {
@@ -1898,10 +2024,16 @@ impl Lexer {
                         }
                         // `tr` / `y` followed by terminators is a bareword, not transliteration.
                         // Check BEFORE skipping whitespace to catch newlines (implicit semicolon).
-                        // NOTE: `,` is intentionally NOT a terminator here — Perl allows
-                        // `tr,FROM,TO,FLAGS` (comma as the transliteration delimiter).
+                        // `,` is treated as a terminator UNLESS the lookahead shows the
+                        // full `tr,FROM,TO,FLAGS` shape — same gating as `s` above so
+                        // `y` / `tr` can still appear as struct field names, list elements,
+                        // and arg names without being eaten as transliteration bodies.
                         if let Some(d) = self.peek() {
                             if matches!(d, ';' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                                self.last_was_term = true;
+                                return Ok(Token::Ident(ident));
+                            }
+                            if d == ',' && !self.lookahead_is_comma_delim_subst() {
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }

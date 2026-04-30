@@ -4296,6 +4296,24 @@ impl Parser {
         match self.peek().clone() {
             Token::Ident(_) => {
                 let name = self.parse_package_qualified_identifier()?;
+                // Topic-slot barewords (`_`, `_<`, `_<<`, `_<<<`, `_<<<<`,
+                // `_0`, `_1`, …, `_N`, plus `_N<+` chain forms) are scalar
+                // refs to the current/positional/outer topic. A user-defined
+                // sub with any of these names — bare or package-qualified —
+                // would shadow the topic in expression position and silently
+                // break every `_`-aware builtin (`map { _ }`, `say _`,
+                // `lc _`, …). Reject ALL forms at parse time, including
+                // `Foo::_`, `Pkg::_0`, `My::Module::_<<<<`.
+                let bare = name.rsplit("::").next().unwrap_or(&name);
+                if Self::is_underscore_topic_slot(bare) {
+                    return Err(self.syntax_err(
+                        format!(
+                            "`fn {}` would shadow the topic-slot scalar; pick a different name",
+                            name
+                        ),
+                        line,
+                    ));
+                }
                 // Allow shadowing builtins:
                 // - In compat mode (full Perl 5)
                 // - When parsing a module (imports should work)
@@ -4343,10 +4361,41 @@ impl Parser {
                     line,
                 })
             }
-            tok => Err(self.syntax_err(
-                format!("Expected sub name, `(`, `{{`, or `:`, got {:?}", tok),
-                self.peek_line(),
-            )),
+            tok => {
+                // Sigil-form topic-slot names (`fn $_`, `fn $_<`, `fn $_0`,
+                // `fn @_`, `fn %_`, …) are also rejected with the same
+                // foot-gun message as the bareword form. Without this branch
+                // the user gets a confusing generic "Expected sub name" error.
+                let topic_name = match &tok {
+                    Token::ScalarVar(n) | Token::ArrayVar(n) | Token::HashVar(n)
+                        if Self::is_underscore_topic_slot(n) =>
+                    {
+                        Some((
+                            match &tok {
+                                Token::ScalarVar(_) => '$',
+                                Token::ArrayVar(_) => '@',
+                                Token::HashVar(_) => '%',
+                                _ => unreachable!(),
+                            },
+                            n.clone(),
+                        ))
+                    }
+                    _ => None,
+                };
+                if let Some((sigil, n)) = topic_name {
+                    return Err(self.syntax_err(
+                        format!(
+                            "`fn {}{}` would shadow the topic-slot scalar; pick a different name",
+                            sigil, n
+                        ),
+                        self.peek_line(),
+                    ));
+                }
+                Err(self.syntax_err(
+                    format!("Expected sub name, `(`, `{{`, or `:`, got {:?}", tok),
+                    self.peek_line(),
+                ))
+            }
         }
     }
 
@@ -11816,8 +11865,7 @@ impl Parser {
                 // Check for fat arrow (bareword string in hash) — except for
                 // topic-slot barewords (`_`, `_<`, `_0`, `_0<`, …), which must
                 // resolve to the topic value, not the literal name.
-                if matches!(self.peek(), Token::FatArrow)
-                    && !Self::is_underscore_topic_slot(&name)
+                if matches!(self.peek(), Token::FatArrow) && !Self::is_underscore_topic_slot(&name)
                 {
                     return Ok(Expr {
                         kind: ExprKind::String(name),
