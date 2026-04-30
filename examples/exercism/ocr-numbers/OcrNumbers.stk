@@ -8,15 +8,15 @@ my %_DIG = (
 
 fn Exercism::OcrNumbers::convert($rows) {
     die "Number of input lines is not a multiple of four"   if len(@$rows) % 4 != 0
-    die "Number of input columns is not a multiple of three" if grep { length($_) % 3 != 0 } @$rows
-    my @groups
-    for my $i (0..int(len(@$rows) / 4) - 1) {
-        my @block = @$rows[$i*4 .. $i*4 + 3]
-        my $w = length($block[0])
-        push @groups, join("", map {
-            my $col = $_
-            $_DIG{join("", map { substr($_, $col * 3, 3) } @block)} // "?"
-        } 0..int($w / 3) - 1)
-    }
-    join ",", @groups
+    die "Number of input columns is not a multiple of three" if fi { length(_) % 3 != 0 } @$rows
+    my $blocks = int(len(@$rows) / 4)
+    ~> 0:$blocks-1 map {
+        my $i = _ * 4
+        my @block = @$rows[$i:$i+3]
+        my $cols = int(length($block[0]) / 3)
+        ~> 0:$cols-1 map {
+            my $col = _
+            $_DIG{~> @block map { substr(_, $col * 3, 3) } |> join("")} // "?"
+        } |> join("")
+    } |> join(",")
 }

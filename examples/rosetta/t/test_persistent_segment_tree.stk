@@ -1,0 +1,134 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Persistent segment tree — every "update" returns a new
+# tree version that shares O(log n) nodes with the previous one. Lets
+# you query any historical version in O(log n) and use O((n+u) log n)
+# space across u updates.
+
+# Implementation: each node has { sum, left_idx, right_idx } stored in
+# a flat node arena. update() walks a copy of the spine, allocating
+# new nodes only along the path; query() reads from an arbitrary
+# historical root.
+
+fn Rosetta::PSeg::new($n) {
+    my @nodes = ({ sum => 0, left => -1, right => -1 })  # node 0 = null
+    my @roots
+    push @roots, Rosetta::PSeg::build_node(\@nodes, 0, $n - 1)
+    { n => $n, nodes => \@nodes, roots => \@roots }
+}
+
+fn Rosetta::PSeg::build_node($nodes, $lo, $hi) {
+    if ($lo == $hi) {
+        push @$nodes, { sum => 0, left => -1, right => -1 }
+        return len(@$nodes) - 1
+    }
+    my $mid = int(($lo + $hi) / 2)
+    my $l = Rosetta::PSeg::build_node($nodes, $lo, $mid)
+    my $r = Rosetta::PSeg::build_node($nodes, $mid + 1, $hi)
+    push @$nodes, { sum => 0, left => $l, right => $r }
+    len(@$nodes) - 1
+}
+
+fn Rosetta::PSeg::update_recursive($nodes, $node, $lo, $hi, $idx, $val) {
+    if ($lo == $hi) {
+        push @$nodes, { sum => $nodes->[$node]{sum} + $val, left => -1, right => -1 }
+        return len(@$nodes) - 1
+    }
+    my $mid = int(($lo + $hi) / 2)
+    my ($new_l, $new_r)
+    if ($idx <= $mid) {
+        $new_l = Rosetta::PSeg::update_recursive($nodes, $nodes->[$node]{left}, $lo, $mid, $idx, $val)
+        $new_r = $nodes->[$node]{right}
+    } else {
+        $new_l = $nodes->[$node]{left}
+        $new_r = Rosetta::PSeg::update_recursive($nodes, $nodes->[$node]{right}, $mid + 1, $hi, $idx, $val)
+    }
+    my $new_sum = $nodes->[$new_l]{sum} + $nodes->[$new_r]{sum}
+    push @$nodes, { sum => $new_sum, left => $new_l, right => $new_r }
+    len(@$nodes) - 1
+}
+
+# Returns version index. Each call adds a new root to ->{roots}.
+fn Rosetta::PSeg::update($t, $version, $idx, $val) {
+    my $root_idx = $t->{roots}[$version]
+    my $new_root = Rosetta::PSeg::update_recursive($t->{nodes}, $root_idx, 0, $t->{n} - 1, $idx, $val)
+    push @{$t->{roots}}, $new_root
+    len(@{$t->{roots}}) - 1
+}
+
+fn Rosetta::PSeg::query_recursive($nodes, $node, $lo, $hi, $qlo, $qhi) {
+    return 0 if $hi < $qlo || $lo > $qhi
+    return $nodes->[$node]{sum} if $qlo <= $lo && $hi <= $qhi
+    my $mid = int(($lo + $hi) / 2)
+    my $l = Rosetta::PSeg::query_recursive($nodes, $nodes->[$node]{left},  $lo,       $mid, $qlo, $qhi)
+    my $r = Rosetta::PSeg::query_recursive($nodes, $nodes->[$node]{right}, $mid + 1, $hi,  $qlo, $qhi)
+    $l + $r
+}
+
+fn Rosetta::PSeg::query($t, $version, $lo, $hi) {
+    my $root = $t->{roots}[$version]
+    Rosetta::PSeg::query_recursive($t->{nodes}, $root, 0, $t->{n} - 1, $lo, $hi)
+}
+
+# 8-element array. Apply 4 updates and verify each historical version.
+my $t = Rosetta::PSeg::new(8)
+# Initial (version 0): all zeros.
+assert_eq Rosetta::PSeg::query($t, 0, 0, 7), 0, "v0 full sum"
+
+# v1: add 5 at index 3
+my $v1 = Rosetta::PSeg::update($t, 0, 3, 5)
+assert_eq Rosetta::PSeg::query($t, $v1, 0, 7), 5, "v1 full sum"
+assert_eq Rosetta::PSeg::query($t, 0, 0, 7), 0, "v0 still 0"
+assert_eq Rosetta::PSeg::query($t, $v1, 3, 3), 5, "v1 idx 3"
+assert_eq Rosetta::PSeg::query($t, $v1, 4, 7), 0, "v1 [4..7] empty"
+
+# v2: add 7 at index 6
+my $v2 = Rosetta::PSeg::update($t, $v1, 6, 7)
+assert_eq Rosetta::PSeg::query($t, $v2, 0, 7), 12, "v2 full sum"
+assert_eq Rosetta::PSeg::query($t, $v2, 0, 5), 5,  "v2 [0..5]"
+assert_eq Rosetta::PSeg::query($t, $v2, 6, 6), 7,  "v2 idx 6"
+assert_eq Rosetta::PSeg::query($t, $v1, 0, 7), 5, "v1 unchanged"
+
+# v3: add 3 at index 0
+my $v3 = Rosetta::PSeg::update($t, $v2, 0, 3)
+assert_eq Rosetta::PSeg::query($t, $v3, 0, 7), 15, "v3 full sum"
+assert_eq Rosetta::PSeg::query($t, $v3, 0, 0), 3,  "v3 idx 0"
+
+# v4: branch off v1 instead of v3
+my $v4 = Rosetta::PSeg::update($t, $v1, 7, 9)
+assert_eq Rosetta::PSeg::query($t, $v4, 0, 7), 14, "v4 full sum (branch from v1)"
+assert_eq Rosetta::PSeg::query($t, $v4, 6, 7), 9, "v4 [6..7] (no v2/v3 contributions)"
+assert_eq Rosetta::PSeg::query($t, $v3, 0, 7), 15, "v3 still 15"
+
+# Persistence: every historical query must remain valid.
+assert_eq Rosetta::PSeg::query($t, 0, 0, 7), 0,  "v0 immutable"
+assert_eq Rosetta::PSeg::query($t, $v1, 0, 7), 5,  "v1 immutable"
+assert_eq Rosetta::PSeg::query($t, $v2, 0, 7), 12, "v2 immutable"
+
+# Cross-check via naive arrays for each version.
+fn Rosetta::PSeg::naive_sum($arr, $lo, $hi) {
+    my $s = 0
+    for my $i ($lo..$hi) { $s += $arr->[$i] }
+    $s
+}
+
+my @v0_arr = (0, 0, 0, 0, 0, 0, 0, 0)
+my @v1_arr = @v0_arr; $v1_arr[3] += 5
+my @v2_arr = @v1_arr; $v2_arr[6] += 7
+my @v3_arr = @v2_arr; $v3_arr[0] += 3
+my @v4_arr = @v1_arr; $v4_arr[7] += 9
+
+for my $r ([0, 7], [0, 3], [3, 6], [4, 7]) {
+    my ($lo, $hi) = @$r
+    assert_eq Rosetta::PSeg::query($t, 0,   $lo, $hi),
+              Rosetta::PSeg::naive_sum(\@v0_arr, $lo, $hi), "v0 [$lo..$hi]"
+    assert_eq Rosetta::PSeg::query($t, $v1, $lo, $hi),
+              Rosetta::PSeg::naive_sum(\@v1_arr, $lo, $hi), "v1 [$lo..$hi]"
+    assert_eq Rosetta::PSeg::query($t, $v2, $lo, $hi),
+              Rosetta::PSeg::naive_sum(\@v2_arr, $lo, $hi), "v2 [$lo..$hi]"
+    assert_eq Rosetta::PSeg::query($t, $v3, $lo, $hi),
+              Rosetta::PSeg::naive_sum(\@v3_arr, $lo, $hi), "v3 [$lo..$hi]"
+    assert_eq Rosetta::PSeg::query($t, $v4, $lo, $hi),
+              Rosetta::PSeg::naive_sum(\@v4_arr, $lo, $hi), "v4 [$lo..$hi]"
+}
+
+test_run

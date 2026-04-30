@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Point quadtree — recursively partitions a 2D region
+# into four quadrants. Each leaf holds at most $capacity points;
+# overflow triggers a subdivide.
+
+fn Rosetta::Quad::new($x, $y, $w, $h, $cap) {
+    { x => $x, y => $y, w => $w, h => $h, cap => $cap // 4, points => [], divided => 0 }
+}
+
+fn Rosetta::Quad::contains($q, $px, $py) {
+    $px >= $q->{x} && $px < $q->{x} + $q->{w}
+        && $py >= $q->{y} && $py < $q->{y} + $q->{h}
+}
+
+fn Rosetta::Quad::intersects($q, $rx, $ry, $rw, $rh) {
+    !($rx > $q->{x} + $q->{w} || $rx + $rw < $q->{x}
+      || $ry > $q->{y} + $q->{h} || $ry + $rh < $q->{y})
+}
+
+fn Rosetta::Quad::subdivide($q) {
+    my $hw = $q->{w} / 2
+    my $hh = $q->{h} / 2
+    $q->{q_ne} = Rosetta::Quad::new($q->{x} + $hw, $q->{y},     $hw, $hh, $q->{cap})
+    $q->{q_nw} = Rosetta::Quad::new($q->{x},      $q->{y},     $hw, $hh, $q->{cap})
+    $q->{q_se} = Rosetta::Quad::new($q->{x} + $hw, $q->{y} + $hh, $hw, $hh, $q->{cap})
+    $q->{q_sw} = Rosetta::Quad::new($q->{x},      $q->{y} + $hh, $hw, $hh, $q->{cap})
+    $q->{divided} = 1
+}
+
+fn Rosetta::Quad::insert($q, $px, $py) {
+    return 0 if !Rosetta::Quad::contains($q, $px, $py)
+    if (!$q->{divided} && len(@{$q->{points}}) < $q->{cap}) {
+        push @{$q->{points}}, [$px, $py]
+        return 1
+    }
+    Rosetta::Quad::subdivide($q) if !$q->{divided}
+    Rosetta::Quad::insert($q->{q_ne}, $px, $py)
+        || Rosetta::Quad::insert($q->{q_nw}, $px, $py)
+        || Rosetta::Quad::insert($q->{q_se}, $px, $py)
+        || Rosetta::Quad::insert($q->{q_sw}, $px, $py)
+}
+
+fn Rosetta::Quad::query_range($q, $rx, $ry, $rw, $rh, $out) {
+    return if !Rosetta::Quad::intersects($q, $rx, $ry, $rw, $rh)
+    for my $p (@{$q->{points}}) {
+        my ($px, $py) = @$p
+        if ($px >= $rx && $px <= $rx + $rw && $py >= $ry && $py <= $ry + $rh) {
+            push @$out, $p
+        }
+    }
+    if ($q->{divided}) {
+        Rosetta::Quad::query_range($q->{q_ne}, $rx, $ry, $rw, $rh, $out)
+        Rosetta::Quad::query_range($q->{q_nw}, $rx, $ry, $rw, $rh, $out)
+        Rosetta::Quad::query_range($q->{q_se}, $rx, $ry, $rw, $rh, $out)
+        Rosetta::Quad::query_range($q->{q_sw}, $rx, $ry, $rw, $rh, $out)
+    }
+}
+
+fn Rosetta::Quad::all_points($q) {
+    my @out
+    Rosetta::Quad::ap($q, \@out)
+    \@out
+}
+
+fn Rosetta::Quad::ap($q, $out) {
+    for my $p (@{$q->{points}}) { push @$out, $p }
+    if ($q->{divided}) {
+        Rosetta::Quad::ap($q->{q_ne}, $out)
+        Rosetta::Quad::ap($q->{q_nw}, $out)
+        Rosetta::Quad::ap($q->{q_se}, $out)
+        Rosetta::Quad::ap($q->{q_sw}, $out)
+    }
+}
+
+fn Rosetta::Quad::format_points($pts) {
+    my @sorted = sort { _0->[0] <=> _1->[0] || _0->[1] <=> _1->[1] } @$pts
+    join(";", map { _0->[0] . "," . _0->[1] } @sorted)
+}
+
+# Insert points and verify
+my $q = Rosetta::Quad::new(0, 0, 100, 100, 4)
+my @points = ([10, 10], [50, 50], [80, 20], [70, 90], [25, 25],
+              [60, 40], [90, 90], [5, 95], [95, 5], [40, 60])
+for my $p (@points) { Rosetta::Quad::insert($q, $p->[0], $p->[1]) }
+
+# All points should round-trip
+my $all = Rosetta::Quad::all_points($q)
+assert_eq Rosetta::Quad::format_points($all),
+          Rosetta::Quad::format_points(\@points),
+          "all points round-trip"
+
+# Range query: top-left quadrant [0..50, 0..50]
+my @r1
+Rosetta::Quad::query_range($q, 0, 0, 50, 50, \@r1)
+my @expected_r1 = grep { _0->[0] <= 50 && _0->[1] <= 50 } @points
+assert_eq Rosetta::Quad::format_points(\@r1),
+          Rosetta::Quad::format_points(\@expected_r1),
+          "top-left quadrant query"
+
+# Tight range
+my @r2
+Rosetta::Quad::query_range($q, 70, 80, 30, 20, \@r2)
+my @expected_r2 = grep {
+    _0->[0] >= 70 && _0->[0] <= 100 && _0->[1] >= 80 && _0->[1] <= 100
+} @points
+assert_eq Rosetta::Quad::format_points(\@r2),
+          Rosetta::Quad::format_points(\@expected_r2),
+          "tight upper-right query"
+
+# Empty range
+my @r3
+Rosetta::Quad::query_range($q, 200, 200, 50, 50, \@r3)
+assert_eq len(@r3), 0, "out-of-bounds query empty"
+
+# Insert outside region returns 0
+my $ok = Rosetta::Quad::insert($q, -5, 50)
+assert_eq $ok, 0, "out-of-bounds insert rejected"
+$ok = Rosetta::Quad::insert($q, 50, 200)
+assert_eq $ok, 0, "out-of-bounds insert rejected (y)"
+
+# contains / intersects sanity
+assert_eq Rosetta::Quad::contains($q, 50, 50), 1, "contains middle"
+assert_eq Rosetta::Quad::contains($q, -1, 50), 0, "out-of-bounds x"
+assert_eq Rosetta::Quad::contains($q, 100, 50), 0, "right edge exclusive"
+assert_eq Rosetta::Quad::intersects($q, -10, -10, 20, 20), 1, "overlaps origin"
+assert_eq Rosetta::Quad::intersects($q, 200, 200, 5, 5), 0, "no overlap"
+
+test_run

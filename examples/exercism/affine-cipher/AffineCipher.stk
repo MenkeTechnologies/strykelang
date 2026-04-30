@@ -1,20 +1,21 @@
 #!/usr/bin/env stryke
 fn Exercism::AffineCipher::_gcd($a, $b) { $b == 0 ? $a : Exercism::AffineCipher::_gcd($b, $a % $b) }
-fn Exercism::AffineCipher::_modinv($a, $m) { (grep { ($a * $_) % $m == 1 } 1..$m - 1)[0] // -1 }
+fn Exercism::AffineCipher::_modinv($a, $m) { (fi { ($a * _) % $m == 1 } 1..$m - 1)[0] // -1 }
 
 fn Exercism::AffineCipher::encode($phrase, $a, $b) {
     die "a and m must be coprime." if Exercism::AffineCipher::_gcd($a, 26) != 1
     my $clean = lc($phrase) =~ s/[^a-z0-9]//gr
-    my $enc = join "", map {
-        /[a-z]/ ? chr(($a * (ord($_) - ord("a")) + $b) % 26 + ord("a")) : $_
-    } chars($clean)
-    join " ", map { substr($enc, $_ * 5, 5) } 0..int((length($enc) - 1) / 5)
+    my $enc = ~> $clean chars map {
+        _ =~ /[a-z]/ ? chr(($a * (ord(_) - ord("a")) + $b) % 26 + ord("a")) : _
+    } |> join("")
+    my $end = int((length($enc) - 1) / 5)
+    ~> 0:$end map { substr($enc, _ * 5, 5) } |> join(" ")
 }
 
 fn Exercism::AffineCipher::decode($phrase, $a, $b) {
     die "a and m must be coprime." if Exercism::AffineCipher::_gcd($a, 26) != 1
     my $inv = Exercism::AffineCipher::_modinv($a, 26)
-    join "", map {
-        /[a-z]/ ? chr((($inv * (ord($_) - ord("a") - $b)) % 26 + 26) % 26 + ord("a")) : $_
-    } chars($phrase =~ s/\s+//gr)
+    ~> ($phrase =~ s/\s+//gr) chars map {
+        _ =~ /[a-z]/ ? chr((($inv * (ord(_) - ord("a") - $b)) % 26 + 26) % 26 + ord("a")) : _
+    } |> join("")
 }

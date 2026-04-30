@@ -1,0 +1,147 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fibonacci heap — supports insert in O(1) amortized,
+# extract-min in O(log n) amortized, decrease-key in O(1) amortized,
+# union in O(1).
+
+# This is a simplified implementation that exercises insert, extract-min,
+# and union — sufficient to demonstrate the lazy meld behavior. Trees in
+# the root list are stored in a flat array and consolidated on extract.
+
+fn Rosetta::FibHeap::new() {
+    { roots => [], min_idx => -1, count => 0 }
+}
+
+fn Rosetta::FibHeap::insert($h, $key) {
+    my $node = { key => $key, children => [] }
+    push @{$h->{roots}}, $node
+    if ($h->{min_idx} == -1 || $key < $h->{roots}[$h->{min_idx}]{key}) {
+        $h->{min_idx} = len(@{$h->{roots}}) - 1
+    }
+    $h->{count}++
+    $node
+}
+
+fn Rosetta::FibHeap::merge_trees($a, $b) {
+    # Merge two trees of equal degree: the smaller-key root becomes parent.
+    if ($a->{key} <= $b->{key}) {
+        push @{$a->{children}}, $b
+        return $a
+    } else {
+        push @{$b->{children}}, $a
+        return $b
+    }
+}
+
+fn Rosetta::FibHeap::consolidate($h) {
+    my %by_degree
+    for my $r (@{$h->{roots}}) {
+        my $cur = $r
+        while (exists $by_degree{len(@{$cur->{children}})}) {
+            my $deg = len(@{$cur->{children}})
+            my $other = delete $by_degree{$deg}
+            $cur = Rosetta::FibHeap::merge_trees($cur, $other)
+        }
+        $by_degree{len(@{$cur->{children}})} = $cur
+    }
+    my @new_roots
+    my $min_idx = -1
+    for my $deg (sort { _0 <=> _1 } keys %by_degree) {
+        push @new_roots, $by_degree{$deg}
+        if ($min_idx == -1 || $by_degree{$deg}{key} < $new_roots[$min_idx]{key}) {
+            $min_idx = len(@new_roots) - 1
+        }
+    }
+    $h->{roots} = \@new_roots
+    $h->{min_idx} = $min_idx
+}
+
+fn Rosetta::FibHeap::extract_min($h) {
+    return undef if $h->{count} == 0
+    my $min_node = $h->{roots}[$h->{min_idx}]
+    my $key = $min_node->{key}
+    # Replace min with its children, then consolidate.
+    my @new_roots
+    for my $i (~> 0:len(@{$h->{roots}}) - 1) {
+        if ($i != $h->{min_idx}) { push @new_roots, $h->{roots}[$i] }
+    }
+    for my $c (@{$min_node->{children}}) { push @new_roots, $c }
+    $h->{roots} = \@new_roots
+    $h->{count}--
+    if ($h->{count} == 0) {
+        $h->{min_idx} = -1
+    } else {
+        Rosetta::FibHeap::consolidate($h)
+    }
+    $key
+}
+
+fn Rosetta::FibHeap::min($h) {
+    return undef if $h->{min_idx} == -1
+    $h->{roots}[$h->{min_idx}]{key}
+}
+
+fn Rosetta::FibHeap::union($a, $b) {
+    my $h = Rosetta::FibHeap::new()
+    for my $r (@{$a->{roots}}) { push @{$h->{roots}}, $r }
+    for my $r (@{$b->{roots}}) { push @{$h->{roots}}, $r }
+    $h->{count} = $a->{count} + $b->{count}
+    if ($h->{count} > 0) {
+        my $min_idx = 0
+        for my $i (1..len(@{$h->{roots}}) - 1) {
+            if ($h->{roots}[$i]{key} < $h->{roots}[$min_idx]{key}) { $min_idx = $i }
+        }
+        $h->{min_idx} = $min_idx
+    }
+    $h
+}
+
+# Insert and min
+my $h = Rosetta::FibHeap::new()
+Rosetta::FibHeap::insert($h, 5)
+Rosetta::FibHeap::insert($h, 2)
+Rosetta::FibHeap::insert($h, 8)
+Rosetta::FibHeap::insert($h, 1)
+Rosetta::FibHeap::insert($h, 7)
+
+assert_eq Rosetta::FibHeap::min($h), 1, "min after inserts"
+assert_eq $h->{count}, 5, "count = 5"
+
+# Extract min in sorted order
+assert_eq Rosetta::FibHeap::extract_min($h), 1, "extract 1"
+assert_eq Rosetta::FibHeap::extract_min($h), 2, "extract 2"
+assert_eq Rosetta::FibHeap::extract_min($h), 5, "extract 5"
+assert_eq Rosetta::FibHeap::extract_min($h), 7, "extract 7"
+assert_eq Rosetta::FibHeap::extract_min($h), 8, "extract 8"
+assert_eq $h->{count}, 0, "empty after extracts"
+assert_ok !defined Rosetta::FibHeap::extract_min($h), "extract empty = undef"
+
+# Larger heap-sort test
+my $big = Rosetta::FibHeap::new()
+my @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+for my $v (@input) { Rosetta::FibHeap::insert($big, $v) }
+my @sorted_via_heap
+while ($big->{count} > 0) { push @sorted_via_heap, Rosetta::FibHeap::extract_min($big) }
+my @native = sort { _0 <=> _1 } @input
+assert_eq join(",", @sorted_via_heap), join(",", @native), "Fib-heap-sort = native sort"
+
+# Union
+my $h1 = Rosetta::FibHeap::new()
+Rosetta::FibHeap::insert($h1, 10)
+Rosetta::FibHeap::insert($h1, 4)
+my $h2 = Rosetta::FibHeap::new()
+Rosetta::FibHeap::insert($h2, 7)
+Rosetta::FibHeap::insert($h2, 2)
+my $u = Rosetta::FibHeap::union($h1, $h2)
+assert_eq Rosetta::FibHeap::min($u), 2, "union min = 2"
+assert_eq $u->{count}, 4, "union count = 4"
+my @ordered
+while ($u->{count} > 0) { push @ordered, Rosetta::FibHeap::extract_min($u) }
+assert_eq join(",", @ordered), "2,4,7,10", "union extracts in order"
+
+# Single element
+my $one = Rosetta::FibHeap::new()
+Rosetta::FibHeap::insert($one, 42)
+assert_eq Rosetta::FibHeap::extract_min($one), 42, "single-element extract"
+assert_eq $one->{count}, 0, "empty after"
+
+test_run

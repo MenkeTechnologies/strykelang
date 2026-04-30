@@ -1,6 +1,5 @@
 #!/usr/bin/env stryke
 fn Exercism::SumOfMultiples::sum_of_multiples($input) {
-    my $limit = $input->{limit}
     my $factors = $input->{factors}
-    sum(grep { my $n = $_; grep { $_ != 0 && $n % $_ == 0 } @$factors } 1..$limit-1) // 0
+    (~> 1:$input->{limit}-1 fi { my $n = _; fi { _ != 0 && $n % _ == 0 } @$factors } sum) // 0
 }

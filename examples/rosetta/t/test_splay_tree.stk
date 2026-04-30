@@ -1,0 +1,137 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Splay tree — self-adjusting BST. After every access, the
+# touched node is rotated to the root via the "splay" operation, so
+# recently used keys are cheap to access again.
+
+fn Rosetta::Splay::new() { { root => undef } }
+
+fn Rosetta::Splay::rotate_right($x) {
+    my $y = $x->{left}
+    $x->{left} = $y->{right}
+    $y->{right} = $x
+    $y
+}
+
+fn Rosetta::Splay::rotate_left($x) {
+    my $y = $x->{right}
+    $x->{right} = $y->{left}
+    $y->{left} = $x
+    $y
+}
+
+# Top-down splay (Sleator-Tarjan): brings $key (or its in-order
+# neighbor) to the root and returns the new root.
+fn Rosetta::Splay::splay($root, $key) {
+    return undef if !defined $root
+    my $header = { left => undef, right => undef, key => 0 }
+    my $l = $header
+    my $r = $header
+    my $t = $root
+    while (1) {
+        if ($key < $t->{key}) {
+            last if !defined $t->{left}
+            if ($key < $t->{left}{key}) {
+                $t = Rosetta::Splay::rotate_right($t)
+                last if !defined $t->{left}
+            }
+            $r->{left} = $t
+            $r = $t
+            $t = $t->{left}
+        } elsif ($key > $t->{key}) {
+            last if !defined $t->{right}
+            if ($key > $t->{right}{key}) {
+                $t = Rosetta::Splay::rotate_left($t)
+                last if !defined $t->{right}
+            }
+            $l->{right} = $t
+            $l = $t
+            $t = $t->{right}
+        } else {
+            last
+        }
+    }
+    $l->{right} = $t->{left}
+    $r->{left} = $t->{right}
+    $t->{left} = $header->{right}
+    $t->{right} = $header->{left}
+    $t
+}
+
+fn Rosetta::Splay::insert($s, $key) {
+    if (!defined $s->{root}) {
+        $s->{root} = { key => $key, left => undef, right => undef }
+        return
+    }
+    $s->{root} = Rosetta::Splay::splay($s->{root}, $key)
+    if ($s->{root}{key} == $key) { return }   # already present
+    my $node = { key => $key, left => undef, right => undef }
+    if ($key < $s->{root}{key}) {
+        $node->{right} = $s->{root}
+        $node->{left} = $s->{root}{left}
+        $s->{root}{left} = undef
+    } else {
+        $node->{left} = $s->{root}
+        $node->{right} = $s->{root}{right}
+        $s->{root}{right} = undef
+    }
+    $s->{root} = $node
+}
+
+fn Rosetta::Splay::contains($s, $key) {
+    return 0 if !defined $s->{root}
+    $s->{root} = Rosetta::Splay::splay($s->{root}, $key)
+    $s->{root}{key} == $key ? 1 : 0
+}
+
+fn Rosetta::Splay::inorder($s) {
+    my @out
+    Rosetta::Splay::io($s->{root}, \@out)
+    \@out
+}
+
+fn Rosetta::Splay::io($node, $out) {
+    return if !defined $node
+    Rosetta::Splay::io($node->{left}, $out)
+    push @$out, $node->{key}
+    Rosetta::Splay::io($node->{right}, $out)
+}
+
+# Insert a few keys
+my $s = Rosetta::Splay::new()
+for my $k (5, 3, 8, 1, 9, 4, 7, 2, 6, 10) { Rosetta::Splay::insert($s, $k) }
+assert_eq join(",", @{Rosetta::Splay::inorder($s)}), "1,2,3,4,5,6,7,8,9,10",
+    "in-order after inserts"
+
+# After each contains, the touched key is at the root.
+for my $k (1, 5, 10, 3) {
+    assert_eq Rosetta::Splay::contains($s, $k), 1, "contains $k"
+    assert_eq $s->{root}{key}, $k, "splayed root = $k"
+}
+
+# Missing key: search ends with the closest in-order neighbor at the root.
+assert_eq Rosetta::Splay::contains($s, 11), 0, "11 not present"
+my $closest = $s->{root}{key}
+assert_ok $closest == 10 || $closest == 9, "splayed root near 11"
+
+# Empty / single-element
+my $e = Rosetta::Splay::new()
+assert_eq Rosetta::Splay::contains($e, 5), 0, "empty contains 0"
+Rosetta::Splay::insert($e, 42)
+assert_eq Rosetta::Splay::contains($e, 42), 1, "single contains"
+assert_eq $e->{root}{key}, 42, "single root = 42"
+
+# Duplicate insert is no-op
+Rosetta::Splay::insert($e, 42)
+my @after = @{Rosetta::Splay::inorder($e)}
+assert_eq join(",", @after), "42", "duplicate ignored"
+
+# Ascending insert (worst case for naive BST)
+my $asc = Rosetta::Splay::new()
+for my $k (~> 1:20) { Rosetta::Splay::insert($asc, $k) }
+assert_eq join(",", @{Rosetta::Splay::inorder($asc)}),
+          join(",", (1..20)), "asc insert in-order"
+# Repeated access of 1 should bring it to root.
+for (1..5) { Rosetta::Splay::contains($asc, 1) }
+assert_eq $asc->{root}{key}, 1, "repeated access of 1 → root"
+
+test_run

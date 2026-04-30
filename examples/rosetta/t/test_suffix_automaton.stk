@@ -1,0 +1,123 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Suffix automaton — minimal DFA recognizing every suffix
+# of a string. O(n) construction in alphabet-size time. The state set
+# is in bijection with the set of distinct substrings, so the total
+# number of states is at most 2n - 1.
+
+fn Rosetta::SAM::new() {
+    # State 0 is the initial state; len = 0, link = -1.
+    my @states = ({ len => 0, link => -1, next => {} })
+    { states => \@states, last => 0 }
+}
+
+fn Rosetta::SAM::extend($sam, $c) {
+    my $cur = len(@{$sam->{states}})
+    push @{$sam->{states}}, { len => $sam->{states}[$sam->{last}]{len} + 1, link => -1, next => {} }
+    my $p = $sam->{last}
+    while ($p != -1 && !exists $sam->{states}[$p]{next}{$c}) {
+        $sam->{states}[$p]{next}{$c} = $cur
+        $p = $sam->{states}[$p]{link}
+    }
+    if ($p == -1) {
+        $sam->{states}[$cur]{link} = 0
+    } else {
+        my $q = $sam->{states}[$p]{next}{$c}
+        if ($sam->{states}[$p]{len} + 1 == $sam->{states}[$q]{len}) {
+            $sam->{states}[$cur]{link} = $q
+        } else {
+            my $clone = len(@{$sam->{states}})
+            my %clone_next
+            for my $k (keys %{$sam->{states}[$q]{next}}) {
+                $clone_next{$k} = $sam->{states}[$q]{next}{$k}
+            }
+            push @{$sam->{states}}, {
+                len => $sam->{states}[$p]{len} + 1,
+                link => $sam->{states}[$q]{link},
+                next => \%clone_next
+            }
+            while ($p != -1 && exists $sam->{states}[$p]{next}{$c}
+                   && $sam->{states}[$p]{next}{$c} == $q) {
+                $sam->{states}[$p]{next}{$c} = $clone
+                $p = $sam->{states}[$p]{link}
+            }
+            $sam->{states}[$q]{link} = $clone
+            $sam->{states}[$cur]{link} = $clone
+        }
+    }
+    $sam->{last} = $cur
+}
+
+fn Rosetta::SAM::build($s) {
+    my $sam = Rosetta::SAM::new()
+    for my $c (split(//, $s)) { Rosetta::SAM::extend($sam, $c) }
+    $sam
+}
+
+fn Rosetta::SAM::contains($sam, $pat) {
+    my $cur = 0
+    for my $c (split(//, $pat)) {
+        return 0 if !exists $sam->{states}[$cur]{next}{$c}
+        $cur = $sam->{states}[$cur]{next}{$c}
+    }
+    1
+}
+
+fn Rosetta::SAM::distinct_substrings($sam) {
+    # Each state represents (state.len - link.len) distinct substrings.
+    my $total = 0
+    for my $i (1..len(@{$sam->{states}}) - 1) {
+        my $st = $sam->{states}[$i]
+        $total += $st->{len} - $sam->{states}[$st->{link}]{len}
+    }
+    $total
+}
+
+# Build SAM for "abcbc"
+my $sam = Rosetta::SAM::build("abcbc")
+
+# Substring queries
+assert_eq Rosetta::SAM::contains($sam, ""), 1,    "empty is substring"
+assert_eq Rosetta::SAM::contains($sam, "a"), 1,   "'a'"
+assert_eq Rosetta::SAM::contains($sam, "bc"), 1,  "'bc'"
+assert_eq Rosetta::SAM::contains($sam, "abc"), 1, "'abc'"
+assert_eq Rosetta::SAM::contains($sam, "abcbc"), 1, "full"
+assert_eq Rosetta::SAM::contains($sam, "cbc"), 1, "'cbc'"
+assert_eq Rosetta::SAM::contains($sam, "bcb"), 1, "'bcb'"
+assert_eq Rosetta::SAM::contains($sam, "ac"), 0,  "'ac' not substring"
+assert_eq Rosetta::SAM::contains($sam, "cba"), 0, "'cba' not substring"
+assert_eq Rosetta::SAM::contains($sam, "abcd"), 0, "'abcd' has 'd' missing"
+
+# Distinct substrings of "abcbc" (excluding empty):
+# a, b, c, ab, bc, cb, abc, bcb, cbc, abcb, bcbc, abcbc → 12
+assert_eq Rosetta::SAM::distinct_substrings($sam), 12, "abcbc distinct substrings = 12"
+
+# Distinct substrings of "aaa": a, aa, aaa = 3
+my $sam2 = Rosetta::SAM::build("aaa")
+assert_eq Rosetta::SAM::distinct_substrings($sam2), 3, "aaa distinct = 3"
+
+# Distinct substrings of "abcd": 4 + 3 + 2 + 1 = 10 (all unique)
+my $sam3 = Rosetta::SAM::build("abcd")
+assert_eq Rosetta::SAM::distinct_substrings($sam3), 10, "abcd distinct = 10"
+
+# Cross-check with naive substring enumeration
+fn Rosetta::SAM::naive_distinct($s) {
+    my %seen
+    my $n = length($s)
+    for my $i (~> 0:$n - 1) {
+        for my $L (~> 1:$n - $i) {
+            $seen{substr($s, $i, $L)} = 1
+        }
+    }
+    len(keys %seen)
+}
+for my $word ("banana", "mississippi", "ababaa", "x", "abcabc") {
+    my $sam_d = Rosetta::SAM::distinct_substrings(Rosetta::SAM::build($word))
+    my $naive = Rosetta::SAM::naive_distinct($word)
+    assert_eq $sam_d, $naive, "$word: SAM = naive distinct"
+}
+
+# Empty string: 0 distinct
+my $sam_empty = Rosetta::SAM::new()
+assert_eq Rosetta::SAM::distinct_substrings($sam_empty), 0, "empty distinct = 0"
+
+test_run

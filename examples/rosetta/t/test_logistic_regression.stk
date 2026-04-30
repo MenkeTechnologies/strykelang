@@ -1,0 +1,93 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Logistic regression — binary classification fit by
+# gradient descent on the negative log-likelihood. Each training row
+# is (features, label) with label ∈ {0, 1}.
+
+fn Rosetta::Logistic::sigmoid($z) { 1 / (1 + exp(-$z)) }
+
+fn Rosetta::Logistic::predict_one($weights, $bias, $x) {
+    my $z = $bias
+    for my $i (~> 0:len(@$x) - 1) { $z += $weights->[$i] * $x->[$i] }
+    Rosetta::Logistic::sigmoid($z)
+}
+
+fn Rosetta::Logistic::fit($X, $y, $lr, $iters) {
+    my $n = len(@$X)
+    my $d = len(@{$X->[0]})
+    my @weights = ~> 1:$d |> map { 0 }
+    my $bias = 0
+    for my $iter (~> 1:$iters) {
+        my @grad = ~> 1:$d |> map { 0 }
+        my $bias_grad = 0
+        for my $i (~> 0:$n - 1) {
+            my $p = Rosetta::Logistic::predict_one(\@weights, $bias, $X->[$i])
+            my $err = $p - $y->[$i]
+            for my $j (~> 0:$d - 1) { $grad[$j] += $err * $X->[$i][$j] }
+            $bias_grad += $err
+        }
+        for my $j (~> 0:$d - 1) { $weights[$j] -= $lr * $grad[$j] / $n }
+        $bias -= $lr * $bias_grad / $n
+    }
+    { weights => \@weights, bias => $bias }
+}
+
+fn Rosetta::Logistic::predict($model, $x) {
+    Rosetta::Logistic::predict_one($model->{weights}, $model->{bias}, $x)
+}
+
+fn Rosetta::Logistic::classify($model, $x) {
+    Rosetta::Logistic::predict($model, $x) >= 0.5 ? 1 : 0
+}
+
+fn Rosetta::Logistic::accuracy($model, $X, $y) {
+    my $hits = 0
+    for my $i (~> 0:len(@$X) - 1) {
+        $hits++ if Rosetta::Logistic::classify($model, $X->[$i]) == $y->[$i]
+    }
+    $hits / len(@$X)
+}
+
+# Sigmoid sanity
+assert_eq Rosetta::Logistic::sigmoid(0), 0.5, "σ(0) = 0.5"
+my $s1 = Rosetta::Logistic::sigmoid(10)
+assert_ok abs($s1 - 1) < 0.001, "σ(10) ≈ 1"
+my $s2 = Rosetta::Logistic::sigmoid(-10)
+assert_ok abs($s2 - 0) < 0.001, "σ(-10) ≈ 0"
+
+# Linearly separable 1D problem: y = 1 iff x > 0.
+my $X1 = [[-3], [-2], [-1], [-0.5], [0.5], [1], [2], [3]]
+my $y1 = [0, 0, 0, 0, 1, 1, 1, 1]
+my $m1 = Rosetta::Logistic::fit($X1, $y1, 0.5, 5000)
+assert_eq Rosetta::Logistic::accuracy($m1, $X1, $y1), 1, "1D classifier 100% accuracy"
+
+# Predicted weight should be positive; predicted bias near 0.
+assert_ok $m1->{weights}[0] > 0, "weight has correct sign"
+
+# 2D problem: AND function.
+# x ∈ {0,1}², label = x[0] AND x[1]
+my $X2 = [[0, 0], [0, 1], [1, 0], [1, 1]]
+my $y2 = [0, 0, 0, 1]
+my $m2 = Rosetta::Logistic::fit($X2, $y2, 1.0, 10000)
+assert_eq Rosetta::Logistic::classify($m2, [0, 0]), 0, "AND(0,0) = 0"
+assert_eq Rosetta::Logistic::classify($m2, [1, 1]), 1, "AND(1,1) = 1"
+assert_eq Rosetta::Logistic::classify($m2, [0, 1]), 0, "AND(0,1) = 0"
+assert_eq Rosetta::Logistic::classify($m2, [1, 0]), 0, "AND(1,0) = 0"
+
+# 2D problem: OR function.
+my $y3 = [0, 1, 1, 1]
+my $m3 = Rosetta::Logistic::fit($X2, $y3, 1.0, 10000)
+assert_eq Rosetta::Logistic::classify($m3, [0, 0]), 0, "OR(0,0) = 0"
+assert_eq Rosetta::Logistic::classify($m3, [0, 1]), 1, "OR(0,1) = 1"
+assert_eq Rosetta::Logistic::classify($m3, [1, 0]), 1, "OR(1,0) = 1"
+assert_eq Rosetta::Logistic::classify($m3, [1, 1]), 1, "OR(1,1) = 1"
+
+# 2D linearly separable region
+my $X4 = [
+    [1, 1], [2, 2], [1, 2], [3, 3], [2, 3],
+    [-1, -1], [-2, -1], [-2, -2], [-3, -2], [-1, -2]
+]
+my $y4 = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+my $m4 = Rosetta::Logistic::fit($X4, $y4, 0.1, 5000)
+assert_eq Rosetta::Logistic::accuracy($m4, $X4, $y4), 1, "2D linearly separable"
+
+test_run

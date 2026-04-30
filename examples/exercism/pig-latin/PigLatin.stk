@@ -8,6 +8,4 @@ fn Exercism::PigLatin::_trans($w) {
     "${w}ay"
 }
 
-fn Exercism::PigLatin::translate($s) {
-    join " ", map { Exercism::PigLatin::_trans($_) } split /\s+/, $s
-}
+fn Exercism::PigLatin::translate($s) { ~> $s split(/\s+/) map { Exercism::PigLatin::_trans } |> join(" ") }

@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+# Rosetta Code: CYK parser — bottom-up O(n³ · |G|) parser for context-
+# free grammars in Chomsky Normal Form (CNF). dp[i][j] holds the set
+# of nonterminals that derive tokens[i..j].
+
+# Grammar representation:
+#   { unary => { "terminal" => [NT, ...] },
+#     binary => { "NTleft NTright" => [NT, ...] },
+#     start => "S" }
+
+fn Rosetta::CYK::parse($grammar, $tokens) {
+    my $n = len(@$tokens)
+    return 0 if $n == 0
+    # dp[$i][$j] = hashref of NTs deriving tokens[$i..$j].
+    my @dp
+    for my $i (~> 0:$n - 1) {
+        my @row
+        for my $j (~> 0:$n - 1) { push @row, {} }
+        push @dp, \@row
+    }
+    # Length-1: terminal productions.
+    for my $i (~> 0:$n - 1) {
+        my $term = $tokens->[$i]
+        if (exists $grammar->{unary}{$term}) {
+            for my $nt (@{$grammar->{unary}{$term}}) {
+                $dp[$i][$i]{$nt} = 1
+            }
+        }
+    }
+    # Length L = 2..n.
+    for my $L (2..$n) {
+        for my $i (0..$n - $L) {
+            my $j = $i + $L - 1
+            for my $k ($i..$j - 1) {
+                for my $left (keys %{$dp[$i][$k]}) {
+                    for my $right (keys %{$dp[$k + 1][$j]}) {
+                        my $key = "$left $right"
+                        if (exists $grammar->{binary}{$key}) {
+                            for my $nt (@{$grammar->{binary}{$key}}) {
+                                $dp[$i][$j]{$nt} = 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    exists $dp[0][$n - 1]{$grammar->{start}} ? 1 : 0
+}
+
+# Grammar: arithmetic over single digits, with +/* respecting precedence.
+# In CNF:
+#   S → S P_PT | S MT
+#   PT → PLUS T | T (handled via S → number)... Actually keeping it simpler.
+#
+# Simpler grammar: balanced parentheses over 'a'.
+#   S → A B | a a
+#   A → A B | a
+#   B → S B | b b      (gibberish — let's pick a clearer test grammar)
+#
+# Use the canonical example from CLRS:
+#   Grammar G accepts a^n b^n for n ≥ 1. CNF version:
+#     S → A B
+#     S → A C
+#     C → S B
+#     A → a
+#     B → b
+my $g1 = {
+    start => "S",
+    unary => {
+        "a" => ["A"],
+        "b" => ["B"]
+    },
+    binary => {
+        "A B" => ["S"],
+        "A C" => ["S"],
+        "S B" => ["C"]
+    }
+}
+assert_eq Rosetta::CYK::parse($g1, ["a", "b"]), 1, "ab matches a^n b^n"
+assert_eq Rosetta::CYK::parse($g1, ["a", "a", "b", "b"]), 1, "aabb matches"
+assert_eq Rosetta::CYK::parse($g1, ["a", "a", "a", "b", "b", "b"]), 1, "aaabbb matches"
+assert_eq Rosetta::CYK::parse($g1, ["a"]), 0, "lone 'a' rejected"
+assert_eq Rosetta::CYK::parse($g1, ["a", "b", "a", "b"]), 0, "abab rejected"
+assert_eq Rosetta::CYK::parse($g1, ["b", "a"]), 0, "ba rejected"
+assert_eq Rosetta::CYK::parse($g1, ["a", "a", "b"]), 0, "aab unbalanced rejected"
+
+# Grammar for palindromes over {a, b}:
+#   S → A A | B B | A T | B U | a | b
+#   T → S A
+#   U → S B
+#   A → a
+#   B → b
+my $g2 = {
+    start => "S",
+    unary => {
+        "a" => ["A", "S"],
+        "b" => ["B", "S"]
+    },
+    binary => {
+        "A A" => ["S"],
+        "B B" => ["S"],
+        "A T" => ["S"],
+        "B U" => ["S"],
+        "S A" => ["T"],
+        "S B" => ["U"]
+    }
+}
+assert_eq Rosetta::CYK::parse($g2, ["a"]), 1, "single a is palindrome"
+assert_eq Rosetta::CYK::parse($g2, ["a", "a"]), 1, "aa palindrome"
+assert_eq Rosetta::CYK::parse($g2, ["a", "b", "a"]), 1, "aba palindrome"
+assert_eq Rosetta::CYK::parse($g2, ["a", "b", "b", "a"]), 1, "abba palindrome"
+assert_eq Rosetta::CYK::parse($g2, ["a", "b"]), 0, "ab not palindrome"
+assert_eq Rosetta::CYK::parse($g2, ["a", "a", "b"]), 0, "aab not palindrome"
+
+# Empty input rejected
+assert_eq Rosetta::CYK::parse($g2, []), 0, "empty rejected"
+
+# Unknown terminal
+assert_eq Rosetta::CYK::parse($g2, ["x"]), 0, "unknown terminal"
+
+test_run

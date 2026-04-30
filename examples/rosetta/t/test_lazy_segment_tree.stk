@@ -1,0 +1,125 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lazy segment tree — supports range-add updates and
+# range-sum queries in O(log n) by deferring updates ("lazy") until
+# their nodes are actually visited.
+
+fn Rosetta::LazySeg::new($n) {
+    my $size = 1
+    $size *= 2 while $size < $n
+    my @tree = ~> 1:2 * $size |> map { 0 }
+    my @lazy = ~> 1:2 * $size |> map { 0 }
+    { size => $size, n => $n, tree => \@tree, lazy => \@lazy }
+}
+
+fn Rosetta::LazySeg::push_down($t, $node, $width) {
+    if ($t->{lazy}[$node] != 0) {
+        my $val = $t->{lazy}[$node]
+        my $half = int($width / 2)
+        $t->{tree}[2 * $node]     += $val * $half
+        $t->{lazy}[2 * $node]     += $val
+        $t->{tree}[2 * $node + 1] += $val * $half
+        $t->{lazy}[2 * $node + 1] += $val
+        $t->{lazy}[$node] = 0
+    }
+}
+
+fn Rosetta::LazySeg::update($t, $lo, $hi, $val) {
+    Rosetta::LazySeg::ur($t, 1, 0, $t->{size}, $lo, $hi + 1, $val)
+}
+
+fn Rosetta::LazySeg::ur($t, $node, $nl, $nr, $lo, $hi, $val) {
+    return if $nr <= $lo || $hi <= $nl
+    if ($lo <= $nl && $nr <= $hi) {
+        $t->{tree}[$node] += $val * ($nr - $nl)
+        $t->{lazy}[$node] += $val
+        return
+    }
+    Rosetta::LazySeg::push_down($t, $node, $nr - $nl)
+    my $mid = int(($nl + $nr) / 2)
+    Rosetta::LazySeg::ur($t, 2 * $node,     $nl, $mid, $lo, $hi, $val)
+    Rosetta::LazySeg::ur($t, 2 * $node + 1, $mid, $nr, $lo, $hi, $val)
+    $t->{tree}[$node] = $t->{tree}[2 * $node] + $t->{tree}[2 * $node + 1]
+}
+
+fn Rosetta::LazySeg::query($t, $lo, $hi) {
+    Rosetta::LazySeg::qr_recursive($t, 1, 0, $t->{size}, $lo, $hi + 1)
+}
+
+fn Rosetta::LazySeg::qr_recursive($t, $node, $nl, $nr, $lo, $hi) {
+    return 0 if $nr <= $lo || $hi <= $nl
+    return $t->{tree}[$node] if $lo <= $nl && $nr <= $hi
+    Rosetta::LazySeg::push_down($t, $node, $nr - $nl)
+    my $mid = int(($nl + $nr) / 2)
+    my $left  = Rosetta::LazySeg::qr_recursive($t, 2 * $node,     $nl, $mid, $lo, $hi)
+    my $right = Rosetta::LazySeg::qr_recursive($t, 2 * $node + 1, $mid, $nr, $lo, $hi)
+    $left + $right
+}
+
+# Naive baseline for cross-checking.
+fn Rosetta::LazySeg::naive_sum($arr, $lo, $hi) {
+    my $s = 0
+    for my $i ($lo..$hi) { $s += $arr->[$i] }
+    $s
+}
+
+fn Rosetta::LazySeg::naive_add($arr, $lo, $hi, $val) {
+    for my $i ($lo..$hi) { $arr->[$i] += $val }
+}
+
+# Length-10 array, all zero. Apply a sequence of range-adds and queries,
+# cross-checking against the naive array.
+my $t = Rosetta::LazySeg::new(10)
+my @arr = ~> 1:10 |> map { 0 }
+
+Rosetta::LazySeg::update($t, 0, 4, 5)
+Rosetta::LazySeg::naive_add(\@arr, 0, 4, 5)
+assert_eq Rosetta::LazySeg::query($t, 0, 4),
+          Rosetta::LazySeg::naive_sum(\@arr, 0, 4), "after add 5 to [0..4]"
+
+Rosetta::LazySeg::update($t, 2, 7, 3)
+Rosetta::LazySeg::naive_add(\@arr, 2, 7, 3)
+for my $r ([0, 9], [0, 4], [3, 6], [5, 5], [7, 9]) {
+    my ($lo, $hi) = @$r
+    assert_eq Rosetta::LazySeg::query($t, $lo, $hi),
+              Rosetta::LazySeg::naive_sum(\@arr, $lo, $hi),
+              "sum [$lo..$hi] after two adds"
+}
+
+Rosetta::LazySeg::update($t, 5, 9, -2)
+Rosetta::LazySeg::naive_add(\@arr, 5, 9, -2)
+for my $r ([0, 9], [0, 2], [3, 7], [4, 9]) {
+    my ($lo, $hi) = @$r
+    assert_eq Rosetta::LazySeg::query($t, $lo, $hi),
+              Rosetta::LazySeg::naive_sum(\@arr, $lo, $hi),
+              "sum [$lo..$hi] after three adds"
+}
+
+# Single element queries
+for my $i (~> 0:9) {
+    assert_eq Rosetta::LazySeg::query($t, $i, $i),
+              $arr[$i], "single-element query at $i"
+}
+
+# Empty interval (sub-out-of-bounds clipping is implicit by node clip)
+my $empty = Rosetta::LazySeg::query($t, 0, -1)
+assert_eq $empty, 0, "empty interval = 0"
+
+# Stress: many random-ish updates and queries against naive
+srand(7)
+my $t2 = Rosetta::LazySeg::new(50)
+my @ar2 = ~> 1:50 |> map { 0 }
+for (~> 1:200) {
+    my $lo = int(rand() * 50)
+    my $hi = $lo + int(rand() * (50 - $lo))
+    if (rand() < 0.5) {
+        my $v = int(rand() * 10) - 5
+        Rosetta::LazySeg::update($t2, $lo, $hi, $v)
+        Rosetta::LazySeg::naive_add(\@ar2, $lo, $hi, $v)
+    } else {
+        my $a = Rosetta::LazySeg::query($t2, $lo, $hi)
+        my $b = Rosetta::LazySeg::naive_sum(\@ar2, $lo, $hi)
+        assert_eq $a, $b, "stress query [$lo..$hi]"
+    }
+}
+
+test_run

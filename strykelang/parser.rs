@@ -14414,9 +14414,13 @@ impl Parser {
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             // Perl autoquotes a bareword immediately before `=>` (hash key), even for keywords like
             // `pos`, `bless`, `return` — see Text::Balanced `_failmsg` (`pos => $pos`).
+            // Stryke exception: topic-slot barewords (`_`, `_<`, `_0`, `_0<`, `_!N!`, …)
+            // resolve to the topic value, not the literal name — `{ _ => 1 }` ≡ `{ $_ => 1 }`.
             let line = self.peek_line();
             let key = if let Token::Ident(ref name) = self.peek().clone() {
-                if matches!(self.peek_at(1), Token::FatArrow) {
+                if matches!(self.peek_at(1), Token::FatArrow)
+                    && !Self::is_underscore_topic_slot(name)
+                {
                     self.advance();
                     Expr {
                         kind: ExprKind::String(name.clone()),
@@ -14476,7 +14480,9 @@ impl Parser {
         {
             let line = self.peek_line();
             let key = if let Token::Ident(ref name) = self.peek().clone() {
-                if matches!(self.peek_at(1), Token::FatArrow) {
+                if matches!(self.peek_at(1), Token::FatArrow)
+                    && !Self::is_underscore_topic_slot(name)
+                {
                     self.advance();
                     Expr {
                         kind: ExprKind::String(name.clone()),

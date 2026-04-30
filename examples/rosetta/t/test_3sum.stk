@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 3SUM — find every unique triple (a, b, c) in an array
+# such that a + b + c == target. Sort + two-pointer gives O(n²).
+
+fn Rosetta::ThreeSum::find($nums, $target) {
+    my @sorted = sort { _0 <=> _1 } @$nums
+    my $n = len(@sorted)
+    my @triples
+    for my $i (~> 0:$n - 3) {
+        next if $i > 0 && $sorted[$i] == $sorted[$i - 1]
+        my ($l, $r) = ($i + 1, $n - 1)
+        while ($l < $r) {
+            my $sum = $sorted[$i] + $sorted[$l] + $sorted[$r]
+            if ($sum == $target) {
+                push @triples, [$sorted[$i], $sorted[$l], $sorted[$r]]
+                $l++
+                $r--
+                while ($l < $r && $sorted[$l] == $sorted[$l - 1]) { $l++ }
+                while ($l < $r && $sorted[$r] == $sorted[$r + 1]) { $r-- }
+            } elsif ($sum < $target) { $l++ }
+            else                     { $r-- }
+        }
+    }
+    \@triples
+}
+
+fn Rosetta::ThreeSum::format_triples($t) {
+    my @rows
+    for my $triple (@$t) { push @rows, join(",", @$triple) }
+    @rows = sort { _0 cmp _1 } @rows
+    join(";", @rows)
+}
+
+# LeetCode 15 canonical case: [-1, 0, 1, 2, -1, -4], target=0
+# Expected triples: (-1, -1, 2), (-1, 0, 1)
+my $r1 = Rosetta::ThreeSum::find([-1, 0, 1, 2, -1, -4], 0)
+assert_eq Rosetta::ThreeSum::format_triples($r1), "-1,-1,2;-1,0,1",
+    "LC 15 example"
+
+# All zeros: only one triple (0, 0, 0).
+my $r2 = Rosetta::ThreeSum::find([0, 0, 0, 0], 0)
+assert_eq Rosetta::ThreeSum::format_triples($r2), "0,0,0", "all zeros"
+
+# No triple sums to target
+my $r3 = Rosetta::ThreeSum::find([1, 2, 3, 4, 5], 100)
+assert_eq len(@$r3), 0, "no triples for unreachable target"
+
+# Non-zero target
+my $r4 = Rosetta::ThreeSum::find([1, 2, 3, 4, 5, 6, 7, 8, 9], 12)
+assert_eq Rosetta::ThreeSum::format_triples($r4),
+    "1,2,9;1,3,8;1,4,7;1,5,6;2,3,7;2,4,6;3,4,5", "target=12"
+
+# Negative target
+my $r5 = Rosetta::ThreeSum::find([-5, -4, -3, -2, -1, 0, 1, 2, 3], -6)
+# Triples summing to -6: (-5,-4,3), (-5,-3,2), (-5,-2,1), (-5,-1,0),
+# (-4,-3,1), (-4,-2,0), (-3,-2,-1). Sorted lexicographically.
+my $expected = "-3,-2,-1;-4,-2,0;-4,-3,1;-5,-1,0;-5,-2,1;-5,-3,2;-5,-4,3"
+assert_eq Rosetta::ThreeSum::format_triples($r5), $expected, "target=-6"
+
+# Duplicates in input — output stays unique.
+my $r6 = Rosetta::ThreeSum::find([2, 2, 2, 2, 2], 6)
+assert_eq Rosetta::ThreeSum::format_triples($r6), "2,2,2", "duplicate-only"
+
+# Triples must be distinct: don't double-count.
+my $r7 = Rosetta::ThreeSum::find([-2, 0, 0, 2, 2], 0)
+assert_eq Rosetta::ThreeSum::format_triples($r7), "-2,0,2", "dedup with multiple zeros"
+
+# Insufficient input
+assert_eq len(@{Rosetta::ThreeSum::find([], 0)}), 0, "empty"
+assert_eq len(@{Rosetta::ThreeSum::find([1], 0)}), 0, "n=1"
+assert_eq len(@{Rosetta::ThreeSum::find([1, 2], 0)}), 0, "n=2"
+
+# Single-triple input
+my $r8 = Rosetta::ThreeSum::find([1, 2, 3], 6)
+assert_eq Rosetta::ThreeSum::format_triples($r8), "1,2,3", "exact n=3 match"
+my $r9 = Rosetta::ThreeSum::find([1, 2, 3], 7)
+assert_eq len(@$r9), 0, "n=3 no match"
+
+test_run

@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 fn Exercism::DndCharacter::ability() {
-    my @rolls = sort { _0 <=> _1 } map { 1 + int(rand 6) } 1..4
+    my @rolls = ~> 1:4 map { 1 + int(rand 6) } sort { _0 <=> _1 }
     sum(@rolls[1..3])
 }
 

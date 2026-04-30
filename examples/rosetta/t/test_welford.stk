@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Welford's online algorithm — single-pass numerically
+# stable mean and variance. Updates moments without revisiting old data
+# and avoids catastrophic cancellation that plagues E[X²] - E[X]².
+
+fn Rosetta::Welford::new() {
+    { n => 0, mean => 0.0, m2 => 0.0 }
+}
+
+fn Rosetta::Welford::update($w, $x) {
+    $w->{n}++
+    my $delta = $x - $w->{mean}
+    $w->{mean} += $delta / $w->{n}
+    my $delta2 = $x - $w->{mean}
+    $w->{m2} += $delta * $delta2
+}
+
+fn Rosetta::Welford::variance($w) {
+    $w->{n} < 2 ? 0 : $w->{m2} / ($w->{n} - 1)
+}
+
+fn Rosetta::Welford::pop_variance($w) {
+    $w->{n} == 0 ? 0 : $w->{m2} / $w->{n}
+}
+
+fn Rosetta::Welford::stddev($w) { sqrt(Rosetta::Welford::variance($w)) }
+
+fn Rosetta::Welford::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Reference values
+my @sample = (2, 4, 4, 4, 5, 5, 7, 9)
+my $w = Rosetta::Welford::new()
+for my $x (@sample) { Rosetta::Welford::update($w, $x) }
+assert_eq $w->{n}, 8, "n = 8"
+assert_ok Rosetta::Welford::approx($w->{mean}, 5, 1e-9), "mean = 5"
+# Sample variance = 32/7 ≈ 4.5714 (population variance = 4)
+assert_ok Rosetta::Welford::approx(Rosetta::Welford::variance($w), 32/7, 1e-9),
+    "sample variance = 32/7"
+assert_ok Rosetta::Welford::approx(Rosetta::Welford::pop_variance($w), 4, 1e-9),
+    "population variance = 4"
+assert_ok Rosetta::Welford::approx(Rosetta::Welford::stddev($w), sqrt(32/7), 1e-9),
+    "stddev = sqrt(32/7)"
+
+# Single value: variance = 0
+my $w1 = Rosetta::Welford::new()
+Rosetta::Welford::update($w1, 42)
+assert_eq Rosetta::Welford::variance($w1), 0, "single value variance = 0"
+assert_ok Rosetta::Welford::approx($w1->{mean}, 42, 1e-9), "single value mean = 42"
+
+# Two values
+my $w2 = Rosetta::Welford::new()
+Rosetta::Welford::update($w2, 1)
+Rosetta::Welford::update($w2, 3)
+assert_ok Rosetta::Welford::approx($w2->{mean}, 2, 1e-9), "mean(1,3) = 2"
+# Sample variance with n-1 = 1: ((1-2)² + (3-2)²)/1 = 2
+assert_ok Rosetta::Welford::approx(Rosetta::Welford::variance($w2), 2, 1e-9),
+    "var(1,3) = 2 (sample)"
+
+# Numerical stability — values offset by huge constant should yield same variance.
+my @small = (4, 7, 13, 16)
+my @big   = map { _0 + 1e9 } @small
+my $ws = Rosetta::Welford::new()
+my $wb = Rosetta::Welford::new()
+for my $x (@small) { Rosetta::Welford::update($ws, $x) }
+for my $x (@big)   { Rosetta::Welford::update($wb, $x) }
+assert_ok Rosetta::Welford::approx(
+    Rosetta::Welford::variance($ws), Rosetta::Welford::variance($wb), 1e-3),
+    "variance invariant under large offset"
+
+# Cross-check against naive two-pass for random-ish data.
+fn Rosetta::Welford::naive_variance($xs) {
+    my $n = len(@$xs)
+    return 0 if $n < 2
+    my $m = 0
+    for my $x (@$xs) { $m += $x }
+    $m /= $n
+    my $s = 0
+    for my $x (@$xs) { $s += ($x - $m) ** 2 }
+    $s / ($n - 1)
+}
+
+my @data = (12, 15, 17, 23, 4, 9, 18, 27, 31, 6)
+my $wd = Rosetta::Welford::new()
+for my $x (@data) { Rosetta::Welford::update($wd, $x) }
+assert_ok Rosetta::Welford::approx(
+    Rosetta::Welford::variance($wd), Rosetta::Welford::naive_variance(\@data), 1e-9),
+    "Welford = naive two-pass"
+
+# Constant data — variance is 0
+my $wc = Rosetta::Welford::new()
+for (~> 1:10) { Rosetta::Welford::update($wc, 5) }
+assert_eq Rosetta::Welford::variance($wc), 0, "constant data variance = 0"
+
+# Empty
+my $we = Rosetta::Welford::new()
+assert_eq $we->{n}, 0, "empty n = 0"
+assert_eq Rosetta::Welford::variance($we), 0, "empty variance = 0"
+
+test_run

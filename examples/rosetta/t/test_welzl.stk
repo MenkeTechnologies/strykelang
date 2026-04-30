@@ -1,0 +1,132 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Welzl's smallest enclosing circle (1991). Expected
+# linear time when points are processed in random order. The minimum
+# enclosing disk is determined by at most 3 boundary points.
+
+fn Rosetta::Welzl::dist2($p, $q) {
+    my $dx = $p->[0] - $q->[0]
+    my $dy = $p->[1] - $q->[1]
+    $dx * $dx + $dy * $dy
+}
+
+fn Rosetta::Welzl::inside($c, $p) {
+    return 0 if !defined $c
+    Rosetta::Welzl::dist2($c->{center}, $p) <= $c->{r2} + 1e-12
+}
+
+fn Rosetta::Welzl::circle_2($a, $b) {
+    my $cx = ($a->[0] + $b->[0]) / 2
+    my $cy = ($a->[1] + $b->[1]) / 2
+    my $r2 = Rosetta::Welzl::dist2([$cx, $cy], $a)
+    { center => [$cx, $cy], r2 => $r2 }
+}
+
+fn Rosetta::Welzl::circle_3($a, $b, $c) {
+    my $ax = $a->[0]; my $ay = $a->[1]
+    my $bx = $b->[0]; my $by = $b->[1]
+    my $cx = $c->[0]; my $cy = $c->[1]
+    my $d = 2 * ($ax * ($by - $cy) + $bx * ($cy - $ay) + $cx * ($ay - $by))
+    return undef if abs($d) < 1e-15
+    my $sa = $ax * $ax + $ay * $ay
+    my $sb = $bx * $bx + $by * $by
+    my $sc = $cx * $cx + $cy * $cy
+    my $ux = ($sa * ($by - $cy) + $sb * ($cy - $ay) + $sc * ($ay - $by)) / $d
+    my $uy = ($sa * ($cx - $bx) + $sb * ($ax - $cx) + $sc * ($bx - $ax)) / $d
+    my $r2 = Rosetta::Welzl::dist2([$ux, $uy], $a)
+    { center => [$ux, $uy], r2 => $r2 }
+}
+
+fn Rosetta::Welzl::trivial($R) {
+    my $n = len(@$R)
+    return undef if $n == 0
+    return { center => [$R->[0][0], $R->[0][1]], r2 => 0 } if $n == 1
+    return Rosetta::Welzl::circle_2($R->[0], $R->[1]) if $n == 2
+    Rosetta::Welzl::circle_3($R->[0], $R->[1], $R->[2])
+}
+
+fn Rosetta::Welzl::recurse($pts, $idx, $R) {
+    return Rosetta::Welzl::trivial($R) if $idx < 0 || len(@$R) == 3
+    my $D = Rosetta::Welzl::recurse($pts, $idx - 1, $R)
+    return $D if Rosetta::Welzl::inside($D, $pts->[$idx])
+    my @R2 = @$R
+    push @R2, $pts->[$idx]
+    Rosetta::Welzl::recurse($pts, $idx - 1, \@R2)
+}
+
+fn Rosetta::Welzl::solve($pts) {
+    my @shuffled = @$pts
+    # Lightweight shuffle (Fisher-Yates) for randomized ordering.
+    for (my $i = len(@shuffled) - 1; $i > 0; $i--) {
+        my $j = int(rand() * ($i + 1))
+        ($shuffled[$i], $shuffled[$j]) = ($shuffled[$j], $shuffled[$i])
+    }
+    Rosetta::Welzl::recurse(\@shuffled, len(@shuffled) - 1, [])
+}
+
+fn Rosetta::Welzl::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Verify every input point lies inside the resulting circle.
+fn Rosetta::Welzl::all_inside($circle, $pts) {
+    for my $p (@$pts) {
+        return 0 if Rosetta::Welzl::dist2($circle->{center}, $p) > $circle->{r2} + 1e-9
+    }
+    1
+}
+
+# Three corners of a square — circumscribed circle.
+srand(7)
+my $tri = [[0, 0], [4, 0], [0, 3]]
+my $c1 = Rosetta::Welzl::solve($tri)
+# Right triangle: enclosing circle has hypotenuse as diameter, r = 2.5
+assert_ok Rosetta::Welzl::approx(sqrt($c1->{r2}), 2.5, 1e-6),
+    "right triangle r = 2.5"
+assert_eq Rosetta::Welzl::all_inside($c1, $tri), 1, "all triangle pts inside"
+
+# Single point — radius 0.
+my $c2 = Rosetta::Welzl::solve([[5, 7]])
+assert_eq sqrt($c2->{r2}), 0, "single point r = 0"
+assert_eq join(",", @{$c2->{center}}), "5,7", "center = the point"
+
+# Two points — diameter = distance.
+my $c3 = Rosetta::Welzl::solve([[0, 0], [6, 8]])
+assert_ok Rosetta::Welzl::approx(sqrt($c3->{r2}), 5, 1e-9), "two-point r = 5"
+
+# Square — diameter is the diagonal, r = sqrt(2)/2 for unit square.
+my $sq = [[0, 0], [1, 0], [1, 1], [0, 1]]
+my $c4 = Rosetta::Welzl::solve($sq)
+assert_ok Rosetta::Welzl::approx(sqrt($c4->{r2}), sqrt(2) / 2, 1e-6),
+    "unit square r = √2/2"
+assert_ok Rosetta::Welzl::approx($c4->{center}[0], 0.5, 1e-6), "Cx = 0.5"
+assert_ok Rosetta::Welzl::approx($c4->{center}[1], 0.5, 1e-6), "Cy = 0.5"
+assert_eq Rosetta::Welzl::all_inside($c4, $sq), 1, "all square pts inside"
+
+# Many random-ish points — verify all-inside invariant.
+my @pts
+for my $i (~> 0:19) {
+    push @pts, [(($i * 13 + 7) % 100), (($i * 17 + 5) % 100)]
+}
+for (1..3) {
+    srand(42 + $_)
+    my $r = Rosetta::Welzl::solve(\@pts)
+    assert_eq Rosetta::Welzl::all_inside($r, \@pts), 1, "random run all inside"
+}
+
+# Cocentric: points on a circle of known radius around origin.
+my $rad = 7
+my $pi = atan2(0, -1)
+my @circle_pts
+for my $i (~> 0:7) {
+    push @circle_pts, [$rad * cos($i * $pi / 4), $rad * sin($i * $pi / 4)]
+}
+my $c5 = Rosetta::Welzl::solve(\@circle_pts)
+assert_ok Rosetta::Welzl::approx(sqrt($c5->{r2}), $rad, 1e-6),
+    "circle pts r = $rad"
+assert_ok Rosetta::Welzl::approx($c5->{center}[0], 0, 1e-6), "circle center x"
+assert_ok Rosetta::Welzl::approx($c5->{center}[1], 0, 1e-6), "circle center y"
+
+# Two-point helper sanity
+my $c2_helper = Rosetta::Welzl::circle_2([0, 0], [4, 0])
+assert_eq join(",", @{$c2_helper->{center}}), "2,0", "circle_2 midpoint"
+assert_eq sqrt($c2_helper->{r2}), 2, "circle_2 radius"
+
+test_run

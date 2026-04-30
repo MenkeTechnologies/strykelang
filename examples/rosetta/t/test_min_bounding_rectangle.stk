@@ -1,0 +1,147 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Minimum-area bounding rectangle (oriented). Uses
+# Toussaint's rotating-calipers theorem: the minimum-area enclosing
+# rectangle for a convex polygon has a side collinear with one of
+# the polygon's edges. Iterate over edges; for each, project all
+# vertices onto the edge axis and onto its perpendicular, and pick
+# the smallest area.
+
+fn Rosetta::MinRect::cross($o, $u, $v) {
+    ($u->[0] - $o->[0]) * ($v->[1] - $o->[1]) - ($u->[1] - $o->[1]) * ($v->[0] - $o->[0])
+}
+
+fn Rosetta::MinRect::convex_hull($pts) {
+    my @sorted = sort {
+        _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
+    } @$pts
+    my $n = len(@sorted)
+    return \@sorted if $n < 3
+    my @lower
+    for my $p (@sorted) {
+        while (len(@lower) >= 2
+               && Rosetta::MinRect::cross($lower[-2], $lower[-1], $p) <= 0) {
+            pop @lower
+        }
+        push @lower, $p
+    }
+    my @upper
+    for (my $i = $n - 1; $i >= 0; $i--) {
+        my $p = $sorted[$i]
+        while (len(@upper) >= 2
+               && Rosetta::MinRect::cross($upper[-2], $upper[-1], $p) <= 0) {
+            pop @upper
+        }
+        push @upper, $p
+    }
+    pop @lower
+    pop @upper
+    push @lower, @upper
+    \@lower
+}
+
+fn Rosetta::MinRect::compute($pts) {
+    my $hull = Rosetta::MinRect::convex_hull($pts)
+    my $n = len(@$hull)
+    if ($n < 2) { return { area => 0, width => 0, height => 0 } }
+    if ($n == 2) {
+        my $dx = $hull->[0][0] - $hull->[1][0]
+        my $dy = $hull->[0][1] - $hull->[1][1]
+        return { area => 0, width => sqrt($dx * $dx + $dy * $dy), height => 0 }
+    }
+    my $best_area = 1e18
+    my $best_w = 0
+    my $best_h = 0
+    for my $i (~> 0:$n - 1) {
+        my $j = ($i + 1) % $n
+        my $ex = $hull->[$j][0] - $hull->[$i][0]
+        my $ey = $hull->[$j][1] - $hull->[$i][1]
+        my $len = sqrt($ex * $ex + $ey * $ey)
+        next if $len == 0
+        # Unit vectors along edge and perpendicular.
+        my $ux = $ex / $len
+        my $uy = $ey / $len
+        my $px = -$uy
+        my $py = $ux
+        # Project hull onto (u, p).
+        my $min_u = 1e18; my $max_u = -1e18
+        my $min_p = 1e18; my $max_p = -1e18
+        for my $h (@$hull) {
+            my $dx = $h->[0] - $hull->[$i][0]
+            my $dy = $h->[1] - $hull->[$i][1]
+            my $pu = $dx * $ux + $dy * $uy
+            my $pp = $dx * $px + $dy * $py
+            $min_u = $pu if $pu < $min_u
+            $max_u = $pu if $pu > $max_u
+            $min_p = $pp if $pp < $min_p
+            $max_p = $pp if $pp > $max_p
+        }
+        my $w = $max_u - $min_u
+        my $h = $max_p - $min_p
+        my $area = $w * $h
+        if ($area < $best_area) {
+            $best_area = $area
+            $best_w = $w
+            $best_h = $h
+        }
+    }
+    { area => $best_area, width => $best_w, height => $best_h }
+}
+
+fn Rosetta::MinRect::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Axis-aligned square: bounding rect = 1×1, area = 1.
+my $sq = [[0, 0], [1, 0], [1, 1], [0, 1]]
+my $r1 = Rosetta::MinRect::compute($sq)
+assert_ok Rosetta::MinRect::approx($r1->{area}, 1, 1e-9), "unit square area = 1"
+
+# Rotated 45° square: vertices at (1,0),(0,1),(-1,0),(0,-1). Min rect
+# rotated to align with edges has area 2 (sides √2 × √2).
+my $rs = [[1, 0], [0, 1], [-1, 0], [0, -1]]
+my $r2 = Rosetta::MinRect::compute($rs)
+assert_ok Rosetta::MinRect::approx($r2->{area}, 2, 1e-9), "rot square area = 2"
+assert_ok Rosetta::MinRect::approx($r2->{width}, sqrt(2), 1e-9), "rot square w = √2"
+assert_ok Rosetta::MinRect::approx($r2->{height}, sqrt(2), 1e-9), "rot square h = √2"
+
+# Right triangle 3-4-5: area = 6, but min bounding rect aligns with
+# legs at axis-aligned position → area = 12. Tighter rotation keeps 12.
+my $tri = [[0, 0], [4, 0], [0, 3]]
+my $r3 = Rosetta::MinRect::compute($tri)
+assert_ok Rosetta::MinRect::approx($r3->{area}, 12, 1e-9), "right tri rect = 12"
+
+# Long thin diagonal cluster — narrow rectangle.
+my $diag = [[0, 0], [10, 10], [11, 11], [12, 12], [12, 11.9]]
+my $r4 = Rosetta::MinRect::compute($diag)
+# Longest diagonal ≈ √288 ≈ 17, perpendicular spread ≈ 0.07ish.
+assert_ok $r4->{area} < 5, "diagonal cluster area small (got " . $r4->{area} . ")"
+
+# Two-point degenerate: width = distance, area = 0.
+my $two = [[0, 0], [5, 0]]
+my $r5 = Rosetta::MinRect::compute($two)
+assert_eq $r5->{area}, 0, "2-point area = 0"
+assert_eq $r5->{width}, 5, "2-point width = 5"
+
+# Single point
+my $one = Rosetta::MinRect::compute([[3, 3]])
+assert_eq $one->{area}, 0, "1-point area = 0"
+
+# Convex hull discards interior points.
+my $with_interior = Rosetta::MinRect::compute([[0, 0], [4, 0], [4, 4], [0, 4], [2, 2]])
+assert_ok Rosetta::MinRect::approx($with_interior->{area}, 16, 1e-9),
+    "4x4 square (with interior pt) = 16"
+
+# Verify the best area is no greater than the axis-aligned bounding rect.
+fn Rosetta::MinRect::axis_aligned_area($pts) {
+    my $minx = $pts->[0][0]; my $maxx = $pts->[0][0]
+    my $miny = $pts->[0][1]; my $maxy = $pts->[0][1]
+    for my $p (@$pts) {
+        $minx = $p->[0] if $p->[0] < $minx
+        $maxx = $p->[0] if $p->[0] > $maxx
+        $miny = $p->[1] if $p->[1] < $miny
+        $maxy = $p->[1] if $p->[1] > $maxy
+    }
+    ($maxx - $minx) * ($maxy - $miny)
+}
+my $aa1 = Rosetta::MinRect::axis_aligned_area($rs)
+assert_ok $r2->{area} <= $aa1 + 1e-9, "rotated rect ≤ axis-aligned"
+
+test_run

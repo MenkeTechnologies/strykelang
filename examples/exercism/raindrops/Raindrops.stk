@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 fn Exercism::Raindrops::raindrop($n) {
     my %h = (3=>"Pling", 5=>"Plang", 7=>"Plong")
-    my $s = ~> (3,5,7) grep { $n % $_ == 0 } map { $h{$_} } |> join ""
+    my $s = ~> (3,5,7) fi { $n % $_ == 0 } map { $h{$_} } |> join ""
     $s || "$n"
 }

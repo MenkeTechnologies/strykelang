@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 fn Exercism::CryptoSquare::cipher($s) {
-    my $lc = ~> $s lc chars |> grep { /[a-z0-9]/ } |> join ""
+    my $lc = ~> $s lc chars |> fi { /[a-z0-9]/ } |> join ""
     return "" if length($lc) == 0
     my $cols = int(sqrt(length($lc)))
     $cols++ while $cols * $cols < length($lc)

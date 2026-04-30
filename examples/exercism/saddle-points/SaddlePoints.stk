@@ -3,11 +3,11 @@ fn Exercism::SaddlePoints::saddle_points($m) {
     my $rows = 0 + @$m
     return [] if $rows == 0
     my $cols = 0 + @{$m->[0]}
-    my @row_max = map { my $r = $m->[$_]; max(@$r) } 0..$rows - 1
-    my @col_min = map {
-        my $c = $_
-        min(map { $m->[$_][$c] } 0..$rows - 1)
-    } 0..$cols - 1
+    my @row_max = ~> 0:$rows-1 map { max(@{$m->[_]}) }
+    my @col_min = ~> 0:$cols-1 map {
+        my $c = _
+        ~> 0:$rows-1 map { $m->[_][$c] } min
+    }
     my @out
     for my $r (0..$rows - 1) {
         for my $c (0..$cols - 1) {

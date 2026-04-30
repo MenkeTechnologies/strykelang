@@ -1,0 +1,97 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Linear sieve of Euler — sieves primes up to n in O(n)
+# while also producing the smallest prime factor (SPF) of each
+# composite. Each composite is crossed off exactly once by its
+# smallest prime factor.
+
+fn Rosetta::LinSieve::sieve($n) {
+    return { primes => [], spf => [] } if $n < 2
+    my @spf = ~> 0:$n |> map { 0 }
+    my @primes
+    for my $i (2..$n) {
+        if ($spf[$i] == 0) {
+            $spf[$i] = $i
+            push @primes, $i
+        }
+        for my $p (@primes) {
+            last if $p > $spf[$i] || $i * $p > $n
+            $spf[$i * $p] = $p
+        }
+    }
+    { primes => \@primes, spf => \@spf }
+}
+
+# Trivial-division check for cross-validation.
+fn Rosetta::LinSieve::is_prime_naive($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::LinSieve::factor($spf, $n) {
+    my @factors
+    while ($n > 1) {
+        my $p = $spf->[$n]
+        push @factors, $p
+        $n = int($n / $p)
+    }
+    \@factors
+}
+
+# Primes up to 30.
+my $r = Rosetta::LinSieve::sieve(30)
+assert_eq join(",", @{$r->{primes}}), "2,3,5,7,11,13,17,19,23,29",
+    "primes up to 30"
+
+# SPF spot-checks
+assert_eq $r->{spf}[2],  2,  "spf(2)"
+assert_eq $r->{spf}[15], 3,  "spf(15) = 3"
+assert_eq $r->{spf}[27], 3,  "spf(27) = 3"
+assert_eq $r->{spf}[28], 2,  "spf(28) = 2"
+assert_eq $r->{spf}[29], 29, "spf(29) = 29 (prime)"
+
+# Cross-check primes up to 100 vs naive.
+my $r100 = Rosetta::LinSieve::sieve(100)
+my $count = 0
+for my $i (2..100) {
+    $count++ if Rosetta::LinSieve::is_prime_naive($i)
+}
+assert_eq len(@{$r100->{primes}}), $count, "prime count up to 100"
+for my $p (@{$r100->{primes}}) {
+    assert_eq Rosetta::LinSieve::is_prime_naive($p), 1, "$p is prime"
+}
+
+# Factorization via SPF
+my $f1 = Rosetta::LinSieve::factor($r100->{spf}, 60)
+assert_eq join(",", @$f1), "2,2,3,5", "60 = 2² · 3 · 5"
+my $f2 = Rosetta::LinSieve::factor($r100->{spf}, 84)
+assert_eq join(",", @$f2), "2,2,3,7", "84 = 2² · 3 · 7"
+my $f3 = Rosetta::LinSieve::factor($r100->{spf}, 97)
+assert_eq join(",", @$f3), "97", "97 prime"
+my $f4 = Rosetta::LinSieve::factor($r100->{spf}, 1)
+assert_eq len(@$f4), 0, "1 has no factors"
+
+# Edge cases
+my $e0 = Rosetta::LinSieve::sieve(0)
+assert_eq len(@{$e0->{primes}}), 0, "sieve(0) empty"
+my $e1 = Rosetta::LinSieve::sieve(1)
+assert_eq len(@{$e1->{primes}}), 0, "sieve(1) empty"
+my $e2 = Rosetta::LinSieve::sieve(2)
+assert_eq join(",", @{$e2->{primes}}), "2", "sieve(2) = [2]"
+
+# Larger: count primes up to 10000 = 1229
+my $r10k = Rosetta::LinSieve::sieve(10000)
+assert_eq len(@{$r10k->{primes}}), 1229, "π(10000) = 1229"
+assert_eq $r10k->{primes}[-1], 9973, "largest prime ≤ 10000 = 9973"
+
+# Test more SPF: 9999 = 3 · 3 · 11 · 101
+my $f5 = Rosetta::LinSieve::factor($r10k->{spf}, 9999)
+assert_eq join(",", @$f5), "3,3,11,101", "9999 factors"
+
+test_run

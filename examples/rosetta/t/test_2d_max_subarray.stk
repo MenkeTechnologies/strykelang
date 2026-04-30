@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 2D maximum subarray (Kadane's 2D). Find the contiguous
+# rectangle in a 2D matrix with the largest sum in O(n²·m) by fixing
+# row pairs and running 1D Kadane on the column sums.
+
+fn Rosetta::Kadane2D::max_subarray_1d($arr) {
+    my $n = len(@$arr)
+    my $best = -1e18
+    my $best_lo = 0
+    my $best_hi = 0
+    my $cur = 0
+    my $cur_lo = 0
+    for my $i (~> 0:$n - 1) {
+        if ($cur <= 0) {
+            $cur = $arr->[$i]
+            $cur_lo = $i
+        } else {
+            $cur += $arr->[$i]
+        }
+        if ($cur > $best) {
+            $best = $cur
+            $best_lo = $cur_lo
+            $best_hi = $i
+        }
+    }
+    { sum => $best, lo => $best_lo, hi => $best_hi }
+}
+
+fn Rosetta::Kadane2D::solve($matrix) {
+    my $rows = len(@$matrix)
+    return { sum => 0, top => 0, bottom => 0, left => 0, right => 0 } if $rows == 0
+    my $cols = len(@{$matrix->[0]})
+    my $best = -1e18
+    my $best_top = 0; my $best_bottom = 0
+    my $best_left = 0; my $best_right = 0
+    for my $top (~> 0:$rows - 1) {
+        my @col_sums = ~> 1:$cols |> map { 0 }
+        for my $bottom ($top..$rows - 1) {
+            for my $c (~> 0:$cols - 1) { $col_sums[$c] += $matrix->[$bottom][$c] }
+            my $r = Rosetta::Kadane2D::max_subarray_1d(\@col_sums)
+            if ($r->{sum} > $best) {
+                $best = $r->{sum}
+                $best_top = $top
+                $best_bottom = $bottom
+                $best_left = $r->{lo}
+                $best_right = $r->{hi}
+            }
+        }
+    }
+    {
+        sum => $best,
+        top => $best_top, bottom => $best_bottom,
+        left => $best_left, right => $best_right
+    }
+}
+
+fn Rosetta::Kadane2D::naive_sum($m, $top, $left, $bottom, $right) {
+    my $s = 0
+    for my $i ($top..$bottom) {
+        for my $j ($left..$right) { $s += $m->[$i][$j] }
+    }
+    $s
+}
+
+# Canonical example with mixed signs.
+# Expected best rect: rows 1..3, cols 1..3 with sum 29.
+my $m1 = [
+    [ 1,  2, -1, -4, -20],
+    [-8, -3,  4,  2,   1],
+    [ 3,  8, 10,  1,   3],
+    [-4, -1,  1,  7,  -6]
+]
+my $r1 = Rosetta::Kadane2D::solve($m1)
+assert_eq $r1->{sum}, 29, "canonical max sum = 29"
+# Verify the reported rectangle has the claimed sum.
+assert_eq Rosetta::Kadane2D::naive_sum($m1, $r1->{top}, $r1->{left},
+    $r1->{bottom}, $r1->{right}), 29, "rect sum matches"
+
+# All positive matrix: best is the whole thing.
+my $m2 = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+]
+my $r2 = Rosetta::Kadane2D::solve($m2)
+assert_eq $r2->{sum}, 45, "all-positive whole matrix"
+assert_eq $r2->{top}, 0, "top=0"
+assert_eq $r2->{bottom}, 2, "bottom=2"
+assert_eq $r2->{left}, 0, "left=0"
+assert_eq $r2->{right}, 2, "right=2"
+
+# All negative: best is the largest single value.
+my $m3 = [
+    [-3, -2, -1],
+    [-5, -4, -7],
+    [-2, -1, -8]
+]
+my $r3 = Rosetta::Kadane2D::solve($m3)
+assert_eq $r3->{sum}, -1, "all-negative max single = -1"
+
+# Single row
+my $r4 = Rosetta::Kadane2D::solve([[-2, 1, -3, 4, -1, 2, 1, -5, 4]])
+assert_eq $r4->{sum}, 6, "1xN: classic Kadane = 6"
+assert_eq $r4->{top}, 0,  "top=0"
+assert_eq $r4->{left}, 3, "left=3"
+assert_eq $r4->{right}, 6, "right=6"
+
+# Single column
+my $r5 = Rosetta::Kadane2D::solve([[1], [2], [-100], [3], [4], [-1], [5]])
+assert_eq $r5->{sum}, 11, "Nx1 = 3+4-1+5 = 11"
+
+# Single cell
+my $r6 = Rosetta::Kadane2D::solve([[42]])
+assert_eq $r6->{sum}, 42, "single cell"
+
+# Empty input
+my $r7 = Rosetta::Kadane2D::solve([])
+assert_eq $r7->{sum}, 0, "empty matrix sum = 0"
+
+# 1D Kadane sanity
+my $kr = Rosetta::Kadane2D::max_subarray_1d([-2, 1, -3, 4, -1, 2, 1, -5, 4])
+assert_eq $kr->{sum}, 6, "1D classic"
+assert_eq $kr->{lo}, 3, "lo = 3"
+assert_eq $kr->{hi}, 6, "hi = 6"
+
+test_run

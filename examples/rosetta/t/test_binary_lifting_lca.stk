@@ -1,0 +1,125 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Binary lifting (sparse table) LCA — preprocess in
+# O(n log n), answer LCA queries online in O(log n).
+
+fn Rosetta::BLLCA::log2_floor($n) {
+    my $r = 0
+    my $x = $n
+    while ($x > 1) { $x = $x >> 1; $r++ }
+    $r
+}
+
+fn Rosetta::BLLCA::build($n, $edges, $root) {
+    my @adj
+    for my $i (~> 1:$n) { push @adj, [] }
+    for my $e (@$edges) {
+        my ($u, $v) = @$e
+        push @{$adj[$u]}, $v
+        push @{$adj[$v]}, $u
+    }
+    my $LOG = Rosetta::BLLCA::log2_floor($n) + 1
+    my @up
+    for (~> 1:$LOG) {
+        my @row = ~> 1:$n |> map { -1 }
+        push @up, \@row
+    }
+    my @depth = ~> 1:$n |> map { 0 }
+    # Iterative DFS for parent / depth.
+    my @stack = ([$root, -1, 0, 0])
+    while (len(@stack) > 0) {
+        my $top = $stack[-1]
+        my ($u, $par, $d, $idx) = @$top
+        if ($idx == 0) {
+            $up[0][$u] = $par
+            $depth[$u] = $d
+        }
+        if ($idx < len(@{$adj[$u]})) {
+            $top->[3]++
+            my $v = $adj[$u][$idx]
+            if ($v != $par) { push @stack, [$v, $u, $d + 1, 0] }
+        } else {
+            pop @stack
+        }
+    }
+    # Sparse table.
+    for my $k (1..$LOG - 1) {
+        for my $v (~> 0:$n - 1) {
+            my $mid = $up[$k - 1][$v]
+            $up[$k][$v] = $mid == -1 ? -1 : $up[$k - 1][$mid]
+        }
+    }
+    { up => \@up, depth => \@depth, log => $LOG, n => $n }
+}
+
+fn Rosetta::BLLCA::lca($t, $u, $v) {
+    my $depth = $t->{depth}
+    if ($depth->[$u] < $depth->[$v]) { ($u, $v) = ($v, $u) }
+    my $diff = $depth->[$u] - $depth->[$v]
+    my $LOG = $t->{log}
+    for my $k (~> 0:$LOG - 1) {
+        if (($diff >> $k) & 1) { $u = $t->{up}[$k][$u] }
+    }
+    return $u if $u == $v
+    for (my $k = $LOG - 1; $k >= 0; $k--) {
+        if ($t->{up}[$k][$u] != $t->{up}[$k][$v]) {
+            $u = $t->{up}[$k][$u]
+            $v = $t->{up}[$k][$v]
+        }
+    }
+    $t->{up}[0][$u]
+}
+
+fn Rosetta::BLLCA::distance($t, $u, $v) {
+    my $w = Rosetta::BLLCA::lca($t, $u, $v)
+    $t->{depth}[$u] + $t->{depth}[$v] - 2 * $t->{depth}[$w]
+}
+
+# Tree:
+#         0
+#        / \
+#       1   2
+#      / \   \
+#     3   4   5
+#        / \
+#       6   7
+my $edges = [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [4, 6], [4, 7]]
+my $tree = Rosetta::BLLCA::build(8, $edges, 0)
+
+assert_eq Rosetta::BLLCA::lca($tree, 3, 4), 1, "LCA(3, 4) = 1"
+assert_eq Rosetta::BLLCA::lca($tree, 3, 7), 1, "LCA(3, 7) = 1"
+assert_eq Rosetta::BLLCA::lca($tree, 6, 7), 4, "LCA(6, 7) = 4"
+assert_eq Rosetta::BLLCA::lca($tree, 3, 5), 0, "LCA(3, 5) = 0"
+assert_eq Rosetta::BLLCA::lca($tree, 5, 5), 5, "LCA(5, 5) = 5"
+assert_eq Rosetta::BLLCA::lca($tree, 2, 5), 2, "LCA(2, 5) = 2"
+assert_eq Rosetta::BLLCA::lca($tree, 1, 4), 1, "LCA(1, 4) = 1"
+assert_eq Rosetta::BLLCA::lca($tree, 0, 7), 0, "LCA(0, 7) = 0"
+
+# Distance
+assert_eq Rosetta::BLLCA::distance($tree, 3, 4), 2, "dist(3, 4)"
+assert_eq Rosetta::BLLCA::distance($tree, 6, 5), 5, "dist(6, 5) — through root"
+assert_eq Rosetta::BLLCA::distance($tree, 6, 7), 2, "dist(6, 7)"
+assert_eq Rosetta::BLLCA::distance($tree, 0, 0), 0, "dist(0, 0)"
+
+# Single-node tree
+my $tiny = Rosetta::BLLCA::build(1, [], 0)
+assert_eq Rosetta::BLLCA::lca($tiny, 0, 0), 0, "single LCA"
+assert_eq Rosetta::BLLCA::distance($tiny, 0, 0), 0, "single distance"
+
+# Path tree 0-1-2-3-4
+my $line_t = Rosetta::BLLCA::build(5, [[0, 1], [1, 2], [2, 3], [3, 4]], 0)
+assert_eq Rosetta::BLLCA::lca($line_t, 4, 1), 1, "line LCA(4,1) = 1"
+assert_eq Rosetta::BLLCA::distance($line_t, 0, 4), 4, "line distance(0,4)"
+
+# Binary tree of 7 nodes (root 0, children 1/2, ...)
+my $bin = Rosetta::BLLCA::build(7,
+    [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]], 0)
+assert_eq Rosetta::BLLCA::lca($bin, 3, 6), 0, "bin LCA(3,6) = 0"
+assert_eq Rosetta::BLLCA::lca($bin, 3, 4), 1, "bin LCA(3,4) = 1"
+assert_eq Rosetta::BLLCA::lca($bin, 5, 6), 2, "bin LCA(5,6) = 2"
+
+# Helper sanity
+assert_eq Rosetta::BLLCA::log2_floor(1), 0, "log2 1"
+assert_eq Rosetta::BLLCA::log2_floor(8), 3, "log2 8"
+assert_eq Rosetta::BLLCA::log2_floor(15), 3, "log2 15"
+
+test_run
