@@ -8421,6 +8421,58 @@ impl Interpreter {
                 Ok(PerlValue::string(n))
             }
             ExprKind::ArrayElement { array, index } => {
+                // Stryke string-index sugar: bareword `_[N]` parses to an
+                // ArrayElement with a `__topicstr__N` synthetic name. Strip
+                // the prefix and treat as substr-of-topic. Differs from
+                // `$_[N]` (sigil form) which keeps Perl's @_-access.
+                if let Some(real) = array.strip_prefix("__topicstr__") {
+                    let s = self.scope.get_scalar(real).to_string();
+                    if let ExprKind::Range {
+                        from,
+                        to,
+                        exclusive,
+                        step,
+                    } = &index.kind
+                    {
+                        let n = s.chars().count() as i64;
+                        let mut from_i = self.eval_expr(from)?.to_int();
+                        let mut to_i = self.eval_expr(to)?.to_int();
+                        let step_i = match step {
+                            Some(e) => self.eval_expr(e)?.to_int(),
+                            None => 1,
+                        };
+                        if from_i < 0 { from_i += n }
+                        if to_i < 0   { to_i   += n }
+                        if *exclusive { to_i -= 1 }
+                        let chars: Vec<char> = s.chars().collect();
+                        let mut out = String::new();
+                        if step_i > 0 {
+                            let mut i = from_i;
+                            while i <= to_i && i < n {
+                                if i >= 0 { out.push(chars[i as usize]); }
+                                i += step_i;
+                            }
+                        } else if step_i < 0 {
+                            let mut i = from_i;
+                            while i >= to_i && i >= 0 {
+                                if i < n { out.push(chars[i as usize]); }
+                                i += step_i;
+                            }
+                        }
+                        return Ok(PerlValue::string(out));
+                    }
+                    let idx = self.eval_expr(index)?.to_int();
+                    let n = s.chars().count() as i64;
+                    let i = if idx < 0 { idx + n } else { idx };
+                    return Ok(if i >= 0 && i < n {
+                        s.chars()
+                            .nth(i as usize)
+                            .map(|c| PerlValue::string(c.to_string()))
+                            .unwrap_or(PerlValue::UNDEF)
+                    } else {
+                        PerlValue::UNDEF
+                    });
+                }
                 self.check_strict_array_var(array, line)?;
                 // Stryke (non-compat) string-slice sugar: when the index is
                 // a `from:to[:step]` range AND the target is a string, return
@@ -9142,6 +9194,56 @@ impl Interpreter {
                             } else {
                                 PerlValue::float(old.to_number() + rhs.to_number())
                             }
+                        }
+                        BinOp::Sub => {
+                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                PerlValue::integer(a.wrapping_sub(b))
+                            } else {
+                                PerlValue::float(old.to_number() - rhs.to_number())
+                            }
+                        }
+                        BinOp::Mul => {
+                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                PerlValue::integer(a.wrapping_mul(b))
+                            } else {
+                                PerlValue::float(old.to_number() * rhs.to_number())
+                            }
+                        }
+                        BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
+                        BinOp::Mod => {
+                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                if b == 0 {
+                                    PerlValue::integer(0)
+                                } else {
+                                    PerlValue::integer(a.rem_euclid(b))
+                                }
+                            } else {
+                                let b = rhs.to_number();
+                                PerlValue::float(if b == 0.0 { 0.0 } else { old.to_number() % b })
+                            }
+                        }
+                        BinOp::Concat => {
+                            let mut s = old.to_string();
+                            rhs.append_to(&mut s);
+                            PerlValue::string(s)
+                        }
+                        BinOp::Pow => {
+                            PerlValue::float(old.to_number().powf(rhs.to_number()))
+                        }
+                        BinOp::BitAnd => {
+                            PerlValue::integer(old.to_int() & rhs.to_int())
+                        }
+                        BinOp::BitOr => {
+                            PerlValue::integer(old.to_int() | rhs.to_int())
+                        }
+                        BinOp::BitXor => {
+                            PerlValue::integer(old.to_int() ^ rhs.to_int())
+                        }
+                        BinOp::ShiftLeft => {
+                            PerlValue::integer(old.to_int() << rhs.to_int())
+                        }
+                        BinOp::ShiftRight => {
+                            PerlValue::integer(old.to_int() >> rhs.to_int())
                         }
                         _ => PerlValue::float(old.to_number() + rhs.to_number()),
                     })?);
@@ -11313,6 +11415,11 @@ impl Interpreter {
                         let v = self.eval_expr_ctx(e, self.wantarray_kind)?;
                         if let Some(items) = v.as_array_vec() {
                             vals.extend(items);
+                        } else if v.is_iterator() {
+                            // `join "", rev chars(...)` etc. — drain the
+                            // lazy iterator into items so it joins the
+                            // sequence instead of stringifying as "Iterator".
+                            vals.extend(v.into_iterator().collect_all());
                         } else {
                             vals.push(v);
                         }

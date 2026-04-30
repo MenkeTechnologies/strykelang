@@ -5,7 +5,7 @@ require "./SimpleCipher.stk"
 my $c = Exercism::SimpleCipher::new("abcdefghij")
 assert_eq Exercism::SimpleCipher::encode($c, "aaaaaaaaaa"), "abcdefghij", "encode"
 assert_eq Exercism::SimpleCipher::decode($c, "abcdefghij"), "aaaaaaaaaa", "decode"
-assert_eq Exercism::SimpleCipher::encode($c, "Hello, World!"), "hfnnphzgvr", "strips non-alpha and lowercases"
+assert_eq Exercism::SimpleCipher::encode($c, "Hello, World!"), "hfnosbuytm", "strips non-alpha and lowercases"
 
 # round-trip with random key
 my $r = Exercism::SimpleCipher::new()

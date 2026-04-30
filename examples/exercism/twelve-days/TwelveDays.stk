@@ -2,7 +2,7 @@
 my @_ORD  = ("first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth")
 my @_GIFT = (
     "a Partridge in a Pear Tree.",
-    "two Turtle Doves, and",
+    "two Turtle Doves,",
     "three French Hens,",
     "four Calling Birds,",
     "five Gold Rings,",
@@ -16,7 +16,8 @@ my @_GIFT = (
 )
 
 fn Exercism::TwelveDays::verse($n) {
-    my $head = "On the $_ORD[$n - 1] day of Christmas my true love gave to me: "
+    my $ord = $_ORD[$n - 1]
+    my $head = "On the $ord day of Christmas my true love gave to me: "
     my @gifts = map { $_GIFT[$_] } rev(0..$n - 1)
     if ($n > 1) { $gifts[-1] = "and a Partridge in a Pear Tree." }
     $head . join(" ", @gifts)
@@ -26,4 +27,4 @@ fn Exercism::TwelveDays::verses($from, $to) {
     join("\n", map { Exercism::TwelveDays::verse($_) } $from..$to)
 }
 
-fn Exercism::TwelveDays::sing() { Exercism::TwelveDays::verses(1, 12) }
+fn Exercism::TwelveDays::sing { Exercism::TwelveDays::verses(1, 12) }

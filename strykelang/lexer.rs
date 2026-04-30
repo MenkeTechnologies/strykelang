@@ -1564,9 +1564,25 @@ impl Lexer {
                         && ident.starts_with('_')
                         && ident[1..].bytes().all(|b| b.is_ascii_digit()));
                 if is_topic_slot {
-                    while self.peek() == Some('<') {
-                        self.advance();
-                        ident.push('<');
+                    // Greedy `<` chevrons for the outer-topic chain, BUT only
+                    // when the chevron run isn't followed by a slice index.
+                    // `_<1:5>` is a string slice; `_<<<<` is the 4-deep
+                    // outer-topic. Disambiguate by peeking past the run: if
+                    // the first non-`<` char is a digit, `-`, `:`, or `>`,
+                    // we're in a slice — bail out and let the parser handle
+                    // `<...>` as postfix subscript.
+                    let mut peek_off = 0usize;
+                    while self.peek_at(peek_off) == Some('<') {
+                        peek_off += 1;
+                    }
+                    let trailing = self.peek_at(peek_off);
+                    let is_slice = peek_off > 0
+                        && matches!(trailing, Some(c) if c.is_ascii_digit() || c == '-' || c == ':' || c == '>');
+                    if !is_slice {
+                        for _ in 0..peek_off {
+                            self.advance();
+                            ident.push('<');
+                        }
                     }
                 }
 

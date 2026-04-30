@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 fn Exercism::PhoneNumber::clean_number($s) {
     die "letters not permitted\n"      if $s =~ /[a-z]/i
-    die "punctuations not permitted\n" if $s =~ m([^0-9() \.+-])
+    die "punctuations not permitted\n" if $s =~ /[^0-9() .+\-]/
     $s = $s =~ s/\D//gr
     my $len = length $s
     die "incorrect number of digits\n" if $len < 10

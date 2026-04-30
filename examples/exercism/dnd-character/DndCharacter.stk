@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 fn Exercism::DndCharacter::ability() {
-    my @rolls = sort { $a <=> $b } map { 1 + int(rand 6) } 1..4
+    my @rolls = sort { _0 <=> _1 } map { 1 + int(rand 6) } 1..4
     sum(@rolls[1..3])
 }
 
-fn Exercism::DndCharacter::modifier($score) { int(($score - 10) / 2) }
+fn Exercism::DndCharacter::modifier($score) { floor(($score - 10) / 2) }
 
 fn Exercism::DndCharacter::new() {
-    my %c = (
+    my %h = (
         strength     => Exercism::DndCharacter::ability(),
         dexterity    => Exercism::DndCharacter::ability(),
         constitution => Exercism::DndCharacter::ability(),
@@ -15,6 +15,6 @@ fn Exercism::DndCharacter::new() {
         wisdom       => Exercism::DndCharacter::ability(),
         charisma     => Exercism::DndCharacter::ability(),
     )
-    $c{hitpoints} = 10 + Exercism::DndCharacter::modifier($c{constitution})
-    \%c
+    $h{hitpoints} = 10 + Exercism::DndCharacter::modifier($h{constitution})
+    \%h
 }

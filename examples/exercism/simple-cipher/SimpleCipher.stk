@@ -3,25 +3,21 @@ fn Exercism::SimpleCipher::new($key) {
     if (defined $key) {
         die "ArgumentError" if $key =~ /[A-Z0-9]/ || length($key) == 0
     } else {
-        # random alpha key, 100 chars
         $key = join "", map { chr(97 + int(rand 26)) } 1..100
     }
     { key => $key }
 }
 
 fn Exercism::SimpleCipher::_process($self, $in, $decode) {
-    my $clean = $in =~ s/[^a-zA-Z]//gr
-    $clean = lc $clean
-    my @c = chars($clean)
+    my @c = chars(lc($in =~ s/[^a-zA-Z]//gr))
     my @k = chars($self->{key})
+    my $kn = 0 + @k
     join "", map {
-        my $i = $_
-        my $tr = ord($c[$i]) - ord("a")
-        my $kk = ord($k[$i % len(@k)]) - ord("a")
-        $kk = -$kk if $decode
-        chr(ord("a") + (($tr + $kk) % 26 + 26) % 26)
-    } 0..len(@c) - 1
+        my $tr = ord($c[$_]) - 97
+        my $kk = ord($k[$_ % $kn]) - 97
+        chr(97 + (($tr + ($decode ? -$kk : $kk)) % 26 + 26) % 26)
+    } 0..(0 + @c) - 1
 }
 
 fn Exercism::SimpleCipher::encode($self, $plain) { Exercism::SimpleCipher::_process($self, $plain, 0) }
-fn Exercism::SimpleCipher::decode($self, $ciph)  { Exercism::SimpleCipher::_process($self, $ciph,  1) }
+fn Exercism::SimpleCipher::decode($self, $ciph)  { Exercism::SimpleCipher::_process($self, $ciph, 1) }

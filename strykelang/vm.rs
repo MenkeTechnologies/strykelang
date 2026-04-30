@@ -2921,6 +2921,24 @@ impl<'a> VM<'a> {
                     Op::GetArrayElem(idx) => {
                         let index = self.pop().to_int();
                         let n = names[*idx as usize].as_str();
+                        // Stryke string-index sugar: bareword `_[N]` parses
+                        // to a `__topicstr__N` synthetic name. Index the
+                        // scalar (`$_` / `$_N`) by char.
+                        if let Some(real) = n.strip_prefix("__topicstr__") {
+                            let s = self.interp.scope.get_scalar(real).to_string();
+                            let cnt = s.chars().count() as i64;
+                            let i = if index < 0 { index + cnt } else { index };
+                            let v = if i >= 0 && i < cnt {
+                                s.chars()
+                                    .nth(i as usize)
+                                    .map(|c| PerlValue::string(c.to_string()))
+                                    .unwrap_or(PerlValue::UNDEF)
+                            } else {
+                                PerlValue::UNDEF
+                            };
+                            self.push(v);
+                            return Ok(());
+                        }
                         // Stryke (non-compat) sugar: `$s[i]` indexes by
                         // Unicode char when `@s` is missing or empty but
                         // `$s` is a non-empty string. NB: `$_[0]` keeps
@@ -4968,6 +4986,34 @@ impl<'a> VM<'a> {
                         let from = self.pop();
                         let line = self.line();
                         let name = names[*arr_idx as usize].as_str();
+                        // Stryke topic-string slice: `_[from:to:step]` parses
+                        // to ArraySliceRange on a `__topicstr__N` name.
+                        if let Some(real) = name.strip_prefix("__topicstr__") {
+                            let s = self.interp.scope.get_scalar(real).to_string();
+                            let chars: Vec<char> = s.chars().collect();
+                            let n = chars.len() as i64;
+                            let mut from_i = from.to_int();
+                            let mut to_i = to.to_int();
+                            let step_i = if step.is_undef() { 1 } else { step.to_int() };
+                            if from_i < 0 { from_i += n }
+                            if to_i < 0   { to_i   += n }
+                            let mut out = String::new();
+                            if step_i > 0 {
+                                let mut i = from_i;
+                                while i <= to_i && i < n {
+                                    if i >= 0 { out.push(chars[i as usize]); }
+                                    i += step_i;
+                                }
+                            } else if step_i < 0 {
+                                let mut i = from_i;
+                                while i >= to_i && i >= 0 {
+                                    if i < n { out.push(chars[i as usize]); }
+                                    i += step_i;
+                                }
+                            }
+                            self.push(PerlValue::string(out));
+                            return Ok(());
+                        }
                         let arr_len = self.interp.scope.array_len(name) as i64;
                         // Stryke string-slice sugar: when `@name` is empty
                         // (or doesn't exist) but `$name` is a non-empty

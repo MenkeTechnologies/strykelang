@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 fn Exercism::Minesweeper::annotate($input) {
-    return [] if len(@$input) == 0
-    my @grid = map { [chars($_)] } @$input
-    my $rows = len(@grid)
-    my $cols = len(@{$grid[0]})
+    return [] if 0 + @$input == 0
+    my @grid = map { my @c = chars($_); \@c } @$input
+    my $rows = 0 + @grid
+    my $cols = 0 + @{$grid[0]}
     for my $r (0..$rows - 1) {
         for my $c (0..$cols - 1) {
             next if $grid[$r][$c] eq "*"
