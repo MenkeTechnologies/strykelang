@@ -1,0 +1,115 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wavelet tree — supports rank/quantile/range queries on a
+# sequence over an alphabet [0, σ). Each level partitions the alphabet
+# in half, encoding 0/1 by which half each element fell into. Build is
+# O(n log σ); rank/quantile are O(log σ).
+
+fn Rosetta::Wavelet::build($seq, $lo, $hi) {
+    return undef if len(@$seq) == 0
+    return { leaf => 1, val => $lo, n => len(@$seq) } if $lo == $hi
+    my $mid = int(($lo + $hi) / 2)
+    my @bits
+    my @left
+    my @right
+    for my $v (@$seq) {
+        if ($v <= $mid) { push @bits, 0; push @left, $v }
+        else            { push @bits, 1; push @right, $v }
+    }
+    # Prefix sums of bits for O(1) rank.
+    my @prefix = (0)
+    for my $b (@bits) { push @prefix, $prefix[-1] + $b }
+    {
+        leaf => 0,
+        lo => $lo,
+        hi => $hi,
+        mid => $mid,
+        bits => \@bits,
+        prefix => \@prefix,
+        left => Rosetta::Wavelet::build(\@left, $lo, $mid),
+        right => Rosetta::Wavelet::build(\@right, $mid + 1, $hi)
+    }
+}
+
+# rank(v, i) = number of occurrences of value v in seq[0..i-1].
+fn Rosetta::Wavelet::rank($node, $v, $i) {
+    return 0 if !defined $node || $i == 0
+    return $i if $node->{leaf} && $node->{val} == $v
+    return 0  if $node->{leaf}
+    my $ones = $node->{prefix}[$i]
+    my $zeros = $i - $ones
+    if ($v <= $node->{mid}) {
+        Rosetta::Wavelet::rank($node->{left}, $v, $zeros)
+    } else {
+        Rosetta::Wavelet::rank($node->{right}, $v, $ones)
+    }
+}
+
+# access(i) = value of seq[i].
+fn Rosetta::Wavelet::access($node, $i) {
+    return $node->{val} if $node->{leaf}
+    if ($node->{bits}[$i] == 0) {
+        my $next_i = $node->{prefix}[$i] - 0  # count of 0-bits in [0..i] = i + 1 - prefix[i+1]
+        # Easier: count zeros up to and including i
+        my $zeros_incl = $i + 1 - $node->{prefix}[$i + 1]
+        Rosetta::Wavelet::access($node->{left}, $zeros_incl - 1)
+    } else {
+        my $ones_incl = $node->{prefix}[$i + 1]
+        Rosetta::Wavelet::access($node->{right}, $ones_incl - 1)
+    }
+}
+
+# quantile(k, lo, hi) — k-th smallest value (0-indexed) in seq[lo..hi-1].
+fn Rosetta::Wavelet::quantile($node, $k, $lo, $hi) {
+    return $node->{val} if $node->{leaf}
+    my $zeros_lo = $lo - $node->{prefix}[$lo]
+    my $zeros_hi = $hi - $node->{prefix}[$hi]
+    my $zeros_in_range = $zeros_hi - $zeros_lo
+    if ($k < $zeros_in_range) {
+        Rosetta::Wavelet::quantile($node->{left}, $k, $zeros_lo, $zeros_hi)
+    } else {
+        my $ones_lo = $node->{prefix}[$lo]
+        my $ones_hi = $node->{prefix}[$hi]
+        Rosetta::Wavelet::quantile($node->{right}, $k - $zeros_in_range, $ones_lo, $ones_hi)
+    }
+}
+
+my @seq = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3)
+# Alphabet [0..9]
+my $tree = Rosetta::Wavelet::build(\@seq, 0, 9)
+
+# rank: count occurrences in prefix
+assert_eq Rosetta::Wavelet::rank($tree, 1, 10), 2, "rank(1, 10) = 2"
+assert_eq Rosetta::Wavelet::rank($tree, 1, 4),  2, "rank(1, 4) = 2"
+assert_eq Rosetta::Wavelet::rank($tree, 5, 10), 2, "rank(5, 10) = 2"
+assert_eq Rosetta::Wavelet::rank($tree, 5, 5),  1, "rank(5, 5) = 1"
+assert_eq Rosetta::Wavelet::rank($tree, 9, 10), 1, "rank(9, 10) = 1"
+assert_eq Rosetta::Wavelet::rank($tree, 7, 10), 0, "rank(7, 10) = 0 (absent)"
+
+# access: each element by index
+for my $i (~> 0:9) {
+    my $v = Rosetta::Wavelet::access($tree, $i)
+    assert_eq $v, $seq[$i], "access($i) = $seq[$i]"
+}
+
+# quantile: k-th smallest in seq[0..10]
+# sorted seq: 1,1,2,3,3,4,5,5,6,9
+my @sorted = sort { _0 <=> _1 } @seq
+for my $k (~> 0:9) {
+    my $q = Rosetta::Wavelet::quantile($tree, $k, 0, 10)
+    assert_eq $q, $sorted[$k], "quantile $k full = $sorted[$k]"
+}
+
+# quantile in sub-range [2..7] (5 elements: 4,1,5,9,2)
+# sorted: 1,2,4,5,9
+my @sub_sorted = sort { _0 <=> _1 } (4, 1, 5, 9, 2)
+for my $k (~> 0:4) {
+    my $q = Rosetta::Wavelet::quantile($tree, $k, 2, 7)
+    assert_eq $q, $sub_sorted[$k], "quantile $k in [2..7] = $sub_sorted[$k]"
+}
+
+# Single-element sequence
+my $tiny = Rosetta::Wavelet::build([42], 0, 100)
+assert_eq Rosetta::Wavelet::access($tiny, 0), 42, "single-element access"
+assert_eq Rosetta::Wavelet::rank($tiny, 42, 1), 1, "single-element rank"
+
+test_run

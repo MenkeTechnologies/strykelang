@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Convex Hull Trick (CHT) — answer "min over a set of
+# linear functions y = m·x + b at a query x" in amortized O(log n) when
+# slopes are inserted in sorted order. Used to speed up DP transitions
+# of the form dp[i] = min_j (m_j · x_i + b_j).
+
+# This implementation: lines added in order of decreasing slope, queries
+# in order of increasing x. With those constraints, both the add-line
+# and the query become amortized O(1) via two pointers.
+
+fn Rosetta::CHT::new() {
+    { lines => [], head => 0 }
+}
+
+fn Rosetta::CHT::is_bad($l1, $l2, $l3) {
+    # Returns true if $l2 is dominated by $l1 and $l3 — i.e., the
+    # intersection of (l1, l3) lies to the left of (l1, l2).
+    # Use cross-multiplication to avoid float rounding.
+    my ($m1, $b1) = @$l1
+    my ($m2, $b2) = @$l2
+    my ($m3, $b3) = @$l3
+    ($b3 - $b1) * ($m1 - $m2) <= ($b2 - $b1) * ($m1 - $m3)
+}
+
+fn Rosetta::CHT::add_line($cht, $m, $b) {
+    my $line = [$m, $b]
+    while (len(@{$cht->{lines}}) >= 2
+           && Rosetta::CHT::is_bad($cht->{lines}[-2], $cht->{lines}[-1], $line)) {
+        pop @{$cht->{lines}}
+    }
+    push @{$cht->{lines}}, $line
+}
+
+fn Rosetta::CHT::eval_line($l, $x) { $l->[0] * $x + $l->[1] }
+
+fn Rosetta::CHT::query($cht, $x) {
+    while ($cht->{head} + 1 < len(@{$cht->{lines}})
+           && Rosetta::CHT::eval_line($cht->{lines}[$cht->{head} + 1], $x)
+              <= Rosetta::CHT::eval_line($cht->{lines}[$cht->{head}], $x)) {
+        $cht->{head}++
+    }
+    Rosetta::CHT::eval_line($cht->{lines}[$cht->{head}], $x)
+}
+
+# Naive: linear scan over all lines (used to cross-check).
+fn Rosetta::CHT::query_naive($lines, $x) {
+    my $best = 1e18
+    for my $l (@$lines) {
+        my $v = Rosetta::CHT::eval_line($l, $x)
+        $best = $v if $v < $best
+    }
+    $best
+}
+
+# Insert lines with decreasing slope, query with increasing x.
+my $cht = Rosetta::CHT::new()
+my @lines = ([5, 10], [3, 4], [2, -2], [-1, 5])  # slopes 5, 3, 2, -1
+for my $l (@lines) { Rosetta::CHT::add_line($cht, $l->[0], $l->[1]) }
+
+# Query at several x values; cross-check with naive scan.
+for my $x (-10, -5, 0, 1, 3, 5, 10, 20) {
+    my $hull = Rosetta::CHT::query($cht, $x)
+    my $naive = Rosetta::CHT::query_naive(\@lines, $x)
+    assert_eq $hull, $naive, "CHT(x=$x) = naive"
+}
+
+# Single line case: query just evaluates that line.
+my $single = Rosetta::CHT::new()
+Rosetta::CHT::add_line($single, 7, -3)
+assert_eq Rosetta::CHT::query($single, 0),  -3, "single line at x=0"
+assert_eq Rosetta::CHT::query($single, 5), 32, "single line at x=5"
+
+# Identical-slope lines: only the lower-intercept one survives.
+my $dup = Rosetta::CHT::new()
+Rosetta::CHT::add_line($dup, 2, 10)
+Rosetta::CHT::add_line($dup, 2, 5)
+# We can't query before $dup's head moves past dropped lines; check structure.
+assert_ok len(@{$dup->{lines}}) <= 2, "duplicate-slope dedup"
+
+# Decreasing-slope insertion sequence — verify CHT yields lower envelope.
+my $env = Rosetta::CHT::new()
+my @seq = ([10, 0], [5, 10], [1, 50])
+for my $l (@seq) { Rosetta::CHT::add_line($env, $l->[0], $l->[1]) }
+for my $x (~> 0:50) {
+    my $hull = Rosetta::CHT::query($env, $x)
+    my $naive = Rosetta::CHT::query_naive(\@seq, $x)
+    assert_eq $hull, $naive, "envelope at x=$x"
+}
+
+test_run

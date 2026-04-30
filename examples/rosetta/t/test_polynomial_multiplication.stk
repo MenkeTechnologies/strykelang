@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polynomial multiplication.
+# Polynomials are coefficient arrays, lowest degree first:
+#   [1, 2, 3] represents 1 + 2x + 3x^2.
+
+fn Rosetta::PolyMul::mul($p, $q) {
+    my $np = len(@$p)
+    my $nq = len(@$q)
+    return [] if $np == 0 || $nq == 0
+    my $n = $np + $nq - 1
+    my @r = ~> 0:$n - 1 |> map { 0 }
+    for my $i (~> 0:$np - 1) {
+        for my $j (~> 0:$nq - 1) {
+            $r[$i + $j] += $p->[$i] * $q->[$j]
+        }
+    }
+    \@r
+}
+
+fn Rosetta::PolyMul::eval_at($p, $x) {
+    # Horner's rule on the reversed coefficient list (high → low).
+    my $acc = 0
+    for my $c (reverse @$p) { $acc = $acc * $x + $c }
+    $acc
+}
+
+fn Rosetta::PolyMul::format_poly($p) {
+    my @terms
+    for my $i (~> 0:len(@$p) - 1) {
+        my $c = $p->[$i]
+        next if $c == 0
+        my $term
+        if ($i == 0) { $term = "$c" }
+        elsif ($i == 1) { $term = $c == 1 ? "x" : ($c == -1 ? "-x" : "${c}x") }
+        else { $term = $c == 1 ? "x^$i" : ($c == -1 ? "-x^$i" : "${c}x^$i") }
+        push @terms, $term
+    }
+    return "0" if len(@terms) == 0
+    join(" + ", @terms)
+}
+
+# (1 + x)(1 + x) = 1 + 2x + x^2
+my $r1 = Rosetta::PolyMul::mul([1, 1], [1, 1])
+assert_eq join(",", @$r1), "1,2,1", "(1+x)^2"
+
+# (1 + x)(1 - x) = 1 - x^2
+my $r2 = Rosetta::PolyMul::mul([1, 1], [1, -1])
+assert_eq join(",", @$r2), "1,0,-1", "(1+x)(1-x) = 1 - x^2"
+
+# (1 + 2x + 3x^2)(4 + 5x) = 4 + 13x + 22x^2 + 15x^3
+my $r3 = Rosetta::PolyMul::mul([1, 2, 3], [4, 5])
+assert_eq join(",", @$r3), "4,13,22,15", "(1+2x+3x^2)(4+5x)"
+
+# (x - 1)(x - 2)(x - 3) = x^3 - 6x^2 + 11x - 6
+my $a = Rosetta::PolyMul::mul([-1, 1], [-2, 1])
+my $b = Rosetta::PolyMul::mul($a, [-3, 1])
+assert_eq join(",", @$b), "-6,11,-6,1", "(x-1)(x-2)(x-3)"
+
+# Empty poly cases
+assert_eq join(",", @{Rosetta::PolyMul::mul([], [1, 2, 3])}), "", "[] · p = []"
+assert_eq join(",", @{Rosetta::PolyMul::mul([5], [1, 2, 3])}), "5,10,15", "scalar · p"
+
+# Cross-check: evaluate (1+2x+3x^2)(4+5x) at x=10 should equal 1+20+300=321 times 4+50=54 → 321*54=17334
+my $p1 = [1, 2, 3]
+my $p2 = [4, 5]
+my $prod = Rosetta::PolyMul::mul($p1, $p2)
+my $x = 10
+assert_eq Rosetta::PolyMul::eval_at($prod, $x),
+          Rosetta::PolyMul::eval_at($p1, $x) * Rosetta::PolyMul::eval_at($p2, $x),
+          "p(10) * q(10) = (p*q)(10)"
+
+# Pretty-print
+assert_eq Rosetta::PolyMul::format_poly([1, 2, 3]), "1 + 2x + 3x^2", "format quadratic"
+assert_eq Rosetta::PolyMul::format_poly([0, 0, 1]), "x^2", "format x^2"
+assert_eq Rosetta::PolyMul::format_poly([0]), "0", "format 0"
+
+test_run

@@ -1,0 +1,133 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Introsort — David Musser's hybrid: quicksort with a
+# depth limit, fall back to heapsort when too deep, plus insertion sort
+# on small partitions. Used by the C++ STL std::sort.
+
+fn Rosetta::Intro::insertion_range($arr, $lo, $hi) {
+    for my $i ($lo + 1..$hi) {
+        my $x = $arr->[$i]
+        my $j = $i - 1
+        while ($j >= $lo && $arr->[$j] > $x) {
+            $arr->[$j + 1] = $arr->[$j]
+            $j--
+        }
+        $arr->[$j + 1] = $x
+    }
+}
+
+fn Rosetta::Intro::sift_down($arr, $start, $end, $offset) {
+    my $root = $start
+    while (2 * $root + 1 <= $end) {
+        my $child = 2 * $root + 1
+        $child++ if $child + 1 <= $end && $arr->[$offset + $child] < $arr->[$offset + $child + 1]
+        last if $arr->[$offset + $root] >= $arr->[$offset + $child]
+        my $t = $arr->[$offset + $root]
+        $arr->[$offset + $root] = $arr->[$offset + $child]
+        $arr->[$offset + $child] = $t
+        $root = $child
+    }
+}
+
+fn Rosetta::Intro::heap_range($arr, $lo, $hi) {
+    my $n = $hi - $lo + 1
+    return if $n < 2
+    for (my $start = int(($n - 2) / 2); $start >= 0; $start--) {
+        Rosetta::Intro::sift_down($arr, $start, $n - 1, $lo)
+    }
+    for (my $end = $n - 1; $end > 0; $end--) {
+        my $t = $arr->[$lo]; $arr->[$lo] = $arr->[$lo + $end]; $arr->[$lo + $end] = $t
+        Rosetta::Intro::sift_down($arr, 0, $end - 1, $lo)
+    }
+}
+
+fn Rosetta::Intro::partition($arr, $lo, $hi) {
+    # Median-of-three pivot.
+    my $mid = int(($lo + $hi) / 2)
+    if ($arr->[$lo] > $arr->[$mid]) {
+        my $t = $arr->[$lo]; $arr->[$lo] = $arr->[$mid]; $arr->[$mid] = $t
+    }
+    if ($arr->[$lo] > $arr->[$hi]) {
+        my $t = $arr->[$lo]; $arr->[$lo] = $arr->[$hi]; $arr->[$hi] = $t
+    }
+    if ($arr->[$mid] > $arr->[$hi]) {
+        my $t = $arr->[$mid]; $arr->[$mid] = $arr->[$hi]; $arr->[$hi] = $t
+    }
+    my $pivot = $arr->[$mid]
+    # Move pivot to hi-1.
+    my $t = $arr->[$mid]; $arr->[$mid] = $arr->[$hi - 1]; $arr->[$hi - 1] = $t
+
+    my ($i, $j) = ($lo, $hi - 1)
+    while (1) {
+        $i++ while $arr->[$i] < $pivot
+        $j-- while $arr->[$j] > $pivot
+        last if $i >= $j
+        my $tt = $arr->[$i]; $arr->[$i] = $arr->[$j]; $arr->[$j] = $tt
+        $i++
+        $j--
+    }
+    # Restore pivot.
+    my $tt = $arr->[$i]; $arr->[$i] = $arr->[$hi - 1]; $arr->[$hi - 1] = $tt
+    $i
+}
+
+fn Rosetta::Intro::loop($arr, $lo, $hi, $depth) {
+    while ($hi - $lo > 16) {
+        if ($depth == 0) {
+            Rosetta::Intro::heap_range($arr, $lo, $hi)
+            return
+        }
+        $depth--
+        my $p = Rosetta::Intro::partition($arr, $lo, $hi)
+        Rosetta::Intro::loop($arr, $p, $hi, $depth)
+        $hi = $p - 1
+    }
+    Rosetta::Intro::insertion_range($arr, $lo, $hi)
+}
+
+fn Rosetta::Intro::log2_floor($n) {
+    my $r = 0
+    my $x = $n
+    while ($x > 1) { $x = int($x / 2); $r++ }
+    $r
+}
+
+fn Rosetta::Intro::sort($list) {
+    my @arr = @$list
+    my $n = len(@arr)
+    return \@arr if $n < 2
+    my $depth = 2 * Rosetta::Intro::log2_floor($n)
+    Rosetta::Intro::loop(\@arr, 0, $n - 1, $depth)
+    \@arr
+}
+
+my $r1 = Rosetta::Intro::sort([5, 2, 8, 1, 9, 3, 7, 4, 6])
+assert_eq join(",", @$r1), "1,2,3,4,5,6,7,8,9", "9 elems"
+
+my $r2 = Rosetta::Intro::sort([])
+assert_eq join(",", @$r2), "", "empty"
+
+my $r3 = Rosetta::Intro::sort([42])
+assert_eq join(",", @$r3), "42", "single"
+
+my $r4 = Rosetta::Intro::sort([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5])
+assert_eq join(",", @$r4), "1,1,2,3,3,4,5,5,5,6,9", "duplicates"
+
+# Larger input — beyond the insertion-sort threshold so quicksort path runs.
+my @big = ~> 0:199 map { (_0 * 7919 + 13) % 1000 }
+my @native = sort { _0 <=> _1 } @big
+my $rb = Rosetta::Intro::sort(\@big)
+assert_eq join(",", @$rb), join(",", @native), "200-elem matches native"
+
+# Already-sorted (worst case for naive quicksort, exercises depth-limit fallback).
+my @sorted = (1..50)
+my $rs = Rosetta::Intro::sort(\@sorted)
+assert_eq join(",", @$rs), join(",", @sorted), "already-sorted 50"
+
+my $rn = Rosetta::Intro::sort([-3, 0, -1, 7, -3, 2])
+assert_eq join(",", @$rn), "-3,-3,-1,0,2,7", "negatives + dups"
+
+assert_eq Rosetta::Intro::log2_floor(1), 0, "log2 1"
+assert_eq Rosetta::Intro::log2_floor(8), 3, "log2 8"
+assert_eq Rosetta::Intro::log2_floor(1024), 10, "log2 1024"
+
+test_run

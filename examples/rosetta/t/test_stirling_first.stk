@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stirling numbers of the first kind (unsigned).
+# c(n, k) counts permutations of n elements with exactly k cycles.
+# Recurrence: c(n, k) = (n-1) * c(n-1, k) + c(n-1, k-1)
+#   with c(0, 0) = 1, c(n, 0) = c(0, k) = 0 for n, k > 0.
+
+my %STIRLING1_MEMO
+
+fn Rosetta::StirlingFirst::compute($n, $k) {
+    if ($n == 0 && $k == 0) {
+        1
+    } elsif ($n == 0 || $k == 0 || $k > $n) {
+        0
+    } elsif (exists $STIRLING1_MEMO{"$n,$k"}) {
+        $STIRLING1_MEMO{"$n,$k"}
+    } else {
+        my $v1 = Rosetta::StirlingFirst::compute($n - 1, $k)
+        my $v2 = Rosetta::StirlingFirst::compute($n - 1, $k - 1)
+        my $res = ($n - 1) * $v1 + $v2
+        $STIRLING1_MEMO{"$n,$k"} = $res
+        $res
+    }
+}
+
+# Row sums equal n! (since each permutation has some number of cycles).
+fn Rosetta::StirlingFirst::row_sum($n) {
+    ~> 0:$n |> map { Rosetta::StirlingFirst::compute($n, _) } |> sum
+}
+
+# Boundary cases
+assert_eq Rosetta::StirlingFirst::compute(0, 0), 1, "c(0,0)"
+assert_eq Rosetta::StirlingFirst::compute(1, 1), 1, "c(1,1)"
+assert_eq Rosetta::StirlingFirst::compute(5, 0), 0, "c(5,0)"
+assert_eq Rosetta::StirlingFirst::compute(0, 5), 0, "c(0,5)"
+assert_eq Rosetta::StirlingFirst::compute(3, 5), 0, "k>n"
+
+# OEIS A008275 / A132393 (unsigned Stirling first kind)
+assert_eq Rosetta::StirlingFirst::compute(3, 1), 2,    "c(3,1)"
+assert_eq Rosetta::StirlingFirst::compute(3, 2), 3,    "c(3,2)"
+assert_eq Rosetta::StirlingFirst::compute(3, 3), 1,    "c(3,3)"
+assert_eq Rosetta::StirlingFirst::compute(4, 2), 11,   "c(4,2)"
+assert_eq Rosetta::StirlingFirst::compute(5, 2), 50,   "c(5,2)"
+assert_eq Rosetta::StirlingFirst::compute(5, 3), 35,   "c(5,3)"
+assert_eq Rosetta::StirlingFirst::compute(6, 3), 225,  "c(6,3)"
+assert_eq Rosetta::StirlingFirst::compute(8, 4), 6769, "c(8,4)"
+assert_eq Rosetta::StirlingFirst::compute(7, 3), 1624, "c(7,3)"
+assert_eq Rosetta::StirlingFirst::compute(8, 3), 13132,"c(8,3)"
+assert_eq Rosetta::StirlingFirst::compute(10, 5), 269325, "c(10,5)"
+
+# Row sum = n!
+assert_eq Rosetta::StirlingFirst::row_sum(0), 1,    "row sum 0 = 0!"
+assert_eq Rosetta::StirlingFirst::row_sum(1), 1,    "row sum 1 = 1!"
+assert_eq Rosetta::StirlingFirst::row_sum(5), 120,  "row sum 5 = 5!"
+assert_eq Rosetta::StirlingFirst::row_sum(7), 5040, "row sum 7 = 7!"
+
+(10, 5) |> Rosetta::StirlingFirst::compute |> assert_eq(269325, "pipe stirling")
+
+test_run

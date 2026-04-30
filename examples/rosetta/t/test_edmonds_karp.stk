@@ -1,0 +1,119 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Edmonds-Karp — BFS-based max-flow. Each augmenting
+# path is a shortest path in the residual graph, giving O(V·E²).
+
+fn Rosetta::EK::add_edge($cap, $u, $v, $w) {
+    $cap->[$u][$v] += $w
+}
+
+fn Rosetta::EK::bfs($cap, $n, $s, $t, $parent) {
+    my @visited = ~> 0:$n - 1 |> map { 0 }
+    $visited[$s] = 1
+    my @queue = ($s)
+    while (len(@queue) > 0) {
+        my $u = shift @queue
+        for my $v (~> 0:$n - 1) {
+            if (!$visited[$v] && ($cap->[$u][$v] // 0) > 0) {
+                $visited[$v] = 1
+                $parent->[$v] = $u
+                return 1 if $v == $t
+                push @queue, $v
+            }
+        }
+    }
+    0
+}
+
+fn Rosetta::EK::max_flow($n, $edges, $s, $t) {
+    my @cap
+    for my $i (~> 0:$n - 1) {
+        my @row = ~> 0:$n - 1 |> map { 0 }
+        push @cap, \@row
+    }
+    for my $e (@$edges) {
+        my ($u, $v, $w) = @$e
+        Rosetta::EK::add_edge(\@cap, $u, $v, $w)
+    }
+    my $flow = 0
+    while (1) {
+        my @parent = ~> 0:$n - 1 |> map { -1 }
+        last if !Rosetta::EK::bfs(\@cap, $n, $s, $t, \@parent)
+        # Walk parent chain to find bottleneck.
+        my $bottleneck = 1e18
+        my $v = $t
+        while ($v != $s) {
+            my $u = $parent[$v]
+            my $c = $cap[$u][$v]
+            $bottleneck = $c if $c < $bottleneck
+            $v = $u
+        }
+        # Augment.
+        $v = $t
+        while ($v != $s) {
+            my $u = $parent[$v]
+            $cap[$u][$v] -= $bottleneck
+            $cap[$v][$u] += $bottleneck
+            $v = $u
+        }
+        $flow += $bottleneck
+    }
+    $flow
+}
+
+# CLRS textbook example (8 vertices, source=0, sink=7).
+# Edges: (s,1,16) (s,2,13) (1,3,12) (2,1,4) (2,4,14) (3,2,9) (3,5,20)
+# (4,3,7) (4,6,4) (5,t,?) — actually let me use the Wikipedia 6-node example.
+# Wikipedia example: max flow = 23 from s=0 to t=5.
+# Edges: (0,1,3) (0,2,3) (1,2,2) (1,3,3) (2,4,2) (3,4,4) (3,5,2) (4,5,3)
+my $edges_wp = [
+    [0, 1, 3], [0, 2, 3],
+    [1, 2, 2], [1, 3, 3],
+    [2, 4, 2],
+    [3, 4, 4], [3, 5, 2],
+    [4, 5, 3]
+]
+my $f1 = Rosetta::EK::max_flow(6, $edges_wp, 0, 5)
+assert_eq $f1, 5, "Wikipedia 6-node max flow = 5"
+
+# Trivial: single edge s→t with capacity 7
+my $f2 = Rosetta::EK::max_flow(2, [[0, 1, 7]], 0, 1)
+assert_eq $f2, 7, "single edge"
+
+# Disconnected: s and t in separate components → max flow 0
+my $f3 = Rosetta::EK::max_flow(4, [[0, 1, 5], [2, 3, 5]], 0, 3)
+assert_eq $f3, 0, "disconnected → 0"
+
+# Bottleneck: parallel paths share an edge
+# s -> a (5), a -> t (3), a -> b (2), b -> t (5). Max flow = 5.
+my $f4 = Rosetta::EK::max_flow(4, [[0, 1, 5], [1, 3, 3], [1, 2, 2], [2, 3, 5]], 0, 3)
+assert_eq $f4, 5, "bottleneck on first edge = 5"
+
+# Diamond: s splits to a/b, recombines at t. Each branch capacity 4 → total 8.
+my $diamond = [
+    [0, 1, 4], [0, 2, 4],
+    [1, 3, 4], [2, 3, 4]
+]
+my $f5 = Rosetta::EK::max_flow(4, $diamond, 0, 3)
+assert_eq $f5, 8, "diamond max flow = 8"
+
+# Multiple parallel-with-augment scenario (CLRS Fig 26.1, simplified):
+# Source s=0, sink t=5
+# Edges: (0,1,16) (0,2,13) (1,2,10) (2,1,4) (1,3,12) (3,2,9) (2,4,14) (4,3,7) (3,5,20) (4,5,4)
+my $clrs = [
+    [0, 1, 16], [0, 2, 13],
+    [1, 2, 10], [2, 1, 4],
+    [1, 3, 12],
+    [3, 2, 9],
+    [2, 4, 14],
+    [4, 3, 7],
+    [3, 5, 20],
+    [4, 5, 4]
+]
+my $f6 = Rosetta::EK::max_flow(6, $clrs, 0, 5)
+assert_eq $f6, 23, "CLRS Fig 26.1 max flow = 23"
+
+# Reflexive: source = sink
+my $f7 = Rosetta::EK::max_flow(3, [[0, 1, 5], [1, 2, 5]], 0, 0)
+assert_eq $f7, 0, "source == sink → 0"
+
+test_run

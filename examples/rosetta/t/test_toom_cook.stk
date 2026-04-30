@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Toom-Cook 3 multiplication. Splits each operand into 3
+# parts and uses 5 sub-multiplies + linear combinations (vs Karatsuba's
+# 3 sub-multiplies on a 2-way split).
+
+fn Rosetta::Toom::digits($x) {
+    return 1 if $x == 0
+    my $d = 0
+    my $n = $x < 0 ? -$x : $x
+    while ($n > 0) { $d++; $n = int($n / 10) }
+    $d
+}
+
+fn Rosetta::Toom::pow10($k) {
+    my $r = 1
+    for (~> 1:$k) { $r *= 10 }
+    $r
+}
+
+fn Rosetta::Toom::split3($x, $base) {
+    my $b2 = $base * $base
+    my $hi = int($x / $b2)
+    my $rem = $x - $hi * $b2
+    my $mid = int($rem / $base)
+    my $lo = $rem - $mid * $base
+    [$lo, $mid, $hi]
+}
+
+fn Rosetta::Toom::mul($x, $y) {
+    return $x * $y if $x < 1000 || $y < 1000
+    my $n = Rosetta::Toom::digits($x)
+    my $m = Rosetta::Toom::digits($y)
+    my $third = int(($n > $m ? $n : $m) / 3) + 1
+    my $base = Rosetta::Toom::pow10($third)
+    my $a = Rosetta::Toom::split3($x, $base)
+    my $b = Rosetta::Toom::split3($y, $base)
+    my ($a0, $a1, $a2) = @$a
+    my ($b0, $b1, $b2) = @$b
+
+    # Evaluate at points 0, 1, -1, 2, ∞
+    my $p0 = $a0
+    my $p1 = $a0 + $a1 + $a2
+    my $pm1 = $a0 - $a1 + $a2
+    my $p2 = $a0 + 2 * $a1 + 4 * $a2
+    my $pinf = $a2
+
+    my $q0 = $b0
+    my $q1 = $b0 + $b1 + $b2
+    my $qm1 = $b0 - $b1 + $b2
+    my $q2 = $b0 + 2 * $b1 + 4 * $b2
+    my $qinf = $b2
+
+    # 5 sub-multiplies
+    my $r0 = Rosetta::Toom::mul($p0, $q0)
+    my $r1 = Rosetta::Toom::mul($p1, $q1)
+    my $rm1 = Rosetta::Toom::mul($pm1, $qm1)
+    my $r2 = Rosetta::Toom::mul($p2, $q2)
+    my $rinf = Rosetta::Toom::mul($pinf, $qinf)
+
+    # Solve P(t) = c0 + c1·t + c2·t² + c3·t³ + c4·t⁴ given P at {0, 1, -1, 2, ∞}.
+    my $c0 = $r0
+    my $c4 = $rinf
+    my $c2 = int(($r1 + $rm1) / 2) - $c0 - $c4
+    my $c3 = int(($r2 - $c0 - 4 * $c2 - 16 * $c4 - $r1 + $rm1) / 6)
+    my $c1 = int(($r1 - $rm1) / 2) - $c3
+
+    # Compose: result = c0 + c1·B + c2·B² + c3·B³ + c4·B⁴
+    my $b1pow = $base
+    my $b2pow = $base * $base
+    my $b3pow = $b2pow * $base
+    my $b4pow = $b2pow * $b2pow
+    $c0 + $c1 * $b1pow + $c2 * $b2pow + $c3 * $b3pow + $c4 * $b4pow
+}
+
+# Below the threshold the function falls through to native multiply; above it,
+# the Toom-3 path actually runs. Make sure the recursion gets exercised.
+assert_eq Rosetta::Toom::mul(0, 12345), 0, "0 * x"
+assert_eq Rosetta::Toom::mul(7, 9), 63, "single digit"
+assert_eq Rosetta::Toom::mul(123, 456), 56088, "small (native path)"
+
+# Above the threshold (>= 1000): exercise the Toom-3 split.
+assert_eq Rosetta::Toom::mul(1234, 5678), 7006652, "4-digit Toom-3"
+assert_eq Rosetta::Toom::mul(12345, 67890), 838102050, "5-digit Toom-3"
+assert_eq Rosetta::Toom::mul(99999, 99999), 9999800001, "near-1e5 squared"
+assert_eq Rosetta::Toom::mul(123456, 987654), 121931812224, "6-digit Toom-3"
+assert_eq Rosetta::Toom::mul(1000000, 1000000), 1000000000000, "1e6 * 1e6"
+
+# Cross-validate against native multiplication on a random-ish grid.
+for my $x (1234, 9999, 12345, 999999, 7777777) {
+    for my $y (4321, 5555, 88888, 123456, 9999999) {
+        assert_eq Rosetta::Toom::mul($x, $y), $x * $y, "$x * $y matches native"
+    }
+}
+
+# Helper sanity
+assert_eq Rosetta::Toom::digits(0), 1, "digits(0) = 1"
+assert_eq Rosetta::Toom::digits(999), 3, "digits(999) = 3"
+assert_eq Rosetta::Toom::pow10(3), 1000, "10^3"
+my $sp = Rosetta::Toom::split3(123456789, 1000)
+assert_eq join(",", @$sp), "789,456,123", "split3(123456789, 1000)"
+
+test_run

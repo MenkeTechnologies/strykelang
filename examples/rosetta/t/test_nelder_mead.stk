@@ -1,0 +1,134 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nelder-Mead simplex method for unconstrained minimization.
+# Maintains an n-dimensional simplex of n+1 vertices and at each step:
+#  1. Reflect worst vertex through centroid of the rest.
+#  2. If reflection is best, try expansion. If reflection is "ok", keep it.
+#  3. Else try contraction (inside or outside).
+#  4. If still no improvement, shrink toward best.
+
+fn Rosetta::NM::vec_add($u, $v) {
+    my @r = ~> 0:len(@$u) - 1 |> map { $u->[_0] + $v->[_0] }
+    \@r
+}
+
+fn Rosetta::NM::vec_sub($u, $v) {
+    my @r = ~> 0:len(@$u) - 1 |> map { $u->[_0] - $v->[_0] }
+    \@r
+}
+
+fn Rosetta::NM::vec_scale($u, $k) {
+    my @r = ~> 0:len(@$u) - 1 |> map { $u->[_0] * $k }
+    \@r
+}
+
+fn Rosetta::NM::centroid($simplex) {
+    my $count = len(@$simplex)
+    my $dim = len(@{$simplex->[0]})
+    my @c = ~> 0:$dim - 1 |> map { 0 }
+    for my $i (~> 0:$count - 1) {
+        for my $d (~> 0:$dim - 1) { $c[$d] += $simplex->[$i][$d] }
+    }
+    my @r = ~> 0:$dim - 1 |> map { $c[_0] / $count }
+    \@r
+}
+
+fn Rosetta::NM::sort_simplex($simplex, $f) {
+    my @scored
+    for my $v (@$simplex) { push @scored, [$f->($v), $v] }
+    @scored = sort { _0->[0] <=> _1->[0] } @scored
+    my @out = map { _0->[1] } @scored
+    \@out
+}
+
+fn Rosetta::NM::minimize($f, $start, $iters) {
+    my $n = len(@$start)
+    # Build initial simplex: x0 plus x0 + step*e_i. Use unit-ish steps so
+    # the simplex covers enough of the search space to start moving.
+    my @simplex = ($start)
+    for my $i (~> 0:$n - 1) {
+        my @v = @$start
+        $v[$i] += ($v[$i] == 0 ? 1.0 : 0.5 * $v[$i])
+        push @simplex, \@v
+    }
+    my $alpha = 1.0; my $gamma = 2.0; my $rho = 0.5; my $sigma = 0.5
+    for my $iter (~> 0:$iters - 1) {
+        my $sorted = Rosetta::NM::sort_simplex(\@simplex, $f)
+        @simplex = @$sorted
+        my $best = $simplex[0]
+        my $worst = $simplex[$n]
+        my $second_worst = $simplex[$n - 1]
+        my @top = @simplex[0..$n - 1]
+        my $cent = Rosetta::NM::centroid(\@top)
+        my $reflected = Rosetta::NM::vec_add($cent,
+            Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($cent, $worst), $alpha))
+        my $fr = $f->($reflected)
+        my $fb = $f->($best)
+        my $fsw = $f->($second_worst)
+        my $fw = $f->($worst)
+        if ($fr < $fb) {
+            my $expanded = Rosetta::NM::vec_add($cent,
+                Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($cent, $worst), $gamma))
+            my $fe = $f->($expanded)
+            $simplex[$n] = $fe < $fr ? $expanded : $reflected
+            next
+        }
+        if ($fr < $fsw) {
+            $simplex[$n] = $reflected
+            next
+        }
+        # Contraction
+        my $contracted
+        if ($fr < $fw) {
+            $contracted = Rosetta::NM::vec_add($cent,
+                Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($reflected, $cent), $rho))
+        } else {
+            $contracted = Rosetta::NM::vec_add($cent,
+                Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($worst, $cent), $rho))
+        }
+        my $fc = $f->($contracted)
+        if ($fc < $fw) {
+            $simplex[$n] = $contracted
+            next
+        }
+        # Shrink
+        for my $i (~> 1:$n) {
+            my $s = Rosetta::NM::vec_add($best,
+                Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($simplex[$i], $best), $sigma))
+            $simplex[$i] = $s
+        }
+    }
+    my $sorted = Rosetta::NM::sort_simplex(\@simplex, $f)
+    $sorted->[0]
+}
+
+fn Rosetta::NM::close($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Quadratic bowl: f(x,y) = (x-3)^2 + (y+2)^2, minimum at (3, -2).
+my $f1 = fn ($v) { ($v->[0] - 3) ** 2 + ($v->[1] + 2) ** 2 }
+my $r1 = Rosetta::NM::minimize($f1, [0, 0], 200)
+assert_ok Rosetta::NM::close($r1->[0],  3, 1e-3), "bowl x*"
+assert_ok Rosetta::NM::close($r1->[1], -2, 1e-3), "bowl y*"
+
+# Sphere in 3D: minimum at (0,0,0).
+my $f2 = fn ($v) { $v->[0] ** 2 + $v->[1] ** 2 + $v->[2] ** 2 }
+my $r2 = Rosetta::NM::minimize($f2, [1, 1, 1], 300)
+assert_ok Rosetta::NM::close($r2->[0], 0, 1e-3), "sphere x*"
+assert_ok Rosetta::NM::close($r2->[1], 0, 1e-3), "sphere y*"
+assert_ok Rosetta::NM::close($r2->[2], 0, 1e-3), "sphere z*"
+
+# Booth function: f(x,y) = (x+2y-7)^2 + (2x+y-5)^2, minimum at (1, 3).
+my $f3 = fn ($v) {
+    my $a = $v->[0] + 2 * $v->[1] - 7
+    my $b = 2 * $v->[0] + $v->[1] - 5
+    $a * $a + $b * $b
+}
+my $r3 = Rosetta::NM::minimize($f3, [0, 0], 400)
+assert_ok Rosetta::NM::close($r3->[0], 1, 1e-2), "Booth x*"
+assert_ok Rosetta::NM::close($r3->[1], 3, 1e-2), "Booth y*"
+
+# 1D: |x - 5|. Subgradient at the kink, but Nelder-Mead handles it.
+my $f4 = fn ($v) { abs($v->[0] - 5) }
+my $r4 = Rosetta::NM::minimize($f4, [0], 200)
+assert_ok Rosetta::NM::close($r4->[0], 5, 1e-3), "|x-5| min at 5"
+
+test_run

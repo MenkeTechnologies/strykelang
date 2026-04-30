@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Particle Swarm Optimization (PSO).
+# Each particle has a position and velocity in d-dimensional space.
+# At each step velocity updates toward (a) the particle's best
+# known position and (b) the swarm's global best, weighted by
+# random factors and inertia.
+
+fn Rosetta::PSO::random($lo, $hi) { $lo + rand() * ($hi - $lo) }
+
+fn Rosetta::PSO::optimize($f, $dim, $bounds, $opts) {
+    my $n_particles = $opts->{n} // 30
+    my $iters = $opts->{iters} // 100
+    my $w = $opts->{w} // 0.7
+    my $c1 = $opts->{c1} // 1.5
+    my $c2 = $opts->{c2} // 1.5
+
+    # Initialize particles uniformly in bounds.
+    my @pos
+    my @vel
+    my @pbest
+    my @pbest_val
+    my $gbest_val = 1e18
+    my @gbest
+
+    for my $i (~> 1:$n_particles) {
+        my @p; my @v
+        for my $d (~> 0:$dim - 1) {
+            my $lo = $bounds->[$d][0]
+            my $hi = $bounds->[$d][1]
+            push @p, Rosetta::PSO::random($lo, $hi)
+            push @v, Rosetta::PSO::random(-($hi - $lo), $hi - $lo) * 0.1
+        }
+        my $val = $f->(\@p)
+        push @pos, \@p
+        push @vel, \@v
+        my @pcopy = @p
+        push @pbest, \@pcopy
+        push @pbest_val, $val
+        if ($val < $gbest_val) {
+            $gbest_val = $val
+            my @g = @p
+            @gbest = @g
+        }
+    }
+
+    for my $iter (~> 1:$iters) {
+        for my $i (~> 0:$n_particles - 1) {
+            for my $d (~> 0:$dim - 1) {
+                my $r1 = rand()
+                my $r2 = rand()
+                $vel[$i][$d] = $w * $vel[$i][$d]
+                              + $c1 * $r1 * ($pbest[$i][$d] - $pos[$i][$d])
+                              + $c2 * $r2 * ($gbest[$d] - $pos[$i][$d])
+                $pos[$i][$d] += $vel[$i][$d]
+                # Reflect at bounds to keep particles in domain.
+                if ($pos[$i][$d] < $bounds->[$d][0]) { $pos[$i][$d] = $bounds->[$d][0] }
+                if ($pos[$i][$d] > $bounds->[$d][1]) { $pos[$i][$d] = $bounds->[$d][1] }
+            }
+            my $val = $f->($pos[$i])
+            if ($val < $pbest_val[$i]) {
+                $pbest_val[$i] = $val
+                my @cp = @{$pos[$i]}
+                $pbest[$i] = \@cp
+                if ($val < $gbest_val) {
+                    $gbest_val = $val
+                    my @g = @{$pos[$i]}
+                    @gbest = @g
+                }
+            }
+        }
+    }
+    { best => \@gbest, value => $gbest_val }
+}
+
+fn Rosetta::PSO::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# 2D quadratic bowl: minimum at (3, -2) with value 0.
+srand(42)
+my $f1 = fn ($p) { ($p->[0] - 3) ** 2 + ($p->[1] + 2) ** 2 }
+my $r1 = Rosetta::PSO::optimize($f1, 2, [[-10, 10], [-10, 10]],
+    { n => 60, iters => 300 })
+assert_ok Rosetta::PSO::approx($r1->{best}[0], 3, 1.0),  "bowl x*"
+assert_ok Rosetta::PSO::approx($r1->{best}[1], -2, 1.0), "bowl y*"
+assert_ok $r1->{value} < 2.0, "bowl value near 0"
+
+# Sphere in 3D
+srand(42)
+my $f2 = fn ($p) { $p->[0] ** 2 + $p->[1] ** 2 + $p->[2] ** 2 }
+my $r2 = Rosetta::PSO::optimize($f2, 3, [[-5, 5], [-5, 5], [-5, 5]],
+    { n => 60, iters => 300 })
+assert_ok $r2->{value} < 1.0, "sphere value near 0"
+
+# 1D: |x - 5|
+srand(42)
+my $f4 = fn ($p) { abs($p->[0] - 5) }
+my $r4 = Rosetta::PSO::optimize($f4, 1, [[-100, 100]],
+    { n => 50, iters => 200 })
+assert_ok Rosetta::PSO::approx($r4->{best}[0], 5, 1.0), "|x-5| min at 5"
+
+test_run

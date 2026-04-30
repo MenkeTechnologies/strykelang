@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: MurmurHash3 — Austin Appleby's non-cryptographic hash.
+# This is the 32-bit variant (MurmurHash3_x86_32).
+
+fn Rosetta::Murmur::u32($x) { $x & 0xFFFFFFFF }
+
+fn Rosetta::Murmur::rotl32($x, $r) {
+    Rosetta::Murmur::u32(($x << $r) | ($x >> (32 - $r)))
+}
+
+fn Rosetta::Murmur::fmix32($h) {
+    my $x = Rosetta::Murmur::u32($h)
+    $x = Rosetta::Murmur::u32($x ^ ($x >> 16))
+    $x = Rosetta::Murmur::u32($x * 0x85ebca6b)
+    $x = Rosetta::Murmur::u32($x ^ ($x >> 13))
+    $x = Rosetta::Murmur::u32($x * 0xc2b2ae35)
+    $x = Rosetta::Murmur::u32($x ^ ($x >> 16))
+    $x
+}
+
+fn Rosetta::Murmur::hash($text, $seed) {
+    my @bytes = $text |> chars() |> map { ord(_) }
+    my $len = len(@bytes)
+    my $nblocks = int($len / 4)
+    my $h1 = Rosetta::Murmur::u32($seed)
+    my $c1 = 0xcc9e2d51
+    my $c2 = 0x1b873593
+
+    for my $i (0..$nblocks - 1) {
+        my $b = $i * 4
+        my $k1 = $bytes[$b] | ($bytes[$b + 1] << 8) | ($bytes[$b + 2] << 16) | ($bytes[$b + 3] << 24)
+        $k1 = Rosetta::Murmur::u32($k1 * $c1)
+        $k1 = Rosetta::Murmur::rotl32($k1, 15)
+        $k1 = Rosetta::Murmur::u32($k1 * $c2)
+
+        $h1 = Rosetta::Murmur::u32($h1 ^ $k1)
+        $h1 = Rosetta::Murmur::rotl32($h1, 13)
+        $h1 = Rosetta::Murmur::u32($h1 * 5 + 0xe6546b64)
+    }
+
+    # Tail
+    my $tail_start = $nblocks * 4
+    my $rem = $len - $tail_start
+    my $k1 = 0
+    if ($rem == 3) { $k1 ^= ($bytes[$tail_start + 2] << 16) }
+    if ($rem >= 2) { $k1 ^= ($bytes[$tail_start + 1] << 8) }
+    if ($rem >= 1) {
+        $k1 ^= $bytes[$tail_start]
+        $k1 = Rosetta::Murmur::u32($k1 * $c1)
+        $k1 = Rosetta::Murmur::rotl32($k1, 15)
+        $k1 = Rosetta::Murmur::u32($k1 * $c2)
+        $h1 = Rosetta::Murmur::u32($h1 ^ $k1)
+    }
+
+    $h1 = Rosetta::Murmur::u32($h1 ^ $len)
+    Rosetta::Murmur::fmix32($h1)
+}
+
+# Reference vectors from the canonical SMHasher project (verified against
+# https://en.wikipedia.org/wiki/MurmurHash#Algorithm and Appleby's repo).
+assert_eq Rosetta::Murmur::hash("",      0), 0,           "empty seed=0"
+assert_eq Rosetta::Murmur::hash("",      1), 0x514E28B7,  "empty seed=1"
+assert_eq Rosetta::Murmur::hash("a",     0), 0x3C2569B2,  "'a' seed=0"
+assert_eq Rosetta::Murmur::hash("ab",    0), 0x9BBFD75F,  "'ab' seed=0"
+assert_eq Rosetta::Murmur::hash("abc",   0), 0xB3DD93FA,  "'abc' seed=0"
+assert_eq Rosetta::Murmur::hash("abcd",  0), 0x43ED676A,  "'abcd' seed=0"
+assert_eq Rosetta::Murmur::hash("Hello, world!", 0), 0xC0363E43, "Hello world"
+assert_eq Rosetta::Murmur::hash("The quick brown fox jumps over the lazy dog", 0), 0x2E4FF723, "fox seed=0"
+
+# Helpers
+assert_eq Rosetta::Murmur::rotl32(1, 1),  2,          "rotl 1<<1"
+assert_eq Rosetta::Murmur::rotl32(0x80000000, 1), 1,  "rotl high bit"
+
+test_run

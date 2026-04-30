@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count-Min Sketch — sublinear frequency estimator with
+# one-sided error (estimate is always ≥ true count). Uses d hash
+# functions over w counters. Built here on top of FNV-1a with seeded
+# rotations rather than k independent universal hashes — good enough
+# for the demonstration and for the conservative-overestimate bound.
+
+fn Rosetta::CMS::u32($x) { $x & 0xFFFFFFFF }
+
+fn Rosetta::CMS::fnv1a($s, $seed) {
+    my $h = Rosetta::CMS::u32(0x811c9dc5 ^ $seed)
+    for my $c (split(//, $s)) {
+        $h = Rosetta::CMS::u32($h ^ ord($c))
+        $h = Rosetta::CMS::u32($h * 0x01000193)
+    }
+    $h
+}
+
+fn Rosetta::CMS::new($d, $w) {
+    my @table
+    for my $i (~> 1:$d) {
+        my @row = ~> 1:$w |> map { 0 }
+        push @table, \@row
+    }
+    { d => $d, w => $w, table => \@table }
+}
+
+fn Rosetta::CMS::add($cms, $key, $count) {
+    for my $i (~> 0:$cms->{d} - 1) {
+        my $h = Rosetta::CMS::fnv1a($key, $i + 1)
+        my $idx = $h % $cms->{w}
+        $cms->{table}[$i][$idx] += $count
+    }
+}
+
+fn Rosetta::CMS::estimate($cms, $key) {
+    my $best
+    for my $i (~> 0:$cms->{d} - 1) {
+        my $h = Rosetta::CMS::fnv1a($key, $i + 1)
+        my $idx = $h % $cms->{w}
+        my $v = $cms->{table}[$i][$idx]
+        $best = $v if !defined $best || $v < $best
+    }
+    $best
+}
+
+# Tiny exact case: 5 hash rows, 1024 cells — collisions effectively zero
+# for the small key sets used here, so estimate equals true count.
+my $cms = Rosetta::CMS::new(5, 1024)
+Rosetta::CMS::add($cms, "a", 3)
+Rosetta::CMS::add($cms, "b", 5)
+Rosetta::CMS::add($cms, "c", 1)
+Rosetta::CMS::add($cms, "a", 2)
+assert_eq Rosetta::CMS::estimate($cms, "a"), 5, "a counted 3+2"
+assert_eq Rosetta::CMS::estimate($cms, "b"), 5, "b counted 5"
+assert_eq Rosetta::CMS::estimate($cms, "c"), 1, "c counted 1"
+
+# Estimate is always ≥ true count (the CMS one-sided guarantee).
+my $stream = "the quick brown fox jumps over the lazy dog the fox the dog"
+my %truth
+for my $w (split(/\s+/, $stream)) { $truth{$w}++ }
+my $cms2 = Rosetta::CMS::new(4, 64)
+for my $w (split(/\s+/, $stream)) { Rosetta::CMS::add($cms2, $w, 1) }
+for my $w (keys %truth) {
+    my $est = Rosetta::CMS::estimate($cms2, $w)
+    assert_ok $est >= $truth{$w}, "estimate($w) >= truth ($est >= $truth{$w})"
+}
+
+# Exact answer for distinct words on a wide table.
+my $cms3 = Rosetta::CMS::new(6, 4096)
+for my $w (split(/\s+/, $stream)) { Rosetta::CMS::add($cms3, $w, 1) }
+for my $w (keys %truth) {
+    my $est = Rosetta::CMS::estimate($cms3, $w)
+    assert_eq $est, $truth{$w}, "wide-table exact for '$w'"
+}
+
+# Unseen key never returns a count larger than max true count
+# (collisions cap at "the" frequency = 3).
+my $unseen = Rosetta::CMS::estimate($cms2, "elephant")
+assert_ok $unseen <= 3, "unseen key estimate bounded by max true count"
+
+test_run

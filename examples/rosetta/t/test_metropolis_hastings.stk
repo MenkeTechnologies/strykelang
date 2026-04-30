@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Metropolis-Hastings sampler. Generates correlated
+# samples from a target unnormalized density via a symmetric Gaussian
+# proposal. Useful when the target distribution is known up to a
+# constant.
+
+# Box-Muller for a standard-normal draw — pulls two uniforms.
+fn Rosetta::MH::randn() {
+    my $u1 = rand()
+    my $u2 = rand()
+    $u1 = 1e-10 if $u1 == 0
+    sqrt(-2 * log($u1)) * cos(2 * atan2(0, -1) * $u2)
+}
+
+fn Rosetta::MH::sample($target, $start, $sigma, $n_samples) {
+    my @chain
+    my $cur = $start
+    my $cur_p = $target->($cur)
+    my $accepted = 0
+    for my $i (~> 1:$n_samples) {
+        my $cand = $cur + Rosetta::MH::randn() * $sigma
+        my $cand_p = $target->($cand)
+        my $ratio = $cur_p > 0 ? $cand_p / $cur_p : 1.0
+        if (rand() < $ratio) {
+            $cur = $cand
+            $cur_p = $cand_p
+            $accepted++
+        }
+        push @chain, $cur
+    }
+    { chain => \@chain, accept_rate => $accepted / $n_samples }
+}
+
+fn Rosetta::MH::mean($xs) {
+    my $s = 0
+    for my $x (@$xs) { $s += $x }
+    $s / len(@$xs)
+}
+
+fn Rosetta::MH::variance($xs) {
+    my $m = Rosetta::MH::mean($xs)
+    my $s = 0
+    for my $x (@$xs) { $s += ($x - $m) ** 2 }
+    $s / len(@$xs)
+}
+
+# Sample from N(3, 2²) using its unnormalized density exp(-(x-3)²/8).
+srand(42)
+my $target_normal = fn ($x) { exp(-($x - 3) ** 2 / 8) }
+my $r1 = Rosetta::MH::sample($target_normal, 0, 1.5, 5000)
+# Discard burn-in.
+my @burned = @{$r1->{chain}}[1000..len(@{$r1->{chain}}) - 1]
+my $mean1 = Rosetta::MH::mean(\@burned)
+my $var1 = Rosetta::MH::variance(\@burned)
+assert_ok abs($mean1 - 3) < 0.5, "MH mean ≈ 3 (got $mean1)"
+assert_ok abs(sqrt($var1) - 2) < 0.5, "MH stddev ≈ 2 (got " . sqrt($var1) . ")"
+
+# Acceptance rate should land in a reasonable range for this proposal.
+assert_ok $r1->{accept_rate} > 0.2 && $r1->{accept_rate} < 0.95,
+    "acceptance rate in (0.2, 0.95): got " . $r1->{accept_rate}
+
+# Sample from a bimodal mixture: 0.5·N(-3, 1) + 0.5·N(3, 1).
+srand(42)
+my $bimodal = fn ($x) {
+    exp(-($x + 3) ** 2 / 2) + exp(-($x - 3) ** 2 / 2)
+}
+my $r2 = Rosetta::MH::sample($bimodal, 0, 2.0, 8000)
+my @b2 = @{$r2->{chain}}[2000..len(@{$r2->{chain}}) - 1]
+my $mean2 = Rosetta::MH::mean(\@b2)
+# Symmetric mixture has true mean 0; large σ proposal lets MH cross the
+# valley between the modes.
+assert_ok abs($mean2) < 1.5, "bimodal mean near 0 (got $mean2)"
+
+# Both modes should be visited.
+my $left_visits = 0
+my $right_visits = 0
+for my $x (@b2) {
+    $left_visits++ if $x < -1
+    $right_visits++ if $x > 1
+}
+assert_ok $left_visits > 100,  "left mode visited"
+assert_ok $right_visits > 100, "right mode visited"
+
+# Mean / variance helpers
+assert_ok abs(Rosetta::MH::mean([1, 2, 3, 4, 5]) - 3) < 1e-9, "mean(1..5) = 3"
+assert_ok abs(Rosetta::MH::variance([1, 2, 3, 4, 5]) - 2) < 1e-9, "variance(1..5) = 2"
+
+test_run

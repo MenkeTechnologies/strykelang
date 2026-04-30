@@ -1,0 +1,91 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sparse table — O(n log n) preprocessing, O(1) range
+# minimum queries on a static array. Works for any idempotent
+# associative operation (min, max, gcd, &, |) since overlapping the
+# two power-of-two windows is harmless.
+
+fn Rosetta::SparseTable::log2_floor($n) {
+    my $r = 0
+    my $x = $n
+    while ($x > 1) { $x = $x >> 1; $r++ }
+    $r
+}
+
+fn Rosetta::SparseTable::build($arr, $op) {
+    my $n = len(@$arr)
+    my $logN = Rosetta::SparseTable::log2_floor($n) + 1
+    my @table
+    push @table, [@$arr]
+    for my $j (~> 1:$logN - 1) {
+        my @row
+        my $width = 1 << $j
+        for my $i (~> 0:$n - $width) {
+            my $left = $table[$j - 1][$i]
+            my $right = $table[$j - 1][$i + (1 << ($j - 1))]
+            push @row, $op->($left, $right)
+        }
+        push @table, \@row
+    }
+    { table => \@table, op => $op, n => $n }
+}
+
+fn Rosetta::SparseTable::query($st, $lo, $hi) {
+    my $len = $hi - $lo + 1
+    my $j = Rosetta::SparseTable::log2_floor($len)
+    my $left = $st->{table}[$j][$lo]
+    my $right = $st->{table}[$j][$hi - (1 << $j) + 1]
+    $st->{op}->($left, $right)
+}
+
+fn Rosetta::SparseTable::query_naive($arr, $op, $lo, $hi) {
+    my $r = $arr->[$lo]
+    for my $i ($lo + 1..$hi) { $r = $op->($r, $arr->[$i]) }
+    $r
+}
+
+# Min queries
+my $min = fn ($a, $b) { $a < $b ? $a : $b }
+my @data = (5, 2, 8, 1, 9, 3, 7, 4, 6, 0, 11, 4)
+my $st_min = Rosetta::SparseTable::build(\@data, $min)
+
+assert_eq Rosetta::SparseTable::query($st_min, 0, 11), 0,  "min over full"
+assert_eq Rosetta::SparseTable::query($st_min, 0, 4),  1,  "min [0..4] = 1"
+assert_eq Rosetta::SparseTable::query($st_min, 5, 9),  0,  "min [5..9] = 0"
+assert_eq Rosetta::SparseTable::query($st_min, 6, 8),  4,  "min [6..8] = 4"
+assert_eq Rosetta::SparseTable::query($st_min, 3, 3),  1,  "single-element [3..3]"
+
+# Max queries
+my $max = fn ($a, $b) { $a > $b ? $a : $b }
+my $st_max = Rosetta::SparseTable::build(\@data, $max)
+assert_eq Rosetta::SparseTable::query($st_max, 0, 11), 11, "max over full"
+assert_eq Rosetta::SparseTable::query($st_max, 0, 5),  9,  "max [0..5] = 9"
+assert_eq Rosetta::SparseTable::query($st_max, 7, 11), 11, "max [7..11] = 11"
+
+# GCD queries — also idempotent in the sense needed for sparse tables.
+fn Rosetta::SparseTable::gcd($a, $b) {
+    my $x = $a; my $y = $b
+    while ($y != 0) { ($x, $y) = ($y, $x % $y) }
+    $x
+}
+my @nums = (12, 18, 24, 30, 6, 36, 60)
+my $st_gcd = Rosetta::SparseTable::build(\@nums, fn ($a, $b) { Rosetta::SparseTable::gcd($a, $b) })
+assert_eq Rosetta::SparseTable::query($st_gcd, 0, 1), 6,  "gcd(12, 18) = 6"
+assert_eq Rosetta::SparseTable::query($st_gcd, 0, 6), 6,  "gcd full = 6"
+assert_eq Rosetta::SparseTable::query($st_gcd, 4, 6), 6,  "gcd [4..6] = 6"
+
+# Cross-check against naive for many queries
+for my $lo (~> 0:11) {
+    for my $hi ($lo..11) {
+        my $st_v = Rosetta::SparseTable::query($st_min, $lo, $hi)
+        my $naive_v = Rosetta::SparseTable::query_naive(\@data, $min, $lo, $hi)
+        assert_eq $st_v, $naive_v, "min match [$lo..$hi]"
+    }
+}
+
+# Helper sanity
+assert_eq Rosetta::SparseTable::log2_floor(1), 0, "log2 1"
+assert_eq Rosetta::SparseTable::log2_floor(8), 3, "log2 8"
+assert_eq Rosetta::SparseTable::log2_floor(15), 3, "log2 15"
+assert_eq Rosetta::SparseTable::log2_floor(16), 4, "log2 16"
+
+test_run

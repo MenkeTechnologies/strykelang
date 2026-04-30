@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Borůvka's algorithm — minimum spanning tree by repeatedly
+# adding the cheapest outgoing edge of every component until one
+# component remains. O(E·log V).
+
+fn Rosetta::Boruvka::find($parent, $i) {
+    while ($parent->[$i] != $i) {
+        $parent->[$i] = $parent->[$parent->[$i]]
+        $i = $parent->[$i]
+    }
+    $i
+}
+
+fn Rosetta::Boruvka::union($parent, $rank, $u, $v) {
+    my $ru = Rosetta::Boruvka::find($parent, $u)
+    my $rv = Rosetta::Boruvka::find($parent, $v)
+    return 0 if $ru == $rv
+    if ($rank->[$ru] < $rank->[$rv]) { $parent->[$ru] = $rv }
+    elsif ($rank->[$ru] > $rank->[$rv]) { $parent->[$rv] = $ru }
+    else { $parent->[$rv] = $ru; $rank->[$ru]++ }
+    1
+}
+
+fn Rosetta::Boruvka::mst($n, $edges) {
+    my @parent = ~> 0:$n - 1
+    my @rank = ~> 1:$n |> map { 0 }
+    my @mst_edges
+    my $total_weight = 0
+    my $components = $n
+
+    while ($components > 1) {
+        my @cheapest = ~> 1:$n |> map { -1 }
+        for (my $i = 0; $i < len(@$edges); $i++) {
+            my $e = $edges->[$i]
+            my ($u, $v, $w) = @$e
+            my $ru = Rosetta::Boruvka::find(\@parent, $u)
+            my $rv = Rosetta::Boruvka::find(\@parent, $v)
+            next if $ru == $rv
+            if ($cheapest[$ru] == -1 || $edges->[$cheapest[$ru]][2] > $w) {
+                $cheapest[$ru] = $i
+            }
+            if ($cheapest[$rv] == -1 || $edges->[$cheapest[$rv]][2] > $w) {
+                $cheapest[$rv] = $i
+            }
+        }
+        my $added = 0
+        for my $i (~> 0:$n - 1) {
+            next if $cheapest[$i] == -1
+            my $e = $edges->[$cheapest[$i]]
+            my ($u, $v, $w) = @$e
+            if (Rosetta::Boruvka::union(\@parent, \@rank, $u, $v)) {
+                push @mst_edges, $e
+                $total_weight += $w
+                $components--
+                $added++
+            }
+        }
+        last if $added == 0
+    }
+    { weight => $total_weight, count => len(@mst_edges) }
+}
+
+# Single edge
+my $r0 = Rosetta::Boruvka::mst(2, [[0, 1, 5]])
+assert_eq $r0->{weight}, 5, "single edge weight"
+assert_eq $r0->{count}, 1, "single edge count"
+
+# Triangle: pick 2 cheapest edges
+my $r1 = Rosetta::Boruvka::mst(3, [[0, 1, 1], [1, 2, 2], [0, 2, 4]])
+assert_eq $r1->{weight}, 3, "triangle MST = 1 + 2"
+assert_eq $r1->{count}, 2, "n-1 edges"
+
+# Standard 4-vertex case
+my $r2 = Rosetta::Boruvka::mst(4, [
+    [0, 1, 10], [0, 2, 6], [0, 3, 5],
+    [1, 3, 15], [2, 3, 4]
+])
+assert_eq $r2->{weight}, 19, "4-vertex MST = 5 + 4 + 10"
+assert_eq $r2->{count}, 3, "n-1 = 3 edges"
+
+# CLRS Fig 23.1: 9 vertices, MST weight = 37
+my $r3 = Rosetta::Boruvka::mst(9, [
+    [0, 1, 4], [0, 7, 8],
+    [1, 2, 8], [1, 7, 11],
+    [2, 3, 7], [2, 5, 4], [2, 8, 2],
+    [3, 4, 9], [3, 5, 14],
+    [4, 5, 10],
+    [5, 6, 2],
+    [6, 7, 1], [6, 8, 6],
+    [7, 8, 7]
+])
+assert_eq $r3->{weight}, 37, "CLRS MST weight = 37"
+assert_eq $r3->{count}, 8, "8 edges"
+
+# Disconnected — Borůvka can't connect, returns partial
+my $r4 = Rosetta::Boruvka::mst(4, [[0, 1, 5], [2, 3, 5]])
+assert_eq $r4->{count}, 2, "disconnected gives 2 edges"
+assert_eq $r4->{weight}, 10, "disconnected weight"
+
+# Cross-check against Kruskal-style answer for a random 6-vertex graph
+my $edges = [
+    [0, 1, 7], [0, 3, 5],
+    [1, 2, 8], [1, 3, 9], [1, 4, 7],
+    [2, 4, 5],
+    [3, 4, 15], [3, 5, 6],
+    [4, 5, 8], [4, 6, 9],
+    [5, 6, 11]
+]
+my $r5 = Rosetta::Boruvka::mst(7, $edges)
+assert_eq $r5->{weight}, 39, "6-vertex MST weight"
+assert_eq $r5->{count}, 6, "n-1 edges = 6"
+
+test_run

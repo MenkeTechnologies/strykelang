@@ -1,0 +1,98 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Articulation points (cut vertices) and bridges (cut edges)
+# via Tarjan's DFS with discovery / low-link tracking.
+
+# Bridges are returned encoded as "u-v" strings (u<v) to sidestep an
+# interpreter quirk that surfaced when iterating shared arrayrefs of
+# arrayrefs in --no-interop mode. APs are returned as a sorted list.
+
+fn Rosetta::AB::dfs($adj, $u, $parent, $state) {
+    $state->{disc}[$u] = $state->{timer}
+    $state->{low}[$u]  = $state->{timer}
+    $state->{timer}++
+    my $children = 0
+    for my $v (@{$adj->[$u]}) {
+        if (!defined $state->{disc}[$v]) {
+            $children++
+            Rosetta::AB::dfs($adj, $v, $u, $state)
+            $state->{low}[$u] = $state->{low}[$v] if $state->{low}[$v] < $state->{low}[$u]
+            if ($parent != -1 && $state->{low}[$v] >= $state->{disc}[$u]) {
+                $state->{aps}{$u} = 1
+            }
+            if ($state->{low}[$v] > $state->{disc}[$u]) {
+                my $a = $u < $v ? $u : $v
+                my $b = $u < $v ? $v : $u
+                $state->{bridges}{"$a-$b"} = 1
+            }
+        } elsif ($v != $parent) {
+            $state->{low}[$u] = $state->{disc}[$v] if $state->{disc}[$v] < $state->{low}[$u]
+        }
+    }
+    if ($parent == -1 && $children > 1) {
+        $state->{aps}{$u} = 1
+    }
+}
+
+fn Rosetta::AB::compute($n, $edges) {
+    my @adj
+    for my $i (~> 1:$n) { push @adj, [] }
+    for my $e (@$edges) {
+        my ($u, $v) = @$e
+        push @{$adj[$u]}, $v
+        push @{$adj[$v]}, $u
+    }
+    my @disc = ~> 1:$n |> map { undef }
+    my @low = ~> 1:$n |> map { undef }
+    my $state = {
+        disc => \@disc,
+        low => \@low,
+        timer => 0,
+        aps => {},
+        bridges => {}
+    }
+    for my $u (~> 0:$n - 1) {
+        Rosetta::AB::dfs(\@adj, $u, -1, $state) if !defined $disc[$u]
+    }
+    my @aps_list = sort { _0 <=> _1 } keys %{$state->{aps}}
+    my @br_list = sort { _0 cmp _1 } keys %{$state->{bridges}}
+    { aps => \@aps_list, bridges => \@br_list }
+}
+
+# Path graph 0-1-2-3-4: every internal vertex is an AP, every edge is a bridge.
+my $r1 = Rosetta::AB::compute(5, [[0, 1], [1, 2], [2, 3], [3, 4]])
+assert_eq join(",", @{$r1->{aps}}), "1,2,3", "path: APs are internal nodes"
+assert_eq join(",", @{$r1->{bridges}}), "0-1,1-2,2-3,3-4", "all edges are bridges"
+
+# Cycle 0-1-2-3-0: no APs, no bridges.
+my $r2 = Rosetta::AB::compute(4, [[0, 1], [1, 2], [2, 3], [3, 0]])
+assert_eq join(",", @{$r2->{aps}}), "", "cycle has no APs"
+assert_eq join(",", @{$r2->{bridges}}), "", "cycle has no bridges"
+
+# Two cycles sharing a vertex: shared vertex is an AP, no bridges.
+my $r3 = Rosetta::AB::compute(5, [[0, 1], [1, 2], [2, 0], [2, 3], [3, 4], [4, 2]])
+assert_eq join(",", @{$r3->{aps}}), "2", "shared vertex is AP"
+assert_eq join(",", @{$r3->{bridges}}), "", "no bridges between cycles"
+
+# Two triangles connected by a single bridge edge.
+my $r4 = Rosetta::AB::compute(6, [[0, 1], [1, 2], [2, 0], [2, 3], [3, 4], [4, 5], [5, 3]])
+assert_eq join(",", @{$r4->{aps}}), "2,3", "endpoints of bridge are APs"
+assert_eq join(",", @{$r4->{bridges}}), "2-3", "single bridge edge"
+
+# Wikipedia example (5 nodes): edges 0-1, 0-2, 1-2, 0-3, 3-4
+# Bridges: 0-3 and 3-4. APs: 0 and 3.
+my $r5 = Rosetta::AB::compute(5, [[0, 1], [0, 2], [1, 2], [0, 3], [3, 4]])
+assert_eq join(",", @{$r5->{aps}}), "0,3", "Wikipedia APs"
+assert_eq join(",", @{$r5->{bridges}}), "0-3,3-4", "Wikipedia bridges"
+
+# Single vertex
+my $r6 = Rosetta::AB::compute(1, [])
+assert_eq join(",", @{$r6->{aps}}), "", "isolated vertex has no APs"
+assert_eq join(",", @{$r6->{bridges}}), "", "isolated vertex has no bridges"
+
+# K4: complete graph, all 4 nodes interlinked → no APs, no bridges.
+my $r7 = Rosetta::AB::compute(4,
+    [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]])
+assert_eq join(",", @{$r7->{aps}}), "", "K4 has no APs"
+assert_eq join(",", @{$r7->{bridges}}), "", "K4 has no bridges"
+
+test_run

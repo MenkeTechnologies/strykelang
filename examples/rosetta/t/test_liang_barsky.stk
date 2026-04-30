@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Liang-Barsky line clipping. Parametric form: each edge
+# yields p_i and q_i; the visible segment is t in [t0, t1] with t0/t1
+# updated by the four (p_i, q_i) pairs.
+
+fn Rosetta::LiangBarsky::clip($x0, $y0, $x1, $y1, $xmin, $ymin, $xmax, $ymax) {
+    my $dx = $x1 - $x0
+    my $dy = $y1 - $y0
+    my @p = (-$dx,           $dx,           -$dy,           $dy)
+    my @q = ($x0 - $xmin,    $xmax - $x0,   $y0 - $ymin,    $ymax - $y0)
+    my $t0 = 0.0
+    my $t1 = 1.0
+    for my $i (~> 0:3) {
+        if ($p[$i] == 0) {
+            return undef if $q[$i] < 0
+        } else {
+            my $r = $q[$i] / $p[$i]
+            if ($p[$i] < 0) {
+                return undef if $r > $t1
+                $t0 = $r if $r > $t0
+            } else {
+                return undef if $r < $t0
+                $t1 = $r if $r < $t1
+            }
+        }
+    }
+    [$x0 + $t0 * $dx, $y0 + $t0 * $dy, $x0 + $t1 * $dx, $y0 + $t1 * $dy]
+}
+
+fn Rosetta::LiangBarsky::fmt($r) {
+    return "rejected" if !defined $r
+    join(",", map { my $v = _0; $v == int($v) ? int($v) : $v } @$r)
+}
+
+# Window 0,0,10,10. Same suite as Cohen-Sutherland for cross-validation.
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(2, 2, 8, 8, 0, 0, 10, 10)),
+    "2,2,8,8", "fully inside"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-5, 2, -1, 8, 0, 0, 10, 10)),
+    "rejected", "fully outside left"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-5, 5, 5, 5, 0, 0, 10, 10)),
+    "0,5,5,5", "crosses left edge"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-2, -2, 12, 12, 0, 0, 10, 10)),
+    "0,0,10,10", "diagonal across full window"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(5, 5, 5, 15, 0, 0, 10, 10)),
+    "5,5,5,10", "crosses top edge"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-5, 5, 15, 5, 0, 0, 10, 10)),
+    "0,5,10,5", "horizontal sweep through"
+
+# Vertical edge cases (dx=0): completely outside vs inside
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(15, -5, 15, 15, 0, 0, 10, 10)),
+    "rejected", "vertical line outside right"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(5, -5, 5, 15, 0, 0, 10, 10)),
+    "5,0,5,10", "vertical line spanning"
+
+# Horizontal edge cases (dy=0)
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-5, 5, 15, 5, 0, 0, 10, 10)),
+    "0,5,10,5", "horizontal line spanning"
+
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(-5, 20, 15, 20, 0, 0, 10, 10)),
+    "rejected", "horizontal line above window"
+
+# Endpoints exactly on the corner
+assert_eq Rosetta::LiangBarsky::fmt(
+    Rosetta::LiangBarsky::clip(0, 0, 10, 10, 0, 0, 10, 10)),
+    "0,0,10,10", "corner-to-corner full diagonal"
+
+test_run

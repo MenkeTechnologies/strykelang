@@ -791,7 +791,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Crypto / compression</strong> — <code>sha256</code>, <code>hmac_sha256</code>, <code>jwt_encode</code>/<code>decode</code>, <code>gzip</code> / <code>gunzip</code> / <code>zstd</code>.</li>
           <li><strong>Standalone binaries</strong> — <code>s build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
-          <li><strong>Bytecode cache</strong> — <code>STRYKE_BC_CACHE=1</code> skips parse + compile on warm starts via on-disk <code>.pec</code> bundles.</li>
+          <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.cache/stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
@@ -859,6 +859,49 @@ s faf                       <span class="comment"># fire_and_forget alias (same 
 
 <span class="comment"># Force script when name conflicts</span>
 s --script basename         <span class="comment"># run ./basename script, not builtin</span></pre>
+      </section>
+
+      <section class="tutorial-section" id="bytecode-cache">
+        <h2>Bytecode Cache (rkyv)</h2>
+        <p>stryke caches compiled bytecode in a single rkyv-archived shard at <code>~/.cache/stryke/scripts.rkyv</code>. First run of a script parses + compiles + persists into the shard. Every subsequent run <code>mmap</code>s the shard, validates the archived root once, looks up the entry by canonical path in a zero-copy <code>ArchivedHashMap</code>, and skips lex/parse/compile entirely.</p>
+<pre>stryke my_app.stk    <span class="comment"># cold: parse + compile + write to shard</span>
+stryke my_app.stk    <span class="comment"># warm: mmap shard + lookup + dispatch</span></pre>
+
+        <h3>Why rkyv (and not SQLite, like before)?</h3>
+        <p>The original cache was a SQLite database — port of an early <code>zshrs</code> design. We migrated to rkyv shards in v0.10.3. Apples-to-apples bench (<code>strykelang/cache_bench.rs</code>, 100 scripts, M-series, OS page cache warm):</p>
+        <table class="reflection-table">
+          <tr><th>Workload</th><th>SQLite (zstd + bincode)</th><th>rkyv (uncompressed)</th><th>Speedup</th></tr>
+          <tr><td>Steady-state per hit</td><td>8.60 µs</td><td>2.49 µs</td><td><strong>3.46×</strong></td></tr>
+          <tr><td>Per-process p50 (open + 1 lookup + close)</td><td>241 µs</td><td>22 µs</td><td><strong>10.79×</strong></td></tr>
+          <tr><td>Per-process total (1000 invocations)</td><td>263.62 ms</td><td>22.95 ms</td><td><strong>11.48×</strong></td></tr>
+          <tr><td>File size (100 scripts)</td><td>84 KB</td><td>270 KB</td><td>0.31× (3.2× bigger)</td></tr>
+        </table>
+        <p>The per-process number is the one that matters for <code>s test t</code> — each test file spawns a fresh process that opens the cache, does one lookup, exits. SQLite pays its full <code>Connection::open</code> + WAL pragmas + statement prepare cost on every process; rkyv pays one <code>mmap</code> + one <code>check_archived_root</code> validation, then <code>ArchivedHashMap::get</code>.</p>
+        <p>The 3.2× size growth is the zstd compression we dropped on the inner blobs (kept bincode for now — phase 2 will derive <code>Archive</code> directly on <code>Chunk</code>/<code>Program</code> for true zero-copy load). Disk size is acceptable: 1000+ scripts cached in ~15 MB.</p>
+
+        <h3>Cache invalidation</h3>
+        <p>Four conditions evict an entry — no stale bytecode is ever served:</p>
+        <ul>
+          <li><strong>Source <code>mtime</code> mismatch</strong> — edit a <code>.stk</code> file → cache miss → recompile.</li>
+          <li><strong><code>stryke_version</code> mismatch</strong> — Cargo version bump.</li>
+          <li><strong>Pointer-width mismatch</strong> — cross-build between 32- and 64-bit targets.</li>
+          <li><strong>Binary <code>mtime</code> newer than cached entry</strong> — any <code>cargo build</code> advances the binary's mtime → every cached script invalidates automatically. Catches edits to <code>compiler.rs</code> / <code>parser.rs</code> / <code>vm.rs</code> that don't bump <code>CARGO_PKG_VERSION</code>.</li>
+        </ul>
+
+        <h3>Inspection &amp; tuning</h3>
+<pre>cacheview()                    <span class="comment"># list all cached scripts</span>
+cacheview("pattern")           <span class="comment"># filter by path</span>
+cacheview("--count")           <span class="comment"># just the count</span>
+cache_stats()                  <span class="comment"># {count, bytes, path, enabled}</span>
+cache_exists("script.stk")     <span class="comment"># 1 if cached, 0 if not</span>
+cache_clear()                  <span class="comment"># wipe the cache</span>
+
+STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this run</span></pre>
+        <p>Bypassed for <code>-e</code> / <code>-E</code> one-liners, <code>-n</code> / <code>-p</code>, <code>--lint</code>, <code>--check</code>, <code>--ast</code>, <code>--fmt</code>, <code>--profile</code> modes. Cache is enabled by default for file-based scripts.</p>
+
+        <h3>Aligned with zshrs</h3>
+        <p>Same rkyv shard pattern as <code>zshrs/src/daemon/shard.rs</code> — <code>mmap</code> + <code>check_archived_root</code> + zero-copy <code>ArchivedHashMap</code> lookup. zshrs uses per-source-tree shards driven by a daemon; stryke uses a single global shard since scripts are individually invoked. Same crate (<code>rkyv = "0.7"</code> with <code>validation</code>, <code>archive_le</code>, <code>size_32</code> features), same crash-safety story (<code>flock</code> on <code>scripts.rkyv.lock</code>, atomic-rename writes via tmp file + <code>fsync</code>), same versioning fields (<code>magic: u32</code> + <code>format_version: u32</code>).</p>
+        <p>Full migration rationale, file-by-file diff, and reproducible bench harness at <a href="../docs/CACHE_RKYV_MIGRATION.md"><code>docs/CACHE_RKYV_MIGRATION.md</code></a>.</p>
       </section>
 
       <section class="tutorial-section">

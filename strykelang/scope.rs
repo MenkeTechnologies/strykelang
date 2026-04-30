@@ -1605,6 +1605,40 @@ impl Scope {
         })
     }
 
+    /// Splice in place — works for regular, shared, and atomic arrays.
+    /// `off..end` must already be clamped (use `splice_compute_range` to compute).
+    /// Returns the removed elements.
+    pub fn splice_in_place(
+        &mut self,
+        name: &str,
+        off: usize,
+        end: usize,
+        rep_vals: Vec<PerlValue>,
+    ) -> Result<Vec<PerlValue>, PerlError> {
+        if let Some(aa) = self.find_atomic_array(name) {
+            let mut g = aa.0.lock();
+            let removed: Vec<PerlValue> = g.drain(off..end).collect();
+            for (i, v) in rep_vals.into_iter().enumerate() {
+                g.insert(off + i, v);
+            }
+            return Ok(removed);
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            let mut g = arc.write();
+            let removed: Vec<PerlValue> = g.drain(off..end).collect();
+            for (i, v) in rep_vals.into_iter().enumerate() {
+                g.insert(off + i, v);
+            }
+            return Ok(removed);
+        }
+        let arr = self.get_array_mut(name)?;
+        let removed: Vec<PerlValue> = arr.drain(off..end).collect();
+        for (i, v) in rep_vals.into_iter().enumerate() {
+            arr.insert(off + i, v);
+        }
+        Ok(removed)
+    }
+
     /// Get array length — works for both regular and atomic arrays.
     pub fn array_len(&self, name: &str) -> usize {
         if let Some(aa) = self.find_atomic_array(name) {

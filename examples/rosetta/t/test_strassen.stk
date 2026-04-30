@@ -1,0 +1,168 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Strassen's algorithm for matrix multiplication.
+# Computes C = A·B in O(n^log2(7)) ≈ O(n^2.807) by replacing the 8
+# recursive sub-multiplies of plain divide-and-conquer with 7.
+
+fn Rosetta::Strassen::add($a, $b, $n) {
+    my @c
+    for my $i (~> 0:$n - 1) {
+        my @row = ~> 0:$n - 1 |> map { $a->[$i][_0] + $b->[$i][_0] }
+        push @c, \@row
+    }
+    \@c
+}
+
+fn Rosetta::Strassen::sub_mat($a, $b, $n) {
+    my @c
+    for my $i (~> 0:$n - 1) {
+        my @row = ~> 0:$n - 1 |> map { $a->[$i][_0] - $b->[$i][_0] }
+        push @c, \@row
+    }
+    \@c
+}
+
+fn Rosetta::Strassen::naive($a, $b, $n) {
+    my @c
+    for my $i (~> 0:$n - 1) {
+        my @row
+        for my $j (~> 0:$n - 1) {
+            my $s = 0
+            for my $k (~> 0:$n - 1) { $s += $a->[$i][$k] * $b->[$k][$j] }
+            push @row, $s
+        }
+        push @c, \@row
+    }
+    \@c
+}
+
+fn Rosetta::Strassen::quad($m, $row_off, $col_off, $half) {
+    my @q
+    for my $i (~> 0:$half - 1) {
+        my @row = ~> 0:$half - 1 |> map { $m->[$row_off + $i][$col_off + _0] }
+        push @q, \@row
+    }
+    \@q
+}
+
+fn Rosetta::Strassen::combine($c11, $c12, $c21, $c22, $half) {
+    my @c
+    for my $i (~> 0:$half - 1) {
+        my @row
+        push @row, @{$c11->[$i]}
+        push @row, @{$c12->[$i]}
+        push @c, \@row
+    }
+    for my $i (~> 0:$half - 1) {
+        my @row
+        push @row, @{$c21->[$i]}
+        push @row, @{$c22->[$i]}
+        push @c, \@row
+    }
+    \@c
+}
+
+fn Rosetta::Strassen::mul($a, $b, $n) {
+    return Rosetta::Strassen::naive($a, $b, $n) if $n <= 2
+    my $half = int($n / 2)
+    my $a11 = Rosetta::Strassen::quad($a, 0,      0,      $half)
+    my $a12 = Rosetta::Strassen::quad($a, 0,      $half,  $half)
+    my $a21 = Rosetta::Strassen::quad($a, $half,  0,      $half)
+    my $a22 = Rosetta::Strassen::quad($a, $half,  $half,  $half)
+    my $b11 = Rosetta::Strassen::quad($b, 0,      0,      $half)
+    my $b12 = Rosetta::Strassen::quad($b, 0,      $half,  $half)
+    my $b21 = Rosetta::Strassen::quad($b, $half,  0,      $half)
+    my $b22 = Rosetta::Strassen::quad($b, $half,  $half,  $half)
+
+    my $m1 = Rosetta::Strassen::mul(
+        Rosetta::Strassen::add($a11, $a22, $half),
+        Rosetta::Strassen::add($b11, $b22, $half),
+        $half)
+    my $m2 = Rosetta::Strassen::mul(
+        Rosetta::Strassen::add($a21, $a22, $half), $b11, $half)
+    my $m3 = Rosetta::Strassen::mul(
+        $a11, Rosetta::Strassen::sub_mat($b12, $b22, $half), $half)
+    my $m4 = Rosetta::Strassen::mul(
+        $a22, Rosetta::Strassen::sub_mat($b21, $b11, $half), $half)
+    my $m5 = Rosetta::Strassen::mul(
+        Rosetta::Strassen::add($a11, $a12, $half), $b22, $half)
+    my $m6 = Rosetta::Strassen::mul(
+        Rosetta::Strassen::sub_mat($a21, $a11, $half),
+        Rosetta::Strassen::add($b11, $b12, $half),
+        $half)
+    my $m7 = Rosetta::Strassen::mul(
+        Rosetta::Strassen::sub_mat($a12, $a22, $half),
+        Rosetta::Strassen::add($b21, $b22, $half),
+        $half)
+
+    my $c11 = Rosetta::Strassen::add(
+        Rosetta::Strassen::sub_mat(Rosetta::Strassen::add($m1, $m4, $half), $m5, $half),
+        $m7, $half)
+    my $c12 = Rosetta::Strassen::add($m3, $m5, $half)
+    my $c21 = Rosetta::Strassen::add($m2, $m4, $half)
+    my $c22 = Rosetta::Strassen::add(
+        Rosetta::Strassen::sub_mat(Rosetta::Strassen::add($m1, $m3, $half), $m2, $half),
+        $m6, $half)
+
+    Rosetta::Strassen::combine($c11, $c12, $c21, $c22, $half)
+}
+
+fn Rosetta::Strassen::flatten($m) {
+    my @out
+    for my $row (@$m) { push @out, @$row }
+    \@out
+}
+
+# 2×2 known case
+my $a2 = [[1, 2], [3, 4]]
+my $b2 = [[5, 6], [7, 8]]
+my $c2 = Rosetta::Strassen::mul($a2, $b2, 2)
+assert_eq join(",", @{Rosetta::Strassen::flatten($c2)}), "19,22,43,50", "2x2 product"
+
+# 4×4 verified against naive O(n^3) on the same inputs
+my $a4 = [
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 1, 2, 3],
+    [4, 5, 6, 7]
+]
+my $b4 = [
+    [2, 0, 1, 3],
+    [4, 1, 2, 0],
+    [1, 5, 0, 6],
+    [3, 2, 4, 1]
+]
+my $cs = Rosetta::Strassen::mul($a4, $b4, 4)
+my $cn = Rosetta::Strassen::naive($a4, $b4, 4)
+assert_eq join(",", @{Rosetta::Strassen::flatten($cs)}),
+          join(",", @{Rosetta::Strassen::flatten($cn)}), "4x4 Strassen matches naive"
+
+# Identity ⊗ A = A
+my $i4 = [
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, 1]
+]
+my $ia = Rosetta::Strassen::mul($i4, $a4, 4)
+assert_eq join(",", @{Rosetta::Strassen::flatten($ia)}),
+          join(",", @{Rosetta::Strassen::flatten($a4)}), "I·A = A"
+
+# 8×8 Strassen vs naive
+my @rng_a8 = ~> 0:63 |> map { (_0 * 7919 + 13) % 17 - 8 }
+my @rng_b8 = ~> 0:63 |> map { (_0 * 1009 + 5) % 13 - 6 }
+my @a8_rows
+my @b8_rows
+for my $r (~> 0:7) {
+    my @ar = ~> 0:7 |> map { $rng_a8[$r * 8 + _0] }
+    my @br = ~> 0:7 |> map { $rng_b8[$r * 8 + _0] }
+    push @a8_rows, \@ar
+    push @b8_rows, \@br
+}
+my $a8 = \@a8_rows
+my $b8 = \@b8_rows
+my $cs8 = Rosetta::Strassen::mul($a8, $b8, 8)
+my $cn8 = Rosetta::Strassen::naive($a8, $b8, 8)
+assert_eq join(",", @{Rosetta::Strassen::flatten($cs8)}),
+          join(",", @{Rosetta::Strassen::flatten($cn8)}), "8x8 Strassen matches naive"
+
+test_run

@@ -1,0 +1,123 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cuckoo hashing — open-addressing scheme with two
+# independent hash functions and tables. Each key has exactly two
+# possible slots; insertion may evict a resident which is then
+# re-inserted into its alternate slot, repeating until a vacancy is
+# found or the rehash threshold is hit.
+
+fn Rosetta::Cuckoo::u32($x) { $x & 0xFFFFFFFF }
+
+fn Rosetta::Cuckoo::hash1($key, $size) {
+    my $h = 0x12345678
+    for my $c (split(//, $key)) {
+        $h = Rosetta::Cuckoo::u32(($h * 31) + ord($c))
+    }
+    $h % $size
+}
+
+fn Rosetta::Cuckoo::hash2($key, $size) {
+    my $h = 0x9e3779b1
+    for my $c (split(//, $key)) {
+        $h = Rosetta::Cuckoo::u32(($h ^ (ord($c) << 5)) + (ord($c) << 2) + ord($c))
+    }
+    $h % $size
+}
+
+fn Rosetta::Cuckoo::new($size) {
+    my @t1 = ~> 1:$size |> map { undef }
+    my @t2 = ~> 1:$size |> map { undef }
+    { size => $size, t1 => \@t1, t2 => \@t2, max_kicks => 64 }
+}
+
+fn Rosetta::Cuckoo::insert($ck, $key) {
+    return 1 if Rosetta::Cuckoo::contains($ck, $key)
+    my $cur = $key
+    my $use_t1 = 1
+    for my $i (~> 1:$ck->{max_kicks}) {
+        my $idx
+        my $table
+        if ($use_t1) {
+            $idx = Rosetta::Cuckoo::hash1($cur, $ck->{size})
+            $table = $ck->{t1}
+        } else {
+            $idx = Rosetta::Cuckoo::hash2($cur, $ck->{size})
+            $table = $ck->{t2}
+        }
+        if (!defined $table->[$idx]) {
+            $table->[$idx] = $cur
+            return 1
+        }
+        my $evicted = $table->[$idx]
+        $table->[$idx] = $cur
+        $cur = $evicted
+        $use_t1 = !$use_t1
+    }
+    0
+}
+
+fn Rosetta::Cuckoo::contains($ck, $key) {
+    my $i1 = Rosetta::Cuckoo::hash1($key, $ck->{size})
+    return 1 if defined $ck->{t1}[$i1] && $ck->{t1}[$i1] eq $key
+    my $i2 = Rosetta::Cuckoo::hash2($key, $ck->{size})
+    return 1 if defined $ck->{t2}[$i2] && $ck->{t2}[$i2] eq $key
+    0
+}
+
+fn Rosetta::Cuckoo::remove($ck, $key) {
+    my $i1 = Rosetta::Cuckoo::hash1($key, $ck->{size})
+    if (defined $ck->{t1}[$i1] && $ck->{t1}[$i1] eq $key) {
+        $ck->{t1}[$i1] = undef
+        return 1
+    }
+    my $i2 = Rosetta::Cuckoo::hash2($key, $ck->{size})
+    if (defined $ck->{t2}[$i2] && $ck->{t2}[$i2] eq $key) {
+        $ck->{t2}[$i2] = undef
+        return 1
+    }
+    0
+}
+
+fn Rosetta::Cuckoo::size_of($ck) {
+    my $n = 0
+    for my $v (@{$ck->{t1}}) { $n++ if defined $v }
+    for my $v (@{$ck->{t2}}) { $n++ if defined $v }
+    $n
+}
+
+# Tiny insert/contains/remove cycle.
+my $ck = Rosetta::Cuckoo::new(31)
+assert_eq Rosetta::Cuckoo::insert($ck, "alice"),   1, "insert alice"
+assert_eq Rosetta::Cuckoo::insert($ck, "bob"),     1, "insert bob"
+assert_eq Rosetta::Cuckoo::insert($ck, "carol"),   1, "insert carol"
+assert_eq Rosetta::Cuckoo::contains($ck, "alice"), 1, "alice present"
+assert_eq Rosetta::Cuckoo::contains($ck, "bob"),   1, "bob present"
+assert_eq Rosetta::Cuckoo::contains($ck, "dave"),  0, "dave absent"
+assert_eq Rosetta::Cuckoo::size_of($ck), 3, "size = 3"
+
+assert_eq Rosetta::Cuckoo::remove($ck, "bob"), 1, "remove bob"
+assert_eq Rosetta::Cuckoo::contains($ck, "bob"), 0, "bob no longer present"
+assert_eq Rosetta::Cuckoo::size_of($ck), 2, "size = 2 after remove"
+
+# Re-insert is idempotent.
+assert_eq Rosetta::Cuckoo::insert($ck, "alice"), 1, "re-insert alice"
+assert_eq Rosetta::Cuckoo::size_of($ck), 2, "size unchanged"
+
+# Bulk insert: 50 keys into a table of 256 — well below the ~50% load
+# limit at which cuckoo eviction starts to fail.
+my $big = Rosetta::Cuckoo::new(256)
+my @keys
+for my $i (~> 1:50) { push @keys, "user_$i" }
+my $ok = 1
+for my $k (@keys) { $ok = 0 if !Rosetta::Cuckoo::insert($big, $k) }
+assert_eq $ok, 1, "all 50 inserts succeed"
+assert_eq Rosetta::Cuckoo::size_of($big), 50, "size = 50"
+for my $k (@keys) {
+    assert_eq Rosetta::Cuckoo::contains($big, $k), 1, "contains $k"
+}
+
+# Lookup of unrelated keys returns 0
+for my $k ("ghost_1", "ghost_2", "ghost_3") {
+    assert_eq Rosetta::Cuckoo::contains($big, $k), 0, "$k absent"
+}
+
+test_run

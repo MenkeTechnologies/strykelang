@@ -2,7 +2,7 @@
 # Rosetta Code: Odd word problem
 
 fn Rosetta::OddWordProblem::reverse($s) {
-    ~> $s chars rev |> join ""
+    ~> $s chars rev join("")
 }
 
 fn Rosetta::OddWordProblem::process($s) {

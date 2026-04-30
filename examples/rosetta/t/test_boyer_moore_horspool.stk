@@ -1,0 +1,97 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Boyer-Moore-Horspool string search.
+# Simpler than full Boyer-Moore: uses only the bad-character shift table.
+# O(n·m) worst case, O(n/m) average — matches the stronger BM in practice.
+
+fn Rosetta::Horspool::build_shift($pat) {
+    my $m = length($pat)
+    my %shift
+    for my $i (~> 0:$m - 2) {
+        $shift{substr($pat, $i, 1)} = $m - 1 - $i
+    }
+    \%shift
+}
+
+fn Rosetta::Horspool::search($text, $pat) {
+    my $n = length($text)
+    my $m = length($pat)
+    return 0  if $m == 0
+    return -1 if $m > $n
+    my $shift = Rosetta::Horspool::build_shift($pat)
+    my $i = 0
+    while ($i <= $n - $m) {
+        my $j = $m - 1
+        while ($j >= 0 && substr($text, $i + $j, 1) eq substr($pat, $j, 1)) {
+            $j--
+        }
+        return $i if $j < 0
+        my $c = substr($text, $i + $m - 1, 1)
+        $i += $shift->{$c} // $m
+    }
+    -1
+}
+
+fn Rosetta::Horspool::search_all($text, $pat) {
+    my $n = length($text)
+    my $m = length($pat)
+    my @hits
+    return \@hits  if $m == 0 || $m > $n
+    my $shift = Rosetta::Horspool::build_shift($pat)
+    my $i = 0
+    while ($i <= $n - $m) {
+        my $j = $m - 1
+        while ($j >= 0 && substr($text, $i + $j, 1) eq substr($pat, $j, 1)) {
+            $j--
+        }
+        if ($j < 0) {
+            push @hits, $i
+            $i += 1
+        } else {
+            my $c = substr($text, $i + $m - 1, 1)
+            $i += $shift->{$c} // $m
+        }
+    }
+    \@hits
+}
+
+# Single-match cases
+assert_eq Rosetta::Horspool::search("abracadabra", "cad"), 4, "find 'cad' in abracadabra"
+assert_eq Rosetta::Horspool::search("the quick brown fox", "fox"), 16, "find 'fox' at end"
+assert_eq Rosetta::Horspool::search("hello world", "hello"), 0, "find 'hello' at start"
+assert_eq Rosetta::Horspool::search("hello world", "xyz"), -1, "missing pattern -> -1"
+assert_eq Rosetta::Horspool::search("aaaaaa", "aab"), -1, "no aab in aaaaaa"
+
+# Empty pattern
+assert_eq Rosetta::Horspool::search("anything", ""), 0, "empty pattern at 0"
+
+# Pattern longer than text
+assert_eq Rosetta::Horspool::search("hi", "hello"), -1, "pattern > text"
+
+# Overlapping matches via search_all
+my $a = Rosetta::Horspool::search_all("aaaa", "aa")
+assert_eq join(",", @$a), "0,1,2", "overlapping aa in aaaa"
+
+my $b = Rosetta::Horspool::search_all("ababcabab", "ab")
+assert_eq join(",", @$b), "0,2,5,7", "non-overlap ab"
+
+my $c = Rosetta::Horspool::search_all("AABCAABXAAZAABA", "AABA")
+assert_eq join(",", @$c), "11", "AABA at index 11"
+
+# Cross-validate against the substring-as-builtin (hides the shift table behind
+# a single linear scan; same answer either way).
+for my $pat ("a", "the", "fox", "lazy", "zzz") {
+    my $text = "the quick brown fox jumps over the lazy dog"
+    my $hp = Rosetta::Horspool::search($text, $pat)
+    my $idx = index($text, $pat)
+    assert_eq $hp, $idx, "horspool '$pat' matches builtin index"
+}
+
+# Shift table sanity: pattern with distinct chars
+my $shift = Rosetta::Horspool::build_shift("abcd")
+assert_eq $shift->{"a"}, 3, "shift a in abcd"
+assert_eq $shift->{"b"}, 2, "shift b in abcd"
+assert_eq $shift->{"c"}, 1, "shift c in abcd"
+# 'd' is the last char; it doesn't go into the table.
+assert_ok !exists $shift->{"d"}, "d not in shift table"
+
+test_run
