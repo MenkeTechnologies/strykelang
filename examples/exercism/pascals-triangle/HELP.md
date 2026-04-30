@@ -2,17 +2,23 @@
 
 ## Running the tests
 
-Each exercise ships with a stryke test file (extension `.t`) that exercises your solution.
-Run it with:
+Each exercise ships with a stryke test file in `t/`. From the exercise directory, run:
 
 ```bash
-stryke pascals-triangle.t
+stryke test
+```
+
+`stryke test` auto-discovers `t/` (or `tests/`) and runs every `*.stk` test file inside.
+To run a single test file directly:
+
+```bash
+stryke t/test_pascals_triangle.stk
 ```
 
 To run every exercism exercise at once:
 
 ```bash
-for t in examples/exercism/*/*.t; do stryke "$t"; done
+for d in examples/exercism/*/; do (cd "$d" && stryke test); done
 ```
 
 Test assertions in stryke use `assert_eq`, `assert_ok`, and friends — see the

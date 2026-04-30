@@ -21,8 +21,6 @@ fn Rosetta::CubicSpline::build($xs, $ys) {
         $z[$i] = ($alpha[$i] - $h[$i - 1] * $z[$i - 1]) / $l[$i]
     }
     $l[$n] = 1
-    p "DEBUG z: " . join(",", @z)
-    p "DEBUG mu: " . join(",", @mu)
     my @cc = ~> 0:$n |> map { 0 }
     my @bb = ~> 0:$n - 1 |> map { 0 }
     my @dd = ~> 0:$n - 1 |> map { 0 }
