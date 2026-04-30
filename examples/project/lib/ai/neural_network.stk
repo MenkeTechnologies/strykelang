@@ -70,7 +70,7 @@ class NeuralNetwork {
 
     fn train($training_data, $epochs) {
         p "Training started (placeholder)..."
-        for my $epoch (1..$epochs) {
+        ~> 1..$epochs ep {
             # Placeholder for training logic
         }
         p "Training finished."

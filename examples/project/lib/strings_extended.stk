@@ -21,7 +21,7 @@ fn str_ucfirst($s) { ucfirst($s) }
 fn str_lcfirst($s) { lcfirst($s) }
 
 fn to_title_case($s) {
-    join(" ", map { ucfirst(lc($_)) } split(/\s+/, $s))
+    join(" ", map { ucfirst(lc(_)) } split(/\s+/, $s))
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -100,8 +100,8 @@ fn str_ord($s) { ord($s) }
 
 fn str_to_chars($s) {
     my @chars = ()
-    for my $i (0 .. length($s) - 1) {
-        push @chars, substr($s, $i, 1)
+    ~> 0 .. length($s) - 1 ep {
+        push @chars, substr($s, _, 1)
     }
     @chars
 }
@@ -232,8 +232,8 @@ fn str_no_interp {
 
 fn str_split_char($s) {
     my @chars = ()
-    for my $i (0 .. length($s) - 1) {
-        push @chars, substr($s, $i, 1)
+    ~> 0 .. length($s) - 1 ep {
+        push @chars, substr($s, _, 1)
     }
     @chars
 }
@@ -292,15 +292,15 @@ fn str_is_blank($s) { $s =~ /^\s*$/ ? 1 : 0 }
 
 fn str_count_char($s, $char) {
     my $count = 0
-    for my $c (split(//, $s)) {
-        $count++ if $c eq $char
+    ~> split(//, $s) ep {
+        $count++ if _ eq $char
     }
     $count
 }
 
 fn str_word_count($s) {
     my @words = split(/\s+/, $s)
-    @words = grep { length($_) > 0 } @words
+    @words = grep { length(_) > 0 } @words
     scalar @words}
 
 fn str_lines($s) {

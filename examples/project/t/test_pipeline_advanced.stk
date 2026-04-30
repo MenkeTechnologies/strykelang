@@ -23,12 +23,12 @@ assert_eq $is_even(5), 0, "5 not even"
 
 my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
-my @doubled = map { $_ * 2 } @nums
+my @doubled = map { _ * 2 } @nums
 assert_eq scalar(@doubled), 10, "map count"
 assert_eq $doubled[0], 2, "map first"
 assert_eq $doubled[9], 20, "map last"
 
-my @evens = grep { $_ % 2 == 0 } @nums
+my @evens = grep { _ % 2 == 0 } @nums
 assert_eq scalar(@evens), 5, "grep evens count"
 assert_eq $evens[0], 2, "grep first even"
 assert_eq $evens[4], 10, "grep last even"
@@ -46,22 +46,22 @@ assert_eq $min_val, 1, "min"
 # CHAINED OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @chain1 = map { $_ * 2 } grep { $_ % 2 == 0 } @nums
+my @chain1 = map { _ * 2 } grep { _ % 2 == 0 } @nums
 assert_eq scalar(@chain1), 5, "chain count"
 assert_eq $chain1[0], 4, "chain first (2*2)"
 assert_eq $chain1[4], 20, "chain last (10*2)"
 
-my $chain_sum = sum(map { $_ * $_ } grep { $_ > 5 } @nums)
+my $chain_sum = sum(map { _ * _ } grep { _ > 5 } @nums)
 assert_eq $chain_sum, 330, "chain sum of squares >5"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PIPELINE OPERATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $piped = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum
+my $piped = 1..10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
 assert_eq $piped, 220, "pipeline sum of even squares"
 
-my @piped_arr = 1..5 |> map { $_ * 3 }
+my @piped_arr = 1..5 |> map { _ * 3 }
 assert_eq scalar(@piped_arr), 5, "pipeline to array count"
 assert_eq $piped_arr[0], 3, "pipeline array first"
 assert_eq $piped_arr[4], 15, "pipeline array last"
@@ -112,11 +112,11 @@ assert_eq $running[5], 15, "scan final"
 fn partition_fn($pred, @items) {
     my @true_part
     my @false_part
-    for my $item (@items) {
-        if ($pred($item)) {
-            push @true_part, $item
+    ~> @items ep {
+        if ($pred(_)) {
+            push @true_part, _
         } else {
-            push @false_part, $item
+            push @false_part, _
         }
     }
     my $t = [@true_part]
@@ -187,8 +187,8 @@ fn find_idx_fn($pred, @items) {
 
 fn count_if_fn($pred, @items) {
     my $count = 0
-    for my $item (@items) {
-        $count++ if $pred($item)
+    ~> @items ep {
+        $count++ if $pred(_)
     }
     $count
 }
@@ -270,9 +270,9 @@ assert_eq $c2->[1], 8, "chunk 2 last"
 
 my @letters = qw(a b a c a b a)
 my %freq
-for my $letter (@letters) {
-    $freq{$letter} = 0 unless exists $freq{$letter}
-    $freq{$letter}++
+~> @letters ep {
+    $freq{_} = 0 unless exists $freq{_}
+    $freq{_}++
 }
 assert_eq $freq{a}, 4, "freq a"
 assert_eq $freq{b}, 2, "freq b"

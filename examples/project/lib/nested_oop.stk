@@ -72,11 +72,11 @@ fn sum_point_coords(@points) {
 }
 
 fn map_points_to_distances(@points) {
-    map { sqrt($_->x * $_->x + $_->y * $_->y) } @points
+    map { sqrt(_->x * _->x + _->y * _->y) } @points
 }
 
 fn filter_points_in_quadrant(@points) {
-    grep { $_->x > 0 && $_->y > 0 } @points
+    grep { _->x > 0 && _->y > 0 } @points
 }
 
 fn sort_points_by_x(@points) {
@@ -221,7 +221,7 @@ fn product_catalog {
 }
 
 fn filter_by_department($roster, $dept) {
-    [grep { $_->department eq $dept } @$roster]
+    [grep { _->department eq $dept } @$roster]
 }
 
 fn total_salary($roster) {
@@ -233,7 +233,7 @@ fn total_salary($roster) {
 }
 
 fn apply_discount_all($products, $pct) {
-    [map { $_->discount($pct) } @$products]
+    [map { _->discount($pct) } @$products]
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -551,8 +551,8 @@ fn matrix_of_points {
     my @matrix
     for my $i (0..2) {
         my @row
-        for my $j (0..2) {
-            push @row, Point($i, $j)
+        ~> 0..2 ep {
+            push @row, Point($i, _)
         }
         push @matrix, [@row]
     }
@@ -562,8 +562,8 @@ fn matrix_of_points {
 fn flatten_point_matrix($matrix) {
     my @flat
     for my $row (@$matrix) {
-        for my $p (@$row) {
-            push @flat, $p
+        ~> @$row ep {
+            push @flat, _
         }
     }
     @flat
@@ -630,12 +630,12 @@ fn process_mixed($items) {
 
 fn transform_points($points, $scale, $offset_x, $offset_y) {
     [map {
-        Point($_->x * $scale + $offset_x, $_->y * $scale + $offset_y)
+        Point(_->x * $scale + $offset_x, _->y * $scale + $offset_y)
     } @$points]
 }
 
 fn filter_adults($people) {
-    [grep { $_->age >= 18 } @$people]
+    [grep { _->age >= 18 } @$people]
 }
 
 fn sort_by_age($people) {
@@ -645,11 +645,11 @@ fn sort_by_age($people) {
 fn partition_by_age($people, $threshold) {
     my @young
     my @old
-    for my $p (@$people) {
-        if ($p->age < $threshold) {
-            push @young, $p
+    ~> @$people ep {
+        if (_->age < $threshold) {
+            push @young, _
         } else {
-            push @old, $p
+            push @old, _
         }
     }
     { young => [@young], old => [@old] }

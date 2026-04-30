@@ -185,8 +185,8 @@ assert_eq exists $uv{b} ? 1 : 0, 0, "missing not exists"
 
 # Large hash
 my %big
-for my $i (1..100) {
-    $big{$i} = $i * 2
+~> 1..100 ep {
+    $big{_} = _ * 2
 }
 assert_eq scalar(keys %big), 100, "large hash count"
 assert_eq $big{50}, 100, "large hash access"

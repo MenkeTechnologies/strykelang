@@ -3062,6 +3062,119 @@ fn ipv4_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
     out
 }
 
+/// Check if string is a valid IPv6 address. Uses Rust's parser so all
+/// compressed (`::`), full (8-group), and IPv4-mapped forms are accepted.
+fn is_ipv6(s: &str) -> bool {
+    s.parse::<std::net::Ipv6Addr>().is_ok()
+}
+
+/// Check if string is a `0x…` / `0X…` hex literal in source-form. Used by
+/// the range op to keep `0x00:0xFF:1` iterating as hex strings instead of
+/// decimal. Returns true only when the prefix is present and the body is
+/// non-empty hex digits.
+fn is_hex_source_literal(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.len() > 2
+        && bytes[0] == b'0'
+        && (bytes[1] == b'x' || bytes[1] == b'X')
+        && bytes[2..].iter().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Iterate a hex range with step. Output values preserve:
+/// - The `0x` / `0X` prefix from the FROM endpoint.
+/// - The minimum digit width to fit either endpoint (zero-padded to that).
+/// - Uppercase iff EITHER endpoint had any uppercase letter — once the user
+///   types `0xFF` we keep the case for every value in the range, even when
+///   the FROM endpoint (`0x00`) had no letters of its own to disambiguate.
+fn hex_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let from_body = &from[2..];
+    let to_body = &to[2..];
+    let Ok(start) = i64::from_str_radix(from_body, 16) else {
+        return vec![];
+    };
+    let Ok(end) = i64::from_str_radix(to_body, 16) else {
+        return vec![];
+    };
+    let prefix = &from[..2];
+    let width = from_body.len().max(to_body.len());
+    let upper = from_body.bytes().any(|b| b.is_ascii_uppercase())
+        || to_body.bytes().any(|b| b.is_ascii_uppercase());
+    let mut out = Vec::new();
+    let format_one = |n: i64, width: usize, upper: bool, prefix: &str| -> String {
+        if upper {
+            format!("{}{:0>w$X}", prefix, n, w = width)
+        } else {
+            format!("{}{:0>w$x}", prefix, n, w = width)
+        }
+    };
+    if step > 0 {
+        if start > end {
+            return out;
+        }
+        let mut cur = start;
+        while cur <= end {
+            out.push(PerlValue::string(format_one(cur, width, upper, prefix)));
+            if (end - cur) < step {
+                break;
+            }
+            cur += step;
+        }
+    } else if step < 0 {
+        if start < end {
+            return out;
+        }
+        let mut cur = start;
+        while cur >= end {
+            out.push(PerlValue::string(format_one(cur, width, upper, prefix)));
+            if (cur - end) < (-step) {
+                break;
+            }
+            cur += step;
+        }
+    }
+    out
+}
+
+fn ipv6_range_stepped(from: &str, to: &str, step: i64) -> Vec<PerlValue> {
+    let Ok(start) = from.parse::<std::net::Ipv6Addr>() else {
+        return vec![];
+    };
+    let Ok(end) = to.parse::<std::net::Ipv6Addr>() else {
+        return vec![];
+    };
+    let s = u128::from(start);
+    let e = u128::from(end);
+    let mut out = Vec::new();
+    if step > 0 {
+        if s > e {
+            return out; // start past end with positive step → empty
+        }
+        let step = step as u128;
+        let mut cur = s;
+        loop {
+            out.push(PerlValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            if cur == e || e.saturating_sub(cur) < step {
+                break;
+            }
+            cur += step;
+        }
+    } else if step < 0 {
+        if s < e {
+            return out; // start before end with negative step → empty
+        }
+        let step = (-step) as u128;
+        let mut cur = s;
+        loop {
+            out.push(PerlValue::string(std::net::Ipv6Addr::from(cur).to_string()));
+            if cur == e || cur.saturating_sub(e) < step {
+                break;
+            }
+            cur -= step;
+        }
+    }
+    out
+}
+
 /// Check if string is ISO date YYYY-MM-DD.
 fn is_iso_date(s: &str) -> bool {
     if s.len() != 10 {
@@ -3635,9 +3748,24 @@ pub(crate) fn perl_list_range_expand_stepped(
     } else {
         // Check special types in order of specificity
 
+        // Hex literals — must check before IPv4 because `0xFF` chars include
+        // hex digits that aren't dotted-quad anyway, but keeping ordering
+        // tight prevents future ambiguity. Preserves `0x` prefix, width,
+        // and case from the source form.
+        if is_hex_source_literal(&from_str) && is_hex_source_literal(&to_str) {
+            return hex_range_stepped(&from_str, &to_str, step_int);
+        }
+
         // IPv4 addresses (must check before floats due to dots)
         if is_ipv4(&from_str) && is_ipv4(&to_str) {
             return ipv4_range_stepped(&from_str, &to_str, step_int);
+        }
+
+        // IPv6 addresses — full or `::`-compressed. Uses the dedicated `!!!`
+        // range separator so the IPv6's own colons don't collide with the
+        // standard `:` range op.
+        if is_ipv6(&from_str) && is_ipv6(&to_str) {
+            return ipv6_range_stepped(&from_str, &to_str, step_int);
         }
 
         // ISO dates YYYY-MM-DD (step = days)

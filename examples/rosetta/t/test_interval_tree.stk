@@ -69,8 +69,8 @@ fn Rosetta::IntervalTree::format_intervals($iv) {
 # Build tree
 my $t = Rosetta::IntervalTree::new()
 my @intervals = ([15, 20], [10, 30], [17, 19], [5, 20], [12, 15], [30, 40])
-for my $iv (@intervals) {
-    Rosetta::IntervalTree::insert($t, $iv->[0], $iv->[1])
+~> @intervals ep {
+    Rosetta::IntervalTree::insert($t, _->[0], _->[1])
 }
 
 # Point lookups

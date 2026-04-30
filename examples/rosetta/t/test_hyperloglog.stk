@@ -89,9 +89,9 @@ fn Rosetta::HLL::estimate($hll) {
     my $m = $hll->{m}
     my $sum = 0
     my $zeros = 0
-    for my $r (@{$hll->{reg}}) {
-        $sum += 1 / (2 ** $r)
-        $zeros++ if $r == 0
+    ~> @{$hll->{reg}} ep {
+        $sum += 1 / (2 ** _)
+        $zeros++ if _ == 0
     }
     my $raw = Rosetta::HLL::alpha($m) * $m * $m / $sum
     if ($raw <= 2.5 * $m && $zeros > 0) {

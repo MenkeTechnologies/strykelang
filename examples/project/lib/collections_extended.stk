@@ -19,8 +19,8 @@ fn ext_zip($a_ref, $b_ref) {
     my @b = @$b_ref
     my @res = ()
     my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
-    for my $i (0..$len-1) {
-        push @res, [$a[$i], $b[$i]]
+    ~> 0..$len-1 ep {
+        push @res, [$a[_], $b[_]]
     }
     @res
 }

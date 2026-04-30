@@ -60,7 +60,7 @@ assert_eq slurp($tmp), "stryke test", "spurt/slurp roundtrip"
 my @procs = process_list()
 assert_gt scalar(@procs), 0, "process list is not empty"
 # Find our own process (approximately by name 's' or 'stryke')
-my @found = grep { $_->{name} =~ /s/ } @procs
+my @found = grep { _->{name} =~ /s/ } @procs
 assert_gt scalar(@found), 0, "found at least one process with 's' in name"
 
 test_run

@@ -29,19 +29,19 @@ assert_eq base64_encode("hello"), "aGVsbG8=", "base64 encode"
 assert_eq base64_decode("aGVsbG8="), "hello", "base64 decode"
 
 # Pipeline
-my $result = sum(map { $_ * 2 } 1..5)
+my $result = sum(map { _ * 2 } 1..5)
 assert_eq $result, 30, "pipeline map+sum"
 
 # Pipe forward with builtins
-my $piped = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum
+my $piped = 1..10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
 assert_eq $piped, 220, "pipe grep map sum"
 
 # Thread macro with builtins
-my $threaded = (~> (1..10) grep { $_ > 5 } sum)
+my $threaded = (~> (1..10) grep { _ > 5 } sum)
 assert_eq $threaded, 40, "thread macro grep sum"
 
 # Streaming maps
-my @s = range(1, 5) |> maps { $_ * 3 }
+my @s = range(1, 5) |> maps { _ * 3 }
 assert_eq scalar(@s), 5, "maps count"
 
 # JSON roundtrip

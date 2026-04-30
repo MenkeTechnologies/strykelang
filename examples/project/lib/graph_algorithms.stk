@@ -12,10 +12,10 @@ fn adv_bfs($graph, $start_node) {
         push @visited, $curr
         
         my $neighbors = $graph->{$curr} // []
-        for my $neighbor (@$neighbors) {
-            unless (exists $seen{$neighbor}) {
-                $seen{$neighbor} = 1
-                push @queue, $neighbor
+        ~> @$neighbors ep {
+            unless (exists $seen{_}) {
+                $seen{_} = 1
+                push @queue, _
             }
         }
     }
@@ -53,8 +53,8 @@ require "./lib/priority_queue.stk"
 # Graph format: { node => [[neighbor, weight], ...] }
 fn adv_dijkstra($graph, $start) {
     my %dist = ()
-    for my $node (keys %$graph) {
-        $dist{$node} = 1e18 # Infinity
+    ~> keys %$graph ep {
+        $dist{_} = 1e18 # Infinity
     }
     $dist{$start} = 0
     

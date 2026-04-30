@@ -5403,10 +5403,18 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     if guard.is_empty() {
         return Ok(PerlValue::string(String::new()));
     }
-    let escaped: Vec<(String, f64)> = guard
+    let mut escaped: Vec<(String, f64)> = guard
         .iter()
         .map(|(k, v)| (display_escape(k), v.to_number()))
         .collect();
+    // Sort by value descending so the largest bar is on top — matches the
+    // visual expectation for frequency charts. Ties broken by label so output
+    // is stable across iteration-order changes in the source hashref.
+    escaped.sort_by(|(ak, av), (bk, bv)| {
+        bv.partial_cmp(av)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| ak.cmp(bk))
+    });
     let label_w = escaped.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     let max_val = escaped.iter().map(|(_, n)| *n).fold(0.0_f64, f64::max);
     // " label │ ████... count\n" — reserve label + " │ " (3) + count digits + space
@@ -8027,6 +8035,14 @@ fn builtin_ansi_wrap(interp: &Interpreter, args: &[PerlValue], code: u8) -> Perl
 /// `strip_ansi S` — drop SGR / CSI sequences.
 fn builtin_strip_ansi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
+    Ok(PerlValue::string(strip_ansi_codes(&s)))
+}
+
+/// Strip ANSI escape sequences (CSI / SGR) from `s`. Used both by the
+/// `strip_ansi` builtin and by [`pdf_content_to_lines`] so terminal-coloured
+/// output (`bar_chart`, `histo`, `flame`, …) renders cleanly when piped to
+/// `to_pdf`.
+pub(crate) fn strip_ansi_codes(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut in_esc = false;
     for c in s.chars() {
@@ -8042,7 +8058,7 @@ fn builtin_strip_ansi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
         }
         out.push(c);
     }
-    Ok(PerlValue::string(out))
+    out
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -24985,7 +25001,45 @@ fn builtin_id3_write(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 }
 
 /// Convert PerlValue content into lines of text for PDF rendering.
+/// Replace Unicode chars that the PDF generator's Type1-Courier font can't
+/// render (block elements, box-drawing) with ASCII equivalents. Combined
+/// with [`strip_ansi_codes`] this turns terminal-coloured output from
+/// `bar_chart`, `histo`, `flame`, etc. into clean, monospace-readable PDF
+/// text. Anything else outside ASCII is left to the PDF reader's font
+/// fallback.
+fn sanitize_for_pdf(s: &str) -> String {
+    let stripped = strip_ansi_codes(s);
+    stripped
+        .chars()
+        .map(|c| match c {
+            // Block elements U+2580..U+259F → solid hash
+            '\u{2580}'..='\u{259F}' => '#',
+            // Vertical box drawing → ASCII pipe
+            '\u{2502}' | '\u{2503}' | '\u{2506}' | '\u{2507}' | '\u{250A}' | '\u{250B}' => '|',
+            // All remaining horizontal box-drawing → dash. Verticals above
+            // short-circuit first, so the range covers only the leftovers.
+            '\u{2500}'..='\u{250B}' | '\u{254C}'..='\u{254F}' => '-',
+            '\u{250C}'..='\u{257F}' => '+',
+            // Bullet variants → asterisk
+            '\u{2022}' | '\u{2023}' | '\u{25E6}' | '\u{2043}' => '*',
+            // Smart-quote and dash punctuation → ASCII fallback
+            '\u{2018}' | '\u{2019}' => '\'',
+            '\u{201C}' | '\u{201D}' => '"',
+            '\u{2013}' | '\u{2014}' => '-',
+            '\u{2026}' => '.',
+            other => other,
+        })
+        .collect()
+}
+
 fn pdf_content_to_lines(val: &PerlValue) -> Vec<String> {
+    pdf_content_to_lines_raw(val)
+        .into_iter()
+        .map(|line| sanitize_for_pdf(&line))
+        .collect()
+}
+
+fn pdf_content_to_lines_raw(val: &PerlValue) -> Vec<String> {
     if val.is_undef() {
         return vec!["(undef)".to_string()];
     }

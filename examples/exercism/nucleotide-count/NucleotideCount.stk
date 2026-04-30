@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 fn Exercism::NucleotideCount::count_nucleotides($strand) {
     my $c = { A => 0, C => 0, G => 0, T => 0 }
-    for my $n (chars($strand)) {
-        die "Invalid nucleotide in strand" unless exists $c->{$n}
-        $c->{$n}++
+    ~> chars($strand) ep {
+        die "Invalid nucleotide in strand" unless exists $c->{_}
+        $c->{_}++
     }
     $c
 }

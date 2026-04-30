@@ -3,16 +3,16 @@
 
 fn Rosetta::Greatest::max(@nums) {
     my $max = $nums[0]
-    for my $n (@nums) {
-        $max = $n if $n > $max
+    ~> @nums ep {
+        $max = _ if _ > $max
     }
     $max
 }
 
 fn Rosetta::Greatest::min(@nums) {
     my $min = $nums[0]
-    for my $n (@nums) {
-        $min = $n if $n < $min
+    ~> @nums ep {
+        $min = _ if _ < $min
     }
     $min
 }
@@ -20,9 +20,9 @@ fn Rosetta::Greatest::min(@nums) {
 fn Rosetta::Greatest::minmax(@nums) {
     my $min = $nums[0]
     my $max = $nums[0]
-    for my $n (@nums) {
-        $min = $n if $n < $min
-        $max = $n if $n > $max
+    ~> @nums ep {
+        $min = _ if _ < $min
+        $max = _ if _ > $max
     }
     ($min, $max)
 }

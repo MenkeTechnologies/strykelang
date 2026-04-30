@@ -15,8 +15,8 @@ fn Exercism::FoodChain::verse($n) {
     my @lines = ("I know an old lady who swallowed a $a->{name}.")
     if ($n == len(@_ANIM)) { return join "\n", @lines, $a->{flavor} }
     push @lines, $a->{flavor} if $a->{flavor}
-    for my $i (rev(1..$n - 1)) {
-        push @lines, $_ANIM[$i]->{reason}
+    ~> rev(1..$n - 1) ep {
+        push @lines, $_ANIM[_]->{reason}
     }
     push @lines, $_ANIM[0]->{reason}
     join "\n", @lines

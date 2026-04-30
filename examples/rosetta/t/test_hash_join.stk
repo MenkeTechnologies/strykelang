@@ -3,10 +3,10 @@
 
 fn Rosetta::HashJoin::join_on($left, $right, $lkey, $rkey) {
     my %index
-    for my $row (@$right) {
-        my $k = $row->{$rkey}
+    ~> @$right ep {
+        my $k = _->{$rkey}
         $index{$k} = [] if !exists $index{$k}
-        push @{$index{$k}}, $row
+        push @{$index{$k}}, _
     }
     my @out
     for my $row (@$left) {

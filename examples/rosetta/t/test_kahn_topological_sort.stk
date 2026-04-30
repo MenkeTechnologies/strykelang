@@ -9,8 +9,8 @@ fn Rosetta::Kahn::sort($edges, $nodes) {
         $in_deg{$n} = 0
         $adj{$n} = []
     }
-    for my $e (@$edges) {
-        my ($u, $v) = ($e->[0], $e->[1])
+    ~> @$edges ep {
+        my ($u, $v) = (_->[0], _->[1])
         push @{$adj{$u}}, $v
         $in_deg{$v}++
     }

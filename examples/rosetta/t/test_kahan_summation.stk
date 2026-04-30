@@ -4,8 +4,8 @@
 fn Rosetta::Kahan::sum(@nums) {
     my $s = 0.0
     my $c = 0.0
-    for my $x (@nums) {
-        my $y = $x - $c
+    ~> @nums ep {
+        my $y = _ - $c
         my $t = $s + $y
         $c = ($t - $s) - $y
         $s = $t
@@ -15,7 +15,7 @@ fn Rosetta::Kahan::sum(@nums) {
 
 fn Rosetta::Kahan::naive(@nums) {
     my $s = 0.0
-    for my $x (@nums) { $s += $x }
+    ~> @nums ep { $s += _ }
     $s
 }
 

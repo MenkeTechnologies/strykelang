@@ -142,13 +142,13 @@ fn universe_simulate_epoch($u) {
     
     # Apply results using functional pipeline
     my @high_energy_up = grep {
-        my $id = $_->id;
+        my $id = _->id;
         my $res = $results->{$id};
         $res->{qstate} eq "UP"
     } @p_list;
     
     my @processed = map {
-        my $id = $_->id;
+        my $id = _->id;
         { id => $id, mapped_energy => $results->{$id}->{final_energy} * 2 }
     } @high_energy_up;
     

@@ -41,7 +41,7 @@ fn Rosetta::EliasGamma::decode_one($s, $pos_ref) {
     return undef if $i + $total > length($s)
     my $bits = substr($s, $i + $zeros, $zeros + 1)
     my $val = 0
-    for my $c (split(//, $bits)) { $val = $val * 2 + ($c eq "1" ? 1 : 0) }
+    ~> split(//, $bits) ep { $val = $val * 2 + (_ eq "1" ? 1 : 0) }
     $$pos_ref = $i + $total
     $val
 }

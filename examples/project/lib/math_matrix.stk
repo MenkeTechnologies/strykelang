@@ -7,8 +7,8 @@ fn adv_matrix_add($m1, $m2) {
     my @res = ()
     for my $i (0..$rows-1) {
         $res[$i] = []
-        for my $j (0..$cols-1) {
-            $res[$i][$j] = $m1->[$i][$j] + $m2->[$i][$j]
+        ~> 0..$cols-1 ep {
+            $res[$i][_] = $m1->[$i][_] + $m2->[$i][_]
         }
     }
     return [@res]
@@ -46,8 +46,8 @@ fn adv_matrix_transpose($m) {
     my @res = ()
     for my $j (0..$cols-1) {
         $res[$j] = []
-        for my $i (0..$rows-1) {
-            $res[$j][$i] = $m->[$i][$j]
+        ~> 0..$rows-1 ep {
+            $res[$j][_] = $m->[_][$j]
         }
     }
     return [@res]

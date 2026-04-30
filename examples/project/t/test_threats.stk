@@ -20,13 +20,13 @@ assert_contains $disk_threats[0]->{message}, "critical", "critical message"
 # Mock: no gateway
 my $bad_net = { ipv4 => "192.168.1.100", mac => "aa:bb:cc:dd:ee:ff", gateway => "unknown", dns => "8.8.8.8" }
 my @net_threats = analyze_threats($sys, $bad_net, \@disks, 8000000000)
-my @high = grep { $_->{level} eq "HIGH" } @net_threats
+my @high = grep { _->{level} eq "HIGH" } @net_threats
 assert_gt scalar(@high), 0, "no gateway is HIGH"
 
 # Mock: long uptime
 my $old_sys = { %$sys, uptime_sec => 60 * 86400 }
 my @up_threats = analyze_threats($old_sys, $net, \@disks, 8000000000)
-my @warns = grep { $_->{level} eq "WARN" } @up_threats
+my @warns = grep { _->{level} eq "WARN" } @up_threats
 assert_gt scalar(@warns), 0, "60 day uptime is WARN"
 
 test_run

@@ -40,8 +40,8 @@ fn Rosetta::IBAN::is_valid($iban) {
     # Compute digits mod 97 in chunks (numeric overflow-safe)
     my $rem = 0
     my @ds = ~> $digits chars
-    for my $d (@ds) {
-        $rem = ($rem * 10 + int($d)) % 97
+    ~> @ds ep {
+        $rem = ($rem * 10 + int(_)) % 97
     }
     $rem == 1
 }

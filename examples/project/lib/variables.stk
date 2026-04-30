@@ -336,19 +336,19 @@ fn local_scope {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn underscore_default {
-    $_ = "test"
+    _ = "test"
     uc
 }
 
 fn topic_in_map {
     my @nums = (1, 2, 3)
-    my @doubled = map { $_ * 2 } @nums
+    my @doubled = map { _ * 2 } @nums
     join(",", @doubled)
 }
 
 fn topic_in_grep {
     my @nums = (1, 2, 3, 4, 5, 6)
-    my @evens = grep { $_ % 2 == 0 } @nums
+    my @evens = grep { _ % 2 == 0 } @nums
     join(",", @evens)
 }
 

@@ -589,8 +589,8 @@ class DocumentNode impl Visitor {
     
     fn traverse($visitor) {
         $self->visit($visitor)
-        for my $child (@{$self->children}) {
-            $child->traverse($visitor)
+        ~> @{$self->children} ep {
+            _->traverse($visitor)
         }
     }
     
@@ -675,7 +675,7 @@ class InputNode extends ElementNode {
         $self->set_attr("name", $self->input_name)
         $self->set_attr("value", $self->value) if $self->value
         $self->set_attr("required", "required") if $self->required
-        "<input" . join("", map { ' ' . $_ . '="' . $self->attributes->{$_} . '"' } keys %{$self->attributes}) . " />"
+        "<input" . join("", map { ' ' . _ . '="' . $self->attributes->{$_} . '"' } keys %{$self->attributes}) . " />"
     }
 }
 

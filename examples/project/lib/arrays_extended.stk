@@ -182,22 +182,22 @@ fn arr_reverse_in_place {
 
 fn arr_map_double {
     my @a = (1, 2, 3, 4, 5)
-    map { $_ * 2 } @a
+    map { _ * 2 } @a
 }
 
 fn arr_map_transform {
     my @a = qw(a b c)
-    map { uc($_) } @a
+    map { uc(_) } @a
 }
 
 fn arr_map_to_hash_values {
     my @a = (1, 2, 3)
-    map { $_ => $_ * $_ } @a
+    map { $_ => _ * _ } @a
 }
 
 fn arr_grep_even {
     my @a = (1, 2, 3, 4, 5, 6)
-    grep { $_ % 2 == 0 } @a
+    grep { _ % 2 == 0 } @a
 }
 
 fn arr_grep_defined {
@@ -212,7 +212,7 @@ fn arr_grep_regex {
 
 fn arr_first_match {
     my @a = (1, 2, 3, 4, 5)
-    my @found = grep { $_ > 3 } @a
+    my @found = grep { _ > 3 } @a
     $found[0]
 }
 

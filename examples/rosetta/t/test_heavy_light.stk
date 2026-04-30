@@ -139,11 +139,11 @@ fn Rosetta::HLD::naive_path_sum($n, $edges, $values, $u, $v) {
     while (len(@q) > 0) {
         my $x = shift @q
         last if $x == $v
-        for my $y (@{$adj[$x]}) {
-            if (!$visited[$y]) {
-                $visited[$y] = 1
-                $prev[$y] = $x
-                push @q, $y
+        ~> @{$adj[$x]} ep {
+            if (!$visited[_]) {
+                $visited[_] = 1
+                $prev[_] = $x
+                push @q, _
             }
         }
     }

@@ -11,10 +11,10 @@ assert_eq await($t1), 42, "async return value"
 # ── Parallel Execution ─────────────────────────────────────────────
 my $start = el()
 my @tasks = map { 
-    async { sleep 0.2; $_ } 
+    async { sleep 0.2; _ } 
 } (1..5)
 
-my @results = map { await($_) } @tasks
+my @results = map { await(_) } @tasks
 my $elapsed = el() - $start
 
 assert_eq scalar(@results), 5, "all tasks finished"

@@ -46,6 +46,6 @@ my $y = Rosetta::DigitalFilter::apply($b, $a, $x)
 assert_ok Rosetta::DigitalFilter::vec_approx_eq($y, [5.0, 15.0, 25.0]), "SMA-2 check"
 
 # Piped version
-$x |> ~> fn { Rosetta::DigitalFilter::apply($b, $a, $_) } |> ~> fn { Rosetta::DigitalFilter::vec_approx_eq($_, [5.0, 15.0, 25.0]) } |> assert_ok("piped digital filter")
+$x |> ~> fn { Rosetta::DigitalFilter::apply($b, $a, _) } |> ~> fn { Rosetta::DigitalFilter::vec_approx_eq(_, [5.0, 15.0, 25.0]) } |> assert_ok("piped digital filter")
 
 test_run

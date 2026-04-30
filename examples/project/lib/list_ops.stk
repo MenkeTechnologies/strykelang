@@ -6,31 +6,31 @@
 
 fn map_double {
     my @a = (1, 2, 3, 4, 5)
-    my @r = map { $_ * 2 } @a
+    my @r = map { _ * 2 } @a
     join(",", @r)
 }
 
 fn map_square {
     my @a = (1, 2, 3, 4)
-    my @r = map { $_ * $_ } @a
+    my @r = map { _ * _ } @a
     join(",", @r)
 }
 
 fn map_string {
     my @a = qw(a b c)
-    my @r = map { uc($_) } @a
+    my @r = map { uc(_) } @a
     join(",", @r)
 }
 
 fn map_length {
     my @a = qw(one two three)
-    my @r = map { length($_) } @a
+    my @r = map { length(_) } @a
     join(",", @r)
 }
 
 fn map_empty {
     my @a = ()
-    my @r = map { $_ * 2 } @a
+    my @r = map { _ * 2 } @a
     scalar @r}
 
 fn map_to_hash_key {
@@ -40,13 +40,13 @@ fn map_to_hash_key {
 
 fn map_conditional {
     my @a = (1, 2, 3, 4, 5)
-    my @r = map { $_ > 2 ? $_ : 0 } @a
+    my @r = map { _ > 2 ? _ : 0 } @a
     join(",", @r)
 }
 
 fn map_chained {
     my @a = (1, 2, 3)
-    my @r = map { $_ + 1 } map { $_ * 2 } @a
+    my @r = map { _ + 1 } map { _ * 2 } @a
     join(",", @r)
 }
 
@@ -59,7 +59,7 @@ fn map_with_index {
 
 fn map_flatten {
     my @a = (1, 2, 3)
-    my @r = map { ($_, $_ * 10) } @a
+    my @r = map { (_, _ * 10) } @a
     join(",", @r)
 }
 
@@ -69,13 +69,13 @@ fn map_flatten {
 
 fn grep_positive {
     my @a = (-2, -1, 0, 1, 2)
-    my @r = grep { $_ > 0 } @a
+    my @r = grep { _ > 0 } @a
     join(",", @r)
 }
 
 fn grep_even {
     my @a = (1, 2, 3, 4, 5, 6)
-    my @r = grep { $_ % 2 == 0 } @a
+    my @r = grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
@@ -87,38 +87,38 @@ fn grep_string_match {
 
 fn grep_defined {
     my @a = (1, undef, 2, undef, 3)
-    my @r = grep { defined($_) } @a
+    my @r = grep { defined(_) } @a
     join(",", @r)
 }
 
 fn grep_true {
     my @a = (0, 1, "", "hello", undef)
-    my @r = grep { $_ } @a
+    my @r = grep { _ } @a
     scalar @r}
 
 fn grep_empty {
     my @a = ()
-    my @r = grep { $_ > 0 } @a
+    my @r = grep { _ > 0 } @a
     scalar @r}
 
 fn grep_none_match {
     my @a = (1, 2, 3)
-    my @r = grep { $_ > 10 } @a
+    my @r = grep { _ > 10 } @a
     scalar @r}
 
 fn grep_all_match {
     my @a = (10, 20, 30)
-    my @r = grep { $_ > 5 } @a
+    my @r = grep { _ > 5 } @a
     scalar @r}
 
 fn grep_count {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    scalar(grep { $_ % 2 == 0 } @a)
+    scalar(grep { _ % 2 == 0 } @a)
 }
 
 fn grep_chained {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    my @r = grep { $_ > 3 } grep { $_ % 2 == 0 } @a
+    my @r = grep { _ > 3 } grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
@@ -491,13 +491,13 @@ fn list_in_scalar {
 
 fn list_in_scalar_grep {
     my @a = (1, 2, 3, 4, 5)
-    my $count = grep { $_ > 2 } @a
+    my $count = grep { _ > 2 } @a
     $count
 }
 
 fn list_in_scalar_map {
     my @a = (1, 2, 3)
-    my $count = map { $_ * 2 } @a
+    my $count = map { _ * 2 } @a
     $count
 }
 
@@ -507,19 +507,19 @@ fn list_in_scalar_map {
 
 fn map_grep_combo {
     my @a = (1, 2, 3, 4, 5, 6)
-    my @r = map { $_ * 2 } grep { $_ % 2 == 0 } @a
+    my @r = map { _ * 2 } grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
 fn sort_grep_combo {
     my @a = (5, 2, 8, 1, 9, 3)
-    my @r = sort { $a <=> $b } grep { $_ > 2 } @a
+    my @r = sort { $a <=> $b } grep { _ > 2 } @a
     join(",", @r)
 }
 
 fn map_sort_combo {
     my @a = (3, 1, 2)
-    my @r = sort { $a <=> $b } map { $_ * 10 } @a
+    my @r = sort { $a <=> $b } map { _ * 10 } @a
     join(",", @r)
 }
 
@@ -531,7 +531,7 @@ fn reverse_sort_combo {
 
 fn join_map_combo {
     my @a = (1, 2, 3)
-    join("-", map { $_ * 2 } @a)
+    join("-", map { _ * 2 } @a)
 }
 
 fn split_join_round {
@@ -543,8 +543,8 @@ fn split_join_round {
 fn transform_pipeline {
     my @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     my @r = sort { $b <=> $a }
-            map { $_ * $_ }
-            grep { $_ % 2 == 0 } @a
+            map { _ * _ }
+            grep { _ % 2 == 0 } @a
     join(",", @r)
 }
 
@@ -555,14 +555,14 @@ fn transform_pipeline {
 fn reduce_sum {
     my @a = (1, 2, 3, 4, 5)
     my $sum = 0
-    $sum += $_ for @a
+    $sum += _ for @a
     $sum
 }
 
 fn reduce_product {
     my @a = (1, 2, 3, 4, 5)
     my $prod = 1
-    $prod *= $_ for @a
+    $prod *= _ for @a
     $prod
 }
 
@@ -587,7 +587,7 @@ fn reduce_min {
 fn reduce_concat {
     my @a = qw(a b c)
     my $s = ""
-    $s .= $_ for @a
+    $s .= _ for @a
     $s
 }
 
@@ -614,18 +614,18 @@ fn sort_with_undef {
 
 fn nested_map {
     my @a = (1, 2)
-    my @r = map { my $x = $_; map { $x * $_ } (1, 2, 3) } @a
+    my @r = map { my $x = _; map { $x * _ } (1, 2, 3) } @a
     join(",", @r)
 }
 
 fn first_match {
     my @a = (1, 2, 3, 4, 5)
-    my @r = grep { $_ > 2 } @a
+    my @r = grep { _ > 2 } @a
     $r[0]
 }
 
 fn last_match {
     my @a = (1, 2, 3, 4, 5)
-    my @r = grep { $_ > 2 } @a
+    my @r = grep { _ > 2 } @a
     $r[-1]
 }

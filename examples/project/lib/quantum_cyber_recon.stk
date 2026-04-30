@@ -86,7 +86,7 @@ print "Initializing Quantum Neural Grid...\n"
 
 my @input_range = (1..100);
 my @grid_nodes = @input_range |> pmap {
-    my $id = $_
+    my $id = _
     my $node = NeuralQuantumLink(id => $id)
     for (1..5) {
         $node->add_qubit(Qubit(alpha => rand(), beta => rand()))
@@ -103,7 +103,7 @@ print "Grid initialized with ", scalar(@grid_nodes), " nodes.\n"
 # Parallel analysis of connectivity and resonance
 print "Running parallel resonance calibration...\n"
 my @resonance_scores = @grid_nodes |> pmap {
-    { id => $_->id, score => $_->total_connectivity() }
+    { id => _->id, score => _->total_connectivity() }
 } |> psort { $b->{score} <=> $a->{score} };
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -142,8 +142,8 @@ print "High resonance sectors found: " . scalar(@$sectors) . "\n"
 print "Executing Final Recon Pipeline...\n"
 
 my $final_report = (1..500)
-    |> pmap { $_ * rand() }                       # Random noise
-    |> pgrep { $_ > 250 }                         # Filter peaks
+    |> pmap { _ * rand() }                       # Random noise
+    |> pgrep { _ > 250 }                         # Filter peaks
     |> chunk(10)                                  # Group them
     |> pmap {                                     # Aggregate chunks
         my $sum = 0
@@ -151,7 +151,7 @@ my $final_report = (1..500)
         $sum / (scalar(@$_) || 1)
     }
     |> psort { $b <=> $a }                        # Sort descending
-    |> take_while(fn { $_ > 350 })                # Only high intensity
+    |> take_while(fn { _ > 350 })                # Only high intensity
     |> join " | ";
 
 print "Intensity Signature: $final_report\n"

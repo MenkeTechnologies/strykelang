@@ -4,28 +4,28 @@
 
 fn union_sets ($a, $b) {
     my @combined
-    for my $x (@$a) { push @combined, $x }
-    for my $x (@$b) { push @combined, $x }
+    ~> @$a ep { push @combined, _ }
+    ~> @$b ep { push @combined, _ }
     my @result = uniq(@combined)
     @result
 }
 
 fn intersect_sets ($a, $b) {
     my $in_b = {}
-    for my $x (@$b) { $in_b->{$x} = 1 }
+    ~> @$b ep { $in_b->{_} = 1 }
     my @result
-    for my $x (@$a) {
-        push @result, $x if exists $in_b->{$x}
+    ~> @$a ep {
+        push @result, _ if exists $in_b->{_}
     }
     @result
 }
 
 fn diff_sets ($a, $b) {
     my $in_b = {}
-    for my $x (@$b) { $in_b->{$x} = 1 }
+    ~> @$b ep { $in_b->{_} = 1 }
     my @result
-    for my $x (@$a) {
-        push @result, $x unless exists $in_b->{$x}
+    ~> @$a ep {
+        push @result, _ unless exists $in_b->{_}
     }
     @result
 }
@@ -35,8 +35,8 @@ fn diff_sets ($a, $b) {
 # Invert a hash (swap keys and values), returns hashref
 fn flip_hash (%h) {
     my $inv = {}
-    for my $k (keys %h) {
-        $inv->{$h{$k}} = $k
+    ~> keys %h ep {
+        $inv->{$h{_}} = _
     }
     $inv
 }
@@ -44,12 +44,12 @@ fn flip_hash (%h) {
 # Select only certain keys from a hash
 fn extract_keys ($href) {
     my @keys
-    for my $i (1..scalar(@_) - 1) {
-        push @keys, $_[$i]
+    ~> 1..scalar(@_) - 1 ep {
+        push @keys, $_[_]
     }
     my $result = {}
-    for my $k (@keys) {
-        $result->{$k} = $href->{$k} if exists $href->{$k}
+    ~> @keys ep {
+        $result->{_} = $href->{_} if exists $href->{_}
     }
     $result
 }
@@ -57,8 +57,8 @@ fn extract_keys ($href) {
 # Map over hash values, keeping keys
 fn apply_to_values ($href, $fn) {
     my $result = {}
-    for my $k (keys %$href) {
-        $result->{$k} = $fn($href->{$k})
+    ~> keys %$href ep {
+        $result->{_} = $fn($href->{_})
     }
     $result
 }
@@ -72,8 +72,8 @@ fn compose_fns ($f, $g) {
 
 # Apply a list of transforms to a value (left fold of functions)
 fn apply_pipeline ($val, @fns) {
-    for my $fn (@fns) {
-        $val = $fn($val)
+    ~> @fns ep {
+        $val = _($val)
     }
     $val
 }
@@ -81,8 +81,8 @@ fn apply_pipeline ($val, @fns) {
 # Count occurrences — returns arrayref of [value, count] pairs
 fn count_occurrences (@items) {
     my $freq = {}
-    for my $item (@items) {
-        $freq->{$item} = ($freq->{$item} // 0) + 1
+    ~> @items ep {
+        $freq->{_} = ($freq->{_} // 0) + 1
     }
     my @pairs
     for my $k (keys %$freq) {

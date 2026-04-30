@@ -49,12 +49,12 @@ fn bench_loop_sum {
 
 fn bench_map_transform {
     my @input = (1..10)
-    bench { map { $_ * 2 } @input } 100
+    bench { map { _ * 2 } @input } 100
 }
 
 fn bench_grep_filter {
     my @input = (1..20)
-    bench { grep { $_ % 2 == 0 } @input } 100
+    bench { grep { _ % 2 == 0 } @input } 100
 }
 
 fn bench_sort_small {
@@ -63,7 +63,7 @@ fn bench_sort_small {
 }
 
 fn bench_hash_lookup {
-    my %data = map { $_ => $_ * 2 } (1..100)
+    my %data = map { $_ => _ * 2 } (1..100)
     bench { $data{50} } 1000
 }
 
@@ -115,13 +115,13 @@ fn bench_nested_loops {
 
 fn bench_pipeline {
     bench {
-        (1..10) |> map { $_ * 2 } |> grep { $_ > 5 } |> sum
+        (1..10) |> map { _ * 2 } |> grep { _ > 5 } |> sum
     } 100
 }
 
 fn bench_threading {
     bench {
-        ~> (1..10) map { $_ ** 2 } sum
+        ~> (1..10) map { _ ** 2 } sum
     } 100
 }
 
@@ -134,12 +134,12 @@ fn compare_loop_vs_map {
     
     my $loop_result = bench {
         my @out
-        for my $x (@input) { push @out, $x * 2 }
+        ~> @input ep { push @out, _ * 2 }
         @out
     } 50
     
     my $map_result = bench {
-        map { $_ * 2 } @input
+        map { _ * 2 } @input
     } 50
     
     "loop vs map comparison complete"
@@ -150,7 +150,7 @@ fn compare_hash_vs_array {
     my @array = (1..100)
     
     bench { exists $hash{50} } 500
-    bench { grep { $_ == 50 } @array } 500
+    bench { grep { _ == 50 } @array } 500
     
     "hash vs array lookup comparison"
 }

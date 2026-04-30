@@ -91,7 +91,7 @@ assert_eq join(",", @$lcp5_kasai), join(",", @$lcp5_naive),
 # Cross-check: max(LCP) >= length of any repeated substring
 # "mississippi" has "issi" of length 4 repeated.
 my $max_lcp = 0
-for my $v (@$lcp5_kasai) { $max_lcp = $v if $v > $max_lcp }
+~> @$lcp5_kasai ep { $max_lcp = _ if _ > $max_lcp }
 assert_ok $max_lcp >= 4, "max LCP >= 4 (issi appears twice)"
 
 test_run

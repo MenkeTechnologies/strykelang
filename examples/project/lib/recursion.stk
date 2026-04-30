@@ -62,9 +62,9 @@ fn merge_sort_arr($arr) {
 
     my $mid = int($len / 2)
     my @left
-    for my $i (0..$mid-1) { push @left, $arr->[$i] }
+    ~> 0..$mid-1 ep { push @left, $arr->[_] }
     my @right
-    for my $i ($mid..$len-1) { push @right, $arr->[$i] }
+    ~> $mid..$len-1 ep { push @right, $arr->[_] }
 
     my $sorted_left = merge_sort_arr(\@left)
     my $sorted_right = merge_sort_arr(\@right)
@@ -148,14 +148,14 @@ fn flatten_nested($arr) {
 fn clone_deep($data) {
     return $data unless ref($data)
     if (ref($data) eq "ARRAY") {
-        my @cloned = map { clone_deep($_) } @$data
+        my @cloned = map { clone_deep(_) } @$data
         my $ret = [@cloned]
         return $ret
     }
     if (ref($data) eq "HASH") {
         my $clone = {}
-        for my $k (keys %$data) {
-            $clone->{$k} = clone_deep($data->{$k})
+        ~> keys %$data ep {
+            $clone->{_} = clone_deep($data->{_})
         }
         return $clone
     }

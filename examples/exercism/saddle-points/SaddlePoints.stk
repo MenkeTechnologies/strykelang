@@ -10,8 +10,8 @@ fn Exercism::SaddlePoints::saddle_points($m) {
     }
     my @out
     for my $r (0..$rows - 1) {
-        for my $c (0..$cols - 1) {
-            push @out, [$r + 1, $c + 1] if $m->[$r][$c] == $row_max[$r] && $m->[$r][$c] == $col_min[$c]
+        ~> 0..$cols - 1 ep {
+            push @out, [$r + 1, _ + 1] if $m->[$r][_] == $row_max[$r] && $m->[$r][_] == $col_min[_]
         }
     }
     \@out
