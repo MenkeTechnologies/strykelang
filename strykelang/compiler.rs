@@ -197,6 +197,17 @@ pub struct Compiler {
     /// compile because `use strict` is resolved in `prepare_program_top_level` before the VM
     /// compile begins.
     strict_vars: bool,
+    /// True while compiling a deferred sort/reduce block in the 4th pass. `$a` and `$b`
+    /// inside such blocks must use name-based access — `set_sort_pair` writes by name,
+    /// so a slot allocation from any outer `my $a`/`my $b` (which the deferred pass sees
+    /// because it runs after the whole program is compiled) would silently miss the
+    /// per-iteration value. Other variables continue to use slots so outer `my`
+    /// captures remain O(1).
+    force_name_for_sort_pair: bool,
+    /// Block indices registered via [`Self::register_sort_pair_block`] — sort/reduce
+    /// comparator bodies that bind `$a`/`$b` magic globals. The deferred 4th pass
+    /// turns on [`Self::force_name_for_sort_pair`] only for these blocks.
+    sort_pair_block_indices: std::collections::HashSet<u16>,
 }
 
 /// Label tracking for `goto LABEL` within a single label-scoped region (top-level main program
@@ -271,7 +282,17 @@ impl Compiler {
             loop_stack: Vec::new(),
             goto_ctx_stack: Vec::new(),
             strict_vars: false,
+            force_name_for_sort_pair: false,
+            sort_pair_block_indices: std::collections::HashSet::new(),
         }
+    }
+
+    /// Mark a block index as a sort/reduce comparator that binds `$a`/`$b`.
+    /// The deferred 4th pass enables [`Self::force_name_for_sort_pair`] before
+    /// compiling registered indices so `$a`/`$b` references resolve via name
+    /// instead of any outer `my` slot allocation.
+    fn register_sort_pair_block(&mut self, idx: u16) {
+        self.sort_pair_block_indices.insert(idx);
     }
 
     /// Set `use strict 'vars'` at compile time. When enabled, [`compile_expr`] rejects any read
@@ -540,11 +561,12 @@ impl Compiler {
 
     /// Look up a scalar's slot index in the current scope layer (if slots are enabled).
     fn scalar_slot(&self, name: &str) -> Option<u8> {
-        // `$a` / `$b` are sort/reduce magic globals — `set_sort_pair` writes by
-        // name, so any user `my $a`/`my $b` slot binding would silently miss the
-        // per-iteration value. Force name-based access (paired with the guard in
-        // [`Self::assign_scalar_slot`] which never allocates a slot for them).
-        if name == "a" || name == "b" {
+        // Deferred sort-block compilation: `$a`/`$b` must be name-based so the
+        // runtime `set_sort_pair` (which writes by name) and the comparator's
+        // reads agree. Slot allocation from any outer `my $a`/`my $b` is
+        // visible here because the 4th pass runs after the whole program is
+        // compiled. See [`Self::force_name_for_sort_pair`].
+        if self.force_name_for_sort_pair && (name == "a" || name == "b") {
             return None;
         }
         if let Some(layer) = self.scope_stack.last() {
@@ -676,17 +698,7 @@ impl Compiler {
 
     /// Assign a new slot index for a scalar in the current scope layer.
     /// Returns the slot index if slots are enabled, None otherwise.
-    ///
-    /// `$a` and `$b` are special: they're the sort/reduce magic globals.
-    /// `set_sort_pair` writes by NAME, so allocating a slot for a user
-    /// `my $a`/`my $b` would make the sort comparator's slot-based reads
-    /// silently miss the per-iteration value. Force name-based access for
-    /// these two regardless of any `my` declaration. Slot lookups also
-    /// gate on this in [`Self::scalar_slot`].
     fn assign_scalar_slot(&mut self, name: &str) -> Option<u8> {
-        if name == "a" || name == "b" {
-            return None;
-        }
         if let Some(layer) = self.scope_stack.last_mut() {
             if layer.use_slots && layer.next_scalar_slot < 255 {
                 let slot = layer.next_scalar_slot;
@@ -1175,7 +1187,14 @@ impl Compiler {
             if Self::block_has_return(&b) {
                 continue;
             }
-            if let Ok(range) = self.try_compile_block_region(&b) {
+            // Sort/reduce blocks bind `$a`/`$b` via [`Scope::set_sort_pair`] (name-write).
+            // Suppress slot resolution for those names while compiling the body so that
+            // any outer `my $a`/`my $b` slot binding doesn't shadow the per-iter values.
+            let is_sort_pair = self.sort_pair_block_indices.contains(&(i as u16));
+            self.force_name_for_sort_pair = is_sort_pair;
+            let result = self.try_compile_block_region(&b);
+            self.force_name_for_sort_pair = false;
+            if let Ok(range) = result {
                 self.chunk.block_bytecode_ranges[i] = Some(range);
             }
         }
@@ -7161,6 +7180,7 @@ impl Compiler {
                             self.emit_op(Op::SortWithBlockFast(tag), line, Some(root));
                         } else {
                             let block_idx = self.chunk.add_block(block.clone());
+                            self.register_sort_pair_block(block_idx);
                             self.emit_op(Op::SortWithBlock(block_idx), line, Some(root));
                         }
                     }
@@ -7323,6 +7343,7 @@ impl Compiler {
                         self.emit_op(Op::PSortWithBlockFast(tag), line, Some(root));
                     } else {
                         let block_idx = self.chunk.add_block(block.clone());
+                        self.register_sort_pair_block(block_idx);
                         self.emit_op(Op::PSortWithBlock(block_idx), line, Some(root));
                     }
                 } else {
@@ -7332,6 +7353,7 @@ impl Compiler {
             ExprKind::ReduceExpr { block, list } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let block_idx = self.chunk.add_block(block.clone());
+                self.register_sort_pair_block(block_idx);
                 self.emit_op(Op::ReduceWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PReduceExpr {
@@ -7346,6 +7368,7 @@ impl Compiler {
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let block_idx = self.chunk.add_block(block.clone());
+                self.register_sort_pair_block(block_idx);
                 self.emit_op(Op::PReduceWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PReduceInitExpr {

@@ -110,43 +110,40 @@ fn range_anon_hash_ref_value_flattens_inner_ref() {
     );
 }
 
-/// `map { ($_, $_*10) } 1..3` — map block is list context; comma lists must expand into the
+/// `map { (_, _*10) } 1:3` — map block is list context; comma lists must expand into the
 /// map output rather than collapsing to the last value.
 #[test]
 fn range_map_block_comma_list_expands() {
-    assert_eq!(
-        rs(r#"join ",", map { ($_, $_*10) } 1..3;"#),
-        "1,10,2,20,3,30"
-    );
+    assert_eq!(rs(r#"join ",", map { (_, _*10) } 1:3;"#), "1,10,2,20,3,30");
 }
 
-/// `printf "%d %d %d\n", 1..3` — printf's argument list after the format is list context.
+/// `printf "%d %d %d\n", 1:3` — printf's argument list after the format is list context.
 #[test]
 fn range_printf_list_context_args() {
     // `printf` writes to STDOUT so we test via sprintf instead, which shares the same
     // list-context arg-flattening path.
-    assert_eq!(rs(r#"sprintf "%d %d %d", 1..3;"#), "1 2 3");
+    assert_eq!(rs(r#"sprintf "%d %d %d", 1:3;"#), "1 2 3");
 }
 
 /// Scalar flip-flop false value is the empty string (`""`), not `0` — matches Perl
 /// `pp_flop` stringification so `"[$x]"` renders as `[]` when the range hasn't triggered.
 #[test]
 fn range_scalar_flip_flop_false_is_empty_string() {
-    assert_eq!(rs(r#"my $x = 1..2; "[$x]";"#), "[]");
+    assert_eq!(rs(r#"my $x = 1:2; "[$x]";"#), "[]");
 }
 
-/// `my @a = (10..1)` — descending numeric range yields an empty list (not a single element
+/// `my @a = (10:1)` — descending numeric range yields an empty list (not a single element
 /// or a wrap).
 #[test]
 fn range_descending_numeric_is_empty() {
-    assert_eq!(ri(r#"my @a = (10..1); 0+@a;"#), 0);
+    assert_eq!(ri(r#"my @a = (10:1); 0+@a;"#), 0);
 }
 
-/// `[reverse 1..5]` — nested reverse of a range inside an anon array ref.
+/// `[reverse 1:5]` — nested reverse of a range inside an anon array ref.
 #[test]
 fn range_anon_array_ref_reverse_range() {
     assert_eq!(
-        rs(r#"my $r = [rev 1..5];
+        rs(r#"my $r = [rev 1:5];
                join ",", @$r;"#),
         "5,4,3,2,1"
     );
@@ -156,7 +153,7 @@ fn range_anon_array_ref_reverse_range() {
 #[test]
 fn range_constant_array_ref() {
     assert_eq!(
-        rs(r#"use constant FOO => [1..5];
+        rs(r#"use constant FOO => [1:5];
                join ",", @{FOO()};"#),
         "1,2,3,4,5"
     );
@@ -4710,10 +4707,7 @@ fn plain_bareword_still_autoquotes_in_hashref_fat_comma() {
 #[test]
 fn operator_keyword_ne_as_hash_subscript_key() {
     // `$h->{ne}` was failing with `Unexpected token StrNe`.
-    assert_eq!(
-        ri(r#"my $h = { ne => 42 }; $h->{ne}"#),
-        42
-    );
+    assert_eq!(ri(r#"my $h = { ne => 42 }; $h->{ne}"#), 42);
 }
 
 #[test]
@@ -4737,10 +4731,7 @@ fn operator_keywords_as_hash_subscript_keys_all_eleven() {
 #[test]
 fn operator_keyword_bare_hash_subscript_no_arrow() {
     // `$h{ne}` (no arrow) must also autoquote `ne` to the string key.
-    assert_eq!(
-        ri(r#"my %h = (ne => 99); $h{ne}"#),
-        99
-    );
+    assert_eq!(ri(r#"my %h = (ne => 99); $h{ne}"#), 99);
 }
 
 // ── Ternary list-context destructure ────────────────────────────────────
@@ -4776,17 +4767,15 @@ fn ternary_list_destructure_swap_pattern() {
 fn ternary_scalar_context_unchanged() {
     // Regression guard: scalar-context ternary still picks the last value
     // of a comma-list (Perl's comma operator in scalar ctx).
-    assert_eq!(
-        ri(r#"my $x = 1 ? (10, 20) : (30, 40); $x"#),
-        20
-    );
+    assert_eq!(ri(r#"my $x = 1 ? (10, 20) : (30, 40); $x"#), 20);
 }
 
 // ── Sort comparator with `my $a` / `my $b` shadowing ────────────────────
 // Sort blocks compile in a deferred 4th pass after the entire program; a
-// `my $b` ANYWHERE in the enclosing scope used to allocate a slot for `$b`,
-// which the comparator's slot-based read would then miss (set_sort_pair
-// writes by name, not slot).
+// `my $b` ANYWHERE in the enclosing scope used to allocate a slot for `$b`
+// which the comparator's slot-based read would then miss (`set_sort_pair`
+// writes by name, not slot). The compiler now forces name-based access
+// for `$a`/`$b` inside registered sort/reduce comparator blocks only.
 
 #[test]
 fn sort_comparator_with_later_my_b_in_scope() {
@@ -4833,16 +4822,16 @@ fn sort_comparator_with_my_a_in_scope() {
 }
 
 // ── `_<` outer-topic chain across nested map ────────────────────────────
-// Two interacting fixes: `set_topic` must not re-shift the chain on each
-// iteration of the same loop (otherwise `_<` on iter-N points at iter-(N-1)
-// instead of the enclosing scope), and the chain falls back to `_` when
-// the resolved value is bound-but-undef so `$h->{_<}` in the outer-iter
-// body reads the iteration key instead of returning surprise-undef.
+// `set_topic` only shifts on the FIRST call in a given frame; subsequent
+// iterations of the same loop refresh `_` only, so `_<` keeps pointing at
+// the enclosing scope's topic. `get_scalar` falls back to `_` when the
+// resolved chain entry is bound-but-undef so `$h->{_<}` at the outermost
+// iter still reads as the iteration key.
 
 #[test]
 fn outer_topic_in_plain_nested_map() {
-    // Without the fix this returned `11 3 21 3` — iter-2 of the inner map
-    // saw iter-1's value via `_<`. Should be 11 12 21 22.
+    // Every inner iter sees the outer iter's `_` via `_<` — not the previous
+    // inner iter's value. Was returning "11,3,21,3" before the fix.
     assert_eq!(
         rs(r#"
             my @r = map { my @a = (1, 2); map { _< + _ } @a } (10, 20);
@@ -4854,8 +4843,8 @@ fn outer_topic_in_plain_nested_map() {
 
 #[test]
 fn outer_topic_chain_falls_back_to_topic_at_outermost_iter() {
-    // `$m->{_<}` at the outer-map body level: with no enclosing closure to
-    // populate the chain, `_<` falls back to `_` (the iteration key).
+    // `$m->{_<}` at the outer-map body level: with no enclosing closure
+    // populating the chain, `_<` falls back to `_` (the iteration key).
     assert_eq!(
         rs(r#"
             my %m = (k => 100);
@@ -4868,13 +4857,13 @@ fn outer_topic_chain_falls_back_to_topic_at_outermost_iter() {
 
 #[test]
 fn outer_topic_etl_pattern_end_to_end() {
-    // Exercism::Etl::transform pattern — exercises both `_<` in a hash-key
-    // position (outer-iter body) AND `_<` inside a nested closure (inner
-    // map block). Was the user's reproducer.
+    // Exercism::Etl::transform pattern. The `$m->{_}` looks up the array for
+    // the current key (outer iter), then the inner map binds `_` to each
+    // letter and `_<` (outer-iter scope's `_`) to the key.
     assert_eq!(
         rs(r#"
             fn Etl::transform($m) {
-                my %h = map { map { (lc _, _< + 0) } @{$m->{_<}} } keys %$m;
+                my %h = map { map { (lc _, _< + 0) } @{$m->{_}} } keys %$m;
                 \%h
             }
             my $out = Etl::transform({ "1" => ["A", "E"], "2" => ["B", "C"] });
@@ -4891,28 +4880,19 @@ fn outer_topic_etl_pattern_end_to_end() {
 
 #[test]
 fn substitution_with_comma_delimiter() {
-    assert_eq!(
-        rs(r#"$_ = "abctest"; s,t,b,g; $_"#),
-        "abcbesb"
-    );
+    assert_eq!(rs(r#"$_ = "abctest"; s,t,b,g; $_"#), "abcbesb");
 }
 
 #[test]
 fn transliteration_with_comma_delimiter() {
-    assert_eq!(
-        rs(r#"$_ = "ABC"; tr,A-Z,a-z,; $_"#),
-        "abc"
-    );
+    assert_eq!(rs(r#"$_ = "ABC"; tr,A-Z,a-z,; $_"#), "abc");
 }
 
 #[test]
 fn substitution_comma_delim_with_regex_metachars() {
     // `\b` in pattern, group reference in replacement — make sure the comma
     // body is read raw and forwarded to the regex engine intact.
-    assert_eq!(
-        rs(r#"$_ = "the cat sat"; s,\b(\w+)\b,X,g; $_"#),
-        "X X X"
-    );
+    assert_eq!(rs(r#"$_ = "the cat sat"; s,\b(\w+)\b,X,g; $_"#), "X X X");
 }
 
 // ── `+{ EXPR }` force-hashref idiom ─────────────────────────────────────
@@ -4923,10 +4903,7 @@ fn substitution_comma_delim_with_regex_metachars() {
 
 #[test]
 fn plus_brace_with_kv_pairs_is_hashref() {
-    assert_eq!(
-        ri(r#"my $h = +{ a => 1, b => 2 }; $h->{a} + $h->{b}"#),
-        3
-    );
+    assert_eq!(ri(r#"my $h = +{ a => 1, b => 2 }; $h->{a} + $h->{b}"#), 3);
 }
 
 #[test]
@@ -4949,14 +4926,103 @@ fn plus_brace_empty_is_empty_hashref() {
     );
 }
 
+// ── `fn _ { }` and topic-slot names rejected ────────────────────────────
+// User-defined subs named after a topic slot would shadow the topic in
+// expression position and silently break every `_`-aware builtin.
+
+fn run_err(s: &str) -> String {
+    match run(s) {
+        Ok(_) => panic!("expected parse error, got success"),
+        Err(e) => e.to_string(),
+    }
+}
+
+#[test]
+fn fn_underscore_bare_rejected() {
+    assert!(run_err(r#"fn _ { 42 }"#).contains("would shadow the topic-slot scalar"));
+}
+
+#[test]
+fn fn_underscore_positional_rejected() {
+    for n in ["_0", "_1", "_5", "_99"] {
+        let src = format!("fn {} {{ 42 }}", n);
+        let msg = run_err(&src);
+        assert!(
+            msg.contains("would shadow the topic-slot scalar"),
+            "expected reject for `fn {}`, got: {}",
+            n,
+            msg
+        );
+    }
+}
+
+#[test]
+fn fn_underscore_chain_rejected() {
+    for n in ["_<", "_<<", "_<<<", "_<<<<", "_0<", "_3<<<<"] {
+        let src = format!("fn {} {{ 42 }}", n);
+        let msg = run_err(&src);
+        assert!(
+            msg.contains("would shadow the topic-slot scalar"),
+            "expected reject for `fn {}`, got: {}",
+            n,
+            msg
+        );
+    }
+}
+
+#[test]
+fn fn_underscore_sigil_forms_rejected() {
+    // Sigil-prefixed forms (`fn $_`, `fn $_<`, `fn $_0`, `fn @_`, `fn @_0`,
+    // …) get the same explicit shadow-the-topic error as the bareword form.
+    for n in ["$_", "$_<", "$_<<<<", "$_0", "$_3", "@_", "@_0"] {
+        let src = format!("fn {} {{ 42 }}", n);
+        let msg = run_err(&src);
+        assert!(
+            msg.contains("would shadow the topic-slot scalar"),
+            "expected reject for `fn {}`, got: {}",
+            n,
+            msg
+        );
+    }
+}
+
+#[test]
+fn fn_underscore_package_qualified_rejected() {
+    // Even with a package prefix, the bare last segment matters.
+    for n in ["Foo::_", "My::Module::_0", "Pkg::_<<<<"] {
+        let src = format!("fn {} {{ 42 }}", n);
+        let msg = run_err(&src);
+        assert!(
+            msg.contains("would shadow the topic-slot scalar"),
+            "expected reject for `fn {}`, got: {}",
+            n,
+            msg
+        );
+    }
+}
+
+#[test]
+fn fn_with_underscore_in_name_still_allowed() {
+    // Regression guard: only EXACT topic-slot spellings are rejected. Names
+    // that merely contain an underscore (like `my_helper`, `_private`,
+    // `_foo`, `_NAME`) compile fine.
+    assert_eq!(ri(r#"fn my_helper { 7 }; my_helper()"#), 7);
+    assert_eq!(ri(r#"fn _private { 8 }; _private()"#), 8);
+    assert_eq!(ri(r#"fn _foo { 9 }; _foo()"#), 9);
+    assert_eq!(ri(r#"fn _NAME { 10 }; _NAME()"#), 10);
+}
+
 #[test]
 fn plus_brace_with_nested_map_etl_pattern() {
-    // Same ETL pattern, this time using the `+{ ... }` form instead of the
-    // `my %h = ...; \%h` shuffle. Both must produce the same result.
+    // Same ETL pattern as the named-sub form, this time using `+{ ... }` to
+    // force hashref instead of `my %h = ...; \%h`. Both must produce the
+    // same hash. Uses `$m->{_}` (current outer-iter key) to look up the
+    // array for that key, then the inner map binds each letter as `_` and
+    // reads the outer key via `_<`.
     assert_eq!(
         rs(r#"
             fn Etl::transform($m) {
-                +{ map { map { (lc _, _< + 0) } @{$m->{_<}} } keys %$m }
+                +{ map { map { (lc _, _< + 0) } @{$m->{_}} } keys %$m }
             }
             my $out = Etl::transform({ "1" => ["A", "E"], "2" => ["B", "C"] });
             join ",", map { "$_=$out->{$_}" } sort keys %$out

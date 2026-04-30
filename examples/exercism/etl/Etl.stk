@@ -1,4 +1,4 @@
 #!/usr/bin/env stryke
 fn Exercism::Etl::transform($m) {
-    +{ map { map { (lc _, _< + 0) } @{$m->{_<}} } keys %$m }
+    +{ map { map { (lc _, _< + 0) } @{$m->{_}} } keys %$m }
 }

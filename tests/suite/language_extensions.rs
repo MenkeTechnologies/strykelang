@@ -1420,19 +1420,24 @@ fn range_product_pipeline() {
 
 #[test]
 fn outer_topic_basic_map() {
-    // $_< is the previous topic value (shifted per set_topic call)
+    // `$_<` is the **enclosing scope's** topic — set_topic shifts only on the
+    // FIRST iter of a given frame; subsequent iters refresh `_` only so `$_<`
+    // keeps pointing at the outer `$_`. For `$_=10; map { $_+$_< } (1,2,3)`
+    // every iter sees `$_<=10`, giving 11/12/13.
     assert_eq!(
         eval_string(r#"$_ = 10; my @r = map { $_ + $_< } (1, 2, 3); join ',', @r"#),
-        "11,3,5"
+        "11,12,13"
     );
 }
 
 #[test]
 fn outer_topic_in_grep() {
-    // $_< holds the previous $_ before grep set the current element
+    // Same frame-based reading as `outer_topic_basic_map` — every grep iter
+    // sees the outer `$_=3` via `$_<`, so only items strictly greater than 3
+    // pass the predicate.
     assert_eq!(
-        eval_string(r#"$_ = 3; (1, 2, 3, 4, 5) |> grep { $_ > $_< } |> join ','"#),
-        "2,3,4,5"
+        eval_string(r#"_ = 3; (1, 2, 3, 4, 5) |> grep { _ > _< } |> join ','"#),
+        "4,5"
     );
 }
 
@@ -1441,9 +1446,9 @@ fn outer_topic_double_nesting() {
     // Two levels: $_< is one up, $_<< is two up
     assert_eq!(
         eval_int(
-            r#"$_ = 100;
+            r#"_ = 100;
             my @outer = map {
-                my @inner = map { $_ + $_< + $_<< } (1);
+                my @inner = map { _ + _< + _<< } (1);
                 $inner[0]
             } (10);
             $outer[0]"#
@@ -1564,28 +1569,29 @@ fn pmap_parallel_cartesian_with_outer_chain_golf() {
 }
 
 #[test]
-fn outer_chain_shifts_on_every_set_topic_not_on_frame() {
-    // Documents the load-bearing semantic: `_<` is "the value `_` held
-    // before the most recent shift", not "the enclosing frame's `_`".
-    // Each map iter shifts, so a multi-element inner loop sees the
-    // previous inner element as `_<` after the first inner iter.
+fn outer_chain_shifts_on_first_set_topic_per_frame() {
+    // Documents the load-bearing semantic: `_<` is "the enclosing scope's
+    // topic" — set_topic shifts only on the FIRST call in a given frame;
+    // subsequent iters of the same loop refresh `_` only, so `_<` keeps
+    // pointing at the outer iter's `_` instead of rolling.
     // For [1,2] × [10,20] with `_< + _`, traced step by step:
-    //   o=1 set_topic(1) → _<=prev(undef→0), _=1
-    //     i=10 set_topic(10) → _<=1, _=10 → body 11
-    //     i=20 set_topic(20) → _<=10, _=20 → body 30
-    //   o=2 set_topic(2) → _<=20 (last shift was inner i=20), _=2
-    //     i=10 set_topic(10) → _<=2, _=10 → body 12
-    //     i=20 set_topic(20) → _<=10, _=20 → body 30
-    // Total 11+30+12+30 = 83.
-    // Same mechanic gives "previous topic" rolling access for
-    // `$_ = 10; map { $_ + $_< } (1,2,3)` → "11,3,5".
+    //   o=1 set_topic(1) on Fcall  → first call: shift, _<=undef, _=1
+    //     push F1
+    //     i=10 set_topic(10) on F1 → first call: shift, _<=walk→Fcall._=1, _=10 → body 11
+    //     i=20 set_topic(20) on F1 → already-shifted: refresh only, _<=1 still, _=20 → body 21
+    //     pop F1
+    //   o=2 set_topic(2) on Fcall  → already-shifted: refresh only, _<=undef still, _=2
+    //     push F1' (fresh frame, fresh flag)
+    //     i=10 → first call: shift, _<=walk→Fcall._=2, _=10 → body 12
+    //     i=20 → already-shifted: _<=2 still, _=20 → body 22
+    // Total 11+21+12+22 = 66.
     assert_eq!(
         eval_int(
             r#"my @outer = (1, 2);
                my @inner = (10, 20);
                ~> @outer map { ~> @inner map { _< + _ } } |> flatten |> sum"#,
         ),
-        83
+        66
     );
 }
 

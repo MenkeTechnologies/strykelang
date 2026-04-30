@@ -69,7 +69,12 @@ fn sqlite_put(conn: &Connection, path: &str, mtime_s: i64, mtime_ns: i64, p: &Pr
     ).unwrap();
 }
 
-fn sqlite_get(conn: &Connection, path: &str, mtime_s: i64, mtime_ns: i64) -> Option<(Program, Chunk)> {
+fn sqlite_get(
+    conn: &Connection,
+    path: &str,
+    mtime_s: i64,
+    mtime_ns: i64,
+) -> Option<(Program, Chunk)> {
     let (pz, cz): (Vec<u8>, Vec<u8>) = conn
         .query_row(
             "SELECT program_blob, chunk_blob FROM scripts WHERE path = ?1 AND mtime_secs = ?2 AND mtime_nsecs = ?3",
@@ -171,7 +176,10 @@ fn bench_rkyv_vs_sqlite() {
 
     // ── Steady-state: open once, N lookups ──
     println!();
-    println!("=== Steady-state: open once, {} lookups ===", n_steady_reads);
+    println!(
+        "=== Steady-state: open once, {} lookups ===",
+        n_steady_reads
+    );
 
     let rkyv_steady = {
         let rkyv = ScriptCache::open(&rkyv_path).unwrap();

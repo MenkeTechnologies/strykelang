@@ -97,6 +97,13 @@ struct Frame {
     atomic_hashes: Vec<(String, AtomicHash)>,
     /// `defer { BLOCK }` closures to run when this frame is popped (LIFO order).
     defers: Vec<PerlValue>,
+    /// True after the first [`Scope::set_topic`] call in this frame. Subsequent
+    /// calls (the next iter of the SAME `map`/`grep`/etc.) skip the chain shift
+    /// so `_<` keeps pointing at the enclosing scope's topic instead of rolling
+    /// to the previous iter's value. Reset by [`Self::clear_all_bindings`] when
+    /// the frame is recycled. `set_closure_args` does NOT set this flag — sub
+    /// entry shifts are real outer-topic captures, not iter re-entries.
+    set_topic_called: bool,
 }
 
 impl Frame {
@@ -120,6 +127,7 @@ impl Frame {
         self.atomic_arrays.clear();
         self.defers.clear();
         self.atomic_hashes.clear();
+        self.set_topic_called = false;
     }
 
     /// True if this slot index is a real binding (not vec padding before a higher-index declare).
@@ -149,6 +157,7 @@ impl Frame {
             atomic_hashes: Vec::new(),
             local_restores: Vec::new(),
             defers: Vec::new(),
+            set_topic_called: false,
         }
     }
 
@@ -895,15 +904,14 @@ impl Scope {
                     return arc.read().clone();
                 }
                 // Topic-slot chain fallback: `_<`, `_<<`, … (and the `_N<+` /
-                // `_0<+` aliases) collapse to the current topic when the chain
-                // value at this frame is undef BUT a chain entry exists (set
-                // by an earlier `set_topic` shift whose pre-shift value was
-                // undef). This matches the power-user expectation that the
-                // outer-map's body sees `_<` as the iteration key, not as
-                // surprise-undef from the absent caller-side topic. The
-                // fallback only fires when the chain WAS established — at
-                // file scope (or other never-shifted contexts) `_<` stays
-                // undef, preserving the existing fan-closure invariants.
+                // `_0<+` aliases) collapse to the current topic when the
+                // resolved chain entry is undef. The fallback only fires when
+                // the chain WAS established (some earlier `set_topic` declared
+                // an entry, possibly with undef from a pre-shift undef topic).
+                // Power-user pattern `$h->{_<}` reads as "outer iter's key" at
+                // the outermost map even with no enclosing closure to populate
+                // the chain. At never-shifted scopes (file scope), `_<` stays
+                // undef — preserving the existing fan-closure invariants.
                 if val.is_undef() && Self::is_topic_chain_name(name) {
                     return self.get_scalar("_");
                 }
@@ -925,7 +933,6 @@ impl Scope {
         while i < bytes.len() && bytes[i].is_ascii_digit() {
             i += 1;
         }
-        // Must have at least one `<` after the optional digit run.
         if i >= bytes.len() || bytes[i] != b'<' {
             return false;
         }
@@ -1182,34 +1189,39 @@ impl Scope {
     /// Use this for single-arg closures (map, grep, etc.) so both `$_` and `$_0` work.
     /// This declares them in the current scope (not global), suitable for sub calls.
     ///
-    /// Also shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`)
-    /// down one level so nested blocks can peek up to 4 frames out — but only
-    /// the FIRST set_topic in a given frame shifts the chain. Subsequent calls
-    /// (the next iteration of `map`/`grep`/etc.) only refresh `_` and `_0` so
-    /// `_<` keeps pointing at the **outer** scope's topic, not the previous
-    /// iteration's value. Without this guard, a 2-deep `map { map { _< } }`
-    /// would see iter-1's value as `_<` on iter-2 instead of the outer key.
-    /// ALL previously-activated positional slots shift in lockstep on the
-    /// first call — a `map { }` iteration inside an enclosing 3-arg sub will
-    /// rotate slots 0..2's chains so `_1<<<<` and `_2<<<<` keep their meaning
-    /// "the Nth positional arg of the closure 4 frames up". Slots beyond the
-    /// high-water mark are skipped.
+    /// Shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`) on the
+    /// FIRST call in a given frame so nested blocks can peek up to 4 frames
+    /// out. Subsequent calls in the same frame (the next iteration of the
+    /// SAME `map`/`grep`/etc.) only refresh `_` and `_0` so `_<` keeps
+    /// pointing at the **enclosing scope's** topic, not the previous
+    /// iteration's value. This is the "frame-based" reading: from inside a
+    /// nested closure, `_<` means "the topic of the closure that contains
+    /// me" (which is constant across my iterations), not "the topic the
+    /// previous iter set" (which would roll). All previously-activated
+    /// positional slots shift in lockstep on the first call.
     #[inline]
     pub fn set_topic(&mut self, val: PerlValue) {
-        // If `_<` is already bound in the topmost frame, this is iteration
-        // re-entry — refresh `_` / `_0` only; preserve the chain so the
-        // enclosing scope's topic stays visible across iterations.
-        if self
+        // Iteration re-entry detection: the per-frame `set_topic_called` flag
+        // is true if a previous `set_topic` already shifted in this frame
+        // (i.e. we're in the next iter of the SAME loop). Refresh `_` / `_0`
+        // only — preserve the chain so the enclosing scope's topic stays
+        // visible. `set_closure_args` does NOT set this flag, so a sub call
+        // followed by `map { ... }` still gets a real shift on the FIRST
+        // map iter (the chain becomes "the sub's args at level 1").
+        let already_shifted = self
             .frames
             .last()
-            .map(|f| f.has_scalar("_<"))
-            .unwrap_or(false)
-        {
+            .map(|f| f.set_topic_called)
+            .unwrap_or(false);
+        if already_shifted {
             self.declare_topic_slot(0, 0, val);
             for slot in 1..=self.max_active_slot {
                 self.declare_topic_slot(slot, 0, PerlValue::UNDEF);
             }
             return;
+        }
+        if let Some(frame) = self.frames.last_mut() {
+            frame.set_topic_called = true;
         }
         self.shift_slot_chain(0, val);
         for slot in 1..=self.max_active_slot {
