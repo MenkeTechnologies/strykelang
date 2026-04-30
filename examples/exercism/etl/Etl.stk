@@ -1,8 +1,5 @@
 #!/usr/bin/env stryke
-fn Exercism::Etl::transform($map) {
-    my $out = {}
-    for my $score (keys %$map) {
-        $out->{lc $_} = $score + 0 for @{$map->{$score}}
-    }
-    $out
+fn Exercism::Etl::transform($m) {
+    my %h = map { my $s = _; map { (lc _, $s + 0) } @{$m->{$s}} } keys %$m
+    \%h
 }

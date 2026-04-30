@@ -1,2 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::Accumulate::accumulate($lst, $f) { [map { $f->($_) } @$lst] }
+fn Exercism::Accumulate::accumulate($lst, $f) { [map { $f->(_) } @$lst] }

@@ -1,7 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::WordCount::count_words($s) {
-    my @w = $s =~ m/\w+(?:'\w+)?/g
-    my %h
-    $h{lc $_}++ for @w
-    \%h
-}
+fn Exercism::WordCount::count_words($s) { my %h; $h{lc $_}++ for $s =~ m/\w+(?:'\w+)?/g; \%h }

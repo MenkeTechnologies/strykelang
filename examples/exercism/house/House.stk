@@ -15,7 +15,7 @@ my @_PARTS = (
 )
 
 fn Exercism::House::_phrase($idx) {
-    ~> 0:$idx map { $_PARTS[_] } rev map { len(@$_) == 1 ? _->[0] : join(" that ", @$_) } |> join(" the ")
+    ~> 0:$idx map { $_PARTS[_] } rev map { join(" that ", @$_) } |> join(" the ")
 }
 
 fn Exercism::House::recite($from, $to) {

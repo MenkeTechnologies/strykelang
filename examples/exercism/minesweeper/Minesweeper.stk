@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 fn Exercism::Minesweeper::annotate($input) {
     return [] if 0 + @$input == 0
-    my @grid = map { my @c = chars($_); \@c } @$input
+    my @grid = map { my @c = chars(_); \@c } @$input
     my $rows = 0 + @grid
     my $cols = 0 + @{$grid[0]}
     for my $r (0..$rows - 1) {

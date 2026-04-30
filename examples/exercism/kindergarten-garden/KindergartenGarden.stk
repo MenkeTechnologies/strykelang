@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
-my @_KIDS = ("Alice","Bob","Charlie","David","Eve","Fred","Ginny","Harriet","Ileana","Joseph","Kincaid","Larry")
+my @_KIDS = qw(Alice Bob Charlie David Eve Fred Ginny Harriet Ileana Joseph Kincaid Larry)
 my %_PLANT = (G=>"grass", C=>"clover", R=>"radishes", V=>"violets")
-my %_POS
-$_POS{$_KIDS[$_]} = _ * 2 for 0..len(@_KIDS) - 1
+my %_POS = map { ($_KIDS[_], _ * 2) } 0..len(@_KIDS) - 1
 
 fn Exercism::KindergartenGarden::plants($diagram, $student) {
     my $p = $_POS{$student}
