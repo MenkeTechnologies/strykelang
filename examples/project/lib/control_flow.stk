@@ -86,8 +86,8 @@ fn sum_range($start, $end) {
 
 fn count_evens(@nums) {
     my $count = 0
-    for my $n (@nums) {
-        $count++ if $n % 2 == 0
+    ~> @nums ep {
+        $count++ if _ % 2 == 0
     }
     $count
 }
@@ -163,7 +163,7 @@ fn until_example($target) {
 
 fn postfix_for_sum {
     my $sum = 0
-    $sum += $_ for (1, 2, 3, 4, 5)
+    $sum += _ for (1, 2, 3, 4, 5)
     $sum
 }
 
@@ -309,15 +309,15 @@ fn return_list_from_loop($count) {
 
 fn fizz_buzz($n) {
     my @result
-    for my $i (1..$n) {
-        if ($i % 15 == 0) {
+    ~> 1..$n ep {
+        if (_ % 15 == 0) {
             push @result, "FizzBuzz"
-        } elsif ($i % 3 == 0) {
+        } elsif (_ % 3 == 0) {
             push @result, "Fizz"
-        } elsif ($i % 5 == 0) {
+        } elsif (_ % 5 == 0) {
             push @result, "Buzz"
         } else {
-            push @result, $i
+            push @result, _
         }
     }
     @result

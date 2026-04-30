@@ -109,8 +109,8 @@ fn make_curried_multiply {
 
 fn make_closures_in_loop {
     my @fns
-    for my $i (1..5) {
-        push @fns, fn { $i * 10 }
+    ~> 1..5 ep {
+        push @fns, fn { _ * 10 }
     }
     @fns
 }

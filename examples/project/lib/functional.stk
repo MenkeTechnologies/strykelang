@@ -29,8 +29,8 @@ fn Fn::reduce($func, $initial, @list) {
 fn Fn::zip(\@a, \@b) {
     my @result
     my $len = scalar(@a) < scalar(@b) ? scalar(@a) : scalar(@b)
-    for my $i (0..$len-1) {
-        push @result, [$a[$i], $b[$i]]
+    ~> 0..$len-1 ep {
+        push @result, [$a[_], $b[_]]
     }
     @result
 }
@@ -55,11 +55,11 @@ fn Fn::flip($f) {
 fn Fn::partition($pred, @list) {
     my $t = [];
     my $f = [];
-    for my $item (@list) {
-        if ($pred->($item)) {
-            push @$t, $item;
+    ~> @list ep {
+        if ($pred->(_)) {
+            push @$t, _;
         } else {
-            push @$f, $item;
+            push @$f, _;
         }
     }
     return [$t, $f];
@@ -67,7 +67,7 @@ fn Fn::partition($pred, @list) {
 
 # ── Fn::pluck: extracts a field from a list of hashes ─────
 fn Fn::pluck($key, @list) {
-    map { $_->{$key} } @list
+    map { _->{$key} } @list
 }
 
 # ── Fn::find: returns the first element satisfying the predicate ─────

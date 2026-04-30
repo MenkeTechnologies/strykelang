@@ -33,8 +33,8 @@ fn summarize_list (@data) {
 # Build a hash from parallel key/value arrays
 fn zip_to_hash ($keys, $vals) {
     my $h = {}
-    for my $i (0..scalar(@$keys) - 1) {
-        $h->{$keys->[$i]} = $vals->[$i]
+    ~> 0..scalar(@$keys) - 1 ep {
+        $h->{$keys->[_]} = $vals->[_]
     }
     $h
 }
@@ -43,12 +43,12 @@ fn zip_to_hash ($keys, $vals) {
 fn split_by_pred ($pred, @items) {
     my $yes = []
     my $no = []
-    for my $item (@items) {
-        local $_ = $item
-        if ($pred($item)) {
-            push @$yes, $item
+    ~> @items ep {
+        local _ = _
+        if ($pred(_)) {
+            push @$yes, _
         } else {
-            push @$no, $item
+            push @$no, _
         }
     }
     [$yes, $no]

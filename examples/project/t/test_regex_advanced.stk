@@ -200,7 +200,7 @@ assert_false ("not-a-phone" =~ /$compiled/), "compiled regex no match"
 
 # ── Split with Regex ───────────────────────────────────────────────
 
-my @words = grep { $_ ne "" } split /\s+/, "  hello    world   test  "
+my @words = grep { _ ne "" } split /\s+/, "  hello    world   test  "
 assert_eq scalar(@words), 3, "split whitespace count"
 assert_eq $words[0], "hello", "split word 1"
 assert_eq $words[2], "test", "split word 3"

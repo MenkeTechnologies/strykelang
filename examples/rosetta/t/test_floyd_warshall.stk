@@ -10,10 +10,10 @@ fn Rosetta::FloydWarshall::solve($n, $edges) {
         }
     }
     
-    for my $e (@$edges) {
-        my $u = $e->[0]
-        my $v = $e->[1]
-        my $w = $e->[2]
+    ~> @$edges ep {
+        my $u = _->[0]
+        my $v = _->[1]
+        my $w = _->[2]
         $dist->[$u][$v] = $w
     }
     

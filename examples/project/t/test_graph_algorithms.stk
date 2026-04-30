@@ -16,8 +16,8 @@ my $graph = {
 my @bfs = adv_bfs($graph, "A")
 # BFS: A -> B, C -> D, E, F
 assert_eq $bfs[0], "A", "bfs 0"
-assert_ok grep { $_ eq "B" } @bfs[1,2], "bfs 1 or 2 is B"
-assert_ok grep { $_ eq "C" } @bfs[1,2], "bfs 1 or 2 is C"
+assert_ok grep { _ eq "B" } @bfs[1,2], "bfs 1 or 2 is B"
+assert_ok grep { _ eq "C" } @bfs[1,2], "bfs 1 or 2 is C"
 assert_eq scalar(@bfs), 6, "bfs all nodes"
 
 # ── adv_dfs ─────

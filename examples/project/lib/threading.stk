@@ -37,15 +37,15 @@ fn thread_first_array_sum {
 }
 
 fn thread_first_filter_sum {
-    ~> (1..10) grep { $_ > 5 } sum
+    ~> (1..10) grep { _ > 5 } sum
 }
 
 fn thread_first_map_sum {
-    ~> (1..5) map { $_ * 2 } sum
+    ~> (1..5) map { _ * 2 } sum
 }
 
 fn thread_first_complex {
-    ~> (1..20) grep { $_ % 2 == 0 } map { $_ * $_ } sum
+    ~> (1..20) grep { _ % 2 == 0 } map { _ * _ } sum
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -57,19 +57,19 @@ fn arrow_thread_simple {
 }
 
 fn arrow_thread_filter {
-    ~> (1..10) grep { $_ % 2 == 0 } sum
+    ~> (1..10) grep { _ % 2 == 0 } sum
 }
 
 fn arrow_thread_map {
-    ~> (1..5) map { $_ ** 2 } sum
+    ~> (1..5) map { _ ** 2 } sum
 }
 
 fn arrow_thread_chain {
-    ~> (1..100) grep { $_ % 3 == 0 } grep { $_ % 5 == 0 } sum
+    ~> (1..100) grep { _ % 3 == 0 } grep { _ % 5 == 0 } sum
 }
 
 fn arrow_thread_to_array {
-    my @result = ~> (1..10) grep { $_ > 5 } map { $_ * 2 }
+    my @result = ~> (1..10) grep { _ > 5 } map { _ * 2 }
     scalar @result
 }
 
@@ -88,7 +88,7 @@ fn arrow_thread_reverse {
 }
 
 fn arrow_thread_nested {
-    ~> (1..20) grep { $_ % 2 == 1 } map { $_ * 3 } grep { $_ < 30 } sum
+    ~> (1..20) grep { _ % 2 == 1 } map { _ * 3 } grep { _ < 30 } sum
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -104,15 +104,15 @@ fn pipeline_string {
 }
 
 fn pipeline_array {
-    (1..5) |> map { $_ * 2 } |> sum
+    (1..5) |> map { _ * 2 } |> sum
 }
 
 fn pipeline_filter {
-    (1..10) |> grep { $_ % 2 == 0 } |> sum
+    (1..10) |> grep { _ % 2 == 0 } |> sum
 }
 
 fn pipeline_complex {
-    (1..100) |> grep { $_ % 7 == 0 } |> map { $_ / 7 } |> sum
+    (1..100) |> grep { _ % 7 == 0 } |> map { _ / 7 } |> sum
 }
 
 fn pipeline_with_transform {
@@ -121,8 +121,8 @@ fn pipeline_with_transform {
 
 fn pipeline_multi_step {
     (1..50)
-        |> grep { is_prime($_) }
-        |> map { $_ * 2 }
+        |> grep { is_prime(_) }
+        |> map { _ * 2 }
         |> sum
 }
 
@@ -138,9 +138,9 @@ fn threading_comparison {
 }
 
 fn threading_vs_traditional {
-    my $traditional = sum(grep { $_ % 2 == 0 } (1..10))
-    my $threaded = ~> (1..10) grep { $_ % 2 == 0 } sum
-    my $piped = (1..10) |> grep { $_ % 2 == 0 } |> sum
+    my $traditional = sum(grep { _ % 2 == 0 } (1..10))
+    my $threaded = ~> (1..10) grep { _ % 2 == 0 } sum
+    my $piped = (1..10) |> grep { _ % 2 == 0 } |> sum
     $traditional == $threaded && $threaded == $piped ? 1 : 0
 }
 

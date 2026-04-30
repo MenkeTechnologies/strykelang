@@ -85,7 +85,7 @@ assert_eq scalar(@wins3), 3, "windowed(3) count"
 # PARALLEL - PMAP_CHUNKED
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @chunked = pmap_chunked 2 { $_ * 2 } (1, 2, 3, 4, 5, 6)
+my @chunked = pmap_chunked 2 { _ * 2 } (1, 2, 3, 4, 5, 6)
 assert_eq scalar(@chunked), 6, "pmap_chunked count"
 assert_eq $chunked[0], 2, "pmap_chunked first"
 assert_eq $chunked[5], 12, "pmap_chunked last"
@@ -133,16 +133,16 @@ assert_ok $dump =~ /a/, "ddump contains key"
 # ══════════════════════════════════════════════════════════════════════════════
 
 my @pipe_result = pipeline(1, 2, 3, 4, 5)
-    ->filter(fn { $_ > 2 })
-    ->map(fn { $_ * 10 })
+    ->filter(fn { _ > 2 })
+    ->map(fn { _ * 10 })
     ->collect()
 assert_eq scalar(@pipe_result), 3, "pipeline filter+map count"
 assert_eq $pipe_result[0], 30, "pipeline first result"
 assert_eq $pipe_result[2], 50, "pipeline last result"
 
 my @par_pipe = par_pipeline(1, 2, 3, 4)
-    ->filter(fn { $_ % 2 == 0 })
-    ->map(fn { $_ * 2 })
+    ->filter(fn { _ % 2 == 0 })
+    ->map(fn { _ * 2 })
     ->collect()
 assert_eq scalar(@par_pipe), 2, "par_pipeline count"
 assert_eq $par_pipe[0], 4, "par_pipeline first"

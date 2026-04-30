@@ -108,8 +108,8 @@ assert_eq $toggle->{is_on}(), 1, "toggle odd times"
 my $parser = make_parser_fsm()
 my $input = "foo 123 bar456"
 my @chars = split("", $input)
-for my $c (@chars) {
-    $parser->{feed}($c)
+~> @chars ep {
+    $parser->{feed}(_)
 }
 my $tokens = $parser->{tokens}()
 assert_eq scalar(@$tokens), 3, "parser token count"

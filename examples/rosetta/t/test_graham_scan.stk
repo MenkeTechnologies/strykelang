@@ -34,12 +34,12 @@ fn Rosetta::Graham::hull($points) {
     } @rest
 
     my @stack = ([$px, $py])
-    for my $pt (@sorted) {
+    ~> @sorted ep {
         while (len(@stack) >= 2
-                && Rosetta::Graham::cross($stack[-2], $stack[-1], $pt) <= 0) {
+                && Rosetta::Graham::cross($stack[-2], $stack[-1], _) <= 0) {
             pop @stack
         }
-        push @stack, $pt
+        push @stack, _
     }
     \@stack
 }

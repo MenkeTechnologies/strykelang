@@ -4895,6 +4895,358 @@ fn substitution_comma_delim_with_regex_metachars() {
     assert_eq!(rs(r#"$_ = "the cat sat"; s,\b(\w+)\b,X,g; $_"#), "X X X");
 }
 
+// ── Special-form range literals lex as a single string token ───────────
+// IPv4 dotted-quad / ISO-date / year-month / IPv6 all participate in the
+// ranged-iteration matrix in `value.rs::perl_list_range_expand_stepped`.
+// The lexer must hand them through as one string so the runtime sees the
+// whole literal; otherwise `.` and `-` and `:` would be eaten as concat /
+// minus / colon range respectively.
+
+#[test]
+fn range_ipv4_step_forward() {
+    assert_eq!(
+        rs(r#"join ",", (192.168.1.1:192.168.1.4:1)"#),
+        "192.168.1.1,192.168.1.2,192.168.1.3,192.168.1.4"
+    );
+}
+
+#[test]
+fn range_ipv4_step_negative() {
+    assert_eq!(
+        rs(r#"join ",", (192.168.1.4:192.168.1.1:-1)"#),
+        "192.168.1.4,192.168.1.3,192.168.1.2,192.168.1.1"
+    );
+}
+
+#[test]
+fn range_iso_date_step_days() {
+    assert_eq!(
+        rs(r#"join ",", (2022-01-01:2022-01-04:1)"#),
+        "2022-01-01,2022-01-02,2022-01-03,2022-01-04"
+    );
+}
+
+#[test]
+fn range_year_month_step_months() {
+    assert_eq!(
+        rs(r#"join ",", (2022-01:2022-04:1)"#),
+        "2022-01,2022-02,2022-03,2022-04"
+    );
+}
+
+#[test]
+fn range_ipv6_with_triple_bang_separator() {
+    // IPv6's literal `:` would collide with the standard `:` range op — the
+    // dedicated `!!!` separator dodges it. Compressed form (`::`) is fine.
+    assert_eq!(
+        rs(r#"join ",", (2001::1!!!2001::4!!!1)"#),
+        "2001::1,2001::2,2001::3,2001::4"
+    );
+}
+
+#[test]
+fn range_ipv6_reverse_step() {
+    assert_eq!(
+        rs(r#"join ",", (2001::ff!!!2001::fc!!!-1)"#),
+        "2001::ff,2001::fe,2001::fd,2001::fc"
+    );
+}
+
+#[test]
+fn range_ipv6_loopback_zero_compressed_prefix() {
+    // `::1` form — IPv6 begins with the zero-compressed `::`. Lexer's `:`
+    // arm picks it up when not in a term position and not inside `[…]`.
+    assert_eq!(
+        rs(r#"join ",", (::1!!!::5!!!1)"#),
+        "::1,::2,::3,::4,::5"
+    );
+}
+
+#[test]
+fn range_ipv6_hex_letter_prefix() {
+    // IPv6 starts with a hex letter (`fe80::`) — goes through the identifier
+    // path, not the number path. `last_was_term` flag is reset before the
+    // identifier so the `::` branch can pick it up.
+    assert_eq!(
+        rs(r#"join ",", (fe80::1!!!fe80::4!!!1)"#),
+        "fe80::1,fe80::2,fe80::3,fe80::4"
+    );
+}
+
+#[test]
+fn range_ipv6_carries_over_compression_boundary() {
+    // 2001:db8::fffe + 1 → 2001:db8::ffff + 1 → 2001:db8::1:0 — the
+    // u128 step iteration carries cleanly across the `::` zero-compression.
+    assert_eq!(
+        rs(r#"join " ", (2001:db8::fffe!!!2001:db8::1:1!!!1)"#),
+        "2001:db8::fffe 2001:db8::ffff 2001:db8::1:0 2001:db8::1:1"
+    );
+}
+
+#[test]
+fn range_ipv6_start_past_end_with_positive_step_is_empty() {
+    assert_eq!(
+        ri(r#"my @r = (2001::a!!!2001::1!!!1); scalar @r"#),
+        0
+    );
+}
+
+#[test]
+fn range_ipv6_start_before_end_with_negative_step_is_empty() {
+    assert_eq!(
+        ri(r#"my @r = (2001::1!!!2001::a!!!-1); scalar @r"#),
+        0
+    );
+}
+
+// ── Hex range preserves source format (0x prefix, width, case) ──────────
+
+#[test]
+fn range_hex_lowercase_zero_padded() {
+    // `0x00:0x10:1` outputs hex strings, not decimal integers. Width
+    // follows the longer endpoint (`0x10` → 2 digits), case follows
+    // the FROM endpoint.
+    assert_eq!(
+        rs(r#"join ",", (0x00:0x10:1)"#),
+        "0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10"
+    );
+}
+
+#[test]
+fn range_hex_uppercase_preserved_reverse_step() {
+    assert_eq!(
+        rs(r#"join ",", (0xFF:0xF0:-3)"#),
+        "0xFF,0xFC,0xF9,0xF6,0xF3,0xF0"
+    );
+}
+
+#[test]
+fn range_hex_uppercase_wins_when_either_endpoint_has_it() {
+    // FROM is `0x00` (no letters to disambiguate case); TO is `0xFF`. The
+    // user's explicit uppercase choice in either endpoint propagates to the
+    // whole range — `0x0C, 0x0F, …, 0xFF` instead of `0x0c, 0x0f, …, 0xff`.
+    assert_eq!(
+        rs(r#"join ",", (0x00:0x12:3)"#),
+        "0x00,0x03,0x06,0x09,0x0c,0x0f,0x12"
+    );
+    assert_eq!(
+        rs(r#"join ",", (0x00:0x12:3)"#)
+            .chars()
+            .filter(|c| c.is_ascii_uppercase())
+            .count(),
+        0
+    );
+    assert_eq!(
+        rs(r#"join ",", (0x00:0xFF:3)"#)
+            .split(',')
+            .last()
+            .unwrap()
+            .to_string(),
+        "0xFF"
+    );
+    // Mid-range hex letters get the case from either endpoint:
+    assert!(rs(r#"join ",", (0x00:0xFF:3)"#).contains("0x0C"));
+    assert!(rs(r#"join ",", (0x00:0xff:3)"#).contains("0x0c"));
+}
+
+#[test]
+fn range_hex_width_follows_longer_endpoint() {
+    assert_eq!(
+        rs(r#"join ",", (0x1:0x100:0x40)"#),
+        "0x001,0x041,0x081,0x0c1"
+    );
+}
+
+#[test]
+fn range_hex_arithmetic_unaffected() {
+    // Outside range context, `0xFF` is still an integer.
+    assert_eq!(ri(r#"0xFF + 1"#), 256);
+    assert_eq!(ri(r#"my $x = 0xFF; $x"#), 255);
+    assert_eq!(ri(r#"my @nums = (0xFF, 0x100); $nums[0] + $nums[1]"#), 511);
+}
+
+// ── Deferred-block compilation honors the lexical scope of definition ──
+// `map` / `grep` / `sort` blocks compile in a 4th pass after every sub
+// body has been popped, so the trailing top-level scope_stack sits on
+// top. Without snapshotting, a fn-local `my $max` referenced inside a
+// `map { … $max … }` would silently bind to a sibling top-level
+// `my $max` slot. Snapshots taken at block-add time and swapped in
+// during the 4th pass prevent that.
+
+#[test]
+fn deferred_map_block_resolves_fn_local_my_against_block_scope() {
+    // Without the fix this returned 3 (the seed) because the `$max`
+    // inside `map { … }` resolved to the top-level `my $max = 0` slot.
+    assert_eq!(
+        ri(r#"
+            fn Greatest::max(@nums) {
+                my $max = $nums[0];
+                map { $max = $_ if $_ > $max } @nums;
+                $max
+            }
+            my ($min, $max) = (0, 0);
+            Greatest::max(3, 1, 4, 1, 5, 9, 2, 6)
+        "#),
+        9
+    );
+}
+
+#[test]
+fn deferred_grep_block_resolves_fn_local_my_against_block_scope() {
+    // grep predicate references a fn-local `my $thr` that must NOT bind
+    // to an outer `my $thr` slot.
+    assert_eq!(
+        ri(r#"
+            fn count_above(@nums) {
+                my $thr = 5;
+                scalar grep { $_ > $thr } @nums
+            }
+            my $thr = 100;
+            count_above(1, 6, 7, 2, 8, 3)
+        "#),
+        3
+    );
+}
+
+#[test]
+fn deferred_sort_block_resolves_fn_local_my_against_block_scope() {
+    // sort comparator references a fn-local `my $rev` ($a/$b are already
+    // gated separately; this guards arbitrary fn-local names).
+    assert_eq!(
+        rs(r#"
+            fn ordered($rev, @items) {
+                my $sign = $rev ? -1 : 1;
+                join(",", sort { ($a <=> $b) * $sign } @items)
+            }
+            my $sign = 999;
+            ordered(0, 3, 1, 2)
+        "#),
+        "1,2,3"
+    );
+}
+
+// ── to_pdf sanitizes terminal output ───────────────────────────────────
+// `bar_chart` / `histo` / `flame` produce ANSI-coloured output with
+// Unicode box-drawing and block-element characters meant for terminals.
+// When piped to `to_pdf`, those have to be stripped or substituted so the
+// generated PDF is readable in the basic Type1 Courier font.
+
+#[test]
+fn to_pdf_strips_ansi_and_block_chars() {
+    // `to_pdf` writes a temp file and returns the path. Read the bytes
+    // back, extract the rendered text via `pdf_text`, and assert that
+    // none of the terminal artifacts (ANSI escapes, U+2588 block, U+2502
+    // pipe) survive the round-trip.
+    let raw = rs(r#"
+        my %h = (a => 5, b => 1, c => 3);
+        my $path = bar_chart(\%h) |> to_pdf;
+        my $extracted = pdf_text($path);
+        $extracted
+    "#);
+    assert!(
+        !raw.contains('\x1b'),
+        "PDF text leaked ANSI escape: {:?}",
+        raw
+    );
+    assert!(
+        !raw.contains('\u{2588}'),
+        "PDF text leaked block char `█`: {:?}",
+        raw
+    );
+    assert!(
+        !raw.contains('\u{2502}'),
+        "PDF text leaked vertical-bar `│`: {:?}",
+        raw
+    );
+    // The sanitiser maps blocks to `#` and the separator to `|`, so the
+    // ASCII fallbacks must be present.
+    assert!(raw.contains('#'), "expected ASCII bar fill: {:?}", raw);
+    assert!(raw.contains('|'), "expected ASCII pipe sep: {:?}", raw);
+    // Labels survive — `a`, `b`, `c`.
+    assert!(raw.contains(" a "), "expected label `a`: {:?}", raw);
+    assert!(raw.contains(" b "), "expected label `b`: {:?}", raw);
+    assert!(raw.contains(" c "), "expected label `c`: {:?}", raw);
+}
+
+#[test]
+fn strip_ansi_helper_removes_csi_sequences() {
+    assert_eq!(
+        rs(r#"strip_ansi("\e[31mhello\e[0m world")"#),
+        "hello world"
+    );
+}
+
+// ── bar_chart sorts descending by value ─────────────────────────────────
+
+#[test]
+fn bar_chart_renders_largest_first_with_alphabetical_tiebreak() {
+    // The chart top-to-bottom order matches highest value first; ties are
+    // broken by label so the output is stable across input iteration order.
+    // Strip ANSI color codes and trailing whitespace before comparing
+    // labels — the bar widths and counts are formatting concerns separate
+    // from the sort invariant we're pinning.
+    let raw = rs(r#"
+        my %h = (a => 5, b => 1, c => 3, d => 3, e => 9);
+        bar_chart(\%h)
+    "#);
+    let labels: Vec<&str> = raw
+        .lines()
+        .filter_map(|line| line.split('│').next())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    assert_eq!(labels, vec!["e", "a", "c", "d", "b"]);
+}
+
+#[test]
+fn range_hex_full_byte_count_256() {
+    assert_eq!(ri(r#"my @r = (0x00:0xFF:1); scalar @r"#), 256);
+}
+
+#[test]
+fn range_arithmetic_minus_still_works() {
+    // Regression guard: the date lexer requires a 4-digit year, so plain
+    // subtraction of small integers stays as arithmetic.
+    assert_eq!(ri(r#"5-2-1"#), 2);
+    assert_eq!(ri(r#"100-1-1"#), 98);
+}
+
+#[test]
+fn range_numeric_colon_form_unaffected() {
+    // The plain `:` range op for integers is preserved alongside the
+    // IPv6/special-literal lexing.
+    assert_eq!(rs(r#"join ",", (1:5:1)"#), "1,2,3,4,5");
+    assert_eq!(rs(r#"join ",", (1:10:2)"#), "1,3,5,7,9");
+}
+
+#[test]
+fn ipv4_literal_concat_falls_back_to_floats_when_not_quad() {
+    // 5-segment dotted forms aren't IPv4 — fall back to float.float concat
+    // so we don't half-eat the chain.
+    assert_eq!(rs(r#"1.2.3.4.5"#), "1.23.45");
+}
+
+// ── Method calls after `->` not consumed as s/tr/y/m/q* operators ──────
+// Regression guard: removing `,` from the s/tr/y terminator list (to enable
+// `s,PAT,REPL,FLAGS`) used to break method calls like `$obj->y` because the
+// lexer would consume `, …, …` as a transliteration body. The lookahead-3-
+// commas heuristic plus the `prev_arrow` gate fix that.
+
+#[test]
+fn arrow_y_method_call_after_struct_field() {
+    assert_eq!(ri(r#"struct Pt { x, y }; my $p = Pt(3, 4); $p->y"#), 4);
+}
+
+#[test]
+fn struct_field_named_y_or_z_not_eaten_as_transliteration() {
+    // `struct Pt { x, y, z }` — `y` followed by `,` must stay a bareword
+    // field name, not consume the rest as a `y///` body.
+    assert_eq!(
+        ri(r#"struct Vec3 { x, y, z }; my $v = Vec3(1, 2, 3); $v->z"#),
+        3
+    );
+}
+
 // ── `+{ EXPR }` force-hashref idiom ─────────────────────────────────────
 // Block-vs-hashref disambiguation used to fall back to CodeRef when the
 // body started with map/grep returning a list; the `+` prefix now forces

@@ -13,8 +13,8 @@ fn Rosetta::GCD::compute($a, $b) {
 fn Rosetta::GCD::multi(@nums) {
     if (len(@nums) == 0) { return 0 }
     my $res = shift @nums
-    for my $n (@nums) {
-        $res = Rosetta::GCD::compute($res, $n)
+    ~> @nums ep {
+        $res = Rosetta::GCD::compute($res, _)
     }
     $res
 }

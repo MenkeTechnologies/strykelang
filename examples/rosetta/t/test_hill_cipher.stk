@@ -29,9 +29,9 @@ fn Rosetta::Hill::matrix_mod_inverse($matrix, $mod) {
     )
     
     # Ensure positive
-    for my $row (@inv) {
+    ~> @inv ep {
         for (my $j = 0; $j < 2; $j++) {
-            if ($row->[$j] < 0) { $row->[$j] += $mod }
+            if (_->[$j] < 0) { _->[$j] += $mod }
         }
     }
     \@inv

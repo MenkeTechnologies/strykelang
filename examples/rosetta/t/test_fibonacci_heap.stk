@@ -64,7 +64,7 @@ fn Rosetta::FibHeap::extract_min($h) {
     for my $i (~> 0:len(@{$h->{roots}}) - 1) {
         if ($i != $h->{min_idx}) { push @new_roots, $h->{roots}[$i] }
     }
-    for my $c (@{$min_node->{children}}) { push @new_roots, $c }
+    ~> @{$min_node->{children}} ep { push @new_roots, _ }
     $h->{roots} = \@new_roots
     $h->{count}--
     if ($h->{count} == 0) {
@@ -82,8 +82,8 @@ fn Rosetta::FibHeap::min($h) {
 
 fn Rosetta::FibHeap::union($a, $b) {
     my $h = Rosetta::FibHeap::new()
-    for my $r (@{$a->{roots}}) { push @{$h->{roots}}, $r }
-    for my $r (@{$b->{roots}}) { push @{$h->{roots}}, $r }
+    ~> @{$a->{roots}} ep { push @{$h->{roots}}, _ }
+    ~> @{$b->{roots}} ep { push @{$h->{roots}}, _ }
     $h->{count} = $a->{count} + $b->{count}
     if ($h->{count} > 0) {
         my $min_idx = 0
@@ -118,7 +118,7 @@ assert_ok !defined Rosetta::FibHeap::extract_min($h), "extract empty = undef"
 # Larger heap-sort test
 my $big = Rosetta::FibHeap::new()
 my @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
-for my $v (@input) { Rosetta::FibHeap::insert($big, $v) }
+~> @input ep { Rosetta::FibHeap::insert($big, _) }
 my @sorted_via_heap
 while ($big->{count} > 0) { push @sorted_via_heap, Rosetta::FibHeap::extract_min($big) }
 my @native = sort { _0 <=> _1 } @input

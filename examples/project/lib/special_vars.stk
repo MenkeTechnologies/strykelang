@@ -7,36 +7,36 @@
 fn default_in_for {
     my @r = ()
     for (1, 2, 3) {
-        push @r, $_
+        push @r, _
     }
     join(",", @r)
 }
 
 fn default_in_map {
     my @a = (1, 2, 3)
-    join(",", map { $_ * 2 } @a)
+    join(",", map { _ * 2 } @a)
 }
 
 fn default_in_grep {
     my @a = (1, 2, 3, 4, 5)
-    scalar(grep { $_ > 2 } @a)
+    scalar(grep { _ > 2 } @a)
 }
 
 fn default_explicit_set {
-    $_ = "hello"
-    my $result = $_
+    _ = "hello"
+    my $result = _
     $result
 }
 
 fn default_in_regex {
-    $_ = "hello world"
-    $_ =~ /world/ ? 1 : 0
+    _ = "hello world"
+    _ =~ /world/ ? 1 : 0
 }
 
 fn default_in_subst {
-    $_ = "hello"
-    $_ =~ s/hello/world/
-    $_
+    _ = "hello"
+    _ =~ s/hello/world/
+    _
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

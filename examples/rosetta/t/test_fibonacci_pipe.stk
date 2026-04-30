@@ -8,8 +8,8 @@ fn Rosetta::Fibonacci::sequence($n) {
     my @fibs = (0, 1)
     # Use range and pfor/pmap to show we can, but iterative is better here.
     # We'll use a standard loop to build the list, then pipe it.
-    for my $i (2:$n) {
-        push @fibs, $fibs[$i-1] + $fibs[$i-2]
+    ~> 2:$n ep {
+        push @fibs, $fibs[_-1] + $fibs[_-2]
     }
     @fibs
 }

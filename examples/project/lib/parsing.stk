@@ -155,7 +155,7 @@ fn single_line_while {
 
 fn single_line_for {
     my $sum = 0
-    $sum += $_ for (1, 2, 3, 4, 5)
+    $sum += _ for (1, 2, 3, 4, 5)
     $sum
 }
 
@@ -175,7 +175,7 @@ fn call_without_parens {
 
 fn nested_calls {
     my @nums = (1, 2, 3, 4, 5)
-    my $result = sum(map { $_ * 2 } @nums)
+    my $result = sum(map { _ * 2 } @nums)
     $result
 }
 

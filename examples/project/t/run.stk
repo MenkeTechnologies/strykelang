@@ -11,8 +11,8 @@ my $failed = 0
 p "Running $total test files...\n"
 
 for (@test_files) {
-    printf "── %s ──\n", basename($_)
-    my $exit = system("s", $_)
+    printf "── %s ──\n", basename(_)
+    my $exit = system("s", _)
     if ($exit != 0) {
         $failed++
     }

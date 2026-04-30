@@ -172,8 +172,8 @@ fn pipe_all(@fns) {
 
 fn count_if($pred, @items) {
     my $count = 0
-    for my $item (@items) {
-        $count++ if $pred($item)
+    ~> @items ep {
+        $count++ if $pred(_)
     }
     $count
 }

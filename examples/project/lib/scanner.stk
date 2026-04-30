@@ -80,7 +80,7 @@ fn scan_git {
         $result->{root} = $root
 
         my @branches = git_branches()
-        my @head = grep { $_->{is_head} } @branches
+        my @head = grep { _->{is_head} } @branches
         $result->{branch} = @head ? $head[0]->{name} : "detached"
 
         my @log = git_log(5)

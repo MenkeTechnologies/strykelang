@@ -31,22 +31,22 @@ fn Rosetta::Kalman::approx($x, $y, $eps) { abs($x - $y) < $eps }
 my @measurements = (9.5, 10.4, 9.8, 10.1, 9.9, 10.2, 9.7, 10.3, 10.0, 9.95)
 my $kf = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
 my @ests
-for my $z (@measurements) {
-    my $est = Rosetta::Kalman::step($kf, $z)
+~> @measurements ep {
+    my $est = Rosetta::Kalman::step($kf, _)
     push @ests, $est
 }
 
 # Final estimate should be close to the true mean (≈ 9.99).
 my $mean = 0
-for my $z (@measurements) { $mean += $z }
+~> @measurements ep { $mean += _ }
 $mean /= len(@measurements)
 assert_ok Rosetta::Kalman::approx($ests[-1], $mean, 0.1), "filter converges near sample mean"
 
 # Variance should be shrinking with each update.
 my @ps
 my $kf2 = Rosetta::Kalman::new(0.0, 1.0, 0.0001, 0.1)
-for my $z (@measurements) {
-    Rosetta::Kalman::step($kf2, $z)
+~> @measurements ep {
+    Rosetta::Kalman::step($kf2, _)
     push @ps, $kf2->{p}
 }
 for my $i (1..len(@ps) - 1) {

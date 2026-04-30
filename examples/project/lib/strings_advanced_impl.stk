@@ -9,12 +9,12 @@ fn adv_levenshtein($s1, $s2) {
     return $len1 if $len2 == 0
     
     my @d = ()
-    for my $i (0..$len1) {
-        $d[$i] = []
-        $d[$i][0] = $i
+    ~> 0..$len1 ep {
+        $d[_] = []
+        $d[_][0] = _
     }
-    for my $j (0..$len2) {
-        $d[0][$j] = $j
+    ~> 0..$len2 ep {
+        $d[0][_] = _
     }
     
     for my $i (1..$len1) {
@@ -46,8 +46,8 @@ fn adv_lcs($s1, $s2) {
     my @dp = ()
     for my $i (0..$len1) {
         $dp[$i] = []
-        for my $j (0..$len2) {
-            $dp[$i][$j] = 0
+        ~> 0..$len2 ep {
+            $dp[$i][_] = 0
         }
     }
 
@@ -93,9 +93,9 @@ fn adv_word_frequency($s) {
     my @words = split(/\s+/, $clean)
     
     my %freq = ()
-    for my $w (@words) {
-        if (length($w) > 0) {
-            $freq{$w} = ($freq{$w} // 0) + 1
+    ~> @words ep {
+        if (length(_) > 0) {
+            $freq{_} = ($freq{_} // 0) + 1
         }
     }
     { %freq }

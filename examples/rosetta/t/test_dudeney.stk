@@ -4,7 +4,7 @@
 fn Rosetta::Dudeney::sum_digits($n) {
     my $sum = 0
     my @digits = ~> "$n" chars map { int(_) }
-    for my $d (@digits) { $sum += $d }
+    ~> @digits ep { $sum += _ }
     $sum
 }
 

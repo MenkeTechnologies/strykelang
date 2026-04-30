@@ -107,8 +107,8 @@ fn heap_sort(@list) {
     return @list if scalar(@list) <= 1
     
     my $pq = pq_new()
-    for my $val (@list) {
-        $pq->push($val)
+    ~> @list ep {
+        $pq->push(_)
     }
     
     my @res = ()

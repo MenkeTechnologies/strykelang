@@ -22,7 +22,7 @@ fn Rosetta::LFU::touch($c, $key) {
     # Remove from old list.
     my $old_list = $c->{freq_lists}{$old}
     my @new_list
-    for my $k (@$old_list) { push @new_list, $k if $k ne $key }
+    ~> @$old_list ep { push @new_list, _ if _ ne $key }
     $c->{freq_lists}{$old} = \@new_list
     if (len(@new_list) == 0) {
         delete $c->{freq_lists}{$old}

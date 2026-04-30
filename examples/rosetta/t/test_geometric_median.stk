@@ -6,7 +6,7 @@ fn Rosetta::GeoMedian::weiszfeld($pts, $iters) {
     my $n = len(@$pts)
     my $cx = 0
     my $cy = 0
-    for my $p (@$pts) { $cx += $p->[0]; $cy += $p->[1] }
+    ~> @$pts ep { $cx += _->[0]; $cy += _->[1] }
     $cx /= $n
     $cy /= $n
     for my $i (1..$iters) {

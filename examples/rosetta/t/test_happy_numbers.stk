@@ -4,7 +4,7 @@
 fn Rosetta::HappyNumbers::sum_sq_digits($n) {
     my $sum = 0
     my @digits = "$n" |> chars
-    for my $d (@digits) { $sum = $sum + (int($d)**2) }
+    ~> @digits ep { $sum = $sum + (int(_)**2) }
     $sum
 }
 

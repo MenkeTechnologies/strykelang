@@ -14,10 +14,10 @@ my $last = last_arg(1, 2, 3)
 assert_eq $last, 3, "last_arg"
 
 # Map, grep, reduce
-my @doubled = map { $_ * 2 } 1..5
+my @doubled = map { _ * 2 } 1..5
 assert_eq join(",", @doubled), "2,4,6,8,10", "map double"
 
-my @evens = grep { $_ % 2 == 0 } 1..10
+my @evens = grep { _ % 2 == 0 } 1..10
 assert_eq join(",", @evens), "2,4,6,8,10", "grep evens"
 
 my $sum = reduce { $a + $b } 1..5
@@ -27,7 +27,7 @@ my $product = reduce { $a * $b } 1..5
 assert_eq $product, 120, "reduce product"
 
 # Pipeline operators
-my $result = 1..10 |> grep { $_ % 2 == 0 } |> map { $_ * $_ } |> sum
+my $result = 1..10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
 assert_eq $result, 220, "pipeline grep map sum"
 
 # Thread macro

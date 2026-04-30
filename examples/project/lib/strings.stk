@@ -8,7 +8,7 @@ fn slugify_str ($str) {
 }
 
 fn get_initials ($name) {
-    join("", map { uc(substr($_, 0, 1)) } split(/\s+/, $name))
+    join("", map { uc(substr(_, 0, 1)) } split(/\s+/, $name))
 }
 
 fn truncate_str ($s, $max) {
@@ -33,12 +33,12 @@ fn caesar_cipher ($text, $shift) {
     $shift //= 13
     my @chars = split("", $text)
     my @out = map {
-        if ($_ =~ /[a-z]/) {
-            chr(((ord($_) - ord("a") + $shift) % 26) + ord("a"))
-        } elsif ($_ =~ /[A-Z]/) {
-            chr(((ord($_) - ord("A") + $shift) % 26) + ord("A"))
+        if (_ =~ /[a-z]/) {
+            chr(((ord(_) - ord("a") + $shift) % 26) + ord("a"))
+        } elsif (_ =~ /[A-Z]/) {
+            chr(((ord(_) - ord("A") + $shift) % 26) + ord("A"))
         } else {
-            $_
+            _
         }
     } @chars
     join("", @out)
@@ -46,5 +46,5 @@ fn caesar_cipher ($text, $shift) {
 
 # Count vowels in a string via pipeline
 fn vowel_count ($s) {
-    scalar(grep { $_ =~ /[aeiouAEIOU]/ } split("", $s))
+    scalar(grep { _ =~ /[aeiouAEIOU]/ } split("", $s))
 }

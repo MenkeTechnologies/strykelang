@@ -4,10 +4,10 @@ fn Exercism::PythagoreanTriplet::is_pythagorean($a, $b, $c) { $a * $a + $b * $b 
 fn Exercism::PythagoreanTriplet::triplets_in_range($min, $max) {
     my @out
     for my $a ($min..$max) {
-        for my $b ($a..$max) {
-            my $c2 = $a * $a + $b * $b
+        ~> $a..$max ep {
+            my $c2 = $a * $a + _ * _
             my $c = int(sqrt($c2) + 0.5)
-            push @out, [$a, $b, $c] if $c <= $max && $c >= $b && $c * $c == $c2
+            push @out, [$a, _, $c] if $c <= $max && $c >= _ && $c * $c == $c2
         }
     }
     \@out

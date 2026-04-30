@@ -20,8 +20,8 @@ assert_false defined($missing) && length($missing) > 0, "missing var is empty"
 # Environment keys
 my @keys = env_keys()
 assert_gt scalar(@keys), 0, "env_keys returns list"
-assert_ok grep { $_ eq "HOME" } @keys, "env_keys includes HOME"
-assert_ok grep { $_ eq "PATH" } @keys, "env_keys includes PATH"
+assert_ok grep { _ eq "HOME" } @keys, "env_keys includes HOME"
+assert_ok grep { _ eq "PATH" } @keys, "env_keys includes PATH"
 
 # Command existence
 assert_ok cmd_exists("ls"), "ls command exists"

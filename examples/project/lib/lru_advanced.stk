@@ -77,8 +77,8 @@ class AdvancedLRUCache {
     fn _remove_from_order($key) {
         my $o = $self->order()
         my @new_o = ()
-        for my $k (@$o) {
-            if ($k ne $key) { push @new_o, $k }
+        ~> @$o ep {
+            if (_ ne $key) { push @new_o, _ }
         }
         $self->order(\@new_o)
     }
@@ -89,9 +89,9 @@ class AdvancedLRUCache {
         my $c = $self->cache()
         my $t = $self->timestamps()
         my @ks = keys %$c
-        for my $k (@ks) {
-            if ($now - $t->{$k} > $self->ttl()) {
-                $self->delete($k)
+        ~> @ks ep {
+            if ($now - $t->{_} > $self->ttl()) {
+                $self->delete(_)
             }
         }
     }

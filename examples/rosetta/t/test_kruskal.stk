@@ -56,7 +56,7 @@ my $mst = Rosetta::Kruskal::solve(4, $edges)
 # MST should be [2,3,4], [0,3,5], [0,1,10]
 # Total weight: 4 + 5 + 10 = 19
 my $total_w = 0
-for my $e (@$mst) { $total_w += $e->[2] }
+~> @$mst ep { $total_w += _->[2] }
 assert_eq $total_w, 19, "MST total weight"
 
 test_run

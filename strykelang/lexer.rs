@@ -210,6 +210,218 @@ impl Lexer {
         s
     }
 
+    /// Peek past whitespace and check whether the next token starts a range
+    /// operator: `:`, `..`, `...`, or `!!!`. Used by the hex-integer lexer
+    /// to switch into range-friendly DoubleString mode so `0x00:0xFF:1`
+    /// iterates with hex output instead of decimal.
+    fn next_is_range_separator(&self) -> bool {
+        let mut i = self.pos;
+        while i < self.input.len() && matches!(self.input[i], ' ' | '\t') {
+            i += 1;
+        }
+        if i >= self.input.len() {
+            return false;
+        }
+        match self.input[i] {
+            ':' => true,
+            '.' if self.input.get(i + 1) == Some(&'.') => true,
+            '!' if self.input.get(i + 1) == Some(&'!')
+                && self.input.get(i + 2) == Some(&'!') =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// `YYYY-MM-DD` / `YYYY-MM` lookahead. Called from [`Self::read_number`]
+    /// when the just-consumed integer part is exactly 4 digits followed by
+    /// `-<digit>`. Tries the longer `YYYY-MM-DD` shape first (full ISO date),
+    /// falling back to `YYYY-MM` (year-month). Both shapes require valid
+    /// month (01..=12) and, for the date form, valid day (01..=31). On match
+    /// returns the literal string and advances `self.pos` past it; on
+    /// failure restores `self.pos` so the caller falls through to the
+    /// existing arithmetic-as-`-` path. The 4-digit year requirement is the
+    /// disambiguator vs. plain subtraction (`2022-01-01` = date,
+    /// `5-2-1` = arithmetic).
+    fn try_consume_iso_date_tail(&mut self, start: usize) -> Option<String> {
+        let saved = self.pos;
+        let year: String = self.input[start..self.pos].iter().collect();
+        if year.len() != 4 || year.parse::<u16>().is_err() {
+            return None;
+        }
+        // Match `-MM`
+        if self.peek() != Some('-') {
+            return None;
+        }
+        if !self.peek_at(1).is_some_and(|c| c.is_ascii_digit())
+            || !self.peek_at(2).is_some_and(|c| c.is_ascii_digit())
+        {
+            return None;
+        }
+        // Reject when third char after `-` is also a digit (e.g. `2022-100`)
+        // — that's arithmetic, not a month.
+        if self.peek_at(3).is_some_and(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        let month_str: String = self.input[self.pos + 1..self.pos + 3].iter().collect();
+        let month: u8 = match month_str.parse() {
+            Ok(m) if (1..=12).contains(&m) => m,
+            _ => return None,
+        };
+        // Provisionally consume `-MM`
+        self.advance(); // -
+        self.advance(); // M
+        self.advance(); // M
+        // Try `-DD` extension
+        if self.peek() == Some('-')
+            && self.peek_at(1).is_some_and(|c| c.is_ascii_digit())
+            && self.peek_at(2).is_some_and(|c| c.is_ascii_digit())
+            && !self.peek_at(3).is_some_and(|c| c.is_ascii_digit())
+        {
+            let day_str: String = self.input[self.pos + 1..self.pos + 3].iter().collect();
+            if let Ok(day) = day_str.parse::<u8>() {
+                if (1..=31).contains(&day) {
+                    self.advance(); // -
+                    self.advance(); // D
+                    self.advance(); // D
+                    let _ = month; // already validated
+                    return Some(format!("{}-{}-{:02}", year, month_str, day));
+                }
+            }
+        }
+        // Year-month form `YYYY-MM`. Reject if followed by another `-DIGIT`
+        // (would be arithmetic) — caught above by the third-digit guard.
+        Some(format!("{}-{}", year, month_str))
+            .filter(|_| {
+                // No risky trailing chars beyond what we've already consumed.
+                let _ = saved;
+                true
+            })
+    }
+
+    /// IPv6 lookahead from an arbitrary starting pos. Called from
+    /// [`Self::read_number`] (digit-prefix), the identifier path (hex-letter
+    /// prefix `fe80::1`), and the `:` lexer arm (zero-compressed prefix
+    /// `::1`). `start` is where the IPv6 candidate begins in `self.input`;
+    /// `self.pos` may already be partway through but is reset here so the
+    /// scanner controls consumption. Greedily consumes hex digits, `:`, and
+    /// at most one `::`, then validates with Rust's [`std::net::Ipv6Addr`]
+    /// parser. On success returns the literal and leaves `self.pos` past
+    /// it; on failure restores `self.pos` to its pre-call value.
+    /// Acts only when the candidate has at least 2 colons — single-colon
+    /// `1:5` is unambiguous range syntax, and 3-segment chains of pure-digit
+    /// groups (`1:5:1`) never parse as IPv6 so range-with-step is preserved.
+    fn try_consume_ipv6_tail(&mut self, start: usize) -> Option<String> {
+        let saved = self.pos;
+        self.pos = start;
+        let mut seen_double_colon = false;
+        let mut prev_was_colon = false;
+        let mut colon_count = 0usize;
+        while self.pos < self.input.len() {
+            let c = self.input[self.pos];
+            if c == ':' {
+                colon_count += 1;
+                if prev_was_colon {
+                    if seen_double_colon {
+                        break;
+                    }
+                    seen_double_colon = true;
+                }
+                prev_was_colon = true;
+                self.advance();
+                continue;
+            }
+            if c.is_ascii_hexdigit() {
+                prev_was_colon = false;
+                self.advance();
+                continue;
+            }
+            break;
+        }
+        // Strip a trailing single colon (likely a range separator the lexer
+        // greedily ate); a trailing `::` is part of the address.
+        if self.pos > start
+            && self.input[self.pos - 1] == ':'
+            && (self.pos < start + 2 || self.input[self.pos - 2] != ':')
+        {
+            self.pos -= 1;
+            colon_count -= 1;
+        }
+        // Package-separator disambiguator: when the candidate ends right
+        // before an ASCII letter or `_` (an identifier continuation), the
+        // `::` is almost certainly a package qualifier (`B::GV::SAFENAME`)
+        // rather than IPv6 zero-compression. IPv6 lookahead bails so the
+        // standard package-separator path runs.
+        if self.pos < self.input.len() {
+            let next = self.input[self.pos];
+            if next.is_ascii_alphabetic() && !next.is_ascii_hexdigit() || next == '_' {
+                self.pos = saved;
+                return None;
+            }
+        }
+        let candidate: String = self.input[start..self.pos].iter().collect();
+        // Require at least one hex digit. The bare `::` form is technically
+        // valid IPv6 (all-zeros) but in real code it nearly always means
+        // something else — array-slice default step (`@a[::]`), package
+        // separator at the start of an empty list, etc. Users who want the
+        // unspecified address can write `::0`.
+        if colon_count < 2
+            || !candidate.chars().any(|c| c.is_ascii_hexdigit())
+            || candidate.parse::<std::net::Ipv6Addr>().is_err()
+        {
+            self.pos = saved;
+            return None;
+        }
+        Some(candidate)
+    }
+
+    /// IPv4 dotted-quad lookahead. Called from [`Self::read_number`] when the
+    /// just-consumed integer part is followed by `.<digit>`. Speculatively
+    /// matches 3 more `.<digits>` segments and accepts only when every octet
+    /// parses as `u8` (0..=255). On match, returns the full dotted-quad
+    /// string (e.g. `"192.168.255.255"`) and advances `self.pos` past it; on
+    /// failure restores `self.pos` to its pre-call value so the caller falls
+    /// through to the existing float-lexing path.
+    fn try_consume_ipv4_tail(&mut self, start: usize) -> Option<String> {
+        let saved = self.pos;
+        // We've already consumed the first octet (start..self.pos).
+        let first: String = self.input[start..self.pos].iter().collect();
+        if first.parse::<u8>().is_err() {
+            return None;
+        }
+        let mut octets: Vec<String> = vec![first];
+        for _ in 0..3 {
+            if self.peek() != Some('.') {
+                self.pos = saved;
+                return None;
+            }
+            if !self.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
+                self.pos = saved;
+                return None;
+            }
+            self.advance(); // consume '.'
+            let oct_start = self.pos;
+            while self.peek().is_some_and(|c| c.is_ascii_digit()) {
+                self.advance();
+            }
+            let octet: String = self.input[oct_start..self.pos].iter().collect();
+            if octet.parse::<u8>().is_err() {
+                self.pos = saved;
+                return None;
+            }
+            octets.push(octet);
+        }
+        // Reject 5-segment chains like `1.2.3.4.5` — the trailing `.<digit>`
+        // means the user wrote something else (e.g. version number, list of
+        // floats). Falling back to float lexing is safer than half-eating it.
+        if self.peek() == Some('.') && self.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
+            self.pos = saved;
+            return None;
+        }
+        Some(octets.join("."))
+    }
+
     fn read_number(&mut self) -> PerlResult<Token> {
         let start = self.pos;
         let mut is_float = false;
@@ -241,6 +453,17 @@ impl Lexer {
             let clean: String = digits.chars().filter(|&c| c != '_').collect();
             let val = i64::from_str_radix(&clean, 16)
                 .map_err(|_| self.syntax_err("Invalid hex literal", self.line))?;
+            // Range-context lookahead: `0x00:0xFF:1` should iterate as hex
+            // strings (`0x00`, `0x01`, …, `0xFF`), preserving the leading
+            // `0x` and case-of-digits. When the next non-whitespace token is
+            // a range separator (`:`, `..`, `...`, or `!!!`), produce a
+            // string-typed literal so the runtime range op can detect the
+            // hex format and emit hex output. In all other contexts the
+            // hex is a normal integer (arithmetic, assignment, etc.).
+            if self.next_is_range_separator() {
+                let raw: String = self.input[start..self.pos].iter().collect();
+                return Ok(Token::DoubleString(raw));
+            }
             return Ok(Token::Integer(val));
         }
         if is_bin {
@@ -253,10 +476,42 @@ impl Lexer {
 
         // Decimal or octal
         let _int_part = self.read_while(|c| c.is_ascii_digit() || c == '_');
+        // IPv4 dotted-quad lookahead: `192.168.255.255` should lex as ONE
+        // string token, not as `192.168` (float) `.` `255.255` (float). Try
+        // to consume 3 more `.NUM` segments where every octet is 0..=255 AND
+        // not followed by another `.NUM` (so a 5-segment chain like
+        // `1.2.3.4.5` cleanly fails the ipv4 path and falls back to floats).
+        // Only fires when the current `.NUM` would have been a float decimal
+        // — preserves all existing float lexing.
         if self.peek() == Some('.') && self.peek_at(1).is_some_and(|c| c.is_ascii_digit()) {
+            if let Some(consumed) = self.try_consume_ipv4_tail(start) {
+                return Ok(Token::DoubleString(consumed));
+            }
             is_float = true;
             self.advance(); // consume '.'
             let _frac = self.read_while(|c| c.is_ascii_digit() || c == '_');
+        }
+        // ISO-date / year-month lookahead: `2022-01-01` and `2022-01`.
+        // Distinct from arithmetic `2022 - 01 - 01` only because the lexer
+        // greedily consumes the dotted form here. The 4-digit-year guard
+        // inside [`Self::try_consume_iso_date_tail`] keeps `5-2-1` parsing
+        // as arithmetic.
+        if !is_float
+            && self.peek() == Some('-')
+            && self.peek_at(1).is_some_and(|c| c.is_ascii_digit())
+        {
+            if let Some(consumed) = self.try_consume_iso_date_tail(start) {
+                return Ok(Token::DoubleString(consumed));
+            }
+        }
+        // IPv6 lookahead: a hex-digit-only integer part followed by `:` and
+        // more hex / `:` could be IPv6. Try to parse and accept; on failure
+        // fall through to the existing range / arithmetic paths so plain
+        // numeric ranges (`1:10`) keep their meaning.
+        if !is_float && self.peek() == Some(':') {
+            if let Some(consumed) = self.try_consume_ipv6_tail(start) {
+                return Ok(Token::DoubleString(consumed));
+            }
         }
         // Scientific notation
         if let Some('e') | Some('E') = self.peek() {
@@ -1392,6 +1647,15 @@ impl Lexer {
             }
             '!' => {
                 self.advance();
+                // `!!!` — IPv6 range separator (`2001::1!!!2001::ff!!!1`).
+                // Avoids the `:`/IPv6 colon collision; lexed as a dedicated
+                // token the parser treats as a `:` substitute in range exprs.
+                if self.peek() == Some('!') && self.peek_at(1) == Some('!') {
+                    self.advance();
+                    self.advance();
+                    self.last_was_term = false;
+                    return Ok(Token::TripleBang);
+                }
                 if self.peek() == Some('=') {
                     self.advance();
                     self.last_was_term = false;
@@ -1572,6 +1836,24 @@ impl Lexer {
                 self.advance();
                 if self.peek() == Some(':') {
                     self.advance();
+                    // IPv6 zero-compressed prefix: `::1`, `::ffff:c000:280`.
+                    // Only fires in term position (where `Pkg::ident` is
+                    // impossible) and only when the chars after `::` form a
+                    // valid IPv6 by Rust's parser. Skip when the `::` lives
+                    // inside `[…]` — that's array-slice step syntax
+                    // (`@a[::2]`, `@a[::-1]`), not an address.
+                    let in_bracket_subscript = self
+                        .input
+                        .get(self.pos.saturating_sub(3))
+                        .copied()
+                        == Some('[');
+                    if !self.last_was_term && !in_bracket_subscript {
+                        let saved = self.pos - 2;
+                        if let Some(consumed) = self.try_consume_ipv6_tail(saved) {
+                            self.last_was_term = true;
+                            return Ok(Token::DoubleString(consumed));
+                        }
+                    }
                     self.last_was_term = false;
                     return Ok(Token::PackageSep);
                 }
@@ -1632,7 +1914,25 @@ impl Lexer {
 
             // Identifiers and keywords
             c if c.is_alphabetic() || c == '_' => {
+                let ident_start = self.pos;
                 let mut ident = self.read_identifier();
+
+                // IPv6 lookahead for hex-letter prefixes: `fe80::1`, `abcd::ff`,
+                // `dead:beef::1`, etc. Only fires when the just-consumed
+                // identifier is a valid 1..=4 hex-digit group (i.e. could be
+                // an IPv6 segment) AND the next char is `:`. Speculatively
+                // greedily consumes hex / `:` / `::` and asks Rust's
+                // `Ipv6Addr` parser to validate; on failure restores `pos`
+                // so the identifier-as-bareword path runs unchanged.
+                if self.peek() == Some(':')
+                    && ident.len() <= 4
+                    && ident.chars().all(|ch| ch.is_ascii_hexdigit())
+                {
+                    if let Some(consumed) = self.try_consume_ipv6_tail(ident_start) {
+                        self.last_was_term = true;
+                        return Ok(Token::DoubleString(consumed));
+                    }
+                }
 
                 // Outer-topic chain in bare form: `_<<<<` (slot 0) and
                 // `_N<<<<` (slot N). Greedy consume `<` chevrons immediately

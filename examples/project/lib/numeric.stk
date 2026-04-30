@@ -355,20 +355,20 @@ fn precision_test {
 fn sum_array {
     my @a = (1, 2, 3, 4, 5)
     my $sum = 0
-    $sum += $_ for @a
+    $sum += _ for @a
     $sum
 }
 
 fn product_array {
     my @a = (1, 2, 3, 4, 5)
     my $prod = 1
-    $prod *= $_ for @a
+    $prod *= _ for @a
     $prod
 }
 
 fn average_array {
     my @a = (2, 4, 6, 8, 10)
     my $sum = 0
-    $sum += $_ for @a
+    $sum += _ for @a
     $sum / scalar(@a)
 }

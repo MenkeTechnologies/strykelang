@@ -113,7 +113,7 @@ pub enum CompileError {
     },
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct ScopeLayer {
     declared_scalars: HashSet<String>,
     /// Bare names from `our $x` — rvalue/lvalue ops must use the package stash key (`main::x`).
@@ -208,6 +208,17 @@ pub struct Compiler {
     /// comparator bodies that bind `$a`/`$b` magic globals. The deferred 4th pass
     /// turns on [`Self::force_name_for_sort_pair`] only for these blocks.
     sort_pair_block_indices: std::collections::HashSet<u16>,
+    /// Snapshot of `scope_stack` taken when each block was added. The 4th pass
+    /// (`compile_program`) defers map/grep/sort block compilation until after
+    /// every sub body has finished, by which point the parent scope_stack has
+    /// already been popped. Without these snapshots, references like the
+    /// fn-local `my $max` inside `map { … $max … }` would resolve against the
+    /// trailing top-level scope_stack and silently bind to a sibling top-level
+    /// `my $max` slot. The 4th pass swaps the matching snapshot in before
+    /// compiling each block. Index lines up with `chunk.blocks`; entries are
+    /// `None` for blocks added through code paths that don't go through the
+    /// compiler's [`Self::add_deferred_block`] wrapper.
+    block_scope_snapshots: Vec<Option<Vec<ScopeLayer>>>,
 }
 
 /// Label tracking for `goto LABEL` within a single label-scoped region (top-level main program
@@ -284,7 +295,23 @@ impl Compiler {
             strict_vars: false,
             force_name_for_sort_pair: false,
             sort_pair_block_indices: std::collections::HashSet::new(),
+            block_scope_snapshots: Vec::new(),
         }
+    }
+
+    /// Add a deferred-compilation block (map/grep/sort/reduce/…) to the chunk
+    /// AND snapshot the current `scope_stack` so the 4th pass can compile the
+    /// block under the lexical scope it was originally defined in. Replaces
+    /// every former `self.add_deferred_block(…)` call site inside the compiler so
+    /// no block slips through unsnapshotted. See [`Self::block_scope_snapshots`].
+    fn add_deferred_block(&mut self, block: Block) -> u16 {
+        let idx = self.chunk.add_block(block);
+        let snap = self.scope_stack.clone();
+        while self.block_scope_snapshots.len() < idx as usize {
+            self.block_scope_snapshots.push(None);
+        }
+        self.block_scope_snapshots.push(Some(snap));
+        idx
     }
 
     /// Mark a block index as a sort/reduce comparator that binds `$a`/`$b`.
@@ -1181,12 +1208,25 @@ impl Compiler {
         }
 
         // Fourth pass: lower simple map/grep/sort block bodies to bytecode (after subs; same `ops` vec).
+        // Each block was added via [`Self::add_deferred_block`], which captured a
+        // snapshot of `scope_stack` at definition time. Swap that snapshot in
+        // before compiling so references resolve against the LEXICAL scope the
+        // block was written in, not the trailing top-level scope_stack that
+        // exists once every sub body has been compiled and popped. Without
+        // this, a sub-local `my $max` referenced inside a `map { … $max … }`
+        // would silently resolve to a sibling top-level `my $max` slot.
         self.chunk.block_bytecode_ranges = vec![None; self.chunk.blocks.len()];
         for i in 0..self.chunk.blocks.len() {
             let b = self.chunk.blocks[i].clone();
             if Self::block_has_return(&b) {
                 continue;
             }
+            let saved_scope_stack = self
+                .block_scope_snapshots
+                .get(i)
+                .cloned()
+                .flatten()
+                .map(|snap| std::mem::replace(&mut self.scope_stack, snap));
             // Sort/reduce blocks bind `$a`/`$b` via [`Scope::set_sort_pair`] (name-write).
             // Suppress slot resolution for those names while compiling the body so that
             // any outer `my $a`/`my $b` slot binding doesn't shadow the per-iter values.
@@ -1196,6 +1236,9 @@ impl Compiler {
             self.force_name_for_sort_pair = false;
             if let Ok(range) = result {
                 self.chunk.block_bytecode_ranges[i] = Some(range);
+            }
+            if let Some(orig) = saved_scope_stack {
+                self.scope_stack = orig;
             }
         }
 
@@ -2431,7 +2474,7 @@ impl Compiler {
                 // bytecode and `run_block_region` can dispatch it. This keeps the
                 // body on the VM bytecode path — the tree-walker (`exec_block`) is
                 // banned for advice. See `tests/tree_walker_absent_aop.rs`.
-                let body_block_idx = self.chunk.add_block(body.clone());
+                let body_block_idx = self.add_deferred_block(body.clone());
                 self.chunk.runtime_advice_decls.push(RuntimeAdviceDecl {
                     kind: *kind,
                     pattern: pattern.clone(),
@@ -5326,7 +5369,7 @@ impl Compiler {
                         self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
                         match &args[0].kind {
                             ExprKind::CodeRef { body, .. } => {
-                                let block_idx = self.chunk.add_block(body.clone());
+                                let block_idx = self.add_deferred_block(body.clone());
                                 self.emit_op(Op::ChunkByWithBlock(block_idx), line, Some(root));
                             }
                             _ => {
@@ -5388,7 +5431,7 @@ impl Compiler {
                             self.emit_op(Op::LoadInt(0), line, Some(root));
                         }
                         self.compile_expr_ctx(&args[1], WantarrayCtx::List)?;
-                        let block_idx = self.chunk.add_block(body.clone());
+                        let block_idx = self.add_deferred_block(body.clone());
                         let op = if name == "pfirst" {
                             Op::PFirstWithBlock(block_idx)
                         } else {
@@ -6328,7 +6371,7 @@ impl Compiler {
             ExprKind::Do(e) => {
                 // do { BLOCK } executes the block; do "file" loads a file
                 if let ExprKind::CodeRef { body, .. } = &e.kind {
-                    let block_idx = self.chunk.add_block(body.clone());
+                    let block_idx = self.add_deferred_block(body.clone());
                     self.emit_op(Op::EvalBlock(block_idx, ctx.as_byte()), line, Some(root));
                 } else {
                     self.compile_expr(e)?;
@@ -6735,7 +6778,7 @@ impl Compiler {
                 self.emit_op(Op::MakeHashRef, line, Some(root));
             }
             ExprKind::CodeRef { body, params } => {
-                let block_idx = self.chunk.add_block(body.clone());
+                let block_idx = self.add_deferred_block(body.clone());
                 let sig_idx = self.chunk.add_code_ref_sig(params.clone());
                 self.emit_op(Op::MakeCodeRef(block_idx, sig_idx), line, Some(root));
             }
@@ -7083,7 +7126,7 @@ impl Compiler {
             } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if *stream {
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     if *flatten_array_refs {
                         self.emit_op(Op::MapsFlatMapWithBlock(block_idx), line, Some(root));
                     } else {
@@ -7092,7 +7135,7 @@ impl Compiler {
                 } else if let Some(k) = crate::map_grep_fast::detect_map_int_mul(block) {
                     self.emit_op(Op::MapIntMul(k), line, Some(root));
                 } else {
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     if *flatten_array_refs {
                         self.emit_op(Op::FlatMapWithBlock(block_idx), line, Some(root));
                     } else {
@@ -7128,7 +7171,7 @@ impl Compiler {
             }
             ExprKind::ForEachExpr { block, list } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.emit_op(Op::ForEachWithBlock(block_idx), line, Some(root));
             }
             ExprKind::GrepExpr {
@@ -7138,12 +7181,12 @@ impl Compiler {
             } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 if keyword.is_stream() {
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     self.emit_op(Op::FilterWithBlock(block_idx), line, Some(root));
                 } else if let Some((m, r)) = crate::map_grep_fast::detect_grep_int_mod_eq(block) {
                     self.emit_op(Op::GrepIntModEq(m, r), line, Some(root));
                 } else {
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     self.emit_op(Op::GrepWithBlock(block_idx), line, Some(root));
                 }
                 if ctx != WantarrayCtx::List {
@@ -7179,7 +7222,7 @@ impl Compiler {
                             };
                             self.emit_op(Op::SortWithBlockFast(tag), line, Some(root));
                         } else {
-                            let block_idx = self.chunk.add_block(block.clone());
+                            let block_idx = self.add_deferred_block(block.clone());
                             self.register_sort_pair_block(block_idx);
                             self.emit_op(Op::SortWithBlock(block_idx), line, Some(root));
                         }
@@ -7206,7 +7249,7 @@ impl Compiler {
                 if *stream {
                     // Streaming: no progress flag needed, just list + block.
                     self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     if *flat_outputs {
                         self.emit_op(Op::PFlatMapsWithBlock(block_idx), line, Some(root));
                     } else {
@@ -7221,7 +7264,7 @@ impl Compiler {
                     self.compile_expr_ctx(list, WantarrayCtx::List)?;
                     if let Some(cluster_e) = on_cluster {
                         self.compile_expr(cluster_e)?;
-                        let block_idx = self.chunk.add_block(block.clone());
+                        let block_idx = self.add_deferred_block(block.clone());
                         self.emit_op(
                             Op::PMapRemote {
                                 block_idx,
@@ -7231,7 +7274,7 @@ impl Compiler {
                             Some(root),
                         );
                     } else {
-                        let block_idx = self.chunk.add_block(block.clone());
+                        let block_idx = self.add_deferred_block(block.clone());
                         if *flat_outputs {
                             self.emit_op(Op::PFlatMapWithBlock(block_idx), line, Some(root));
                         } else {
@@ -7253,7 +7296,7 @@ impl Compiler {
                 }
                 self.compile_expr(chunk_size)?;
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.emit_op(Op::PMapChunkedWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PGrepExpr {
@@ -7264,7 +7307,7 @@ impl Compiler {
             } => {
                 if *stream {
                     self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     self.emit_op(Op::PGrepsWithBlock(block_idx), line, Some(root));
                 } else {
                     if let Some(p) = progress {
@@ -7273,7 +7316,7 @@ impl Compiler {
                         self.emit_op(Op::LoadInt(0), line, Some(root));
                     }
                     self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                    let block_idx = self.chunk.add_block(block.clone());
+                    let block_idx = self.add_deferred_block(block.clone());
                     self.emit_op(Op::PGrepWithBlock(block_idx), line, Some(root));
                 }
             }
@@ -7288,7 +7331,7 @@ impl Compiler {
                     self.emit_op(Op::LoadInt(0), line, Some(root));
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.emit_op(Op::PForWithBlock(block_idx), line, Some(root));
             }
             ExprKind::ParLinesExpr {
@@ -7342,7 +7385,7 @@ impl Compiler {
                         };
                         self.emit_op(Op::PSortWithBlockFast(tag), line, Some(root));
                     } else {
-                        let block_idx = self.chunk.add_block(block.clone());
+                        let block_idx = self.add_deferred_block(block.clone());
                         self.register_sort_pair_block(block_idx);
                         self.emit_op(Op::PSortWithBlock(block_idx), line, Some(root));
                     }
@@ -7352,7 +7395,7 @@ impl Compiler {
             }
             ExprKind::ReduceExpr { block, list } => {
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.register_sort_pair_block(block_idx);
                 self.emit_op(Op::ReduceWithBlock(block_idx), line, Some(root));
             }
@@ -7367,7 +7410,7 @@ impl Compiler {
                     self.emit_op(Op::LoadInt(0), line, Some(root));
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.register_sort_pair_block(block_idx);
                 self.emit_op(Op::PReduceWithBlock(block_idx), line, Some(root));
             }
@@ -7384,7 +7427,7 @@ impl Compiler {
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 self.compile_expr(init)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.emit_op(Op::PReduceInitWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PMapReduceExpr {
@@ -7399,8 +7442,8 @@ impl Compiler {
                     self.emit_op(Op::LoadInt(0), line, Some(root));
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let map_idx = self.chunk.add_block(map_block.clone());
-                let reduce_idx = self.chunk.add_block(reduce_block.clone());
+                let map_idx = self.add_deferred_block(map_block.clone());
+                let reduce_idx = self.add_deferred_block(reduce_block.clone());
                 self.emit_op(
                     Op::PMapReduceWithBlocks(map_idx, reduce_idx),
                     line,
@@ -7418,7 +7461,7 @@ impl Compiler {
                     self.emit_op(Op::LoadInt(0), line, Some(root));
                 }
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 self.emit_op(Op::PcacheWithBlock(block_idx), line, Some(root));
             }
             ExprKind::PselectExpr { receivers, timeout } => {
@@ -7455,7 +7498,7 @@ impl Compiler {
                 } else {
                     self.emit_op(Op::LoadInt(0), line, Some(root));
                 }
-                let block_idx = self.chunk.add_block(block.clone());
+                let block_idx = self.add_deferred_block(block.clone());
                 match (count, capture) {
                     (Some(c), false) => {
                         self.compile_expr(c)?;
@@ -7474,20 +7517,20 @@ impl Compiler {
                 }
             }
             ExprKind::AsyncBlock { body } | ExprKind::SpawnBlock { body } => {
-                let block_idx = self.chunk.add_block(body.clone());
+                let block_idx = self.add_deferred_block(body.clone());
                 self.emit_op(Op::AsyncBlock(block_idx), line, Some(root));
             }
             ExprKind::Trace { body } => {
-                let block_idx = self.chunk.add_block(body.clone());
+                let block_idx = self.add_deferred_block(body.clone());
                 self.emit_op(Op::TraceBlock(block_idx), line, Some(root));
             }
             ExprKind::Timer { body } => {
-                let block_idx = self.chunk.add_block(body.clone());
+                let block_idx = self.add_deferred_block(body.clone());
                 self.emit_op(Op::TimerBlock(block_idx), line, Some(root));
             }
             ExprKind::Bench { body, times } => {
                 self.compile_expr(times)?;
-                let block_idx = self.chunk.add_block(body.clone());
+                let block_idx = self.add_deferred_block(body.clone());
                 self.emit_op(Op::BenchBlock(block_idx), line, Some(root));
             }
             ExprKind::Await(e) => {

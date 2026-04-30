@@ -10,12 +10,12 @@ fn fib_n ($n) {
 
 fn factorial_n ($n) {
     my $r = 1
-    $r *= $_ for 1..$n
+    $r *= _ for 1..$n
     $r
 }
 
 fn primes_under ($max) {
-    my @result = grep { is_prime($_) } 2..$max
+    my @result = grep { is_prime(_) } 2..$max
     @result
 }
 

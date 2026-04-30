@@ -52,14 +52,14 @@ fn make_lru_cache($max_size) {
 
     my $get = fn($key) {
         return undef unless exists $cache{$key}
-        @keys_order = grep { $_ ne $key } @keys_order
+        @keys_order = grep { _ ne $key } @keys_order
         push @keys_order, $key
         $cache{$key}
     }
 
     my $set = fn($key, $val) {
         if (exists $cache{$key}) {
-            @keys_order = grep { $_ ne $key } @keys_order
+            @keys_order = grep { _ ne $key } @keys_order
         } elsif (scalar(@keys_order) >= $max_size) {
             my $oldest = shift @keys_order
             delete $cache{$oldest}
@@ -167,8 +167,8 @@ fn sum_fibs_memo($n) {
 
 fn count_primes_memo($max) {
     my $count = 0
-    for my $n (2..$max) {
-        $count++ if is_prime_memo($n)
+    ~> 2..$max ep {
+        $count++ if is_prime_memo(_)
     }
     $count
 }

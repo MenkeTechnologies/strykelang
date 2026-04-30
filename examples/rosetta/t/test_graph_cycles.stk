@@ -15,8 +15,8 @@ fn Rosetta::GraphCycles::backtrack($curr, $path, $visited, $adj, $cycles) {
 
 fn Rosetta::GraphCycles::solve($adj) {
     my @cycles
-    for my $node (keys %$adj) {
-        Rosetta::GraphCycles::backtrack($node, [], {}, $adj, \@cycles)
+    ~> keys %$adj ep {
+        Rosetta::GraphCycles::backtrack(_, [], {}, $adj, \@cycles)
     }
     \@cycles
 }

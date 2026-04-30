@@ -24,7 +24,7 @@ fn for_array_sum {
 fn for_default_var {
     my $sum = 0
     for (1, 2, 3) {
-        $sum += $_
+        $sum += _
     }
     $sum
 }
@@ -32,7 +32,7 @@ fn for_default_var {
 fn for_nested {
     my $count = 0
     for my $i (1..3) {
-        for my $j (1..3) {
+        ~> 1..3 ep {
             $count++
         }
     }
@@ -183,7 +183,7 @@ fn values_count {
 fn values_sum {
     my %h = (a => 1, b => 2, c => 3)
     my $sum = 0
-    $sum += $_ for values %h
+    $sum += _ for values %h
     $sum
 }
 
@@ -217,15 +217,15 @@ fn array_for_index {
 fn array_postfix_for {
     my @arr = (1, 2, 3)
     my $sum = 0
-    $sum += $_ for @arr
+    $sum += _ for @arr
     $sum
 }
 
 fn array_reverse_iter {
     my @arr = (1, 2, 3)
     my @result = ()
-    for my $x (rev @arr) {
-        push @result, $x
+    ~> rev @arr ep {
+        push @result, _
     }
     join(",", @result)
 }
@@ -236,12 +236,12 @@ fn array_reverse_iter {
 
 fn map_transform {
     my @arr = (1, 2, 3)
-    join(",", map { $_ * 2 } @arr)
+    join(",", map { _ * 2 } @arr)
 }
 
 fn map_filter_combo {
     my @arr = (1, 2, 3, 4, 5)
-    join(",", map { $_ * 2 } grep { $_ > 2 } @arr)
+    join(",", map { _ * 2 } grep { _ > 2 } @arr)
 }
 
 fn map_with_index {
@@ -252,7 +252,7 @@ fn map_with_index {
 
 fn map_flatten {
     my @arr = (1, 2, 3)
-    scalar(map { ($_, $_ * 10) } @arr)
+    scalar(map { (_, _ * 10) } @arr)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -261,7 +261,7 @@ fn map_flatten {
 
 fn grep_filter {
     my @arr = (1, 2, 3, 4, 5, 6)
-    join(",", grep { $_ % 2 == 0 } @arr)
+    join(",", grep { _ % 2 == 0 } @arr)
 }
 
 fn grep_regex {
@@ -271,12 +271,12 @@ fn grep_regex {
 
 fn grep_defined {
     my @arr = (1, undef, 2, undef, 3)
-    scalar(grep { defined($_) } @arr)
+    scalar(grep { defined(_) } @arr)
 }
 
 fn grep_first {
     my @arr = (1, 5, 3, 8, 2)
-    my @found = grep { $_ > 4 } @arr
+    my @found = grep { _ > 4 } @arr
     $found[0]
 }
 
@@ -391,8 +391,8 @@ fn hash_of_arrays_iter {
 fn collect_matching {
     my @arr = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     my @evens = ()
-    for my $n (@arr) {
-        push @evens, $n if $n % 2 == 0
+    ~> @arr ep {
+        push @evens, _ if _ % 2 == 0
     }
     join(",", @evens)
 }

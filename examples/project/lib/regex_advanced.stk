@@ -290,7 +290,7 @@ fn regex_no_capture {
 # REGEX MODIFIERS COMBINED
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn mods_ig { "HELLO HELLO" =~ s/hello/hi/ig; $_ // "" }
+fn mods_ig { "HELLO HELLO" =~ s/hello/hi/ig; _ // "" }
 fn mods_gi { "aAaA" =~ /a/gi ? 1 : 0 }
 
 fn subst_preserves_original {

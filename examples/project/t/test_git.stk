@@ -19,7 +19,7 @@ assert_ok -d $root, "git_root is a directory"
 my @branches = git_branches()
 assert_gt scalar(@branches), 0, "has branches"
 
-my @head_branch = grep { $_->{is_head} } @branches
+my @head_branch = grep { _->{is_head} } @branches
 assert_eq scalar(@head_branch), 1, "has exactly one HEAD branch"
 assert_ok defined($head_branch[0]->{name}), "head branch has a name"
 

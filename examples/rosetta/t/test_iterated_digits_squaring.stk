@@ -6,8 +6,8 @@ fn Rosetta::IteratedDigitsSquaring::compute($n) {
     while ($curr != 1 && $curr != 89) {
         my $sum = 0
         my @digits = ~> "$curr" chars
-        for my $d (@digits) {
-            $sum += int($d) * int($d)
+        ~> @digits ep {
+            $sum += int(_) * int(_)
         }
         $curr = $sum
     }

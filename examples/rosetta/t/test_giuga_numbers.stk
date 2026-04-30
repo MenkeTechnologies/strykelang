@@ -24,7 +24,7 @@ fn Rosetta::Giuga::is_giuga($n) {
     # Composite check: at least 2 distinct primes OR repeated prime power
     # For Giuga we also need n squarefree (no repeated prime factor).
     my $prod = 1
-    for my $p (@$primes) { $prod *= $p }
+    ~> @$primes ep { $prod *= _ }
     return 0 if $prod != $n
     for my $p (@$primes) {
         my $q = int($n / $p) - 1
