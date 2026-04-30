@@ -1,0 +1,167 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Delaunay triangulation via Bowyer-Watson incremental
+# algorithm. Start with a "super-triangle" enclosing every input
+# point; insert points one at a time, removing every triangle whose
+# circumcircle contains the new point and re-triangulating the cavity.
+
+fn Rosetta::Delaunay::circumcircle($a, $b, $c) {
+    my $ax = $a->[0]; my $ay = $a->[1]
+    my $bx = $b->[0]; my $by = $b->[1]
+    my $cx = $c->[0]; my $cy = $c->[1]
+    my $d = 2 * ($ax * ($by - $cy) + $bx * ($cy - $ay) + $cx * ($ay - $by))
+    return undef if abs($d) < 1e-15
+    my $sa = $ax * $ax + $ay * $ay
+    my $sb = $bx * $bx + $by * $by
+    my $sc = $cx * $cx + $cy * $cy
+    my $ux = ($sa * ($by - $cy) + $sb * ($cy - $ay) + $sc * ($ay - $by)) / $d
+    my $uy = ($sa * ($cx - $bx) + $sb * ($ax - $cx) + $sc * ($bx - $ax)) / $d
+    my $dx = $ax - $ux
+    my $dy = $ay - $uy
+    { center => [$ux, $uy], r2 => $dx * $dx + $dy * $dy }
+}
+
+fn Rosetta::Delaunay::in_circle($circ, $p) {
+    return 0 if !defined $circ
+    my $dx = $p->[0] - $circ->{center}[0]
+    my $dy = $p->[1] - $circ->{center}[1]
+    $dx * $dx + $dy * $dy <= $circ->{r2} + 1e-9
+}
+
+# Edge keyed canonically by sorted endpoint indices.
+fn Rosetta::Delaunay::edge_key($a, $b) {
+    $a < $b ? "$a,$b" : "$b,$a"
+}
+
+fn Rosetta::Delaunay::triangulate($points) {
+    my $n = len(@$points)
+    return [] if $n < 3
+    # Bounding box → super-triangle.
+    my $minx = $points->[0][0]; my $maxx = $points->[0][0]
+    my $miny = $points->[0][1]; my $maxy = $points->[0][1]
+    for my $p (@$points) {
+        $minx = $p->[0] if $p->[0] < $minx
+        $maxx = $p->[0] if $p->[0] > $maxx
+        $miny = $p->[1] if $p->[1] < $miny
+        $maxy = $p->[1] if $p->[1] > $maxy
+    }
+    my $dx = $maxx - $minx + 1
+    my $dy = $maxy - $miny + 1
+    my $cx = ($minx + $maxx) / 2
+    my $cy = ($miny + $maxy) / 2
+    my $size = $dx > $dy ? $dx : $dy
+    # Big enough super-triangle vertices (well outside bounding box).
+    my @pts = @$points
+    push @pts, [$cx - 20 * $size, $cy - $size]
+    push @pts, [$cx, $cy + 20 * $size]
+    push @pts, [$cx + 20 * $size, $cy - $size]
+    my $sa = $n; my $sb = $n + 1; my $sc = $n + 2
+    my @tris = ([$sa, $sb, $sc])
+    for my $i (~> 0:$n - 1) {
+        my $p = $points->[$i]
+        # Find triangles whose circumcircle contains $p.
+        my @bad
+        my @good
+        for my $t (@tris) {
+            my $cc = Rosetta::Delaunay::circumcircle(
+                $pts[$t->[0]], $pts[$t->[1]], $pts[$t->[2]])
+            if (Rosetta::Delaunay::in_circle($cc, $p)) {
+                push @bad, $t
+            } else {
+                push @good, $t
+            }
+        }
+        # Find boundary of bad-triangle cavity (edges in only one bad triangle).
+        my %edge_count
+        for my $t (@bad) {
+            for my $pair ([0, 1], [1, 2], [2, 0]) {
+                my $key = Rosetta::Delaunay::edge_key($t->[$pair->[0]], $t->[$pair->[1]])
+                $edge_count{$key} //= 0
+                $edge_count{$key}++
+            }
+        }
+        # Re-triangulate the cavity to $i.
+        for my $t (@bad) {
+            for my $pair ([0, 1], [1, 2], [2, 0]) {
+                my $u = $t->[$pair->[0]]
+                my $v = $t->[$pair->[1]]
+                my $key = Rosetta::Delaunay::edge_key($u, $v)
+                if ($edge_count{$key} == 1) {
+                    push @good, [$u, $v, $i]
+                }
+            }
+        }
+        @tris = @good
+    }
+    # Drop triangles that touch any super-triangle vertex.
+    my @final
+    for my $t (@tris) {
+        next if $t->[0] >= $n || $t->[1] >= $n || $t->[2] >= $n
+        push @final, $t
+    }
+    \@final
+}
+
+fn Rosetta::Delaunay::format_triangles($tris) {
+    my @rows
+    for my $t (@$tris) {
+        my @s = sort { _0 <=> _1 } @$t
+        push @rows, join(",", @s)
+    }
+    @rows = sort { _0 cmp _1 } @rows
+    join(";", @rows)
+}
+
+# 4-point square — Delaunay triangulation has exactly two triangles.
+my $sq = [[0, 0], [1, 0], [1, 1], [0, 1]]
+my $r1 = Rosetta::Delaunay::triangulate($sq)
+assert_eq len(@$r1), 2, "square produces 2 triangles"
+
+# Three collinear-ish points — degenerate, no triangle.
+# For generic position, three non-collinear points → 1 triangle.
+my $tri = [[0, 0], [4, 0], [0, 3]]
+my $r2 = Rosetta::Delaunay::triangulate($tri)
+assert_eq len(@$r2), 1, "3-point triangle"
+
+# Five points: square plus center → 4 triangles fanning out from center.
+my $sq5 = [[0, 0], [1, 0], [1, 1], [0, 1], [0.5, 0.5]]
+my $r3 = Rosetta::Delaunay::triangulate($sq5)
+assert_eq len(@$r3), 4, "square + center = 4 triangles"
+
+# Verify Delaunay property: no triangle's circumcircle contains another input
+# point (to within numeric tolerance).
+fn Rosetta::Delaunay::verify($pts, $tris) {
+    for my $t (@$tris) {
+        my $cc = Rosetta::Delaunay::circumcircle(
+            $pts->[$t->[0]], $pts->[$t->[1]], $pts->[$t->[2]])
+        for my $i (~> 0:len(@$pts) - 1) {
+            next if $i == $t->[0] || $i == $t->[1] || $i == $t->[2]
+            my $dx = $pts->[$i][0] - $cc->{center}[0]
+            my $dy = $pts->[$i][1] - $cc->{center}[1]
+            my $d2 = $dx * $dx + $dy * $dy
+            return 0 if $d2 < $cc->{r2} - 1e-6
+        }
+    }
+    1
+}
+assert_eq Rosetta::Delaunay::verify($sq5, $r3), 1, "Delaunay property holds for square+center"
+
+# 7 points — count not pinned but verify Delaunay property.
+my @pts7 = ([0, 0], [4, 0], [4, 3], [0, 3], [2, 1], [1, 2], [3, 2])
+my $r4 = Rosetta::Delaunay::triangulate(\@pts7)
+assert_ok len(@$r4) > 0, "produces triangles"
+assert_eq Rosetta::Delaunay::verify(\@pts7, $r4), 1, "Delaunay property on 7-pt set"
+
+# Empty input
+my $r5 = Rosetta::Delaunay::triangulate([])
+assert_eq len(@$r5), 0, "empty"
+
+# Two points — too few
+my $r6 = Rosetta::Delaunay::triangulate([[0, 0], [1, 1]])
+assert_eq len(@$r6), 0, "2 points"
+
+# circumcircle helper sanity
+my $cc = Rosetta::Delaunay::circumcircle([0, 0], [4, 0], [0, 3])
+assert_ok abs($cc->{center}[0] - 2) < 1e-9, "circumcircle Cx"
+assert_ok abs($cc->{center}[1] - 1.5) < 1e-9, "circumcircle Cy"
+
+test_run

@@ -22,4 +22,4 @@ fn Exercism::FoodChain::verse($n) {
     join "\n", @lines
 }
 
-fn Exercism::FoodChain::verses($from, $to) { join "\n\n", map { Exercism::FoodChain::verse($_) } $from..$to }
+fn Exercism::FoodChain::verses($from, $to) { ~> $from:$to map { Exercism::FoodChain::verse } |> join("\n\n") }

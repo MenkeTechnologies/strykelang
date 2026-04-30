@@ -1,0 +1,154 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Held-Karp algorithm — exact dynamic-programming TSP in
+# O(n² · 2ⁿ) time and O(n · 2ⁿ) space, vs the O(n!) of brute force.
+# State: (subset S of visited cities, last city j) → shortest path
+# starting from city 0 visiting exactly S and ending at j.
+
+fn Rosetta::HeldKarp::solve($dist) {
+    my $n = len(@$dist)
+    my $full = (1 << $n) - 1
+    my $INF = 1e18
+    # dp[(mask << 16) | j] = best cost (use a hash for sparse access).
+    my %dp
+    my %parent
+    # Base: paths starting at 0, visiting only {0, j}, ending at j.
+    for my $j (1..$n - 1) {
+        my $key = ((1 | (1 << $j)) << 8) | $j
+        $dp{$key} = $dist->[0][$j]
+        $parent{$key} = 0
+    }
+    for my $size (3..$n) {
+        # Enumerate all subsets of {1..n-1} of size $size-1, always including 0.
+        my @subsets
+        Rosetta::HeldKarp::enumerate_subsets($n - 1, $size - 1, \@subsets)
+        for my $bits (@subsets) {
+            my $mask = ($bits << 1) | 1   # always include city 0
+            for my $j (1..$n - 1) {
+                next if !(($mask >> $j) & 1)
+                my $best = $INF
+                my $best_k = -1
+                my $prev_mask = $mask ^ (1 << $j)
+                for my $k (1..$n - 1) {
+                    next if $k == $j
+                    next if !(($prev_mask >> $k) & 1)
+                    my $key_prev = ($prev_mask << 8) | $k
+                    next if !exists $dp{$key_prev}
+                    my $cand = $dp{$key_prev} + $dist->[$k][$j]
+                    if ($cand < $best) { $best = $cand; $best_k = $k }
+                }
+                if ($best_k != -1) {
+                    my $key = ($mask << 8) | $j
+                    $dp{$key} = $best
+                    $parent{$key} = $best_k
+                }
+            }
+        }
+    }
+    # Close the cycle.
+    my $best_cost = 1e18
+    my $best_last = -1
+    for my $j (1..$n - 1) {
+        my $key = ($full << 8) | $j
+        next if !exists $dp{$key}
+        my $cand = $dp{$key} + $dist->[$j][0]
+        if ($cand < $best_cost) { $best_cost = $cand; $best_last = $j }
+    }
+    # Reconstruct.
+    my @tour
+    my $cur_mask = $full
+    my $cur = $best_last
+    while ($cur != 0) {
+        push @tour, $cur
+        my $key = ($cur_mask << 8) | $cur
+        my $prev = $parent{$key}
+        $cur_mask ^= (1 << $cur)
+        $cur = $prev
+    }
+    push @tour, 0
+    @tour = reverse @tour
+    push @tour, 0   # close the cycle
+    { cost => $best_cost, tour => \@tour }
+}
+
+# Generate every subset of {0..top-1} of exactly $size bits (each as a
+# bitmask in the lower top-1 positions). Output excludes the bit for
+# city 0 (always set externally).
+fn Rosetta::HeldKarp::enumerate_subsets($top, $size, $out) {
+    Rosetta::HeldKarp::es_recurse($top, $size, 0, 0, $out)
+}
+
+fn Rosetta::HeldKarp::es_recurse($top, $size, $idx, $bits, $out) {
+    if ($size == 0) { push @$out, $bits; return }
+    return if $idx >= $top
+    return if $top - $idx < $size
+    Rosetta::HeldKarp::es_recurse($top, $size - 1, $idx + 1, $bits | (1 << $idx), $out)
+    Rosetta::HeldKarp::es_recurse($top, $size, $idx + 1, $bits, $out)
+}
+
+fn Rosetta::HeldKarp::distance($cities, $i, $j) {
+    my $dx = $cities->[$i][0] - $cities->[$j][0]
+    my $dy = $cities->[$i][1] - $cities->[$j][1]
+    sqrt($dx * $dx + $dy * $dy)
+}
+
+fn Rosetta::HeldKarp::matrix_from_cities($cities) {
+    my $n = len(@$cities)
+    my @m
+    for my $i (~> 0:$n - 1) {
+        my @row
+        for my $j (~> 0:$n - 1) { push @row, Rosetta::HeldKarp::distance($cities, $i, $j) }
+        push @m, \@row
+    }
+    \@m
+}
+
+fn Rosetta::HeldKarp::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# 4-city square. Optimal Hamilton cycle: 4 edges of length 1 = 4.
+my $sq = Rosetta::HeldKarp::matrix_from_cities([[0, 0], [1, 0], [1, 1], [0, 1]])
+my $r1 = Rosetta::HeldKarp::solve($sq)
+assert_ok Rosetta::HeldKarp::approx($r1->{cost}, 4, 1e-9), "square TSP = 4"
+assert_eq len(@{$r1->{tour}}), 5, "tour visits all + return"
+assert_eq $r1->{tour}[0], 0, "starts at 0"
+assert_eq $r1->{tour}[-1], 0, "returns to 0"
+
+# 3-city triangle: any cycle hits all 3 edges. 3-4-5 right triangle: 3 + 4 + 5 = 12.
+my $tri = [
+    [0, 3, 4],
+    [3, 0, 5],
+    [4, 5, 0]
+]
+my $r2 = Rosetta::HeldKarp::solve($tri)
+assert_eq $r2->{cost}, 12, "3-4-5 triangle TSP = 12"
+
+# 5-city case: known optimal 17.
+# Distances: complete graph with following weights.
+my $d5 = [
+    [0, 2, 9, 10, 1],
+    [2, 0, 6, 4,  5],
+    [9, 6, 0, 8,  3],
+    [10,4, 8, 0,  7],
+    [1, 5, 3, 7,  0]
+]
+my $r3 = Rosetta::HeldKarp::solve($d5)
+# Brute-force verified optimum: 18 (tour 0-1-3-2-4-0 and its reverse).
+assert_eq $r3->{cost}, 18, "5-city TSP = 18"
+
+# Verify tour is a valid Hamilton cycle: visits each city once + return.
+my %seen
+for my $c (@{$r3->{tour}}[0..len(@{$r3->{tour}}) - 2]) { $seen{$c}++ }
+assert_eq len(keys %seen), 5, "tour visits 5 distinct cities"
+
+# 2-city: trivial.
+my $two = [[0, 7], [7, 0]]
+my $r4 = Rosetta::HeldKarp::solve($two)
+assert_eq $r4->{cost}, 14, "2-city round-trip = 2*7"
+
+# Subset enumeration sanity
+my @subs
+Rosetta::HeldKarp::enumerate_subsets(4, 2, \@subs)
+@subs = sort { _0 <=> _1 } @subs
+# Subsets of {0,1,2,3} with 2 bits: 0b0011, 0b0101, 0b0110, 0b1001, 0b1010, 0b1100 → 6
+assert_eq len(@subs), 6, "C(4, 2) = 6 subsets"
+
+test_run

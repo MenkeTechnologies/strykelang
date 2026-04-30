@@ -1,0 +1,135 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 2D Fenwick (Binary Indexed) tree — supports point
+# updates and rectangular prefix-sum queries on an n×m grid in
+# O(log n · log m) per op.
+
+fn Rosetta::Fenwick2D::new($n, $m) {
+    my @tree
+    for my $i (~> 1:$n) {
+        my @row = ~> 0:$m |> map { 0 }
+        push @tree, \@row
+    }
+    { n => $n, m => $m, tree => \@tree }
+}
+
+fn Rosetta::Fenwick2D::update($f, $r, $c, $delta) {
+    # 1-indexed internally.
+    my $i = $r + 1
+    while ($i <= $f->{n}) {
+        my $j = $c + 1
+        while ($j <= $f->{m}) {
+            $f->{tree}[$i - 1][$j - 1] += $delta
+            $j += $j & -$j
+        }
+        $i += $i & -$i
+    }
+}
+
+# Sum of rectangle [0..r] × [0..c] (inclusive).
+fn Rosetta::Fenwick2D::prefix_sum($f, $r, $c) {
+    return 0 if $r < 0 || $c < 0
+    my $s = 0
+    my $i = $r + 1
+    while ($i > 0) {
+        my $j = $c + 1
+        while ($j > 0) {
+            $s += $f->{tree}[$i - 1][$j - 1]
+            $j -= $j & -$j
+        }
+        $i -= $i & -$i
+    }
+    $s
+}
+
+fn Rosetta::Fenwick2D::range_sum($f, $r1, $c1, $r2, $c2) {
+    my $a = Rosetta::Fenwick2D::prefix_sum($f, $r2, $c2)
+    my $b = Rosetta::Fenwick2D::prefix_sum($f, $r1 - 1, $c2)
+    my $c = Rosetta::Fenwick2D::prefix_sum($f, $r2, $c1 - 1)
+    my $d = Rosetta::Fenwick2D::prefix_sum($f, $r1 - 1, $c1 - 1)
+    $a - $b - $c + $d
+}
+
+# Naive 2D prefix sum for cross-checking.
+fn Rosetta::Fenwick2D::naive_range($g, $r1, $c1, $r2, $c2) {
+    my $s = 0
+    for my $i ($r1..$r2) {
+        for my $j ($c1..$c2) { $s += $g->[$i][$j] }
+    }
+    $s
+}
+
+# 4×4 grid, all zeros. Add values, query rectangles.
+my $f = Rosetta::Fenwick2D::new(4, 4)
+my @grid
+for my $i (~> 0:3) {
+    my @row = ~> 0:3 |> map { 0 }
+    push @grid, \@row
+}
+
+# Place values
+my @ops = (
+    [0, 0, 1], [1, 1, 5], [2, 2, 3], [3, 3, 7],
+    [0, 3, 2], [3, 0, 4], [1, 2, 6], [2, 1, 8]
+)
+for my $op (@ops) {
+    my ($r, $c, $v) = @$op
+    Rosetta::Fenwick2D::update($f, $r, $c, $v)
+    $grid[$r][$c] += $v
+}
+
+# Spot-check key rectangles
+assert_eq Rosetta::Fenwick2D::prefix_sum($f, 3, 3), 36, "full prefix sum"
+assert_eq Rosetta::Fenwick2D::prefix_sum($f, 1, 1), 6, "[0..1]×[0..1]"
+assert_eq Rosetta::Fenwick2D::range_sum($f, 1, 1, 2, 2), 22, "[1..2]×[1..2] = 22"
+assert_eq Rosetta::Fenwick2D::range_sum($f, 0, 0, 0, 3), 3,  "row 0"
+assert_eq Rosetta::Fenwick2D::range_sum($f, 3, 0, 3, 3), 11, "row 3"
+assert_eq Rosetta::Fenwick2D::range_sum($f, 0, 0, 3, 0), 5,  "col 0"
+
+# Cross-check every rectangle with naive.
+for my $r1 (~> 0:3) {
+    for my $c1 (~> 0:3) {
+        for my $r2 ($r1..3) {
+            for my $c2 ($c1..3) {
+                my $bit = Rosetta::Fenwick2D::range_sum($f, $r1, $c1, $r2, $c2)
+                my $nv  = Rosetta::Fenwick2D::naive_range(\@grid, $r1, $c1, $r2, $c2)
+                assert_eq $bit, $nv, "[$r1,$c1]..[$r2,$c2]"
+            }
+        }
+    }
+}
+
+# Decrement
+Rosetta::Fenwick2D::update($f, 1, 1, -5)
+$grid[1][1] -= 5
+assert_eq Rosetta::Fenwick2D::prefix_sum($f, 3, 3), 31, "after -5 at (1,1)"
+
+# Larger random sanity
+srand(11)
+my $f2 = Rosetta::Fenwick2D::new(8, 8)
+my @g2
+for my $i (~> 0:7) {
+    my @row = ~> 0:7 |> map { 0 }
+    push @g2, \@row
+}
+for (~> 1:30) {
+    my $r = int(rand() * 8)
+    my $c = int(rand() * 8)
+    my $v = int(rand() * 20) - 10
+    Rosetta::Fenwick2D::update($f2, $r, $c, $v)
+    $g2[$r][$c] += $v
+}
+for my $r1 (0, 2, 5) {
+    for my $r2 (3, 6, 7) {
+        next if $r2 < $r1
+        for my $c1 (0, 1, 4) {
+            for my $c2 (5, 7) {
+                next if $c2 < $c1
+                my $bit = Rosetta::Fenwick2D::range_sum($f2, $r1, $c1, $r2, $c2)
+                my $nv  = Rosetta::Fenwick2D::naive_range(\@g2, $r1, $c1, $r2, $c2)
+                assert_eq $bit, $nv, "stress [$r1,$c1]..[$r2,$c2]"
+            }
+        }
+    }
+}
+
+test_run

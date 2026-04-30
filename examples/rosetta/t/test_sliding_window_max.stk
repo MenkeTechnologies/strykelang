@@ -1,0 +1,94 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sliding window maximum — for an array of size n and a
+# window of size k, output the max in each window in O(n) using a
+# monotonic deque (decreasing values from front).
+
+fn Rosetta::SlidingMax::compute($arr, $k) {
+    my $n = len(@$arr)
+    return [] if $k <= 0 || $k > $n
+    my @dq        # holds indices, $arr->[dq[0]] is current max
+    my @out
+    for my $i (~> 0:$n - 1) {
+        # Drop indices outside the window.
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) { shift @dq }
+        # Drop smaller-or-equal values from the back so the deque stays
+        # strictly decreasing.
+        while (len(@dq) > 0 && $arr->[$dq[-1]] <= $arr->[$i]) { pop @dq }
+        push @dq, $i
+        push @out, $arr->[$dq[0]] if $i >= $k - 1
+    }
+    \@out
+}
+
+fn Rosetta::SlidingMax::compute_min($arr, $k) {
+    my $n = len(@$arr)
+    return [] if $k <= 0 || $k > $n
+    my @dq
+    my @out
+    for my $i (~> 0:$n - 1) {
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) { shift @dq }
+        while (len(@dq) > 0 && $arr->[$dq[-1]] >= $arr->[$i]) { pop @dq }
+        push @dq, $i
+        push @out, $arr->[$dq[0]] if $i >= $k - 1
+    }
+    \@out
+}
+
+# Naive cross-check
+fn Rosetta::SlidingMax::naive_max($arr, $k) {
+    my $n = len(@$arr)
+    return [] if $k <= 0 || $k > $n
+    my @out
+    for my $i (0..$n - $k) {
+        my $m = $arr->[$i]
+        for my $j ($i + 1..$i + $k - 1) { $m = $arr->[$j] if $arr->[$j] > $m }
+        push @out, $m
+    }
+    \@out
+}
+
+# LeetCode 239 reference: arr=[1,3,-1,-3,5,3,6,7], k=3 → [3,3,5,5,6,7]
+my $arr = [1, 3, -1, -3, 5, 3, 6, 7]
+my $r1 = Rosetta::SlidingMax::compute($arr, 3)
+assert_eq join(",", @$r1), "3,3,5,5,6,7", "LC 239 max"
+my $rmin = Rosetta::SlidingMax::compute_min($arr, 3)
+assert_eq join(",", @$rmin), "-1,-3,-3,-3,3,3", "LC 239 min"
+
+# Window size = 1: returns the array unchanged.
+my $r2 = Rosetta::SlidingMax::compute([5, 2, 8, 1, 9], 1)
+assert_eq join(",", @$r2), "5,2,8,1,9", "k=1 returns input"
+
+# Window size = n: single element, max of all.
+my $r3 = Rosetta::SlidingMax::compute([5, 2, 8, 1, 9], 5)
+assert_eq join(",", @$r3), "9", "k=n single window"
+
+# Strictly increasing input
+my $r4 = Rosetta::SlidingMax::compute([1, 2, 3, 4, 5, 6], 3)
+assert_eq join(",", @$r4), "3,4,5,6", "ascending: max = right edge"
+
+# Strictly decreasing input
+my $r5 = Rosetta::SlidingMax::compute([6, 5, 4, 3, 2, 1], 3)
+assert_eq join(",", @$r5), "6,5,4,3", "descending: max = left edge"
+
+# Constant array
+my $r6 = Rosetta::SlidingMax::compute([7, 7, 7, 7], 2)
+assert_eq join(",", @$r6), "7,7,7", "constant"
+
+# Cross-check against naive on random-ish input
+srand(31)
+my @big = ~> 1:50 |> map { int(rand() * 100) - 50 }
+for my $k (1, 3, 5, 7, 10, 25, 50) {
+    my $deque = Rosetta::SlidingMax::compute(\@big, $k)
+    my $naive = Rosetta::SlidingMax::naive_max(\@big, $k)
+    assert_eq join(",", @$deque), join(",", @$naive), "deque = naive (k=$k)"
+}
+
+# Edge cases
+my $r7 = Rosetta::SlidingMax::compute([], 3)
+assert_eq len(@$r7), 0, "empty input"
+my $r8 = Rosetta::SlidingMax::compute([1, 2, 3], 5)
+assert_eq len(@$r8), 0, "k > n"
+my $r9 = Rosetta::SlidingMax::compute([5], 1)
+assert_eq join(",", @$r9), "5", "single element"
+
+test_run

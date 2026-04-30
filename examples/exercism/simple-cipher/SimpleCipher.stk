@@ -3,7 +3,7 @@ fn Exercism::SimpleCipher::new($key) {
     if (defined $key) {
         die "ArgumentError" if $key =~ /[A-Z0-9]/ || length($key) == 0
     } else {
-        $key = join "", map { chr(97 + int(rand 26)) } 1..100
+        $key = ~> 1:100 map { chr(97 + int(rand 26)) } |> join("")
     }
     { key => $key }
 }
@@ -11,12 +11,12 @@ fn Exercism::SimpleCipher::new($key) {
 fn Exercism::SimpleCipher::_process($self, $in, $decode) {
     my @c = chars(lc($in =~ s/[^a-zA-Z]//gr))
     my @k = chars($self->{key})
-    my $kn = 0 + @k
-    join "", map {
-        my $tr = ord($c[$_]) - 97
-        my $kk = ord($k[$_ % $kn]) - 97
+    my $kn = len(@k)
+    ~> 0:len(@c)-1 map {
+        my $tr = ord($c[_]) - 97
+        my $kk = ord($k[_ % $kn]) - 97
         chr(97 + (($tr + ($decode ? -$kk : $kk)) % 26 + 26) % 26)
-    } 0..(0 + @c) - 1
+    } |> join("")
 }
 
 fn Exercism::SimpleCipher::encode($self, $plain) { Exercism::SimpleCipher::_process($self, $plain, 0) }

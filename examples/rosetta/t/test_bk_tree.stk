@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: BK tree (Burkhard-Keller tree) — index strings under a
+# discrete metric (typically Levenshtein) for fast approximate-match
+# lookup. Each child of a node is keyed by its distance to the parent;
+# the triangle inequality lets us prune subtrees during search.
+
+fn Rosetta::BK::levenshtein($a, $b) {
+    my $la = length($a)
+    my $lb = length($b)
+    return $lb if $la == 0
+    return $la if $lb == 0
+    my @prev = ~> 0:$lb
+    for my $i (~> 1:$la) {
+        my @cur = ($i)
+        my $ac = substr($a, $i - 1, 1)
+        for my $j (~> 1:$lb) {
+            my $cost = $ac eq substr($b, $j - 1, 1) ? 0 : 1
+            my $del = $prev[$j] + 1
+            my $ins = $cur[$j - 1] + 1
+            my $sub = $prev[$j - 1] + $cost
+            my $m = $del < $ins ? $del : $ins
+            $m = $sub if $sub < $m
+            push @cur, $m
+        }
+        @prev = @cur
+    }
+    $prev[$lb]
+}
+
+fn Rosetta::BK::new() { { root => undef } }
+
+fn Rosetta::BK::insert($t, $word) {
+    if (!defined $t->{root}) {
+        $t->{root} = { word => $word, children => {} }
+        return
+    }
+    my $node = $t->{root}
+    while (1) {
+        my $d = Rosetta::BK::levenshtein($word, $node->{word})
+        return if $d == 0
+        if (exists $node->{children}{$d}) {
+            $node = $node->{children}{$d}
+        } else {
+            $node->{children}{$d} = { word => $word, children => {} }
+            return
+        }
+    }
+}
+
+fn Rosetta::BK::search($t, $query, $threshold) {
+    my @out
+    return \@out if !defined $t->{root}
+    Rosetta::BK::sr($t->{root}, $query, $threshold, \@out)
+    @out = sort { _0 cmp _1 } @out
+    \@out
+}
+
+fn Rosetta::BK::sr($node, $query, $threshold, $out) {
+    my $d = Rosetta::BK::levenshtein($query, $node->{word})
+    push @$out, $node->{word} if $d <= $threshold
+    my $lo = $d - $threshold
+    my $hi = $d + $threshold
+    for my $key (keys %{$node->{children}}) {
+        if ($key >= $lo && $key <= $hi) {
+            Rosetta::BK::sr($node->{children}{$key}, $query, $threshold, $out)
+        }
+    }
+}
+
+# Levenshtein sanity
+assert_eq Rosetta::BK::levenshtein("kitten", "sitting"), 3, "kitten/sitting"
+assert_eq Rosetta::BK::levenshtein("hello", "hello"), 0, "identical"
+assert_eq Rosetta::BK::levenshtein("", "abc"), 3, "empty/abc"
+assert_eq Rosetta::BK::levenshtein("abc", ""), 3, "abc/empty"
+assert_eq Rosetta::BK::levenshtein("abc", "yabd"), 2, "abc/yabd"
+
+# Build a small dictionary
+my $tree = Rosetta::BK::new()
+my @words = ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart", "car",
+             "loop", "look", "took", "tool", "noon", "moon")
+for my $w (@words) { Rosetta::BK::insert($tree, $w) }
+
+# Search with threshold 1 from "book"
+my $r1 = Rosetta::BK::search($tree, "book", 1)
+# distance 0: book; distance 1: books, boo, boon, cook, look, took
+assert_eq join(",", @$r1), "boo,book,books,boon,cook,look,took",
+    "search book ≤1"
+
+# threshold 2 from "ook" — should match more
+my $r2 = Rosetta::BK::search($tree, "ook", 2)
+assert_ok len(@$r2) > len(@$r1), "looser threshold finds more"
+
+# Single threshold-0 query: only exact match
+my $r3 = Rosetta::BK::search($tree, "cake", 0)
+assert_eq join(",", @$r3), "cake", "exact match cake"
+
+# Query that's 3 away from many: "hi"
+my $r4 = Rosetta::BK::search($tree, "hi", 2)
+assert_eq join(",", @$r4), "", "no matches within 2 for hi"
+
+# Add a duplicate — no effect.
+my $tree2 = Rosetta::BK::new()
+Rosetta::BK::insert($tree2, "test")
+Rosetta::BK::insert($tree2, "test")
+my $r5 = Rosetta::BK::search($tree2, "test", 0)
+assert_eq join(",", @$r5), "test", "duplicate insert"
+
+# Empty tree
+my $empty = Rosetta::BK::new()
+my $r6 = Rosetta::BK::search($empty, "anything", 5)
+assert_eq len(@$r6), 0, "empty tree no matches"
+
+test_run

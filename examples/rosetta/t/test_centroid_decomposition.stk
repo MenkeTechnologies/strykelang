@@ -1,0 +1,117 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Centroid decomposition. Recursively pick a centroid
+# (node whose removal leaves no component larger than half the tree),
+# then recurse on each piece. Yields a balanced "decomposition tree"
+# of depth O(log n) — crucial for path-counting / nearest-marked-node
+# queries on trees.
+
+fn Rosetta::Centroid::compute_sizes($adj, $u, $par, $removed, $size) {
+    $size->[$u] = 1
+    for my $v (@{$adj->[$u]}) {
+        next if $v == $par || $removed->[$v]
+        Rosetta::Centroid::compute_sizes($adj, $v, $u, $removed, $size)
+        $size->[$u] += $size->[$v]
+    }
+}
+
+fn Rosetta::Centroid::find_centroid($adj, $u, $par, $tree_size, $removed, $size) {
+    for my $v (@{$adj->[$u]}) {
+        next if $v == $par || $removed->[$v]
+        if ($size->[$v] > int($tree_size / 2)) {
+            return Rosetta::Centroid::find_centroid($adj, $v, $u, $tree_size, $removed, $size)
+        }
+    }
+    $u
+}
+
+fn Rosetta::Centroid::decompose($adj, $entry, $removed, $parent_centroid) {
+    my @sz = ~> 1:len(@$adj) |> map { 0 }
+    Rosetta::Centroid::compute_sizes($adj, $entry, -1, $removed, \@sz)
+    my $c = Rosetta::Centroid::find_centroid($adj, $entry, -1, $sz[$entry], $removed, \@sz)
+    $parent_centroid->[$c] = -1 if !exists $parent_centroid->[$c]
+    $removed->[$c] = 1
+    my @children
+    for my $v (@{$adj->[$c]}) {
+        next if $removed->[$v]
+        my $child_root = Rosetta::Centroid::decompose($adj, $v, $removed, $parent_centroid)
+        $parent_centroid->[$child_root] = $c
+        push @children, $child_root
+    }
+    $c
+}
+
+fn Rosetta::Centroid::build($n, $edges) {
+    my @adj
+    for my $i (~> 1:$n) { push @adj, [] }
+    for my $e (@$edges) {
+        my ($u, $v) = @$e
+        push @{$adj[$u]}, $v
+        push @{$adj[$v]}, $u
+    }
+    my @removed = ~> 1:$n |> map { 0 }
+    my @parent_centroid = ~> 1:$n |> map { -1 }
+    my $root = Rosetta::Centroid::decompose(\@adj, 0, \@removed, \@parent_centroid)
+    $parent_centroid[$root] = -1
+    {
+        n => $n,
+        adj => \@adj,
+        root => $root,
+        parent_centroid => \@parent_centroid
+    }
+}
+
+# Depth in centroid tree (= depth in decomposition).
+fn Rosetta::Centroid::depth_of($cd, $u) {
+    my $d = 0
+    while ($cd->{parent_centroid}[$u] != -1) {
+        $u = $cd->{parent_centroid}[$u]
+        $d++
+    }
+    $d
+}
+
+fn Rosetta::Centroid::max_depth($cd) {
+    my $max = 0
+    for my $i (~> 0:$cd->{n} - 1) {
+        my $d = Rosetta::Centroid::depth_of($cd, $i)
+        $max = $d if $d > $max
+    }
+    $max
+}
+
+# Path graph 0-1-2-3-4-5-6 (7 nodes): centroid tree depth ≤ ⌈log2 7⌉ = 3.
+my $line = Rosetta::Centroid::build(7, [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]])
+assert_eq $line->{root}, 3, "line root = middle node"
+assert_ok Rosetta::Centroid::max_depth($line) <= 3,
+    "line max depth ≤ ⌈log2 7⌉"
+
+# Star centered at 0
+my $star = Rosetta::Centroid::build(5, [[0, 1], [0, 2], [0, 3], [0, 4]])
+assert_eq $star->{root}, 0, "star centroid is center"
+# Each leaf is one centroid below the center.
+assert_eq Rosetta::Centroid::depth_of($star, 1), 1, "star leaf depth 1"
+assert_eq Rosetta::Centroid::depth_of($star, 4), 1, "star leaf depth 1"
+
+# Single node
+my $one = Rosetta::Centroid::build(1, [])
+assert_eq $one->{root}, 0, "single node root"
+assert_eq Rosetta::Centroid::max_depth($one), 0, "depth 0"
+
+# Two-node tree
+my $two = Rosetta::Centroid::build(2, [[0, 1]])
+assert_ok $two->{root} == 0 || $two->{root} == 1, "two-node centroid is one of them"
+assert_eq Rosetta::Centroid::max_depth($two), 1, "two-node depth 1"
+
+# Balanced binary tree of 7 nodes
+my $bt = Rosetta::Centroid::build(7, [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]])
+assert_eq $bt->{root}, 0, "balanced bin tree root = 0"
+assert_ok Rosetta::Centroid::max_depth($bt) <= 3, "balanced bin tree depth ≤ 3"
+
+# Larger path: 15 nodes — log2(15) ≈ 3.9, depth ≤ 4
+my @line_edges
+for my $i (~> 0:13) { push @line_edges, [$i, $i + 1] }
+my $line15 = Rosetta::Centroid::build(15, \@line_edges)
+my $d = Rosetta::Centroid::max_depth($line15)
+assert_ok $d <= 4, "line(15) depth ≤ 4 (got $d)"
+
+test_run

@@ -1,0 +1,120 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Berlekamp-Massey — find the shortest linear recurrence
+# generating a given sequence over GF(p). Returns the recurrence
+# coefficients [c_1, c_2, ..., c_L] such that
+#   s_n = c_1·s_{n-1} + c_2·s_{n-2} + ... + c_L·s_{n-L}  (mod p)
+
+fn Rosetta::BM::mod_pos($x, $m) { (($x % $m) + $m) % $m }
+
+fn Rosetta::BM::mod_inverse($a, $m) {
+    # Extended Euclidean — m must be prime for guaranteed existence.
+    my $old_r = $a; my $r = $m
+    my $old_s = 1; my $s = 0
+    while ($r != 0) {
+        my $q = int($old_r / $r)
+        ($old_r, $r) = ($r, $old_r - $q * $r)
+        ($old_s, $s) = ($s, $old_s - $q * $s)
+    }
+    return undef if $old_r != 1
+    Rosetta::BM::mod_pos($old_s, $m)
+}
+
+fn Rosetta::BM::find($seq, $p) {
+    my $n = len(@$seq)
+    my @ls   # current candidate recurrence (length L)
+    my @prev # last recurrence at the time of the last length change
+    my $delta_prev = 1
+    my $L_prev = 0
+    my $shift = 1
+    for my $i (~> 0:$n - 1) {
+        # Compute discrepancy.
+        my $d = $seq->[$i]
+        for my $j (~> 0:len(@ls) - 1) {
+            $d = Rosetta::BM::mod_pos($d - $ls[$j] * $seq->[$i - 1 - $j], $p)
+        }
+        if ($d == 0) {
+            $shift++
+        } elsif (2 * len(@ls) <= $i) {
+            my @backup = @ls
+            my $coef = Rosetta::BM::mod_pos($d * Rosetta::BM::mod_inverse($delta_prev, $p), $p)
+            # ls(x) = ls(x) - coef · x^shift · prev(x)
+            my @new_ls
+            for (1..$shift - 1) { push @new_ls, 0 }
+            push @new_ls, $coef
+            for my $c (@prev) { push @new_ls, Rosetta::BM::mod_pos(-$coef * $c, $p) }
+            # Pad ls to match new_ls length, then add element-wise.
+            my $max_len = len(@new_ls) > len(@ls) ? len(@new_ls) : len(@ls)
+            for my $j (~> 0:$max_len - 1) {
+                my $a = $j < len(@ls) ? $ls[$j] : 0
+                my $b = $j < len(@new_ls) ? $new_ls[$j] : 0
+                $ls[$j] = Rosetta::BM::mod_pos($a + $b, $p)
+            }
+            @prev = @backup
+            $delta_prev = $d
+            $L_prev = $i + 1 - len(@backup)
+            $shift = 1
+        } else {
+            my $coef = Rosetta::BM::mod_pos($d * Rosetta::BM::mod_inverse($delta_prev, $p), $p)
+            my @new_ls
+            for (1..$shift - 1) { push @new_ls, 0 }
+            push @new_ls, $coef
+            for my $c (@prev) { push @new_ls, Rosetta::BM::mod_pos(-$coef * $c, $p) }
+            my $max_len = len(@new_ls) > len(@ls) ? len(@new_ls) : len(@ls)
+            for my $j (~> 0:$max_len - 1) {
+                my $a = $j < len(@ls) ? $ls[$j] : 0
+                my $bb = $j < len(@new_ls) ? $new_ls[$j] : 0
+                $ls[$j] = Rosetta::BM::mod_pos($a + $bb, $p)
+            }
+            $shift++
+        }
+    }
+    \@ls
+}
+
+fn Rosetta::BM::extend($seq, $coefs, $p, $extra) {
+    my @out = @$seq
+    my $L = len(@$coefs)
+    for (1..$extra) {
+        my $next = 0
+        for my $j (~> 0:$L - 1) {
+            $next = Rosetta::BM::mod_pos($next + $coefs->[$j] * $out[-1 - $j], $p)
+        }
+        push @out, $next
+    }
+    \@out
+}
+
+# Fibonacci mod 1009: recurrence is s_n = s_{n-1} + s_{n-2} → coefs [1, 1].
+my @fib = (1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233)
+my $r1 = Rosetta::BM::find(\@fib, 1009)
+assert_eq join(",", @$r1), "1,1", "Fibonacci recurrence"
+
+# Constant sequence 5,5,5,...: s_n = s_{n-1} → coefs [1].
+my $r2 = Rosetta::BM::find([5, 5, 5, 5, 5, 5], 1009)
+assert_eq join(",", @$r2), "1", "constant sequence"
+
+# Powers of 2 (s_n = 2 · s_{n-1}): coefs [2].
+my $r3 = Rosetta::BM::find([1, 2, 4, 8, 16, 32, 64, 128], 1009)
+assert_eq join(",", @$r3), "2", "powers of 2"
+
+# Tribonacci: s_n = s_{n-1} + s_{n-2} + s_{n-3}, coefs [1, 1, 1].
+my @trib = (1, 1, 2, 4, 7, 13, 24, 44, 81, 149)
+my $r4 = Rosetta::BM::find(\@trib, 1009)
+assert_eq join(",", @$r4), "1,1,1", "Tribonacci"
+
+# Lucas: s_n = s_{n-1} + s_{n-2} starting 2, 1 — same recurrence as Fibonacci.
+my @luc = (2, 1, 3, 4, 7, 11, 18, 29, 47, 76)
+my $r5 = Rosetta::BM::find(\@luc, 1009)
+assert_eq join(",", @$r5), "1,1", "Lucas"
+
+# Extension: predict next terms using the recurrence we found.
+my $ext = Rosetta::BM::extend([1, 1, 2, 3, 5, 8], $r1, 1009, 5)
+assert_eq join(",", @$ext), "1,1,2,3,5,8,13,21,34,55,89", "extend Fibonacci by 5"
+
+# mod_inverse sanity
+assert_eq Rosetta::BM::mod_inverse(3, 11), 4,  "3⁻¹ mod 11 = 4"
+my $inv7 = Rosetta::BM::mod_inverse(7, 1009)
+my $check = (7 * $inv7) % 1009
+assert_eq $check, 1, "7·(7⁻¹) ≡ 1 (mod 1009)"
+
+test_run

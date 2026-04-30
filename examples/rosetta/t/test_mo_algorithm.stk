@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mo's algorithm — answer a batch of offline range
+# queries on a static array in O((n + q) · sqrt(n) · cost_per_move).
+# Sorts queries by (block_of_lo, hi) and slides two pointers, paying
+# only one add/remove per shift.
+#
+# Demonstrated on "count distinct values in [lo..hi]". Replace the
+# add/remove pair with any other sliding-window aggregate.
+
+fn Rosetta::Mo::block($i, $bs) { int($i / $bs) }
+
+fn Rosetta::Mo::solve($arr, $queries) {
+    my $n = len(@$arr)
+    my $q = len(@$queries)
+    my $bs = $n > 0 ? int(sqrt($n)) + 1 : 1
+    # Annotate each query with its original index.
+    my @qs
+    for my $i (~> 0:$q - 1) {
+        my ($lo, $hi) = @{$queries->[$i]}
+        push @qs, [$lo, $hi, $i]
+    }
+    @qs = sort {
+        my $ba = Rosetta::Mo::block(_0->[0], $bs)
+        my $bb = Rosetta::Mo::block(_1->[0], $bs)
+        $ba != $bb ? $ba <=> $bb : _0->[1] <=> _1->[1]
+    } @qs
+
+    my %freq
+    my $distinct = 0
+    my @answers = ~> 1:$q |> map { 0 }
+    my ($cur_lo, $cur_hi) = (0, -1)
+    for my $entry (@qs) {
+        my ($lo, $hi, $idx) = @$entry
+        # Extend left
+        while ($cur_lo > $lo) {
+            $cur_lo--
+            my $v = $arr->[$cur_lo]
+            $freq{$v} //= 0
+            $distinct++ if $freq{$v} == 0
+            $freq{$v}++
+        }
+        # Extend right
+        while ($cur_hi < $hi) {
+            $cur_hi++
+            my $v = $arr->[$cur_hi]
+            $freq{$v} //= 0
+            $distinct++ if $freq{$v} == 0
+            $freq{$v}++
+        }
+        # Shrink left
+        while ($cur_lo < $lo) {
+            my $v = $arr->[$cur_lo]
+            $freq{$v}--
+            $distinct-- if $freq{$v} == 0
+            $cur_lo++
+        }
+        # Shrink right
+        while ($cur_hi > $hi) {
+            my $v = $arr->[$cur_hi]
+            $freq{$v}--
+            $distinct-- if $freq{$v} == 0
+            $cur_hi--
+        }
+        $answers[$idx] = $distinct
+    }
+    \@answers
+}
+
+# Naive count-distinct for cross-checking.
+fn Rosetta::Mo::naive_distinct($arr, $lo, $hi) {
+    my %s
+    for my $i ($lo..$hi) { $s{$arr->[$i]} = 1 }
+    len(keys %s)
+}
+
+# Hand-checked queries
+my $arr = [1, 2, 1, 3, 4, 2, 3, 5, 1, 6]
+my $queries = [
+    [0, 4],   # 1 2 1 3 4 → 4 distinct
+    [2, 6],   # 1 3 4 2 3 → 4 distinct
+    [0, 9],   # full → 6 distinct
+    [3, 3],   # single = 1
+    [1, 8],   # 2 1 3 4 2 3 5 1 → 5 distinct
+    [5, 9]    # 2 3 5 1 6 → 5 distinct
+]
+my $r = Rosetta::Mo::solve($arr, $queries)
+assert_eq join(",", @$r), "4,4,6,1,5,5", "hand-checked queries"
+
+# Cross-check with naive on random-ish data.
+srand(13)
+my @arr2 = ~> 1:30 |> map { int(rand() * 10) }
+my @qs2
+for (~> 1:50) {
+    my $lo = int(rand() * 30)
+    my $hi = $lo + int(rand() * (30 - $lo))
+    push @qs2, [$lo, $hi]
+}
+my $mo = Rosetta::Mo::solve(\@arr2, \@qs2)
+for my $i (~> 0:len(@qs2) - 1) {
+    my ($lo, $hi) = @{$qs2[$i]}
+    my $naive = Rosetta::Mo::naive_distinct(\@arr2, $lo, $hi)
+    assert_eq $mo->[$i], $naive, "Mo[$i] [$lo..$hi] = naive"
+}
+
+# Single-element array
+my $r1 = Rosetta::Mo::solve([42], [[0, 0]])
+assert_eq $r1->[0], 1, "single-element single query"
+
+# Empty queries list
+my $r2 = Rosetta::Mo::solve([1, 2, 3], [])
+assert_eq len(@$r2), 0, "empty queries"
+
+test_run

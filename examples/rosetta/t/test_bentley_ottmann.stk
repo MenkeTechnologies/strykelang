@@ -1,0 +1,138 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bentley-Ottmann segment intersection sweep — find all
+# pairwise intersections of n line segments in O((n + k) log n), where
+# k is the number of intersections. This is a simplified all-pairs
+# variant that demonstrates the geometric primitive correctly; the
+# event-queue + status-line architecture is shown via a brute O(n²)
+# fallback alongside.
+
+fn Rosetta::BO::cross($ox, $oy, $ax, $ay, $bx, $by) {
+    ($ax - $ox) * ($by - $oy) - ($ay - $oy) * ($bx - $ox)
+}
+
+fn Rosetta::BO::sgn($v) { $v > 0 ? 1 : ($v < 0 ? -1 : 0) }
+
+fn Rosetta::BO::on_segment($px, $py, $ax, $ay, $bx, $by) {
+    $px >= ($ax < $bx ? $ax : $bx) && $px <= ($ax > $bx ? $ax : $bx)
+    && $py >= ($ay < $by ? $ay : $by) && $py <= ($ay > $by ? $ay : $by)
+}
+
+fn Rosetta::BO::intersect($s1, $s2) {
+    my ($ax, $ay, $bx, $by) = @$s1
+    my ($cx, $cy, $dx, $dy) = @$s2
+    my $d1 = Rosetta::BO::sgn(Rosetta::BO::cross($cx, $cy, $dx, $dy, $ax, $ay))
+    my $d2 = Rosetta::BO::sgn(Rosetta::BO::cross($cx, $cy, $dx, $dy, $bx, $by))
+    my $d3 = Rosetta::BO::sgn(Rosetta::BO::cross($ax, $ay, $bx, $by, $cx, $cy))
+    my $d4 = Rosetta::BO::sgn(Rosetta::BO::cross($ax, $ay, $bx, $by, $dx, $dy))
+    return 1 if $d1 != $d2 && $d3 != $d4
+    return 1 if $d1 == 0 && Rosetta::BO::on_segment($ax, $ay, $cx, $cy, $dx, $dy)
+    return 1 if $d2 == 0 && Rosetta::BO::on_segment($bx, $by, $cx, $cy, $dx, $dy)
+    return 1 if $d3 == 0 && Rosetta::BO::on_segment($cx, $cy, $ax, $ay, $bx, $by)
+    return 1 if $d4 == 0 && Rosetta::BO::on_segment($dx, $dy, $ax, $ay, $bx, $by)
+    0
+}
+
+# Sweep variant: sort endpoints by x, walk the active set. Returns
+# pairs (i, j) with i < j whose segments intersect.
+fn Rosetta::BO::find_intersections($segments) {
+    my $n = len(@$segments)
+    my @events
+    for my $i (~> 0:$n - 1) {
+        my $s = $segments->[$i]
+        my $x0 = $s->[0] < $s->[2] ? $s->[0] : $s->[2]
+        my $x1 = $s->[0] > $s->[2] ? $s->[0] : $s->[2]
+        push @events, [$x0, 0, $i]   # 0 = enter
+        push @events, [$x1, 1, $i]   # 1 = leave
+    }
+    @events = sort {
+        _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
+    } @events
+    my %active
+    my @hits
+    for my $e (@events) {
+        my ($x, $kind, $i) = @$e
+        if ($kind == 0) {
+            for my $j (keys %active) {
+                if (Rosetta::BO::intersect($segments->[$i], $segments->[$j])) {
+                    my $aa = $i < $j ? $i : $j
+                    my $bb = $i < $j ? $j : $i
+                    push @hits, [$aa, $bb]
+                }
+            }
+            $active{$i} = 1
+        } else {
+            delete $active{$i}
+        }
+    }
+    @hits = sort {
+        _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
+    } @hits
+    \@hits
+}
+
+fn Rosetta::BO::brute($segments) {
+    my $n = len(@$segments)
+    my @hits
+    for my $i (~> 0:$n - 2) {
+        for my $j ($i + 1..$n - 1) {
+            push @hits, [$i, $j] if Rosetta::BO::intersect($segments->[$i], $segments->[$j])
+        }
+    }
+    \@hits
+}
+
+fn Rosetta::BO::format_hits($hits) {
+    my @parts
+    for my $h (@$hits) { push @parts, $h->[0] . "-" . $h->[1] }
+    join(";", @parts)
+}
+
+# Two crossing segments
+my $s1 = [[0, 0, 10, 10], [0, 10, 10, 0]]
+assert_eq Rosetta::BO::format_hits(Rosetta::BO::find_intersections($s1)), "0-1",
+    "two crossing"
+
+# Two parallel segments — no intersection
+my $s2 = [[0, 0, 10, 0], [0, 5, 10, 5]]
+assert_eq Rosetta::BO::format_hits(Rosetta::BO::find_intersections($s2)), "",
+    "two parallel"
+
+# Three crossing in a star pattern: 3 pairs intersect
+my $s3 = [[0, 0, 10, 10], [0, 10, 10, 0], [5, -5, 5, 15]]
+my $hits3 = Rosetta::BO::find_intersections($s3)
+assert_eq len(@$hits3), 3, "3-segment star: 3 pairs"
+
+# Endpoint touch (collinear): treated as intersecting
+my $s4 = [[0, 0, 5, 0], [5, 0, 10, 0]]
+assert_eq Rosetta::BO::format_hits(Rosetta::BO::find_intersections($s4)), "0-1",
+    "endpoint touch"
+
+# Disjoint
+my $s5 = [[0, 0, 5, 5], [10, 10, 15, 15]]
+assert_eq len(@{Rosetta::BO::find_intersections($s5)}), 0, "disjoint"
+
+# Cross-validate against brute force for random-ish set of 8 segments.
+srand(99)
+my @rand_segs
+for (~> 1:8) {
+    my @ep
+    for (1..4) { push @ep, int(rand() * 20) }
+    push @rand_segs, \@ep
+}
+my $sweep = Rosetta::BO::find_intersections(\@rand_segs)
+my $brute = Rosetta::BO::brute(\@rand_segs)
+assert_eq Rosetta::BO::format_hits($sweep), Rosetta::BO::format_hits($brute),
+    "sweep matches brute on 8 random segments"
+
+# Empty input
+assert_eq len(@{Rosetta::BO::find_intersections([])}), 0, "empty input"
+
+# Single segment
+assert_eq len(@{Rosetta::BO::find_intersections([[0, 0, 5, 5]])}), 0, "single segment"
+
+# Sanity: helpers
+assert_eq Rosetta::BO::sgn(0), 0, "sgn 0"
+assert_eq Rosetta::BO::sgn(5), 1, "sgn +"
+assert_eq Rosetta::BO::sgn(-3), -1, "sgn -"
+
+test_run

@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Persistent array — every "set" returns a new version
+# while sharing the unchanged subtrees with the previous version.
+# Implemented as a balanced binary tree of size n, indexed by integer
+# position. Get / set are O(log n).
+
+fn Rosetta::PArr::build($values, $lo, $hi, $nodes) {
+    if ($lo == $hi) {
+        push @$nodes, { val => $values->[$lo], left => -1, right => -1 }
+        return len(@$nodes) - 1
+    }
+    my $mid = int(($lo + $hi) / 2)
+    my $l = Rosetta::PArr::build($values, $lo, $mid, $nodes)
+    my $r = Rosetta::PArr::build($values, $mid + 1, $hi, $nodes)
+    push @$nodes, { val => 0, left => $l, right => $r }
+    len(@$nodes) - 1
+}
+
+fn Rosetta::PArr::new($values) {
+    my $n = len(@$values)
+    return { n => 0, nodes => [], roots => [-1] } if $n == 0
+    my @nodes
+    my $root = Rosetta::PArr::build($values, 0, $n - 1, \@nodes)
+    { n => $n, nodes => \@nodes, roots => [$root] }
+}
+
+fn Rosetta::PArr::get_recursive($nodes, $node, $lo, $hi, $idx) {
+    return $nodes->[$node]{val} if $lo == $hi
+    my $mid = int(($lo + $hi) / 2)
+    $idx <= $mid
+        ? Rosetta::PArr::get_recursive($nodes, $nodes->[$node]{left},  $lo,       $mid, $idx)
+        : Rosetta::PArr::get_recursive($nodes, $nodes->[$node]{right}, $mid + 1, $hi, $idx)
+}
+
+fn Rosetta::PArr::get($t, $version, $idx) {
+    Rosetta::PArr::get_recursive($t->{nodes}, $t->{roots}[$version], 0, $t->{n} - 1, $idx)
+}
+
+fn Rosetta::PArr::set_recursive($nodes, $node, $lo, $hi, $idx, $val) {
+    if ($lo == $hi) {
+        push @$nodes, { val => $val, left => -1, right => -1 }
+        return len(@$nodes) - 1
+    }
+    my $mid = int(($lo + $hi) / 2)
+    my ($new_l, $new_r)
+    if ($idx <= $mid) {
+        $new_l = Rosetta::PArr::set_recursive($nodes, $nodes->[$node]{left},  $lo,       $mid, $idx, $val)
+        $new_r = $nodes->[$node]{right}
+    } else {
+        $new_l = $nodes->[$node]{left}
+        $new_r = Rosetta::PArr::set_recursive($nodes, $nodes->[$node]{right}, $mid + 1, $hi, $idx, $val)
+    }
+    push @$nodes, { val => 0, left => $new_l, right => $new_r }
+    len(@$nodes) - 1
+}
+
+fn Rosetta::PArr::set($t, $version, $idx, $val) {
+    my $root = $t->{roots}[$version]
+    my $new_root = Rosetta::PArr::set_recursive($t->{nodes}, $root, 0, $t->{n} - 1, $idx, $val)
+    push @{$t->{roots}}, $new_root
+    len(@{$t->{roots}}) - 1
+}
+
+fn Rosetta::PArr::to_list($t, $version) {
+    my @out
+    for my $i (~> 0:$t->{n} - 1) { push @out, Rosetta::PArr::get($t, $version, $i) }
+    \@out
+}
+
+# Build version 0 from [10, 20, 30, 40, 50]
+my $a = Rosetta::PArr::new([10, 20, 30, 40, 50])
+assert_eq join(",", @{Rosetta::PArr::to_list($a, 0)}), "10,20,30,40,50",
+    "v0 initial array"
+
+# v1: set index 2 to 99
+my $v1 = Rosetta::PArr::set($a, 0, 2, 99)
+assert_eq join(",", @{Rosetta::PArr::to_list($a, $v1)}), "10,20,99,40,50",
+    "v1 after set(2, 99)"
+assert_eq join(",", @{Rosetta::PArr::to_list($a, 0)}), "10,20,30,40,50",
+    "v0 unchanged"
+
+# v2: branch from v1
+my $v2 = Rosetta::PArr::set($a, $v1, 0, -7)
+assert_eq join(",", @{Rosetta::PArr::to_list($a, $v2)}), "-7,20,99,40,50",
+    "v2 after set(0, -7) on v1"
+assert_eq join(",", @{Rosetta::PArr::to_list($a, $v1)}), "10,20,99,40,50",
+    "v1 unchanged after v2 set"
+
+# v3: branch from v0 (alternate timeline)
+my $v3 = Rosetta::PArr::set($a, 0, 4, 555)
+assert_eq join(",", @{Rosetta::PArr::to_list($a, $v3)}), "10,20,30,40,555",
+    "v3 from v0"
+
+# Get on individual versions
+assert_eq Rosetta::PArr::get($a, 0,   2), 30,  "v0[2]"
+assert_eq Rosetta::PArr::get($a, $v1, 2), 99,  "v1[2]"
+assert_eq Rosetta::PArr::get($a, $v2, 0), -7,  "v2[0]"
+assert_eq Rosetta::PArr::get($a, $v3, 4), 555, "v3[4]"
+
+# Many sets — every version must remain queryable.
+my $b = Rosetta::PArr::new([1, 2, 3, 4, 5, 6, 7, 8])
+my @versions = (0)
+push @versions, Rosetta::PArr::set($b, $versions[-1], 0, 100)
+push @versions, Rosetta::PArr::set($b, $versions[-1], 1, 200)
+push @versions, Rosetta::PArr::set($b, $versions[-1], 7, 800)
+assert_eq join(",", @{Rosetta::PArr::to_list($b, $versions[0])}),
+    "1,2,3,4,5,6,7,8", "v0 immutable"
+assert_eq join(",", @{Rosetta::PArr::to_list($b, $versions[1])}),
+    "100,2,3,4,5,6,7,8", "v1"
+assert_eq join(",", @{Rosetta::PArr::to_list($b, $versions[2])}),
+    "100,200,3,4,5,6,7,8", "v2"
+assert_eq join(",", @{Rosetta::PArr::to_list($b, $versions[3])}),
+    "100,200,3,4,5,6,7,800", "v3"
+
+# Empty array
+my $e = Rosetta::PArr::new([])
+assert_eq $e->{n}, 0, "empty n=0"
+
+# Single element
+my $s = Rosetta::PArr::new([42])
+assert_eq Rosetta::PArr::get($s, 0, 0), 42, "single get"
+my $sv1 = Rosetta::PArr::set($s, 0, 0, 99)
+assert_eq Rosetta::PArr::get($s, $sv1, 0), 99, "single set v1"
+assert_eq Rosetta::PArr::get($s, 0, 0), 42, "single v0 unchanged"
+
+test_run

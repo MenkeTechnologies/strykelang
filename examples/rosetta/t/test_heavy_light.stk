@@ -1,0 +1,189 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Heavy-Light Decomposition (HLD). Decomposes a tree into
+# disjoint "chains" so any root-to-leaf path crosses at most O(log n)
+# chains. Combined with a segment tree (or Fenwick) over the chain
+# array, this gives O(log² n) path queries / updates.
+#
+# Demonstrates: build HLD, then answer "sum of node values along path
+# (u, v)" using a Fenwick tree over the heavy-light positions.
+
+fn Rosetta::HLD::build($n, $edges, $root, $values) {
+    my @adj
+    for my $i (~> 1:$n) { push @adj, [] }
+    for my $e (@$edges) {
+        my ($u, $v) = @$e
+        push @{$adj[$u]}, $v
+        push @{$adj[$v]}, $u
+    }
+    my @parent = ~> 1:$n |> map { -1 }
+    my @depth = ~> 1:$n |> map { 0 }
+    my @size = ~> 1:$n |> map { 1 }
+    my @heavy = ~> 1:$n |> map { -1 }
+    # Iterative DFS to compute parent/depth/size/heavy.
+    my @order
+    my @stack = ([$root, -1, 0, 0])
+    while (len(@stack) > 0) {
+        my $top = $stack[-1]
+        my ($u, $par, $d, $idx) = @$top
+        if ($idx == 0) {
+            $parent[$u] = $par
+            $depth[$u] = $d
+            push @order, $u
+        }
+        if ($idx < len(@{$adj[$u]})) {
+            $top->[3]++
+            my $v = $adj[$u][$idx]
+            if ($v != $par) { push @stack, [$v, $u, $d + 1, 0] }
+        } else {
+            pop @stack
+        }
+    }
+    # Post-order: compute sizes / heavy child.
+    for (my $i = len(@order) - 1; $i >= 0; $i--) {
+        my $u = $order[$i]
+        my $best = -1
+        my $best_size = 0
+        for my $v (@{$adj[$u]}) {
+            next if $v == $parent[$u]
+            $size[$u] += $size[$v]
+            if ($size[$v] > $best_size) { $best_size = $size[$v]; $best = $v }
+        }
+        $heavy[$u] = $best
+    }
+    # Decompose into chains: for each node, store position in flat array.
+    my @head = ~> 1:$n |> map { 0 }
+    my @pos = ~> 1:$n |> map { 0 }
+    my @flat = ~> 1:$n |> map { 0 }
+    my $timer = 0
+    my @chain_stack = ([$root, $root])  # [node, head_of_chain]
+    while (len(@chain_stack) > 0) {
+        my ($u, $h) = @{pop @chain_stack}
+        $head[$u] = $h
+        $pos[$u] = $timer
+        $flat[$timer] = $values->[$u]
+        $timer++
+        # Push light children first so heavy comes off the stack last.
+        for my $v (@{$adj[$u]}) {
+            next if $v == $parent[$u] || $v == $heavy[$u]
+            push @chain_stack, [$v, $v]
+        }
+        if ($heavy[$u] != -1) { push @chain_stack, [$heavy[$u], $h] }
+    }
+    {
+        n => $n,
+        parent => \@parent,
+        depth => \@depth,
+        head => \@head,
+        pos => \@pos,
+        flat => \@flat,
+        bit => Rosetta::HLD::fenwick_new($n, \@flat)
+    }
+}
+
+# Fenwick (BIT) for range-sum + point-update over the flattened array.
+fn Rosetta::HLD::fenwick_new($n, $flat) {
+    my @t = ~> 0:$n |> map { 0 }
+    for my $i (~> 0:$n - 1) {
+        my $j = $i + 1
+        while ($j <= $n) {
+            $t[$j] += $flat->[$i]
+            $j += $j & -$j
+        }
+    }
+    \@t
+}
+
+fn Rosetta::HLD::bit_prefix($bit, $i) {
+    my $s = 0
+    my $j = $i + 1
+    while ($j > 0) {
+        $s += $bit->[$j]
+        $j -= $j & -$j
+    }
+    $s
+}
+
+fn Rosetta::HLD::bit_range($bit, $lo, $hi) {
+    Rosetta::HLD::bit_prefix($bit, $hi) - ($lo > 0 ? Rosetta::HLD::bit_prefix($bit, $lo - 1) : 0)
+}
+
+fn Rosetta::HLD::path_sum($hld, $u, $v) {
+    my $sum = 0
+    while ($hld->{head}[$u] != $hld->{head}[$v]) {
+        if ($hld->{depth}[$hld->{head}[$u]] < $hld->{depth}[$hld->{head}[$v]]) {
+            ($u, $v) = ($v, $u)
+        }
+        my $h = $hld->{head}[$u]
+        $sum += Rosetta::HLD::bit_range($hld->{bit}, $hld->{pos}[$h], $hld->{pos}[$u])
+        $u = $hld->{parent}[$h]
+    }
+    if ($hld->{depth}[$u] > $hld->{depth}[$v]) { ($u, $v) = ($v, $u) }
+    $sum += Rosetta::HLD::bit_range($hld->{bit}, $hld->{pos}[$u], $hld->{pos}[$v])
+    $sum
+}
+
+# Naive path sum for cross-checking.
+fn Rosetta::HLD::naive_path_sum($n, $edges, $values, $u, $v) {
+    my @adj
+    for (~> 1:$n) { push @adj, [] }
+    for my $e (@$edges) {
+        my ($a, $b) = @$e
+        push @{$adj[$a]}, $b
+        push @{$adj[$b]}, $a
+    }
+    # BFS from u to v, recording predecessors.
+    my @prev = ~> 1:$n |> map { -1 }
+    my @visited = ~> 1:$n |> map { 0 }
+    $visited[$u] = 1
+    my @q = ($u)
+    while (len(@q) > 0) {
+        my $x = shift @q
+        last if $x == $v
+        for my $y (@{$adj[$x]}) {
+            if (!$visited[$y]) {
+                $visited[$y] = 1
+                $prev[$y] = $x
+                push @q, $y
+            }
+        }
+    }
+    my $sum = $values->[$v]
+    my $cur = $v
+    while ($cur != $u) {
+        $cur = $prev[$cur]
+        $sum += $values->[$cur]
+    }
+    $sum
+}
+
+# Tree:
+#       0(1)
+#      /     \
+#    1(2)   2(3)
+#    / \     |
+#  3(4) 4(5) 5(6)
+#               |
+#              6(7)
+my $values = [1, 2, 3, 4, 5, 6, 7]
+my $edges = [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [5, 6]]
+my $hld = Rosetta::HLD::build(7, $edges, 0, $values)
+
+# Path sums (cross-check with naive)
+for my $pair ([3, 4], [3, 6], [4, 6], [0, 6], [0, 0], [3, 3], [5, 6], [1, 5]) {
+    my ($u, $v) = @$pair
+    my $hld_sum   = Rosetta::HLD::path_sum($hld, $u, $v)
+    my $naive_sum = Rosetta::HLD::naive_path_sum(7, $edges, $values, $u, $v)
+    assert_eq $hld_sum, $naive_sum, "path_sum($u, $v)"
+}
+
+# Single-node tree
+my $tiny = Rosetta::HLD::build(1, [], 0, [42])
+assert_eq Rosetta::HLD::path_sum($tiny, 0, 0), 42, "single node = 42"
+
+# Path graph 0-1-2-3-4 with values 1..5: full path sum = 15
+my $line = Rosetta::HLD::build(5, [[0, 1], [1, 2], [2, 3], [3, 4]], 0, [1, 2, 3, 4, 5])
+assert_eq Rosetta::HLD::path_sum($line, 0, 4), 15, "line full sum"
+assert_eq Rosetta::HLD::path_sum($line, 1, 3), 9,  "line [1..3] = 2+3+4"
+assert_eq Rosetta::HLD::path_sum($line, 2, 2), 3,  "line single"
+
+test_run

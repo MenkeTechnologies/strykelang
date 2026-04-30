@@ -2,9 +2,9 @@
 my @_KIDS = ("Alice","Bob","Charlie","David","Eve","Fred","Ginny","Harriet","Ileana","Joseph","Kincaid","Larry")
 my %_PLANT = (G=>"grass", C=>"clover", R=>"radishes", V=>"violets")
 my %_POS
-$_POS{$_KIDS[$_]} = $_ * 2 for 0..len(@_KIDS) - 1
+$_POS{$_KIDS[$_]} = _ * 2 for 0..len(@_KIDS) - 1
 
 fn Exercism::KindergartenGarden::plants($diagram, $student) {
     my $p = $_POS{$student}
-    [map { $_PLANT{substr($_, $p, 1)}, $_PLANT{substr($_, $p + 1, 1)} } split /\n/, $diagram]
+    [~> $diagram split(/\n/) map { $_PLANT{substr(_, $p, 1)}, $_PLANT{substr(_, $p + 1, 1)} }]
 }

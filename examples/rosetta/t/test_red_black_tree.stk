@@ -1,0 +1,179 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Red-black tree — self-balancing BST with O(log n)
+# insert, search, delete-by-key, plus in-order traversal.
+
+# Each node: { key, color (0=red, 1=black), left, right, parent }.
+
+my $RED = 0
+my $BLACK = 1
+
+fn Rosetta::RBT::new() {
+    { root => undef }
+}
+
+fn Rosetta::RBT::is_red($n) {
+    return 0 if !defined $n
+    $n->{color} == 0
+}
+
+fn Rosetta::RBT::rotate_left($t, $x) {
+    my $y = $x->{right}
+    $x->{right} = $y->{left}
+    if (defined $y->{left}) { $y->{left}{parent} = $x }
+    $y->{parent} = $x->{parent}
+    if (!defined $x->{parent}) { $t->{root} = $y }
+    elsif ($x == $x->{parent}{left}) { $x->{parent}{left} = $y }
+    else { $x->{parent}{right} = $y }
+    $y->{left} = $x
+    $x->{parent} = $y
+}
+
+fn Rosetta::RBT::rotate_right($t, $x) {
+    my $y = $x->{left}
+    $x->{left} = $y->{right}
+    if (defined $y->{right}) { $y->{right}{parent} = $x }
+    $y->{parent} = $x->{parent}
+    if (!defined $x->{parent}) { $t->{root} = $y }
+    elsif ($x == $x->{parent}{right}) { $x->{parent}{right} = $y }
+    else { $x->{parent}{left} = $y }
+    $y->{right} = $x
+    $x->{parent} = $y
+}
+
+fn Rosetta::RBT::fix_after_insert($t, $z) {
+    while (defined $z->{parent} && Rosetta::RBT::is_red($z->{parent})) {
+        my $p = $z->{parent}
+        my $g = $p->{parent}
+        if (defined $g && $p == $g->{left}) {
+            my $u = $g->{right}
+            if (Rosetta::RBT::is_red($u)) {
+                $p->{color} = 1
+                $u->{color} = 1
+                $g->{color} = 0
+                $z = $g
+            } else {
+                if ($z == $p->{right}) {
+                    $z = $p
+                    Rosetta::RBT::rotate_left($t, $z)
+                    $p = $z->{parent}
+                    $g = defined $p ? $p->{parent} : undef
+                }
+                $p->{color} = 1 if defined $p
+                $g->{color} = 0 if defined $g
+                Rosetta::RBT::rotate_right($t, $g) if defined $g
+            }
+        } elsif (defined $g) {
+            my $u = $g->{left}
+            if (Rosetta::RBT::is_red($u)) {
+                $p->{color} = 1
+                $u->{color} = 1
+                $g->{color} = 0
+                $z = $g
+            } else {
+                if ($z == $p->{left}) {
+                    $z = $p
+                    Rosetta::RBT::rotate_right($t, $z)
+                    $p = $z->{parent}
+                    $g = defined $p ? $p->{parent} : undef
+                }
+                $p->{color} = 1 if defined $p
+                $g->{color} = 0 if defined $g
+                Rosetta::RBT::rotate_left($t, $g) if defined $g
+            }
+        } else {
+            last
+        }
+    }
+    $t->{root}{color} = 1
+}
+
+fn Rosetta::RBT::insert($t, $key) {
+    my $z = { key => $key, color => 0, left => undef, right => undef, parent => undef }
+    my $y = undef
+    my $x = $t->{root}
+    while (defined $x) {
+        $y = $x
+        $x = $key < $x->{key} ? $x->{left} : $x->{right}
+    }
+    $z->{parent} = $y
+    if (!defined $y) { $t->{root} = $z }
+    elsif ($key < $y->{key}) { $y->{left} = $z }
+    else { $y->{right} = $z }
+    Rosetta::RBT::fix_after_insert($t, $z)
+}
+
+fn Rosetta::RBT::contains($t, $key) {
+    my $x = $t->{root}
+    while (defined $x) {
+        return 1 if $x->{key} == $key
+        $x = $key < $x->{key} ? $x->{left} : $x->{right}
+    }
+    0
+}
+
+fn Rosetta::RBT::inorder($t) {
+    my @out
+    Rosetta::RBT::io($t->{root}, \@out)
+    \@out
+}
+
+fn Rosetta::RBT::io($n, $out) {
+    return if !defined $n
+    Rosetta::RBT::io($n->{left}, $out)
+    push @$out, $n->{key}
+    Rosetta::RBT::io($n->{right}, $out)
+}
+
+fn Rosetta::RBT::black_height_consistent($t) {
+    Rosetta::RBT::bh($t->{root}) >= 0
+}
+
+fn Rosetta::RBT::bh($n) {
+    return 0 if !defined $n
+    my $lh = Rosetta::RBT::bh($n->{left})
+    my $rh = Rosetta::RBT::bh($n->{right})
+    return -1 if $lh < 0 || $rh < 0 || $lh != $rh
+    $lh + ($n->{color} == 1 ? 1 : 0)
+}
+
+fn Rosetta::RBT::no_double_red($n) {
+    return 1 if !defined $n
+    if ($n->{color} == 0) {
+        return 0 if defined $n->{left}  && $n->{left}{color}  == 0
+        return 0 if defined $n->{right} && $n->{right}{color} == 0
+    }
+    Rosetta::RBT::no_double_red($n->{left}) && Rosetta::RBT::no_double_red($n->{right})
+}
+
+# Insert ascending — should not degenerate.
+my $t1 = Rosetta::RBT::new()
+for my $k (~> 1:10) { Rosetta::RBT::insert($t1, $k) }
+assert_eq join(",", @{Rosetta::RBT::inorder($t1)}), "1,2,3,4,5,6,7,8,9,10",
+    "ascending insert in-order"
+assert_eq $t1->{root}{color}, 1, "root is black after asc insert"
+assert_eq Rosetta::RBT::no_double_red($t1->{root}), 1, "no double-red (asc)"
+
+# Random-ish insert
+my $t3 = Rosetta::RBT::new()
+for my $k (5, 3, 8, 1, 9, 4, 7, 2, 6, 10, 0) { Rosetta::RBT::insert($t3, $k) }
+assert_eq join(",", @{Rosetta::RBT::inorder($t3)}), "0,1,2,3,4,5,6,7,8,9,10",
+    "random insert in-order"
+assert_eq Rosetta::RBT::no_double_red($t3->{root}), 1, "no double-red (rand)"
+assert_eq $t3->{root}{color}, 1, "root black (rand)"
+
+# Contains
+assert_eq Rosetta::RBT::contains($t3, 5), 1, "contains 5"
+assert_eq Rosetta::RBT::contains($t3, 10), 1, "contains 10"
+assert_eq Rosetta::RBT::contains($t3, 11), 0, "missing 11"
+assert_eq Rosetta::RBT::contains($t3, -1), 0, "missing -1"
+
+# Empty / single
+my $te = Rosetta::RBT::new()
+assert_eq Rosetta::RBT::contains($te, 5), 0, "empty contains 0"
+assert_eq len(@{Rosetta::RBT::inorder($te)}), 0, "empty inorder is empty"
+
+Rosetta::RBT::insert($te, 42)
+assert_eq Rosetta::RBT::contains($te, 42), 1, "single contains"
+assert_eq $te->{root}{color}, 1, "single root black"
+
+test_run

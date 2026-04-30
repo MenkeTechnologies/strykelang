@@ -1,0 +1,137 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Beam search — best-first search that keeps only the
+# top-k partial solutions ("beam width") at every depth. Trades
+# completeness/optimality for memory and runtime; commonly used in
+# decoding sequence models and combinatorial heuristics.
+
+# State: arrayref. Successor fn: state → arrayref of [next_state, cost].
+# Goal fn: state → bool. Returns the best path it finds within max_depth.
+
+fn Rosetta::Beam::search($start, $goal_fn, $successors_fn, $cost_fn, $beam_width, $max_depth) {
+    my @beam = ([0, $start, [$start]])  # [cost_so_far, state, path]
+    if ($goal_fn->($start)) {
+        return { path => [$start], cost => 0 }
+    }
+    for my $depth (~> 1:$max_depth) {
+        my @candidates
+        for my $entry (@beam) {
+            my ($cost, $state, $path) = @$entry
+            for my $succ (@{$successors_fn->($state)}) {
+                my ($ns, $c) = @$succ
+                my $new_cost = $cost + $c
+                my @new_path = @$path
+                push @new_path, $ns
+                if ($goal_fn->($ns)) {
+                    return { path => \@new_path, cost => $new_cost }
+                }
+                push @candidates, [$new_cost, $ns, \@new_path]
+            }
+        }
+        last if len(@candidates) == 0
+        @candidates = sort { _0->[0] <=> _1->[0] } @candidates
+        @beam = ()
+        for my $i (~> 0:$beam_width - 1) {
+            last if $i >= len(@candidates)
+            push @beam, $candidates[$i]
+        }
+    }
+    return { path => undef, cost => undef }
+}
+
+# Toy: find a path in a tiny weighted graph.
+my %graph = (
+    "A" => [["B", 1], ["C", 4]],
+    "B" => [["D", 2], ["E", 5]],
+    "C" => [["F", 1]],
+    "D" => [["G", 1]],
+    "E" => [["G", 2]],
+    "F" => [["G", 3]],
+    "G" => []
+)
+
+my $r1 = Rosetta::Beam::search(
+    "A",
+    fn ($s) { $s eq "G" },
+    fn ($s) { $graph{$s} // [] },
+    fn ($e) { $e->[1] },
+    3, 10)
+assert_ok defined $r1->{path}, "found path A → G"
+assert_eq $r1->{path}[0], "A", "starts at A"
+assert_eq $r1->{path}[-1], "G", "ends at G"
+assert_eq $r1->{cost}, 4, "optimal A → B → D → G cost = 4"
+
+# Beam width 1 = greedy: still finds something but may not be optimal.
+my $r2 = Rosetta::Beam::search(
+    "A",
+    fn ($s) { $s eq "G" },
+    fn ($s) { $graph{$s} // [] },
+    fn ($e) { $e->[1] },
+    1, 10)
+assert_ok defined $r2->{path}, "greedy finds something"
+
+# Goal not reachable
+my %trap = ("A" => [["B", 1]], "B" => [["A", 1]])
+my $r3 = Rosetta::Beam::search(
+    "A",
+    fn ($s) { $s eq "Z" },
+    fn ($s) { $trap{$s} // [] },
+    fn ($e) { $e->[1] },
+    3, 5)
+assert_ok !defined $r3->{path}, "unreachable returns undef path"
+
+# Start = goal
+my $r4 = Rosetta::Beam::search(
+    "G",
+    fn ($s) { $s eq "G" },
+    fn ($s) { [] },
+    fn ($e) { 0 },
+    3, 5)
+assert_eq $r4->{cost}, 0, "start = goal cost = 0"
+assert_eq join(",", @{$r4->{path}}), "G", "single-state path"
+
+# Larger problem: weighted lattice. Best path A→I has cost 4
+# (A,1)→(B,1)→(D,1)→(I,1) = 4 with appropriate weights.
+my %lattice = (
+    "A" => [["B", 1], ["C", 5]],
+    "B" => [["D", 1], ["E", 3]],
+    "C" => [["F", 1]],
+    "D" => [["G", 5], ["H", 2]],
+    "E" => [["H", 1]],
+    "F" => [["I", 1]],
+    "G" => [["I", 1]],
+    "H" => [["I", 1]],
+    "I" => []
+)
+my $r5 = Rosetta::Beam::search(
+    "A",
+    fn ($s) { $s eq "I" },
+    fn ($s) { $lattice{$s} // [] },
+    fn ($e) { $e->[1] },
+    4, 10)
+assert_ok defined $r5->{path}, "lattice path found"
+assert_eq $r5->{path}[0], "A", "lattice starts A"
+assert_eq $r5->{path}[-1], "I", "lattice ends I"
+# Beam returns the first goal found, not necessarily the global optimum.
+# Cost is bounded above by the worst single path; here it's ≤ 8.
+assert_ok $r5->{cost} <= 8, "lattice cost finite"
+
+# Sequence-style: digits 0..9, find sequence of length 4 minimizing sum.
+# Each step appends a digit 0..3, terminal at length 4. Min sum = 0.
+my $r6 = Rosetta::Beam::search(
+    [],
+    fn ($s) { len(@$s) == 4 },
+    fn ($s) {
+        my @succs
+        for my $d (0, 1, 2, 3) {
+            my @ns = @$s
+            push @ns, $d
+            push @succs, [\@ns, $d]
+        }
+        \@succs
+    },
+    fn ($e) { $e->[1] },
+    3, 5)
+assert_eq $r6->{cost}, 0, "all-zero sequence cost = 0"
+assert_eq len(@{$r6->{path}}), 5, "5 nodes in path (initial + 4 picks)"
+
+test_run

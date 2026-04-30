@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hierholzer's algorithm — find an Eulerian circuit (or
+# path) in O(E). Walk a closed circuit from the start, remembering the
+# stuck vertex; whenever it has unused outgoing edges, splice another
+# closed circuit at that point until none remain.
+
+fn Rosetta::Hierholzer::find_circuit($n, $edges, $directed) {
+    # Build adjacency with edge indices (so each edge can be marked used once).
+    my @adj
+    for my $i (~> 1:$n) { push @adj, [] }
+    my $m = len(@$edges)
+    my @used = ~> 1:$m |> map { 0 }
+    for my $i (~> 0:$m - 1) {
+        my ($u, $v) = @{$edges->[$i]}
+        push @{$adj[$u]}, [$v, $i]
+        push @{$adj[$v]}, [$u, $i] if !$directed
+    }
+    # Pointer per vertex into its adjacency list.
+    my @ptr = ~> 1:$n |> map { 0 }
+    # Find a vertex with at least one edge to start.
+    my $start = -1
+    for my $i (~> 0:$n - 1) {
+        if (len(@{$adj[$i]}) > 0) { $start = $i; last }
+    }
+    return [] if $start == -1
+    my @stack = ($start)
+    my @circuit
+    while (len(@stack) > 0) {
+        my $v = $stack[-1]
+        # Skip already-used edges.
+        while ($ptr[$v] < len(@{$adj[$v]}) && $used[$adj[$v][$ptr[$v]][1]]) {
+            $ptr[$v]++
+        }
+        if ($ptr[$v] < len(@{$adj[$v]})) {
+            my $entry = $adj[$v][$ptr[$v]]
+            my ($next, $eid) = @$entry
+            $used[$eid] = 1
+            $ptr[$v]++
+            push @stack, $next
+        } else {
+            push @circuit, pop @stack
+        }
+    }
+    # Validate: every edge must be used (otherwise no Eulerian trail exists).
+    for my $u (@used) { return [] if !$u }
+    @circuit = reverse @circuit
+    # Eulerian *circuit* requires the trail to close at the start vertex.
+    return [] if $circuit[0] != $circuit[-1]
+    \@circuit
+}
+
+# Verify the circuit traverses every edge exactly once.
+fn Rosetta::Hierholzer::verify($circuit, $edges, $directed) {
+    return 1 if len(@$edges) == 0
+    return 0 if len(@$circuit) != len(@$edges) + 1
+    my @used = ~> 1:len(@$edges) |> map { 0 }
+    for my $i (~> 0:len(@$circuit) - 2) {
+        my $a = $circuit->[$i]
+        my $b = $circuit->[$i + 1]
+        my $found = -1
+        for my $j (~> 0:len(@$edges) - 1) {
+            next if $used[$j]
+            my ($u, $v) = @{$edges->[$j]}
+            if (($u == $a && $v == $b) || (!$directed && $u == $b && $v == $a)) {
+                $found = $j
+                last
+            }
+        }
+        return 0 if $found == -1
+        $used[$found] = 1
+    }
+    1
+}
+
+# Triangle 0-1-2-0 (undirected): one cycle covering all 3 edges.
+my $tri = [[0, 1], [1, 2], [2, 0]]
+my $c1 = Rosetta::Hierholzer::find_circuit(3, $tri, 0)
+assert_eq Rosetta::Hierholzer::verify($c1, $tri, 0), 1, "triangle Eulerian"
+assert_eq $c1->[0], $c1->[-1], "circuit closes"
+
+# K4 with multi-edges to make every degree even — actually K4 has all
+# vertices degree 3 (odd), so no Euler circuit. Drop one edge to fix.
+# K4 minus edge (0,3): degrees 2,3,3,2 — odd at 1 and 2, no circuit.
+# Use 4-cycle instead: 0-1-2-3-0 (Euler circuit exists).
+my $sq = [[0, 1], [1, 2], [2, 3], [3, 0]]
+my $c2 = Rosetta::Hierholzer::find_circuit(4, $sq, 0)
+assert_eq Rosetta::Hierholzer::verify($c2, $sq, 0), 1, "4-cycle Eulerian"
+assert_eq len(@$c2), 5, "4-cycle visits 5 vertices (closed)"
+
+# Two triangles sharing a vertex (bowtie): all even degrees → circuit exists.
+my $bow = [[0, 1], [1, 2], [2, 0], [2, 3], [3, 4], [4, 2]]
+my $c3 = Rosetta::Hierholzer::find_circuit(5, $bow, 0)
+assert_eq Rosetta::Hierholzer::verify($c3, $bow, 0), 1, "bowtie Eulerian"
+
+# Directed Eulerian: 0→1→2→0 cycle.
+my $dir = [[0, 1], [1, 2], [2, 0]]
+my $c4 = Rosetta::Hierholzer::find_circuit(3, $dir, 1)
+assert_eq Rosetta::Hierholzer::verify($c4, $dir, 1), 1, "directed triangle"
+
+# Directed graph with no circuit (path 0→1→2): in-degree ≠ out-degree.
+my $path = [[0, 1], [1, 2]]
+my $c5 = Rosetta::Hierholzer::find_circuit(3, $path, 1)
+assert_eq len(@$c5), 0, "no Eulerian circuit returns empty"
+
+# Larger undirected example: two squares glued at an edge.
+# Square A: 0-1-2-3-0; Square B: 2-3-4-5-2; shared edge 2-3
+# But sharing 2-3 makes 2 and 3 have degree 4 (even) and 0,1,4,5 have degree 2.
+my $two_sq = [[0, 1], [1, 2], [2, 3], [3, 0], [2, 3], [3, 4], [4, 5], [5, 2]]
+my $c6 = Rosetta::Hierholzer::find_circuit(6, $two_sq, 0)
+assert_eq Rosetta::Hierholzer::verify($c6, $two_sq, 0), 1, "two squares glued"
+
+# Single edge — has Euler trail but not circuit; should return empty.
+# Endpoints have odd degree.
+my $single = [[0, 1]]
+my $c7 = Rosetta::Hierholzer::find_circuit(2, $single, 0)
+assert_eq len(@$c7), 0, "single-edge graph has no circuit"
+
+# Empty graph
+my $c8 = Rosetta::Hierholzer::find_circuit(0, [], 0)
+assert_eq len(@$c8), 0, "empty graph"
+
+test_run

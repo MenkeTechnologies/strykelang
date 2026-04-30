@@ -1,0 +1,118 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Interval tree — augmented BST keyed on interval lo,
+# storing the max hi reachable in each subtree. Supports adding
+# intervals and querying for any interval that overlaps a point.
+
+fn Rosetta::IntervalTree::new() {
+    { root => undef }
+}
+
+fn Rosetta::IntervalTree::insert($t, $lo, $hi) {
+    $t->{root} = Rosetta::IntervalTree::insert_node($t->{root}, $lo, $hi)
+}
+
+fn Rosetta::IntervalTree::insert_node($node, $lo, $hi) {
+    if (!defined $node) {
+        return { lo => $lo, hi => $hi, max => $hi, left => undef, right => undef }
+    }
+    if ($lo < $node->{lo}) {
+        $node->{left} = Rosetta::IntervalTree::insert_node($node->{left}, $lo, $hi)
+    } else {
+        $node->{right} = Rosetta::IntervalTree::insert_node($node->{right}, $lo, $hi)
+    }
+    if ($hi > $node->{max}) { $node->{max} = $hi }
+    $node
+}
+
+# Find any interval containing point p; returns [lo, hi] or undef.
+fn Rosetta::IntervalTree::contains_point($t, $p) {
+    Rosetta::IntervalTree::cp($t->{root}, $p)
+}
+
+fn Rosetta::IntervalTree::cp($node, $p) {
+    return undef if !defined $node
+    if ($node->{lo} <= $p && $p <= $node->{hi}) {
+        return [$node->{lo}, $node->{hi}]
+    }
+    if (defined $node->{left} && $node->{left}{max} >= $p) {
+        my $r = Rosetta::IntervalTree::cp($node->{left}, $p)
+        return $r if defined $r
+    }
+    Rosetta::IntervalTree::cp($node->{right}, $p)
+}
+
+# Collect all intervals overlapping [qlo, qhi].
+fn Rosetta::IntervalTree::overlaps_range($t, $qlo, $qhi) {
+    my @out
+    Rosetta::IntervalTree::or_collect($t->{root}, $qlo, $qhi, \@out)
+    \@out
+}
+
+fn Rosetta::IntervalTree::or_collect($node, $qlo, $qhi, $out) {
+    return if !defined $node
+    if ($node->{lo} <= $qhi && $qlo <= $node->{hi}) {
+        push @$out, [$node->{lo}, $node->{hi}]
+    }
+    if (defined $node->{left} && $node->{left}{max} >= $qlo) {
+        Rosetta::IntervalTree::or_collect($node->{left}, $qlo, $qhi, $out)
+    }
+    if (defined $node->{right} && $node->{lo} <= $qhi) {
+        Rosetta::IntervalTree::or_collect($node->{right}, $qlo, $qhi, $out)
+    }
+}
+
+fn Rosetta::IntervalTree::format_intervals($iv) {
+    my @sorted = sort { _0->[0] <=> _1->[0] || _0->[1] <=> _1->[1] } @$iv
+    join(";", map { _0->[0] . "-" . _0->[1] } @sorted)
+}
+
+# Build tree
+my $t = Rosetta::IntervalTree::new()
+my @intervals = ([15, 20], [10, 30], [17, 19], [5, 20], [12, 15], [30, 40])
+for my $iv (@intervals) {
+    Rosetta::IntervalTree::insert($t, $iv->[0], $iv->[1])
+}
+
+# Point lookups
+my $p1 = Rosetta::IntervalTree::contains_point($t, 14)
+assert_ok defined $p1, "p=14 in some interval"
+assert_ok $p1->[0] <= 14 && 14 <= $p1->[1], "found interval contains 14"
+
+my $p2 = Rosetta::IntervalTree::contains_point($t, 25)
+assert_ok defined $p2, "p=25 covered"
+
+my $p3 = Rosetta::IntervalTree::contains_point($t, 50)
+assert_ok !defined $p3, "p=50 outside all intervals"
+
+# Range query — collect all intervals overlapping [10, 18].
+# Expected matches: [15,20], [10,30], [17,19], [5,20], [12,15]
+my $r1 = Rosetta::IntervalTree::overlaps_range($t, 10, 18)
+my $expected_r1 = "5-20;10-30;12-15;15-20;17-19"
+assert_eq Rosetta::IntervalTree::format_intervals($r1), $expected_r1, "[10..18] overlaps"
+
+# [25..28] overlaps only [10,30]
+my $r2 = Rosetta::IntervalTree::overlaps_range($t, 25, 28)
+assert_eq Rosetta::IntervalTree::format_intervals($r2), "10-30", "[25..28] overlaps"
+
+# [35..38] overlaps only [30,40]
+my $r3 = Rosetta::IntervalTree::overlaps_range($t, 35, 38)
+assert_eq Rosetta::IntervalTree::format_intervals($r3), "30-40", "[35..38] overlaps"
+
+# [50..60] overlaps nothing
+my $r4 = Rosetta::IntervalTree::overlaps_range($t, 50, 60)
+assert_eq len(@$r4), 0, "[50..60] no overlap"
+
+# Empty tree
+my $empty = Rosetta::IntervalTree::new()
+assert_ok !defined Rosetta::IntervalTree::contains_point($empty, 5),
+    "empty tree returns undef"
+my $er = Rosetta::IntervalTree::overlaps_range($empty, 0, 100)
+assert_eq len(@$er), 0, "empty tree no overlaps"
+
+# Single interval
+my $one = Rosetta::IntervalTree::new()
+Rosetta::IntervalTree::insert($one, 5, 10)
+assert_ok defined Rosetta::IntervalTree::contains_point($one, 7), "in single interval"
+assert_ok !defined Rosetta::IntervalTree::contains_point($one, 11), "outside single"
+
+test_run

@@ -1,0 +1,142 @@
+#!/usr/bin/env stryke
+# Rosetta Code: B-tree of order m — search/insert. Each non-root node
+# holds between ⌈m/2⌉-1 and m-1 keys. On overflow we split the full
+# child along the median into the parent.
+
+fn Rosetta::BTree::new($order) {
+    {
+        order => $order,
+        root => Rosetta::BTree::new_node(1)
+    }
+}
+
+fn Rosetta::BTree::new_node($leaf) {
+    { keys => [], children => [], leaf => $leaf }
+}
+
+fn Rosetta::BTree::search($node, $key) {
+    my $i = 0
+    while ($i < len(@{$node->{keys}}) && $key > $node->{keys}[$i]) { $i++ }
+    if ($i < len(@{$node->{keys}}) && $node->{keys}[$i] == $key) {
+        return [$node, $i]
+    }
+    return undef if $node->{leaf}
+    Rosetta::BTree::search($node->{children}[$i], $key)
+}
+
+fn Rosetta::BTree::contains($t, $key) {
+    defined Rosetta::BTree::search($t->{root}, $key) ? 1 : 0
+}
+
+fn Rosetta::BTree::split_child($parent, $i, $order) {
+    my $full = $parent->{children}[$i]
+    my $t = int(($order - 1) / 2)
+    my $sibling = Rosetta::BTree::new_node($full->{leaf})
+    # Sibling gets keys[t+1 .. order-2]
+    for my $j ($t + 1..$order - 2) { push @{$sibling->{keys}}, $full->{keys}[$j] }
+    if (!$full->{leaf}) {
+        for my $j ($t + 1..$order - 1) {
+            push @{$sibling->{children}}, $full->{children}[$j]
+        }
+        # Trim full's children
+        my @kept_children
+        for my $j (~> 0:$t) { push @kept_children, $full->{children}[$j] }
+        $full->{children} = \@kept_children
+    }
+    my $median = $full->{keys}[$t]
+    # Trim full's keys to [0..t-1]
+    my @kept_keys
+    for my $j (~> 0:$t - 1) { push @kept_keys, $full->{keys}[$j] }
+    $full->{keys} = \@kept_keys
+    # Insert median into parent at position i
+    splice @{$parent->{keys}}, $i, 0, $median
+    splice @{$parent->{children}}, $i + 1, 0, $sibling
+}
+
+fn Rosetta::BTree::insert_nonfull($node, $key, $order) {
+    my $i = len(@{$node->{keys}}) - 1
+    if ($node->{leaf}) {
+        # Find insertion position; skip duplicates.
+        return if grep { _0 == $key } @{$node->{keys}}
+        while ($i >= 0 && $key < $node->{keys}[$i]) { $i-- }
+        splice @{$node->{keys}}, $i + 1, 0, $key
+        return
+    }
+    while ($i >= 0 && $key < $node->{keys}[$i]) { $i-- }
+    $i++
+    if (len(@{$node->{children}[$i]{keys}}) == $order - 1) {
+        Rosetta::BTree::split_child($node, $i, $order)
+        $i++ if $key > $node->{keys}[$i]
+    }
+    Rosetta::BTree::insert_nonfull($node->{children}[$i], $key, $order)
+}
+
+fn Rosetta::BTree::insert($t, $key) {
+    my $root = $t->{root}
+    if (len(@{$root->{keys}}) == $t->{order} - 1) {
+        my $new_root = Rosetta::BTree::new_node(0)
+        push @{$new_root->{children}}, $root
+        Rosetta::BTree::split_child($new_root, 0, $t->{order})
+        Rosetta::BTree::insert_nonfull($new_root, $key, $t->{order})
+        $t->{root} = $new_root
+    } else {
+        Rosetta::BTree::insert_nonfull($root, $key, $t->{order})
+    }
+}
+
+fn Rosetta::BTree::inorder($t) {
+    my @out
+    Rosetta::BTree::io($t->{root}, \@out)
+    \@out
+}
+
+fn Rosetta::BTree::io($node, $out) {
+    for my $i (~> 0:len(@{$node->{keys}}) - 1) {
+        if (!$node->{leaf}) { Rosetta::BTree::io($node->{children}[$i], $out) }
+        push @$out, $node->{keys}[$i]
+    }
+    if (!$node->{leaf}) {
+        Rosetta::BTree::io($node->{children}[len(@{$node->{keys}})], $out)
+    }
+}
+
+# Build a B-tree of order 4 with 1..20.
+my $tree = Rosetta::BTree::new(4)
+for my $k (~> 1:20) { Rosetta::BTree::insert($tree, $k) }
+assert_eq join(",", @{Rosetta::BTree::inorder($tree)}),
+          join(",", (1..20)), "in-order = ascending"
+
+# Search
+for my $k (~> 1:20) {
+    assert_eq Rosetta::BTree::contains($tree, $k), 1, "contains $k"
+}
+assert_eq Rosetta::BTree::contains($tree, 0),  0, "missing 0"
+assert_eq Rosetta::BTree::contains($tree, 21), 0, "missing 21"
+assert_eq Rosetta::BTree::contains($tree, 100), 0, "missing 100"
+
+# Order-5 tree, descending insert
+my $t5 = Rosetta::BTree::new(5)
+for (my $k = 30; $k >= 1; $k--) { Rosetta::BTree::insert($t5, $k) }
+assert_eq join(",", @{Rosetta::BTree::inorder($t5)}),
+          join(",", (1..30)), "order-5 descending insert"
+
+# Random-ish input
+my $tr = Rosetta::BTree::new(4)
+my @keys = (5, 3, 8, 1, 9, 4, 7, 2, 6, 10, 0, 15, 12, 18, 11, 13, 17, 14, 16, 19)
+for my $k (@keys) { Rosetta::BTree::insert($tr, $k) }
+my @sorted = sort { _0 <=> _1 } @keys
+assert_eq join(",", @{Rosetta::BTree::inorder($tr)}),
+          join(",", @sorted), "random insert in-order"
+
+# Duplicate insert is no-op
+my $td = Rosetta::BTree::new(4)
+Rosetta::BTree::insert($td, 5)
+Rosetta::BTree::insert($td, 5)
+assert_eq join(",", @{Rosetta::BTree::inorder($td)}), "5", "duplicate"
+
+# Empty tree
+my $e = Rosetta::BTree::new(4)
+assert_eq Rosetta::BTree::contains($e, 5), 0, "empty contains 0"
+assert_eq len(@{Rosetta::BTree::inorder($e)}), 0, "empty inorder"
+
+test_run

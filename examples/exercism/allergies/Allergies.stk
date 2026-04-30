@@ -5,5 +5,5 @@ my %_AL = (eggs => 1, peanuts => 2, shellfish => 4, strawberries => 8,
 fn Exercism::Allergies::allergic_to($item, $score) { $_AL{$item} & $score }
 
 fn Exercism::Allergies::list_allergies($score) {
-    [grep { Exercism::Allergies::allergic_to($_, $score) } sort { $_AL{_0} <=> $_AL{_1} } keys %_AL]
+    [~> keys %_AL sort { $_AL{_0} <=> $_AL{_1} } grep { Exercism::Allergies::allergic_to(_, $score) }]
 }

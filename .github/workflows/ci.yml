@@ -105,16 +105,11 @@ jobs:
         run: ./target/release/s test examples/rosetta/t
       - name: Run stryke test on exercism project
         # Each exercise is its own dir with `t/test_*.stk` inside, where
-        # the test does `require "./Module.stk"`. `cd` into each before
-        # invoking `s test t` so the relative require resolves.
-        run: |
-          set -e
-          fail=0
-          ROOT="${{ github.workspace }}"
-          for d in "$ROOT"/examples/exercism/*/; do
-            (cd "$d" && "$ROOT/target/release/s" test t) || fail=$((fail+1))
-          done
-          test "$fail" -eq 0
+        # the test does `require "./Module.stk"`. The script cds into each
+        # before invoking `s test t` so the relative require resolves.
+        env:
+          ST: ${{ github.workspace }}/target/release/s
+        run: bash examples/exercism_run_all.sh --summary
 
   release-build:
     name: Release Build

@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Differential Evolution (DE) — population-based
+# stochastic optimizer. Each iteration mutates each target vector by
+# adding a scaled difference of two other random members, crosses it
+# with the target, and accepts the trial if it improves the fitness.
+# DE/rand/1/bin variant.
+
+fn Rosetta::DE::random($lo, $hi) { $lo + rand() * ($hi - $lo) }
+
+fn Rosetta::DE::optimize($f, $dim, $bounds, $opts) {
+    my $np    = $opts->{np}    // 30
+    my $iters = $opts->{iters} // 100
+    my $F     = $opts->{F}     // 0.8
+    my $cr    = $opts->{cr}    // 0.9
+
+    # Initialize population uniformly in bounds.
+    my @pop
+    my @vals
+    for my $i (~> 1:$np) {
+        my @v
+        for my $d (~> 0:$dim - 1) {
+            push @v, Rosetta::DE::random($bounds->[$d][0], $bounds->[$d][1])
+        }
+        push @pop, \@v
+        push @vals, $f->(\@v)
+    }
+
+    for my $iter (~> 1:$iters) {
+        for my $i (~> 0:$np - 1) {
+            # Pick three distinct random indices ≠ i.
+            my $a; my $b; my $c
+            $a = int(rand() * $np); $a = ($a + 1) % $np while $a == $i
+            $b = int(rand() * $np); $b = ($b + 1) % $np while $b == $i || $b == $a
+            $c = int(rand() * $np); $c = ($c + 1) % $np while $c == $i || $c == $a || $c == $b
+            my @trial
+            my $rand_dim = int(rand() * $dim)
+            for my $d (~> 0:$dim - 1) {
+                my $v
+                if ($d == $rand_dim || rand() < $cr) {
+                    $v = $pop[$a][$d] + $F * ($pop[$b][$d] - $pop[$c][$d])
+                    if ($v < $bounds->[$d][0]) { $v = $bounds->[$d][0] }
+                    if ($v > $bounds->[$d][1]) { $v = $bounds->[$d][1] }
+                } else {
+                    $v = $pop[$i][$d]
+                }
+                push @trial, $v
+            }
+            my $tv = $f->(\@trial)
+            if ($tv < $vals[$i]) {
+                $pop[$i] = \@trial
+                $vals[$i] = $tv
+            }
+        }
+    }
+    my $best_idx = 0
+    for my $i (1..$np - 1) {
+        $best_idx = $i if $vals[$i] < $vals[$best_idx]
+    }
+    { best => $pop[$best_idx], value => $vals[$best_idx] }
+}
+
+fn Rosetta::DE::approx($x, $y, $eps) { abs($x - $y) < $eps }
+
+# Bowl
+srand(42)
+my $f1 = fn ($p) { ($p->[0] - 3) ** 2 + ($p->[1] + 2) ** 2 }
+my $r1 = Rosetta::DE::optimize($f1, 2, [[-10, 10], [-10, 10]],
+    { np => 30, iters => 100 })
+assert_ok Rosetta::DE::approx($r1->{best}[0], 3, 0.5),  "bowl x*"
+assert_ok Rosetta::DE::approx($r1->{best}[1], -2, 0.5), "bowl y*"
+assert_ok $r1->{value} < 0.5, "bowl value near 0"
+
+# Sphere 4D
+srand(42)
+my $f2 = fn ($p) {
+    my $s = 0
+    for my $v (@$p) { $s += $v * $v }
+    $s
+}
+my $bounds_4 = [[-5, 5], [-5, 5], [-5, 5], [-5, 5]]
+my $r2 = Rosetta::DE::optimize($f2, 4, $bounds_4, { np => 30, iters => 200 })
+assert_ok $r2->{value} < 0.5, "sphere 4D near 0"
+
+# Rastrigin (multimodal): f(x) = 10n + Σ(xi² - 10cos(2π xi)). Min 0 at origin.
+srand(42)
+my $f3 = fn ($p) {
+    my $pi = atan2(0, -1)
+    my $s = 10 * len(@$p)
+    for my $v (@$p) { $s += $v * $v - 10 * cos(2 * $pi * $v) }
+    $s
+}
+my $r3 = Rosetta::DE::optimize($f3, 2, [[-5.12, 5.12], [-5.12, 5.12]],
+    { np => 50, iters => 300 })
+assert_ok $r3->{value} < 1, "Rastrigin 2D near 0"
+
+# 1D
+srand(42)
+my $f4 = fn ($p) { abs($p->[0] - 7) }
+my $r4 = Rosetta::DE::optimize($f4, 1, [[-100, 100]], { np => 20, iters => 100 })
+assert_ok Rosetta::DE::approx($r4->{best}[0], 7, 0.5), "|x-7| min at 7"
+
+test_run
