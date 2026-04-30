@@ -2,17 +2,23 @@
 
 ## Running the tests
 
-Each exercise ships with a stryke test file (extension `.t`) that exercises your solution.
-Run it with:
+Each exercise ships with a stryke test file in `t/`. From the exercise directory, run:
 
 ```bash
-stryke leap.t
+stryke test
+```
+
+`stryke test` auto-discovers `t/` (or `tests/`) and runs every `*.stk` test file inside.
+To run a single test file directly:
+
+```bash
+stryke t/test_leap.stk
 ```
 
 To run every exercism exercise at once:
 
 ```bash
-s test examples/exercism
+for d in examples/exercism/*/; do (cd "$d" && stryke test); done
 ```
 
 Test assertions in stryke use `assert_eq`, `assert_ok`, and friends — see the
@@ -20,21 +26,18 @@ Test assertions in stryke use `assert_eq`, `assert_ok`, and friends — see the
 
 ## Submitting your solution
 
-You can submit your solution using the `exercism submit Leap.stk` command.
-This uploads your solution and prints the solution-page URL.
+Submit using:
 
-Submitting an incomplete solution is fine — it lets you:
+```bash
+exercism submit Leap.stk
+```
 
-- See how others have completed the exercise
-- Request mentor help
+Submitting an incomplete solution is fine — it lets you see how others have completed
+the exercise and request mentor help.
 
-## Need to get help?
-
-If you'd like help solving the exercise, check the following pages:
+## Need help?
 
 - The [Stryke track's documentation](https://exercism.org/docs/tracks/stryke)
 - The [Stryke language repo](https://github.com/MenkeTechnologies/strykelang)
 - [Exercism's programming category on the forum](https://forum.exercism.org/c/programming/5)
 - The [Frequently Asked Questions](https://exercism.org/docs/using/faqs)
-
-Should those resources not suffice, submit your (incomplete) solution to request mentoring.

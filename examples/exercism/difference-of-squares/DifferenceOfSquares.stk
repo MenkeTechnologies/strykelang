@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
-fn Exercism::DifferenceOfSquares::square_of_sum($n)  { sum(1..$n) ** 2 }
-fn Exercism::DifferenceOfSquares::sum_of_squares($n) { sum(map { $_ ** 2 } 1..$n) }
+fn Exercism::DifferenceOfSquares::square_of_sum($n)  { sum(1:$n) ** 2 }
+fn Exercism::DifferenceOfSquares::sum_of_squares($n) { ~> 1:$n map {$_ ** 2} sum }
 fn Exercism::DifferenceOfSquares::difference_of_squares($n) {
     Exercism::DifferenceOfSquares::square_of_sum($n) - Exercism::DifferenceOfSquares::sum_of_squares($n)
 }
