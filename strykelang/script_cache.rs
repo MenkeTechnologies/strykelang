@@ -7,10 +7,10 @@
 //! Storage layout (rkyv archived):
 //!   ScriptShard {
 //!     header: { magic, format_version, stryke_version, pointer_width, built_at_secs },
-//!     entries: HashMap<canonical_path, ScriptEntry>,
+//!     entries: `HashMap<canonical_path, ScriptEntry>`,
 //!   }
 //!   ScriptEntry { mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs,
-//!                 program_blob: Vec<u8>, chunk_blob: Vec<u8> }
+//!                 program_blob: `Vec<u8>`, chunk_blob: `Vec<u8>` }
 //!
 //! Inner `program_blob` / `chunk_blob` are bincode for now — `PerlValue`'s
 //! Arc-shared graph and the `CacheConst` adapter aren't trivially rkyv-archivable,

@@ -544,6 +544,54 @@ my our local state sub fn class struct enum trait
 use no require package BEGIN END CHECK INIT UNITCHECK
 and or not x eq ne lt gt le ge cmp</div>
         <p>Attempting <code>fn y { }</code> or <code>fn goto { }</code> produces: <code>`y` is a reserved word and cannot be used as a function name</code></p>
+        <p style="margin-top: 1em;"><strong>Topic-slot names</strong> are also rejected: <code>fn _</code>, <code>fn _&lt;</code>, <code>fn _0</code>, <code>fn _N</code>, <code>fn _N&lt;+</code>, plus the sigil-prefixed forms <code>fn $_</code>, <code>fn @_</code>, and the package-qualified forms <code>fn Foo::_</code>, <code>fn Pkg::_0</code>. A user-defined sub by any of these names would shadow the topic in expression position and silently break every <code>_</code>-aware builtin. Names like <code>fn _foo</code>, <code>fn _NAME</code>, <code>fn my_helper</code> still work — only EXACT topic-slot spellings reject.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Range literals</h2>
+        <p>The <code>:</code> range operator (and the <code>!!!</code> separator for IPv6) recognize several built-in literal types as a single token. The runtime expansion dispatches on the surface form so each type gets the right step semantics.</p>
+        <div class="oneliner" style="font-size:11px;">192.168.1.1:192.168.1.5:1     <span class="comment"># IPv4, octet step</span>
+2022-01-01:2022-01-05:1       <span class="comment"># ISO date, day step</span>
+2022-01:2022-04:1             <span class="comment"># year-month, month step</span>
+0x00:0xFF:1                   <span class="comment"># hex, preserves prefix/width/case</span>
+2001::1!!!2001::5!!!1         <span class="comment"># IPv6 (uses !!! separator)</span>
+fe80::ff!!!fe80::fc!!!-1      <span class="comment"># IPv6 reverse step</span>
+::1!!!::5!!!1                 <span class="comment"># IPv6 zero-comp prefix</span></div>
+        <p><strong>Hex case preservation</strong> — uppercase iff EITHER endpoint has any uppercase letter. <code>0x00:0xFF:1</code> emits <code>0x00, 0x01, …, 0xFF</code> (uppercase wins from TO). Outside range context, <code>0xFF</code> is still the integer 255 — only range-context lookahead triggers the string-typed literal.</p>
+        <p><strong>Why <code>!!!</code> for IPv6</strong> — IPv6 uses <code>:</code> internally; reusing it as the range separator would be ambiguous. The dedicated <code>!!!</code> token plays the role of <code>:</code> in range expressions only.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Topic chain — <code>_&lt;</code> and the positional matrix</h2>
+        <p>Inside a closure (map/grep/sort block, sub body, fan/fan_cap), <code>_&lt;</code> reads the topic of the enclosing scope — the value <code>_</code> held in the frame that called this closure. The chain extends up to four frames: <code>_&lt;&lt;</code>, <code>_&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;</code>. Numeric positional slots get the same matrix: <code>_0&lt;</code>, <code>_1&lt;&lt;</code>, …, <code>_N&lt;&lt;&lt;&lt;</code>. Bareword and sigil forms (<code>$_&lt;</code>) are equivalent.</p>
+<pre><span class="comment"># Nested map — `_&lt;` reaches the outer iter's `_`:</span>
+map { my @inner = (1, 2); map { _&lt; + _ } @inner } (10, 20)
+<span class="comment"># 11, 12, 21, 22</span>
+
+<span class="comment"># Inside a 3-arg sub, _0&lt;&lt;&lt;&lt; reaches arg 0 four frames up:</span>
+fn deep($_0, $_1, $_2) {
+  ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
+    p _0&lt;&lt;&lt;&lt;, _1&lt;&lt;&lt;&lt;, _2&lt;&lt;&lt;&lt;
+  } } } }
+}</pre>
+        <p><strong>Iter re-entry</strong> — the chain shifts on the FIRST <code>set_topic</code> call in a given frame; subsequent iterations of the same loop only refresh <code>_</code>, so <code>_&lt;</code> keeps pointing at the enclosing scope's topic instead of rolling to the previous iter's value. Bound-but-undef chain entries fall back to <code>_</code> so <code>$h-&gt;{_&lt;}</code> at the outermost iter reads the iteration key.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Hash-key power forms</h2>
+        <p>Stryke extends Perl's bareword autoquoting in three ways:</p>
+        <ul>
+          <li><strong>Topic-slot barewords</strong> — <code>_</code>, <code>_&lt;</code>, <code>_0</code>, <code>_0&lt;</code>, <code>_N&lt;+</code> resolve to the topic value, not the literal name. <code>{ _ =&gt; 1 }</code> ≡ <code>{ $_ =&gt; 1 }</code>; <code>$h-&gt;{_&lt;}</code> reads the outer-scope topic.</li>
+          <li><strong>Operator keywords</strong> — <code>eq</code>, <code>ne</code>, <code>lt</code>, <code>gt</code>, <code>le</code>, <code>ge</code>, <code>cmp</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>x</code> autoquote inside <code>{…}</code> hash subscripts. <code>$h-&gt;{ne}</code>, <code>$h{eq}</code>, etc. read normally.</li>
+          <li><strong><code>+{ EXPR }</code> force-hashref</strong> — block-vs-hashref disambiguation falls back to a code block when the body doesn't fit <code>KEY =&gt; VAL</code>. The <code>+</code> prefix forces hashref interpretation; a list-yielding body is paired up to produce a hash. <code>+{ map { ($_, $_ * 2) } (1,2,3) }</code> gives <code>{1 =&gt; 2, 2 =&gt; 4, 3 =&gt; 6}</code>.</li>
+        </ul>
+      </section>
+
+      <section class="tutorial-section">
+        <h2><code>s,/tr,/y,</code> with comma delimiter</h2>
+        <p>The <code>s</code>, <code>tr</code>, and <code>y</code> operators accept any non-alphanumeric delimiter, including <code>,</code>. The lookahead heuristic gates the comma form on having three commas before the statement ends, so <code>$obj-&gt;y</code> method calls and <code>struct Pt { x, y, z }</code> field declarations stay barewords.</p>
+        <div class="oneliner" style="font-size:11px;">stryke -pe 's,a,b,g' &lt; input
+stryke -pe 'tr,A-Z,a-z,'</div>
       </section>
 
       <section class="tutorial-section">

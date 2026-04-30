@@ -172,7 +172,7 @@
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
-        <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
+        <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">28</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">45</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">133</span></li>
@@ -1374,7 +1374,7 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
     </section>
     <section class="tutorial-section" id="ch-stryke-extensions">
       <h2>stryke Extensions</h2>
-      <p class="chapter-meta">19 topics</p>
+      <p class="chapter-meta">28 topics</p>
       <article class="doc-entry" id="doc-fn">
         <h3><a class="doc-anchor" href="#doc-fn">#</a> <code>fn</code></h3>
         <p>Define a named or anonymous function with optional typed parameters and default values. Named functions are installed into the current package; anonymous functions (closures) capture their enclosing lexical scope. Functions are first-class values — assign them to scalars, store in arrays, pass as callbacks. The last expression evaluated is the implicit return value unless an explicit <code>return</code> is used.</p>
@@ -1575,6 +1575,123 @@ for (1:10) {
         <pre><code class="lang-perl">my $r = capture(&quot;ls -la&quot;)
 p $r-&gt;stdout, $r-&gt;stderr, $r-&gt;exitcode
 capture(&quot;ps aux&quot;) |&gt; lines |&gt; map { columns } |&gt; tbl |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-range-literals">
+        <h3><a class="doc-anchor" href="#doc-range-literals">#</a> Range literals</h3>
+        <p>The <code>:</code> range operator (and the <code>!!!</code> alternate for IPv6) accept several built-in literal types in addition to plain integers. The lexer recognizes each form as a single token so <code>192.168.1.1</code>, <code>2022-01-01</code>, <code>2001::1</code>, and <code>0xFF</code> aren't fractured into <code>.</code>/<code>-</code>/<code>:</code> arithmetic. The runtime expansion then dispatches on the surface form to give the right step semantics.</p>
+        <p><strong>IPv4</strong> — dotted-quad with each octet 0..=255:</p>
+        <pre><code class="lang-perl">ep 192.168.1.1:192.168.1.5:1
+# 192.168.1.1, 192.168.1.2, …, 192.168.1.5
+
+ep 192.168.255.255:192.168.255.250:-1
+# reverse iteration with negative step
+</code></pre>
+        <p><strong>ISO date</strong> (<code>YYYY-MM-DD</code>) and <strong>year-month</strong> (<code>YYYY-MM</code>) — step is days / months respectively. The 4-digit-year guard keeps plain subtraction (<code>5-2-1</code>) parsing as arithmetic.</p>
+        <pre><code class="lang-perl">ep 2022-01-01:2022-01-05:1     # day step
+ep 2022-01:2022-04:1            # month step
+say 5-2-1                       # 2 — still arithmetic
+</code></pre>
+        <p><strong>Hex literals</strong> in range context preserve the <code>0x</code> prefix, the digit width (zero-padded to fit the longer endpoint), and uppercase iff EITHER endpoint has any uppercase letter. Outside a range expression <code>0xFF</code> is still the integer 255.</p>
+        <pre><code class="lang-perl">ep 0x00:0x10:1                 # 0x00, 0x01, …, 0x10
+ep 0xFF:0xF0:-3                # 0xFF, 0xFC, 0xF9, … (uppercase preserved)
+ep 0x1:0x100:0x40              # 0x001, 0x041, 0x081, 0x0c1 (width 3)
+say 0xFF + 1                   # 256 — outside range, still integer
+</code></pre>
+        <p><strong>IPv6</strong> — full and zero-compressed forms. Because <code>:</code> would collide with the standard range op, IPv6 ranges use the dedicated <code>!!!</code> separator (see below).</p>
+      </article>
+      <article class="doc-entry" id="doc-bang-bang-bang">
+        <h3><a class="doc-anchor" href="#doc-bang-bang-bang">#</a> <code>!!!</code> — IPv6 range separator</h3>
+        <p>IPv6 addresses use <code>:</code> internally; reusing <code>:</code> as the range separator would be ambiguous. The <code>!!!</code> token plays the role of <code>:</code> in range expressions only — start, end, and optional step are separated by <code>!!!</code> instead. The lexer accepts IPv6 in three prefix forms: digit-leading (<code>2001::1</code>), hex-letter-leading (<code>fe80::1</code>), and zero-compressed (<code>::1</code>). Validity is decided by Rust's <code>std::net::Ipv6Addr</code> parser.</p>
+        <pre><code class="lang-perl">ep 2001::1!!!2001::5!!!1       # 2001::1 .. 2001::5
+ep fe80::ff!!!fe80::fc!!!-1    # reverse iteration
+ep ::1!!!::5!!!1               # zero-compressed prefix
+ep 2001:db8::fffe!!!2001:db8::1:1!!!1
+# carries across the :: compression boundary cleanly
+</code></pre>
+        <p>Iteration is u128 step arithmetic; both directions are supported and a wrong-sign step (start past end with positive step, or before end with negative step) yields the empty list.</p>
+      </article>
+      <article class="doc-entry" id="doc-outer-topic">
+        <h3><a class="doc-anchor" href="#doc-outer-topic">#</a> <code>_&lt;</code> — outer topic chain</h3>
+        <p>Inside a closure (map/grep/sort block, sub body, fan/fan_cap closure), <code>_&lt;</code> reads the topic of the enclosing scope — the value <code>_</code> held in the frame that called this closure. The chain extends up to four frames: <code>_&lt;&lt;</code>, <code>_&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;</code>. Numeric positional slots get the same matrix: <code>_0&lt;</code>, <code>_1&lt;&lt;</code>, …, <code>_N&lt;&lt;&lt;&lt;</code>. The bareword form (no sigil) and the sigil form (<code>$_&lt;</code>) are equivalent.</p>
+        <pre><code class="lang-perl"># Nested map — `_&lt;` reaches the outer iter's `_`:
+map { my @inner = (1, 2); map { _&lt; + _ } @inner } (10, 20)
+# 11, 12, 21, 22
+
+# Inside a 3-arg sub, _0&lt;&lt;&lt;&lt; reaches arg 0 four frames up:
+fn deep($_0, $_1, $_2) {
+  ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
+    p _0&lt;&lt;&lt;&lt;, _1&lt;&lt;&lt;&lt;, _2&lt;&lt;&lt;&lt;
+  } } } }
+}
+</code></pre>
+        <p><strong>Iter re-entry semantics</strong>: the chain shifts on the FIRST <code>set_topic</code> call in a given frame; subsequent iterations of the same loop only refresh <code>_</code> so <code>_&lt;</code> keeps pointing at the enclosing scope's topic instead of rolling to the previous iter's value. Bound-but-undef chain entries fall back to <code>_</code> so <code>$h-&gt;{_&lt;}</code> at the outermost iter reads the iteration key.</p>
+      </article>
+      <article class="doc-entry" id="doc-topic-hash-keys">
+        <h3><a class="doc-anchor" href="#doc-topic-hash-keys">#</a> Topic-slot barewords as hash keys</h3>
+        <p>Perl auto-quotes a single bareword on the left of <code>=&gt;</code> and inside <code>{…}</code> hash subscripts, even for keywords. Stryke makes a single exception for the topic-slot family — <code>_</code>, <code>_&lt;</code>, <code>_0</code>, <code>_0&lt;</code>, <code>_1</code>, …, <code>_N&lt;+</code> — so they evaluate to the topic value rather than the literal name. Plain barewords (<code>foo</code>, keywords, builtin names) still autoquote as before.</p>
+        <pre><code class="lang-perl">$_ = "topic"
+my $h1 = { _ =&gt; 1 }            # ≡ { $_ =&gt; 1 } — key is "topic"
+my $h2 = { foo =&gt; 1, bar =&gt; 2 } # plain barewords still autoquote
+
+# Hash subscript:
+my %m = (k1 =&gt; 7)
+map { $m{_&lt;} } "k1"             # _&lt; falls back to _ at outermost iter
+
+# Nested ETL pattern:
++{ map { map { (lc _, _&lt; + 0) } @{$m-&gt;{_}} } keys %$m }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-operator-keyword-keys">
+        <h3><a class="doc-anchor" href="#doc-operator-keyword-keys">#</a> Operator-keyword hash keys</h3>
+        <p>The lexer eagerly converts <code>eq</code>, <code>ne</code>, <code>lt</code>, <code>gt</code>, <code>le</code>, <code>ge</code>, <code>cmp</code>, <code>and</code>, <code>or</code>, <code>not</code>, and <code>x</code> to operator tokens. Inside a <code>{…}</code> hash subscript followed by <code>}</code>, those tokens autoquote back to the identifier string so <code>$h-&gt;{ne}</code>, <code>$h{eq}</code>, etc. read normally.</p>
+        <pre><code class="lang-perl">my $h = { eq =&gt; 1, ne =&gt; 2, cmp =&gt; 7, and =&gt; 8 }
+say $h-&gt;{ne}        # 2
+say $h-&gt;{cmp}       # 7
+my %m = (or =&gt; 99)
+say $m{or}          # 99
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-comma-substitution">
+        <h3><a class="doc-anchor" href="#doc-comma-substitution">#</a> <code>s,/tr,/y,</code> comma delimiter</h3>
+        <p>The <code>s</code>, <code>tr</code>, and <code>y</code> operators accept any non-alphanumeric delimiter, including <code>,</code>. The lookahead heuristic gates the comma form on having three commas before the statement ends so <code>$obj-&gt;y</code> method calls and <code>struct Pt { x, y, z }</code> field declarations stay barewords.</p>
+        <pre><code class="lang-perl">$_ = &quot;the cat sat&quot;
+s,\b(\w+)\b,X,g
+say $_                          # X X X
+
+$_ = &quot;ABC&quot;
+tr,A-Z,a-z,
+say $_                          # abc
+
+# Common command-line idiom:
+# stryke -pe 's,a,b,g' &lt; input
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-plus-brace-hashref">
+        <h3><a class="doc-anchor" href="#doc-plus-brace-hashref">#</a> <code>+{ EXPR }</code> — force hashref</h3>
+        <p>Block-vs-hashref disambiguation in <code>{…}</code> falls back to a code block (<code>CodeRef</code>) when the body doesn't fit a <code>KEY =&gt; VAL, …</code> shape. The unary <code>+</code> prefix forces hashref interpretation: a list-yielding body (<code>map</code>, <code>grep</code>, etc.) is paired up via the <code>MakeHashRef</code> runtime to produce a hash from the list. Use this when you'd otherwise need <code>my %h = …; \%h</code>.</p>
+        <pre><code class="lang-perl"># Pair list from map → hashref:
+my $h = +{ map { ($_, $_ * 2) } (1, 2, 3) }
+# { 1 =&gt; 2, 2 =&gt; 4, 3 =&gt; 6 }
+
+# ETL pattern with nested map:
++{ map { map { (lc _, _&lt; + 0) } @{$m-&gt;{_}} } keys %$m }
+
+my $h2 = +{ a =&gt; 1, b =&gt; 2 }    # KV form still works
+my $h3 = +{}                    # empty hashref
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fn-underscore-blacklist">
+        <h3><a class="doc-anchor" href="#doc-fn-underscore-blacklist">#</a> Topic-slot names rejected as UDFs</h3>
+        <p>Topic-slot barewords (<code>_</code>, <code>_&lt;</code>, <code>_0..N</code>, <code>_N&lt;+</code>) are scalar refs to the topic, positional, and outer-chain values. Defining a sub with one of those names — bare, sigil-prefixed, or package-qualified — would shadow the topic and silently break every <code>_</code>-aware builtin. Stryke rejects the declaration at parse time:</p>
+        <pre><code class="lang-perl">fn _        { 1 }    # error: would shadow the topic-slot scalar
+fn _&lt;       { 1 }    # error
+fn _0       { 1 }    # error
+fn $_       { 1 }    # error (sigil form)
+fn @_       { 1 }    # error
+fn Foo::_   { 1 }    # error (package-qualified)
+fn _foo     { 1 }    # OK — only EXACT topic-slot spellings reject
+fn my_helper { 1 }   # OK
 </code></pre>
       </article>
     </section>
