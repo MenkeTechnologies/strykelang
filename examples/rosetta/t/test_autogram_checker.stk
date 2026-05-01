@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Autogram checker — sentence whose stated letter counts equal
+# its actual letter counts (e.g. Lee Sallows' classic).
+
+fn Rosetta::Autogram::word_to_n($w) {
+    my %m = (
+        "one"=>1, "two"=>2, "three"=>3, "four"=>4, "five"=>5, "six"=>6, "seven"=>7,
+        "eight"=>8, "nine"=>9, "ten"=>10, "eleven"=>11, "twelve"=>12, "thirteen"=>13,
+        "fourteen"=>14, "fifteen"=>15, "sixteen"=>16, "seventeen"=>17, "eighteen"=>18,
+        "nineteen"=>19, "twenty"=>20, "thirty"=>30, "forty"=>40, "fifty"=>50,
+        "sixty"=>60, "seventy"=>70, "eighty"=>80, "ninety"=>90,
+    )
+    my $n = 0
+    for my $part (split /[\s-]+/, lc $w) {
+        next if $part eq "and" || $part eq ""
+        $n += $m{$part} // 0
+    }
+    $n
+}
+
+fn Rosetta::Autogram::actual_letter_counts($s) {
+    my %cnt
+    for my $ch (split("", lc $s)) {
+        $cnt{$ch} = ($cnt{$ch} // 0) + 1 if $ch =~ /[a-z]/
+    }
+    %cnt
+}
+
+fn Rosetta::Autogram::is_autogram($sentence) {
+    my %actual = Rosetta::Autogram::actual_letter_counts($sentence)
+    my %claimed
+    while ($sentence =~ /\b([a-z]+(?:[-\s][a-z]+)*?)\s+([a-z])(?:'s)?\b/gi) {
+        my $num_word = $1
+        my $letter   = lc $2
+        my $n = Rosetta::Autogram::word_to_n($num_word)
+        next if $n == 0
+        $claimed{$letter} = $n
+    }
+    for my $L ("a".."z") {
+        my $a = $actual{$L} // 0
+        my $c = $claimed{$L} // 0
+        return 0 if $c != 0 && $c != $a
+    }
+    1
+}
+
+# Bogus claim: "nineteen e's" but the sentence has only 4 e's.
+my $bogus = "this sentence has nineteen e's"
+assert_ok !Rosetta::Autogram::is_autogram($bogus), "bogus claim rejected"
+
+# Counts function basics
+my %cnt = Rosetta::Autogram::actual_letter_counts("Aaa Bb Bb")
+assert_eq $cnt{a}, 3, "3 a's"
+assert_eq $cnt{b}, 4, "4 b's"
+
+# word_to_n
+assert_eq Rosetta::Autogram::word_to_n("twenty-seven"), 27, "twenty-seven"
+assert_eq Rosetta::Autogram::word_to_n("five"),         5,  "five"
+assert_eq Rosetta::Autogram::word_to_n("eighteen"),     18, "eighteen"
+
+test_run

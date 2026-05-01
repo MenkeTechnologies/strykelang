@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fairshare between two and more — Thue-Morse k-ary generalization.
+# T_k(n) = digit-sum-mod-k of n in base k. The first N terms give a fair scheduling.
+
+fn Rosetta::Fair::sequence($base, $count) {
+    my @out
+    for my $n (0..$count-1) {
+        my $s = 0
+        my $x = $n
+        while ($x > 0) { $s += $x % $base; $x = int($x / $base) }
+        push @out, $s % $base
+    }
+    @out
+}
+
+# 2-ary is the classic Thue-Morse: 0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0,...
+my @t2 = Rosetta::Fair::sequence(2, 16)
+assert_eq join(",", @t2),
+    "0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0",
+    "Thue-Morse 16"
+
+# 3-ary: 0,1,2,1,2,0,2,0,1,1,2,0,2,0,1,0,1,2,2,0,1,...
+my @t3 = Rosetta::Fair::sequence(3, 12)
+assert_eq join(",", @t3),
+    "0,1,2,1,2,0,2,0,1,1,2,0",
+    "k=3 first 12"
+
+# 5-ary
+my @t5 = Rosetta::Fair::sequence(5, 25)
+# Counts of each digit should each be 5 (uniform distribution at this size).
+my %cnt
+for my $v (@t5) { $cnt{$v} = ($cnt{$v} // 0) + 1 }
+for my $d (0..4) {
+    assert_eq $cnt{$d}, 5, "k=5 digit $d appears 5 times in first 25"
+}
+
+# Each base's first element is 0
+for my $k (2..6) {
+    my @s = Rosetta::Fair::sequence($k, 1)
+    assert_eq $s[0], 0, "first term k=$k is 0"
+}
+
+test_run

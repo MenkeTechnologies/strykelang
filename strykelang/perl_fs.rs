@@ -799,14 +799,12 @@ fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>)
     PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
 }
 
-/// Stable display form for glob results: relative paths get a `./` prefix when missing.
+/// Display form for glob results. Pass-through — zshrs is authoritative
+/// on prefixing (it already emits `./` for cwd matches and bare names
+/// for colon-modifier results like `(:t)` / `(:e)` / `(:r)`). Re-adding
+/// `./` here used to corrupt colon-modifier output.
 fn normalize_glob_path_display(s: String) -> String {
-    let p = Path::new(&s);
-    if p.is_absolute() || s.starts_with("./") || s.starts_with("../") {
-        s
-    } else {
-        format!("./{s}")
-    }
+    s
 }
 
 /// `rename OLD, NEW` — 1 on success, 0 on failure (Perl-style).

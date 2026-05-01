@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Diversity prediction theorem
+# Given truth t and predictions p_i:
+#   collective_error = (mean(p) - t)^2
+#   average_individual_error = mean( (p_i - t)^2 )
+#   prediction_diversity     = mean( (p_i - mean(p))^2 )
+# Theorem: average_individual_error == collective_error + prediction_diversity.
+
+fn Rosetta::Diversity::evaluate($truth, @preds) {
+    my $n = len(@preds)
+    return undef if $n == 0
+    my $mean = 0
+    for my $p (@preds) { $mean += $p }
+    $mean /= $n
+    my $coll = ($mean - $truth) ** 2
+    my $avg_ind = 0
+    my $diversity = 0
+    for my $p (@preds) {
+        $avg_ind   += ($p - $truth) ** 2
+        $diversity += ($p - $mean)  ** 2
+    }
+    $avg_ind   /= $n
+    $diversity /= $n
+    [$coll, $avg_ind, $diversity]
+}
+
+# Wikipedia example: truth=49, preds=(48, 47, 51).
+my $r = Rosetta::Diversity::evaluate(49, 48, 47, 51)
+my $coll = $r->[0]; my $avg = $r->[1]; my $div = $r->[2]
+# mean = 48.6666..., coll = (48.66 - 49)^2 ≈ 0.111
+assert_ok abs($coll - 0.1111111) < 1e-6, "collective error"
+# avg_ind = (1+4+4)/3 = 3
+assert_ok abs($avg - 3.0) < 1e-12, "average individual"
+# diversity = avg - coll
+assert_ok abs($div - ($avg - $coll)) < 1e-12, "theorem holds"
+
+# Random-ish set: truth=100, preds=(95, 105, 98, 102, 100)
+my $r2 = Rosetta::Diversity::evaluate(100, 95, 105, 98, 102, 100)
+assert_ok abs($r2->[1] - ($r2->[0] + $r2->[2])) < 1e-12,
+    "theorem holds for arbitrary inputs"
+
+# All predictions equal truth: every term zero
+my $r3 = Rosetta::Diversity::evaluate(50, 50, 50, 50)
+assert_ok abs($r3->[0]) < 1e-12, "no collective error"
+assert_ok abs($r3->[1]) < 1e-12, "no avg individual"
+assert_ok abs($r3->[2]) < 1e-12, "no diversity"
+
+# All identical but wrong: diversity zero, both errors equal.
+my $r4 = Rosetta::Diversity::evaluate(50, 60, 60, 60)
+assert_ok abs($r4->[0] - 100) < 1e-12, "coll = 100"
+assert_ok abs($r4->[1] - 100) < 1e-12, "avg = 100"
+assert_ok abs($r4->[2]) < 1e-12, "no diversity"
+
+test_run

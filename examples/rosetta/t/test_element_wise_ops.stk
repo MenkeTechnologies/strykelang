@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Element-wise operations (matrix and vector pointwise)
+
+fn Rosetta::EW::vec_add(@xs) {
+    my $a = $xs[0]
+    my $b = $xs[1]
+    my @out
+    for my $i (0..len(@$a)-1) {
+        push @out, $a->[$i] + $b->[$i]
+    }
+    \@out
+}
+
+fn Rosetta::EW::vec_mul(@xs) {
+    my $a = $xs[0]
+    my $b = $xs[1]
+    my @out
+    for my $i (0..len(@$a)-1) {
+        push @out, $a->[$i] * $b->[$i]
+    }
+    \@out
+}
+
+fn Rosetta::EW::scalar_mul($v, $s) {
+    my @out = ~> @$v map { _ * $s }
+    \@out
+}
+
+fn Rosetta::EW::mat_op($m1, $m2, $op) {
+    my @out
+    for my $i (0..len(@$m1)-1) {
+        my @row
+        for my $j (0..len(@{$m1->[$i]})-1) {
+            my $a = $m1->[$i]->[$j]
+            my $b = $m2->[$i]->[$j]
+            if    ($op eq "+") { push @row, $a + $b }
+            elsif ($op eq "*") { push @row, $a * $b }
+            elsif ($op eq "-") { push @row, $a - $b }
+            elsif ($op eq "/") { push @row, $a / $b }
+            else  { return undef }
+        }
+        push @out, \@row
+    }
+    \@out
+}
+
+# Vector
+my $v1 = [1, 2, 3, 4]
+my $v2 = [10, 20, 30, 40]
+
+my $sum = Rosetta::EW::vec_add($v1, $v2)
+assert_eq join(",", @$sum), "11,22,33,44", "vec add"
+
+my $prod = Rosetta::EW::vec_mul($v1, $v2)
+assert_eq join(",", @$prod), "10,40,90,160", "vec mul"
+
+my $sc = Rosetta::EW::scalar_mul($v1, 5)
+assert_eq join(",", @$sc), "5,10,15,20", "scalar mul"
+
+# Matrix
+my $A = [[1,2],[3,4]]
+my $B = [[10,20],[30,40]]
+
+my $S = Rosetta::EW::mat_op($A, $B, "+")
+assert_eq join(",", @{$S->[0]}), "11,22", "mat add row 0"
+assert_eq join(",", @{$S->[1]}), "33,44", "mat add row 1"
+
+my $P = Rosetta::EW::mat_op($A, $B, "*")
+assert_eq join(",", @{$P->[0]}), "10,40",  "mat mul row 0"
+assert_eq join(",", @{$P->[1]}), "90,160", "mat mul row 1"
+
+my $D = Rosetta::EW::mat_op($B, $A, "/")
+assert_eq join(",", @{$D->[0]}), "10,10", "mat div row 0"
+assert_eq join(",", @{$D->[1]}), "10,10", "mat div row 1"
+
+test_run

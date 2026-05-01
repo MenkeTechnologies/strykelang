@@ -55,7 +55,7 @@
 [x] Apply a callback to an array
 [x] Apply a digital filter (direct form II transposed)
 [x] Approximate equality
-[ ] Apéry's constant
+[x] Apéry's constant
 [x] Arbitrary-precision integers (included)
 [x] Archimedean spiral
 [x] Arena storage pool
@@ -78,7 +78,7 @@
 [x] Associative array/Merging
 [x] Atomic updates
 [x] Attractive numbers
-[ ] Autogram checker
+[x] Autogram checker
 [x] Average loop length
 [x] Averages/Arithmetic mean
 [x] Averages/Mean angle
@@ -106,12 +106,12 @@
 [ ] Bin given limits
 [x] Binary digits
 [x] Binary search
-[ ] Binary strings
-[ ] Binomial transform
+[x] Binary strings
+[x] Binomial transform
 [x] Bioinformatics/Base count
 [ ] Bioinformatics/Global alignment
 [ ] Bioinformatics/Sequence mutation
-[ ] Biorhythms
+[x] Biorhythms
 [ ] Bitcoin/address validation
 [ ] Bitcoin/public point to address
 [x] Bitmap
@@ -155,7 +155,7 @@
 [x] Call an object method
 [x] Camel case and snake case
 [ ] Canny edge detector
-[ ] Canonicalize CIDR
+[x] Canonicalize CIDR
 [x] Cantor set
 [x] Carmichael 3 strong pseudoprimes
 [x] Cartesian product of two or more lists
@@ -163,7 +163,7 @@
 [x] Casting out nines
 [x] Catalan numbers
 [x] Catalan numbers/Pascal's triangle
-[ ] Catamorphism
+[x] Catamorphism
 [ ] Catmull–Clark subdivision surface
 [x] Centre and radius of a circle passing through 3 points in a plane
 [ ] Chaocipher
@@ -184,8 +184,8 @@
 [x] Cholesky decomposition
 [x] Chowla numbers
 [ ] Christofides algorithm
-[ ] Church numerals
-[ ] Circles of given radius through two points
+[x] Church numerals
+[x] Circles of given radius through two points
 [x] Circular primes
 [ ] Cistercian numerals
 [x] Classes
@@ -196,7 +196,7 @@
 [ ] Color of a screen pixel
 [ ] Color quantization
 [ ] Color wheel
-[ ] Colorful numbers
+[x] Colorful numbers
 [ ] Colour bars/Display
 [ ] Colour pinstripe/Display
 [ ] Colour pinstripe/Printer
@@ -251,7 +251,7 @@
 [x] Cuban primes
 [x] Cullen and Woodall numbers
 [x] Cumulative standard deviation
-[ ] Currency
+[x] Currency
 [x] Currying
 [x] Curzon numbers
 [x] CUSIP
@@ -277,7 +277,7 @@
 [ ] Delegates
 [x] Delete a file
 [ ] Deming's funnel
-[ ] Department numbers
+[x] Department numbers
 [x] Descending primes
 [x] Detect division by zero
 [x] Determinant and permanent
@@ -302,7 +302,7 @@
 [x] Distance and Bearing
 [ ] Distributed programming
 [x] Distribution of 0 digits in factorial series
-[ ] Diversity prediction theorem
+[x] Diversity prediction theorem
 [ ] DNS query
 [ ] Documentation
 [ ] Dominoes
@@ -327,7 +327,7 @@
 [x] Eertree
 [x] Egyptian division
 [x] EKG sequence convergence
-[ ] Element-wise operations
+[x] Element-wise operations
 [x] Elementary cellular automaton
 [x] Elementary cellular automaton/Infinite length
 [x] Elementary cellular automaton/Random number generator
@@ -351,7 +351,7 @@
 [ ] Erdős–Woods numbers
 [x] Esthetic numbers
 [x] Ethiopian multiplication
-[ ] Euclid-Mullin sequence
+[x] Euclid-Mullin sequence
 [ ] Euclidean rhythm
 [x] Euler method
 [x] Euler's constant 0.5772...
@@ -389,7 +389,7 @@
 [x] Factorize string into Lyndon words
 [x] Factors of a Mersenne number
 [x] Factors of an integer
-[ ] Fairshare between two and more
+[x] Fairshare between two and more
 [x] Farey sequence
 [ ] Fast Fourier transform
 [ ] FASTA format
@@ -471,7 +471,7 @@
 [x] Giuga numbers
 [ ] Globally replace text in several files
 [ ] Go Fish
-[ ] Goldbach's comet
+[x] Goldbach's comet
 [ ] Golden ratio/Convergence
 [ ] Gosper's hack
 [ ] Gotchas

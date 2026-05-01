@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Goldbach's comet
+# G(n) = number of ways to write 2n as p+q with p,q prime, p<=q. Plot/data.
+
+fn Math::Prime::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Goldbach::primes_up_to($N) {
+    my @res
+    for my $k (2..$N) { push @res, $k if Math::Prime::is_prime($k) }
+    @res
+}
+
+fn Rosetta::Goldbach::g_of_n($n) {
+    my $tgt = 2 * $n
+    my @primes = Rosetta::Goldbach::primes_up_to($tgt)
+    my %is_p
+    for my $p (@primes) { $is_p{$p} = 1 }
+    my $count = 0
+    for my $p (@primes) {
+        last if $p > $n
+        my $q = $tgt - $p
+        $count += 1 if $is_p{$q}
+    }
+    $count
+}
+
+# Reference (OEIS A002375): n=2 -> 1 (4=2+2), n=3 -> 1 (6=3+3),
+# n=4 -> 1 (8=3+5), n=5 -> 2 (10=3+7=5+5), n=6 -> 1 (12=5+7),
+# n=7 -> 2 (14=3+11=7+7), n=10 -> 2 (20=3+17=7+13)
+assert_eq Rosetta::Goldbach::g_of_n(2),  1, "G(2)=1"
+assert_eq Rosetta::Goldbach::g_of_n(3),  1, "G(3)=1"
+assert_eq Rosetta::Goldbach::g_of_n(4),  1, "G(4)=1"
+assert_eq Rosetta::Goldbach::g_of_n(5),  2, "G(5)=2"
+assert_eq Rosetta::Goldbach::g_of_n(6),  1, "G(6)=1"
+assert_eq Rosetta::Goldbach::g_of_n(7),  2, "G(7)=2"
+assert_eq Rosetta::Goldbach::g_of_n(10), 2, "G(10)=2"
+assert_eq Rosetta::Goldbach::g_of_n(15), 3, "G(15)=3 (30=7+23,11+19,13+17)"
+
+# Goldbach: G(n) > 0 for all n >= 2 (verified within reach).
+for my $n (2..40) {
+    assert_ok Rosetta::Goldbach::g_of_n($n) >= 1, "G($n) > 0"
+}
+
+test_run

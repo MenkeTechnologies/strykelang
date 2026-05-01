@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Euclid-Mullin sequence
+# a(1)=2; a(n+1) = smallest prime divisor of (a(1)*a(2)*...*a(n) + 1).
+
+fn Math::Prime::smallest_factor($n) {
+    return 2 if $n % 2 == 0 || $n == 1
+    my $i = 3
+    while ($i * $i <= $n) {
+        return $i if $n % $i == 0
+        $i += 2
+    }
+    $n
+}
+
+fn Rosetta::EuclidMullin::sequence($count) {
+    my @seq = (2)
+    my $product = 2
+    while (len(@seq) < $count) {
+        my $next = Math::Prime::smallest_factor($product + 1)
+        push @seq, $next
+        $product *= $next
+    }
+    @seq
+}
+
+# OEIS A000945: 2, 3, 7, 43, 13, 53, 5, 6221671, ...
+# (The 8th term is huge — first 7 are tractable.)
+my @first7 = Rosetta::EuclidMullin::sequence(7)
+assert_eq join(",", @first7), "2,3,7,43,13,53,5", "first 7 Euclid-Mullin"
+
+assert_eq Math::Prime::smallest_factor(15),  3,  "15 -> 3"
+assert_eq Math::Prime::smallest_factor(91),  7,  "91 -> 7"
+assert_eq Math::Prime::smallest_factor(101), 101, "101 prime"
+assert_eq Math::Prime::smallest_factor(2*3*7+1), 43, "43 prime"
+
+test_run

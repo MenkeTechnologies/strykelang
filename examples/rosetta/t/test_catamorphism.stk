@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Catamorphism — folds.
+# Closures use named params so $a/$b are accumulator/element rather than
+# guessing at $_/$_[0] semantics.
+
+fn Rosetta::Cata::foldr($f, $z, @xs) {
+    my $acc = $z
+    for my $i (reverse 0..len(@xs)-1) {
+        $acc = $f->($xs[$i], $acc)
+    }
+    $acc
+}
+
+fn Rosetta::Cata::foldl($f, $z, @xs) {
+    my $acc = $z
+    for my $x (@xs) { $acc = $f->($acc, $x) }
+    $acc
+}
+
+# Closures take ($x, $acc) for foldr / ($acc, $x) for foldl.
+fn Rosetta::Cata::sum(@xs)      { Rosetta::Cata::foldr(fn ($x, $acc) { $x + $acc }, 0, @xs) }
+fn Rosetta::Cata::product(@xs)  { Rosetta::Cata::foldr(fn ($x, $acc) { $x * $acc }, 1, @xs) }
+fn Rosetta::Cata::length_(@xs)  { Rosetta::Cata::foldr(fn ($x, $acc) { $acc + 1 }, 0, @xs) }
+fn Rosetta::Cata::max_(@xs)     {
+    Rosetta::Cata::foldr(fn ($x, $acc) { $x > $acc ? $x : $acc }, $xs[0], @xs)
+}
+fn Rosetta::Cata::reverse_(@xs) {
+    # foldl with prepend gives reverse: ((((nil, x1), x2), x3), ...)
+    Rosetta::Cata::foldl(fn ($acc, $x) { my @r = ($x, @$acc); \@r }, [], @xs)
+}
+
+assert_eq Rosetta::Cata::sum(1,2,3,4,5),     15,  "sum"
+assert_eq Rosetta::Cata::product(1,2,3,4,5), 120, "product"
+assert_eq Rosetta::Cata::length_(1,2,3,4,5), 5,   "length via fold"
+assert_eq Rosetta::Cata::max_(3,1,4,1,5,9,2,6), 9, "max"
+
+# foldl reverse builds the list backwards
+my $rev = Rosetta::Cata::reverse_(1,2,3,4,5)
+assert_eq join(",", @$rev), "5,4,3,2,1", "reverse via foldl"
+
+# Identity: foldr (cons) [] xs == xs
+my $copy = Rosetta::Cata::foldr(
+    fn ($x, $acc) { my @r = ($x, @$acc); \@r },
+    [],
+    10, 20, 30,
+)
+assert_eq join(",", @$copy), "10,20,30", "foldr cons identity"
+
+test_run

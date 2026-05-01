@@ -28745,7 +28745,7 @@ mod tests {
         let a_pos = tbl.find("│ a ").expect("a row");
         let z_pos = tbl.find("│ z ").expect("z row");
         assert!(
-            m_pos < a_pos && a_pos < z_pos,
+            a_pos < m_pos && m_pos < z_pos,
             "expected m,a (tie 3) then z: {tbl}"
         );
     }

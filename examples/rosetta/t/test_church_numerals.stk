@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Church numerals
+# Number n is encoded as: λf. λx. f(f(...f(x))) — applies f n times.
+
+fn Rosetta::Church::zero() { fn { my $f = $_; fn { $_ } } }
+
+fn Rosetta::Church::succ($n) {
+    fn {
+        my $f = $_
+        fn {
+            my $x = $_
+            $f->($n->($f)->($x))
+        }
+    }
+}
+
+fn Rosetta::Church::add($m, $n) {
+    fn {
+        my $f = $_
+        fn {
+            my $x = $_
+            $m->($f)->($n->($f)->($x))
+        }
+    }
+}
+
+fn Rosetta::Church::mul($m, $n) {
+    fn {
+        my $f = $_
+        $m->($n->($f))
+    }
+}
+
+fn Rosetta::Church::pow($m, $n) {
+    $n->($m)
+}
+
+fn Rosetta::Church::to_int($n) {
+    $n->(fn { my $x = $_; $x + 1 })->(0)
+}
+
+fn Rosetta::Church::from_int($k) {
+    my $n = Rosetta::Church::zero()
+    for (1..$k) { $n = Rosetta::Church::succ($n) }
+    $n
+}
+
+my $zero  = Rosetta::Church::zero()
+my $one   = Rosetta::Church::succ($zero)
+my $two   = Rosetta::Church::succ($one)
+my $three = Rosetta::Church::succ($two)
+
+assert_eq Rosetta::Church::to_int($zero),  0, "zero"
+assert_eq Rosetta::Church::to_int($one),   1, "one"
+assert_eq Rosetta::Church::to_int($two),   2, "two"
+assert_eq Rosetta::Church::to_int($three), 3, "three"
+
+# Add
+my $five = Rosetta::Church::add($two, $three)
+assert_eq Rosetta::Church::to_int($five), 5, "2+3=5"
+
+# Multiply
+my $six = Rosetta::Church::mul($two, $three)
+assert_eq Rosetta::Church::to_int($six), 6, "2*3=6"
+
+# Power 3^2 = 9
+my $nine = Rosetta::Church::pow($three, $two)
+assert_eq Rosetta::Church::to_int($nine), 9, "3^2=9"
+
+# Round-trip integer
+my $seven_c = Rosetta::Church::from_int(7)
+assert_eq Rosetta::Church::to_int($seven_c), 7, "round-trip 7"
+
+test_run

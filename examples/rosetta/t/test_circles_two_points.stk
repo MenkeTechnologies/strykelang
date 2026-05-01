@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Circles of given radius through two points
+# Given P1, P2 and r, find the centers of the (≤ 2) circles passing through both points.
+
+fn Rosetta::CirclesTP::find($p1, $p2, $r) {
+    my $dx = $p2->[0] - $p1->[0]
+    my $dy = $p2->[1] - $p1->[1]
+    my $d  = sqrt($dx * $dx + $dy * $dy)
+    if ($d == 0 && $r == 0) { return ["coincident-zero"] }
+    if ($d == 0)            { return ["coincident-nonzero-no-circle"] }
+    if ($d > 2 * $r)        { return ["too-far"] }
+    my $mx = ($p1->[0] + $p2->[0]) / 2
+    my $my = ($p1->[1] + $p2->[1]) / 2
+    my $h  = sqrt($r * $r - ($d * $d) / 4)
+    if ($h == 0) {
+        return [[$mx, $my]]
+    }
+    # Perpendicular unit vector
+    my $ux = -$dy / $d
+    my $uy =  $dx / $d
+    [
+        [$mx + $h * $ux, $my + $h * $uy],
+        [$mx - $h * $ux, $my - $h * $uy],
+    ]
+}
+
+# (0,0) and (2,0), r=2: centers at (1, sqrt(3)) and (1, -sqrt(3))
+my $r = Rosetta::CirclesTP::find([0,0], [2,0], 2)
+assert_eq len(@$r), 2, "two circles"
+my $c1 = $r->[0]; my $c2 = $r->[1]
+# Order may flip; check both
+my $upper = $c1->[1] > 0 ? $c1 : $c2
+my $lower = $c1->[1] > 0 ? $c2 : $c1
+assert_ok abs($upper->[0] - 1) < 1e-12,             "upper x=1"
+assert_ok abs($upper->[1] - sqrt(3)) < 1e-12,        "upper y=sqrt(3)"
+assert_ok abs($lower->[1] + sqrt(3)) < 1e-12,        "lower y=-sqrt(3)"
+
+# Diametric — d == 2r, exactly one circle
+my $diam = Rosetta::CirclesTP::find([0,0], [4,0], 2)
+assert_eq len(@$diam), 1, "diametric -> 1 circle"
+assert_eq $diam->[0]->[0], 2, "center x=2"
+assert_eq $diam->[0]->[1], 0, "center y=0"
+
+# Too far apart
+my $far = Rosetta::CirclesTP::find([0,0], [10,0], 2)
+assert_eq $far->[0], "too-far", "too far"
+
+# Coincident with r=0: degenerate, infinite circles (we report a sentinel)
+my $deg = Rosetta::CirclesTP::find([1,1], [1,1], 0)
+assert_eq $deg->[0], "coincident-zero", "coincident with zero radius"
+
+# Coincident with r>0: no unique circle
+my $deg2 = Rosetta::CirclesTP::find([1,1], [1,1], 5)
+assert_eq $deg2->[0], "coincident-nonzero-no-circle", "coincident nonzero"
+
+test_run

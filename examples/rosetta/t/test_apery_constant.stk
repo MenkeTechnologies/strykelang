@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Apéry's constant — ζ(3) ≈ 1.2020569031595942...
+
+fn Rosetta::Apery::naive($N) {
+    my $s = 0
+    for my $k (1..$N) { $s += 1.0 / ($k ** 3) }
+    $s
+}
+
+# Apéry's series (much faster convergence): ζ(3) = (5/2) * Σ (-1)^(k-1) / (k^3 * C(2k,k))
+fn Rosetta::Apery::accelerated($N) {
+    my $s = 0
+    my $sign = 1
+    my @binom = (1)   # C(0,0)
+    for my $k (1..$N) {
+        # C(2k, k) — build incrementally
+        my $cnk = 1
+        my $top = 2 * $k
+        my $bot = $k
+        for my $i (1..$bot) {
+            $cnk = $cnk * ($top - $i + 1) / $i
+        }
+        $s += $sign / ($k ** 3 * $cnk)
+        $sign = -$sign
+    }
+    2.5 * $s
+}
+
+my $ref = 1.2020569031595942
+
+# Naive needs many terms.
+my $n50 = Rosetta::Apery::naive(50)
+assert_ok abs($n50 - $ref) < 5e-4, "naive 50 terms within 5e-4"
+my $n5000 = Rosetta::Apery::naive(5000)
+assert_ok abs($n5000 - $ref) < 5e-8, "naive 5k terms within 5e-8"
+
+# Apéry's series converges geometrically; 15 terms reach ~1e-10.
+my $a15 = Rosetta::Apery::accelerated(15)
+assert_ok abs($a15 - $ref) < 1e-10, "Apéry 15 terms within 1e-10"
+my $a30 = Rosetta::Apery::accelerated(30)
+assert_ok abs($a30 - $ref) < 1e-13, "Apéry 30 terms within 1e-13"
+
+test_run

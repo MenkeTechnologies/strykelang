@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Currency — integer cents arithmetic.
+
+fn Rosetta::Currency::cents($dollars, $cents) {
+    int($dollars) * 100 + int($cents)
+}
+
+fn Rosetta::Currency::fmt($cents) {
+    my $sign = $cents < 0 ? "-" : ""
+    my $abs  = abs($cents)
+    my $d = int($abs / 100)
+    my $c = $abs % 100
+    "$sign\$" . $d . sprintf(".%02d", $c)
+}
+
+fn Rosetta::Currency::round_half_up($x) {
+    int($x + 0.5 * ($x < 0 ? -1 : 1))
+}
+
+# Receipt: 4e12 hamburgers @ $5.50 + 2 milkshakes @ $2.86, 7.65% tax.
+fn Rosetta::Currency::receipt() {
+    my $hamb_qty = 4000000000000
+    my $hamb_unit = Rosetta::Currency::cents(5, 50)
+    my $milk_qty = 2
+    my $milk_unit = Rosetta::Currency::cents(2, 86)
+
+    my $sub = $hamb_qty * $hamb_unit + $milk_qty * $milk_unit
+    my $tax_x10000 = $sub * 765
+    my $tax = Rosetta::Currency::round_half_up($tax_x10000 / 10000)
+    my $tot = $sub + $tax
+    [$sub, $tax, $tot]
+}
+
+my $r = Rosetta::Currency::receipt()
+my $sub = $r->[0]
+my $tax = $r->[1]
+my $tot = $r->[2]
+
+assert_eq $sub, 2_200_000_000_000_572, "subtotal cents"
+assert_eq Rosetta::Currency::fmt($sub), "\$22000000000005.72", "subtotal formatted"
+assert_ok $tax > 0, "tax positive"
+assert_eq $tot, $sub + $tax, "total = sub + tax"
+
+# Format spot-checks
+assert_eq Rosetta::Currency::fmt(0),    "\$0.00", "zero"
+assert_eq Rosetta::Currency::fmt(1234), "\$12.34", "12.34"
+assert_eq Rosetta::Currency::fmt(-100), "-\$1.00", "negative"
+assert_eq Rosetta::Currency::fmt(99),   "\$0.99", "small"
+
+test_run

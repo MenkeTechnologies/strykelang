@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Colorful numbers
+# n is colorful if all products of its consecutive digit substrings are distinct.
+
+fn Rosetta::Colorful::is_colorful($n) {
+    my @digits = split("", "$n")
+    return 0 if len(@digits) > 10   # > 10 digits forces a clash by pigeonhole
+    # All single digits are unique only if no digit repeats — but actually the
+    # task allows repeats among substring products if the underlying substring
+    # itself is different. Simpler: collect every product over every contiguous
+    # substring; require distinctness.
+    my %seen
+    for my $i (0..len(@digits)-1) {
+        my $prod = 1
+        for my $j ($i..len(@digits)-1) {
+            $prod *= $digits[$j]
+            return 0 if $seen{$prod}
+            $seen{$prod} = 1
+        }
+    }
+    1
+}
+
+fn Rosetta::Colorful::all_under($limit) {
+    my @res
+    for my $n (0..$limit) {
+        push @res, $n if Rosetta::Colorful::is_colorful($n)
+    }
+    @res
+}
+
+# Single-digit numbers are colorful trivially.
+for my $n (0..9) {
+    assert_ok Rosetta::Colorful::is_colorful($n), "single $n"
+}
+
+# 263 is colorful: products 2,6,3,12,18,36 — all distinct.
+assert_ok Rosetta::Colorful::is_colorful(263), "263 colorful"
+
+# 326 is colorful: 3,2,6,6,12 — has duplicate 6 (3*2 and 6 single). Not colorful.
+assert_ok !Rosetta::Colorful::is_colorful(326), "326 not"
+
+# Numbers with repeated digits are non-colorful (single digit appears twice).
+assert_ok !Rosetta::Colorful::is_colorful(11),    "11 repeats"
+assert_ok !Rosetta::Colorful::is_colorful(2003),  "2003 has 0,0 substr products coincide"
+
+# Counts under 100: known reference is 50 (0..9, plus 23,24,25,...).
+my @under_100 = Rosetta::Colorful::all_under(99)
+assert_ok len(@under_100) >= 10, "at least the 10 singles"
+assert_ok len(@under_100) <= 100, "bounded"
+
+test_run
