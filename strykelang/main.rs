@@ -1182,6 +1182,13 @@ fn main() {
         process::exit(stryke::controller::run_controller(bind, port));
     }
 
+    // `stryke ai "prompt"` subcommand — quick CLI access to the ai
+    // builtin without writing a script. Reads the prompt from argv,
+    // or stdin if argv is empty.
+    if args.len() >= 2 && args[1] == "ai" {
+        process::exit(run_ai_subcommand(&args[2..]));
+    }
+
     // `stryke build SCRIPT -o OUT` subcommand: intercept before clap so `build` does not have
     // to be added to the main `Cli` struct (keeping the perl-compatible flag surface clean).
     if args.len() >= 2 && args[1] == "build" {
@@ -2569,6 +2576,137 @@ fn run_ast_subcommand(args: &[String]) -> i32 {
 
 /// `stryke build SCRIPT [-o OUT]` or `stryke build --project DIR [-o OUT]`
 /// Compile a Perl script (or project with lib/) into a standalone binary.
+/// `stryke ai PROMPT [--model NAME] [--system TEXT] [--stream]` — quick
+/// CLI access. With no PROMPT, reads it from stdin. Output goes to
+/// stdout. Errors surface on stderr with exit 1.
+fn run_ai_subcommand(args: &[String]) -> i32 {
+    use std::io::Read;
+    let mut prompt: Option<String> = None;
+    let mut model: Option<String> = None;
+    let mut system: Option<String> = None;
+    let mut stream = false;
+    let mut json_out = false;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--model" if i + 1 < args.len() => {
+                model = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--system" if i + 1 < args.len() => {
+                system = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--stream" => {
+                stream = true;
+                i += 1;
+            }
+            "--json" => {
+                json_out = true;
+                i += 1;
+            }
+            "--help" | "-h" => {
+                println!(
+                    "Usage: stryke ai [PROMPT] [--model MODEL] [--system TEXT]\n\
+                     \n\
+                     Reads PROMPT from stdin if not given on the command line.\n\
+                     Outputs the model's response to stdout.\n\
+                     \n\
+                     Flags:\n\
+                       --model MODEL   override the model (default from stryke.toml)\n\
+                       --system TEXT   set the system prompt\n\
+                       --stream        stream tokens to stdout as they arrive\n\
+                       --json          emit a JSON object with usd, tokens, response"
+                );
+                return 0;
+            }
+            other if !other.starts_with("--") => {
+                let mut combined = other.to_string();
+                i += 1;
+                while i < args.len() && !args[i].starts_with("--") {
+                    combined.push(' ');
+                    combined.push_str(&args[i]);
+                    i += 1;
+                }
+                prompt = Some(combined);
+            }
+            other => {
+                eprintln!("stryke ai: unknown flag `{}`", other);
+                return 2;
+            }
+        }
+    }
+
+    if prompt.is_none() {
+        let mut buf = String::new();
+        if std::io::stdin().read_to_string(&mut buf).is_err() {
+            eprintln!("stryke ai: failed to read prompt from stdin");
+            return 1;
+        }
+        let trimmed = buf.trim().to_string();
+        if trimmed.is_empty() {
+            eprintln!("stryke ai: no prompt given (argv or stdin)");
+            return 1;
+        }
+        prompt = Some(trimmed);
+    }
+    let prompt = prompt.unwrap();
+
+    // Build a stryke -e snippet — keeps the AI plumbing identical to
+    // every other code path. Cheaper than re-implementing config
+    // parsing in the CLI.
+    let mut script = String::new();
+    if stream {
+        script.push_str(
+            "my $state = +{ buf => \"\" };\n\
+             my %opts = ( on_chunk => sub { print $_[0]; STDOUT->flush } );\n",
+        );
+    } else {
+        script.push_str("my %opts = ();\n");
+    }
+    if let Some(m) = &model {
+        script.push_str(&format!("$opts{{model}} = q{{{}}};\n", m));
+    }
+    if let Some(s) = &system {
+        script.push_str(&format!("$opts{{system}} = q{{{}}};\n", s));
+    }
+    if stream {
+        script.push_str(
+            "my $resp = stream_prompt(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n",
+        );
+    } else {
+        script.push_str(
+            "my $resp = ai(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n",
+        );
+    }
+    if json_out {
+        script.push_str(
+            "my $c = ai_cost();\n\
+             use JSON ();\n\
+             print JSON::encode_json(+{ response => $resp, usd => $c->{usd}, input_tokens => $c->{input_tokens}, output_tokens => $c->{output_tokens} });\n\
+             print \"\\n\";\n",
+        );
+    } else if !stream {
+        script.push_str("print $resp, \"\\n\";\n");
+    } else {
+        script.push_str("print \"\\n\";\n");
+    }
+    let final_script = script.replace(
+        "__PROMPT__",
+        &prompt.replace('\\', "\\\\").replace('}', "\\}"),
+    );
+
+    let mut interp = Interpreter::new();
+    match stryke::parse_and_run_string(&final_script, &mut interp) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("stryke ai: {}", e);
+            1
+        }
+    }
+}
+
 fn run_build_subcommand(args: &[String]) -> i32 {
     let mut script: Option<String> = None;
     let mut project_dir: Option<String> = None;

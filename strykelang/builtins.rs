@@ -1561,6 +1561,150 @@ pub(crate) fn try_builtin(
         "stress_io" | "sio" => Some(builtin_stress_io(args)),
         "stress_test" | "st" => Some(builtin_stress_test(args, line)),
         "heat" => Some(builtin_heat(args)),
+        // Expanded stress surface — see strykelang/stress.rs.
+        "stress_fp"      | "sfp"      => Some(crate::stress::stress_fp(args, line)),
+        "stress_int"     | "sint"     => Some(crate::stress::stress_int(args, line)),
+        "stress_cache"   | "scache"   => Some(crate::stress::stress_cache(args, line)),
+        "stress_branch"  | "sbranch"  => Some(crate::stress::stress_branch(args, line)),
+        "stress_sort"    | "ssort"    => Some(crate::stress::stress_sort(args, line)),
+        "stress_alloc"   | "salloc"   => Some(crate::stress::stress_alloc(args, line)),
+        "stress_mmap"    | "smmap"    => Some(crate::stress::stress_mmap(args, line)),
+        "stress_disk"    | "sdisk"    => Some(crate::stress::stress_disk(args, line)),
+        "stress_iops"    | "siops"    => Some(crate::stress::stress_iops(args, line)),
+        "stress_net"     | "snet"     => Some(crate::stress::stress_net(args, line)),
+        "stress_http"    | "shttp"    => Some(crate::stress::stress_http(args, line)),
+        "stress_dns"     | "sdns"     => Some(crate::stress::stress_dns(args, line)),
+        "stress_thread"  | "sthread"  => Some(crate::stress::stress_thread(args, line)),
+        "stress_aes"     | "saes"     => Some(crate::stress::stress_aes(args, line)),
+        "stress_compress"| "scompress"=> Some(crate::stress::stress_compress(args, line)),
+        "stress_regex"   | "sregex"   => Some(crate::stress::stress_regex(args, line)),
+        "stress_json"    | "sjson"    => Some(crate::stress::stress_json(args, line)),
+        "stress_burst"               => Some(crate::stress::stress_burst(args, line)),
+        "stress_ramp"                => Some(crate::stress::stress_ramp(args, line)),
+        "stress_oscillate"           => Some(crate::stress::stress_oscillate(args, line)),
+        "stress_all"                 => Some(crate::stress::stress_all(args, line)),
+        "stress_temp"                => Some(crate::stress::stress_temp(args, line)),
+        "stress_thermal_zones"       => Some(crate::stress::stress_thermal_zones(args, line)),
+        "stress_freq"                => Some(crate::stress::stress_freq(args, line)),
+        "stress_throttled"           => Some(crate::stress::stress_throttled(args, line)),
+        "stress_load"                => Some(crate::stress::stress_load(args, line)),
+        "stress_meminfo"             => Some(crate::stress::stress_meminfo(args, line)),
+        "stress_cores"               => Some(crate::stress::stress_cores(args, line)),
+        "stress_arm_kill_switch"     => Some(crate::stress::stress_arm_kill_switch(args, line)),
+        "stress_killed"              => Some(crate::stress::stress_killed(args, line)),
+        "stress_disarm_kill_switch"  => Some(crate::stress::stress_disarm_kill_switch(args, line)),
+        #[cfg(unix)]
+        "stress_fork"    | "sfork"   => Some(crate::stress::stress_fork(args, line)),
+        // AI primitives — see strykelang/ai.rs and docs/AI_PRIMITIVES.md.
+        // `ai` auto-routes to the agent loop when `tools => [...]` is
+        // present; otherwise it's the single-shot `ai_prompt`.
+        "ai" => {
+            let has_kw = |key: &str| -> bool {
+                args.windows(2).any(|w| {
+                    matches!(w[0].as_str(), Some(s) if s == key)
+                })
+            };
+            let has_registered = !crate::ai::registered_tools().lock().is_empty();
+            if has_kw("schema") {
+                Some(crate::ai::ai_extract(args, line))
+            } else if has_kw("image") {
+                Some(crate::ai::ai_vision(args, line))
+            } else if has_kw("pdf") {
+                Some(crate::ai::ai_pdf(args, line))
+            } else if has_kw("tools") || has_registered {
+                Some(interp.ai_agent(args, line))
+            } else {
+                Some(crate::ai::ai_prompt(args, line))
+            }
+        }
+        "prompt"                     => Some(crate::ai::ai_prompt(args, line)),
+        "stream_prompt" => {
+            let has_cb = args.windows(2).any(|w| {
+                matches!(w[0].as_str(), Some(s) if s == "on_chunk")
+            });
+            if has_cb {
+                Some(interp.ai_stream_with_callback(args, line))
+            } else {
+                Some(crate::ai::ai_stream_prompt(args, line))
+            }
+        }
+        "chat"                       => Some(crate::ai::ai_chat(args, line)),
+        "embed"                      => Some(crate::ai::ai_embed(args, line)),
+        "tokens_of"                  => Some(crate::ai::ai_tokens_of(args, line)),
+        "ai_cost"                    => Some(crate::ai::ai_cost(args, line)),
+        "ai_cache_clear"             => Some(crate::ai::ai_cache_clear(args, line)),
+        "ai_cache_size"              => Some(crate::ai::ai_cache_size(args, line)),
+        "ai_mock_install"            => Some(crate::ai::ai_mock_install(args, line)),
+        "ai_mock_clear"              => Some(crate::ai::ai_mock_clear(args, line)),
+        "ai_config_get"              => Some(crate::ai::ai_config_get(args, line)),
+        "ai_config_set"              => Some(crate::ai::ai_config_set(args, line)),
+        // Phase 1 — agent loop. `ai($prompt, tools => [...])` routes
+        // here when a tools list is present; bare `ai` stays in
+        // ai_prompt.
+        "ai_agent"                   => Some(interp.ai_agent(args, line)),
+        // Phase 3 — collection builtins.
+        "ai_filter"                  => Some(crate::ai::ai_filter(args, line)),
+        "ai_map"                     => Some(crate::ai::ai_map(args, line)),
+        "ai_classify"                => Some(crate::ai::ai_classify(args, line)),
+        "ai_match"                   => Some(crate::ai::ai_match(args, line)),
+        "ai_sort"                    => Some(crate::ai::ai_sort(args, line)),
+        "ai_dedupe"                  => Some(crate::ai::ai_dedupe(args, line)),
+        // Vector + retrieval helpers.
+        "vec_cosine"                 => Some(crate::ai::vec_cosine(args, line)),
+        "vec_search"                 => Some(crate::ai::vec_search(args, line)),
+        "vec_topk"                   => Some(crate::ai::vec_topk(args, line)),
+        // Cost / routing / history.
+        "ai_estimate"                => Some(crate::ai::ai_estimate(args, line)),
+        "ai_routing_get"             => Some(crate::ai::ai_routing_get(args, line)),
+        "ai_routing_set"             => Some(crate::ai::ai_routing_set(args, line)),
+        "ai_history"                 => Some(crate::ai::ai_history(args, line)),
+        "ai_history_clear"           => Some(crate::ai::ai_history_clear(args, line)),
+        // MCP client (Phase 2 — server-side DSL still pending).
+        "mcp_connect"                => Some(crate::mcp::mcp_connect(args, line)),
+        "mcp_tools"                  => Some(crate::mcp::mcp_tools(args, line)),
+        "mcp_resources"              => Some(crate::mcp::mcp_resources(args, line)),
+        "mcp_prompts"                => Some(crate::mcp::mcp_prompts(args, line)),
+        "mcp_call"                   => Some(crate::mcp::mcp_call(args, line)),
+        "mcp_resource"               => Some(crate::mcp::mcp_resource(args, line)),
+        "mcp_prompt"                 => Some(crate::mcp::mcp_prompt(args, line)),
+        "mcp_close"                  => Some(crate::mcp::mcp_close(args, line)),
+        "mcp_attach_to_ai"           => Some(crate::mcp::mcp_attach_to_ai(args, line)),
+        "mcp_detach_from_ai"         => Some(crate::mcp::mcp_detach_from_ai(args, line)),
+        "mcp_attached"               => Some(crate::mcp::mcp_attached(args, line)),
+        // Tool registry (Phase 1 sugar without `tool fn` keyword).
+        "ai_register_tool"           => Some(crate::ai::ai_register_tool(args, line)),
+        "ai_unregister_tool"         => Some(crate::ai::ai_unregister_tool(args, line)),
+        "ai_clear_tools"             => Some(crate::ai::ai_clear_tools(args, line)),
+        "ai_tools_list"              => Some(crate::ai::ai_tools_list(args, line)),
+        // Embedding memory / RAG.
+        "ai_memory_save"             => Some(crate::ai::ai_memory_save(args, line)),
+        "ai_memory_recall"           => Some(crate::ai::ai_memory_recall(args, line)),
+        "ai_memory_forget"           => Some(crate::ai::ai_memory_forget(args, line)),
+        "ai_memory_count"            => Some(crate::ai::ai_memory_count(args, line)),
+        "ai_memory_clear"            => Some(crate::ai::ai_memory_clear(args, line)),
+        // Streaming with on_chunk callback.
+        "stream_prompt_cb"           => Some(interp.ai_stream_with_callback(args, line)),
+        // Multimodal vision input.
+        "ai_vision"                  => Some(crate::ai::ai_vision(args, line)),
+        "ai_pdf"                     => Some(crate::ai::ai_pdf(args, line)),
+        "ai_extract"                 => Some(crate::ai::ai_extract(args, line)),
+        "ai_summarize"               => Some(crate::ai::ai_summarize(args, line)),
+        "ai_translate"               => Some(crate::ai::ai_translate(args, line)),
+        "ai_budget"                  => Some(crate::ai::ai_budget_dispatch(interp, args, line)),
+        "ai_last_thinking"           => Some(crate::ai::ai_last_thinking(args, line)),
+        "ai_template"                => Some(crate::ai::ai_template(args, line)),
+        "ai_session_new"             => Some(crate::ai::ai_session_new(args, line)),
+        "ai_session_send"            => Some(crate::ai::ai_session_send(args, line)),
+        "ai_session_history"         => Some(crate::ai::ai_session_history(args, line)),
+        "ai_session_close"           => Some(crate::ai::ai_session_close(args, line)),
+        "ai_session_reset"           => Some(crate::ai::ai_session_reset(args, line)),
+        "web_search_tool"            => Some(crate::ai::web_search_tool(args, line)),
+        "fetch_url_tool"             => Some(crate::ai::fetch_url_tool(args, line)),
+        "read_file_tool"             => Some(crate::ai::read_file_tool(args, line)),
+        "run_code_tool"              => Some(crate::ai::run_code_tool(args, line)),
+        "ai_batch"                   => Some(crate::ai::ai_batch(args, line)),
+        "ai_pmap"                    => Some(crate::ai::ai_pmap(args, line)),
+        "mcp_server_start"           => Some(crate::mcp::mcp_server_start_dispatch(interp, args, line)),
         "fire_and_forget" | "faf" | "pin" => Some(builtin_fire_and_forget()),
         "serve" => Some(interp.builtin_serve(args, line)),
         "web_route" => Some(crate::web::web_route(args, line)),

@@ -7,6 +7,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod agent;
+pub mod ai;
 pub mod aop;
 pub mod aot;
 pub mod ast;
@@ -35,6 +36,7 @@ pub mod list_builtins;
 pub mod lsp;
 mod map_grep_fast;
 mod map_stream;
+pub mod mcp;
 pub mod mro;
 mod nanbox;
 mod native_codec;
@@ -69,6 +71,7 @@ pub mod script_cache;
 mod sort_fast;
 pub mod special_vars;
 pub mod static_analysis;
+pub mod stress;
 pub mod token;
 pub mod value;
 pub mod vm;
