@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# app/controllers/{{file_stem}}_controller.stk — JSON REST controller
+# for {{model}}. Mounted under /api/{{plural}}.
+
+class {{class_name}}Controller extends ApplicationController {
+    fn index {
+        web_json({{model}}::all())
+    }
+
+    fn show {
+        my $row = {{model}}::find(web_params()->{id})
+        unless (defined $row) {
+            web_json(+{ error => "not_found" }, 404)
+            return
+        }
+        web_json($row)
+    }
+
+    fn create {
+        my $row = {{model}}::create(web_params())
+        web_json($row, 201)
+    }
+
+    fn update {
+        my $id = web_params()->{id}
+        {{model}}::update($id, web_params())
+        web_json({{model}}::find($id))
+    }
+
+    fn destroy {
+        {{model}}::destroy(web_params()->{id})
+        web_json(+{ ok => 1 })
+    }
+}

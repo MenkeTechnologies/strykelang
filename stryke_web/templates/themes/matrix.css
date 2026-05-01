@@ -1,0 +1,190 @@
+/* Matrix theme — green digital rain on black. CSS-only animation,
+   no JS. Pairs the green phosphor look with a falling-glyph BG via
+   pseudo-elements. */
+
+:root {
+    --bg: #000000;
+    --green: #00ff41;
+    --green-bright: #b6ffcc;
+    --green-dim: #003b15;
+    --green-glow: rgba(0, 255, 65, 0.35);
+    --border: #073d18;
+    --text: #00ff41;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+::selection { background: var(--green); color: #000; }
+
+body {
+    font-family: 'Share Tech Mono', 'Courier New', ui-monospace, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    text-shadow: 0 0 6px var(--green-glow);
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Falling-glyph background — repeating gradients fake the rain. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        repeating-linear-gradient(180deg,
+            transparent 0,
+            transparent 18px,
+            rgba(0, 255, 65, 0.04) 18px,
+            rgba(0, 255, 65, 0.04) 19px,
+            transparent 19px,
+            transparent 36px),
+        repeating-linear-gradient(90deg,
+            transparent 0,
+            transparent 14px,
+            rgba(0, 255, 65, 0.025) 14px,
+            rgba(0, 255, 65, 0.025) 15px);
+    pointer-events: none;
+    z-index: 0;
+    animation: matrix-rain 18s linear infinite;
+}
+@keyframes matrix-rain {
+    0%   { background-position: 0 0, 0 0; }
+    100% { background-position: 0 720px, 0 0; }
+}
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.85) 100%);
+    pointer-events: none;
+    z-index: 9998;
+}
+
+main, body > h1, body > div, body > p, body > table, body > form, nav {
+    position: relative;
+    z-index: 1;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: var(--green-dim); }
+
+nav.app-nav {
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--green-dim);
+    background: rgba(0, 0, 0, 0.85);
+    margin-bottom: 18px;
+}
+nav.app-nav a {
+    color: var(--green);
+    margin-right: 18px;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 13px;
+}
+nav.app-nav a:hover {
+    color: var(--green-bright);
+    text-shadow: 0 0 12px var(--green-bright);
+}
+nav.app-nav strong { color: var(--green-bright); }
+
+main, body > h1, body > div, body > p, body > table, body > form {
+    max-width: 92rem;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+h1, h2, h3 {
+    color: var(--green-bright);
+    text-shadow: 0 0 12px var(--green-bright), 0 0 24px var(--green-glow);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    margin: 20px 0 14px;
+    font-weight: normal;
+}
+
+a { color: var(--green-bright); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 12px var(--green-bright); }
+
+table, form, dl {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--green-dim);
+    box-shadow: 0 0 24px rgba(0, 255, 65, 0.08);
+    margin: 14px 0;
+    padding: 14px;
+}
+table { width: 100%; border-collapse: collapse; padding: 0; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--green-dim); }
+th {
+    color: var(--green-bright);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+}
+tbody tr:hover { background: rgba(0, 255, 65, 0.04); }
+tbody tr:hover td { color: var(--green-bright); }
+
+input, textarea, select {
+    width: 100%;
+    padding: 9px 12px;
+    background: rgba(0, 0, 0, 0.85);
+    color: var(--green-bright);
+    border: 1px solid var(--green-dim);
+    border-radius: 0;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: 14px;
+    text-shadow: 0 0 4px var(--green-glow);
+}
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 14px var(--green-glow);
+}
+
+button, .btn {
+    padding: 8px 18px;
+    background: transparent;
+    color: var(--green-bright);
+    border: 1px solid var(--green);
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: 13px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 6px var(--green-glow);
+    transition: all 150ms ease;
+}
+button:hover {
+    background: var(--green);
+    color: #000;
+    text-shadow: none;
+    box-shadow: 0 0 18px var(--green-glow);
+}
+
+label {
+    display: block;
+    color: var(--green-bright);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+form > div { margin-bottom: 12px; }
+
+.flash-notice { margin: 14px 0; padding: 9px 14px; border-left: 3px solid var(--green); background: rgba(0, 255, 65, 0.06); color: var(--green-bright); }
+.flash-alert  { margin: 14px 0; padding: 9px 14px; border-left: 3px solid #ff3030; background: rgba(255, 48, 48, 0.06); color: #ff5555; }
+
+.admin-tables { columns: 4; column-gap: 24px; list-style: none; padding: 14px; }
+.admin-tables a {
+    display: block;
+    padding: 6px 10px;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+.admin-tables a:hover { border-color: var(--green); color: var(--green-bright); background: rgba(0, 255, 65, 0.04); }

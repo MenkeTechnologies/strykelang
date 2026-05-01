@@ -1,0 +1,24 @@
+<p><a href="/admin">&larr; admin</a></p>
+<h1><%= web_h($table) %> <small>(<%= $count %> rows)</small></h1>
+
+<% my @cols = (); %>
+<% if (ref($rows) eq "ARRAY" && @$rows) { @cols = sort keys %{$rows->[0]} } %>
+
+<table class="app-table">
+    <thead>
+        <tr>
+            <% for my $c (@cols) { %>
+                <th><%= web_h($c) %></th>
+            <% } %>
+        </tr>
+    </thead>
+    <tbody>
+        <% for my $r (@{ $rows // [] }) { %>
+            <tr>
+                <% for my $c (@cols) { %>
+                    <td><%= web_h(($r->{$c} // "") . "") %></td>
+                <% } %>
+            </tr>
+        <% } %>
+    </tbody>
+</table>

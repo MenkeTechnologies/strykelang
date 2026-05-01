@@ -1,0 +1,175 @@
+/* Synthwave theme — purple/pink/orange retrowave palette. Same chrome
+   as cyberpunk but with a sunset gradient instead of CRT cyan. */
+
+:root {
+    --bg-primary: #0d0221;
+    --bg-secondary: #1a0b3d;
+    --bg-card: #14082f;
+    --accent: #ff71ce;
+    --accent-glow: rgba(255, 113, 206, 0.45);
+    --cyan: #b967ff;
+    --cyan-glow: rgba(185, 103, 255, 0.4);
+    --magenta: #ff71ce;
+    --orange: #ff9472;
+    --yellow: #fffb96;
+    --text: #f4e3ff;
+    --text-dim: #9d7eb7;
+    --border: #2a1a4e;
+    --grid-line: rgba(185, 103, 255, 0.06);
+    --grid-cross: rgba(255, 113, 206, 0.04);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+::selection { background: rgba(255, 113, 206, 0.4); color: #fff; }
+
+body {
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    background: var(--bg-primary);
+    background-image:
+        linear-gradient(180deg, rgba(255, 113, 206, 0.15) 0%, transparent 38%),
+        linear-gradient(0deg, rgba(255, 148, 114, 0.18) 0%, transparent 32%),
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-cross) 1px, transparent 1px);
+    background-size: auto, auto, 64px 64px, 64px 64px;
+    background-attachment: fixed;
+    color: var(--text);
+    line-height: 1.55;
+    min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(13, 2, 33, 0.7); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--accent), var(--cyan));
+    border-radius: 4px;
+}
+
+nav.app-nav {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(13, 2, 33, 0.95), rgba(26, 11, 61, 0.95));
+    margin-bottom: 24px;
+    box-shadow: 0 0 24px rgba(255, 113, 206, 0.18);
+    position: relative;
+}
+nav.app-nav::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), var(--orange), transparent);
+}
+nav.app-nav a {
+    color: var(--accent);
+    margin-right: 18px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 12px;
+    text-shadow: 0 0 8px var(--accent-glow);
+    text-decoration: none;
+}
+nav.app-nav a:hover { color: var(--orange); text-shadow: 0 0 8px rgba(255, 148, 114, 0.5); }
+
+main, body > h1, body > div, body > p, body > table, body > form {
+    max-width: 92rem;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+h1, h2, h3 {
+    font-family: 'Orbitron', 'Share Tech Mono', sans-serif;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--accent), var(--orange), var(--yellow), var(--cyan), var(--accent));
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 10px var(--accent-glow));
+    animation: synthwave-shimmer 6s linear infinite;
+    margin: 24px 0 16px;
+}
+h1 { font-size: clamp(1.4rem, 3vw, 2rem); }
+@keyframes synthwave-shimmer { 0% { background-position: 0% 0%; } 100% { background-position: 300% 0%; } }
+
+a { color: var(--accent); }
+a:hover { color: var(--orange); }
+
+table, form, dl {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(185, 103, 255, 0.12);
+    padding: 16px;
+    margin: 16px 0;
+}
+table { padding: 0; width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th {
+    background: rgba(255, 113, 206, 0.08);
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 11px;
+}
+tbody tr:hover { background: rgba(185, 103, 255, 0.06); }
+
+input, textarea, select {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(13, 2, 33, 0.7);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    font-size: 14px;
+}
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+}
+
+button, .btn {
+    padding: 10px 20px;
+    background: linear-gradient(90deg, var(--accent), var(--orange));
+    color: #1a0b3d;
+    border: 0;
+    border-radius: 3px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 0 16px var(--accent-glow);
+}
+button:hover { background: linear-gradient(90deg, var(--cyan), var(--accent)); }
+
+label {
+    display: block;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+form > div { margin-bottom: 14px; }
+
+.flash-notice { margin: 16px 0; padding: 10px 14px; border-left: 3px solid var(--cyan); background: rgba(185, 103, 255, 0.08); color: var(--cyan); }
+.flash-alert  { margin: 16px 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(255, 113, 206, 0.08); color: var(--accent); }
+
+.admin-tables { columns: 4; column-gap: 24px; list-style: none; padding: 16px; }
+.admin-tables a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 3px;
+    background: rgba(185, 103, 255, 0.06);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+}
+.admin-tables a:hover { border-color: var(--orange); color: var(--orange); }

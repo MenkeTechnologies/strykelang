@@ -1,0 +1,8 @@
+/* Pico theme — references the Pico CSS CDN. The layout already pulls
+   in pico.classless via stylesheet_link_tag; this file just adds tiny
+   overrides on top so you can theme without downloading anything. */
+@import url("https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css");
+body > main { padding: 16px; }
+form > div { margin-bottom: 12px; }
+.flash-notice { padding: 8px 12px; background: rgba(70, 200, 100, 0.18); border-left: 4px solid #46c864; }
+.flash-alert  { padding: 8px 12px; background: rgba(220, 70, 70, 0.18); border-left: 4px solid #dc4646; }

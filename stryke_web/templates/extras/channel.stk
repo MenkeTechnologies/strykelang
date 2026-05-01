@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# app/channels/{{file_stem}}_channel.stk — WebSocket / SSE channel stub.
+# Stryke's `pchannel` and async primitives are the runtime — once
+# `web_subscribe` lands in PASS 9 this hooks into a per-channel
+# pub/sub topic.
+
+class {{class_name}} {
+    fn Self.subscribed($params) {
+        # web_stream_for("{{file_stem}}", $params)  # PASS 9
+    }
+
+    fn Self.unsubscribed {
+        # cleanup
+    }
+
+    fn Self.receive($payload) {
+        # incoming client message
+    }
+}

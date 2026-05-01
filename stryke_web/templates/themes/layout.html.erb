@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>App</title>
+    <link rel="stylesheet" href="/assets/application.css">
+    <link rel="stylesheet" href="/assets/admin.css">
+    <%= web_csrf_meta_tag() %>
+</head>
+<body>
+    <nav class="app-nav">
+        <a href="/">Home</a>
+        <a href="/admin">Admin</a>
+        <a href="/health">Health</a>
+        <% if (web_session_get("user_id")) { %>
+            <span style="float:right">
+                Signed in as <strong><%= web_h(web_session_get("user_email") // "user") %></strong>
+                — <%= web_button_to("Sign out", "/logout", method => "delete") %>
+            </span>
+        <% } else { %>
+            <span style="float:right">
+                <a href="/login">Log in</a>
+                <a href="/signup">Sign up</a>
+            </span>
+        <% } %>
+    </nav>
+
+    <% if (web_flash_get("notice")) { %>
+        <div class="flash-notice"><%= web_h(web_flash_get("notice")) %></div>
+    <% } %>
+    <% if (web_flash_get("alert")) { %>
+        <div class="flash-alert"><%= web_h(web_flash_get("alert")) %></div>
+    <% } %>
+
+    <%= yield %>
+</body>
+</html>

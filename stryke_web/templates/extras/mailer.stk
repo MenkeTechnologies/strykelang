@@ -1,0 +1,8 @@
+#!/usr/bin/env stryke
+# app/mailers/{{file_stem}}_mailer.stk — generated stub.
+# Each method renders + delivers one email. Wire SMTP via the framework
+# `web_send_mail` builtin once it ships in PASS 9.
+
+class {{class_name}} {
+{{actions_block}}
+}

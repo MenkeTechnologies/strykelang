@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# app/models/application_record.stk — base model for {{app_name}}.
+#
+# Every generated model extends this. Cross-cutting concerns
+# (timestamps, soft-delete, audit, default scopes) belong here so they
+# apply to every model in the app. Equivalent to Rails'
+# `ApplicationRecord < ActiveRecord::Base` — PASS 1 keeps it plain;
+# the ORM base class lands in PASS 3.
+
+class ApplicationRecord {
+    # Default behaviors (wired in PASS 3):
+    # - created_at / updated_at populated automatically by Model on save.
+    # - primary key is `id` (override via `primary_key "uuid"` for UUIDs).
+    # - table name is the snake-cased plural of the class name (Post → posts).
+}

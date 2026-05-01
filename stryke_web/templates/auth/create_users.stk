@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Auth migration — adds the users table with password_digest. Idempotent
+# via `CREATE TABLE IF NOT EXISTS` inside web_create_table.
+
+class CreateUsersWithAuth {
+    fn up {
+        web_create_table("users", +{
+            name            => "string",
+            email           => "string",
+            password_digest => "string",
+        })
+    }
+
+    fn down {
+        web_drop_table("users")
+    }
+}

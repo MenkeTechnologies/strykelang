@@ -1,0 +1,22 @@
+/* Simple theme — readable defaults, no framework. */
+* { box-sizing: border-box; }
+html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; color: #1a1a1a; background: #fafafa; }
+body { max-width: 960px; margin: 0 auto; padding: 24px; }
+h1, h2, h3 { line-height: 1.2; }
+h1 { border-bottom: 2px solid #e5e5e5; padding-bottom: 8px; }
+a { color: #0066cc; text-decoration: none; }
+a:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
+th { background: #f0f0f0; font-weight: 600; }
+tr:hover td { background: #fff8e7; }
+input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+textarea { min-height: 100px; resize: vertical; }
+button { padding: 8px 14px; background: #0066cc; color: white; border: 0; border-radius: 4px; cursor: pointer; font-size: 14px; }
+button:hover { background: #0052a3; }
+form > div { margin-bottom: 12px; }
+label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+.flash-notice { padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 12px; }
+.flash-alert  { padding: 10px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 12px; }
+nav { padding: 12px 0; border-bottom: 1px solid #e5e5e5; margin-bottom: 24px; }
+nav a { margin-right: 16px; }

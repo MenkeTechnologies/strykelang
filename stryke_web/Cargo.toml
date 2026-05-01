@@ -1,0 +1,26 @@
+# Standalone crate — explicitly opted out of the strykelang workspace so
+# `cargo build` from `stryke_web/` doesn't pull in the (much larger)
+# parent crate. Promote to workspace member in the future if you want a
+# single `cargo build` to cover both.
+[workspace]
+
+[package]
+name = "stryke_web"
+version = "0.1.0"
+edition = "2021"
+description = "Rails-shaped web framework for the stryke language. The CLI binary generates .stk app skeletons; the framework runtime lives as builtins in the stryke interpreter."
+license = "MIT"
+authors = ["MenkeTechnologies"]
+repository = "https://github.com/MenkeTechnologies/strykelang"
+
+[[bin]]
+name = "s_web"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+heck = "0.5"
+
+[lib]
+name = "stryke_web"
+path = "src/lib.rs"

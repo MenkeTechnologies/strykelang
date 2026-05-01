@@ -70,6 +70,8 @@ pub mod static_analysis;
 pub mod token;
 pub mod value;
 pub mod vm;
+pub mod web;
+pub mod web_orm;
 
 // Re-export shell components from the zsh crate
 pub use zsh::exec as shell_exec;

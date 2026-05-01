@@ -1,0 +1,10 @@
+<h1>{{singular_title}}</h1>
+
+<dl>
+{{dl_pairs}}
+</dl>
+
+<p>
+    <%= web_link_to("Edit", "/{{plural_snake}}/" . ${{singular_snake}}->{id} . "/edit") %>
+    <%= web_link_to("Back", "/{{plural_snake}}") %>
+</p>

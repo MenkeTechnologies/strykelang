@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# app/models/user.stk — auth-enabled User model.
+#
+# `password_digest` is the SHA-256+salt hash produced by `web_password_hash`.
+# Use `User::sign_in($email, $password)` to look up + verify and set a
+# session, and `User::current()` to read the signed-in user.
+
+class User extends ApplicationRecord {
+    name: Str
+    email: Str
+    password_digest: Str
+
+    fn Self.table_name { "users" }
+    fn Self.all { web_model_all("users") }
+    fn Self.find($id) { web_model_find("users", $id) }
+    fn Self.where($cond) { web_model_where("users", $cond) }
+    fn Self.create($attrs) { web_model_create("users", $attrs) }
+    fn Self.update($id, $attrs) { web_model_update("users", $id, $attrs) }
+    fn Self.destroy($id) { web_model_destroy("users", $id) }
+
+    fn Self.find_by_email($email) {
+        my $rows = web_model_where("users", +{ email => $email })
+        return undef unless ref($rows) eq "ARRAY" && @$rows
+        $rows->[0]
+    }
+
+    fn Self.register($attrs) {
+        my $email = $attrs->{email}
+        my $password = $attrs->{password}
+        return +{ ok => 0, error => "email required" } unless defined $email && length $email
+        return +{ ok => 0, error => "password required" } unless defined $password && length $password
+        if (User::find_by_email($email)) {
+            return +{ ok => 0, error => "email already taken" }
+        }
+        my $digest = web_password_hash($password)
+        my $u = web_model_create("users", +{
+            name            => $attrs->{name} // $email,
+            email           => $email,
+            password_digest => $digest,
+        })
+        +{ ok => 1, user => $u }
+    }
+
+    fn Self.sign_in($email, $password) {
+        my $u = User::find_by_email($email)
+        return +{ ok => 0, error => "no such user" } unless defined $u
+        unless (web_password_verify($password, $u->{password_digest})) {
+            return +{ ok => 0, error => "wrong password" }
+        }
+        web_session_set("user_id", $u->{id})
+        web_session_set("user_email", $u->{email})
+        +{ ok => 1, user => $u }
+    }
+
+    fn Self.sign_out {
+        web_session_clear()
+    }
+
+    fn Self.current {
+        my $id = web_session_get("user_id")
+        return undef unless defined $id && $id
+        User::find($id)
+    }
+}

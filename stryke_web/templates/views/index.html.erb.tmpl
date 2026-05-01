@@ -1,0 +1,24 @@
+<h1>{{plural_title}}</h1>
+
+<p><%= web_link_to("New {{singular_title}}", "/{{plural_snake}}/new") %></p>
+
+<table>
+    <thead>
+        <tr>
+{{th_cells}}
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        <% for my $r (@{ ${{plural_snake}} // [] }) { %>
+            <tr>
+{{td_cells}}
+                <td>
+                    <%= web_link_to("Show", "/{{plural_snake}}/" . $r->{id}) %>
+                    <%= web_link_to("Edit", "/{{plural_snake}}/" . $r->{id} . "/edit") %>
+                    <%= web_button_to("Delete", "/{{plural_snake}}/" . $r->{id}, method => "delete", confirm => "Are you sure?") %>
+                </td>
+            </tr>
+        <% } %>
+    </tbody>
+</table>
