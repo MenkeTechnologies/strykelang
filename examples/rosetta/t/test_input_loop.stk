@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Input loop
+
+fn Rosetta::InputLoop::process($input_str) {
+    my @lines = $input_str |> split(/\n/)
+    my @processed
+    @lines |> map {
+        push @processed, "Line: " . _
+    }
+    join("\n", @processed)
+}
+
+my $input = "first\nsecond\nthird"
+my $res = Rosetta::InputLoop::process($input)
+
+assert_eq $res, "Line: first\nLine: second\nLine: third", "input loop processing"
+
+test_run

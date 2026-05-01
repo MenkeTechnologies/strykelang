@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fermat primality test
+
+fn Rosetta::Primality::pow_mod($base, $exp, $mod) {
+    return 0 if $mod == 1
+    my $result = 1
+    $base = $base % $mod
+    while ($exp > 0) {
+        if ($exp & 1) {
+            $result = ($result * $base) % $mod
+        }
+        $exp = $exp >> 1
+        $base = ($base * $base) % $mod
+    }
+    $result
+}
+
+fn Rosetta::Primality::fermat_test($n, $k) {
+    if ($n <= 1) { return 0 }
+    if ($n <= 3) { return 1 }
+    
+    for (1 .. $k) {
+        my $a = 2 + floor(rand($n - 4 + 1))
+        # a^(n-1) % n should be 1 if n is prime
+        if (Rosetta::Primality::pow_mod($a, $n - 1, $n) != 1) {
+            return 0
+        }
+    }
+    1
+}
+
+# Test with known primes and composites
+my @primes = (5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
+my @composites = (4, 6, 8, 9, 10, 12, 14, 15, 16, 18)
+
+@primes |> map {
+    assert_eq(Rosetta::Primality::fermat_test(_, 5), 1, "prime $_")
+}
+
+@composites |> map {
+    assert_eq(Rosetta::Primality::fermat_test(_, 5), 0, "composite $_")
+}
+
+test_run
