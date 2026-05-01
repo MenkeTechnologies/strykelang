@@ -295,97 +295,98 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     // 4. Dispatch by provider.
     let base_url_override = opt_str(&opts, "base_url", "");
-    let result =
-        match provider.as_str() {
-            "anthropic" => call_anthropic(
+    let result = match provider.as_str() {
+        "anthropic" => call_anthropic(
+            &prompt,
+            &system,
+            &model,
+            max_tokens,
+            temperature,
+            timeout,
+            cache_control,
+            thinking,
+            thinking_budget,
+            line,
+        )?,
+        "openai" => call_openai_with_base(
+            &prompt,
+            &system,
+            &model,
+            max_tokens,
+            temperature,
+            timeout,
+            "https://api.openai.com/v1/chat/completions",
+            "OPENAI_API_KEY",
+            line,
+        )?,
+        // OpenAI-compatible local servers: LM Studio (default :1234),
+        // vLLM, llama-server, llamafile, anything-llm. Same wire shape;
+        // user just sets `base_url => "http://localhost:1234/v1/chat/completions"`
+        // (or via `[ai] base_url = "..."`).
+        "openai_compat" | "compat" | "local" => {
+            let base = if !base_url_override.is_empty() {
+                base_url_override.clone()
+            } else {
+                std::env::var("STRYKE_AI_BASE_URL")
+                    .unwrap_or_else(|_| "http://localhost:1234/v1/chat/completions".into())
+            };
+            call_openai_with_base(
                 &prompt,
                 &system,
                 &model,
                 max_tokens,
                 temperature,
                 timeout,
-                cache_control,
-                thinking,
-                thinking_budget,
+                &base,
+                "STRYKE_AI_LOCAL_KEY",
                 line,
-            )?,
-            "openai" => call_openai_with_base(
+            )?
+        }
+        // Ollama's native (non-OpenAI) generate API.
+        "ollama" => {
+            let base = if !base_url_override.is_empty() {
+                base_url_override.clone()
+            } else {
+                std::env::var("OLLAMA_HOST")
+                    .map(|h| {
+                        if h.starts_with("http") {
+                            h
+                        } else {
+                            format!("http://{}", h)
+                        }
+                    })
+                    .unwrap_or_else(|_| "http://localhost:11434".into())
+            };
+            call_ollama(
                 &prompt,
                 &system,
                 &model,
                 max_tokens,
                 temperature,
                 timeout,
-                "https://api.openai.com/v1/chat/completions",
-                "OPENAI_API_KEY",
+                &base,
                 line,
-            )?,
-            // OpenAI-compatible local servers: LM Studio (default :1234),
-            // vLLM, llama-server, llamafile, anything-llm. Same wire shape;
-            // user just sets `base_url => "http://localhost:1234/v1/chat/completions"`
-            // (or via `[ai] base_url = "..."`).
-            "openai_compat" | "compat" | "local" => {
-                let base = if !base_url_override.is_empty() {
-                    base_url_override.clone()
-                } else {
-                    std::env::var("STRYKE_AI_BASE_URL")
-                        .unwrap_or_else(|_| "http://localhost:1234/v1/chat/completions".into())
-                };
-                call_openai_with_base(
-                    &prompt,
-                    &system,
-                    &model,
-                    max_tokens,
-                    temperature,
-                    timeout,
-                    &base,
-                    "STRYKE_AI_LOCAL_KEY",
-                    line,
-                )?
-            }
-            // Ollama's native (non-OpenAI) generate API.
-            "ollama" => {
-                let base = if !base_url_override.is_empty() {
-                    base_url_override.clone()
-                } else {
-                    std::env::var("OLLAMA_HOST")
-                        .map(|h| {
-                            if h.starts_with("http") {
-                                h
-                            } else {
-                                format!("http://{}", h)
-                            }
-                        })
-                        .unwrap_or_else(|_| "http://localhost:11434".into())
-                };
-                call_ollama(
-                    &prompt,
-                    &system,
-                    &model,
-                    max_tokens,
-                    temperature,
-                    timeout,
-                    &base,
-                    line,
-                )?
-            }
-            "gemini" | "google" => call_gemini(
-                &prompt,
-                &system,
-                &model,
-                max_tokens,
-                temperature,
-                timeout,
-                line,
-            )?,
-            other => return Err(PerlError::runtime(
+            )?
+        }
+        "gemini" | "google" => call_gemini(
+            &prompt,
+            &system,
+            &model,
+            max_tokens,
+            temperature,
+            timeout,
+            line,
+        )?,
+        other => {
+            return Err(PerlError::runtime(
                 format!(
                     "ai: provider `{}` not implemented (try anthropic/openai/ollama/local/gemini)",
                     other
                 ),
                 line,
-            )),
-        };
+            ))
+        }
+    };
 
     if cache_enabled {
         cache().lock().insert(key, result.clone());

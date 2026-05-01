@@ -35,11 +35,16 @@ pub fn run_pwatch(
         pattern,
         zsh::glob::GlobOptions {
             null_glob: true,
+            mark_dirs: false,
             no_glob_dots: true,
+            list_types: false,
+            numeric_sort: false,
+            follow_links: false,
             extended_glob: true,
             case_glob: true,
+            glob_star_short: true,
             bare_glob_qual: true,
-            ..Default::default()
+            brace_ccl: true,
         },
     )
     .into_iter()

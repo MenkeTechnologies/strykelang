@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: First class environments
+# Capture state via a hashref so all closures in the published interface share
+# the same backing storage.
+
+fn Rosetta::FCEnv::make_counter() {
+    my $s = { count => 0 }
+    {
+        inc   => fn { $s->{count} += 1; $s->{count} },
+        dec   => fn { $s->{count} -= 1; $s->{count} },
+        get   => fn { $s->{count} },
+        reset => fn { $s->{count} = 0; 0 },
+    }
+}
+
+# Three independent environments, each with private state.
+my @envs = (
+    Rosetta::FCEnv::make_counter(),
+    Rosetta::FCEnv::make_counter(),
+    Rosetta::FCEnv::make_counter(),
+)
+
+# Drive each independently.
+$envs[0]->{inc}->()
+$envs[0]->{inc}->()
+$envs[0]->{inc}->()
+$envs[1]->{inc}->()
+$envs[2]->{dec}->()
+
+assert_eq $envs[0]->{get}->(),  3, "env 0 = 3"
+assert_eq $envs[1]->{get}->(),  1, "env 1 = 1"
+assert_eq $envs[2]->{get}->(), -1, "env 2 = -1"
+
+# pipeline: snapshot all
+my @snap = ~> @envs map { _->{get}->() }
+assert_eq join(",", @snap), "3,1,-1", "snapshot"
+
+# Reset env 0, ensure others untouched.
+$envs[0]->{reset}->()
+assert_eq $envs[0]->{get}->(), 0, "env 0 reset"
+assert_eq $envs[1]->{get}->(), 1, "env 1 unaffected"
+assert_eq $envs[2]->{get}->(), -1, "env 2 unaffected"
+
+# Environments are first-class: pass into a function, store in a hash, etc.
+fn Rosetta::FCEnv::ramp_up($env, $n) {
+    for (1..$n) { $env->{inc}->() }
+    $env->{get}->()
+}
+
+my $fresh = Rosetta::FCEnv::make_counter()
+assert_eq Rosetta::FCEnv::ramp_up($fresh, 10), 10, "passing env into a fn works"
+
+test_run
