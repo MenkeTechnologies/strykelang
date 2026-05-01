@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# PtyHandle — method-form wrapper around the bare pty_* builtins so
+# users can write `$h->expect(/.../)` instead of `pty_expect($h, /.../)`.
+# Bare builtins still work; this is purely sugar.
+#
+# Usage:
+#   require "perl_pty_class.stk"
+#   my $h = PtyHandle::spawn("ssh user@host")
+#   $h->expect(qr/password:/, 30)
+#   $h->send("hunter2\n")
+#   $h->close()
+
+class PtyHandle {
+    raw: Any
+
+    fn Self.spawn(@cmd) {
+        PtyHandle(raw => pty_spawn(@cmd))
+    }
+
+    fn send($text)            { pty_send($self->raw, $text) }
+    fn read($timeout)         { pty_read($self->raw, $timeout // 5) }
+    fn expect($pat, $timeout) { pty_expect($self->raw, $pat, $timeout // 30) }
+    fn buffer                 { pty_buffer($self->raw) }
+    fn alive                  { pty_alive($self->raw) }
+    fn eof                    { pty_eof($self->raw) }
+    fn close                  { pty_close($self->raw) }
+    fn interact               { pty_interact($self->raw) }
+
+    # Table form — `$h->branch([+{re=>qr/.../, do=>sub{...}}, ...], 30)`.
+    # Returns the value of `do->()` for the first matching branch, or
+    # undef on timeout / EOF.
+    fn branch($branches, $timeout) {
+        my $hit = pty_expect_table($self->raw, $branches, $timeout // 30)
+        return undef unless defined $hit
+        my $action = $hit->{action}
+        return $hit->{matched} unless ref($action) eq "CODE"
+        $action->($hit->{matched})
+    }
+}

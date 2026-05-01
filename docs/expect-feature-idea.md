@@ -108,6 +108,105 @@ Stryke could be the first language with native expect-style primitives in terse,
 
 ---
 
+## Phases 1–4 — SHIPPED
+
+Status: Unix-only. ConPTY (Windows) deferred. Implementation lives in
+`strykelang/perl_pty.rs` (~700 LoC) plus a thin wrapper class at
+`strykelang/perl_pty_class.stk` (~40 LoC of stryke).
+
+### Final syntax (NOT the operator-overloaded proposal)
+
+The original sketch with `~` for expect and `>>` for send was rejected
+because the parser already triple-uses `~` (BitNot, range separator,
+char-index suppression via `parser.rs:131 suppress_tilde_range`) and
+`>>` is bitwise shift + open-mode token. Adding a fourth meaning would
+add another parser counter and a typo trap with `~>` (thread-macro).
+
+Bare-builtin form (canonical):
+
+```stryke
+my $h = pty_spawn("ssh user@host")
+pty_expect($h, qr/password:/, 30)
+pty_send($h, "hunter2\n")
+pty_expect($h, qr/\$ /, 30)
+pty_send($h, "ls -la\n")
+my $output = pty_expect($h, qr/\$ /, 30)
+pty_close($h)
+```
+
+Method form (sugar via `class PtyHandle`):
+
+```stryke
+require "perl_pty_class.stk"
+my $h = PtyHandle::spawn("ssh user@host")
+$h->expect(qr/password:/, 30)
+$h->send("hunter2\n")
+$h->close()
+```
+
+Table form (the actually-novel ergonomic — Tcl's `expect { ... }`
+block, in stryke):
+
+```stryke
+my $tag = $h->branch([
+    +{ re => qr/password:/, do => sub { $h->send($pw . "\n"); "got_pass" } },
+    +{ re => qr/yes\/no/,   do => sub { $h->send("yes\n");  "got_confirm" } },
+    +{ re => qr/denied/,    do => sub { die "auth failed" } },
+], 30)
+```
+
+### Phase 1 — `pty_spawn` / `pty_send` / `pty_read` / `pty_close`
+
+`nix::pty::openpty()` + raw `fork()` + `setsid` + `ioctl(TIOCSCTTY)` +
+`dup2` + `execvp` for the child. Parent gets the master fd
+non-blocking. Master/slave wrapped in a global registry keyed by
+`__pty_id__`. SIGTERM → 200ms wait → SIGKILL on close.
+
+### Phase 2 — `pty_expect(handle, qr/.../, timeout_secs)`
+
+Timeout-aware loop: try regex on accumulated buffer, else `select()`
+with remaining budget, drain non-blocking into buffer, retry. Returns
+matched substring on hit, `undef` on timeout/EOF. Strips Perl-style
+`(?^:...)` qr-stringification before compiling via the `regex` crate.
+
+### Phase 3 — `pty_expect_table(handle, [+{re=>…, do=>…}], timeout)`
+
+Walks every branch on every read tick; first match wins. Returns
+`+{matched=>"...", action=>$cv}` so the wrapper class can either run
+the closure (method form) or hand the pair back as-is (bare builtin
+form). Avoids calling stryke from inside a free Rust builtin.
+
+### Phase 4 — `pty_interact(handle)`
+
+`tcgetattr` save → `cfmakeraw` apply (only when stdin is a tty) →
+`select()` on stdin + master with no timeout → forward both
+directions until either side EOFs or stdin sees `0x1d` (Ctrl-]).
+Restores tty mode on exit. Verified to exit cleanly when stdin is
+piped (no tty) so it works in unattended test harnesses.
+
+### Smoke
+
+```
+P1 (spawn/send/expect/close): ok (phase1)
+P2 (timeout):                 ok
+P3 (table form):              ok (pass_branch)
+P4 (interact graceful):       ok
+```
+
+Run via `stryke` against a fake-login shell script (`username:` →
+`password: hunter2` → `welcome, $u`); cluster fanout via `pfor` lands
+in Phase 5.
+
+### Phase 5 (next) — cluster + Windows
+
+- ConPTY (Windows) — separate code path, ~1 week
+- `pfor @hosts -> $h { my $p = pty_spawn("ssh $h"); ... }`
+  benchmark vs Ansible to back the "infra automation at scale" pitch
+- `pty_after_eof($h, $cb)` — async reaper for fanout
+- VTE state machine for ANSI strip (currently raw bytes only)
+
+---
+
 ## Session Context (2026-04-26)
 
 This came out of a "what killer features do other languages have that Stryke doesn't?" brainstorm. Most features from other languages are already covered:
