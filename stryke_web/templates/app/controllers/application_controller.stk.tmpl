@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# app/controllers/application_controller.stk — base controller for {{app_name}}.
+#
+# Every generated controller extends this class. Filters and helpers
+# defined here are inherited app-wide. Equivalent to Rails'
+# `ApplicationController < ActionController::Base` — PASS 1 keeps the
+# class plain (no framework base yet); subsequent passes add filters,
+# layouts, and the `Controller` runtime base class.
+
+class ApplicationController {
+    fn current_user {
+        # Look up the signed-in user via session. Override in your auth module.
+        undef
+    }
+
+    fn signed_in {
+        defined $self->current_user
+    }
+
+    fn authenticate {
+        unless ($self->signed_in) {
+            web_redirect("/login")
+        }
+    }
+}

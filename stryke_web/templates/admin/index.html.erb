@@ -1,0 +1,7 @@
+<h1>Admin</h1>
+<p>Pick a table to view its rows.</p>
+<ul class="admin-tables">
+    <% for my $t (@$tables) { %>
+        <li><a href="/admin/<%= web_h($t) %>"><%= web_h($t) %></a></li>
+    <% } %>
+</ul>

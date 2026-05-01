@@ -1,0 +1,9 @@
+<form action="<%= ${{singular_snake}}->{id} ? \"/{{plural_snake}}/${\ ${{singular_snake}}->{id}}\" : \"/{{plural_snake}}\" %>" method="post">
+    <% if (${{singular_snake}}->{id}) { %>
+        <input type="hidden" name="_method" value="patch">
+    <% } %>
+
+{{form_fields}}
+
+    <button type="submit"><%= ${{singular_snake}}->{id} ? "Update" : "Create" %> {{singular_title}}</button>
+</form>

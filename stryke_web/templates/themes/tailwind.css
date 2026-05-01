@@ -1,0 +1,8 @@
+/* Tailwind theme — uses the Play CDN (no build step). Project-local
+   overrides go below; the layout pulls the CDN script. */
+body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+.flash-notice { padding: 8px 12px; margin-bottom: 12px; background: #ecfdf5; color: #064e3b; border-left: 4px solid #10b981; border-radius: 4px; }
+.flash-alert  { padding: 8px 12px; margin-bottom: 12px; background: #fef2f2; color: #7f1d1d; border-left: 4px solid #ef4444; border-radius: 4px; }
+table.app-table { width: 100%; border-collapse: collapse; }
+table.app-table th, table.app-table td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+table.app-table th { background: #f9fafb; font-weight: 600; }

@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# config/application.stk — boot-time configuration for {{app_name}}.
+#
+# Loaded once before the server starts (or once per dev-mode reload).
+# This is where you wire framework defaults, autoload paths, middleware,
+# secret keys, and anything that must be set before the first request.
+
+web_application_config(+{
+    name        => "{{app_name}}",
+    environment => $ENV{STRYKE_ENV} // "development",
+    time_zone   => "UTC",
+    locale      => "en",
+
+    # Autoload — directories whose .stk files are require'd lazily on
+    # first reference to a class defined in them. Mirrors Rails' Zeitwerk.
+    autoload_paths => [
+        "app/controllers",
+        "app/models",
+        "app/helpers",
+        "app/jobs",
+        "app/mailers",
+        "app/channels",
+    ],
+
+    # Middleware — runs in order on every request before the router.
+    # Each entry is a sub name or coderef receiving (req, next).
+    middleware => [
+        "log_request",
+        "rescue_from_errors",
+        "session_cookie",
+    ],
+
+    # Secret keys — environment-aware. Generated keys live in
+    # `config/credentials.stk.enc` (encrypted).
+    secret_key_base => $ENV{SECRET_KEY_BASE} // "",
+})

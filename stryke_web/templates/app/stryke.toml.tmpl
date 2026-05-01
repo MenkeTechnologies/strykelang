@@ -1,0 +1,17 @@
+# stryke.toml — manifest for {{app_name}} (analog of Gemfile / package.json).
+# Tracks framework version + adapter choices so deploys stay reproducible.
+
+[app]
+name        = "{{app_name}}"
+stryke      = ">= 0.10"
+framework   = "stryke_web"
+
+[database]
+adapter = "{{database}}"
+
+[features]
+# Toggle bundled subsystems. Disabling shrinks the runtime.
+mailer    = true
+jobs      = true
+channels  = true
+encrypted = true

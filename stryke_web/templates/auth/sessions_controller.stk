@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# app/controllers/sessions_controller.stk — login + logout flow.
+
+class SessionsController extends ApplicationController {
+    fn new {
+        web_render(template => "sessions/new", locals => +{})
+    }
+
+    fn create {
+        my $p = web_params()
+        my $r = User::sign_in($p->{email} // "", $p->{password} // "")
+        if ($r->{ok}) {
+            web_flash_set("notice", "Welcome back!")
+            web_redirect("/")
+        } else {
+            web_flash_set("alert", $r->{error})
+            web_redirect("/login")
+        }
+    }
+
+    fn destroy {
+        User::sign_out()
+        web_flash_set("notice", "Signed out.")
+        web_redirect("/")
+    }
+}

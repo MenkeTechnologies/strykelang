@@ -248,12 +248,12 @@ pub(crate) fn sqlite_dispatch(
     }
 }
 
-fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlResult<usize> {
+pub(crate) fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlResult<usize> {
     conn.execute(sql, rusqlite::params_from_iter(params.iter()))
         .map_err(|e| PerlError::runtime(format!("sqlite exec: {}", e), 0))
 }
 
-fn query_sql(conn: &Connection, sql: &str, params: &[Value], line: usize) -> PerlResult<PerlValue> {
+pub(crate) fn query_sql(conn: &Connection, sql: &str, params: &[Value], line: usize) -> PerlResult<PerlValue> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;
@@ -286,7 +286,7 @@ fn query_sql(conn: &Connection, sql: &str, params: &[Value], line: usize) -> Per
     Ok(PerlValue::array(rows_out))
 }
 
-fn perl_to_sql_value(v: &PerlValue) -> Value {
+pub(crate) fn perl_to_sql_value(v: &PerlValue) -> Value {
     if v.is_undef() {
         return Value::Null;
     }
@@ -305,7 +305,7 @@ fn perl_to_sql_value(v: &PerlValue) -> Value {
     Value::Text(v.to_string())
 }
 
-fn sqlite_value_to_perl(v: Value) -> PerlValue {
+pub(crate) fn sqlite_value_to_perl(v: Value) -> PerlValue {
     match v {
         Value::Null => PerlValue::UNDEF,
         Value::Integer(i) => PerlValue::integer(i),

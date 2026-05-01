@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# app/controllers/users_controller.stk — signup flow.
+
+class UsersController extends ApplicationController {
+    fn new {
+        web_render(template => "users/new", locals => +{})
+    }
+
+    fn create {
+        my $p = web_permit(web_params(), "name", "email", "password")
+        my $r = User::register($p)
+        if ($r->{ok}) {
+            web_session_set("user_id", $r->{user}->{id})
+            web_session_set("user_email", $r->{user}->{email})
+            web_flash_set("notice", "Account created — welcome!")
+            web_redirect("/")
+        } else {
+            web_flash_set("alert", $r->{error})
+            web_redirect("/signup")
+        }
+    }
+}

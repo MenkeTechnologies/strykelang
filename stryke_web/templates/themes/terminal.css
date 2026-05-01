@@ -1,0 +1,140 @@
+/* Terminal theme — green-on-black phosphor CRT. Looks like a VT220
+   that decided to render web apps. Pairs well with `--api` mode. */
+
+:root {
+    --bg: #000a05;
+    --green: #33ff66;
+    --green-bright: #b6ffcc;
+    --green-dim: #1d6b39;
+    --amber: #ffb000;
+    --red: #ff3030;
+    --border: #0e3d22;
+    --text: #66ff99;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+::selection { background: var(--green); color: var(--bg); }
+
+body {
+    font-family: 'VT323', 'Share Tech Mono', 'Courier New', ui-monospace, monospace;
+    background: var(--bg);
+    background-image:
+        radial-gradient(ellipse at center, rgba(51, 255, 102, 0.04) 0%, transparent 70%),
+        repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(51, 255, 102, 0.03) 2px, rgba(51, 255, 102, 0.03) 3px);
+    color: var(--text);
+    line-height: 1.45;
+    min-height: 100vh;
+    text-shadow: 0 0 4px rgba(51, 255, 102, 0.5);
+}
+body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+    pointer-events: none;
+    z-index: 9998;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.6); }
+::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 0; }
+
+nav.app-nav {
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--green-dim);
+    background: rgba(0, 10, 5, 0.95);
+    margin-bottom: 18px;
+}
+nav.app-nav::before { content: '> '; color: var(--green-bright); }
+nav.app-nav a {
+    color: var(--green);
+    margin-right: 16px;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 14px;
+}
+nav.app-nav a:hover { color: var(--green-bright); text-shadow: 0 0 8px var(--green-bright); }
+nav.app-nav strong { color: var(--amber); }
+
+main, body > h1, body > div, body > p, body > table, body > form {
+    max-width: 90rem;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+h1, h2, h3 {
+    color: var(--green-bright);
+    text-shadow: 0 0 8px var(--green-bright);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 18px 0 12px;
+    font-weight: normal;
+}
+h1::before { content: '## '; color: var(--amber); }
+h2::before { content: '### '; color: var(--amber); }
+h3::before { content: '#### '; color: var(--amber); }
+
+a { color: var(--green-bright); text-decoration: underline; }
+a:hover { color: var(--amber); text-shadow: 0 0 8px var(--amber); }
+
+table, form, dl {
+    border: 1px dashed var(--green-dim);
+    background: rgba(0, 0, 0, 0.4);
+    margin: 14px 0;
+    padding: 12px;
+}
+table { width: 100%; border-collapse: collapse; padding: 0; }
+th, td {
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px dashed var(--green-dim);
+    color: var(--text);
+}
+th { color: var(--green-bright); text-transform: uppercase; letter-spacing: 1px; font-size: 13px; }
+tbody tr:hover td { color: var(--green-bright); background: rgba(51, 255, 102, 0.05); }
+
+input, textarea, select {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--green-bright);
+    border: 1px solid var(--green-dim);
+    border-radius: 0;
+    font-family: 'VT323', 'Share Tech Mono', ui-monospace, monospace;
+    font-size: 16px;
+    text-shadow: 0 0 4px rgba(51, 255, 102, 0.5);
+}
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 10px var(--green);
+}
+textarea { min-height: 120px; resize: vertical; }
+
+button, .btn {
+    padding: 6px 16px;
+    background: transparent;
+    color: var(--green-bright);
+    border: 1px solid var(--green);
+    border-radius: 0;
+    font-family: 'VT323', 'Share Tech Mono', ui-monospace, monospace;
+    font-size: 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 0 4px var(--green-bright);
+}
+button:hover { background: var(--green); color: var(--bg); text-shadow: none; }
+button::before { content: '['; }
+button::after  { content: ']'; }
+
+label { display: block; color: var(--amber); text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 4px; }
+form > div { margin-bottom: 12px; }
+
+.flash-notice { margin: 12px 0; padding: 8px 12px; border-left: 2px solid var(--green); background: rgba(51, 255, 102, 0.06); color: var(--green-bright); }
+.flash-alert  { margin: 12px 0; padding: 8px 12px; border-left: 2px solid var(--red); background: rgba(255, 48, 48, 0.06); color: var(--red); }
+
+.admin-tables { columns: 4; column-gap: 20px; list-style: none; padding: 12px; }
+.admin-tables a { display: block; padding: 4px 8px; color: var(--green); }
+.admin-tables a::before { content: '> '; color: var(--amber); }
+.admin-tables a:hover { color: var(--green-bright); }

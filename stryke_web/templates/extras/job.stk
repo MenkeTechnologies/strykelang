@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# app/jobs/{{file_stem}}_job.stk — background job stub.
+# Stryke's parallel primitives (`pmap`, `pfor`, channels) are the runtime
+# the framework will use to drive the queue. PASS 9 ships `web_enqueue`
+# + a worker pool.
+
+class {{class_name}} {
+    fn Self.perform_later($args) {
+        # web_enqueue("{{class_name}}", $args)  # PASS 9
+        Self::perform_now($args)
+    }
+
+    fn Self.perform_now($args) {
+        # TODO: do the work for $args.
+    }
+}

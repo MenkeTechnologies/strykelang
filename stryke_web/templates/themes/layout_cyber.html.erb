@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{theme_name}} :: stryke_web</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/application.css">
+    <link rel="stylesheet" href="/assets/admin.css">
+    <%= web_csrf_meta_tag() %>
+</head>
+<body>
+    <nav class="app-nav">
+        <a href="/">Home</a>
+        <a href="/admin">Admin</a>
+        <a href="/health">Health</a>
+        <% if (web_session_get("user_id")) { %>
+            <span style="float:right">
+                <strong><%= web_h(web_session_get("user_email") // "user") %></strong>
+                — <%= web_button_to("Sign out", "/logout", method => "delete") %>
+            </span>
+        <% } else { %>
+            <span style="float:right">
+                <a href="/login">Log in</a>
+                <a href="/signup">Sign up</a>
+            </span>
+        <% } %>
+    </nav>
+
+    <main>
+        <% if (web_flash_get("notice")) { %>
+            <div class="flash-notice"><%= web_h(web_flash_get("notice")) %></div>
+        <% } %>
+        <% if (web_flash_get("alert")) { %>
+            <div class="flash-alert"><%= web_h(web_flash_get("alert")) %></div>
+        <% } %>
+
+        <%= yield %>
+    </main>
+</body>
+</html>

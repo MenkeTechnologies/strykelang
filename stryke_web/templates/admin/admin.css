@@ -1,0 +1,7 @@
+/* Admin panel styles. */
+.admin-tables { columns: 3; column-gap: 32px; list-style: none; padding-left: 0; }
+.admin-tables li { padding: 4px 0; }
+.admin-tables a { display: block; padding: 4px 8px; border-radius: 4px; }
+.admin-tables a:hover { background: rgba(0,0,0,0.05); }
+.app-table { font-size: 13px; }
+.app-table td { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# config/routes.stk — request routing for {{app_name}}.
+#
+# DSL (each call registers one route in the global router):
+#     web_route "GET    /path", "controller#action"
+#     web_route "POST   /path", "controller#action"
+#     web_resources "posts"           # full REST scaffold (7 routes)
+#     web_root "controller#action"    # GET / shortcut
+#
+# `controller#action` resolves to {ControllerName}Controller's action method.
+
+# Default landing page — replace with `web_root "posts#index"` etc.
+web_root "welcome#index"
+
+# Generators add routes here. Don't worry about ordering for static
+# paths — `:id` placeholders only match a single segment, so the route
+# table can stay as-is. For overlapping prefixes, declare the more
+# specific route first.

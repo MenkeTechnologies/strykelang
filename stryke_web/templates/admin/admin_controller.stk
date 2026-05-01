@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# app/controllers/admin_controller.stk — auto-generated CRUD admin.
+#
+# Lists every model, paginates rows, lets you click into any table.
+# Read-only for v0; PASS 8 wires editing once `web_render(:layout)`
+# and form generation are pulled into the framework.
+
+class AdminController extends ApplicationController {
+    fn Self.tables { [{{table_list}}] }
+
+    fn index {
+        web_render(template => "admin/index", locals => +{ tables => AdminController::tables() })
+    }
+
+    fn table {
+        my $name = web_params()->{table}
+        my $allowed = 0
+        for my $t (@{ AdminController::tables() }) { $allowed = 1 if $t eq $name }
+        unless ($allowed) {
+            web_flash_set("alert", "unknown table: $name")
+            web_redirect("/admin")
+            return
+        }
+        my $rows = web_db_query("SELECT * FROM $name ORDER BY id DESC LIMIT 50")
+        my $count = (web_db_query("SELECT count(*) AS c FROM $name"))->[0]->{c}
+        web_render(
+            template => "admin/table",
+            locals => +{
+                table => $name,
+                rows  => $rows,
+                count => $count,
+            },
+        )
+    }
+}

@@ -1,0 +1,23 @@
+# config/database.toml — connection settings per environment.
+# Mirrors Rails' config/database.yml.
+#
+# Production uses `DATABASE_URL` env override when set. Dev/test use the
+# adapter+path declared here. SQLite paths are relative to the app root.
+
+[development]
+adapter = "{{database}}"
+database = "db/{{app_name}}_development.sqlite3"
+pool = 5
+timeout = 5000
+
+[test]
+adapter = "{{database}}"
+database = "db/{{app_name}}_test.sqlite3"
+pool = 5
+timeout = 5000
+
+[production]
+adapter = "{{database}}"
+database = "db/{{app_name}}_production.sqlite3"
+pool = 25
+timeout = 5000
