@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Dice game probabilities
+# P(player A wins): A throws n1 dice, B throws n2 dice. Compare totals; A wins on strict greater.
+
+fn Rosetta::DiceProb::distribution($n_dice, $faces) {
+    # Returns hash: total -> count of outcomes.
+    my %dist
+    $dist{0} = 1
+    for (1..$n_dice) {
+        my %next
+        for my $sum (keys %dist) {
+            for my $f (1..$faces) {
+                my $key = $sum + $f
+                $next{$key} = ($next{$key} // 0) + $dist{$sum}
+            }
+        }
+        %dist = %next
+    }
+    %dist
+}
+
+fn Rosetta::DiceProb::win_prob($n1, $f1, $n2, $f2) {
+    my %da = Rosetta::DiceProb::distribution($n1, $f1)
+    my %db = Rosetta::DiceProb::distribution($n2, $f2)
+    my $total_a = 0
+    for my $v (values %da) { $total_a += $v }
+    my $total_b = 0
+    for my $v (values %db) { $total_b += $v }
+    my $wins = 0
+    for my $sa (keys %da) {
+        for my $sb (keys %db) {
+            $wins += $da{$sa} * $db{$sb} if $sa > $sb
+        }
+    }
+    $wins / ($total_a * $total_b)
+}
+
+# 9 4-sided vs 6 6-sided: classic Rosetta example, P(A wins) ≈ 0.5731...
+my $p1 = Rosetta::DiceProb::win_prob(9, 4, 6, 6)
+assert_ok abs($p1 - 0.5731440767) < 1e-6, "9d4 vs 6d6"
+
+# 5 10-sided vs 6 7-sided: classic Rosetta example, P(A wins) ≈ 0.6427886287
+my $p2 = Rosetta::DiceProb::win_prob(5, 10, 6, 7)
+assert_ok abs($p2 - 0.6427886287) < 1e-6, "5d10 vs 6d7"
+
+# Symmetry sanity: equal dice -> P(win) < 0.5 (because ties exist)
+my $p3 = Rosetta::DiceProb::win_prob(2, 6, 2, 6)
+assert_ok $p3 < 0.5 && $p3 > 0.4, "2d6 vs 2d6 has ties"
+
+test_run

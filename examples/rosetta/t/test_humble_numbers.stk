@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Humble numbers — positive integers whose only prime factors are 2,3,5,7
+
+fn Rosetta::Humble::is_humble($n) {
+    return 0 if $n < 1
+    for my $p (2, 3, 5, 7) {
+        while ($n % $p == 0) { $n = int($n / $p) }
+    }
+    $n == 1
+}
+
+fn Rosetta::Humble::first_n($count) {
+    my @res
+    my $n = 1
+    while (len(@res) < $count) {
+        push @res, $n if Rosetta::Humble::is_humble($n)
+        $n += 1
+    }
+    @res
+}
+
+# OEIS A002473: 1,2,3,4,5,6,7,8,9,10,12,14,15,16,18,20,21,...
+my @first17 = Rosetta::Humble::first_n(17)
+assert_eq join(",", @first17),
+    "1,2,3,4,5,6,7,8,9,10,12,14,15,16,18,20,21",
+    "first 17 humbles"
+
+assert_ok  Rosetta::Humble::is_humble(1),    "1 humble"
+assert_ok  Rosetta::Humble::is_humble(105),  "105 = 3*5*7"
+assert_ok !Rosetta::Humble::is_humble(11),   "11 not humble"
+assert_ok !Rosetta::Humble::is_humble(143),  "143=11*13 not humble"
+
+test_run

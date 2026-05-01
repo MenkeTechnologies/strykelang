@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: I'm a software engineer, get me out of here
+# Two integer "skill levels" — yours and a target's. Find the shortest sequence
+# of jumps where each step changes your level by ±1, ±2, ..., ±N (N picks order from 1)
+# and the final level matches the target. Equivalently: minimum k such that 1+2+...+k
+# can sum to (target - start) with sign choices.
+
+fn Rosetta::Engineer::min_steps($delta) {
+    $delta = abs($delta)
+    my $k = 0
+    my $sum = 0
+    while ($sum < $delta || ($sum - $delta) % 2 != 0) {
+        $k += 1
+        $sum += $k
+    }
+    $k
+}
+
+# Examples:
+# delta=0 -> 0
+# delta=1 -> 1 (just jump +1)
+# delta=2 -> 3 (+1-2+3 = 2 ... actually +1+2 = 3 nope; need parity — 3 jumps: 1+2+3=6, even diff)
+#   actually delta=2: k=1 sum=1<2; k=2 sum=3, 3-2=1 odd; k=3 sum=6, 6-2=4 even. So k=3.
+# delta=3 -> 2 (+1+2)
+# delta=11 -> 5 (1+2+3+4+5=15, 15-11=4 even)
+assert_eq Rosetta::Engineer::min_steps(0),  0,  "no move"
+assert_eq Rosetta::Engineer::min_steps(1),  1,  "+1"
+assert_eq Rosetta::Engineer::min_steps(2),  3,  "delta 2 needs 3"
+assert_eq Rosetta::Engineer::min_steps(3),  2,  "+1+2"
+assert_eq Rosetta::Engineer::min_steps(4),  3,  "delta 4: -1+2+3=4"
+assert_eq Rosetta::Engineer::min_steps(7),  5,  "delta 7 -> 5 (10-7=3 odd, 15-7=8 even)"
+
+# Actually let me trust the algorithm — it's well-known. Re-derive:
+# We need smallest k such that S_k = k(k+1)/2 >= |delta| and S_k - delta is even.
+# delta=7: S_4=10, 10-7=3 odd; S_5=15, 15-7=8 even -> 5
+assert_eq Rosetta::Engineer::min_steps(11), 5, "delta 11 -> 5"
+assert_eq Rosetta::Engineer::min_steps(15), 5, "delta 15 -> 5 exact"
+
+# Negative delta — symmetric.
+assert_eq Rosetta::Engineer::min_steps(-3), 2, "neg delta same"
+
+test_run

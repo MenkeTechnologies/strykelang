@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Currying
+
+fn Rosetta::Currying::curry2($f) {
+    fn { my $a = $_; fn { $f->($a, $_) } }
+}
+
+fn Rosetta::Currying::curry3($f) {
+    fn { my $a = $_; fn { my $b = $_; fn { $f->($a, $b, $_) } } }
+}
+
+fn Math::add($a, $b) { $a + $b }
+fn Math::add3($a, $b, $c) { $a + $b + $c }
+
+my $add  = Rosetta::Currying::curry2(\&Math::add)
+my $inc  = $add->(1)
+my $add5 = $add->(5)
+assert_eq $inc->(10),  11, "curried add 1+10"
+assert_eq $add5->(7),  12, "curried add 5+7"
+
+my $add3 = Rosetta::Currying::curry3(\&Math::add3)
+assert_eq $add3->(1)->(2)->(3), 6, "3-curry 1+2+3"
+assert_eq $add3->(10)->(20)->(30), 60, "3-curry 10+20+30"
+
+# pipeline form: 4 |> partial-applied add
+my $apply_inc = $inc
+my $r = 4 |> $apply_inc
+assert_eq $r, 5, "pipe through curried inc"
+
+test_run

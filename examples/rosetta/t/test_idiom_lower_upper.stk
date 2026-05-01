@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Idiomatically determine all the lowercase and uppercase letters
+
+fn Rosetta::IdiomCase::lowers() {
+    ~> 0:127 grep { my $c = chr(_); $c =~ /[a-z]/ } map { chr(_) } |> join ""
+}
+
+fn Rosetta::IdiomCase::uppers() {
+    ~> 0:127 grep { my $c = chr(_); $c =~ /[A-Z]/ } map { chr(_) } |> join ""
+}
+
+fn Rosetta::IdiomCase::is_letter($c) {
+    $c =~ /^[A-Za-z]$/
+}
+
+assert_eq Rosetta::IdiomCase::lowers(),
+    "abcdefghijklmnopqrstuvwxyz",
+    "all 26 lowercase ASCII"
+assert_eq Rosetta::IdiomCase::uppers(),
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "all 26 uppercase ASCII"
+assert_eq length(Rosetta::IdiomCase::lowers()), 26, "26 lowers"
+assert_eq length(Rosetta::IdiomCase::uppers()), 26, "26 uppers"
+
+assert_ok  Rosetta::IdiomCase::is_letter("a"), "a"
+assert_ok  Rosetta::IdiomCase::is_letter("Z"), "Z"
+assert_ok !Rosetta::IdiomCase::is_letter("3"), "3"
+assert_ok !Rosetta::IdiomCase::is_letter("!"), "!"
+
+test_run

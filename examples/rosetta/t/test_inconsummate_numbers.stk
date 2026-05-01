@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Inconsummate numbers in base 10
+# n is inconsummate if there's no positive integer x such that x / digit_sum(x) == n.
+
+fn Rosetta::Inconsummate::digit_sum($n) {
+    my $s = 0
+    my $x = $n
+    while ($x > 0) { $s += $x % 10; $x = int($x / 10) }
+    $s
+}
+
+# A bound: x ≤ n * digit_sum_max(x). For digit-sum at most 9k for x with k digits,
+# x = n*ds(x). Search reasonable range; for first 50 incons. range below 5000 is enough.
+fn Rosetta::Inconsummate::is_inconsummate($n) {
+    return 0 if $n < 1
+    my $limit = $n * 81 + 10  # 81 ≈ digit_sum max for 9-digit, sufficient buffer
+    for my $x (1..$limit) {
+        my $ds = Rosetta::Inconsummate::digit_sum($x)
+        return 0 if $ds > 0 && $x == $n * $ds
+    }
+    1
+}
+
+fn Rosetta::Inconsummate::first_n($count) {
+    my @res
+    my $n = 1
+    while (len(@res) < $count) {
+        push @res, $n if Rosetta::Inconsummate::is_inconsummate($n)
+        $n += 1
+    }
+    @res
+}
+
+# OEIS A003635: 62, 63, 65, 75, 84, 95, 161, 173, 195, 216, ...
+my @first10 = Rosetta::Inconsummate::first_n(10)
+assert_eq join(",", @first10),
+    "62,63,65,75,84,95,161,173,195,216",
+    "first 10 inconsummate"
+
+assert_ok  Rosetta::Inconsummate::is_inconsummate(62),  "62 inconsummate"
+assert_ok  Rosetta::Inconsummate::is_inconsummate(173), "173 inconsummate"
+# 100 is consummate: 100*1 = 100 with digit sum 1? No — 100/(1+0+0)=100 → x=100, ds=1, 100/1=100. Match.
+assert_ok !Rosetta::Inconsummate::is_inconsummate(100), "100 consummate via x=100"
+# 1 is consummate: x=1, ds=1, 1/1=1.
+assert_ok !Rosetta::Inconsummate::is_inconsummate(1),   "1 consummate"
+
+test_run

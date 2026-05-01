@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Exponentiation operator
+
+fn Rosetta::Exp::int_pow($base, $exp) {
+    my $r = 1
+    while ($exp > 0) {
+        if ($exp % 2 == 1) { $r *= $base }
+        $base *= $base
+        $exp = int($exp / 2)
+    }
+    $r
+}
+
+fn Rosetta::Exp::float_pow($base, $exp) {
+    exp($exp * log($base))
+}
+
+# Native ** operator
+assert_eq 2 ** 10,    1024, "2^10"
+assert_eq 3 ** 5,     243,  "3^5"
+assert_eq 5 ** 0,     1,    "x^0=1"
+assert_ok abs(2 ** 0.5 - 1.41421356) < 1e-7, "sqrt(2)"
+
+# Integer fast-power
+assert_eq Rosetta::Exp::int_pow(2, 10),    1024, "fast 2^10"
+assert_eq Rosetta::Exp::int_pow(7, 4),     2401, "fast 7^4"
+assert_eq Rosetta::Exp::int_pow(13, 0),    1,    "fast x^0"
+
+# Float power
+assert_ok abs(Rosetta::Exp::float_pow(2, 0.5) - 1.41421356) < 1e-7, "fp sqrt 2"
+assert_ok abs(Rosetta::Exp::float_pow(10, 3) - 1000) < 1e-9, "fp 10^3"
+
+# Pipeline form
+my $r = 2 |> Rosetta::Exp::int_pow(16)
+assert_eq $r, 65536, "pipe 2^16"
+
+test_run

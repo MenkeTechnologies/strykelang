@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Casting out nines
+
+fn Rosetta::CastingNines::digit_sum($n) {
+    my $s = 0
+    my $x = abs($n)
+    while ($x > 0) {
+        $s += $x % 10
+        $x = int($x / 10)
+    }
+    $s
+}
+
+fn Rosetta::CastingNines::digital_root($n) {
+    my $x = $n
+    while ($x >= 10) {
+        $x = Rosetta::CastingNines::digit_sum($x)
+    }
+    $x
+}
+
+# CastingOutNines: a + b ≡ a' + b' (mod 9), a*b ≡ a'*b' (mod 9), where a' = digital root.
+fn Rosetta::CastingNines::check_add($a, $b, $sum) {
+    Rosetta::CastingNines::digital_root($a) + Rosetta::CastingNines::digital_root($b)
+        == Rosetta::CastingNines::digital_root($sum)
+        || (Rosetta::CastingNines::digital_root($a) + Rosetta::CastingNines::digital_root($b)) % 9
+            == Rosetta::CastingNines::digital_root($sum) % 9
+}
+
+assert_eq Rosetta::CastingNines::digit_sum(123),  6,  "digit-sum 123"
+assert_eq Rosetta::CastingNines::digit_sum(999),  27, "digit-sum 999"
+assert_eq Rosetta::CastingNines::digital_root(456), 6,  "dr 456"
+assert_eq Rosetta::CastingNines::digital_root(999), 9,  "dr 999"
+assert_eq Rosetta::CastingNines::digital_root(0),   0,  "dr 0"
+
+# 1234 + 5678 = 6912; dr(1234)=1, dr(5678)=8, dr(6912)=9 (also 1+8=9)
+assert_ok Rosetta::CastingNines::check_add(1234, 5678, 6912), "1234+5678 checks"
+# Wrong sum: 1234+5678 != 6913 — dr(6913)=1, but dr(1234)+dr(5678)=9
+assert_ok !Rosetta::CastingNines::check_add(1234, 5678, 6913), "wrong sum fails check"
+
+test_run

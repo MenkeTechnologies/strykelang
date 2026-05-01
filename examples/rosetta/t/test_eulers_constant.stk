@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Euler's constant 0.5772... (γ)
+# γ = lim_{N→∞} (sum_{k=1}^N 1/k - ln N)
+
+fn Rosetta::EulerC::approx($N) {
+    my $h = 0
+    for my $k (1..$N) { $h += 1.0 / $k }
+    $h - log($N)
+}
+
+# Asymptotic refinement: γ ≈ H_N - ln(N) - 1/(2N) + 1/(12 N^2) - 1/(120 N^4)
+fn Rosetta::EulerC::asymptotic($N) {
+    my $h = 0
+    for my $k (1..$N) { $h += 1.0 / $k }
+    my $g = $h - log($N) - 1.0/(2*$N) + 1.0/(12*$N*$N) - 1.0/(120*$N**4)
+    $g
+}
+
+# Reference (15 digits): 0.577215664901533
+my $ref = 0.5772156649015329
+
+# Plain harmonic-minus-log converges slowly.
+my $a1000 = Rosetta::EulerC::approx(1000)
+assert_ok abs($a1000 - $ref) < 1e-3, "1000 terms within 1e-3"
+
+# Asymptotic correction nails ~1e-12 with 100 terms.
+my $b100 = Rosetta::EulerC::asymptotic(100)
+assert_ok abs($b100 - $ref) < 1e-10, "asymptotic 100 within 1e-10"
+
+# Asymptotic with 1000 terms — even tighter.
+my $b1000 = Rosetta::EulerC::asymptotic(1000)
+assert_ok abs($b1000 - $ref) < 1e-13, "asymptotic 1000 within 1e-13"
+
+test_run

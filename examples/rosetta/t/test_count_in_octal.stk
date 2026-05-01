@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Count in octal
+
+fn Rosetta::CountOctal::to_octal($n) {
+    return "0" if $n == 0
+    my $s = ""
+    my $x = $n
+    while ($x > 0) {
+        $s = ($x % 8) . $s
+        $x = int($x / 8)
+    }
+    $s
+}
+
+fn Rosetta::CountOctal::range($lo, $hi) {
+    ~> $lo:$hi map { Rosetta::CountOctal::to_octal(_) }
+}
+
+assert_eq Rosetta::CountOctal::to_octal(0),  "0",   "0"
+assert_eq Rosetta::CountOctal::to_octal(7),  "7",   "7"
+assert_eq Rosetta::CountOctal::to_octal(8),  "10",  "8 -> 10"
+assert_eq Rosetta::CountOctal::to_octal(64), "100", "64 -> 100"
+assert_eq Rosetta::CountOctal::to_octal(511),"777", "511 -> 777"
+assert_eq Rosetta::CountOctal::to_octal(512),"1000","512 -> 1000"
+
+my @first17 = Rosetta::CountOctal::range(0, 16)
+assert_eq join(",", @first17),
+    "0,1,2,3,4,5,6,7,10,11,12,13,14,15,16,17,20",
+    "0..16 in octal"
+
+test_run

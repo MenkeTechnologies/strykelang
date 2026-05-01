@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Distance and Bearing — great-circle distance and initial bearing.
+
+fn Rosetta::DistBearing::pi() { 3.141592653589793 }
+fn Rosetta::DistBearing::deg2rad($d) { $d * Rosetta::DistBearing::pi() / 180 }
+fn Rosetta::DistBearing::rad2deg($r) { $r * 180 / Rosetta::DistBearing::pi() }
+
+# Great-circle distance, haversine, in km. R ≈ 6371.
+fn Rosetta::DistBearing::distance($lat1, $lon1, $lat2, $lon2) {
+    my $r = 6371.0
+    my $p1 = Rosetta::DistBearing::deg2rad($lat1)
+    my $p2 = Rosetta::DistBearing::deg2rad($lat2)
+    my $dp = Rosetta::DistBearing::deg2rad($lat2 - $lat1)
+    my $dl = Rosetta::DistBearing::deg2rad($lon2 - $lon1)
+    my $a  = sin($dp/2) ** 2 + cos($p1) * cos($p2) * sin($dl/2) ** 2
+    my $c  = 2 * atan2(sqrt($a), sqrt(1 - $a))
+    $r * $c
+}
+
+# Initial bearing in degrees (0..360).
+fn Rosetta::DistBearing::bearing($lat1, $lon1, $lat2, $lon2) {
+    my $p1 = Rosetta::DistBearing::deg2rad($lat1)
+    my $p2 = Rosetta::DistBearing::deg2rad($lat2)
+    my $dl = Rosetta::DistBearing::deg2rad($lon2 - $lon1)
+    my $y  = sin($dl) * cos($p2)
+    my $x  = cos($p1) * sin($p2) - sin($p1) * cos($p2) * cos($dl)
+    my $b  = Rosetta::DistBearing::rad2deg(atan2($y, $x))
+    ($b + 360) % 360
+}
+
+# London (51.5, -0.1) to Paris (48.85, 2.35) ≈ 343.5 km, bearing ≈ 148°
+my $d_lp = Rosetta::DistBearing::distance(51.5, -0.1, 48.85, 2.35)
+my $b_lp = Rosetta::DistBearing::bearing(51.5, -0.1, 48.85, 2.35)
+assert_ok abs($d_lp - 343.5) < 5,    "London-Paris ~344 km"
+assert_ok abs($b_lp - 148.0) < 5,    "London-Paris bearing ~148°"
+
+# JFK (40.6, -73.8) to LHR (51.5, -0.5) ≈ 5550 km
+my $d_jfk = Rosetta::DistBearing::distance(40.6, -73.8, 51.5, -0.5)
+assert_ok abs($d_jfk - 5550) < 30,   "JFK-LHR ~5550 km"
+
+# Antipodal: (0,0) to (0,180) — half the great circle, ≈ π R
+my $d_anti = Rosetta::DistBearing::distance(0, 0, 0, 180)
+assert_ok abs($d_anti - 6371 * Rosetta::DistBearing::pi()) < 10, "antipodal half-circle"
+
+# Same point: distance 0
+assert_ok abs(Rosetta::DistBearing::distance(45, 45, 45, 45)) < 1e-9, "same point distance 0"
+
+test_run

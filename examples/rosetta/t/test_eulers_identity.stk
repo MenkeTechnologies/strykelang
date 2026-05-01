@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Euler's identity — e^(iπ) + 1 = 0
+
+fn Rosetta::EulerId::cexp_imag($theta) {
+    # e^(i*theta) = (cos theta, sin theta)
+    [cos($theta), sin($theta)]
+}
+
+fn Rosetta::EulerId::pi() { 3.141592653589793 }
+
+my $z = Rosetta::EulerId::cexp_imag(Rosetta::EulerId::pi())
+my $real_plus_one = $z->[0] + 1
+my $imag = $z->[1]
+
+assert_ok abs($real_plus_one) < 1e-12, "Re(e^iπ)+1 ≈ 0"
+assert_ok abs($imag) < 1e-12,           "Im(e^iπ) ≈ 0"
+
+# Half-angle: e^(iπ/2) ≈ (0, 1) = i
+my $half = Rosetta::EulerId::cexp_imag(Rosetta::EulerId::pi() / 2)
+assert_ok abs($half->[0]) < 1e-12, "Re(e^(iπ/2)) ≈ 0"
+assert_ok abs($half->[1] - 1) < 1e-12, "Im(e^(iπ/2)) ≈ 1"
+
+# Periodicity: e^(2πi) = 1
+my $two_pi = Rosetta::EulerId::cexp_imag(2 * Rosetta::EulerId::pi())
+assert_ok abs($two_pi->[0] - 1) < 1e-12, "Re(e^(2πi)) ≈ 1"
+assert_ok abs($two_pi->[1]) < 1e-12,     "Im(e^(2πi)) ≈ 0"
+
+test_run

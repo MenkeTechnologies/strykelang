@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Four is the number of letters in the ...
+# Iterating "X is the number of letters in '...'" eventually fixes at 4.
+
+fn Rosetta::FourLetters::word($n) {
+    my @ones = ("zero","one","two","three","four","five","six","seven","eight","nine",
+                "ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen",
+                "seventeen","eighteen","nineteen")
+    my @tens = ("","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety")
+    return $ones[$n] if $n < 20
+    return $tens[int($n / 10)] . ($n % 10 != 0 ? ($tens[int($n/10)] eq "" ? "" : " ") . $ones[$n % 10] : "") if $n < 100
+    "?"
+}
+
+fn Rosetta::FourLetters::letters_only($s) {
+    my $count = 0
+    for my $c (split("", $s)) {
+        $count += 1 if $c =~ /[A-Za-z]/
+    }
+    $count
+}
+
+fn Rosetta::FourLetters::next_n($n) {
+    Rosetta::FourLetters::letters_only(Rosetta::FourLetters::word($n))
+}
+
+# Convergence: every starting n reaches 4 (4 is the only fixed point).
+fn Rosetta::FourLetters::trail_to_four($start) {
+    my @trail = ($start)
+    my $n = $start
+    while ($n != 4) {
+        $n = Rosetta::FourLetters::next_n($n)
+        push @trail, $n
+        last if len(@trail) > 50  # safety
+    }
+    @trail
+}
+
+# letters_only("four")=4 — fixed point
+assert_eq Rosetta::FourLetters::letters_only("four"),    4, "four=4"
+assert_eq Rosetta::FourLetters::letters_only("twenty"),  6, "twenty=6"
+assert_eq Rosetta::FourLetters::letters_only("seventeen"), 9, "seventeen=9"
+
+assert_eq Rosetta::FourLetters::next_n(4),  4,  "4 -> 4"
+assert_eq Rosetta::FourLetters::next_n(5),  4,  "5 -> 4"
+assert_eq Rosetta::FourLetters::next_n(20), 6,  "20 -> 6 (twenty)"
+
+my @trail = Rosetta::FourLetters::trail_to_four(11)
+assert_eq $trail[len(@trail)-1], 4, "trail ends at 4"
+assert_ok len(@trail) < 10, "convergence quick"
+
+test_run

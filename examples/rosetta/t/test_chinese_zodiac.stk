@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chinese zodiac
+
+fn Rosetta::ChineseZodiac::animal($year) {
+    my @animals = ("Rat","Ox","Tiger","Rabbit","Dragon","Snake","Horse","Goat","Monkey","Rooster","Dog","Pig")
+    $animals[($year - 4) % 12]
+}
+
+fn Rosetta::ChineseZodiac::element($year) {
+    my @elements = ("Wood","Fire","Earth","Metal","Water")
+    $elements[(int(($year - 4) / 2)) % 5]
+}
+
+fn Rosetta::ChineseZodiac::yin_yang($year) {
+    $year % 2 == 0 ? "Yang" : "Yin"
+}
+
+fn Rosetta::ChineseZodiac::full($year) {
+    Rosetta::ChineseZodiac::element($year) . " "
+        . Rosetta::ChineseZodiac::animal($year) . " ("
+        . Rosetta::ChineseZodiac::yin_yang($year) . ")"
+}
+
+assert_eq Rosetta::ChineseZodiac::animal(1935),  "Pig",     "1935 Pig"
+assert_eq Rosetta::ChineseZodiac::animal(1949),  "Ox",      "1949 Ox"
+assert_eq Rosetta::ChineseZodiac::animal(1968),  "Monkey",  "1968 Monkey"
+assert_eq Rosetta::ChineseZodiac::animal(2017),  "Rooster", "2017 Rooster"
+assert_eq Rosetta::ChineseZodiac::animal(2024),  "Dragon",  "2024 Dragon"
+assert_eq Rosetta::ChineseZodiac::animal(1984),  "Rat",     "1984 Rat"
+
+assert_eq Rosetta::ChineseZodiac::element(1935), "Wood",  "1935 Wood"
+assert_eq Rosetta::ChineseZodiac::element(2024), "Wood",  "2024 Wood"
+assert_eq Rosetta::ChineseZodiac::yin_yang(2024),"Yang",  "2024 Yang"
+assert_eq Rosetta::ChineseZodiac::yin_yang(2025),"Yin",   "2025 Yin"
+
+assert_eq Rosetta::ChineseZodiac::full(2024), "Wood Dragon (Yang)", "2024 full"
+
+test_run

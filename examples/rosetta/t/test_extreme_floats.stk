@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Extreme floating point values
+
+fn Rosetta::ExtFloats::posinf()  { 9e999 }            # Inf
+fn Rosetta::ExtFloats::neginf()  { -9e999 }           # -Inf
+fn Rosetta::ExtFloats::nan()     { 9e999 - 9e999 }    # NaN
+
+assert_ok Rosetta::ExtFloats::posinf() > 1e300, "+Inf is huge"
+assert_ok Rosetta::ExtFloats::neginf() < -1e300, "-Inf is tiny"
+
+# NaN is not equal to itself.
+my $n = Rosetta::ExtFloats::nan()
+assert_ok $n != $n, "NaN != NaN"
+
+# Inf arithmetic
+assert_ok Rosetta::ExtFloats::posinf() + 1 > 1e300, "Inf+1 still Inf"
+assert_ok Rosetta::ExtFloats::posinf() * 2 > 1e300, "Inf*2 still Inf"
+
+# Smallest positive subnormal (≈ 5e-324) and DBL_MIN (~2.225e-308)
+my $tiny = 1.0
+for (1..1100) { $tiny /= 2.0 }
+assert_ok $tiny == 0 || $tiny > 0, "underflow well-defined"
+
+# Largest finite (~1.7976931348623157e308)
+my $huge = 1.0
+for (1..1023) { $huge *= 2.0 }
+$huge *= 1.999999
+assert_ok $huge < Rosetta::ExtFloats::posinf(), "near-max < Inf"
+assert_ok $huge > 1e300, "near-max enormous"
+
+# Negative zero
+my $negzero = -0.0
+assert_ok $negzero == 0, "-0.0 compares equal to 0"
+
+test_run

@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Evolutionary algorithm
+# Classic "weasel program": evolve a random string toward a target via mutation + selection.
+
+fn Rosetta::Evolve::charset() { "ABCDEFGHIJKLMNOPQRSTUVWXYZ " }
+
+fn Rosetta::Evolve::random_char() {
+    my $cs = Rosetta::Evolve::charset()
+    substr($cs, int(rand() * length($cs)), 1)
+}
+
+fn Rosetta::Evolve::random_string($len) {
+    ~> 1:$len map { Rosetta::Evolve::random_char() } |> join ""
+}
+
+fn Rosetta::Evolve::fitness($str, $target) {
+    my $score = 0
+    for my $i (0..length($target)-1) {
+        $score += 1 if substr($str, $i, 1) eq substr($target, $i, 1)
+    }
+    $score
+}
+
+fn Rosetta::Evolve::mutate($str, $rate) {
+    my @chars = split("", $str)
+    my @out = ~> @chars map {
+        rand() < $rate ? Rosetta::Evolve::random_char() : _
+    }
+    join("", @out)
+}
+
+fn Rosetta::Evolve::evolve($target, $pop_size, $rate) {
+    srand(42)
+    my $best = Rosetta::Evolve::random_string(length($target))
+    my $gens = 0
+    while ($best ne $target) {
+        $gens += 1
+        last if $gens > 5000  # safety
+        my @children = ~> 1:$pop_size map {
+            Rosetta::Evolve::mutate($best, $rate)
+        }
+        push @children, $best
+        my $best_score = Rosetta::Evolve::fitness($best, $target)
+        for my $c (@children) {
+            my $s = Rosetta::Evolve::fitness($c, $target)
+            if ($s > $best_score) { $best = $c; $best_score = $s }
+        }
+    }
+    [$best, $gens]
+}
+
+my $r = Rosetta::Evolve::evolve("HELLO WORLD", 50, 0.05)
+assert_eq $r->[0], "HELLO WORLD", "evolved to target"
+assert_ok $r->[1] > 0, "took some generations"
+assert_ok $r->[1] < 5000, "converged within budget"
+
+# Fitness on identical strings
+assert_eq Rosetta::Evolve::fitness("HELLO", "HELLO"), 5, "fitness identical"
+assert_eq Rosetta::Evolve::fitness("XELLO", "HELLO"), 4, "fitness off by 1"
+
+test_run

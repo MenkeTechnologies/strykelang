@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compare length of two strings
+
+fn Rosetta::CompareLength::shorter($a, $b) {
+    length($a) < length($b) ? $a : $b
+}
+
+fn Rosetta::CompareLength::cmp_len($a, $b) {
+    length($a) <=> length($b)
+}
+
+fn Rosetta::CompareLength::sort_by_length(@strs) {
+    ~> @strs sort { length($a) <=> length($b) }
+}
+
+assert_eq Rosetta::CompareLength::shorter("hi", "hello"), "hi", "shorter picks hi"
+assert_eq Rosetta::CompareLength::shorter("longer", "lo"), "lo", "shorter picks lo"
+assert_eq Rosetta::CompareLength::cmp_len("ab", "abc"), -1, "ab < abc"
+assert_eq Rosetta::CompareLength::cmp_len("abc", "ab"), 1,  "abc > ab"
+assert_eq Rosetta::CompareLength::cmp_len("xy", "ab"), 0,   "tie"
+
+my @sorted = Rosetta::CompareLength::sort_by_length("ccc","a","bb","dddd")
+assert_eq join(",", @sorted), "a,bb,ccc,dddd", "sorted by length"
+
+# pipeline form
+my @descending = ("alpha","beta","gammaring","delta")
+    |> sort { length($b) <=> length($a) }
+assert_eq $descending[0], "gammaring", "longest via pipe"
+
+test_run

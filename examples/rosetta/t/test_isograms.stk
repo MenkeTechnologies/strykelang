@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Isograms and heterograms
+
+fn Rosetta::Isograms::letter_freq($word) {
+    my %h
+    for my $c (split("", lc $word)) {
+        next unless $c =~ /[a-z]/
+        $h{$c} = ($h{$c} // 0) + 1
+    }
+    %h
+}
+
+fn Rosetta::Isograms::is_heterogram($word) {
+    my %f = Rosetta::Isograms::letter_freq($word)
+    for my $v (values %f) {
+        return 0 if $v > 1
+    }
+    1
+}
+
+fn Rosetta::Isograms::is_n_isogram($word, $n) {
+    my %f = Rosetta::Isograms::letter_freq($word)
+    return 0 unless len(keys %f) > 0
+    for my $v (values %f) {
+        return 0 unless $v == $n
+    }
+    1
+}
+
+assert_ok  Rosetta::Isograms::is_heterogram("subdermatoglyphic"), "all unique"
+assert_ok  Rosetta::Isograms::is_heterogram("uncopyrightable"),   "all unique"
+assert_ok !Rosetta::Isograms::is_heterogram("hello"),             "two l's"
+
+assert_ok  Rosetta::Isograms::is_n_isogram("aabb", 2),    "2-isogram"
+assert_ok  Rosetta::Isograms::is_n_isogram("abcd", 1),    "1-isogram (heterogram)"
+assert_ok !Rosetta::Isograms::is_n_isogram("aabbb", 2),   "mixed counts"
+assert_ok  Rosetta::Isograms::is_n_isogram("happenchance", 2), "happenchance is 2-iso"
+
+# pipeline filter
+my @words = ("hello","listen","quick","subdermatoglyphic","mom")
+my @hets = ~> @words grep { Rosetta::Isograms::is_heterogram(_) }
+assert_eq join(",", @hets), "listen,quick,subdermatoglyphic", "filter heterograms"
+
+test_run

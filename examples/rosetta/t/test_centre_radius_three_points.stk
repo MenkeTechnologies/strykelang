@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Centre and radius of a circle passing through 3 points
+
+fn Rosetta::CRThree::circle_thru($p1, $p2, $p3) {
+    my $ax = $p1->[0]; my $ay = $p1->[1]
+    my $bx = $p2->[0]; my $by = $p2->[1]
+    my $cx = $p3->[0]; my $cy = $p3->[1]
+    my $d = 2 * ($ax * ($by - $cy) + $bx * ($cy - $ay) + $cx * ($ay - $by))
+    return undef if abs($d) < 1e-12   # collinear
+    my $a2 = $ax**2 + $ay**2
+    my $b2 = $bx**2 + $by**2
+    my $c2 = $cx**2 + $cy**2
+    my $ux = ($a2 * ($by - $cy) + $b2 * ($cy - $ay) + $c2 * ($ay - $by)) / $d
+    my $uy = ($a2 * ($cx - $bx) + $b2 * ($ax - $cx) + $c2 * ($bx - $ax)) / $d
+    my $r = sqrt(($ux - $ax) ** 2 + ($uy - $ay) ** 2)
+    [$ux, $uy, $r]
+}
+
+# Triangle with right angle: (0,0), (4,0), (0,3) — circumcircle center at hypotenuse midpoint, radius = 2.5
+my $r1 = Rosetta::CRThree::circle_thru([0,0],[4,0],[0,3])
+assert_ok abs($r1->[0] - 2)   < 1e-9, "center x"
+assert_ok abs($r1->[1] - 1.5) < 1e-9, "center y"
+assert_ok abs($r1->[2] - 2.5) < 1e-9, "radius 2.5"
+
+# Equilateral around origin
+my $r2 = Rosetta::CRThree::circle_thru([1,0], [-0.5, 0.86602540378], [-0.5, -0.86602540378])
+assert_ok abs($r2->[0]) < 1e-7, "equilateral center x ≈ 0"
+assert_ok abs($r2->[1]) < 1e-7, "equilateral center y ≈ 0"
+assert_ok abs($r2->[2] - 1) < 1e-7, "equilateral radius ≈ 1"
+
+# Collinear should return undef
+my $r3 = Rosetta::CRThree::circle_thru([0,0],[1,1],[2,2])
+assert_ok !defined($r3), "collinear -> undef"
+
+test_run
