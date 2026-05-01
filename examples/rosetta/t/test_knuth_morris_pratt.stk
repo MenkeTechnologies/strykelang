@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knuth-Morris-Pratt string search
+
+fn Rosetta::KMP::compute_lps($pat) {
+    my @p = $pat |> chars
+    my $m = len(@p)
+    my @lps = ~> 1:$m map { 0 }
+    my $len = 0
+    my $i = 1
+    while ($i < $m) {
+        if ($p[$i] eq $p[$len]) {
+            $len++
+            $lps[$i] = $len
+            $i++
+        } else {
+            if ($len != 0) {
+                $len = $lps[$len - 1]
+            } else {
+                $lps[$i] = 0
+                $i++
+            }
+        }
+    }
+    \@lps
+}
+
+fn Rosetta::KMP::search($txt, $pat) {
+    my @t = $txt |> chars
+    my @p = $pat |> chars
+    my $n = len(@t)
+    my $m = len(@p)
+    if ($m == 0) { return [0] }
+    my $lps = Rosetta::KMP::compute_lps($pat)
+    my $i = 0
+    my $j = 0
+    my @indices
+    while ($i < $n) {
+        if ($p[$j] eq $t[$i]) {
+            $i++
+            $j++
+        }
+        if ($j == $m) {
+            push @indices, $i - $j
+            $j = $lps->[$j - 1]
+        } elsif ($i < $n && $p[$j] ne $t[$i]) {
+            if ($j != 0) {
+                $j = $lps->[$j - 1]
+            } else {
+                $i++
+            }
+        }
+    }
+    \@indices
+}
+
+my $indices = Rosetta::KMP::search("ABABDABACDABABCABAB", "ABABCABAB")
+assert_eq join(",", @$indices), "10", "single match"
+
+my $indices2 = Rosetta::KMP::search("aaaaa", "aa")
+assert_eq join(",", @$indices2), "0,1,2,3", "overlapping matches"
+
+my $indices3 = Rosetta::KMP::search("ABC ABCDAB ABCDABCDABDE", "ABCDABD")
+assert_eq join(",", @$indices3), "15", "search with partial matches"
+
+my $indices4 = Rosetta::KMP::search("hello", "world")
+assert_eq len(@$indices4), 0, "no match"
+
+test_run

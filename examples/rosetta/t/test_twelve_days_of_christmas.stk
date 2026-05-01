@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Twelve Days of Christmas
+
+my @_days = qw(first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth)
+my @_gifts = (
+    "twelve Drummers Drumming",
+    "eleven Pipers Piping",
+    "ten Lords a Leaping",
+    "nine Ladies Dancing",
+    "eight Maids a Milking",
+    "seven Swans a Swimming",
+    "six Geese a Laying",
+    "five Golden Rings",
+    "four Calling Birds",
+    "three French Hens",
+    "two Turtle Doves",
+    "a Partridge in a Pear Tree"
+)
+
+fn Rosetta::TwelveDays::verse($n) {
+    my $res = "On the " . $_days[$n-1] . " day of Christmas my true love gave to me:\n"
+    for my $i (~> (12-$n) : 11) {
+        my $gift = $_gifts[$i]
+        if ($n > 1 && $i == 11) { $res .= "and " }
+        $res .= "$gift" . ($i == 11 ? "." : ",\n")
+    }
+    $res
+}
+
+my $v1 = Rosetta::TwelveDays::verse(1)
+assert_ok $v1 =~ /first day/, "Verse 1 has first day"
+assert_ok $v1 =~ /a Partridge in a Pear Tree./, "Verse 1 ends correctly"
+
+my $v2 = Rosetta::TwelveDays::verse(2)
+assert_ok $v2 =~ /second day/, "Verse 2 has second day"
+assert_ok $v2 =~ /and a Partridge in a Pear Tree./, "Verse 2 has 'and'"
+
+test_run

@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Thabit numbers
+
+fn Rosetta::Thabit::generate($n) {
+    # Thabit number: 3 * 2^n - 1
+    my @res = ~> 0 : $n map { 3 * (2 ** _) - 1 }
+    \@res
+}
+
+my $thabit = Rosetta::Thabit::generate(5)
+assert_eq join(",", @$thabit), "2,5,11,23,47,95", "First 6 Thabit numbers"
+
+test_run

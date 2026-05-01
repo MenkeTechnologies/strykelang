@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Self-descriptive numbers
+
+fn Rosetta::SelfDescriptive::check($n) {
+    my $s = "$n"
+    my @d = split //, $s
+    my $len = len(@d)
+    my %counts
+    for my $x (@d) { $counts{$x}++ }
+    
+    for my $i (0..$len-1) {
+        my $val = $d[$i]
+        my $count = $counts{$i} || 0
+        if ($val != $count) { return 0 }
+    }
+    1
+}
+
+assert_ok Rosetta::SelfDescriptive::check(1210), "1210 is self-descriptive"
+assert_ok Rosetta::SelfDescriptive::check(2020), "2020 is self-descriptive"
+assert_ok Rosetta::SelfDescriptive::check(21200), "21200 is self-descriptive"
+assert_ok Rosetta::SelfDescriptive::check(3211000), "3211000 is self-descriptive"
+assert_ok !Rosetta::SelfDescriptive::check(1234), "1234 is not self-descriptive"
+
+test_run

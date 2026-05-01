@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gaussian elimination
+
+fn Rosetta::Gaussian::solve($a_in, $b_in) {
+    my $n = len(@$a_in)
+    my @a
+    for my $row (@$a_in) { push @a, [@$row] }
+    my @b = @$b_in
+
+    for my $i (0 .. $n - 1) {
+        my $max_el = abs($a[$i][$i])
+        my $max_row = $i
+        for my $k ($i + 1 .. $n - 1) {
+            if (abs($a[$k][$i]) > $max_el) {
+                $max_el = abs($a[$k][$i])
+                $max_row = $k
+            }
+        }
+
+        my $tmp = $a[$max_row]
+        $a[$max_row] = $a[$i]
+        $a[$i] = $tmp
+        my $tmp_b = $b[$max_row]
+        $b[$max_row] = $b[$i]
+        $b[$i] = $tmp_b
+
+        for my $k ($i + 1 .. $n - 1) {
+            my $c = -$a[$k][$i] / $a[$i][$i]
+            for my $j ($i .. $n - 1) {
+                if ($i == $j) {
+                    $a[$k][$j] = 0
+                } else {
+                    $a[$k][$j] += $c * $a[$i][$j]
+                }
+            }
+            $b[$k] += $c * $b[$i]
+        }
+    }
+
+    my @x
+    for (1..$n) { push @x, 0 }
+    for my $i (~> 0 : $n - 1 rev) {
+        $x[$i] = $b[$i] / $a[$i][$i]
+        for my $k (0 .. $i - 1) {
+            $b[$k] -= $a[$k][$i] * $x[$i]
+        }
+    }
+    \@x
+}
+
+my $a = [
+    [2, 1, -1],
+    [-3, -1, 2],
+    [-2, 1, 2]
+]
+my $b = [8, -11, -3]
+my $x = Rosetta::Gaussian::solve($a, $b)
+
+assert_ok abs($x->[0] - 2) < 0.0001, "x1 = 2"
+assert_ok abs($x->[1] - 3) < 0.0001, "x2 = 3"
+assert_ok abs($x->[2] - -1) < 0.0001, "x3 = -1"
+
+test_run

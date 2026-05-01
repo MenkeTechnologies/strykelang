@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Great Circle Distance
+
+fn Rosetta::GreatCircle::deg2rad($d) { $d * 3.141592653589793 / 180.0 }
+
+fn Rosetta::GreatCircle::distance($lat1, $lon1, $lat2, $lon2) {
+    my $radius = 6371.0 # Earth radius in km
+    my $dlat = Rosetta::GreatCircle::deg2rad($lat2 - $lat1)
+    my $dlon = Rosetta::GreatCircle::deg2rad($lon2 - $lon1)
+    my $a = sin($dlat / 2) ** 2 + cos(Rosetta::GreatCircle::deg2rad($lat1)) * cos(Rosetta::GreatCircle::deg2rad($lat2)) * sin($dlon / 2) ** 2
+    my $c = 2 * atan2(sqrt($a), sqrt(1 - $a))
+    $radius * $c
+}
+
+# Distance between Nashville (36.12, -86.67) and Los Angeles (33.94, -118.40)
+my $dist = Rosetta::GreatCircle::distance(36.12, -86.67, 33.94, -118.40)
+assert_ok abs($dist - 2886.4) < 1.0, "Nashville to LA distance (~2886 km)"
+
+test_run

@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Partition function
+
+fn Rosetta::Partition::solve($n) {
+    my @p = ~> 0:$n map { 0 }
+    $p[0] = 1
+    for my $i (~> 1 : $n) {
+        for my $j (~> $i : $n) {
+            $p[$j] += $p[$j - $i]
+        }
+    }
+    $p[$n]
+}
+
+assert_eq Rosetta::Partition::solve(5), 7, "P(5) = 7"
+assert_eq Rosetta::Partition::solve(10), 42, "P(10) = 42"
+assert_eq Rosetta::Partition::solve(20), 627, "P(20) = 627"
+
+test_run

@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Kynea numbers
+
+fn Rosetta::Kynea::generate($n) {
+    # Kynea number: (2^n + 1)^2 - 2
+    my @res = ~> 1 : $n map { ((2 ** _) + 1) ** 2 - 2 }
+    \@res
+}
+
+my $kynea = Rosetta::Kynea::generate(5)
+assert_eq join(",", @$kynea), "7,23,79,287,1087", "Kynea numbers 1 to 5"
+
+test_run

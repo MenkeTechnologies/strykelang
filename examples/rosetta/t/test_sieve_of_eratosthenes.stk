@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sieve of Eratosthenes
+
+fn Rosetta::Sieve::primes($limit) {
+    if ($limit < 2) { return [] }
+    my @sieve = ~> 0:$limit |> map { 1 }
+    $sieve[0] = 0
+    $sieve[1] = 0
+
+    my $sqrt_limit = int(sqrt($limit))
+    for my $p (~> 2:$sqrt_limit) {
+        if ($sieve[$p]) {
+            for (my $i = $p * $p; $i <= $limit; $i += $p) {
+                $sieve[$i] = 0
+            }
+        }
+    }
+
+    ~> 2:$limit |> grep { $sieve[_] }
+}
+
+my @p10 = Rosetta::Sieve::primes(10)
+assert_eq join(",", @p10), "2,3,5,7", "primes up to 10"
+
+my @p30 = Rosetta::Sieve::primes(30)
+assert_eq join(",", @p30), "2,3,5,7,11,13,17,19,23,29", "primes up to 30"
+
+test_run

@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zig-zag matrix
+
+fn Rosetta::ZigZag::solve($n) {
+    my @matrix = ~> 0:$n-1 map { [~> 0:$n-1 map { 0 }] }
+    my $i = 0
+    my $j = 0
+    for my $v (~> 0 : ($n * $n - 1)) {
+        $matrix[$i][$j] = $v
+        if (($i + $j) % 2 == 0) {
+            if ($j < $n - 1) {
+                $j++
+                if ($i > 0) { $i-- }
+            } else {
+                $i++
+            }
+        } else {
+            if ($i < $n - 1) {
+                $i++
+                if ($j > 0) { $j-- }
+            } else {
+                $j++
+            }
+        }
+    }
+    \@matrix
+}
+
+fn Rosetta::ZigZag::to_str($m) {
+    ~> @$m map { join(",", @$_) } |> join(";")
+}
+
+my $m3 = Rosetta::ZigZag::solve(3)
+assert_eq Rosetta::ZigZag::to_str($m3), "0,1,5;2,4,6;3,7,8", "3x3 Zig-Zag"
+
+my $m5 = Rosetta::ZigZag::solve(5)
+assert_eq Rosetta::ZigZag::to_str($m5), "0,1,5,6,14;2,4,7,13,15;3,8,12,16,21;9,11,17,20,22;10,18,19,23,24", "5x5 Zig-Zag"
+
+test_run

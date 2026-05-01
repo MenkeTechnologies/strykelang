@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Monte Carlo Pi
+
+fn Rosetta::MonteCarloPi::estimate($n) {
+    my $count = 0
+    # Use pmap to parallelize
+    my @results = pmap {
+        srand(_ + now_ns)
+        my $x = rand()
+        my $y = rand()
+        $x*$x + $y*$y <= 1.0 ? 1 : 0
+    } (1..$n)
+    
+    $count = sum(@results)
+    4.0 * $count / $n
+}
+
+# Estimate Pi with 1,000,000 samples
+my $pi_est = Rosetta::MonteCarloPi::estimate(1000000)
+assert_ok abs($pi_est - 3.14159) < 0.05, "Pi estimate (~3.14)"
+
+test_run

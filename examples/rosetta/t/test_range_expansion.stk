@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Range expansion
+
+fn Rosetta::RangeExpansion::solve($s) {
+    my @parts = split /,/, $s
+    my @res
+    for my $p (@parts) {
+        if ($p =~ /(-?\d+)-(-?\d+)/) {
+            my $start = $1
+            my $end = $2
+            push @res, ($start .. $end)
+        } else {
+            push @res, $p
+        }
+    }
+    \@res
+}
+
+my $exp = Rosetta::RangeExpansion::solve("-6,-3-1,3-5,7,8,14,15,17-20")
+assert_eq join(",", @$exp), "-6,-3,-2,-1,0,1,3,4,5,7,8,14,15,17,18,19,20", "range expansion"
+
+test_run
