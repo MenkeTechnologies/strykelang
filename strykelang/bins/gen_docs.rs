@@ -306,9 +306,11 @@ fn markdown_to_html(md: &str) -> String {
     out
 }
 
-/// Inline pass: `backtick code` spans, otherwise HTML-escape. The lsp corpus
-/// doesn't use `*em*` / `**bold**` — keeping this narrow avoids false matches
-/// on perl-syntax text like `$_ * 2`.
+/// Inline pass: `backtick code` spans and `**bold**` spans, otherwise
+/// HTML-escape. Single `*em*` is intentionally not supported because the
+/// lsp corpus contains perl-syntax text like `$_ * 2` and `*foo` typeglobs
+/// that would generate false matches; bold uses doubled `**` which avoids
+/// that collision.
 fn inline(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let bytes = s.as_bytes();
@@ -326,6 +328,25 @@ fn inline(s: &str) -> String {
                 out.push_str(&html_escape(&s[start..j]));
                 out.push_str("</code>");
                 i = j + 1;
+                continue;
+            }
+        }
+        // `**bold**`. Require the closing `**` to also exist; otherwise fall
+        // through and treat the literal `**` as text.
+        if i + 1 < s.len() && bytes[i] == b'*' && bytes[i + 1] == b'*' {
+            let start = i + 2;
+            let mut j = start;
+            while j + 1 < s.len() {
+                if bytes[j] == b'*' && bytes[j + 1] == b'*' {
+                    break;
+                }
+                j += 1;
+            }
+            if j + 1 < s.len() && bytes[j] == b'*' && bytes[j + 1] == b'*' {
+                out.push_str("<strong>");
+                out.push_str(&inline(&s[start..j]));
+                out.push_str("</strong>");
+                i = j + 2;
                 continue;
             }
         }

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.11.0 · 3549 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.11.1 · 3547 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -205,7 +205,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2620</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2618</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -300,7 +300,7 @@ my @resolved = pcache dns_resolve, @hostnames
       </article>
       <article class="doc-entry" id="doc-preduce">
         <h3><a class="doc-anchor" href="#doc-preduce">#</a> <code>preduce</code></h3>
-        <p>Parallel tree-fold using rayon&#39;s <code>reduce</code> — splits the list into chunks, reduces each chunk independently, then merges partial results. The combining operation **must be associative** (e.g. <code>+</code>, <code>*</code>, <code>max</code>); non-associative ops will produce incorrect results. Much faster than sequential <code>reduce</code> on large numeric lists because the tree structure allows O(log n) merge depth across cores.</p>
+        <p>Parallel tree-fold using rayon&#39;s <code>reduce</code> — splits the list into chunks, reduces each chunk independently, then merges partial results. The combining operation <strong>must be associative</strong> (e.g. <code>+</code>, <code>*</code>, <code>max</code>); non-associative ops will produce incorrect results. Much faster than sequential <code>reduce</code> on large numeric lists because the tree structure allows O(log n) merge depth across cores.</p>
         <pre><code class="lang-perl">my $total = preduce { $_0 + $_1 } @nums
 my $biggest = preduce { $_0 &gt; $_1 ? $_0 : $_1 } @vals
 my $product = preduce { $a * $b } 1:100
@@ -523,7 +523,7 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
       </article>
       <article class="doc-entry" id="doc-thread">
         <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
-        <p>Thread-first macro — chain stages where the threaded value is injected as the **first** argument (like Clojure&#39;s <code>-&gt;</code>).</p>
+        <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure&#39;s <code>-&gt;</code>).</p>
         <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
 fn div { $_0 / $_1 }
@@ -534,7 +534,7 @@ fn div { $_0 / $_1 }
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;&gt;</code></h3>
-        <p>Thread-last macro — chain stages where the threaded value is injected as the **last** argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
+        <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
         <pre><code class="lang-perl">fn div { $_0 / $_1 }
 ~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
 -&gt;&gt; 10 div(_, 2) p                          # explicit _ overrides: div(10, 2) = 5
@@ -1401,22 +1401,22 @@ fn with_hash(%opts = (debug =&gt; 0)) { $opts{debug} }
       <article class="doc-entry" id="doc-struct">
         <h3><a class="doc-anchor" href="#doc-struct">#</a> <code>struct</code></h3>
         <p><code>struct</code> declares a named record type with typed fields, giving stryke lightweight struct semantics similar to Rust structs or Python dataclasses. Structs support multiple construction syntaxes, default values, field mutation, user-defined methods, functional updates, and structural equality.</p>
-        <p>**Declaration:**</p>
+        <p><strong>Declaration:</strong></p>
         <pre><code class="lang-perl">struct Point { x =&gt; Float, y =&gt; Float }           # typed fields
 struct Point { x =&gt; Float = 0.0, y =&gt; Float = 0.0 } # with defaults
 struct Pair { key, value }                        # untyped (Any)
 </code></pre>
-        <p>**Construction:**</p>
+        <p><strong>Construction:</strong></p>
         <pre><code class="lang-perl">my $p = Point(x =&gt; 1.5, y =&gt; 2.0)  # function-call with named args
 my $p = Point(1.5, 2.0)            # positional (declaration order)
 my $p = Point-&gt;new(x =&gt; 1.5, y =&gt; 2.0) # traditional OO style
 my $p = Point()                    # uses defaults if defined
 </code></pre>
-        <p>**Field access (getter/setter):**</p>
+        <p><strong>Field access (getter/setter):</strong></p>
         <pre><code class="lang-perl">p $p-&gt;x       # getter (0 args)
 $p-&gt;x(3.0)    # setter (1 arg)
 </code></pre>
-        <p>**User-defined methods:**</p>
+        <p><strong>User-defined methods:</strong></p>
         <pre><code class="lang-perl">struct Circle {
     radius =&gt; Float,
     fn area { 3.14159 * $self-&gt;radius ** 2 }
@@ -1428,16 +1428,16 @@ my $c = Circle(radius =&gt; 5)
 p $c-&gt;area        # 78.53975
 p $c-&gt;scale(2)    # Circle(radius =&gt; 10)
 </code></pre>
-        <p>**Built-in methods:**</p>
+        <p><strong>Built-in methods:</strong></p>
         <pre><code class="lang-perl">my $q = $p-&gt;with(x =&gt; 5)  # functional update — new instance
 my $h = $p-&gt;to_hash       # { x =&gt; 1.5, y =&gt; 2.0 }
 my @f = $p-&gt;fields        # (x, y)
 my $c = $p-&gt;clone         # deep copy
 </code></pre>
-        <p>**Smart stringify:**</p>
+        <p><strong>Smart stringify:</strong></p>
         <pre><code class="lang-perl">p $p  # Point(x =&gt; 1.5, y =&gt; 2)
 </code></pre>
-        <p>**Structural equality:**</p>
+        <p><strong>Structural equality:</strong></p>
         <pre><code class="lang-perl">my $a = Point(1, 2)
 my $b = Point(1, 2)
 p $a == $b  # 1 (compares all fields)
@@ -1766,7 +1766,7 @@ paste |&gt; wc |&gt; p                      # word count of clipboard
       </article>
       <article class="doc-entry" id="doc-to-table">
         <h3><a class="doc-anchor" href="#doc-to-table">#</a> <code>to_table</code></h3>
-        <p><code>to_table</code> (aliases <code>table</code>, <code>tbl</code>) renders data as a plain-text column-aligned table with Unicode box-drawing borders. Arrays of hashrefs render as full tables with headers, plain arrays as numbered rows, single hashes as key-value tables. The output is fixed-width text suitable for terminal display, log files, or any monospace context.</p>
+        <p><code>to_table</code> (aliases <code>table</code>, <code>tbl</code>) renders data as a plain-text column-aligned table with Unicode box-drawing borders. Arrays of hashrefs render as full tables with headers, plain arrays as numbered rows, single hashes as key-value tables sorted by numeric value descending (ties by key), matching <code>freq</code> → <code>tbl</code> expectations. The output is fixed-width text suitable for terminal display, log files, or any monospace context.</p>
         <pre><code class="lang-perl">my @r = ({name =&gt; &quot;Alice&quot;, age =&gt; 30}, {name =&gt; &quot;Bob&quot;, age =&gt; 25})
 @r |&gt; tbl |&gt; p
 # ┌───────┬─────┐
@@ -3421,26 +3421,26 @@ my @sales = par_csv_read(glob(&quot;sales_*.csv&quot;)) |&gt; flat
       </article>
       <article class="doc-entry" id="doc-glob-par">
         <h3><a class="doc-anchor" href="#doc-glob-par">#</a> <code>glob_par</code></h3>
-        <p>Perform a parallel recursive file-system glob, using multiple threads to walk directory trees concurrently. This is significantly faster than <code>glob</code> for deep directory hierarchies with thousands of files. Accepts the same glob syntax (<code>*</code>, <code>**</code>, <code>{a,b}</code>) but returns results as they are discovered across threads. Ideal for large codebases or log directories.</p>
+        <p>Parallel recursive file-system glob using rayon across multiple patterns. Backed by the same zshrs glob engine as <code>glob</code>, so every zsh qualifier (<code>(/)</code>, <code>(.)</code>, <code>(L+1024)</code>, <code>(om[1])</code>, …) is supported here too. Each pattern expands single-threaded but the patterns run concurrently — ideal for many independent searches. For full qualifier reference see <code>glob</code>.</p>
         <pre><code class="lang-perl">my @logs = glob_par(&quot;**/*.log&quot;)
 p scalar @logs               # count of log files
 &quot;**/*.rs&quot; |&gt; glob_par |&gt; e p  # print all Rust files
 my @imgs = glob_par(&quot;assets/**/*.{png,jpg,webp}&quot;)
-@imgs |&gt; e { p bn(_) }
+my @big_recent = glob_par(&quot;**(.L+1m om[1,5])&quot;)  # 5 newest &gt;1MB files
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pwatch">
         <h3><a class="doc-anchor" href="#doc-pwatch">#</a> <code>pwatch</code></h3>
-        <p><code>pwatch(PATH, fn { ... })</code> — watch a file or directory for filesystem changes and invoke the callback on each event.</p>
-        <p>The watcher runs on a background thread using OS-native notifications (FSEvents on macOS, inotify on Linux) so it consumes near-zero CPU while idle. The callback receives the event type and affected path in <code>_</code>. Directory watches are recursive by default. The watcher continues until the returned handle is dropped or the program exits. This is useful for building live-reload dev servers, file-triggered pipelines, or audit logs. Combine with <code>debounce</code> or a <code>pchannel</code> if the callback is expensive and rapid bursts of events need to be coalesced.</p>
-        <pre><code class="lang-perl">my $w = pwatch &quot;./src&quot;, fn {
+        <p><code>pwatch(PATTERN, fn { ... })</code> — watch a path or glob pattern for filesystem changes and invoke the callback on each event.</p>
+        <p>The watcher runs on a background thread using OS-native notifications (FSEvents on macOS, inotify on Linux) so it consumes near-zero CPU while idle. The callback receives the event path in <code>_</code>. The watcher continues until the returned handle is dropped or the program exits. Useful for live-reload dev servers, file-triggered pipelines, or audit logs. Combine with <code>debounce</code> or a <code>pchannel</code> if the callback is expensive and rapid bursts of events need to be coalesced.</p>
+        <p>The initial expansion goes through the full zshrs glob engine, so zsh qualifiers (<code>(.)</code>, <code>(/)</code>, <code>(L+1m)</code>, …) work for picking what to watch. The runtime event matcher uses the qualifier-stripped pattern shape — stat-based qualifiers can&#39;t apply to a single fired event, but they did apply to the watch-set selection upfront.</p>
+        <pre><code class="lang-perl">my $w = pwatch &quot;./src/**/*.rs&quot;, fn {
     p &quot;changed: $_&quot;
     rebuild()
 }
 
-# Watch multiple paths:
-my $w1 = pwatch &quot;/var/log/app.log&quot;, fn { p &quot;log updated&quot; }
-my $w2 = pwatch &quot;./config&quot;, fn { reload_config() }
+my $logs = pwatch &quot;logs/*(.)&quot;, fn { p &quot;log updated: $_&quot; }
+my $cfg = pwatch &quot;./config&quot;, fn { reload_config() }
 sleep                                 # block forever
 </code></pre>
       </article>
@@ -3583,12 +3583,14 @@ my @rows = map { sprintf &quot;%3d. %s&quot;, _, $names[_] } 0..$ #names
       </article>
       <article class="doc-entry" id="doc-slurp">
         <h3><a class="doc-anchor" href="#doc-slurp">#</a> <code>slurp</code></h3>
-        <p>Read an entire file into memory as a single UTF-8 string. The short alias <code>sl</code> is convenient in pipelines. Dies if the file does not exist or cannot be read. This is the complement of <code>spurt</code>/<code>wf</code> — together they form a simple read/write pair for whole-file operations. For binary data, use <code>read_bytes</code>/<code>slurp_raw</code> instead.</p>
+        <p>Read an entire file into memory as a single UTF-8 string, or — when the path is a glob pattern — concatenate the contents of every matching regular file. Aliases: <code>sl</code>, <code>cat</code>, <code>c</code>. Dies if the file is missing or unreadable. For binary data use <code>read_bytes</code>/<code>slurp_raw</code>.</p>
+        <p>When the path contains glob metacharacters (<code>*</code> <code>?</code> <code>[</code> <code>**</code>) or a trailing zsh qualifier suffix <code>(...)</code>, it is expanded by the zshrs glob engine and the results are concatenated. <strong><code>slurp</code> hard-fails if the qualifier yields any non-regular file</strong> — <code>slurp &quot;**(/)&quot;</code> errors <code>slurp: not a regular file: ./sub</code> because slurping a directory is meaningless. To list directory paths, use <code>glob &quot;**(/)&quot;</code>. See <code>glob</code> for the full qualifier reference.</p>
         <pre><code class="lang-perl">my $text = slurp(&quot;config.yaml&quot;)
-p $text
+my $all = c(&quot;**(.)&quot;)               # every regular file recursively, concatenated
+my $logs = c(&quot;logs/*.log&quot;)          # all logs in one go
 my $json = sl(&quot;data.json&quot;)
 my $data = decode_json($json)
-&quot;README.md&quot; |&gt; sl |&gt; length |&gt; p  # character count
+&quot;README.md&quot; |&gt; sl |&gt; length |&gt; p    # character count
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-slurp-raw">
@@ -4182,7 +4184,7 @@ splice @a, 2     # remove from index 2 onward
       </article>
       <article class="doc-entry" id="doc-splice-last">
         <h3><a class="doc-anchor" href="#doc-splice-last">#</a> <code>splice_last</code></h3>
-        <p><code>splice_last @array, OFFSET [, LENGTH [, LIST]]</code> — same shape as <code>splice</code>, but returns the **last** removed element instead of the full removed list (or <code>undef</code> if nothing was removed). The stryke spelling of Perl&#39;s <code>scalar splice(@a, off, n)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. The array is still mutated in place, exactly like <code>splice</code>. Aliases: <code>splice1</code>, <code>spl_last</code>. Desugars to <code>tail(splice(...))</code> so any list-context property of <code>splice</code> is preserved.</p>
+        <p><code>splice_last @array, OFFSET [, LENGTH [, LIST]]</code> — same shape as <code>splice</code>, but returns the <strong>last</strong> removed element instead of the full removed list (or <code>undef</code> if nothing was removed). The stryke spelling of Perl&#39;s <code>scalar splice(@a, off, n)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. The array is still mutated in place, exactly like <code>splice</code>. Aliases: <code>splice1</code>, <code>spl_last</code>. Desugars to <code>tail(splice(...))</code> so any list-context property of <code>splice</code> is preserved.</p>
         <pre><code class="lang-perl">my @a = 10:50:10
 my $last = splice_last @a, 1, 2   # removes (20, 30), returns 30
 @a |&gt; e p                          # 10 40 50
@@ -5257,17 +5259,32 @@ if (which(&quot;rg&quot;)) {
       </article>
       <article class="doc-entry" id="doc-glob">
         <h3><a class="doc-anchor" href="#doc-glob">#</a> <code>glob</code></h3>
-        <p>Expand a shell-style glob pattern against the filesystem and return a list of matching paths. Supports <code>*</code>, <code>?</code>, <code>[abc]</code>, <code>{a,b}</code> patterns, and <code>**</code> for recursive matching. This actually reads the filesystem, unlike <code>glob_match</code> which is a pure string test.</p>
+        <p>Expand a zsh-style glob pattern against the filesystem and return a list of matching paths. World-first: stryke supports <strong>every</strong> zsh glob qualifier from <code>man zshexpn</code> _Filename Generation &gt; Glob Qualifiers_ (no other scripting language does this). Backed by <code>zsh::glob</code> from zshrs — single source of truth, zero stryke-side reimplementation. Patterns: <code>*</code>, <code>?</code>, <code>[abc]</code>, <code>{a,b}</code>, <code>**</code> recursive, plus the <code>(...)</code> qualifier suffix.</p>
+        <h4>Qualifier reference (full set)</h4>
+        <p><strong>File type:</strong> <code>(/)</code> dir · <code>(.)</code> regular file · <code>(@)</code> symlink · <code>(=)</code> socket · <code>(p)</code> FIFO · <code>(%b)</code> block dev · <code>(%c)</code> char dev · <code>(%)</code> any device · <code>(*)</code> executable file.</p>
+        <p><strong>Permission:</strong> <code>(r)</code> <code>(w)</code> <code>(x)</code> EUID r/w/x · <code>(R)</code> <code>(W)</code> <code>(X)</code> world · <code>(A)</code> <code>(I)</code> <code>(E)</code> group · <code>(s)</code> setuid · <code>(S)</code> setgid · <code>(t)</code> sticky · <code>(f&lt;bits&gt;)</code> exact mode-bit match (e.g. <code>(f644)</code>).</p>
+        <p><strong>Ownership / device:</strong> <code>(U)</code> owned by EUID · <code>(G)</code> owned by EGID · <code>(u&lt;N&gt;)</code> uid N · <code>(g&lt;N&gt;)</code> gid N · <code>(d&lt;N&gt;)</code> match by device number.</p>
+        <p><strong>Numeric</strong> (each accepts <code>+N</code> greater, <code>-N</code> less, <code>N</code> equal): <code>(L[unit]±N)</code> size — <code>p</code>/<code>k</code>/<code>m</code>/<code>g</code>/<code>t</code> units, default bytes · <code>(l±N)</code> link count · <code>(a[unit]±N)</code> atime · <code>(m[unit]±N)</code> mtime · <code>(c[unit]±N)</code> ctime — time units <code>s</code>/<code>m</code>/<code>h</code>/<code>d</code>/<code>w</code>/<code>M</code>.</p>
+        <p><strong>Sort:</strong> <code>(on)</code> <code>(oL)</code> <code>(ol)</code> <code>(oa)</code> <code>(om)</code> <code>(oc)</code> <code>(od)</code> ascending; capital <code>O*</code> descending; <code>(oN)</code> no sort.</p>
+        <p><strong>Selection:</strong> <code>([N])</code> Nth match · <code>([N,M])</code> slice. Combine with sort: <code>(om[1])</code> newest single match.</p>
+        <p><strong>Flags:</strong> <code>(N)</code> NULL_GLOB — empty list on no match · <code>(D)</code> include dotfiles · <code>(F)</code> non-empty directory · <code>(M)</code> mark-dirs (append <code>/</code>) · <code>(T)</code> list-types (append type char) · <code>(n)</code> numeric sort.</p>
+        <p><strong>Eval / functions:</strong> <code>(e&#39;CMD&#39;)</code> shell-eval predicate · <code>(+func)</code> function-as-test (predicate sub).</p>
+        <p><strong>Join words:</strong> <code>(P…)</code> prefix words · <code>(Q…)</code> postfix words around each match.</p>
+        <p><strong>Colon modifiers:</strong> <code>(:s/PAT/REPL/)</code> sed substitution on each path · <code>(:e)</code> extension · <code>(:r)</code> strip extension · <code>(:t)</code> tail · <code>(:h)</code> head · all of zsh&#39;s history-style modifiers.</p>
+        <p><strong>Combinators:</strong> prefix <code>^</code> negates · prefix <code>-</code> toggles symlink-following · <code>,</code> separates OR alternatives · chained qualifiers AND.</p>
         <pre><code class="lang-perl">my @scripts = glob(&quot;*.pl&quot;)
-@scripts |&gt; e p
 my @all_rs = glob(&quot;src/**/*.rs&quot;)
-p scalar @all_rs              # count of Rust files
-my @cfg = glob(&quot;/etc/{nginx,apache2}/*.conf&quot;)
+my @dirs = glob(&quot;**(/)&quot;)           # directories only, recursive
+my @big = glob(&quot;**(L+1024)&quot;)       # files larger than 1024 bytes
+my @recent = glob(&quot;**(om[1])&quot;)     # most recently modified, take 1
+my @safe = glob(&quot;missing*(N)&quot;)     # null-glob, never errors
+my @mode = glob(&quot;**(f644)&quot;)        # files with exactly mode 644
+my @stems = glob(&quot;*.txt(:r)&quot;)      # all .txt files, extension stripped
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-glob-match">
         <h3><a class="doc-anchor" href="#doc-glob-match">#</a> <code>glob_match</code></h3>
-        <p>Test whether a filename or path matches a shell-style glob pattern. Returns true (1) on match, false (empty string) otherwise. Supports <code>*</code>, <code>?</code>, <code>[abc]</code>, and <code>{a,b}</code> patterns. This is a pure string match — it does not read the filesystem, so it works for filtering lists of paths you already have.</p>
+        <p>Test whether a string matches a shell-style glob pattern. Returns true (1) on match, false (empty string) otherwise. Supports <code>*</code>, <code>?</code>, <code>[abc]</code>, and <code>{a,b}</code>. This is a pure string match — it does not read the filesystem, so it works for filtering lists of paths you already have. Note: zsh glob qualifiers like <code>(/)</code> or <code>(.)</code> are stat-based filters that only apply at filesystem-expansion time (<code>glob</code>/<code>glob_par</code>/<code>slurp</code>); <code>glob_match</code> ignores any trailing qualifier.</p>
         <pre><code class="lang-perl">p glob_match(&quot;*.pl&quot;, &quot;script.pl&quot;)        # 1
 p glob_match(&quot;*.pl&quot;, &quot;script.py&quot;)        # (empty)
 my @perl = grep { glob_match(&quot;*.{pl,pm}&quot;, _) } @files
@@ -5754,7 +5771,7 @@ p inet_ntoa($addr) . &quot;:$port&quot;
       </article>
       <article class="doc-entry" id="doc-unpack-first">
         <h3><a class="doc-anchor" href="#doc-unpack-first">#</a> <code>unpack_first</code></h3>
-        <p><code>unpack_first(FMT, STR)</code> — decode the binary string and return the **first** decoded element (or <code>undef</code> if the format yields nothing). The stryke spelling of Perl&#39;s <code>scalar unpack(FMT, STR)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. Aliases: <code>unpack1</code>, <code>up1</code>. Equivalent to <code>head(unpack(FMT, STR))</code> but spelled as a single verb.</p>
+        <p><code>unpack_first(FMT, STR)</code> — decode the binary string and return the <strong>first</strong> decoded element (or <code>undef</code> if the format yields nothing). The stryke spelling of Perl&#39;s <code>scalar unpack(FMT, STR)</code> for <code>--no-interop</code> mode where <code>scalar</code> is rejected at parse time. Aliases: <code>unpack1</code>, <code>up1</code>. Equivalent to <code>head(unpack(FMT, STR))</code> but spelled as a single verb.</p>
         <pre><code class="lang-perl">my $first_byte = unpack_first(&quot;C&quot;, $bytes)
 my $port       = unpack1(&quot;n&quot;, $sockaddr)
 my $magic_word = up1(&quot;N&quot;, $header)
@@ -8170,7 +8187,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2620 topics</p>
+      <p class="chapter-meta">2618 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -10295,14 +10312,6 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">my $result = bytes_to_mb $input 
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-c">
-        <h3><a class="doc-anchor" href="#doc-c">#</a> <code>c</code></h3>
-        <p><code>c</code> — i/o extensions builtin.</p>
-        <pre><code class="lang-perl">my $result = c $x 
-# or in a pipeline:
-@list |&gt; map c |&gt; p
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-c256">
         <h3><a class="doc-anchor" href="#doc-c256">#</a> <code>c256</code></h3>
         <p><code>c256</code> — color / ansi builtin. Alias for <code>color256</code>.</p>
@@ -10483,14 +10492,6 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">my $result = cartpow $x 
 # or in a pipeline:
 @list |&gt; map cartpow |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-cat">
-        <h3><a class="doc-anchor" href="#doc-cat">#</a> <code>cat</code></h3>
-        <p><code>cat</code> — i/o extensions builtin.</p>
-        <pre><code class="lang-perl">my $result = cat $x 
-# or in a pipeline:
-@list |&gt; map cat |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-catalan">

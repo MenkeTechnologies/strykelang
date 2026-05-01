@@ -22,18 +22,49 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
+/// `glob_with_options` preset for stryke: full extended glob, bare-qualifier
+/// shorthand on (`*(/)` works without `(#q.../)`), `null_glob: true` so a
+/// no-match returns an empty list (Perl `glob` semantics) instead of echoing
+/// the literal pattern back.
+fn stryke_glob(pattern: &str) -> Vec<String> {
+    zsh::glob::glob_with_options(
+        pattern,
+        zsh::glob::GlobOptions {
+            null_glob: true,
+            mark_dirs: false,
+            no_glob_dots: true,
+            list_types: false,
+            numeric_sort: false,
+            follow_links: false,
+            extended_glob: true,
+            case_glob: true,
+            glob_star_short: false,
+            bare_glob_qual: true,
+            brace_ccl: false,
+        },
+    )
+}
+
 /// `slurp`/`cat`/`c` payload — accepts a literal path OR a zsh-style glob
-/// pattern (forwarded to [`zsh::glob::glob`], so the entire qualifier set
-/// `(/)`, `(.)`, `(@)`, `(L+10)`, `(mh-1)`, `(om)`, `(N)`, … all work).
-/// World-first: zsh glob qualifiers in a scripting language. When the
-/// qualifier filters away every regular file (e.g. `c("**(/)")` returns
-/// directories only) we hard-fail rather than silently return empty —
-/// slurping a directory is meaningless and asking for it is a bug.
+/// pattern (forwarded to [`zsh::glob`], so the entire qualifier set `(/)`,
+/// `(.)`, `(@)`, `(L+10)`, `(mh-1)`, `(om)`, `(N)`, … all work). World-first:
+/// zsh glob qualifiers in a scripting language. When the qualifier filters
+/// away every regular file (e.g. `c("**(/)")` returns directories only) we
+/// hard-fail rather than silently return empty — slurping a directory is
+/// meaningless and asking for it is a bug.
+///
+/// Routing: a path goes through the glob expander when it has wildcards
+/// (per zshrs's [`zsh::glob::has_wildcards`]) OR a trailing bare qualifier
+/// suffix (`dir(/)` / `name(.)`). Otherwise we read the literal path so a
+/// missing file produces the proper `No such file or directory` instead of
+/// a silent empty.
 pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
-    if !looks_like_glob(path) {
+    let (stripped, qual) = zsh::glob::split_qualifier(path);
+    let is_glob = qual.is_some() || zsh::glob::has_wildcards(stripped);
+    if !is_glob {
         return read_file_text_perl_compat(path);
     }
-    let paths = zsh::glob::glob(path);
+    let paths = stryke_glob(path);
     if paths.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
@@ -54,20 +85,13 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
     Ok(out)
 }
 
-/// Heuristic: does this path want glob expansion? Triggers on the standard
-/// zsh wildcard set and on the trailing `(...)` qualifier suffix so plain
-/// `dir(/)` / `name(.)` (literal name + qualifier filter) routes to
-/// [`zsh::glob::glob`] instead of being read as a file named literally
-/// `dir(/)`. `~`, `#`, `^` are extended-glob meta but rarely meant as glob
-/// in stryke source paths (`~/foo` is home-dir, `#` is a comment in shells)
-/// — leave them out to avoid surprises.
-fn looks_like_glob(path: &str) -> bool {
-    if path.contains('*') || path.contains('?') || path.contains('[') {
-        return true;
-    }
-    // Trailing `(...)` is the bare-qualifier marker (BARE_GLOB_QUAL on by
-    // default in zshrs). Match only when there's a balanced open paren.
-    path.ends_with(')') && path.contains('(')
+/// Pattern routes to [`zsh::glob`] when it has wildcards or a bare qualifier
+/// suffix; literal paths short-circuit so callers can preserve "no such
+/// file" diagnostics. Wraps zshrs's own predicates so stryke owns no
+/// pattern-parsing logic of its own.
+fn pattern_is_glob(path: &str) -> bool {
+    let (stripped, qual) = zsh::glob::split_qualifier(path);
+    qual.is_some() || zsh::glob::has_wildcards(stripped)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
@@ -716,11 +740,11 @@ pub fn list_char_devices(dir: &str) -> PerlValue {
 pub fn glob_patterns(patterns: &[String]) -> PerlValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {
-        if !looks_like_glob(pat) {
+        if !pattern_is_glob(pat) {
             paths.push(normalize_glob_path_display(pat.clone()));
             continue;
         }
-        for s in zsh::glob::glob(pat) {
+        for s in stryke_glob(pat) {
             paths.push(normalize_glob_path_display(s));
         }
     }
@@ -755,10 +779,10 @@ fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>)
     let out: Vec<String> = patterns
         .par_iter()
         .flat_map_iter(|pat| {
-            let rows: Vec<String> = if !looks_like_glob(pat) {
+            let rows: Vec<String> = if !pattern_is_glob(pat) {
                 vec![pat.clone()]
             } else {
-                zsh::glob::glob(pat)
+                stryke_glob(pat)
             };
             if let Some(p) = progress {
                 p.tick();
