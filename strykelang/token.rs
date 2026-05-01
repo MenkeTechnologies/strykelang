@@ -105,10 +105,6 @@ pub enum Token {
     // Regex binding
     BindMatch,
     BindNotMatch,
-    /// `!!!` — IPv6 range separator. Plays the role of `:` in range
-    /// expressions when the operands contain literal IPv6 addresses (whose
-    /// own `:` would otherwise collide with the range op).
-    TripleBang,
 
     // Arrows & separators
     Arrow,

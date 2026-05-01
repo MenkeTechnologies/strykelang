@@ -550,15 +550,16 @@ and or not x eq ne lt gt le ge cmp</div>
       <section class="tutorial-section">
         <h2>Range literals</h2>
         <p>The <code>:</code> range operator (and the <code>!!!</code> separator for IPv6) recognize several built-in literal types as a single token. The runtime expansion dispatches on the surface form so each type gets the right step semantics.</p>
-        <div class="oneliner" style="font-size:11px;">192.168.1.1:192.168.1.5:1     <span class="comment"># IPv4, octet step</span>
+        <div class="oneliner" style="font-size:11px;">1~5~1                         <span class="comment"># numeric (~ works universally)</span>
+192.168.1.1:192.168.1.5:1     <span class="comment"># IPv4, octet step</span>
 2022-01-01:2022-01-05:1       <span class="comment"># ISO date, day step</span>
 2022-01:2022-04:1             <span class="comment"># year-month, month step</span>
 0x00:0xFF:1                   <span class="comment"># hex, preserves prefix/width/case</span>
-2001::1!!!2001::5!!!1         <span class="comment"># IPv6 (uses !!! separator)</span>
-fe80::ff!!!fe80::fc!!!-1      <span class="comment"># IPv6 reverse step</span>
-::1!!!::5!!!1                 <span class="comment"># IPv6 zero-comp prefix</span></div>
+2001::1~2001::5~1             <span class="comment"># IPv6 (must use ~ — : collides)</span>
+fe80::ff~fe80::fc~-1          <span class="comment"># IPv6 reverse step</span>
+::1~::5~1                     <span class="comment"># IPv6 zero-comp prefix</span></div>
         <p><strong>Hex case preservation</strong> — uppercase iff EITHER endpoint has any uppercase letter. <code>0x00:0xFF:1</code> emits <code>0x00, 0x01, …, 0xFF</code> (uppercase wins from TO). Outside range context, <code>0xFF</code> is still the integer 255 — only range-context lookahead triggers the string-typed literal.</p>
-        <p><strong>Why <code>!!!</code> for IPv6</strong> — IPv6 uses <code>:</code> internally; reusing it as the range separator would be ambiguous. The dedicated <code>!!!</code> token plays the role of <code>:</code> in range expressions only.</p>
+        <p><strong>Why <code>~</code> for IPv6</strong> — IPv6 uses <code>:</code> internally; reusing it as the range separator would be ambiguous. The universal <code>~</code> separator dodges the collision and works for all range types. <code>!</code> can't be used because it's the paired char-index delimiter (<code>$x!N!</code>); inside paired <code>~…~</code> char-index/slice subscripts (<code>$x~5~</code>, <code>$_~1:3~</code>) the range op is suppressed so closing delimiters don't get eaten.</p>
       </section>
 
       <section class="tutorial-section">

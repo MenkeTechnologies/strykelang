@@ -123,6 +123,12 @@ pub struct Parser {
     /// Bumped while parsing the then-branch of a ternary `? :` so `a ? b : c` doesn't
     /// misparse `b : c` as a range.
     suppress_colon_range: u32,
+    /// Counter (depth-tracked like [`Self::suppress_colon_range`]) that
+    /// disables `~` as a range separator. Used inside paired `~...~` char-
+    /// index/slice subscripts so the closing `~` doesn't get eaten as a
+    /// range op. `:` range is still allowed inside (e.g. `$_~1:3~` is a
+    /// slice with a `:` range as the index).
+    suppress_tilde_range: u32,
     /// When true, `pipe_forward_apply` uses thread-last semantics (append to args)
     /// instead of thread-first (prepend). Set by `->>` thread macro.
     thread_last_mode: bool,
@@ -160,6 +166,7 @@ impl Parser {
             suppress_slash_as_div: 0,
             suppress_m_regex: 0,
             suppress_colon_range: 0,
+            suppress_tilde_range: 0,
             thread_last_mode: false,
             parsing_module: false,
             list_construct_close_pos: None,
@@ -7317,9 +7324,12 @@ impl Parser {
     fn parse_range(&mut self) -> PerlResult<Expr> {
         let left = self.parse_log_or()?;
         let line = left.line;
-        // `1..10` or `1...10` (traditional) or `1:10` (short form). `!!!` is
-        // the IPv6-friendly range separator (`2001::1!!!2001::ff!!!1`) and
-        // behaves identically to `:` here, lexed to dodge the `:`/IPv6 collision.
+        // `1..10` (traditional inclusive) / `1...10` (exclusive) / `1:10`
+        // (short form) / `1~10` (universal short form). The `~` separator
+        // works for every range type and is the only viable separator for
+        // IPv6 since IPv6 already uses `:` internally; `:` would collide.
+        // It also dodges `!`'s collision with the `_!N!` paired char-index
+        // syntax. Single-`~` (vs `!!!` triple) keeps the surface simple.
         let (exclusive, _colon_style) = if self.eat(&Token::RangeExclusive) {
             (true, false)
         } else if self.eat(&Token::Range) {
@@ -7328,14 +7338,18 @@ impl Parser {
             // `1:10` short form — only valid for numeric ranges, not ternary
             // Lookahead: must be followed by something that looks like a range endpoint
             (false, true)
-        } else if self.eat(&Token::TripleBang) {
+        } else if self.suppress_tilde_range == 0 && self.eat(&Token::BitNot) {
             (false, true)
         } else {
             return Ok(left);
         };
         let right = self.parse_log_or()?;
-        // Optional step: `1..100:2` / `1:100:2` / `IPV6!!!IPV6!!!STEP`.
-        let step = if self.eat(&Token::Colon) || self.eat(&Token::TripleBang) {
+        // Optional step: `1..100:2` / `1:100:2` / `IPV6~IPV6~STEP`. `~` is
+        // gated by `suppress_tilde_range` so paired char-index (`$x~5~`)
+        // doesn't get its closing delimiter eaten as a range op.
+        let step = if self.eat(&Token::Colon)
+            || (self.suppress_tilde_range == 0 && self.eat(&Token::BitNot))
+        {
             Some(Box::new(self.parse_unary()?))
         } else {
             None
@@ -7984,7 +7998,14 @@ impl Parser {
                         unreachable!()
                     };
                     self.advance(); // consume opening `!` or `~`
-                    let index = self.parse_expression()?;
+                    // Suppress `~` as a range separator while parsing the
+                    // paired index — `$_~5~` would otherwise consume the
+                    // closing `~` as a range op. `:` is still allowed so
+                    // `$_~1:3~` (slice with `:` range index) keeps working.
+                    self.suppress_tilde_range = self.suppress_tilde_range.saturating_add(1);
+                    let index_result = self.parse_expression();
+                    self.suppress_tilde_range = self.suppress_tilde_range.saturating_sub(1);
+                    let index = index_result?;
                     let close_match = match (&opener, self.peek()) {
                         (Token::LogNot, Token::LogNot) => true,
                         (Token::BitNot, Token::BitNot) => true,
