@@ -22,13 +22,29 @@ pub fn run_pwatch(
     atomic_hashes: Vec<(String, AtomicHash)>,
     line: usize,
 ) -> PerlResult<PerlValue> {
-    let gpat = glob::Pattern::new(pattern)
+    // pwatch's runtime matcher (`gpat.matches`) runs on every filesystem
+    // event, so it can only check pattern shape — not stat-based qualifiers
+    // like `(/)`. Strip the trailing qualifier suffix via zshrs's parser so
+    // the pattern half can feed `glob::Pattern`; the qualifier still applies
+    // during initial expansion via `zsh::glob::glob_with_options` below.
+    let (pattern_no_qual, _qual) = zsh::glob::split_qualifier(pattern);
+    let gpat = glob::Pattern::new(pattern_no_qual)
         .map_err(|e| PerlError::runtime(format!("pwatch: invalid glob pattern: {}", e), line))?;
 
-    let expanded: Vec<PathBuf> = glob::glob(pattern)
-        .map_err(|e| PerlError::runtime(format!("pwatch: glob: {}", e), line))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| PerlError::runtime(format!("pwatch: glob: {}", e), line))?;
+    let expanded: Vec<PathBuf> = zsh::glob::glob_with_options(
+        pattern,
+        zsh::glob::GlobOptions {
+            null_glob: true,
+            no_glob_dots: true,
+            extended_glob: true,
+            case_glob: true,
+            bare_glob_qual: true,
+            ..Default::default()
+        },
+    )
+    .into_iter()
+    .map(PathBuf::from)
+    .collect();
 
     let mut watch_specs: Vec<(PathBuf, RecursiveMode)> = Vec::new();
     let mut seen = HashSet::new();

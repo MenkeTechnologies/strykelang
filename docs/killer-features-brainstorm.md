@@ -173,7 +173,7 @@ This brainstorm came from the question: "What killer features do other languages
 
 Original answer (2026-04-26): Not many. The main gap was Expect-style interactive automation — now closed.
 
-Subsequent work (2026-04 → 2026-05) shipped the AI primitives surface (`ai`, MCP client/server, agents, vision/audio/image, multi-provider, citations, files API), the Rails-shaped web framework (`stryke_web` with full scaffold generator), and the Cargo-shaped package manager (`s install/add/remove/update/outdated/audit/vendor/run/install -g/...` plus `[workspace]` member globbing). Each one was its own "world's first AND world's fastest in category" lever.
+Subsequent work (2026-04 → 2026-05) shipped the AI primitives surface (`ai`, MCP client/server, agents, vision/audio/image, multi-provider, citations, files API), the Rails-shaped web framework (`stryke_web` with full scaffold generator), the Cargo-shaped package manager (`s install/add/remove/update/outdated/audit/vendor/run/install -g/...` plus `[workspace]` member globbing), and **the full zsh glob qualifier set imported from zshrs** — every qualifier from `man zshexpn` (`(/)`, `(.)`, `(@)`, `(*)`, `(L±N)`, `(om[N])`, `(N)`, `(D)`, `(F)`, `(f<bits>)`, `(d<N>)`, `(e'CMD')`, `(P…)`, `(Q…)`, `(:s/…/…/)`, `^`, `-`, `,`) wired into every glob entry-point (`glob`, `glob_par`, `slurp`/`c`/`cat`, `pwatch`, `<…>`, `par_find_files`). World-first: no other scripting language has this. Each one was its own "world's first AND world's fastest in category" lever.
 
 The polymorphic range system (10 types, forward/reverse, custom step) remains a world-first that no other language has.
 
