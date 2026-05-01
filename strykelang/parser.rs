@@ -11945,6 +11945,12 @@ impl Parser {
                     && !(self.suppress_parenless_call > 0 && matches!(self.peek(), Token::Ident(_)))
                     && !(matches!(self.peek(), Token::LBrace)
                         && self.peek_line() > self.prev_line())
+                    && !(matches!(self.peek(), Token::BitNot)
+                        && self.suppress_tilde_range == 0
+                        && matches!(
+                            self.peek_at(1),
+                            Token::Ident(_) | Token::Integer(_) | Token::Float(_)
+                        ))
                 {
                     // Perl allows func arg without parens
                     // Guard: `sub <name> { }` is a named sub declaration (new
@@ -11955,6 +11961,10 @@ impl Parser {
                     // still allows `{` for struct/hash literals like `t Foo { x => 1 } p`.
                     // Guard: `{` on a new line is a new statement (hashref/block),
                     // not an argument to the preceding bareword call.
+                    // Guard: `~Ident` / `~Integer` / `~Float` after a bareword is
+                    // the universal-tilde range separator (`I~M~5`, `Mon~Fri`,
+                    // `Jan~Dec~2`), not unary BitNot of an arg. Bail to Bareword
+                    // so the outer `parse_range` consumes `~` as the range op.
                     let args = self.parse_list_until_terminator()?;
                     Ok(Expr {
                         kind: ExprKind::FuncCall { name, args },
@@ -11988,12 +11998,26 @@ impl Parser {
                 let h = h.clone();
                 let saved = self.pos;
                 self.advance();
-                // Verify next token is a term start (not operator)
-                if self.peek().is_term_start()
-                    || matches!(
-                        self.peek(),
-                        Token::DoubleString(_) | Token::BacktickString(_) | Token::SingleString(_)
-                    )
+                // Verify next token is a term start (not operator).
+                // Guard: `~Ident` / `~Integer` / `~Float` is a universal-tilde
+                // range separator (`p I~M~5`, `p Mon~Fri`), not unary BitNot of
+                // an arg. Bail filehandle detection so the bareword `I` flows
+                // into the regular expression path where `parse_range` consumes
+                // `~` as the range op.
+                let is_tilde_range_after = matches!(self.peek(), Token::BitNot)
+                    && self.suppress_tilde_range == 0
+                    && matches!(
+                        self.peek_at(1),
+                        Token::Ident(_) | Token::Integer(_) | Token::Float(_)
+                    );
+                if !is_tilde_range_after
+                    && (self.peek().is_term_start()
+                        || matches!(
+                            self.peek(),
+                            Token::DoubleString(_)
+                                | Token::BacktickString(_)
+                                | Token::SingleString(_)
+                        ))
                 {
                     Some(h)
                 } else {

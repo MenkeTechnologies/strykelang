@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Madelung constant
+
+fn Rosetta::Madelung::compute($n) {
+    my $sum = 0.0
+    for my $i (-$n..$n) {
+        for my $j (-$n..$n) {
+            for my $k (-$n..$n) {
+                if ($i == 0 && $j == 0 && $k == 0) {
+                    next
+                }
+                my $dist = sqrt($i*$i + $j*$j + $k*$k)
+                my $sign = (($i + $j + $k) % 2 == 0) ? 1 : -1
+                $sum += $sign / $dist
+            }
+        }
+    }
+    $sum
+}
+
+# The constant for NaCl is approx -1.74756
+# With n=10, we should get something close.
+my $m10 = Rosetta::Madelung::compute(10)
+# Note: Rosetta Code often asks for n=10 or similar.
+# The sign in some definitions is flipped (positive 1.747).
+# We'll check the magnitude.
+my $abs_m10 = ($m10 < 0 ? -$m10 : $m10)
+assert_ok $abs_m10 > 1.6 && $abs_m10 < 1.8, "Madelung constant magnitude for n=10 ($abs_m10)"
+
+# Pipe usage
+10 |> Rosetta::Madelung::compute() |> { _ < 0 ? -_ : _ } |> assert_ok("pipe Madelung")
+
+test_run

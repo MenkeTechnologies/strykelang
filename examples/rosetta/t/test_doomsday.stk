@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Doomsday algorithm
+
+fn Rosetta::Doomsday::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || ($y % 400 == 0)
+}
+
+fn Rosetta::Doomsday::day_of_week($y, $m, $d) {
+    my @days = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+    
+    # Anchor day for the century
+    my $century = int($y / 100)
+    my $anchor = (5 * ($century % 4) + 2) % 7
+    
+    my $y_in_c = $y % 100
+    my $doomsday = (int($y_in_c / 12) + ($y_in_c % 12) + int(($y_in_c % 12) / 4) + $anchor) % 7
+    
+    # Fixed doomsdays for each month
+    my %month_doomsday = (
+        1 => (Rosetta::Doomsday::is_leap($y) ? 4 : 3),
+        2 => (Rosetta::Doomsday::is_leap($y) ? 29 : 28),
+        3 => 0, # Pi day (Mar 14 is 0 mod 7 from Mar 0) - wait, Mar 7/14/21/28 are doomsdays
+        4 => 4,
+        5 => 9,
+        6 => 6,
+        7 => 11,
+        8 => 8,
+        9 => 5,
+        10 => 10,
+        11 => 7,
+        12 => 12
+    )
+    
+    # Mar 0 is a convenient reference
+    if ($m == 3) {
+        return $days[($doomsday + ($d - 0)) % 7]
+    }
+    
+    my $m_doomsday = $month_doomsday{$m}
+    my $diff = $d - $m_doomsday
+    $days[($doomsday + $diff + 700) % 7]
+}
+
+assert_eq Rosetta::Doomsday::day_of_week(2026, 5, 1), "Friday", "2026-05-01 is Friday"
+assert_eq Rosetta::Doomsday::day_of_week(1969, 7, 20), "Sunday", "1969-07-20 is Sunday"
+assert_eq Rosetta::Doomsday::day_of_week(2000, 1, 1), "Saturday", "2000-01-01 is Saturday"
+assert_eq Rosetta::Doomsday::day_of_week(1900, 1, 1), "Monday", "1900-01-01 is Monday"
+assert_eq Rosetta::Doomsday::day_of_week(2024, 2, 29), "Thursday", "2024-02-29 is Thursday"
+
+# Pipe usage
+2026 |> Rosetta::Doomsday::day_of_week(5, 1) |> assert_eq("Friday", "pipe Doomsday")
+
+test_run

@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chen primes
+
+fn Rosetta::ChenPrimes::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::ChenPrimes::is_semiprime($n) {
+    my $count = 0
+    my $temp = $n
+    my $i = 2
+    while ($i * $i <= $temp) {
+        while ($temp % $i == 0) {
+            $temp = int($temp / $i)
+            $count++
+        }
+        $i++
+    }
+    if ($temp > 1) { $count++ }
+    $count == 2
+}
+
+fn Rosetta::ChenPrimes::is_chen($p) {
+    return 0 if !Rosetta::ChenPrimes::is_prime($p)
+    my $q = $p + 2
+    Rosetta::ChenPrimes::is_prime($q) || Rosetta::ChenPrimes::is_semiprime($q)
+}
+
+fn Rosetta::ChenPrimes::generate($limit) {
+    ~> 2:$limit pgrep { Rosetta::ChenPrimes::is_chen(_) }
+}
+
+# 2 is a Chen prime because 2+2=4 is a semiprime (2*2)
+assert_ok Rosetta::ChenPrimes::is_chen(2), "2 is a Chen prime"
+# 3 is a Chen prime because 3+2=5 is a prime
+assert_ok Rosetta::ChenPrimes::is_chen(3), "3 is a Chen prime"
+# 5 is a Chen prime because 5+2=7 is a prime
+assert_ok Rosetta::ChenPrimes::is_chen(5), "5 is a Chen prime"
+# 7 is a Chen prime because 7+2=9 is a semiprime (3*3)
+assert_ok Rosetta::ChenPrimes::is_chen(7), "7 is a Chen prime"
+# 11 is a Chen prime because 11+2=13 is a prime
+assert_ok Rosetta::ChenPrimes::is_chen(11), "11 is a Chen prime"
+# 13 is a Chen prime because 13+2=15 is a semiprime (3*5)
+assert_ok Rosetta::ChenPrimes::is_chen(13), "13 is a Chen prime"
+# 17 is a Chen prime because 17+2=19 is prime
+assert_ok Rosetta::ChenPrimes::is_chen(17), "17 is a Chen prime"
+# 19 is a Chen prime because 19+2=21 is a semiprime (3*7)
+assert_ok Rosetta::ChenPrimes::is_chen(19), "19 is a Chen prime"
+
+# 43 is NOT a Chen prime because 43+2=45 (3*3*5)
+assert_ok !Rosetta::ChenPrimes::is_chen(43), "43 is NOT a Chen prime"
+
+my @res = Rosetta::ChenPrimes::generate(50)
+assert_eq join(",", @res), "2,3,5,7,11,13,17,19,23,29,31,37,41,47", "Chen primes up to 50"
+
+test_run
