@@ -52,6 +52,8 @@ mod pending_destroy;
 pub mod perl_decode;
 pub mod perl_fs;
 pub mod perl_inc;
+#[cfg(unix)]
+pub mod perl_pty;
 mod perl_regex;
 pub mod perl_signal;
 pub mod pkg;

@@ -1670,6 +1670,26 @@ pub(crate) fn try_builtin(
         "web_jsonapi_collection" => Some(crate::web::web_jsonapi_collection(args, line)),
         "web_jsonapi_error" => Some(crate::web::web_jsonapi_error(args, line)),
         "web_bearer_token" => Some(crate::web::web_bearer_token(args, line)),
+        #[cfg(unix)]
+        "pty_spawn" => Some(crate::perl_pty::pty_spawn(args, line)),
+        #[cfg(unix)]
+        "pty_send" => Some(crate::perl_pty::pty_send(args, line)),
+        #[cfg(unix)]
+        "pty_read" => Some(crate::perl_pty::pty_read(args, line)),
+        #[cfg(unix)]
+        "pty_expect" => Some(crate::perl_pty::pty_expect(args, line)),
+        #[cfg(unix)]
+        "pty_expect_table" => Some(crate::perl_pty::pty_expect_table(args, line)),
+        #[cfg(unix)]
+        "pty_buffer" => Some(crate::perl_pty::pty_buffer(args, line)),
+        #[cfg(unix)]
+        "pty_alive" => Some(crate::perl_pty::pty_alive(args, line)),
+        #[cfg(unix)]
+        "pty_eof" => Some(crate::perl_pty::pty_eof(args, line)),
+        #[cfg(unix)]
+        "pty_close" => Some(crate::perl_pty::pty_close(args, line)),
+        #[cfg(unix)]
+        "pty_interact" => Some(crate::perl_pty::pty_interact(args, line)),
         "fetch" | "ft" => Some(builtin_fetch(args, line)),
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
         "http_request" | "hr" => Some(builtin_http_request(args, line)),
