@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Shoelace formula
+
+fn Rosetta::Shoelace::area(@points) {
+    my $n = len(@points)
+    my $area = 0.0
+    for my $i (0 .. $n - 1) {
+        my $j = ($i + 1) % $n
+        $area += $points[$i][0] * $points[$j][1]
+        $area -= $points[$j][0] * $points[$i][1]
+    }
+    abs($area) / 2.0
+}
+
+my @p = ([3,4], [5,11], [12,8], [9,5], [5,6])
+assert_eq Rosetta::Shoelace::area(@p), 30, "Area of polygon"
+
+test_run

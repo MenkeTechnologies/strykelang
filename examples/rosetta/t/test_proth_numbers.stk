@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Proth numbers
+
+fn Rosetta::Proth::is_proth($n) {
+    if ($n <= 0) { return 0 }
+    my $n_minus_1 = $n - 1
+    for (my $k = 1; $k < $n_minus_1; $k += 2) {
+        if ($n_minus_1 % $k == 0) {
+            my $pow2 = $n_minus_1 / $k
+            # Check if pow2 is a power of 2
+            if (($pow2 & ($pow2 - 1)) == 0) {
+                # k must be less than pow2
+                if ($k < $pow2) {
+                    return 1
+                }
+            }
+        }
+    }
+    0
+}
+
+fn Rosetta::Proth::generate($limit) {
+    my @res
+    my $n = 1
+    while (len(@res) < $limit) {
+        if (Rosetta::Proth::is_proth($n)) {
+            push @res, $n
+        }
+        $n++
+    }
+    \@res
+}
+
+my $proth = Rosetta::Proth::generate(10)
+assert_eq join(",", @$proth), "3,5,9,13,17,25,33,41,49,57", "First 10 Proth numbers"
+
+test_run

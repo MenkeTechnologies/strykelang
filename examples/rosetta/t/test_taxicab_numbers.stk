@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Taxicab numbers
+
+fn Rosetta::Taxicab::solve($limit) {
+    my %sums
+    for my $i (~> 1 : 100) {
+        for my $j (~> $i : 100) {
+            my $sum = $i**3 + $j**3
+            push @{$sums{$sum}}, "$i^3 + $j^3"
+        }
+    }
+    
+    my @res
+    for my $s (~> keys %sums sort { $a <=> $b }) {
+        if (len(@{$sums{$s}}) >= 2) {
+            push @res, $s
+            last if (len(@res) >= $limit)
+        }
+    }
+    \@res
+}
+
+my $taxis = Rosetta::Taxicab::solve(2)
+assert_eq $taxis->[0], 1729, "First taxicab is 1729"
+assert_eq $taxis->[1], 4104, "Second taxicab is 4104"
+
+test_run

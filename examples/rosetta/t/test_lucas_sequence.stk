@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Lucas sequence
+
+fn Rosetta::Lucas::generate($n) {
+    if ($n == 0) { return [2] }
+    if ($n == 1) { return [2, 1] }
+    my @res = (2, 1)
+    for my $i (2 .. $n) {
+        push @res, $res[$i - 1] + $res[$i - 2]
+    }
+    \@res
+}
+
+my $lucas = Rosetta::Lucas::generate(10)
+assert_eq join(",", @$lucas), "2,1,3,4,7,11,18,29,47,76,123", "First 11 Lucas numbers"
+
+test_run

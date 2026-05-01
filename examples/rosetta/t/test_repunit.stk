@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Repunit
+
+fn Rosetta::Repunit::generate($n) {
+    # A repunit is a number like 1, 11, 111, ...
+    my $res = 0
+    for my $i (1 .. $n) {
+        $res = $res * 10 + 1
+    }
+    $res
+}
+
+assert_eq Rosetta::Repunit::generate(1), 1, "R1"
+assert_eq Rosetta::Repunit::generate(3), 111, "R3"
+assert_eq Rosetta::Repunit::generate(5), 11111, "R5"
+
+test_run
