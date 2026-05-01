@@ -20,6 +20,11 @@ const APPLICATION_CSS_TERMINAL: &str = include_str!("../templates/themes/termina
 const APPLICATION_CSS_MATRIX: &str = include_str!("../templates/themes/matrix.css");
 const LAYOUT_THEMED: &str = include_str!("../templates/themes/layout.html.erb");
 const LAYOUT_CYBER: &str = include_str!("../templates/themes/layout_cyber.html.erb");
+const DOCKERFILE: &str = include_str!("../templates/devops/Dockerfile");
+const DOCKERIGNORE: &str = include_str!("../templates/devops/dockerignore");
+const CI_YAML: &str = include_str!("../templates/devops/ci.yml");
+const PWA_MANIFEST: &str = include_str!("../templates/devops/manifest.json");
+const PWA_SW: &str = include_str!("../templates/devops/sw.js");
 
 // ── Theme ──────────────────────────────────────────────────────────────
 
@@ -295,6 +300,38 @@ pub fn channel(name: &str) -> Result<()> {
         &body,
     )?;
     println!("Channel scaffolded: {}Channel", name.to_pascal_case());
+    Ok(())
+}
+
+// ── DevOps generators (Dockerfile / GitHub Actions / PWA) ─────────────
+
+pub fn docker(app_name: &str) -> Result<()> {
+    ensure_app_root()?;
+    let dockerfile = DOCKERFILE.replace("{{app_name}}", app_name);
+    write_file(&PathBuf::from("Dockerfile"), &dockerfile)?;
+    write_file(&PathBuf::from(".dockerignore"), DOCKERIGNORE)?;
+    println!("Wrote Dockerfile + .dockerignore. Build: docker build -t {} .", app_name);
+    Ok(())
+}
+
+pub fn ci() -> Result<()> {
+    ensure_app_root()?;
+    write_file(&PathBuf::from(".github/workflows/ci.yml"), CI_YAML)?;
+    println!("Wrote .github/workflows/ci.yml — pushes to main run health smoke.");
+    Ok(())
+}
+
+pub fn pwa(app_name: &str) -> Result<()> {
+    ensure_app_root()?;
+    let manifest = PWA_MANIFEST.replace("{{app_name}}", app_name);
+    let sw = PWA_SW.replace("{{app_name}}", app_name);
+    write_file(&PathBuf::from("public/manifest.json"), &manifest)?;
+    write_file(&PathBuf::from("public/sw.js"), &sw)?;
+    println!(
+        "Wrote public/manifest.json + public/sw.js. Add to <head>:\n  \
+         <link rel=\"manifest\" href=\"/manifest.json\">\n  \
+         <script>navigator.serviceWorker?.register('/sw.js')</script>"
+    );
     Ok(())
 }
 

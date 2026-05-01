@@ -1,0 +1,7 @@
+target/
+**/*.sqlite3*
+log/
+tmp/
+.git/
+.DS_Store
+node_modules/

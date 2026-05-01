@@ -58,10 +58,20 @@ enum Cmd {
         #[arg(long)]
         admin: bool,
         /// CSS theme preset baked into `app/views/layouts/application.html.erb`
-        /// and `public/assets/application.css`. One of: `pico`,
-        /// `bootstrap`, `tailwind`, `simple`, `dark`. Default: `simple`.
+        /// and `public/assets/application.css`. One of: `simple`, `dark`,
+        /// `pico`, `bootstrap`, `tailwind`, `cyberpunk`, `synthwave`,
+        /// `terminal`, `matrix`. Default: `simple`.
         #[arg(long, default_value = "simple")]
         theme: String,
+        /// Add a Dockerfile + .dockerignore.
+        #[arg(long)]
+        docker: bool,
+        /// Add a GitHub Actions CI workflow.
+        #[arg(long)]
+        ci: bool,
+        /// Add PWA manifest.json + service worker.
+        #[arg(long)]
+        pwa: bool,
     },
 
     /// Generate scaffolding inside an existing app (alias: `g`)
@@ -90,6 +100,18 @@ enum Cmd {
 
     /// Open a REPL with the app loaded
     Console,
+
+    /// Build a single self-contained binary that ships every .stk file
+    /// + the stryke runtime. Writes a Rust wrapper crate; user runs
+    /// `cargo build --release` inside it for the fat binary.
+    Build {
+        /// Output directory for the wrapper crate (default: `./dist`).
+        #[arg(short, long)]
+        out: Option<String>,
+        /// Override the resulting binary name (default: app dir name).
+        #[arg(short, long)]
+        name: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -151,6 +173,12 @@ enum GenerateCmd {
     Channel {
         name: String,
     },
+    /// Dockerfile + .dockerignore.
+    Docker,
+    /// GitHub Actions CI workflow.
+    Ci,
+    /// PWA manifest.json + service worker.
+    Pwa,
 }
 
 #[derive(Subcommand)]
@@ -165,9 +193,7 @@ enum DbCmd {
     Reset,
 }
 
-/// One-liner mode. Lay out the new tree, optionally apply theme +
-/// auth + admin + api, optionally bulk-scaffold a preset, optionally
-/// run `db migrate`. Each step is a no-op unless its flag is set.
+/// One-liner mode.
 #[allow(clippy::too_many_arguments)]
 fn one_shot_new(
     name: &str,
@@ -179,14 +205,21 @@ fn one_shot_new(
     auth: bool,
     admin: bool,
     theme: &str,
+    docker: bool,
+    ci: bool,
+    pwa: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     stryke_web::cmd_new::run(name, skip_git, database)?;
+
+    let display_name = std::path::Path::new(name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(name)
+        .to_string();
 
     let prev = std::env::current_dir()?;
     std::env::set_current_dir(name)?;
     let result: Result<(), Box<dyn std::error::Error>> = (|| {
-        // Theme is applied first so subsequent generated views can
-        // reference any classes / partials the theme installed.
         if theme != "simple" || api {
             stryke_web::cmd_extras::apply_theme(theme, api)?;
         }
@@ -204,6 +237,15 @@ fn one_shot_new(
         if admin {
             stryke_web::cmd_extras::admin()?;
         }
+        if docker {
+            stryke_web::cmd_extras::docker(&display_name)?;
+        }
+        if ci {
+            stryke_web::cmd_extras::ci()?;
+        }
+        if pwa {
+            stryke_web::cmd_extras::pwa(&display_name)?;
+        }
         if migrate {
             println!();
             println!("Running migrations…");
@@ -214,7 +256,7 @@ fn one_shot_new(
     let _ = std::env::set_current_dir(&prev);
     result?;
 
-    if app.is_some() || migrate || auth || admin || api {
+    if app.is_some() || migrate || auth || admin || api || docker || ci || pwa {
         println!();
         println!("Done. Boot the app:");
         println!("  cd {}", name);
@@ -236,6 +278,9 @@ fn main() -> ExitCode {
             auth,
             admin,
             theme,
+            docker,
+            ci,
+            pwa,
         } => one_shot_new(
             &name,
             skip_git,
@@ -246,6 +291,9 @@ fn main() -> ExitCode {
             auth,
             admin,
             &theme,
+            docker,
+            ci,
+            pwa,
         ),
         Cmd::Generate { what } => match what {
             GenerateCmd::Controller { name, actions } => {
@@ -269,6 +317,9 @@ fn main() -> ExitCode {
             }
             GenerateCmd::Job { name } => stryke_web::cmd_extras::job(&name),
             GenerateCmd::Channel { name } => stryke_web::cmd_extras::channel(&name),
+            GenerateCmd::Docker => stryke_web::cmd_extras::docker("app"),
+            GenerateCmd::Ci => stryke_web::cmd_extras::ci(),
+            GenerateCmd::Pwa => stryke_web::cmd_extras::pwa("app"),
         },
         Cmd::Server { port } => stryke_web::cmd_server::run(port),
         Cmd::Routes => stryke_web::cmd_routes::run(),
@@ -279,6 +330,9 @@ fn main() -> ExitCode {
             DbCmd::Reset => stryke_web::cmd_db::reset(),
         },
         Cmd::Console => stryke_web::cmd_server::console(),
+        Cmd::Build { out, name } => {
+            stryke_web::cmd_build::run(out.as_deref(), name.as_deref())
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

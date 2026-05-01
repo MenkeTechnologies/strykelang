@@ -72,6 +72,29 @@ PASSes 1–5 of the framework runtime have shipped:
   in `web_application_config`), per-request log line written to
   `log/$ENV.log`, `web_set_header`, `web_status`, `web_uuid`, `web_now`,
   `web_model_count/first/last`
+- **PASS 10 — monster mode** — JWT (`web_jwt_encode/decode`), rate
+  limiting (`web_rate_limit`), TOTP/2FA (`web_otp_secret/generate/verify`),
+  Markdown rendering (`web_markdown`), HTTP cache (`web_etag` with 304
+  short-circuit), CSV export (`web_csv`), faker
+  (`web_faker_name/email/sentence/paragraph/int`), counter caches
+  (`web_model_increment`), eager loading (`web_model_with`), content
+  blocks (`web_content_for/yield_content`), partials
+  (`web_render_partial`), security headers (`web_security_headers`),
+  OpenAPI 3.0 dump (`web_openapi`), signed time-limited tokens for
+  password resets (`web_token_for/consume`), permission checks
+  (`web_can`), plus `s_web g {docker,ci,pwa}` and matching `--docker
+  --ci --pwa` flags on `s_web new`
+- **PASS 11 — APIs + fat binary** — built-in `/openapi.json`,
+  Swagger UI at `/docs`, Redoc at `/docs/redoc` (no app code needed
+  for any of them — automatic from the live route table). JSON:API
+  helpers (`web_jsonapi_resource/collection/error`). Bearer token
+  extractor (`web_bearer_token` for JWT auth APIs). And **`s_web build`**
+  — generates a Rust wrapper crate that `include_str!`s every `.stk`
+  file, so `cargo build --release` produces a single self-contained
+  binary that ships the entire framework + app + SQLite (statically
+  linked) with no runtime deps beyond libc + libssl. Verified at
+  136 MB on macOS arm64 — runs `./api_monster` and the embedded app
+  boots, migrates, and serves all routes immediately.
 
 Remaining work:
 
@@ -136,6 +159,9 @@ Wall time: ~0.45s scaffold + migrations.
 | `--admin` | Admin panel at `/admin` with CRUD browsing |
 | `--api` | API-only mode — drop views/layout, default controllers emit JSON |
 | `--migrate` | Run `db migrate` so the SQLite schema is ready immediately |
+| `--docker` | Add `Dockerfile` + `.dockerignore` (multi-stage build, runs migrations + boots server on container start) |
+| `--ci` | Add `.github/workflows/ci.yml` running migrate + boot + `/health` smoke on push |
+| `--pwa` | Add `public/manifest.json` + `public/sw.js` for installable PWA + offline cache |
 | `--skip-git` | Don't `git init` |
 
 ### Smaller examples
@@ -222,6 +248,10 @@ admin tables, forms, and buttons all theme correctly:
 | `s_web g mailer Name [actions…]` | Mailer stub |
 | `s_web g job Name` | Background-job stub |
 | `s_web g channel Name` | WebSocket / SSE channel stub |
+| `s_web g docker` | Multi-stage Dockerfile + .dockerignore |
+| `s_web g ci` | GitHub Actions CI workflow |
+| `s_web g pwa` | PWA manifest + service worker |
+| `s_web build [--out DIR] [--name NAME]` | Generate a Rust wrapper crate that embeds every `.stk` via `include_str!`. Run `cargo build --release` inside it for a single fat binary with the entire framework + app + SQLite linked statically |
 
 ## Generated layout
 
@@ -325,6 +355,26 @@ prefixed `web_*` builtins:
 | `web_permit($params, "title", "body")` | Strong params — whitelist accepted keys |
 | `web_signed("payload")` / `web_unsigned($signed)` | HMAC-signed round-trippable strings (uses `secret_key_base` from app config) |
 | `web_log("info", "msg")` / `web_set_header("X-Frame-Options", "DENY")` / `web_status(404)` / `web_uuid()` / `web_now()` | Misc response + log helpers |
+| `web_jwt_encode(+{user_id=>1, role=>"admin"})` / `web_jwt_decode($token)` | HS256 JWT mint / verify (signed with `secret_key_base`) |
+| `web_rate_limit("login:$ip", 5, 60)` | Token-bucket rate limit — returns 1 if allowed, 0 if exceeded |
+| `web_otp_secret()` / `web_otp_generate($secret)` / `web_otp_verify($secret, $code)` | TOTP 2FA — RFC 6238, 30s window, ±1 step skew tolerance |
+| `web_markdown($text)` (alias `web_md`) | CommonMark subset: headings, **bold**, *italic*, `code`, [links](url), fenced code, lists, blockquotes, hr |
+| `web_etag("payload")` | Compute + emit ETag, return 1 if request matched (auto 304 + skip render) |
+| `web_csv($rows)` | Hashref array → CSV string with quoting; accepts both `\@rows` and `@rows` |
+| `web_faker_name/email/sentence/paragraph/int(min, max)` | Test/seed data generators |
+| `web_model_increment("posts", $id, "comments_count", 1)` | Atomic counter cache update |
+| `web_model_with("posts", "user")` | Single IN-query eager load (`$post->{_user}` populated, no n+1) |
+| `web_content_for("title", "...")` / `web_yield_content("title")` | Rails-style content blocks for layouts |
+| `web_render_partial("posts/form", +{post=>$p})` | Resolve `app/views/posts/_form.html.erb` and render with locals |
+| `web_security_headers()` | Set X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, Permissions-Policy |
+| `web_openapi()` | Returns the live route table as an OpenAPI 3.0 hashref (serve via `web_json`) |
+| `web_token_for($user_id, "reset", 3600)` / `web_token_consume($token, "reset")` | Signed time-limited tokens for password reset / email verify links |
+| `web_can("posts.edit", $user)` | Role + permissions check (`role => "admin"` short-circuits) |
+| `/openapi.json` | Auto-served — OpenAPI 3.0 doc generated from the live route table |
+| `/docs` | Auto-served — Swagger UI loading `/openapi.json` |
+| `/docs/redoc` | Auto-served — Redoc rendering of `/openapi.json` |
+| `web_jsonapi_resource("posts", $row)` / `web_jsonapi_collection("posts", $rows)` / `web_jsonapi_error(404, "not_found", "msg")` | JSON:API envelope helpers |
+| `web_bearer_token()` | Returns the `Authorization: Bearer X` token (pair with `web_jwt_decode`) |
 
 Default-convention render: an action that calls neither `web_render`
 nor `web_redirect` auto-renders `app/views/{resource}/{action}.html.erb`.
