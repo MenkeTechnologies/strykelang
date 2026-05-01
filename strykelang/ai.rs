@@ -8,7 +8,7 @@
 //!   * `prompt($prompt, opts...)`     — alias for `ai`
 //!   * `stream_prompt($prompt, opts)` — streaming variant; returns one
 //!                                       concatenated string for v0
-//!                                       (real Stream<Str> is Phase 5)
+//!                                       (real `Stream<Str>` is Phase 5)
 //!   * `chat($messages, opts...)`     — explicit message-list version
 //!   * `embed($text)` / `embed(@texts)` — text embedding via Voyage AI
 //!   * `tokens_of($text)`             — char/4 heuristic
@@ -183,9 +183,14 @@ fn cache_key(provider: &str, model: &str, system: &str, prompt: &str) -> String 
 static MOCKS: OnceLock<Mutex<Vec<(regex::Regex, String)>>> = OnceLock::new();
 
 static LAST_THINKING_BUF: OnceLock<Mutex<String>> = OnceLock::new();
+static LAST_CITATIONS_BUF: OnceLock<Mutex<Vec<serde_json::Value>>> = OnceLock::new();
 
 fn last_thinking() -> &'static Mutex<String> {
     LAST_THINKING_BUF.get_or_init(|| Mutex::new(String::new()))
+}
+
+fn last_citations() -> &'static Mutex<Vec<serde_json::Value>> {
+    LAST_CITATIONS_BUF.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 fn mocks() -> &'static Mutex<Vec<(regex::Regex, String)>> {
@@ -233,7 +238,16 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     // 1. Mock mode wins everything.
     if let Some(resp) = match_mock(&prompt) {
-        record_history(&provider, &model, &prompt, resp.chars().count(), 0, 0, 0.0, false);
+        record_history(
+            &provider,
+            &model,
+            &prompt,
+            resp.chars().count(),
+            0,
+            0,
+            0.0,
+            false,
+        );
         return Ok(PerlValue::string(resp));
     }
     if mock_only_mode() {
@@ -251,7 +265,16 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     if cache_enabled {
         if let Some(hit) = cache().lock().get(&key).cloned() {
             CACHE_HITS.fetch_add(1, Ordering::Relaxed);
-            record_history(&provider, &model, &prompt, hit.chars().count(), 0, 0, 0.0, true);
+            record_history(
+                &provider,
+                &model,
+                &prompt,
+                hit.chars().count(),
+                0,
+                0,
+                0.0,
+                true,
+            );
             return Ok(PerlValue::string(hit));
         }
         CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
@@ -271,19 +294,98 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     }
 
     // 4. Dispatch by provider.
-    let result = match provider.as_str() {
-        "anthropic" => call_anthropic(
-            &prompt, &system, &model, max_tokens, temperature, timeout,
-            cache_control, thinking, thinking_budget, line,
-        )?,
-        "openai" => call_openai(&prompt, &system, &model, max_tokens, temperature, timeout, line)?,
-        other => {
-            return Err(PerlError::runtime(
-                format!("ai: provider `{}` not implemented yet (Phase 4)", other),
+    let base_url_override = opt_str(&opts, "base_url", "");
+    let result =
+        match provider.as_str() {
+            "anthropic" => call_anthropic(
+                &prompt,
+                &system,
+                &model,
+                max_tokens,
+                temperature,
+                timeout,
+                cache_control,
+                thinking,
+                thinking_budget,
                 line,
-            ))
-        }
-    };
+            )?,
+            "openai" => call_openai_with_base(
+                &prompt,
+                &system,
+                &model,
+                max_tokens,
+                temperature,
+                timeout,
+                "https://api.openai.com/v1/chat/completions",
+                "OPENAI_API_KEY",
+                line,
+            )?,
+            // OpenAI-compatible local servers: LM Studio (default :1234),
+            // vLLM, llama-server, llamafile, anything-llm. Same wire shape;
+            // user just sets `base_url => "http://localhost:1234/v1/chat/completions"`
+            // (or via `[ai] base_url = "..."`).
+            "openai_compat" | "compat" | "local" => {
+                let base = if !base_url_override.is_empty() {
+                    base_url_override.clone()
+                } else {
+                    std::env::var("STRYKE_AI_BASE_URL")
+                        .unwrap_or_else(|_| "http://localhost:1234/v1/chat/completions".into())
+                };
+                call_openai_with_base(
+                    &prompt,
+                    &system,
+                    &model,
+                    max_tokens,
+                    temperature,
+                    timeout,
+                    &base,
+                    "STRYKE_AI_LOCAL_KEY",
+                    line,
+                )?
+            }
+            // Ollama's native (non-OpenAI) generate API.
+            "ollama" => {
+                let base = if !base_url_override.is_empty() {
+                    base_url_override.clone()
+                } else {
+                    std::env::var("OLLAMA_HOST")
+                        .map(|h| {
+                            if h.starts_with("http") {
+                                h
+                            } else {
+                                format!("http://{}", h)
+                            }
+                        })
+                        .unwrap_or_else(|_| "http://localhost:11434".into())
+                };
+                call_ollama(
+                    &prompt,
+                    &system,
+                    &model,
+                    max_tokens,
+                    temperature,
+                    timeout,
+                    &base,
+                    line,
+                )?
+            }
+            "gemini" | "google" => call_gemini(
+                &prompt,
+                &system,
+                &model,
+                max_tokens,
+                temperature,
+                timeout,
+                line,
+            )?,
+            other => return Err(PerlError::runtime(
+                format!(
+                    "ai: provider `{}` not implemented (try anthropic/openai/ollama/local/gemini)",
+                    other
+                ),
+                line,
+            )),
+        };
 
     if cache_enabled {
         cache().lock().insert(key, result.clone());
@@ -302,11 +404,160 @@ pub(crate) fn ai_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn ai_stream_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    // Phase 0 returns the full text; real Stream<Str> is Phase 5.
-    // Apps using `for my $chunk in stream_prompt(...)` should still
-    // work because a String iterates char-by-char in stryke list ctx
-    // and the agent's UX is the same final body either way.
-    ai_prompt(args, line)
+    // Iter-context streaming: returns a PerlValue::iterator that yields
+    // one text-delta chunk per `next()`. Scalar context still works
+    // because stryke iterators stringify by collecting + joining.
+    //
+    // Mock-mode and missing API key fall back to the buffered string
+    // path so tests stay deterministic offline.
+    let prompt = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("stream_prompt: prompt required", line))?;
+    let opts = parse_opts(&args[1..]);
+
+    if let Some(resp) = match_mock(&prompt) {
+        return Ok(make_string_chunked_iter(resp));
+    }
+    if mock_only_mode() {
+        return Err(PerlError::runtime(
+            "stream_prompt: STRYKE_AI_MODE=mock-only and no mock matched",
+            line,
+        ));
+    }
+
+    let provider = opt_str(&opts, "provider", &config().lock().provider);
+    if provider != "anthropic" {
+        return ai_prompt(args, line);
+    }
+    let model = opt_str(&opts, "model", &config().lock().model);
+    let system = opt_str(&opts, "system", "");
+    let max_tokens = opt_int(&opts, "max_tokens", 1024);
+    let temperature = opt_float(&opts, "temperature", -1.0);
+    let timeout = opt_int(&opts, "timeout", 120);
+
+    let key_env = config().lock().api_key_env.clone();
+    let api_key = std::env::var(&key_env).map_err(|_| {
+        PerlError::runtime(format!("stream_prompt: ${} env var not set", key_env), line)
+    })?;
+    let mut body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{ "role": "user", "content": prompt }],
+        "stream": true,
+    });
+    if !system.is_empty() {
+        body["system"] = serde_json::Value::String(system);
+    }
+    if temperature >= 0.0 {
+        body["temperature"] = serde_json::Value::from(temperature);
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.anthropic.com/v1/messages")
+        .set("x-api-key", &api_key)
+        .set("anthropic-version", "2023-06-01")
+        .set("content-type", "application/json")
+        .set("accept", "text/event-stream")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
+    let reader = std::io::BufReader::new(resp.into_reader());
+    let iter = AnthropicStreamIter {
+        reader: parking_lot::Mutex::new(Some(reader)),
+        done: parking_lot::Mutex::new(false),
+        model,
+    };
+    Ok(PerlValue::iterator(Arc::new(iter)))
+}
+
+struct AnthropicStreamIter {
+    reader: parking_lot::Mutex<Option<std::io::BufReader<Box<dyn std::io::Read + Send + Sync>>>>,
+    done: parking_lot::Mutex<bool>,
+    model: String,
+}
+
+impl crate::value::PerlIterator for AnthropicStreamIter {
+    fn next_item(&self) -> Option<PerlValue> {
+        use std::io::BufRead;
+        if *self.done.lock() {
+            return None;
+        }
+        let mut guard = self.reader.lock();
+        let reader = guard.as_mut()?;
+        let mut input_tokens = 0u64;
+        let mut output_tokens = 0u64;
+        loop {
+            let mut line = String::new();
+            let n = reader.read_line(&mut line).unwrap_or(0);
+            if n == 0 {
+                *self.done.lock() = true;
+                let (in_per_1k, out_per_1k) = price_per_1k_tokens(&self.model);
+                INPUT_TOKENS.fetch_add(input_tokens, std::sync::atomic::Ordering::Relaxed);
+                OUTPUT_TOKENS.fetch_add(output_tokens, std::sync::atomic::Ordering::Relaxed);
+                add_cost(
+                    input_tokens as f64 / 1000.0 * in_per_1k
+                        + output_tokens as f64 / 1000.0 * out_per_1k,
+                );
+                return None;
+            }
+            let Some(payload) = line
+                .trim_end()
+                .strip_prefix("data: ")
+                .map(|s| s.to_string())
+            else {
+                continue;
+            };
+            if payload == "[DONE]" {
+                *self.done.lock() = true;
+                return None;
+            }
+            let v: serde_json::Value = match serde_json::from_str(&payload) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            match v["type"].as_str() {
+                Some("content_block_delta") => {
+                    if let Some(t) = v["delta"]["text"].as_str() {
+                        return Some(PerlValue::string(t.to_string()));
+                    }
+                }
+                Some("message_start") => {
+                    if let Some(n) = v["message"]["usage"]["input_tokens"].as_u64() {
+                        input_tokens = n;
+                    }
+                }
+                Some("message_delta") => {
+                    if let Some(n) = v["usage"]["output_tokens"].as_u64() {
+                        output_tokens = n;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Mock-mode iterator: chunks a known string into character-sized
+/// pieces so tests can drive `for my $chunk in stream_prompt("...")`
+/// loops deterministically without the network.
+fn make_string_chunked_iter(s: String) -> PerlValue {
+    struct Iter {
+        chars: parking_lot::Mutex<std::collections::VecDeque<char>>,
+    }
+    impl crate::value::PerlIterator for Iter {
+        fn next_item(&self) -> Option<PerlValue> {
+            self.chars
+                .lock()
+                .pop_front()
+                .map(|c| PerlValue::string(c.to_string()))
+        }
+    }
+    let chars: std::collections::VecDeque<char> = s.chars().collect();
+    PerlValue::iterator(Arc::new(Iter {
+        chars: parking_lot::Mutex::new(chars),
+    }))
 }
 
 pub(crate) fn ai_chat(args: &[PerlValue], line: usize) -> Result<PerlValue> {
@@ -400,6 +651,7 @@ pub(crate) fn ai_embed(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     match provider.as_str() {
         "voyage" => call_voyage_embed(&inputs, &cfg.embed_model, &api_key_env, line),
         "openai" => call_openai_embed(&inputs, &cfg.embed_model, &api_key_env, line),
+        "ollama" => call_ollama_embed(&inputs, &cfg.embed_model, line),
         other => Err(PerlError::runtime(
             format!("embed: provider `{}` not implemented", other),
             line,
@@ -458,6 +710,171 @@ pub(crate) fn ai_last_thinking(_args: &[PerlValue], _line: usize) -> Result<Perl
     Ok(PerlValue::string(last_thinking().lock().clone()))
 }
 
+/// `ai_dashboard()` → ANSI-colored multi-line summary of cost/tokens/cache.
+/// Useful for dropping at the end of a script or during an interactive
+/// session: `print ai_dashboard()`. Pure output formatter — no side
+/// effects on counters. Color codes are stripped automatically when
+/// stdout is not a tty (so logs stay clean).
+pub(crate) fn ai_dashboard(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let usd = current_cost_usd();
+    let inp = INPUT_TOKENS.load(Ordering::Relaxed);
+    let out = OUTPUT_TOKENS.load(Ordering::Relaxed);
+    let emb = EMBED_TOKENS.load(Ordering::Relaxed);
+    let cc = CACHE_CREATION_TOKENS.load(Ordering::Relaxed);
+    let cr = CACHE_READ_TOKENS.load(Ordering::Relaxed);
+    let hits = CACHE_HITS.load(Ordering::Relaxed);
+    let misses = CACHE_MISSES.load(Ordering::Relaxed);
+    let total = hits + misses;
+    let hit_pct = if total > 0 {
+        (hits as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
+    let cache_savings_tokens = cr;
+    let cap = config().lock().max_cost_run_usd;
+    let cap_str = if cap > 0.0 && cap.is_finite() {
+        format!("${:.4} / ${:.4}", usd, cap)
+    } else {
+        format!("${:.4}", usd)
+    };
+    let use_color = is_tty_stdout();
+    let (c_cyan, c_green, c_yellow, c_dim, c_reset) = if use_color {
+        (
+            "\x1b[1;36m",
+            "\x1b[1;32m",
+            "\x1b[1;33m",
+            "\x1b[2m",
+            "\x1b[0m",
+        )
+    } else {
+        ("", "", "", "", "")
+    };
+    let mut s = String::new();
+    s.push_str(&format!(
+        "{c_cyan}┌─ stryke ai dashboard ─{c_reset}\n",
+        c_cyan = c_cyan,
+        c_reset = c_reset
+    ));
+    s.push_str(&format!(
+        "│ {c_dim}cost{c_reset}     {c_green}{}{c_reset}\n",
+        cap_str,
+        c_dim = c_dim,
+        c_green = c_green,
+        c_reset = c_reset
+    ));
+    s.push_str(&format!(
+        "│ {c_dim}prompt{c_reset}   in {} / out {}\n",
+        inp,
+        out,
+        c_dim = c_dim,
+        c_reset = c_reset
+    ));
+    if emb > 0 {
+        s.push_str(&format!(
+            "│ {c_dim}embed{c_reset}    {} tokens\n",
+            emb,
+            c_dim = c_dim,
+            c_reset = c_reset
+        ));
+    }
+    if cc > 0 || cr > 0 {
+        s.push_str(&format!(
+            "│ {c_dim}prompt cache{c_reset}  write {} / read {} {c_yellow}(saved ~{} tokens){c_reset}\n",
+            cc,
+            cr,
+            cache_savings_tokens,
+            c_dim = c_dim,
+            c_yellow = c_yellow,
+            c_reset = c_reset
+        ));
+    }
+    if total > 0 {
+        s.push_str(&format!(
+            "│ {c_dim}result cache{c_reset}  {}/{} ({:.1}% hit)\n",
+            hits,
+            total,
+            hit_pct,
+            c_dim = c_dim,
+            c_reset = c_reset
+        ));
+    }
+    s.push_str(&format!(
+        "{c_cyan}└──────{c_reset}\n",
+        c_cyan = c_cyan,
+        c_reset = c_reset
+    ));
+    Ok(PerlValue::string(s))
+}
+
+/// `ai_pricing($model)` → hashref `+{ input => $usd_per_1k, output => $usd_per_1k }`.
+/// Returns the per-1K-token pricing the runtime uses for cost tracking. Call
+/// `ai_pricing("claude-opus-4-7")` etc. to see what an upcoming request will
+/// cost without sending it. Models we don't recognize fall back to the
+/// "sensible default" tier (Sonnet-class).
+pub(crate) fn ai_pricing(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let model = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| config().lock().model.clone());
+    let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
+    let mut h = IndexMap::new();
+    h.insert("model".to_string(), PerlValue::string(model));
+    h.insert("input".to_string(), PerlValue::float(in_per_1k));
+    h.insert("output".to_string(), PerlValue::float(out_per_1k));
+    h.insert(
+        "input_per_1m".to_string(),
+        PerlValue::float(in_per_1k * 1000.0),
+    );
+    h.insert(
+        "output_per_1m".to_string(),
+        PerlValue::float(out_per_1k * 1000.0),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// `ai_describe("path/or/url.png", style => "concise")` — convenience wrapper
+/// around `ai_vision` that asks for a description. `style => "concise"` (one
+/// sentence), `"detailed"` (paragraph), or any custom prompt suffix appended
+/// to "Describe this image".
+pub(crate) fn ai_describe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let img = args
+        .first()
+        .cloned()
+        .ok_or_else(|| PerlError::runtime("ai_describe: image path/url required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let style = opt_str(&opts, "style", "concise");
+    let suffix = match style.as_str() {
+        "concise" => " in one sentence.",
+        "detailed" => " in detail, including objects, colors, and atmosphere.",
+        "alt" => " as an HTML alt-text attribute, ≤125 chars.",
+        custom if !custom.is_empty() => &format!(" {}", custom),
+        _ => ".",
+    };
+    let prompt = format!("Describe this image{}", suffix);
+    let mut vision_args: Vec<PerlValue> = vec![
+        PerlValue::string(prompt),
+        PerlValue::string("image".to_string()),
+        img,
+    ];
+    for (k, v) in opts.iter().filter(|(k, _)| k.as_str() != "style") {
+        vision_args.push(PerlValue::string(k.clone()));
+        vision_args.push(v.clone());
+    }
+    ai_vision(&vision_args, line)
+}
+
+/// True if stdout is a tty — drives ANSI color emission in `ai_dashboard`.
+fn is_tty_stdout() -> bool {
+    #[cfg(unix)]
+    unsafe {
+        libc::isatty(libc::STDOUT_FILENO) == 1
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
 pub(crate) fn ai_cache_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     cache().lock().clear();
     CACHE_HITS.store(0, Ordering::Relaxed);
@@ -483,7 +900,10 @@ pub(crate) fn ai_mock_install(args: &[PerlValue], line: usize) -> Result<PerlVal
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("ai_mock_install: response required", line))?;
     let re = regex::Regex::new(&pattern).map_err(|e| {
-        PerlError::runtime(format!("ai_mock_install: bad regex `{}`: {}", pattern, e), line)
+        PerlError::runtime(
+            format!("ai_mock_install: bad regex `{}`: {}", pattern, e),
+            line,
+        )
     })?;
     mocks().lock().push((re, response));
     Ok(PerlValue::UNDEF)
@@ -495,10 +915,7 @@ pub(crate) fn ai_mock_clear(_args: &[PerlValue], _line: usize) -> Result<PerlVal
 }
 
 pub(crate) fn ai_config_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let key = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let cfg = config().lock().clone();
     let v = match key.as_str() {
         "provider" => PerlValue::string(cfg.provider),
@@ -586,12 +1003,8 @@ fn call_anthropic(
     line: usize,
 ) -> Result<String> {
     let key_env = config().lock().api_key_env.clone();
-    let api_key = std::env::var(&key_env).map_err(|_| {
-        PerlError::runtime(
-            format!("ai: ${} env var not set", key_env),
-            line,
-        )
-    })?;
+    let api_key = std::env::var(&key_env)
+        .map_err(|_| PerlError::runtime(format!("ai: ${} env var not set", key_env), line))?;
     let mut body = serde_json::json!({
         "model": model,
         "max_tokens": max_tokens,
@@ -639,22 +1052,27 @@ fn call_anthropic(
     CACHE_CREATION_TOKENS.fetch_add(cache_creation, Ordering::Relaxed);
     CACHE_READ_TOKENS.fetch_add(cache_read, Ordering::Relaxed);
     let (in_per_1k, out_per_1k) = price_per_1k_tokens(model);
-    let normal_cost = input as f64 / 1000.0 * in_per_1k
-        + output as f64 / 1000.0 * out_per_1k;
+    let normal_cost = input as f64 / 1000.0 * in_per_1k + output as f64 / 1000.0 * out_per_1k;
     let cache_cost = cache_creation as f64 / 1000.0 * in_per_1k * 1.25
         + cache_read as f64 / 1000.0 * in_per_1k * 0.10;
     add_cost(normal_cost + cache_cost);
 
     // Extract assistant text — and any extended-thinking blocks if the
-    // model included them. Both stay in `content[]`.
+    // model included them. Both stay in `content[]`. Citations attached
+    // to text blocks (Anthropic Citations feature) accumulate into
+    // `LAST_CITATIONS_BUF` and are surfaced via `ai_citations()`.
     let mut out = String::new();
     let mut thinking_text = String::new();
+    let mut citations: Vec<serde_json::Value> = Vec::new();
     if let Some(arr) = json["content"].as_array() {
         for chunk in arr {
             match chunk["type"].as_str() {
                 Some("text") => {
                     if let Some(t) = chunk["text"].as_str() {
                         out.push_str(t);
+                    }
+                    if let Some(cs) = chunk["citations"].as_array() {
+                        citations.extend(cs.iter().cloned());
                     }
                 }
                 Some("thinking") => {
@@ -671,6 +1089,7 @@ fn call_anthropic(
     } else {
         last_thinking().lock().clear();
     }
+    *last_citations().lock() = citations;
     if out.is_empty() {
         return Err(PerlError::runtime(
             format!(
@@ -685,19 +1104,22 @@ fn call_anthropic(
 
 // ── Provider: OpenAI ──────────────────────────────────────────────────
 
-fn call_openai(
+#[allow(clippy::too_many_arguments)]
+fn call_openai_with_base(
     prompt: &str,
     system: &str,
     model: &str,
     max_tokens: i64,
     temperature: f64,
     timeout: i64,
+    url: &str,
+    key_env: &str,
     line: usize,
 ) -> Result<String> {
-    let key_env = "OPENAI_API_KEY";
-    let api_key = std::env::var(key_env).map_err(|_| {
-        PerlError::runtime(format!("ai: ${} env var not set", key_env), line)
-    })?;
+    // Local OpenAI-compatible servers (LM Studio, llama-server, vLLM,
+    // ollama in compat mode) often don't require auth. Treat missing
+    // env as empty and let the server reject if it cares.
+    let api_key = std::env::var(key_env).unwrap_or_default();
     let mut messages: Vec<serde_json::Value> = Vec::new();
     if !system.is_empty() {
         messages.push(serde_json::json!({"role": "system", "content": system}));
@@ -716,15 +1138,16 @@ fn call_openai(
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(timeout.max(1) as u64))
         .build();
-    let resp = agent
-        .post("https://api.openai.com/v1/chat/completions")
-        .set("authorization", &format!("Bearer {}", api_key))
-        .set("content-type", "application/json")
+    let mut req = agent.post(url).set("content-type", "application/json");
+    if !api_key.is_empty() {
+        req = req.set("authorization", &format!("Bearer {}", api_key));
+    }
+    let resp = req
         .send_json(body)
         .map_err(|e| PerlError::runtime(format!("ai: openai request: {}", e), line))?;
-    let json: serde_json::Value = resp.into_json().map_err(|e| {
-        PerlError::runtime(format!("ai: openai decode: {}", e), line)
-    })?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai: openai decode: {}", e), line))?;
 
     let usage = &json["usage"];
     let input = usage["prompt_tokens"].as_u64().unwrap_or(0);
@@ -758,9 +1181,8 @@ fn call_voyage_embed(
     api_key_env: &str,
     line: usize,
 ) -> Result<PerlValue> {
-    let api_key = std::env::var(api_key_env).map_err(|_| {
-        PerlError::runtime(format!("embed: ${} not set", api_key_env), line)
-    })?;
+    let api_key = std::env::var(api_key_env)
+        .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
         "input": inputs,
         "model": model,
@@ -774,9 +1196,9 @@ fn call_voyage_embed(
         .set("content-type", "application/json")
         .send_json(body)
         .map_err(|e| PerlError::runtime(format!("embed: voyage request: {}", e), line))?;
-    let json: serde_json::Value = resp.into_json().map_err(|e| {
-        PerlError::runtime(format!("embed: voyage decode: {}", e), line)
-    })?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("embed: voyage decode: {}", e), line))?;
 
     if let Some(t) = json["usage"]["total_tokens"].as_u64() {
         EMBED_TOKENS.fetch_add(t, Ordering::Relaxed);
@@ -793,9 +1215,8 @@ fn call_openai_embed(
     api_key_env: &str,
     line: usize,
 ) -> Result<PerlValue> {
-    let api_key = std::env::var(api_key_env).map_err(|_| {
-        PerlError::runtime(format!("embed: ${} not set", api_key_env), line)
-    })?;
+    let api_key = std::env::var(api_key_env)
+        .map_err(|_| PerlError::runtime(format!("embed: ${} not set", api_key_env), line))?;
     let body = serde_json::json!({
         "input": inputs,
         "model": model,
@@ -809,9 +1230,9 @@ fn call_openai_embed(
         .set("content-type", "application/json")
         .send_json(body)
         .map_err(|e| PerlError::runtime(format!("embed: openai request: {}", e), line))?;
-    let json: serde_json::Value = resp.into_json().map_err(|e| {
-        PerlError::runtime(format!("embed: openai decode: {}", e), line)
-    })?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("embed: openai decode: {}", e), line))?;
     if let Some(t) = json["usage"]["total_tokens"].as_u64() {
         EMBED_TOKENS.fetch_add(t, Ordering::Relaxed);
         // text-embedding-3-small is $0.02 / 1M.
@@ -820,10 +1241,47 @@ fn call_openai_embed(
     embeddings_response_to_perl(&json["data"])
 }
 
+/// Local embeddings via Ollama's `/api/embed` endpoint. Cost is zero because
+/// the model runs on the user's hardware. The default model is
+/// `nomic-embed-text` — small, fast, English-tuned. Other models work as long
+/// as they're pulled into Ollama (`ollama pull mxbai-embed-large`, etc.).
+fn call_ollama_embed(inputs: &[String], model: &str, line: usize) -> Result<PerlValue> {
+    let base = std::env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".into());
+    let url = format!("{}/api/embed", base.trim_end_matches('/'));
+    let model = if model.is_empty() || model == "voyage-3" || model.starts_with("text-embedding") {
+        "nomic-embed-text"
+    } else {
+        model
+    };
+    let body = serde_json::json!({
+        "model": model,
+        "input": inputs,
+    });
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(60))
+        .build();
+    let resp = agent
+        .post(&url)
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("embed: ollama request: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("embed: ollama decode: {}", e), line))?;
+    // Ollama returns `{embeddings: [[...], [...]]}` — reshape into the
+    // OpenAI-style `data: [{embedding: [...]}, ...]` we already parse.
+    let embeddings = json["embeddings"].as_array().cloned().unwrap_or_default();
+    let mut shaped: Vec<serde_json::Value> = Vec::with_capacity(embeddings.len());
+    for emb in embeddings {
+        shaped.push(serde_json::json!({ "embedding": emb }));
+    }
+    embeddings_response_to_perl(&serde_json::Value::Array(shaped))
+}
+
 fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<PerlValue> {
-    let arr = data.as_array().ok_or_else(|| {
-        PerlError::runtime("embed: provider returned non-array data", 0)
-    })?;
+    let arr = data
+        .as_array()
+        .ok_or_else(|| PerlError::runtime("embed: provider returned non-array data", 0))?;
     let mut all: Vec<PerlValue> = Vec::with_capacity(arr.len());
     for item in arr {
         let vec_arr = item["embedding"]
@@ -841,7 +1299,9 @@ fn embeddings_response_to_perl(data: &serde_json::Value) -> Result<PerlValue> {
         // Single input → single embedding hashref.
         return Ok(all.into_iter().next().unwrap());
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(all))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        all,
+    ))))
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -907,11 +1367,7 @@ fn truncate(s: &str, n: usize) -> String {
 // `max_turns` is hit.
 
 impl Interpreter {
-    pub(crate) fn ai_agent(
-        &mut self,
-        args: &[PerlValue],
-        line: usize,
-    ) -> Result<PerlValue> {
+    pub(crate) fn ai_agent(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let prompt = args
             .first()
             .map(|v| v.to_string())
@@ -966,9 +1422,8 @@ impl Interpreter {
         }
 
         // Build the tools list as a JSON array shaped for the provider.
-        let mut compiled: Vec<CompiledTool> = Vec::with_capacity(
-            tools_list.len() + registered.len() + attached.len(),
-        );
+        let mut compiled: Vec<CompiledTool> =
+            Vec::with_capacity(tools_list.len() + registered.len() + attached.len());
         for t in &tools_list {
             compiled.push(compile_tool(t, line)?);
         }
@@ -1080,9 +1535,8 @@ impl Interpreter {
             })
             .collect();
 
-        let mut messages: Vec<serde_json::Value> = vec![
-            serde_json::json!({"role": "user", "content": prompt}),
-        ];
+        let mut messages: Vec<serde_json::Value> =
+            vec![serde_json::json!({"role": "user", "content": prompt})];
 
         for turn in 0..max_turns {
             // Cost ceiling check on every turn.
@@ -1119,14 +1573,11 @@ impl Interpreter {
                 .set("content-type", "application/json")
                 .send_json(body)
                 .map_err(|e| {
-                    PerlError::runtime(
-                        format!("ai_agent: anthropic turn {}: {}", turn, e),
-                        line,
-                    )
+                    PerlError::runtime(format!("ai_agent: anthropic turn {}: {}", turn, e), line)
                 })?;
-            let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_agent: decode: {}", e), line)
-            })?;
+            let json: serde_json::Value = resp
+                .into_json()
+                .map_err(|e| PerlError::runtime(format!("ai_agent: decode: {}", e), line))?;
 
             // Track tokens / cost for this turn.
             if let Some(input) = json["usage"]["input_tokens"].as_u64() {
@@ -1141,10 +1592,7 @@ impl Interpreter {
             }
 
             let stop_reason = json["stop_reason"].as_str().unwrap_or("");
-            let content = json["content"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default();
+            let content = json["content"].as_array().cloned().unwrap_or_default();
 
             // Append assistant turn to history so next turn's tool
             // results land in the right context.
@@ -1167,8 +1615,7 @@ impl Interpreter {
                         let id = block["id"].as_str().unwrap_or("").to_string();
                         let name = block["name"].as_str().unwrap_or("").to_string();
                         let input = block["input"].clone();
-                        let output =
-                            self.invoke_tool(tools, &name, input, line)?;
+                        let output = self.invoke_tool(tools, &name, input, line)?;
                         tool_results.push(serde_json::json!({
                             "type": "tool_result",
                             "tool_use_id": id,
@@ -1213,9 +1660,8 @@ impl Interpreter {
         tools: &[CompiledTool],
         line: usize,
     ) -> Result<PerlValue> {
-        let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
-            PerlError::runtime("ai_agent: $OPENAI_API_KEY not set", line)
-        })?;
+        let api_key = std::env::var("OPENAI_API_KEY")
+            .map_err(|_| PerlError::runtime("ai_agent: $OPENAI_API_KEY not set", line))?;
         let agent = ureq::AgentBuilder::new()
             .timeout(Duration::from_secs(timeout.max(1) as u64))
             .build();
@@ -1274,14 +1720,11 @@ impl Interpreter {
                 .set("content-type", "application/json")
                 .send_json(body)
                 .map_err(|e| {
-                    PerlError::runtime(
-                        format!("ai_agent: openai turn {}: {}", turn, e),
-                        line,
-                    )
+                    PerlError::runtime(format!("ai_agent: openai turn {}: {}", turn, e), line)
                 })?;
-            let json: serde_json::Value = resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("ai_agent: decode: {}", e), line)
-            })?;
+            let json: serde_json::Value = resp
+                .into_json()
+                .map_err(|e| PerlError::runtime(format!("ai_agent: decode: {}", e), line))?;
 
             if let Some(input) = json["usage"]["prompt_tokens"].as_u64() {
                 INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -1341,12 +1784,12 @@ impl Interpreter {
         input: serde_json::Value,
         line: usize,
     ) -> Result<serde_json::Value> {
-        let tool = tools
-            .iter()
-            .find(|t| t.name == name)
-            .ok_or_else(|| {
-                PerlError::runtime(format!("ai_agent: model called unknown tool `{}`", name), line)
-            })?;
+        let tool = tools.iter().find(|t| t.name == name).ok_or_else(|| {
+            PerlError::runtime(
+                format!("ai_agent: model called unknown tool `{}`", name),
+                line,
+            )
+        })?;
 
         // Native built-in tool fast path.
         if let Some(id) = tool.native_id {
@@ -1357,21 +1800,17 @@ impl Interpreter {
 
         // MCP-routed: forward to the connected server.
         if let Some((handle_id, server_name)) = &tool.mcp_handle_id {
-            return crate::mcp::call_attached_tool(
-                *handle_id,
-                server_name,
-                input,
-                line,
-            );
+            return crate::mcp::call_attached_tool(*handle_id, server_name, input, line);
         }
 
         let run_sub = tool.run_sub.as_ref().ok_or_else(|| {
-            PerlError::runtime(format!("ai_agent: tool `{}` has no implementation", name), line)
+            PerlError::runtime(
+                format!("ai_agent: tool `{}` has no implementation", name),
+                line,
+            )
         })?;
         let arg_hash = json_to_perl(&input);
-        let result = match self
-            .call_sub(run_sub, vec![arg_hash], WantarrayCtx::Scalar, line)
-        {
+        let result = match self.call_sub(run_sub, vec![arg_hash], WantarrayCtx::Scalar, line) {
             Ok(v) => v,
             Err(FlowOrError::Flow(_)) => PerlValue::UNDEF,
             Err(FlowOrError::Error(e)) => {
@@ -1421,10 +1860,7 @@ fn compile_tool(v: &PerlValue, line: usize) -> Result<CompiledTool> {
     // Built-in tool fast path: if `__native_tool_id__` is set, skip
     // the `run` coderef requirement and route through the native
     // registry instead.
-    if let Some(native_id) = map
-        .get("__native_tool_id__")
-        .map(|v| v.to_int())
-    {
+    if let Some(native_id) = map.get("__native_tool_id__").map(|v| v.to_int()) {
         return Ok(CompiledTool {
             name,
             description,
@@ -1435,14 +1871,12 @@ fn compile_tool(v: &PerlValue, line: usize) -> Result<CompiledTool> {
         });
     }
 
-    let run_v = map
-        .get("run")
-        .ok_or_else(|| {
-            PerlError::runtime(
-                format!("ai_agent: tool `{}` missing `run` coderef", name),
-                line,
-            )
-        })?;
+    let run_v = map.get("run").ok_or_else(|| {
+        PerlError::runtime(
+            format!("ai_agent: tool `{}` missing `run` coderef", name),
+            line,
+        )
+    })?;
     let run_sub = run_v.as_code_ref().ok_or_else(|| {
         PerlError::runtime(
             format!("ai_agent: tool `{}` has non-coderef `run`", name),
@@ -1524,8 +1958,7 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
         return perl_to_json_object(&map);
     }
     if let Some(arr) = v.as_array_ref() {
-        let items: Vec<serde_json::Value> =
-            arr.read().iter().map(perl_to_json).collect();
+        let items: Vec<serde_json::Value> = arr.read().iter().map(perl_to_json).collect();
         return serde_json::Value::Array(items);
     }
     if let Some(i) = v.as_integer() {
@@ -1595,7 +2028,9 @@ pub(crate) fn ai_filter(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .zip(bools.iter())
         .filter_map(|(v, b)| if *b { Some(v) } else { None })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(kept))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        kept,
+    ))))
 }
 
 pub(crate) fn ai_map(args: &[PerlValue], line: usize) -> Result<PerlValue> {
@@ -1666,7 +2101,9 @@ pub(crate) fn ai_match(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     );
     let mut call_args = vec![PerlValue::string(prompt)];
     forward_opts(&mut call_args, &opts);
-    let raw = ai_prompt(&call_args, line)?.to_string().to_ascii_lowercase();
+    let raw = ai_prompt(&call_args, line)?
+        .to_string()
+        .to_ascii_lowercase();
     Ok(PerlValue::integer(
         if raw.contains("true") && !raw.contains("false") {
             1
@@ -1707,7 +2144,9 @@ pub(crate) fn ai_sort(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             out.push(v.clone());
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 pub(crate) fn ai_dedupe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
@@ -1742,7 +2181,9 @@ pub(crate) fn ai_dedupe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         // Defensive — return originals if parse failed.
         kept = items;
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(kept))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        kept,
+    ))))
 }
 
 fn parse_collection_args(
@@ -1752,7 +2193,10 @@ fn parse_collection_args(
 ) -> Result<(Vec<PerlValue>, String, IndexMap<String, PerlValue>)> {
     if args.len() < 2 {
         return Err(PerlError::runtime(
-            format!("{}: usage: {}(\\@items, \"criterion\", opts...)", name, name),
+            format!(
+                "{}: usage: {}(\\@items, \"criterion\", opts...)",
+                name, name
+            ),
             line,
         ));
     }
@@ -1767,7 +2211,14 @@ fn parse_collection_args(
 }
 
 fn forward_opts(call_args: &mut Vec<PerlValue>, opts: &IndexMap<String, PerlValue>) {
-    for k in &["model", "system", "max_tokens", "temperature", "cache", "timeout"] {
+    for k in &[
+        "model",
+        "system",
+        "max_tokens",
+        "temperature",
+        "cache",
+        "timeout",
+    ] {
         if let Some(v) = opts.get(*k) {
             call_args.push(PerlValue::string(k.to_string()));
             call_args.push(v.clone());
@@ -1829,8 +2280,7 @@ fn parse_json_array_of_bools(raw: &str, expected: usize) -> Vec<bool> {
         Some(s) => s,
         None => return vec![false; expected],
     };
-    let v: serde_json::Value =
-        serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
+    let v: serde_json::Value = serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
     let mut out: Vec<bool> = v
         .as_array()
         .map(|a| {
@@ -1855,8 +2305,7 @@ fn parse_json_array_of_strings(raw: &str, expected: usize) -> Vec<String> {
         Some(s) => s,
         None => return vec![String::new(); expected],
     };
-    let v: serde_json::Value =
-        serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
+    let v: serde_json::Value = serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
     let mut out: Vec<String> = v
         .as_array()
         .map(|a| {
@@ -1877,8 +2326,7 @@ fn parse_json_array_of_ints(raw: &str) -> Vec<i64> {
         Some(s) => s,
         None => return Vec::new(),
     };
-    let v: serde_json::Value =
-        serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
+    let v: serde_json::Value = serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
     v.as_array()
         .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
         .unwrap_or_default()
@@ -1889,8 +2337,7 @@ fn parse_json_array_of_int_arrays(raw: &str) -> Vec<Vec<i64>> {
         Some(s) => s,
         None => return Vec::new(),
     };
-    let v: serde_json::Value =
-        serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
+    let v: serde_json::Value = serde_json::from_str(arr_str).unwrap_or(serde_json::Value::Null);
     v.as_array()
         .map(|a| {
             a.iter()
@@ -1919,11 +2366,7 @@ pub(crate) fn vec_cosine(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     );
     if a.len() != b.len() || a.is_empty() {
         return Err(PerlError::runtime(
-            format!(
-                "vec_cosine: dim mismatch (a={}, b={})",
-                a.len(),
-                b.len()
-            ),
+            format!("vec_cosine: dim mismatch (a={}, b={})", a.len(), b.len()),
             line,
         ));
     }
@@ -1989,7 +2432,9 @@ pub(crate) fn vec_search(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 /// `vec_topk(\@scores, $k)` — utility: return the indexes of the
@@ -2000,15 +2445,16 @@ pub(crate) fn vec_topk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             .ok_or_else(|| PerlError::runtime("vec_topk: scores required", line))?,
     );
     let k = args.get(1).map(|v| v.to_int()).unwrap_or(10).max(1) as usize;
-    let mut indexed: Vec<(usize, f64)> =
-        scores.into_iter().enumerate().collect();
+    let mut indexed: Vec<(usize, f64)> = scores.into_iter().enumerate().collect();
     indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     indexed.truncate(k);
     let out: Vec<PerlValue> = indexed
         .into_iter()
         .map(|(i, _)| PerlValue::integer(i as i64))
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn floats_from(v: &PerlValue) -> Vec<f64> {
@@ -2028,8 +2474,7 @@ pub(crate) fn ai_estimate(args: &[PerlValue], _line: usize) -> Result<PerlValue>
     let prompt = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = parse_opts(&args[1.min(args.len())..]);
     let model = opt_str(&opts, "model", &config().lock().model);
-    let in_tokens =
-        ((prompt.chars().count() + 3) / 4).max(1) as f64;
+    let in_tokens = ((prompt.chars().count() + 3) / 4).max(1) as f64;
     let out_tokens = opts
         .get("out_tokens")
         .map(|v| v.to_number())
@@ -2038,8 +2483,14 @@ pub(crate) fn ai_estimate(args: &[PerlValue], _line: usize) -> Result<PerlValue>
     let usd = in_tokens / 1000.0 * in_per_1k + out_tokens / 1000.0 * out_per_1k;
     let mut h = IndexMap::new();
     h.insert("usd".to_string(), PerlValue::float(usd));
-    h.insert("input_tokens".to_string(), PerlValue::integer(in_tokens as i64));
-    h.insert("output_tokens".to_string(), PerlValue::integer(out_tokens as i64));
+    h.insert(
+        "input_tokens".to_string(),
+        PerlValue::integer(in_tokens as i64),
+    );
+    h.insert(
+        "output_tokens".to_string(),
+        PerlValue::integer(out_tokens as i64),
+    );
     h.insert("model".to_string(), PerlValue::string(model));
     Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
@@ -2052,10 +2503,7 @@ fn routing() -> &'static Mutex<IndexMap<String, String>> {
 
 /// `ai_routing_get("embed")` → provider name or undef.
 pub(crate) fn ai_routing_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let op = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let op = args.first().map(|v| v.to_string()).unwrap_or_default();
     if op.is_empty() {
         let g = routing().lock();
         let mut m = IndexMap::new();
@@ -2211,9 +2659,9 @@ pub(crate) fn ai_register_tool(args: &[PerlValue], line: usize) -> Result<PerlVa
     let name = args[0].to_string();
     let desc = args[1].to_string();
     let params = args[2].clone();
-    let run_sub = args[3].as_code_ref().ok_or_else(|| {
-        PerlError::runtime("ai_register_tool: 4th arg must be a coderef", line)
-    })?;
+    let run_sub = args[3]
+        .as_code_ref()
+        .ok_or_else(|| PerlError::runtime("ai_register_tool: 4th arg must be a coderef", line))?;
     let mut g = registered_tools().lock();
     g.retain(|t| t.name != name); // idempotent re-register
     g.push(RegisteredTool {
@@ -2245,7 +2693,10 @@ pub(crate) fn ai_tools_list(_args: &[PerlValue], _line: usize) -> Result<PerlVal
         .map(|t| {
             let mut m = IndexMap::new();
             m.insert("name".into(), PerlValue::string(t.name.clone()));
-            m.insert("description".into(), PerlValue::string(t.description.clone()));
+            m.insert(
+                "description".into(),
+                PerlValue::string(t.description.clone()),
+            );
             m.insert("parameters".into(), t.parameters.clone());
             PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
@@ -2424,9 +2875,7 @@ pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlVa
         let mut stmt = store
             .conn
             .prepare("SELECT id, content, embedding, COALESCE(metadata, '') FROM ai_memory")
-            .map_err(|e| {
-                PerlError::runtime(format!("ai_memory: prepare: {}", e), line)
-            })?;
+            .map_err(|e| PerlError::runtime(format!("ai_memory: prepare: {}", e), line))?;
         let mut iter = stmt
             .query_map([], |r| {
                 let id: String = r.get(0)?;
@@ -2480,7 +2929,9 @@ pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlVa
             PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)))
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 pub(crate) fn ai_memory_forget(args: &[PerlValue], line: usize) -> Result<PerlValue> {
@@ -2599,12 +3050,7 @@ impl Interpreter {
 
         let provider = opt_str(&opts, "provider", &config().lock().provider);
         if provider == "openai" {
-            return self.ai_stream_openai(
-                &prompt,
-                opts,
-                on_chunk_sub.as_ref().unwrap(),
-                line,
-            );
+            return self.ai_stream_openai(&prompt, opts, on_chunk_sub.as_ref().unwrap(), line);
         }
         if provider != "anthropic" {
             return ai_prompt(args, line);
@@ -2642,9 +3088,7 @@ impl Interpreter {
             .set("content-type", "application/json")
             .set("accept", "text/event-stream")
             .send_json(body)
-            .map_err(|e| {
-                PerlError::runtime(format!("stream_prompt: anthropic: {}", e), line)
-            })?;
+            .map_err(|e| PerlError::runtime(format!("stream_prompt: anthropic: {}", e), line))?;
 
         let reader = std::io::BufReader::new(resp.into_reader());
         let mut full = String::new();
@@ -2699,8 +3143,7 @@ impl Interpreter {
         OUTPUT_TOKENS.fetch_add(output_tokens, Ordering::Relaxed);
         let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
         add_cost(
-            input_tokens as f64 / 1000.0 * in_per_1k
-                + output_tokens as f64 / 1000.0 * out_per_1k,
+            input_tokens as f64 / 1000.0 * in_per_1k + output_tokens as f64 / 1000.0 * out_per_1k,
         );
         record_history(
             &provider,
@@ -2730,9 +3173,8 @@ impl Interpreter {
         let temperature = opt_float(&opts, "temperature", -1.0);
         let timeout = opt_int(&opts, "timeout", 120);
 
-        let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
-            PerlError::runtime("stream_prompt: $OPENAI_API_KEY not set", line)
-        })?;
+        let api_key = std::env::var("OPENAI_API_KEY")
+            .map_err(|_| PerlError::runtime("stream_prompt: $OPENAI_API_KEY not set", line))?;
         let mut messages: Vec<serde_json::Value> = Vec::new();
         if !system.is_empty() {
             messages.push(serde_json::json!({"role":"system","content":system}));
@@ -2757,9 +3199,7 @@ impl Interpreter {
             .set("content-type", "application/json")
             .set("accept", "text/event-stream")
             .send_json(body)
-            .map_err(|e| {
-                PerlError::runtime(format!("stream_prompt: openai: {}", e), line)
-            })?;
+            .map_err(|e| PerlError::runtime(format!("stream_prompt: openai: {}", e), line))?;
 
         let reader = std::io::BufReader::new(resp.into_reader());
         let mut full = String::new();
@@ -2811,8 +3251,7 @@ impl Interpreter {
         OUTPUT_TOKENS.fetch_add(output_tokens, Ordering::Relaxed);
         let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
         add_cost(
-            input_tokens as f64 / 1000.0 * in_per_1k
-                + output_tokens as f64 / 1000.0 * out_per_1k,
+            input_tokens as f64 / 1000.0 * in_per_1k + output_tokens as f64 / 1000.0 * out_per_1k,
         );
         record_history(
             "openai",
@@ -2842,15 +3281,15 @@ pub(crate) fn ai_vision(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .ok_or_else(|| PerlError::runtime("ai_vision: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
     let image_v = opts.get("image").cloned().ok_or_else(|| {
-        PerlError::runtime(
-            "ai_vision: pass image => $bytes | $url | $path",
-            line,
-        )
+        PerlError::runtime("ai_vision: pass image => $bytes | $url | $path", line)
     })?;
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     if provider != "anthropic" {
         return Err(PerlError::runtime(
-            format!("ai_vision: provider `{}` not implemented (Anthropic only for v0)", provider),
+            format!(
+                "ai_vision: provider `{}` not implemented (Anthropic only for v0)",
+                provider
+            ),
             line,
         ));
     }
@@ -2905,9 +3344,7 @@ pub(crate) fn ai_vision(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .set("anthropic-version", "2023-06-01")
         .set("content-type", "application/json")
         .send_json(body)
-        .map_err(|e| {
-            PerlError::runtime(format!("ai_vision: anthropic: {}", e), line)
-        })?;
+        .map_err(|e| PerlError::runtime(format!("ai_vision: anthropic: {}", e), line))?;
     let json: serde_json::Value = resp
         .into_json()
         .map_err(|e| PerlError::runtime(format!("ai_vision: decode: {}", e), line))?;
@@ -2955,11 +3392,17 @@ fn resolve_image_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
             .map_err(|e| PerlError::runtime(format!("ai_vision: read image: {}", e), line))?;
-        (buf, ct.split(';').next().unwrap_or("image/jpeg").trim().to_string())
+        (
+            buf,
+            ct.split(';')
+                .next()
+                .unwrap_or("image/jpeg")
+                .trim()
+                .to_string(),
+        )
     } else if std::path::Path::new(&s).exists() {
-        let bytes = std::fs::read(&s).map_err(|e| {
-            PerlError::runtime(format!("ai_vision: read {}: {}", s, e), line)
-        })?;
+        let bytes = std::fs::read(&s)
+            .map_err(|e| PerlError::runtime(format!("ai_vision: read {}: {}", s, e), line))?;
         let ct = guess_media_type(&s);
         (bytes, ct)
     } else if let Some(arc) = v.as_bytes_arc() {
@@ -2973,6 +3416,852 @@ fn resolve_image_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
     };
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
     Ok((b64, media_type))
+}
+
+// ── Ollama (native generate API) ──────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn call_ollama(
+    prompt: &str,
+    system: &str,
+    model: &str,
+    max_tokens: i64,
+    temperature: f64,
+    timeout: i64,
+    base: &str,
+    line: usize,
+) -> Result<String> {
+    let url = format!("{}/api/generate", base.trim_end_matches('/'));
+    let mut body = serde_json::json!({
+        "model": if model.is_empty() || model.starts_with("claude") || model.starts_with("gpt") {
+            // Ollama needs an Ollama-tagged model name; if the user didn't
+            // override, default to a sensible small one.
+            "llama3.2"
+        } else {
+            model
+        },
+        "prompt": prompt,
+        "stream": false,
+        "options": {
+            "num_predict": max_tokens,
+        },
+    });
+    if !system.is_empty() {
+        body["system"] = serde_json::Value::String(system.to_string());
+    }
+    if temperature >= 0.0 {
+        body["options"]["temperature"] = serde_json::Value::from(temperature);
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post(&url)
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai: ollama request: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai: ollama decode: {}", e), line))?;
+    // Track tokens — Ollama returns prompt_eval_count + eval_count.
+    let input = json["prompt_eval_count"].as_u64().unwrap_or(0);
+    let output = json["eval_count"].as_u64().unwrap_or(0);
+    INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
+    OUTPUT_TOKENS.fetch_add(output, Ordering::Relaxed);
+    // Local model = $0 — no add_cost call.
+    let response = json["response"].as_str().unwrap_or("").to_string();
+    if response.is_empty() {
+        return Err(PerlError::runtime(
+            format!(
+                "ai: ollama returned empty response (raw: {})",
+                truncate(&json.to_string(), 200)
+            ),
+            line,
+        ));
+    }
+    Ok(response)
+}
+
+// ── Gemini (Google AI Studio) ────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn call_gemini(
+    prompt: &str,
+    system: &str,
+    model: &str,
+    max_tokens: i64,
+    temperature: f64,
+    timeout: i64,
+    line: usize,
+) -> Result<String> {
+    let api_key = std::env::var("GOOGLE_API_KEY")
+        .or_else(|_| std::env::var("GEMINI_API_KEY"))
+        .map_err(|_| {
+            PerlError::runtime(
+                "ai: $GOOGLE_API_KEY (or $GEMINI_API_KEY) not set for gemini provider",
+                line,
+            )
+        })?;
+    // Model defaults: if user has Anthropic/OpenAI default still set,
+    // map to Gemini's flagship.
+    let model = if model.starts_with("claude") || model.starts_with("gpt") {
+        "gemini-2.5-flash".to_string()
+    } else {
+        model.to_string()
+    };
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+        model, api_key
+    );
+    let mut config = serde_json::json!({
+        "maxOutputTokens": max_tokens,
+    });
+    if temperature >= 0.0 {
+        config["temperature"] = serde_json::Value::from(temperature);
+    }
+    let mut body = serde_json::json!({
+        "contents": [{ "parts": [{ "text": prompt }] }],
+        "generationConfig": config,
+    });
+    if !system.is_empty() {
+        body["systemInstruction"] = serde_json::json!({
+            "parts": [{ "text": system }]
+        });
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post(&url)
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai: gemini request: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai: gemini decode: {}", e), line))?;
+    let usage = &json["usageMetadata"];
+    let input = usage["promptTokenCount"].as_u64().unwrap_or(0);
+    let output = usage["candidatesTokenCount"].as_u64().unwrap_or(0);
+    INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
+    OUTPUT_TOKENS.fetch_add(output, Ordering::Relaxed);
+    let (in_per_1k, out_per_1k) = price_per_1k_tokens(&model);
+    add_cost(input as f64 / 1000.0 * in_per_1k + output as f64 / 1000.0 * out_per_1k);
+
+    let mut text = String::new();
+    if let Some(cands) = json["candidates"].as_array() {
+        if let Some(parts) = cands.first().and_then(|c| c["content"]["parts"].as_array()) {
+            for p in parts {
+                if let Some(t) = p["text"].as_str() {
+                    text.push_str(t);
+                }
+            }
+        }
+    }
+    if text.is_empty() {
+        return Err(PerlError::runtime(
+            format!(
+                "ai: gemini returned no text (raw: {})",
+                truncate(&json.to_string(), 200)
+            ),
+            line,
+        ));
+    }
+    Ok(text)
+}
+
+// ── Whisper transcription (OpenAI Audio) ──────────────────────────────
+
+/// `ai_transcribe($audio_path, model => "whisper-1", language => "en")`
+/// — speech-to-text via OpenAI's audio transcription endpoint. Returns
+/// a string. Accepts mp3/mp4/mpeg/mpga/m4a/wav/webm.
+pub(crate) fn ai_transcribe(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let path = args.first().map(|v| v.to_string()).ok_or_else(|| {
+        PerlError::runtime(
+            "ai_transcribe: usage: ai_transcribe(\"path/to/audio.mp3\")",
+            line,
+        )
+    })?;
+    let opts = parse_opts(&args[1..]);
+    let model = opt_str(&opts, "model", "whisper-1");
+    let language = opt_str(&opts, "language", "");
+    let timeout = opt_int(&opts, "timeout", 120);
+
+    if let Some(resp) = match_mock(&format!("transcribe:{}", path)) {
+        return Ok(PerlValue::string(resp));
+    }
+    if mock_only_mode() {
+        return Err(PerlError::runtime(
+            "ai_transcribe: STRYKE_AI_MODE=mock-only and no transcribe mock installed",
+            line,
+        ));
+    }
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_transcribe: $OPENAI_API_KEY not set", line))?;
+    let bytes = std::fs::read(&path)
+        .map_err(|e| PerlError::runtime(format!("ai_transcribe: read {}: {}", path, e), line))?;
+
+    let body = build_multipart(&[
+        ("model", model.as_bytes(), None),
+        (
+            "language",
+            language.as_bytes(),
+            if language.is_empty() {
+                None
+            } else {
+                Some("text/plain")
+            },
+        ),
+        (
+            "file",
+            &bytes,
+            Some(&format!(
+                "{}:application/octet-stream",
+                std::path::Path::new(&path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("audio.bin")
+            )),
+        ),
+    ]);
+    let boundary = "stryke_form_boundary_3f7a";
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/audio/transcriptions")
+        .set("authorization", &format!("Bearer {}", api_key))
+        .set(
+            "content-type",
+            &format!("multipart/form-data; boundary={}", boundary),
+        )
+        .send_bytes(&body)
+        .map_err(|e| PerlError::runtime(format!("ai_transcribe: request: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_transcribe: decode: {}", e), line))?;
+    let text = json["text"].as_str().unwrap_or("").to_string();
+    Ok(PerlValue::string(text))
+}
+
+// ── TTS (OpenAI Audio Speech) ────────────────────────────────────────
+
+/// `ai_speak($text, voice => "alloy", model => "tts-1", output => "out.mp3")`
+/// — text-to-speech via OpenAI. Returns audio bytes (and optionally
+/// writes to `output` path).
+pub(crate) fn ai_speak(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let text = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_speak: text required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let model = opt_str(&opts, "model", "tts-1");
+    let voice = opt_str(&opts, "voice", "alloy");
+    let format = opt_str(&opts, "format", "mp3");
+    let output = opt_str(&opts, "output", "");
+    let timeout = opt_int(&opts, "timeout", 60);
+
+    if mock_only_mode() {
+        let fake = b"MOCK_TTS_AUDIO".to_vec();
+        if !output.is_empty() {
+            std::fs::write(&output, &fake).ok();
+        }
+        return Ok(PerlValue::bytes(Arc::new(fake)));
+    }
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_speak: $OPENAI_API_KEY not set", line))?;
+    let body = serde_json::json!({
+        "model": model,
+        "voice": voice,
+        "input": text,
+        "response_format": format,
+    });
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/audio/speech")
+        .set("authorization", &format!("Bearer {}", api_key))
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai_speak: request: {}", e), line))?;
+    let mut buf = Vec::new();
+    std::io::Read::read_to_end(&mut resp.into_reader(), &mut buf)
+        .map_err(|e| PerlError::runtime(format!("ai_speak: read body: {}", e), line))?;
+    if !output.is_empty() {
+        std::fs::write(&output, &buf)
+            .map_err(|e| PerlError::runtime(format!("ai_speak: write {}: {}", output, e), line))?;
+    }
+    Ok(PerlValue::bytes(Arc::new(buf)))
+}
+
+// ── Image generation (OpenAI Images) ─────────────────────────────────
+//
+// `ai_image($prompt, model => "gpt-image-1", size => "1024x1024",
+//           quality => "high", output => "out.png")` generates an image and
+// returns the raw bytes (PNG by default). Pass `n => N` for multiple images
+// — returns an arrayref of byte buffers.
+//
+// For OpenAI, both `gpt-image-1` and `dall-e-3` use the same endpoint with
+// different parameter sets. We default to `dall-e-3` because it doesn't
+// require organization verification.
+pub(crate) fn ai_image(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let prompt = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_image: prompt required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let model = opt_str(&opts, "model", "dall-e-3");
+    let size = opt_str(&opts, "size", "1024x1024");
+    let quality = opt_str(&opts, "quality", "standard");
+    let output = opt_str(&opts, "output", "");
+    let n = opt_int(&opts, "n", 1).max(1);
+    let style = opt_str(&opts, "style", "");
+    let timeout = opt_int(&opts, "timeout", 120);
+
+    if let Some(resp) = match_mock(&format!("image:{}", prompt)) {
+        let bytes = resp.into_bytes();
+        if !output.is_empty() {
+            std::fs::write(&output, &bytes).ok();
+        }
+        return Ok(PerlValue::bytes(Arc::new(bytes)));
+    }
+    if mock_only_mode() {
+        return Err(PerlError::runtime(
+            "ai_image: STRYKE_AI_MODE=mock-only and no image mock installed",
+            line,
+        ));
+    }
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_image: $OPENAI_API_KEY not set", line))?;
+
+    let mut body = serde_json::json!({
+        "model": model,
+        "prompt": prompt,
+        "n": n,
+        "size": size,
+        "response_format": "b64_json",
+    });
+    // dall-e-3 supports `quality` and `style`; gpt-image-1 has its own param surface.
+    if model.starts_with("dall-e-3") {
+        body["quality"] = serde_json::json!(quality);
+        if !style.is_empty() {
+            body["style"] = serde_json::json!(style);
+        }
+    } else if model.starts_with("gpt-image") {
+        // gpt-image-1 uses `quality: "high"|"medium"|"low"`; pass through if set.
+        if !quality.is_empty() && quality != "standard" {
+            body["quality"] = serde_json::json!(quality);
+        }
+        // gpt-image-1 returns b64 by default; response_format is rejected.
+        body.as_object_mut()
+            .and_then(|m| m.remove("response_format"));
+    }
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/images/generations")
+        .set("authorization", &format!("Bearer {}", api_key))
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai_image: request: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_image: decode: {}", e), line))?;
+    let data = json["data"].as_array().cloned().unwrap_or_default();
+    if data.is_empty() {
+        return Err(PerlError::runtime(
+            format!("ai_image: empty response: {}", json),
+            line,
+        ));
+    }
+
+    let mut images: Vec<Vec<u8>> = Vec::new();
+    for item in &data {
+        if let Some(b64) = item["b64_json"].as_str() {
+            let bytes = base64_decode_lenient(b64)
+                .ok_or_else(|| PerlError::runtime("ai_image: invalid base64 in response", line))?;
+            images.push(bytes);
+        } else if let Some(url) = item["url"].as_str() {
+            let r = agent
+                .get(url)
+                .call()
+                .map_err(|e| PerlError::runtime(format!("ai_image: download: {}", e), line))?;
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut r.into_reader(), &mut buf)
+                .map_err(|e| PerlError::runtime(format!("ai_image: read download: {}", e), line))?;
+            images.push(buf);
+        }
+    }
+
+    if images.len() == 1 {
+        if !output.is_empty() {
+            std::fs::write(&output, &images[0]).map_err(|e| {
+                PerlError::runtime(format!("ai_image: write {}: {}", output, e), line)
+            })?;
+        }
+        Ok(PerlValue::bytes(Arc::new(images.remove(0))))
+    } else {
+        if !output.is_empty() {
+            for (i, b) in images.iter().enumerate() {
+                let p = if let Some(dot) = output.rfind('.') {
+                    format!("{}_{}{}", &output[..dot], i + 1, &output[dot..])
+                } else {
+                    format!("{}_{}", output, i + 1)
+                };
+                std::fs::write(&p, b).map_err(|e| {
+                    PerlError::runtime(format!("ai_image: write {}: {}", p, e), line)
+                })?;
+            }
+        }
+        let arr: Vec<PerlValue> = images
+            .into_iter()
+            .map(|b| PerlValue::bytes(Arc::new(b)))
+            .collect();
+        Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            arr,
+        ))))
+    }
+}
+
+// ── Image editing / variations (OpenAI Images) ───────────────────────
+//
+// `ai_image_edit($prompt, image => "in.png", mask => "mask.png", output => "out.png")`
+// — edit an existing image given a prompt + optional mask. Uses
+// OpenAI `/v1/images/edits` with multipart upload. The mask must be a
+// PNG with transparent regions marking the area to edit.
+pub(crate) fn ai_image_edit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let prompt = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_image_edit: prompt required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let image_path = opt_str(&opts, "image", "");
+    if image_path.is_empty() {
+        return Err(PerlError::runtime(
+            "ai_image_edit: pass image => \"path/to/source.png\"",
+            line,
+        ));
+    }
+    let mask_path = opt_str(&opts, "mask", "");
+    let model = opt_str(&opts, "model", "gpt-image-1");
+    let size = opt_str(&opts, "size", "1024x1024");
+    let n = opt_int(&opts, "n", 1).max(1);
+    let output = opt_str(&opts, "output", "");
+    let timeout = opt_int(&opts, "timeout", 180);
+
+    if let Some(resp) = match_mock(&format!("image_edit:{}", prompt)) {
+        let bytes = resp.into_bytes();
+        if !output.is_empty() {
+            std::fs::write(&output, &bytes).ok();
+        }
+        return Ok(PerlValue::bytes(Arc::new(bytes)));
+    }
+    if mock_only_mode() {
+        return Err(PerlError::runtime(
+            "ai_image_edit: STRYKE_AI_MODE=mock-only and no image_edit mock installed",
+            line,
+        ));
+    }
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_image_edit: $OPENAI_API_KEY not set", line))?;
+    let image_bytes = std::fs::read(&image_path).map_err(|e| {
+        PerlError::runtime(format!("ai_image_edit: read {}: {}", image_path, e), line)
+    })?;
+    let image_filename = std::path::Path::new(&image_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("image.png");
+
+    let n_str = n.to_string();
+    let mut fields: Vec<(&str, &[u8], Option<String>)> = vec![
+        ("prompt", prompt.as_bytes(), None),
+        ("model", model.as_bytes(), None),
+        ("size", size.as_bytes(), None),
+        ("n", n_str.as_bytes(), None),
+        (
+            "image",
+            &image_bytes,
+            Some(format!("{}:image/png", image_filename)),
+        ),
+    ];
+    let mask_bytes;
+    if !mask_path.is_empty() {
+        mask_bytes = std::fs::read(&mask_path).map_err(|e| {
+            PerlError::runtime(
+                format!("ai_image_edit: read mask {}: {}", mask_path, e),
+                line,
+            )
+        })?;
+        let mask_filename = std::path::Path::new(&mask_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("mask.png")
+            .to_string();
+        fields.push((
+            "mask",
+            &mask_bytes,
+            Some(format!("{}:image/png", mask_filename)),
+        ));
+    }
+    let owned_fields = fields;
+    let owned_refs: Vec<(&str, &[u8], Option<&str>)> = owned_fields
+        .iter()
+        .map(|(n, b, ct)| (*n, *b, ct.as_deref()))
+        .collect();
+    let body = build_multipart(&owned_refs);
+    let boundary = "stryke_form_boundary_3f7a";
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/images/edits")
+        .set("authorization", &format!("Bearer {}", api_key))
+        .set(
+            "content-type",
+            &format!("multipart/form-data; boundary={}", boundary),
+        )
+        .send_bytes(&body)
+        .map_err(|e| PerlError::runtime(format!("ai_image_edit: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_image_edit: decode: {}", e), line))?;
+
+    finalize_image_response(&json, &output, line)
+}
+
+/// `ai_image_variation(image => "in.png", n => 4, size => "1024x1024", output => "out.png")`
+/// — generate variations of an existing image. OpenAI `/v1/images/variations`
+/// (DALL-E 2 only — gpt-image-1 doesn't expose a variations endpoint).
+pub(crate) fn ai_image_variation(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let opts = parse_opts(args);
+    let image_path = opt_str(&opts, "image", "");
+    if image_path.is_empty() {
+        return Err(PerlError::runtime(
+            "ai_image_variation: pass image => \"path/to/source.png\"",
+            line,
+        ));
+    }
+    let model = opt_str(&opts, "model", "dall-e-2");
+    let size = opt_str(&opts, "size", "1024x1024");
+    let n = opt_int(&opts, "n", 1).max(1);
+    let output = opt_str(&opts, "output", "");
+    let timeout = opt_int(&opts, "timeout", 180);
+
+    if mock_only_mode() {
+        let fake = b"MOCK_IMG_VAR".to_vec();
+        return Ok(PerlValue::bytes(Arc::new(fake)));
+    }
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_image_variation: $OPENAI_API_KEY not set", line))?;
+    let image_bytes = std::fs::read(&image_path).map_err(|e| {
+        PerlError::runtime(
+            format!("ai_image_variation: read {}: {}", image_path, e),
+            line,
+        )
+    })?;
+    let filename = std::path::Path::new(&image_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("image.png");
+    let n_str = n.to_string();
+    let body = build_multipart(&[
+        ("model", model.as_bytes(), None),
+        ("size", size.as_bytes(), None),
+        ("n", n_str.as_bytes(), None),
+        ("response_format", b"b64_json", None),
+        (
+            "image",
+            &image_bytes,
+            Some(&format!("{}:image/png", filename)),
+        ),
+    ]);
+    let boundary = "stryke_form_boundary_3f7a";
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/images/variations")
+        .set("authorization", &format!("Bearer {}", api_key))
+        .set(
+            "content-type",
+            &format!("multipart/form-data; boundary={}", boundary),
+        )
+        .send_bytes(&body)
+        .map_err(|e| PerlError::runtime(format!("ai_image_variation: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_image_variation: decode: {}", e), line))?;
+
+    finalize_image_response(&json, &output, line)
+}
+
+/// Shared response handler for image generation/edit/variation. Returns
+/// PerlValue::bytes for n=1 or arrayref of bytes for n>1, optionally
+/// writing to `output` path (with `_1`/`_2`/... suffix when n>1).
+fn finalize_image_response(
+    json: &serde_json::Value,
+    output: &str,
+    line: usize,
+) -> Result<PerlValue> {
+    let data = json["data"].as_array().cloned().unwrap_or_default();
+    if data.is_empty() {
+        return Err(PerlError::runtime(
+            format!("image: empty response: {}", json),
+            line,
+        ));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(60))
+        .build();
+    let mut images: Vec<Vec<u8>> = Vec::new();
+    for item in &data {
+        if let Some(b64) = item["b64_json"].as_str() {
+            let bytes = base64_decode_lenient(b64)
+                .ok_or_else(|| PerlError::runtime("image: invalid base64", line))?;
+            images.push(bytes);
+        } else if let Some(url) = item["url"].as_str() {
+            let r = agent
+                .get(url)
+                .call()
+                .map_err(|e| PerlError::runtime(format!("image: download: {}", e), line))?;
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut r.into_reader(), &mut buf)
+                .map_err(|e| PerlError::runtime(format!("image: read download: {}", e), line))?;
+            images.push(buf);
+        }
+    }
+    if images.len() == 1 {
+        if !output.is_empty() {
+            std::fs::write(output, &images[0])
+                .map_err(|e| PerlError::runtime(format!("image: write {}: {}", output, e), line))?;
+        }
+        Ok(PerlValue::bytes(Arc::new(images.remove(0))))
+    } else {
+        if !output.is_empty() {
+            for (i, b) in images.iter().enumerate() {
+                let p = if let Some(dot) = output.rfind('.') {
+                    format!("{}_{}{}", &output[..dot], i + 1, &output[dot..])
+                } else {
+                    format!("{}_{}", output, i + 1)
+                };
+                std::fs::write(&p, b)
+                    .map_err(|e| PerlError::runtime(format!("image: write {}: {}", p, e), line))?;
+            }
+        }
+        let arr: Vec<PerlValue> = images
+            .into_iter()
+            .map(|b| PerlValue::bytes(Arc::new(b)))
+            .collect();
+        Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            arr,
+        ))))
+    }
+}
+
+/// Lenient base64 decoder — handles standard `A-Za-z0-9+/=` plus url-safe `-_`.
+/// We don't pull a base64 crate just for this — image responses are large but
+/// the table is tiny and well-defined.
+fn base64_decode_lenient(s: &str) -> Option<Vec<u8>> {
+    let mut buf: u32 = 0;
+    let mut bits: u8 = 0;
+    let mut out = Vec::with_capacity(s.len() * 3 / 4);
+    for ch in s.bytes() {
+        let v = match ch {
+            b'A'..=b'Z' => ch - b'A',
+            b'a'..=b'z' => ch - b'a' + 26,
+            b'0'..=b'9' => ch - b'0' + 52,
+            b'+' | b'-' => 62,
+            b'/' | b'_' => 63,
+            b'=' | b'\n' | b'\r' | b' ' | b'\t' => continue,
+            _ => return None,
+        };
+        buf = (buf << 6) | v as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+            buf &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
+// ── Model listing ─────────────────────────────────────────────────────
+//
+// `ai_models($provider)` returns an arrayref of model IDs available from
+// the given provider. Useful for autocompletion in tools and UIs that
+// want to surface the live model catalog.
+pub(crate) fn ai_models(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let provider = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "openai".into());
+    let opts = parse_opts(&args[1..]);
+    let timeout = opt_int(&opts, "timeout", 30);
+
+    if mock_only_mode() {
+        let mock = vec![
+            PerlValue::string("mock-model-1".to_string()),
+            PerlValue::string("mock-model-2".to_string()),
+        ];
+        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            mock,
+        ))));
+    }
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let ids: Vec<String> = match provider.as_str() {
+        "openai" => {
+            let key = std::env::var("OPENAI_API_KEY")
+                .map_err(|_| PerlError::runtime("ai_models: $OPENAI_API_KEY not set", line))?;
+            let resp = agent
+                .get("https://api.openai.com/v1/models")
+                .set("authorization", &format!("Bearer {}", key))
+                .call()
+                .map_err(|e| PerlError::runtime(format!("ai_models: openai: {}", e), line))?;
+            let json: serde_json::Value = resp.into_json().map_err(|e| {
+                PerlError::runtime(format!("ai_models: openai decode: {}", e), line)
+            })?;
+            json["data"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|o| o["id"].as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        "anthropic" | "claude" => {
+            let key = std::env::var("ANTHROPIC_API_KEY")
+                .map_err(|_| PerlError::runtime("ai_models: $ANTHROPIC_API_KEY not set", line))?;
+            let resp = agent
+                .get("https://api.anthropic.com/v1/models")
+                .set("x-api-key", &key)
+                .set("anthropic-version", "2023-06-01")
+                .call()
+                .map_err(|e| PerlError::runtime(format!("ai_models: anthropic: {}", e), line))?;
+            let json: serde_json::Value = resp.into_json().map_err(|e| {
+                PerlError::runtime(format!("ai_models: anthropic decode: {}", e), line)
+            })?;
+            json["data"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|o| o["id"].as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        "ollama" => {
+            let base =
+                std::env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".into());
+            let url = format!("{}/api/tags", base.trim_end_matches('/'));
+            let resp = agent
+                .get(&url)
+                .call()
+                .map_err(|e| PerlError::runtime(format!("ai_models: ollama: {}", e), line))?;
+            let json: serde_json::Value = resp.into_json().map_err(|e| {
+                PerlError::runtime(format!("ai_models: ollama decode: {}", e), line)
+            })?;
+            json["models"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|o| o["name"].as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        "gemini" | "google" => {
+            let key = std::env::var("GOOGLE_API_KEY")
+                .or_else(|_| std::env::var("GEMINI_API_KEY"))
+                .map_err(|_| PerlError::runtime("ai_models: $GOOGLE_API_KEY not set", line))?;
+            let url = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+                key
+            );
+            let resp = agent
+                .get(&url)
+                .call()
+                .map_err(|e| PerlError::runtime(format!("ai_models: gemini: {}", e), line))?;
+            let json: serde_json::Value = resp.into_json().map_err(|e| {
+                PerlError::runtime(format!("ai_models: gemini decode: {}", e), line)
+            })?;
+            json["models"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|o| {
+                            o["name"]
+                                .as_str()
+                                .map(|s| s.trim_start_matches("models/").to_string())
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        other => {
+            return Err(PerlError::runtime(
+                format!(
+                    "ai_models: unknown provider `{}` (try openai|anthropic|ollama|gemini)",
+                    other
+                ),
+                line,
+            ));
+        }
+    };
+    let arr: Vec<PerlValue> = ids.into_iter().map(PerlValue::string).collect();
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        arr,
+    ))))
+}
+
+/// Build a multipart/form-data body. Each field is `(name, bytes, content_type_filename)`.
+/// When `content_type_filename` is `Some("name:type")` we treat it as a file part.
+fn build_multipart(fields: &[(&str, &[u8], Option<&str>)]) -> Vec<u8> {
+    let boundary = "stryke_form_boundary_3f7a";
+    let mut out = Vec::new();
+    for (name, bytes, ctf) in fields {
+        if bytes.is_empty() && ctf.is_none() {
+            continue; // skip empty plain fields like an unset `language`
+        }
+        out.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        match ctf {
+            Some(ct) if ct.contains(':') => {
+                let (filename, mime) = ct.split_once(':').unwrap();
+                out.extend_from_slice(
+                    format!(
+                        "Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\nContent-Type: {}\r\n\r\n",
+                        name, filename, mime
+                    )
+                    .as_bytes(),
+                );
+            }
+            Some(ct) => {
+                out.extend_from_slice(
+                    format!(
+                        "Content-Disposition: form-data; name=\"{}\"\r\nContent-Type: {}\r\n\r\n",
+                        name, ct
+                    )
+                    .as_bytes(),
+                );
+            }
+            None => {
+                out.extend_from_slice(
+                    format!("Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name).as_bytes(),
+                );
+            }
+        }
+        out.extend_from_slice(bytes);
+        out.extend_from_slice(b"\r\n");
+    }
+    out.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+    out
 }
 
 fn guess_media_type(path: &str) -> String {
@@ -3001,18 +4290,15 @@ pub(crate) fn ai_extract(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("ai_extract: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
-    let schema_v = opts
-        .get("schema")
-        .cloned()
-        .ok_or_else(|| {
-            PerlError::runtime(
-                "ai_extract: pass schema => +{field => \"type\"}",
-                line,
-            )
-        })?;
+    let schema_v = opts.get("schema").cloned().ok_or_else(|| {
+        PerlError::runtime("ai_extract: pass schema => +{field => \"type\"}", line)
+    })?;
     let schema_str = describe_schema(&schema_v);
 
-    let context = opts.get("context").map(|v| v.to_string()).unwrap_or_default();
+    let context = opts
+        .get("context")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
     let body = if context.is_empty() {
         prompt.clone()
     } else {
@@ -3036,13 +4322,16 @@ pub(crate) fn ai_extract(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     }
     let raw = ai_prompt(&call_args, line)?.to_string();
     let json_str = extract_first_json_object(&raw).unwrap_or(&raw);
-    let parsed: serde_json::Value = serde_json::from_str(json_str)
-        .map_err(|e| {
-            PerlError::runtime(
-                format!("ai_extract: parse: {} (raw: {})", e, truncate(json_str, 200)),
-                line,
-            )
-        })?;
+    let parsed: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+        PerlError::runtime(
+            format!(
+                "ai_extract: parse: {} (raw: {})",
+                e,
+                truncate(json_str, 200)
+            ),
+            line,
+        )
+    })?;
     Ok(coerce_to_schema(&parsed, &schema_v))
 }
 
@@ -3130,12 +4419,8 @@ fn coerce_to_schema(v: &serde_json::Value, schema: &PerlValue) -> PerlValue {
 fn coerce_value(v: &serde_json::Value, ty: &str) -> PerlValue {
     match ty {
         "int" | "integer" | "Int" => match v {
-            serde_json::Value::Number(n) => {
-                PerlValue::integer(n.as_i64().unwrap_or(0))
-            }
-            serde_json::Value::String(s) => {
-                PerlValue::integer(s.parse::<i64>().unwrap_or(0))
-            }
+            serde_json::Value::Number(n) => PerlValue::integer(n.as_i64().unwrap_or(0)),
+            serde_json::Value::String(s) => PerlValue::integer(s.parse::<i64>().unwrap_or(0)),
             serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
             _ => PerlValue::integer(0),
         },
@@ -3238,11 +4523,7 @@ pub(crate) fn ai_translate(args: &[PerlValue], line: usize) -> Result<PerlValue>
 /// program with a runtime error if cost during the block exceeds
 /// `$usd_max`. Restores the prior global cap on exit.
 impl Interpreter {
-    pub(crate) fn ai_budget(
-        &mut self,
-        args: &[PerlValue],
-        line: usize,
-    ) -> Result<PerlValue> {
+    pub(crate) fn ai_budget(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let cap = args
             .first()
             .map(|v| v.to_number())
@@ -3250,9 +4531,7 @@ impl Interpreter {
         let body = args
             .get(1)
             .and_then(|v| v.as_code_ref())
-            .ok_or_else(|| {
-                PerlError::runtime("ai_budget: second arg must be a coderef", line)
-            })?;
+            .ok_or_else(|| PerlError::runtime("ai_budget: second arg must be a coderef", line))?;
 
         let snapshot = current_cost_usd();
         let prev_cap = config().lock().max_cost_run_usd;
@@ -3267,10 +4546,7 @@ impl Interpreter {
             Ok(v) => {
                 if spent > cap {
                     return Err(PerlError::runtime(
-                        format!(
-                            "ai_budget: spent ${:.4} (cap ${:.2})",
-                            spent, cap
-                        ),
+                        format!("ai_budget: spent ${:.4} (cap ${:.2})", spent, cap),
                         line,
                     ));
                 }
@@ -3301,13 +4577,17 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .map(|v| v.to_string())
         .ok_or_else(|| PerlError::runtime("ai_pdf: prompt required", line))?;
     let opts = parse_opts(&args[1..]);
-    let pdf_v = opts.get("pdf").cloned().ok_or_else(|| {
-        PerlError::runtime("ai_pdf: pass pdf => $path|$url|$bytes", line)
-    })?;
+    let pdf_v = opts
+        .get("pdf")
+        .cloned()
+        .ok_or_else(|| PerlError::runtime("ai_pdf: pass pdf => $path|$url|$bytes", line))?;
     let provider = opt_str(&opts, "provider", &config().lock().provider);
     if provider != "anthropic" {
         return Err(PerlError::runtime(
-            format!("ai_pdf: provider `{}` not implemented (Anthropic only)", provider),
+            format!(
+                "ai_pdf: provider `{}` not implemented (Anthropic only)",
+                provider
+            ),
             line,
         ));
     }
@@ -3328,23 +4608,31 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 
     let (b64, _) = resolve_pdf_input(&pdf_v, line)?;
     let key_env = config().lock().api_key_env.clone();
-    let api_key = std::env::var(&key_env).map_err(|_| {
-        PerlError::runtime(format!("ai_pdf: ${} env var not set", key_env), line)
-    })?;
+    let api_key = std::env::var(&key_env)
+        .map_err(|_| PerlError::runtime(format!("ai_pdf: ${} env var not set", key_env), line))?;
+    let want_citations = opt_int(&opts, "citations", 0) != 0;
+    let title = opt_str(&opts, "title", "");
+    let mut document = serde_json::json!({
+        "type": "document",
+        "source": {
+            "type": "base64",
+            "media_type": "application/pdf",
+            "data": b64,
+        }
+    });
+    if want_citations {
+        document["citations"] = serde_json::json!({ "enabled": true });
+    }
+    if !title.is_empty() {
+        document["title"] = serde_json::Value::String(title);
+    }
     let mut body = serde_json::json!({
         "model": model,
         "max_tokens": max_tokens,
         "messages": [{
             "role": "user",
             "content": [
-                {
-                    "type": "document",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "application/pdf",
-                        "data": b64,
-                    }
-                },
+                document,
                 { "type": "text", "text": prompt }
             ]
         }],
@@ -3362,10 +4650,9 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .set("content-type", "application/json")
         .send_json(body)
         .map_err(|e| PerlError::runtime(format!("ai_pdf: anthropic: {}", e), line))?;
-    let json: serde_json::Value =
-        resp.into_json().map_err(|e| {
-            PerlError::runtime(format!("ai_pdf: decode: {}", e), line)
-        })?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_pdf: decode: {}", e), line))?;
 
     if let Some(input) = json["usage"]["input_tokens"].as_u64() {
         INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
@@ -3379,16 +4666,191 @@ pub(crate) fn ai_pdf(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     }
 
     let mut out = String::new();
+    let mut citations: Vec<serde_json::Value> = Vec::new();
     if let Some(arr) = json["content"].as_array() {
         for chunk in arr {
             if chunk["type"] == "text" {
                 if let Some(t) = chunk["text"].as_str() {
                     out.push_str(t);
                 }
+                if let Some(cs) = chunk["citations"].as_array() {
+                    citations.extend(cs.iter().cloned());
+                }
             }
         }
     }
+    *last_citations().lock() = citations;
     Ok(PerlValue::string(out))
+}
+
+// ── Multi-document grounded responses ────────────────────────────────
+//
+// `ai_grounded($prompt, documents => [\@docs], titles => [\@titles])`
+// — Anthropic-only convenience for grounding a single prompt against
+// multiple reference documents with citations enabled. Each document
+// is a path (PDF or text) or an inline string. The model's response
+// carries citations referencing each document by index. Use
+// `ai_citations()` to retrieve them after the call.
+pub(crate) fn ai_grounded(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let prompt = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_grounded: prompt required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let docs_v = opts
+        .get("documents")
+        .cloned()
+        .ok_or_else(|| PerlError::runtime("ai_grounded: documents => [...] required", line))?;
+    let docs: Vec<String> = match docs_v.as_array_ref() {
+        Some(arr) => arr.read().iter().map(|v| v.to_string()).collect(),
+        None => vec![docs_v.to_string()],
+    };
+    let titles: Vec<String> = match opts.get("titles").and_then(|v| v.as_array_ref()) {
+        Some(arr) => arr.read().iter().map(|v| v.to_string()).collect(),
+        None => Vec::new(),
+    };
+    let model = opt_str(&opts, "model", &config().lock().model);
+    let system = opt_str(&opts, "system", "");
+    let max_tokens = opt_int(&opts, "max_tokens", 1024);
+    let timeout = opt_int(&opts, "timeout", 180);
+    let provider = opt_str(&opts, "provider", &config().lock().provider);
+    if provider != "anthropic" {
+        return Err(PerlError::runtime(
+            format!(
+                "ai_grounded: provider `{}` not supported (Anthropic only)",
+                provider
+            ),
+            line,
+        ));
+    }
+
+    if let Some(resp) = match_mock(&prompt) {
+        return Ok(PerlValue::string(resp));
+    }
+    if mock_only_mode() {
+        return Err(PerlError::runtime(
+            "ai_grounded: STRYKE_AI_MODE=mock-only and no mock matched",
+            line,
+        ));
+    }
+    let key_env = config().lock().api_key_env.clone();
+    let api_key = std::env::var(&key_env)
+        .map_err(|_| PerlError::runtime(format!("ai_grounded: ${} not set", key_env), line))?;
+
+    let mut content_blocks: Vec<serde_json::Value> = Vec::with_capacity(docs.len() + 1);
+    for (i, doc) in docs.iter().enumerate() {
+        let block = build_document_block(doc, titles.get(i).map(|s| s.as_str()), line)?;
+        content_blocks.push(block);
+    }
+    content_blocks.push(serde_json::json!({ "type": "text", "text": prompt }));
+    let mut body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{
+            "role": "user",
+            "content": content_blocks,
+        }],
+    });
+    if !system.is_empty() {
+        body["system"] = serde_json::Value::String(system);
+    }
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.anthropic.com/v1/messages")
+        .set("x-api-key", &api_key)
+        .set("anthropic-version", "2023-06-01")
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai_grounded: anthropic: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_grounded: decode: {}", e), line))?;
+
+    if let Some(input) = json["usage"]["input_tokens"].as_u64() {
+        INPUT_TOKENS.fetch_add(input, Ordering::Relaxed);
+        let (in_per_1k, _) = price_per_1k_tokens(&model);
+        add_cost(input as f64 / 1000.0 * in_per_1k);
+    }
+    if let Some(output) = json["usage"]["output_tokens"].as_u64() {
+        OUTPUT_TOKENS.fetch_add(output, Ordering::Relaxed);
+        let (_, out_per_1k) = price_per_1k_tokens(&model);
+        add_cost(output as f64 / 1000.0 * out_per_1k);
+    }
+
+    let mut out = String::new();
+    let mut citations: Vec<serde_json::Value> = Vec::new();
+    if let Some(arr) = json["content"].as_array() {
+        for chunk in arr {
+            if chunk["type"] == "text" {
+                if let Some(t) = chunk["text"].as_str() {
+                    out.push_str(t);
+                }
+                if let Some(cs) = chunk["citations"].as_array() {
+                    citations.extend(cs.iter().cloned());
+                }
+            }
+        }
+    }
+    *last_citations().lock() = citations;
+    Ok(PerlValue::string(out))
+}
+
+/// Build one Anthropic content block from a document spec. Auto-detects:
+/// - PDF path (`.pdf` extension or magic bytes) → base64 document block
+/// - Other file path → plain-text document block
+/// - Inline string with no path-like shape → plain-text block
+fn build_document_block(spec: &str, title: Option<&str>, line: usize) -> Result<serde_json::Value> {
+    // Treat as a path if it points at an existing file.
+    let p = std::path::Path::new(spec);
+    let mut block = if p.is_file() {
+        let bytes = std::fs::read(p)
+            .map_err(|e| PerlError::runtime(format!("ai_grounded: read {}: {}", spec, e), line))?;
+        let is_pdf = bytes.starts_with(b"%PDF-") || spec.to_lowercase().ends_with(".pdf");
+        if is_pdf {
+            use base64::Engine;
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            serde_json::json!({
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": "application/pdf",
+                    "data": b64,
+                },
+                "citations": { "enabled": true },
+            })
+        } else {
+            let text = String::from_utf8_lossy(&bytes).to_string();
+            serde_json::json!({
+                "type": "document",
+                "source": {
+                    "type": "text",
+                    "media_type": "text/plain",
+                    "data": text,
+                },
+                "citations": { "enabled": true },
+            })
+        }
+    } else {
+        // Inline string → treat as raw text content.
+        serde_json::json!({
+            "type": "document",
+            "source": {
+                "type": "text",
+                "media_type": "text/plain",
+                "data": spec,
+            },
+            "citations": { "enabled": true },
+        })
+    };
+    if let Some(t) = title {
+        if !t.is_empty() {
+            block["title"] = serde_json::Value::String(t.to_string());
+        }
+    }
+    Ok(block)
 }
 
 // ── Anthropic Batch API (50% off, async) ────────────────────────────
@@ -3416,8 +4878,10 @@ pub(crate) fn ai_batch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let opts = parse_opts(&args[1..]);
     let provider = opt_str(&opts, "provider", &config().lock().provider);
 
-    if matches!(std::env::var("STRYKE_AI_BATCH").as_deref(), Ok("sync") | Ok("seq"))
-        || provider != "anthropic"
+    if matches!(
+        std::env::var("STRYKE_AI_BATCH").as_deref(),
+        Ok("sync") | Ok("seq")
+    ) || provider != "anthropic"
     {
         return ai_batch_sequential(&prompts, &opts, line);
     }
@@ -3446,7 +4910,9 @@ fn ai_batch_sequential(
         }
         out.push(ai_prompt(&call_args, line)?);
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn ai_batch_anthropic(
@@ -3461,9 +4927,8 @@ fn ai_batch_anthropic(
     let max_wait = opt_int(opts, "max_wait_secs", 24 * 3600).max(60) as u64;
 
     let key_env = config().lock().api_key_env.clone();
-    let api_key = std::env::var(&key_env).map_err(|_| {
-        PerlError::runtime(format!("ai_batch: ${} env var not set", key_env), line)
-    })?;
+    let api_key = std::env::var(&key_env)
+        .map_err(|_| PerlError::runtime(format!("ai_batch: ${} env var not set", key_env), line))?;
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(60))
         .build();
@@ -3495,9 +4960,9 @@ fn ai_batch_anthropic(
         .set("content-type", "application/json")
         .send_json(serde_json::json!({ "requests": requests }))
         .map_err(|e| PerlError::runtime(format!("ai_batch: create: {}", e), line))?;
-    let create_json: serde_json::Value = create_resp.into_json().map_err(|e| {
-        PerlError::runtime(format!("ai_batch: create decode: {}", e), line)
-    })?;
+    let create_json: serde_json::Value = create_resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_batch: create decode: {}", e), line))?;
     let batch_id = create_json["id"]
         .as_str()
         .ok_or_else(|| {
@@ -3530,16 +4995,14 @@ fn ai_batch_anthropic(
             .set("anthropic-version", "2023-06-01")
             .call()
             .map_err(|e| PerlError::runtime(format!("ai_batch: status: {}", e), line))?;
-        let status_json: serde_json::Value = status_resp.into_json().map_err(|e| {
-            PerlError::runtime(format!("ai_batch: status decode: {}", e), line)
-        })?;
+        let status_json: serde_json::Value = status_resp
+            .into_json()
+            .map_err(|e| PerlError::runtime(format!("ai_batch: status decode: {}", e), line))?;
         let status = status_json["processing_status"].as_str().unwrap_or("");
         if status == "ended" {
             results_url = status_json["results_url"]
                 .as_str()
-                .ok_or_else(|| {
-                    PerlError::runtime("ai_batch: no results_url after ended", line)
-                })?
+                .ok_or_else(|| PerlError::runtime("ai_batch: no results_url after ended", line))?
                 .to_string();
             break;
         }
@@ -3591,7 +5054,10 @@ fn ai_batch_anthropic(
         } else {
             by_id.insert(
                 cid,
-                format!("[batch error: {}]", result["error"]["type"].as_str().unwrap_or("unknown")),
+                format!(
+                    "[batch error: {}]",
+                    result["error"]["type"].as_str().unwrap_or("unknown")
+                ),
             );
         }
     }
@@ -3610,7 +5076,9 @@ fn ai_batch_anthropic(
             PerlValue::string(by_id.get(&cid).cloned().unwrap_or_default())
         })
         .collect();
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 // ── Cluster fanout (Phase 5) ─────────────────────────────────────────
@@ -3642,10 +5110,7 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     // collapses to a single ai_map call.
     let cluster_v = opts.get("cluster").cloned();
     if cluster_v.is_none() {
-        let mut call_args: Vec<PerlValue> = vec![
-            items_v.clone(),
-            PerlValue::string(instruction),
-        ];
+        let mut call_args: Vec<PerlValue> = vec![items_v.clone(), PerlValue::string(instruction)];
         for (k, v) in &opts {
             if k == "cluster" {
                 continue;
@@ -3675,20 +5140,14 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let serialized: Vec<serde_json::Value> = shards
         .iter()
         .map(|shard| {
-            let arr: Vec<serde_json::Value> =
-                shard.iter().map(|v| perl_value_to_json(v)).collect();
+            let arr: Vec<serde_json::Value> = shard.iter().map(|v| perl_value_to_json(v)).collect();
             serde_json::Value::Array(arr)
         })
         .collect();
 
-    let results = crate::cluster::run_cluster(
-        &cluster,
-        String::new(),
-        block_src,
-        Vec::new(),
-        serialized,
-    )
-    .map_err(|e| PerlError::runtime(format!("ai_pmap: cluster: {}", e), line))?;
+    let results =
+        crate::cluster::run_cluster(&cluster, String::new(), block_src, Vec::new(), serialized)
+            .map_err(|e| PerlError::runtime(format!("ai_pmap: cluster: {}", e), line))?;
 
     // Concat shards.
     let mut out: Vec<PerlValue> = Vec::with_capacity(items.len());
@@ -3699,7 +5158,9 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             .unwrap_or_else(|| r.to_list());
         out.extend(arr);
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn shard_items(items: &[PerlValue], n: usize) -> Vec<Vec<PerlValue>> {
@@ -3765,7 +5226,10 @@ pub(crate) fn ai_session_new(args: &[PerlValue], _line: usize) -> Result<PerlVal
     sessions().lock().insert(id, sess);
     let mut m = IndexMap::new();
     m.insert("__session_id__".into(), PerlValue::integer(id as i64));
-    m.insert("model".into(), PerlValue::string(opt_str(&opts, "model", &cfg.model)));
+    m.insert(
+        "model".into(),
+        PerlValue::string(opt_str(&opts, "model", &cfg.model)),
+    );
     Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
@@ -3847,12 +5311,13 @@ pub(crate) fn ai_session_history(args: &[PerlValue], line: usize) -> Result<Perl
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| {
-            PerlError::runtime("ai_session_history: session handle required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("ai_session_history: session handle required", line))?;
     let g = sessions().lock();
     let sess = g.get(&id).ok_or_else(|| {
-        PerlError::runtime(format!("ai_session_history: session {} not found", id), line)
+        PerlError::runtime(
+            format!("ai_session_history: session {} not found", id),
+            line,
+        )
     })?;
     let items: Vec<PerlValue> = sess
         .messages
@@ -3877,9 +5342,7 @@ pub(crate) fn ai_session_close(args: &[PerlValue], line: usize) -> Result<PerlVa
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| {
-            PerlError::runtime("ai_session_close: session handle required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("ai_session_close: session handle required", line))?;
     sessions().lock().shift_remove(&id);
     Ok(PerlValue::UNDEF)
 }
@@ -3892,14 +5355,87 @@ pub(crate) fn ai_session_reset(args: &[PerlValue], line: usize) -> Result<PerlVa
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
-        .ok_or_else(|| {
-            PerlError::runtime("ai_session_reset: session handle required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("ai_session_reset: session handle required", line))?;
     let mut g = sessions().lock();
     if let Some(sess) = g.get_mut(&id) {
         sess.messages.clear();
     }
     Ok(PerlValue::UNDEF)
+}
+
+/// `ai_session_export($handle)` → JSON string capturing the session's
+/// system prompt, model, provider, and full message log. Pair with
+/// `ai_session_import($json)` to restore on a later run.
+pub(crate) fn ai_session_export(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .and_then(|v| {
+            v.as_hash_map()
+                .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
+        })
+        .and_then(|m| m.get("__session_id__").map(|v| v.to_int() as u64))
+        .ok_or_else(|| PerlError::runtime("ai_session_export: session handle required", line))?;
+    let g = sessions().lock();
+    let sess = g.get(&id).ok_or_else(|| {
+        PerlError::runtime(format!("ai_session_export: session {} not found", id), line)
+    })?;
+    let json = serde_json::json!({
+        "v": 1,
+        "system": sess.system,
+        "model": sess.model,
+        "provider": sess.provider,
+        "messages": sess.messages.iter().map(|(r, c)| serde_json::json!({"role": r, "content": c})).collect::<Vec<_>>(),
+    });
+    Ok(PerlValue::string(json.to_string()))
+}
+
+/// `ai_session_import($json)` → handle hashref. Inverse of
+/// `ai_session_export`. Allocates a fresh session id, populates it from the
+/// JSON body, returns a handle compatible with the rest of the
+/// `ai_session_*` surface.
+pub(crate) fn ai_session_import(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let s = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_session_import: json string required", line))?;
+    let json: serde_json::Value = serde_json::from_str(&s)
+        .map_err(|e| PerlError::runtime(format!("ai_session_import: parse: {}", e), line))?;
+    let messages = json["messages"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| {
+                    let role = m["role"].as_str()?.to_string();
+                    let content = m["content"].as_str()?.to_string();
+                    Some((role, content))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let sess = ChatSession {
+        system: json["system"].as_str().unwrap_or("").to_string(),
+        model: json["model"].as_str().unwrap_or("").to_string(),
+        provider: json["provider"].as_str().unwrap_or("").to_string(),
+        messages,
+    };
+    let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
+    sessions().lock().insert(id, sess);
+    let mut m = IndexMap::new();
+    m.insert("__session_id__".into(), PerlValue::integer(id as i64));
+    m.insert(
+        "model".into(),
+        PerlValue::string(json["model"].as_str().unwrap_or("").to_string()),
+    );
+    m.insert(
+        "imported".into(),
+        PerlValue::integer(
+            json["messages"]
+                .as_array()
+                .map(|a| a.len() as i64)
+                .unwrap_or(0),
+        ),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))))
 }
 
 // ── Prompt templates ──────────────────────────────────────────────────
@@ -3974,9 +5510,9 @@ fn call_anthropic_with_retry(
             .send_json(body.clone())
         {
             Ok(resp) => {
-                return resp.into_json().map_err(|e| {
-                    PerlError::runtime(format!("ai: anthropic decode: {}", e), line)
-                });
+                return resp
+                    .into_json()
+                    .map_err(|e| PerlError::runtime(format!("ai: anthropic decode: {}", e), line));
             }
             Err(ureq::Error::Status(code, resp)) => {
                 if attempt + 1 < max_attempts && should_retry(code) {
@@ -3985,11 +5521,7 @@ fn call_anthropic_with_retry(
                 }
                 let body_text = resp.into_string().unwrap_or_default();
                 last_err = Some(PerlError::runtime(
-                    format!(
-                        "ai: anthropic {}: {}",
-                        code,
-                        truncate(&body_text, 200)
-                    ),
+                    format!("ai: anthropic {}: {}", code, truncate(&body_text, 200)),
                     line,
                 ));
                 break;
@@ -4007,9 +5539,7 @@ fn call_anthropic_with_retry(
             }
         }
     }
-    Err(last_err.unwrap_or_else(|| {
-        PerlError::runtime("ai: anthropic call failed", line)
-    }))
+    Err(last_err.unwrap_or_else(|| PerlError::runtime("ai: anthropic call failed", line)))
 }
 
 // ── Built-in tools (ready-to-pass tool specs) ─────────────────────────
@@ -4222,7 +5752,9 @@ fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<PerlValue> {
             out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn run_ddg_search(q: &str, limit: i64) -> Result<PerlValue> {
@@ -4242,22 +5774,28 @@ fn run_ddg_search(q: &str, limit: i64) -> Result<PerlValue> {
         r#"<a class="result__a" href="(?P<url>[^"]+)"[^>]*>(?P<title>[^<]+)</a>"#,
     )
     .unwrap();
-    let snip_re = regex::Regex::new(
-        r#"<a class="result__snippet"[^>]*>(?P<snip>[^<]+)</a>"#,
-    )
-    .unwrap();
+    let snip_re =
+        regex::Regex::new(r#"<a class="result__snippet"[^>]*>(?P<snip>[^<]+)</a>"#).unwrap();
     let titles: Vec<(String, String)> = re
         .captures_iter(&body)
         .map(|c| {
             (
-                c.name("url").map(|m| m.as_str().to_string()).unwrap_or_default(),
-                c.name("title").map(|m| m.as_str().to_string()).unwrap_or_default(),
+                c.name("url")
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default(),
+                c.name("title")
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default(),
             )
         })
         .collect();
     let snips: Vec<String> = snip_re
         .captures_iter(&body)
-        .map(|c| c.name("snip").map(|m| m.as_str().to_string()).unwrap_or_default())
+        .map(|c| {
+            c.name("snip")
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default()
+        })
         .collect();
     let mut out: Vec<PerlValue> = Vec::new();
     for (i, (url, title)) in titles.iter().take(limit as usize).enumerate() {
@@ -4270,7 +5808,9 @@ fn run_ddg_search(q: &str, limit: i64) -> Result<PerlValue> {
         );
         out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(m))));
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn urlencoding(s: &str) -> String {
@@ -4324,9 +5864,9 @@ fn run_python(code: &str) -> Result<PerlValue> {
         }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
-    let output = child.wait_with_output().map_err(|e| {
-        PerlError::runtime(format!("run_code: wait: {}", e), 0)
-    })?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| PerlError::runtime(format!("run_code: wait: {}", e), 0))?;
     let mut combined = String::new();
     combined.push_str(&String::from_utf8_lossy(&output.stdout));
     if !output.stderr.is_empty() {
@@ -4354,9 +5894,8 @@ fn resolve_pdf_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
             .map_err(|e| PerlError::runtime(format!("ai_pdf: read body: {}", e), line))?;
         buf
     } else if std::path::Path::new(&s).exists() {
-        std::fs::read(&s).map_err(|e| {
-            PerlError::runtime(format!("ai_pdf: read {}: {}", s, e), line)
-        })?
+        std::fs::read(&s)
+            .map_err(|e| PerlError::runtime(format!("ai_pdf: read {}: {}", s, e), line))?
     } else if let Some(arc) = v.as_bytes_arc() {
         (*arc).clone()
     } else {
@@ -4367,4 +5906,698 @@ fn resolve_pdf_input(v: &PerlValue, line: usize) -> Result<(String, String)> {
     };
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
     Ok((b64, "application/pdf".to_string()))
+}
+
+// ── Citations accessor ────────────────────────────────────────────────
+//
+// Anthropic's Citations feature surfaces grounded references for each
+// content block: when the model uses a `document` content block with
+// `citations.enabled = true`, the response carries `citations: [...]`
+// entries pointing back into the source. We capture these into
+// `LAST_CITATIONS_BUF` during call_anthropic and surface them via this
+// builtin (analogous to `ai_last_thinking`).
+pub(crate) fn ai_citations(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let cites = last_citations().lock().clone();
+    let arr: Vec<PerlValue> = cites
+        .iter()
+        .map(|c| {
+            let mut h = IndexMap::new();
+            if let Some(t) = c["type"].as_str() {
+                h.insert("type".to_string(), PerlValue::string(t.to_string()));
+            }
+            if let Some(t) = c["cited_text"].as_str() {
+                h.insert("text".to_string(), PerlValue::string(t.to_string()));
+            }
+            if let Some(t) = c["document_title"].as_str() {
+                h.insert("title".to_string(), PerlValue::string(t.to_string()));
+            }
+            if let Some(t) = c["document_index"].as_i64() {
+                h.insert("document_index".to_string(), PerlValue::integer(t));
+            }
+            if let Some(t) = c["start_char_index"].as_i64() {
+                h.insert("start".to_string(), PerlValue::integer(t));
+            }
+            if let Some(t) = c["end_char_index"].as_i64() {
+                h.insert("end".to_string(), PerlValue::integer(t));
+            }
+            if let Some(t) = c["start_page_number"].as_i64() {
+                h.insert("start_page".to_string(), PerlValue::integer(t));
+            }
+            if let Some(t) = c["end_page_number"].as_i64() {
+                h.insert("end_page".to_string(), PerlValue::integer(t));
+            }
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+        })
+        .collect();
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        arr,
+    ))))
+}
+
+// ── Files API (OpenAI) ────────────────────────────────────────────────
+//
+// `/v1/files` endpoint for uploading reference files (used by Whisper,
+// vision, batch, assistants). Returns a file_id usable in subsequent
+// API calls.
+
+/// `ai_file_upload("path/to/file", purpose => "user_data")` →
+/// hashref with `id`, `bytes`, `created_at`, `filename`, `purpose`.
+pub(crate) fn ai_file_upload(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let path = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_file_upload: path required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let purpose = opt_str(&opts, "purpose", "user_data");
+    let timeout = opt_int(&opts, "timeout", 120);
+
+    if mock_only_mode() {
+        let mut h = IndexMap::new();
+        h.insert(
+            "id".to_string(),
+            PerlValue::string("file-mock-123".to_string()),
+        );
+        h.insert("filename".to_string(), PerlValue::string(path.clone()));
+        h.insert("purpose".to_string(), PerlValue::string(purpose.clone()));
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    let key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_file_upload: $OPENAI_API_KEY not set", line))?;
+    let bytes = std::fs::read(&path)
+        .map_err(|e| PerlError::runtime(format!("ai_file_upload: read {}: {}", path, e), line))?;
+    let filename = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("upload.bin");
+    let body = build_multipart(&[
+        ("purpose", purpose.as_bytes(), None),
+        (
+            "file",
+            &bytes,
+            Some(&format!("{}:application/octet-stream", filename)),
+        ),
+    ]);
+    let boundary = "stryke_form_boundary_3f7a";
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/files")
+        .set("authorization", &format!("Bearer {}", key))
+        .set(
+            "content-type",
+            &format!("multipart/form-data; boundary={}", boundary),
+        )
+        .send_bytes(&body)
+        .map_err(|e| PerlError::runtime(format!("ai_file_upload: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_file_upload: decode: {}", e), line))?;
+    Ok(json_to_perl_hash(&json))
+}
+
+/// `ai_file_list()` → arrayref of file metadata hashrefs.
+pub(crate) fn ai_file_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let opts = parse_opts(args);
+    let purpose = opt_str(&opts, "purpose", "");
+    let timeout = opt_int(&opts, "timeout", 30);
+
+    if mock_only_mode() {
+        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            Vec::new(),
+        ))));
+    }
+    let key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_file_list: $OPENAI_API_KEY not set", line))?;
+    let mut url = "https://api.openai.com/v1/files".to_string();
+    if !purpose.is_empty() {
+        url.push_str(&format!("?purpose={}", purpose));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .get(&url)
+        .set("authorization", &format!("Bearer {}", key))
+        .call()
+        .map_err(|e| PerlError::runtime(format!("ai_file_list: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_file_list: decode: {}", e), line))?;
+    let data = json["data"].as_array().cloned().unwrap_or_default();
+    let arr: Vec<PerlValue> = data.iter().map(json_to_perl_hash).collect();
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        arr,
+    ))))
+}
+
+/// `ai_file_delete($file_id)` → 1 if deleted, 0 otherwise.
+pub(crate) fn ai_file_delete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_file_delete: file_id required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let timeout = opt_int(&opts, "timeout", 30);
+
+    if mock_only_mode() {
+        return Ok(PerlValue::integer(1));
+    }
+    let key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_file_delete: $OPENAI_API_KEY not set", line))?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .delete(&format!("https://api.openai.com/v1/files/{}", id))
+        .set("authorization", &format!("Bearer {}", key))
+        .call()
+        .map_err(|e| PerlError::runtime(format!("ai_file_delete: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_file_delete: decode: {}", e), line))?;
+    Ok(PerlValue::integer(
+        if json["deleted"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
+    ))
+}
+
+/// `ai_file_get($file_id)` → metadata hashref.
+pub(crate) fn ai_file_get(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_file_get: file_id required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let timeout = opt_int(&opts, "timeout", 30);
+
+    if mock_only_mode() {
+        let mut h = IndexMap::new();
+        h.insert("id".to_string(), PerlValue::string(id));
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    let key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_file_get: $OPENAI_API_KEY not set", line))?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .get(&format!("https://api.openai.com/v1/files/{}", id))
+        .set("authorization", &format!("Bearer {}", key))
+        .call()
+        .map_err(|e| PerlError::runtime(format!("ai_file_get: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_file_get: decode: {}", e), line))?;
+    Ok(json_to_perl_hash(&json))
+}
+
+// ── Anthropic Files API ───────────────────────────────────────────────
+//
+// Anthropic's beta `/v1/files` endpoint mirrors OpenAI's: upload a file
+// once, reference it by id from batch jobs and document blocks. Auth via
+// `$ANTHROPIC_API_KEY`, requires the `files-api-2025-04-14` beta header.
+
+const ANTHROPIC_FILES_BETA: &str = "files-api-2025-04-14";
+
+/// `ai_file_anthropic_upload("path/to/file.pdf")` → metadata hashref with
+/// `id`, `filename`, `mime_type`, `size_bytes`, `created_at`.
+pub(crate) fn ai_file_anthropic_upload(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let path = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_file_anthropic_upload: path required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let timeout = opt_int(&opts, "timeout", 120);
+
+    if mock_only_mode() {
+        let mut h = IndexMap::new();
+        h.insert(
+            "id".to_string(),
+            PerlValue::string("file-anthropic-mock-1".to_string()),
+        );
+        h.insert("filename".to_string(), PerlValue::string(path.clone()));
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+        PerlError::runtime("ai_file_anthropic_upload: $ANTHROPIC_API_KEY not set", line)
+    })?;
+    let bytes = std::fs::read(&path).map_err(|e| {
+        PerlError::runtime(
+            format!("ai_file_anthropic_upload: read {}: {}", path, e),
+            line,
+        )
+    })?;
+    let filename = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("upload.bin");
+    let body = build_multipart(&[(
+        "file",
+        &bytes,
+        Some(&format!("{}:application/octet-stream", filename)),
+    )]);
+    let boundary = "stryke_form_boundary_3f7a";
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.anthropic.com/v1/files")
+        .set("x-api-key", &key)
+        .set("anthropic-version", "2023-06-01")
+        .set("anthropic-beta", ANTHROPIC_FILES_BETA)
+        .set(
+            "content-type",
+            &format!("multipart/form-data; boundary={}", boundary),
+        )
+        .send_bytes(&body)
+        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_upload: {}", e), line))?;
+    let json: serde_json::Value = resp.into_json().map_err(|e| {
+        PerlError::runtime(format!("ai_file_anthropic_upload: decode: {}", e), line)
+    })?;
+    Ok(json_to_perl_hash(&json))
+}
+
+/// `ai_file_anthropic_list()` → arrayref of metadata hashrefs.
+pub(crate) fn ai_file_anthropic_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let opts = parse_opts(args);
+    let timeout = opt_int(&opts, "timeout", 30);
+    if mock_only_mode() {
+        return Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+            Vec::new(),
+        ))));
+    }
+    let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+        PerlError::runtime("ai_file_anthropic_list: $ANTHROPIC_API_KEY not set", line)
+    })?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .get("https://api.anthropic.com/v1/files")
+        .set("x-api-key", &key)
+        .set("anthropic-version", "2023-06-01")
+        .set("anthropic-beta", ANTHROPIC_FILES_BETA)
+        .call()
+        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_list: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_file_anthropic_list: decode: {}", e), line))?;
+    let data = json["data"].as_array().cloned().unwrap_or_default();
+    let arr: Vec<PerlValue> = data.iter().map(json_to_perl_hash).collect();
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        arr,
+    ))))
+}
+
+/// `ai_file_anthropic_delete($file_id)` → 1 on success, 0 otherwise.
+pub(crate) fn ai_file_anthropic_delete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_file_anthropic_delete: file_id required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let timeout = opt_int(&opts, "timeout", 30);
+    if mock_only_mode() {
+        return Ok(PerlValue::integer(1));
+    }
+    let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+        PerlError::runtime("ai_file_anthropic_delete: $ANTHROPIC_API_KEY not set", line)
+    })?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .delete(&format!("https://api.anthropic.com/v1/files/{}", id))
+        .set("x-api-key", &key)
+        .set("anthropic-version", "2023-06-01")
+        .set("anthropic-beta", ANTHROPIC_FILES_BETA)
+        .call();
+    match resp {
+        Ok(_) => Ok(PerlValue::integer(1)),
+        Err(_) => Ok(PerlValue::integer(0)),
+    }
+}
+
+// ── Moderation (OpenAI) ──────────────────────────────────────────────
+//
+// `ai_moderate($text, model => "omni-moderation-latest")` — content
+// safety classifier. Returns `+{ flagged, categories => +{...},
+// scores => +{...} }`. Free endpoint — no token cost. Use it before
+// sending user-generated content to a generative model.
+pub(crate) fn ai_moderate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let input = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_moderate: input required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let model = opt_str(&opts, "model", "omni-moderation-latest");
+    let timeout = opt_int(&opts, "timeout", 30);
+
+    if mock_only_mode() {
+        let mut h = IndexMap::new();
+        h.insert("flagged".to_string(), PerlValue::integer(0));
+        h.insert(
+            "categories".to_string(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
+        );
+        h.insert(
+            "scores".to_string(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(IndexMap::new()))),
+        );
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    let key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| PerlError::runtime("ai_moderate: $OPENAI_API_KEY not set", line))?;
+    let body = serde_json::json!({
+        "model": model,
+        "input": input,
+    });
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(timeout.max(1) as u64))
+        .build();
+    let resp = agent
+        .post("https://api.openai.com/v1/moderations")
+        .set("authorization", &format!("Bearer {}", key))
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| PerlError::runtime(format!("ai_moderate: {}", e), line))?;
+    let json: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| PerlError::runtime(format!("ai_moderate: decode: {}", e), line))?;
+    let result = json["results"]
+        .get(0)
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    let mut h = IndexMap::new();
+    h.insert(
+        "flagged".to_string(),
+        PerlValue::integer(if result["flagged"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        }),
+    );
+    h.insert(
+        "categories".to_string(),
+        json_to_perl_hash(&result["categories"]),
+    );
+    h.insert(
+        "scores".to_string(),
+        json_to_perl_hash(&result["category_scores"]),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+// ── Text chunking (for RAG) ──────────────────────────────────────────
+//
+// `ai_chunk($text, max_tokens => 500, overlap => 50, by => "tokens"|"chars"|"sentences")`
+// → arrayref of strings. Pure local logic — no API call. Tokens are
+// estimated as 4 chars each (matching `tokens_of`). Sentence mode
+// splits on `.!?` followed by whitespace, keeping punctuation.
+pub(crate) fn ai_chunk(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let text = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_chunk: text required", line))?;
+    let opts = parse_opts(&args[1..]);
+    let max_tokens = opt_int(&opts, "max_tokens", 500).max(1) as usize;
+    let overlap = opt_int(&opts, "overlap", 50).max(0) as usize;
+    let by = opt_str(&opts, "by", "tokens");
+
+    let chunks = match by.as_str() {
+        "chars" => chunk_by_chars(&text, max_tokens * 4, overlap * 4),
+        "sentences" => chunk_by_sentences(&text, max_tokens * 4),
+        _ => chunk_by_chars(&text, max_tokens * 4, overlap * 4),
+    };
+    let arr: Vec<PerlValue> = chunks.into_iter().map(PerlValue::string).collect();
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        arr,
+    ))))
+}
+
+/// Sliding-window chunker over chars. Each chunk is `max_chars` long; the
+/// next chunk starts `max_chars - overlap` after the current one. Final
+/// chunk may be shorter.
+fn chunk_by_chars(text: &str, max_chars: usize, overlap: usize) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out: Vec<String> = Vec::new();
+    if chars.is_empty() {
+        return out;
+    }
+    let stride = max_chars.saturating_sub(overlap).max(1);
+    let mut i = 0;
+    while i < chars.len() {
+        let end = (i + max_chars).min(chars.len());
+        out.push(chars[i..end].iter().collect());
+        if end >= chars.len() {
+            break;
+        }
+        i += stride;
+    }
+    out
+}
+
+/// Sentence-aware chunker. Splits on `.!?` followed by whitespace, then
+/// greedily packs consecutive sentences until the next one would push the
+/// chunk over `max_chars`. Minimum one sentence per chunk.
+fn chunk_by_sentences(text: &str, max_chars: usize) -> Vec<String> {
+    let mut sents: Vec<&str> = Vec::new();
+    let bytes = text.as_bytes();
+    let mut start = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        if matches!(bytes[i], b'.' | b'!' | b'?') {
+            let mut end = i + 1;
+            while end < bytes.len() && bytes[end].is_ascii_whitespace() {
+                end += 1;
+            }
+            if end > i + 1 || end == bytes.len() {
+                if let Ok(s) = std::str::from_utf8(&bytes[start..end]) {
+                    sents.push(s.trim());
+                }
+                start = end;
+            }
+        }
+        i += 1;
+    }
+    if start < bytes.len() {
+        if let Ok(s) = std::str::from_utf8(&bytes[start..]) {
+            let t = s.trim();
+            if !t.is_empty() {
+                sents.push(t);
+            }
+        }
+    }
+    let mut out: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    for s in sents {
+        if !buf.is_empty() && buf.len() + s.len() + 1 > max_chars {
+            out.push(std::mem::take(&mut buf));
+        }
+        if !buf.is_empty() {
+            buf.push(' ');
+        }
+        buf.push_str(s);
+    }
+    if !buf.is_empty() {
+        out.push(buf);
+    }
+    out
+}
+
+// ── Warmup / auth check ──────────────────────────────────────────────
+//
+// `ai_warm(model => "...", provider => "...")` sends a 1-token "ping"
+// request so the user finds out about auth or network issues at script
+// start instead of mid-flow. Returns `+{ ok, latency_ms, model }`.
+// Counts toward cost like any other call (typically <$0.001).
+pub(crate) fn ai_warm(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let opts = parse_opts(args);
+    let cfg = config().lock().clone();
+    let provider = opt_str(&opts, "provider", &cfg.provider);
+    let model = opt_str(&opts, "model", &cfg.model);
+    let timeout = opt_int(&opts, "timeout", 15);
+
+    let started = std::time::Instant::now();
+    let mut warm_args: Vec<PerlValue> = vec![PerlValue::string("hi".to_string())];
+    warm_args.push(PerlValue::string("max_tokens".to_string()));
+    warm_args.push(PerlValue::integer(1));
+    warm_args.push(PerlValue::string("model".to_string()));
+    warm_args.push(PerlValue::string(model.clone()));
+    warm_args.push(PerlValue::string("provider".to_string()));
+    warm_args.push(PerlValue::string(provider.clone()));
+    warm_args.push(PerlValue::string("timeout".to_string()));
+    warm_args.push(PerlValue::integer(timeout));
+    warm_args.push(PerlValue::string("cache".to_string()));
+    warm_args.push(PerlValue::integer(0));
+
+    let result = ai_prompt(&warm_args, 0);
+    let elapsed_ms = started.elapsed().as_millis() as i64;
+    let mut h = IndexMap::new();
+    match result {
+        Ok(_) => {
+            h.insert("ok".to_string(), PerlValue::integer(1));
+            h.insert("error".to_string(), PerlValue::string(String::new()));
+        }
+        Err(e) => {
+            h.insert("ok".to_string(), PerlValue::integer(0));
+            h.insert("error".to_string(), PerlValue::string(e.to_string()));
+        }
+    }
+    h.insert("latency_ms".to_string(), PerlValue::integer(elapsed_ms));
+    h.insert("model".to_string(), PerlValue::string(model));
+    h.insert("provider".to_string(), PerlValue::string(provider));
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+// ── Semantic comparison ──────────────────────────────────────────────
+//
+// `ai_compare($a, $b, criteria => "factual accuracy", scale => 5)` →
+// hashref `+{ winner, reason, scores => +{a, b} }`. The model picks a
+// winner (`"a"`, `"b"`, or `"tie"`) and rates each on the given criteria.
+// Single LLM call returns structured JSON.
+pub(crate) fn ai_compare(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let a = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_compare: first input required", line))?;
+    let b = args
+        .get(1)
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("ai_compare: second input required", line))?;
+    let opts = parse_opts(&args[2.min(args.len())..]);
+    let criteria = opt_str(&opts, "criteria", "overall quality");
+    let scale = opt_int(&opts, "scale", 5).clamp(2, 100);
+
+    let prompt = format!(
+        "Compare these two inputs on \"{criteria}\". Score each from 1 to {scale}.\n\
+         Pick a winner: \"a\", \"b\", or \"tie\". Briefly explain.\n\
+         Respond with strict JSON: {{\"winner\":..., \"score_a\":..., \"score_b\":..., \"reason\":\"...\"}}.\n\n\
+         A: {a}\n\nB: {b}",
+        criteria = criteria,
+        scale = scale,
+        a = a,
+        b = b,
+    );
+
+    if let Some(resp) = match_mock(&prompt) {
+        let mut h = IndexMap::new();
+        h.insert("raw".to_string(), PerlValue::string(resp));
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+    if mock_only_mode() {
+        let mut h = IndexMap::new();
+        h.insert("winner".to_string(), PerlValue::string("tie".to_string()));
+        h.insert(
+            "reason".to_string(),
+            PerlValue::string("mock-only".to_string()),
+        );
+        let mut scores = IndexMap::new();
+        scores.insert("a".to_string(), PerlValue::float(scale as f64 / 2.0));
+        scores.insert("b".to_string(), PerlValue::float(scale as f64 / 2.0));
+        h.insert(
+            "scores".to_string(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
+        );
+        return Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+    }
+
+    let prompt_args: Vec<PerlValue> = vec![
+        PerlValue::string(prompt),
+        PerlValue::string("max_tokens".to_string()),
+        PerlValue::integer(512),
+    ];
+    let resp = ai_prompt(&prompt_args, line)?;
+    let resp_str = resp.to_string();
+
+    // Best-effort JSON extraction — strip ```json fences and trim.
+    let body = strip_json_fences(&resp_str);
+    let json: serde_json::Value =
+        serde_json::from_str(body.trim()).unwrap_or_else(|_| serde_json::json!({}));
+    let mut h = IndexMap::new();
+    h.insert(
+        "winner".to_string(),
+        PerlValue::string(json["winner"].as_str().unwrap_or("tie").to_string()),
+    );
+    h.insert(
+        "reason".to_string(),
+        PerlValue::string(json["reason"].as_str().unwrap_or("").to_string()),
+    );
+    let mut scores = IndexMap::new();
+    scores.insert(
+        "a".to_string(),
+        PerlValue::float(json["score_a"].as_f64().unwrap_or(0.0)),
+    );
+    scores.insert(
+        "b".to_string(),
+        PerlValue::float(json["score_b"].as_f64().unwrap_or(0.0)),
+    );
+    h.insert(
+        "scores".to_string(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(scores))),
+    );
+    h.insert("raw".to_string(), PerlValue::string(resp_str));
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+/// Strip ```json fenced code blocks from a model response — best-effort
+/// extractor for structured output that the model wraps in fences despite
+/// the prompt asking for raw JSON.
+fn strip_json_fences(s: &str) -> &str {
+    let trimmed = s.trim();
+    if let Some(rest) = trimmed.strip_prefix("```json") {
+        if let Some(body) = rest.strip_suffix("```") {
+            return body.trim();
+        }
+        return rest.trim();
+    }
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        if let Some(body) = rest.strip_suffix("```") {
+            return body.trim();
+        }
+        return rest.trim();
+    }
+    trimmed
+}
+
+/// Convert a JSON value into a PerlValue hashref for surfacing to user code.
+/// Nested objects / arrays become hashrefs / arrayrefs recursively. Scalars
+/// drop into PerlValue::{integer, float, string, true/false}.
+fn json_to_perl_hash(v: &serde_json::Value) -> PerlValue {
+    match v {
+        serde_json::Value::Object(map) => {
+            let mut h = IndexMap::new();
+            for (k, val) in map {
+                h.insert(k.clone(), json_to_perl_value(val));
+            }
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h)))
+        }
+        _ => json_to_perl_value(v),
+    }
+}
+
+fn json_to_perl_value(v: &serde_json::Value) -> PerlValue {
+    match v {
+        serde_json::Value::Null => PerlValue::UNDEF,
+        serde_json::Value::Bool(b) => PerlValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                PerlValue::integer(i)
+            } else if let Some(f) = n.as_f64() {
+                PerlValue::float(f)
+            } else {
+                PerlValue::string(n.to_string())
+            }
+        }
+        serde_json::Value::String(s) => PerlValue::string(s.clone()),
+        serde_json::Value::Array(a) => {
+            let arr: Vec<PerlValue> = a.iter().map(json_to_perl_value).collect();
+            PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(arr)))
+        }
+        serde_json::Value::Object(_) => json_to_perl_hash(v),
+    }
 }

@@ -1244,13 +1244,76 @@ fn main() {
         process::exit(stryke::pkg::commands::cmd_remove(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "install" {
-        process::exit(stryke::pkg::commands::cmd_install(&args[2..]));
+        let rest = &args[2..];
+        if rest.iter().any(|a| a == "-g" || a == "--global") {
+            let filtered: Vec<String> = rest
+                .iter()
+                .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                .cloned()
+                .collect();
+            process::exit(stryke::pkg::commands::cmd_install_global(&filtered));
+        } else {
+            process::exit(stryke::pkg::commands::cmd_install(rest));
+        }
     }
     if args.len() >= 2 && args[1] == "tree" {
         process::exit(stryke::pkg::commands::cmd_tree(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "info" {
         process::exit(stryke::pkg::commands::cmd_info(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "update" {
+        process::exit(stryke::pkg::commands::cmd_update(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "outdated" {
+        process::exit(stryke::pkg::commands::cmd_outdated(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "audit" {
+        process::exit(stryke::pkg::commands::cmd_audit(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "vendor" {
+        process::exit(stryke::pkg::commands::cmd_vendor(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "clean" {
+        process::exit(stryke::pkg::commands::cmd_clean(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "search" {
+        process::exit(stryke::pkg::commands::cmd_search(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "publish" {
+        process::exit(stryke::pkg::commands::cmd_publish(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "yank" {
+        process::exit(stryke::pkg::commands::cmd_yank(&args[2..]));
+    }
+    // `stryke uninstall -g NAME` and `stryke list -g` for global CLI tools.
+    if args.len() >= 2 && args[1] == "uninstall" {
+        let rest = &args[2..];
+        if rest.iter().any(|a| a == "-g" || a == "--global") {
+            let filtered: Vec<String> = rest
+                .iter()
+                .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                .cloned()
+                .collect();
+            process::exit(stryke::pkg::commands::cmd_uninstall_global(&filtered));
+        } else {
+            eprintln!("s uninstall: pass -g for global tools (no per-project uninstall yet)");
+            process::exit(1);
+        }
+    }
+    if args.len() >= 2 && args[1] == "list" {
+        let rest = &args[2..];
+        if rest.iter().any(|a| a == "-g" || a == "--global") {
+            let filtered: Vec<String> = rest
+                .iter()
+                .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                .cloned()
+                .collect();
+            process::exit(stryke::pkg::commands::cmd_list_global(&filtered));
+        } else {
+            eprintln!("s list: pass -g to list global tools");
+            process::exit(1);
+        }
     }
     if args.len() >= 2 && args[1] == "pkg" {
         process::exit(stryke::pkg::commands::dispatch(&args[2..]));
@@ -1261,8 +1324,28 @@ fn main() {
         process::exit(run_repl_subcommand(&args[2..]));
     }
 
-    // `stryke run` — run main.stk in current directory (or specified file).
+    // `stryke run` — three-way dispatch:
+    //   1. `stryke run NAME` where NAME is a [scripts] entry → npm-style task runner.
+    //   2. `stryke run FILE.stk` → run that .stk file (legacy behavior).
+    //   3. `stryke run` with no args → run ./main.stk (legacy behavior).
     if args.len() >= 2 && args[1] == "run" {
+        // Detect script-name dispatch: first positional arg matches a [scripts]
+        // key in the nearest stryke.toml. Falls through to .stk-file dispatch
+        // if the manifest is missing or the name doesn't match.
+        if args.len() >= 3 && !args[2].starts_with('-') && !args[2].ends_with(".stk") {
+            let candidate = &args[2];
+            if let Ok(cwd) = std::env::current_dir() {
+                if let Some(root) = stryke::pkg::commands::find_project_root(&cwd) {
+                    let mp = root.join(stryke::pkg::commands::MANIFEST_FILE);
+                    if let Ok(m) = stryke::pkg::manifest::Manifest::from_path(&mp) {
+                        if m.scripts.contains_key(candidate) {
+                            process::exit(stryke::pkg::commands::cmd_run_script(&args[2..]));
+                        }
+                    }
+                }
+            }
+        }
+
         let script = if args.len() >= 3 {
             args[2].clone()
         } else {
@@ -2579,6 +2662,11 @@ fn run_ast_subcommand(args: &[String]) -> i32 {
 /// `stryke ai PROMPT [--model NAME] [--system TEXT] [--stream]` — quick
 /// CLI access. With no PROMPT, reads it from stdin. Output goes to
 /// stdout. Errors surface on stderr with exit 1.
+///
+/// Modal flags switch to specialized pipelines:
+///   --image       image generation (DALL-E 3 / gpt-image-1)
+///   --transcribe  Whisper transcription (PROMPT becomes the audio path)
+///   --speak       OpenAI TTS (PROMPT becomes the spoken text)
 fn run_ai_subcommand(args: &[String]) -> i32 {
     use std::io::Read;
     let mut prompt: Option<String> = None;
@@ -2586,6 +2674,14 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
     let mut system: Option<String> = None;
     let mut stream = false;
     let mut json_out = false;
+    let mut mode_image = false;
+    let mut mode_transcribe = false;
+    let mut mode_speak = false;
+    let mut output: Option<String> = None;
+    let mut size: Option<String> = None;
+    let mut voice: Option<String> = None;
+    let mut quality: Option<String> = None;
+    let mut language: Option<String> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -2606,18 +2702,58 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
                 json_out = true;
                 i += 1;
             }
+            "--image" => {
+                mode_image = true;
+                i += 1;
+            }
+            "--transcribe" => {
+                mode_transcribe = true;
+                i += 1;
+            }
+            "--speak" => {
+                mode_speak = true;
+                i += 1;
+            }
+            "-o" | "--output" if i + 1 < args.len() => {
+                output = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--size" if i + 1 < args.len() => {
+                size = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--voice" if i + 1 < args.len() => {
+                voice = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--quality" if i + 1 < args.len() => {
+                quality = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--language" if i + 1 < args.len() => {
+                language = Some(args[i + 1].clone());
+                i += 2;
+            }
             "--help" | "-h" => {
                 println!(
-                    "Usage: stryke ai [PROMPT] [--model MODEL] [--system TEXT]\n\
+                    "Usage: stryke ai [PROMPT] [FLAGS]\n\
                      \n\
-                     Reads PROMPT from stdin if not given on the command line.\n\
-                     Outputs the model's response to stdout.\n\
+                     Modes (mutually exclusive — default is text completion):\n\
+                       <none>          chat completion → stdout\n\
+                       --image         text-to-image (DALL-E 3 / gpt-image-1)\n\
+                       --transcribe    Whisper transcription (PROMPT = audio path)\n\
+                       --speak         OpenAI TTS (PROMPT = text to speak)\n\
                      \n\
-                     Flags:\n\
+                     Common flags:\n\
                        --model MODEL   override the model (default from stryke.toml)\n\
-                       --system TEXT   set the system prompt\n\
-                       --stream        stream tokens to stdout as they arrive\n\
-                       --json          emit a JSON object with usd, tokens, response"
+                       --system TEXT   set the system prompt (chat mode)\n\
+                       --stream        stream tokens to stdout (chat mode)\n\
+                       --json          emit a JSON object with usd/tokens/response\n\
+                       -o, --output    write binary output to a path (image/speak)\n\
+                     \n\
+                     Image flags:    --size 1024x1024  --quality hd  -o out.png\n\
+                     Speak flags:    --voice alloy     -o out.mp3\n\
+                     Transcribe:     --language en"
                 );
                 return 0;
             }
@@ -2636,6 +2772,25 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
                 return 2;
             }
         }
+    }
+
+    let mode_count = [mode_image, mode_transcribe, mode_speak]
+        .iter()
+        .filter(|b| **b)
+        .count();
+    if mode_count > 1 {
+        eprintln!("stryke ai: --image / --transcribe / --speak are mutually exclusive");
+        return 2;
+    }
+
+    if mode_image {
+        return run_ai_image_cli(prompt, model, output, size, quality);
+    }
+    if mode_transcribe {
+        return run_ai_transcribe_cli(prompt, model, output, language);
+    }
+    if mode_speak {
+        return run_ai_speak_cli(prompt, model, output, voice);
     }
 
     if prompt.is_none() {
@@ -2672,13 +2827,9 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
         script.push_str(&format!("$opts{{system}} = q{{{}}};\n", s));
     }
     if stream {
-        script.push_str(
-            "my $resp = stream_prompt(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n",
-        );
+        script.push_str("my $resp = stream_prompt(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n");
     } else {
-        script.push_str(
-            "my $resp = ai(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n",
-        );
+        script.push_str("my $resp = ai(do { local $_ = q{__PROMPT__}; $_ }, %opts);\n");
     }
     if json_out {
         script.push_str(
@@ -2707,10 +2858,133 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
     }
 }
 
+/// `stryke ai --image PROMPT --output FILE` — runs `ai_image` from CLI.
+/// When `--output` is omitted, prints the base64 PNG to stdout.
+fn run_ai_image_cli(
+    prompt: Option<String>,
+    model: Option<String>,
+    output: Option<String>,
+    size: Option<String>,
+    quality: Option<String>,
+) -> i32 {
+    let prompt = match prompt {
+        Some(p) => p,
+        None => {
+            eprintln!("stryke ai --image: PROMPT required");
+            return 2;
+        }
+    };
+    let mut script = String::from("my %opts;\n");
+    if let Some(m) = model {
+        script.push_str(&format!("$opts{{model}} = q{{{}}};\n", m));
+    }
+    if let Some(s) = size {
+        script.push_str(&format!("$opts{{size}} = q{{{}}};\n", s));
+    }
+    if let Some(q) = quality {
+        script.push_str(&format!("$opts{{quality}} = q{{{}}};\n", q));
+    }
+    if let Some(o) = &output {
+        script.push_str(&format!("$opts{{output}} = q{{{}}};\n", o));
+        script.push_str(&format!(
+            "my $bytes = ai_image(q{{{}}}, %opts);\nprint STDERR \"wrote \", q{{{}}}, \" (\", length($bytes), \" bytes)\\n\";\n",
+            prompt.replace('\\', "\\\\").replace('}', "\\}"),
+            o
+        ));
+    } else {
+        // No output path — emit base64 to stdout so it's pipeable.
+        script.push_str(&format!(
+            "my $bytes = ai_image(q{{{}}}, %opts);\nuse MIME::Base64 ();\nprint MIME::Base64::encode_base64($bytes);\n",
+            prompt.replace('\\', "\\\\").replace('}', "\\}")
+        ));
+    }
+    run_ai_cli_script(&script)
+}
+
+/// `stryke ai --transcribe PATH [--output OUT.txt] [--language en]`
+fn run_ai_transcribe_cli(
+    prompt: Option<String>,
+    model: Option<String>,
+    output: Option<String>,
+    language: Option<String>,
+) -> i32 {
+    let path = match prompt {
+        Some(p) => p,
+        None => {
+            eprintln!("stryke ai --transcribe: PATH to audio file required");
+            return 2;
+        }
+    };
+    let mut script = String::from("my %opts;\n");
+    if let Some(m) = model {
+        script.push_str(&format!("$opts{{model}} = q{{{}}};\n", m));
+    }
+    if let Some(l) = language {
+        script.push_str(&format!("$opts{{language}} = q{{{}}};\n", l));
+    }
+    script.push_str(&format!(
+        "my $text = ai_transcribe(q{{{}}}, %opts);\n",
+        path.replace('\\', "\\\\").replace('}', "\\}"),
+    ));
+    if let Some(o) = output {
+        script.push_str(&format!(
+            "open my $fh, '>', q{{{}}} or die qq{{open $!: }};\nprint $fh $text;\nclose $fh;\nprint STDERR qq{{wrote }}, q{{{}}}, qq{{ (}}, length($text), qq{{ chars)\\n}};\n",
+            o, o
+        ));
+    } else {
+        script.push_str("print $text, \"\\n\";\n");
+    }
+    run_ai_cli_script(&script)
+}
+
+/// `stryke ai --speak TEXT [--output OUT.mp3] [--voice alloy]`
+fn run_ai_speak_cli(
+    prompt: Option<String>,
+    model: Option<String>,
+    output: Option<String>,
+    voice: Option<String>,
+) -> i32 {
+    let text = match prompt {
+        Some(p) => p,
+        None => {
+            eprintln!("stryke ai --speak: TEXT required");
+            return 2;
+        }
+    };
+    let mut script = String::from("my %opts;\n");
+    if let Some(m) = model {
+        script.push_str(&format!("$opts{{model}} = q{{{}}};\n", m));
+    }
+    if let Some(v) = voice {
+        script.push_str(&format!("$opts{{voice}} = q{{{}}};\n", v));
+    }
+    let out_path = output.unwrap_or_else(|| "speech.mp3".to_string());
+    script.push_str(&format!("$opts{{output}} = q{{{}}};\n", out_path));
+    script.push_str(&format!(
+        "my $bytes = ai_speak(q{{{}}}, %opts);\nprint STDERR qq{{wrote }}, q{{{}}}, qq{{ (}}, length($bytes), qq{{ bytes)\\n}};\n",
+        text.replace('\\', "\\\\").replace('}', "\\}"),
+        out_path
+    ));
+    run_ai_cli_script(&script)
+}
+
+/// Shared script-driver for the three modal `stryke ai` CLI helpers.
+fn run_ai_cli_script(script: &str) -> i32 {
+    let mut interp = Interpreter::new();
+    match stryke::parse_and_run_string(script, &mut interp) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("stryke ai: {}", e);
+            1
+        }
+    }
+}
+
 fn run_build_subcommand(args: &[String]) -> i32 {
     let mut script: Option<String> = None;
     let mut project_dir: Option<String> = None;
     let mut out: Option<String> = None;
+    let mut mcp_server = false;
     let mut i = 0usize;
     while i < args.len() {
         match args[i].as_str() {
@@ -2730,9 +3004,12 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 }
                 project_dir = Some(args[i].clone());
             }
+            "--mcp-server" => {
+                mcp_server = true;
+            }
             "-h" | "--help" => {
-                println!("usage: stryke build SCRIPT [-o OUTPUT]");
-                println!("       stryke build --project DIR [-o OUTPUT]");
+                println!("usage: stryke build SCRIPT [-o OUTPUT] [--mcp-server]");
+                println!("       stryke build --project DIR [-o OUTPUT] [--mcp-server]");
                 println!();
                 println!(
                     "Compile a Perl script into a standalone executable binary. The output is"
@@ -2746,12 +3023,16 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 println!("no perl, no stryke, no @INC setup required.");
                 println!();
                 println!("Options:");
-                println!("  --project DIR   Bundle main.stk + lib/*.stk (excludes t/ tests)");
+                println!("  --project DIR    Bundle main.stk + lib/*.stk (excludes t/ tests)");
+                println!("  --mcp-server     Wrap as an MCP server: after running the user's");
+                println!("                   script (which calls `tool fn ...`), the binary");
+                println!("                   serves the registered tools over stdio JSON-RPC.");
                 println!();
                 println!("Examples:");
                 println!("  stryke build app.pl                     # → ./app");
                 println!("  stryke build app.pl -o /usr/local/bin/app");
                 println!("  stryke build --project ./myapp -o myapp # bundle project");
+                println!("  stryke build tools.stk --mcp-server -o my-mcp-server");
                 return 0;
             }
             s if script.is_none() && project_dir.is_none() && !s.starts_with('-') => {
@@ -2766,6 +3047,26 @@ fn run_build_subcommand(args: &[String]) -> i32 {
         }
         i += 1;
     }
+
+    // When `--mcp-server` is set, append a tail that flips the binary
+    // into MCP-stdio mode after the user's script has registered its
+    // tools. We do this by generating a wrapper temp file with the
+    // user's script + a final `mcp_serve_registered_tools(...)` call.
+    let script = if mcp_server {
+        let Some(orig) = script.as_ref() else {
+            eprintln!("stryke build --mcp-server: requires SCRIPT (project mode adds it to main.stk if you really need that)");
+            return 2;
+        };
+        match wrap_for_mcp_server(orig, out.as_deref()) {
+            Ok(path) => Some(path),
+            Err(e) => {
+                eprintln!("stryke build --mcp-server: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        script
+    };
 
     if let Some(dir) = project_dir {
         let project_path = PathBuf::from(&dir);
@@ -2810,6 +3111,45 @@ fn run_build_subcommand(args: &[String]) -> i32 {
             }
         }
     }
+}
+
+/// Generate a temporary `.stk` file that loads the user's script and then
+/// flips into MCP-stdio mode. Used by `stryke build --mcp-server`. The
+/// temp file lives next to the output so paths in error messages are
+/// stable; if `out` is None, it goes in the system temp dir.
+fn wrap_for_mcp_server(orig: &str, out: Option<&str>) -> Result<String, String> {
+    use std::io::Write;
+    let orig_abs =
+        std::fs::canonicalize(orig).map_err(|e| format!("canonicalize {}: {}", orig, e))?;
+    let dir = match out {
+        Some(o) => PathBuf::from(o)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(std::env::temp_dir),
+        None => std::env::temp_dir(),
+    };
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    let wrapper = dir.join(format!("stryke-mcp-wrapper-{}-{}.stk", pid, nanos));
+    let server_name = std::path::Path::new(orig)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "stryke-mcp".to_string());
+    let body = format!(
+        "# Auto-generated by `stryke build --mcp-server`. Loads the user's\n\
+         # script (which registers tools via `tool fn ...`), then enters\n\
+         # the MCP stdio JSON-RPC loop.\n\
+         require {orig_abs:?};\n\
+         mcp_serve_registered_tools({server_name:?});\n",
+    );
+    let mut f = std::fs::File::create(&wrapper)
+        .map_err(|e| format!("create {}: {}", wrapper.display(), e))?;
+    f.write_all(body.as_bytes())
+        .map_err(|e| format!("write {}: {}", wrapper.display(), e))?;
+    Ok(wrapper.to_string_lossy().into_owned())
 }
 
 /// `stryke convert FILE...` — convert Perl source to idiomatic stryke syntax.

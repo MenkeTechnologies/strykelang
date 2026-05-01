@@ -147,7 +147,9 @@ fn compile_pattern(path: &str) -> (String, Vec<String>) {
                 while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
                     j += 1;
                 }
-                let name = std::str::from_utf8(&bytes[start..j]).unwrap_or("").to_string();
+                let name = std::str::from_utf8(&bytes[start..j])
+                    .unwrap_or("")
+                    .to_string();
                 if !name.is_empty() {
                     out.push_str(&format!("(?P<__{}__>[^/]+)", name));
                     captures.push(name);
@@ -163,7 +165,9 @@ fn compile_pattern(path: &str) -> (String, Vec<String>) {
                 while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
                     j += 1;
                 }
-                let name = std::str::from_utf8(&bytes[start..j]).unwrap_or("").to_string();
+                let name = std::str::from_utf8(&bytes[start..j])
+                    .unwrap_or("")
+                    .to_string();
                 if !name.is_empty() {
                     out.push_str(&format!("(?P<__{}__>.+)", name));
                     captures.push(name);
@@ -245,11 +249,7 @@ pub(crate) fn web_resources(args: &[PerlValue], line: usize) -> Result<PerlValue
             format!("/{}/:id", name),
             format!("{}#update", name),
         ),
-        (
-            "PUT",
-            format!("/{}/:id", name),
-            format!("{}#update", name),
-        ),
+        ("PUT", format!("/{}/:id", name), format!("{}#update", name)),
         (
             "DELETE",
             format!("/{}/:id", name),
@@ -274,7 +274,10 @@ pub(crate) fn web_root(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             line,
         ));
     }
-    web_route(&[PerlValue::string("GET /".to_string()), args[0].clone()], line)
+    web_route(
+        &[PerlValue::string("GET /".to_string()), args[0].clone()],
+        line,
+    )
 }
 
 pub(crate) fn web_application_config(args: &[PerlValue], line: usize) -> Result<PerlValue> {
@@ -341,10 +344,7 @@ pub(crate) fn web_redirect(args: &[PerlValue], line: usize) -> Result<PerlValue>
         cur.status = status;
         cur.headers = vec![
             ("location".into(), url.clone()),
-            (
-                "content-type".into(),
-                "text/plain; charset=utf-8".into(),
-            ),
+            ("content-type".into(), "text/plain; charset=utf-8".into()),
         ];
         cur.body = format!("Redirecting to {}", url);
         cur.rendered = true;
@@ -354,8 +354,7 @@ pub(crate) fn web_redirect(args: &[PerlValue], line: usize) -> Result<PerlValue>
 
 pub(crate) fn web_json(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let val = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let body = crate::native_data::json_encode(&val)
-        .unwrap_or_else(|_| "null".to_string());
+    let body = crate::native_data::json_encode(&val).unwrap_or_else(|_| "null".to_string());
     let status = if args.len() >= 2 {
         args[1].to_int() as u16
     } else {
@@ -374,10 +373,7 @@ pub(crate) fn web_json(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn web_text(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let body = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let body = args.first().map(|v| v.to_string()).unwrap_or_default();
     let status = if args.len() >= 2 {
         args[1].to_int() as u16
     } else {
@@ -471,11 +467,7 @@ fn split_action_list(v: &PerlValue) -> Vec<String> {
     if let Some(arr) = v.as_array_ref() {
         return arr.read().iter().map(|x| x.to_string()).collect();
     }
-    v.clone()
-        .to_list()
-        .iter()
-        .map(|x| x.to_string())
-        .collect()
+    v.clone().to_list().iter().map(|x| x.to_string()).collect()
 }
 
 pub(crate) fn web_routes_table(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
@@ -490,10 +482,7 @@ pub(crate) fn web_routes_table(_args: &[PerlValue], _line: usize) -> Result<Perl
         "----", "----", "-----------------"
     ));
     for r in &r.routes {
-        out.push_str(&format!(
-            "{:<8}  {:<30}  {}\n",
-            r.verb, r.pattern, r.action
-        ));
+        out.push_str(&format!("{:<8}  {:<30}  {}\n", r.verb, r.pattern, r.action));
     }
     Ok(PerlValue::string(out))
 }
@@ -614,9 +603,7 @@ pub(crate) fn web_permit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let src = args[0]
         .as_hash_map()
         .or_else(|| args[0].as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| {
-            PerlError::runtime("web_permit: first arg must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_permit: first arg must be a hashref", line))?;
     let mut out = IndexMap::new();
     for keyv in &args[1..] {
         let k = keyv.to_string();
@@ -647,15 +634,11 @@ pub(crate) fn web_password_verify(args: &[PerlValue], line: usize) -> Result<Per
     let pw = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_password_verify: password required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_password_verify: password required", line))?;
     let stored = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_password_verify: stored hash required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_password_verify: stored hash required", line))?;
     let parts: Vec<&str> = stored.splitn(3, '$').collect();
     if parts.len() != 3 || parts[0] != "web1" {
         return Ok(PerlValue::integer(0));
@@ -664,11 +647,13 @@ pub(crate) fn web_password_verify(args: &[PerlValue], line: usize) -> Result<Per
     let want = parts[2];
     let combined = format!("{}{}", salt_hex, pw);
     let got = sha256_hex(combined.as_bytes());
-    Ok(PerlValue::integer(if constant_time_eq(got.as_bytes(), want.as_bytes()) {
-        1
-    } else {
-        0
-    }))
+    Ok(PerlValue::integer(
+        if constant_time_eq(got.as_bytes(), want.as_bytes()) {
+            1
+        } else {
+            0
+        },
+    ))
 }
 
 static RNG_STATE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -745,10 +730,7 @@ fn unix_now() -> i64 {
 }
 
 pub(crate) fn web_cache_get(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let key = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let now = unix_now();
     let map = cache_slot().lock();
     if let Some((val, expires)) = map.get(&key) {
@@ -782,10 +764,7 @@ pub(crate) fn web_cache_set(args: &[PerlValue], line: usize) -> Result<PerlValue
 }
 
 pub(crate) fn web_cache_delete(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let key = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     cache_slot().lock().shift_remove(&key);
     Ok(PerlValue::UNDEF)
 }
@@ -798,10 +777,7 @@ pub(crate) fn web_cache_clear(_args: &[PerlValue], _line: usize) -> Result<PerlV
 /// `web_t("welcome.title")` — translate from the loaded locale dict.
 /// Falls back to the key itself when not found so views never crash.
 pub(crate) fn web_t(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let key = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
     let lang = args
         .get(1)
         .map(|v| v.to_string())
@@ -822,21 +798,14 @@ pub(crate) fn web_load_locale(args: &[PerlValue], line: usize) -> Result<PerlVal
     let lang = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_load_locale: language required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_load_locale: language required", line))?;
     let map = args
         .get(1)
         .and_then(|v| {
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| {
-            PerlError::runtime(
-                "web_load_locale: second arg must be a hashref",
-                line,
-            )
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_load_locale: second arg must be a hashref", line))?;
     let mut flat = IndexMap::new();
     for (k, v) in map {
         flat.insert(k, v.to_string());
@@ -929,20 +898,14 @@ pub(crate) fn web_now(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
 /// hand the round-tripped value to `web_unsigned` without trusting the
 /// client. Used for one-click email links / password-reset tokens.
 pub(crate) fn web_signed(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let payload = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let payload = args.first().map(|v| v.to_string()).unwrap_or_default();
     let secret = secret_key();
     let mac = sha256_hex((secret + &payload).as_bytes());
     Ok(PerlValue::string(format!("{}.{}", payload, &mac[..32])))
 }
 
 pub(crate) fn web_unsigned(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let signed = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let signed = args.first().map(|v| v.to_string()).unwrap_or_default();
     let Some((payload, mac)) = signed.rsplit_once('.') else {
         return Ok(PerlValue::UNDEF);
     };
@@ -971,25 +934,20 @@ fn secret_key() -> String {
 pub(crate) fn web_jwt_encode(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let payload = args
         .first()
-        .ok_or_else(|| {
-            PerlError::runtime("web_jwt_encode: payload (hashref) required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_jwt_encode: payload (hashref) required", line))?;
     let payload_map = payload
         .as_hash_map()
         .or_else(|| payload.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| {
-            PerlError::runtime("web_jwt_encode: payload must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_jwt_encode: payload must be a hashref", line))?;
     let mut wrapped = IndexMap::new();
     for (k, v) in payload_map {
         wrapped.insert(k, v);
     }
     let header = r#"{"alg":"HS256","typ":"JWT"}"#;
     let header_b64 = base64url_encode(header.as_bytes());
-    let payload_val =
-        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(wrapped)));
-    let payload_json = crate::native_data::json_encode(&payload_val)
-        .unwrap_or_else(|_| "{}".into());
+    let payload_val = PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(wrapped)));
+    let payload_json =
+        crate::native_data::json_encode(&payload_val).unwrap_or_else(|_| "{}".into());
     let payload_b64 = base64url_encode(payload_json.as_bytes());
     let signing_input = format!("{}.{}", header_b64, payload_b64);
     let mac = hmac_sha256_b64(&signing_input, &secret_key());
@@ -997,10 +955,7 @@ pub(crate) fn web_jwt_encode(args: &[PerlValue], line: usize) -> Result<PerlValu
 }
 
 pub(crate) fn web_jwt_decode(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let token = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let token = args.first().map(|v| v.to_string()).unwrap_or_default();
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
         return Ok(PerlValue::UNDEF);
@@ -1027,8 +982,7 @@ fn hmac_sha256_b64(input: &str, key: &str) -> String {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
-    let mut mac = HmacSha256::new_from_slice(key.as_bytes())
-        .expect("hmac key");
+    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).expect("hmac key");
     mac.update(input.as_bytes());
     base64url_encode(&mac.finalize().into_bytes())
 }
@@ -1147,15 +1101,37 @@ fn base32_decode(s: &str) -> Option<Vec<u8>> {
 
 pub(crate) fn web_faker_name(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let firsts = [
-        "Alice", "Bob", "Carol", "Dan", "Eve", "Frank", "Grace", "Heidi", "Ivan",
-        "Judy", "Kim", "Leo", "Mallory", "Niaj", "Olivia", "Peggy", "Quinn", "Rupert",
-        "Sybil", "Trent", "Ursula", "Victor", "Walter", "Xena", "Yvonne", "Zane",
+        "Alice", "Bob", "Carol", "Dan", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy", "Kim",
+        "Leo", "Mallory", "Niaj", "Olivia", "Peggy", "Quinn", "Rupert", "Sybil", "Trent", "Ursula",
+        "Victor", "Walter", "Xena", "Yvonne", "Zane",
     ];
     let lasts = [
-        "Adams", "Brown", "Chen", "Davis", "Evans", "Foster", "Garcia", "Harris",
-        "Iqbal", "Jones", "Khan", "Lopez", "Miller", "Nguyen", "O'Brien", "Patel",
-        "Quinn", "Rivera", "Smith", "Tran", "Underwood", "Vasquez", "Williams",
-        "Xu", "Young", "Zhang",
+        "Adams",
+        "Brown",
+        "Chen",
+        "Davis",
+        "Evans",
+        "Foster",
+        "Garcia",
+        "Harris",
+        "Iqbal",
+        "Jones",
+        "Khan",
+        "Lopez",
+        "Miller",
+        "Nguyen",
+        "O'Brien",
+        "Patel",
+        "Quinn",
+        "Rivera",
+        "Smith",
+        "Tran",
+        "Underwood",
+        "Vasquez",
+        "Williams",
+        "Xu",
+        "Young",
+        "Zhang",
     ];
     let s = format!("{} {}", pick(&firsts), pick(&lasts));
     Ok(PerlValue::string(s))
@@ -1163,7 +1139,13 @@ pub(crate) fn web_faker_name(_args: &[PerlValue], _line: usize) -> Result<PerlVa
 
 pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let users = ["alice", "bob", "carol", "dan", "eve", "frank", "grace"];
-    let domains = ["example.com", "test.io", "demo.net", "stryke.dev", "mail.app"];
+    let domains = [
+        "example.com",
+        "test.io",
+        "demo.net",
+        "stryke.dev",
+        "mail.app",
+    ];
     let n = (random_bytes(2)[0] as i64) % 1000;
     Ok(PerlValue::string(format!(
         "{}{}@{}",
@@ -1175,9 +1157,28 @@ pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlV
 
 pub(crate) fn web_faker_sentence(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let words = [
-        "stryke", "neon", "cyberpunk", "matrix", "ghost", "shell", "shadow",
-        "void", "echo", "spire", "flux", "axion", "quasar", "pulse", "stack",
-        "lattice", "vector", "kernel", "phantom", "aurora", "nova", "quantum",
+        "stryke",
+        "neon",
+        "cyberpunk",
+        "matrix",
+        "ghost",
+        "shell",
+        "shadow",
+        "void",
+        "echo",
+        "spire",
+        "flux",
+        "axion",
+        "quasar",
+        "pulse",
+        "stack",
+        "lattice",
+        "vector",
+        "kernel",
+        "phantom",
+        "aurora",
+        "nova",
+        "quantum",
     ];
     let n = 5 + (random_bytes(1)[0] as usize % 8);
     let mut out = String::new();
@@ -1231,10 +1232,7 @@ fn pick<'a>(arr: &'a [&'a str]) -> &'a str {
 // pulling in a full crate.
 
 pub(crate) fn web_markdown(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let src = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let src = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(render_markdown(&src)))
 }
 
@@ -1326,7 +1324,10 @@ fn render_markdown(src: &str) -> String {
             out.push_str(&format!("<h1>{}</h1>\n", inline_md(rest)));
             continue;
         }
-        if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+        if let Some(rest) = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+        {
             flush_para(&mut paragraph, &mut out);
             if !in_list {
                 out.push_str("<ul>\n");
@@ -1394,13 +1395,10 @@ fn inline_md(s: &str) -> String {
         if bytes[i] == b'[' {
             if let Some(close_text) = find_close_marker(&bytes, i + 1, b"]") {
                 if close_text + 1 < bytes.len() && bytes[close_text + 1] == b'(' {
-                    if let Some(close_url) =
-                        find_close_marker(&bytes, close_text + 2, b")")
-                    {
-                        let text =
-                            std::str::from_utf8(&bytes[i + 1..close_text]).unwrap_or("");
-                        let url = std::str::from_utf8(&bytes[close_text + 2..close_url])
-                            .unwrap_or("");
+                    if let Some(close_url) = find_close_marker(&bytes, close_text + 2, b")") {
+                        let text = std::str::from_utf8(&bytes[i + 1..close_text]).unwrap_or("");
+                        let url =
+                            std::str::from_utf8(&bytes[close_text + 2..close_url]).unwrap_or("");
                         out.push_str(&format!("<a href=\"{}\">{}</a>", url, text));
                         i = close_url + 1;
                         continue;
@@ -1428,20 +1426,13 @@ fn find_close_marker(bytes: &[u8], from: usize, marker: &[u8]) -> Option<usize> 
 // ── HTTP cache (ETag / 304 Not Modified) ───────────────────────────────
 
 pub(crate) fn web_etag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let payload = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let payload = args.first().map(|v| v.to_string()).unwrap_or_default();
     let etag = format!("\"{}\"", &sha256_hex(payload.as_bytes())[..16]);
     let inm = with_current(|cur| {
         cur.request
             .as_ref()
             .and_then(|r| r.as_hash_ref())
-            .and_then(|h| {
-                h.read()
-                    .get("headers")
-                    .cloned()
-            })
+            .and_then(|h| h.read().get("headers").cloned())
             .and_then(|hv| hv.as_hash_ref().map(|h| h.read().clone()))
             .and_then(|m| m.get("if-none-match").map(|v| v.to_string()))
     });
@@ -1491,8 +1482,7 @@ pub(crate) fn web_csv(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
             out.push('\n');
             header_written = true;
         }
-        let cells: Vec<String> =
-            map.values().map(|v| csv_field(&v.to_string())).collect();
+        let cells: Vec<String> = map.values().map(|v| csv_field(&v.to_string())).collect();
         out.push_str(&cells.join(","));
         out.push('\n');
     }
@@ -1530,10 +1520,7 @@ pub(crate) fn web_content_for(args: &[PerlValue], line: usize) -> Result<PerlVal
 }
 
 pub(crate) fn web_yield_content(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let name = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let s = CONTENT_BLOCKS.with(|c| c.borrow().get(&name).cloned());
     Ok(PerlValue::string(s.unwrap_or_default()))
 }
@@ -1551,15 +1538,12 @@ impl Interpreter {
         args: &[PerlValue],
         line: usize,
     ) -> Result<PerlValue> {
-        let name = args
-            .first()
-            .map(|v| v.to_string())
-            .ok_or_else(|| {
-                PerlError::runtime(
-                    "web_render_partial: usage: web_render_partial(\"path\", locals_hashref)",
-                    line,
-                )
-            })?;
+        let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
+            PerlError::runtime(
+                "web_render_partial: usage: web_render_partial(\"path\", locals_hashref)",
+                line,
+            )
+        })?;
         let locals = args
             .get(1)
             .and_then(|v| {
@@ -1596,10 +1580,8 @@ impl Interpreter {
 pub(crate) fn web_security_headers(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     with_current(|cur| {
         cur.headers.push(("x-frame-options".into(), "DENY".into()));
-        cur.headers.push((
-            "x-content-type-options".into(),
-            "nosniff".into(),
-        ));
+        cur.headers
+            .push(("x-content-type-options".into(), "nosniff".into()));
         cur.headers.push((
             "referrer-policy".into(),
             "strict-origin-when-cross-origin".into(),
@@ -1677,7 +1659,9 @@ pub(crate) fn web_openapi(_args: &[PerlValue], _line: usize) -> Result<PerlValue
         "paths".to_string(),
         PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(paths_out))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(root))))
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        root,
+    ))))
 }
 
 fn openapi_path(p: &str) -> String {
@@ -1727,10 +1711,7 @@ pub(crate) fn web_token_for(args: &[PerlValue], line: usize) -> Result<PerlValue
 }
 
 pub(crate) fn web_token_consume(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let token = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let token = args.first().map(|v| v.to_string()).unwrap_or_default();
     let purpose = args
         .get(1)
         .map(|v| v.to_string())
@@ -1768,10 +1749,7 @@ pub(crate) fn web_token_consume(args: &[PerlValue], _line: usize) -> Result<Perl
 // ── Permissions / can ─────────────────────────────────────────────────
 
 pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let action = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let action = args.first().map(|v| v.to_string()).unwrap_or_default();
     let user = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
     let user_map = user
         .as_hash_map()
@@ -1793,7 +1771,9 @@ pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
         .get("permissions")
         .map(|v| v.to_string())
         .unwrap_or_default();
-    let allowed = perms.split(',').any(|p| p.trim() == action || p.trim() == "*");
+    let allowed = perms
+        .split(',')
+        .any(|p| p.trim() == action || p.trim() == "*");
     Ok(PerlValue::integer(if allowed { 1 } else { 0 }))
 }
 
@@ -1805,9 +1785,7 @@ pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<Pe
     let kind = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_jsonapi_resource: type required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_jsonapi_resource: type required", line))?;
     let row = args
         .get(1)
         .and_then(|v| {
@@ -1815,10 +1793,7 @@ pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<Pe
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .unwrap_or_default();
-    let id = row
-        .get("id")
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let id = row.get("id").map(|v| v.to_string()).unwrap_or_default();
     let mut attrs = row.clone();
     attrs.shift_remove("id");
 
@@ -1834,7 +1809,9 @@ pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<Pe
         "data".into(),
         PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(data))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        envelope,
+    ))))
 }
 
 /// `web_jsonapi_collection("posts", $rows)` → wraps an array_ref of
@@ -1843,9 +1820,7 @@ pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<
     let kind = args
         .first()
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_jsonapi_collection: type required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_jsonapi_collection: type required", line))?;
     let rows: Vec<PerlValue> = match args.get(1) {
         Some(v) => v
             .as_array_ref()
@@ -1860,10 +1835,7 @@ pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<
             .as_hash_map()
             .or_else(|| row.as_hash_ref().map(|h| h.read().clone()))
             .unwrap_or_default();
-        let id = map
-            .get("id")
-            .map(|v| v.to_string())
-            .unwrap_or_default();
+        let id = map.get("id").map(|v| v.to_string()).unwrap_or_default();
         let mut attrs = map.clone();
         attrs.shift_remove("id");
         let mut entry = IndexMap::new();
@@ -1879,10 +1851,7 @@ pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<
     }
 
     let mut meta = IndexMap::new();
-    meta.insert(
-        "count".into(),
-        PerlValue::integer(wrapped.len() as i64),
-    );
+    meta.insert("count".into(), PerlValue::integer(wrapped.len() as i64));
 
     let mut envelope = IndexMap::new();
     envelope.insert(
@@ -1893,7 +1862,9 @@ pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<
         "meta".into(),
         PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(meta))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        envelope,
+    ))))
 }
 
 /// `web_jsonapi_error(404, "not_found", "Post 42 missing")` →
@@ -1919,7 +1890,9 @@ pub(crate) fn web_jsonapi_error(args: &[PerlValue], _line: usize) -> Result<Perl
             PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(err))),
         ]))),
     );
-    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        envelope,
+    ))))
 }
 
 /// `web_bearer_token()` → returns the `Authorization: Bearer X` token
@@ -1956,10 +1929,7 @@ pub(crate) fn web_bearer_token(_args: &[PerlValue], _line: usize) -> Result<Perl
 /// HTML-escape: `&` `<` `>` `"` `'`. Use everywhere user content lands
 /// inside HTML — `<%= web_h($post->{title}) %>`.
 pub(crate) fn web_h(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let s = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(html_escape(&s)))
 }
 
@@ -1967,10 +1937,7 @@ pub(crate) fn web_h(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
 /// with optional html-attribute hashref. The label is HTML-escaped; the
 /// href is attribute-escaped.
 pub(crate) fn web_link_to(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let label = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let label = args.first().map(|v| v.to_string()).unwrap_or_default();
     let href = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let attrs = collect_html_attrs_from_pairs(&args[args.len().min(2)..]);
     let mut html = String::from("<a");
@@ -1986,23 +1953,19 @@ pub(crate) fn web_link_to(args: &[PerlValue], _line: usize) -> Result<PerlValue>
 /// containing a single submit button. Used for non-GET destructive
 /// actions where a plain `<a>` would pollute the URL or be cached.
 pub(crate) fn web_button_to(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let label = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let label = args.first().map(|v| v.to_string()).unwrap_or_default();
     let action = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(2)..]);
     let method_raw = opts
         .get("method")
         .map(|v| v.to_string())
         .unwrap_or_else(|| "post".to_string());
-    let (form_method, hidden_override) = if method_raw.eq_ignore_ascii_case("get")
-        || method_raw.eq_ignore_ascii_case("post")
-    {
-        (method_raw.to_lowercase(), None)
-    } else {
-        ("post".to_string(), Some(method_raw.to_lowercase()))
-    };
+    let (form_method, hidden_override) =
+        if method_raw.eq_ignore_ascii_case("get") || method_raw.eq_ignore_ascii_case("post") {
+            (method_raw.to_lowercase(), None)
+        } else {
+            ("post".to_string(), Some(method_raw.to_lowercase()))
+        };
     let mut html = String::from("<form");
     push_attr(&mut html, "action", &action);
     push_attr(&mut html, "method", &form_method);
@@ -2041,13 +2004,12 @@ pub(crate) fn web_form_with(args: &[PerlValue], _line: usize) -> Result<PerlValu
         .get("method")
         .map(|v| v.to_string())
         .unwrap_or_else(|| "post".to_string());
-    let (form_method, hidden_override) = if method_raw.eq_ignore_ascii_case("get")
-        || method_raw.eq_ignore_ascii_case("post")
-    {
-        (method_raw.to_lowercase(), None)
-    } else {
-        ("post".to_string(), Some(method_raw.to_lowercase()))
-    };
+    let (form_method, hidden_override) =
+        if method_raw.eq_ignore_ascii_case("get") || method_raw.eq_ignore_ascii_case("post") {
+            (method_raw.to_lowercase(), None)
+        } else {
+            ("post".to_string(), Some(method_raw.to_lowercase()))
+        };
     let mut html = String::from("<form");
     push_attr(&mut html, "action", &url);
     push_attr(&mut html, "method", &form_method);
@@ -2072,10 +2034,7 @@ pub(crate) fn web_form_close(_args: &[PerlValue], _line: usize) -> Result<PerlVa
 
 /// `web_text_field("title", $post->{title})` → `<input type="text" ...>`.
 pub(crate) fn web_text_field(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let name = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let value = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(format!(
         "<input type=\"text\" name=\"{}\" value=\"{}\">",
@@ -2086,10 +2045,7 @@ pub(crate) fn web_text_field(args: &[PerlValue], _line: usize) -> Result<PerlVal
 
 /// `web_text_area("body", $post->{body})` → `<textarea ...>...</textarea>`.
 pub(crate) fn web_text_area(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let name = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let value = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(format!(
         "<textarea name=\"{}\">{}</textarea>",
@@ -2101,10 +2057,7 @@ pub(crate) fn web_text_area(args: &[PerlValue], _line: usize) -> Result<PerlValu
 /// `web_check_box("published", $post->{published})` → checkbox plus a
 /// hidden `0` companion so an unchecked box still posts a value.
 pub(crate) fn web_check_box(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let name = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let name = args.first().map(|v| v.to_string()).unwrap_or_default();
     let truthy = args
         .get(1)
         .map(|v| v.to_int() != 0 && !v.to_string().is_empty() && v.to_string() != "0")
@@ -2129,10 +2082,7 @@ pub(crate) fn web_csrf_meta_tag(_args: &[PerlValue], _line: usize) -> Result<Per
 /// `web_stylesheet_link_tag("application")` → `<link rel="stylesheet" ...>`.
 /// Multiple names render multiple link tags. `media => "all"` is the
 /// default. Uses the Rails convention of looking under `/assets/`.
-pub(crate) fn web_stylesheet_link_tag(
-    args: &[PerlValue],
-    _line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_stylesheet_link_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let mut out = String::new();
     let mut media = "all".to_string();
     let names: Vec<String> = args
@@ -2168,10 +2118,7 @@ pub(crate) fn web_stylesheet_link_tag(
 }
 
 /// `web_javascript_link_tag("application", defer => 1)` → `<script>` tags.
-pub(crate) fn web_javascript_link_tag(
-    args: &[PerlValue],
-    _line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_javascript_link_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     let mut out = String::new();
     let names: Vec<String> = args
         .iter()
@@ -2182,14 +2129,8 @@ pub(crate) fn web_javascript_link_tag(
         .map(|v| v.to_string())
         .collect();
     let opts = collect_kv_pairs(&args[names.len()..]);
-    let defer = opts
-        .get("defer")
-        .map(|v| v.to_int() != 0)
-        .unwrap_or(false);
-    let asyn = opts
-        .get("async")
-        .map(|v| v.to_int() != 0)
-        .unwrap_or(false);
+    let defer = opts.get("defer").map(|v| v.to_int() != 0).unwrap_or(false);
+    let asyn = opts.get("async").map(|v| v.to_int() != 0).unwrap_or(false);
     for name in &names {
         let src = if name.starts_with('/') || name.starts_with("http") {
             name.clone()
@@ -2208,10 +2149,7 @@ pub(crate) fn web_javascript_link_tag(
 
 /// `web_image_tag("logo.png", alt => "logo")` → `<img src="..." alt="...">`.
 pub(crate) fn web_image_tag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let src = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let src = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(1)..]);
     let resolved = if src.starts_with('/') || src.starts_with("http") {
         src.clone()
@@ -2233,10 +2171,7 @@ pub(crate) fn web_image_tag(args: &[PerlValue], _line: usize) -> Result<PerlValu
 /// `web_truncate("long string", length => 30, omission => "…")` → cap a
 /// string for display. Defaults: 30 chars, ellipsis suffix.
 pub(crate) fn web_truncate(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    let s = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = collect_kv_pairs(&args[args.len().min(1)..]);
     let length = opts
         .get("length")
@@ -2302,14 +2237,8 @@ fn irregular_plural(word: &str) -> Option<&'static str> {
 /// `web_time_ago_in_words($timestamp)` — best-effort relative time
 /// string ("3 minutes ago", "yesterday"). Accepts ISO-8601-ish input
 /// from the timestamps `web_model_create` writes.
-pub(crate) fn web_time_ago_in_words(
-    args: &[PerlValue],
-    _line: usize,
-) -> Result<PerlValue> {
-    let s = args
-        .first()
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+pub(crate) fn web_time_ago_in_words(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     Ok(PerlValue::string(format_time_ago(&s)))
 }
 
@@ -2451,19 +2380,11 @@ impl Interpreter {
     /// `html`, `body`, `json`, `template`. The template branch reads the
     /// matching `.erb` file and runs it through the ERB engine below,
     /// optionally wrapping in `app/views/layouts/application.html.erb`.
-    pub(crate) fn web_render(
-        &mut self,
-        args: &[PerlValue],
-        line: usize,
-    ) -> Result<PerlValue> {
+    pub(crate) fn web_render(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let opts = parse_render_opts(args);
-        let status = opts
-            .get("status")
-            .map(|v| v.to_int() as u16)
-            .unwrap_or(200);
+        let status = opts.get("status").map(|v| v.to_int() as u16).unwrap_or(200);
         let (body, ct) = if let Some(v) = opts.get("json") {
-            let s = crate::native_data::json_encode(v)
-                .unwrap_or_else(|_| "null".to_string());
+            let s = crate::native_data::json_encode(v).unwrap_or_else(|_| "null".to_string());
             (s, "application/json; charset=utf-8".to_string())
         } else if let Some(v) = opts.get("text") {
             (v.to_string(), "text/plain; charset=utf-8".to_string())
@@ -2521,10 +2442,7 @@ impl Interpreter {
     ) -> Result<String> {
         let view_path = format!("app/views/{}.html.erb", name);
         let body_src = std::fs::read_to_string(&view_path).map_err(|e| {
-            PerlError::runtime(
-                format!("web_render: can't read {}: {}", view_path, e),
-                line,
-            )
+            PerlError::runtime(format!("web_render: can't read {}: {}", view_path, e), line)
         })?;
         let body = self.render_erb(&body_src, locals, line)?;
 
@@ -2546,10 +2464,12 @@ impl Interpreter {
 
     /// Compile + evaluate ERB. Recognised tags:
     ///
-    ///     <%# comment %>     dropped
-    ///     <% stmt %>         executed for side effects (no output)
-    ///     <%= expr %>        evaluated and stringified into output
-    ///     <%- ... -%>        same as above with whitespace trimming
+    /// ```text
+    /// <%# comment %>     dropped
+    /// <% stmt %>         executed for side effects (no output)
+    /// <%= expr %>        evaluated and stringified into output
+    /// <%- ... -%>        same as above with whitespace trimming
+    /// ```
     ///
     /// Locals are installed as `my $name = $value` in a child scope so
     /// the views can reference them as plain scalars.
@@ -2603,9 +2523,8 @@ impl Interpreter {
                     // when the prior segment ended with a literal-append.
                     trim_trailing_ws_in_last_append(&mut program);
                 }
-                let close = find_substr(bytes, tag_start, b"%>").ok_or_else(|| {
-                    PerlError::runtime("erb: unclosed `<%` tag", line)
-                })?;
+                let close = find_substr(bytes, tag_start, b"%>")
+                    .ok_or_else(|| PerlError::runtime("erb: unclosed `<%` tag", line))?;
                 let mut content_end = close;
                 let mut after = close + 2;
                 if content_end > tag_start && bytes[content_end - 1] == b'-' {
@@ -2637,9 +2556,8 @@ impl Interpreter {
         }
         program.push_str("$__erb_buf\n");
 
-        let val = crate::parse_and_run_string(&program, self).map_err(|e| {
-            PerlError::runtime(format!("erb: {}", e), line)
-        })?;
+        let val = crate::parse_and_run_string(&program, self)
+            .map_err(|e| PerlError::runtime(format!("erb: {}", e), line))?;
         Ok(val.to_string())
     }
 
@@ -2655,9 +2573,8 @@ impl Interpreter {
                 line,
             ));
         }
-        let listener = std::net::TcpListener::bind(format!("0.0.0.0:{}", port)).map_err(|e| {
-            PerlError::runtime(format!("web_boot_application: bind: {}", e), line)
-        })?;
+        let listener = std::net::TcpListener::bind(format!("0.0.0.0:{}", port))
+            .map_err(|e| PerlError::runtime(format!("web_boot_application: bind: {}", e), line))?;
         eprintln!("stryke web: serving on http://0.0.0.0:{}", port);
 
         for stream in listener.incoming() {
@@ -2678,11 +2595,7 @@ impl Interpreter {
     /// caller's accept loop is what fans out across connections; this
     /// keeps the dispatch logic single-threaded so we can reuse the
     /// interpreter directly without the worker-pool dance `serve` does.
-    fn dispatch_one(
-        &mut self,
-        mut stream: std::net::TcpStream,
-        line: usize,
-    ) -> Result<()> {
+    fn dispatch_one(&mut self, mut stream: std::net::TcpStream, line: usize) -> Result<()> {
         use std::io::{BufRead, BufReader, Write};
 
         let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(30)));
@@ -2745,10 +2658,9 @@ impl Interpreter {
                     parse_query(&body, &mut params);
                 } else if ct_str.starts_with("application/json") {
                     if let Ok(parsed) = crate::native_data::json_decode(&body) {
-                        if let Some(map) =
-                            parsed.as_hash_map().or_else(|| {
-                                parsed.as_hash_ref().map(|h| h.read().clone())
-                            })
+                        if let Some(map) = parsed
+                            .as_hash_map()
+                            .or_else(|| parsed.as_hash_ref().map(|h| h.read().clone()))
                         {
                             for (k, v) in map {
                                 params.insert(k, v);
@@ -2787,9 +2699,18 @@ impl Interpreter {
             .map(|v| v.to_string());
         if effective_method == "OPTIONS" && cors.is_some() {
             let headers: Vec<(String, String)> = vec![
-                ("access-control-allow-origin".to_string(), cors.clone().unwrap()),
-                ("access-control-allow-methods".to_string(), "GET,POST,PATCH,PUT,DELETE,OPTIONS".to_string()),
-                ("access-control-allow-headers".to_string(), "content-type,authorization".to_string()),
+                (
+                    "access-control-allow-origin".to_string(),
+                    cors.clone().unwrap(),
+                ),
+                (
+                    "access-control-allow-methods".to_string(),
+                    "GET,POST,PATCH,PUT,DELETE,OPTIONS".to_string(),
+                ),
+                (
+                    "access-control-allow-headers".to_string(),
+                    "content-type,authorization".to_string(),
+                ),
                 ("access-control-max-age".to_string(), "86400".to_string()),
             ];
             return write_response(&mut stream, 204, &headers, "", &[]);
@@ -2797,8 +2718,7 @@ impl Interpreter {
 
         // Built-in /health endpoint — no user code, framework guarantee.
         if effective_method == "GET" && path == "/health" {
-            let body =
-                "{\"status\":\"ok\",\"framework\":\"stryke_web\",\"version\":1}".to_string();
+            let body = "{\"status\":\"ok\",\"framework\":\"stryke_web\",\"version\":1}".to_string();
             return write_response(
                 &mut stream,
                 200,
@@ -2812,8 +2732,7 @@ impl Interpreter {
         // an OpenAPI 3.0 doc with no app code.
         if effective_method == "GET" && path == "/openapi.json" {
             let doc = web_openapi(&[], 0).unwrap_or(PerlValue::UNDEF);
-            let body = crate::native_data::json_encode(&doc)
-                .unwrap_or_else(|_| "{}".into());
+            let body = crate::native_data::json_encode(&doc).unwrap_or_else(|_| "{}".into());
             return write_response(
                 &mut stream,
                 200,
@@ -2867,10 +2786,7 @@ impl Interpreter {
             let mut path_params: IndexMap<String, PerlValue> = IndexMap::new();
             for name in &r.captures {
                 if let Some(m) = caps.name(&format!("__{}__", name)) {
-                    path_params.insert(
-                        name.clone(),
-                        PerlValue::string(m.as_str().to_string()),
-                    );
+                    path_params.insert(name.clone(), PerlValue::string(m.as_str().to_string()));
                 }
             }
             Some((r.action.clone(), path_params))
@@ -2946,11 +2862,13 @@ impl Interpreter {
         let entries: Vec<FilterEntry> = {
             let g = filters_slot().lock();
             match g.get(class_name) {
-                Some(f) => if before {
-                    f.before.clone()
-                } else {
-                    f.after.clone()
-                },
+                Some(f) => {
+                    if before {
+                        f.before.clone()
+                    } else {
+                        f.after.clone()
+                    }
+                }
                 None => Vec::new(),
             }
         };
@@ -3009,7 +2927,12 @@ impl Interpreter {
         session: IndexMap<String, PerlValue>,
         flash_in: IndexMap<String, PerlValue>,
         line: usize,
-    ) -> (u16, Vec<(String, String)>, String, Vec<(String, String, CookieOpts)>) {
+    ) -> (
+        u16,
+        Vec<(String, String)>,
+        String,
+        Vec<(String, String, CookieOpts)>,
+    ) {
         let (resource, act) = match action.split_once('#') {
             Some((r, a)) => (r, a),
             None => {
@@ -3055,19 +2978,18 @@ impl Interpreter {
             }
         };
         let method_def = class_def.methods.iter().find(|m| m.name == act).cloned();
-        let (body_block, params_sig) = match method_def.and_then(|m| {
-            m.body.clone().map(|b| (b, m.params.clone()))
-        }) {
-            Some(p) => p,
-            None => {
-                return (
-                    500,
-                    vec![("content-type".into(), "text/plain; charset=utf-8".into())],
-                    format!("action not found: {}#{}", class_name, act),
-                    Vec::new(),
-                );
-            }
-        };
+        let (body_block, params_sig) =
+            match method_def.and_then(|m| m.body.clone().map(|b| (b, m.params.clone()))) {
+                Some(p) => p,
+                None => {
+                    return (
+                        500,
+                        vec![("content-type".into(), "text/plain; charset=utf-8".into())],
+                        format!("action not found: {}#{}", class_name, act),
+                        Vec::new(),
+                    );
+                }
+            };
 
         // Run before_action filters. Skip the main action if any
         // filter rendered/redirected (sets `cur.rendered = true`).
@@ -3082,8 +3004,7 @@ impl Interpreter {
         let already_rendered = with_current(|cur| cur.rendered);
 
         if !already_rendered {
-            let call_result =
-                self.call_static_class_method(&body_block, &params_sig, vec![], line);
+            let call_result = self.call_static_class_method(&body_block, &params_sig, vec![], line);
             match call_result {
                 Ok(_) | Err(FlowOrError::Flow(_)) => {}
                 Err(FlowOrError::Error(e)) => {
@@ -3107,8 +3028,7 @@ impl Interpreter {
             if let Ok(body) = self.render_template(&template_name, &IndexMap::new(), None, line) {
                 with_current(|cur| {
                     cur.status = 200;
-                    cur.headers =
-                        vec![("content-type".into(), "text/html; charset=utf-8".into())];
+                    cur.headers = vec![("content-type".into(), "text/html; charset=utf-8".into())];
                     cur.body = body;
                     cur.rendered = true;
                 });
@@ -3406,7 +3326,10 @@ fn write_response_bytes(
         resp.push_str("content-type: text/plain; charset=utf-8\r\n");
     }
     for (k, v, opts) in cookies {
-        resp.push_str(&format!("set-cookie: {}\r\n", encode_set_cookie(k, v, opts)));
+        resp.push_str(&format!(
+            "set-cookie: {}\r\n",
+            encode_set_cookie(k, v, opts)
+        ));
     }
     resp.push_str(&format!("content-length: {}\r\n", body.len()));
     resp.push_str("connection: close\r\n\r\n");
@@ -3455,18 +3378,14 @@ fn parse_cookie_header(headers: &IndexMap<String, PerlValue>) -> IndexMap<String
 /// Session cookie value is base64url-encoded JSON. No HMAC for v0 — flag
 /// the cookie HttpOnly + SameSite=Lax. PASS 8 wires HMAC-SHA256 signing
 /// using the `secret_key_base` from `web_application_config`.
-fn decode_session_cookie(
-    cookies: &IndexMap<String, String>,
-) -> IndexMap<String, PerlValue> {
+fn decode_session_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, PerlValue> {
     cookies
         .get("_stryke_session")
         .and_then(|raw| decode_session_payload(raw))
         .unwrap_or_default()
 }
 
-fn decode_flash_cookie(
-    cookies: &IndexMap<String, String>,
-) -> IndexMap<String, PerlValue> {
+fn decode_flash_cookie(cookies: &IndexMap<String, String>) -> IndexMap<String, PerlValue> {
     cookies
         .get("_stryke_flash")
         .and_then(|raw| decode_session_payload(raw))
@@ -3488,14 +3407,11 @@ fn encode_session_payload(map: &IndexMap<String, PerlValue>) -> String {
 }
 
 fn base64url_encode(input: &[u8]) -> String {
-    const CHARS: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::with_capacity((input.len() * 4 + 2) / 3);
     let mut i = 0;
     while i + 3 <= input.len() {
-        let n = ((input[i] as u32) << 16)
-            | ((input[i + 1] as u32) << 8)
-            | (input[i + 2] as u32);
+        let n = ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);
         out.push(CHARS[(n >> 18 & 63) as usize] as char);
         out.push(CHARS[(n >> 12 & 63) as usize] as char);
         out.push(CHARS[(n >> 6 & 63) as usize] as char);
@@ -3632,4 +3548,3 @@ fn http_status_text(status: u16) -> &'static str {
         _ => "OK",
     }
 }
-

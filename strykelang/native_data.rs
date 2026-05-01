@@ -253,7 +253,12 @@ pub(crate) fn exec_sql(conn: &Connection, sql: &str, params: &[Value]) -> PerlRe
         .map_err(|e| PerlError::runtime(format!("sqlite exec: {}", e), 0))
 }
 
-pub(crate) fn query_sql(conn: &Connection, sql: &str, params: &[Value], line: usize) -> PerlResult<PerlValue> {
+pub(crate) fn query_sql(
+    conn: &Connection,
+    sql: &str,
+    params: &[Value],
+    line: usize,
+) -> PerlResult<PerlValue> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| PerlError::runtime(format!("sqlite query: {}", e), line))?;

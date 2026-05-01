@@ -54,7 +54,11 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0x13\] zshrs Shell](#0x13-zshrs-shell)
-- [\[0x14\] Documentation](#0x14-documentation)
+- [\[0x14\] Package Manager](#0x14-package-manager)
+- [\[0x15\] Web Framework (`s_web`)](#0x15-web-framework-s_web)
+- [\[0x16\] AI Primitives](#0x16-ai-primitives)
+- [\[0x17\] Expect / Interactive Automation](#0x17-expect--interactive-automation)
+- [\[0x18\] Documentation](#0x18-documentation)
 - [\[0xFF\] License](#0xff-license)
 
 ---
@@ -66,12 +70,16 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Server farms first** — the first language designed for distributed infrastructure load testing
 - **Bare metal heat** — `heat(60)` pins ALL cores to 100% TDP for 60 seconds
 - **Agent/Controller architecture** — `stryke controller` + `stryke agent` for fleet-wide stress testing
+- **AI is a primitive, not a library** — `ai "summarize this", $doc` with auto-attached `tool fn`s, MCP client+server, agent loop, RAG memory, vector search ([§ 0x16](#0x16-ai-primitives))
+- **Web framework `s_web`** — Rails-shaped scaffold + ERB engine + SQLite ORM + admin panel + auth + PWA + Dockerfile, `s_web new app --app everything --theme cyberpunk --auth --admin --migrate` ([§ 0x15](#0x15-web-framework-s_web))
+- **PTY-driven interactive automation** — `pty_spawn`/`pty_expect`/`pty_send`/`pty_interact`, the modern Tcl/Expect successor with cluster fanout ([§ 0x17](#0x17-expect--interactive-automation))
+- **Package manager** — Cargo-shaped `stryke.toml` + `stryke.lock`, `s add`/`s install`/`s tree` resolver, hash-pinned reproducible builds ([§ 0x14](#0x14-package-manager))
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `PerlValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **Over 3200 standard library functions**
+- **Over 3500 standard library functions**
 
 ---
 
@@ -3284,7 +3292,247 @@ $ for f in *.json; do @ read_json("$f") |> keys |> cnt |> p; done
 
 ---
 
-## [0x14] DOCUMENTATION
+## [0x14] PACKAGE MANAGER
+
+Cargo-shaped manifest + lockfile, hash-pinned, parallel resolver. Single binary surface (`stryke ...`), no separate `cargo`-style entry point. Full design in [`docs/PACKAGE_REGISTRY.md`](docs/PACKAGE_REGISTRY.md).
+
+```
+# Lifecycle
+stryke new myapp                  # scaffold project at ./myapp/
+stryke init                       # scaffold project in cwd
+stryke add http@^1.0 json         # write deps to stryke.toml
+stryke add mylib --path=../mylib  # local path dep (works today)
+stryke add http --dev             # dev-deps
+stryke add criterion --group=bench
+stryke remove http                # drop dep from manifest
+stryke install                    # resolve + write stryke.lock
+stryke install --offline          # no network; lockfile-only
+stryke update [NAME]              # re-resolve and rewrite stryke.lock
+stryke outdated                   # report deps drifted from their lock pin
+stryke audit                      # check lockfile against advisory feed
+stryke tree                       # print resolved dep graph
+stryke info http                  # show lockfile entry for a dep
+stryke vendor                     # snapshot store deps to ./vendor/
+stryke clean [--all]              # wipe target/ (and optionally global caches)
+
+# npm-style task runner
+stryke run greet                  # execute [scripts] entry "greet"
+
+# Global CLI tools
+stryke install -g ../mytool       # link [bin] entries from a path package into ~/.stryke/bin/
+stryke uninstall -g mytool
+stryke list -g
+
+# Registry surface (registry endpoint not deployed yet — stubs return diagnostics)
+stryke search NAME
+stryke publish [--dry-run]
+stryke yank VERSION
+```
+
+Project layout (`examples/project/`):
+
+```
+myapp/
+├── stryke.toml                   # manifest (name, version, deps, [scripts], [bin], [workspace], etc.)
+├── stryke.lock                   # exact versions + integrity hashes (commit this)
+├── main.stk                      # entry point (`stryke main.stk` or just `stryke`)
+├── lib/                          # module sources, accessed via require/use
+├── bin/                          # additional executables (auto-discovered)
+├── t/                            # tests (`stryke test t/`)
+├── benches/                      # benchmarks (`stryke bench`)
+└── target/                       # build outputs (gitignored)
+```
+
+Workspaces are first-class:
+
+```toml
+# stryke.toml at workspace root
+[workspace]
+members = ["crates/*"]
+
+[workspace.deps]
+shared = { path = "../shared" }   # one version pinned for the whole monorepo
+```
+
+Then in any member's `stryke.toml`:
+
+```toml
+[deps]
+shared = { workspace = true }     # inherit version + features from the root
+```
+
+Single `stryke.lock` at the workspace root pins every member's transitive graph.
+
+Deps live globally in `~/.stryke/store/name@version/` — no `node_modules/`-shaped per-project dependency tree. Every dep is hash-pinned in the lockfile (Nix-style reproducibility, Cargo-style ergonomics). `stryke build --release` AOT-compiles the whole program — your code, every dep, the stdlib — through Cranelift to a single statically-linked native binary. SFTP-able. No interpreter needed on the target machine.
+
+**Status**: path deps + workspace deps + full CLI surface (`new`/`init`/`add`/`remove`/`install`/`update`/`outdated`/`audit`/`tree`/`info`/`vendor`/`clean`/`run`/`install -g` etc.) are wired and tested today. Registry/git deps + the PubGrub semver resolver land when the registry endpoint is deployed — the CLI stubs for `search`/`publish`/`yank` already exist and return clear "registry not deployed yet" diagnostics so the surface matches the RFC end-state.
+
+**Skipped on purpose**: install-time code execution (no `build.rs` / `postinstall`), hoisting, phantom deps, peer deps, mutable registries. The lockfile is sacred; regenerate explicitly.
+
+---
+
+## [0x15] WEB FRAMEWORK (`s_web`)
+
+Rails-shaped framework that lives in the sibling crate `stryke_web/`. Generator emits `.stk` source files; framework runtime is `web_*` builtins in the main `strykelang/` crate. Full reference in [`stryke_web/README.md`](stryke_web/README.md).
+
+**One-line full-stack app**:
+
+```sh
+s_web new mega --app everything --theme cyberpunk --auth --admin --docker --ci --pwa --migrate
+cd mega && bin/server
+# ~70 resources, ~490 CRUD routes, dark cyberpunk CSS, signup/login/sessions,
+# admin panel at /admin, /health endpoint, Dockerfile, GitHub Actions CI, PWA
+# manifest + service worker. Runs at http://localhost:3000.
+```
+
+| Component | What's wired |
+|---|---|
+| Routing | `web_route VERB " /path", "ctrl#act"`, `web_resources "posts"` (7-route REST), `web_root "ctrl#act"`, OpenAPI 3.0 dump auto-served at `/openapi.json`, Swagger UI at `/docs` |
+| Controllers | `web_render(html\|text\|json\|template\|redirect)`, `web_params`, `web_request`, `web_set_header`, `web_status`, `web_security_headers`, default-convention render |
+| Views | ERB engine (`<%= %>` / `<% %>` / `<%# %>` / `<%- -%>`), layout wrap, partials (`web_render_partial`), `web_link_to`, `web_form_with`, `web_text_field/area/check_box`, `web_csrf_meta_tag` |
+| ORM (SQLite) | `class Article extends ApplicationRecord` with auto-generated `Self.all/find/where/create/update/destroy` static methods. `web_model_paginate/search/soft_destroy/count/first/last/with` for n+1 elimination, soft delete, pagination |
+| Migrations | `web_create_table/drop_table/add_column/remove_column` schema DSL, `web_migrate/rollback` runner, `schema_migrations` tracking |
+| Validations / strong params | `web_validate(+{title => "presence,length:1..100", email => "format:^.+@.+$"})`, `web_permit($params, "title", "body")` |
+| Auth | `web_password_hash/verify`, `web_session_set/get`, signed time-limited tokens (`web_token_for`/`consume`), CSRF meta, `web_can("posts.edit", $user)` permissions |
+| Filters | `web_before_action`/`web_after_action` with `only`/`except` |
+| HTTP cache | `web_etag` with auto-304 short-circuit, prompt-cache headers |
+| Helpers | `web_h` (HTML escape), `web_truncate`, `web_pluralize`, `web_time_ago_in_words`, `web_image_tag`, `web_button_to` |
+| API | `--api` mode, `s_web g api Post` JSON controllers, JSON:API helpers (`web_jsonapi_resource/collection/error`), `web_bearer_token` |
+| Themes | 9 baked-in: `simple`, `dark`, `pico`, `bootstrap`, `tailwind`, `cyberpunk`, `synthwave`, `terminal`, `matrix` |
+| DevOps | `--docker` (multi-stage Dockerfile + .dockerignore), `--ci` (GitHub Actions), `--pwa` (manifest.json + service worker) |
+| **Fat binary** | `s_web build --out dist && cd dist && cargo build --release` produces a single self-contained binary that include_str!s every `.stk` file plus the stryke runtime — drop on any Linux box, run, no deps |
+| Generators | `s_web g {scaffold, model, migration, controller, app, auth, admin, api, mailer, job, channel, docker, ci, pwa}` |
+
+**Presets**: `blog` (8 resources), `ecommerce` (15), `saas` (12), `social` (10), `cms` (12), `forum` (10), `crm` (10), `helpdesk` (8), plus named clones: `amazon` (25), `facebook` (23), `learning` (21 — Anki-style with SRS), and `everything` (~70 resources unioned + dedup'd).
+
+---
+
+## [0x16] AI PRIMITIVES
+
+`ai` is a builtin like `print` — two letters, ubiquitous, unlimited power. Full design + phase-by-phase status in [`docs/AI_PRIMITIVES.md`](docs/AI_PRIMITIVES.md).
+
+```stryke
+my $r = ai "summarize this", $document       # bare call
+my $r = ai "research X", tools => [...]      # auto-routes to agent loop
+my $r = ai "describe", image => "/img.jpg"   # vision
+my $r = ai "extract", schema => +{...}       # structured output
+my $r = ai "...", pdf => "/contract.pdf"     # document input
+for my $chunk in stream_prompt("write a haiku") { print $chunk }   # iter-context streaming
+```
+
+| Surface | Builtins |
+|---|---|
+| Single-shot | `ai`, `prompt`, `stream_prompt`, `chat`, `embed`, `tokens_of`, `ai_estimate` |
+| Agent loop | `ai($p, tools => [...])` — Anthropic tool_use + OpenAI function-calling protocols. Multi-turn, multi-tool, max_turns/max_cost ceilings |
+| `tool fn` keyword | `tool fn weather($city: string) "Get weather" { ... }` — auto-schemas signature, auto-registers, auto-attaches to bare `ai($p)` calls |
+| Built-in tools | `web_search_tool` (Brave/DDG), `fetch_url_tool`, `read_file_tool`, `run_code_tool` (sandboxed Python) — drop into `tools => [...]` |
+| MCP client | `mcp_connect("stdio:CMD")` and `mcp_connect("https://...")`, full `tools/resources/prompts/call` surface, auto-attach to agent loop via `mcp_attach_to_ai` |
+| MCP server | `mcp_server_start("name", +{tools => [...]})` runtime, plus declarative `mcp_server "name" { tool foo($a) "..." {...} }` parser DSL |
+| Sessions | `ai_session_new/send/history/reset/close` — multi-turn chat tracking |
+| Collection ops | `ai_filter`, `ai_map`, `ai_classify`, `ai_match`, `ai_sort`, `ai_dedupe` — single batched LLM call across the collection |
+| Memory / RAG | `ai_memory_save/recall/forget/count/clear` — sqlite-backed embedding store, cosine retrieval |
+| Vector ops | `vec_cosine`, `vec_search`, `vec_topk` |
+| Multimodal | `ai_vision` (image), `ai_pdf` (document) |
+| Cost / cache | `ai_cost`, `ai_cache_get/set/clear`, `ai_history`, `ai_budget($usd, sub { ... })` scoped cap |
+| Mock / test | `ai_mock_install`, `STRYKE_AI_MODE=mock-only` for CI |
+| Convenience | `ai_summarize`, `ai_translate`, `ai_extract`, `ai_template`, `ai_last_thinking` |
+| Audio | `ai_transcribe "audio.mp3"` (Whisper), `ai_speak "text", voice => "alloy"` (OpenAI TTS) |
+| Image | `ai_image $prompt`, `ai_image_edit $prompt, image => $src, mask => $m`, `ai_image_variation image => $src, n => 4` — DALL-E 3 / gpt-image-1 / DALL-E 2 |
+| Catalog | `ai_models("openai"\|"anthropic"\|"ollama"\|"gemini")` — live model IDs from each provider's `/models` endpoint |
+| Citations | `ai_pdf $p, pdf => $f, citations => 1` and `ai_grounded $p, documents => [@paths]` — multi-doc grounding with auto-citations via `ai_citations()` |
+| Files (OpenAI) | `ai_file_upload "file.bin", purpose => "user_data"`, `ai_file_list`, `ai_file_get`, `ai_file_delete` |
+| Files (Anthropic) | `ai_file_anthropic_upload "file.pdf"`, `ai_file_anthropic_list`, `ai_file_anthropic_delete` — beta `files-api-2025-04-14` |
+| Moderation | `ai_moderate $text` → `+{ flagged, categories, scores }` — OpenAI safety classifier (free endpoint) |
+| Chunk | `ai_chunk $text, max_tokens => 500, overlap => 50, by => "chars"\|"sentences"` — RAG primitive, no API call |
+| Warm / verify | `ai_warm(model => ..., provider => ...)` → `+{ ok, latency_ms, error }` — auth + reachability ping at script start |
+| Compare | `ai_compare $a, $b, criteria => "...", scale => 5` → `+{ winner, reason, scores }` — single-call structured comparison |
+| Dashboard | `print ai_dashboard()` — ANSI summary of cost/tokens/cache hit-ratio |
+| Pricing | `ai_pricing("claude-opus-4-7")` → `+{ input, output, input_per_1m, output_per_1m }` for pre-flight cost estimates |
+| Describe | `ai_describe "img.png", style => "concise"\|"detailed"\|"alt"` — vision wrapper with style presets |
+| Sessions | `ai_session_new/send/history/reset/close` plus `ai_session_export($h) → $json` and `ai_session_import($json) → $h` for persistence across runs |
+| Embed providers | Voyage (default), OpenAI (`text-embedding-3`), Ollama (`nomic-embed-text`/`mxbai-embed-large` — local, $0/M tokens) |
+| CLI modes | `stryke ai --image PROMPT -o out.png`, `--transcribe audio.mp3 -o out.txt`, `--speak "hello" -o out.mp3` — UNIX-filter mode covers chat, image, audio |
+| Batch | `ai_batch(\@prompts)` — Anthropic batch API at 50% cost |
+| Cluster fanout | `ai_pmap(\@items, "instruction", cluster => $c)` — distributed AI work |
+| CLI | `stryke ai "prompt"` — UNIX filter mode with `--model`, `--system`, `--stream`, `--json` |
+
+**Providers wired**: Anthropic (full surface incl. extended thinking, prompt caching, vision, PDF, batch), OpenAI (Chat + tool calls + streaming, Whisper, TTS), Voyage (embeddings, default), Ollama (`/api/generate`), OpenAI-compatible (`openai_compat`/`compat`/`local` — LM Studio, vLLM, llama-server; configurable `STRYKE_AI_BASE_URL`), Google Gemini. In-process llama.cpp deferred — Ollama / LM Studio is the supported local path today.
+
+```stryke
+# Auto-attached: bare `ai()` sees the tool fn without `tools =>` arg.
+tool fn current_user($username: string) "Look up a user" {
+    User::find_by_email($username)
+}
+
+tool fn create_post($title: string, $body: string) "Create a post" {
+    Post::create(+{ title => $title, body => $body })
+}
+
+my $reply = ai("create a post titled 'Hello' from alice@x.io with body 'World'");
+```
+
+---
+
+## [0x17] EXPECT / INTERACTIVE AUTOMATION
+
+PTY-driven interactive scripting — the modern Tcl/Expect successor. Full design + phase status in [`docs/expect-feature-idea.md`](docs/expect-feature-idea.md).
+
+```stryke
+my $h = pty_spawn("ssh user@host");
+pty_expect($h, qr/password:/, 30);
+pty_send($h, "hunter2\n");
+pty_expect($h, qr/\$ /, 30);
+pty_send($h, "uptime\n");
+my $out = pty_expect($h, qr/\$ /, 30);
+pty_close($h);
+
+# Table form (Tcl `expect { ... }` block, in stryke):
+my $tag = pty_expect_table($h, [
+    +{ re => qr/password:/, do => sub { pty_send($h, "$pw\n"); "ok" } },
+    +{ re => qr/yes\/no/,   do => sub { pty_send($h, "yes\n"); "confirmed" } },
+    +{ re => qr/denied/,    do => sub { die "auth failed" } },
+], 30);
+
+# Method-form sugar (require "perl_pty_class.stk"):
+my $h = PtyHandle::spawn("ssh host");
+$h->expect(qr/password:/, 30);
+$h->send("$pw\n");
+$h->branch([+{re => qr/\$ /, do => sub { "shell ready" }}], 30);
+$h->interact();   # raw-mode handoff, Ctrl-] to detach
+$h->close();
+```
+
+| Builtin | Behavior |
+|---|---|
+| `pty_spawn(cmd)` / `pty_spawn(cmd, arg, ...)` | Allocate PTY via `nix::pty::openpty`, fork+exec child, return handle |
+| `pty_send($h, "text")` | Write to master fd |
+| `pty_read($h, timeout_secs)` | One-shot read, returns string or undef on EOF |
+| `pty_expect($h, qr/.../, timeout?)` | Loop: try regex on buffer, else `select()` + drain, retry until match or timeout |
+| `pty_expect_table($h, [+{re, do}, ...], timeout?)` | Multi-pattern dispatch — first match wins; calls the matched branch's `do` sub |
+| `pty_buffer($h)` / `pty_alive($h)` / `pty_eof($h)` | Inspection |
+| `pty_close($h)` | SIGTERM → 200ms grace → SIGKILL, returns exit status |
+| `pty_interact($h)` | Raw-mode handoff: `tcgetattr`/`cfmakeraw`, `select()` on stdin+master, forward both directions until EOF or Ctrl-] |
+
+Combined with `pmap_on` cluster dispatch you get parallel SSH automation across N hosts:
+
+```stryke
+my $cluster = cluster(["host1:8", "host2:8", "host3:8"]);
+pmap_on $cluster @hosts -> $host {
+    my $h = pty_spawn("ssh $host");
+    pty_expect($h, qr/password:/, 10);
+    pty_send($h, "$passwords{$host}\n");
+    pty_expect($h, qr/\$ /, 30);
+    pty_send($h, "apt update && apt upgrade -y\n");
+    pty_expect($h, qr/\$ /, 1800);
+    pty_close($h);
+}
+```
+
+Unix-only for v0; Windows ConPTY support is a separate code path that's still pending.
+
+---
+
+## [0x18] DOCUMENTATION
 
 All documentation is served via GitHub Pages at [`menketechnologies.github.io/strykelang/`](https://menketechnologies.github.io/strykelang/).
 
@@ -3292,7 +3540,14 @@ All documentation is served via GitHub Pages at [`menketechnologies.github.io/st
 |----------|-------------|
 | [`Docs Home`](https://menketechnologies.github.io/strykelang/) | Stryke reference — quickstart, builtins, parallel primitives, pipe-forward syntax, reflection hashes |
 | [`Full Reference`](https://menketechnologies.github.io/strykelang/reference.html) | Complete language reference — every builtin, operator, special variable, and regex feature |
-| [`Engineering Report`](https://menketechnologies.github.io/strykelang/report.html) | strykelang internals — 198,178 Rust lines across 182 files, 3,737 callable builtins (207 Perl 5 core + 3,022 stryke extensions), 338 VM opcodes, 330 AST variants, Cranelift JIT, rayon-backed parallel runtime, 4,796 tests, 20,056 perl-parity cases |
+| [`Engineering Report`](https://menketechnologies.github.io/strykelang/report.html) | strykelang internals — Rust lines, callable builtins, VM opcodes, AST variants, Cranelift JIT, rayon-backed parallel runtime, perl-parity cases |
+| [`PACKAGE_REGISTRY.md`](docs/PACKAGE_REGISTRY.md) | Package manager design — manifest, lockfile, resolver, global store, build outputs |
+| [`stryke_web/README.md`](stryke_web/README.md) | Web framework — generators, presets, themes, builtins, fat-binary build |
+| [`AI_PRIMITIVES.md`](docs/AI_PRIMITIVES.md) | AI primitives — agent loop, MCP, tool fn, RAG, vector search, providers, phase-by-phase status |
+| [`expect-feature-idea.md`](docs/expect-feature-idea.md) | Interactive automation — PTY runtime, expect tables, cluster fanout |
+| [`STRESS_TESTING.md`](docs/STRESS_TESTING.md) | Distributed load testing — `stress_*` builtins, agent/controller, hardware/cooling validation |
+| [`WEB_FRAMEWORK.md`](docs/WEB_FRAMEWORK.md) | Original web-framework design RFC |
+| [`ROADMAP.md`](docs/ROADMAP.md) | Forward-looking work and open questions |
 
 ---
 

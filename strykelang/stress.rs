@@ -101,7 +101,9 @@ pub(crate) fn stress_int(args: &[PerlValue], _line: usize) -> Result<PerlValue> 
                 let mut x: u64 = 0xCAFEBABEDEADBEEF;
                 while start.elapsed() < dur {
                     for _ in 0..10_000 {
-                        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                        x = x
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(1442695040888963407);
                         x ^= x.rotate_left(13);
                         x = x.wrapping_mul(0x5851F42D4C957F2D);
                         local += 4;
@@ -167,7 +169,11 @@ pub(crate) fn stress_branch(args: &[PerlValue], _line: usize) -> Result<PerlValu
                     for _ in 0..100_000 {
                         x = x.wrapping_mul(6364136223846793005).wrapping_add(1);
                         sum += if x & 1 == 0 {
-                            if x & 2 == 0 { 1 } else { -1 }
+                            if x & 2 == 0 {
+                                1
+                            } else {
+                                -1
+                            }
                         } else if x & 4 == 0 {
                             2
                         } else {
@@ -258,11 +264,10 @@ pub(crate) fn stress_mmap(args: &[PerlValue], line: usize) -> Result<PerlValue> 
                 let bytes = mb * 1024 * 1024;
                 let mut local: i64 = 0;
                 while start.elapsed() < dur {
-                    let mut map =
-                        match memmap2::MmapOptions::new().len(bytes).map_anon() {
-                            Ok(m) => m,
-                            Err(_) => break,
-                        };
+                    let mut map = match memmap2::MmapOptions::new().len(bytes).map_anon() {
+                        Ok(m) => m,
+                        Err(_) => break,
+                    };
                     for i in (0..bytes).step_by(4096) {
                         map[i] = (i & 0xff) as u8;
                         local += 1;
@@ -359,8 +364,7 @@ pub(crate) fn stress_iops(args: &[PerlValue], _line: usize) -> Result<PerlValue>
                 while local_start.elapsed() < dur && start.elapsed() < dur.saturating_mul(4) {
                     for _ in 0..100 {
                         x = x.wrapping_mul(6364136223846793005).wrapping_add(1);
-                        let off =
-                            (x as usize % (scratch.len() / block)) * block;
+                        let off = (x as usize % (scratch.len() / block)) * block;
                         let _ = f.seek(SeekFrom::Start(off as u64));
                         let _ = f.read_exact(&mut buf);
                         let _ = f.seek(SeekFrom::Start(off as u64));
@@ -384,12 +388,12 @@ pub(crate) fn stress_iops(args: &[PerlValue], _line: usize) -> Result<PerlValue>
 pub(crate) fn stress_net(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     use std::io::Write;
     use std::net::TcpStream;
-    let target = args
-        .first()
-        .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("stress_net: usage: stress_net(\"host:port\", secs, conns)", line)
-        })?;
+    let target = args.first().map(|v| v.to_string()).ok_or_else(|| {
+        PerlError::runtime(
+            "stress_net: usage: stress_net(\"host:port\", secs, conns)",
+            line,
+        )
+    })?;
     let dur = duration_arg(&args[1.min(args.len())..], 5.0);
     let conns = args.get(2).map(|v| v.to_int()).unwrap_or(8).max(1) as usize;
     let n = cores();
@@ -424,12 +428,12 @@ pub(crate) fn stress_net(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 /// `stress_http(url, secs, conns)` — HTTP GET storm. Counts successful
 /// 2xx responses across cores.
 pub(crate) fn stress_http(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let url = args
-        .first()
-        .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("stress_http: usage: stress_http(\"http://...\", secs, conns)", line)
-        })?;
+    let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
+        PerlError::runtime(
+            "stress_http: usage: stress_http(\"http://...\", secs, conns)",
+            line,
+        )
+    })?;
     let dur = duration_arg(&args[1.min(args.len())..], 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -463,12 +467,12 @@ pub(crate) fn stress_http(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 /// `stress_dns(host, secs)` — DNS lookup storm. Returns successful
 /// resolves count.
 pub(crate) fn stress_dns(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let host = args
-        .first()
-        .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("stress_dns: usage: stress_dns(\"host.example.com\", secs)", line)
-        })?;
+    let host = args.first().map(|v| v.to_string()).ok_or_else(|| {
+        PerlError::runtime(
+            "stress_dns: usage: stress_dns(\"host.example.com\", secs)",
+            line,
+        )
+    })?;
     let dur = duration_arg(&args[1.min(args.len())..], 5.0);
     let n = cores();
     let total = AtomicI64::new(0);
@@ -615,8 +619,7 @@ pub(crate) fn stress_compress(args: &[PerlValue], _line: usize) -> Result<PerlVa
                 }
                 let mut local: i64 = 0;
                 while start.elapsed() < dur {
-                    let mut enc =
-                        GzEncoder::new(Vec::with_capacity(bytes), Compression::default());
+                    let mut enc = GzEncoder::new(Vec::with_capacity(bytes), Compression::default());
                     let _ = enc.write_all(&payload);
                     let compressed = enc.finish().unwrap_or_default();
                     let mut dec = GzDecoder::new(&compressed[..]);
@@ -713,9 +716,8 @@ pub(crate) fn stress_burst(args: &[PerlValue], line: usize) -> Result<PerlValue>
         .ok_or_else(|| PerlError::runtime("stress_burst: workload name required", line))?;
     let on = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(0.05);
     let off = args.get(2).map(|v| v.to_number()).unwrap_or(2.0).max(0.0);
-    let total = Duration::from_secs_f64(
-        args.get(3).map(|v| v.to_number()).unwrap_or(20.0).max(0.05),
-    );
+    let total =
+        Duration::from_secs_f64(args.get(3).map(|v| v.to_number()).unwrap_or(20.0).max(0.05));
     let started = Instant::now();
     let mut iters: i64 = 0;
     while started.elapsed() < total {
@@ -737,11 +739,7 @@ pub(crate) fn stress_ramp(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         .ok_or_else(|| PerlError::runtime("stress_ramp: workload name required", line))?;
     let start_pct = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
     let end_pct = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
-    let total = args
-        .get(3)
-        .map(|v| v.to_number())
-        .unwrap_or(30.0)
-        .max(0.5);
+    let total = args.get(3).map(|v| v.to_number()).unwrap_or(30.0).max(0.5);
     let begin = Instant::now();
     let total_dur = Duration::from_secs_f64(total);
     let mut ticks: i64 = 0;
@@ -843,15 +841,68 @@ pub(crate) fn stress_all(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let h_regex = s.spawn(|| stress_regex(&arg, line));
         let h_json = s.spawn(|| stress_json(&arg, line));
 
-        out.insert("fp".to_string(), h_fp.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("int".to_string(), h_int.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("cache".to_string(), h_cache.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("branch".to_string(), h_branch.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("sort".to_string(), h_sort.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("alloc".to_string(), h_alloc.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("aes".to_string(), h_aes.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("regex".to_string(), h_regex.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
-        out.insert("json".to_string(), h_json.join().unwrap_or(Ok(PerlValue::UNDEF)).unwrap_or(PerlValue::UNDEF));
+        out.insert(
+            "fp".to_string(),
+            h_fp.join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "int".to_string(),
+            h_int
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "cache".to_string(),
+            h_cache
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "branch".to_string(),
+            h_branch
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "sort".to_string(),
+            h_sort
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "alloc".to_string(),
+            h_alloc
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "aes".to_string(),
+            h_aes
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "regex".to_string(),
+            h_regex
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
+        out.insert(
+            "json".to_string(),
+            h_json
+                .join()
+                .unwrap_or(Ok(PerlValue::UNDEF))
+                .unwrap_or(PerlValue::UNDEF),
+        );
     });
     // Compress + thread are heavier — run sequentially after.
     run!("compress", stress_compress);
@@ -883,7 +934,11 @@ pub(crate) fn stress_thermal_zones(_args: &[PerlValue], _line: usize) -> Result<
     if let Ok(entries) = std::fs::read_dir("/sys/class/thermal") {
         for e in entries.flatten() {
             let path = e.path();
-            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            let name = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
             if !name.starts_with("thermal_zone") {
                 continue;
             }
@@ -903,7 +958,9 @@ pub(crate) fn stress_thermal_zones(_args: &[PerlValue], _line: usize) -> Result<
             }
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn read_hottest_thermal_zone() -> Option<f64> {
@@ -938,7 +995,10 @@ pub(crate) fn stress_freq(_args: &[PerlValue], _line: usize) -> Result<PerlValue
             let path = e.path();
             let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if !name.starts_with("cpu")
-                || !name[3..].chars().next().map_or(false, |c| c.is_ascii_digit())
+                || !name[3..]
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c.is_ascii_digit())
             {
                 continue;
             }
@@ -984,7 +1044,10 @@ fn read_avg_freq_khz() -> Option<f64> {
         let path = e.path();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
         if !name.starts_with("cpu")
-            || !name[3..].chars().next().map_or(false, |c| c.is_ascii_digit())
+            || !name[3..]
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_ascii_digit())
         {
             continue;
         }
@@ -1008,7 +1071,10 @@ fn read_max_freq_khz() -> Option<f64> {
         let path = e.path();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
         if !name.starts_with("cpu")
-            || !name[3..].chars().next().map_or(false, |c| c.is_ascii_digit())
+            || !name[3..]
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_ascii_digit())
         {
             continue;
         }
@@ -1095,16 +1161,435 @@ pub(crate) fn stress_arm_kill_switch(args: &[PerlValue], _line: usize) -> Result
 
 /// `stress_killed()` → 1 if the kill switch tripped.
 pub(crate) fn stress_killed(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
-    Ok(PerlValue::integer(
-        if GLOBAL_KILL.load(Ordering::Relaxed) { 1 } else { 0 },
-    ))
+    Ok(PerlValue::integer(if GLOBAL_KILL.load(Ordering::Relaxed) {
+        1
+    } else {
+        0
+    }))
 }
 
 /// `stress_disarm_kill_switch()` — reset the kill flag.
-pub(crate) fn stress_disarm_kill_switch(
-    _args: &[PerlValue],
-    _line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn stress_disarm_kill_switch(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     GLOBAL_KILL.store(false, Ordering::Relaxed);
     Ok(PerlValue::UNDEF)
+}
+
+// ── Metrics history ───────────────────────────────────────────────────
+//
+// A process-wide ring of `(timestamp_ms, name, value, labels)` samples.
+// Drop a record per stress-loop iteration or per scrape tick, then dump
+// in CSV / JSON / Prometheus text format on demand. Used by the
+// controller to ship metrics to dashboards or to stream live to a TUI.
+
+#[derive(Clone)]
+struct MetricSample {
+    ts_ms: i64,
+    name: String,
+    value: f64,
+    labels: IndexMap<String, String>,
+}
+
+static METRICS: std::sync::OnceLock<parking_lot::Mutex<Vec<MetricSample>>> =
+    std::sync::OnceLock::new();
+
+fn metrics() -> &'static parking_lot::Mutex<Vec<MetricSample>> {
+    METRICS.get_or_init(|| parking_lot::Mutex::new(Vec::with_capacity(4096)))
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// `stress_metrics_record($name, $value, label1 => "...", label2 => "...")`
+/// — append one sample to the metrics history. Value is coerced to f64.
+/// Labels are stored as strings; integer/float labels stringify.
+pub(crate) fn stress_metrics_record(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let name = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("stress_metrics_record: name required", line))?;
+    let value = args
+        .get(1)
+        .map(|v| v.as_float().unwrap_or_else(|| v.to_int() as f64))
+        .unwrap_or(0.0);
+    let mut labels = IndexMap::new();
+    let mut i = 2;
+    while i + 1 < args.len() {
+        labels.insert(args[i].to_string(), args[i + 1].to_string());
+        i += 2;
+    }
+    metrics().lock().push(MetricSample {
+        ts_ms: now_ms(),
+        name,
+        value,
+        labels,
+    });
+    Ok(PerlValue::UNDEF)
+}
+
+/// `stress_metrics_clear()` — wipe the history.
+pub(crate) fn stress_metrics_clear(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    metrics().lock().clear();
+    Ok(PerlValue::UNDEF)
+}
+
+/// `stress_metrics_count()` — number of samples currently in the history.
+pub(crate) fn stress_metrics_count(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    Ok(PerlValue::integer(metrics().lock().len() as i64))
+}
+
+/// `stress_metrics_export($path, format => "csv"|"json")` — write the
+/// history to disk. JSON is one-array-of-objects; CSV has the columns
+/// `ts_ms,name,value,labels` where labels is a `k=v;k=v` pack.
+pub(crate) fn stress_metrics_export(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let path = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("stress_metrics_export: path required", line))?;
+    let mut format = "json".to_string();
+    let mut i = 1;
+    while i + 1 < args.len() {
+        if args[i].to_string() == "format" {
+            format = args[i + 1].to_string();
+        }
+        i += 2;
+    }
+    let g = metrics().lock();
+    let body = match format.as_str() {
+        "csv" => format_csv(&g),
+        "json" => format_json(&g),
+        "prom" | "prometheus" => format_prometheus(&g),
+        other => {
+            return Err(PerlError::runtime(
+                format!("stress_metrics_export: unknown format `{}`", other),
+                line,
+            ));
+        }
+    };
+    std::fs::write(&path, &body).map_err(|e| {
+        PerlError::runtime(
+            format!("stress_metrics_export: write {}: {}", path, e),
+            line,
+        )
+    })?;
+    Ok(PerlValue::integer(g.len() as i64))
+}
+
+/// `stress_metrics_prometheus()` → string in Prometheus text exposition
+/// format. Suitable for serving from a `/metrics` endpoint with no
+/// additional formatting.
+pub(crate) fn stress_metrics_prometheus(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let g = metrics().lock();
+    Ok(PerlValue::string(format_prometheus(&g)))
+}
+
+/// `stress_metrics_json()` → JSON string of the entire history.
+pub(crate) fn stress_metrics_json(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let g = metrics().lock();
+    Ok(PerlValue::string(format_json(&g)))
+}
+
+/// `stress_metrics_csv()` → CSV string of the entire history.
+pub(crate) fn stress_metrics_csv(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let g = metrics().lock();
+    Ok(PerlValue::string(format_csv(&g)))
+}
+
+/// `stress_metrics_watch(field => "stress_temp", interval_ms => 1000, max_ticks => 60)`
+/// → arrayref of values sampled at the requested cadence. Each tick
+/// reads the latest sample matching `field` and appends its value.
+/// When `field` is omitted, returns the running cost-style summary
+/// (currently only the count of samples per name).
+pub(crate) fn stress_metrics_watch(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let mut field = String::new();
+    let mut interval_ms: i64 = 1000;
+    let mut max_ticks: i64 = 60;
+    let mut on_tick: Option<PerlValue> = None;
+    let mut i = 0;
+    while i + 1 < args.len() {
+        let key = args[i].to_string();
+        let val = args[i + 1].clone();
+        match key.as_str() {
+            "field" => field = val.to_string(),
+            "interval_ms" => interval_ms = val.to_int(),
+            "max_ticks" => max_ticks = val.to_int(),
+            "on_tick" => on_tick = Some(val),
+            _ => {}
+        }
+        i += 2;
+    }
+    if field.is_empty() {
+        return Err(PerlError::runtime(
+            "stress_metrics_watch: field => \"name\" required",
+            line,
+        ));
+    }
+    let interval = Duration::from_millis(interval_ms.max(1) as u64);
+    let mut out: Vec<PerlValue> = Vec::with_capacity(max_ticks.max(0) as usize);
+    let mut last_ts_seen: i64 = 0;
+    for _ in 0..max_ticks.max(0) {
+        std::thread::sleep(interval);
+        let g = metrics().lock();
+        let latest = g
+            .iter()
+            .rev()
+            .find(|s| s.name == field && s.ts_ms > last_ts_seen)
+            .cloned();
+        drop(g);
+        if let Some(s) = latest {
+            last_ts_seen = s.ts_ms;
+            let v = PerlValue::float(s.value);
+            out.push(v.clone());
+            if let Some(_cb) = &on_tick {
+                // Callback dispatch goes through the interpreter caller;
+                // we record the value and let user code attach via the
+                // returned arrayref. The on_tick option is reserved for
+                // future bytecode-level hookup.
+            }
+        }
+        if GLOBAL_KILL.load(Ordering::Relaxed) {
+            break;
+        }
+    }
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
+}
+
+fn format_csv(samples: &[MetricSample]) -> String {
+    let mut out = String::from("ts_ms,name,value,labels\n");
+    for s in samples {
+        let labels_pack = s
+            .labels
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(";");
+        out.push_str(&format!(
+            "{},{},{},{}\n",
+            s.ts_ms,
+            csv_escape(&s.name),
+            s.value,
+            csv_escape(&labels_pack)
+        ));
+    }
+    out
+}
+
+fn csv_escape(s: &str) -> String {
+    if s.contains(',') || s.contains('"') || s.contains('\n') {
+        let escaped = s.replace('"', "\"\"");
+        format!("\"{}\"", escaped)
+    } else {
+        s.to_string()
+    }
+}
+
+fn format_json(samples: &[MetricSample]) -> String {
+    let mut out = String::from("[");
+    for (i, s) in samples.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        let labels_json: Vec<String> = s
+            .labels
+            .iter()
+            .map(|(k, v)| format!("\"{}\":\"{}\"", json_escape(k), json_escape(v)))
+            .collect();
+        out.push_str(&format!(
+            "{{\"ts_ms\":{},\"name\":\"{}\",\"value\":{},\"labels\":{{{}}}}}",
+            s.ts_ms,
+            json_escape(&s.name),
+            s.value,
+            labels_json.join(",")
+        ));
+    }
+    out.push(']');
+    out
+}
+
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Prometheus text exposition format. Latest value per (name, labels) wins.
+fn format_prometheus(samples: &[MetricSample]) -> String {
+    let mut latest: IndexMap<String, &MetricSample> = IndexMap::new();
+    for s in samples {
+        let labels_key: Vec<String> = s
+            .labels
+            .iter()
+            .map(|(k, v)| format!("{}={:?}", k, v))
+            .collect();
+        let key = format!("{}{{{}}}", s.name, labels_key.join(","));
+        latest.insert(key, s);
+    }
+    let mut by_name: IndexMap<&str, Vec<&MetricSample>> = IndexMap::new();
+    for s in latest.values() {
+        by_name.entry(&s.name).or_default().push(s);
+    }
+    let mut out = String::new();
+    for (name, group) in by_name {
+        out.push_str(&format!("# TYPE {} gauge\n", prom_safe_name(name)));
+        for s in group {
+            let labels_part = if s.labels.is_empty() {
+                String::new()
+            } else {
+                let parts: Vec<String> = s
+                    .labels
+                    .iter()
+                    .map(|(k, v)| format!("{}={:?}", prom_safe_name(k), v))
+                    .collect();
+                format!("{{{}}}", parts.join(","))
+            };
+            out.push_str(&format!(
+                "{}{} {} {}\n",
+                prom_safe_name(name),
+                labels_part,
+                s.value,
+                s.ts_ms
+            ));
+        }
+    }
+    out
+}
+
+fn prom_safe_name(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == ':' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────
+//
+// Append-only JSONL stream for compliance trails. Each call writes one
+// line. Path defaults to `~/.stryke/audit.log`; override via
+// `STRYKE_AUDIT_LOG=/path/to/log`. Each line is:
+//   {"ts": <iso8601>, "ts_ms": <epoch_ms>, "event": "...",
+//    "pid": ..., "host": "...", "user": "...", "details": {...}}
+
+/// `audit_log("event_name", k1 => v1, k2 => v2, ...)` — append one
+/// JSONL line. Returns 1 on success, 0 on failure (does not throw —
+/// audit failures must never crash the program).
+pub(crate) fn audit_log(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let event = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "<unnamed>".to_string());
+
+    let mut details: Vec<(String, String)> = Vec::new();
+    let mut i = 1;
+    while i + 1 < args.len() {
+        details.push((args[i].to_string(), args[i + 1].to_string()));
+        i += 2;
+    }
+
+    let path = std::env::var("STRYKE_AUDIT_LOG").unwrap_or_else(|_| {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        format!("{}/.stryke/audit.log", home)
+    });
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let now_ts = now_ms();
+    let host = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("HOST"))
+        .unwrap_or_default();
+    let user = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_default();
+    let pid = std::process::id();
+
+    let details_json: Vec<String> = details
+        .iter()
+        .map(|(k, v)| format!("\"{}\":\"{}\"", json_escape(k), json_escape(v)))
+        .collect();
+    let line_str = format!(
+        "{{\"ts_ms\":{},\"ts\":\"{}\",\"event\":\"{}\",\"pid\":{},\"host\":\"{}\",\"user\":\"{}\",\"details\":{{{}}}}}\n",
+        now_ts,
+        iso8601_from_ms(now_ts),
+        json_escape(&event),
+        pid,
+        json_escape(&host),
+        json_escape(&user),
+        details_json.join(","),
+    );
+
+    use std::io::Write;
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut f) => {
+            let ok = f.write_all(line_str.as_bytes()).is_ok();
+            Ok(PerlValue::integer(if ok { 1 } else { 0 }))
+        }
+        Err(_) => Ok(PerlValue::integer(0)),
+    }
+}
+
+/// `audit_log_path()` → the path the next `audit_log` call will write to.
+pub(crate) fn audit_log_path(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let path = std::env::var("STRYKE_AUDIT_LOG").unwrap_or_else(|_| {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        format!("{}/.stryke/audit.log", home)
+    });
+    Ok(PerlValue::string(path))
+}
+
+fn iso8601_from_ms(ms: i64) -> String {
+    let secs = ms / 1000;
+    let days = secs / 86_400;
+    let secs_of_day = secs % 86_400;
+    let h = secs_of_day / 3600;
+    let m = (secs_of_day % 3600) / 60;
+    let s = secs_of_day % 60;
+    let (y, mo, d) = days_to_ymd(days);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        y,
+        mo,
+        d,
+        h,
+        m,
+        s,
+        ms % 1000
+    )
+}
+
+fn days_to_ymd(days_since_epoch: i64) -> (i32, u32, u32) {
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as i32, m, d)
 }

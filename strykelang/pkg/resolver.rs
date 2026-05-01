@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::lockfile::{integrity_for_directory, LockedPackage, Lockfile};
-use super::manifest::{DepSource, DepSpec, Manifest};
+use super::manifest::{DepSource, DepSpec, DetailedDep, Manifest};
 use super::store::Store;
 use super::{PkgError, PkgResult};
 
@@ -57,6 +57,11 @@ impl<'a> Resolver<'a> {
     /// Walks deps recursively: each path dep's own `stryke.toml` (when present)
     /// is parsed and its path/workspace deps follow the same pipeline. Cycles
     /// are detected via the `visiting` set and reported as an error.
+    ///
+    /// When the root manifest has `[workspace]`, every member's deps are
+    /// resolved into the same graph, and `dep.workspace = true` resolves
+    /// against the root's `[workspace.deps]` table. The lockfile is single
+    /// and lives at the workspace root.
     pub fn resolve(&self) -> PkgResult<ResolveOutcome> {
         self.store.ensure_layout()?;
 
@@ -64,17 +69,53 @@ impl<'a> Resolver<'a> {
         let mut installed: Vec<(String, String, PathBuf)> = Vec::new();
         let mut visiting: BTreeSet<String> = BTreeSet::new();
 
-        // Direct deps first — registry/git deps fail loud here.
+        // Direct deps first — registry/git deps fail loud here. Workspace
+        // member manifests are resolved underneath this same loop so the
+        // single lockfile sees the union of all members' dep graphs.
         let direct = self.collect_direct_deps();
         for (name, spec) in &direct {
+            let resolved_spec = self.resolve_workspace_dep(name, spec)?;
             self.walk_dep(
                 name,
-                spec,
+                &resolved_spec,
                 self.manifest_dir,
                 &mut graph,
                 &mut installed,
                 &mut visiting,
             )?;
+        }
+
+        // Workspace members each contribute their direct deps to the same graph.
+        if let Some(ws) = &self.manifest.workspace {
+            for member_pattern in &ws.members {
+                let member_dirs = expand_workspace_glob(self.manifest_dir, member_pattern)?;
+                for member_dir in member_dirs {
+                    let member_manifest_path = member_dir.join("stryke.toml");
+                    if !member_manifest_path.is_file() {
+                        return Err(PkgError::Resolve(format!(
+                            "workspace member {} has no stryke.toml",
+                            member_dir.display()
+                        )));
+                    }
+                    let member_manifest = Manifest::from_path(&member_manifest_path)?;
+                    for (name, spec) in member_manifest
+                        .deps
+                        .iter()
+                        .chain(member_manifest.dev_deps.iter())
+                        .chain(member_manifest.groups.values().flat_map(|g| g.iter()))
+                    {
+                        let resolved_spec = self.resolve_workspace_dep(name, spec)?;
+                        self.walk_dep(
+                            name,
+                            &resolved_spec,
+                            &member_dir,
+                            &mut graph,
+                            &mut installed,
+                            &mut visiting,
+                        )?;
+                    }
+                }
+            }
         }
 
         let mut lockfile = Lockfile::new();
@@ -93,6 +134,70 @@ impl<'a> Resolver<'a> {
             lockfile,
             installed,
         })
+    }
+
+    /// If `spec` is `{ workspace = true }`, look up the name in the root
+    /// manifest's `[workspace.deps]` and return that. Otherwise return the
+    /// spec unchanged. This is the inheritance mechanism that lets every
+    /// workspace member share one version of `http`/`json`/etc.
+    ///
+    /// Path deps inherited from `[workspace.deps]` are absolutized against
+    /// the workspace root so the subsequent walk doesn't re-resolve them
+    /// relative to the member directory (which would point at a wrong path).
+    fn resolve_workspace_dep(&self, name: &str, spec: &DepSpec) -> PkgResult<DepSpec> {
+        let inherits = matches!(spec, DepSpec::Detailed(d) if d.workspace);
+        if !inherits {
+            return Ok(spec.clone());
+        }
+        let ws = match &self.manifest.workspace {
+            Some(w) => w,
+            None => {
+                return Err(PkgError::Resolve(format!(
+                    "dep `{}` has `workspace = true` but the root manifest has no [workspace] table",
+                    name
+                )));
+            }
+        };
+        let inherited = ws.deps.get(name).ok_or_else(|| {
+            PkgError::Resolve(format!(
+                "dep `{}` inherits from [workspace.deps] but no such entry exists in the root manifest",
+                name
+            ))
+        })?;
+        let mut absolutized = match inherited.clone() {
+            DepSpec::Detailed(mut d) => {
+                if let Some(p) = d.path.as_ref() {
+                    let pp = std::path::Path::new(p);
+                    if !pp.is_absolute() {
+                        let abs = self.manifest_dir.join(pp);
+                        d.path = Some(abs.to_string_lossy().into_owned());
+                    }
+                }
+                DepSpec::Detailed(d)
+            }
+            other => other,
+        };
+        // Merge: dep-side `features` accumulate on top of the inherited spec.
+        if let DepSpec::Detailed(member) = spec {
+            if !member.features.is_empty() {
+                let mut merged = match absolutized {
+                    DepSpec::Detailed(d) => d,
+                    DepSpec::Version(v) => DetailedDep {
+                        version: Some(v),
+                        default_features: true,
+                        ..DetailedDep::default()
+                    },
+                    DepSpec::Placeholder => DetailedDep::default(),
+                };
+                for f in &member.features {
+                    if !merged.features.contains(f) {
+                        merged.features.push(f.clone());
+                    }
+                }
+                absolutized = DepSpec::Detailed(merged);
+            }
+        }
+        Ok(absolutized)
     }
 
     /// Flatten direct deps from `[deps]`, `[dev-deps]`, and every `[groups.*]`.
@@ -235,6 +340,37 @@ fn resolve_path(relative_to: &Path, raw: &str) -> PathBuf {
     }
 }
 
+/// Expand a workspace `members = ["..."]` pattern against `root_dir`. Supports
+/// the two cases the RFC calls out: literal dirs (`crates/foo`) and one-level
+/// wildcards (`crates/*`). Multi-segment globs and `**` are not supported —
+/// the workspace pattern is a directory list, not a generic glob.
+fn expand_workspace_glob(root_dir: &Path, pattern: &str) -> PkgResult<Vec<PathBuf>> {
+    if let Some(prefix) = pattern.strip_suffix("/*") {
+        let parent = root_dir.join(prefix);
+        if !parent.is_dir() {
+            return Ok(Vec::new());
+        }
+        let mut out: Vec<PathBuf> = Vec::new();
+        for entry in std::fs::read_dir(&parent)
+            .map_err(|e| PkgError::Io(format!("read workspace dir {}: {}", parent.display(), e)))?
+        {
+            let entry = entry.map_err(|e| PkgError::Io(e.to_string()))?;
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                out.push(entry.path());
+            }
+        }
+        out.sort();
+        Ok(out)
+    } else if pattern.contains('*') {
+        Err(PkgError::Resolve(format!(
+            "workspace member pattern `{}` not supported — only literal dirs and `prefix/*` work today",
+            pattern
+        )))
+    } else {
+        Ok(vec![root_dir.join(pattern)])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +468,89 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("registry dep"), "got: {}", msg);
         assert!(msg.contains("http"), "got: {}", msg);
+    }
+
+    #[test]
+    fn workspace_resolves_member_deps_into_root_lockfile() {
+        // Build a workspace with two members that share a common path-dep via
+        // `[workspace.deps]` + `workspace = true`. Single root lockfile sees both.
+        let leaf = make_path_dep("shared", "1.0.0");
+
+        let ws_root = tempdir("ws_root");
+        std::fs::create_dir_all(ws_root.join("crates/a/lib")).unwrap();
+        std::fs::create_dir_all(ws_root.join("crates/b/lib")).unwrap();
+        std::fs::write(
+            ws_root.join("stryke.toml"),
+            format!(
+                r#"
+[workspace]
+members = ["crates/*"]
+
+[workspace.deps]
+shared = {{ path = "{}" }}
+"#,
+                leaf.display()
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            ws_root.join("crates/a/stryke.toml"),
+            "[package]\nname = \"a\"\nversion = \"0.1.0\"\n\n[deps]\nshared = { workspace = true }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            ws_root.join("crates/b/stryke.toml"),
+            "[package]\nname = \"b\"\nversion = \"0.1.0\"\n\n[deps]\nshared = { workspace = true }\n",
+        )
+        .unwrap();
+
+        let ws_manifest = Manifest::from_path(&ws_root.join("stryke.toml")).unwrap();
+        let store_root = tempdir("ws_store");
+        let store = Store::at(&store_root);
+        let r = Resolver {
+            manifest: &ws_manifest,
+            manifest_dir: &ws_root,
+            store: &store,
+        };
+        let outcome = r.resolve().unwrap();
+        // Single dep in the lockfile — both members share the same `shared@1.0.0`.
+        assert_eq!(outcome.lockfile.packages.len(), 1);
+        assert_eq!(outcome.lockfile.packages[0].name, "shared");
+        assert_eq!(outcome.lockfile.packages[0].version, "1.0.0");
+    }
+
+    #[test]
+    fn workspace_glob_returns_sorted_member_dirs() {
+        let root = tempdir("ws_glob");
+        for n in ["zeta", "alpha", "beta"] {
+            std::fs::create_dir_all(root.join(format!("crates/{}", n))).unwrap();
+        }
+        let dirs = super::expand_workspace_glob(&root, "crates/*").unwrap();
+        let names: Vec<String> = dirs
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["alpha", "beta", "zeta"]);
+    }
+
+    #[test]
+    fn workspace_dep_without_table_is_an_error() {
+        let root = tempdir("ws_err");
+        std::fs::write(
+            root.join("stryke.toml"),
+            "[package]\nname = \"x\"\nversion = \"0.1.0\"\n\n[deps]\nshared = { workspace = true }\n",
+        )
+        .unwrap();
+        let m = Manifest::from_path(&root.join("stryke.toml")).unwrap();
+        let store_root = tempdir("ws_err_store");
+        let store = Store::at(&store_root);
+        let r = Resolver {
+            manifest: &m,
+            manifest_dir: &root,
+            store: &store,
+        };
+        let err = r.resolve().unwrap_err().to_string();
+        assert!(err.contains("workspace = true"), "got: {}", err);
     }
 
     #[test]

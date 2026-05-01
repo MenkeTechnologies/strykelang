@@ -436,21 +436,23 @@ The registry rule that defines the ecosystem: **published versions are immutable
 
 ## Implementation Order
 
-1. `stryke.toml` parser (deps, scripts, bin, workspace).
-2. `~/.stryke/store/` and `~/.stryke/cache/` layout.
-3. `s install` for path deps only — proves the resolution loop.
-4. `s add` / `s remove`.
-5. `stryke.lock` generation with integrity hashes.
-6. Module resolution integration (lock-driven, store paths).
-7. PubGrub semver resolver.
-8. Parallel fetch/verify/extract.
-9. Git deps.
-10. Features.
-11. Workspaces with shared deps inheritance.
-12. `s install -g` for CLI tools.
-13. Sparse registry protocol + first registry deployment.
-14. `s publish`, `s yank`, `s audit`.
-15. Sigstore signing.
+1. ✅ `stryke.toml` parser (deps, scripts, bin, workspace). **SHIPPED**
+2. ✅ `~/.stryke/store/` and `~/.stryke/cache/` layout. **SHIPPED**
+3. ✅ `s install` for path deps only — proves the resolution loop. **SHIPPED**
+4. ✅ `s add` / `s remove`. **SHIPPED**
+5. ✅ `stryke.lock` generation with integrity hashes. **SHIPPED**
+6. ✅ Module resolution integration (lock-driven, store paths). **SHIPPED**
+7. ⏳ PubGrub semver resolver — **deferred until registry deployed**.
+8. ⏳ Parallel fetch/verify/extract — **deferred until registry deployed**.
+9. ⏳ Git deps — **deferred** (clear unimplemented error today).
+10. ⏳ Features — partial: per-package feature flags parse and round-trip; resolver-side activation lands with the registry resolver.
+11. ✅ Workspaces with shared deps inheritance. **SHIPPED** — `[workspace]` + `members = ["crates/*"]` glob + `{ workspace = true }` inheritance + single root lockfile.
+12. ✅ `s install -g` for CLI tools. **SHIPPED** — `s install -g PATH`, `s uninstall -g NAME`, `s list -g`. Launchers go to `~/.stryke/bin/`.
+13. ⏳ Sparse registry protocol + first registry deployment. **CLI stubs shipped** (`s search`, `s publish [--dry-run]`, `s yank`); endpoint deployment is the next chunk.
+14. ✅ `s publish` (dry-run), `s yank` (stub), `s audit` (stub feed). **CLI shipped, feed/endpoint deferred.**
+15. ⏳ Sigstore signing — **deferred until registry deployed**.
+
+Plus the operational commands the RFC's command list calls out: ✅ `s update`, ✅ `s outdated`, ✅ `s vendor`, ✅ `s clean`, ✅ `s run SCRIPT` (npm-style task runner from `[scripts]`).
 
 ## Non-Goals
 

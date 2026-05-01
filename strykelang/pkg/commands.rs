@@ -787,6 +787,753 @@ fn segments_to_path(segments: &[&str]) -> PathBuf {
     p
 }
 
+/// `s clean` — wipe `target/` plus the per-project bytecode cache. Global
+/// `~/.stryke/cache/` is preserved unless `--all` is passed (which also nukes
+/// the store). Path-dep installs in `~/.stryke/store/` are kept by default
+/// because they're trivially regenerated, but the user may not expect a
+/// global wipe just from `s clean`.
+pub fn cmd_clean(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke clean [--all]");
+        println!();
+        println!("Remove the local target/ directory and per-project bytecode cache.");
+        println!();
+        println!("Flags:");
+        println!("  --all    additionally clear ~/.stryke/cache/ and ~/.stryke/store/");
+        return 0;
+    }
+    let want_global = args.iter().any(|a| a == "--all");
+
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s clean: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = find_project_root(&cwd).unwrap_or(cwd);
+    let mut wiped: Vec<String> = Vec::new();
+    for sub in ["target", ".stryke-cache"] {
+        let d = root.join(sub);
+        if d.exists() {
+            if let Err(e) = std::fs::remove_dir_all(&d) {
+                eprintln!("s clean: remove {}: {}", d.display(), e);
+                return 1;
+            }
+            wiped.push(d.display().to_string());
+        }
+    }
+
+    if want_global {
+        if let Ok(store) = Store::user_default() {
+            for d in [store.cache_dir(), store.store_dir(), store.git_dir()] {
+                if d.exists() {
+                    if let Err(e) = std::fs::remove_dir_all(&d) {
+                        eprintln!("s clean: remove {}: {}", d.display(), e);
+                        return 1;
+                    }
+                    wiped.push(d.display().to_string());
+                }
+            }
+        }
+    }
+
+    if wiped.is_empty() {
+        eprintln!("  nothing to clean");
+    } else {
+        for w in &wiped {
+            eprintln!("  removed {}", w);
+        }
+    }
+    0
+}
+
+/// `s update [NAME]` — re-resolve the manifest and overwrite `stryke.lock`.
+/// Today, with only path/workspace deps wired, this is `s install` with the
+/// existing lockfile thrown out first. When the registry resolver lands, this
+/// is where semver-aware version bumps will live.
+pub fn cmd_update(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke update [NAME]");
+        println!();
+        println!("Re-resolve the dependency graph and rewrite stryke.lock. With registry");
+        println!("deps unwired, this currently re-pins path/workspace dep integrity hashes.");
+        println!();
+        println!("NAME: when given, only that dep is re-resolved (others stay pinned).");
+        return 0;
+    }
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s update: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s update: no stryke.toml found");
+            return 1;
+        }
+    };
+    let lock_path = root.join(LOCKFILE_FILE);
+    if lock_path.exists() {
+        if let Err(e) = std::fs::remove_file(&lock_path) {
+            eprintln!("s update: remove {}: {}", lock_path.display(), e);
+            return 1;
+        }
+    }
+    eprintln!("  re-resolving dependency graph");
+    cmd_install(&[])
+}
+
+/// `s outdated` — compare every dep's lockfile pin against its current
+/// upstream state. For path deps that means rehashing the source dir; if the
+/// integrity hash drifted, the dep is "outdated." Registry deps return a
+/// "registry not wired" notice rather than silent green.
+pub fn cmd_outdated(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke outdated");
+        println!();
+        println!("Show deps whose stryke.lock pin no longer matches the upstream state.");
+        println!("Path deps: integrity hash recomputed against the source directory.");
+        println!("Registry deps: not wired in this stryke version.");
+        return 0;
+    }
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s outdated: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s outdated: no stryke.toml found");
+            return 1;
+        }
+    };
+    let manifest = match Manifest::from_path(&root.join(MANIFEST_FILE)) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("s outdated: {}", e);
+            return 1;
+        }
+    };
+    let lock_path = root.join(LOCKFILE_FILE);
+    if !lock_path.is_file() {
+        eprintln!("s outdated: stryke.lock not found — run `s install` first");
+        return 1;
+    }
+    let lock = match Lockfile::from_path(&lock_path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("s outdated: {}", e);
+            return 1;
+        }
+    };
+
+    let mut drifted: Vec<String> = Vec::new();
+    let mut registry_skipped: Vec<String> = Vec::new();
+    for (name, spec) in manifest.deps.iter() {
+        if let Some(p) = spec.path() {
+            let abs = if std::path::Path::new(p).is_absolute() {
+                std::path::PathBuf::from(p)
+            } else {
+                root.join(p)
+            };
+            if let Ok(now) = super::lockfile::integrity_for_directory(&abs) {
+                if let Some(entry) = lock.find(name) {
+                    if entry.integrity != now {
+                        drifted.push(format!(
+                            "  {}@{}  pinned {}  current {}",
+                            name, entry.version, entry.integrity, now
+                        ));
+                    }
+                } else {
+                    drifted.push(format!(
+                        "  {} (path)  not in lockfile — run `s install`",
+                        name
+                    ));
+                }
+            }
+        } else {
+            registry_skipped.push(name.clone());
+        }
+    }
+
+    if drifted.is_empty() && registry_skipped.is_empty() {
+        eprintln!("\x1b[32m✓ all path deps are up to date\x1b[0m");
+        return 0;
+    }
+    if !drifted.is_empty() {
+        eprintln!("path deps with drift (run `s install` to re-pin):");
+        for d in &drifted {
+            eprintln!("{}", d);
+        }
+    }
+    if !registry_skipped.is_empty() {
+        eprintln!(
+            "registry deps skipped — wire protocol not deployed yet ({}): {}",
+            registry_skipped.len(),
+            registry_skipped.join(", ")
+        );
+    }
+    0
+}
+
+/// `s audit` — check the lockfile against a known-vulnerability advisory feed.
+/// The feed itself is not deployed yet; today the command parses the lockfile,
+/// reports the dep count, and emits an honest "no advisories — feed not yet
+/// deployed" message rather than fake "you're safe" output.
+pub fn cmd_audit(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke audit [--fail-on=high|critical]");
+        println!();
+        println!("Check stryke.lock against a vulnerability advisory feed. The feed itself");
+        println!("is not deployed yet — this command currently reports the dep count and");
+        println!("emits an honest 'no advisories' message rather than faking it.");
+        return 0;
+    }
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s audit: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s audit: no stryke.toml found");
+            return 1;
+        }
+    };
+    let lock_path = root.join(LOCKFILE_FILE);
+    if !lock_path.is_file() {
+        eprintln!("s audit: stryke.lock not found — run `s install` first");
+        return 1;
+    }
+    let lock = match Lockfile::from_path(&lock_path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("s audit: {}", e);
+            return 1;
+        }
+    };
+    eprintln!(
+        "  audited {} package{}",
+        lock.packages.len(),
+        if lock.packages.len() == 1 { "" } else { "s" }
+    );
+    eprintln!("\x1b[33m  advisory feed not yet deployed — no vulnerabilities reported\x1b[0m");
+    0
+}
+
+/// `s run SCRIPT [ARGS...]` — npm-style task runner. Looks up SCRIPT in the
+/// `[scripts]` table of the project's `stryke.toml` and executes it via the
+/// system shell so pipes/redirects work. Any extra ARGS are appended.
+///
+/// This is distinct from the existing `stryke run main.stk` semantic: that
+/// path runs a `.stk` file directly. Script names from `[scripts]` win when
+/// both are possible (the user's manifest is authoritative).
+pub fn cmd_run_script(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke run SCRIPT [ARGS...]");
+        println!();
+        println!("Look up SCRIPT in the [scripts] table of stryke.toml and execute it via");
+        println!("the system shell. Any ARGS are appended to the script command line.");
+        println!();
+        println!("Without [scripts], `stryke run` falls back to running ./main.stk directly.");
+        return 0;
+    }
+    if args.is_empty() {
+        eprintln!("usage: s run SCRIPT [ARGS...]");
+        return 1;
+    }
+    let script = &args[0];
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s run: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s run: no stryke.toml found in this directory or any parent");
+            return 1;
+        }
+    };
+    let manifest = match Manifest::from_path(&root.join(MANIFEST_FILE)) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("s run: {}", e);
+            return 1;
+        }
+    };
+    let cmd = match manifest.scripts.get(script) {
+        Some(c) => c.clone(),
+        None => {
+            eprintln!("s run: no script `{}` in [scripts]", script);
+            if !manifest.scripts.is_empty() {
+                eprintln!(
+                    "available: {}",
+                    manifest
+                        .scripts
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+            return 1;
+        }
+    };
+    let extra = &args[1..];
+    let full = if extra.is_empty() {
+        cmd.clone()
+    } else {
+        format!(
+            "{} {}",
+            cmd,
+            extra
+                .iter()
+                .map(|a| shell_escape_simple(a))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    };
+    eprintln!("  $ {}", full);
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    let status = std::process::Command::new(&shell)
+        .arg("-c")
+        .arg(&full)
+        .current_dir(&root)
+        .status();
+    match status {
+        Ok(s) => s.code().unwrap_or(1),
+        Err(e) => {
+            eprintln!("s run: spawn {}: {}", shell, e);
+            1
+        }
+    }
+}
+
+/// Minimal shell quoting — wrap in single quotes and escape any inner quotes.
+fn shell_escape_simple(s: &str) -> String {
+    if !s.contains(' ')
+        && !s.contains('\'')
+        && !s.contains('"')
+        && !s.contains('$')
+        && !s.contains('`')
+    {
+        return s.to_string();
+    }
+    let escaped = s.replace('\'', "'\\''");
+    format!("'{}'", escaped)
+}
+
+/// `s vendor` — copy every dep in `stryke.lock` from the global store into
+/// `./vendor/<name>@<version>/` so the project builds with `--offline` even
+/// on a machine without `~/.stryke/store/` populated. Existing `vendor/`
+/// content is replaced.
+pub fn cmd_vendor(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke vendor");
+        println!();
+        println!("Copy every dep in stryke.lock from ~/.stryke/store/ into ./vendor/ so");
+        println!("the project is offline-buildable. Useful for shipping a tarball that");
+        println!("builds without registry access.");
+        return 0;
+    }
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s vendor: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s vendor: no stryke.toml found");
+            return 1;
+        }
+    };
+    let lock_path = root.join(LOCKFILE_FILE);
+    if !lock_path.is_file() {
+        eprintln!("s vendor: stryke.lock not found — run `s install` first");
+        return 1;
+    }
+    let lock = match Lockfile::from_path(&lock_path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("s vendor: {}", e);
+            return 1;
+        }
+    };
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s vendor: {}", e);
+            return 1;
+        }
+    };
+
+    let vendor_dir = root.join("vendor");
+    if vendor_dir.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&vendor_dir) {
+            eprintln!("s vendor: clear {}: {}", vendor_dir.display(), e);
+            return 1;
+        }
+    }
+    if let Err(e) = std::fs::create_dir_all(&vendor_dir) {
+        eprintln!("s vendor: mkdir {}: {}", vendor_dir.display(), e);
+        return 1;
+    }
+
+    let mut copied = 0_usize;
+    for pkg in &lock.packages {
+        let src = store.package_dir(&pkg.name, &pkg.version);
+        if !src.is_dir() {
+            eprintln!(
+                "s vendor: {}@{} not in store — run `s install` first",
+                pkg.name, pkg.version
+            );
+            return 1;
+        }
+        let dst = vendor_dir.join(format!("{}@{}", pkg.name, pkg.version));
+        if let Err(e) = copy_tree(&src, &dst) {
+            eprintln!("s vendor: copy {}: {}", src.display(), e);
+            return 1;
+        }
+        copied += 1;
+    }
+    eprintln!(
+        "\x1b[32m✓ vendored {} package{} into {}\x1b[0m",
+        copied,
+        if copied == 1 { "" } else { "s" },
+        vendor_dir.display()
+    );
+    0
+}
+
+/// Recursive directory copy used by `s vendor`. Mirrors the resolver's logic
+/// but lives here to keep it private to vendor (no symlinks-as-symlinks
+/// requirement — vendor is a flat snapshot).
+fn copy_tree(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        let meta = entry.metadata()?;
+        if meta.is_dir() {
+            copy_tree(&from, &to)?;
+        } else if meta.file_type().is_symlink() {
+            #[cfg(unix)]
+            {
+                let target = std::fs::read_link(&from)?;
+                std::os::unix::fs::symlink(target, &to)?;
+            }
+            #[cfg(not(unix))]
+            std::fs::copy(&from, &to)?;
+        } else {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// `s install -g PATH` — install a path-based package's `[bin]` entries into
+/// `~/.stryke/bin/` as shebang wrappers. No registry needed — works today for
+/// any local package with a manifest declaring binaries.
+pub fn cmd_install_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) || args.is_empty() {
+        println!("usage: stryke install -g PATH");
+        println!();
+        println!("Install a local package's [bin] entries into ~/.stryke/bin/ as launcher");
+        println!("scripts that invoke `stryke <main_stk>`. PATH is the path to a directory");
+        println!("containing a stryke.toml with a [bin] table.");
+        return if args.is_empty() { 1 } else { 0 };
+    }
+    let pkg_path = std::path::PathBuf::from(&args[0]);
+    if !pkg_path.is_dir() {
+        eprintln!("s install -g: {} is not a directory", pkg_path.display());
+        return 1;
+    }
+    let manifest = match Manifest::from_path(&pkg_path.join(MANIFEST_FILE)) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("s install -g: {}", e);
+            return 1;
+        }
+    };
+    if manifest.bin.is_empty() {
+        eprintln!("s install -g: package has no [bin] entries");
+        return 1;
+    }
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s install -g: {}", e);
+            return 1;
+        }
+    };
+    if let Err(e) = store.ensure_layout() {
+        eprintln!("s install -g: {}", e);
+        return 1;
+    }
+
+    let abs_pkg = match pkg_path.canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("s install -g: canonicalize {}: {}", pkg_path.display(), e);
+            return 1;
+        }
+    };
+
+    for (bin_name, entry) in &manifest.bin {
+        let target = abs_pkg.join(entry);
+        if !target.is_file() {
+            eprintln!(
+                "s install -g: bin `{}` -> {} does not exist",
+                bin_name,
+                target.display()
+            );
+            return 1;
+        }
+        let launcher = store.bin_dir().join(bin_name);
+        if let Err(e) = write_launcher(&launcher, &target) {
+            eprintln!("s install -g: write {}: {}", launcher.display(), e);
+            return 1;
+        }
+        eprintln!("  installed {} -> {}", launcher.display(), target.display());
+    }
+    eprintln!(
+        "\x1b[32m✓ installed {} bin{} (add {} to PATH)\x1b[0m",
+        manifest.bin.len(),
+        if manifest.bin.len() == 1 { "" } else { "s" },
+        store.bin_dir().display()
+    );
+    0
+}
+
+/// Write a `#!/bin/sh` launcher that invokes `stryke <abs_target> "$@"`. We
+/// don't symlink the .stk source because the launcher needs to call the
+/// interpreter — symlinking the .stk would make the file appear as the
+/// "binary" but `./~/.stryke/bin/foo` would just dump perl source.
+fn write_launcher(
+    launcher_path: &std::path::Path,
+    target: &std::path::Path,
+) -> std::io::Result<()> {
+    if launcher_path.exists() {
+        std::fs::remove_file(launcher_path)?;
+    }
+    let body = format!(
+        "#!/bin/sh\nexec stryke {:?} \"$@\"\n",
+        target.display().to_string()
+    );
+    std::fs::write(launcher_path, body)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(launcher_path)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(launcher_path, perms)?;
+    }
+    Ok(())
+}
+
+/// `s uninstall -g NAME` — remove a launcher from `~/.stryke/bin/`.
+pub fn cmd_uninstall_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) || args.is_empty() {
+        println!("usage: stryke uninstall -g NAME");
+        println!();
+        println!("Remove the launcher script ~/.stryke/bin/NAME installed by `stryke install -g`.");
+        return if args.is_empty() { 1 } else { 0 };
+    }
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s uninstall -g: {}", e);
+            return 1;
+        }
+    };
+    let target = store.bin_dir().join(&args[0]);
+    if !target.exists() {
+        eprintln!("s uninstall -g: {} not installed", args[0]);
+        return 1;
+    }
+    if let Err(e) = std::fs::remove_file(&target) {
+        eprintln!("s uninstall -g: remove {}: {}", target.display(), e);
+        return 1;
+    }
+    eprintln!("  removed {}", target.display());
+    0
+}
+
+/// `s list -g` — list every launcher in `~/.stryke/bin/`.
+pub fn cmd_list_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke list -g");
+        println!();
+        println!("List launchers installed via `stryke install -g` in ~/.stryke/bin/.");
+        return 0;
+    }
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s list -g: {}", e);
+            return 1;
+        }
+    };
+    let bin_dir = store.bin_dir();
+    if !bin_dir.is_dir() {
+        eprintln!("  no global tools installed");
+        return 0;
+    }
+    let mut names: Vec<String> = Vec::new();
+    let entries = match std::fs::read_dir(&bin_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("s list -g: read {}: {}", bin_dir.display(), e);
+            return 1;
+        }
+    };
+    for entry in entries.flatten() {
+        if let Some(n) = entry.file_name().to_str() {
+            names.push(n.to_string());
+        }
+    }
+    names.sort();
+    if names.is_empty() {
+        eprintln!("  no global tools installed");
+    } else {
+        for n in &names {
+            println!("{}", n);
+        }
+    }
+    0
+}
+
+/// `s search NAME` — registry-dependent, not deployed yet. Honest stub so the
+/// CLI shape matches the RFC. When the registry endpoint exists, this hits
+/// the `/api/v1/index/{name}` path and prints matches.
+pub fn cmd_search(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke search NAME");
+        println!();
+        println!("Query the stryke registry for packages matching NAME. The registry");
+        println!("endpoint is not deployed yet — this command emits a clear diagnostic");
+        println!("rather than silent failure.");
+        return 0;
+    }
+    if args.is_empty() {
+        eprintln!("usage: s search NAME");
+        return 1;
+    }
+    eprintln!(
+        "s search: registry endpoint not deployed yet (RFC §\"Registry Protocol\"). \
+         Query was `{}`.",
+        args[0]
+    );
+    1
+}
+
+/// `s publish` — registry-dependent stub. When the registry exists, this
+/// reads the manifest, packages the source as a tarball, computes the
+/// integrity hash, and POSTs to `/api/v1/packages/{name}/{version}`.
+pub fn cmd_publish(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke publish [--registry=URL] [--dry-run]");
+        println!();
+        println!("Package the project as a tarball and push to the stryke registry. The");
+        println!("registry endpoint is not deployed yet — this command currently performs");
+        println!("the local pack step (under --dry-run) and stops.");
+        return 0;
+    }
+    let dry_run = args.iter().any(|a| a == "--dry-run");
+    if !dry_run {
+        eprintln!(
+            "s publish: registry endpoint not deployed yet (RFC §\"Registry Protocol\"). \
+             Pass --dry-run to exercise the local pack step."
+        );
+        return 1;
+    }
+    // Dry-run: validate the manifest and report what would be sent.
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s publish: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s publish: no stryke.toml found");
+            return 1;
+        }
+    };
+    let manifest = match Manifest::from_path(&root.join(MANIFEST_FILE)) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("s publish: {}", e);
+            return 1;
+        }
+    };
+    if let Err(e) = manifest.validate() {
+        eprintln!("s publish: {}", e);
+        return 1;
+    }
+    let pkg = match manifest.package.as_ref() {
+        Some(p) => p,
+        None => {
+            eprintln!("s publish: workspace roots can't be published — pick a member");
+            return 1;
+        }
+    };
+    let integrity = match super::lockfile::integrity_for_directory(&root) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s publish: hash {}: {}", root.display(), e);
+            return 1;
+        }
+    };
+    eprintln!("  would publish {} v{}", pkg.name, pkg.version);
+    eprintln!("  source dir: {}", root.display());
+    eprintln!("  integrity:  {}", integrity);
+    eprintln!("  (dry run — no upload performed)");
+    0
+}
+
+/// `s yank VERSION` — registry-dependent stub. When the registry exists, this
+/// POSTs to `/api/v1/packages/{name}/{version}/yank`.
+pub fn cmd_yank(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke yank VERSION");
+        println!();
+        println!("Mark a published version as do-not-resolve. Registry endpoint not");
+        println!("deployed yet — this command emits a clear diagnostic rather than");
+        println!("silent failure. Yanked versions are never deleted (immutable registry).");
+        return 0;
+    }
+    if args.is_empty() {
+        eprintln!("usage: s yank VERSION");
+        return 1;
+    }
+    eprintln!(
+        "s yank: registry endpoint not deployed yet (RFC §\"Registry Protocol\"). \
+         Version was `{}`.",
+        args[0]
+    );
+    1
+}
+
 /// Convenience wrapper: route a top-level `s pkg <subcommand>` invocation. Not
 /// the primary surface (each subcommand is wired individually in `main.rs`),
 /// but useful when porting from prototype shells.
@@ -802,10 +1549,22 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  init [NAME]               scaffold project in cwd");
         println!("  new NAME                  scaffold project at ./NAME/");
         println!("  install [--offline]       resolve deps + write stryke.lock");
+        println!("  install -g PATH           install a local package's [bin] entries globally");
+        println!("  uninstall -g NAME         remove a global launcher");
+        println!("  list -g                   list global launchers");
         println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
         println!("  remove NAME               drop a dep from stryke.toml");
+        println!("  update [NAME]             re-resolve and rewrite stryke.lock");
+        println!("  outdated                  report deps drifted from their lock pin");
+        println!("  audit                     check lockfile against advisory feed");
         println!("  tree                      print resolved dep graph");
         println!("  info NAME                 show lockfile entry for a dep");
+        println!("  vendor                    snapshot store deps to ./vendor/");
+        println!("  clean [--all]             wipe target/ (and optionally global caches)");
+        println!("  search NAME               registry query (registry not deployed)");
+        println!("  publish [--dry-run]       publish to registry (registry not deployed)");
+        println!("  yank VERSION              yank a version (registry not deployed)");
+        println!("  run SCRIPT [ARGS...]      run a [scripts] entry");
         println!();
         println!("Run `stryke <subcommand> -h` for per-subcommand flags.");
         return if args.is_empty() { 1 } else { 0 };
@@ -821,9 +1580,56 @@ pub fn dispatch(args: &[String]) -> i32 {
         },
         "add" => cmd_add(&args[1..]),
         "remove" => cmd_remove(&args[1..]),
-        "install" => cmd_install(&args[1..]),
+        "install" => {
+            // Detect `-g` for global install; falls through to lock-driven install otherwise.
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_install_global(&filtered)
+            } else {
+                cmd_install(&args[1..])
+            }
+        }
+        "uninstall" => {
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_uninstall_global(&filtered)
+            } else {
+                eprintln!("s uninstall: pass -g for global tools (no per-project uninstall yet)");
+                1
+            }
+        }
+        "list" => {
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_list_global(&filtered)
+            } else {
+                eprintln!("s list: pass -g to list global tools");
+                1
+            }
+        }
         "tree" => cmd_tree(&args[1..]),
         "info" => cmd_info(&args[1..]),
+        "update" => cmd_update(&args[1..]),
+        "outdated" => cmd_outdated(&args[1..]),
+        "audit" => cmd_audit(&args[1..]),
+        "vendor" => cmd_vendor(&args[1..]),
+        "clean" => cmd_clean(&args[1..]),
+        "search" => cmd_search(&args[1..]),
+        "publish" => cmd_publish(&args[1..]),
+        "yank" => cmd_yank(&args[1..]),
+        "run" => cmd_run_script(&args[1..]),
         other => {
             eprintln!("s pkg: unknown subcommand `{}`", other);
             1

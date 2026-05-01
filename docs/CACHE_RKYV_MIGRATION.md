@@ -1,7 +1,8 @@
-# Bytecode Cache: SQLite → rkyv Migration
+# Bytecode Cache: SQLite → rkyv Migration — **SHIPPED**
 
 **Decision:** stryke's bytecode cache moved from a SQLite database to a single rkyv-archived shard.
 **Result:** 11x faster per-process cache hit (p50: 241 µs → 22 µs). 3.2x bigger on disk. Aligned with zshrs.
+**Status:** Phase 1 (SQLite → rkyv shard with bincode-encoded Program/Chunk inner blobs) is complete and live in `strykelang/script_cache.rs`. Phase 2 (zero-copy on inner `PerlValue`/`Chunk`/`Program`) remains deferred — see [What's deferred](#whats-deferred-phase-2).
 
 ## Status quo (pre-migration)
 
@@ -126,7 +127,7 @@ When the OS page cache is cold, the larger rkyv file faults more pages from disk
 
 Any future "list all scripts cached more than 1 day ago" / "find scripts with chunk > 50KB" queries now require iterating the `ArchivedHashMap` in code instead of `SELECT … WHERE …`. Acceptable — those queries weren't being made.
 
-## What's deferred (phase 2)
+## What's deferred (phase 2) — ⏳ NOT SHIPPED
 
 The current rkyv shard wraps **bincode-encoded** Program/Chunk bytes. To get true zero-copy load on the inner data — skip bincode entirely on cache hit — `Chunk` and `Program` would need `#[derive(Archive, Deserialize, Serialize)]` derives across:
 

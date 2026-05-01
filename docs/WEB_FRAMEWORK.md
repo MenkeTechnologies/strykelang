@@ -1,6 +1,8 @@
-# Stryke Web — Design Doc
+# Stryke Web — Design Doc — **PHASE 0 SHIPPED, Phase 1 in progress**
 
 > *Build it like Rails. Deploy it like Go. Run it faster than both.*
+
+**Status:** Phase 0 walking skeleton + most of Phase 1 MVP shipped. The `stryke_web` crate is wired and the runtime `web_*` builtins live in `strykelang/web.rs` and `strykelang/web_orm.rs`. Generator surface (`s_web new myapp --app everything --theme cyberpunk --auth --admin --docker --ci --pwa --migrate`) produces a full-stack cyberpunk-themed app with ~70 resources, auth, admin, ETag-aware controllers, Dockerfile, GitHub Actions CI, and PWA manifest. See README §[0x15] for the user-facing surface and `stryke_web/README.md` for the generator reference. HTTP/2, glommio + io_uring, and the SIMD HTTP parser remain Phase 2+ deferred work.
 
 The world's fastest, cleanest web framework. Native machine-code throughput with Rails-grade developer experience, shipped as a single statically-linked binary. No interpreter on the target machine, no Docker required, no `bundle install`, no `node_modules`, no nginx fronting required, no Sidekiq+Redis dance for the simple case.
 
@@ -328,7 +330,7 @@ Schema is dumped to `db/schema.stk` after migrations. CI verifies migrations are
 | Construct | Syntax | Notes |
 |---|---|---|
 | Output, HTML-escaped | `#{ expr }` | Same `#{}` interpolation as normal stryke strings — zero new syntax to learn |
-| Output, raw (no escape) | `#{{ expr }}` | Explicit opt-out, lints flag every use |
+| Output, raw (no escape) | {% raw %}<code>#{{ expr }}</code>{% endraw %} | Explicit opt-out, lints flag every use |
 | Control flow / blocks | `<% stryke_code %>` | Body is literal stryke — `for`, `if`, `while`, blocks, declarations |
 | Template comment | `<%# ... %>` | Stripped at compile time, never reaches output |
 | Layout / inheritance | `<% extends "..." %>` `<% block :name { %> ... <% } %>` | Block definitions use stryke block syntax |
@@ -347,7 +349,7 @@ A template render is a function call. No string interpolation overhead, no escap
 
 **Layouts and partials** work identically to Rails. `<% include "shared/_post", post: $post %>` renders `app/views/shared/_post.stk.html` with `$post` in scope.
 
-**Auto-escape by default.** `#{ user_input }` is HTML-escaped at compile time per slot — the escape decision is baked into the generated native code, no runtime branching. `#{{ user_input }}` is the explicit raw opt-out and every occurrence is flagged by lint.
+**Auto-escape by default.** `#{ user_input }` is HTML-escaped at compile time per slot — the escape decision is baked into the generated native code, no runtime branching. {% raw %}<code>#{{ user_input }}</code>{% endraw %} is the explicit raw opt-out and every occurrence is flagged by lint.
 
 ## Background Jobs
 
@@ -670,50 +672,50 @@ Benchmark files live next to the code they benchmark (e.g., `benches/web/router_
 
 ## Implementation Phases
 
-### Phase 0 — Walking Skeleton (months 0-3)
+### Phase 0 — Walking Skeleton — ✅ SHIPPED
 
 Goal: prove the perf model.
 
-- HTTP/1.1 server on hyper + tokio (cross-platform start).
-- Radix-trie router compiled at build time.
-- Request/response abstractions with arena allocator.
-- Basic middleware (logger, compression).
-- Generator: `s new myapp --web` produces a working "hello world".
-- Postgres ORM with chain API, prepared statements, pool.
-- TechEmpower plaintext + JSON benchmarks runnable.
-- **Target: 500k req/s plaintext on a modern laptop.**
+- ✅ HTTP/1.1 server (`web_serve`).
+- ✅ Radix-trie router compiled from the routing DSL (`web_route`/`web_resources`/`web_root`).
+- ✅ Request/response abstractions (`web_request`, `web_render`, `web_set_header`, `web_status`, `web_params`).
+- ✅ Middleware (logger, security headers, ETag short-circuit, CSRF token).
+- ✅ Generator: `s_web new myapp` produces a working app.
+- ✅ ORM with chain API, prepared statements, pool — SQLite is the dev/test default per the resolved decision below; Postgres/MySQL via runtime builtins.
+- ⏳ TechEmpower plaintext + JSON benchmarks runnable — local benchmarks via `s bench` work; TechEmpower harness wiring is Phase 2 deferred.
+- **Target: 500k req/s plaintext on a modern laptop** — perf still subject to TechEmpower-style validation.
 
-### Phase 1 — MVP Framework (months 3-6)
+### Phase 1 — MVP Framework — ✅ MOSTLY SHIPPED
 
 Goal: real apps shippable.
 
-- HTTP/2 via `h2`, TLS via `rustls`.
-- Migrations DSL.
-- AOT-compiled templates.
-- Background jobs (database backend).
-- WebSockets, SSE.
-- Generators for model/controller/resource/migration/job.
-- Encrypted secrets.
-- Security middleware (CSRF, CSP, HSTS).
-- Embedded static assets pipeline.
-- **Target: 1M req/s plaintext, 500k JSON, 150k DB single-query.**
+- ⏳ HTTP/2 via `h2`, TLS via `rustls` — deferred.
+- ✅ Migrations DSL (`web_create_table`, `web_add_column`, `web_remove_column`, `web_drop_table`, `web_migrate`/`web_rollback`, `schema_migrations` tracking).
+- ✅ ERB templates (`<%= %>` / `<% %>` / `<%# %>` / `<%- -%>`) + layouts + `web_render_partial`.
+- ✅ Background jobs (database backend) — `web_jobs_init` creates the SQLite `jobs` table; `web_job_enqueue`/`dequeue`/`complete`/`fail` plus `web_jobs_list`/`web_jobs_stats`/`web_job_purge` for inspection.
+- ⏳ WebSockets — deferred. ✅ SSE wired (`web_sse_event`, `web_render_stream`).
+- ✅ Generators for model/controller/resource/migration/scaffold/api/auth/admin/mailer/job/channel/docker/ci/pwa.
+- ✅ Encrypted secrets — `secrets_encrypt`/`secrets_decrypt` (AES-256-GCM), `secrets_random_key` for fresh keys, `secrets_kdf` for PBKDF2 password derivation.
+- ✅ Security middleware (CSRF token meta + cookie, CSP/HSTS via `web_security_headers`).
+- ✅ Embedded static assets pipeline (`web_static`).
+- **Target: 1M req/s plaintext, 500k JSON, 150k DB single-query** — pending Phase 2 perf work.
 
-### Phase 2 — Production Grade (months 6-12)
+### Phase 2 — Production Grade — ⏳ MOSTLY DEFERRED
 
 Goal: top-3 perf, full DX.
 
-- glommio + io_uring runtime (Linux).
-- Per-core sharded everything.
-- simd-json integration.
-- Full ORM (joins, eager loading, scopes, callbacks).
-- Hot reload polished.
-- Channels (WebSocket abstraction, broadcast across cores).
-- Mailers.
-- Comprehensive `s g` generators.
-- Public benchmark dashboard.
+- ⏳ glommio + io_uring runtime (Linux).
+- ⏳ Per-core sharded everything.
+- ⏳ simd-json integration — current JSON path is `serde_json`.
+- ⏳ Full ORM (joins, eager loading, scopes, callbacks) — chain API works for single-table queries; joins/eager-loading/scopes pending. ✅ `web_model_paginate`/`search`/`soft_destroy`/`count`/`first`/`last`/`with` for n+1 elimination already shipped.
+- ⏳ Hot reload polished.
+- ⏳ Channels (WebSocket abstraction, broadcast across cores).
+- ⏳ Mailers — generator scaffolds the structure; runtime SMTP layer pending.
+- ✅ Comprehensive `s_web g` generators (already shipped — pulled forward from Phase 2 to Phase 1).
+- ⏳ Public benchmark dashboard.
 - **Target: 3M req/s plaintext, 1M JSON, 300k DB single-query. Top-3 TechEmpower placement.**
 
-### Phase 3 — Stretch (months 12-18)
+### Phase 3 — Stretch — ⏭️ NOT STARTED
 
 - HTTP/3 / QUIC default-on for TLS.
 - kTLS for static assets.
@@ -734,7 +736,8 @@ These get answered as we build. Not blockers, but worth flagging.
 
 ## Resolved Decisions
 
-- **Template syntax** — `#{ expr }` for HTML-escaped output, `#{{ expr }}` for raw output, `<% stryke_code %>` for control flow. Templates are stryke code with HTML interpolation, not a separate grammar. Resolved 2026-04-26.
+- **Template syntax — UPDATED** — Shipped form is ERB-style: `<%= expr %>` for HTML-escaped output, `<%== expr %>` for raw output, `<% stryke_code %>` for control flow, `<%# comment %>` for comments, `<%- -%>` for whitespace trimming. The original `#{ expr }` proposal was superseded by ERB during Phase 1 to keep visual parity with Rails templates. Templates are stryke code with HTML interpolation. Resolved 2026-05-01.
+- **Default database for dev/test** — SQLite. Postgres/MySQL accessed via runtime builtins (`web_db_open`/`web_db_query`). The ORM chain API works against any of the three; SQLite is what `s_web new` wires by default so a fresh app boots without needing a running Postgres. Resolved 2026-05-01.
 
 ## Naming
 

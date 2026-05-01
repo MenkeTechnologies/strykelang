@@ -28,48 +28,44 @@ Most "killer features" from other languages are already in Stryke:
 | Distributed dispatch | Erlang-ish | ✓ Cluster dispatch |
 | Coroutines/async | Lua/Go | ✓ Present |
 | Pattern matching | ML/Rust | ✓ Regexes + match |
-| Embeddable | Lua/Tcl | ? TBD |
+| Expect-style PTY automation | Tcl/Expect | ✓ `pty_spawn`/`expect`/`send` (perl_pty.rs) |
+| AI primitives (`ai`, MCP, agents) | None — world first | ✓ ai.rs, mcp.rs |
+| Web framework (Rails-shaped) | Rails | ✓ stryke_web |
+| Package manager (Cargo-shaped) | Cargo | ✓ pkg/ — path deps + workspaces wired |
+| Embeddable | Lua/Tcl | ⏳ TBD — host-language embedding API not yet exposed |
 | Sigils for compression | Perl | ✓ `$@%` |
 | Implicit `$_` | Perl | ✓ Plus `_` shorthand |
 | Range with step | Python-ish | ✓ BETTER — 10 types! |
 
-## The Gap: Expect-style Interactive Automation
+## The (Former) Gap: Expect-style Interactive Automation — **SHIPPED**
 
-**Source:** Tcl/Expect (1990, still unmatched)
+**Source:** Tcl/Expect (1990, still unmatched until now)
 
-**What it does:** Automate interactive CLI sessions — spawn process, wait for pattern in output, send input, repeat.
+PTY/expect runtime fully wired in `strykelang/perl_pty.rs`. Builtins: `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact`. Method-form sugar via `require "perl_pty_class.stk"`.
 
-**Use cases:**
-- SSH with password prompts
-- Interactive installers
-- CLI tools that prompt
-- Database REPLs
-- Network equipment (routers, switches)
-- MFA prompts
-- Legacy systems
-
-**Why it's missing everywhere:**
-- Python has `pexpect` — clunky
-- Ruby has `expect` gem — meh
-- Go has nothing good
-- Node has nothing good
-- Everyone just shells out to actual Expect
-
-**Proposed Stryke syntax:**
 ```stryke
-my $s = spawn "ssh user@host"
-$s ~ /password:/ >> "hunter2\n"
-$s ~ /\$/ >> "ls -la\n"
-p $s ~ /\$/
-$s.close
+my $h = pty_spawn("ssh user@host");
+pty_expect($h, qr/password:/, 30);
+pty_send($h, "hunter2\n");
+pty_expect($h, qr/\$ /, 30);
+pty_send($h, "uptime\n");
+my $out = pty_expect($h, qr/\$ /, 30);
+pty_close($h);
 
-# Or thread-style
-t spawn("ssh host") expect(/pass:/) send("pw\n") expect(/\$/) send("ls\n") expect(/\$/)
+# Combined with cluster dispatch — parallel SSH automation across N hosts
+my $cluster = cluster(["host1:8", "host2:8", "host3:8"]);
+pmap_on $cluster @hosts -> $host {
+    my $h = pty_spawn("ssh $host");
+    pty_expect($h, qr/password:/, 10);
+    pty_send($h, "$passwords{$host}\n");
+    pty_expect($h, qr/\$ /, 30);
+    pty_send($h, "apt update && apt upgrade -y\n");
+}
 ```
 
-**Enterprise value:** Huge for infra automation + cluster dispatch combo.
+**Enterprise value:** infra automation + cluster dispatch combo realized.
 
-See `docs/expect-feature-idea.md` for full design.
+See `docs/expect-feature-idea.md` for the full phase log.
 
 ## Other Features to Consider
 
@@ -175,9 +171,11 @@ Languages not yet fully mined for ideas:
 
 This brainstorm came from the question: "What killer features do other languages have that Stryke can't touch?"
 
-Answer: Not many. The main gap identified is **Expect-style interactive automation**.
+Original answer (2026-04-26): Not many. The main gap was Expect-style interactive automation — now closed.
 
-The polymorphic range system implemented tonight (10 types, forward/reverse, custom step) is itself a world-first that no other language has.
+Subsequent work (2026-04 → 2026-05) shipped the AI primitives surface (`ai`, MCP client/server, agents, vision/audio/image, multi-provider, citations, files API), the Rails-shaped web framework (`stryke_web` with full scaffold generator), and the Cargo-shaped package manager (`s install/add/remove/update/outdated/audit/vendor/run/install -g/...` plus `[workspace]` member globbing). Each one was its own "world's first AND world's fastest in category" lever.
+
+The polymorphic range system (10 types, forward/reverse, custom step) remains a world-first that no other language has.
 
 ## Guiding Principle
 

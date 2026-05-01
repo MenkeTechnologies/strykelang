@@ -23,9 +23,9 @@ use crate::value::PerlValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::os::fd::{AsRawFd, OwnedFd, RawFd};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 type Result<T> = std::result::Result<T, PerlError>;
@@ -40,6 +40,7 @@ type Result<T> = std::result::Result<T, PerlError>;
 struct PtyHandle {
     master_fd: OwnedFd,
     pid: nix::unistd::Pid,
+    #[allow(dead_code)]
     cmd: String,
     /// Bytes read from the master that haven't been consumed by an
     /// `expect` match yet. `expect` scans this for the regex; `read`
@@ -60,22 +61,14 @@ fn lookup(handle: &PerlValue, line: usize) -> Result<Arc<Mutex<PtyHandle>>> {
     let map = handle
         .as_hash_map()
         .or_else(|| handle.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| {
-            PerlError::runtime("pty: handle must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("pty: handle must be a hashref", line))?;
     let id = map
         .get("__pty_id__")
         .map(|v| v.to_int() as u64)
-        .ok_or_else(|| {
-            PerlError::runtime("pty: hashref missing `__pty_id__`", line)
-        })?;
-    registry()
-        .lock()
-        .get(&id)
-        .cloned()
-        .ok_or_else(|| {
-            PerlError::runtime(format!("pty: handle id {} not found (closed?)", id), line)
-        })
+        .ok_or_else(|| PerlError::runtime("pty: hashref missing `__pty_id__`", line))?;
+    registry().lock().get(&id).cloned().ok_or_else(|| {
+        PerlError::runtime(format!("pty: handle id {} not found (closed?)", id), line)
+    })
 }
 
 fn make_handle_value(id: u64, cmd: &str, pid: i32) -> PerlValue {
@@ -114,18 +107,15 @@ pub(crate) fn pty_spawn(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         (cmd, argv)
     };
 
-    let openpty =
-        nix::pty::openpty(None, None).map_err(|e| {
-            PerlError::runtime(format!("pty_spawn: openpty: {}", e), line)
-        })?;
+    let openpty = nix::pty::openpty(None, None)
+        .map_err(|e| PerlError::runtime(format!("pty_spawn: openpty: {}", e), line))?;
 
     // SAFETY: fork() in Rust must be careful — between fork and execvp
     // we must not call any function that takes a lock or allocates
     // beyond what we pre-built. `setsid`, `ioctl(TIOCSCTTY)`, `dup2`
     // and `execvp` are all signal-safe.
-    let result = unsafe { nix::unistd::fork() }.map_err(|e| {
-        PerlError::runtime(format!("pty_spawn: fork: {}", e), line)
-    })?;
+    let result = unsafe { nix::unistd::fork() }
+        .map_err(|e| PerlError::runtime(format!("pty_spawn: fork: {}", e), line))?;
 
     match result {
         nix::unistd::ForkResult::Child => {
@@ -157,7 +147,11 @@ pub(crate) fn pty_spawn(args: &[PerlValue], line: usize) -> Result<PerlValue> {
             let _ = nix::unistd::execvp(&cs_cmd, &cs_argv);
             // execvp only returns on failure.
             unsafe {
-                libc::write(libc::STDERR_FILENO, b"pty_spawn: execvp failed\n".as_ptr() as *const _, 25);
+                libc::write(
+                    libc::STDERR_FILENO,
+                    b"pty_spawn: execvp failed\n".as_ptr() as *const _,
+                    25,
+                );
                 libc::_exit(127);
             }
         }
@@ -175,9 +169,7 @@ pub(crate) fn pty_spawn(args: &[PerlValue], line: usize) -> Result<PerlValue> {
                 closed: false,
                 exit_status: None,
             };
-            registry()
-                .lock()
-                .insert(id, Arc::new(Mutex::new(handle)));
+            registry().lock().insert(id, Arc::new(Mutex::new(handle)));
             Ok(make_handle_value(id, &cmd_str, child.as_raw()))
         }
     }
@@ -189,20 +181,14 @@ fn set_nonblocking(fd: RawFd) -> Result<()> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0 {
         return Err(PerlError::runtime(
-            format!(
-                "pty_spawn: fcntl get: {}",
-                std::io::Error::last_os_error()
-            ),
+            format!("pty_spawn: fcntl get: {}", std::io::Error::last_os_error()),
             0,
         ));
     }
     let r = unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
     if r < 0 {
         return Err(PerlError::runtime(
-            format!(
-                "pty_spawn: fcntl set: {}",
-                std::io::Error::last_os_error()
-            ),
+            format!("pty_spawn: fcntl set: {}", std::io::Error::last_os_error()),
             0,
         ));
     }
@@ -254,14 +240,13 @@ fn shell_split(s: &str) -> Vec<String> {
 // ── pty_send ──────────────────────────────────────────────────────────
 
 pub(crate) fn pty_send(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_send: handle required", line)
-    })?, line)?;
-    let payload = args
-        .get(1)
-        .map(|v| v.to_string())
-        .unwrap_or_default();
-    let mut g = h.lock();
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_send: handle required", line))?,
+        line,
+    )?;
+    let payload = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let g = h.lock();
     if g.closed {
         return Err(PerlError::runtime("pty_send: handle is closed", line));
     }
@@ -307,13 +292,12 @@ pub(crate) fn pty_send(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // string on timeout. Undef on EOF.
 
 pub(crate) fn pty_read(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_read: handle required", line)
-    })?, line)?;
-    let timeout_secs = args
-        .get(1)
-        .map(|v| v.to_int())
-        .unwrap_or(5);
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_read: handle required", line))?,
+        line,
+    )?;
+    let timeout_secs = args.get(1).map(|v| v.to_int()).unwrap_or(5);
     let timeout = Duration::from_millis((timeout_secs.max(0) as u64) * 1000);
 
     let mut g = h.lock();
@@ -340,10 +324,13 @@ pub(crate) fn pty_read(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     }
 
     let bytes = std::mem::take(&mut g.buffer);
-    Ok(PerlValue::string(String::from_utf8_lossy(&bytes).into_owned()))
+    Ok(PerlValue::string(
+        String::from_utf8_lossy(&bytes).into_owned(),
+    ))
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum ReadyResult {
     Ready,
     Timeout,
@@ -403,7 +390,7 @@ fn drain_into_buffer(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
         }
         let err = std::io::Error::last_os_error();
         match err.raw_os_error() {
-            Some(libc::EAGAIN) | Some(libc::EWOULDBLOCK) => return got,
+            Some(e) if e == libc::EAGAIN || e == libc::EWOULDBLOCK => return got,
             Some(libc::EINTR) => continue,
             // EIO is what Linux returns when the slave side closes —
             // treat as EOF.
@@ -416,27 +403,34 @@ fn drain_into_buffer(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
 // ── pty_expect (single pattern + table form) ──────────────────────────
 
 pub(crate) fn pty_expect(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h_v = args.first().ok_or_else(|| {
-        PerlError::runtime("pty_expect: handle required", line)
-    })?;
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("pty_expect: handle required", line))?;
     let h = lookup(h_v, line)?;
-    let pattern_v = args.get(1).ok_or_else(|| {
-        PerlError::runtime("pty_expect: pattern required", line)
-    })?;
+    let pattern_v = args
+        .get(1)
+        .ok_or_else(|| PerlError::runtime("pty_expect: pattern required", line))?;
     let timeout_secs = args.get(2).map(|v| v.to_int()).unwrap_or(30);
     let re = compile_pattern(pattern_v, line)?;
 
-    expect_one(&h, &re, Duration::from_millis((timeout_secs.max(0) as u64) * 1000), line)
+    expect_one(
+        &h,
+        &re,
+        Duration::from_millis((timeout_secs.max(0) as u64) * 1000),
+        line,
+    )
 }
 
 pub(crate) fn pty_expect_table(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     // args = ($h, [+{re => qr/.../, do => sub{}}, ...], $timeout?)
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_expect_table: handle required", line)
-    })?, line)?;
-    let table_v = args.get(1).ok_or_else(|| {
-        PerlError::runtime("pty_expect_table: branch list required", line)
-    })?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_expect_table: handle required", line))?,
+        line,
+    )?;
+    let table_v = args
+        .get(1)
+        .ok_or_else(|| PerlError::runtime("pty_expect_table: branch list required", line))?;
     let timeout_secs = args.get(2).map(|v| v.to_int()).unwrap_or(30);
     let timeout = Duration::from_millis((timeout_secs.max(0) as u64) * 1000);
 
@@ -478,8 +472,7 @@ pub(crate) fn pty_expect_table(args: &[PerlValue], line: usize) -> Result<PerlVa
         }
         if let Some((start, end, action)) = hit {
             let matched_bytes = g.buffer[start..end].to_vec();
-            let matched =
-                String::from_utf8_lossy(&matched_bytes).into_owned();
+            let matched = String::from_utf8_lossy(&matched_bytes).into_owned();
             g.buffer.drain(..end);
             drop(g);
             {
@@ -537,8 +530,7 @@ fn expect_one(
         if g.closed && g.buffer.is_empty() {
             return Ok(PerlValue::UNDEF);
         }
-        let hit_range: Option<(usize, usize)> =
-            re.find(&g.buffer).map(|m| (m.start(), m.end()));
+        let hit_range: Option<(usize, usize)> = re.find(&g.buffer).map(|m| (m.start(), m.end()));
         if let Some((start, end)) = hit_range {
             let bytes = g.buffer[start..end].to_vec();
             g.buffer.drain(..end);
@@ -576,34 +568,32 @@ fn compile_pattern(v: &PerlValue, line: usize) -> Result<regex::bytes::Regex> {
     let pat = v.to_string();
     // Stryke `qr/.../` typically stringifies to `(?^:...)` Perl-style.
     // The `regex` crate doesn't grok that prefix — strip it.
-    let stripped = if let Some(inner) = pat
-        .strip_prefix("(?^")
-        .and_then(|s| {
-            // optional flags before colon: `(?^u:...)` etc.
-            let close = s.find(')')?;
-            let body_start = s.find(':')?;
-            if body_start < close {
-                Some(&s[body_start + 1..s.len() - 1])
-            } else {
-                None
-            }
-        })
-    {
+    let stripped = if let Some(inner) = pat.strip_prefix("(?^").and_then(|s| {
+        // optional flags before colon: `(?^u:...)` etc.
+        let close = s.find(')')?;
+        let body_start = s.find(':')?;
+        if body_start < close {
+            Some(&s[body_start + 1..s.len() - 1])
+        } else {
+            None
+        }
+    }) {
         inner.to_string()
     } else {
         pat
     };
-    regex::bytes::Regex::new(&stripped).map_err(|e| {
-        PerlError::runtime(format!("pty: bad regex `{}`: {}", stripped, e), line)
-    })
+    regex::bytes::Regex::new(&stripped)
+        .map_err(|e| PerlError::runtime(format!("pty: bad regex `{}`: {}", stripped, e), line))
 }
 
 // ── pty_buffer / pty_alive / pty_eof ─────────────────────────────────
 
 pub(crate) fn pty_buffer(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_buffer: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_buffer: handle required", line))?,
+        line,
+    )?;
     let g = h.lock();
     Ok(PerlValue::string(
         String::from_utf8_lossy(&g.buffer).into_owned(),
@@ -611,9 +601,11 @@ pub(crate) fn pty_buffer(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn pty_alive(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_alive: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_alive: handle required", line))?,
+        line,
+    )?;
     let g = h.lock();
     if g.closed {
         return Ok(PerlValue::integer(0));
@@ -628,19 +620,25 @@ pub(crate) fn pty_alive(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn pty_eof(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_eof: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_eof: handle required", line))?,
+        line,
+    )?;
     let g = h.lock();
-    Ok(PerlValue::integer(if g.closed && g.buffer.is_empty() { 1 } else { 0 }))
+    Ok(PerlValue::integer(if g.closed && g.buffer.is_empty() {
+        1
+    } else {
+        0
+    }))
 }
 
 // ── pty_close ─────────────────────────────────────────────────────────
 
 pub(crate) fn pty_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h_v = args.first().ok_or_else(|| {
-        PerlError::runtime("pty_close: handle required", line)
-    })?;
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("pty_close: handle required", line))?;
     let h = lookup(h_v, line)?;
     let id = handle_id(h_v).unwrap_or(0);
 
@@ -692,9 +690,11 @@ fn handle_id(v: &PerlValue) -> Option<u64> {
 // (the standard expect interact escape).
 
 pub(crate) fn pty_interact(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("pty_interact: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("pty_interact: handle required", line))?,
+        line,
+    )?;
 
     let stdin_fd = libc::STDIN_FILENO;
     let stdout_fd = libc::STDOUT_FILENO;
@@ -703,8 +703,7 @@ pub(crate) fn pty_interact(args: &[PerlValue], line: usize) -> Result<PerlValue>
     // Save tty mode + go raw if stdin is a tty.
     use nix::sys::termios::{tcgetattr, tcsetattr, SetArg};
     let saved = if unsafe { libc::isatty(stdin_fd) } != 0 {
-        let cur = tcgetattr(unsafe { std::os::fd::BorrowedFd::borrow_raw(stdin_fd) })
-            .ok();
+        let cur = tcgetattr(unsafe { std::os::fd::BorrowedFd::borrow_raw(stdin_fd) }).ok();
         if let Some(t) = cur.clone() {
             let mut raw = t.clone();
             nix::sys::termios::cfmakeraw(&mut raw);
@@ -741,7 +740,13 @@ pub(crate) fn pty_interact(args: &[PerlValue], line: usize) -> Result<PerlValue>
         }
         let max = stdin_fd.max(master_fd) + 1;
         let n = unsafe {
-            libc::select(max, &mut rfds, std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut())
+            libc::select(
+                max,
+                &mut rfds,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
         };
         if n < 0 {
             let err = std::io::Error::last_os_error();
@@ -770,7 +775,7 @@ pub(crate) fn pty_interact(args: &[PerlValue], line: usize) -> Result<PerlValue>
             if r <= 0 {
                 let err = std::io::Error::last_os_error();
                 match err.raw_os_error() {
-                    Some(libc::EAGAIN) | Some(libc::EWOULDBLOCK) => continue,
+                    Some(e) if e == libc::EAGAIN || e == libc::EWOULDBLOCK => continue,
                     _ => break 'outer,
                 }
             }
@@ -788,6 +793,201 @@ pub(crate) fn pty_interact(args: &[PerlValue], line: usize) -> Result<PerlValue>
         );
     }
     Ok(PerlValue::UNDEF)
+}
+
+// ── ANSI strip ────────────────────────────────────────────────────────
+//
+// `pty_strip_ansi($text)` removes CSI/OSC/ESC sequences so callers can
+// match against rendered text. This is a small VT100/xterm subset —
+// enough for SSH banners, prompts, and progress bars; no full terminal
+// emulator. Pure logic, no `mut self`, no allocation beyond the result.
+pub(crate) fn pty_strip_ansi(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let s = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("pty_strip_ansi: text required", line))?;
+    Ok(PerlValue::string(strip_ansi(&s)))
+}
+
+fn strip_ansi(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == 0x1b && i + 1 < bytes.len() {
+            match bytes[i + 1] {
+                b'[' => {
+                    // CSI: ESC [ ... <0x40-0x7E>
+                    i += 2;
+                    while i < bytes.len() && !(0x40..=0x7e).contains(&bytes[i]) {
+                        i += 1;
+                    }
+                    if i < bytes.len() {
+                        i += 1;
+                    }
+                }
+                b']' => {
+                    // OSC: ESC ] ... BEL or ESC \
+                    i += 2;
+                    while i < bytes.len() {
+                        if bytes[i] == 0x07 {
+                            i += 1;
+                            break;
+                        }
+                        if bytes[i] == 0x1b && i + 1 < bytes.len() && bytes[i + 1] == b'\\' {
+                            i += 2;
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                b'(' | b')' | b'*' | b'+' => {
+                    // Character set selection: ESC ( <X>
+                    i += 3.min(bytes.len() - i);
+                }
+                b'P' | b'^' | b'_' => {
+                    // DCS / PM / APC — terminated by ST (ESC \) or BEL.
+                    i += 2;
+                    while i < bytes.len() {
+                        if bytes[i] == 0x07 {
+                            i += 1;
+                            break;
+                        }
+                        if bytes[i] == 0x1b && i + 1 < bytes.len() && bytes[i + 1] == b'\\' {
+                            i += 2;
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                _ => {
+                    // Other 2-byte ESC sequences (RIS, IND, etc.)
+                    i += 2;
+                }
+            }
+        } else if bytes[i] == 0x07 || bytes[i] == 0x08 {
+            // Strip BEL and BS — they show up in expect buffers as cruft.
+            i += 1;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+// ── pty_after_eof ─────────────────────────────────────────────────────
+//
+// Async EOF reaper: spawn a background thread that polls the handle's
+// closed flag, and when it transitions to true, fires a marker so the
+// caller can react. Since stryke closures can't be safely invoked from
+// a free Rust thread (closures capture the interpreter context), we
+// take a stryke fn name as a string and the user runs the dispatch
+// loop themselves. The runtime side just records the event.
+
+static EOF_EVENTS: std::sync::OnceLock<parking_lot::Mutex<Vec<EofEvent>>> =
+    std::sync::OnceLock::new();
+
+#[derive(Clone)]
+struct EofEvent {
+    handle_id: u64,
+    callback: String,
+    fired: bool,
+}
+
+fn eof_events() -> &'static parking_lot::Mutex<Vec<EofEvent>> {
+    EOF_EVENTS.get_or_init(|| parking_lot::Mutex::new(Vec::new()))
+}
+
+/// `pty_after_eof($h, "callback_name")` — register a callback name to
+/// fire when this PTY reaches EOF. Spawns a background watcher thread
+/// that polls the handle's closed flag every 100ms. Returns 1.
+///
+/// To dispatch fired events from your script, call `pty_pending_events()`
+/// in your main loop — it returns an arrayref of `+{handle_id, callback}`
+/// pairs since the last call. This avoids the bidirectional callback
+/// dance and matches stryke's main-loop model.
+pub(crate) fn pty_after_eof(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("pty_after_eof: handle required", line))?;
+    let id = handle_id(h_v)
+        .ok_or_else(|| PerlError::runtime("pty_after_eof: hashref missing __pty_id__", line))?;
+    let callback = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "<anonymous>".to_string());
+
+    eof_events().lock().push(EofEvent {
+        handle_id: id,
+        callback: callback.clone(),
+        fired: false,
+    });
+
+    // Spawn a watcher thread that flips `fired` once the PTY closes.
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(100));
+        let still_open = registry()
+            .lock()
+            .get(&id)
+            .map(|h| {
+                let g = h.lock();
+                !g.closed
+            })
+            .unwrap_or(false);
+        if !still_open {
+            let mut events = eof_events().lock();
+            for e in events.iter_mut() {
+                if e.handle_id == id && e.callback == callback && !e.fired {
+                    e.fired = true;
+                }
+            }
+            break;
+        }
+    });
+
+    Ok(PerlValue::integer(1))
+}
+
+/// `pty_pending_events()` → arrayref of `+{handle_id, callback}` for any
+/// `pty_after_eof` registrations that have fired since the last call.
+/// Drains the fired list. Pair with a main-loop poller:
+///
+/// ```stryke
+/// while (1) {
+///     for my $e (@{ pty_pending_events() }) {
+///         my $cb = $main::dispatch->{ $e->{callback} };
+///         $cb->($e) if $cb;
+///     }
+///     sleep 1;
+/// }
+/// ```
+pub(crate) fn pty_pending_events(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let mut events = eof_events().lock();
+    let mut out: Vec<PerlValue> = Vec::new();
+    let mut keep: Vec<EofEvent> = Vec::with_capacity(events.len());
+    for e in events.drain(..) {
+        if e.fired {
+            let mut h = indexmap::IndexMap::new();
+            h.insert(
+                "handle_id".to_string(),
+                PerlValue::integer(e.handle_id as i64),
+            );
+            h.insert(
+                "callback".to_string(),
+                PerlValue::string(e.callback.clone()),
+            );
+            out.push(PerlValue::hash_ref(std::sync::Arc::new(
+                parking_lot::RwLock::new(h),
+            )));
+        } else {
+            keep.push(e);
+        }
+    }
+    *events = keep;
+    Ok(PerlValue::array_ref(std::sync::Arc::new(
+        parking_lot::RwLock::new(out),
+    )))
 }
 
 // ── PtyHandle wrapper class ───────────────────────────────────────────

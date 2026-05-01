@@ -7998,10 +7998,10 @@ impl Parser {
                         unreachable!()
                     };
                     self.advance(); // consume opening `!` or `~`
-                    // Suppress `~` as a range separator while parsing the
-                    // paired index — `$_~5~` would otherwise consume the
-                    // closing `~` as a range op. `:` is still allowed so
-                    // `$_~1:3~` (slice with `:` range index) keeps working.
+                                    // Suppress `~` as a range separator while parsing the
+                                    // paired index — `$_~5~` would otherwise consume the
+                                    // closing `~` as a range op. `:` is still allowed so
+                                    // `$_~1:3~` (slice with `:` range index) keeps working.
                     self.suppress_tilde_range = self.suppress_tilde_range.saturating_add(1);
                     let index_result = self.parse_expression();
                     self.suppress_tilde_range = self.suppress_tilde_range.saturating_sub(1);
@@ -13530,6 +13530,99 @@ impl Parser {
             | "cyber_city" | "cyber_grid" | "cyber_rain" | "matrix_rain"
             | "cyber_glitch" | "glitch_text" | "cyber_banner" | "neon_banner"
             | "cyber_circuit" | "cyber_skull" | "cyber_eye"
+            // ── AI primitives (docs/AI_PRIMITIVES.md) ─────────────────
+            | "ai" | "ai_agent" | "prompt" | "stream_prompt" | "stream_prompt_cb"
+            | "tokens_of"
+            | "ai_estimate" | "ai_cost" | "ai_history" | "ai_history_clear"
+            | "ai_cache_clear" | "ai_cache_size"
+            | "ai_mock_install" | "ai_mock_clear"
+            | "ai_config_get" | "ai_config_set" | "ai_routing_get" | "ai_routing_set"
+            | "ai_register_tool" | "ai_unregister_tool" | "ai_clear_tools" | "ai_tools_list"
+            | "ai_filter" | "ai_map" | "ai_classify" | "ai_match" | "ai_sort" | "ai_dedupe"
+            | "ai_extract" | "ai_summarize" | "ai_translate" | "ai_template"
+            | "ai_session_new" | "ai_session_send" | "ai_session_history"
+            | "ai_session_close" | "ai_session_reset"
+            | "ai_session_export" | "ai_session_import"
+            | "ai_memory_save" | "ai_memory_recall" | "ai_memory_forget"
+            | "ai_memory_count" | "ai_memory_clear"
+            | "ai_vision" | "ai_pdf" | "ai_grounded" | "ai_citations"
+            | "ai_transcribe" | "ai_speak" | "ai_image" | "ai_image_edit" | "ai_image_variation"
+            | "ai_models" | "ai_describe" | "ai_pricing" | "ai_dashboard"
+            | "ai_moderate" | "ai_chunk" | "ai_warm" | "ai_compare"
+            | "ai_last_thinking" | "ai_budget" | "ai_batch" | "ai_pmap"
+            | "ai_file_upload" | "ai_file_list" | "ai_file_get" | "ai_file_delete"
+            | "ai_file_anthropic_upload" | "ai_file_anthropic_list" | "ai_file_anthropic_delete"
+            | "vec_cosine" | "vec_search" | "vec_topk"
+            // ── AI tool specs ────────────────────────────────────────
+            | "web_search_tool" | "fetch_url_tool" | "read_file_tool" | "run_code_tool"
+            // ── MCP (Model Context Protocol) ─────────────────────────
+            | "mcp_connect" | "mcp_close" | "mcp_tools" | "mcp_call"
+            | "mcp_resource" | "mcp_resources" | "mcp_prompt" | "mcp_prompts"
+            | "mcp_attach_to_ai" | "mcp_detach_from_ai" | "mcp_attached"
+            | "mcp_server_start" | "mcp_serve_registered_tools"
+            // ── PTY / expect (docs/expect-feature-idea.md) ────────────
+            | "pty_spawn" | "pty_send" | "pty_read" | "pty_expect" | "pty_expect_table"
+            | "pty_buffer" | "pty_alive" | "pty_eof" | "pty_close" | "pty_interact"
+            | "pty_strip_ansi" | "pty_after_eof" | "pty_pending_events"
+            // ── Stress / telemetry extensions ─────────────────────────
+            | "stress_fp" | "stress_int" | "stress_cache" | "stress_branch"
+            | "stress_sort" | "stress_alloc" | "stress_mmap" | "stress_disk"
+            | "stress_iops" | "stress_net" | "stress_http" | "stress_dns"
+            | "stress_fork" | "stress_thread" | "stress_aes" | "stress_compress"
+            | "stress_regex" | "stress_json" | "stress_burst" | "stress_ramp"
+            | "stress_oscillate" | "stress_all" | "stress_temp" | "stress_thermal_zones"
+            | "stress_freq" | "stress_throttled" | "stress_load" | "stress_meminfo"
+            | "stress_cores" | "stress_arm_kill_switch" | "stress_killed"
+            | "stress_disarm_kill_switch"
+            | "stress_metrics_record" | "stress_metrics_clear" | "stress_metrics_count"
+            | "stress_metrics_export" | "stress_metrics_prometheus"
+            | "stress_metrics_json" | "stress_metrics_csv" | "stress_metrics_watch"
+            // ── Compliance / secrets ─────────────────────────────────
+            | "audit_log" | "audit_log_path"
+            | "secrets_encrypt" | "secrets_decrypt" | "secrets_random_key" | "secrets_kdf"
+            // ── Web framework (docs/WEB_FRAMEWORK.md) ─────────────────
+            | "web_route" | "web_resources" | "web_root" | "web_routes_table"
+            | "web_application_config" | "web_boot_application"
+            | "web_render" | "web_render_partial" | "web_redirect"
+            | "web_json" | "web_text" | "web_csv" | "web_markdown"
+            | "web_params" | "web_request" | "web_set_header" | "web_status"
+            | "web_before_action" | "web_after_action"
+            | "web_session" | "web_session_set" | "web_session_get" | "web_session_clear"
+            | "web_signed" | "web_unsigned"
+            | "web_cookies" | "web_set_cookie"
+            | "web_flash" | "web_flash_set" | "web_flash_get"
+            | "web_validate" | "web_permit"
+            | "web_password_hash" | "web_password_verify"
+            | "web_token_for" | "web_token_consume" | "web_csrf_meta_tag"
+            | "web_security_headers" | "web_can"
+            | "web_h" | "web_truncate" | "web_pluralize" | "web_time_ago_in_words"
+            | "web_image_tag" | "web_link_to" | "web_button_to"
+            | "web_form_with" | "web_form_close"
+            | "web_text_field" | "web_text_area" | "web_check_box"
+            | "web_stylesheet_link_tag" | "web_javascript_link_tag"
+            | "web_yield_content" | "web_content_for"
+            | "web_etag" | "web_cache_get" | "web_cache_set"
+            | "web_cache_delete" | "web_cache_clear"
+            | "web_db_connect" | "web_db_execute" | "web_db_query"
+            | "web_db_begin" | "web_db_commit" | "web_db_rollback"
+            | "web_create_table" | "web_drop_table"
+            | "web_add_column" | "web_remove_column"
+            | "web_migrate" | "web_rollback"
+            | "web_model_all" | "web_model_find" | "web_model_first" | "web_model_last"
+            | "web_model_where" | "web_model_create" | "web_model_update"
+            | "web_model_destroy" | "web_model_count" | "web_model_increment"
+            | "web_model_paginate" | "web_model_search" | "web_model_soft_destroy"
+            | "web_model_with"
+            | "web_jobs_init" | "web_job_enqueue" | "web_job_dequeue"
+            | "web_job_complete" | "web_job_fail"
+            | "web_jobs_list" | "web_jobs_stats" | "web_job_purge"
+            | "web_jsonapi_resource" | "web_jsonapi_collection" | "web_jsonapi_error"
+            | "web_bearer_token" | "web_jwt_encode" | "web_jwt_decode"
+            | "web_otp_secret" | "web_otp_generate" | "web_otp_verify"
+            | "web_uuid" | "web_now" | "web_log" | "web_rate_limit"
+            | "web_t" | "web_load_locale" | "web_openapi"
+            | "web_faker_int" | "web_faker_email" | "web_faker_name"
+            | "web_faker_sentence" | "web_faker_paragraph"
             => Some(name),
             _ => None,
         }

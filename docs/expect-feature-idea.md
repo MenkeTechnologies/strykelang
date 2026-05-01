@@ -1,4 +1,6 @@
-# Expect-style Interactive Automation for Stryke
+# Expect-style Interactive Automation for Stryke — **PHASES 1-4 SHIPPED**
+
+**Status:** PTY/expect runtime is fully wired in `strykelang/perl_pty.rs`. `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact` all dispatch through `builtins.rs`. Method-form sugar (`PtyHandle::spawn`/`->expect`/`->send`/`->branch`/`->interact`/`->close`) lives in `examples/` — `require "perl_pty_class.stk"` in your script. Phase 5 (cluster fanout polish + Windows ConPTY) remains deferred.
 
 ## The Gap
 
@@ -197,13 +199,12 @@ Run via `stryke` against a fake-login shell script (`username:` →
 `password: hunter2` → `welcome, $u`); cluster fanout via `pfor` lands
 in Phase 5.
 
-### Phase 5 (next) — cluster + Windows
+### Phase 5 — cluster + Windows — ⏳ PARTIAL
 
-- ConPTY (Windows) — separate code path, ~1 week
-- `pfor @hosts -> $h { my $p = pty_spawn("ssh $h"); ... }`
-  benchmark vs Ansible to back the "infra automation at scale" pitch
-- `pty_after_eof($h, $cb)` — async reaper for fanout
-- VTE state machine for ANSI strip (currently raw bytes only)
+- ⏳ ConPTY (Windows) — separate code path, ~1 week. Skipped per project rule (Unix-only).
+- ⏳ `pfor @hosts -> $h { my $p = pty_spawn("ssh $h"); ... }` benchmark vs Ansible — `pmap_on cluster` already works today with `pty_spawn` inside the body, so cross-host PTY automation is functional via the cluster surface; the deferred work is the dedicated benchmarking pass.
+- ✅ `pty_after_eof($h, "callback_name")` async reaper — spawns a watcher thread that flips a fired flag once the PTY closes. Drain via `pty_pending_events()` in the main loop.
+- ✅ ANSI strip (`pty_strip_ansi $text`) — VT100/xterm CSI/OSC/ESC removal. Pure logic; not a full terminal emulator but covers prompts, banners, and progress bars.
 
 ---
 

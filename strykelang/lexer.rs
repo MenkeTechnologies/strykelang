@@ -271,7 +271,7 @@ impl Lexer {
         self.advance(); // -
         self.advance(); // M
         self.advance(); // M
-        // Try `-DD` extension
+                        // Try `-DD` extension
         if self.peek() == Some('-')
             && self.peek_at(1).is_some_and(|c| c.is_ascii_digit())
             && self.peek_at(2).is_some_and(|c| c.is_ascii_digit())
@@ -290,12 +290,11 @@ impl Lexer {
         }
         // Year-month form `YYYY-MM`. Reject if followed by another `-DIGIT`
         // (would be arithmetic) — caught above by the third-digit guard.
-        Some(format!("{}-{}", year, month_str))
-            .filter(|_| {
-                // No risky trailing chars beyond what we've already consumed.
-                let _ = saved;
-                true
-            })
+        Some(format!("{}-{}", year, month_str)).filter(|_| {
+            // No risky trailing chars beyond what we've already consumed.
+            let _ = saved;
+            true
+        })
     }
 
     /// IPv6 lookahead from an arbitrary starting pos. Called from
@@ -1831,11 +1830,8 @@ impl Lexer {
                     // valid IPv6 by Rust's parser. Skip when the `::` lives
                     // inside `[…]` — that's array-slice step syntax
                     // (`@a[::2]`, `@a[::-1]`), not an address.
-                    let in_bracket_subscript = self
-                        .input
-                        .get(self.pos.saturating_sub(3))
-                        .copied()
-                        == Some('[');
+                    let in_bracket_subscript =
+                        self.input.get(self.pos.saturating_sub(3)).copied() == Some('[');
                     if !self.last_was_term && !in_bracket_subscript {
                         let saved = self.pos - 2;
                         if let Some(consumed) = self.try_consume_ipv6_tail(saved) {
