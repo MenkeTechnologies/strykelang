@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: String interpolation (format)
+
+fn Rosetta::Interpolation::interpolate($name, $age) {
+    # Stryke supports standard interpolation in double quotes
+    my $res = "Name: $name, Age: $age"
+    $res
+}
+
+fn Rosetta::Interpolation::sprintf_style($name, $age) {
+    # Stryke also supports sprintf
+    sprintf("Name: %s, Age: %d", $name, $age)
+}
+
+my $n = "Alice"
+my $a = 30
+
+assert_eq Rosetta::Interpolation::interpolate($n, $a), "Name: Alice, Age: 30", "standard interpolation"
+assert_eq Rosetta::Interpolation::sprintf_style($n, $a), "Name: Alice, Age: 30", "sprintf style"
+
+test_run

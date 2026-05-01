@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Zipf's law
+
+fn Rosetta::Zipf::solve($text, $n) {
+    my %counts
+    $text |> lc() |> split(/\W+/) |> map {
+        if (_ ne "") {
+            $counts{$_}++
+        }
+    }
+    
+    # Sort keys by their frequency in %counts (descending)
+    my @sorted = keys %counts |> sort { $counts{$_1} <=> $counts{$_0} }
+    
+    my @results
+    # Zipf's Law: Frequency * Rank approx constant
+    my $limit = min($n, len(@sorted))
+    for my $rank (1 .. $limit) {
+        my $word = $sorted[$rank - 1]
+        my $freq = $counts{$word}
+        push @results, { word => $word, freq => $freq, rank => $rank, product => $freq * $rank }
+    }
+    [@results]
+}
+
+# Test with a synthetic string
+my $text = "the " x 100 . "of " x 50 . "and " x 33 . "to " x 25 . "a " x 20
+# Top 5:
+# 1. the: 100 * 1 = 100
+# 2. of: 50 * 2 = 100
+# 3. and: 33 * 3 = 99
+# 4. to: 25 * 4 = 100
+# 5. a: 20 * 5 = 100
+
+my $res = Rosetta::Zipf::solve($text, 5)
+
+assert_eq(len(@$res), 5, "top 5 words")
+assert_eq($res->[0]->{word}, "the", "rank 1")
+assert_eq($res->[1]->{word}, "of", "rank 2")
+assert_eq($res->[2]->{word}, "and", "rank 3")
+assert_eq($res->[3]->{word}, "to", "rank 4")
+assert_eq($res->[4]->{word}, "a", "rank 5")
+
+assert_eq($res->[0]->{product}, 100, "product 1")
+assert_eq($res->[1]->{product}, 100, "product 2")
+assert_eq($res->[2]->{product}, 99, "product 3")
+assert_eq($res->[3]->{product}, 100, "product 4")
+assert_eq($res->[4]->{product}, 100, "product 5")
+
+test_run
