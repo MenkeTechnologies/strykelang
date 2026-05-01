@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Directory creation
+
+fn Rosetta::Directory::demonstrate($dir_path) {
+    # Check if directory exists
+    if (-d $dir_path) {
+        # If it exists, remove it first to start fresh for the test
+        rmdir($dir_path)
+    }
+
+    # Create the directory
+    my $success = mkdir($dir_path)
+    
+    if (!$success) {
+        die "Failed to create directory $dir_path"
+    }
+
+    # Check that it was created
+    my $exists = -d $dir_path
+    
+    # Clean up after test
+    rmdir($dir_path)
+    
+    $exists
+}
+
+my $test_dir = "/tmp/stryke_test_dir_creation"
+my $result = Rosetta::Directory::demonstrate($test_dir)
+
+assert_ok $result, "directory was successfully created and detected"
+assert_ok !(-d $test_dir), "directory was successfully cleaned up"
+
+test_run

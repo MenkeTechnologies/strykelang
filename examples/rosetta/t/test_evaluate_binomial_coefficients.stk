@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Evaluate binomial coefficients
+
+fn Rosetta::Binomial::evaluate($n, $k) {
+    if ($k < 0 || $k > $n) {
+        return 0
+    }
+    if ($k == 0 || $k == $n) {
+        return 1
+    }
+    if ($k > $n / 2) {
+        $k = $n - $k
+    }
+    
+    my $res = 1
+    for (my $i = 1; $i <= $k; $i++) {
+        $res = $res * ($n - $i + 1) / $i
+    }
+    $res
+}
+
+# Testing C(5, 3) = 10
+assert_eq Rosetta::Binomial::evaluate(5, 3), 10, "C(5, 3) = 10"
+
+# Testing boundary conditions
+assert_eq Rosetta::Binomial::evaluate(5, 0), 1, "C(5, 0) = 1"
+assert_eq Rosetta::Binomial::evaluate(5, 5), 1, "C(5, 5) = 1"
+assert_eq Rosetta::Binomial::evaluate(5, -1), 0, "C(5, -1) = 0"
+assert_eq Rosetta::Binomial::evaluate(5, 6), 0, "C(5, 6) = 0"
+
+# Testing a larger value C(10, 5) = 252
+assert_eq Rosetta::Binomial::evaluate(10, 5), 252, "C(10, 5) = 252"
+
+# Piped mapping over a row of Pascal's triangle (n=4: 1 4 6 4 1)
+my @row4 = 0:4 |> map { Rosetta::Binomial::evaluate(4, _) }
+assert_eq join(" ", @row4), "1 4 6 4 1", "Row 4 of Pascals triangle"
+
+test_run

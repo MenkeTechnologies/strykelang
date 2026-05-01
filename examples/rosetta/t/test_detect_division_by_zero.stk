@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Detect division by zero
+
+fn Rosetta::Division::detect($numerator, $denominator) {
+    if ($denominator == 0) {
+        return "Division by zero detected"
+    } else {
+        return $numerator / $denominator
+    }
+}
+
+# In Stryke, dividing by zero throws an exception.
+# We can use an eval block to catch it idiomatically.
+fn Rosetta::Division::idiomatic_detect($numerator, $denominator) {
+    my $res = eval { $numerator / $denominator }
+    if ($@) {
+        if ($@ =~ /Illegal division by zero/) {
+            return "Exception caught"
+        }
+        return "Unknown error"
+    } else {
+        return $res
+    }
+}
+
+# Test standard check
+assert_eq Rosetta::Division::detect(10, 2), 5, "10 / 2 = 5"
+assert_eq Rosetta::Division::detect(10, 0), "Division by zero detected", "10 / 0"
+
+# Test idiomatic check with eval
+assert_eq Rosetta::Division::idiomatic_detect(10, 2), 5, "idiomatic 10 / 2 = 5"
+assert_eq Rosetta::Division::idiomatic_detect(10, 0), "Exception caught", "idiomatic 10 / 0"
+assert_eq Rosetta::Division::idiomatic_detect(0, 0), "Exception caught", "idiomatic 0 / 0"
+
+test_run

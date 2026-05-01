@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find common directory path
+
+fn Rosetta::Path::common_directory_path(@paths) {
+    if (len(@paths) == 0) { return "" }
+    
+    # Split each path into components
+    my @split_paths = @paths |> map { [ _ |> split(/\//) ] }
+    
+    # Take the first path as a reference
+    my $ref_arr = $split_paths[0]
+    my @common
+    
+    for (my $i = 0; $i < len(@$ref_arr); $i++) {
+        my $comp = $ref_arr->[$i]
+        my $all_match = 1
+        
+        for (my $j = 1; $j < len(@split_paths); $j++) {
+            my $current = $split_paths[$j]
+            if ($i >= len(@$current) || $current->[$i] ne $comp) {
+                $all_match = 0
+                last
+            }
+        }
+        
+        if ($all_match) {
+            push @common, $comp
+        } else {
+            last
+        }
+    }
+    
+    join("/", @common)
+}
+
+my @p1 = (
+    "/home/user1/tmp/coverage/test",
+    "/home/user1/tmp/covert/operator",
+    "/home/user1/tmp/cops/resura"
+)
+assert_eq Rosetta::Path::common_directory_path(@p1), "/home/user1/tmp", "common path 1"
+
+my @p2 = (
+    "/usr/local/bin",
+    "/usr/local/lib",
+    "/usr/local/include"
+)
+assert_eq Rosetta::Path::common_directory_path(@p2), "/usr/local", "common path 2"
+
+my @p3 = (
+    "/a/b/c",
+    "/a/b/d",
+    "/a/b/e"
+)
+assert_eq Rosetta::Path::common_directory_path(@p3), "/a/b", "common path 3"
+
+test_run

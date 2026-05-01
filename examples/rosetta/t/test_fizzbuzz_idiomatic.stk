@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FizzBuzz (Idiomatic)
+
+fn Rosetta::FizzBuzz::idiomatic($n) {
+    1 : $n |> map {
+        (_ % 15 == 0) ? "FizzBuzz" :
+        (_ % 3 == 0)  ? "Fizz" :
+        (_ % 5 == 0)  ? "Buzz" :
+        _
+    }
+}
+
+my @res = Rosetta::FizzBuzz::idiomatic(15)
+
+assert_eq @res[0], 1, "1"
+assert_eq @res[2], "Fizz", "3 is Fizz"
+assert_eq @res[4], "Buzz", "5 is Buzz"
+assert_eq @res[14], "FizzBuzz", "15 is FizzBuzz"
+
+test_run

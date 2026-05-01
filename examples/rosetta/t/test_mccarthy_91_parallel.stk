@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: McCarthy 91 function (parallel version)
+
+fn Rosetta::McCarthy91::compute($n) {
+    if ($n > 100) {
+        return $n - 10
+    } else {
+        return Rosetta::McCarthy91::compute(Rosetta::McCarthy91::compute($n + 11))
+    }
+}
+
+# Test cases from 0 to 100 in parallel
+0 : 100 |> pmap { Rosetta::McCarthy91::compute(_) } |> map {
+    assert_eq(_, 91, "parallel M == 91")
+}
+
+# Test cases above 100 in parallel
+101 : 120 |> pmap { { n => _, res => Rosetta::McCarthy91::compute(_) } } |> map {
+    assert_eq(_->{res}, _->{n} - 10, "parallel M above 100")
+}
+
+test_run

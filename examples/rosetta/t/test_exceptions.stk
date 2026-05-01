@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Exceptions
+
+fn Rosetta::Exceptions::throw_and_catch() {
+    my $caught = 0
+    
+    # Try block equivalent is eval
+    eval {
+        # Throw equivalent is die
+        die "This is a custom exception"
+    }
+    
+    # Catch block equivalent is checking $@
+    if ($@) {
+        $caught = 1
+        assert_ok $@ =~ /This is a custom exception/, "caught specific message"
+    }
+    
+    $caught
+}
+
+fn Rosetta::Exceptions::no_exception() {
+    my $caught = 0
+    
+    eval {
+        my $x = 1 + 1
+    }
+    
+    if ($@) {
+        $caught = 1
+    }
+    
+    $caught
+}
+
+my $did_catch = Rosetta::Exceptions::throw_and_catch()
+assert_eq $did_catch, 1, "successfully caught the exception"
+
+my $did_catch_none = Rosetta::Exceptions::no_exception()
+assert_eq $did_catch_none, 0, "did not catch anything when no error occurred"
+
+test_run
