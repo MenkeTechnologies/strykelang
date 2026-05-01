@@ -317,13 +317,438 @@ Stops compromised packages from quietly running up an LLM bill.
 
 ## Implementation Phases
 
-### Phase 0 — Walking Skeleton (months 0-2)
+### Phase 0 — Walking Skeleton — **SHIPPED**
 
-- `prompt` and `stream_prompt` builtins, single-shot Anthropic calls.
-- `embed` builtin with sqlite-vec backend for local vector search.
-- TOML config for provider/model/key.
-- Result cache (in-memory, file-backed).
-- Cost tracking.
+Lives in `strykelang/ai.rs`. Wired through `builtins.rs`. Builtins:
+
+| Name | Status |
+|---|---|
+| `ai($prompt, opts...)` / `prompt($prompt, opts...)` | Single-shot, no tools yet (agent loop is Phase 1) |
+| `stream_prompt($prompt, opts)` | Returns full text in v0; real `Stream<Str>` is Phase 5 |
+| `chat($messages, opts...)` | Message-list with role=system/user/assistant |
+| `embed($text)` / `embed(@texts)` | Voyage AI default, OpenAI alt |
+| `tokens_of($text)` | char/4 heuristic (good-enough pre-flight) |
+| `ai_cost()` | `+{usd, input_tokens, output_tokens, embed_tokens, cache_hits, cache_misses}` |
+| `ai_cache_clear()` / `ai_cache_size()` | In-process result cache, sha256-keyed on `(provider, model, system, prompt)` |
+| `ai_mock_install($pattern, $response)` / `ai_mock_clear()` | Regex-keyed mock interceptor; first-match-wins |
+| `ai_config_get($key)` / `ai_config_set($key, $val)` | Read/write of the loaded `[ai]` table |
+| `STRYKE_AI_MODE=mock-only` | Errors any unmocked call — for `s test` |
+
+Providers actually wired: **Anthropic**, **OpenAI** (Messages + Chat
+Completions), **Voyage** + **OpenAI** for embeddings. TOML config from
+`./stryke.toml`; falls back to env vars. Pricing table embedded for
+the 4 major model families so `ai_cost()` is meaningful without a
+provider invoice round-trip.
+
+What's intentionally NOT in Phase 0:
+- Tool / agent loop (`tool fn` keyword needs parser work — Phase 1)
+- MCP client / server (Phase 2)
+- Collection builtins (`ai_filter`, `ai_map`, …) (Phase 3)
+- llama.cpp local backend (Phase 4)
+- Real `Stream<Str>` streaming (Phase 5)
+- Auto-tool-attachment of MCP servers (Phase 2 prerequisite)
+
+### Phase 1 — Agent loop — **SHIPPED (without `tool fn` keyword)**
+
+The agent loop runtime is in place. Without parser work for the `tool
+fn` declaration, tools are passed explicitly as a hashref list:
+
+```stryke
+my $report = ai "research X across our docs and Hacker News",
+    tools => [
+        +{ name        => "kb_search",
+           description => "Search internal knowledge base",
+           parameters  => +{ q => "string", limit => "int" },
+           run         => sub { search_kb($_[0]->{q}, $_[0]->{limit}) } },
+        +{ name        => "fetch_url",
+           description => "Fetch a URL and return text",
+           parameters  => +{ url => "string" },
+           run         => sub { fetch($_[0]->{url}) } },
+    ],
+    max_turns => 10,
+    system    => "You are a senior engineer."
+```
+
+Bare `ai $prompt` keeps the Phase 0 single-shot semantics; `ai $prompt,
+tools => [...]` auto-routes to the agent loop. Both Anthropic
+(`tool_use`/`tool_result`) and OpenAI (`tool_calls`/`tool` role)
+protocol shapes are wired. Mock mode short-circuits the loop and
+returns a mocked final string for tests.
+
+`tool fn name(...) -> Type "doc" { ... }` (auto-schema from signature
++ docstring, auto-registration of all in-scope tools) is the parser
+extension — still Phase 1 to-do.
+
+### Tool registry (Phase 1 sugar) — **SHIPPED**
+
+For people who don't want to wait on the `tool fn` parser keyword,
+register tools at runtime:
+
+```stryke
+ai_register_tool(
+    "weather", "Get weather for a city",
+    +{ city => "string" },
+    sub { fetch("https://api.weather.com/" . uri_encode($_[0]->{city})) }
+);
+
+# Bare `ai($prompt)` now auto-routes to the agent loop and sees this tool:
+my $r = ai("what's the weather in SF?");
+```
+
+| Builtin | Behavior |
+|---|---|
+| `ai_register_tool($name, $desc, +{params}, sub { ... })` | Add an always-on tool; idempotent re-register |
+| `ai_unregister_tool($name)` | Remove |
+| `ai_clear_tools()` | Wipe registry |
+| `ai_tools_list()` | Inspect what's registered |
+
+Bare `ai($prompt)` auto-routes to the agent loop when registered tools
+are non-empty OR `tools => [...]` is passed OR `auto_mcp => 1` (default)
+and an MCP server is attached.
+
+### Memory / RAG — **SHIPPED**
+
+Sqlite-backed embedding store. Save text + embedding, recall by cosine
+similarity. In-memory by default; persistent with `path => "memory.db"`.
+
+| Builtin | Behavior |
+|---|---|
+| `ai_memory_save("id", "content", $metadata?, $path?)` | Embed + insert (idempotent on id) |
+| `ai_memory_recall("query", top_k => N)` | Re-embed query, return top-k by cosine |
+| `ai_memory_forget("id")` / `ai_memory_count()` / `ai_memory_clear()` | Maintenance |
+
+Mock-mode hash-embeds deterministically so tests round-trip without
+the network. Verified: 4 docs saved, query "fast systems-level" picks
+"Stryke is the fastest Perl-5 interpreter" at score 0.7679 over the
+other three.
+
+### Streaming with `on_chunk` — **SHIPPED**
+
+Real Anthropic SSE parsing. Pass `on_chunk => sub { … }` and the
+callback fires once per delta chunk; the full text is also returned at
+the end:
+
+```stryke
+my $state = +{ buf => "" };
+my $full = stream_prompt("write a haiku",
+    on_chunk => sub { $state->{buf} .= $_[0]; print $_[0] }
+);
+```
+
+Stryke gotcha: closures capture *scalars* by value. Mutate state
+through a hashref/arrayref (heap-shared) so the outer scope sees it.
+String concat on `my $buf` inside the closure won't propagate; pushing
+into `@{$state->{chunks}}` will.
+
+### Structured output — **SHIPPED**
+
+```stryke
+my $r = ai("Extract user info from: Alice, 30, active",
+    schema => +{ name => "string", age => "int", active => "bool" });
+# $r is a hashref: { name => "Alice", age => 30, active => 1 }
+```
+
+`ai($p, schema => +{...})` auto-routes to `ai_extract`. The schema hashref
+maps field names to coercion types (`string`/`int`/`number`/`bool`/`array`/
+`object`). Builds a JSON-only prompt, walks the response for the first
+balanced `{...}`, parses, validates + coerces to the schema. Returns a
+real stryke hashref ready for field access.
+
+### Anthropic prompt caching — **SHIPPED**
+
+```stryke
+my $r = ai("question", system => $long_system_prompt, cache_control => 1);
+# Subsequent calls with the same system block read from cache at ~10%
+# of normal input cost.
+```
+
+The runtime sets `cache_control: { type: "ephemeral" }` on the system
+block when `cache_control => 1` is set. `ai_cost()` now also returns
+`cache_creation_tokens` / `cache_read_tokens` so spend is accurate
+(creation +25%, reads -90% vs normal input).
+
+### Extended thinking — **SHIPPED**
+
+```stryke
+my $answer = ai("hard math problem",
+    thinking => 1, thinking_budget => 8000);
+my $reasoning = ai_last_thinking();   # full thinking trace
+```
+
+When `thinking => 1` is set the request includes the Anthropic
+extended-thinking block; the model's reasoning is captured separately
+from the answer and surfaced via `ai_last_thinking()`.
+
+### PDF / document input — **SHIPPED**
+
+```stryke
+my $summary = ai("summarize this contract", pdf => "/path/to/contract.pdf");
+my $extract = ai("extract terms",        pdf => "https://example.com/doc.pdf");
+my $direct  = ai("read",                  pdf => $raw_bytes);
+```
+
+`ai($p, pdf => $path|$url|$bytes)` auto-routes to `ai_pdf`, which builds
+an Anthropic `document` content block (base64-inlined PDF, up to
+32MB / 100 pages).
+
+### Scoped budget — **SHIPPED**
+
+```stryke
+ai_budget(0.50, sub {
+    my @summaries = ai_map(\@long_docs, "summarize");
+    my @ranked = ai_sort(\@summaries, "by relevance to backend engineering");
+    return \@ranked;
+});
+# Errors if total spend during the block exceeds $0.50.
+```
+
+Per-block USD cap. Enforces by snapshotting current cost on entry,
+raising the global ceiling to `snapshot + cap` for the duration, and
+checking spend on exit. Restores the prior global cap unconditionally.
+
+### Convenience wrappers — **SHIPPED**
+
+| Builtin | Behavior |
+|---|---|
+| `ai_summarize($text, words => 50)` | Concise summary at target length |
+| `ai_translate($text, to => "Spanish")` | Translation |
+| `ai_extract($prompt, schema => +{...})` | Structured JSON output (also auto-routed via `ai($p, schema => ...)`) |
+
+### Built-in tools — **SHIPPED**
+
+Drop-in tool specs ready for the agent loop, no `run` coderef needed
+because they route through a native registry:
+
+```stryke
+my $r = ai("research the latest stryke release notes",
+    tools => [
+        web_search_tool(),    # uses BRAVE_SEARCH_API_KEY if set, else DDG
+        fetch_url_tool(),     # HTTP GET, returns body text
+        read_file_tool(),     # local FS read
+        run_code_tool(),      # python3 subprocess, 10s timeout
+    ]);
+```
+
+The `run_code_tool` shells to `python3` so a Python interpreter must
+be on the path; works fine on every modern Linux/macOS dev box.
+
+| Tool | Implementation |
+|---|---|
+| `web_search_tool` | Brave Search API (auth via `$BRAVE_SEARCH_API_KEY`) → DuckDuckGo HTML scrape fallback |
+| `fetch_url_tool` | `ureq` GET with 30s timeout |
+| `read_file_tool` | `std::fs::read_to_string` |
+| `run_code_tool` | `python3` subprocess, 10s timeout, returns stdout+stderr |
+
+### Conversational sessions — **SHIPPED**
+
+```stryke
+my $s = ai_session_new(system => "Be terse", model => "claude-haiku-4-5");
+ai_session_send($s, "what's 2+2?");
+ai_session_send($s, "and times 3?");
+my $hist = ai_session_history($s);   # arrayref of {role, content}
+ai_session_reset($s);                 # clear history but keep config
+ai_session_close($s);                 # drop session
+```
+
+Multi-turn chat that auto-tracks role=user / role=assistant turns.
+Provider/model picked at session creation, can be overridden per
+`send` call.
+
+### Prompt templates — **SHIPPED**
+
+```stryke
+my $p = ai_template("hi {name}, age {age}", name => "Alice", age => 30);
+# → "hi Alice, age 30"
+
+ai_template("escaped {{lit}}, real {key}", key => "yes");
+# → "{lit}}, real yes"  ({{ → literal {, missing keys pass through)
+```
+
+Pure string substitution. No code execution. Use as the prompt arg to
+`ai`/`prompt`/`chat`.
+
+### Retry / backoff — **SHIPPED**
+
+Anthropic calls (single-shot AND streaming AND vision AND PDF) auto-
+retry on `429` / `500` / `502` / `503` / `504` with exponential
+backoff (1s → 2s → 4s → 8s → 16s, capped at 30s). 4 attempts total
+before giving up. Transport errors (network blips) also retry.
+
+### Routing actually honored — **SHIPPED**
+
+`ai_routing_set("embed", "openai")` now actually switches embedding
+calls to OpenAI's `text-embedding-*` endpoint instead of the default
+Voyage. The route table is consulted before falling back to the
+`[ai.embed]` TOML config or the `embed_provider` default.
+
+### CLI — **SHIPPED**
+
+```bash
+stryke ai "summarize the linux kernel in 50 words"
+echo "rough idea: ..." | stryke ai --model claude-haiku-4-5 --system "Be concise"
+stryke ai "long thinking task" --stream
+stryke ai "structured" --json    # emit {response, usd, input_tokens, output_tokens}
+```
+
+`stryke ai PROMPT` reads from argv or stdin, calls the configured
+model, prints to stdout. Honors `--model`, `--system`, `--stream`,
+`--json`. Useful as a UNIX filter or one-shot from terminal.
+
+### Vision (multimodal images) — **SHIPPED**
+
+```stryke
+my $caption = ai("describe this image", image => "/path/to/photo.jpg");
+my $alt = ai("describe", image => "https://example.com/img.png");
+my $hex = ai("describe", image => $raw_bytes);
+```
+
+Routes to `ai_vision`, which builds an Anthropic content array with a
+base64-inlined image block (URLs fetched first, paths read, raw bytes
+encoded directly). Mime-type guessed from extension. Cost tracking
+runs through the same path as text calls.
+
+### MCP server (programmatic) — **SHIPPED**
+
+The declarative `mcp_server "name" { ... }` parser block is still
+deferred (needs the same parser work as `tool fn`), but the runtime is
+fully wired. Stand up a server with one builtin call:
+
+```stryke
+mcp_server_start("stryke-srv", +{
+    tools => [
+        +{ name => "echo", description => "Echo input",
+           parameters => +{ text => "string" },
+           run => sub { $_[0]->{text} } },
+        +{ name => "uppercase", description => "Uppercase text",
+           parameters => +{ text => "string" },
+           run => sub { uc($_[0]->{text}) } },
+    ]
+});
+```
+
+Runs a stdio JSON-RPC loop on stdin/stdout, exposes
+`initialize` / `tools/list` / `tools/call`. Verified end-to-end with
+a stryke client connecting to a stryke server: tools enumerate, calls
+round-trip, results return. The same binary that runs your stryke
+script can now BE an MCP server — pair with `s_web build` to ship a
+self-contained MCP server binary.
+
+### MCP HTTP transport — **SHIPPED**
+
+```stryke
+my $gh = mcp_connect("https://api.github.com/mcp");
+my $tavily = mcp_connect("https://mcp.tavily.com/mcp");
+```
+
+Speaks the streamable-HTTP MCP transport: POST per request, accept
+`application/json` OR `text/event-stream` (SSE) responses, carry
+`mcp-session-id` across calls when the server sets one. Reads
+bearer auth from `$MCP_BEARER_TOKEN` if set.
+
+### OpenAI streaming — **SHIPPED**
+
+`stream_prompt($p, on_chunk => sub { ... }, provider => "openai")`
+now parses OpenAI's SSE delta format too. Same callback contract as
+the Anthropic path — fires once per text-delta chunk.
+
+### Anthropic batch API — **SHIPPED**
+
+```stryke
+my $results = ai_batch(\@prompts,
+    model    => "claude-haiku-4-5",
+    system   => "Be terse",
+    poll_secs    => 5,
+    max_wait_secs => 1800);
+# 50% of normal cost; trades a few minutes of wall time.
+```
+
+Submits the batch, polls `processing_status` until `ended`, downloads
+JSONL results, reorders by `custom_id`. Cost tracking applies the
+~50% batch discount automatically. Falls back to sequential calls if
+the batch endpoint errors (region/account-gated) or
+`STRYKE_AI_BATCH=sync` is set.
+
+### Cluster fanout — **SHIPPED**
+
+```stryke
+my $cluster = cluster(["host1:8", "host2:8"]);
+my @summaries = @{ ai_pmap(\@docs, "summarize",
+    cluster => $cluster, model => "claude-haiku-4-5") };
+```
+
+Splits items into N shards (N = cluster slot count), runs `ai_map` on
+each shard via the existing `pmap_on` plumbing, concatenates results
+in order. Without a `cluster => ...` arg, falls back to a single local
+`ai_map` call (one batched LLM request).
+
+### Phase 2 — MCP client — **SHIPPED (server side still pending)**
+
+Lives in `strykelang/mcp.rs`. Speaks JSON-RPC line-delimited over
+stdio. Builtins:
+
+| Builtin | Behavior |
+|---|---|
+| `mcp_connect("stdio:CMD ARGS...", $name?)` | Spawn subprocess, run `initialize` + `notifications/initialized` handshake, return handle |
+| `mcp_tools($h)` / `mcp_resources($h)` / `mcp_prompts($h)` | Cached `*/list` results |
+| `mcp_call($h, $name, +{...args})` | `tools/call` |
+| `mcp_resource($h, $uri)` | `resources/read` |
+| `mcp_prompt($h, $name, +{...args})` | `prompts/get` |
+| `mcp_close($h)` | Kill subprocess, drop registry slot |
+| `mcp_attach_to_ai($h)` / `mcp_detach_from_ai($h)` | Mark a handle as auto-attachable so the agent loop can pull its tools |
+| `mcp_attached()` | List of currently-attached handles |
+
+Smoke-tested against a 100-line Python fake-server implementing
+`initialize`, `tools/list`, `tools/call`, `resources/list`,
+`resources/read`, `prompts/list`, `prompts/get`. Handshake +
+caching + every method round-trip works.
+
+Transports NOT yet wired:
+- `ws://...` (WebSocket — needs a tungstenite dep)
+- `http://...` (streaming HTTP — needs SSE)
+
+The **server** side — declarative `mcp_server "name" { tool foo … }`
+DSL — needs the same parser extension as `tool fn`. Not in this pass.
+
+### Phase 3 — Collection builtins — **SHIPPED**
+
+Each one builds a single batched prompt asking the model for a JSON
+array of judgments, then parses the response. One LLM call per
+collection, not N.
+
+| Builtin | Shape | Returns |
+|---|---|---|
+| `ai_filter(\@items, "criterion")` | Boolean per item | Filtered arrayref |
+| `ai_map(\@items, "instruction")` | String per item | Mapped arrayref |
+| `ai_classify(\@items, "label hint", into => [\"a\",\"b\"])` | Label per item | Arrayref of labels |
+| `ai_match($item, "criterion")` | Single boolean | 0 or 1 |
+| `ai_sort(\@items, "criterion")` | Index array (best-first) | Reordered arrayref |
+| `ai_dedupe(\@items, "hint")` | Group of indexes per cluster | Deduped arrayref |
+
+JSON-array extraction is forgiving: walks the response looking for the
+first balanced `[ ... ]` so the model can wrap output in prose without
+breaking the parse.
+
+### Retrieval / vector ops — **SHIPPED**
+
+| Builtin | Returns |
+|---|---|
+| `vec_cosine(\@a, \@b)` | Cosine similarity in `[-1, 1]` |
+| `vec_search(\@query, \@candidates, top_k => N)` | Arrayref of `+{idx, score}`, ranked best-first |
+| `vec_topk(\@scores, $k)` | Indexes of top-k scalars |
+
+Verified on the unit basis: `cos([1,0,0],[1,0,0])=1.0000`,
+`cos([1,0,0],[0,1,0])=0.0000`, `cos([1,0,0],[-1,0,0])=-1.0000`. `vec_search`
+ranks `[1,0,0]` against four candidates as `1 (id), 2 (45°), 0 (orth)`
+with scores `1.000, 0.707, 0.000`.
+
+### Cost / routing / history — **SHIPPED**
+
+| Builtin | Behavior |
+|---|---|
+| `ai_estimate($prompt, model => "...", out_tokens => N)` | Pre-flight USD estimate from token heuristic + price table |
+| `ai_routing_get($op)` / `ai_routing_set($op, $provider)` | Per-operation provider override (advisory; embed honors it) |
+| `ai_history()` | Arrayref of last 100 calls — `+{provider, model, prompt, response_chars, input_tokens, output_tokens, usd, cache_hit, unix_time}` |
+| `ai_history_clear()` | Reset history |
 
 ### Phase 1 — Tools and Agents (months 2-4)
 
