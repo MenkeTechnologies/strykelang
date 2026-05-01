@@ -1598,18 +1598,22 @@ ep 0xFF:0xF0:-3                # 0xFF, 0xFC, 0xF9, … (uppercase preserved)
 ep 0x1:0x100:0x40              # 0x001, 0x041, 0x081, 0x0c1 (width 3)
 say 0xFF + 1                   # 256 — outside range, still integer
 </code></pre>
-        <p><strong>IPv6</strong> — full and zero-compressed forms. Because <code>:</code> would collide with the standard range op, IPv6 ranges use the dedicated <code>!!!</code> separator (see below).</p>
+        <p><strong>IPv6</strong> — full and zero-compressed forms. Because <code>:</code> would collide with the standard range op, IPv6 ranges use the universal <code>~</code> separator (see below). Note: <code>~</code> works as a range separator for ALL types, not just IPv6 — it's just mandatory for IPv6.</p>
       </article>
-      <article class="doc-entry" id="doc-bang-bang-bang">
-        <h3><a class="doc-anchor" href="#doc-bang-bang-bang">#</a> <code>!!!</code> — IPv6 range separator</h3>
-        <p>IPv6 addresses use <code>:</code> internally; reusing <code>:</code> as the range separator would be ambiguous. The <code>!!!</code> token plays the role of <code>:</code> in range expressions only — start, end, and optional step are separated by <code>!!!</code> instead. The lexer accepts IPv6 in three prefix forms: digit-leading (<code>2001::1</code>), hex-letter-leading (<code>fe80::1</code>), and zero-compressed (<code>::1</code>). Validity is decided by Rust's <code>std::net::Ipv6Addr</code> parser.</p>
-        <pre><code class="lang-perl">ep 2001::1!!!2001::5!!!1       # 2001::1 .. 2001::5
-ep fe80::ff!!!fe80::fc!!!-1    # reverse iteration
-ep ::1!!!::5!!!1               # zero-compressed prefix
-ep 2001:db8::fffe!!!2001:db8::1:1!!!1
+      <article class="doc-entry" id="doc-tilde-range">
+        <h3><a class="doc-anchor" href="#doc-tilde-range">#</a> <code>~</code> — universal range separator</h3>
+        <p>Single <code>~</code> works as a range separator for every supported range type, alongside the original <code>:</code> form. It's the only viable separator for IPv6 since IPv6 addresses use <code>:</code> internally and would collide with the <code>:</code> range op. The lexer accepts IPv6 in three prefix forms: digit-leading (<code>2001::1</code>), hex-letter-leading (<code>fe80::1</code>), and zero-compressed (<code>::1</code>). Validity is decided by Rust's <code>std::net::Ipv6Addr</code> parser.</p>
+        <pre><code class="lang-perl">ep 1~5~1                       # plain numeric
+ep 192.168.1.1~192.168.1.5~1   # IPv4
+ep 0x00~0x10~1                 # hex (preserves prefix/width/case)
+ep 2022-01-01~2022-01-05~1     # ISO date
+ep 2001::1~2001::5~1           # IPv6 (must use ~)
+ep fe80::ff~fe80::fc~-1        # IPv6 reverse iteration
+ep ::1~::5~1                   # IPv6 zero-compressed prefix
+ep 2001:db8::fffe~2001:db8::1:1~1
 # carries across the :: compression boundary cleanly
 </code></pre>
-        <p>Iteration is u128 step arithmetic; both directions are supported and a wrong-sign step (start past end with positive step, or before end with negative step) yields the empty list.</p>
+        <p>Iteration is u128 step arithmetic for IPv6; both directions are supported and a wrong-sign step (start past end with positive step, or before end with negative step) yields the empty list. <code>~</code> is suppressed as a range separator inside paired <code>~…~</code> char-index/slice subscripts (<code>$x~5~</code>, <code>$_~1:3~</code>) so closing delimiters don't get eaten. <code>!</code> is reserved for the paired char-index syntax (<code>$x!N!</code>) and was never a viable choice.</p>
       </article>
       <article class="doc-entry" id="doc-outer-topic">
         <h3><a class="doc-anchor" href="#doc-outer-topic">#</a> <code>_&lt;</code> — outer topic chain</h3>

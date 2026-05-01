@@ -4935,11 +4935,11 @@ fn range_year_month_step_months() {
 }
 
 #[test]
-fn range_ipv6_with_triple_bang_separator() {
+fn range_ipv6_with_tilde_separator() {
     // IPv6's literal `:` would collide with the standard `:` range op — the
-    // dedicated `!!!` separator dodges it. Compressed form (`::`) is fine.
+    // universal `~` separator dodges it. Compressed form (`::`) is fine.
     assert_eq!(
-        rs(r#"join ",", (2001::1!!!2001::4!!!1)"#),
+        rs(r#"join ",", (2001::1~2001::4~1)"#),
         "2001::1,2001::2,2001::3,2001::4"
     );
 }
@@ -4947,7 +4947,7 @@ fn range_ipv6_with_triple_bang_separator() {
 #[test]
 fn range_ipv6_reverse_step() {
     assert_eq!(
-        rs(r#"join ",", (2001::ff!!!2001::fc!!!-1)"#),
+        rs(r#"join ",", (2001::ff~2001::fc~-1)"#),
         "2001::ff,2001::fe,2001::fd,2001::fc"
     );
 }
@@ -4957,7 +4957,7 @@ fn range_ipv6_loopback_zero_compressed_prefix() {
     // `::1` form — IPv6 begins with the zero-compressed `::`. Lexer's `:`
     // arm picks it up when not in a term position and not inside `[…]`.
     assert_eq!(
-        rs(r#"join ",", (::1!!!::5!!!1)"#),
+        rs(r#"join ",", (::1~::5~1)"#),
         "::1,::2,::3,::4,::5"
     );
 }
@@ -4968,7 +4968,7 @@ fn range_ipv6_hex_letter_prefix() {
     // path, not the number path. `last_was_term` flag is reset before the
     // identifier so the `::` branch can pick it up.
     assert_eq!(
-        rs(r#"join ",", (fe80::1!!!fe80::4!!!1)"#),
+        rs(r#"join ",", (fe80::1~fe80::4~1)"#),
         "fe80::1,fe80::2,fe80::3,fe80::4"
     );
 }
@@ -4978,7 +4978,7 @@ fn range_ipv6_carries_over_compression_boundary() {
     // 2001:db8::fffe + 1 → 2001:db8::ffff + 1 → 2001:db8::1:0 — the
     // u128 step iteration carries cleanly across the `::` zero-compression.
     assert_eq!(
-        rs(r#"join " ", (2001:db8::fffe!!!2001:db8::1:1!!!1)"#),
+        rs(r#"join " ", (2001:db8::fffe~2001:db8::1:1~1)"#),
         "2001:db8::fffe 2001:db8::ffff 2001:db8::1:0 2001:db8::1:1"
     );
 }
@@ -4986,7 +4986,7 @@ fn range_ipv6_carries_over_compression_boundary() {
 #[test]
 fn range_ipv6_start_past_end_with_positive_step_is_empty() {
     assert_eq!(
-        ri(r#"my @r = (2001::a!!!2001::1!!!1); scalar @r"#),
+        ri(r#"my @r = (2001::a~2001::1~1); scalar @r"#),
         0
     );
 }
@@ -4994,9 +4994,48 @@ fn range_ipv6_start_past_end_with_positive_step_is_empty() {
 #[test]
 fn range_ipv6_start_before_end_with_negative_step_is_empty() {
     assert_eq!(
-        ri(r#"my @r = (2001::1!!!2001::a!!!-1); scalar @r"#),
+        ri(r#"my @r = (2001::1~2001::a~-1); scalar @r"#),
         0
     );
+}
+
+#[test]
+fn range_tilde_works_universally_across_all_types() {
+    // `~` is the universal range separator — works for plain numeric, IPv4,
+    // ISO date, year-month, hex, and IPv6. The `:` form still works
+    // alongside for non-IPv6 types.
+    assert_eq!(rs(r#"join ",", (1~5~1)"#), "1,2,3,4,5");
+    assert_eq!(
+        rs(r#"join ",", (192.168.1.1~192.168.1.3~1)"#),
+        "192.168.1.1,192.168.1.2,192.168.1.3"
+    );
+    assert_eq!(
+        rs(r#"join ",", (2022-01-01~2022-01-03~1)"#),
+        "2022-01-01,2022-01-02,2022-01-03"
+    );
+    assert_eq!(
+        rs(r#"join ",", (0x00~0x05~1)"#),
+        "0x00,0x01,0x02,0x03,0x04,0x05"
+    );
+}
+
+#[test]
+fn tilde_paired_char_index_unaffected_by_range_change() {
+    // `$_~5~` paired char-index must keep working — the range parser's
+    // `~` separator is suppressed inside the paired `~…~` index so the
+    // closing `~` doesn't get eaten as a range op.
+    assert_eq!(rs(r#"$_ = "abcdef"; $_~0~"#), "a");
+    assert_eq!(rs(r#"$_ = "abcdef"; $_~3~"#), "d");
+    // Slice form with `:` range as the index — both `~` (paired) and `:`
+    // (range) coexist because only `~` is suppressed inside the index.
+    assert_eq!(rs(r#"$_ = "abcdef"; $_~1:3~"#), "bcd");
+}
+
+#[test]
+fn tilde_bitwise_not_unaffected_by_range_change() {
+    // Single `~` in unary prefix position is still bitwise NOT.
+    assert_eq!(ri(r#"~0"#), -1);
+    assert_eq!(ri(r#"~~5"#), 5);
 }
 
 // ── Hex range preserves source format (0x prefix, width, case) ──────────

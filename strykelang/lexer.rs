@@ -211,9 +211,11 @@ impl Lexer {
     }
 
     /// Peek past whitespace and check whether the next token starts a range
-    /// operator: `:`, `..`, `...`, or `!!!`. Used by the hex-integer lexer
-    /// to switch into range-friendly DoubleString mode so `0x00:0xFF:1`
-    /// iterates with hex output instead of decimal.
+    /// operator: `:`, `..`, `...`, or `~`. Used by the hex-integer lexer
+    /// to switch into range-friendly DoubleString mode so `0x00:0xFF:1` and
+    /// `0x00~0xFF~1` iterate with hex output instead of decimal. `~` here
+    /// must NOT be `~>` / `~>>` (the thread macro) — those are operators on
+    /// a value, not range starters.
     fn next_is_range_separator(&self) -> bool {
         let mut i = self.pos;
         while i < self.input.len() && matches!(self.input[i], ' ' | '\t') {
@@ -225,11 +227,7 @@ impl Lexer {
         match self.input[i] {
             ':' => true,
             '.' if self.input.get(i + 1) == Some(&'.') => true,
-            '!' if self.input.get(i + 1) == Some(&'!')
-                && self.input.get(i + 2) == Some(&'!') =>
-            {
-                true
-            }
+            '~' if self.input.get(i + 1) != Some(&'>') => true,
             _ => false,
         }
     }
@@ -1647,15 +1645,6 @@ impl Lexer {
             }
             '!' => {
                 self.advance();
-                // `!!!` — IPv6 range separator (`2001::1!!!2001::ff!!!1`).
-                // Avoids the `:`/IPv6 colon collision; lexed as a dedicated
-                // token the parser treats as a `:` substitute in range exprs.
-                if self.peek() == Some('!') && self.peek_at(1) == Some('!') {
-                    self.advance();
-                    self.advance();
-                    self.last_was_term = false;
-                    return Ok(Token::TripleBang);
-                }
                 if self.peek() == Some('=') {
                     self.advance();
                     self.last_was_term = false;
@@ -1814,18 +1803,6 @@ impl Lexer {
             }
             '~' => {
                 self.advance();
-                // `~~~` — IPv6 range separator (`2001::1~~~2001::ff~~~1`).
-                // Replaces the old `!!!` token because `!` is the paired
-                // string-index delimiter (`_!N!`) and the visual collision
-                // confused readers. Single `~` stays bitwise-NOT; double
-                // `~~` stays double-NOT (a no-op, but legal); only the
-                // exact triple pattern flips into the range token.
-                if self.peek() == Some('~') && self.peek_at(1) == Some('~') {
-                    self.advance();
-                    self.advance();
-                    self.last_was_term = false;
-                    return Ok(Token::TripleTilde);
-                }
                 if self.peek() == Some('>') {
                     self.advance();
                     if self.peek() == Some('>') {
