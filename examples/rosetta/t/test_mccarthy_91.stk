@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: McCarthy 91 function
+
+fn Rosetta::McCarthy91::compute($n) {
+    if ($n > 100) {
+        return $n - 10
+    } else {
+        return Rosetta::McCarthy91::compute(Rosetta::McCarthy91::compute($n + 11))
+    }
+}
+
+# Test cases from 0 to 100
+0 : 100 |> map {
+    assert_eq(Rosetta::McCarthy91::compute(_), 91, "M($_) == 91")
+}
+
+# Test cases above 100
+101 : 120 |> map {
+    assert_eq(Rosetta::McCarthy91::compute(_), _ - 10, "M($_) == $_ - 10")
+}
+
+test_run

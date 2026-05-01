@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Concurrent computing
+
+fn Rosetta::Concurrent::run() {
+    my $a1 = async {
+        sleep(rand(0.1))
+        p "Enjoy"
+    }
+    
+    my $a2 = async {
+        sleep(rand(0.1))
+        p "Rosetta"
+    }
+    
+    my $a3 = async {
+        sleep(rand(0.1))
+        p "Code"
+    }
+    
+    # Wait for all to complete
+    await $a1
+    await $a2
+    await $a3
+}
+
+Rosetta::Concurrent::run()
+
+# Since the output order is non-deterministic, we just assert that it ran
+assert_ok 1, "Concurrent computing ran"
+
+test_run

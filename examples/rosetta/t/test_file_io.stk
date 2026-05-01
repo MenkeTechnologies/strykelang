@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File input/output
+# Task: Create a file, write contents to it, read the contents back, and verify.
+# Instruction: "do not litter $PWD with temp files, put them in /tmp"
+
+fn Rosetta::FileIO::demonstrate($filename, $content) {
+    # Write to file
+    open my $out_fh, '>', $filename or die "Could not open $filename for writing"
+    print $out_fh $content
+    close $out_fh
+    
+    # Read from file
+    open my $in_fh, '<', $filename or die "Could not open $filename for reading"
+    # Slurp the whole file
+    my $read_content = slurp($filename)
+    close $in_fh
+    
+    $read_content
+}
+
+my $tmp_file = "/tmp/stryke_rosetta_file_io_test.txt"
+my $test_data = "Hello, Rosetta Code!\nThis is a test of File I/O in Stryke."
+
+my $result = Rosetta::FileIO::demonstrate($tmp_file, $test_data)
+
+assert_eq $result, $test_data, "file read matches written data"
+
+# Clean up
+if (-e $tmp_file) {
+    unlink($tmp_file)
+}
+assert_ok !(-e $tmp_file), "file cleaned up"
+
+test_run

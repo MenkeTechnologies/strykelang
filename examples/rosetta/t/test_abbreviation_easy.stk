@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abbreviation, easy
+
+fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
+    my @commands = $commands_str |> split(/\s+/)
+    my %abbrevs
+    
+    @commands |> map {
+        my $cmd = _
+        my $last_upper = -1
+        for (my $i = 0; $i < length($cmd); $i++) {
+            if (substr($cmd, $i, 1) =~ /[A-Z]/) {
+                $last_upper = $i
+            }
+        }
+        
+        my $full = lc($cmd)
+        my $min_len = $last_upper + 1
+        
+        if ($min_len == 0 && length($full) > 0) {
+            $abbrevs{$full} = $full
+        } else {
+            for (my $i = $min_len; $i <= length($full); $i++) {
+                my $abbr = substr($full, 0, $i)
+                $abbrevs{$abbr} = $full
+            }
+        }
+    }
+    
+    my @input_words = $input_str |> split(/\s+/)
+    my @results
+    @input_words |> map {
+        my $word = lc(_)
+        if (exists $abbrevs{$word}) {
+            push @results, $abbrevs{$word}
+        } else {
+            push @results, "*error*"
+        }
+    }
+    join(" ", @results)
+}
+
+my $commands = "Add ALTer  BAckup Bottom  CLeAn cLOse CoPy Delete Help iNsert List Move Quit Edit Replace REtrieve Save SHow Table Type"
+my $input = "re fORe ba TAB"
+my $expected = "retrieve *error* backup table"
+
+assert_eq(Rosetta::Abbreviation::solve($commands, $input), $expected, "abbreviation easy test")
+
+test_run
