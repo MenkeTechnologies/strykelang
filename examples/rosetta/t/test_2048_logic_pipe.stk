@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 2048 Game Logic (piped version)
+
+fn Rosetta::Game2048Pipe::slide_row($row) {
+    my @non_zero = ~> @$row grep { _ != 0 }
+    
+    my @res
+    my $i = 0
+    my $len = len(@non_zero)
+    while ($i < $len) {
+        if ($i + 1 < $len && $non_zero[$i] == $non_zero[$i+1]) {
+            push @res, $non_zero[$i] * 2
+            $i = $i + 2
+        } else {
+            push @res, $non_zero[$i]
+            $i = $i + 1
+        }
+    }
+    
+    # Pad with zeros using pipeline
+    ~> @res, (~> 1:(4 - len(@res)) map { 0 })
+}
+
+fn Rosetta::Game2048Pipe::move_left($grid) {
+    ~> @$grid map { [ Rosetta::Game2048Pipe::slide_row(_) ] }
+}
+
+my $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
+my @res = Rosetta::Game2048Pipe::move_left($g1)
+
+assert_eq join(",", @{$res[0]}), "4,0,0,0", "row 2,2,0,0 -> 4,0,0,0"
+assert_eq join(",", @{$res[1]}), "4,0,0,0", "row 2,0,2,0 -> 4,0,0,0"
+assert_eq join(",", @{$res[2]}), "4,4,0,0", "row 2,2,2,2 -> 4,4,0,0"
+assert_eq join(",", @{$res[3]}), "8,16,0,0", "row 4,4,8,8 -> 8,16,0,0"
+
+test_run
