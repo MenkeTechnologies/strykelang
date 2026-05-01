@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: De Bruijn sequence
+
+fn Rosetta::DeBruijn::generate($k, $n) {
+    my @a = (0) * ($k * $n + 1)
+    my @sequence = ()
+    
+    Rosetta::DeBruijn::db(1, 1, $k, $n, \@a, \@sequence)
+    \@sequence
+}
+
+fn Rosetta::DeBruijn::db($t, $p, $k, $n, $a_ref, $seq_ref) {
+    if ($t > $n) {
+        if ($n % $p == 0) {
+            # Use range and streaming pipe to push elements
+            ~> 1:$p ep {
+                push @$seq_ref, $a_ref->[_]
+            }
+        }
+    } else {
+        $a_ref->[$t] = $a_ref->[$t - $p]
+        Rosetta::DeBruijn::db($t + 1, $p, $k, $n, $a_ref, $seq_ref)
+        for my $j ($a_ref->[$t - $p] + 1 .. $k - 1) {
+            $a_ref->[$t] = $j
+            Rosetta::DeBruijn::db($t + 1, $t, $k, $n, $a_ref, $seq_ref)
+        }
+    }
+}
+
+fn Rosetta::DeBruijn::stringify($seq) {
+    join("", @$seq)
+}
+
+# Example: k=2 (binary), n=3
+# De Bruijn sequence k=2, n=3 is 00010111
+my $res = Rosetta::DeBruijn::generate(2, 3)
+assert_eq Rosetta::DeBruijn::stringify($res), "00010111", "De Bruijn k=2, n=3"
+
+# Example: k=2, n=4
+my $res2 = Rosetta::DeBruijn::generate(2, 4)
+assert_eq Rosetta::DeBruijn::stringify($res2), "0000100110101111", "De Bruijn k=2, n=4"
+
+# Pipe usage
+2 |> Rosetta::DeBruijn::generate(3) |> Rosetta::DeBruijn::stringify() |> assert_eq("00010111", "pipe generate")
+
+test_run

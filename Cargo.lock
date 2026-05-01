@@ -702,8 +702,6 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "compsys"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e1cc5ae321929a922c91c740efba0929aec649313f4f40d588fe0f947b80d31"
 dependencies = [
  "dirs 5.0.1",
  "libc",
@@ -1785,9 +1783,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "fusevm"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fd972c3f4eb04fd4b03b52ae4cc606a9aa853dc14008b11ff9a32a8ff4e664e"
+checksum = "305c2e4f79ff852e0ca2aad492a34fa16017a33765e02160f3944f0f5debf2e5"
 dependencies = [
  "glob",
  "serde",
@@ -6663,9 +6661,7 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d4768bce6518a0aba1b61d1232c1763eeeec782123faf4fa58d8d31ef5bcd4"
+version = "0.10.1"
 dependencies = [
  "atty",
  "bincode",
@@ -6710,6 +6706,37 @@ dependencies = [
  "tracing-chrome",
  "tracing-subscriber",
  "unicode-width 0.2.2",
+ "walkdir",
+ "zshrs-daemon",
+]
+
+[[package]]
+name = "zshrs-daemon"
+version = "0.10.1"
+dependencies = [
+ "atty",
+ "byteorder",
+ "chrono",
+ "dirs 5.0.1",
+ "glob",
+ "libc",
+ "memmap2",
+ "nix 0.29.0",
+ "notify",
+ "notify-debouncer-mini",
+ "parking_lot",
+ "rand 0.8.6",
+ "regex",
+ "rkyv",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
  "walkdir",
 ]
 

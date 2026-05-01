@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Excel column name
+
+fn Rosetta::ExcelColumns::to_name($n) {
+    my $name = ""
+    while ($n > 0) {
+        my $rem = ($n - 1) % 26
+        $name = chr(65 + $rem) . $name
+        $n = int(($n - $rem) / 26)
+    }
+    $name
+}
+
+fn Rosetta::ExcelColumns::from_name($name) {
+    my $n = 0
+    # Use streaming pipe to process characters
+    ~> split("", $name) ep {
+        $n = $n * 26 + ord(_) - 64
+    }
+    $n
+}
+
+assert_eq Rosetta::ExcelColumns::to_name(1), "A", "1 -> A"
+assert_eq Rosetta::ExcelColumns::to_name(26), "Z", "26 -> Z"
+assert_eq Rosetta::ExcelColumns::to_name(27), "AA", "27 -> AA"
+assert_eq Rosetta::ExcelColumns::to_name(28), "AB", "28 -> AB"
+assert_eq Rosetta::ExcelColumns::to_name(52), "AZ", "52 -> AZ"
+assert_eq Rosetta::ExcelColumns::to_name(53), "BA", "53 -> BA"
+assert_eq Rosetta::ExcelColumns::to_name(702), "ZZ", "702 -> ZZ"
+assert_eq Rosetta::ExcelColumns::to_name(703), "AAA", "703 -> AAA"
+assert_eq Rosetta::ExcelColumns::to_name(16384), "XFD", "16384 -> XFD"
+
+assert_eq Rosetta::ExcelColumns::from_name("A"), 1, "A -> 1"
+assert_eq Rosetta::ExcelColumns::from_name("Z"), 26, "Z -> 26"
+assert_eq Rosetta::ExcelColumns::from_name("AA"), 27, "AA -> 27"
+assert_eq Rosetta::ExcelColumns::from_name("XFD"), 16384, "XFD -> 16384"
+
+# Pipe usage
+16384 |> Rosetta::ExcelColumns::to_name() |> assert_eq("XFD", "pipe to_name")
+"XFD" |> Rosetta::ExcelColumns::from_name() |> assert_eq(16384, "pipe from_name")
+
+test_run

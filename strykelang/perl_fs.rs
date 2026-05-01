@@ -1,6 +1,5 @@
 //! Perl-style filesystem helpers (`stat`, `glob`, etc.).
 
-use glob::{MatchOptions, Pattern};
 use rand::Rng;
 use rayon::prelude::*;
 use std::env;
@@ -23,63 +22,52 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
-/// `slurp`/`cat`/`c` payload — accepts a literal path OR a glob pattern.
-/// When the path contains glob metacharacters (`*`, `?`, `[`), expand and
-/// concatenate the contents of all matched files. Lets `c("**/*.md")` (or
-/// the shell-style shorthand `c("**.md")`) just work as a one-liner without
-/// the user wiring `glob` + `map { c $_ }` + `join`. A non-glob path falls
-/// through to the regular file read.
+/// `slurp`/`cat`/`c` payload — accepts a literal path OR a zsh-style glob
+/// pattern (forwarded to [`zsh::glob::glob`], so the entire qualifier set
+/// `(/)`, `(.)`, `(@)`, `(L+10)`, `(mh-1)`, `(om)`, `(N)`, … all work).
+/// World-first: zsh glob qualifiers in a scripting language. When the
+/// qualifier filters away every regular file (e.g. `c("**(/)")` returns
+/// directories only) we hard-fail rather than silently return empty —
+/// slurping a directory is meaningless and asking for it is a bug.
 pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
-    if !path.contains('*') && !path.contains('?') && !path.contains('[') {
+    if !looks_like_glob(path) {
         return read_file_text_perl_compat(path);
     }
-    let normalized = normalize_glob_shorthand(path);
-    let mut paths: Vec<std::path::PathBuf> = Vec::new();
-    match glob::glob(&normalized) {
-        Ok(g) => {
-            for entry in g.flatten() {
-                if entry.is_file() {
-                    paths.push(entry);
-                }
-            }
-        }
-        Err(e) => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("invalid glob pattern: {}", e),
-            ));
-        }
-    }
+    let paths = zsh::glob::glob(path);
     if paths.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!("no files matched glob: {}", path),
         ));
     }
-    paths.sort();
     let mut out = String::new();
-    for p in paths {
-        out.push_str(&read_file_text_perl_compat(&p)?);
+    for p in &paths {
+        let meta = std::fs::metadata(p)?;
+        if !meta.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("slurp: not a regular file: {}", p),
+            ));
+        }
+        out.push_str(&read_file_text_perl_compat(p)?);
     }
     Ok(out)
 }
 
-/// Normalize shell-style shorthand `**SUFFIX` to glob-crate-valid
-/// `**/*SUFFIX`. Rust's `glob` crate (correctly per spec) requires `**` to
-/// be its own path component; users typing `**.md` mean "any .md anywhere
-/// recursively." Splitting on `/` and rewriting per-component preserves
-/// patterns like `dir/**.md` (→ `dir/**/*.md`).
-fn normalize_glob_shorthand(path: &str) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    for comp in path.split('/') {
-        if comp.starts_with("**") && comp.len() > 2 {
-            parts.push("**".to_string());
-            parts.push(format!("*{}", &comp[2..]));
-        } else {
-            parts.push(comp.to_string());
-        }
+/// Heuristic: does this path want glob expansion? Triggers on the standard
+/// zsh wildcard set and on the trailing `(...)` qualifier suffix so plain
+/// `dir(/)` / `name(.)` (literal name + qualifier filter) routes to
+/// [`zsh::glob::glob`] instead of being read as a file named literally
+/// `dir(/)`. `~`, `#`, `^` are extended-glob meta but rarely meant as glob
+/// in stryke source paths (`~/foo` is home-dir, `#` is a comment in shells)
+/// — leave them out to avoid surprises.
+fn looks_like_glob(path: &str) -> bool {
+    if path.contains('*') || path.contains('?') || path.contains('[') {
+        return true;
     }
-    parts.join("/")
+    // Trailing `(...)` is the bare-qualifier marker (BARE_GLOB_QUAL on by
+    // default in zshrs). Match only when there's a balanced open paren.
+    path.ends_with(')') && path.contains('(')
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
@@ -728,58 +716,17 @@ pub fn list_char_devices(dir: &str) -> PerlValue {
 pub fn glob_patterns(patterns: &[String]) -> PerlValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {
-        if let Ok(g) = glob::glob(pat) {
-            for e in g.flatten() {
-                paths.push(normalize_glob_path_display(
-                    e.to_string_lossy().into_owned(),
-                ));
-            }
+        if !looks_like_glob(pat) {
+            paths.push(normalize_glob_path_display(pat.clone()));
+            continue;
+        }
+        for s in zsh::glob::glob(pat) {
+            paths.push(normalize_glob_path_display(s));
         }
     }
     paths.sort();
     paths.dedup();
     PerlValue::array(paths.into_iter().map(PerlValue::string).collect())
-}
-
-/// Directory prefix of `pat` with no glob metacharacters in any path component.
-fn glob_base_path(pat: &str) -> PathBuf {
-    let p = Path::new(pat);
-    let mut acc = PathBuf::new();
-    for c in p.components() {
-        let s = c.as_os_str().to_string_lossy();
-        if s.contains('*') || s.contains('?') || s.contains('[') {
-            break;
-        }
-        acc.push(c.as_os_str());
-    }
-    if acc.as_os_str().is_empty() {
-        PathBuf::from(".")
-    } else {
-        acc
-    }
-}
-
-fn glob_par_walk(dir: &Path, pattern: &Pattern, options: &MatchOptions) -> Vec<String> {
-    let read = match std::fs::read_dir(dir) {
-        Ok(r) => r,
-        Err(_) => return Vec::new(),
-    };
-    let entries: Vec<_> = read.filter_map(|e| e.ok()).collect();
-    entries
-        .par_iter()
-        .flat_map_iter(|e| {
-            let path = e.path();
-            let mut out = Vec::new();
-            let s = path.to_string_lossy();
-            if pattern.matches_with(s.as_ref(), *options) {
-                out.push(s.into_owned());
-            }
-            if path.is_dir() {
-                out.extend(glob_par_walk(&path, pattern, options));
-            }
-            out.into_iter()
-        })
-        .collect()
 }
 
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
@@ -801,20 +748,18 @@ pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> P
 }
 
 fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>) -> PerlValue {
-    let options = MatchOptions::new();
+    // Parallelize across patterns. Each pattern goes through `zsh::glob::glob`
+    // single-threaded so the full qualifier machinery is available; intra-
+    // pattern parallelism is sacrificed in exchange for `(/)`, `(.)`, `(om)`,
+    // `(L+N)`, etc. World-first: zsh glob qualifiers in a scripting language.
     let out: Vec<String> = patterns
         .par_iter()
         .flat_map_iter(|pat| {
-            let rows = (|| {
-                let Ok(pattern) = Pattern::new(pat) else {
-                    return Vec::new();
-                };
-                let base = glob_base_path(pat);
-                if !base.exists() {
-                    return Vec::new();
-                }
-                glob_par_walk(&base, &pattern, &options)
-            })();
+            let rows: Vec<String> = if !looks_like_glob(pat) {
+                vec![pat.clone()]
+            } else {
+                zsh::glob::glob(pat)
+            };
             if let Some(p) = progress {
                 p.tick();
             }

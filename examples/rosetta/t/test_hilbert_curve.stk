@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hilbert curve
+
+fn Rosetta::Hilbert::d2xy($n, $d) {
+    my $x = 0
+    my $y = 0
+    my $t = $d
+    my $s = 1
+    while ($s < $n) {
+        my $rx = 1 & (int($t / 2))
+        my $ry = 1 & ($t ^ $rx)
+        my $res = Rosetta::Hilbert::rot($s, $x, $y, $rx, $ry)
+        $x = $res->[0] + $s * $rx
+        $y = $res->[1] + $s * $ry
+        $t = int($t / 4)
+        $s *= 2
+    }
+    [$x, $y]
+}
+
+fn Rosetta::Hilbert::rot($n, $x, $y, $rx, $ry) {
+    if ($ry == 0) {
+        if ($rx == 1) {
+            $x = $n - 1 - $x
+            $y = $n - 1 - $y
+        }
+        return [$y, $x]
+    }
+    [$x, $y]
+}
+
+# n=4 (2x2 order) -> 16 points
+my $res0 = Rosetta::Hilbert::d2xy(2, 0)
+assert_eq $res0->[0], 0, "d=0 x"
+assert_eq $res0->[1], 0, "d=0 y"
+
+my $res1 = Rosetta::Hilbert::d2xy(2, 1)
+assert_eq $res1->[0], 0, "d=1 x"
+assert_eq $res1->[1], 1, "d=1 y"
+
+my $res2 = Rosetta::Hilbert::d2xy(2, 2)
+assert_eq $res2->[0], 1, "d=2 x"
+assert_eq $res2->[1], 1, "d=2 y"
+
+my $res3 = Rosetta::Hilbert::d2xy(2, 3)
+assert_eq $res3->[0], 1, "d=3 x"
+assert_eq $res3->[1], 0, "d=3 y"
+
+# Higher order n=4
+# d=15 should be (3,0)
+my $res15 = Rosetta::Hilbert::d2xy(4, 15)
+assert_eq $res15->[0], 3, "n=4 d=15 x"
+assert_eq $res15->[1], 0, "n=4 d=15 y"
+
+# Pipe usage - correctly pass $n then pipe $d
+4 |> Rosetta::Hilbert::d2xy(15) |> { sprintf("%d,%d", _->[0], _->[1]) } |> assert_eq("3,0", "pipe Hilbert")
+
+test_run

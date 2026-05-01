@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Easter calculation
+
+fn Rosetta::Easter::compute($year) {
+    # Meeus/Jones/Butcher algorithm
+    my $a = $year % 19
+    my $b = int($year / 100)
+    my $c = $year % 100
+    my $d = int($b / 4)
+    my $e = $b % 4
+    my $f = int(($b + 8) / 25)
+    my $g = int(($b - $f + 1) / 3)
+    my $h = (19 * $a + $b - $d - $g + 15) % 30
+    my $i = int($c / 4)
+    my $k = $c % 4
+    my $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7
+    my $m = int(($a + 11 * $h + 22 * $l) / 451)
+    my $month = int(($h + $l - 7 * $m + 114) / 31)
+    my $day = (($h + $l - 7 * $m + 114) % 31) + 1
+    
+    # Return as YYYY-MM-DD
+    sprintf("%04d-%02d-%02d", $year, $month, $day)
+}
+
+assert_eq Rosetta::Easter::compute(2020), "2020-04-12", "Easter 2020"
+assert_eq Rosetta::Easter::compute(2021), "2021-04-04", "Easter 2021"
+assert_eq Rosetta::Easter::compute(2022), "2022-04-17", "Easter 2022"
+assert_eq Rosetta::Easter::compute(2023), "2023-04-09", "Easter 2023"
+assert_eq Rosetta::Easter::compute(2024), "2024-03-31", "Easter 2024"
+assert_eq Rosetta::Easter::compute(2025), "2025-04-20", "Easter 2025"
+
+# Pipe usage
+2026 |> Rosetta::Easter::compute() |> assert_eq("2026-04-05", "pipe Easter 2026")
+
+test_run

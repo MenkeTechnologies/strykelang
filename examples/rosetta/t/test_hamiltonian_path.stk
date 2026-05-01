@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hamiltonian path
+
+fn Rosetta::HamiltonianPath::solve($adj, $start) {
+    my $n = len($adj)
+    my @path = ($start)
+    my @visited = (0) * $n
+    $visited[$start] = 1
+    
+    # Define inner function for backtracking
+    fn Rosetta::HamiltonianPath::backtrack($curr, $adj_ref, $visited_ref, $path_ref, $n) {
+        if (len(@$path_ref) == $n) {
+            return 1
+        }
+        
+        # Use streaming pipe to iterate over neighbors
+        # (Though simple loop might be cleaner for backtracking state management)
+        for my $next (@{$adj_ref->[$curr]}) {
+            if (!$visited_ref->[$next]) {
+                $visited_ref->[$next] = 1
+                push @$path_ref, $next
+                if (Rosetta::HamiltonianPath::backtrack($next, $adj_ref, $visited_ref, $path_ref, $n)) {
+                    return 1
+                }
+                pop @$path_ref
+                $visited_ref->[$next] = 0
+            }
+        }
+        0
+    }
+    
+    if (Rosetta::HamiltonianPath::backtrack($start, $adj, \@visited, \@path, $n)) {
+        return \@path
+    }
+    undef
+}
+
+fn Rosetta::HamiltonianPath::format_path($path) {
+    join("->", @$path)
+}
+
+# Example 1: 4 nodes forming a line 3-0-1-2
+# 0-1, 1-2, 0-3
+my $adj1 = [
+    [1, 3],
+    [0, 2],
+    [1],
+    [0]
+]
+my $res1 = Rosetta::HamiltonianPath::solve($adj1, 3)
+assert_ok $res1, "path exists for line graph from 3"
+assert_eq Rosetta::HamiltonianPath::format_path($res1), "3->0->1->2", "path is 3-0-1-2"
+
+# Example 2: Complete graph K4
+my $adj2 = [
+    [1, 2, 3],
+    [0, 2, 3],
+    [0, 1, 3],
+    [0, 1, 2]
+]
+my $res2 = Rosetta::HamiltonianPath::solve($adj2, 0)
+assert_ok $res2, "path exists for K4"
+assert_eq len(@$res2), 4, "path length is 4"
+
+# Example 3: Disconnected graph
+my $adj3 = [
+    [1],
+    [0],
+    [3],
+    [2]
+]
+my $res3 = Rosetta::HamiltonianPath::solve($adj3, 0)
+assert_ok !$res3, "no Hamiltonian path for disconnected graph"
+
+# Pipe usage
+$adj1 |> Rosetta::HamiltonianPath::solve(3) |> Rosetta::HamiltonianPath::format_path() |> assert_eq("3->0->1->2", "pipe solve")
+
+test_run
