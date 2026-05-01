@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Binary strings — typed byte buffers; test creation, length,
+# concat, substring, indexing, comparison, and search.
+
+fn Rosetta::BinStr::from_bytes(@bytes) {
+    join("", ~> @bytes map { chr(_) })
+}
+
+fn Rosetta::BinStr::byte_at($s, $i) { ord(substr($s, $i, 1)) }
+
+fn Rosetta::BinStr::find($haystack, $needle) {
+    index($haystack, $needle)
+}
+
+my $a = "hello"
+my $b = "world"
+
+# Length
+assert_eq length($a), 5, "len a"
+assert_eq length($b), 5, "len b"
+
+# Concat
+my $c = $a . " " . $b
+assert_eq $c, "hello world", "concat"
+assert_eq length($c), 11, "len concat"
+
+# Substring
+assert_eq substr($c, 0, 5),  "hello", "substr 0..4"
+assert_eq substr($c, 6, 5),  "world", "substr 6..10"
+assert_eq substr($c, -5, 5), "world", "negative offset"
+
+# Indexing (byte)
+assert_eq Rosetta::BinStr::byte_at($a, 0), 104, "h = 104"
+assert_eq Rosetta::BinStr::byte_at($a, 4), 111, "o = 111"
+
+# Comparison
+assert_ok $a lt $b,   "lex hello < world"
+assert_eq $a eq $a,   1, "self-equal"
+assert_ok $a ne $b,   "ne"
+
+# Search
+assert_eq Rosetta::BinStr::find($c, "world"), 6, "find world at 6"
+assert_eq Rosetta::BinStr::find($c, "xyz"),   -1, "not found"
+
+# Construct from raw bytes (round-trip)
+my $bin = Rosetta::BinStr::from_bytes(72, 105, 33)
+assert_eq $bin, "Hi!", "from_bytes"
+assert_eq length($bin), 3, "3 bytes"
+
+# Replacement (Perl-style s///)
+my $copy = $c
+$copy =~ s/world/stryke/
+assert_eq $copy, "hello stryke", "s/// replace"
+
+test_run

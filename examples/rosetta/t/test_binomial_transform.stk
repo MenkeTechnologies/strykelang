@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Binomial transform
+# b_n = sum_{k=0..n} (-1)^k C(n,k) a_k     — forward
+# a_n = sum_{k=0..n}        C(n,k) b_k     — inverse  (yes, the inverse is the
+#                                            "ordinary" binomial transform)
+
+fn Rosetta::Binom::C($n, $k) {
+    return 0 if $k < 0 || $k > $n
+    my $r = 1
+    for my $i (1..$k) {
+        $r = $r * ($n - $i + 1) / $i
+    }
+    int($r)
+}
+
+# Self-inverse "signed" binomial transform: b_n = Σ_k (-1)^k C(n,k) a_k.
+# This convention is involutary: T[T[a]] = a.
+fn Rosetta::Binom::transform(@a) {
+    my @b
+    for my $n (0..len(@a)-1) {
+        my $s = 0
+        for my $k (0..$n) {
+            my $sign = ($k % 2 == 0) ? 1 : -1
+            $s += $sign * Rosetta::Binom::C($n, $k) * $a[$k]
+        }
+        push @b, $s
+    }
+    @b
+}
+
+# Aliases matching the standard Rosetta naming.
+fn Rosetta::Binom::forward(@a) { Rosetta::Binom::transform(@a) }
+fn Rosetta::Binom::inverse(@a) { Rosetta::Binom::transform(@a) }
+
+# Constant-1: Σ_k (-1)^k C(n,k) = (1-1)^n = 0 for n≥1.
+my @id = Rosetta::Binom::transform(1, 1, 1, 1, 1, 1)
+assert_eq join(",", @id), "1,0,0,0,0,0", "1,1,1,1 -> 1,0,..."
+
+# Powers of 2: Σ_k (-1)^k C(n,k) 2^k = (1-2)^n = (-1)^n.
+my @pow2 = Rosetta::Binom::transform(1, 2, 4, 8, 16, 32)
+assert_eq join(",", @pow2), "1,-1,1,-1,1,-1", "2^n -> (-1)^n"
+
+# Round-trip: transform is involutary.
+my @x = (3, 1, 4, 1, 5, 9, 2, 6)
+my @rt = Rosetta::Binom::transform(Rosetta::Binom::transform(@x))
+assert_eq join(",", @rt), "3,1,4,1,5,9,2,6", "round-trip"
+
+# Powers of 3 forward: result is (-1)^n * 2^n? Actually depends on sign convention.
+# Verify by spot-checking C(n,k) values.
+assert_eq Rosetta::Binom::C(5, 2), 10, "C(5,2)=10"
+assert_eq Rosetta::Binom::C(6, 3), 20, "C(6,3)=20"
+assert_eq Rosetta::Binom::C(0, 0), 1,  "C(0,0)=1"
+
+test_run

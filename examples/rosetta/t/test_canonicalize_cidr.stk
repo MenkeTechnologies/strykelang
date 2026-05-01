@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Canonicalize CIDR
+# Given an IPv4 CIDR like "87.70.141.1/22", zero out the host bits and emit
+# "87.70.140.0/22".
+
+fn Rosetta::CIDR::ip_to_int($ip) {
+    my @parts = split(/\./, $ip)
+    return undef unless len(@parts) == 4
+    my $n = 0
+    for my $p (@parts) {
+        return undef if $p !~ /^\d+$/ || $p < 0 || $p > 255
+        $n = $n * 256 + $p
+    }
+    $n
+}
+
+fn Rosetta::CIDR::int_to_ip($n) {
+    my $a = int($n / 16777216) % 256
+    my $b = int($n / 65536) % 256
+    my $c = int($n / 256) % 256
+    my $d = $n % 256
+    "$a.$b.$c.$d"
+}
+
+fn Rosetta::CIDR::canonicalize($cidr) {
+    my @parts = split(/\//, $cidr)
+    return undef unless len(@parts) == 2
+    my $ip = $parts[0]
+    my $prefix = $parts[1] + 0
+    return undef if $prefix < 0 || $prefix > 32
+    my $n = Rosetta::CIDR::ip_to_int($ip)
+    return undef unless defined($n)
+    my $shift = 32 - $prefix
+    my $mask = $shift == 32 ? 0 : ((0xFFFFFFFF >> $shift) << $shift) & 0xFFFFFFFF
+    my $net = $n & $mask
+    Rosetta::CIDR::int_to_ip($net) . "/" . $prefix
+}
+
+# Standard examples
+assert_eq Rosetta::CIDR::canonicalize("87.70.141.1/22"),    "87.70.140.0/22",  "/22 zeros tail"
+assert_eq Rosetta::CIDR::canonicalize("36.18.154.103/12"),  "36.16.0.0/12",    "/12 zeros tail"
+assert_eq Rosetta::CIDR::canonicalize("62.62.197.11/29"),   "62.62.197.8/29",  "/29 zeros tail"
+assert_eq Rosetta::CIDR::canonicalize("10.0.0.1/8"),        "10.0.0.0/8",      "/8"
+assert_eq Rosetta::CIDR::canonicalize("10.0.0.0/32"),       "10.0.0.0/32",    "/32 single host"
+assert_eq Rosetta::CIDR::canonicalize("0.0.0.0/0"),         "0.0.0.0/0",       "/0 default route"
+
+# Invalid
+assert_ok !defined(Rosetta::CIDR::canonicalize("999.0.0.0/24")), "octet out of range"
+assert_ok !defined(Rosetta::CIDR::canonicalize("1.2.3.4/33")),   "prefix out of range"
+
+test_run

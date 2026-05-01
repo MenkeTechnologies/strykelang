@@ -6663,9 +6663,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.10.4"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "192c29366dc84142610d07889155ff4ad6eaecd1211f19c26a830f640522c2b7"
+checksum = "6f9b1bc257e0f13f76faed155252d967e3fcef43344aed350fc260d3d77e4a39"
 dependencies = [
  "atty",
  "bincode",

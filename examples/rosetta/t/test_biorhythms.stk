@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Biorhythms
+
+fn Rosetta::Biorhythm::pi() { 3.141592653589793 }
+
+fn Rosetta::Biorhythm::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0
+}
+
+fn Rosetta::Biorhythm::day_of_year($y, $m, $d) {
+    my @md = (0,31,28,31,30,31,30,31,31,30,31,30,31)
+    my $doy = 0
+    for my $i (1..$m-1) {
+        $doy += $md[$i]
+        $doy += 1 if $i == 2 && Rosetta::Biorhythm::is_leap($y)
+    }
+    $doy + $d
+}
+
+fn Rosetta::Biorhythm::days_between($y1, $m1, $d1, $y2, $m2, $d2) {
+    if ($y1 == $y2) {
+        my $a = Rosetta::Biorhythm::day_of_year($y2, $m2, $d2)
+        my $b = Rosetta::Biorhythm::day_of_year($y1, $m1, $d1)
+        return $a - $b
+    }
+    my $year_len_1 = Rosetta::Biorhythm::is_leap($y1) ? 366 : 365
+    my $diff = $year_len_1 - Rosetta::Biorhythm::day_of_year($y1, $m1, $d1)
+    for my $y ($y1+1..$y2-1) {
+        $diff += Rosetta::Biorhythm::is_leap($y) ? 366 : 365
+    }
+    $diff += Rosetta::Biorhythm::day_of_year($y2, $m2, $d2)
+    $diff
+}
+
+fn Rosetta::Biorhythm::values($by, $bm, $bd, $ty, $tm, $td) {
+    my $days = Rosetta::Biorhythm::days_between($by, $bm, $bd, $ty, $tm, $td)
+    my $phys = sin(2 * Rosetta::Biorhythm::pi() * $days / 23)
+    my $emot = sin(2 * Rosetta::Biorhythm::pi() * $days / 28)
+    my $intl = sin(2 * Rosetta::Biorhythm::pi() * $days / 33)
+    [$days, $phys, $emot, $intl]
+}
+
+# Same day -> 0 days, all phases at 0.
+my $r0 = Rosetta::Biorhythm::values(2000,1,1, 2000,1,1)
+assert_eq $r0->[0], 0, "0 days"
+assert_ok abs($r0->[1]) < 1e-12, "phys 0"
+assert_ok abs($r0->[2]) < 1e-12, "emot 0"
+assert_ok abs($r0->[3]) < 1e-12, "intl 0"
+
+# 23 days later, physical cycle completes -> sin = 0.
+my $r23 = Rosetta::Biorhythm::values(2000,1,1, 2000,1,24)
+assert_eq $r23->[0], 23, "23 days"
+assert_ok abs($r23->[1]) < 1e-12, "phys back to 0"
+
+# Year boundary: 2000-12-31 -> 2001-01-31 = 31 days
+my $cross = Rosetta::Biorhythm::days_between(2000,12,31, 2001,1,31)
+assert_eq $cross, 31, "year boundary"
+
+# Leap year: 2000-02-28 -> 2000-03-01 = 2 days
+my $leap = Rosetta::Biorhythm::days_between(2000,2,28, 2000,3,1)
+assert_eq $leap, 2, "leap year Feb 29"
+
+# Non-leap 1999: Feb 28 -> Mar 1 = 1 day
+my $non = Rosetta::Biorhythm::days_between(1999,2,28, 1999,3,1)
+assert_eq $non, 1, "non-leap year"
+
+test_run
