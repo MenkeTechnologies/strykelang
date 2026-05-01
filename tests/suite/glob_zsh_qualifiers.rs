@@ -7,11 +7,8 @@ use crate::common::*;
 use std::path::PathBuf;
 
 fn fixture_dir(label: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "stryke_glob_qual_{}_{}",
-        label,
-        std::process::id()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("stryke_glob_qual_{}_{}", label, std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("sub/deeper")).unwrap();
     std::fs::write(dir.join("file1.txt"), "alpha\n").unwrap();
@@ -47,8 +44,7 @@ fn slurp_slash_qualifier_directories_hard_fails() {
 fn glob_slash_qualifier_lists_directories_recursively() {
     let dir = fixture_dir("globslash");
     let p = dir.to_str().unwrap();
-    let code =
-        format!(r#"chdir("{p}"); my @d = glob("**(/)"); join(",", sort @d)"#);
+    let code = format!(r#"chdir("{p}"); my @d = glob("**(/)"); join(",", sort @d)"#);
     let out = eval_string(&code);
     assert!(out.contains("./sub"), "got {out}");
     assert!(out.contains("./sub/deeper"), "got {out}");
@@ -61,8 +57,7 @@ fn glob_slash_qualifier_lists_directories_recursively() {
 fn glob_dot_qualifier_lists_regular_files_recursively() {
     let dir = fixture_dir("globdot");
     let p = dir.to_str().unwrap();
-    let code =
-        format!(r#"chdir("{p}"); my @f = glob("**(.)"); join(",", sort @f)"#);
+    let code = format!(r#"chdir("{p}"); my @f = glob("**(.)"); join(",", sort @f)"#);
     let out = eval_string(&code);
     for f in ["file1.txt", "file2.txt", "file3.txt", "file4.txt"] {
         assert!(out.contains(f), "missing {f}: {out}");
@@ -74,9 +69,7 @@ fn glob_dot_qualifier_lists_regular_files_recursively() {
 fn glob_n_qualifier_returns_empty_on_no_match() {
     let dir = fixture_dir("globn");
     let p = dir.to_str().unwrap();
-    let code = format!(
-        r#"chdir("{p}"); my @f = glob("nope-this-cannot-match*(N)"); scalar(@f)"#
-    );
+    let code = format!(r#"chdir("{p}"); my @f = glob("nope-this-cannot-match*(N)"); scalar(@f)"#);
     assert_eq!(eval_int(&code), 0);
     std::fs::remove_dir_all(&dir).ok();
 }

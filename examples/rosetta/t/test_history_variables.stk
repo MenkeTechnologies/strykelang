@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+# Rosetta Code: History variables
+# stryke captures lexicals by VALUE in `fn { … }` — to share mutable state across
+# closures, capture a ref (here: an arrayref) so the heap object is the rendezvous
+# point.
+
+fn Rosetta::Hist::make() {
+    my $h = []
+    {
+        set      => fn { my $v = $_; push @$h, $v; $v },
+        get      => fn { len(@$h) > 0 ? $h->[len(@$h)-1] : undef },
+        all      => fn { [@$h] },
+        len      => fn { len(@$h) },
+        at       => fn { $h->[$_] },
+        rollback => fn {
+            return if len(@$h) == 0
+            pop @$h
+            len(@$h) > 0 ? $h->[len(@$h)-1] : undef
+        },
+    }
+}
+
+my $v = Rosetta::Hist::make()
+$v->{set}->(10)
+$v->{set}->(20)
+$v->{set}->(30)
+
+assert_eq $v->{get}->(),  30, "current = 30"
+assert_eq $v->{len}->(),  3,  "3 historic values"
+assert_eq $v->{at}->(0),  10, "history[0]=10"
+assert_eq $v->{at}->(1),  20, "history[1]=20"
+
+my $all = $v->{all}->()
+assert_eq join(",", @$all), "10,20,30", "full history"
+
+# Rollback drops the latest
+$v->{rollback}->()
+assert_eq $v->{get}->(), 20, "after rollback current=20"
+assert_eq $v->{len}->(), 2,  "len after rollback"
+
+# Independence: a fresh history is truly fresh.
+my $u = Rosetta::Hist::make()
+assert_eq $u->{len}->(), 0, "fresh starts empty"
+$u->{set}->(99)
+assert_eq $u->{get}->(), 99, "fresh independent"
+assert_eq $v->{get}->(), 20, "v unaffected by u"
+
+test_run

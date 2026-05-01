@@ -25,7 +25,10 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
 /// `glob_with_options` preset for stryke: full extended glob, bare-qualifier
 /// shorthand on (`*(/)` works without `(#q.../)`), `null_glob: true` so a
 /// no-match returns an empty list (Perl `glob` semantics) instead of echoing
-/// the literal pattern back.
+/// the literal pattern back. `glob_star_short: true` makes `**.stk` match
+/// every .stk file at any depth, `brace_ccl: true` enables `{a,b,c}` and
+/// `{abc}` brace expansion — both wired through to the expander in
+/// zshrs ≥0.10.4.
 fn stryke_glob(pattern: &str) -> Vec<String> {
     zsh::glob::glob_with_options(
         pattern,
@@ -38,9 +41,9 @@ fn stryke_glob(pattern: &str) -> Vec<String> {
             follow_links: false,
             extended_glob: true,
             case_glob: true,
-            glob_star_short: false,
+            glob_star_short: true,
             bare_glob_qual: true,
-            brace_ccl: false,
+            brace_ccl: true,
         },
     )
 }
@@ -91,7 +94,7 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
 /// pattern-parsing logic of its own.
 fn pattern_is_glob(path: &str) -> bool {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    qual.is_some() || zsh::glob::has_wildcards(stripped)
+    qual.is_some() || zsh::glob::has_wildcards(stripped) || zsh::glob::has_braces(stripped, true)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).

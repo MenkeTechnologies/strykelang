@@ -5610,12 +5610,19 @@ fn builtin_to_table(args: &[PerlValue]) -> PerlResult<PerlValue> {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| ak.cmp(bk))
         });
-        let rows_str: Vec<Vec<String>> = rows
-            .into_iter()
-            .map(|(k, v, _)| vec![k, v])
-            .collect();
-        let key_w = rows_str.iter().map(|r| r[0].len()).max().unwrap_or(3).max(3);
-        let val_w = rows_str.iter().map(|r| r[1].len()).max().unwrap_or(5).max(5);
+        let rows_str: Vec<Vec<String>> = rows.into_iter().map(|(k, v, _)| vec![k, v]).collect();
+        let key_w = rows_str
+            .iter()
+            .map(|r| r[0].len())
+            .max()
+            .unwrap_or(3)
+            .max(3);
+        let val_w = rows_str
+            .iter()
+            .map(|r| r[1].len())
+            .max()
+            .unwrap_or(5)
+            .max(5);
         let headers = vec!["key".to_string(), "value".to_string()];
         return Ok(PerlValue::string(table_render(
             &headers,
@@ -28737,7 +28744,10 @@ mod tests {
         let m_pos = tbl.find("│ m ").expect("m row");
         let a_pos = tbl.find("│ a ").expect("a row");
         let z_pos = tbl.find("│ z ").expect("z row");
-        assert!(m_pos < a_pos && a_pos < z_pos, "expected m,a (tie 3) then z: {tbl}");
+        assert!(
+            m_pos < a_pos && a_pos < z_pos,
+            "expected m,a (tie 3) then z: {tbl}"
+        );
     }
 
     #[test]
