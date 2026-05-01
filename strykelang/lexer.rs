@@ -1814,6 +1814,18 @@ impl Lexer {
             }
             '~' => {
                 self.advance();
+                // `~~~` — IPv6 range separator (`2001::1~~~2001::ff~~~1`).
+                // Replaces the old `!!!` token because `!` is the paired
+                // string-index delimiter (`_!N!`) and the visual collision
+                // confused readers. Single `~` stays bitwise-NOT; double
+                // `~~` stays double-NOT (a no-op, but legal); only the
+                // exact triple pattern flips into the range token.
+                if self.peek() == Some('~') && self.peek_at(1) == Some('~') {
+                    self.advance();
+                    self.advance();
+                    self.last_was_term = false;
+                    return Ok(Token::TripleTilde);
+                }
                 if self.peek() == Some('>') {
                     self.advance();
                     if self.peek() == Some('>') {

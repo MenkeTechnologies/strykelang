@@ -10927,7 +10927,7 @@ impl Interpreter {
             }
             ExprKind::Slurp(e) => {
                 let path = self.eval_expr(e)?.to_string();
-                read_file_text_perl_compat(&path)
+                crate::perl_fs::read_file_text_or_glob(&path)
                     .map(PerlValue::string)
                     .map_err(|e| {
                         FlowOrError::Error(PerlError::runtime(format!("slurp: {}", e), line))

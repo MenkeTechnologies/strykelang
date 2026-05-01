@@ -23,6 +23,65 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
+/// `slurp`/`cat`/`c` payload — accepts a literal path OR a glob pattern.
+/// When the path contains glob metacharacters (`*`, `?`, `[`), expand and
+/// concatenate the contents of all matched files. Lets `c("**/*.md")` (or
+/// the shell-style shorthand `c("**.md")`) just work as a one-liner without
+/// the user wiring `glob` + `map { c $_ }` + `join`. A non-glob path falls
+/// through to the regular file read.
+pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
+    if !path.contains('*') && !path.contains('?') && !path.contains('[') {
+        return read_file_text_perl_compat(path);
+    }
+    let normalized = normalize_glob_shorthand(path);
+    let mut paths: Vec<std::path::PathBuf> = Vec::new();
+    match glob::glob(&normalized) {
+        Ok(g) => {
+            for entry in g.flatten() {
+                if entry.is_file() {
+                    paths.push(entry);
+                }
+            }
+        }
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid glob pattern: {}", e),
+            ));
+        }
+    }
+    if paths.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no files matched glob: {}", path),
+        ));
+    }
+    paths.sort();
+    let mut out = String::new();
+    for p in paths {
+        out.push_str(&read_file_text_perl_compat(&p)?);
+    }
+    Ok(out)
+}
+
+/// Normalize shell-style shorthand `**SUFFIX` to glob-crate-valid
+/// `**/*SUFFIX`. Rust's `glob` crate (correctly per spec) requires `**` to
+/// be its own path component; users typing `**.md` mean "any .md anywhere
+/// recursively." Splitting on `/` and rewriting per-component preserves
+/// patterns like `dir/**.md` (→ `dir/**/*.md`).
+fn normalize_glob_shorthand(path: &str) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for comp in path.split('/') {
+        if comp.starts_with("**") && comp.len() > 2 {
+            parts.push("**".to_string());
+            parts.push(format!("*{}", &comp[2..]));
+        } else {
+            parts.push(comp.to_string());
+        }
+    }
+    parts.join("/")
+}
+
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
 pub fn read_line_perl_compat(reader: &mut impl BufRead, buf: &mut String) -> io::Result<usize> {
     buf.clear();

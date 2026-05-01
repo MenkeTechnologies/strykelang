@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mutual recursion
+
+fn Rosetta::MutualRecursion::F($n) {
+    $n == 0 ? 1 : $n - Rosetta::MutualRecursion::M(Rosetta::MutualRecursion::F($n - 1))
+}
+
+fn Rosetta::MutualRecursion::M($n) {
+    $n == 0 ? 0 : $n - Rosetta::MutualRecursion::F(Rosetta::MutualRecursion::M($n - 1))
+}
+
+# Test Hofstadter Female and Male sequences
+my @f = ~> 0:9 map { Rosetta::MutualRecursion::F(_) }
+assert_eq join(",", @f), "1,1,2,2,3,3,4,5,5,6", "Female sequence"
+
+my @m = ~> 0:9 map { Rosetta::MutualRecursion::M(_) }
+assert_eq join(",", @m), "0,0,1,2,2,3,4,4,5,6", "Male sequence"
+
+test_run

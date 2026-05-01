@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Higher-order functions
+
+fn Rosetta::HOF::apply($f, $x) {
+    $f->($x)
+}
+
+fn Rosetta::HOF::compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+my $double = fn ($x) { $x * 2 }
+my $plus_one = fn ($x) { $x + 1 }
+
+my $val = Rosetta::HOF::apply($double, 5)
+assert_eq $val, 10, "apply double 5"
+
+my $h = Rosetta::HOF::compose($double, $plus_one)
+assert_eq $h->(5), 12, "double(plus_one(5)) = 2*(5+1) = 12"
+
+# Piped HOF
+5 |> $plus_one |> $double |> assert_eq(12, "piped HOF")
+
+test_run

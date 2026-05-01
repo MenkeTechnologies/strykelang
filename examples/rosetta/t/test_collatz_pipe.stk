@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Collatz Conjecture (piped version)
+
+fn Rosetta::CollatzPipe::step($n) {
+    $n % 2 == 0 ? $n / 2 : 3 * $n + 1
+}
+
+fn Rosetta::CollatzPipe::sequence($n) {
+    # We can't easily do a while loop in a pure pipeline without a specialized operator
+    # but we can use ~> with a generator-like logic if we had one.
+    # For now, show piping the results.
+    my @seq = ($n)
+    my $curr = $n
+    while ($curr != 1) {
+        $curr = $curr |> Rosetta::CollatzPipe::step
+        push @seq, $curr
+    }
+    @seq
+}
+
+6 |> Rosetta::CollatzPipe::sequence |> join(",") |> assert_eq("6,3,10,5,16,8,4,2,1", "piped collatz seq")
+
+test_run
