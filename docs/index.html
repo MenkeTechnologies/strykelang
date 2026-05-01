@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.10.5 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3200+ builtins</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.11.0 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3500+ builtins</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -171,7 +171,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 3200+ builtins, and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 3500+ builtins, and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -347,7 +347,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>3200+ operations across 3700+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
+        <p>3500+ operations across 4000+ spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -463,6 +463,199 @@ scp load_test node{1..100}:/tmp/</pre>
         </table>
 
         <p>See <a href="STRESS_TESTING.md">docs/STRESS_TESTING.md</a> and <a href="rfcs/">RFCs</a> for full documentation.</p>
+      </section>
+
+      <section class="tutorial-section" style="border: 2px solid #05d9e8; background: linear-gradient(135deg, rgba(5,217,232,0.08) 0%, transparent 50%);">
+        <h2 style="color:#05d9e8;">AI Primitives — <code>ai</code> is a builtin like <code>print</code></h2>
+        <p>Two letters, ubiquitous, unlimited power. Agent loop, MCP client+server, RAG memory, vector search — all native to the language.</p>
+
+<pre><span class="comment"># Single-shot</span>
+my $r = ai "summarize this", $document
+
+<span class="comment"># Auto-routes to agent loop when tool fns are in scope</span>
+tool fn weather($city: string) "Get weather" {
+    fetch "https://api.weather.com/" . uri_encode($city)
+}
+ai "what's the weather in Tokyo?"
+
+<span class="comment"># Vision, structured output, PDFs — all via the same `ai` call</span>
+my $caption = ai "describe", image =&gt; "/photo.jpg"
+my $user    = ai "extract", schema =&gt; +{ name =&gt; "string", age =&gt; "int" }
+my $summary = ai "summarize", pdf =&gt; "/contract.pdf"
+
+<span class="comment"># Streaming as a real iterator</span>
+for my $chunk in stream_prompt("write a haiku") { print $chunk }
+
+<span class="comment"># Collection ops — single batched LLM call across the list</span>
+my @kept = @{ ai_filter(\@docs, "is about cooking") }
+my @summaries = @{ ai_map(\@articles, "summarize in one sentence") }
+
+<span class="comment"># RAG memory backed by sqlite</span>
+ai_memory_save("doc-1", "Stryke is the fastest Perl-5 interpreter")
+my $hits = ai_memory_recall("which language is fast", top_k =&gt; 3)
+
+<span class="comment"># MCP server in one block</span>
+mcp_server "filesystem" {
+    tool read_file($path: string) "Read file" { slurp $path }
+    tool list_dir($path: string) "List dir"   { join("\n", readdir $path) }
+}</pre>
+
+        <h3>Surface</h3>
+        <table class="reflection-table">
+          <thead><tr><th>Builtin</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>ai $prompt, opts...</code></td><td>Single-shot or auto-routed agent loop / vision / PDF / structured output</td></tr>
+            <tr><td><code>tool fn name(...) "doc" { }</code></td><td>Declare an agent-callable tool — auto-schemas signature, auto-attaches to <code>ai()</code></td></tr>
+            <tr><td><code>stream_prompt $p, on_chunk =&gt; sub { }</code></td><td>SSE streaming with callback or iterator-context for-loop</td></tr>
+            <tr><td><code>ai_filter / ai_map / ai_classify / ai_match / ai_sort / ai_dedupe</code></td><td>Collection ops — one batched call across the list</td></tr>
+            <tr><td><code>embed</code> / <code>vec_cosine</code> / <code>vec_search</code></td><td>Embeddings + cosine retrieval</td></tr>
+            <tr><td><code>ai_memory_save / recall / forget</code></td><td>Sqlite-backed RAG memory</td></tr>
+            <tr><td><code>mcp_connect("stdio:...")</code> / <code>mcp_connect("https://...")</code></td><td>MCP client (stdio + streamable HTTP)</td></tr>
+            <tr><td><code>mcp_server "name" { tool ... }</code></td><td>Programmatic MCP server in-process</td></tr>
+            <tr><td><code>ai_session_*</code></td><td>Multi-turn chat with auto-history</td></tr>
+            <tr><td><code>ai_budget($usd, sub { })</code></td><td>Scoped USD cap; errors if block exceeds</td></tr>
+            <tr><td><code>ai_batch(\@prompts)</code></td><td>Anthropic batch API at 50% cost</td></tr>
+            <tr><td><code>ai_pmap(\@items, "instruction", cluster =&gt; $c)</code></td><td>Distributed AI across cluster nodes</td></tr>
+            <tr><td><code>ai_transcribe "audio.mp3"</code> / <code>ai_speak $text</code></td><td>Whisper transcription / OpenAI TTS</td></tr>
+            <tr><td><code>ai_image $prompt, output =&gt; "out.png"</code></td><td>Image generation (DALL-E 3, gpt-image-1)</td></tr>
+            <tr><td><code>ai_image_edit $prompt, image =&gt; $src, mask =&gt; $m</code></td><td>Image-to-image edit with optional mask</td></tr>
+            <tr><td><code>ai_image_variation image =&gt; $src, n =&gt; 4</code></td><td>Variations of an existing image (DALL-E 2)</td></tr>
+            <tr><td><code>ai_dashboard()</code></td><td>ANSI summary: cost, tokens, cache hit-ratio</td></tr>
+            <tr><td><code>ai_pricing "claude-opus-4-7"</code></td><td>Pre-flight pricing hashref (input/output per 1k or 1m)</td></tr>
+            <tr><td><code>ai_describe "img.png", style =&gt; "alt"</code></td><td>Vision wrapper with concise/detailed/alt presets</td></tr>
+            <tr><td><code>ai_grounded $p, documents =&gt; [@paths]</code></td><td>Multi-doc grounding with auto-citations</td></tr>
+            <tr><td><code>ai_session_export</code> / <code>ai_session_import</code></td><td>Persist a chat session across runs as JSON</td></tr>
+            <tr><td><code>ai_models "openai"</code></td><td>Live model catalog from any provider</td></tr>
+            <tr><td><code>ai_pdf $p, pdf =&gt; $f, citations =&gt; 1</code> + <code>ai_citations()</code></td><td>Anthropic grounded responses with char/page offsets</td></tr>
+            <tr><td><code>ai_file_upload</code> / <code>list</code> / <code>get</code> / <code>delete</code></td><td>OpenAI Files API</td></tr>
+            <tr><td><code>ai_file_anthropic_upload</code> / <code>list</code> / <code>delete</code></td><td>Anthropic Files API (beta)</td></tr>
+            <tr><td><code>ai_moderate $text</code></td><td>OpenAI safety classifier (free)</td></tr>
+            <tr><td><code>ai_chunk $text, by =&gt; "sentences"</code></td><td>RAG text chunker (pure local)</td></tr>
+            <tr><td><code>ai_warm(model =&gt; ...)</code></td><td>Auth + reachability ping at script start</td></tr>
+            <tr><td><code>ai_compare $a, $b, criteria =&gt; "..."</code></td><td>Structured semantic comparison</td></tr>
+            <tr><td><code>stryke ai "prompt"</code></td><td>UNIX-filter CLI: <code>--model</code>, <code>--system</code>, <code>--stream</code>, <code>--json</code></td></tr>
+          </tbody>
+        </table>
+
+        <p>Providers: Anthropic (full surface incl. extended thinking, prompt caching, vision, PDF, batch), OpenAI (chat + tool-calls + streaming, Whisper, TTS), Voyage (embeddings, default), Ollama, OpenAI-compatible (<code>openai_compat</code> — LM Studio / vLLM / llama-server, configurable <code>STRYKE_AI_BASE_URL</code>), Google Gemini. Mock with <code>ai_mock_install</code> + <code>STRYKE_AI_MODE=mock-only</code> for deterministic CI.</p>
+
+        <p>Full reference: <a href="AI_PRIMITIVES.md">docs/AI_PRIMITIVES.md</a>.</p>
+      </section>
+
+      <section class="tutorial-section" style="border: 2px solid #ff2a6d; background: linear-gradient(135deg, rgba(255,42,109,0.08) 0%, transparent 50%);">
+        <h2 style="color:#ff2a6d;">Web Framework — <code>s_web</code></h2>
+        <p>Rails-shaped scaffold. Generator emits <code>.stk</code> source files; framework runtime is <code>web_*</code> builtins. The whole framework + your entire app + SQLite ships as a single <code>cargo build --release</code> binary via <code>s_web build</code>.</p>
+
+<pre><span class="comment"># One command — full-stack app, ~70 resources, dark cyberpunk theme,</span>
+<span class="comment"># auth + admin + Dockerfile + GitHub Actions + PWA + migrations.</span>
+$ s_web new mega --app everything --theme cyberpunk \
+    --auth --admin --docker --ci --pwa --migrate
+$ cd mega &amp;&amp; bin/server
+<span class="comment"># http://localhost:3000 — signup, login, /admin browses every model,</span>
+<span class="comment"># /health, /docs (Swagger UI), /openapi.json, ~490 CRUD routes.</span></pre>
+
+        <h3>Highlights</h3>
+        <table class="reflection-table">
+          <thead><tr><th>Concern</th><th>Builtins</th></tr></thead>
+          <tbody>
+            <tr><td>Routing</td><td><code>web_route</code>, <code>web_resources</code>, <code>web_root</code>, <code>/openapi.json</code> + <code>/docs</code> auto-served</td></tr>
+            <tr><td>ORM</td><td><code>Article::all/find/create/update/destroy</code> static methods generated per model; <code>web_model_paginate/search/soft_destroy/with</code></td></tr>
+            <tr><td>Migrations</td><td><code>web_create_table/drop_table/add_column</code> + <code>web_migrate/rollback</code> + <code>schema_migrations</code></td></tr>
+            <tr><td>Validations</td><td><code>web_validate(+{title =&gt; "presence,length:1..100"})</code></td></tr>
+            <tr><td>Auth</td><td><code>web_password_hash/verify</code>, sessions, signed tokens, <code>web_can</code>, <code>web_jwt_encode/decode</code>, <code>web_otp_*</code> 2FA</td></tr>
+            <tr><td>Views</td><td>ERB engine, layouts, partials, helpers (<code>web_link_to/form_with/text_field/button_to</code>, etc.)</td></tr>
+            <tr><td>Themes</td><td>9 baked-in: <code>simple</code>, <code>dark</code>, <code>pico</code>, <code>bootstrap</code>, <code>tailwind</code>, <code>cyberpunk</code>, <code>synthwave</code>, <code>terminal</code>, <code>matrix</code></td></tr>
+            <tr><td>Presets</td><td><code>blog</code>, <code>ecommerce</code>, <code>saas</code>, <code>social</code>, <code>cms</code>, <code>forum</code>, <code>crm</code>, <code>helpdesk</code>, <code>amazon</code>, <code>facebook</code>, <code>learning</code>, <code>everything</code></td></tr>
+            <tr><td>Generators</td><td><code>s_web g {scaffold, model, migration, controller, app, auth, admin, api, mailer, job, channel, docker, ci, pwa}</code></td></tr>
+            <tr><td>Fat binary</td><td><code>s_web build --out dist &amp;&amp; cd dist &amp;&amp; cargo build --release</code> — one self-contained executable, no runtime deps</td></tr>
+          </tbody>
+        </table>
+
+        <p>Full reference: <a href="WEB_FRAMEWORK.md">docs/WEB_FRAMEWORK.md</a> and <a href="https://github.com/MenkeTechnologies/strykelang/tree/main/stryke_web">stryke_web/README.md</a>.</p>
+      </section>
+
+      <section class="tutorial-section" style="border: 2px solid #39ff14; background: linear-gradient(135deg, rgba(57,255,20,0.08) 0%, transparent 50%);">
+        <h2 style="color:#39ff14;">Expect — Interactive Automation</h2>
+        <p>PTY-driven scripting; the modern Tcl/Expect successor with native cluster fanout.</p>
+
+<pre>my $h = pty_spawn("ssh user@host")
+pty_expect($h, qr/password:/, 30)
+pty_send($h, "$pw\n")
+pty_expect($h, qr/\$ /, 30)
+pty_send($h, "uptime\n")
+my $output = pty_expect($h, qr/\$ /, 30)
+pty_close($h)
+
+<span class="comment"># Table form (Tcl `expect { ... }` block)</span>
+my $tag = pty_expect_table($h, [
+    +{ re =&gt; qr/password:/, do =&gt; sub { pty_send($h, "$pw\n"); "ok" } },
+    +{ re =&gt; qr/yes\/no/,   do =&gt; sub { pty_send($h, "yes\n"); "confirmed" } },
+    +{ re =&gt; qr/denied/,    do =&gt; sub { die "auth failed" } },
+], 30)
+
+<span class="comment"># Method-form sugar</span>
+my $h = PtyHandle::spawn("ssh host")
+$h-&gt;expect(qr/password:/, 30)
+$h-&gt;send("$pw\n")
+$h-&gt;interact()   <span class="comment"># raw-mode handoff, Ctrl-] to detach</span>
+
+<span class="comment"># Parallel SSH automation across N hosts</span>
+my $cluster = cluster(["host1:8", "host2:8", "host3:8"])
+pmap_on $cluster @hosts -&gt; $host {
+    my $h = pty_spawn("ssh $host")
+    pty_expect($h, qr/\$ /, 30)
+    pty_send($h, "apt update && apt upgrade -y\n")
+    pty_expect($h, qr/\$ /, 1800)
+    pty_close($h)
+}</pre>
+
+        <p>Full design: <a href="expect-feature-idea.md">docs/expect-feature-idea.md</a>.</p>
+      </section>
+
+      <section class="tutorial-section" style="border: 2px solid #b967ff; background: linear-gradient(135deg, rgba(185,103,255,0.08) 0%, transparent 50%);">
+        <h2 style="color:#b967ff;">Package Manager</h2>
+        <p>Cargo-shaped manifest + lockfile, hash-pinned reproducible builds, parallel resolver. Single binary surface — no separate <code>cargo</code>-style entry point.</p>
+
+<pre>$ stryke new myapp                  <span class="comment"># scaffold project at ./myapp/</span>
+$ cd myapp
+$ stryke add http@^1.0 json         <span class="comment"># write deps to stryke.toml</span>
+$ stryke install                    <span class="comment"># resolve + write stryke.lock</span>
+$ stryke update                     <span class="comment"># re-resolve and rewrite stryke.lock</span>
+$ stryke outdated                   <span class="comment"># report deps drifted from their lock pin</span>
+$ stryke audit                      <span class="comment"># lockfile vs vulnerability advisory feed</span>
+$ stryke tree                       <span class="comment"># resolved dep graph</span>
+$ stryke info http                  <span class="comment"># lockfile entry for a dep</span>
+$ stryke vendor                     <span class="comment"># snapshot store deps to ./vendor/</span>
+$ stryke clean                      <span class="comment"># wipe target/</span>
+$ stryke run greet                  <span class="comment"># npm-style task from [scripts]</span>
+$ stryke install -g ../mytool       <span class="comment"># link [bin] launchers into ~/.stryke/bin/</span>
+$ stryke build --release            <span class="comment"># AOT-compile to single static binary</span></pre>
+
+        <h3>Project layout</h3>
+<pre>myapp/
+├── stryke.toml         <span class="comment"># manifest (name, deps, [scripts], [bin], [workspace])</span>
+├── stryke.lock         <span class="comment"># exact versions + integrity hashes</span>
+├── main.stk            <span class="comment"># entry point</span>
+├── lib/                <span class="comment"># module sources (require/use)</span>
+├── bin/                <span class="comment"># additional executables</span>
+├── t/                  <span class="comment"># tests (`stryke test t/`)</span>
+├── benches/            <span class="comment"># benchmarks (`stryke bench`)</span>
+└── target/             <span class="comment"># build outputs (gitignored)</span>
+    └── release/myapp   <span class="comment"># ← native machine code, scp-ready</span></pre>
+
+        <h3>Workspaces</h3>
+<pre><span class="comment"># stryke.toml at workspace root</span>
+[workspace]
+members = ["crates/*"]
+
+[workspace.deps]
+shared = { path = "../shared" }     <span class="comment"># one version pinned for the whole monorepo</span>
+
+<span class="comment"># In any member's stryke.toml</span>
+[deps]
+shared = { workspace = true }       <span class="comment"># inherit version + features</span></pre>
+
+        <p>Deps live globally in <code>~/.stryke/store/name@version/</code>. No <code>node_modules</code>-shaped per-project tree. Every dep hash-pinned in the lockfile (Nix-style reproducibility, Cargo-style ergonomics). Status: path deps + workspaces + full CLI surface (<code>new/init/add/remove/install/update/outdated/audit/tree/info/vendor/clean/run/install&nbsp;-g</code>) are wired and tested today; registry/git deps + PubGrub semver land when the registry endpoint is deployed (<code>search/publish/yank</code> stubs already return clear "registry not deployed yet" diagnostics). Full design: <a href="PACKAGE_REGISTRY.md">docs/PACKAGE_REGISTRY.md</a>.</p>
       </section>
 
       <section class="tutorial-section">
@@ -951,156 +1144,6 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
         <h3>Aligned with zshrs</h3>
         <p>Same rkyv shard pattern as <code>zshrs/src/daemon/shard.rs</code> — <code>mmap</code> + <code>check_archived_root</code> + zero-copy <code>ArchivedHashMap</code> lookup. zshrs uses per-source-tree shards driven by a daemon; stryke uses a single global shard since scripts are individually invoked. Same crate (<code>rkyv = "0.7"</code> with <code>validation</code>, <code>archive_le</code>, <code>size_32</code> features), same crash-safety story (<code>flock</code> on <code>scripts.rkyv.lock</code>, atomic-rename writes via tmp file + <code>fsync</code>), same versioning fields (<code>magic: u32</code> + <code>format_version: u32</code>).</p>
         <p>Full migration rationale, file-by-file diff, and reproducible bench harness at <a href="../docs/CACHE_RKYV_MIGRATION.md"><code>docs/CACHE_RKYV_MIGRATION.md</code></a>.</p>
-      </section>
-
-      <section class="tutorial-section">
-        <h2>zshrs — The Most Powerful Shell Ever Created</h2>
-        <p><code>zshrs</code> is a drop-in zsh replacement written in Rust. Full bash/zsh/fish compatibility, SQLite-indexed completions, and native stryke parallel operations.</p>
-
-        <h3>Why zshrs?</h3>
-        <table class="reflection-table" style="font-size:11px;">
-          <thead><tr><th>vs zsh</th><th>vs fish</th><th>vs bash</th></tr></thead>
-          <tbody>
-            <tr><td>10x faster startup</td><td>Full POSIX compat</td><td>Fish-quality UX</td></tr>
-            <tr><td>SQLite history (frequency, duration, exit status)</td><td>Runs <code>.bashrc</code> unchanged</td><td>Modern completions</td></tr>
-            <tr><td>Native stryke parallel ops</td><td>No syntax translation needed</td><td>Syntax highlighting</td></tr>
-            <tr><td>ZWC precompiled function support</td><td>Global/suffix aliases</td><td>Autosuggestions</td></tr>
-          </tbody>
-        </table>
-
-        <h3>Core features</h3>
-        <table class="reflection-table">
-          <thead><tr><th>Feature</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td><strong>zsh/bash/fish compat</strong></td><td>Runs <code>.zshrc</code>, <code>.bashrc</code>, shell scripts unchanged</td></tr>
-            <tr><td><strong>Fish-style highlighting</strong></td><td>Real-time colorization — commands green, strings yellow, errors red, variables cyan</td></tr>
-            <tr><td><strong>Fish-style autosuggestions</strong></td><td>Ghost-text completions from history, accept with →</td></tr>
-            <tr><td><strong>Fish-style abbreviations</strong></td><td><code>g</code> → <code>git</code>, <code>gco</code> → <code>git checkout</code>, expand with space</td></tr>
-            <tr><td><strong>SQLite completions</strong></td><td>FTS5 prefix search indexes all PATH executables for instant fuzzy completion</td></tr>
-            <tr><td><strong>SQLite history</strong></td><td>Frequency-ranked, timestamped, tracks duration and exit status per command</td></tr>
-            <tr><td><strong>Stryke mode</strong></td><td>Prefix any line with <code>@</code> for full parallel primitives</td></tr>
-            <tr><td><strong>ZWC support</strong></td><td>Reads compiled <code>.zwc</code> files for fast function loading</td></tr>
-            <tr><td><strong>Job control</strong></td><td>Full <code>&amp;</code>, <code>fg</code>, <code>bg</code>, <code>jobs</code>, <code>wait</code>, <code>disown</code></td></tr>
-            <tr><td><strong>Traps &amp; signals</strong></td><td><code>trap 'cmd' EXIT INT TERM ERR DEBUG</code></td></tr>
-            <tr><td><strong>Hooks</strong></td><td><code>precmd</code>, <code>preexec</code>, <code>chpwd</code>, <code>add-zsh-hook</code></td></tr>
-            <tr><td><strong>zsh modules</strong></td><td><code>zpty</code>, <code>zsocket</code>, <code>zprof</code>, <code>sched</code>, <code>zparseopts</code></td></tr>
-            <tr><td><strong>PCRE regex</strong></td><td><code>pcre_compile</code>, <code>pcre_match</code> with capture groups</td></tr>
-            <tr><td><strong>Shell emulation</strong></td><td><code>emulate zsh</code>, <code>bash</code>, <code>ksh</code>, <code>sh</code></td></tr>
-          </tbody>
-        </table>
-
-        <h3>Build options</h3>
-        <table class="reflection-table" style="font-size:11px;">
-          <thead><tr><th>Build</th><th>Size</th><th>@ mode</th><th>Command</th></tr></thead>
-          <tbody>
-            <tr><td>Fat</td><td>~24MB</td><td>Yes</td><td><code>cargo build --release</code> (strykelang)</td></tr>
-            <tr><td>Lean</td><td>~4MB</td><td>No</td><td><code>cargo build --release -p zsh</code></td></tr>
-          </tbody>
-        </table>
-
-        <h3>Usage</h3>
-<pre>zshrs                       # interactive shell
-zshrs -c 'echo hello'       # execute command
-zshrs script.sh             # run script file
-zshrs --dump-zwc file.zwc   # inspect compiled zsh files
-
-# In interactive mode, @ enters stryke (fat build only):
-$ @ 1:100 |&gt; sum |&gt; p
-5050
-$ @ fetch_json("https://api.github.com/users/octocat") |&gt; dd
-$ @ ls |&gt; pmap { stat(_)-&gt;{size} } |&gt; sum |&gt; p     # parallel file sizes
-$ @ glob("**/*.rs") |&gt; pgrep { slurp(_) =~ /TODO/ } |&gt; p</pre>
-
-        <h3>Default abbreviations (fish-style)</h3>
-        <p>Abbreviations expand inline when you press space — type <code>gs&lt;space&gt;</code> and it becomes <code>git status </code>.</p>
-        <table class="reflection-table" style="font-size:11px;">
-          <thead><tr><th>Abbr</th><th>Expansion</th><th>Abbr</th><th>Expansion</th></tr></thead>
-          <tbody>
-            <tr><td><code>g</code></td><td>git</td><td><code>ga</code></td><td>git add</td></tr>
-            <tr><td><code>gaa</code></td><td>git add --all</td><td><code>gc</code></td><td>git commit</td></tr>
-            <tr><td><code>gcm</code></td><td>git commit -m</td><td><code>gco</code></td><td>git checkout</td></tr>
-            <tr><td><code>gd</code></td><td>git diff</td><td><code>gds</code></td><td>git diff --staged</td></tr>
-            <tr><td><code>gp</code></td><td>git push</td><td><code>gpl</code></td><td>git pull</td></tr>
-            <tr><td><code>gs</code></td><td>git status</td><td><code>gsw</code></td><td>git switch</td></tr>
-            <tr><td><code>gb</code></td><td>git branch</td><td><code>gl</code></td><td>git log --oneline</td></tr>
-            <tr><td><code>cb</code></td><td>cargo build</td><td><code>cr</code></td><td>cargo run</td></tr>
-            <tr><td><code>ct</code></td><td>cargo test</td><td><code>cc</code></td><td>cargo check</td></tr>
-            <tr><td><code>cf</code></td><td>cargo fmt</td><td><code>ccl</code></td><td>cargo clippy</td></tr>
-            <tr><td><code>dc</code></td><td>docker compose</td><td><code>dcu</code></td><td>docker compose up</td></tr>
-            <tr><td><code>k</code></td><td>kubectl</td><td><code>kgp</code></td><td>kubectl get pods</td></tr>
-            <tr><td><code>...</code></td><td>../..</td><td><code>....</code></td><td>../../..</td></tr>
-          </tbody>
-        </table>
-
-        <h3>Full feature reference</h3>
-        <div class="cat-grid">
-          <div class="cat-card">
-            <h4>Parameter expansion</h4>
-            <p><code>${var:-default}</code>, <code>${#var}</code>, <code>${var:offset:len}</code>, <code>${var#pat}</code>, <code>${var/old/new}</code>, <code>${(U)var}</code>, <code>${(s/:/)var}</code>, <code>${(o)arr}</code>, <code>${(k)assoc}</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Arrays</h4>
-            <p><code>arr=(a b c)</code>, <code>${arr[1]}</code>, <code>${arr[-1]}</code>, <code>${arr[2,4]}</code>, <code>arr+=(d)</code>, <code>declare -A map</code>, <code>map[k]=v</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Control flow</h4>
-            <p><code>if/elif/else/fi</code>, <code>for/do/done</code>, <code>for ((;;))</code>, <code>while/until</code>, <code>case/esac</code>, <code>select</code>, <code>repeat N cmd</code>, <code>{} always {}</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Arithmetic</h4>
-            <p><code>$((expr))</code>, <code>((stmt))</code>, <code>let</code>, <code>+ - * / % **</code>, <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code>, <code>++ --</code>, <code>?: ,</code>, hex/octal/binary literals</p>
-          </div>
-          <div class="cat-card">
-            <h4>Conditionals</h4>
-            <p><code>[[ ]]</code>, <code>[ ]</code>, <code>-eq -ne -lt -gt</code>, <code>== != &lt; &gt;</code>, <code>-z -n</code>, <code>=~</code> regex, <code>-e -f -d -L -r -w -x -s -nt -ot</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Redirection</h4>
-            <p><code>&gt; &gt;&gt; &lt; 2&gt; &amp;&gt;</code>, <code>2&gt;&amp;1</code>, <code>&gt;|</code> force, heredoc <code>&lt;&lt;EOF</code>, herestring <code>&lt;&lt;&lt;</code>, process sub <code>&lt;(cmd)</code> <code>&gt;(cmd)</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Globbing</h4>
-            <p><code>* ? [abc] [!a] [a-z]</code>, <code>{a,b,c}</code>, <code>{1..10}</code>, <code>{0..10..2}</code>, <code>**/*.rs</code>, qualifiers <code>*(.) *(/) *(@) *(om)</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Functions</h4>
-            <p><code>f() {}</code>, <code>function f {}</code>, <code>local</code>, <code>return</code>, <code>$@ $* $#</code>, <code>autoload -Uz</code>, <code>functions</code>, <code>unfunction</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Aliases</h4>
-            <p><code>alias</code>, <code>unalias</code>, global <code>alias -g G='|grep'</code>, suffix <code>alias -s txt=cat</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Job control</h4>
-            <p><code>&amp;</code>, <code>jobs</code>, <code>fg</code>, <code>bg</code>, <code>wait</code>, <code>disown</code>, <code>suspend</code>, <code>kill</code>, <code>%1 %+ %- %?str</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Traps</h4>
-            <p><code>trap 'cmd' EXIT INT TERM ERR DEBUG CHLD</code>, <code>trap -</code> reset, <code>trap ''</code> ignore, <code>kill -l</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>History</h4>
-            <p><code>history</code>, <code>fc</code>, <code>!!</code>, <code>!-2</code>, <code>!42</code>, <code>!echo</code>, <code>!?pat</code>, <code>!$ !^ !*</code>, <code>^old^new</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Prompt</h4>
-            <p><code>%n %m %~ %? %j %T %D</code>, <code>\u \h \w \W \$</code>, <code>RPROMPT</code>, colors <code>%F{red} %f</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Hooks</h4>
-            <p><code>precmd</code>, <code>preexec</code>, <code>chpwd</code>, <code>periodic</code>, <code>add-zsh-hook</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>zsh modules</h4>
-            <p><code>zpty</code>, <code>zsocket</code>, <code>zprof</code>, <code>sched</code>, <code>zformat</code>, <code>zparseopts</code>, <code>zregexparse</code>, <code>pcre_compile/match</code>, <code>zstyle</code>, <code>zstat</code></p>
-          </div>
-          <div class="cat-card">
-            <h4>Options</h4>
-            <p><code>setopt/unsetopt</code>: <code>autocd</code>, <code>extendedglob</code>, <code>nullglob</code>, <code>pipefail</code>, <code>noclobber</code>, <code>histignorespace</code>, <code>sharehistory</code></p>
-          </div>
-        </div>
-
-        <p>See the <a href="https://github.com/MenkeTechnologies/strykelang#0x13-zshrs-shell">full zshrs documentation in README</a> for complete reference with examples.</p>
       </section>
 
       <section class="tutorial-section">

@@ -86,6 +86,17 @@ my $r = stream_prompt "write a story"                                  # streami
 my @vec = embed "hello world"                                          # single embedding
 my @vecs = embed @docs                                                 # batched
 my $resp = chat $messages, model: "claude-opus-4-7"                    # explicit message list
+
+# Audio (OpenAI Whisper / TTS)
+my $text  = ai_transcribe "podcast.mp3", model => "whisper-1", language => "en"
+my $bytes = ai_speak "Hello, world.", voice => "alloy", output => "out.mp3"
+
+# Image generation (OpenAI DALL-E 3 / gpt-image-1)
+my $png = ai_image "cyberpunk neon-lit alley", model => "dall-e-3",
+                   size => "1024x1024", quality => "hd", output => "alley.png"
+
+# Provider catalog
+my $catalog = ai_models "openai"      # arrayref of model IDs
 ```
 
 These are the building blocks `ai` itself is built on. Available when you want explicit control over the LLM interaction.
@@ -180,36 +191,63 @@ my $review = $agent.run("review PR 4523 against our coding standards")
 
 The bare `ai $prompt` is `ai_agent.run($prompt)` with sensible defaults. Same primitive, different ergonomics.
 
-## Provider Architecture
+## Provider Architecture — **SHIPPED**
 
 Configuration in `stryke.toml`:
 
 ```toml
 [ai]
-provider     = "anthropic"             # "anthropic" | "openai" | "google" | "local"
+provider     = "anthropic"             # "anthropic" | "openai" | "ollama" | "openai_compat" | "gemini"
 model        = "claude-opus-4-7"
 api_key_env  = "ANTHROPIC_API_KEY"
 cache        = true
 max_cost_run = 1.00                    # USD hard ceiling per program run
-fallback     = "local"                 # used when API unreachable
-
-[ai.local]
-model_path   = "embedded:claude-haiku-quantized"
-threads      = "all"
-gpu          = "auto"
 
 [ai.openai]
 api_key_env  = "OPENAI_API_KEY"
 model        = "gpt-4o"
 
+[ai.ollama]
+base_url     = "http://localhost:11434"
+model        = "llama3.2"
+
+[ai.openai_compat]                     # LM Studio / vLLM / llama-server / any OpenAI-shaped local server
+base_url     = "http://localhost:1234/v1/chat/completions"
+api_key_env  = "STRYKE_AI_LOCAL_KEY"   # optional; many local servers ignore auth
+model        = "local-model"
+
+[ai.gemini]
+api_key_env  = "GOOGLE_API_KEY"        # also accepts GEMINI_API_KEY
+model        = "gemini-2.5-flash"
+
 [ai.routing]
-embed        = "anthropic"             # different providers per operation
-classify     = "local"                 # cheap ops go local
+embed        = "voyage"                # different providers per operation
+classify     = "ollama"                # cheap ops go local
 ```
 
 The runtime picks the provider per call based on config. All providers expose a uniform interface; provider-specific extensions (Anthropic prompt caching, OpenAI streaming function calls, etc.) are accessible through provider-namespaced options when needed.
 
-**Local fallback** uses a llama.cpp-equivalent linked statically into the binary. The default ships a small quantized model so `ai` always works, even with no API key, even offline. Quality scales when a remote provider is configured.
+**Provider matrix (shipped today):**
+
+| Provider           | Identifier(s)                     | Auth env                                | Notes                                              |
+|--------------------|-----------------------------------|-----------------------------------------|----------------------------------------------------|
+| Anthropic          | `anthropic`, `claude`             | `ANTHROPIC_API_KEY`                     | Cache, extended thinking, vision, PDF, batch       |
+| OpenAI             | `openai`, `gpt`                   | `OPENAI_API_KEY`                        | Streaming, function calls, embeddings, Whisper, TTS |
+| Ollama             | `ollama`                          | (none — local)                          | Native `/api/generate`; no cost tracking           |
+| OpenAI-compatible  | `openai_compat`, `compat`, `local`| `STRYKE_AI_LOCAL_KEY` (optional)        | LM Studio / vLLM / llama-server; configurable base_url |
+| Google Gemini      | `gemini`, `google`                | `GOOGLE_API_KEY` or `GEMINI_API_KEY`    | `gemini-2.5-flash` default                         |
+| Voyage AI          | (embed default)                   | `VOYAGE_API_KEY`                        | Default embedding provider                         |
+
+Override the base URL at runtime with `STRYKE_AI_BASE_URL=...` for the `openai_compat` family — useful when pointing at any OpenAI-shaped endpoint without editing config.
+
+**Audio surface** — Whisper transcription + OpenAI TTS:
+
+```perl
+my $text = ai_transcribe("podcast.mp3", model => "whisper-1", language => "en");
+my $bytes = ai_speak("Hello, world.", voice => "alloy", model => "tts-1", format => "mp3", output => "out.mp3");
+```
+
+`ai_speak` returns the raw audio bytes; pass `output => "path"` to also write to disk.
 
 ## Cost & Latency
 
@@ -379,6 +417,56 @@ returns a mocked final string for tests.
 + docstring, auto-registration of all in-scope tools) is the parser
 extension — still Phase 1 to-do.
 
+### `tool fn` keyword — **SHIPPED**
+
+```stryke
+tool fn weather($city: string) "Get current weather for a city" {
+    "sunny in $city"
+}
+
+tool fn add_nums($a: int, $b: int) "Add two integers" {
+    $a + $b
+}
+
+# bare ai($prompt) auto-attaches every tool fn defined in scope:
+my $r = ai("what's the weather in Tokyo?");
+```
+
+How it ships: a source-level pre-pass in `strykelang/ai_sugar.rs`
+rewrites `tool fn NAME(args) "doc" { body }` into:
+
+```stryke
+fn NAME { my $__args__ = $_[0]; my $city = $__args__->{city}; ...body... }
+ai_register_tool("NAME", "doc", +{ city => "string" }, \&NAME);
+```
+
+Param types from the `: Type` annotation become the JSON Schema sent
+to the model. Optional `-> ReturnType` is parsed and ignored (used
+purely for documentation). Optional docstring is the model-visible
+description. Inside the body, params are bound as named locals so
+`tool fn weather($city: string) { ... $city ... }` works the same way
+the user wrote it.
+
+### `mcp_server "name" { ... }` declarative DSL — **SHIPPED**
+
+```stryke
+mcp_server "filesystem" {
+    tool read_file($path: string) "Read file contents" {
+        slurp $path
+    }
+    tool list_dir($path: string) "List directory entries" {
+        join("\n", grep { !/^\./ } readdir $path)
+    }
+}
+```
+
+Same source-level pre-pass: `mcp_server "name" { tool A() "..." {...}
+tool B() "..." {...} }` rewrites to a private set of `fn _mcp_name_A_0
+{...}` / `fn _mcp_name_B_1 {...}` declarations followed by
+`mcp_server_start("name", +{ tools => [+{name, description, parameters,
+run => \&_mcp_..._0}, ...] });`. Round-trip verified end-to-end
+against a stryke client.
+
 ### Tool registry (Phase 1 sugar) — **SHIPPED**
 
 For people who don't want to wait on the `tool fn` parser keyword,
@@ -421,6 +509,25 @@ Mock-mode hash-embeds deterministically so tests round-trip without
 the network. Verified: 4 docs saved, query "fast systems-level" picks
 "Stryke is the fastest Perl-5 interpreter" at score 0.7679 over the
 other three.
+
+### Real `Stream<Str>` iter context — **SHIPPED**
+
+`stream_prompt($p)` now returns a `PerlIterator`-backed handle that
+yields one text-delta chunk per `next()`:
+
+```stryke
+my $stream = stream_prompt("write a haiku");
+for my $chunk ($stream) {
+    print $chunk;
+    STDOUT->flush;
+}
+```
+
+Each call to `next_item` reads the next SSE delta from the live
+Anthropic connection. Mock mode falls back to a char-chunked iterator
+so tests can drive the same `for my $chunk in (...)` loop without the
+network. The on_chunk callback form (`stream_prompt($p, on_chunk =>
+sub { … })`) still works for push-style consumers.
 
 ### Streaming with `on_chunk` — **SHIPPED**
 
@@ -556,6 +663,7 @@ Provider/model picked at session creation, can be overridden per
 
 ### Prompt templates — **SHIPPED**
 
+{% raw %}
 ```stryke
 my $p = ai_template("hi {name}, age {age}", name => "Alice", age => 30);
 # → "hi Alice, age 30"
@@ -563,6 +671,7 @@ my $p = ai_template("hi {name}, age {age}", name => "Alice", age => 30);
 ai_template("escaped {{lit}}, real {key}", key => "yes");
 # → "{lit}}, real yes"  ({{ → literal {, missing keys pass through)
 ```
+{% endraw %}
 
 Pure string substitution. No code execution. Use as the prompt arg to
 `ai`/`prompt`/`chat`.
@@ -771,12 +880,61 @@ with scores `1.000, 0.707, 0.000`.
 - Predicted-cost static analysis.
 - Hot-loop lints.
 
-### Phase 4 — Local Models and Multi-Provider (months 8-10)
+### Phase 4 — Local Models and Multi-Provider — **SHIPPED (in-process llama.cpp deferred)**
 
-- llama.cpp linked, embedded model shipped.
-- Local fallback when API unreachable.
-- Routing config (`[ai.routing]` table).
-- Google/Gemini provider added.
+- ✅ Ollama provider (native `/api/generate`).
+- ✅ OpenAI-compatible provider (`openai_compat`/`compat`/`local`) — LM Studio, vLLM, llama-server, any OpenAI-shaped server. Configurable `STRYKE_AI_BASE_URL`.
+- ✅ Google Gemini provider (`gemini`/`google`) with `GOOGLE_API_KEY`/`GEMINI_API_KEY` auth.
+- ✅ Whisper transcription (`ai_transcribe`).
+- ✅ OpenAI TTS (`ai_speak`).
+- ✅ Image generation (`ai_image`) — DALL-E 3 + gpt-image-1 via `/v1/images/generations`. Returns raw PNG bytes for `n=1`, arrayref for `n>1`. Supports `output => "out.png"` to also write to disk.
+- ✅ Image editing (`ai_image_edit`) — `/v1/images/edits` with optional mask (PNG with transparent regions marking edit area).
+- ✅ Image variations (`ai_image_variation`) — `/v1/images/variations` (DALL-E 2 only — gpt-image-1 doesn't expose variations).
+- ✅ Cost dashboard (`ai_dashboard()`) — ANSI multi-line summary of running cost, token in/out, embed tokens, prompt-cache write/read, result-cache hit ratio.
+- ✅ Pricing lookup (`ai_pricing($model)`) — pre-flight per-1k-token costs the runtime uses.
+- ✅ Vision wrapper (`ai_describe`) — convenience over `ai_vision` with `style => "concise"|"detailed"|"alt"` presets.
+- ✅ Multi-document grounded responses (`ai_grounded $p, documents => [@paths]`) — Anthropic citations auto-enabled across mixed PDF + text + inline-string corpora.
+- ✅ Session persistence (`ai_session_export($h)` / `ai_session_import($json)`) — round-trip a multi-turn chat across runs.
+- ✅ Local embeddings (Ollama `/api/embed`) — third embed provider alongside Voyage and OpenAI. Default model `nomic-embed-text`. $0 cost.
+- ✅ Moderation (`ai_moderate`) — OpenAI `/v1/moderations`, free endpoint, returns `flagged`/`categories`/`scores`.
+- ✅ Anthropic Files API (`ai_file_anthropic_upload`/`list`/`delete`) — beta `/v1/files` endpoint (`files-api-2025-04-14`).
+- ✅ Text chunking (`ai_chunk`) — sliding-window or sentence-aware splitter for RAG. Pure local logic.
+- ✅ Warmup / auth verification (`ai_warm`) — 1-token ping, returns `ok`/`latency_ms`/`error`.
+- ✅ Semantic comparison (`ai_compare`) — single LLM call returning structured `winner`/`reason`/`scores` JSON.
+- ✅ CLI modal flags (`stryke ai --image|--transcribe|--speak`) — UNIX-filter surface now covers chat, image, audio.
+- ✅ Live model catalog (`ai_models($provider)`) — queries `/v1/models` (OpenAI/Anthropic), `/api/tags` (Ollama), `/v1beta/models` (Gemini).
+- ✅ Routing config (`[ai.routing]` table).
+- ⏳ In-process llama.cpp linked + embedded model — deferred. Shell-out via Ollama or LM Studio is the supported local path today.
+
+### Citations — **SHIPPED**
+
+Anthropic's grounded-response surface. Pass `citations => 1` to `ai_pdf` (and friends, as wiring extends) and the document blocks get `citations: { enabled: true }`. The model's text response carries citations attached to text blocks; we accumulate them into a thread-local buffer and surface them via `ai_citations()`.
+
+```stryke
+my $r = ai_pdf "Summarize the contract", pdf => "/legal/agreement.pdf",
+        citations => 1, title => "Master Services Agreement";
+for my $cite (@{ ai_citations() }) {
+    say "  [$cite->{title}] p$cite->{start_page}-$cite->{end_page}: $cite->{text}";
+}
+```
+
+Each citation hashref carries: `type`, `text` (the cited string), `title`, `document_index`, `start`/`end` char offsets (text docs) or `start_page`/`end_page` page numbers (PDFs).
+
+### Files API — **SHIPPED**
+
+OpenAI's `/v1/files` for uploading reference files (used by Whisper, Vision, Batch, Assistants):
+
+```stryke
+my $f = ai_file_upload "podcast.mp3", purpose => "user_data";
+say "uploaded $f->{id} ($f->{bytes} bytes)";
+
+my $files = ai_file_list();
+for my $f (@$files) { say "$f->{id}  $f->{filename}  $f->{purpose}" }
+
+ai_file_delete($f->{id}) or die "delete failed";
+```
+
+Builtins: `ai_file_upload`, `ai_file_list`, `ai_file_get`, `ai_file_delete`. All return native hashrefs/arrayrefs (JSON → PerlValue conversion is recursive).
 
 ### Phase 5 — Composition (months 10-12)
 

@@ -82,9 +82,8 @@ pub(crate) fn web_db_connect(args: &[PerlValue], line: usize) -> Result<PerlValu
             let _ = std::fs::create_dir_all(parent);
         }
     }
-    let conn = Connection::open(&path).map_err(|e| {
-        PerlError::runtime(format!("web_db_connect: open {}: {}", path, e), line)
-    })?;
+    let conn = Connection::open(&path)
+        .map_err(|e| PerlError::runtime(format!("web_db_connect: open {}: {}", path, e), line))?;
     // Sensible defaults for SQLite — same set Rails ships in dev.
     let _ = conn.execute_batch(
         "PRAGMA journal_mode = WAL;\n\
@@ -172,12 +171,7 @@ pub(crate) fn web_model_where(args: &[PerlValue], line: usize) -> Result<PerlVal
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| {
-            PerlError::runtime(
-                "web_model_where: second arg must be a hashref",
-                line,
-            )
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_model_where: second arg must be a hashref", line))?;
     let mut sql = format!("SELECT * FROM {}", quote_ident(&table));
     let mut bindings: Vec<rusqlite::types::Value> = Vec::new();
     if !cond.is_empty() {
@@ -286,10 +280,7 @@ pub(crate) fn web_model_update(args: &[PerlValue], line: usize) -> Result<PerlVa
         })?;
     let cols = table_columns(&table, line)?;
     let mut working = attrs.clone();
-    working.insert(
-        "updated_at".into(),
-        PerlValue::string(current_timestamp()),
-    );
+    working.insert("updated_at".into(), PerlValue::string(current_timestamp()));
     working.retain(|k, _| cols.iter().any(|c| c == k) && k != "id");
     if working.is_empty() {
         return Ok(PerlValue::integer(0));
@@ -325,14 +316,11 @@ pub(crate) fn web_model_destroy(args: &[PerlValue], line: usize) -> Result<PerlV
 /// Soft delete — sets `deleted_at` to the current timestamp instead of
 /// removing the row. Pair with `web_model_visible` to filter them out
 /// of subsequent queries.
-pub(crate) fn web_model_soft_destroy(
-    args: &[PerlValue],
-    line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_model_soft_destroy(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let table = require_table(args.first(), "web_model_soft_destroy", line)?;
-    let id = args.get(1).ok_or_else(|| {
-        PerlError::runtime("web_model_soft_destroy: id required", line)
-    })?;
+    let id = args
+        .get(1)
+        .ok_or_else(|| PerlError::runtime("web_model_soft_destroy: id required", line))?;
     let cols = table_columns(&table, line)?;
     if !cols.iter().any(|c| c == "deleted_at") {
         // Add the column on the fly so soft-delete works on tables
@@ -357,16 +345,10 @@ pub(crate) fn web_model_soft_destroy(
 
 /// Paginated SELECT: returns a hashref `{rows => [...], total => N,
 /// page => P, per_page => K, total_pages => …}`.
-pub(crate) fn web_model_paginate(
-    args: &[PerlValue],
-    line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_model_paginate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let table = require_table(args.first(), "web_model_paginate", line)?;
     let opts = parse_kv(&args[1.min(args.len())..]);
-    let page = opts
-        .get("page")
-        .map(|v| v.to_int().max(1))
-        .unwrap_or(1);
+    let page = opts.get("page").map(|v| v.to_int().max(1)).unwrap_or(1);
     let per_page = opts
         .get("per_page")
         .map(|v| v.to_int().clamp(1, 1000))
@@ -406,34 +388,21 @@ pub(crate) fn web_model_paginate(
     out.insert("total".to_string(), PerlValue::integer(total));
     out.insert("page".to_string(), PerlValue::integer(page));
     out.insert("per_page".to_string(), PerlValue::integer(per_page));
-    out.insert(
-        "total_pages".to_string(),
-        PerlValue::integer(total_pages),
-    );
+    out.insert("total_pages".to_string(), PerlValue::integer(total_pages));
     Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(out))))
 }
 
 /// LIKE-based search across one or more columns. `web_model_search("posts",
 /// "stryke", cols => ["title", "body"])` returns matching rows.
-pub(crate) fn web_model_search(
-    args: &[PerlValue],
-    line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_model_search(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let table = require_table(args.first(), "web_model_search", line)?;
-    let query = args
-        .get(1)
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let query = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let opts = parse_kv(&args[2.min(args.len())..]);
     let cols: Vec<String> = if let Some(v) = opts.get("cols") {
         if let Some(arr) = v.as_array_ref() {
             arr.read().iter().map(|x| x.to_string()).collect()
         } else {
-            v.clone()
-                .to_list()
-                .iter()
-                .map(|x| x.to_string())
-                .collect()
+            v.clone().to_list().iter().map(|x| x.to_string()).collect()
         }
     } else {
         return Err(PerlError::runtime(
@@ -500,10 +469,7 @@ pub(crate) fn web_model_last(args: &[PerlValue], line: usize) -> Result<PerlValu
 
 /// `web_model_increment("posts", id, "comments_count", 1)` — atomic
 /// `UPDATE … SET col = col + delta` for counter caches.
-pub(crate) fn web_model_increment(
-    args: &[PerlValue],
-    line: usize,
-) -> Result<PerlValue> {
+pub(crate) fn web_model_increment(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let table = require_table(args.first(), "web_model_increment", line)?;
     let id = args
         .get(1)
@@ -511,9 +477,7 @@ pub(crate) fn web_model_increment(
     let col = args
         .get(2)
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_model_increment: column required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_model_increment: column required", line))?;
     let by = args.get(3).map(|v| v.to_int()).unwrap_or(1);
     let sql = format!(
         "UPDATE {} SET {} = COALESCE({},0) + ?1 WHERE id = ?2",
@@ -521,10 +485,7 @@ pub(crate) fn web_model_increment(
         quote_ident(&col),
         quote_ident(&col)
     );
-    let bound = vec![
-        rusqlite::types::Value::Integer(by),
-        perl_to_sql_value(id),
-    ];
+    let bound = vec![rusqlite::types::Value::Integer(by), perl_to_sql_value(id)];
     let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
     Ok(PerlValue::integer(n as i64))
 }
@@ -589,7 +550,9 @@ pub(crate) fn web_model_with(args: &[PerlValue], line: usize) -> Result<PerlValu
             ))));
         }
     }
-    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        out,
+    ))))
 }
 
 fn pluralize_simple(s: &str) -> String {
@@ -644,18 +607,14 @@ pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue>
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| {
-            PerlError::runtime("web_validate: first arg must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_validate: first arg must be a hashref", line))?;
     let rules = args
         .get(1)
         .and_then(|v| {
             v.as_hash_map()
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
-        .ok_or_else(|| {
-            PerlError::runtime("web_validate: second arg must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_validate: second arg must be a hashref", line))?;
 
     let mut errors: IndexMap<String, PerlValue> = IndexMap::new();
     for (field, spec_v) in &rules {
@@ -674,13 +633,9 @@ pub(crate) fn web_validate(args: &[PerlValue], line: usize) -> Result<PerlValue>
             let (kind, arg) = raw.split_once(':').unwrap_or((raw, ""));
             let err = check_one_validator(field, &s, &value, &attrs, kind, arg);
             if let Some(msg) = err {
-                errors
-                    .entry(field.clone())
-                    .or_insert_with(|| {
-                        PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
-                            Vec::new(),
-                        )))
-                    });
+                errors.entry(field.clone()).or_insert_with(|| {
+                    PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(Vec::new())))
+                });
                 if let Some(arr) = errors.get(field).and_then(|v| v.as_array_ref()) {
                     arr.write().push(PerlValue::string(msg));
                 }
@@ -719,16 +674,10 @@ fn check_one_validator(
             let (min, max) = parse_range(arg).unwrap_or((0, i64::MAX));
             let n = s.chars().count() as i64;
             if n < min {
-                return Some(format!(
-                    "{} too short (minimum {} characters)",
-                    field, min
-                ));
+                return Some(format!("{} too short (minimum {} characters)", field, min));
             }
             if n > max {
-                return Some(format!(
-                    "{} too long (maximum {} characters)",
-                    field, max
-                ));
+                return Some(format!("{} too long (maximum {} characters)", field, max));
             }
             None
         }
@@ -757,10 +706,7 @@ fn check_one_validator(
             None
         }
         "confirmation" => {
-            let other = attrs
-                .get(arg)
-                .map(|v| v.to_string())
-                .unwrap_or_default();
+            let other = attrs.get(arg).map(|v| v.to_string()).unwrap_or_default();
             if other != s {
                 return Some(format!("{} doesn't match {}", field, arg));
             }
@@ -813,8 +759,7 @@ pub(crate) fn web_create_table(args: &[PerlValue], line: usize) -> Result<PerlVa
                 .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
         })
         .unwrap_or_default();
-    let mut col_defs: Vec<String> =
-        vec!["id INTEGER PRIMARY KEY AUTOINCREMENT".to_string()];
+    let mut col_defs: Vec<String> = vec!["id INTEGER PRIMARY KEY AUTOINCREMENT".to_string()];
     for (cname, ty) in &cols {
         col_defs.push(format!(
             "{} {}",
@@ -865,9 +810,7 @@ pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlV
     let col = args
         .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("web_remove_column: column name required", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("web_remove_column: column name required", line))?;
     // SQLite 3.35+ supports `DROP COLUMN`.
     let sql = format!(
         "ALTER TABLE {} DROP COLUMN {}",
@@ -886,11 +829,7 @@ pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlV
 // their `up` / `down` blocks in deterministic order.
 
 impl Interpreter {
-    pub(crate) fn web_migrate(
-        &mut self,
-        _args: &[PerlValue],
-        line: usize,
-    ) -> Result<PerlValue> {
+    pub(crate) fn web_migrate(&mut self, _args: &[PerlValue], line: usize) -> Result<PerlValue> {
         with_db(
             |c| {
                 exec_sql(
@@ -929,11 +868,7 @@ impl Interpreter {
         Ok(PerlValue::integer(applied_now.len() as i64))
     }
 
-    pub(crate) fn web_rollback(
-        &mut self,
-        _args: &[PerlValue],
-        line: usize,
-    ) -> Result<PerlValue> {
+    pub(crate) fn web_rollback(&mut self, _args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let applied = applied_versions(line)?;
         let mut migrations = self.collect_migration_classes();
         migrations.sort_by(|a, b| b.0.cmp(&a.0)); // descending
@@ -1051,10 +986,7 @@ fn quote_ident(name: &str) -> String {
     // quoting (alpha + digit + underscore). Reject anything else by
     // double-quoting and escaping internal quotes — same shape Rails
     // uses for `quote_column_name`.
-    if name
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
+    if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         name.to_string()
     } else {
         format!("\"{}\"", name.replace('"', "\"\""))
@@ -1085,10 +1017,7 @@ fn current_timestamp() -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m_num = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = y + if m_num <= 2 { 1 } else { 0 };
-    format!(
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-        y, m_num, d, h, m, s
-    )
+    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m_num, d, h, m, s)
 }
 
 fn stryke_type_to_sql(ty: &str) -> &'static str {
@@ -1123,4 +1052,359 @@ fn table_columns(table: &str, line: usize) -> Result<Vec<String>> {
 fn first_row_or_undef(rows: PerlValue) -> PerlValue {
     let list = rows.to_list();
     list.into_iter().next().unwrap_or(PerlValue::UNDEF)
+}
+
+// ── Background job queue ─────────────────────────────────────────────
+//
+// SQLite-backed `jobs` table:
+//   id INTEGER PRIMARY KEY, name TEXT, args_json TEXT,
+//   status TEXT (pending|running|done|failed),
+//   queue TEXT (default), priority INTEGER,
+//   created_at TEXT, locked_at TEXT, ran_at TEXT,
+//   error TEXT, attempts INTEGER, max_attempts INTEGER
+//
+// Builtins:
+//   web_jobs_init()                                    create table if missing
+//   web_job_enqueue("name", +{...args}, queue=>..., max_attempts=>3, priority=>0)
+//   web_job_dequeue(queue=>"default")                  → +{id,name,args,...} or undef
+//   web_job_complete(id)                               → 1
+//   web_job_fail(id, error=>"...")                     retry if attempts<max
+//   web_jobs_list(queue=>..., status=>..., limit=>50)  → arrayref
+//   web_jobs_stats()                                   → +{pending, running, done, failed}
+//   web_job_purge(status=>"done", older_than=>"7d")    cleanup
+
+const JOBS_DDL: &str = "\
+CREATE TABLE IF NOT EXISTS jobs (\n\
+  id INTEGER PRIMARY KEY,\n\
+  name TEXT NOT NULL,\n\
+  args_json TEXT NOT NULL DEFAULT '{}',\n\
+  status TEXT NOT NULL DEFAULT 'pending',\n\
+  queue TEXT NOT NULL DEFAULT 'default',\n\
+  priority INTEGER NOT NULL DEFAULT 0,\n\
+  attempts INTEGER NOT NULL DEFAULT 0,\n\
+  max_attempts INTEGER NOT NULL DEFAULT 1,\n\
+  created_at TEXT NOT NULL,\n\
+  locked_at TEXT,\n\
+  ran_at TEXT,\n\
+  error TEXT\n\
+);\n\
+CREATE INDEX IF NOT EXISTS idx_jobs_status_queue ON jobs(status, queue, priority DESC, id);\n";
+
+pub(crate) fn web_jobs_init(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    with_db(
+        |c| {
+            c.execute_batch(JOBS_DDL)
+                .map_err(|e| PerlError::runtime(format!("web_jobs_init: {}", e), line))?;
+            Ok(())
+        },
+        line,
+    )?;
+    Ok(PerlValue::UNDEF)
+}
+
+pub(crate) fn web_job_enqueue(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let name = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("web_job_enqueue: name required", line))?;
+    let args_json = args
+        .get(1)
+        .map(|v| crate::native_data::json_encode(v).unwrap_or_else(|_| "{}".to_string()))
+        .unwrap_or_else(|| "{}".to_string());
+
+    let kv = parse_kv(&args[2.min(args.len())..]);
+    let queue = kv
+        .get("queue")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let priority = kv.get("priority").map(|v| v.to_int()).unwrap_or(0);
+    let max_attempts = kv
+        .get("max_attempts")
+        .map(|v| v.to_int().max(1))
+        .unwrap_or(1);
+    let created_at = current_timestamp();
+
+    let id: i64 = with_db(
+        |c| {
+            // Upsert via raw INSERT to capture the rowid.
+            let mut stmt = c.prepare("INSERT INTO jobs (name, args_json, status, queue, priority, max_attempts, created_at) VALUES (?, ?, 'pending', ?, ?, ?, ?)")
+                .map_err(|e| PerlError::runtime(format!("web_job_enqueue: {}", e), line))?;
+            stmt.execute(rusqlite::params![
+                &name,
+                &args_json,
+                &queue,
+                priority,
+                max_attempts,
+                &created_at,
+            ])
+            .map_err(|e| PerlError::runtime(format!("web_job_enqueue: {}", e), line))?;
+            Ok(c.last_insert_rowid())
+        },
+        line,
+    )?;
+    Ok(PerlValue::integer(id))
+}
+
+pub(crate) fn web_job_dequeue(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let kv = parse_kv(args);
+    let queue = kv
+        .get("queue")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let now = current_timestamp();
+    let row: Option<(i64, String, String, i64, i64)> = with_db(
+        |c| {
+            // Pick highest-priority oldest pending job; mark as running.
+            let id: Option<i64> = c
+                .query_row(
+                    "SELECT id FROM jobs WHERE status = 'pending' AND queue = ? ORDER BY priority DESC, id ASC LIMIT 1",
+                    rusqlite::params![&queue],
+                    |r| r.get(0),
+                )
+                .ok();
+            let Some(id) = id else {
+                return Ok(None);
+            };
+            let updated = c
+                .execute(
+                    "UPDATE jobs SET status = 'running', locked_at = ?, attempts = attempts + 1 WHERE id = ? AND status = 'pending'",
+                    rusqlite::params![&now, id],
+                )
+                .map_err(|e| PerlError::runtime(format!("web_job_dequeue: {}", e), line))?;
+            if updated == 0 {
+                return Ok(None);
+            }
+            let row = c
+                .query_row(
+                    "SELECT id, name, args_json, attempts, max_attempts FROM jobs WHERE id = ?",
+                    rusqlite::params![id],
+                    |r| {
+                        Ok((
+                            r.get::<_, i64>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, String>(2)?,
+                            r.get::<_, i64>(3)?,
+                            r.get::<_, i64>(4)?,
+                        ))
+                    },
+                )
+                .map_err(|e| PerlError::runtime(format!("web_job_dequeue: {}", e), line))?;
+            Ok(Some(row))
+        },
+        line,
+    )?;
+    match row {
+        None => Ok(PerlValue::UNDEF),
+        Some((id, name, args_json, attempts, max_attempts)) => {
+            let mut h = IndexMap::new();
+            h.insert("id".to_string(), PerlValue::integer(id));
+            h.insert("name".to_string(), PerlValue::string(name));
+            h.insert(
+                "args_json".to_string(),
+                PerlValue::string(args_json.clone()),
+            );
+            // Provide pre-decoded args hashref/arrayref for ergonomic dispatch.
+            let parsed = crate::native_data::json_decode(&args_json).unwrap_or(PerlValue::UNDEF);
+            h.insert("args".to_string(), parsed);
+            h.insert("attempts".to_string(), PerlValue::integer(attempts));
+            h.insert("max_attempts".to_string(), PerlValue::integer(max_attempts));
+            Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+        }
+    }
+}
+
+pub(crate) fn web_job_complete(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .map(|v| v.to_int())
+        .ok_or_else(|| PerlError::runtime("web_job_complete: id required", line))?;
+    let now = current_timestamp();
+    with_db(
+        |c| {
+            c.execute(
+                "UPDATE jobs SET status = 'done', ran_at = ?, error = NULL WHERE id = ?",
+                rusqlite::params![&now, id],
+            )
+            .map_err(|e| PerlError::runtime(format!("web_job_complete: {}", e), line))?;
+            Ok(())
+        },
+        line,
+    )?;
+    Ok(PerlValue::integer(1))
+}
+
+pub(crate) fn web_job_fail(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let id = args
+        .first()
+        .map(|v| v.to_int())
+        .ok_or_else(|| PerlError::runtime("web_job_fail: id required", line))?;
+    let kv = parse_kv(&args[1.min(args.len())..]);
+    let error = kv
+        .get("error")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "<unspecified>".to_string());
+    let now = current_timestamp();
+    let new_status = with_db(
+        |c| {
+            // If attempts < max_attempts, retry; else mark failed.
+            let (attempts, max_attempts): (i64, i64) = c
+                .query_row(
+                    "SELECT attempts, max_attempts FROM jobs WHERE id = ?",
+                    rusqlite::params![id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .map_err(|e| PerlError::runtime(format!("web_job_fail: {}", e), line))?;
+            let next = if attempts < max_attempts {
+                "pending"
+            } else {
+                "failed"
+            };
+            c.execute(
+                "UPDATE jobs SET status = ?, ran_at = ?, error = ? WHERE id = ?",
+                rusqlite::params![next, &now, &error, id],
+            )
+            .map_err(|e| PerlError::runtime(format!("web_job_fail: {}", e), line))?;
+            Ok(next.to_string())
+        },
+        line,
+    )?;
+    Ok(PerlValue::string(new_status))
+}
+
+pub(crate) fn web_jobs_list(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let kv = parse_kv(args);
+    let queue = kv.get("queue").map(|v| v.to_string());
+    let status = kv.get("status").map(|v| v.to_string());
+    let limit = kv.get("limit").map(|v| v.to_int().max(1)).unwrap_or(50);
+    let mut sql = String::from(
+        "SELECT id, name, args_json, status, queue, priority, attempts, max_attempts, created_at, locked_at, ran_at, error FROM jobs WHERE 1=1",
+    );
+    let mut binds: Vec<rusqlite::types::Value> = Vec::new();
+    if let Some(q) = queue {
+        sql.push_str(" AND queue = ?");
+        binds.push(rusqlite::types::Value::Text(q));
+    }
+    if let Some(s) = status {
+        sql.push_str(" AND status = ?");
+        binds.push(rusqlite::types::Value::Text(s));
+    }
+    sql.push_str(" ORDER BY id DESC LIMIT ?");
+    binds.push(rusqlite::types::Value::Integer(limit));
+
+    let rows: Vec<PerlValue> = with_db(
+        |c| {
+            let mut stmt = c
+                .prepare(&sql)
+                .map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+            let params = rusqlite::params_from_iter(binds.iter());
+            let row_iter = stmt
+                .query_map(params, |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                        r.get::<_, String>(3)?,
+                        r.get::<_, String>(4)?,
+                        r.get::<_, i64>(5)?,
+                        r.get::<_, i64>(6)?,
+                        r.get::<_, i64>(7)?,
+                        r.get::<_, String>(8)?,
+                        r.get::<_, Option<String>>(9)?,
+                        r.get::<_, Option<String>>(10)?,
+                        r.get::<_, Option<String>>(11)?,
+                    ))
+                })
+                .map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+            let mut out: Vec<PerlValue> = Vec::new();
+            for r in row_iter {
+                let (
+                    id,
+                    name,
+                    args_json,
+                    status,
+                    queue,
+                    priority,
+                    attempts,
+                    max_attempts,
+                    created_at,
+                    locked_at,
+                    ran_at,
+                    error,
+                ) = r.map_err(|e| PerlError::runtime(format!("web_jobs_list: {}", e), line))?;
+                let mut h = IndexMap::new();
+                h.insert("id".to_string(), PerlValue::integer(id));
+                h.insert("name".to_string(), PerlValue::string(name));
+                h.insert("args_json".to_string(), PerlValue::string(args_json));
+                h.insert("status".to_string(), PerlValue::string(status));
+                h.insert("queue".to_string(), PerlValue::string(queue));
+                h.insert("priority".to_string(), PerlValue::integer(priority));
+                h.insert("attempts".to_string(), PerlValue::integer(attempts));
+                h.insert("max_attempts".to_string(), PerlValue::integer(max_attempts));
+                h.insert("created_at".to_string(), PerlValue::string(created_at));
+                h.insert(
+                    "locked_at".to_string(),
+                    locked_at.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                );
+                h.insert(
+                    "ran_at".to_string(),
+                    ran_at.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                );
+                h.insert(
+                    "error".to_string(),
+                    error.map(PerlValue::string).unwrap_or(PerlValue::UNDEF),
+                );
+                out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))));
+            }
+            Ok(out)
+        },
+        line,
+    )?;
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(
+        rows,
+    ))))
+}
+
+pub(crate) fn web_jobs_stats(_args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let stats: IndexMap<String, i64> = with_db(
+        |c| {
+            let mut out = IndexMap::new();
+            for status in &["pending", "running", "done", "failed"] {
+                let n: i64 = c
+                    .query_row(
+                        "SELECT COUNT(*) FROM jobs WHERE status = ?",
+                        rusqlite::params![status],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                out.insert((*status).to_string(), n);
+            }
+            Ok(out)
+        },
+        line,
+    )?;
+    let mut h = IndexMap::new();
+    for (k, v) in stats {
+        h.insert(k, PerlValue::integer(v));
+    }
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
+}
+
+pub(crate) fn web_job_purge(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let kv = parse_kv(args);
+    let status = kv
+        .get("status")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "done".to_string());
+    let n: i64 = with_db(
+        |c| {
+            c.execute(
+                "DELETE FROM jobs WHERE status = ?",
+                rusqlite::params![&status],
+            )
+            .map(|n| n as i64)
+            .map_err(|e| PerlError::runtime(format!("web_job_purge: {}", e), line))
+        },
+        line,
+    )?;
+    Ok(PerlValue::integer(n))
 }

@@ -8,6 +8,7 @@
 
 pub mod agent;
 pub mod ai;
+pub mod ai_sugar;
 pub mod aop;
 pub mod aot;
 pub mod ast;
@@ -68,6 +69,7 @@ pub mod rust_ffi;
 pub mod rust_sugar;
 pub mod scope;
 pub mod script_cache;
+pub mod secrets;
 mod sort_fast;
 pub mod special_vars;
 pub mod static_analysis;
@@ -187,7 +189,8 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<
     let desugared = if compat_mode() {
         code.to_string()
     } else {
-        rust_sugar::desugar_rust_blocks(code)
+        let s = rust_sugar::desugar_rust_blocks(code);
+        ai_sugar::desugar(&s)
     };
     let mut lexer = lexer::Lexer::new_with_file(&desugared, file);
     let tokens = lexer.tokenize()?;

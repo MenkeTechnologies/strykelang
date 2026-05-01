@@ -86,22 +86,16 @@ fn lookup(handle: &PerlValue, line: usize) -> Result<Arc<Mutex<McpHandle>>> {
     let map = handle
         .as_hash_map()
         .or_else(|| handle.as_hash_ref().map(|h| h.read().clone()))
-        .ok_or_else(|| {
-            PerlError::runtime("mcp: handle must be a hashref", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("mcp: handle must be a hashref", line))?;
     let id = map
         .get("__mcp_id__")
         .map(|v| v.to_int() as u64)
-        .ok_or_else(|| {
-            PerlError::runtime("mcp: hashref missing `__mcp_id__`", line)
-        })?;
+        .ok_or_else(|| PerlError::runtime("mcp: hashref missing `__mcp_id__`", line))?;
     registry()
         .lock()
         .get(&id)
         .cloned()
-        .ok_or_else(|| {
-            PerlError::runtime(format!("mcp: handle id {} not found", id), line)
-        })
+        .ok_or_else(|| PerlError::runtime(format!("mcp: handle id {} not found", id), line))
 }
 
 fn handle_id(v: &PerlValue) -> Option<u64> {
@@ -122,15 +116,13 @@ fn make_handle_value(id: u64, name: &str) -> PerlValue {
 // ── mcp_connect ───────────────────────────────────────────────────────
 
 pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let url = args
-        .first()
+    let url = args.first().map(|v| v.to_string()).ok_or_else(|| {
+        PerlError::runtime("mcp_connect: usage: mcp_connect(\"stdio:CMD ARGS\")", line)
+    })?;
+    let name = args
+        .get(1)
         .map(|v| v.to_string())
-        .ok_or_else(|| {
-            PerlError::runtime("mcp_connect: usage: mcp_connect(\"stdio:CMD ARGS\")", line)
-        })?;
-    let name = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| {
-        url.split(':').nth(1).unwrap_or("mcp").to_string()
-    });
+        .unwrap_or_else(|| url.split(':').nth(1).unwrap_or("mcp").to_string());
 
     // HTTP transport — streamable HTTP MCP servers (Anthropic spec).
     if url.starts_with("http://") || url.starts_with("https://") {
@@ -139,7 +131,10 @@ pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 
     let cmd_str = url.strip_prefix("stdio:").ok_or_else(|| {
         PerlError::runtime(
-            format!("mcp_connect: unsupported transport `{}` — only `stdio:` and `http(s)://` wired", url),
+            format!(
+                "mcp_connect: unsupported transport `{}` — only `stdio:` and `http(s)://` wired",
+                url
+            ),
             line,
         )
     })?;
@@ -155,15 +150,17 @@ pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> 
     cmd.stdin(Stdio::piped());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::null());
-    let mut child = cmd.spawn().map_err(|e| {
-        PerlError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line)
-    })?;
-    let stdin = child.stdin.take().ok_or_else(|| {
-        PerlError::runtime("mcp_connect: missing stdin", line)
-    })?;
-    let stdout = child.stdout.take().ok_or_else(|| {
-        PerlError::runtime("mcp_connect: missing stdout", line)
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| PerlError::runtime(format!("mcp_connect: spawn {}: {}", parts[0], e), line))?;
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| PerlError::runtime("mcp_connect: missing stdin", line))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| PerlError::runtime("mcp_connect: missing stdout", line))?;
     let stdout = BufReader::new(stdout);
 
     let mut handle = McpHandle {
@@ -198,9 +195,8 @@ pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> 
         rpc_send(stdin, &init).map_err(|e| {
             PerlError::runtime(format!("mcp_connect: send initialize: {}", e), line)
         })?;
-        rpc_recv(stdout, init_id).map_err(|e| {
-            PerlError::runtime(format!("mcp_connect: initialize: {}", e), line)
-        })?;
+        rpc_recv(stdout, init_id)
+            .map_err(|e| PerlError::runtime(format!("mcp_connect: initialize: {}", e), line))?;
         let initialized = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized",
@@ -218,9 +214,11 @@ pub(crate) fn mcp_connect(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 // ── mcp_tools / mcp_resources / mcp_prompts ──────────────────────────
 
 pub(crate) fn mcp_tools(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_tools: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_tools: handle required", line))?,
+        line,
+    )?;
     let cached = h.lock().cached_tools.clone();
     let list = match cached {
         Some(t) => t,
@@ -235,9 +233,11 @@ pub(crate) fn mcp_tools(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn mcp_resources(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_resources: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_resources: handle required", line))?,
+        line,
+    )?;
     let cached = h.lock().cached_resources.clone();
     let list = match cached {
         Some(r) => r,
@@ -252,9 +252,11 @@ pub(crate) fn mcp_resources(args: &[PerlValue], line: usize) -> Result<PerlValue
 }
 
 pub(crate) fn mcp_prompts(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_prompts: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_prompts: handle required", line))?,
+        line,
+    )?;
     let cached = h.lock().cached_prompts.clone();
     let list = match cached {
         Some(p) => p,
@@ -271,9 +273,11 @@ pub(crate) fn mcp_prompts(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 // ── mcp_call ──────────────────────────────────────────────────────────
 
 pub(crate) fn mcp_call(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_call: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_call: handle required", line))?,
+        line,
+    )?;
     let tool_name = args
         .get(1)
         .map(|v| v.to_string())
@@ -293,9 +297,11 @@ pub(crate) fn mcp_call(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 }
 
 pub(crate) fn mcp_resource(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_resource: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_resource: handle required", line))?,
+        line,
+    )?;
     let uri = args
         .get(1)
         .map(|v| v.to_string())
@@ -310,9 +316,11 @@ pub(crate) fn mcp_resource(args: &[PerlValue], line: usize) -> Result<PerlValue>
 }
 
 pub(crate) fn mcp_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h = lookup(args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_prompt: handle required", line)
-    })?, line)?;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| PerlError::runtime("mcp_prompt: handle required", line))?,
+        line,
+    )?;
     let name = args
         .get(1)
         .map(|v| v.to_string())
@@ -334,9 +342,9 @@ pub(crate) fn mcp_prompt(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // ── mcp_close ─────────────────────────────────────────────────────────
 
 pub(crate) fn mcp_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h_v = args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_close: handle required", line)
-    })?;
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("mcp_close: handle required", line))?;
     let h = lookup(h_v, line)?;
     let id = handle_id(h_v).unwrap_or(0);
     {
@@ -359,12 +367,11 @@ pub(crate) fn mcp_close(args: &[PerlValue], line: usize) -> Result<PerlValue> {
 // ── Auto-attach to ai ─────────────────────────────────────────────────
 
 pub(crate) fn mcp_attach_to_ai(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h_v = args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_attach_to_ai: handle required", line)
-    })?;
-    let id = handle_id(h_v).ok_or_else(|| {
-        PerlError::runtime("mcp_attach_to_ai: handle id missing", line)
-    })?;
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("mcp_attach_to_ai: handle required", line))?;
+    let id = handle_id(h_v)
+        .ok_or_else(|| PerlError::runtime("mcp_attach_to_ai: handle id missing", line))?;
     let mut g = attached().lock();
     if !g.contains(&id) {
         g.push(id);
@@ -373,12 +380,11 @@ pub(crate) fn mcp_attach_to_ai(args: &[PerlValue], line: usize) -> Result<PerlVa
 }
 
 pub(crate) fn mcp_detach_from_ai(args: &[PerlValue], line: usize) -> Result<PerlValue> {
-    let h_v = args.first().ok_or_else(|| {
-        PerlError::runtime("mcp_detach_from_ai: handle required", line)
-    })?;
-    let id = handle_id(h_v).ok_or_else(|| {
-        PerlError::runtime("mcp_detach_from_ai: handle id missing", line)
-    })?;
+    let h_v = args
+        .first()
+        .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle required", line))?;
+    let id = handle_id(h_v)
+        .ok_or_else(|| PerlError::runtime("mcp_detach_from_ai: handle id missing", line))?;
     attached().lock().retain(|x| *x != id);
     Ok(PerlValue::UNDEF)
 }
@@ -498,7 +504,13 @@ fn mcp_connect_http(url: &str, name: &str, line: usize) -> Result<PerlValue> {
             "clientInfo": { "name": "stryke", "version": "0.1.0" }
         }
     });
-    if let McpTransport::Http { url, bearer, agent, session_id } = &mut handle.transport {
+    if let McpTransport::Http {
+        url,
+        bearer,
+        agent,
+        session_id,
+    } = &mut handle.transport
+    {
         let resp = http_rpc(agent, url, bearer.as_deref(), session_id, &init, line)?;
         let _ = resp;
         // Anthropic streamable-HTTP MCP returns mcp-session-id; carry
@@ -511,7 +523,13 @@ fn mcp_connect_http(url: &str, name: &str, line: usize) -> Result<PerlValue> {
         "jsonrpc": "2.0",
         "method": "notifications/initialized",
     });
-    if let McpTransport::Http { url, bearer, agent, session_id } = &mut handle.transport {
+    if let McpTransport::Http {
+        url,
+        bearer,
+        agent,
+        session_id,
+    } = &mut handle.transport
+    {
         // Best-effort post; ignore body.
         let mut req_builder = agent
             .post(url)
@@ -596,10 +614,9 @@ fn http_rpc(
         ))
     } else {
         // Plain JSON response.
-        let v: serde_json::Value =
-            resp.into_json().map_err(|e| {
-                PerlError::runtime(format!("mcp http: decode: {}", e), line)
-            })?;
+        let v: serde_json::Value = resp
+            .into_json()
+            .map_err(|e| PerlError::runtime(format!("mcp http: decode: {}", e), line))?;
         Ok(v)
     }
 }
@@ -628,12 +645,10 @@ fn call_method(
     });
     let resp = match &mut g.transport {
         McpTransport::Stdio { stdin, stdout, .. } => {
-            rpc_send(stdin, &req).map_err(|e| {
-                PerlError::runtime(format!("mcp: {}: send: {}", method, e), line)
-            })?;
-            rpc_recv(stdout, id).map_err(|e| {
-                PerlError::runtime(format!("mcp: {}: recv: {}", method, e), line)
-            })?
+            rpc_send(stdin, &req)
+                .map_err(|e| PerlError::runtime(format!("mcp: {}: send: {}", method, e), line))?;
+            rpc_recv(stdout, id)
+                .map_err(|e| PerlError::runtime(format!("mcp: {}: recv: {}", method, e), line))?
         }
         McpTransport::Http {
             url,
@@ -658,7 +673,10 @@ fn rpc_send(stdin: &mut ChildStdin, msg: &serde_json::Value) -> std::io::Result<
     stdin.flush()
 }
 
-fn rpc_recv(stdout: &mut BufReader<ChildStdout>, want_id: u64) -> std::io::Result<serde_json::Value> {
+fn rpc_recv(
+    stdout: &mut BufReader<ChildStdout>,
+    want_id: u64,
+) -> std::io::Result<serde_json::Value> {
     // Read line-delimited JSON-RPC. Skip notifications (no `id`) and
     // any responses with a different id.
     loop {
@@ -675,7 +693,10 @@ fn rpc_recv(stdout: &mut BufReader<ChildStdout>, want_id: u64) -> std::io::Resul
             continue;
         }
         let v: serde_json::Value = serde_json::from_str(trimmed).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{}: {}", e, trimmed))
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("{}: {}", e, trimmed),
+            )
         })?;
         if let Some(id) = v.get("id").and_then(|x| x.as_u64()) {
             if id == want_id {
@@ -734,8 +755,7 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
         return serde_json::Value::Object(out);
     }
     if let Some(arr) = v.as_array_ref() {
-        let items: Vec<serde_json::Value> =
-            arr.read().iter().map(perl_to_json).collect();
+        let items: Vec<serde_json::Value> = arr.read().iter().map(perl_to_json).collect();
         return serde_json::Value::Array(items);
     }
     if let Some(i) = v.as_integer() {
@@ -787,12 +807,12 @@ impl crate::interpreter::Interpreter {
         args: &[PerlValue],
         line: usize,
     ) -> Result<PerlValue> {
-        let name = args
-            .first()
-            .map(|v| v.to_string())
-            .ok_or_else(|| {
-                PerlError::runtime("mcp_server_start: usage: mcp_server_start(\"name\", +{tools => [...]})", line)
-            })?;
+        let name = args.first().map(|v| v.to_string()).ok_or_else(|| {
+            PerlError::runtime(
+                "mcp_server_start: usage: mcp_server_start(\"name\", +{tools => [...]})",
+                line,
+            )
+        })?;
         let opts_v = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
         let opts = opts_v
             .as_hash_map()
@@ -819,6 +839,48 @@ pub(crate) fn mcp_server_start_dispatch(
     line: usize,
 ) -> Result<PerlValue> {
     interp.mcp_server_start(args, line)
+}
+
+/// `mcp_serve_registered_tools($server_name)` — convert every tool
+/// registered via `ai_register_tool` (or `tool fn` desugar) into the
+/// MCP server schema and start the stdio JSON-RPC loop. This is the
+/// runtime side of `s build --mcp-server` / `stryke --mcp-server` —
+/// both flags eventually call this after the user's script has had a
+/// chance to register its tools.
+pub(crate) fn mcp_serve_registered_tools(
+    interp: &mut Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> Result<PerlValue> {
+    let name = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "stryke-mcp".to_string());
+    let registered = crate::ai::registered_tools().lock().clone();
+    if registered.is_empty() {
+        return Err(PerlError::runtime(
+            "mcp_serve_registered_tools: no tools registered — call `tool fn name { ... }` or `ai_register_tool(...)` before serving",
+            line,
+        ));
+    }
+    let tools: Vec<ServerTool> = registered
+        .into_iter()
+        .map(|rt| ServerTool {
+            input_schema: server_params_to_schema(&rt.parameters),
+            name: rt.name,
+            description: rt.description,
+            run_sub: rt.run_sub,
+        })
+        .collect();
+    run_stdio_server(interp, &name, &tools, line)
+}
+
+pub(crate) fn mcp_serve_registered_tools_dispatch(
+    interp: &mut Interpreter,
+    args: &[PerlValue],
+    line: usize,
+) -> Result<PerlValue> {
+    mcp_serve_registered_tools(interp, args, line)
 }
 
 fn compile_server_tool(v: &PerlValue, line: usize) -> Result<ServerTool> {
@@ -956,7 +1018,10 @@ fn run_stdio_server(
             }
             "tools/call" => {
                 let tool_name = params["name"].as_str().unwrap_or("").to_string();
-                let args_json = params.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+                let args_json = params
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
                 match tools.iter().find(|t| t.name == tool_name) {
                     Some(t) => {
                         let arg_perl = json_to_perl(&args_json);

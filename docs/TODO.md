@@ -1,4 +1,13 @@
-  Bugs Documented/Worked Around (not fixable without major changes)
+  # Stryke TODO — Known Limitations + Optimization Backlog
+
+  This file tracks (1) shipped-but-imperfect surface that has documented workarounds
+  and (2) the optimization menu that's still on the table now that stryke beats LuaJIT
+  on loop/array/regex without any of the heavy techniques applied.
+
+  Feature shipping status lives in ROADMAP.md, AI_PRIMITIVES.md, PACKAGE_REGISTRY.md,
+  and WEB_FRAMEWORK.md. This document is for crash-known bugs and JIT/perf work.
+
+  ## Bugs Documented/Worked Around (not fixable without major changes)
 
   1. Arrays don't share state in closures - Arrays captured by closures are copied, not shared. Use
       arrayref ($tokens = []) instead.
@@ -12,7 +21,9 @@
 
 
 
-        Think about what's still on the table. stryke beat LuaJIT with:
+  ## What's still on the table
+
+  stryke beat LuaJIT with:
 
   - Not all ops lowered yet
   - No Cranelift JIT — still interpreting bytecodes

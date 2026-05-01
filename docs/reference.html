@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.10.5 · 3288 topics · 34 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.11.0 · 3549 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -172,7 +172,7 @@
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
-        <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">28</span></li>
+        <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
         <li><a href="#ch-data-serialization">Data &amp; Serialization</a> <span class="chapter-count">45</span></li>
         <li><a href="#ch-http-networking">HTTP &amp; Networking</a> <span class="chapter-count">23</span></li>
         <li><a href="#ch-crypto-encoding">Crypto &amp; Encoding</a> <span class="chapter-count">133</span></li>
@@ -200,7 +200,12 @@
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2618</span></li>
+        <li><a href="#ch-ai-primitives-docs-ai-primitives-md">AI primitives (docs/AI_PRIMITIVES.md)</a> <span class="chapter-count">79</span></li>
+        <li><a href="#ch-mcp-model-context-protocol">MCP (Model Context Protocol)</a> <span class="chapter-count">13</span></li>
+        <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
+        <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
+        <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2620</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -1374,7 +1379,7 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
     </section>
     <section class="tutorial-section" id="ch-stryke-extensions">
       <h2>stryke Extensions</h2>
-      <p class="chapter-meta">28 topics</p>
+      <p class="chapter-meta">19 topics</p>
       <article class="doc-entry" id="doc-fn">
         <h3><a class="doc-anchor" href="#doc-fn">#</a> <code>fn</code></h3>
         <p>Define a named or anonymous function with optional typed parameters and default values. Named functions are installed into the current package; anonymous functions (closures) capture their enclosing lexical scope. Functions are first-class values — assign them to scalars, store in arrays, pass as callbacks. The last expression evaluated is the implicit return value unless an explicit <code>return</code> is used.</p>
@@ -1575,127 +1580,6 @@ for (1:10) {
         <pre><code class="lang-perl">my $r = capture(&quot;ls -la&quot;)
 p $r-&gt;stdout, $r-&gt;stderr, $r-&gt;exitcode
 capture(&quot;ps aux&quot;) |&gt; lines |&gt; map { columns } |&gt; tbl |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-range-literals">
-        <h3><a class="doc-anchor" href="#doc-range-literals">#</a> Range literals</h3>
-        <p>The <code>:</code> range operator (and the <code>!!!</code> alternate for IPv6) accept several built-in literal types in addition to plain integers. The lexer recognizes each form as a single token so <code>192.168.1.1</code>, <code>2022-01-01</code>, <code>2001::1</code>, and <code>0xFF</code> aren't fractured into <code>.</code>/<code>-</code>/<code>:</code> arithmetic. The runtime expansion then dispatches on the surface form to give the right step semantics.</p>
-        <p><strong>IPv4</strong> — dotted-quad with each octet 0..=255:</p>
-        <pre><code class="lang-perl">ep 192.168.1.1:192.168.1.5:1
-# 192.168.1.1, 192.168.1.2, …, 192.168.1.5
-
-ep 192.168.255.255:192.168.255.250:-1
-# reverse iteration with negative step
-</code></pre>
-        <p><strong>ISO date</strong> (<code>YYYY-MM-DD</code>) and <strong>year-month</strong> (<code>YYYY-MM</code>) — step is days / months respectively. The 4-digit-year guard keeps plain subtraction (<code>5-2-1</code>) parsing as arithmetic.</p>
-        <pre><code class="lang-perl">ep 2022-01-01:2022-01-05:1     # day step
-ep 2022-01:2022-04:1            # month step
-say 5-2-1                       # 2 — still arithmetic
-</code></pre>
-        <p><strong>Hex literals</strong> in range context preserve the <code>0x</code> prefix, the digit width (zero-padded to fit the longer endpoint), and uppercase iff EITHER endpoint has any uppercase letter. Outside a range expression <code>0xFF</code> is still the integer 255.</p>
-        <pre><code class="lang-perl">ep 0x00:0x10:1                 # 0x00, 0x01, …, 0x10
-ep 0xFF:0xF0:-3                # 0xFF, 0xFC, 0xF9, … (uppercase preserved)
-ep 0x1:0x100:0x40              # 0x001, 0x041, 0x081, 0x0c1 (width 3)
-say 0xFF + 1                   # 256 — outside range, still integer
-</code></pre>
-        <p><strong>IPv6</strong> — full and zero-compressed forms. Because <code>:</code> would collide with the standard range op, IPv6 ranges use the universal <code>~</code> separator (see below). Note: <code>~</code> works as a range separator for ALL types, not just IPv6 — it's just mandatory for IPv6.</p>
-      </article>
-      <article class="doc-entry" id="doc-tilde-range">
-        <h3><a class="doc-anchor" href="#doc-tilde-range">#</a> <code>~</code> — universal range separator</h3>
-        <p>Single <code>~</code> works as a range separator for every supported range type, alongside the original <code>:</code> form. It's the only viable separator for IPv6 since IPv6 addresses use <code>:</code> internally and would collide with the <code>:</code> range op. The lexer accepts IPv6 in three prefix forms: digit-leading (<code>2001::1</code>), hex-letter-leading (<code>fe80::1</code>), and zero-compressed (<code>::1</code>). Validity is decided by Rust's <code>std::net::Ipv6Addr</code> parser.</p>
-        <pre><code class="lang-perl">ep 1~5~1                       # plain numeric
-ep 192.168.1.1~192.168.1.5~1   # IPv4
-ep 0x00~0x10~1                 # hex (preserves prefix/width/case)
-ep 2022-01-01~2022-01-05~1     # ISO date
-ep 2001::1~2001::5~1           # IPv6 (must use ~)
-ep fe80::ff~fe80::fc~-1        # IPv6 reverse iteration
-ep ::1~::5~1                   # IPv6 zero-compressed prefix
-ep 2001:db8::fffe~2001:db8::1:1~1
-# carries across the :: compression boundary cleanly
-</code></pre>
-        <p>Iteration is u128 step arithmetic for IPv6; both directions are supported and a wrong-sign step (start past end with positive step, or before end with negative step) yields the empty list. <code>~</code> is suppressed as a range separator inside paired <code>~…~</code> char-index/slice subscripts (<code>$x~5~</code>, <code>$_~1:3~</code>) so closing delimiters don't get eaten. <code>!</code> is reserved for the paired char-index syntax (<code>$x!N!</code>) and was never a viable choice.</p>
-      </article>
-      <article class="doc-entry" id="doc-outer-topic">
-        <h3><a class="doc-anchor" href="#doc-outer-topic">#</a> <code>_&lt;</code> — outer topic chain</h3>
-        <p>Inside a closure (map/grep/sort block, sub body, fan/fan_cap closure), <code>_&lt;</code> reads the topic of the enclosing scope — the value <code>_</code> held in the frame that called this closure. The chain extends up to four frames: <code>_&lt;&lt;</code>, <code>_&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;</code>. Numeric positional slots get the same matrix: <code>_0&lt;</code>, <code>_1&lt;&lt;</code>, …, <code>_N&lt;&lt;&lt;&lt;</code>. The bareword form (no sigil) and the sigil form (<code>$_&lt;</code>) are equivalent.</p>
-        <pre><code class="lang-perl"># Nested map — `_&lt;` reaches the outer iter's `_`:
-map { my @inner = (1, 2); map { _&lt; + _ } @inner } (10, 20)
-# 11, 12, 21, 22
-
-# Inside a 3-arg sub, _0&lt;&lt;&lt;&lt; reaches arg 0 four frames up:
-fn deep($_0, $_1, $_2) {
-  ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
-    p _0&lt;&lt;&lt;&lt;, _1&lt;&lt;&lt;&lt;, _2&lt;&lt;&lt;&lt;
-  } } } }
-}
-</code></pre>
-        <p><strong>Iter re-entry semantics</strong>: the chain shifts on the FIRST <code>set_topic</code> call in a given frame; subsequent iterations of the same loop only refresh <code>_</code> so <code>_&lt;</code> keeps pointing at the enclosing scope's topic instead of rolling to the previous iter's value. Bound-but-undef chain entries fall back to <code>_</code> so <code>$h-&gt;{_&lt;}</code> at the outermost iter reads the iteration key.</p>
-      </article>
-      <article class="doc-entry" id="doc-topic-hash-keys">
-        <h3><a class="doc-anchor" href="#doc-topic-hash-keys">#</a> Topic-slot barewords as hash keys</h3>
-        <p>Perl auto-quotes a single bareword on the left of <code>=&gt;</code> and inside <code>{…}</code> hash subscripts, even for keywords. Stryke makes a single exception for the topic-slot family — <code>_</code>, <code>_&lt;</code>, <code>_0</code>, <code>_0&lt;</code>, <code>_1</code>, …, <code>_N&lt;+</code> — so they evaluate to the topic value rather than the literal name. Plain barewords (<code>foo</code>, keywords, builtin names) still autoquote as before.</p>
-        <pre><code class="lang-perl">$_ = "topic"
-my $h1 = { _ =&gt; 1 }            # ≡ { $_ =&gt; 1 } — key is "topic"
-my $h2 = { foo =&gt; 1, bar =&gt; 2 } # plain barewords still autoquote
-
-# Hash subscript:
-my %m = (k1 =&gt; 7)
-map { $m{_&lt;} } "k1"             # _&lt; falls back to _ at outermost iter
-
-# Nested ETL pattern:
-+{ map { map { (lc _, _&lt; + 0) } @{$m-&gt;{_}} } keys %$m }
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-operator-keyword-keys">
-        <h3><a class="doc-anchor" href="#doc-operator-keyword-keys">#</a> Operator-keyword hash keys</h3>
-        <p>The lexer eagerly converts <code>eq</code>, <code>ne</code>, <code>lt</code>, <code>gt</code>, <code>le</code>, <code>ge</code>, <code>cmp</code>, <code>and</code>, <code>or</code>, <code>not</code>, and <code>x</code> to operator tokens. Inside a <code>{…}</code> hash subscript followed by <code>}</code>, those tokens autoquote back to the identifier string so <code>$h-&gt;{ne}</code>, <code>$h{eq}</code>, etc. read normally.</p>
-        <pre><code class="lang-perl">my $h = { eq =&gt; 1, ne =&gt; 2, cmp =&gt; 7, and =&gt; 8 }
-say $h-&gt;{ne}        # 2
-say $h-&gt;{cmp}       # 7
-my %m = (or =&gt; 99)
-say $m{or}          # 99
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-comma-substitution">
-        <h3><a class="doc-anchor" href="#doc-comma-substitution">#</a> <code>s,/tr,/y,</code> comma delimiter</h3>
-        <p>The <code>s</code>, <code>tr</code>, and <code>y</code> operators accept any non-alphanumeric delimiter, including <code>,</code>. The lookahead heuristic gates the comma form on having three commas before the statement ends so <code>$obj-&gt;y</code> method calls and <code>struct Pt { x, y, z }</code> field declarations stay barewords.</p>
-        <pre><code class="lang-perl">$_ = &quot;the cat sat&quot;
-s,\b(\w+)\b,X,g
-say $_                          # X X X
-
-$_ = &quot;ABC&quot;
-tr,A-Z,a-z,
-say $_                          # abc
-
-# Common command-line idiom:
-# stryke -pe 's,a,b,g' &lt; input
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-plus-brace-hashref">
-        <h3><a class="doc-anchor" href="#doc-plus-brace-hashref">#</a> <code>+{ EXPR }</code> — force hashref</h3>
-        <p>Block-vs-hashref disambiguation in <code>{…}</code> falls back to a code block (<code>CodeRef</code>) when the body doesn't fit a <code>KEY =&gt; VAL, …</code> shape. The unary <code>+</code> prefix forces hashref interpretation: a list-yielding body (<code>map</code>, <code>grep</code>, etc.) is paired up via the <code>MakeHashRef</code> runtime to produce a hash from the list. Use this when you'd otherwise need <code>my %h = …; \%h</code>.</p>
-        <pre><code class="lang-perl"># Pair list from map → hashref:
-my $h = +{ map { ($_, $_ * 2) } (1, 2, 3) }
-# { 1 =&gt; 2, 2 =&gt; 4, 3 =&gt; 6 }
-
-# ETL pattern with nested map:
-+{ map { map { (lc _, _&lt; + 0) } @{$m-&gt;{_}} } keys %$m }
-
-my $h2 = +{ a =&gt; 1, b =&gt; 2 }    # KV form still works
-my $h3 = +{}                    # empty hashref
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-fn-underscore-blacklist">
-        <h3><a class="doc-anchor" href="#doc-fn-underscore-blacklist">#</a> Topic-slot names rejected as UDFs</h3>
-        <p>Topic-slot barewords (<code>_</code>, <code>_&lt;</code>, <code>_0..N</code>, <code>_N&lt;+</code>) are scalar refs to the topic, positional, and outer-chain values. Defining a sub with one of those names — bare, sigil-prefixed, or package-qualified — would shadow the topic and silently break every <code>_</code>-aware builtin. Stryke rejects the declaration at parse time:</p>
-        <pre><code class="lang-perl">fn _        { 1 }    # error: would shadow the topic-slot scalar
-fn _&lt;       { 1 }    # error
-fn _0       { 1 }    # error
-fn $_       { 1 }    # error (sigil form)
-fn @_       { 1 }    # error
-fn Foo::_   { 1 }    # error (package-qualified)
-fn _foo     { 1 }    # OK — only EXACT topic-slot spellings reject
-fn my_helper { 1 }   # OK
 </code></pre>
       </article>
     </section>
@@ -6597,9 +6481,1696 @@ test_run   # prints summary, exits 1 on failure
 </code></pre>
       </article>
     </section>
+    <section class="tutorial-section" id="ch-ai-primitives-docs-ai-primitives-md">
+      <h2>AI primitives (docs/AI_PRIMITIVES.md)</h2>
+      <p class="chapter-meta">79 topics</p>
+      <article class="doc-entry" id="doc-ai">
+        <h3><a class="doc-anchor" href="#doc-ai">#</a> <code>ai</code></h3>
+        <p><code>ai $prompt, opts...</code> — single-shot LLM call (or auto-routes to the agent loop when <code>tools =&gt; [...]</code>/<code>tool fn</code>s are in scope, vision when <code>image =&gt; $url|$path</code>, structured output when <code>schema =&gt; +{...}</code>, document input when <code>pdf =&gt; $path</code>).</p>
+        <pre><code class="lang-perl">my $r = ai &quot;summarize this&quot;, $document
+my $r = ai &quot;weather in SF&quot;   # auto-uses any `tool fn` defined in scope
+my $r = ai &quot;describe&quot;, image =&gt; &quot;/photo.jpg&quot;
+my $r = ai &quot;extract user&quot;, schema =&gt; +{ name =&gt; &quot;string&quot;, age =&gt; &quot;int&quot; }
+</code></pre>
+        <p>Providers: anthropic (default), openai. Mock with <code>ai_mock_install</code>. Cost via <code>ai_cost</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-stream-prompt">
+        <h3><a class="doc-anchor" href="#doc-stream-prompt">#</a> <code>stream_prompt</code></h3>
+        <p><code>stream_prompt $prompt, on_chunk =&gt; sub { ... }</code> — Anthropic SSE streaming. With <code>on_chunk</code>, fires once per text-delta. Without, returns a <code>PerlIterator</code>-backed handle: <code>for my $chunk in stream_prompt(&quot;...&quot;) { print $chunk }</code>.</p>
+        <pre><code class="lang-perl">my $state = +{ buf =&gt; &quot;&quot; };
+stream_prompt(&quot;write a haiku&quot;,
+    on_chunk =&gt; sub { $state-&gt;{buf} .= $_[0]; print $_[0] });
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-chat">
+        <h3><a class="doc-anchor" href="#doc-chat">#</a> <code>chat</code></h3>
+        <p><code>chat \@messages, opts...</code> — explicit message-list call. Each entry is <code>+{role =&gt; &quot;user&quot;|&quot;assistant&quot;|&quot;system&quot;, content =&gt; ...}</code>.</p>
+        <pre><code class="lang-perl">chat([
+    +{ role =&gt; &quot;system&quot;, content =&gt; &quot;Be concise&quot; },
+    +{ role =&gt; &quot;user&quot;,   content =&gt; &quot;hi&quot; },
+])
+</code></pre>
+        <p>For multi-turn with auto-tracking, use <code>ai_session_*</code> instead.</p>
+      </article>
+      <article class="doc-entry" id="doc-embed">
+        <h3><a class="doc-anchor" href="#doc-embed">#</a> <code>embed</code></h3>
+        <p><code>embed $text</code> or <code>embed \@texts</code> — vector embedding via Voyage AI (default) or OpenAI. Returns arrayref of floats (single text) or arrayref-of-arrayref (batch). Routes via <code>ai_routing_set(&quot;embed&quot;, ...)</code>.</p>
+        <pre><code class="lang-perl">my @vec = @{ embed(&quot;hello world&quot;) }
+my @vecs = @{ embed([&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]) }
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-tokens-of">
+        <h3><a class="doc-anchor" href="#doc-tokens-of">#</a> <code>tokens_of</code></h3>
+        <p><code>tokens_of</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = tokens_of $x 
+# or in a pipeline:
+@list |&gt; map tokens_of |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-estimate">
+        <h3><a class="doc-anchor" href="#doc-ai-estimate">#</a> <code>ai_estimate</code></h3>
+        <p><code>ai_estimate</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_estimate $x 
+# or in a pipeline:
+@list |&gt; map ai_estimate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-cost">
+        <h3><a class="doc-anchor" href="#doc-ai-cost">#</a> <code>ai_cost</code></h3>
+        <p><code>ai_cost()</code> — running spend / token / cache stats hashref: <code>+{usd, input_tokens, output_tokens, embed_tokens, cache_creation_tokens, cache_read_tokens, cache_hits, cache_misses}</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-history">
+        <h3><a class="doc-anchor" href="#doc-ai-history">#</a> <code>ai_history</code></h3>
+        <p><code>ai_history</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_history $x 
+# or in a pipeline:
+@list |&gt; map ai_history |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-history-clear">
+        <h3><a class="doc-anchor" href="#doc-ai-history-clear">#</a> <code>ai_history_clear</code></h3>
+        <p><code>ai_history_clear</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_history_clear $x 
+# or in a pipeline:
+@list |&gt; map ai_history_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-cache-clear">
+        <h3><a class="doc-anchor" href="#doc-ai-cache-clear">#</a> <code>ai_cache_clear</code></h3>
+        <p><code>ai_cache_clear</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_cache_clear $x 
+# or in a pipeline:
+@list |&gt; map ai_cache_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-cache-size">
+        <h3><a class="doc-anchor" href="#doc-ai-cache-size">#</a> <code>ai_cache_size</code></h3>
+        <p><code>ai_cache_size</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_cache_size $x 
+# or in a pipeline:
+@list |&gt; map ai_cache_size |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-mock-install">
+        <h3><a class="doc-anchor" href="#doc-ai-mock-install">#</a> <code>ai_mock_install</code></h3>
+        <p><code>ai_mock_install</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_mock_install $x 
+# or in a pipeline:
+@list |&gt; map ai_mock_install |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-mock-clear">
+        <h3><a class="doc-anchor" href="#doc-ai-mock-clear">#</a> <code>ai_mock_clear</code></h3>
+        <p><code>ai_mock_clear</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_mock_clear $x 
+# or in a pipeline:
+@list |&gt; map ai_mock_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-config-get">
+        <h3><a class="doc-anchor" href="#doc-ai-config-get">#</a> <code>ai_config_get</code></h3>
+        <p><code>ai_config_get</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_config_get $x 
+# or in a pipeline:
+@list |&gt; map ai_config_get |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-config-set">
+        <h3><a class="doc-anchor" href="#doc-ai-config-set">#</a> <code>ai_config_set</code></h3>
+        <p><code>ai_config_set</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_config_set $x 
+# or in a pipeline:
+@list |&gt; map ai_config_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-routing-get">
+        <h3><a class="doc-anchor" href="#doc-ai-routing-get">#</a> <code>ai_routing_get</code></h3>
+        <p><code>ai_routing_get</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_routing_get $x 
+# or in a pipeline:
+@list |&gt; map ai_routing_get |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-routing-set">
+        <h3><a class="doc-anchor" href="#doc-ai-routing-set">#</a> <code>ai_routing_set</code></h3>
+        <p><code>ai_routing_set</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_routing_set $x 
+# or in a pipeline:
+@list |&gt; map ai_routing_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-register-tool">
+        <h3><a class="doc-anchor" href="#doc-ai-register-tool">#</a> <code>ai_register_tool</code></h3>
+        <p><code>ai_register_tool($name, $description, +{params}, sub { ... })</code> — register a tool that the bare <code>ai($prompt)</code> call auto-attaches to its agent loop. Idempotent re-register on same name.</p>
+        <pre><code class="lang-perl">ai_register_tool(&quot;weather&quot;, &quot;Get weather&quot;,
+    +{ city =&gt; &quot;string&quot; },
+    sub { fetch &quot;https://api.weather.com/&quot; . uri_encode($_[0]-&gt;{city}) });
+ai_clear_tools();
+</code></pre>
+        <p>For parser-level sugar, use <code>tool fn</code> instead.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-unregister-tool">
+        <h3><a class="doc-anchor" href="#doc-ai-unregister-tool">#</a> <code>ai_unregister_tool</code></h3>
+        <p><code>ai_unregister_tool</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_unregister_tool $x 
+# or in a pipeline:
+@list |&gt; map ai_unregister_tool |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-clear-tools">
+        <h3><a class="doc-anchor" href="#doc-ai-clear-tools">#</a> <code>ai_clear_tools</code></h3>
+        <p><code>ai_clear_tools</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_clear_tools $x 
+# or in a pipeline:
+@list |&gt; map ai_clear_tools |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-tools-list">
+        <h3><a class="doc-anchor" href="#doc-ai-tools-list">#</a> <code>ai_tools_list</code></h3>
+        <p><code>ai_tools_list</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_tools_list $x 
+# or in a pipeline:
+@list |&gt; map ai_tools_list |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-filter">
+        <h3><a class="doc-anchor" href="#doc-ai-filter">#</a> <code>ai_filter</code></h3>
+        <p><code>ai_filter \@items, &quot;criterion&quot;</code> — keep items the model judges as matching the criterion. Single batched LLM call; cheap by construction.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-map">
+        <h3><a class="doc-anchor" href="#doc-ai-map">#</a> <code>ai_map</code></h3>
+        <p><code>ai_map \@items, &quot;instruction&quot;</code> — apply instruction to each item, single batched LLM call. Returns arrayref of strings.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-classify">
+        <h3><a class="doc-anchor" href="#doc-ai-classify">#</a> <code>ai_classify</code></h3>
+        <p><code>ai_classify \@items, &quot;hint&quot;, into =&gt; [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]</code> — assign one of the labels to each item.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-match">
+        <h3><a class="doc-anchor" href="#doc-ai-match">#</a> <code>ai_match</code></h3>
+        <p><code>ai_match</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_match $x 
+# or in a pipeline:
+@list |&gt; map ai_match |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-sort">
+        <h3><a class="doc-anchor" href="#doc-ai-sort">#</a> <code>ai_sort</code></h3>
+        <p><code>ai_sort</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_sort $x 
+# or in a pipeline:
+@list |&gt; map ai_sort |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-dedupe">
+        <h3><a class="doc-anchor" href="#doc-ai-dedupe">#</a> <code>ai_dedupe</code></h3>
+        <p><code>ai_dedupe</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_dedupe $x 
+# or in a pipeline:
+@list |&gt; map ai_dedupe |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-extract">
+        <h3><a class="doc-anchor" href="#doc-ai-extract">#</a> <code>ai_extract</code></h3>
+        <p><code>ai_extract &quot;prompt&quot;, schema =&gt; +{ name =&gt; &quot;string&quot;, age =&gt; &quot;int&quot; }</code> — structured JSON output; returns a typed hashref.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-summarize">
+        <h3><a class="doc-anchor" href="#doc-ai-summarize">#</a> <code>ai_summarize</code></h3>
+        <p><code>ai_summarize $text, words =&gt; 50</code> — convenience wrapper that asks the model for a concise summary at target length.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-translate">
+        <h3><a class="doc-anchor" href="#doc-ai-translate">#</a> <code>ai_translate</code></h3>
+        <p><code>ai_translate $text, to =&gt; &quot;Spanish&quot;</code> — convenience wrapper for translation.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-template">
+        <h3><a class="doc-anchor" href="#doc-ai-template">#</a> <code>ai_template</code></h3>
+        <p><code>ai_template &quot;hi {name}&quot;, name =&gt; &quot;world&quot;</code> — pure string substitution. <code>{{</code> escapes to a literal <code>{</code>. Missing keys pass through unchanged.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-transcribe">
+        <h3><a class="doc-anchor" href="#doc-ai-transcribe">#</a> <code>ai_transcribe</code></h3>
+        <p><code>ai_transcribe &quot;audio.mp3&quot;, model =&gt; &quot;whisper-1&quot;, language =&gt; &quot;en&quot;</code> — OpenAI Whisper transcription. Multipart upload to <code>/v1/audio/transcriptions</code>. Returns the transcript string. Defaults to <code>whisper-1</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-speak">
+        <h3><a class="doc-anchor" href="#doc-ai-speak">#</a> <code>ai_speak</code></h3>
+        <p><code>ai_speak $text, voice =&gt; &quot;alloy&quot;, model =&gt; &quot;tts-1&quot;, format =&gt; &quot;mp3&quot;, output =&gt; &quot;out.mp3&quot;</code> — OpenAI TTS. Returns raw audio bytes; pass <code>output =&gt;</code> to also write to disk. Voices: alloy, echo, fable, onyx, nova, shimmer.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-image">
+        <h3><a class="doc-anchor" href="#doc-ai-image">#</a> <code>ai_image</code></h3>
+        <p><code>ai_image $prompt, model =&gt; &quot;dall-e-3&quot;, size =&gt; &quot;1024x1024&quot;, quality =&gt; &quot;hd&quot;, output =&gt; &quot;out.png&quot;, n =&gt; 1</code> — image generation (OpenAI Images). Returns raw PNG bytes for n=1, or arrayref of bytes for n&gt;1. Models: <code>dall-e-3</code>, <code>gpt-image-1</code>. <code>output</code> writes to disk (with <code>_1</code>/<code>_2</code>/... suffix for n&gt;1).</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-image-edit">
+        <h3><a class="doc-anchor" href="#doc-ai-image-edit">#</a> <code>ai_image_edit</code></h3>
+        <p><code>ai_image_edit $prompt, image =&gt; &quot;in.png&quot;, mask =&gt; &quot;mask.png&quot;, output =&gt; &quot;out.png&quot;</code> — image-to-image edit via OpenAI <code>/v1/images/edits</code>. Optional mask is a PNG with transparent regions marking where to edit. Returns PNG bytes (or arrayref for <code>n&gt;1</code>).</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-image-variation">
+        <h3><a class="doc-anchor" href="#doc-ai-image-variation">#</a> <code>ai_image_variation</code></h3>
+        <p><code>ai_image_variation image =&gt; &quot;in.png&quot;, n =&gt; 4, size =&gt; &quot;1024x1024&quot;</code> — generate variations of an existing image (OpenAI <code>/v1/images/variations</code>, DALL-E 2). Returns PNG bytes for <code>n=1</code> or arrayref for <code>n&gt;1</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-models">
+        <h3><a class="doc-anchor" href="#doc-ai-models">#</a> <code>ai_models</code></h3>
+        <p><code>ai_models($provider)</code> → arrayref of model IDs from the live catalog. Providers: <code>openai</code>, <code>anthropic</code>, <code>ollama</code>, <code>gemini</code>. Useful for tooling that surfaces the available models without hardcoding lists.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-citations">
+        <h3><a class="doc-anchor" href="#doc-ai-citations">#</a> <code>ai_citations</code></h3>
+        <p><code>ai_citations()</code> — arrayref of citations from the most recent Anthropic call (when <code>citations =&gt; 1</code> was passed). Each entry is a hashref with <code>text</code> (cited string), <code>title</code>, <code>start</code>/<code>end</code> char offsets or <code>start_page</code>/<code>end_page</code> page numbers, and <code>document_index</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-dashboard">
+        <h3><a class="doc-anchor" href="#doc-ai-dashboard">#</a> <code>ai_dashboard</code></h3>
+        <p><code>ai_dashboard()</code> → ANSI-colored multi-line summary (cost, tokens in/out, embed tokens, prompt-cache write/read, result-cache hit ratio). Drop at the end of a script or during a session: <code>print ai_dashboard()</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-pricing">
+        <h3><a class="doc-anchor" href="#doc-ai-pricing">#</a> <code>ai_pricing</code></h3>
+        <p><code>ai_pricing(&quot;claude-opus-4-7&quot;)</code> → hashref <code>+{ model, input, output, input_per_1m, output_per_1m }</code> with the per-1K-token pricing the runtime uses for cost tracking. Useful for pre-flight cost estimates.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-describe">
+        <h3><a class="doc-anchor" href="#doc-ai-describe">#</a> <code>ai_describe</code></h3>
+        <p><code>ai_describe(&quot;image.png&quot;, style =&gt; &quot;concise&quot;)</code> — vision wrapper that asks the model to describe an image. Styles: <code>concise</code> (one sentence), <code>detailed</code> (paragraph), <code>alt</code> (HTML alt-text ≤125 chars), or any custom suffix.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-grounded">
+        <h3><a class="doc-anchor" href="#doc-ai-grounded">#</a> <code>ai_grounded</code></h3>
+        <p><code>ai_grounded($prompt, documents =&gt; [@paths_or_strings], titles =&gt; [@titles])</code> — Anthropic-only multi-document grounding. Each entry can be a PDF path, a text-file path, or an inline string. Citations are auto-enabled; retrieve via <code>ai_citations()</code> after the call.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-moderate">
+        <h3><a class="doc-anchor" href="#doc-ai-moderate">#</a> <code>ai_moderate</code></h3>
+        <p><code>ai_moderate($text, model =&gt; &quot;omni-moderation-latest&quot;)</code> → <code>+{ flagged, categories, scores }</code>. OpenAI content-safety classifier. Free endpoint — no token cost. Use it before sending user-generated content to a generative model.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-chunk">
+        <h3><a class="doc-anchor" href="#doc-ai-chunk">#</a> <code>ai_chunk</code></h3>
+        <p><code>ai_chunk($text, max_tokens =&gt; 500, overlap =&gt; 50, by =&gt; &quot;tokens&quot;|&quot;chars&quot;|&quot;sentences&quot;)</code> → arrayref of strings. Pure local logic — no API call. Sentence mode splits on <code>.!?</code> and greedily packs.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-warm">
+        <h3><a class="doc-anchor" href="#doc-ai-warm">#</a> <code>ai_warm</code></h3>
+        <p><code>ai_warm(model =&gt; ..., provider =&gt; ...)</code> → <code>+{ ok, latency_ms, error, model, provider }</code>. Sends a 1-token ping so auth/network failures surface at script start instead of mid-flow.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-compare">
+        <h3><a class="doc-anchor" href="#doc-ai-compare">#</a> <code>ai_compare</code></h3>
+        <p><code>ai_compare($a, $b, criteria =&gt; &quot;factual accuracy&quot;, scale =&gt; 5)</code> → <code>+{ winner, reason, scores =&gt; +{a, b}, raw }</code>. Single-call structured comparison. <code>winner</code> is <code>&quot;a&quot;</code>, <code>&quot;b&quot;</code>, or <code>&quot;tie&quot;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-export">
+        <h3><a class="doc-anchor" href="#doc-ai-session-export">#</a> <code>ai_session_export</code></h3>
+        <p><code>ai_session_export($handle)</code> → JSON string capturing system, model, provider, and full message log. Pair with <code>ai_session_import($json)</code> to restore.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-import">
+        <h3><a class="doc-anchor" href="#doc-ai-session-import">#</a> <code>ai_session_import</code></h3>
+        <p><code>ai_session_import($json)</code> → fresh session handle hashref. Inverse of <code>ai_session_export</code>. Allocates a new id and populates the session from the JSON body.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-upload">
+        <h3><a class="doc-anchor" href="#doc-ai-file-upload">#</a> <code>ai_file_upload</code></h3>
+        <p><code>ai_file_upload(&quot;path&quot;, purpose =&gt; &quot;user_data&quot;)</code> → metadata hashref with <code>id</code>, <code>bytes</code>, <code>filename</code>, <code>purpose</code>, <code>created_at</code>. OpenAI Files API — file_id can be referenced by Whisper/Vision/Batch/Assistants.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-list">
+        <h3><a class="doc-anchor" href="#doc-ai-file-list">#</a> <code>ai_file_list</code></h3>
+        <p><code>ai_file_list(purpose =&gt; &quot;...&quot;)</code> → arrayref of file metadata hashrefs from <code>/v1/files</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-get">
+        <h3><a class="doc-anchor" href="#doc-ai-file-get">#</a> <code>ai_file_get</code></h3>
+        <p><code>ai_file_get($file_id)</code> → metadata hashref for a single file.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-delete">
+        <h3><a class="doc-anchor" href="#doc-ai-file-delete">#</a> <code>ai_file_delete</code></h3>
+        <p><code>ai_file_delete($file_id)</code> → 1 if deleted, 0 otherwise. Removes the file from OpenAI&#39;s storage.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-anthropic-upload">
+        <h3><a class="doc-anchor" href="#doc-ai-file-anthropic-upload">#</a> <code>ai_file_anthropic_upload</code></h3>
+        <p><code>ai_file_anthropic_upload(&quot;path/to/file.pdf&quot;)</code> → metadata hashref with <code>id</code>, <code>filename</code>, <code>mime_type</code>, <code>size_bytes</code>, <code>created_at</code>. Anthropic&#39;s beta <code>/v1/files</code> endpoint — file_id can be referenced from batch jobs and document blocks.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-anthropic-list">
+        <h3><a class="doc-anchor" href="#doc-ai-file-anthropic-list">#</a> <code>ai_file_anthropic_list</code></h3>
+        <p><code>ai_file_anthropic_list()</code> → arrayref of file-metadata hashrefs from Anthropic&#39;s <code>/v1/files</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-file-anthropic-delete">
+        <h3><a class="doc-anchor" href="#doc-ai-file-anthropic-delete">#</a> <code>ai_file_anthropic_delete</code></h3>
+        <p><code>ai_file_anthropic_delete($file_id)</code> → 1 on success, 0 otherwise. Removes the file from Anthropic&#39;s storage.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-new">
+        <h3><a class="doc-anchor" href="#doc-ai-session-new">#</a> <code>ai_session_new</code></h3>
+        <p><code>ai_session_new(system =&gt; &quot;...&quot;, model =&gt; &quot;...&quot;)</code> — start a multi-turn chat session. Use <code>ai_session_send($s, &quot;msg&quot;)</code> to advance, <code>ai_session_history($s)</code> to inspect, <code>ai_session_close($s)</code> to drop.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-send">
+        <h3><a class="doc-anchor" href="#doc-ai-session-send">#</a> <code>ai_session_send</code></h3>
+        <p><code>ai_session_send</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_session_send $x 
+# or in a pipeline:
+@list |&gt; map ai_session_send |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-history">
+        <h3><a class="doc-anchor" href="#doc-ai-session-history">#</a> <code>ai_session_history</code></h3>
+        <p><code>ai_session_history</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_session_history $x 
+# or in a pipeline:
+@list |&gt; map ai_session_history |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-close">
+        <h3><a class="doc-anchor" href="#doc-ai-session-close">#</a> <code>ai_session_close</code></h3>
+        <p><code>ai_session_close</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_session_close $x 
+# or in a pipeline:
+@list |&gt; map ai_session_close |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-session-reset">
+        <h3><a class="doc-anchor" href="#doc-ai-session-reset">#</a> <code>ai_session_reset</code></h3>
+        <p><code>ai_session_reset</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_session_reset $x 
+# or in a pipeline:
+@list |&gt; map ai_session_reset |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-memory-save">
+        <h3><a class="doc-anchor" href="#doc-ai-memory-save">#</a> <code>ai_memory_save</code></h3>
+        <p><code>ai_memory_save(&quot;id&quot;, &quot;content&quot;, $metadata?, $path?)</code> — embed + persist a doc in the sqlite-backed memory store.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-memory-recall">
+        <h3><a class="doc-anchor" href="#doc-ai-memory-recall">#</a> <code>ai_memory_recall</code></h3>
+        <p><code>ai_memory_recall(&quot;query&quot;, top_k =&gt; 5)</code> — re-embed query, return top-k matches by cosine similarity. Each entry: <code>+{id, content, score, metadata}</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-memory-forget">
+        <h3><a class="doc-anchor" href="#doc-ai-memory-forget">#</a> <code>ai_memory_forget</code></h3>
+        <p><code>ai_memory_forget</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_memory_forget $x 
+# or in a pipeline:
+@list |&gt; map ai_memory_forget |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-memory-count">
+        <h3><a class="doc-anchor" href="#doc-ai-memory-count">#</a> <code>ai_memory_count</code></h3>
+        <p><code>ai_memory_count</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_memory_count $x 
+# or in a pipeline:
+@list |&gt; map ai_memory_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-memory-clear">
+        <h3><a class="doc-anchor" href="#doc-ai-memory-clear">#</a> <code>ai_memory_clear</code></h3>
+        <p><code>ai_memory_clear</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_memory_clear $x 
+# or in a pipeline:
+@list |&gt; map ai_memory_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-vision">
+        <h3><a class="doc-anchor" href="#doc-ai-vision">#</a> <code>ai_vision</code></h3>
+        <p><code>ai_vision</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_vision $x 
+# or in a pipeline:
+@list |&gt; map ai_vision |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-pdf">
+        <h3><a class="doc-anchor" href="#doc-ai-pdf">#</a> <code>ai_pdf</code></h3>
+        <p><code>ai_pdf</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_pdf $x 
+# or in a pipeline:
+@list |&gt; map ai_pdf |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-budget">
+        <h3><a class="doc-anchor" href="#doc-ai-budget">#</a> <code>ai_budget</code></h3>
+        <p><code>ai_budget($usd_cap, sub { ... })</code> — runs the block; raises a runtime error if AI spend during the block exceeds <code>$usd_cap</code>. Restores prior global cap on exit.</p>
+      </article>
+      <article class="doc-entry" id="doc-ai-last-thinking">
+        <h3><a class="doc-anchor" href="#doc-ai-last-thinking">#</a> <code>ai_last_thinking</code></h3>
+        <p><code>ai_last_thinking</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_last_thinking $x 
+# or in a pipeline:
+@list |&gt; map ai_last_thinking |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-batch">
+        <h3><a class="doc-anchor" href="#doc-ai-batch">#</a> <code>ai_batch</code></h3>
+        <p><code>ai_batch</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_batch $x 
+# or in a pipeline:
+@list |&gt; map ai_batch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-pmap">
+        <h3><a class="doc-anchor" href="#doc-ai-pmap">#</a> <code>ai_pmap</code></h3>
+        <p><code>ai_pmap</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_pmap $x 
+# or in a pipeline:
+@list |&gt; map ai_pmap |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-vec-cosine">
+        <h3><a class="doc-anchor" href="#doc-vec-cosine">#</a> <code>vec_cosine</code></h3>
+        <p><code>vec_cosine \@a, \@b</code> — cosine similarity in <code>[-1, 1]</code>. Both args are arrayrefs of floats (typical embedding shape).</p>
+      </article>
+      <article class="doc-entry" id="doc-vec-search">
+        <h3><a class="doc-anchor" href="#doc-vec-search">#</a> <code>vec_search</code></h3>
+        <p><code>vec_search \@query, \@candidates, top_k =&gt; N</code> — return top-k matches as <code>+{idx, score}</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-vec-topk">
+        <h3><a class="doc-anchor" href="#doc-vec-topk">#</a> <code>vec_topk</code></h3>
+        <p><code>vec_topk</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = vec_topk $x 
+# or in a pipeline:
+@list |&gt; map vec_topk |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-search-tool">
+        <h3><a class="doc-anchor" href="#doc-web-search-tool">#</a> <code>web_search_tool</code></h3>
+        <p><code>web_search_tool()</code> — built-in tool spec for <code>tools =&gt; [...]</code>. Brave Search via <code>$BRAVE_SEARCH_API_KEY</code>, falls back to DuckDuckGo HTML scrape.</p>
+      </article>
+      <article class="doc-entry" id="doc-fetch-url-tool">
+        <h3><a class="doc-anchor" href="#doc-fetch-url-tool">#</a> <code>fetch_url_tool</code></h3>
+        <p><code>fetch_url_tool()</code> — built-in tool spec that fetches a URL and returns text.</p>
+      </article>
+      <article class="doc-entry" id="doc-read-file-tool">
+        <h3><a class="doc-anchor" href="#doc-read-file-tool">#</a> <code>read_file_tool</code></h3>
+        <p><code>read_file_tool()</code> — built-in tool spec that reads a file from disk.</p>
+      </article>
+      <article class="doc-entry" id="doc-run-code-tool">
+        <h3><a class="doc-anchor" href="#doc-run-code-tool">#</a> <code>run_code_tool</code></h3>
+        <p><code>run_code_tool()</code> — built-in tool spec that runs Python code in a subprocess (10s timeout, returns stdout+stderr).</p>
+      </article>
+      <article class="doc-entry" id="doc-tool">
+        <h3><a class="doc-anchor" href="#doc-tool">#</a> <code>tool</code></h3>
+        <p><code>tool fn NAME($p1: type, $p2: type) -&gt; Type &quot;docstring&quot; { body }</code> — declare an agent-callable tool. Param types become the JSON Schema. Auto-registers via <code>ai_register_tool</code> so bare <code>ai($prompt)</code> calls see it.</p>
+        <pre><code class="lang-perl">tool fn weather($city: string) &quot;Get current weather&quot; {
+    fetch &quot;https://api.weather.com/&quot; . uri_encode($city)
+}
+
+tool fn calc($a: int, $b: int) -&gt; int &quot;Add two ints&quot; { $a + $b }
+
+my $r = ai(&quot;what&#39;s the weather in SF and 7+5?&quot;);
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-mcp-model-context-protocol">
+      <h2>MCP (Model Context Protocol)</h2>
+      <p class="chapter-meta">13 topics</p>
+      <article class="doc-entry" id="doc-mcp-connect">
+        <h3><a class="doc-anchor" href="#doc-mcp-connect">#</a> <code>mcp_connect</code></h3>
+        <p><code>mcp_connect &quot;stdio:CMD ARGS&quot;</code> or <code>mcp_connect &quot;https://server/mcp&quot;</code> — connect to an MCP server. Speaks JSON-RPC over stdio (subprocess) or streamable HTTP. Returns a handle.</p>
+      </article>
+      <article class="doc-entry" id="doc-mcp-tools">
+        <h3><a class="doc-anchor" href="#doc-mcp-tools">#</a> <code>mcp_tools</code></h3>
+        <p><code>mcp_tools $h</code> — list the server&#39;s tools. Cached after first call.</p>
+      </article>
+      <article class="doc-entry" id="doc-mcp-resources">
+        <h3><a class="doc-anchor" href="#doc-mcp-resources">#</a> <code>mcp_resources</code></h3>
+        <p><code>mcp_resources</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_resources $x 
+# or in a pipeline:
+@list |&gt; map mcp_resources |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-prompts">
+        <h3><a class="doc-anchor" href="#doc-mcp-prompts">#</a> <code>mcp_prompts</code></h3>
+        <p><code>mcp_prompts</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_prompts $x 
+# or in a pipeline:
+@list |&gt; map mcp_prompts |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-call">
+        <h3><a class="doc-anchor" href="#doc-mcp-call">#</a> <code>mcp_call</code></h3>
+        <p><code>mcp_call $h, &quot;tool_name&quot;, +{...args}</code> — invoke a tool on the connected server.</p>
+      </article>
+      <article class="doc-entry" id="doc-mcp-resource">
+        <h3><a class="doc-anchor" href="#doc-mcp-resource">#</a> <code>mcp_resource</code></h3>
+        <p><code>mcp_resource</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_resource $x 
+# or in a pipeline:
+@list |&gt; map mcp_resource |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-prompt">
+        <h3><a class="doc-anchor" href="#doc-mcp-prompt">#</a> <code>mcp_prompt</code></h3>
+        <p><code>mcp_prompt</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_prompt $x 
+# or in a pipeline:
+@list |&gt; map mcp_prompt |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-close">
+        <h3><a class="doc-anchor" href="#doc-mcp-close">#</a> <code>mcp_close</code></h3>
+        <p><code>mcp_close</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_close $x 
+# or in a pipeline:
+@list |&gt; map mcp_close |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-attach-to-ai">
+        <h3><a class="doc-anchor" href="#doc-mcp-attach-to-ai">#</a> <code>mcp_attach_to_ai</code></h3>
+        <p><code>mcp_attach_to_ai $h</code> — register a connected MCP server so subsequent bare <code>ai($prompt)</code> calls auto-include its tools.</p>
+      </article>
+      <article class="doc-entry" id="doc-mcp-detach-from-ai">
+        <h3><a class="doc-anchor" href="#doc-mcp-detach-from-ai">#</a> <code>mcp_detach_from_ai</code></h3>
+        <p><code>mcp_detach_from_ai</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_detach_from_ai $x 
+# or in a pipeline:
+@list |&gt; map mcp_detach_from_ai |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-attached">
+        <h3><a class="doc-anchor" href="#doc-mcp-attached">#</a> <code>mcp_attached</code></h3>
+        <p><code>mcp_attached</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = mcp_attached $x 
+# or in a pipeline:
+@list |&gt; map mcp_attached |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mcp-server-start">
+        <h3><a class="doc-anchor" href="#doc-mcp-server-start">#</a> <code>mcp_server_start</code></h3>
+        <p><code>mcp_server_start &quot;name&quot;, +{ tools =&gt; [...] }</code> — run a stdio JSON-RPC MCP server in-process. Pair with <code>s_web build</code> to ship a self-contained MCP server binary.</p>
+        <p>For parser-level sugar, use <code>mcp_server &quot;name&quot; { tool foo($a) &quot;...&quot; {...} }</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-mcp-server">
+        <h3><a class="doc-anchor" href="#doc-mcp-server">#</a> <code>mcp_server</code></h3>
+        <p><code>mcp_server &quot;name&quot; { tool NAME(args) &quot;doc&quot; { body } ... }</code> — declarative MCP server block. Compiles to <code>mcp_server_start(&quot;name&quot;, +{ tools =&gt; [...] })</code> with private helper fns for each tool body.</p>
+        <pre><code class="lang-perl">mcp_server &quot;filesystem&quot; {
+    tool read_file($path: string) &quot;Read file contents&quot; { slurp $path }
+    tool list_dir($path: string)  &quot;List dir entries&quot;  { join(&quot;\n&quot;, readdir $path) }
+}
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-web-framework-stryke-web-readme-md">
+      <h2>Web framework (stryke_web/README.md)</h2>
+      <p class="chapter-meta">112 topics</p>
+      <article class="doc-entry" id="doc-web-route">
+        <h3><a class="doc-anchor" href="#doc-web-route">#</a> <code>web_route</code></h3>
+        <p><code>web_route &quot;VERB /path&quot;, &quot;controller#action&quot;</code> — register a route in the global router.</p>
+        <pre><code class="lang-perl">web_route &quot;GET /posts&quot;, &quot;posts#index&quot;
+web_route &quot;POST /posts&quot;, &quot;posts#create&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-resources">
+        <h3><a class="doc-anchor" href="#doc-web-resources">#</a> <code>web_resources</code></h3>
+        <p><code>web_resources &quot;posts&quot;</code> — register the 7-route REST scaffold (index/show/new/create/edit/update/destroy) for a resource.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-root">
+        <h3><a class="doc-anchor" href="#doc-web-root">#</a> <code>web_root</code></h3>
+        <p><code>web_root &quot;posts#index&quot;</code> — shortcut for <code>web_route &quot;GET /&quot;</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-application-config">
+        <h3><a class="doc-anchor" href="#doc-web-application-config">#</a> <code>web_application_config</code></h3>
+        <p><code>web_application_config</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_application_config $x 
+# or in a pipeline:
+@list |&gt; map web_application_config |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-render">
+        <h3><a class="doc-anchor" href="#doc-web-render">#</a> <code>web_render</code></h3>
+        <p><code>web_render html =&gt; &quot;...&quot;</code> / <code>text =&gt; ...</code> / <code>json =&gt; ...</code> / <code>template =&gt; &quot;posts/index&quot;, locals =&gt; +{...}</code> — emit a response. Templates resolve <code>app/views/...html.erb</code>, run through the ERB engine, wrap in the application layout.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-render-partial">
+        <h3><a class="doc-anchor" href="#doc-web-render-partial">#</a> <code>web_render_partial</code></h3>
+        <p><code>web_render_partial</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_render_partial $x 
+# or in a pipeline:
+@list |&gt; map web_render_partial |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-redirect">
+        <h3><a class="doc-anchor" href="#doc-web-redirect">#</a> <code>web_redirect</code></h3>
+        <p><code>web_redirect &quot;/path&quot;, 302</code> — issue a 3xx redirect with <code>Location</code> header.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-json">
+        <h3><a class="doc-anchor" href="#doc-web-json">#</a> <code>web_json</code></h3>
+        <p><code>web_json</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_json $x 
+# or in a pipeline:
+@list |&gt; map web_json |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-text">
+        <h3><a class="doc-anchor" href="#doc-web-text">#</a> <code>web_text</code></h3>
+        <p><code>web_text</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_text $x 
+# or in a pipeline:
+@list |&gt; map web_text |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-params">
+        <h3><a class="doc-anchor" href="#doc-web-params">#</a> <code>web_params</code></h3>
+        <p><code>web_params()</code> — hashref of query + form-urlencoded body + JSON body + path captures.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-request">
+        <h3><a class="doc-anchor" href="#doc-web-request">#</a> <code>web_request</code></h3>
+        <p><code>web_request</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_request $x 
+# or in a pipeline:
+@list |&gt; map web_request |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-routes-table">
+        <h3><a class="doc-anchor" href="#doc-web-routes-table">#</a> <code>web_routes_table</code></h3>
+        <p><code>web_routes_table</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_routes_table $x 
+# or in a pipeline:
+@list |&gt; map web_routes_table |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-boot-application">
+        <h3><a class="doc-anchor" href="#doc-web-boot-application">#</a> <code>web_boot_application</code></h3>
+        <p><code>web_boot_application</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_boot_application $x 
+# or in a pipeline:
+@list |&gt; map web_boot_application |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-db-connect">
+        <h3><a class="doc-anchor" href="#doc-web-db-connect">#</a> <code>web_db_connect</code></h3>
+        <p><code>web_db_connect &quot;sqlite://path&quot;</code> — open and cache the global SQLite connection. Required before any <code>web_model_*</code> call.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-db-execute">
+        <h3><a class="doc-anchor" href="#doc-web-db-execute">#</a> <code>web_db_execute</code></h3>
+        <p><code>web_db_execute</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_db_execute $x 
+# or in a pipeline:
+@list |&gt; map web_db_execute |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-db-query">
+        <h3><a class="doc-anchor" href="#doc-web-db-query">#</a> <code>web_db_query</code></h3>
+        <p><code>web_db_query</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_db_query $x 
+# or in a pipeline:
+@list |&gt; map web_db_query |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-jobs-init">
+        <h3><a class="doc-anchor" href="#doc-web-jobs-init">#</a> <code>web_jobs_init</code></h3>
+        <p><code>web_jobs_init()</code> — create the SQLite <code>jobs</code> table if it doesn&#39;t exist. Idempotent.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-job-enqueue">
+        <h3><a class="doc-anchor" href="#doc-web-job-enqueue">#</a> <code>web_job_enqueue</code></h3>
+        <p><code>web_job_enqueue(&quot;name&quot;, +{...args}, queue =&gt; &quot;...&quot;, priority =&gt; N, max_attempts =&gt; N)</code> → job id (i64). Status starts as <code>pending</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-job-dequeue">
+        <h3><a class="doc-anchor" href="#doc-web-job-dequeue">#</a> <code>web_job_dequeue</code></h3>
+        <p><code>web_job_dequeue(queue =&gt; &quot;...&quot;)</code> → <code>+{id, name, args_json, args, attempts, max_attempts}</code> or undef. Atomically marks the picked job as <code>running</code> and increments <code>attempts</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-job-complete">
+        <h3><a class="doc-anchor" href="#doc-web-job-complete">#</a> <code>web_job_complete</code></h3>
+        <p><code>web_job_complete($id)</code> — mark a running job as <code>done</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-job-fail">
+        <h3><a class="doc-anchor" href="#doc-web-job-fail">#</a> <code>web_job_fail</code></h3>
+        <p><code>web_job_fail($id, error =&gt; &quot;msg&quot;)</code> — if <code>attempts &lt; max_attempts</code>, returns to <code>pending</code> for retry; otherwise marked <code>failed</code>. Returns the new status.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-jobs-list">
+        <h3><a class="doc-anchor" href="#doc-web-jobs-list">#</a> <code>web_jobs_list</code></h3>
+        <p><code>web_jobs_list(queue =&gt; &quot;...&quot;, status =&gt; &quot;...&quot;, limit =&gt; 50)</code> → arrayref of job hashrefs.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-jobs-stats">
+        <h3><a class="doc-anchor" href="#doc-web-jobs-stats">#</a> <code>web_jobs_stats</code></h3>
+        <p><code>web_jobs_stats()</code> → <code>+{pending, running, done, failed}</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-job-purge">
+        <h3><a class="doc-anchor" href="#doc-web-job-purge">#</a> <code>web_job_purge</code></h3>
+        <p><code>web_job_purge(status =&gt; &quot;done&quot;)</code> → number of rows deleted.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-db-begin">
+        <h3><a class="doc-anchor" href="#doc-web-db-begin">#</a> <code>web_db_begin</code></h3>
+        <p><code>web_db_begin</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_db_begin $x 
+# or in a pipeline:
+@list |&gt; map web_db_begin |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-db-commit">
+        <h3><a class="doc-anchor" href="#doc-web-db-commit">#</a> <code>web_db_commit</code></h3>
+        <p><code>web_db_commit</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_db_commit $x 
+# or in a pipeline:
+@list |&gt; map web_db_commit |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-db-rollback">
+        <h3><a class="doc-anchor" href="#doc-web-db-rollback">#</a> <code>web_db_rollback</code></h3>
+        <p><code>web_db_rollback</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_db_rollback $x 
+# or in a pipeline:
+@list |&gt; map web_db_rollback |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-all">
+        <h3><a class="doc-anchor" href="#doc-web-model-all">#</a> <code>web_model_all</code></h3>
+        <p><code>web_model_all &quot;posts&quot;</code> — <code>SELECT * FROM posts ORDER BY id</code>. Returns arrayref of hashrefs.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-model-find">
+        <h3><a class="doc-anchor" href="#doc-web-model-find">#</a> <code>web_model_find</code></h3>
+        <p><code>web_model_find &quot;posts&quot;, $id</code> — find by id; returns hashref or undef.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-model-where">
+        <h3><a class="doc-anchor" href="#doc-web-model-where">#</a> <code>web_model_where</code></h3>
+        <p><code>web_model_where</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_where $x 
+# or in a pipeline:
+@list |&gt; map web_model_where |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-create">
+        <h3><a class="doc-anchor" href="#doc-web-model-create">#</a> <code>web_model_create</code></h3>
+        <p><code>web_model_create &quot;posts&quot;, +{title =&gt; &quot;...&quot;, body =&gt; &quot;...&quot;}</code> — INSERT + return new row with id and auto-set <code>created_at</code>/<code>updated_at</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-model-update">
+        <h3><a class="doc-anchor" href="#doc-web-model-update">#</a> <code>web_model_update</code></h3>
+        <p><code>web_model_update</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_update $x 
+# or in a pipeline:
+@list |&gt; map web_model_update |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-destroy">
+        <h3><a class="doc-anchor" href="#doc-web-model-destroy">#</a> <code>web_model_destroy</code></h3>
+        <p><code>web_model_destroy</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_destroy $x 
+# or in a pipeline:
+@list |&gt; map web_model_destroy |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-soft-destroy">
+        <h3><a class="doc-anchor" href="#doc-web-model-soft-destroy">#</a> <code>web_model_soft_destroy</code></h3>
+        <p><code>web_model_soft_destroy</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_soft_destroy $x 
+# or in a pipeline:
+@list |&gt; map web_model_soft_destroy |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-paginate">
+        <h3><a class="doc-anchor" href="#doc-web-model-paginate">#</a> <code>web_model_paginate</code></h3>
+        <p><code>web_model_paginate</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_paginate $x 
+# or in a pipeline:
+@list |&gt; map web_model_paginate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-search">
+        <h3><a class="doc-anchor" href="#doc-web-model-search">#</a> <code>web_model_search</code></h3>
+        <p><code>web_model_search</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_search $x 
+# or in a pipeline:
+@list |&gt; map web_model_search |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-count">
+        <h3><a class="doc-anchor" href="#doc-web-model-count">#</a> <code>web_model_count</code></h3>
+        <p><code>web_model_count</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_count $x 
+# or in a pipeline:
+@list |&gt; map web_model_count |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-first">
+        <h3><a class="doc-anchor" href="#doc-web-model-first">#</a> <code>web_model_first</code></h3>
+        <p><code>web_model_first</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_first $x 
+# or in a pipeline:
+@list |&gt; map web_model_first |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-last">
+        <h3><a class="doc-anchor" href="#doc-web-model-last">#</a> <code>web_model_last</code></h3>
+        <p><code>web_model_last</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_last $x 
+# or in a pipeline:
+@list |&gt; map web_model_last |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-increment">
+        <h3><a class="doc-anchor" href="#doc-web-model-increment">#</a> <code>web_model_increment</code></h3>
+        <p><code>web_model_increment</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_increment $x 
+# or in a pipeline:
+@list |&gt; map web_model_increment |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-model-with">
+        <h3><a class="doc-anchor" href="#doc-web-model-with">#</a> <code>web_model_with</code></h3>
+        <p><code>web_model_with</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_model_with $x 
+# or in a pipeline:
+@list |&gt; map web_model_with |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-create-table">
+        <h3><a class="doc-anchor" href="#doc-web-create-table">#</a> <code>web_create_table</code></h3>
+        <p><code>web_create_table</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_create_table $x 
+# or in a pipeline:
+@list |&gt; map web_create_table |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-drop-table">
+        <h3><a class="doc-anchor" href="#doc-web-drop-table">#</a> <code>web_drop_table</code></h3>
+        <p><code>web_drop_table</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_drop_table $x 
+# or in a pipeline:
+@list |&gt; map web_drop_table |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-add-column">
+        <h3><a class="doc-anchor" href="#doc-web-add-column">#</a> <code>web_add_column</code></h3>
+        <p><code>web_add_column</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_add_column $x 
+# or in a pipeline:
+@list |&gt; map web_add_column |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-remove-column">
+        <h3><a class="doc-anchor" href="#doc-web-remove-column">#</a> <code>web_remove_column</code></h3>
+        <p><code>web_remove_column</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_remove_column $x 
+# or in a pipeline:
+@list |&gt; map web_remove_column |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-migrate">
+        <h3><a class="doc-anchor" href="#doc-web-migrate">#</a> <code>web_migrate</code></h3>
+        <p><code>web_migrate()</code> — apply every <code>up</code> block from <code>db/migrate/*.stk</code> whose version isn&#39;t yet in <code>schema_migrations</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-rollback">
+        <h3><a class="doc-anchor" href="#doc-web-rollback">#</a> <code>web_rollback</code></h3>
+        <p><code>web_rollback</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_rollback $x 
+# or in a pipeline:
+@list |&gt; map web_rollback |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-validate">
+        <h3><a class="doc-anchor" href="#doc-web-validate">#</a> <code>web_validate</code></h3>
+        <p><code>web_validate $attrs, +{title =&gt; &quot;presence,length:1..100&quot;, email =&gt; &quot;format:^.+@.+$&quot;}</code> — returns <code>+{ok =&gt; 1}</code> or <code>+{ok =&gt; 0, errors =&gt; +{...}}</code>. Validators: <code>presence</code>, <code>length:MIN..MAX</code>, <code>format:REGEX</code>, <code>numericality</code>, <code>inclusion:a|b|c</code>, <code>confirmation:other_field</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-permit">
+        <h3><a class="doc-anchor" href="#doc-web-permit">#</a> <code>web_permit</code></h3>
+        <p><code>web_permit</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_permit $x 
+# or in a pipeline:
+@list |&gt; map web_permit |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-password-hash">
+        <h3><a class="doc-anchor" href="#doc-web-password-hash">#</a> <code>web_password_hash</code></h3>
+        <p><code>web_password_hash $pw</code> returns a <code>web1$saltHex$digest</code> shaped string. <code>web_password_verify $pw, $stored</code> returns 1/0. SHA-256 + 16-byte salt; constant-time compare.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-session">
+        <h3><a class="doc-anchor" href="#doc-web-session">#</a> <code>web_session</code></h3>
+        <p><code>web_session</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_session $x 
+# or in a pipeline:
+@list |&gt; map web_session |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-session-set">
+        <h3><a class="doc-anchor" href="#doc-web-session-set">#</a> <code>web_session_set</code></h3>
+        <p>Server-side session storage backed by a signed cookie. <code>web_session_set(&quot;user_id&quot;, 42)</code> / <code>web_session_get(&quot;user_id&quot;)</code>. Cookie value is base64-JSON; HttpOnly + SameSite=Lax by default.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-session-clear">
+        <h3><a class="doc-anchor" href="#doc-web-session-clear">#</a> <code>web_session_clear</code></h3>
+        <p><code>web_session_clear</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_session_clear $x 
+# or in a pipeline:
+@list |&gt; map web_session_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-set-cookie">
+        <h3><a class="doc-anchor" href="#doc-web-set-cookie">#</a> <code>web_set_cookie</code></h3>
+        <p><code>web_set_cookie</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_set_cookie $x 
+# or in a pipeline:
+@list |&gt; map web_set_cookie |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-cookies">
+        <h3><a class="doc-anchor" href="#doc-web-cookies">#</a> <code>web_cookies</code></h3>
+        <p><code>web_cookies</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_cookies $x 
+# or in a pipeline:
+@list |&gt; map web_cookies |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-flash">
+        <h3><a class="doc-anchor" href="#doc-web-flash">#</a> <code>web_flash</code></h3>
+        <p><code>web_flash</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_flash $x 
+# or in a pipeline:
+@list |&gt; map web_flash |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-flash-set">
+        <h3><a class="doc-anchor" href="#doc-web-flash-set">#</a> <code>web_flash_set</code></h3>
+        <p><code>web_flash_set</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_flash_set $x 
+# or in a pipeline:
+@list |&gt; map web_flash_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-flash-get">
+        <h3><a class="doc-anchor" href="#doc-web-flash-get">#</a> <code>web_flash_get</code></h3>
+        <p><code>web_flash_get</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_flash_get $x 
+# or in a pipeline:
+@list |&gt; map web_flash_get |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-jwt-encode">
+        <h3><a class="doc-anchor" href="#doc-web-jwt-encode">#</a> <code>web_jwt_encode</code></h3>
+        <p><code>web_jwt_encode +{user_id =&gt; 1, role =&gt; &quot;admin&quot;}</code> — HS256-sign a JWT using <code>secret_key_base</code> from <code>web_application_config</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-jwt-decode">
+        <h3><a class="doc-anchor" href="#doc-web-jwt-decode">#</a> <code>web_jwt_decode</code></h3>
+        <p><code>web_jwt_decode $token</code> — verify + decode an HS256 JWT. Returns the payload hashref or undef on bad signature.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-bearer-token">
+        <h3><a class="doc-anchor" href="#doc-web-bearer-token">#</a> <code>web_bearer_token</code></h3>
+        <p><code>web_bearer_token</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_bearer_token $x 
+# or in a pipeline:
+@list |&gt; map web_bearer_token |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-otp-secret">
+        <h3><a class="doc-anchor" href="#doc-web-otp-secret">#</a> <code>web_otp_secret</code></h3>
+        <p>TOTP / 2FA — RFC 6238, 30-second window, ±1 step skew tolerance. <code>web_otp_secret()</code> returns a base32 secret to share with the authenticator app; <code>web_otp_generate($secret)</code> returns the current 6-digit code; <code>web_otp_verify($secret, $code)</code> returns 1/0.</p>
+      </article>
+      <article class="doc-entry" id="doc-web-token-for">
+        <h3><a class="doc-anchor" href="#doc-web-token-for">#</a> <code>web_token_for</code></h3>
+        <p><code>web_token_for</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_token_for $x 
+# or in a pipeline:
+@list |&gt; map web_token_for |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-token-consume">
+        <h3><a class="doc-anchor" href="#doc-web-token-consume">#</a> <code>web_token_consume</code></h3>
+        <p><code>web_token_consume</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_token_consume $x 
+# or in a pipeline:
+@list |&gt; map web_token_consume |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-can">
+        <h3><a class="doc-anchor" href="#doc-web-can">#</a> <code>web_can</code></h3>
+        <p><code>web_can</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_can $x 
+# or in a pipeline:
+@list |&gt; map web_can |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-signed">
+        <h3><a class="doc-anchor" href="#doc-web-signed">#</a> <code>web_signed</code></h3>
+        <p><code>web_signed</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_signed $x 
+# or in a pipeline:
+@list |&gt; map web_signed |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-unsigned">
+        <h3><a class="doc-anchor" href="#doc-web-unsigned">#</a> <code>web_unsigned</code></h3>
+        <p><code>web_unsigned</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_unsigned $x 
+# or in a pipeline:
+@list |&gt; map web_unsigned |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-cache-get">
+        <h3><a class="doc-anchor" href="#doc-web-cache-get">#</a> <code>web_cache_get</code></h3>
+        <p><code>web_cache_get</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_cache_get $x 
+# or in a pipeline:
+@list |&gt; map web_cache_get |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-cache-set">
+        <h3><a class="doc-anchor" href="#doc-web-cache-set">#</a> <code>web_cache_set</code></h3>
+        <p><code>web_cache_set</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_cache_set $x 
+# or in a pipeline:
+@list |&gt; map web_cache_set |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-cache-delete">
+        <h3><a class="doc-anchor" href="#doc-web-cache-delete">#</a> <code>web_cache_delete</code></h3>
+        <p><code>web_cache_delete</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_cache_delete $x 
+# or in a pipeline:
+@list |&gt; map web_cache_delete |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-cache-clear">
+        <h3><a class="doc-anchor" href="#doc-web-cache-clear">#</a> <code>web_cache_clear</code></h3>
+        <p><code>web_cache_clear</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_cache_clear $x 
+# or in a pipeline:
+@list |&gt; map web_cache_clear |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-t">
+        <h3><a class="doc-anchor" href="#doc-web-t">#</a> <code>web_t</code></h3>
+        <p><code>web_t</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_t $x 
+# or in a pipeline:
+@list |&gt; map web_t |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-load-locale">
+        <h3><a class="doc-anchor" href="#doc-web-load-locale">#</a> <code>web_load_locale</code></h3>
+        <p><code>web_load_locale</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_load_locale $x 
+# or in a pipeline:
+@list |&gt; map web_load_locale |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-log">
+        <h3><a class="doc-anchor" href="#doc-web-log">#</a> <code>web_log</code></h3>
+        <p><code>web_log</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_log $x 
+# or in a pipeline:
+@list |&gt; map web_log |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-set-header">
+        <h3><a class="doc-anchor" href="#doc-web-set-header">#</a> <code>web_set_header</code></h3>
+        <p><code>web_set_header</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_set_header $x 
+# or in a pipeline:
+@list |&gt; map web_set_header |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-status">
+        <h3><a class="doc-anchor" href="#doc-web-status">#</a> <code>web_status</code></h3>
+        <p><code>web_status</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_status $x 
+# or in a pipeline:
+@list |&gt; map web_status |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-uuid">
+        <h3><a class="doc-anchor" href="#doc-web-uuid">#</a> <code>web_uuid</code></h3>
+        <p><code>web_uuid</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_uuid $x 
+# or in a pipeline:
+@list |&gt; map web_uuid |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-now">
+        <h3><a class="doc-anchor" href="#doc-web-now">#</a> <code>web_now</code></h3>
+        <p><code>web_now</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_now $x 
+# or in a pipeline:
+@list |&gt; map web_now |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-security-headers">
+        <h3><a class="doc-anchor" href="#doc-web-security-headers">#</a> <code>web_security_headers</code></h3>
+        <p><code>web_security_headers</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_security_headers $x 
+# or in a pipeline:
+@list |&gt; map web_security_headers |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-openapi">
+        <h3><a class="doc-anchor" href="#doc-web-openapi">#</a> <code>web_openapi</code></h3>
+        <p><code>web_openapi</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_openapi $x 
+# or in a pipeline:
+@list |&gt; map web_openapi |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-etag">
+        <h3><a class="doc-anchor" href="#doc-web-etag">#</a> <code>web_etag</code></h3>
+        <p><code>web_etag</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_etag $x 
+# or in a pipeline:
+@list |&gt; map web_etag |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-csv">
+        <h3><a class="doc-anchor" href="#doc-web-csv">#</a> <code>web_csv</code></h3>
+        <p><code>web_csv</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_csv $x 
+# or in a pipeline:
+@list |&gt; map web_csv |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-markdown">
+        <h3><a class="doc-anchor" href="#doc-web-markdown">#</a> <code>web_markdown</code></h3>
+        <p><code>web_markdown</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_markdown $x 
+# or in a pipeline:
+@list |&gt; map web_markdown |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-md">
+        <h3><a class="doc-anchor" href="#doc-web-md">#</a> <code>web_md</code></h3>
+        <p><code>web_md</code> — web framework (docs/web_framework.md) builtin. Alias for <code>web_markdown</code>.</p>
+        <pre><code class="lang-perl">my $result = web_md $x 
+# or in a pipeline:
+@list |&gt; map web_md |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-content-for">
+        <h3><a class="doc-anchor" href="#doc-web-content-for">#</a> <code>web_content_for</code></h3>
+        <p><code>web_content_for</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_content_for $x 
+# or in a pipeline:
+@list |&gt; map web_content_for |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-yield-content">
+        <h3><a class="doc-anchor" href="#doc-web-yield-content">#</a> <code>web_yield_content</code></h3>
+        <p><code>web_yield_content</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_yield_content $x 
+# or in a pipeline:
+@list |&gt; map web_yield_content |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-jsonapi-resource">
+        <h3><a class="doc-anchor" href="#doc-web-jsonapi-resource">#</a> <code>web_jsonapi_resource</code></h3>
+        <p><code>web_jsonapi_resource</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_jsonapi_resource $x 
+# or in a pipeline:
+@list |&gt; map web_jsonapi_resource |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-jsonapi-collection">
+        <h3><a class="doc-anchor" href="#doc-web-jsonapi-collection">#</a> <code>web_jsonapi_collection</code></h3>
+        <p><code>web_jsonapi_collection</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_jsonapi_collection $x 
+# or in a pipeline:
+@list |&gt; map web_jsonapi_collection |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-jsonapi-error">
+        <h3><a class="doc-anchor" href="#doc-web-jsonapi-error">#</a> <code>web_jsonapi_error</code></h3>
+        <p><code>web_jsonapi_error</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_jsonapi_error $x 
+# or in a pipeline:
+@list |&gt; map web_jsonapi_error |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-rate-limit">
+        <h3><a class="doc-anchor" href="#doc-web-rate-limit">#</a> <code>web_rate_limit</code></h3>
+        <p><code>web_rate_limit</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_rate_limit $x 
+# or in a pipeline:
+@list |&gt; map web_rate_limit |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-before-action">
+        <h3><a class="doc-anchor" href="#doc-web-before-action">#</a> <code>web_before_action</code></h3>
+        <p><code>web_before_action</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_before_action $x 
+# or in a pipeline:
+@list |&gt; map web_before_action |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-after-action">
+        <h3><a class="doc-anchor" href="#doc-web-after-action">#</a> <code>web_after_action</code></h3>
+        <p><code>web_after_action</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_after_action $x 
+# or in a pipeline:
+@list |&gt; map web_after_action |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-h">
+        <h3><a class="doc-anchor" href="#doc-web-h">#</a> <code>web_h</code></h3>
+        <p><code>web_h</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_h $x 
+# or in a pipeline:
+@list |&gt; map web_h |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-link-to">
+        <h3><a class="doc-anchor" href="#doc-web-link-to">#</a> <code>web_link_to</code></h3>
+        <p><code>web_link_to</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_link_to $x 
+# or in a pipeline:
+@list |&gt; map web_link_to |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-button-to">
+        <h3><a class="doc-anchor" href="#doc-web-button-to">#</a> <code>web_button_to</code></h3>
+        <p><code>web_button_to</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_button_to $x 
+# or in a pipeline:
+@list |&gt; map web_button_to |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-form-with">
+        <h3><a class="doc-anchor" href="#doc-web-form-with">#</a> <code>web_form_with</code></h3>
+        <p><code>web_form_with</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_form_with $x 
+# or in a pipeline:
+@list |&gt; map web_form_with |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-form-close">
+        <h3><a class="doc-anchor" href="#doc-web-form-close">#</a> <code>web_form_close</code></h3>
+        <p><code>web_form_close</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_form_close $x 
+# or in a pipeline:
+@list |&gt; map web_form_close |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-text-field">
+        <h3><a class="doc-anchor" href="#doc-web-text-field">#</a> <code>web_text_field</code></h3>
+        <p><code>web_text_field</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_text_field $x 
+# or in a pipeline:
+@list |&gt; map web_text_field |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-text-area">
+        <h3><a class="doc-anchor" href="#doc-web-text-area">#</a> <code>web_text_area</code></h3>
+        <p><code>web_text_area</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_text_area $x 
+# or in a pipeline:
+@list |&gt; map web_text_area |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-check-box">
+        <h3><a class="doc-anchor" href="#doc-web-check-box">#</a> <code>web_check_box</code></h3>
+        <p><code>web_check_box</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_check_box $x 
+# or in a pipeline:
+@list |&gt; map web_check_box |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-csrf-meta-tag">
+        <h3><a class="doc-anchor" href="#doc-web-csrf-meta-tag">#</a> <code>web_csrf_meta_tag</code></h3>
+        <p><code>web_csrf_meta_tag</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_csrf_meta_tag $x 
+# or in a pipeline:
+@list |&gt; map web_csrf_meta_tag |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-stylesheet-link-tag">
+        <h3><a class="doc-anchor" href="#doc-web-stylesheet-link-tag">#</a> <code>web_stylesheet_link_tag</code></h3>
+        <p><code>web_stylesheet_link_tag</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_stylesheet_link_tag $x 
+# or in a pipeline:
+@list |&gt; map web_stylesheet_link_tag |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-javascript-link-tag">
+        <h3><a class="doc-anchor" href="#doc-web-javascript-link-tag">#</a> <code>web_javascript_link_tag</code></h3>
+        <p><code>web_javascript_link_tag</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_javascript_link_tag $x 
+# or in a pipeline:
+@list |&gt; map web_javascript_link_tag |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-image-tag">
+        <h3><a class="doc-anchor" href="#doc-web-image-tag">#</a> <code>web_image_tag</code></h3>
+        <p><code>web_image_tag</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_image_tag $x 
+# or in a pipeline:
+@list |&gt; map web_image_tag |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-truncate">
+        <h3><a class="doc-anchor" href="#doc-web-truncate">#</a> <code>web_truncate</code></h3>
+        <p><code>web_truncate</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_truncate $x 
+# or in a pipeline:
+@list |&gt; map web_truncate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-pluralize">
+        <h3><a class="doc-anchor" href="#doc-web-pluralize">#</a> <code>web_pluralize</code></h3>
+        <p><code>web_pluralize</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_pluralize $x 
+# or in a pipeline:
+@list |&gt; map web_pluralize |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-time-ago-in-words">
+        <h3><a class="doc-anchor" href="#doc-web-time-ago-in-words">#</a> <code>web_time_ago_in_words</code></h3>
+        <p><code>web_time_ago_in_words</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_time_ago_in_words $x 
+# or in a pipeline:
+@list |&gt; map web_time_ago_in_words |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-faker-name">
+        <h3><a class="doc-anchor" href="#doc-web-faker-name">#</a> <code>web_faker_name</code></h3>
+        <p><code>web_faker_name</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_faker_name $x 
+# or in a pipeline:
+@list |&gt; map web_faker_name |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-faker-email">
+        <h3><a class="doc-anchor" href="#doc-web-faker-email">#</a> <code>web_faker_email</code></h3>
+        <p><code>web_faker_email</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_faker_email $x 
+# or in a pipeline:
+@list |&gt; map web_faker_email |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-faker-sentence">
+        <h3><a class="doc-anchor" href="#doc-web-faker-sentence">#</a> <code>web_faker_sentence</code></h3>
+        <p><code>web_faker_sentence</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_faker_sentence $x 
+# or in a pipeline:
+@list |&gt; map web_faker_sentence |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-faker-paragraph">
+        <h3><a class="doc-anchor" href="#doc-web-faker-paragraph">#</a> <code>web_faker_paragraph</code></h3>
+        <p><code>web_faker_paragraph</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_faker_paragraph $x 
+# or in a pipeline:
+@list |&gt; map web_faker_paragraph |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-faker-int">
+        <h3><a class="doc-anchor" href="#doc-web-faker-int">#</a> <code>web_faker_int</code></h3>
+        <p><code>web_faker_int</code> — web framework (docs/web_framework.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = web_faker_int $x 
+# or in a pipeline:
+@list |&gt; map web_faker_int |&gt; p
+</code></pre>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-stress-telemetry-docs-stress-testing-md">
+      <h2>Stress / telemetry (docs/STRESS_TESTING.md)</h2>
+      <p class="chapter-meta">42 topics</p>
+      <article class="doc-entry" id="doc-stress-fp">
+        <h3><a class="doc-anchor" href="#doc-stress-fp">#</a> <code>stress_fp</code></h3>
+        <p><code>stress_fp $secs</code> — float matrix-multiply pinning every core. Returns total FLOP count.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-int">
+        <h3><a class="doc-anchor" href="#doc-stress-int">#</a> <code>stress_int</code></h3>
+        <p><code>stress_int $secs</code> — integer pipeline pinning every core.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-cache">
+        <h3><a class="doc-anchor" href="#doc-stress-cache">#</a> <code>stress_cache</code></h3>
+        <p><code>stress_cache $secs, $kb</code> — pound a working set of <code>kb</code> KiB per core in random order. Default 1024 (~ L2/L3 boundary).</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-branch">
+        <h3><a class="doc-anchor" href="#doc-stress-branch">#</a> <code>stress_branch</code></h3>
+        <p><code>stress_branch</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_branch $x 
+# or in a pipeline:
+@list |&gt; map stress_branch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-sort">
+        <h3><a class="doc-anchor" href="#doc-stress-sort">#</a> <code>stress_sort</code></h3>
+        <p><code>stress_sort</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_sort $x 
+# or in a pipeline:
+@list |&gt; map stress_sort |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-alloc">
+        <h3><a class="doc-anchor" href="#doc-stress-alloc">#</a> <code>stress_alloc</code></h3>
+        <p><code>stress_alloc</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_alloc $x 
+# or in a pipeline:
+@list |&gt; map stress_alloc |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-mmap">
+        <h3><a class="doc-anchor" href="#doc-stress-mmap">#</a> <code>stress_mmap</code></h3>
+        <p><code>stress_mmap</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_mmap $x 
+# or in a pipeline:
+@list |&gt; map stress_mmap |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-disk">
+        <h3><a class="doc-anchor" href="#doc-stress-disk">#</a> <code>stress_disk</code></h3>
+        <p><code>stress_disk $path, $secs, $mb_per_write</code> — sustained sequential write + fsync + read across all cores.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-iops">
+        <h3><a class="doc-anchor" href="#doc-stress-iops">#</a> <code>stress_iops</code></h3>
+        <p><code>stress_iops $path, $secs, $block_kb</code> — small random reads/writes for IOPS testing. Default 4KB blocks.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-net">
+        <h3><a class="doc-anchor" href="#doc-stress-net">#</a> <code>stress_net</code></h3>
+        <p><code>stress_net &quot;host:port&quot;, $secs, $conns</code> — open <code>conns</code> TCP connections per core, pump bytes.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-http">
+        <h3><a class="doc-anchor" href="#doc-stress-http">#</a> <code>stress_http</code></h3>
+        <p><code>stress_http $url, $secs, $conns</code> — HTTP GET storm. Counts 2xx responses.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-dns">
+        <h3><a class="doc-anchor" href="#doc-stress-dns">#</a> <code>stress_dns</code></h3>
+        <p><code>stress_dns</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_dns $x 
+# or in a pipeline:
+@list |&gt; map stress_dns |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-thread">
+        <h3><a class="doc-anchor" href="#doc-stress-thread">#</a> <code>stress_thread</code></h3>
+        <p><code>stress_thread</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_thread $x 
+# or in a pipeline:
+@list |&gt; map stress_thread |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-fork">
+        <h3><a class="doc-anchor" href="#doc-stress-fork">#</a> <code>stress_fork</code></h3>
+        <p><code>stress_fork</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_fork $x 
+# or in a pipeline:
+@list |&gt; map stress_fork |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-aes">
+        <h3><a class="doc-anchor" href="#doc-stress-aes">#</a> <code>stress_aes</code></h3>
+        <p><code>stress_aes $secs</code> — AES-128 encrypt round-trip across cores.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-compress">
+        <h3><a class="doc-anchor" href="#doc-stress-compress">#</a> <code>stress_compress</code></h3>
+        <p><code>stress_compress $secs, $kb</code> — gzip compress+decompress payload of <code>kb</code> KiB per core.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-regex">
+        <h3><a class="doc-anchor" href="#doc-stress-regex">#</a> <code>stress_regex</code></h3>
+        <p><code>stress_regex</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_regex $x 
+# or in a pipeline:
+@list |&gt; map stress_regex |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-json">
+        <h3><a class="doc-anchor" href="#doc-stress-json">#</a> <code>stress_json</code></h3>
+        <p><code>stress_json</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_json $x 
+# or in a pipeline:
+@list |&gt; map stress_json |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-burst">
+        <h3><a class="doc-anchor" href="#doc-stress-burst">#</a> <code>stress_burst</code></h3>
+        <p><code>stress_burst</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_burst $x 
+# or in a pipeline:
+@list |&gt; map stress_burst |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-ramp">
+        <h3><a class="doc-anchor" href="#doc-stress-ramp">#</a> <code>stress_ramp</code></h3>
+        <p><code>stress_ramp</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_ramp $x 
+# or in a pipeline:
+@list |&gt; map stress_ramp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-oscillate">
+        <h3><a class="doc-anchor" href="#doc-stress-oscillate">#</a> <code>stress_oscillate</code></h3>
+        <p><code>stress_oscillate</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_oscillate $x 
+# or in a pipeline:
+@list |&gt; map stress_oscillate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-all">
+        <h3><a class="doc-anchor" href="#doc-stress-all">#</a> <code>stress_all</code></h3>
+        <p><code>stress_all $secs</code> — run every stress kernel above in parallel for <code>secs</code>. Returns a hashref of per-kernel counts.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-cores">
+        <h3><a class="doc-anchor" href="#doc-stress-cores">#</a> <code>stress_cores</code></h3>
+        <p><code>stress_cores</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_cores $x 
+# or in a pipeline:
+@list |&gt; map stress_cores |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-temp">
+        <h3><a class="doc-anchor" href="#doc-stress-temp">#</a> <code>stress_temp</code></h3>
+        <p>Telemetry helpers: <code>stress_temp()</code> reads CPU temp from <code>/sys/class/thermal</code> (Linux), <code>stress_freq()</code> averages cpufreq across cores, <code>stress_throttled()</code> returns 1 when freq &lt; 80% of max AND temp &gt; 80°C, <code>stress_load()</code> returns <code>+{m1, m5, m15}</code>, <code>stress_meminfo()</code> returns total/used/free/swap bytes.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-thermal-zones">
+        <h3><a class="doc-anchor" href="#doc-stress-thermal-zones">#</a> <code>stress_thermal_zones</code></h3>
+        <p><code>stress_thermal_zones</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_thermal_zones $x 
+# or in a pipeline:
+@list |&gt; map stress_thermal_zones |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-arm-kill-switch">
+        <h3><a class="doc-anchor" href="#doc-stress-arm-kill-switch">#</a> <code>stress_arm_kill_switch</code></h3>
+        <p><code>stress_arm_kill_switch</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_arm_kill_switch $x 
+# or in a pipeline:
+@list |&gt; map stress_arm_kill_switch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-killed">
+        <h3><a class="doc-anchor" href="#doc-stress-killed">#</a> <code>stress_killed</code></h3>
+        <p><code>stress_killed</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_killed $x 
+# or in a pipeline:
+@list |&gt; map stress_killed |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-disarm-kill-switch">
+        <h3><a class="doc-anchor" href="#doc-stress-disarm-kill-switch">#</a> <code>stress_disarm_kill_switch</code></h3>
+        <p><code>stress_disarm_kill_switch</code> — stress / telemetry extensions builtin.</p>
+        <pre><code class="lang-perl">my $result = stress_disarm_kill_switch $x 
+# or in a pipeline:
+@list |&gt; map stress_disarm_kill_switch |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-record">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-record">#</a> <code>stress_metrics_record</code></h3>
+        <p><code>stress_metrics_record(&quot;name&quot;, $value, k1 =&gt; v1, ...)</code> — append a sample to the metrics history. Labels are stringified.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-clear">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-clear">#</a> <code>stress_metrics_clear</code></h3>
+        <p><code>stress_metrics_clear()</code> — wipe the metrics history. Pair with <code>stress_metrics_count()</code> before/after to verify.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-count">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-count">#</a> <code>stress_metrics_count</code></h3>
+        <p><code>stress_metrics_count()</code> → current number of samples in the history.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-export">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-export">#</a> <code>stress_metrics_export</code></h3>
+        <p><code>stress_metrics_export(&quot;path&quot;, format =&gt; &quot;csv&quot;|&quot;json&quot;|&quot;prom&quot;)</code> → number of samples written.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-prometheus">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-prometheus">#</a> <code>stress_metrics_prometheus</code></h3>
+        <p><code>stress_metrics_prometheus()</code> → string in Prometheus text exposition format. Latest value per (name, labels) wins. Drop into a <code>/metrics</code> HTTP handler.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-json">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-json">#</a> <code>stress_metrics_json</code></h3>
+        <p><code>stress_metrics_json()</code> → JSON string of the entire metrics history.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-csv">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-csv">#</a> <code>stress_metrics_csv</code></h3>
+        <p><code>stress_metrics_csv()</code> → CSV string with <code>ts_ms,name,value,labels</code> columns.</p>
+      </article>
+      <article class="doc-entry" id="doc-stress-metrics-watch">
+        <h3><a class="doc-anchor" href="#doc-stress-metrics-watch">#</a> <code>stress_metrics_watch</code></h3>
+        <p><code>stress_metrics_watch(field =&gt; &quot;stress_temp&quot;, interval_ms =&gt; 1000, max_ticks =&gt; 60)</code> → arrayref of values sampled at the requested cadence. Polls the metrics history for new entries matching <code>field</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-audit-log">
+        <h3><a class="doc-anchor" href="#doc-audit-log">#</a> <code>audit_log</code></h3>
+        <p><code>audit_log(&quot;event_name&quot;, k1 =&gt; v1, ...)</code> — append one JSONL line to <code>~/.stryke/audit.log</code> (or <code>$STRYKE_AUDIT_LOG</code>). Never throws; returns 1/0.</p>
+      </article>
+      <article class="doc-entry" id="doc-audit-log-path">
+        <h3><a class="doc-anchor" href="#doc-audit-log-path">#</a> <code>audit_log_path</code></h3>
+        <p><code>audit_log_path()</code> → absolute path the next <code>audit_log</code> call will write to.</p>
+      </article>
+      <article class="doc-entry" id="doc-secrets-encrypt">
+        <h3><a class="doc-anchor" href="#doc-secrets-encrypt">#</a> <code>secrets_encrypt</code></h3>
+        <p><code>secrets_encrypt($plain, key =&gt; $key)</code> → base64 envelope (nonce(12) || ciphertext || tag(16)). AES-256-GCM. Key must be 32 raw bytes or 32-byte base64.</p>
+      </article>
+      <article class="doc-entry" id="doc-secrets-decrypt">
+        <h3><a class="doc-anchor" href="#doc-secrets-decrypt">#</a> <code>secrets_decrypt</code></h3>
+        <p><code>secrets_decrypt($envelope, key =&gt; $key)</code> → plaintext, or undef on auth failure.</p>
+      </article>
+      <article class="doc-entry" id="doc-secrets-random-key">
+        <h3><a class="doc-anchor" href="#doc-secrets-random-key">#</a> <code>secrets_random_key</code></h3>
+        <p><code>secrets_random_key()</code> → fresh 32-byte AES-256 key as base64. Reads <code>/dev/urandom</code> on Unix.</p>
+      </article>
+      <article class="doc-entry" id="doc-secrets-kdf">
+        <h3><a class="doc-anchor" href="#doc-secrets-kdf">#</a> <code>secrets_kdf</code></h3>
+        <p><code>secrets_kdf($password, salt =&gt; &quot;...&quot;, iterations =&gt; 600_000)</code> → 32-byte key as base64. PBKDF2-HMAC-SHA256.</p>
+      </article>
+    </section>
+    <section class="tutorial-section" id="ch-pty-expect-docs-expect-feature-idea-md">
+      <h2>PTY / expect (docs/expect-feature-idea.md)</h2>
+      <p class="chapter-meta">13 topics</p>
+      <article class="doc-entry" id="doc-pty-spawn">
+        <h3><a class="doc-anchor" href="#doc-pty-spawn">#</a> <code>pty_spawn</code></h3>
+        <p><code>pty_spawn &quot;cmd args&quot;</code> or <code>pty_spawn(&quot;cmd&quot;, &quot;arg1&quot;, &quot;arg2&quot;)</code> — allocate a PTY, fork+exec the child, return a handle. Master fd is non-blocking.</p>
+        <pre><code class="lang-perl">my $h = pty_spawn(&quot;ssh user@host&quot;);
+pty_expect($h, qr/password:/, 30);
+pty_send($h, &quot;hunter2\n&quot;);
+pty_close($h);
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pty-send">
+        <h3><a class="doc-anchor" href="#doc-pty-send">#</a> <code>pty_send</code></h3>
+        <p><code>pty_send $h, &quot;text&quot;</code> — write to the PTY master. Handles EAGAIN/EINTR; returns bytes written.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-read">
+        <h3><a class="doc-anchor" href="#doc-pty-read">#</a> <code>pty_read</code></h3>
+        <p><code>pty_read</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = pty_read $x 
+# or in a pipeline:
+@list |&gt; map pty_read |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pty-expect">
+        <h3><a class="doc-anchor" href="#doc-pty-expect">#</a> <code>pty_expect</code></h3>
+        <p><code>pty_expect $h, qr/regex/, $timeout_secs</code> — loop reading until the regex matches the accumulated buffer or <code>timeout_secs</code> elapses. Returns the matched substring or undef on timeout/EOF. Buffer is consumed up to (and including) the match.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-expect-table">
+        <h3><a class="doc-anchor" href="#doc-pty-expect-table">#</a> <code>pty_expect_table</code></h3>
+        <p><code>pty_expect_table $h, [+{re =&gt; qr/.../, do =&gt; sub {...}}, ...], $timeout</code> — multi-pattern dispatch (Tcl <code>expect { ... }</code> block). First match wins; the matched branch&#39;s <code>do</code> sub is called.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-buffer">
+        <h3><a class="doc-anchor" href="#doc-pty-buffer">#</a> <code>pty_buffer</code></h3>
+        <p><code>pty_buffer</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = pty_buffer $x 
+# or in a pipeline:
+@list |&gt; map pty_buffer |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pty-alive">
+        <h3><a class="doc-anchor" href="#doc-pty-alive">#</a> <code>pty_alive</code></h3>
+        <p><code>pty_alive</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = pty_alive $x 
+# or in a pipeline:
+@list |&gt; map pty_alive |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pty-eof">
+        <h3><a class="doc-anchor" href="#doc-pty-eof">#</a> <code>pty_eof</code></h3>
+        <p><code>pty_eof</code> — mcp (model context protocol) builtin.</p>
+        <pre><code class="lang-perl">my $result = pty_eof $x 
+# or in a pipeline:
+@list |&gt; map pty_eof |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pty-close">
+        <h3><a class="doc-anchor" href="#doc-pty-close">#</a> <code>pty_close</code></h3>
+        <p><code>pty_close $h</code> — SIGTERM → 200ms grace → SIGKILL. Returns exit status.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-interact">
+        <h3><a class="doc-anchor" href="#doc-pty-interact">#</a> <code>pty_interact</code></h3>
+        <p><code>pty_interact $h</code> — raw-mode handoff: forwards stdin → master and master → stdout until EOF or Ctrl-]. Saves and restores tty state.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-strip-ansi">
+        <h3><a class="doc-anchor" href="#doc-pty-strip-ansi">#</a> <code>pty_strip_ansi</code></h3>
+        <p><code>pty_strip_ansi $text</code> → string with CSI/OSC/ESC sequences removed. Useful before regex-matching against PTY output that mixes color codes into prompts.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-after-eof">
+        <h3><a class="doc-anchor" href="#doc-pty-after-eof">#</a> <code>pty_after_eof</code></h3>
+        <p><code>pty_after_eof $h, &quot;callback_name&quot;</code> — register an EOF callback. Spawns a watcher thread that flips a fired flag once the PTY closes. Pair with <code>pty_pending_events()</code> in your main loop.</p>
+      </article>
+      <article class="doc-entry" id="doc-pty-pending-events">
+        <h3><a class="doc-anchor" href="#doc-pty-pending-events">#</a> <code>pty_pending_events</code></h3>
+        <p><code>pty_pending_events()</code> → arrayref of <code>+{handle_id, callback}</code> for any <code>pty_after_eof</code> registrations that have fired since the last call. Drains the fired list.</p>
+      </article>
+    </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2618 topics</p>
+      <p class="chapter-meta">2620 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -6888,6 +8459,14 @@ p $a[1]  # lag-1 autocorrelation
         <pre><code class="lang-perl">my $result = ageyrs $x 
 # or in a pipeline:
 @list |&gt; map ageyrs |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ai-agent">
+        <h3><a class="doc-anchor" href="#doc-ai-agent">#</a> <code>ai_agent</code></h3>
+        <p><code>ai_agent</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = ai_agent $x 
+# or in a pipeline:
+@list |&gt; map ai_agent |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-ain">
@@ -9126,14 +10705,6 @@ p @$c   # (1, 1)
         <h3><a class="doc-anchor" href="#doc-chars-to-string">#</a> <code>chars_to_string</code></h3>
         <p><code>chars_to_string</code> — string helpers (batch 4) builtin.</p>
         <pre><code class="lang-perl">my $result = chars_to_string $input 
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-chat">
-        <h3><a class="doc-anchor" href="#doc-chat">#</a> <code>chat</code></h3>
-        <p><code>chat</code> — extended stdlib builtin. Alias for <code>char_at</code>.</p>
-        <pre><code class="lang-perl">my $result = chat $x 
-# or in a pipeline:
-@list |&gt; map chat |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-chebyshev-distance">
@@ -11711,10 +13282,10 @@ p elu(-1)    # -0.632
 @list |&gt; map emavg |&gt; p
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-embed">
-        <h3><a class="doc-anchor" href="#doc-embed">#</a> <code>embed</code></h3>
-        <p><code>embed</code> — time-delay embedding. Converts a time series into a matrix of lagged values. Like R&#39;s embed().</p>
-        <pre><code class="lang-perl">p embed([1,2,3,4,5], 3)  # [[3,2,1],[4,3,2],[5,4,3]]
+      <article class="doc-entry" id="doc-embed-ts">
+        <h3><a class="doc-anchor" href="#doc-embed-ts">#</a> <code>embed_ts</code></h3>
+        <p><code>embed_ts</code> — time-delay embedding. Converts a time series into a matrix of lagged values. Like R&#39;s embed().</p>
+        <pre><code class="lang-perl">p embed_ts([1,2,3,4,5], 3)  # [[3,2,1],[4,3,2],[5,4,3]]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-emojinum">
@@ -18228,6 +19799,10 @@ p mdd(@equity)   # ~0.29 (29% max drawdown)
 @list |&gt; map mcol |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mcp-serve-registered-tools">
+        <h3><a class="doc-anchor" href="#doc-mcp-serve-registered-tools">#</a> <code>mcp_serve_registered_tools</code></h3>
+        <p><code>mcp_serve_registered_tools(&quot;server-name&quot;)</code> — convert every tool registered via <code>tool fn</code> / <code>ai_register_tool</code> into MCP server schema and run the stdio JSON-RPC loop. Used by <code>stryke build --mcp-server</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-md5">
         <h3><a class="doc-anchor" href="#doc-md5">#</a> <code>md5</code></h3>
         <p><code>md5</code> — crypto / encoding builtin.</p>
@@ -24297,6 +25872,14 @@ p stirling2(5, 3)   # 25
         <pre><code class="lang-perl">my $result = strdist $x 
 # or in a pipeline:
 @list |&gt; map strdist |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stream-prompt-cb">
+        <h3><a class="doc-anchor" href="#doc-stream-prompt-cb">#</a> <code>stream_prompt_cb</code></h3>
+        <p><code>stream_prompt_cb</code> — ai primitives (docs/ai_primitives.md) builtin.</p>
+        <pre><code class="lang-perl">my $result = stream_prompt_cb $x 
+# or in a pipeline:
+@list |&gt; map stream_prompt_cb |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-strikethrough">

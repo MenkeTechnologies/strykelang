@@ -4956,10 +4956,7 @@ fn range_ipv6_reverse_step() {
 fn range_ipv6_loopback_zero_compressed_prefix() {
     // `::1` form — IPv6 begins with the zero-compressed `::`. Lexer's `:`
     // arm picks it up when not in a term position and not inside `[…]`.
-    assert_eq!(
-        rs(r#"join ",", (::1~::5~1)"#),
-        "::1,::2,::3,::4,::5"
-    );
+    assert_eq!(rs(r#"join ",", (::1~::5~1)"#), "::1,::2,::3,::4,::5");
 }
 
 #[test]
@@ -4985,18 +4982,12 @@ fn range_ipv6_carries_over_compression_boundary() {
 
 #[test]
 fn range_ipv6_start_past_end_with_positive_step_is_empty() {
-    assert_eq!(
-        ri(r#"my @r = (2001::a~2001::1~1); scalar @r"#),
-        0
-    );
+    assert_eq!(ri(r#"my @r = (2001::a~2001::1~1); scalar @r"#), 0);
 }
 
 #[test]
 fn range_ipv6_start_before_end_with_negative_step_is_empty() {
-    assert_eq!(
-        ri(r#"my @r = (2001::1~2001::a~-1); scalar @r"#),
-        0
-    );
+    assert_eq!(ri(r#"my @r = (2001::1~2001::a~-1); scalar @r"#), 0);
 }
 
 #[test]
@@ -5209,10 +5200,7 @@ fn to_pdf_strips_ansi_and_block_chars() {
 
 #[test]
 fn strip_ansi_helper_removes_csi_sequences() {
-    assert_eq!(
-        rs(r#"strip_ansi("\e[31mhello\e[0m world")"#),
-        "hello world"
-    );
+    assert_eq!(rs(r#"strip_ansi("\e[31mhello\e[0m world")"#), "hello world");
 }
 
 // ── bar_chart sorts descending by value ─────────────────────────────────
