@@ -24,6 +24,7 @@
 //! need a separate template tree on disk.
 
 pub mod cmd_app;
+pub mod cmd_build;
 pub mod cmd_new;
 pub mod cmd_generate;
 pub mod cmd_extras;

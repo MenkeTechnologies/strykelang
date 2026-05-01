@@ -671,15 +671,22 @@ pub(crate) fn web_password_verify(args: &[PerlValue], line: usize) -> Result<Per
     }))
 }
 
+static RNG_STATE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn random_bytes(n: usize) -> Vec<u8> {
+    use std::sync::atomic::Ordering;
     use std::time::SystemTime;
-    let seed = SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0);
-    let mut state = seed
-        ^ std::process::id() as u64
-        ^ (std::ptr::addr_of!(seed) as u64);
+    let mut state = RNG_STATE.load(Ordering::Relaxed);
+    if state == 0 {
+        let seed = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
+        state = seed ^ std::process::id() as u64 ^ 0x9E37_79B9_7F4A_7C15;
+        if state == 0 {
+            state = 0xDEADBEEFCAFEBABE;
+        }
+    }
     let mut out = Vec::with_capacity(n);
     for _ in 0..n {
         state ^= state << 13;
@@ -687,6 +694,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
         state ^= state << 17;
         out.push((state & 0xFF) as u8);
     }
+    RNG_STATE.store(state, Ordering::Relaxed);
     out
 }
 
@@ -956,6 +964,987 @@ fn secret_key() -> String {
         }
     }
     "stryke_web_default_secret_change_me".to_string()
+}
+
+// ── JWT (HS256) ────────────────────────────────────────────────────────
+
+pub(crate) fn web_jwt_encode(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let payload = args
+        .first()
+        .ok_or_else(|| {
+            PerlError::runtime("web_jwt_encode: payload (hashref) required", line)
+        })?;
+    let payload_map = payload
+        .as_hash_map()
+        .or_else(|| payload.as_hash_ref().map(|h| h.read().clone()))
+        .ok_or_else(|| {
+            PerlError::runtime("web_jwt_encode: payload must be a hashref", line)
+        })?;
+    let mut wrapped = IndexMap::new();
+    for (k, v) in payload_map {
+        wrapped.insert(k, v);
+    }
+    let header = r#"{"alg":"HS256","typ":"JWT"}"#;
+    let header_b64 = base64url_encode(header.as_bytes());
+    let payload_val =
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(wrapped)));
+    let payload_json = crate::native_data::json_encode(&payload_val)
+        .unwrap_or_else(|_| "{}".into());
+    let payload_b64 = base64url_encode(payload_json.as_bytes());
+    let signing_input = format!("{}.{}", header_b64, payload_b64);
+    let mac = hmac_sha256_b64(&signing_input, &secret_key());
+    Ok(PerlValue::string(format!("{}.{}", signing_input, mac)))
+}
+
+pub(crate) fn web_jwt_decode(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let token = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
+        return Ok(PerlValue::UNDEF);
+    }
+    let signing_input = format!("{}.{}", parts[0], parts[1]);
+    let want = hmac_sha256_b64(&signing_input, &secret_key());
+    if !constant_time_eq(want.as_bytes(), parts[2].as_bytes()) {
+        return Ok(PerlValue::UNDEF);
+    }
+    let payload_bytes = match base64url_decode(parts[1]) {
+        Some(b) => b,
+        None => return Ok(PerlValue::UNDEF),
+    };
+    let json = match std::str::from_utf8(&payload_bytes) {
+        Ok(s) => s,
+        Err(_) => return Ok(PerlValue::UNDEF),
+    };
+    crate::native_data::json_decode(json)
+        .map(|v| v)
+        .or(Ok(PerlValue::UNDEF))
+}
+
+fn hmac_sha256_b64(input: &str, key: &str) -> String {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(key.as_bytes())
+        .expect("hmac key");
+    mac.update(input.as_bytes());
+    base64url_encode(&mac.finalize().into_bytes())
+}
+
+// ── Rate limiting ──────────────────────────────────────────────────────
+//
+// Token-bucket style: each `(key, window_seconds)` keeps a Vec<unix_secs>
+// of recent hits. `web_rate_limit("login:$ip", 5, 60)` returns 1 if the
+// hit was allowed (incrementing the counter), 0 if the limit is hit.
+
+static RATE_BUCKETS: OnceLock<Mutex<IndexMap<String, Vec<i64>>>> = OnceLock::new();
+
+fn rate_buckets() -> &'static Mutex<IndexMap<String, Vec<i64>>> {
+    RATE_BUCKETS.get_or_init(|| Mutex::new(IndexMap::new()))
+}
+
+pub(crate) fn web_rate_limit(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    if args.len() < 3 {
+        return Err(PerlError::runtime(
+            "web_rate_limit: usage: web_rate_limit(\"key\", limit_n, window_seconds)",
+            line,
+        ));
+    }
+    let key = args[0].to_string();
+    let limit = args[1].to_int().max(1);
+    let window = args[2].to_int().max(1);
+    let now = unix_now();
+    let mut g = rate_buckets().lock();
+    let bucket = g.entry(key).or_default();
+    bucket.retain(|t| now - t < window);
+    if (bucket.len() as i64) >= limit {
+        return Ok(PerlValue::integer(0));
+    }
+    bucket.push(now);
+    Ok(PerlValue::integer(1))
+}
+
+// ── TOTP (RFC 6238 — SHA1, 30s, 6 digits) ──────────────────────────────
+
+pub(crate) fn web_otp_secret(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    // 20 random bytes encoded as base32 (no padding) — what authenticator
+    // apps expect.
+    let bytes = random_bytes(20);
+    let s = base32_encode(&bytes);
+    Ok(PerlValue::string(s))
+}
+
+pub(crate) fn web_otp_generate(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let secret_b32 = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("web_otp_generate: secret required", line))?;
+    let key = match base32_decode(&secret_b32) {
+        Some(k) => k,
+        None => {
+            return Err(PerlError::runtime(
+                "web_otp_generate: bad base32 secret",
+                line,
+            ))
+        }
+    };
+    let counter = (unix_now() / 30) as u64;
+    let code = totp_code(&key, counter);
+    Ok(PerlValue::string(format!("{:06}", code)))
+}
+
+pub(crate) fn web_otp_verify(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let secret_b32 = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("web_otp_verify: secret required", line))?;
+    let code = args
+        .get(1)
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("web_otp_verify: code required", line))?;
+    let key = match base32_decode(&secret_b32) {
+        Some(k) => k,
+        None => return Ok(PerlValue::integer(0)),
+    };
+    let counter = (unix_now() / 30) as u64;
+    // Allow ±1 step (30s skew either side).
+    for delta in &[-1i64, 0, 1] {
+        let c = (counter as i64 + delta) as u64;
+        let want = format!("{:06}", totp_code(&key, c));
+        if constant_time_eq(want.as_bytes(), code.as_bytes()) {
+            return Ok(PerlValue::integer(1));
+        }
+    }
+    Ok(PerlValue::integer(0))
+}
+
+fn totp_code(key: &[u8], counter: u64) -> u32 {
+    use hmac::{Hmac, Mac};
+    use sha1::Sha1;
+    type HmacSha1 = Hmac<Sha1>;
+    let mut mac = HmacSha1::new_from_slice(key).expect("hmac key");
+    mac.update(&counter.to_be_bytes());
+    let h = mac.finalize().into_bytes();
+    let offset = (h[h.len() - 1] & 0x0f) as usize;
+    let bin = ((h[offset] as u32 & 0x7f) << 24)
+        | ((h[offset + 1] as u32) << 16)
+        | ((h[offset + 2] as u32) << 8)
+        | (h[offset + 3] as u32);
+    bin % 1_000_000
+}
+
+fn base32_encode(bytes: &[u8]) -> String {
+    base32::encode(base32::Alphabet::Rfc4648 { padding: false }, bytes)
+}
+
+fn base32_decode(s: &str) -> Option<Vec<u8>> {
+    base32::decode(base32::Alphabet::Rfc4648 { padding: false }, s)
+}
+
+// ── Faker ──────────────────────────────────────────────────────────────
+
+pub(crate) fn web_faker_name(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let firsts = [
+        "Alice", "Bob", "Carol", "Dan", "Eve", "Frank", "Grace", "Heidi", "Ivan",
+        "Judy", "Kim", "Leo", "Mallory", "Niaj", "Olivia", "Peggy", "Quinn", "Rupert",
+        "Sybil", "Trent", "Ursula", "Victor", "Walter", "Xena", "Yvonne", "Zane",
+    ];
+    let lasts = [
+        "Adams", "Brown", "Chen", "Davis", "Evans", "Foster", "Garcia", "Harris",
+        "Iqbal", "Jones", "Khan", "Lopez", "Miller", "Nguyen", "O'Brien", "Patel",
+        "Quinn", "Rivera", "Smith", "Tran", "Underwood", "Vasquez", "Williams",
+        "Xu", "Young", "Zhang",
+    ];
+    let s = format!("{} {}", pick(&firsts), pick(&lasts));
+    Ok(PerlValue::string(s))
+}
+
+pub(crate) fn web_faker_email(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let users = ["alice", "bob", "carol", "dan", "eve", "frank", "grace"];
+    let domains = ["example.com", "test.io", "demo.net", "stryke.dev", "mail.app"];
+    let n = (random_bytes(2)[0] as i64) % 1000;
+    Ok(PerlValue::string(format!(
+        "{}{}@{}",
+        pick(&users),
+        n,
+        pick(&domains)
+    )))
+}
+
+pub(crate) fn web_faker_sentence(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let words = [
+        "stryke", "neon", "cyberpunk", "matrix", "ghost", "shell", "shadow",
+        "void", "echo", "spire", "flux", "axion", "quasar", "pulse", "stack",
+        "lattice", "vector", "kernel", "phantom", "aurora", "nova", "quantum",
+    ];
+    let n = 5 + (random_bytes(1)[0] as usize % 8);
+    let mut out = String::new();
+    for i in 0..n {
+        if i > 0 {
+            out.push(' ');
+        }
+        out.push_str(pick(&words));
+    }
+    if let Some(c) = out.get_mut(0..1) {
+        c.make_ascii_uppercase();
+    }
+    out.push('.');
+    Ok(PerlValue::string(out))
+}
+
+pub(crate) fn web_faker_paragraph(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let n = 3 + (random_bytes(1)[0] as usize % 4);
+    let mut out = String::new();
+    for i in 0..n {
+        if i > 0 {
+            out.push(' ');
+        }
+        let s = web_faker_sentence(&[], 0)?.to_string();
+        out.push_str(&s);
+    }
+    Ok(PerlValue::string(out))
+}
+
+pub(crate) fn web_faker_int(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let min = args.first().map(|v| v.to_int()).unwrap_or(0);
+    let max = args.get(1).map(|v| v.to_int()).unwrap_or(100);
+    let span = (max - min).max(1) as u64;
+    let bytes = random_bytes(8);
+    let mut n: u64 = 0;
+    for b in bytes {
+        n = (n << 8) | (b as u64);
+    }
+    Ok(PerlValue::integer(min + (n % span) as i64))
+}
+
+fn pick<'a>(arr: &'a [&'a str]) -> &'a str {
+    let i = (random_bytes(1)[0] as usize) % arr.len();
+    arr[i]
+}
+
+// ── Markdown ───────────────────────────────────────────────────────────
+//
+// Tiny commonmark-subset: headings, bold/italic, inline code, links,
+// fenced code, paragraphs, lists. Enough for blog posts and docs without
+// pulling in a full crate.
+
+pub(crate) fn web_markdown(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let src = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    Ok(PerlValue::string(render_markdown(&src)))
+}
+
+fn render_markdown(src: &str) -> String {
+    let mut out = String::with_capacity(src.len() + 64);
+    let mut in_code = false;
+    let mut code_lang;
+    let mut in_list = false;
+    let mut paragraph: Vec<String> = Vec::new();
+
+    let flush_para = |para: &mut Vec<String>, out: &mut String| {
+        if !para.is_empty() {
+            out.push_str("<p>");
+            out.push_str(&inline_md(&para.join(" ")));
+            out.push_str("</p>\n");
+            para.clear();
+        }
+    };
+    let close_list = |open: &mut bool, out: &mut String| {
+        if *open {
+            out.push_str("</ul>\n");
+            *open = false;
+        }
+    };
+
+    for line in src.lines() {
+        if let Some(rest) = line.strip_prefix("```") {
+            if !in_code {
+                flush_para(&mut paragraph, &mut out);
+                close_list(&mut in_list, &mut out);
+                in_code = true;
+                code_lang = rest.trim().to_string();
+                out.push_str(&format!(
+                    "<pre><code class=\"language-{}\">",
+                    html_escape(&code_lang)
+                ));
+                let _ = &code_lang;
+            } else {
+                in_code = false;
+                out.push_str("</code></pre>\n");
+            }
+            continue;
+        }
+        if in_code {
+            out.push_str(&html_escape(line));
+            out.push('\n');
+            continue;
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("###### ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h6>{}</h6>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("##### ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h5>{}</h5>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("#### ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h4>{}</h4>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("### ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h3>{}</h3>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("## ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h2>{}</h2>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("# ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<h1>{}</h1>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+            flush_para(&mut paragraph, &mut out);
+            if !in_list {
+                out.push_str("<ul>\n");
+                in_list = true;
+            }
+            out.push_str(&format!("  <li>{}</li>\n", inline_md(rest)));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("> ") {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str(&format!("<blockquote>{}</blockquote>\n", inline_md(rest)));
+            continue;
+        }
+        if trimmed == "---" || trimmed == "***" {
+            flush_para(&mut paragraph, &mut out);
+            close_list(&mut in_list, &mut out);
+            out.push_str("<hr>\n");
+            continue;
+        }
+        paragraph.push(line.to_string());
+    }
+    flush_para(&mut paragraph, &mut out);
+    close_list(&mut in_list, &mut out);
+    if in_code {
+        out.push_str("</code></pre>\n");
+    }
+    out
+}
+
+fn inline_md(s: &str) -> String {
+    let escaped = html_escape(s);
+    let mut out = String::with_capacity(escaped.len());
+    let bytes = escaped.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        // Bold: **...**
+        if i + 1 < bytes.len() && bytes[i] == b'*' && bytes[i + 1] == b'*' {
+            if let Some(end) = find_close_marker(&bytes, i + 2, b"**") {
+                let inner = std::str::from_utf8(&bytes[i + 2..end]).unwrap_or("");
+                out.push_str(&format!("<strong>{}</strong>", inner));
+                i = end + 2;
+                continue;
+            }
+        }
+        // Italic: *...*
+        if bytes[i] == b'*' {
+            if let Some(end) = find_close_marker(&bytes, i + 1, b"*") {
+                let inner = std::str::from_utf8(&bytes[i + 1..end]).unwrap_or("");
+                out.push_str(&format!("<em>{}</em>", inner));
+                i = end + 1;
+                continue;
+            }
+        }
+        // Inline code: `...`
+        if bytes[i] == b'`' {
+            if let Some(end) = find_close_marker(&bytes, i + 1, b"`") {
+                let inner = std::str::from_utf8(&bytes[i + 1..end]).unwrap_or("");
+                out.push_str(&format!("<code>{}</code>", inner));
+                i = end + 1;
+                continue;
+            }
+        }
+        // Links: [text](href)
+        if bytes[i] == b'[' {
+            if let Some(close_text) = find_close_marker(&bytes, i + 1, b"]") {
+                if close_text + 1 < bytes.len() && bytes[close_text + 1] == b'(' {
+                    if let Some(close_url) =
+                        find_close_marker(&bytes, close_text + 2, b")")
+                    {
+                        let text =
+                            std::str::from_utf8(&bytes[i + 1..close_text]).unwrap_or("");
+                        let url = std::str::from_utf8(&bytes[close_text + 2..close_url])
+                            .unwrap_or("");
+                        out.push_str(&format!("<a href=\"{}\">{}</a>", url, text));
+                        i = close_url + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+fn find_close_marker(bytes: &[u8], from: usize, marker: &[u8]) -> Option<usize> {
+    let mut i = from;
+    while i + marker.len() <= bytes.len() {
+        if &bytes[i..i + marker.len()] == marker {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+// ── HTTP cache (ETag / 304 Not Modified) ───────────────────────────────
+
+pub(crate) fn web_etag(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let payload = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let etag = format!("\"{}\"", &sha256_hex(payload.as_bytes())[..16]);
+    let inm = with_current(|cur| {
+        cur.request
+            .as_ref()
+            .and_then(|r| r.as_hash_ref())
+            .and_then(|h| {
+                h.read()
+                    .get("headers")
+                    .cloned()
+            })
+            .and_then(|hv| hv.as_hash_ref().map(|h| h.read().clone()))
+            .and_then(|m| m.get("if-none-match").map(|v| v.to_string()))
+    });
+    if let Some(client_tag) = inm {
+        if client_tag == etag {
+            with_current(|cur| {
+                cur.status = 304;
+                cur.body = String::new();
+                cur.headers = vec![("etag".into(), etag.clone())];
+                cur.rendered = true;
+            });
+            return Ok(PerlValue::integer(1));
+        }
+    }
+    with_current(|cur| {
+        cur.headers.push(("etag".into(), etag.clone()));
+    });
+    Ok(PerlValue::integer(0))
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────
+
+pub(crate) fn web_csv(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    // Accept either `web_csv(\@rows)` (array_ref) or `web_csv(@rows)`
+    // (flat list of hashrefs) — both shapes occur naturally in stryke
+    // depending on whether the caller has a ref or a list in hand.
+    let rows: Vec<PerlValue> = if args.len() == 1 {
+        if let Some(arr) = args[0].as_array_ref() {
+            arr.read().clone()
+        } else {
+            args.to_vec()
+        }
+    } else {
+        args.to_vec()
+    };
+    let mut out = String::new();
+    let mut header_written = false;
+    for row in &rows {
+        let h = match row.as_hash_ref() {
+            Some(h) => h,
+            None => continue,
+        };
+        let map = h.read().clone();
+        if !header_written {
+            let cols: Vec<String> = map.keys().map(|k| csv_field(k)).collect();
+            out.push_str(&cols.join(","));
+            out.push('\n');
+            header_written = true;
+        }
+        let cells: Vec<String> =
+            map.values().map(|v| csv_field(&v.to_string())).collect();
+        out.push_str(&cells.join(","));
+        out.push('\n');
+    }
+    Ok(PerlValue::string(out))
+}
+
+fn csv_field(s: &str) -> String {
+    if s.contains(',') || s.contains('"') || s.contains('\n') {
+        let escaped = s.replace('"', "\"\"");
+        format!("\"{}\"", escaped)
+    } else {
+        s.to_string()
+    }
+}
+
+// ── Content blocks (yield_content / content_for) ───────────────────────
+
+thread_local! {
+    static CONTENT_BLOCKS: RefCell<IndexMap<String, String>> = RefCell::new(IndexMap::new());
+}
+
+pub(crate) fn web_content_for(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    if args.len() < 2 {
+        return Err(PerlError::runtime(
+            "web_content_for: usage: web_content_for(\"name\", \"<html>\")",
+            line,
+        ));
+    }
+    let name = args[0].to_string();
+    let body = args[1].to_string();
+    CONTENT_BLOCKS.with(|c| {
+        c.borrow_mut().insert(name, body);
+    });
+    Ok(PerlValue::UNDEF)
+}
+
+pub(crate) fn web_yield_content(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let name = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let s = CONTENT_BLOCKS.with(|c| c.borrow().get(&name).cloned());
+    Ok(PerlValue::string(s.unwrap_or_default()))
+}
+
+// ── Render partial ─────────────────────────────────────────────────────
+//
+// `web_render_partial("posts/form", +{ post => $p })` reads
+// `app/views/posts/_form.html.erb` and returns the rendered string for
+// embedding inside another template. The leading underscore matches the
+// Rails partial convention.
+
+impl Interpreter {
+    pub(crate) fn web_render_partial(
+        &mut self,
+        args: &[PerlValue],
+        line: usize,
+    ) -> Result<PerlValue> {
+        let name = args
+            .first()
+            .map(|v| v.to_string())
+            .ok_or_else(|| {
+                PerlError::runtime(
+                    "web_render_partial: usage: web_render_partial(\"path\", locals_hashref)",
+                    line,
+                )
+            })?;
+        let locals = args
+            .get(1)
+            .and_then(|v| {
+                v.as_hash_map()
+                    .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
+            })
+            .unwrap_or_default();
+        let (dir, file) = match name.rsplit_once('/') {
+            Some((d, f)) => (d.to_string(), f.to_string()),
+            None => (String::new(), name.clone()),
+        };
+        let underscore = if file.starts_with('_') {
+            file.clone()
+        } else {
+            format!("_{}", file)
+        };
+        let path = if dir.is_empty() {
+            format!("app/views/{}.html.erb", underscore)
+        } else {
+            format!("app/views/{}/{}.html.erb", dir, underscore)
+        };
+        let src = std::fs::read_to_string(&path).map_err(|e| {
+            PerlError::runtime(
+                format!("web_render_partial: can't read {}: {}", path, e),
+                line,
+            )
+        })?;
+        self.render_erb(&src, &locals, line).map(PerlValue::string)
+    }
+}
+
+// ── Security headers / CSP ────────────────────────────────────────────
+
+pub(crate) fn web_security_headers(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    with_current(|cur| {
+        cur.headers.push(("x-frame-options".into(), "DENY".into()));
+        cur.headers.push((
+            "x-content-type-options".into(),
+            "nosniff".into(),
+        ));
+        cur.headers.push((
+            "referrer-policy".into(),
+            "strict-origin-when-cross-origin".into(),
+        ));
+        cur.headers.push((
+            "strict-transport-security".into(),
+            "max-age=31536000; includeSubDomains".into(),
+        ));
+        cur.headers.push((
+            "permissions-policy".into(),
+            "geolocation=(), microphone=(), camera=()".into(),
+        ));
+    });
+    Ok(PerlValue::UNDEF)
+}
+
+// ── OpenAPI route dump ─────────────────────────────────────────────────
+
+pub(crate) fn web_openapi(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let r = router().lock();
+    let mut paths: IndexMap<String, IndexMap<String, PerlValue>> = IndexMap::new();
+    for route in &r.routes {
+        let oas_path = openapi_path(&route.pattern);
+        let entry = paths.entry(oas_path).or_default();
+        let mut op = IndexMap::new();
+        op.insert(
+            "operationId".to_string(),
+            PerlValue::string(route.action.replace('#', "_")),
+        );
+        op.insert(
+            "summary".to_string(),
+            PerlValue::string(route.action.clone()),
+        );
+        op.insert(
+            "responses".to_string(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new({
+                let mut m: IndexMap<String, PerlValue> = IndexMap::new();
+                let mut ok = IndexMap::new();
+                ok.insert(
+                    "description".to_string(),
+                    PerlValue::string("OK".to_string()),
+                );
+                m.insert(
+                    "200".to_string(),
+                    PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(ok))),
+                );
+                m
+            }))),
+        );
+        entry.insert(
+            route.verb.to_lowercase(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(op))),
+        );
+    }
+    let mut paths_out: IndexMap<String, PerlValue> = IndexMap::new();
+    for (k, v) in paths {
+        paths_out.insert(
+            k,
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(v))),
+        );
+    }
+    let mut info = IndexMap::new();
+    info.insert(
+        "title".to_string(),
+        PerlValue::string("stryke_web app".to_string()),
+    );
+    info.insert("version".to_string(), PerlValue::string("1.0".into()));
+    let mut root = IndexMap::new();
+    root.insert("openapi".to_string(), PerlValue::string("3.0.3".into()));
+    root.insert(
+        "info".to_string(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(info))),
+    );
+    root.insert(
+        "paths".to_string(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(paths_out))),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(root))))
+}
+
+fn openapi_path(p: &str) -> String {
+    // `/posts/:id` → `/posts/{id}` per OpenAPI convention.
+    let mut out = String::with_capacity(p.len());
+    let bytes = p.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b':' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
+                j += 1;
+            }
+            out.push('{');
+            out.push_str(std::str::from_utf8(&bytes[start..j]).unwrap_or(""));
+            out.push('}');
+            i = j;
+        } else {
+            out.push(bytes[i] as char);
+            i += 1;
+        }
+    }
+    out
+}
+
+// ── Token mint / consume (password resets, email verify links) ────────
+
+pub(crate) fn web_token_for(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let user_id = args
+        .first()
+        .map(|v| v.to_int())
+        .ok_or_else(|| PerlError::runtime("web_token_for: user_id required", line))?;
+    let purpose = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let ttl = args.get(2).map(|v| v.to_int()).unwrap_or(3600);
+    let exp = unix_now() + ttl;
+    let payload = format!("{}|{}|{}", purpose, user_id, exp);
+    let mac = sha256_hex((secret_key() + &payload).as_bytes());
+    Ok(PerlValue::string(format!(
+        "{}.{}",
+        base64url_encode(payload.as_bytes()),
+        &mac[..32]
+    )))
+}
+
+pub(crate) fn web_token_consume(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let token = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let purpose = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let Some((b64, mac)) = token.rsplit_once('.') else {
+        return Ok(PerlValue::UNDEF);
+    };
+    let bytes = match base64url_decode(b64) {
+        Some(b) => b,
+        None => return Ok(PerlValue::UNDEF),
+    };
+    let payload = match std::str::from_utf8(&bytes) {
+        Ok(s) => s,
+        Err(_) => return Ok(PerlValue::UNDEF),
+    };
+    let want = sha256_hex((secret_key() + payload).as_bytes());
+    if !constant_time_eq(mac.as_bytes(), want[..32].as_bytes()) {
+        return Ok(PerlValue::UNDEF);
+    }
+    let parts: Vec<&str> = payload.splitn(3, '|').collect();
+    if parts.len() != 3 {
+        return Ok(PerlValue::UNDEF);
+    }
+    if parts[0] != purpose {
+        return Ok(PerlValue::UNDEF);
+    }
+    let exp = parts[2].parse::<i64>().unwrap_or(0);
+    if unix_now() > exp {
+        return Ok(PerlValue::UNDEF);
+    }
+    let user_id = parts[1].parse::<i64>().unwrap_or(0);
+    Ok(PerlValue::integer(user_id))
+}
+
+// ── Permissions / can ─────────────────────────────────────────────────
+
+pub(crate) fn web_can(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let action = args
+        .first()
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let user = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
+    let user_map = user
+        .as_hash_map()
+        .or_else(|| user.as_hash_ref().map(|h| h.read().clone()));
+    if user_map.is_none() {
+        return Ok(PerlValue::integer(0));
+    }
+    let user_map = user_map.unwrap();
+    // Convention: admins can do anything; otherwise check `permissions`
+    // text field for `action` substring.
+    let role = user_map
+        .get("role")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if role == "admin" || role == "owner" {
+        return Ok(PerlValue::integer(1));
+    }
+    let perms = user_map
+        .get("permissions")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let allowed = perms.split(',').any(|p| p.trim() == action || p.trim() == "*");
+    Ok(PerlValue::integer(if allowed { 1 } else { 0 }))
+}
+
+// ── JSON:API helpers ───────────────────────────────────────────────────
+
+/// `web_jsonapi_resource("posts", $row)` → wraps a single hashref into
+/// a JSON:API `{data: {type, id, attributes}}` envelope.
+pub(crate) fn web_jsonapi_resource(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let kind = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| {
+            PerlError::runtime("web_jsonapi_resource: type required", line)
+        })?;
+    let row = args
+        .get(1)
+        .and_then(|v| {
+            v.as_hash_map()
+                .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
+        })
+        .unwrap_or_default();
+    let id = row
+        .get("id")
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let mut attrs = row.clone();
+    attrs.shift_remove("id");
+
+    let mut data = IndexMap::new();
+    data.insert("type".into(), PerlValue::string(kind));
+    data.insert("id".into(), PerlValue::string(id));
+    data.insert(
+        "attributes".into(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+    );
+    let mut envelope = IndexMap::new();
+    envelope.insert(
+        "data".into(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(data))),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+}
+
+/// `web_jsonapi_collection("posts", $rows)` → wraps an array_ref of
+/// hashrefs into `{data: [{type, id, attributes}, ...], meta: {count}}`.
+pub(crate) fn web_jsonapi_collection(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let kind = args
+        .first()
+        .map(|v| v.to_string())
+        .ok_or_else(|| {
+            PerlError::runtime("web_jsonapi_collection: type required", line)
+        })?;
+    let rows: Vec<PerlValue> = match args.get(1) {
+        Some(v) => v
+            .as_array_ref()
+            .map(|a| a.read().clone())
+            .unwrap_or_else(|| v.clone().to_list()),
+        None => Vec::new(),
+    };
+
+    let mut wrapped = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let map = row
+            .as_hash_map()
+            .or_else(|| row.as_hash_ref().map(|h| h.read().clone()))
+            .unwrap_or_default();
+        let id = map
+            .get("id")
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let mut attrs = map.clone();
+        attrs.shift_remove("id");
+        let mut entry = IndexMap::new();
+        entry.insert("type".into(), PerlValue::string(kind.clone()));
+        entry.insert("id".into(), PerlValue::string(id));
+        entry.insert(
+            "attributes".into(),
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(attrs))),
+        );
+        wrapped.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+            entry,
+        ))));
+    }
+
+    let mut meta = IndexMap::new();
+    meta.insert(
+        "count".into(),
+        PerlValue::integer(wrapped.len() as i64),
+    );
+
+    let mut envelope = IndexMap::new();
+    envelope.insert(
+        "data".into(),
+        PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(wrapped))),
+    );
+    envelope.insert(
+        "meta".into(),
+        PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(meta))),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+}
+
+/// `web_jsonapi_error(404, "not_found", "Post 42 missing")` →
+/// `{errors: [{status, code, title}]}` per JSON:API.
+pub(crate) fn web_jsonapi_error(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let status = args.first().map(|v| v.to_int()).unwrap_or(500);
+    let code = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "internal_error".into());
+    let title = args
+        .get(2)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| code.clone());
+    let mut err = IndexMap::new();
+    err.insert("status".into(), PerlValue::string(status.to_string()));
+    err.insert("code".into(), PerlValue::string(code));
+    err.insert("title".into(), PerlValue::string(title));
+    let mut envelope = IndexMap::new();
+    envelope.insert(
+        "errors".into(),
+        PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(vec![
+            PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(err))),
+        ]))),
+    );
+    Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(envelope))))
+}
+
+/// `web_bearer_token()` → returns the `Authorization: Bearer X` token
+/// from the request, or undef if missing/malformed. Pair with
+/// `web_jwt_decode` for token-auth APIs.
+pub(crate) fn web_bearer_token(_args: &[PerlValue], _line: usize) -> Result<PerlValue> {
+    let auth = with_current(|cur| {
+        cur.request
+            .as_ref()
+            .and_then(|r| r.as_hash_ref())
+            .and_then(|h| h.read().get("headers").cloned())
+            .and_then(|hv| hv.as_hash_ref().map(|h| h.read().clone()))
+            .and_then(|m| m.get("authorization").map(|v| v.to_string()))
+    });
+    let Some(s) = auth else {
+        return Ok(PerlValue::UNDEF);
+    };
+    let trimmed = s.trim();
+    if let Some(rest) = trimmed.strip_prefix("Bearer ") {
+        return Ok(PerlValue::string(rest.trim().to_string()));
+    }
+    if let Some(rest) = trimmed.strip_prefix("bearer ") {
+        return Ok(PerlValue::string(rest.trim().to_string()));
+    }
+    Ok(PerlValue::UNDEF)
 }
 
 // ── View helpers ───────────────────────────────────────────────────────
@@ -1819,6 +2808,42 @@ impl Interpreter {
             );
         }
 
+        // Built-in /openapi.json — serializes the live route table as
+        // an OpenAPI 3.0 doc with no app code.
+        if effective_method == "GET" && path == "/openapi.json" {
+            let doc = web_openapi(&[], 0).unwrap_or(PerlValue::UNDEF);
+            let body = crate::native_data::json_encode(&doc)
+                .unwrap_or_else(|_| "{}".into());
+            return write_response(
+                &mut stream,
+                200,
+                &[("content-type".into(), "application/json".into())],
+                &body,
+                &[],
+            );
+        }
+
+        // Built-in /docs — Swagger UI HTML pulling /openapi.json. Pure
+        // CDN static page, no app code, works even on `--api` mode.
+        if effective_method == "GET" && path == "/docs" {
+            return write_response(
+                &mut stream,
+                200,
+                &[("content-type".into(), "text/html; charset=utf-8".into())],
+                SWAGGER_UI_HTML,
+                &[],
+            );
+        }
+        if effective_method == "GET" && path == "/docs/redoc" {
+            return write_response(
+                &mut stream,
+                200,
+                &[("content-type".into(), "text/html; charset=utf-8".into())],
+                REDOC_HTML,
+                &[],
+            );
+        }
+
         // Static file fallback — serve from `public/` for safe paths so
         // CSS/JS/images work without a separate web server.
         if effective_method == "GET" {
@@ -2254,6 +3279,54 @@ enum ErbKind {
     Expr,
     Comment,
 }
+
+// ── Built-in /docs HTML (Swagger UI + Redoc) ───────────────────────────
+
+const SWAGGER_UI_HTML: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>API Docs · Swagger UI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>body { margin: 0; }</style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = () => {
+            window.ui = SwaggerUIBundle({
+                url: '/openapi.json',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                layout: 'BaseLayout',
+                docExpansion: 'list',
+                tryItOutEnabled: true,
+            });
+        };
+    </script>
+</body>
+</html>
+"#;
+
+const REDOC_HTML: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>API Docs · Redoc</title>
+    <style>body { margin: 0; }</style>
+</head>
+<body>
+    <redoc spec-url="/openapi.json"></redoc>
+    <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script>
+</body>
+</html>
+"#;
 
 // ── Static-file fallback / response writer / cookies / sessions ────────
 

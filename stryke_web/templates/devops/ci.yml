@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stryke
+        run: |
+          curl -sSL https://github.com/MenkeTechnologies/stryke/releases/latest/download/stryke-linux-x86_64.tar.gz | tar xz -C /usr/local/bin
+          stryke --version
+      - name: Run migrations
+        env:
+          STRYKE_ENV: test
+        run: |
+          stryke -e 'require "./config/application.stk"; web_db_connect("sqlite://db/test.sqlite3"); for my $f (glob "db/migrate/**/*.stk") { require $f } web_migrate()'
+      - name: Boot smoke
+        env:
+          STRYKE_ENV: test
+          PORT: 3000
+        run: |
+          stryke bin/server &
+          SERVER_PID=$!
+          sleep 3
+          curl -fsS http://127.0.0.1:3000/health
+          kill $SERVER_PID

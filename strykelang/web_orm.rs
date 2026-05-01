@@ -498,6 +498,120 @@ pub(crate) fn web_model_last(args: &[PerlValue], line: usize) -> Result<PerlValu
     Ok(first_row_or_undef(rows))
 }
 
+/// `web_model_increment("posts", id, "comments_count", 1)` — atomic
+/// `UPDATE … SET col = col + delta` for counter caches.
+pub(crate) fn web_model_increment(
+    args: &[PerlValue],
+    line: usize,
+) -> Result<PerlValue> {
+    let table = require_table(args.first(), "web_model_increment", line)?;
+    let id = args
+        .get(1)
+        .ok_or_else(|| PerlError::runtime("web_model_increment: id required", line))?;
+    let col = args
+        .get(2)
+        .map(|v| v.to_string())
+        .ok_or_else(|| {
+            PerlError::runtime("web_model_increment: column required", line)
+        })?;
+    let by = args.get(3).map(|v| v.to_int()).unwrap_or(1);
+    let sql = format!(
+        "UPDATE {} SET {} = COALESCE({},0) + ?1 WHERE id = ?2",
+        quote_ident(&table),
+        quote_ident(&col),
+        quote_ident(&col)
+    );
+    let bound = vec![
+        rusqlite::types::Value::Integer(by),
+        perl_to_sql_value(id),
+    ];
+    let n = with_db(|c| exec_sql(c, &sql, &bound), line)?;
+    Ok(PerlValue::integer(n as i64))
+}
+
+/// `web_model_with("posts", "user")` — preload one belongs_to relation.
+/// Returns posts with `_user => +{...}` attached. Uses a single IN
+/// query to dodge n+1.
+pub(crate) fn web_model_with(args: &[PerlValue], line: usize) -> Result<PerlValue> {
+    let table = require_table(args.first(), "web_model_with", line)?;
+    let assoc = args
+        .get(1)
+        .map(|v| v.to_string())
+        .ok_or_else(|| PerlError::runtime("web_model_with: assoc name required", line))?;
+    let foreign_key = format!("{}_id", assoc);
+    let assoc_table = pluralize_simple(&assoc);
+    let sql = format!("SELECT * FROM {} ORDER BY id ASC", quote_ident(&table));
+    let parents = with_db(|c| query_sql(c, &sql, &[], line), line)?;
+    let parent_list = parents.to_list();
+    let ids: Vec<i64> = parent_list
+        .iter()
+        .filter_map(|r| {
+            r.as_hash_ref()
+                .and_then(|h| h.read().get(&foreign_key).map(|v| v.to_int()))
+        })
+        .collect();
+    let mut by_id: IndexMap<i64, PerlValue> = IndexMap::new();
+    if !ids.is_empty() {
+        let placeholders = (1..=ids.len())
+            .map(|i| format!("?{}", i))
+            .collect::<Vec<_>>()
+            .join(",");
+        let bind: Vec<rusqlite::types::Value> = ids
+            .iter()
+            .map(|i| rusqlite::types::Value::Integer(*i))
+            .collect();
+        let assoc_sql = format!(
+            "SELECT * FROM {} WHERE id IN ({})",
+            quote_ident(&assoc_table),
+            placeholders
+        );
+        let assoc_rows = with_db(|c| query_sql(c, &assoc_sql, &bind, line), line)?;
+        for row in assoc_rows.to_list() {
+            if let Some(h) = row.as_hash_ref() {
+                if let Some(id) = h.read().get("id").map(|v| v.to_int()) {
+                    by_id.insert(id, row.clone());
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for parent in parent_list {
+        if let Some(h) = parent.as_hash_ref() {
+            let mut new_map = h.read().clone();
+            if let Some(fk) = new_map.get(&foreign_key).cloned() {
+                let id = fk.to_int();
+                if let Some(child) = by_id.get(&id) {
+                    new_map.insert(format!("_{}", assoc), child.clone());
+                }
+            }
+            out.push(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+                new_map,
+            ))));
+        }
+    }
+    Ok(PerlValue::array_ref(Arc::new(parking_lot::RwLock::new(out))))
+}
+
+fn pluralize_simple(s: &str) -> String {
+    if s.ends_with('y')
+        && !s.ends_with("ay")
+        && !s.ends_with("ey")
+        && !s.ends_with("oy")
+        && !s.ends_with("uy")
+    {
+        format!("{}ies", &s[..s.len() - 1])
+    } else if s.ends_with('s')
+        || s.ends_with('x')
+        || s.ends_with('z')
+        || s.ends_with("sh")
+        || s.ends_with("ch")
+    {
+        format!("{}es", s)
+    } else {
+        format!("{}s", s)
+    }
+}
+
 /// `web_db_transaction` — opens a transaction, runs the BEGIN/COMMIT
 /// pair around the SQL string the caller passes, returning rollback on
 /// error. For multi-step txn use `web_db_execute("BEGIN")`/COMMIT.
