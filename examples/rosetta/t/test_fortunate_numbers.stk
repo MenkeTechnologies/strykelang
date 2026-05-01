@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fortunate numbers
+# F(n) = smallest m > 1 such that primorial(p_n) + m is prime.
+
+fn Rosetta::Fortunate::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Fortunate::nth_prime($n) {
+    my @ps
+    my $k = 2
+    while (len(@ps) < $n) {
+        push @ps, $k if Rosetta::Fortunate::is_prime($k)
+        $k += 1
+    }
+    $ps[$n - 1]
+}
+
+fn Rosetta::Fortunate::primorial($n) {
+    my $p = 1
+    my $k = 2
+    my $count = 0
+    while ($count < $n) {
+        if (Rosetta::Fortunate::is_prime($k)) {
+            $p *= $k
+            $count += 1
+        }
+        $k += 1
+    }
+    $p
+}
+
+fn Rosetta::Fortunate::fortunate($n) {
+    my $pr = Rosetta::Fortunate::primorial($n)
+    my $m = 2
+    while (1) {
+        return $m if Rosetta::Fortunate::is_prime($pr + $m)
+        $m += 1
+    }
+}
+
+# OEIS A005235: 3, 5, 7, 13, 23, 17, 19, 23, 37, 61, ...
+my @first8 = ~> 1:8 map { Rosetta::Fortunate::fortunate(_) }
+assert_eq join(",", @first8), "3,5,7,13,23,17,19,23", "first 8 fortunate"
+
+assert_eq Rosetta::Fortunate::primorial(1), 2,    "primorial(1)=2"
+assert_eq Rosetta::Fortunate::primorial(3), 30,   "primorial(3)=2*3*5"
+assert_eq Rosetta::Fortunate::primorial(5), 2310, "primorial(5)=2*3*5*7*11"
+
+test_run

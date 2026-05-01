@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Comma quibbling
+
+fn Rosetta::CommaQuib::quib(@words) {
+    my $n = len(@words)
+    return "{}"     if $n == 0
+    return "{" . $words[0] . "}" if $n == 1
+    my @first = @words
+    my $last  = pop @first
+    "{" . join(", ", @first) . " and " . $last . "}"
+}
+
+assert_eq Rosetta::CommaQuib::quib(),                       "{}",                  "empty"
+assert_eq Rosetta::CommaQuib::quib("ABC"),                   "{ABC}",               "single"
+assert_eq Rosetta::CommaQuib::quib("ABC","DEF"),             "{ABC and DEF}",       "two"
+assert_eq Rosetta::CommaQuib::quib("ABC","DEF","G","H"),     "{ABC, DEF, G and H}", "four"
+
+# pipeline form
+my $s = ("a","b","c","d","e") |> Rosetta::CommaQuib::quib
+assert_eq $s, "{a, b, c, d and e}", "pipe form"
+
+test_run

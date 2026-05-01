@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Faulhaber's formula — sum 1^k + 2^k + ... + n^k
+
+# Direct sum (good enough for the test, no need for Bernoulli expansion).
+fn Rosetta::Faulhaber::sum_powers($n, $k) {
+    my $total = 0
+    for my $i (1..$n) {
+        $total += $i ** $k
+    }
+    $total
+}
+
+# Closed-form for first 4 powers (Faulhaber polynomials, k=0..3).
+fn Rosetta::Faulhaber::closed_form($n, $k) {
+    if    ($k == 0) { $n }
+    elsif ($k == 1) { int($n * ($n + 1) / 2) }
+    elsif ($k == 2) { int($n * ($n + 1) * (2 * $n + 1) / 6) }
+    elsif ($k == 3) {
+        my $s = int($n * ($n + 1) / 2)
+        $s * $s
+    }
+    else { Rosetta::Faulhaber::sum_powers($n, $k) }
+}
+
+assert_eq Rosetta::Faulhaber::sum_powers(10, 1),  55,    "1+...+10"
+assert_eq Rosetta::Faulhaber::sum_powers(10, 2),  385,   "1²+...+10²"
+assert_eq Rosetta::Faulhaber::sum_powers(10, 3),  3025,  "1³+...+10³"
+assert_eq Rosetta::Faulhaber::sum_powers(5, 4),   979,   "1⁴+...+5⁴"
+
+# Verify closed form matches direct sum.
+for my $n (1, 5, 10, 25, 100) {
+    for my $k (0..3) {
+        my $a = Rosetta::Faulhaber::sum_powers($n, $k)
+        my $b = Rosetta::Faulhaber::closed_form($n, $k)
+        assert_eq $b, $a, "closed[$n,$k] == sum"
+    }
+}
+
+test_run

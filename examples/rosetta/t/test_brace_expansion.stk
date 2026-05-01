@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Brace expansion (csh-style)
+# Limited form: {a,b,c} alternation. Nested groups expand outermost-first.
+
+fn Rosetta::BraceExp::find_outer($s) {
+    my $depth = 0
+    my $start = -1
+    my $i = 0
+    my @chars = split("", $s)
+    while ($i < len(@chars)) {
+        if ($chars[$i] eq "{") {
+            $start = $i if $depth == 0
+            $depth += 1
+        } elsif ($chars[$i] eq "}") {
+            $depth -= 1
+            if ($depth == 0 && $start >= 0) {
+                return [$start, $i]
+            }
+        }
+        $i += 1
+    }
+    [-1, -1]
+}
+
+fn Rosetta::BraceExp::split_alts($body) {
+    my @parts
+    my $depth = 0
+    my $cur = ""
+    for my $c (split("", $body)) {
+        if    ($c eq "{") { $depth += 1; $cur .= $c }
+        elsif ($c eq "}") { $depth -= 1; $cur .= $c }
+        elsif ($c eq "," && $depth == 0) { push @parts, $cur; $cur = "" }
+        else  { $cur .= $c }
+    }
+    push @parts, $cur
+    @parts
+}
+
+fn Rosetta::BraceExp::expand($s) {
+    my $r = Rosetta::BraceExp::find_outer($s)
+    my $from = $r->[0]
+    my $to   = $r->[1]
+    return ($s) if $from < 0
+    my $pre  = substr($s, 0, $from)
+    my $body = substr($s, $from + 1, $to - $from - 1)
+    my $post = substr($s, $to + 1)
+    my @alts = Rosetta::BraceExp::split_alts($body)
+    return ($s) if len(@alts) < 2
+    my @out
+    for my $alt (@alts) {
+        for my $tail (Rosetta::BraceExp::expand($post)) {
+            for my $r (Rosetta::BraceExp::expand($pre . $alt . $tail)) {
+                push @out, $r
+            }
+        }
+    }
+    @out
+}
+
+assert_eq join(",", Rosetta::BraceExp::expand("a{b,c}d")),
+    "abd,acd", "simple alternation"
+assert_eq join(",", Rosetta::BraceExp::expand("{x,y,z}")),
+    "x,y,z", "bare alternation"
+assert_eq join(",", Rosetta::BraceExp::expand("plain")),
+    "plain", "no braces"
+assert_eq join(",", Rosetta::BraceExp::expand("a{b,c}d{e,f}")),
+    "abde,abdf,acde,acdf", "two groups"
+assert_eq join(",", Rosetta::BraceExp::expand("a{b,{c,d}}e")),
+    "abe,ace,ade", "nested"
+
+test_run

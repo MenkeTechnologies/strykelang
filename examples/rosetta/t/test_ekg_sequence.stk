@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: EKG sequence convergence
+# a(1)=1; a(2)=2; a(n) = smallest unused integer sharing a factor with a(n-1).
+
+fn Math::GCD::gcd($a, $b) {
+    while ($b != 0) { my $t = $b; $b = $a % $b; $a = $t }
+    $a
+}
+
+fn Rosetta::EKG::generate($count) {
+    my @res = (1, 2)
+    my %used = (1 => 1, 2 => 1)
+    while (len(@res) < $count) {
+        my $prev = $res[len(@res) - 1]
+        my $k = 3
+        while (1) {
+            unless ($used{$k}) {
+                if (Math::GCD::gcd($k, $prev) > 1) {
+                    push @res, $k
+                    $used{$k} = 1
+                    last
+                }
+            }
+            $k += 1
+        }
+    }
+    @res
+}
+
+# OEIS A064413: 1, 2, 4, 6, 3, 9, 12, 8, 10, 5, 15, 18, 14, 7, 21, ...
+my @first15 = Rosetta::EKG::generate(15)
+assert_eq join(",", @first15),
+    "1,2,4,6,3,9,12,8,10,5,15,18,14,7,21",
+    "first 15 EKG"
+
+# Convergence check: at index n, value <= ~2n (no runaway)
+my @big = Rosetta::EKG::generate(50)
+my $last = $big[len(@big) - 1]
+assert_ok $last < 200, "EKG[50] bounded"
+
+test_run

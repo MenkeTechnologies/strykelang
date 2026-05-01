@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abundant odd numbers
+
+fn Rosetta::AbundantOdd::proper_divisor_sum($n) {
+    my $s = 1
+    my $i = 3
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $s += $i
+            $s += $n / $i unless ($n / $i) == $i
+        }
+        $i += 2
+    }
+    $n == 1 ? 0 : $s
+}
+
+fn Rosetta::AbundantOdd::is_abundant($n) {
+    Rosetta::AbundantOdd::proper_divisor_sum($n) > $n
+}
+
+fn Rosetta::AbundantOdd::first_n($count) {
+    my @res
+    my $n = 1
+    while (len(@res) < $count) {
+        push @res, $n if Rosetta::AbundantOdd::is_abundant($n)
+        $n += 2
+    }
+    @res
+}
+
+# First 5 odd abundants from OEIS A005231: 945, 1575, 2205, 2835, 3465
+my @first5 = Rosetta::AbundantOdd::first_n(5)
+assert_eq join(",", @first5), "945,1575,2205,2835,3465", "first 5 odd abundants"
+
+# Spot checks
+assert_ok Rosetta::AbundantOdd::is_abundant(945), "945 is odd-abundant"
+assert_ok !Rosetta::AbundantOdd::is_abundant(15),  "15 is not abundant"
+assert_eq Rosetta::AbundantOdd::proper_divisor_sum(945), 975, "sigma(945)-945 = 975"
+
+test_run

@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Galton box animation (statistical core, no animation)
+# Drop N balls down a binomial peg board with `levels` rows; collect bin counts.
+
+fn Rosetta::Galton::drop($balls, $levels) {
+    srand(7)
+    my @bins
+    for my $i (0..$levels) { $bins[$i] = 0 }
+    for (1..$balls) {
+        my $pos = 0
+        for (1..$levels) {
+            $pos += 1 if rand() < 0.5
+        }
+        $bins[$pos] += 1
+    }
+    @bins
+}
+
+fn Rosetta::Galton::expected($balls, $levels) {
+    # E[k]=balls * C(levels,k) / 2^levels
+    my @c = (1)
+    for my $i (1..$levels) {
+        my @next = (1)
+        for my $j (1..$i-1) {
+            push @next, $c[$j-1] + $c[$j]
+        }
+        push @next, 1
+        @c = @next
+    }
+    my $denom = 2 ** $levels
+    ~> @c map { $balls * _ / $denom }
+}
+
+my @bins = Rosetta::Galton::drop(10000, 8)
+assert_eq len(@bins), 9, "9 bins for 8 levels"
+
+my $total = 0
+for my $b (@bins) { $total += $b }
+assert_eq $total, 10000, "all balls accounted for"
+
+my @exp = Rosetta::Galton::expected(10000, 8)
+assert_eq len(@exp), 9, "9 expected bins"
+
+# Each bin within ~5σ of expected. Std dev ~= sqrt(N*p*(1-p)).
+for my $i (0..8) {
+    my $sigma = sqrt(10000 * ($exp[$i] / 10000) * (1 - ($exp[$i] / 10000)))
+    my $diff = abs($bins[$i] - $exp[$i])
+    assert_ok $diff < 5 * $sigma + 5, "bin $i within tolerance"
+}
+
+# Symmetry sanity: middle bin (i=4) is the largest.
+my $max = -1
+my $argmax = 0
+for my $i (0..8) {
+    if ($bins[$i] > $max) { $max = $bins[$i]; $argmax = $i }
+}
+assert_ok $argmax == 4 || $argmax == 3 || $argmax == 5, "peak near middle"
+
+test_run

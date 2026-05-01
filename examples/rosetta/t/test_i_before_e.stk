@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: I before E except after C
+# Check rule against a small list (a real implementation would crawl /usr/share/dict/words).
+
+fn Rosetta::IBeforeE::is_ie_after_c($word) {
+    $word =~ /cie/i
+}
+
+fn Rosetta::IBeforeE::is_ei_not_after_c($word) {
+    $word =~ /(?<![cC])ei/   # 'ei' not preceded by c
+}
+
+fn Rosetta::IBeforeE::violates($word) {
+    Rosetta::IBeforeE::is_ie_after_c($word) || Rosetta::IBeforeE::is_ei_not_after_c($word)
+}
+
+# Words that DO follow the rule: "believe" (ie not after c), "receive" (ei after c).
+assert_ok !Rosetta::IBeforeE::violates("believe"),  "believe ok"
+assert_ok !Rosetta::IBeforeE::violates("receive"),  "receive ok"
+assert_ok !Rosetta::IBeforeE::violates("piece"),    "piece ok"
+
+# Violators: "ancient" (cie after c — wait no, c-i-e is rule violation), "weird" (ei not after c)
+assert_ok  Rosetta::IBeforeE::violates("ancient"),  "ancient violates (cie)"
+assert_ok  Rosetta::IBeforeE::violates("weird"),    "weird violates (ei not after c)"
+assert_ok  Rosetta::IBeforeE::violates("seize"),    "seize violates"
+
+# Coverage on a small list.
+my @words = ("believe","receive","ancient","weird","piece","seize","field","veil")
+my $valid = 0
+my $invalid = 0
+for my $w (@words) {
+    if (Rosetta::IBeforeE::violates($w)) { $invalid += 1 }
+    else                                  { $valid += 1 }
+}
+assert_eq $valid,   4, "4 follow the rule"
+assert_eq $invalid, 4, "4 violate the rule"
+
+test_run

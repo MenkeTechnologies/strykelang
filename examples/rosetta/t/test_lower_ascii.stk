@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Generate lower case ASCII alphabet
+
+fn Rosetta::LowerAscii::all() {
+    ~> 97:122 map { chr(_) }
+}
+
+fn Rosetta::LowerAscii::concat() {
+    join("", Rosetta::LowerAscii::all())
+}
+
+my @lc = Rosetta::LowerAscii::all()
+assert_eq len(@lc), 26, "26 letters"
+assert_eq $lc[0],  "a", "first is a"
+assert_eq $lc[25], "z", "last is z"
+assert_eq join(",", @lc),
+    "a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z",
+    "full alphabet"
+assert_eq Rosetta::LowerAscii::concat(),
+    "abcdefghijklmnopqrstuvwxyz",
+    "concat alphabet"
+
+test_run

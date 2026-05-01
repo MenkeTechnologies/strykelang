@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Dinesman's multiple-dwelling problem
+# Baker, Cooper, Fletcher, Miller, Smith live on floors 1..5 (no two on same floor).
+# Constraints:
+#   Baker not on top.
+#   Cooper not on bottom.
+#   Fletcher not on top, not on bottom.
+#   Miller above Cooper.
+#   Smith not adjacent to Fletcher.
+#   Fletcher not adjacent to Cooper.
+
+fn Rosetta::Dinesman::permutations(@xs) {
+    return ([@xs]) if len(@xs) <= 1
+    my @result
+    for my $i (0..len(@xs)-1) {
+        my @rest = @xs
+        my $picked = splice(@rest, $i, 1)
+        for my $tail (Rosetta::Dinesman::permutations(@rest)) {
+            push @result, [$picked, @$tail]
+        }
+    }
+    @result
+}
+
+fn Rosetta::Dinesman::solve() {
+    my @floors = (1, 2, 3, 4, 5)
+    my @found
+    for my $perm (Rosetta::Dinesman::permutations(@floors)) {
+        # perm = [Baker, Cooper, Fletcher, Miller, Smith] floor numbers
+        my $b = $perm->[0]
+        my $c = $perm->[1]
+        my $f = $perm->[2]
+        my $m = $perm->[3]
+        my $s = $perm->[4]
+        next if $b == 5
+        next if $c == 1
+        next if $f == 5 || $f == 1
+        next if $m <= $c
+        next if abs($s - $f) == 1
+        next if abs($f - $c) == 1
+        push @found, $perm
+    }
+    @found
+}
+
+my @sols = Rosetta::Dinesman::solve()
+assert_eq len(@sols), 1, "exactly one solution"
+
+my $sol = $sols[0]
+assert_eq $sol->[0], 3, "Baker on 3"
+assert_eq $sol->[1], 2, "Cooper on 2"
+assert_eq $sol->[2], 4, "Fletcher on 4"
+assert_eq $sol->[3], 5, "Miller on 5"
+assert_eq $sol->[4], 1, "Smith on 1"
+
+test_run

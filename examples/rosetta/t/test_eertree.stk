@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Eertree (Palindromic tree)
+# Counts the number of distinct palindromic substrings of a string.
+
+fn Rosetta::Eertree::distinct_palindromes($s) {
+    my @chars = split("", $s)
+    my $n = len(@chars)
+    return 0 if $n == 0
+    # Manacher-flavored: for each center, expand maximally; collect distinct strings.
+    my %seen
+    # odd-length palindromes
+    for my $c (0..$n-1) {
+        my $l = $c
+        my $r = $c
+        while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
+            $seen{ join("", @chars[$l..$r]) } = 1
+            $l -= 1; $r += 1
+        }
+    }
+    # even-length palindromes
+    for my $c (0..$n-2) {
+        my $l = $c
+        my $r = $c + 1
+        while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
+            $seen{ join("", @chars[$l..$r]) } = 1
+            $l -= 1; $r += 1
+        }
+    }
+    len(keys %seen)
+}
+
+assert_eq Rosetta::Eertree::distinct_palindromes("eertree"),     7,  "eertree"
+assert_eq Rosetta::Eertree::distinct_palindromes("aabbaab"),     7,  "aabbaab"
+assert_eq Rosetta::Eertree::distinct_palindromes("abc"),         3,  "all chars"
+assert_eq Rosetta::Eertree::distinct_palindromes("aaaa"),        4,  "a, aa, aaa, aaaa"
+assert_eq Rosetta::Eertree::distinct_palindromes(""),            0,  "empty"
+assert_eq Rosetta::Eertree::distinct_palindromes("level"),       5,  "level"
+
+test_run

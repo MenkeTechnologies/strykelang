@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find if a point is within a triangle.
+
+fn Rosetta::PtInTri::sign($p, $a, $b) {
+    ($p->[0] - $b->[0]) * ($a->[1] - $b->[1]) - ($a->[0] - $b->[0]) * ($p->[1] - $b->[1])
+}
+
+fn Rosetta::PtInTri::contains($p, $tri) {
+    my $a = $tri->[0]; my $b = $tri->[1]; my $c = $tri->[2]
+    my $d1 = Rosetta::PtInTri::sign($p, $a, $b)
+    my $d2 = Rosetta::PtInTri::sign($p, $b, $c)
+    my $d3 = Rosetta::PtInTri::sign($p, $c, $a)
+    my $has_neg = ($d1 < 0) || ($d2 < 0) || ($d3 < 0)
+    my $has_pos = ($d1 > 0) || ($d2 > 0) || ($d3 > 0)
+    !($has_neg && $has_pos)
+}
+
+my $tri = [[0,0], [10,0], [0,10]]
+assert_ok  Rosetta::PtInTri::contains([1,1], $tri),   "interior"
+assert_ok  Rosetta::PtInTri::contains([3,3], $tri),   "interior 2"
+assert_ok  Rosetta::PtInTri::contains([0,5], $tri),   "edge"
+assert_ok  Rosetta::PtInTri::contains([0,0], $tri),   "vertex"
+assert_ok !Rosetta::PtInTri::contains([5,6], $tri),   "outside (5,6)"
+assert_ok !Rosetta::PtInTri::contains([-1,1], $tri),  "outside left"
+assert_ok !Rosetta::PtInTri::contains([11,0], $tri),  "outside right"
+
+# Reverse-orientation triangle still works.
+my $rev = [[0,0], [0,10], [10,0]]
+assert_ok  Rosetta::PtInTri::contains([1,1], $rev),   "interior, reversed orientation"
+assert_ok !Rosetta::PtInTri::contains([20,20], $rev), "far outside"
+
+test_run

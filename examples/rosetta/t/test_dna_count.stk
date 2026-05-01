@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FASTA-style DNA base counting (covers FASTA format / bioinformatics base count)
+
+fn Rosetta::DNA::count_bases($seq) {
+    my %counts = ("A" => 0, "C" => 0, "G" => 0, "T" => 0)
+    for my $b (split("", uc $seq)) {
+        $counts{$b} = ($counts{$b} // 0) + 1 if $b =~ /[ACGT]/
+    }
+    %counts
+}
+
+fn Rosetta::DNA::gc_content($seq) {
+    my %cnt = Rosetta::DNA::count_bases($seq)
+    my $total = $cnt{A} + $cnt{C} + $cnt{G} + $cnt{T}
+    return 0 if $total == 0
+    ($cnt{G} + $cnt{C}) / $total
+}
+
+fn Rosetta::DNA::reverse_complement($seq) {
+    my %map = ("A" => "T", "T" => "A", "C" => "G", "G" => "C", "N" => "N")
+    my @rev = reverse split("", uc $seq)
+    my @complemented = ~> @rev map { $map{_} // _ }
+    join("", @complemented)
+}
+
+my %cnt = Rosetta::DNA::count_bases("AAGCT")
+assert_eq $cnt{A}, 2, "A=2"
+assert_eq $cnt{G}, 1, "G=1"
+assert_eq $cnt{C}, 1, "C=1"
+assert_eq $cnt{T}, 1, "T=1"
+
+assert_eq Rosetta::DNA::gc_content("GCGC"), 1.0,  "all GC"
+assert_eq Rosetta::DNA::gc_content("ATAT"), 0.0,  "no GC"
+assert_eq Rosetta::DNA::gc_content("AGCT"), 0.5,  "balanced"
+
+assert_eq Rosetta::DNA::reverse_complement("AAGCT"),  "AGCTT", "rev comp AAGCT"
+assert_eq Rosetta::DNA::reverse_complement("GATTACA"),"TGTAATC","rev comp GATTACA"
+
+test_run

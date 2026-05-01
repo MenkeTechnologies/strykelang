@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Classes
+
+class Account {
+    owner: Str = ""
+    balance: Int = 0
+
+    fn deposit($amount) {
+        $self->balance($self->balance + $amount)
+        $self
+    }
+
+    fn withdraw($amount) {
+        return 0 if $amount > $self->balance
+        $self->balance($self->balance - $amount)
+        1
+    }
+
+    fn report {
+        "Account(" . $self->owner . "): $" . $self->balance
+    }
+}
+
+my $a = Account(owner => "Alice")
+$a->deposit(100)
+$a->deposit(50)
+assert_eq $a->balance, 150, "after 2 deposits"
+
+assert_eq $a->withdraw(30),  1,   "withdraw ok returns 1"
+assert_eq $a->balance,       120, "after withdraw"
+assert_eq $a->withdraw(500), 0,   "overdraw blocked"
+assert_eq $a->balance,       120, "balance unchanged"
+
+assert_eq $a->report(), "Account(Alice): \$120", "report formatted"
+
+# Instances are independent
+my $b = Account(owner => "Bob", balance => 500)
+$b->deposit(25)
+assert_eq $b->balance, 525, "Bob unaffected by Alice"
+assert_eq $a->balance, 120, "Alice unaffected by Bob"
+
+test_run

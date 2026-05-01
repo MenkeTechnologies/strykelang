@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Disarium numbers
+
+fn Rosetta::Disarium::is_disarium($n) {
+    my @ds = split("", "$n")
+    my $total = 0
+    for my $i (0..len(@ds)-1) {
+        $total += $ds[$i] ** ($i + 1)
+    }
+    $total == $n
+}
+
+fn Rosetta::Disarium::first_n($count) {
+    my @res
+    my $n = 0
+    while (len(@res) < $count) {
+        push @res, $n if Rosetta::Disarium::is_disarium($n)
+        $n += 1
+    }
+    @res
+}
+
+# OEIS A032799: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 89, 135, 175, 518, 598, 1306, 1676, 2427, ...
+my @first18 = Rosetta::Disarium::first_n(18)
+assert_eq join(",", @first18),
+    "0,1,2,3,4,5,6,7,8,9,89,135,175,518,598,1306,1676,2427",
+    "first 18 disariums"
+
+assert_ok  Rosetta::Disarium::is_disarium(89),   "89 is disarium (8^1+9^2=89)"
+assert_ok  Rosetta::Disarium::is_disarium(135),  "135 is disarium"
+assert_ok !Rosetta::Disarium::is_disarium(100),  "100 is not"
+
+test_run

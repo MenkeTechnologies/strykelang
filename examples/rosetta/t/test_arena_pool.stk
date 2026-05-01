@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Arena storage pool
+# An arena owns a pool of objects; freeing one returns it for reuse instead of GC.
+
+class Arena {
+    free_ref: Any = undef
+    inuse: Int = 0
+
+    fn BUILD {
+        $self->free_ref([])
+    }
+
+    fn alloc {
+        if (len(@{$self->free_ref}) > 0) {
+            my $obj = pop @{$self->free_ref}
+            $self->inuse($self->inuse + 1)
+            return $obj
+        }
+        my $h = { value => 0, generation => $self->inuse + 1 }
+        $self->inuse($self->inuse + 1)
+        $h
+    }
+
+    fn release($obj) {
+        $obj->{value} = 0
+        push @{$self->free_ref}, $obj
+        $self->inuse($self->inuse - 1)
+        $self
+    }
+
+    fn free_count { len(@{$self->free_ref}) }
+
+    fn pool_size {
+        len(@{$self->free_ref}) + $self->inuse
+    }
+}
+
+my $arena = Arena()
+assert_eq $arena->inuse, 0, "starts empty"
+
+my $a = $arena->alloc()
+my $b = $arena->alloc()
+my $c = $arena->alloc()
+assert_eq $arena->inuse, 3, "3 in use"
+
+$arena->release($a)
+$arena->release($b)
+assert_eq $arena->inuse, 1,                "1 still in use"
+assert_eq $arena->free_count, 2,         "2 free"
+
+# Reuse: next alloc returns one of the freed objects (no fresh allocation).
+my $d = $arena->alloc()
+assert_eq $arena->inuse, 2,                "2 in use after reuse"
+assert_eq $arena->free_count, 1,         "1 still free"
+
+# Total objects ever allocated equals high-water mark; reuse counts.
+assert_eq $arena->pool_size, 3, "pool tracks high-water (3 alloc, 2 + 1 free)"
+
+test_run

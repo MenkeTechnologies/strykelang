@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Closures/Value capture
+# Create a list of 10 functions that return their index when called — capturing the value of i,
+# not a reference to a shared variable.
+
+fn Rosetta::Closures::make_squarers() {
+    my @fns
+    for my $i (0..9) {
+        my $captured = $i  # local binding so each closure captures its own value
+        push @fns, fn { $captured * $captured }
+    }
+    @fns
+}
+
+fn Rosetta::Closures::make_adders($base) {
+    my @fns
+    for my $k (1..5) {
+        my $b = $base
+        my $kk = $k
+        push @fns, fn { my $x = $_; $b + $kk + $x }
+    }
+    @fns
+}
+
+my @squarers = Rosetta::Closures::make_squarers()
+assert_eq len(@squarers), 10, "10 closures"
+assert_eq $squarers[0]->(),  0,  "f0 -> 0"
+assert_eq $squarers[3]->(),  9,  "f3 -> 9"
+assert_eq $squarers[7]->(),  49, "f7 -> 49"
+assert_eq $squarers[9]->(),  81, "f9 -> 81"
+
+my @adders = Rosetta::Closures::make_adders(100)
+# adder[k] = 100 + (k+1) + arg  (k 0..4 => 101..105 base)
+assert_eq $adders[0]->(0),  101, "100+1+0"
+assert_eq $adders[2]->(50), 153, "100+3+50"
+assert_eq $adders[4]->(10), 115, "100+5+10"
+
+# pipeline form
+my @results = ~> (1..5) map { $squarers[$_]->() }
+assert_eq join(",", @results), "1,4,9,16,25", "map closures over indices"
+
+test_run

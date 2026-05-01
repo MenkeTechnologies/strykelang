@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Engel expansion
+# x = 1/a1 + 1/(a1*a2) + 1/(a1*a2*a3) + ... where each a_k = ceil(1/u_k)
+# u_1 = x, u_{k+1} = u_k * a_k - 1
+
+fn Rosetta::Engel::expand($p, $q, $depth) {
+    my @a
+    my $up = $p
+    my $uq = $q
+    for my $i (1..$depth) {
+        last if $up == 0
+        # a = ceil(uq / up)
+        my $ak = int($uq / $up)
+        $ak += 1 if $up * $ak < $uq
+        push @a, $ak
+        # u_{k+1} = u_k * a_k - 1  (rational up/uq)
+        $up = $up * $ak - $uq
+        # reduce
+        my $g = $up
+        my $h = $uq
+        while ($h != 0) { my $t = $h; $h = $g % $h; $g = $t }
+        if ($g > 1) { $up = int($up / $g); $uq = int($uq / $g) }
+    }
+    @a
+}
+
+# 0.69314718... ≈ ln 2 — known Engel: 2,3,7,9,104,510,...
+my @ln2 = Rosetta::Engel::expand(693147, 1000000, 6)
+assert_eq join(",", @ln2[0..3]), "2,3,7,9", "ln2 first 4 partials"
+
+# Pi - 3 = 0.14159... — first few Engel: 8,8,17,19,300,...  Use 314159/100000-3
+my @pi3 = Rosetta::Engel::expand(14159, 100000, 4)
+assert_eq join(",", @pi3[0..2]), "8,8,17", "pi-3 first 3 partials"
+
+# Rational: 1/3 = 1/3 -> a=3, then remainder zero
+my @third = Rosetta::Engel::expand(1, 3, 5)
+assert_eq join(",", @third), "3", "1/3 -> [3]"
+
+test_run

@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find the intersection of two lines (in 2D, infinite lines).
+
+fn Rosetta::TwoLines::intersect($l1, $l2) {
+    # Each line: [[x1,y1],[x2,y2]] (two points on the line).
+    my $x1 = $l1->[0]->[0]; my $y1 = $l1->[0]->[1]
+    my $x2 = $l1->[1]->[0]; my $y2 = $l1->[1]->[1]
+    my $x3 = $l2->[0]->[0]; my $y3 = $l2->[0]->[1]
+    my $x4 = $l2->[1]->[0]; my $y4 = $l2->[1]->[1]
+    my $denom = ($x1 - $x2) * ($y3 - $y4) - ($y1 - $y2) * ($x3 - $x4)
+    return undef if abs($denom) < 1e-12   # parallel or collinear
+    my $cross1 = $x1 * $y2 - $y1 * $x2
+    my $cross2 = $x3 * $y4 - $y3 * $x4
+    my $px = ($cross1 * ($x3 - $x4) - ($x1 - $x2) * $cross2) / $denom
+    my $py = ($cross1 * ($y3 - $y4) - ($y1 - $y2) * $cross2) / $denom
+    [$px, $py]
+}
+
+# y = x and y = -x + 4 cross at (2,2).
+my $p = Rosetta::TwoLines::intersect([[0,0],[1,1]], [[0,4],[4,0]])
+assert_eq $p->[0], 2, "x=2"
+assert_eq $p->[1], 2, "y=2"
+
+# Vertical x=3 and y=5 cross at (3,5).
+my $p2 = Rosetta::TwoLines::intersect([[3,0],[3,10]], [[0,5],[10,5]])
+assert_eq $p2->[0], 3, "x=3"
+assert_eq $p2->[1], 5, "y=5"
+
+# Parallel y=x and y=x+1 -> undef
+my $p3 = Rosetta::TwoLines::intersect([[0,0],[1,1]], [[0,1],[1,2]])
+assert_ok !defined($p3), "parallel undef"
+
+# Two segments meeting beyond endpoints — still infinite-line intersection.
+my $p4 = Rosetta::TwoLines::intersect([[4,0],[6,10]], [[0,3],[10,7]])
+assert_ok defined($p4), "infinite line intersection exists"
+
+test_run

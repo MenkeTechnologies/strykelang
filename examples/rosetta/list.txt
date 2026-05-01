@@ -19,7 +19,7 @@
 [ ] Abelian sandpile model
 [ ] Abelian sandpile model/Identity
 [ ] Abstract type
-[ ] Abundant odd numbers
+[x] Abundant odd numbers
 [x] Abundant, deficient and perfect number classifications
 [x] Accumulator factory
 [x] Achilles numbers
@@ -27,7 +27,7 @@
 [ ] Active Directory/Connect
 [ ] Active Directory/Search for a user
 [ ] Active object
-[ ] Add a variable to a class instance at runtime
+[x] Add a variable to a class instance at runtime
 [x] Additive primes
 [ ] Address of a variable
 [x] ADFGVX cipher
@@ -58,7 +58,7 @@
 [ ] Apéry's constant
 [x] Arbitrary-precision integers (included)
 [x] Archimedean spiral
-[ ] Arena storage pool
+[x] Arena storage pool
 [x] Arithmetic derivative
 [x] Arithmetic evaluation
 [x] Arithmetic numbers
@@ -132,9 +132,9 @@
 [x] Boolean values
 [x] Borůvka algorithm
 [x] Boustrophedon transform
-[ ] Box the compass
+[x] Box the compass
 [x] Boyer-Moore string search
-[ ] Brace expansion
+[x] Brace expansion
 [x] Brazilian numbers
 [ ] Break OO privacy
 [x] Brilliant numbers
@@ -145,14 +145,14 @@
 [x] Burrows–Wheeler transform
 [ ] Bézier curves/Intersections
 [x] Caesar cipher
-[ ] Calculating the value of e
+[x] Calculating the value of e
 [ ] Calendar
 [ ] Calendar - for "REAL" programmers
-[ ] Calkin-Wilf sequence
-[ ] Call a foreign-language function
-[ ] Call a function
-[ ] Call a function in a shared library
-[ ] Call an object method
+[x] Calkin-Wilf sequence
+[x] Call a foreign-language function
+[x] Call a function
+[x] Call a function in a shared library
+[x] Call an object method
 [x] Camel case and snake case
 [ ] Canny edge detector
 [ ] Canonicalize CIDR
@@ -160,27 +160,27 @@
 [x] Carmichael 3 strong pseudoprimes
 [x] Cartesian product of two or more lists
 [ ] Case-sensitivity of identifiers
-[ ] Casting out nines
+[x] Casting out nines
 [x] Catalan numbers
 [x] Catalan numbers/Pascal's triangle
 [ ] Catamorphism
 [ ] Catmull–Clark subdivision surface
-[ ] Centre and radius of a circle passing through 3 points in a plane
+[x] Centre and radius of a circle passing through 3 points in a plane
 [ ] Chaocipher
 [x] Chaos game
 [x] Character codes
 [ ] Chat server
-[ ] Check if a polygon overlaps with a rectangle
-[ ] Check if two polygons overlap
+[x] Check if a polygon overlaps with a rectangle
+[x] Check if two polygons overlap
 [ ] Check input device is a terminal
-[ ] Check Machin-like formulas
+[x] Check Machin-like formulas
 [ ] Check output device is a terminal
 [x] Check that file exists
 [ ] Checkpoint synchronization
 [x] Chernick's Carmichael numbers
 [x] Cheryl's birthday
 [x] Chinese remainder theorem
-[ ] Chinese zodiac
+[x] Chinese zodiac
 [x] Cholesky decomposition
 [x] Chowla numbers
 [ ] Christofides algorithm
@@ -188,9 +188,9 @@
 [ ] Circles of given radius through two points
 [x] Circular primes
 [ ] Cistercian numerals
-[ ] Classes
+[x] Classes
 [x] Closest-pair problem
-[ ] Closures/Value capture
+[x] Closures/Value capture
 [ ] Cocke–Younger–Kasami (CYK) Algorithm
 [ ] Collections
 [ ] Color of a screen pixel
@@ -203,12 +203,12 @@
 [x] Combinations
 [x] Combinations and permutations
 [x] Combinations with repetitions
-[ ] Comma quibbling
+[x] Comma quibbling
 [x] Command-line arguments
-[ ] Commatizing numbers
+[x] Commatizing numbers
 [x] Comments
 [x] Compare a list of strings
-[ ] Compare length of two strings
+[x] Compare length of two strings
 [x] Compare sorting algorithms' performance
 [ ] Compile-time calculation
 [ ] Compiler/AST interpreter
@@ -218,10 +218,10 @@
 [ ] Compiler/syntax analyzer
 [ ] Compiler/virtual machine interpreter
 [x] Composite numbers k with no single digit factors whose factors are all substrings of k
-[ ] Compound data type
+[x] Compound data type
 [x] Concurrent computing
 [x] Conditional structures
-[ ] Conjugate transpose
+[x] Conjugate transpose
 [x] Consecutive primes with ascending or descending differences
 [ ] Constrained genericity
 [ ] Constrained random points on a circle
@@ -236,7 +236,7 @@
 [x] Copy a string
 [ ] Copy stdin to stdout
 [x] Count in factors
-[ ] Count in octal
+[x] Count in octal
 [x] Count occurrences of a substring
 [x] Count the coins
 [x] Cramer's rule
@@ -252,7 +252,7 @@
 [x] Cullen and Woodall numbers
 [x] Cumulative standard deviation
 [ ] Currency
-[ ] Currying
+[x] Currying
 [x] Curzon numbers
 [x] CUSIP
 [ ] Cut a rectangle
@@ -265,10 +265,10 @@
 [ ] Dating agency
 [x] Day of the week
 [x] De Bruijn sequences
-[ ] De Polignac numbers
+[x] De Polignac numbers
 [ ] Deal cards for FreeCell
 [x] Death Star
-[ ] Deceptive numbers
+[x] Deceptive numbers
 [ ] Deconvolution/1D
 [x] Deconvolution/2D+
 [x] Decorate-sort-undecorate idiom
@@ -289,17 +289,17 @@
 [ ] Determine if only one instance is running
 [ ] Determine if two triangles overlap
 [ ] Determine sentence type
-[ ] Dice game probabilities
+[x] Dice game probabilities
 [x] Digital root
 [x] Digital root/Multiplicative digital root
 [x] Dijkstra's algorithm
-[ ] Dinesman's multiple-dwelling problem
+[x] Dinesman's multiple-dwelling problem
 [x] Dining philosophers
-[ ] Disarium numbers
+[x] Disarium numbers
 [ ] Discordian date
 [x] Display a linear combination
 [ ] Display an outline as a nested table
-[ ] Distance and Bearing
+[x] Distance and Bearing
 [ ] Distributed programming
 [x] Distribution of 0 digits in factorial series
 [ ] Diversity prediction theorem
@@ -324,9 +324,9 @@
 [x] Earliest difference between prime gaps
 [x] Eban numbers
 [ ] Echo server
-[ ] Eertree
+[x] Eertree
 [x] Egyptian division
-[ ] EKG sequence convergence
+[x] EKG sequence convergence
 [ ] Element-wise operations
 [x] Elementary cellular automaton
 [x] Elementary cellular automaton/Infinite length
@@ -338,10 +338,10 @@
 [x] Empty program
 [x] Empty string
 [ ] Enforced immutability
-[ ] Engel expansion
+[x] Engel expansion
 [x] Entropy
 [x] Entropy/Narcissist
-[ ] Enumerations
+[x] Enumerations
 [x] Environment variables
 [x] Equal prime and composite sums
 [x] Equilibrium index
@@ -354,13 +354,13 @@
 [ ] Euclid-Mullin sequence
 [ ] Euclidean rhythm
 [x] Euler method
-[ ] Euler's constant 0.5772...
-[ ] Euler's identity
+[x] Euler's constant 0.5772...
+[x] Euler's identity
 [x] Euler's sum of powers conjecture
 [x] Evaluate binomial coefficients
 [x] Even or odd
 [ ] Events
-[ ] Evolutionary algorithm
+[x] Evolutionary algorithm
 [x] Exceptions
 [x] Exceptions/Catch an exception thrown in a nested call
 [ ] Executable library
@@ -375,12 +375,12 @@
 [ ] Experimental Verification of the NKTg Law Using NASA Mercury Data in 2025
 [ ] Experimental Verification of the NKTg Law Using NASA Neptune Data (2023–2024)
 [x] Exponential digital sums
-[ ] Exponentiation operator
+[x] Exponentiation operator
 [ ] Exponentiation order
-[ ] Exponentiation with infix operators in (or operating on) the base
+[x] Exponentiation with infix operators in (or operating on) the base
 [ ] Extend your language
 [x] Extensible prime generator
-[ ] Extreme floating point values
+[x] Extreme floating point values
 [ ] Faces from a mesh
 [x] Factorial
 [x] Factorial base numbers indexing permutations of a collection
@@ -393,9 +393,9 @@
 [x] Farey sequence
 [ ] Fast Fourier transform
 [ ] FASTA format
-[ ] Faulhaber's formula
+[x] Faulhaber's formula
 [ ] Faulhaber's triangle
-[ ] Feigenbaum constant calculation
+[x] Feigenbaum constant calculation
 [x] Fermat numbers
 [x] Fermat pseudoprimes
 [x] Fibonacci n-step number sequences
@@ -411,19 +411,19 @@
 [ ] Find Chess960 starting position identifier
 [x] Find common directory path
 [x] Find duplicate files
-[ ] Find if a point is within a triangle
+[x] Find if a point is within a triangle
 [x] Find largest left truncatable prime in a given base
 [x] Find limit of recursion
 [ ] Find palindromic numbers in both binary and ternary bases
-[ ] Find the intersection of a line with a plane
+[x] Find the intersection of a line with a plane
 [ ] Find the intersection of two lines
 [ ] Find the last Sunday of each month
 [x] Find the missing permutation
-[ ] First class environments
+[x] First class environments
 [x] First perfect square in base n with n unique digits
 [x] First power of 2 that has leading decimal digits of 12
-[ ] First-class functions
-[ ] First-class functions/Use numbers analogously
+[x] First-class functions
+[x] First-class functions/Use numbers analogously
 [ ] Five weekends
 [x] Fivenum
 [ ] Fixed length records
@@ -438,11 +438,11 @@
 [ ] Fork
 [x] Formal power series
 [x] Formatted numeric output
-[ ] Fortunate numbers
+[x] Fortunate numbers
 [x] Forward difference
 [ ] Four bit adder
 [x] Four is magic
-[ ] Four is the number of letters in the ...
+[x] Four is the number of letters in the ...
 [ ] Fractal tree
 [x] Fraction reduction
 [x] Fractran
@@ -453,9 +453,9 @@
 [x] Function frequency
 [ ] Function prototype
 [ ] Functional coverage tree
-[ ] Fusc sequence
+[x] Fusc sequence
 [ ] Gabow's algorithm
-[ ] Galton box animation
+[x] Galton box animation
 [x] Gamma function
 [x] Gapful numbers
 [x] Gauss-Jordan matrix inversion
@@ -463,7 +463,7 @@
 [x] Gaussian primes
 [x] General FizzBuzz
 [ ] Generate Chess960 starting position
-[ ] Generate lower case ASCII alphabet
+[x] Generate lower case ASCII alphabet
 [ ] Generate random chess position
 [ ] Generator/Exponential
 [x] Generic swap
@@ -539,10 +539,10 @@
 [ ] HTTPS/Authenticated
 [ ] HTTPS/Client-authenticated
 [x] Huffman coding
-[ ] Humble numbers
+[x] Humble numbers
 [ ] Hunt the Wumpus
-[ ] I before E except after C
-[ ] I'm a software engineer, get me out of here
+[x] I before E except after C
+[x] I'm a software engineer, get me out of here
 [x] IBAN
 [x] Iccanobif primes
 [x] Identity matrix
@@ -553,14 +553,14 @@
 [ ] Image noise
 [ ] Imaginary base numbers
 [ ] Include a file
-[ ] Inconsummate numbers in base 10
-[ ] Increasing gaps between consecutive Niven numbers
+[x] Inconsummate numbers in base 10
+[x] Increasing gaps between consecutive Niven numbers
 [x] Increment a numerical string
 [x] Index finite lists of positive integers
 [ ] Infinity
-[ ] Inheritance/Multiple
-[ ] Inheritance/Single
-[ ] Inner classes
+[x] Inheritance/Multiple
+[x] Inheritance/Single
+[x] Inner classes
 [x] Input loop
 [x] Integer comparison
 [x] Integer overflow
@@ -571,8 +571,8 @@
 [x] Inventory sequence
 [x] Inverted index
 [ ] Inverted syntax
-[ ] ISBN13 check digit
-[ ] Isograms and heterograms
+[x] ISBN13 check digit
+[x] Isograms and heterograms
 [x] Isqrt (integer square root) of X
 [x] Iterated digits squaring
 [x] Jacobi symbol
@@ -973,7 +973,7 @@
 [x] Repeat a string
 [x] Repunit primes
 [ ] Resistor mesh
-[ ] Respond to an unknown method call
+[x] Respond to an unknown method call
 [ ] Retrieve and search chat history
 [ ] Return multiple values
 [x] Reverse a string
@@ -1011,7 +1011,7 @@
 [ ] Schieber-Vishkin algorithm
 [ ] Scope modifiers
 [ ] Scope/Function names and labels
-[ ] Sealed classes and methods
+[x] Sealed classes and methods
 [x] Search a list
 [x] Search a list of records
 [ ] Search in paragraph's text
@@ -1022,7 +1022,7 @@
 [x] Self-describing numbers
 [x] Semiprime
 [ ] Semordnilap
-[ ] Send an unknown method call
+[x] Send an unknown method call
 [ ] Send email
 [x] Sequence of non-squares
 [x] Sequence of primes by trial division
@@ -1272,7 +1272,7 @@
 [ ] URL decoding
 [x] URL encoding
 [ ] URL parser
-[ ] Use another language to call a function
+[x] Use another language to call a function
 [ ] User input/Graphical
 [ ] User input/Text
 [ ] UTF-8 encode and decode

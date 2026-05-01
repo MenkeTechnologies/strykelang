@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Enumerations
+
+enum Color { Red, Green, Blue, Yellow }
+enum Day   { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
+
+# Variants are constructable directly.
+my $c = Color::Red
+my $d = Day::Wed
+
+assert_ok defined($c), "color defined"
+assert_ok defined($d), "day defined"
+
+# Pattern matching dispatch
+fn Rosetta::Enums::is_warm($color) {
+    match ($color) {
+        Color::Red    => 1
+        Color::Yellow => 1
+        _             => 0
+    }
+}
+
+assert_eq Rosetta::Enums::is_warm(Color::Red),    1, "red is warm"
+assert_eq Rosetta::Enums::is_warm(Color::Yellow), 1, "yellow is warm"
+assert_eq Rosetta::Enums::is_warm(Color::Blue),   0, "blue is not"
+assert_eq Rosetta::Enums::is_warm(Color::Green),  0, "green is not"
+
+fn Rosetta::Enums::is_weekend($day) {
+    match ($day) {
+        Day::Sat => 1
+        Day::Sun => 1
+        _        => 0
+    }
+}
+
+assert_eq Rosetta::Enums::is_weekend(Day::Sat), 1, "Sat weekend"
+assert_eq Rosetta::Enums::is_weekend(Day::Sun), 1, "Sun weekend"
+assert_eq Rosetta::Enums::is_weekend(Day::Mon), 0, "Mon weekday"
+
+test_run

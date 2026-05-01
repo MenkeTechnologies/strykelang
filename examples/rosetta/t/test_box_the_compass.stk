@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Box the compass
+
+fn Rosetta::BoxCompass::point($index) {
+    my @names = (
+        "North","North by east","North-northeast","Northeast by north",
+        "Northeast","Northeast by east","East-northeast","East by north",
+        "East","East by south","East-southeast","Southeast by east",
+        "Southeast","Southeast by south","South-southeast","South by east",
+        "South","South by west","South-southwest","Southwest by south",
+        "Southwest","Southwest by west","West-southwest","West by south",
+        "West","West by north","West-northwest","Northwest by west",
+        "Northwest","Northwest by north","North-northwest","North by west",
+    )
+    $names[$index % 32]
+}
+
+fn Rosetta::BoxCompass::deg_to_index($deg) {
+    int((($deg + 5.625) % 360) / 11.25)
+}
+
+assert_eq Rosetta::BoxCompass::point(0),  "North", "0 -> North"
+assert_eq Rosetta::BoxCompass::point(8),  "East",  "8 -> East"
+assert_eq Rosetta::BoxCompass::point(16), "South", "16 -> South"
+assert_eq Rosetta::BoxCompass::point(24), "West",  "24 -> West"
+assert_eq Rosetta::BoxCompass::point(31), "North by west", "31 -> NbW"
+
+assert_eq Rosetta::BoxCompass::deg_to_index(0),     0,  "0deg -> idx 0"
+assert_eq Rosetta::BoxCompass::deg_to_index(90),    8,  "90deg -> idx 8"
+assert_eq Rosetta::BoxCompass::deg_to_index(180),   16, "180deg -> idx 16"
+assert_eq Rosetta::BoxCompass::deg_to_index(270),   24, "270deg -> idx 24"
+assert_eq Rosetta::BoxCompass::deg_to_index(354.38),0,  "354.38 wraps to N"
+
+# pipeline: degrees -> name
+my $name = 67.5 |> Rosetta::BoxCompass::deg_to_index |> Rosetta::BoxCompass::point
+assert_eq $name, "East-northeast", "67.5deg -> ENE"
+
+test_run

@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find the intersection of a line with a plane
+# Line: P(t) = P0 + t*D. Plane: (X - Q) · n = 0.
+# Solve for t: t = (Q - P0) · n / (D · n).
+
+fn Math::Vec3::dot($a, $b) {
+    $a->[0]*$b->[0] + $a->[1]*$b->[1] + $a->[2]*$b->[2]
+}
+
+fn Math::Vec3::sub($a, $b) {
+    [$a->[0]-$b->[0], $a->[1]-$b->[1], $a->[2]-$b->[2]]
+}
+
+fn Math::Vec3::add($a, $b) {
+    [$a->[0]+$b->[0], $a->[1]+$b->[1], $a->[2]+$b->[2]]
+}
+
+fn Math::Vec3::scale($a, $s) {
+    [$a->[0]*$s, $a->[1]*$s, $a->[2]*$s]
+}
+
+fn Rosetta::LinePlane::intersect($p0, $dir, $q, $n) {
+    my $denom = Math::Vec3::dot($dir, $n)
+    return undef if abs($denom) < 1e-12   # parallel
+    my $t = Math::Vec3::dot(Math::Vec3::sub($q, $p0), $n) / $denom
+    Math::Vec3::add($p0, Math::Vec3::scale($dir, $t))
+}
+
+# Line through (0,0,0) along (1,1,1) hits plane z=10 at (10,10,10).
+my $i1 = Rosetta::LinePlane::intersect([0,0,0], [1,1,1], [0,0,10], [0,0,1])
+assert_eq $i1->[0], 10, "x=10"
+assert_eq $i1->[1], 10, "y=10"
+assert_eq $i1->[2], 10, "z=10"
+
+# Line (0,0,0)+t*(1,0,0) hits plane x=5 at (5,0,0)
+my $i2 = Rosetta::LinePlane::intersect([0,0,0], [1,0,0], [5,0,0], [1,0,0])
+assert_eq $i2->[0], 5,  "x=5"
+assert_eq $i2->[1], 0,  "y=0"
+assert_eq $i2->[2], 0,  "z=0"
+
+# Parallel line and plane: line direction (1,0,0), plane normal (0,1,0)
+my $i3 = Rosetta::LinePlane::intersect([0,5,0], [1,0,0], [0,0,0], [0,1,0])
+assert_ok !defined($i3), "parallel returns undef"
+
+test_run

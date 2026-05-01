@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Inheritance/Single
+
+class Animal {
+    name: Str = ""
+
+    fn describe { "I am " . $self->name }
+    fn legs     { 4 }
+    fn speak    { "..." }
+}
+
+class Dog extends Animal {
+    fn speak { "Woof! I am " . $self->name }
+}
+
+class Cat extends Animal {
+    fn speak { "Meow!" }
+}
+
+class Bird extends Animal {
+    fn legs  { 2 }
+    fn speak { "Tweet" }
+}
+
+my $rex    = Dog(name => "Rex")
+my $tom    = Cat(name => "Tom")
+my $tweety = Bird(name => "Tweety")
+
+assert_eq $rex->describe(),    "I am Rex",        "inherited describe"
+assert_eq $tom->describe(),    "I am Tom",        "inherited describe"
+assert_eq $rex->speak(),       "Woof! I am Rex",  "overridden speak"
+assert_eq $tom->speak(),       "Meow!",           "overridden speak"
+assert_eq $tweety->speak(),    "Tweet",           "Bird speaks"
+assert_eq $rex->legs(),        4,                 "Dog inherits 4 legs"
+assert_eq $tweety->legs(),     2,                 "Bird overrides legs"
+
+# pipeline: list of animals
+my @pets = ($rex, $tom, $tweety)
+my @speeches = ~> @pets map { _->speak() }
+assert_eq join("|", @speeches), "Woof! I am Rex|Meow!|Tweet", "polymorphic speak"
+
+test_run

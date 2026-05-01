@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Call a function
+
+fn Rosetta::CallFunc::greet()           { "hello" }
+fn Rosetta::CallFunc::add($a, $b)       { $a + $b }
+fn Rosetta::CallFunc::format_pair($k, $v) { "$k=$v" }
+fn Rosetta::CallFunc::variadic(@args)   { len(@args) }
+
+# Direct call
+assert_eq Rosetta::CallFunc::greet(),                "hello", "no args"
+assert_eq Rosetta::CallFunc::add(2, 3),              5,        "two args"
+assert_eq Rosetta::CallFunc::format_pair("a", 1),    "a=1",    "named pair"
+assert_eq Rosetta::CallFunc::variadic(1,2,3,4,5),    5,        "variadic count"
+
+# Indirect call via coderef
+my $cr = \&Rosetta::CallFunc::add
+assert_eq $cr->(7, 8), 15, "via coderef"
+
+# Pipeline call
+my $piped = 9 |> Rosetta::CallFunc::add(1)
+assert_eq $piped, 10, "pipe add"
+
+# Method-style on namespaced (just calling, not OO)
+my @results = (1,2,3) |> map { Rosetta::CallFunc::add(_, 100) }
+assert_eq join(",", @results), "101,102,103", "map call"
+
+test_run

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Function definition
+
+fn Rosetta::FuncDef::multiply($a, $b) { $a * $b }
+fn Rosetta::FuncDef::factorial($n) {
+    return 1 if $n <= 1
+    $n * Rosetta::FuncDef::factorial($n - 1)
+}
+fn Rosetta::FuncDef::variadic_sum(@xs) {
+    ~> @xs reduce { _0 + _1 }
+}
+
+# Anonymous closure
+my $square = fn { my $x = $_; $x * $x }
+
+assert_eq Rosetta::FuncDef::multiply(3, 4), 12, "named multiply"
+assert_eq Rosetta::FuncDef::factorial(5),    120, "recursive factorial"
+assert_eq Rosetta::FuncDef::variadic_sum(1,2,3,4,5), 15, "variadic"
+assert_eq $square->(7), 49, "anonymous closure"
+
+# pipeline form
+my $r = 6 |> Rosetta::FuncDef::factorial
+assert_eq $r, 720, "pipe factorial"
+
+test_run

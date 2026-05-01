@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Inheritance/Multiple — via traits.
+
+trait Walks { fn walk }
+trait Swims { fn swim }
+trait Flies { fn fly  }
+
+class Duck impl Walks, Swims, Flies {
+    name: Str = "duck"
+    fn walk { $self->name . " waddles" }
+    fn swim { $self->name . " paddles" }
+    fn fly  { $self->name . " flaps"   }
+}
+
+class Fish impl Swims {
+    name: Str = "fish"
+    fn swim { $self->name . " swims" }
+}
+
+class Sparrow impl Walks, Flies {
+    name: Str = "sparrow"
+    fn walk { $self->name . " hops" }
+    fn fly  { $self->name . " soars" }
+}
+
+my $duck   = Duck(name => "Donald")
+my $nemo   = Fish(name => "Nemo")
+my $birdie = Sparrow(name => "Tweety")
+
+assert_eq $duck->walk(),   "Donald waddles", "Duck walks"
+assert_eq $duck->swim(),   "Donald paddles", "Duck swims"
+assert_eq $duck->fly(),    "Donald flaps",   "Duck flies"
+assert_eq $nemo->swim(),   "Nemo swims",     "Fish swims"
+assert_eq $birdie->walk(), "Tweety hops",    "Sparrow walks"
+assert_eq $birdie->fly(),  "Tweety soars",   "Sparrow flies"
+
+# Polymorphism: every type that implements Swims responds to swim()
+my @swims = ($duck->swim(), $nemo->swim())
+assert_eq join("|", @swims), "Donald paddles|Nemo swims", "Swims trait dispatch"
+
+test_run
