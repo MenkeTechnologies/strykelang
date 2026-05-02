@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wordiff
+# Two same-length words form a Wordiff move if they differ in
+# exactly one of: change a letter, insert a letter, delete a letter,
+# anagram-permute the existing letters. We classify the move type.
+
+fn Rosetta::Wordiff::is_anagram($a, $b) {
+    return 0 if length($a) != length($b)
+    return 0 if $a eq $b
+    join("", sort split //, $a) eq join("", sort split //, $b)
+}
+
+fn Rosetta::Wordiff::single_diff($a, $b) {
+    return 0 if length($a) != length($b)
+    my $diffs = 0
+    for my $i (0..length($a) - 1) {
+        $diffs++ if substr($a, $i, 1) ne substr($b, $i, 1)
+    }
+    $diffs == 1
+}
+
+fn Rosetta::Wordiff::is_insertion($a, $b) {
+    return 0 if length($b) != length($a) + 1
+    for my $i (0..length($b) - 1) {
+        my $candidate = substr($b, 0, $i) . substr($b, $i + 1)
+        return 1 if $candidate eq $a
+    }
+    0
+}
+
+fn Rosetta::Wordiff::is_deletion($a, $b) {
+    Rosetta::Wordiff::is_insertion($b, $a)
+}
+
+fn Rosetta::Wordiff::move_type($a, $b) {
+    return "same"     if $a eq $b
+    return "change"   if Rosetta::Wordiff::single_diff($a, $b)
+    return "anagram"  if Rosetta::Wordiff::is_anagram($a, $b)
+    return "insert"   if Rosetta::Wordiff::is_insertion($a, $b)
+    return "delete"   if Rosetta::Wordiff::is_deletion($a, $b)
+    "none"
+}
+
+# Direct
+assert_eq Rosetta::Wordiff::move_type("cat", "cat"),  "same",     "same"
+assert_eq Rosetta::Wordiff::move_type("cat", "bat"),  "change",   "cat→bat (change)"
+assert_eq Rosetta::Wordiff::move_type("cat", "act"),  "anagram",  "cat→act (anagram)"
+assert_eq Rosetta::Wordiff::move_type("cat", "cart"), "insert",   "cat→cart (insert)"
+assert_eq Rosetta::Wordiff::move_type("cart","cat"),  "delete",   "cart→cat (delete)"
+assert_eq Rosetta::Wordiff::move_type("cat", "dog"),  "none",     "cat→dog (none)"
+assert_eq Rosetta::Wordiff::move_type("cat", "dogs"), "none",     "cat→dogs (none)"
+
+# Anagram excludes identity
+assert_eq Rosetta::Wordiff::is_anagram("cat", "cat"), 0, "identity not anagram"
+
+# Multi-difference NOT classified as change
+assert_eq Rosetta::Wordiff::move_type("cat", "doe"), "none", "two letter changes excluded"
+
+# Insertion at any position
+assert_eq Rosetta::Wordiff::is_insertion("at", "cat"), 1, "at→cat insert at front"
+assert_eq Rosetta::Wordiff::is_insertion("ct", "cat"), 1, "ct→cat insert middle"
+assert_eq Rosetta::Wordiff::is_insertion("ca", "cat"), 1, "ca→cat insert end"
+assert_eq Rosetta::Wordiff::is_insertion("car","cat"), 0, "car→cat not insert"
+
+# Pipe form
+"cat" |> fn { Rosetta::Wordiff::move_type(_, "cart") } |> assert_eq("insert", "pipe move type")
+
+test_run

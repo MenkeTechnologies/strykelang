@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: The Name Game (Banana-fana-fo-Fana song)
+# Given a name, output the four lyric lines that "rhyme" with it
+# using the b-, f-, m- prefixes; if the name itself starts with that
+# prefix, the prefix consumes the first letter.
+
+fn Rosetta::NameGame::transform($name, $letter) {
+    my $first = uc(substr($name, 0, 1))
+    if ($first eq uc($letter)) {
+        return $letter . substr($name, 1)
+    }
+    $letter . lc(substr($name, 1)) ne $name ?
+        $letter . lc(substr($name, 0))      :
+        $letter . lc($name)
+}
+
+fn Rosetta::NameGame::transform_v2($name, $letter) {
+    my $first = uc(substr($name, 0, 1))
+    return $name if $first eq uc($letter)
+    if ($first eq "A" || $first eq "E" || $first eq "I"
+        || $first eq "O" || $first eq "U") {
+        return $letter . lc($name)
+    }
+    $letter . lc(substr($name, 1))
+}
+
+fn Rosetta::NameGame::lyrics($name) {
+    return undef if length($name) < 1
+    my $cap = uc(substr($name, 0, 1)) . lc(substr($name, 1))
+    my $b = Rosetta::NameGame::transform_v2($cap, "B")
+    my $f = Rosetta::NameGame::transform_v2($cap, "F")
+    my $m = Rosetta::NameGame::transform_v2($cap, "M")
+    [
+        "$cap, $cap, bo-$b",
+        "Banana-fana-fo-$f",
+        "Fee-fi-mo-$m",
+        "$cap!",
+    ]
+}
+
+# Standard sample: "Gary"
+my $gary = Rosetta::NameGame::lyrics("Gary")
+assert_eq $gary->[0], "Gary, Gary, bo-Bary",   "Gary line 1"
+assert_eq $gary->[1], "Banana-fana-fo-Fary",   "Gary line 2"
+assert_eq $gary->[2], "Fee-fi-mo-Mary",        "Gary line 3"
+assert_eq $gary->[3], "Gary!",                 "Gary line 4"
+
+# Names starting with one of B/F/M
+my $billy = Rosetta::NameGame::lyrics("Billy")
+assert_eq $billy->[0], "Billy, Billy, bo-Billy", "Billy line 1 (B-name)"
+
+my $felix = Rosetta::NameGame::lyrics("Felix")
+assert_eq $felix->[1], "Banana-fana-fo-Felix",   "Felix line 2 (F-name)"
+
+my $mike = Rosetta::NameGame::lyrics("Mike")
+assert_eq $mike->[2], "Fee-fi-mo-Mike",          "Mike line 3 (M-name)"
+
+# Capitalisation normalised
+my $lower = Rosetta::NameGame::lyrics("alice")
+assert_eq $lower->[0], "Alice, Alice, bo-Balice", "lowercased input gets capitalised"
+
+# Pipe form
+"Gary" |> Rosetta::NameGame::lyrics |> fn { $_->[3] } |> assert_eq("Gary!", "pipe last line")
+
+test_run

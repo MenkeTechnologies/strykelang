@@ -1,0 +1,108 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Solve a Hidato puzzle
+# Hidato: fill a grid with consecutive integers 1..N where each
+# number is orthogonally OR diagonally adjacent to the next.
+# Some cells are pre-filled; some are blocked (-1).
+# Backtracking from the cell containing 1, placing 2, 3, … by DFS.
+
+fn Rosetta::Hidato::find_start($grid) {
+    for my $r (0..len(@$grid) - 1) {
+        for my $c (0..len(@{$grid->[$r]}) - 1) {
+            return [$r, $c] if $grid->[$r][$c] == 1
+        }
+    }
+    undef
+}
+
+fn Rosetta::Hidato::count_fillable($grid) {
+    my $c = 0
+    for my $row (@$grid) {
+        for my $cell (@$row) {
+            $c++ if $cell != -1
+        }
+    }
+    $c
+}
+
+fn Rosetta::Hidato::dfs($grid, $r, $c, $n, $target, $rows, $cols) {
+    return 1 if $n > $target
+    my @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
+    for my $d (@dirs) {
+        my $nr = $r + $d->[0]
+        my $nc = $c + $d->[1]
+        next if $nr < 0 || $nr >= $rows || $nc < 0 || $nc >= $cols
+        my $cell = $grid->[$nr][$nc]
+        next if $cell == -1
+        # If the cell already has the value we want, follow it.
+        if ($cell == $n) {
+            return 1 if Rosetta::Hidato::dfs($grid, $nr, $nc, $n + 1, $target, $rows, $cols)
+            next
+        }
+        # Empty (= 0) — try placing $n.
+        next if $cell != 0
+        $grid->[$nr][$nc] = $n
+        return 1 if Rosetta::Hidato::dfs($grid, $nr, $nc, $n + 1, $target, $rows, $cols)
+        $grid->[$nr][$nc] = 0
+    }
+    0
+}
+
+fn Rosetta::Hidato::solve($grid) {
+    my $rows = len(@$grid)
+    my $cols = len(@{$grid->[0]})
+    my $target = Rosetta::Hidato::count_fillable($grid)
+    my $start = Rosetta::Hidato::find_start($grid)
+    return undef unless defined $start
+    Rosetta::Hidato::dfs($grid, $start->[0], $start->[1], 2, $target, $rows, $cols) ?
+        $grid : undef
+}
+
+# Tiny 3×3 puzzle
+my $g = [
+    [1, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+]
+my $sol = Rosetta::Hidato::solve($g)
+assert_ok defined($sol), "3×3 puzzle solved"
+assert_eq $sol->[0][0], 1, "1 stays at origin"
+
+# Verify all 9 numbers used exactly once
+my %seen
+for my $row (@$sol) {
+    for my $v (@$row) { $seen{$v}++ }
+}
+for my $i (1..9) {
+    assert_eq $seen{$i}, 1, sprintf("number %d used once", $i)
+}
+
+# Adjacency property: each pair (k, k+1) is king-adjacent.
+my %pos
+for my $r (0..2) {
+    for my $c (0..2) { $pos{$sol->[$r][$c]} = [$r, $c] }
+}
+for my $k (1..8) {
+    my ($r1, $c1) = @{$pos{$k}}
+    my ($r2, $c2) = @{$pos{$k + 1}}
+    assert_ok abs($r1 - $r2) <= 1 && abs($c1 - $c2) <= 1,
+        sprintf("%d-%d king-adjacent", $k, $k + 1)
+}
+
+# Puzzle with blocked cell
+my $g2 = [
+    [1, 0, 0],
+    [0,-1, 0],
+    [0, 0, 0],
+]
+my $sol2 = Rosetta::Hidato::solve($g2)
+assert_ok defined($sol2), "puzzle with blocked cell solved"
+assert_eq $sol2->[1][1], -1, "blocked cell preserved"
+
+# Pipe form
+my $g3 = [
+    [1, 0],
+    [0, 0],
+]
+$g3 |> Rosetta::Hidato::solve |> fn { defined $_ ? 1 : 0 } |> assert_eq(1, "pipe 2×2 solved")
+
+test_run

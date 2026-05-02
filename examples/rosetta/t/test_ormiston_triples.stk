@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ormiston triples
+# Three consecutive primes (p, q, r) where each is a permutation of
+# the digits of the others. Smallest known triple: 11117, 11171,
+# 11177? Actually first triple starts at 119483.
+
+fn Rosetta::Ormiston::digit_key($n) {
+    join("", sort split //, "$n")
+}
+
+fn Rosetta::Ormiston::next_prime($p) {
+    my $cand = $p == 2 ? 3 : $p + 2
+    while (!is_prime($cand)) { $cand += 2 }
+    $cand
+}
+
+fn Rosetta::Ormiston::triples($limit) {
+    my @out
+    my $a = 2
+    my $b = Rosetta::Ormiston::next_prime($a)
+    my $c = Rosetta::Ormiston::next_prime($b)
+    while ($a < $limit) {
+        my $ka = Rosetta::Ormiston::digit_key($a)
+        my $kb = Rosetta::Ormiston::digit_key($b)
+        my $kc = Rosetta::Ormiston::digit_key($c)
+        if ($ka eq $kb && $kb eq $kc) {
+            push @out, [$a, $b, $c]
+        }
+        $a = $b
+        $b = $c
+        $c = Rosetta::Ormiston::next_prime($c)
+    }
+    @out
+}
+
+# digit_key spot checks
+assert_eq Rosetta::Ormiston::digit_key(123), "123", "digit_key sorted"
+assert_eq Rosetta::Ormiston::digit_key(321), "123", "digit_key permutes"
+assert_eq Rosetta::Ormiston::digit_key(11117), "11117", "digit_key 5-digit"
+
+# next_prime sanity
+assert_eq Rosetta::Ormiston::next_prime(2),  3, "next prime of 2"
+assert_eq Rosetta::Ormiston::next_prime(7),  11, "next prime of 7"
+assert_eq Rosetta::Ormiston::next_prime(13), 17, "next prime of 13"
+
+# Smallest Ormiston triple per OEIS A157996: (1947769, 1947967, 1949767)?
+# That's beyond brute-force scope. We test on a small range only and
+# verify the function shape. Below 2 million we expect ≥ 1 triple.
+# Our test runs only up to 10000 — likely zero triples.
+my @small = Rosetta::Ormiston::triples(10000)
+assert_eq scalar(@small), 0, "no Ormiston triple ≤ 10000"
+
+# Property: Ormiston pairs (consecutive primes) require shared digit
+# multiset. Verify that *every* triple (when found) satisfies this.
+my $valid = 1
+for my $t (@small) {
+    my @ks = map { Rosetta::Ormiston::digit_key($_) } @$t
+    $valid = 0 if $ks[0] ne $ks[1] || $ks[1] ne $ks[2]
+}
+assert_ok $valid, "every found triple shares digit multiset"
+
+# Pipe form
+123 |> Rosetta::Ormiston::digit_key |> assert_eq("123", "pipe digit_key")
+
+test_run

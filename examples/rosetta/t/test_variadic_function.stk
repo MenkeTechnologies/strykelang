@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Variadic function
+# A function that accepts any number of arguments. In stryke, the
+# slurpy `@args` parameter captures the remaining positional values.
+
+fn Rosetta::Variadic::echo(@args) {
+    @args
+}
+
+fn Rosetta::Variadic::sum(@args) {
+    my $s = 0
+    for my $x (@args) { $s += $x }
+    $s
+}
+
+fn Rosetta::Variadic::max(@args) {
+    return undef if len(@args) == 0
+    my $m = $args[0]
+    for my $i (1..len(@args) - 1) {
+        $m = $args[$i] if $args[$i] > $m
+    }
+    $m
+}
+
+fn Rosetta::Variadic::with_label($label, @vals) {
+    "$label: " . join(",", @vals)
+}
+
+# echo
+assert_eq join(",", Rosetta::Variadic::echo()),         "",      "echo()"
+assert_eq join(",", Rosetta::Variadic::echo(1)),        "1",     "echo(1)"
+assert_eq join(",", Rosetta::Variadic::echo(1, 2, 3)),  "1,2,3", "echo(1,2,3)"
+
+# sum
+assert_eq Rosetta::Variadic::sum(),            0,  "sum()"
+assert_eq Rosetta::Variadic::sum(1, 2, 3),     6,  "sum(1,2,3)"
+assert_eq Rosetta::Variadic::sum(10, -5, 100), 105,"mixed signs"
+
+# max
+assert_eq Rosetta::Variadic::max(5),         5,  "single"
+assert_eq Rosetta::Variadic::max(3, 9, 1),   9,  "max(3,9,1)"
+assert_eq Rosetta::Variadic::max(-5, -10, -1), -1, "all negative"
+assert_ok !defined(Rosetta::Variadic::max()),     "empty → undef"
+
+# Mixed fixed + slurpy
+assert_eq Rosetta::Variadic::with_label("scores", 85, 92, 78), "scores: 85,92,78", "label + values"
+assert_eq Rosetta::Variadic::with_label("empty"), "empty: ",                       "label only"
+
+# Pipe form passing list through
+my @nums = (1, 2, 3, 4, 5)
+@nums |> Rosetta::Variadic::sum |> assert_eq(15, "pipe sum")
+
+# Spread an array into the function
+my @vs = (-3, -1, 7, 2)
+assert_eq Rosetta::Variadic::max(@vs), 7, "max from array spread"
+
+test_run

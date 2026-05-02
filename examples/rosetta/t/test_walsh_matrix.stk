@@ -1,0 +1,89 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Walsh matrix
+# Hadamard-Walsh matrix of order 2^n: H(0) = [[1]],
+# H(n) = [[H(n-1), H(n-1)], [H(n-1), -H(n-1)]] (Sylvester construction).
+
+fn Rosetta::Walsh::build($n) {
+    my @m = ([1])
+    for my $i (~> 1:$n) {
+        my $size = len(@m)
+        my @new
+        for my $r (0..$size - 1) {
+            my @top = (@{$m[$r]}, @{$m[$r]})
+            push @new, \@top
+        }
+        for my $r (0..$size - 1) {
+            my @bot = (@{$m[$r]}, map { -$_ } @{$m[$r]})
+            push @new, \@bot
+        }
+        @m = @new
+    }
+    \@m
+}
+
+fn Rosetta::Walsh::is_hadamard($m) {
+    my $n = len(@$m)
+    for my $i (0..$n - 1) {
+        for my $j ($i + 1..$n - 1) {
+            my $dot = 0
+            for my $k (0..$n - 1) {
+                $dot += $m->[$i][$k] * $m->[$j][$k]
+            }
+            return 0 if $dot != 0
+        }
+    }
+    1
+}
+
+# Order 2^0 = 1
+my $h0 = Rosetta::Walsh::build(0)
+assert_eq len(@$h0), 1, "size 1"
+assert_eq $h0->[0][0], 1, "H(0) = [[1]]"
+
+# Order 2^1 = 2
+my $h1 = Rosetta::Walsh::build(1)
+assert_eq len(@$h1), 2, "size 2"
+assert_eq $h1->[0][0],  1, "H(1)[0][0] = 1"
+assert_eq $h1->[0][1],  1, "H(1)[0][1] = 1"
+assert_eq $h1->[1][0],  1, "H(1)[1][0] = 1"
+assert_eq $h1->[1][1], -1, "H(1)[1][1] = -1"
+
+# Order 2^2 = 4
+my $h2 = Rosetta::Walsh::build(2)
+assert_eq len(@$h2), 4, "size 4"
+
+# Sylvester block structure
+assert_eq $h2->[0][0],  1, "h2[0,0]"
+assert_eq $h2->[0][3],  1, "h2[0,3]"
+assert_eq $h2->[1][1], -1, "h2[1,1]"
+assert_eq $h2->[2][2], -1, "h2[2,2]"
+assert_eq $h2->[3][3],  1, "h2[3,3]"
+
+# Hadamard property: rows orthogonal
+assert_eq Rosetta::Walsh::is_hadamard($h2), 1, "H(2) orthogonal"
+my $h3 = Rosetta::Walsh::build(3)
+assert_eq Rosetta::Walsh::is_hadamard($h3), 1, "H(3) orthogonal"
+my $h4 = Rosetta::Walsh::build(4)
+assert_eq Rosetta::Walsh::is_hadamard($h4), 1, "H(4) orthogonal"
+
+# Every entry is ±1
+my $all_pm1 = 1
+for my $row (@$h4) {
+    for my $v (@$row) {
+        $all_pm1 = 0 if abs($v) != 1
+    }
+}
+assert_ok $all_pm1, "H(4) entries are ±1"
+
+# Sum of any non-first row is 0
+for my $i (1..len(@$h4) - 1) {
+    my $s = 0
+    for my $v (@{$h4->[$i]}) { $s += $v }
+    assert_eq $s, 0, sprintf("row %d sum = 0", $i)
+}
+
+# Pipe form
+my $piped = 3 |> Rosetta::Walsh::build
+assert_eq len(@$piped), 8, "pipe size 2^3 = 8"
+
+test_run

@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: S-expressions
+# Tokenise → parse → render Lisp-style s-expressions. Support nested
+# parentheses, integers, floats, quoted strings, and bare symbols.
+
+fn Rosetta::SExpr::tokenize($s) {
+    my @tokens
+    my $i = 0
+    my $n = length($s)
+    while ($i < $n) {
+        my $c = substr($s, $i, 1)
+        if ($c =~ /\s/) { $i++; next }
+        if ($c eq "(" || $c eq ")") {
+            push @tokens, $c
+            $i++
+            next
+        }
+        if ($c eq '"') {
+            my $j = $i + 1
+            while ($j < $n && substr($s, $j, 1) ne '"') { $j++ }
+            push @tokens, substr($s, $i, $j - $i + 1)
+            $i = $j + 1
+            next
+        }
+        # Atom
+        my $j = $i
+        while ($j < $n) {
+            my $cc = substr($s, $j, 1)
+            last if $cc =~ /\s/ || $cc eq "(" || $cc eq ")"
+            $j++
+        }
+        push @tokens, substr($s, $i, $j - $i)
+        $i = $j
+    }
+    \@tokens
+}
+
+fn Rosetta::SExpr::parse_tokens($tokens, $pos) {
+    return [undef, $pos] if $pos >= len(@$tokens)
+    my $t = $tokens->[$pos]
+    if ($t eq "(") {
+        my @items
+        $pos++
+        while ($pos < len(@$tokens) && $tokens->[$pos] ne ")") {
+            my $r = Rosetta::SExpr::parse_tokens($tokens, $pos)
+            push @items, $r->[0]
+            $pos = $r->[1]
+        }
+        return [\@items, $pos + 1]
+    }
+    [Rosetta::SExpr::coerce($t), $pos + 1]
+}
+
+fn Rosetta::SExpr::coerce($t) {
+    return { type => "string", value => substr($t, 1, length($t) - 2) }
+        if substr($t, 0, 1) eq '"'
+    return { type => "int",    value => $t + 0 }    if $t =~ /^-?\d+$/
+    return { type => "float",  value => $t + 0 }    if $t =~ /^-?\d+\.\d+$/
+    { type => "symbol", value => $t }
+}
+
+fn Rosetta::SExpr::parse($s) {
+    my $tokens = Rosetta::SExpr::tokenize($s)
+    Rosetta::SExpr::parse_tokens($tokens, 0)->[0]
+}
+
+fn Rosetta::SExpr::render($node) {
+    return "(" . join(" ", map { Rosetta::SExpr::render($_) } @$node) . ")"
+        if ref($node) eq "ARRAY"
+    if (ref($node) eq "HASH") {
+        return '"' . $node->{value} . '"' if $node->{type} eq "string"
+        return $node->{value}
+    }
+    "$node"
+}
+
+# Tokeniser
+my $tk = Rosetta::SExpr::tokenize("(foo 1 2 3)")
+assert_eq join("|", @$tk), "(|foo|1|2|3|)", "tokenise basic"
+
+my $tk2 = Rosetta::SExpr::tokenize("(a (b c) d)")
+assert_eq join("|", @$tk2), "(|a|(|b|c|)|d|)", "tokenise nested"
+
+my $tk3 = Rosetta::SExpr::tokenize('(say "hello world")')
+assert_eq join("|", @$tk3), '(|say|"hello world"|)', "tokenise string"
+
+# Parse + structure
+my $p = Rosetta::SExpr::parse("(add 1 2)")
+assert_eq ref($p), "ARRAY", "list parsed"
+assert_eq scalar(@$p), 3, "3 items"
+assert_eq $p->[0]{type},  "symbol", "first is symbol"
+assert_eq $p->[0]{value}, "add",    "symbol = add"
+assert_eq $p->[1]{type},  "int",    "1 is int"
+assert_eq $p->[1]{value}, 1,        "1 = 1"
+
+# Nested
+my $p2 = Rosetta::SExpr::parse("(if (= x 0) 1 (* x 2))")
+assert_eq ref($p2->[1]), "ARRAY", "nested call"
+assert_eq $p2->[1][0]{value}, "=",  "operator ="
+
+# Float
+my $p3 = Rosetta::SExpr::parse("(value 3.14)")
+assert_eq $p3->[1]{type},  "float", "3.14 is float"
+assert_near $p3->[1]{value}, 3.14, 1e-9, "float value"
+
+# Round-trip
+my $rt = Rosetta::SExpr::render(Rosetta::SExpr::parse("(a (b c) d)"))
+assert_eq $rt, "(a (b c) d)", "round-trip"
+
+# Pipe form
+"(+ 1 2)" |> Rosetta::SExpr::parse |> fn { $_->[0]{value} } |> assert_eq("+", "pipe operator")
+
+test_run

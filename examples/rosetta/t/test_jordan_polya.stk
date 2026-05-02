@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jordan-Pólya numbers (OEIS A001013)
+# Products of factorials. 1 = empty product, 2 = 2!, 6 = 3!, 24 = 4!,
+# 4 = 2!·2!, 12 = 2!·3!, … the sequence begins
+# 1, 2, 4, 6, 8, 12, 16, 24, 32, 36, 48, 64, 72, 96, 120, 128, …
+
+fn Rosetta::JordanPolya::factorial($n) {
+    my $r = 1
+    for my $i (~> 2:$n) { $r *= $i }
+    $r
+}
+
+fn Rosetta::JordanPolya::sequence_up_to($limit) {
+    # Generate factorials ≥ 2 whose values are ≤ $limit, then close
+    # the multiplicative semigroup under multiplication staying ≤ limit.
+    my @facs
+    my $k = 2
+    while (1) {
+        my $f = Rosetta::JordanPolya::factorial($k)
+        last if $f > $limit
+        push @facs, $f
+        $k++
+    }
+    my %set
+    $set{1} = 1
+    my @frontier = (1)
+    while (len(@frontier) > 0) {
+        my @next
+        for my $v (@frontier) {
+            for my $f (@facs) {
+                my $p = $v * $f
+                next if $p > $limit
+                if (!exists $set{$p}) {
+                    $set{$p} = 1
+                    push @next, $p
+                }
+            }
+        }
+        @frontier = @next
+    }
+    my @sorted = sort { $a <=> $b } keys %set
+    @sorted
+}
+
+# Sanity on factorial helper
+assert_eq Rosetta::JordanPolya::factorial(0),  1,    "0! = 1"
+assert_eq Rosetta::JordanPolya::factorial(5),  120,  "5! = 120"
+assert_eq Rosetta::JordanPolya::factorial(7),  5040, "7! = 5040"
+
+# First chunk of the sequence
+my @s = Rosetta::JordanPolya::sequence_up_to(150)
+assert_eq join(",", @s), "1,2,4,6,8,12,16,24,32,36,48,64,72,96,120,128,144", "JP up to 150"
+
+# Membership tests
+my @big = Rosetta::JordanPolya::sequence_up_to(10000)
+my %is_jp = map { $_ => 1 } @big
+assert_eq exists($is_jp{720}),  1, "720 = 6! is JP"
+assert_eq exists($is_jp{1440}), 1, "1440 = 2!·6! is JP"
+assert_eq exists($is_jp{5040}), 1, "5040 = 7! is JP"
+# 5 is not a JP number
+assert_eq exists($is_jp{5}),  0, "5 is not JP"
+assert_eq exists($is_jp{18}), 0, "18 is not JP"
+
+# Pipe form — count JP numbers ≤ 1000 (matches OEIS A001013 / Rosetta task tally)
+1000 |> Rosetta::JordanPolya::sequence_up_to |> len |> assert_eq(31, "JP numbers ≤ 1000")
+
+test_run

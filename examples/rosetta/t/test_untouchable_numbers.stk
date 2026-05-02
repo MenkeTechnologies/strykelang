@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Untouchable numbers (OEIS A005114)
+# A positive integer n is "untouchable" if it cannot be expressed as
+# the sum of proper divisors of any positive integer.
+# First few: 2, 5, 52, 88, 96, 120, 124, 146, 162, 188, 206, …
+# (1 is excluded by convention because aliquot sums skip it.)
+
+fn Rosetta::Untouchable::aliquot($n) {
+    return 0 if $n < 2
+    my $s = 1  # 1 is always a proper divisor
+    my $i = 2
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $s += $i
+            $s += int($n / $i) if $i != int($n / $i)
+        }
+        $i++
+    }
+    $s
+}
+
+fn Rosetta::Untouchable::is_set($limit) {
+    my %touched
+    for my $k (1..$limit + 200) {
+        my $a = Rosetta::Untouchable::aliquot($k)
+        $touched{$a} = 1 if $a >= 1 && $a <= $limit
+    }
+    \%touched
+}
+
+fn Rosetta::Untouchable::list_below($limit) {
+    my $touched = Rosetta::Untouchable::is_set($limit * 200)
+    2:$limit |> grep { !exists $touched->{$_} }
+}
+
+# Aliquot sanity
+assert_eq Rosetta::Untouchable::aliquot(6),  6,  "aliquot(6) = 6 (perfect)"
+assert_eq Rosetta::Untouchable::aliquot(12), 16, "aliquot(12) = 16"
+assert_eq Rosetta::Untouchable::aliquot(28), 28, "aliquot(28) = 28"
+
+# First small untouchables (skipping 1 by convention)
+my @ut = Rosetta::Untouchable::list_below(250)
+assert_eq join(",", @ut), "2,5,52,88,96,120,124,146,162,188,206,210,216,228,238,246,248", "untouchables ≤ 250"
+
+# Specific membership
+my %h = map { $_ => 1 } @ut
+assert_eq exists($h{52}),  1, "52 untouchable"
+assert_eq exists($h{120}), 1, "120 untouchable"
+assert_eq exists($h{6}),   0, "6 not untouchable (aliquot(6) = 6)"
+assert_eq exists($h{12}),  0, "12 not untouchable"
+
+# Pipe form
+120 |> fn {
+    my $t = Rosetta::Untouchable::is_set(200)
+    !exists $t->{$_}
+} |> assert_eq(1, "pipe is_untouchable(120)")
+
+test_run

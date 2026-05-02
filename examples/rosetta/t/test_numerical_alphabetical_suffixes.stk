@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numerical and alphabetical suffixes
+# Parse a string like "12K", "3.5M", "100.5 GiB", "1024B" into a
+# canonical numeric value using the standard SI / IEC suffix maps.
+
+fn Rosetta::SiSuffix::si_factor($suffix) {
+    my %m = (
+        ""  => 1,
+        "K" => 1e3,  "M" => 1e6,  "G" => 1e9,
+        "T" => 1e12, "P" => 1e15, "E" => 1e18,
+    )
+    exists $m{uc($suffix)} ? $m{uc($suffix)} : undef
+}
+
+fn Rosetta::SiSuffix::iec_factor($suffix) {
+    my %m = (
+        ""    => 1,
+        "Ki"  => 1024,
+        "Mi"  => 1024 ** 2,
+        "Gi"  => 1024 ** 3,
+        "Ti"  => 1024 ** 4,
+        "Pi"  => 1024 ** 5,
+    )
+    exists $m{$suffix} ? $m{$suffix} : undef
+}
+
+fn Rosetta::SiSuffix::parse($s) {
+    return undef unless $s =~ /^\s*(-?\d+(?:\.\d+)?)\s*([KMGTPEkmgtpe]?i?)\s*([Bb]?)\s*$/
+    my $val = $1 + 0
+    my $prefix = $2
+    my $unit = $3
+    my $factor
+    if (length($prefix) >= 2 && substr($prefix, -1) eq "i") {
+        my $key = uc(substr($prefix, 0, 1)) . "i"
+        $factor = Rosetta::SiSuffix::iec_factor($key)
+    } else {
+        $factor = Rosetta::SiSuffix::si_factor($prefix)
+    }
+    return undef unless defined $factor
+    $val * $factor
+}
+
+# Bare numbers
+assert_eq Rosetta::SiSuffix::parse("42"),     42,    "no suffix"
+assert_eq Rosetta::SiSuffix::parse("3.14"),   3.14,  "decimal no suffix"
+assert_eq Rosetta::SiSuffix::parse("-100"),  -100,   "negative"
+
+# SI suffixes
+assert_eq Rosetta::SiSuffix::parse("10K"),   10000,    "10 K"
+assert_eq Rosetta::SiSuffix::parse("3.5M"),  3500000,  "3.5 M"
+assert_eq Rosetta::SiSuffix::parse("1G"),    1e9,      "1 G"
+assert_eq Rosetta::SiSuffix::parse("2T"),    2e12,     "2 T"
+
+# IEC suffixes
+assert_eq Rosetta::SiSuffix::parse("1Ki"),   1024,     "1 Ki"
+assert_eq Rosetta::SiSuffix::parse("1Mi"),   1048576,  "1 Mi"
+assert_eq Rosetta::SiSuffix::parse("2Gi"),   2 * 1024 ** 3, "2 Gi"
+
+# With B unit (passed through; just dropped here)
+assert_eq Rosetta::SiSuffix::parse("100B"),  100,      "100 B"
+assert_eq Rosetta::SiSuffix::parse("1KiB"),  1024,     "1 KiB"
+
+# Whitespace tolerated
+assert_eq Rosetta::SiSuffix::parse(" 5K "),  5000,     "padded"
+
+# Invalid
+assert_ok !defined(Rosetta::SiSuffix::parse("abc")),  "non-numeric rejected"
+assert_ok !defined(Rosetta::SiSuffix::parse("3X")),   "unknown suffix rejected"
+
+# Pipe form
+"3.5M" |> Rosetta::SiSuffix::parse |> assert_eq(3500000, "pipe 3.5M")
+
+test_run

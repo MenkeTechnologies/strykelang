@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Same fringe
+# Two binary trees have the same fringe iff their leaf sequences,
+# read in left-to-right order, are identical regardless of internal
+# structure.
+
+fn Rosetta::Fringe::leaves($tree) {
+    return [] unless defined $tree
+    return [$tree] unless ref($tree) eq "ARRAY"
+    my @out
+    for my $sub (@$tree) {
+        push @out, @{Rosetta::Fringe::leaves($sub)}
+    }
+    \@out
+}
+
+fn Rosetta::Fringe::same($a, $b) {
+    my $la = Rosetta::Fringe::leaves($a)
+    my $lb = Rosetta::Fringe::leaves($b)
+    return 0 if len(@$la) != len(@$lb)
+    for my $i (0..len(@$la) - 1) {
+        return 0 if $la->[$i] ne $lb->[$i]
+    }
+    1
+}
+
+# Two structurally different trees with the same fringe
+my $left  = ["a", ["b", ["c", "d"]]]
+my $right = [[["a", "b"], "c"], "d"]
+assert_eq join(",", @{Rosetta::Fringe::leaves($left)}),  "a,b,c,d", "left fringe"
+assert_eq join(",", @{Rosetta::Fringe::leaves($right)}), "a,b,c,d", "right fringe"
+assert_eq Rosetta::Fringe::same($left, $right), 1, "same fringe across structures"
+
+# Different fringes
+my $other = ["a", ["c", ["b", "d"]]]
+assert_eq Rosetta::Fringe::same($left, $other), 0, "swapped leaves → different"
+
+# Single-leaf cases
+assert_eq Rosetta::Fringe::same("x", "x"), 1, "leaf vs leaf same"
+assert_eq Rosetta::Fringe::same("x", "y"), 0, "leaf vs leaf different"
+assert_eq Rosetta::Fringe::same(["x"], "x"), 1, "trivial wrapping ignored"
+
+# Different sizes
+assert_eq Rosetta::Fringe::same(["a","b","c"], ["a","b"]), 0, "size mismatch"
+
+# Pipe form: equality through pipeline
+$left |> fn { Rosetta::Fringe::same(_, $right) } |> assert_eq(1, "pipe same(left, right)")
+
+# Highly unbalanced equivalents
+my $skinny_l = ["a", ["b", ["c", ["d", "e"]]]]
+my $skinny_r = [[[["a", "b"], "c"], "d"], "e"]
+assert_eq Rosetta::Fringe::same($skinny_l, $skinny_r), 1, "left-skewed = right-skewed"
+
+test_run

@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Stem-and-leaf plot
+# Group integers by floor(x/10) (stem); the unit digit is the leaf.
+# Leaves within each stem are sorted ascending.
+
+fn Rosetta::StemLeaf::build($values) {
+    my %g
+    for my $v (@$values) {
+        my $stem = int($v / 10)
+        push @{$g{$stem}}, $v % 10
+    }
+    for my $s (keys %g) {
+        my @sorted = sort { $a <=> $b } @{$g{$s}}
+        $g{$s} = \@sorted
+    }
+    \%g
+}
+
+fn Rosetta::StemLeaf::render($values) {
+    my $g = Rosetta::StemLeaf::build($values)
+    my @stems = sort { $a <=> $b } keys %$g
+    my @lines
+    for my $s (@stems) {
+        push @lines, sprintf("%2d | %s", $s, join(" ", @{$g->{$s}}))
+    }
+    join("\n", @lines)
+}
+
+# Rosetta canonical sample
+my @data = (12, 127, 28, 42, 39, 113, 42, 18, 44, 118, 44, 37, 113, 124,
+            37, 48, 127, 36, 29, 31, 125, 139, 131, 115, 105, 132, 104,
+            123, 35, 113, 122, 42, 117, 119, 58, 109, 23, 105, 63, 27,
+            44, 105, 99, 41, 128, 121, 116, 125, 32, 61, 37, 127, 29,
+            113, 121, 58, 114, 126, 53, 114, 96, 25, 109, 7, 31, 141,
+            46, 13, 27, 43, 117, 116, 27, 7, 68, 40, 31, 115, 124, 42,
+            128, 52, 71, 118, 117, 38, 27, 106, 33, 117, 116, 111, 40,
+            119, 47, 105, 57, 122, 109, 124, 115, 43, 120, 43, 27, 27,
+            18, 28, 48, 125, 107, 114, 34, 133, 45, 120, 30, 127, 31,
+            116, 146)
+
+my $g = Rosetta::StemLeaf::build(\@data)
+
+# Stem 0 holds 7, 7
+assert_eq join(",", @{$g->{0}}), "7,7", "stem 0 → 07, 07"
+
+# Stem 14 holds 141, 146 → leaves 1, 6
+assert_eq join(",", @{$g->{14}}), "1,6", "stem 14 → 1, 6"
+
+# Render contains every stem present in the dataset
+my $out = Rosetta::StemLeaf::render(\@data)
+for my $s (sort { $a <=> $b } keys %$g) {
+    my $tag = sprintf("%2d |", $s)
+    assert_ok index($out, $tag) >= 0, sprintf("render contains stem %d", $s)
+}
+
+# Counts add up
+my $total = 0
+for my $s (keys %$g) { $total += len(@{$g->{$s}}) }
+assert_eq $total, scalar(@data), "no values lost"
+
+# Leaves within each stem are sorted
+my $sorted_ok = 1
+for my $s (keys %$g) {
+    my @leaves = @{$g->{$s}}
+    for my $i (0..len(@leaves) - 2) {
+        $sorted_ok = 0 if $leaves[$i] > $leaves[$i + 1]
+    }
+}
+assert_ok $sorted_ok, "leaves sorted within each stem"
+
+# Direct small dataset
+my $g2 = Rosetta::StemLeaf::build([5, 12, 22, 19, 7])
+assert_eq join(",", @{$g2->{0}}), "5,7", "small set stem 0"
+assert_eq join(",", @{$g2->{1}}), "2,9", "small set stem 1"
+assert_eq join(",", @{$g2->{2}}), "2",   "small set stem 2"
+
+# Pipe form
+my $piped = [5, 12, 22, 19, 7] |> Rosetta::StemLeaf::build
+assert_eq join(",", @{$piped->{1}}), "2,9", "pipe stem 1"
+
+test_run

@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Optional parameters
+# Stryke supports defaulted positional parameters. We exercise the
+# default-fallback behaviour and override.
+
+fn Rosetta::OptParam::greet($name, $greeting) {
+    $greeting = "Hello" unless defined $greeting
+    "$greeting, $name!"
+}
+
+fn Rosetta::OptParam::format_dollar($amount, $currency, $places) {
+    $currency = "\$"  unless defined $currency
+    $places   = 2     unless defined $places
+    sprintf("%s%.${places}f", $currency, $amount)
+}
+
+fn Rosetta::OptParam::repeat($s, $n) {
+    $n = 1 unless defined $n
+    return "" if $n <= 0
+    $s x $n
+}
+
+# Default greeting
+assert_eq Rosetta::OptParam::greet("Alice"),         "Hello, Alice!", "default greeting"
+assert_eq Rosetta::OptParam::greet("Bob", "Hi"),     "Hi, Bob!",      "explicit greeting"
+
+# Currency formatter
+assert_eq Rosetta::OptParam::format_dollar(3.14159),                 "\$3.14",       "default \$ and 2 places"
+assert_eq Rosetta::OptParam::format_dollar(3.14159, "€"),            "€3.14",        "currency override"
+assert_eq Rosetta::OptParam::format_dollar(3.14159, "\$", 4),         "\$3.1416",     "places override"
+
+# Repeat
+assert_eq Rosetta::OptParam::repeat("ab"),       "ab",       "default n = 1"
+assert_eq Rosetta::OptParam::repeat("ab", 3),    "ababab",   "n = 3"
+assert_eq Rosetta::OptParam::repeat("ab", 0),    "",         "n = 0"
+assert_eq Rosetta::OptParam::repeat("ab", -2),   "",         "negative → empty"
+
+# Pipe form
+"World" |> Rosetta::OptParam::greet |> assert_eq("Hello, World!", "pipe greet default")
+
+test_run

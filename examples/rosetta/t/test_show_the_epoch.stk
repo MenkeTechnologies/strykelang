@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Show the epoch
+# Display the date corresponding to the time-zero of the system's
+# wall-clock. POSIX systems use 1970-01-01T00:00:00Z; the function
+# proves this by formatting time(0) and inspecting time().
+
+fn Rosetta::Epoch::stamp() {
+    # gmtime(0) yields the broken-down UTC time at the epoch.
+    my @t = gmtime(0)
+    sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",
+        $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0])
+}
+
+fn Rosetta::Epoch::seconds_since() {
+    time()
+}
+
+# POSIX epoch
+assert_eq Rosetta::Epoch::stamp(), "1970-01-01T00:00:00Z", "POSIX epoch"
+
+# time() advances monotonically
+my $t0 = Rosetta::Epoch::seconds_since()
+my $t1 = Rosetta::Epoch::seconds_since()
+assert_ok $t1 >= $t0, "time() does not run backwards"
+assert_ok $t0 > 1_700_000_000, "time() past 2023"
+
+# gmtime(0) round-trip
+my @t = gmtime(0)
+assert_eq $t[0], 0,   "second = 0"
+assert_eq $t[1], 0,   "minute = 0"
+assert_eq $t[2], 0,   "hour = 0"
+assert_eq $t[3], 1,   "day = 1"
+assert_eq $t[4], 0,   "month = 0 (Jan)"
+assert_eq $t[5] + 1900, 1970, "year = 1970"
+
+# Pipe form
+() |> fn { Rosetta::Epoch::stamp() } |> assert_eq("1970-01-01T00:00:00Z", "pipe stamp")
+
+test_run

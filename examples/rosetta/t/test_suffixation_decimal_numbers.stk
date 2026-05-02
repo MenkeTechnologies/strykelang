@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Suffixation of decimal numbers
+# Apply scaling suffixes to a decimal number. Supports binary (Ki, Mi, …)
+# and SI (K, M, G, …) families. Returns the scaled integer (or float).
+
+fn Rosetta::Suffixation::factor($suf) {
+    my %iec = (
+        Ki => 1024, Mi => 1024 ** 2, Gi => 1024 ** 3,
+        Ti => 1024 ** 4, Pi => 1024 ** 5, Ei => 1024 ** 6,
+    )
+    my %si = (
+        K => 1e3, M => 1e6, G => 1e9, T => 1e12, P => 1e15, E => 1e18,
+    )
+    return $iec{$suf} if exists $iec{$suf}
+    return $si{$suf}  if exists $si{$suf}
+    undef
+}
+
+fn Rosetta::Suffixation::apply($s) {
+    return undef unless $s =~ /^\s*(-?\d+(?:\.\d+)?)\s*([KMGTPE]i?)?\s*$/
+    my $val = $1 + 0
+    my $suf = $2
+    return $val if !defined $suf || length($suf) == 0
+    my $f = Rosetta::Suffixation::factor($suf)
+    return undef unless defined $f
+    $val * $f
+}
+
+# Bare numbers
+assert_eq Rosetta::Suffixation::apply("12"),        12,    "no suffix"
+assert_eq Rosetta::Suffixation::apply("3.14"),      3.14,  "decimal no suffix"
+assert_eq Rosetta::Suffixation::apply("-5"),       -5,     "negative"
+
+# SI
+assert_eq Rosetta::Suffixation::apply("12K"),    12000,    "12 K"
+assert_eq Rosetta::Suffixation::apply("4.5M"),   4500000,  "4.5 M"
+assert_eq Rosetta::Suffixation::apply("1G"),     1e9,      "1 G"
+assert_eq Rosetta::Suffixation::apply("2T"),     2e12,     "2 T"
+assert_eq Rosetta::Suffixation::apply("1P"),     1e15,     "1 P"
+
+# IEC
+assert_eq Rosetta::Suffixation::apply("12Ki"),   12 * 1024,        "12 Ki"
+assert_eq Rosetta::Suffixation::apply("1Mi"),    1024 ** 2,        "1 Mi"
+assert_eq Rosetta::Suffixation::apply("3Gi"),    3 * 1024 ** 3,    "3 Gi"
+
+# Whitespace tolerated
+assert_eq Rosetta::Suffixation::apply(" 5 K "),  5000, "padded SI"
+assert_eq Rosetta::Suffixation::apply(" 4.5 Ki"),4.5 * 1024, "padded IEC"
+
+# Negative with suffix
+assert_eq Rosetta::Suffixation::apply("-100K"), -100000, "negative SI"
+
+# Invalid
+assert_ok !defined(Rosetta::Suffixation::apply("xyz")),  "non-numeric"
+assert_ok !defined(Rosetta::Suffixation::apply("3X")),   "unknown suffix"
+
+# Pipe form
+"4.5M" |> Rosetta::Suffixation::apply |> assert_eq(4500000, "pipe 4.5M")
+
+test_run

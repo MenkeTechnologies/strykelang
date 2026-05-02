@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Read a configuration file
+# Parse a simple "key = value" config file. Lines beginning with `;`
+# or `#` are comments. Empty lines ignored. Booleans (true/false)
+# and numbers are auto-coerced.
+
+fn Rosetta::ConfigRead::trim($s) {
+    my $t = $s
+    $t =~ s/^\s+//
+    $t =~ s/\s+$//
+    $t
+}
+
+fn Rosetta::ConfigRead::coerce($v) {
+    return undef    if $v eq ""
+    return 1        if lc($v) eq "true"  || lc($v) eq "yes" || lc($v) eq "on"
+    return 0        if lc($v) eq "false" || lc($v) eq "no"  || lc($v) eq "off"
+    return $v + 0   if $v =~ /^-?\d+(?:\.\d+)?$/
+    $v
+}
+
+fn Rosetta::ConfigRead::parse($contents) {
+    my %cfg
+    for my $line (split /\n/, $contents) {
+        my $t = Rosetta::ConfigRead::trim($line)
+        next if length($t) == 0
+        next if substr($t, 0, 1) eq "#" || substr($t, 0, 1) eq ";"
+        my $eq = index($t, "=")
+        if ($eq < 0) {
+            # Bare key with no value: treat as "true"
+            $cfg{Rosetta::ConfigRead::trim($t)} = 1
+            next
+        }
+        my $key = Rosetta::ConfigRead::trim(substr($t, 0, $eq))
+        my $val = Rosetta::ConfigRead::trim(substr($t, $eq + 1))
+        $cfg{$key} = Rosetta::ConfigRead::coerce($val)
+    }
+    \%cfg
+}
+
+# Direct
+my $cfg = Rosetta::ConfigRead::parse(
+    "# This is a comment\n"
+  . "fullname = Foo Barber\n"
+  . "favouritefruit = banana\n"
+  . "needspeeling\n"
+  . "; comment line\n"
+  . "seedsremoved = false\n"
+  . "otherfamily = Rhu Barber, Harry Barber\n"
+  . "count = 42\n"
+  . "ratio = 3.14\n"
+)
+
+assert_eq $cfg->{fullname},       "Foo Barber",        "fullname"
+assert_eq $cfg->{favouritefruit}, "banana",            "favouritefruit"
+assert_eq $cfg->{needspeeling},   1,                   "bare key → true"
+assert_eq $cfg->{seedsremoved},   0,                   "false → 0"
+assert_eq $cfg->{otherfamily},    "Rhu Barber, Harry Barber", "comma value preserved"
+assert_eq $cfg->{count},          42,                  "integer coerced"
+assert_eq $cfg->{ratio},          3.14,                "float coerced"
+
+# Comments stripped
+assert_ok !exists($cfg->{"# This is a comment"}), "comments not stored"
+
+# coerce()
+assert_eq Rosetta::ConfigRead::coerce("true"),  1,    "true → 1"
+assert_eq Rosetta::ConfigRead::coerce("FALSE"), 0,    "FALSE → 0"
+assert_eq Rosetta::ConfigRead::coerce("42"),    42,   "42 → 42"
+assert_eq Rosetta::ConfigRead::coerce("hello"), "hello", "string passes through"
+
+# Empty / whitespace-only contents
+my $empty = Rosetta::ConfigRead::parse("")
+assert_eq scalar(keys %$empty), 0, "empty input → empty config"
+
+# Pipe form
+"a = 1\nb = 2" |> Rosetta::ConfigRead::parse |> fn { $_->{a} + $_->{b} } |> assert_eq(3, "pipe sum")
+
+test_run

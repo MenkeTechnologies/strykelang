@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Logical operations
+# Build the boolean algebra primitives (NOT, AND, OR, XOR, NAND, NOR,
+# IMPLIES, EQUIV) on truth values 0 / 1 and verify their truth tables.
+
+fn Rosetta::Logic::not_g($a)     { $a ? 0 : 1 }
+fn Rosetta::Logic::and_g($a, $b) { $a && $b ? 1 : 0 }
+fn Rosetta::Logic::or_g($a, $b)  { $a || $b ? 1 : 0 }
+fn Rosetta::Logic::xor_g($a, $b) { (Rosetta::Logic::and_g($a, Rosetta::Logic::not_g($b))
+                                || Rosetta::Logic::and_g(Rosetta::Logic::not_g($a), $b)) ? 1 : 0 }
+fn Rosetta::Logic::nand_g($a, $b){ Rosetta::Logic::not_g(Rosetta::Logic::and_g($a, $b)) }
+fn Rosetta::Logic::nor_g($a, $b) { Rosetta::Logic::not_g(Rosetta::Logic::or_g($a, $b)) }
+fn Rosetta::Logic::implies($a, $b) { Rosetta::Logic::or_g(Rosetta::Logic::not_g($a), $b) }
+fn Rosetta::Logic::equiv($a, $b)   { Rosetta::Logic::not_g(Rosetta::Logic::xor_g($a, $b)) }
+
+fn Rosetta::Logic::truth_table($f) {
+    my @rows
+    for my $a (0, 1) {
+        for my $b (0, 1) {
+            push @rows, sprintf("%d %d → %d", $a, $b, $f->($a, $b))
+        }
+    }
+    join("\n", @rows)
+}
+
+# Single-input
+assert_eq Rosetta::Logic::not_g(0), 1, "¬0 = 1"
+assert_eq Rosetta::Logic::not_g(1), 0, "¬1 = 0"
+
+# AND
+assert_eq Rosetta::Logic::and_g(0, 0), 0, "0∧0"
+assert_eq Rosetta::Logic::and_g(0, 1), 0, "0∧1"
+assert_eq Rosetta::Logic::and_g(1, 0), 0, "1∧0"
+assert_eq Rosetta::Logic::and_g(1, 1), 1, "1∧1"
+
+# OR
+assert_eq Rosetta::Logic::or_g(0, 0), 0, "0∨0"
+assert_eq Rosetta::Logic::or_g(0, 1), 1, "0∨1"
+assert_eq Rosetta::Logic::or_g(1, 0), 1, "1∨0"
+assert_eq Rosetta::Logic::or_g(1, 1), 1, "1∨1"
+
+# XOR
+assert_eq Rosetta::Logic::xor_g(0, 0), 0, "0⊕0"
+assert_eq Rosetta::Logic::xor_g(0, 1), 1, "0⊕1"
+assert_eq Rosetta::Logic::xor_g(1, 1), 0, "1⊕1"
+
+# NAND, NOR
+assert_eq Rosetta::Logic::nand_g(1, 1), 0, "1↑1 = 0"
+assert_eq Rosetta::Logic::nor_g(0, 0),  1, "0↓0 = 1"
+
+# IMPLIES, EQUIV
+assert_eq Rosetta::Logic::implies(1, 0), 0, "1 → 0 = 0"
+assert_eq Rosetta::Logic::implies(0, 1), 1, "0 → 1 = 1"
+assert_eq Rosetta::Logic::equiv(1, 1),   1, "1 ↔ 1 = 1"
+assert_eq Rosetta::Logic::equiv(1, 0),   0, "1 ↔ 0 = 0"
+
+# Truth tables match
+my $tt_and = Rosetta::Logic::truth_table(\&Rosetta::Logic::and_g)
+assert_eq $tt_and, "0 0 → 0\n0 1 → 0\n1 0 → 0\n1 1 → 1", "AND truth table"
+
+# De Morgan: ¬(a ∧ b) = ¬a ∨ ¬b for all a, b
+my $de_morgan = 1
+for my $a (0, 1) {
+    for my $b (0, 1) {
+        my $lhs = Rosetta::Logic::not_g(Rosetta::Logic::and_g($a, $b))
+        my $rhs = Rosetta::Logic::or_g(Rosetta::Logic::not_g($a), Rosetta::Logic::not_g($b))
+        $de_morgan = 0 if $lhs != $rhs
+    }
+}
+assert_ok $de_morgan, "De Morgan's law verified"
+
+# Pipe form
+1 |> fn { Rosetta::Logic::and_g(_, 1) } |> assert_eq(1, "pipe AND")
+
+test_run

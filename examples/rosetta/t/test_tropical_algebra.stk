@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tropical algebra (max-plus semiring)
+# Operations: ⊕ = max, ⊗ = +. The additive identity is -∞.
+# Build min/max/plus operators and verify a few classic identities.
+
+fn Rosetta::Tropical::add_tr($a, $b) {
+    return $a if defined $a && !defined $b
+    return $b if defined $b && !defined $a
+    return undef if !defined $a && !defined $b
+    $a > $b ? $a : $b
+}
+
+fn Rosetta::Tropical::mul_tr($a, $b) {
+    return undef if !defined $a || !defined $b
+    $a + $b
+}
+
+fn Rosetta::Tropical::pow_tr($a, $n) {
+    return undef if $n < 0
+    return 0 if $n == 0
+    $a * $n
+}
+
+fn Rosetta::Tropical::poly_eval($coeffs, $x) {
+    # Σ_i (coeffs[i] ⊗ x^i) under tropical = max_i (coeffs[i] + i·x)
+    my $best
+    for my $i (0..len(@$coeffs) - 1) {
+        next unless defined $coeffs->[$i]
+        my $v = $coeffs->[$i] + $i * $x
+        $best = $v if !defined $best || $v > $best
+    }
+    $best
+}
+
+# ⊕ = max
+assert_eq Rosetta::Tropical::add_tr(3, 5), 5,  "3 ⊕ 5 = 5"
+assert_eq Rosetta::Tropical::add_tr(7, 7), 7,  "idempotent"
+assert_eq Rosetta::Tropical::add_tr(-2, 0), 0, "max with negative"
+
+# Additive identity (treated as undef = -∞)
+assert_eq Rosetta::Tropical::add_tr(undef, 4), 4, "undef ⊕ 4 = 4"
+assert_eq Rosetta::Tropical::add_tr(4, undef), 4, "4 ⊕ undef = 4"
+
+# ⊗ = +
+assert_eq Rosetta::Tropical::mul_tr(3, 4), 7, "3 ⊗ 4 = 7"
+assert_eq Rosetta::Tropical::mul_tr(0, 5), 5, "0 ⊗ 5 = 5 (mult identity)"
+assert_eq Rosetta::Tropical::mul_tr(-2, 5), 3, "negative ⊗"
+
+# Distributivity: (a ⊕ b) ⊗ c = (a ⊗ c) ⊕ (b ⊗ c)
+my ($a, $b, $c) = (3, 5, 4)
+my $lhs = Rosetta::Tropical::mul_tr(Rosetta::Tropical::add_tr($a, $b), $c)
+my $rhs = Rosetta::Tropical::add_tr(
+    Rosetta::Tropical::mul_tr($a, $c),
+    Rosetta::Tropical::mul_tr($b, $c))
+assert_eq $lhs, $rhs, "distributivity holds"
+
+# Power: 5^3 in tropical = 5*3 = 15
+assert_eq Rosetta::Tropical::pow_tr(5, 3),  15, "5^3 = 15 (tropical)"
+assert_eq Rosetta::Tropical::pow_tr(0, 3),   0, "0^3 = 0"
+assert_eq Rosetta::Tropical::pow_tr(7, 0),   0, "x^0 = mult identity"
+
+# Polynomial evaluation: max-plus polynomial of degree 2.
+# coeffs = [1, 2, 3] → max(1, 2 + x, 3 + 2x)
+# At x = 0: max(1, 2, 3) = 3
+# At x = 5: max(1, 7, 13) = 13
+# At x = -10: max(1, -8, -17) = 1
+assert_eq Rosetta::Tropical::poly_eval([1, 2, 3], 0),  3,  "tropical poly at 0"
+assert_eq Rosetta::Tropical::poly_eval([1, 2, 3], 5),  13, "tropical poly at 5"
+assert_eq Rosetta::Tropical::poly_eval([1, 2, 3], -10), 1, "tropical poly at -10"
+
+# Pipe form
+3 |> fn { Rosetta::Tropical::mul_tr(_, 4) } |> assert_eq(7, "pipe 3 ⊗ 4")
+
+test_run

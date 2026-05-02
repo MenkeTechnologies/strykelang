@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: UTF-8 encode and decode
+# Encode a Unicode code point (integer) to UTF-8 byte sequence and
+# decode it back. Restricted to the Unicode range U+0000..U+10FFFF.
+
+fn Rosetta::Utf8::encode($cp) {
+    return undef if $cp < 0 || $cp > 0x10FFFF
+    if ($cp < 0x80) {
+        return [$cp]
+    } elsif ($cp < 0x800) {
+        return [0xC0 | ($cp >> 6), 0x80 | ($cp & 0x3F)]
+    } elsif ($cp < 0x10000) {
+        return [0xE0 | ($cp >> 12),
+                0x80 | (($cp >> 6) & 0x3F),
+                0x80 | ($cp & 0x3F)]
+    } else {
+        return [0xF0 | ($cp >> 18),
+                0x80 | (($cp >> 12) & 0x3F),
+                0x80 | (($cp >> 6) & 0x3F),
+                0x80 | ($cp & 0x3F)]
+    }
+}
+
+fn Rosetta::Utf8::decode($bytes) {
+    return undef if len(@$bytes) == 0
+    my $b0 = $bytes->[0]
+    if ($b0 < 0x80) {
+        return len(@$bytes) == 1 ? $b0 : undef
+    } elsif (($b0 & 0xE0) == 0xC0) {
+        return undef if len(@$bytes) != 2
+        return (($b0 & 0x1F) << 6) | ($bytes->[1] & 0x3F)
+    } elsif (($b0 & 0xF0) == 0xE0) {
+        return undef if len(@$bytes) != 3
+        return (($b0 & 0x0F) << 12)
+            | (($bytes->[1] & 0x3F) << 6)
+            | ($bytes->[2] & 0x3F)
+    } elsif (($b0 & 0xF8) == 0xF0) {
+        return undef if len(@$bytes) != 4
+        return (($b0 & 0x07) << 18)
+            | (($bytes->[1] & 0x3F) << 12)
+            | (($bytes->[2] & 0x3F) << 6)
+            | ($bytes->[3] & 0x3F)
+    }
+    undef
+}
+
+fn Rosetta::Utf8::format_hex($bytes) {
+    join(" ", map { sprintf("%02X", $_) } @$bytes)
+}
+
+# Encoding (rosetta canonical samples)
+my @samples = (
+    [0x0041,   "41",          "A"],
+    [0x00F6,   "C3 B6",       "ö"],
+    [0x0416,   "D0 96",       "Ж (Cyrillic Zhe)"],
+    [0x20AC,   "E2 82 AC",    "€ Euro sign"],
+    [0x1D11E,  "F0 9D 84 9E", "𝄞 Musical G clef"],
+)
+for my $s (@samples) {
+    my ($cp, $hex, $tag) = @$s
+    my $bs = Rosetta::Utf8::encode($cp)
+    assert_eq Rosetta::Utf8::format_hex($bs), $hex, sprintf("encode %s", $tag)
+    assert_eq Rosetta::Utf8::decode($bs), $cp, sprintf("decode %s round-trip", $tag)
+}
+
+# Boundary points
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x7F)),     "7F",          "U+7F"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x80)),     "C2 80",       "U+80"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x7FF)),    "DF BF",       "U+7FF"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x800)),    "E0 A0 80",    "U+800"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0xFFFF)),   "EF BF BF",    "U+FFFF"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x10000)),  "F0 90 80 80", "U+10000"
+assert_eq Rosetta::Utf8::format_hex(Rosetta::Utf8::encode(0x10FFFF)), "F4 8F BF BF", "U+10FFFF"
+
+# Out-of-range
+assert_ok !defined(Rosetta::Utf8::encode(-1)),       "negative rejected"
+assert_ok !defined(Rosetta::Utf8::encode(0x110000)), "above U+10FFFF rejected"
+
+# Pipe form
+0x20AC |> Rosetta::Utf8::encode |> Rosetta::Utf8::format_hex |> assert_eq("E2 82 AC", "pipe euro")
+
+test_run

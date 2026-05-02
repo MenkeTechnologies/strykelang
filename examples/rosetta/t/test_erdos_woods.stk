@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Erdős–Woods numbers (OEIS A059756)
+# A positive integer k is Erdős–Woods if there exists a positive
+# integer a such that, for every i in 1..k-1, the integer (a + i)
+# shares a non-trivial common factor with a or with (a + k).
+# Sequence begins 16, 22, 34, 36, 46, 56, 64, 66, 70, …
+
+fn Rosetta::ErdosWoods::gcd($x, $y) {
+    $x = abs($x); $y = abs($y)
+    while ($y != 0) { ($x, $y) = ($y, $x % $y) }
+    $x
+}
+
+fn Rosetta::ErdosWoods::valid_a($a, $k) {
+    for my $i (1..$k - 1) {
+        my $m = $a + $i
+        return 0 if Rosetta::ErdosWoods::gcd($m, $a) == 1
+                 && Rosetta::ErdosWoods::gcd($m, $a + $k) == 1
+    }
+    1
+}
+
+fn Rosetta::ErdosWoods::is($k, $a_max) {
+    return 0 if $k < 2
+    for my $a (2..$a_max) {
+        return 1 if Rosetta::ErdosWoods::valid_a($a, $k)
+    }
+    0
+}
+
+# gcd sanity
+assert_eq Rosetta::ErdosWoods::gcd(12, 18), 6, "gcd(12,18)"
+assert_eq Rosetta::ErdosWoods::gcd(7, 13),  1, "gcd(7,13)"
+
+# Smallest Erdős–Woods number: k = 16 with witness a = 2184.
+# Larger E–W numbers (22, 34, …) need very large witnesses
+# (OEIS A059757: 3521210 for k = 22) so brute-force is bounded
+# here by the smallest witness only.
+assert_eq Rosetta::ErdosWoods::is(16, 3000), 1, "16 is Erdős–Woods"
+
+# Small k below 16 are NOT Erdős–Woods (well covered by 2..2000)
+my @small = ~> 2:15 |> grep { Rosetta::ErdosWoods::is(_, 2000) }
+assert_eq len(@small), 0, "no Erdős–Woods k < 16"
+
+# Pipe form: scan and filter first 16 candidates
+my @found = ~> 2:16 |> grep { Rosetta::ErdosWoods::is(_, 3000) }
+assert_eq join(",", @found), "16", "only 16 falls in first window"
+
+# Pipe to predicate
+16 |> fn { Rosetta::ErdosWoods::is(_, 3000) } |> assert_eq(1, "pipe is(16)")
+
+# Witness for k = 16: a = 2184 (well-known small witness)
+assert_eq Rosetta::ErdosWoods::valid_a(2184, 16), 1, "2184 witnesses k = 16"
+
+# Non-witnesses for k = 16
+assert_eq Rosetta::ErdosWoods::valid_a(100, 16),  0, "100 does not witness k = 16"
+assert_eq Rosetta::ErdosWoods::valid_a(2183, 16), 0, "2183 does not witness k = 16"
+
+test_run

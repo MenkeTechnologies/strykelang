@@ -1,0 +1,94 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Update a configuration file
+# Parse / mutate / serialise the same INI-style configuration as
+# Read-a-configuration-file. Mutating operations preserve key order
+# and round-trip through serialise/parse.
+
+fn Rosetta::ConfigUpdate::trim($s) {
+    my $t = $s
+    $t =~ s/^\s+//
+    $t =~ s/\s+$//
+    $t
+}
+
+fn Rosetta::ConfigUpdate::parse($contents) {
+    my @order
+    my %cfg
+    for my $line (split /\n/, $contents) {
+        my $t = Rosetta::ConfigUpdate::trim($line)
+        next if length($t) == 0
+        next if substr($t, 0, 1) eq "#" || substr($t, 0, 1) eq ";"
+        my $eq = index($t, "=")
+        my ($key, $val)
+        if ($eq < 0) {
+            $key = $t; $val = "1"
+        } else {
+            $key = Rosetta::ConfigUpdate::trim(substr($t, 0, $eq))
+            $val = Rosetta::ConfigUpdate::trim(substr($t, $eq + 1))
+        }
+        if (!exists $cfg{$key}) { push @order, $key }
+        $cfg{$key} = $val
+    }
+    { order => \@order, values => \%cfg }
+}
+
+fn Rosetta::ConfigUpdate::set($cfg, $key, $val) {
+    if (!exists $cfg->{values}{$key}) { push @{$cfg->{order}}, $key }
+    $cfg->{values}{$key} = $val
+    $cfg
+}
+
+fn Rosetta::ConfigUpdate::delete_key($cfg, $key) {
+    return $cfg unless exists $cfg->{values}{$key}
+    delete $cfg->{values}{$key}
+    my @new_order
+    for my $k (@{$cfg->{order}}) { push @new_order, $k if $k ne $key }
+    $cfg->{order} = \@new_order
+    $cfg
+}
+
+fn Rosetta::ConfigUpdate::serialise($cfg) {
+    my @lines
+    for my $k (@{$cfg->{order}}) {
+        push @lines, "$k = $cfg->{values}{$k}"
+    }
+    join("\n", @lines)
+}
+
+# Parse → set → serialise round-trip
+my $cfg = Rosetta::ConfigUpdate::parse("a = 1\nb = 2\nc = 3")
+assert_eq join(",", @{$cfg->{order}}),  "a,b,c", "key order preserved"
+assert_eq $cfg->{values}{a}, "1", "a = 1"
+assert_eq $cfg->{values}{b}, "2", "b = 2"
+
+# Mutate b
+Rosetta::ConfigUpdate::set($cfg, "b", "20")
+assert_eq $cfg->{values}{b}, "20", "b updated"
+assert_eq join(",", @{$cfg->{order}}),  "a,b,c", "order unchanged after update"
+
+# Append d
+Rosetta::ConfigUpdate::set($cfg, "d", "4")
+assert_eq join(",", @{$cfg->{order}}),  "a,b,c,d", "d appended at end"
+
+# Delete b
+Rosetta::ConfigUpdate::delete_key($cfg, "b")
+assert_eq join(",", @{$cfg->{order}}),  "a,c,d", "b removed"
+assert_ok !exists($cfg->{values}{b}), "b deleted from values"
+
+# Idempotent delete
+Rosetta::ConfigUpdate::delete_key($cfg, "b")
+assert_eq join(",", @{$cfg->{order}}),  "a,c,d", "second delete is no-op"
+
+# Serialise
+my $out = Rosetta::ConfigUpdate::serialise($cfg)
+assert_eq $out, "a = 1\nc = 3\nd = 4", "serialise preserves order"
+
+# Round-trip
+my $cfg2 = Rosetta::ConfigUpdate::parse($out)
+assert_eq join(",", @{$cfg2->{order}}),  "a,c,d", "re-parsed order"
+assert_eq $cfg2->{values}{a}, "1", "re-parsed a"
+
+# Pipe form
+"x = 1" |> Rosetta::ConfigUpdate::parse |> fn { $_->{values}{x} } |> assert_eq("1", "pipe parse")
+
+test_run

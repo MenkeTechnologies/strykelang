@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Two's complement
+# Convert a signed integer to its `bits`-wide two's-complement bit
+# pattern (string of 0/1), and the inverse.
+
+fn Rosetta::TwosComp::to_bits($n, $bits) {
+    my $mask = (1 << $bits) - 1
+    my $u = $n & $mask
+    my $s = ""
+    for (my $i = $bits - 1; $i >= 0; $i--) {
+        $s .= (($u >> $i) & 1)
+    }
+    $s
+}
+
+fn Rosetta::TwosComp::from_bits($s) {
+    my $bits = length($s)
+    my $u = 0
+    for my $i (0..$bits - 1) {
+        my $c = substr($s, $i, 1)
+        $u = $u * 2 + ($c eq "1" ? 1 : 0)
+    }
+    # If sign bit set, subtract 2^bits
+    my $sign = 1 << ($bits - 1)
+    $u >= $sign ? $u - (1 << $bits) : $u
+}
+
+fn Rosetta::TwosComp::negate_bits($s) {
+    Rosetta::TwosComp::to_bits(-Rosetta::TwosComp::from_bits($s), length($s))
+}
+
+# Encoding
+assert_eq Rosetta::TwosComp::to_bits(1, 8),    "00000001", "+1 in 8-bit"
+assert_eq Rosetta::TwosComp::to_bits(-1, 8),   "11111111", "-1 in 8-bit"
+assert_eq Rosetta::TwosComp::to_bits(-128, 8), "10000000", "-128 in 8-bit"
+assert_eq Rosetta::TwosComp::to_bits(127, 8),  "01111111", "+127 in 8-bit"
+assert_eq Rosetta::TwosComp::to_bits(0, 8),    "00000000", "0 in 8-bit"
+
+# Decoding
+assert_eq Rosetta::TwosComp::from_bits("11111111"), -1,   "11111111 → -1"
+assert_eq Rosetta::TwosComp::from_bits("10000000"), -128, "10000000 → -128"
+assert_eq Rosetta::TwosComp::from_bits("01111111"), 127,  "01111111 → +127"
+assert_eq Rosetta::TwosComp::from_bits("00000000"), 0,    "00000000 → 0"
+
+# Round-trip on every 8-bit signed value
+my $rt_ok = 1
+for my $i (-128..127) {
+    my $back = Rosetta::TwosComp::from_bits(Rosetta::TwosComp::to_bits($i, 8))
+    $rt_ok = 0 if $back != $i
+}
+assert_ok $rt_ok, "8-bit round-trip preserves all 256 values"
+
+# Negation property: -(-n) = n for non-extreme n
+assert_eq Rosetta::TwosComp::negate_bits(Rosetta::TwosComp::negate_bits("00000111")),
+    "00000111", "double negate of +7"
+
+# Width matters: -1 is "1" in 1-bit, "11" in 2-bit, "1111" in 4-bit
+assert_eq Rosetta::TwosComp::to_bits(-1, 1), "1",    "-1 in 1-bit"
+assert_eq Rosetta::TwosComp::to_bits(-1, 4), "1111", "-1 in 4-bit"
+
+# Pipe form
+-42 |> fn { Rosetta::TwosComp::to_bits(_, 16) } |> assert_eq("1111111111010110", "pipe -42 in 16-bit")
+
+test_run

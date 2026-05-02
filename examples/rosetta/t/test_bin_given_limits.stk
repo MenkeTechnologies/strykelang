@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bin given limits
+# Distribute a stream of values into K+1 bins given K sorted bin
+# boundaries [t0, t1, …, t_{K-1}]. Bin i covers [t_{i-1}, t_i) with
+# the first bin (-∞, t0) and the last [t_{K-1}, ∞).
+
+fn Rosetta::Bin::index($v, $limits) {
+    for my $i (0..len(@$limits) - 1) {
+        return $i if $v < $limits->[$i]
+    }
+    len(@$limits)
+}
+
+fn Rosetta::Bin::counts($values, $limits) {
+    my @c = (0) x (len(@$limits) + 1)
+    for my $v (@$values) {
+        $c[Rosetta::Bin::index($v, $limits)]++
+    }
+    \@c
+}
+
+# Single boundary splits into two bins
+my $c1 = Rosetta::Bin::counts([1, 2, 3, 4, 5], [3])
+assert_eq join(",", @$c1), "2,3", "split at 3"
+
+# Three boundaries — four bins
+my $vals = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3]
+my $lim  = [23, 37, 43, 53, 67, 83]
+my $c2 = Rosetta::Bin::counts($vals, $lim)
+# All values < 23 → first bin
+assert_eq $c2->[0], 26, "all 26 values below 23"
+assert_eq $c2->[1], 0,  "no values in [23,37)"
+my $sum = 0
+for my $x (@$c2) { $sum += $x }
+assert_eq $sum, 26, "counts sum to input length"
+
+# Boundary semantics: [t_i-1, t_i) — value equal to a limit lands in upper bin
+my $c3 = Rosetta::Bin::counts([5, 10, 15, 20], [10, 20])
+assert_eq join(",", @$c3), "1,2,1", "5→bin0, 10,15→bin1, 20→bin2"
+
+# Empty input
+my $c4 = Rosetta::Bin::counts([], [10])
+assert_eq join(",", @$c4), "0,0", "empty input → all zero"
+
+# Pipe form
+[1, 2, 3, 4, 5] |> fn { Rosetta::Bin::counts(_, [3]) } |> fn { join(",", @$_) } |> assert_eq("2,3", "pipe split")
+
+# Index helper
+assert_eq Rosetta::Bin::index(7, [5, 10, 15]), 1, "7 in [5,10)"
+assert_eq Rosetta::Bin::index(20, [5, 10, 15]), 3, "20 ≥ all → last"
+assert_eq Rosetta::Bin::index(0, [5, 10, 15]), 0, "0 < 5 → first"
+
+test_run

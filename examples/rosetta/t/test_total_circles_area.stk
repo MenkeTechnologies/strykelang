@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Total circles area
+# Compute the area covered by the union of N possibly-overlapping
+# disks. Brute-force Monte-Carlo + adaptive bounding-box sampling.
+
+fn Rosetta::CirclesArea::bbox($circles) {
+    my $first = $circles->[0]
+    my $minx = $first->[0] - $first->[2]
+    my $maxx = $first->[0] + $first->[2]
+    my $miny = $first->[1] - $first->[2]
+    my $maxy = $first->[1] + $first->[2]
+    for my $c (@$circles) {
+        my $lx = $c->[0] - $c->[2]; my $hx = $c->[0] + $c->[2]
+        my $ly = $c->[1] - $c->[2]; my $hy = $c->[1] + $c->[2]
+        $minx = $lx if $lx < $minx
+        $miny = $ly if $ly < $miny
+        $maxx = $hx if $hx > $maxx
+        $maxy = $hy if $hy > $maxy
+    }
+    [$minx, $miny, $maxx, $maxy]
+}
+
+fn Rosetta::CirclesArea::point_in_any($circles, $x, $y) {
+    for my $c (@$circles) {
+        my $dx = $x - $c->[0]
+        my $dy = $y - $c->[1]
+        return 1 if $dx * $dx + $dy * $dy <= $c->[2] * $c->[2]
+    }
+    0
+}
+
+fn Rosetta::CirclesArea::estimate($circles, $samples) {
+    my $bb = Rosetta::CirclesArea::bbox($circles)
+    my $w = $bb->[2] - $bb->[0]
+    my $h = $bb->[3] - $bb->[1]
+    my $hits = 0
+    for my $i (~> 1:$samples) {
+        my $x = $bb->[0] + rand() * $w
+        my $y = $bb->[1] + rand() * $h
+        $hits++ if Rosetta::CirclesArea::point_in_any($circles, $x, $y)
+    }
+    ($hits / $samples) * $w * $h
+}
+
+# Single circle of radius 5 → area = π · 25 ≈ 78.54
+my $pi = 4 * atan2(1, 1)
+my $est1 = Rosetta::CirclesArea::estimate([[0, 0, 5]], 50000)
+assert_near $est1, $pi * 25, 1, "single-circle area ≈ π · 25"
+
+# Two disjoint unit circles → area = 2π
+my $est2 = Rosetta::CirclesArea::estimate([[0, 0, 1], [10, 10, 1]], 30000)
+assert_near $est2, 2 * $pi, 0.5, "two disjoint area ≈ 2π"
+
+# Two identical circles → area = π (just the one)
+my $est3 = Rosetta::CirclesArea::estimate([[0, 0, 1], [0, 0, 1]], 30000)
+assert_near $est3, $pi, 0.3, "duplicate circles area ≈ π"
+
+# Helper sanity
+assert_eq Rosetta::CirclesArea::point_in_any([[0, 0, 1]], 0, 0),    1, "(0,0) in unit circle"
+assert_eq Rosetta::CirclesArea::point_in_any([[0, 0, 1]], 1.5, 0),  0, "(1.5,0) outside"
+assert_eq Rosetta::CirclesArea::point_in_any([[0, 0, 1], [3, 0, 1]], 3, 0),
+    1, "(3,0) in second circle"
+
+# Bounding box of three circles
+my $bb = Rosetta::CirclesArea::bbox([[0, 0, 1], [3, 4, 2], [-1, -2, 0.5]])
+assert_eq $bb->[0], -1.5, "bbox minx"
+assert_eq $bb->[2], 5,    "bbox maxx"
+assert_eq $bb->[1], -2.5, "bbox miny"
+assert_eq $bb->[3], 6,    "bbox maxy"
+
+test_run

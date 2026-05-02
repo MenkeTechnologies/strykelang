@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Tree from nesting levels
+# Given a flat sequence of (level, value) pairs, produce the implied
+# nested tree. Level 0 elements live at the top; each higher level
+# becomes a child of the most-recent ancestor at the next-lower level.
+
+fn Rosetta::TreeNest::build($pairs) {
+    my $root = { value => undef, children => [] }
+    my @stack = ([0, $root])
+    for my $p (@$pairs) {
+        my ($lvl, $val) = @$p
+        # Pop until stack top sits at lvl - 1 or shallower
+        while (len(@stack) > 1 && $stack[-1][0] >= $lvl) { pop @stack }
+        # Pad anonymous nodes for any level gap
+        while ($stack[-1][0] < $lvl - 1) {
+            my $mid = { value => undef, children => [] }
+            push @{$stack[-1][1]{children}}, $mid
+            push @stack, [$stack[-1][0] + 1, $mid]
+        }
+        my $node = { value => $val, children => [] }
+        push @{$stack[-1][1]{children}}, $node
+        push @stack, [$lvl, $node]
+    }
+    $root
+}
+
+fn Rosetta::TreeNest::flatten($root) {
+    my @out
+    Rosetta::TreeNest::flatten_into($root, 0, \@out)
+    @out
+}
+
+fn Rosetta::TreeNest::flatten_into($node, $lvl, $acc) {
+    if (defined $node->{value}) {
+        push @$acc, [$lvl - 1, $node->{value}]
+    }
+    for my $c (@{$node->{children}}) {
+        Rosetta::TreeNest::flatten_into($c, $lvl + 1, $acc)
+    }
+}
+
+# Direct example from rosetta task
+my $tree = Rosetta::TreeNest::build([
+    [1, "a"], [2, "b"], [2, "c"],
+    [3, "d"], [4, "e"], [4, "f"],
+    [1, "g"], [2, "h"], [2, "i"],
+])
+# Top-level children should be 'a' and 'g'.
+my @top = @{$tree->{children}}
+assert_eq scalar(@top), 2, "two top-level nodes"
+assert_eq $top[0]{value}, "a", "first top is a"
+assert_eq $top[1]{value}, "g", "second top is g"
+assert_eq scalar(@{$top[0]{children}}), 2, "a has 2 kids: b, c"
+assert_eq $top[0]{children}[0]{value}, "b", "a/b"
+assert_eq $top[0]{children}[1]{value}, "c", "a/c"
+# c has child d
+assert_eq scalar(@{$top[0]{children}[1]{children}}), 1, "c has 1 child"
+assert_eq $top[0]{children}[1]{children}[0]{value}, "d", "c/d"
+# d has children e, f
+assert_eq scalar(@{$top[0]{children}[1]{children}[0]{children}}), 2, "d has 2 kids"
+# g has h, i
+assert_eq $top[1]{children}[0]{value}, "h", "g/h"
+assert_eq $top[1]{children}[1]{value}, "i", "g/i"
+
+# Single-element tree
+my $single = Rosetta::TreeNest::build([[1, "X"]])
+assert_eq scalar(@{$single->{children}}), 1, "1 root child"
+assert_eq $single->{children}[0]{value}, "X", "root value"
+
+# Empty input
+my $empty = Rosetta::TreeNest::build([])
+assert_eq scalar(@{$empty->{children}}), 0, "empty tree"
+
+# Pipe form
+[[1, "p"], [2, "q"]] |> Rosetta::TreeNest::build |> fn { $_->{children}[0]{value} } |> assert_eq("p", "pipe build")
+
+test_run

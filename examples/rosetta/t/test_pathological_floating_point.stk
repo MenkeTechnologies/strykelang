@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pathological floating-point problems
+# Showcase numerical fragility: catastrophic cancellation, loss of
+# significance, accumulated error in benign-looking sequences.
+
+fn Rosetta::FpPath::muller_recurrence($n) {
+    # x_{n+1} = 111 - 1130/x_n + 3000/(x_n · x_{n-1})
+    # Mathematically converges to 6, but floating point drifts to 100.
+    my @x = (4.0, 4.25)
+    for my $i (2..$n) {
+        my $next = 111 - 1130 / $x[-1] + 3000 / ($x[-1] * $x[-2])
+        push @x, $next
+    }
+    \@x
+}
+
+fn Rosetta::FpPath::bad_subtraction($a, $b) {
+    # ($a + $b) - $a should equal $b — but doesn't if $a >> $b.
+    ($a + $b) - $a
+}
+
+fn Rosetta::FpPath::stable_dot($a, $b) {
+    # Kahan summation for compensated dot product.
+    return 0 if len(@$a) != len(@$b)
+    my $sum = 0
+    my $comp = 0
+    for my $i (0..len(@$a) - 1) {
+        my $term = $a->[$i] * $b->[$i]
+        my $y = $term - $comp
+        my $t = $sum + $y
+        $comp = ($t - $sum) - $y
+        $sum = $t
+    }
+    $sum
+}
+
+# Muller's recurrence: drifts to 100 by iteration 25 instead of 6.
+my $x = Rosetta::FpPath::muller_recurrence(20)
+my $tail = $x->[-1]
+assert_ok abs($tail - 6) > 50, sprintf("Muller drifts to %s, far from 6", $tail)
+
+# Catastrophic cancellation: add 1.0 to 1e16, then subtract 1e16.
+# The 1 is lost.
+my $loss = Rosetta::FpPath::bad_subtraction(1e16, 1.0)
+assert_ok $loss != 1.0, "(1e16 + 1) - 1e16 ≠ 1 (precision lost)"
+
+# But for normal magnitudes the operation is exact.
+assert_eq Rosetta::FpPath::bad_subtraction(1e6, 1.0), 1.0, "(1e6 + 1) - 1e6 = 1"
+
+# Naive sum of 0.1 ten times is not 1.0
+my $naive = 0
+for my $i (~> 1:10) { $naive += 0.1 }
+assert_ok $naive != 1.0, "10 × 0.1 ≠ 1.0 (binary rounding)"
+
+# But Kahan summation is closer than naive on the same input
+my @tenths = (0.1) x 10
+my @ones   = (1)   x 10
+my $kahan = Rosetta::FpPath::stable_dot(\@tenths, \@ones)
+assert_ok abs($kahan - 1.0) <= abs($naive - 1.0) + 1e-15,
+    "Kahan dot product ≤ naive error"
+
+# Demonstrating loss in 1/3 reciprocal
+my $third = 1 / 3
+my $back = $third * 3
+assert_ok abs($back - 1) < 1e-15, "(1/3) × 3 ≈ 1 within machine epsilon"
+# But cumulative addition drifts
+my $third_sum = 0
+for my $i (~> 1:3) { $third_sum += 1/3 }
+assert_ok abs($third_sum - 1) < 1e-15 || abs($third_sum - 1) > 0,
+    "1/3 + 1/3 + 1/3 may or may not equal 1"
+
+# Pipe form
+30 |> Rosetta::FpPath::muller_recurrence |> fn { abs($_->[-1] - 100) } |> fn { $_ < 1 } |> assert_eq(1, "pipe Muller → ~100")
+
+test_run

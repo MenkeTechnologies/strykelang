@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Search in paragraph's text
+# Find every paragraph in a document that contains all of the supplied
+# search words. Words are matched case-insensitively. Paragraphs are
+# delimited by blank lines.
+
+fn Rosetta::Search::paragraphs($doc) {
+    [split /\n\s*\n/, $doc]
+}
+
+fn Rosetta::Search::contains_all($paragraph, $words) {
+    my $lc = lc($paragraph)
+    for my $w (@$words) {
+        return 0 if index($lc, lc($w)) < 0
+    }
+    1
+}
+
+fn Rosetta::Search::find($doc, $words) {
+    my $paras = Rosetta::Search::paragraphs($doc)
+    my @hits
+    for my $i (0..len(@$paras) - 1) {
+        push @hits, $i if Rosetta::Search::contains_all($paras->[$i], $words)
+    }
+    @hits
+}
+
+# Tiny corpus
+my $doc =
+    "Lorem ipsum dolor sit amet.\n"
+  . "consectetur adipiscing.\n"
+  . "\n"
+  . "The quick brown fox.\n"
+  . "jumps over the lazy dog.\n"
+  . "\n"
+  . "And another paragraph here.\n"
+  . "FOX runs again.\n"
+
+# Paragraph splitting
+my $paras = Rosetta::Search::paragraphs($doc)
+assert_eq scalar(@$paras), 3, "3 paragraphs"
+
+# Search single word
+my @h = Rosetta::Search::find($doc, ["fox"])
+assert_eq scalar(@h), 2, "fox in 2 paragraphs"
+assert_eq $h[0], 1, "first match index"
+assert_eq $h[1], 2, "second match index"
+
+# Multi-word AND search
+my @h2 = Rosetta::Search::find($doc, ["fox", "lazy"])
+assert_eq scalar(@h2), 1, "fox AND lazy in 1 paragraph"
+assert_eq $h2[0], 1, "second paragraph"
+
+# Case-insensitive
+my @h3 = Rosetta::Search::find($doc, ["FOX"])
+assert_eq scalar(@h3), 2, "FOX matches case-insensitively"
+
+# No match
+my @h4 = Rosetta::Search::find($doc, ["unicorn"])
+assert_eq scalar(@h4), 0, "unicorn not found"
+
+# All-words requires *every* word present
+my @h5 = Rosetta::Search::find($doc, ["fox", "ipsum"])
+assert_eq scalar(@h5), 0, "fox and ipsum never co-occur"
+
+# Empty word list matches every paragraph
+my @h6 = Rosetta::Search::find($doc, [])
+assert_eq scalar(@h6), 3, "empty query matches all"
+
+# Pipe form
+my @piped = Rosetta::Search::find($doc, ["fox"])
+assert_eq scalar(@piped), 2, "pipe count"
+
+test_run

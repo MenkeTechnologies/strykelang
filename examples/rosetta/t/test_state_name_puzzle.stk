@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: State name puzzle
+# Find all unordered pairs of US state names whose concatenated
+# letters can be partitioned into two different state names.
+# Classic puzzle credited to Martin Gardner / Will Shortz.
+
+fn Rosetta::StatePuzzle::canonical($s) {
+    my $clean = $s
+    $clean =~ s/\s+//g
+    join("", sort split //, lc($clean))
+}
+
+fn Rosetta::StatePuzzle::find_pairs($states) {
+    my $n = len(@$states)
+    my %by_key
+    for my $i (0..$n - 2) {
+        for my $j ($i + 1..$n - 1) {
+            my $k = Rosetta::StatePuzzle::canonical($states->[$i] . $states->[$j])
+            push @{$by_key{$k}}, [$i, $j]
+        }
+    }
+    my @pairs
+    for my $k (keys %by_key) {
+        my $list = $by_key{$k}
+        next if len(@$list) < 2
+        my $first  = $list->[0]
+        my $second = $list->[1]
+        push @pairs, [
+            [$states->[$first->[0]],  $states->[$first->[1]]],
+            [$states->[$second->[0]], $states->[$second->[1]]]
+        ]
+    }
+    @pairs
+}
+
+# Helper sanity
+assert_eq Rosetta::StatePuzzle::canonical("North Dakota"),
+    Rosetta::StatePuzzle::canonical("Dakota North"),
+    "canonical sorts letters"
+
+# Concrete: NORTH CAROLINA + SOUTH DAKOTA == NORTH DAKOTA + SOUTH CAROLINA
+my $left  = Rosetta::StatePuzzle::canonical("North Carolina" . "South Dakota")
+my $right = Rosetta::StatePuzzle::canonical("North Dakota" . "South Carolina")
+assert_eq $left, $right, "NC + SD letters = ND + SC letters"
+
+# A second classic: New Hampshire + Vermont
+# Test that pair-finding for the small set picks up a swap
+my @states = ("North Carolina", "South Dakota", "North Dakota", "South Carolina")
+my @pairs = Rosetta::StatePuzzle::find_pairs(\@states)
+assert_ok len(@pairs) >= 1, "found a state-pair swap"
+
+# The pair contains both originals and a rearrangement
+my $pair = $pairs[0]
+my $orig_set = join("|", sort @{$pair->[0]})
+my $rearr_set = join("|", sort @{$pair->[1]})
+assert_ok $orig_set ne $rearr_set, "rearrangement differs from original"
+assert_eq Rosetta::StatePuzzle::canonical($pair->[0][0] . $pair->[0][1]),
+    Rosetta::StatePuzzle::canonical($pair->[1][0] . $pair->[1][1]),
+    "letters preserved"
+
+# Pipe form
+"Texas" |> Rosetta::StatePuzzle::canonical |> assert_eq("aestx", "pipe canonical")
+
+test_run

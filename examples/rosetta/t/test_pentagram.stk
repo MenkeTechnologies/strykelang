@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pentagram
+# Compute the 5 outer points of a regular pentagram inscribed in a
+# unit circle, and the 5 inner intersection points (the pentagon
+# formed inside). Returns [{outer => [...], inner => [...]}].
+
+fn Rosetta::Pentagram::outer_points($r, $cx, $cy) {
+    my $pi = 4 * atan2(1, 1)
+    my @pts
+    for my $k (0..4) {
+        my $angle = $pi / 2 + 2 * $pi * $k / 5
+        push @pts, [$cx + $r * cos($angle), $cy + $r * sin($angle)]
+    }
+    \@pts
+}
+
+fn Rosetta::Pentagram::edges() {
+    # Connect every other vertex (step 2 mod 5 → star)
+    [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]]
+}
+
+fn Rosetta::Pentagram::inner_radius($r) {
+    # The inner pentagon of a regular pentagram inscribed in radius r
+    # has radius r' = r · (3 - √5) / 2 = r / φ²  where φ = (1+√5)/2.
+    my $phi = (1 + sqrt(5)) / 2
+    $r / ($phi * $phi)
+}
+
+# Five outer points on unit circle
+my $outer = Rosetta::Pentagram::outer_points(1, 0, 0)
+assert_eq len(@$outer), 5, "5 outer points"
+
+# All five outer points on the circle of radius 1
+my $on_circle = 1
+for my $p (@$outer) {
+    my $r2 = $p->[0] * $p->[0] + $p->[1] * $p->[1]
+    $on_circle = 0 if abs($r2 - 1) > 1e-9
+}
+assert_ok $on_circle, "all outer points lie on unit circle"
+
+# Edge list connects the star
+my $es = Rosetta::Pentagram::edges()
+assert_eq len(@$es), 5, "5 star edges"
+
+# Each vertex appears in exactly two edges
+my @count = (0) x 5
+for my $e (@$es) {
+    $count[$e->[0]]++
+    $count[$e->[1]]++
+}
+for my $i (0..4) {
+    assert_eq $count[$i], 2, sprintf("vertex %d in 2 edges", $i)
+}
+
+# Inner radius shrinks by φ² ≈ 2.618
+my $phi = (1 + sqrt(5)) / 2
+my $expected_inner = 1 / ($phi * $phi)
+assert_near Rosetta::Pentagram::inner_radius(1), $expected_inner, 1e-12,
+    "inner radius = r / φ²"
+
+# All star angles at outer vertices are 36°
+my $angle_ok = 1
+for my $i (0..4) {
+    my $a = $outer->[$i]
+    my $b = $outer->[($i + 2) % 5]
+    my $c = $outer->[($i + 3) % 5]
+    my $abx = $b->[0] - $a->[0]
+    my $aby = $b->[1] - $a->[1]
+    my $acx = $c->[0] - $a->[0]
+    my $acy = $c->[1] - $a->[1]
+    my $dot = $abx * $acx + $aby * $acy
+    my $nb  = sqrt($abx * $abx + $aby * $aby)
+    my $nc  = sqrt($acx * $acx + $acy * $acy)
+    my $cos_t = $dot / ($nb * $nc)
+    my $expected_cos = cos(36 * (4 * atan2(1, 1)) / 180)
+    $angle_ok = 0 if abs($cos_t - $expected_cos) > 1e-9
+}
+assert_ok $angle_ok, "every star tip is 36°"
+
+# Pipe form
+1 |> Rosetta::Pentagram::inner_radius |> assert_near($expected_inner, 1e-12, "pipe inner_radius")
+
+test_run

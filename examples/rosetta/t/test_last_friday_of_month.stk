@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Last Friday of each month
+# For a given year, return the date of the last Friday in every month.
+
+fn Rosetta::LastFriday::dow($y, $m, $d) {
+    my ($yy, $mm) = ($y, $m)
+    if ($mm < 3) { $mm += 12; $yy -= 1 }
+    my $K = $yy % 100
+    my $J = int($yy / 100)
+    (($d + int(13 * ($mm + 1) / 5) + $K + int($K / 4) + int($J / 4) + 5 * $J) % 7)
+}
+
+fn Rosetta::LastFriday::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || ($y % 400 == 0)
+}
+
+fn Rosetta::LastFriday::days_in($y, $m) {
+    my @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    my $d = $days[$m - 1]
+    $d = 29 if $m == 2 && Rosetta::LastFriday::is_leap($y)
+    $d
+}
+
+fn Rosetta::LastFriday::for_month($y, $m) {
+    my $last = Rosetta::LastFriday::days_in($y, $m)
+    # Zeller: 0=Sat, 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri
+    for (my $d = $last; $d >= $last - 6; $d--) {
+        return $d if Rosetta::LastFriday::dow($y, $m, $d) == 6
+    }
+    -1
+}
+
+fn Rosetta::LastFriday::for_year($y) {
+    1:12 |> map { Rosetta::LastFriday::for_month($y, _) }
+}
+
+# Year 2012 reference values from rosetta task
+my @y2012 = Rosetta::LastFriday::for_year(2012)
+assert_eq join(",", @y2012), "27,24,30,27,25,29,27,31,28,26,30,28", "Last Fridays of 2012"
+
+# Year 2026: derive and assert internal consistency rather than
+# re-derive expected values by hand.
+my @y2026 = Rosetta::LastFriday::for_year(2026)
+my $all_friday = 1
+my $all_within = 1
+for my $m (1..12) {
+    my $d = $y2026[$m - 1]
+    $all_friday = 0 if Rosetta::LastFriday::dow(2026, $m, $d) != 6
+    my $last = Rosetta::LastFriday::days_in(2026, $m)
+    $all_within = 0 if $d > $last || $d < $last - 6
+}
+assert_ok $all_friday, "every result for 2026 is a Friday"
+assert_ok $all_within, "every 2026 result is in the last week of its month"
+
+# Pipe form
+2012 |> Rosetta::LastFriday::for_year |> join(",") |> assert_eq("27,24,30,27,25,29,27,31,28,26,30,28", "pipe 2012")
+
+# Threaded
+my @y2024 = ~> 2024 Rosetta::LastFriday::for_year
+assert_eq len(@y2024), 12, "12 months in 2024"
+# Feb 2024 was leap (29 days); last Friday should be 23.
+assert_eq $y2024[1], 23, "Feb 2024 last Friday = 23"
+
+test_run

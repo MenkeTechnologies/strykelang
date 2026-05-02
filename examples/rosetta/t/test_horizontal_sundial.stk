@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Horizontal sundial calculations
+# For a sundial at latitude φ (degrees), compute the hour-line angle
+# H_t (in degrees from the noon line) for each hour offset t (hours
+# from solar noon):  tan(H_t) = sin(φ) · tan(15° · t)
+
+fn Rosetta::Sundial::hour_angle($lat_deg, $hour_offset) {
+    my $pi = 4 * atan2(1, 1)
+    my $lat = $lat_deg * $pi / 180
+    my $t   = 15 * $hour_offset * $pi / 180
+    my $h   = atan2(sin($lat) * sin($t), cos($t))
+    $h * 180 / $pi
+}
+
+fn Rosetta::Sundial::hour_lines($lat_deg) {
+    my @lines
+    for my $h (-6..6) {
+        push @lines, [$h, Rosetta::Sundial::hour_angle($lat_deg, $h)]
+    }
+    \@lines
+}
+
+# At equator (φ = 0): every hour line collapses onto noon (sin(0) = 0).
+my $eq = Rosetta::Sundial::hour_angle(0, 3)
+assert_near $eq, 0, 1e-9, "equator: hour angle = 0"
+
+# At noon (t = 0): hour angle is always 0 regardless of latitude.
+for my $lat (0, 30, 45, 60, 80) {
+    assert_near Rosetta::Sundial::hour_angle($lat, 0), 0, 1e-9,
+        sprintf("noon at lat %d°", $lat)
+}
+
+# At pole (φ = 90°): hour angle = t × 15° (sundial face IS the dial).
+assert_near Rosetta::Sundial::hour_angle(90, 1),  15, 1e-9, "pole 1h = 15°"
+assert_near Rosetta::Sundial::hour_angle(90, 3),  45, 1e-9, "pole 3h = 45°"
+assert_near Rosetta::Sundial::hour_angle(90, -2), -30, 1e-9, "pole -2h = -30°"
+
+# Symmetry: H(-t) = -H(t)
+for my $lat (10, 30, 60) {
+    for my $t (1, 2, 3, 4) {
+        my $a = Rosetta::Sundial::hour_angle($lat, $t)
+        my $b = Rosetta::Sundial::hour_angle($lat, -$t)
+        assert_near $a, -$b, 1e-9,
+            sprintf("symmetry lat=%d°, t=%d", $lat, $t)
+    }
+}
+
+# Specific reference: Greenwich (φ ≈ 51.4778°), 3 PM
+# tan(H) = sin(51.4778°) · tan(45°) = 0.7820 → H ≈ 38.04°
+assert_near Rosetta::Sundial::hour_angle(51.4778, 3), 38.04, 0.05,
+    "Greenwich 3PM ≈ 38°"
+
+# 13 hour lines from -6h..+6h
+my $lines = Rosetta::Sundial::hour_lines(45)
+assert_eq scalar(@$lines), 13, "13 hour lines"
+
+# Pipe form
+45 |> fn { Rosetta::Sundial::hour_angle(_, 6) } |> fn { abs($_ - 90) < 1e-9 || abs($_ + 90) < 1e-9 } |> assert_eq(1, "pipe 6h at lat 45 = ±90°")
+
+test_run

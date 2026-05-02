@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gosper's hack — next integer with the same number of 1-bits
+# as the input. Classic bit-twiddling trick from HAKMEM Item 175 (1972).
+
+fn Rosetta::GospersHack::next($x) {
+    my $c = $x & -$x
+    my $r = $x + $c
+    (((($r ^ $x) >> 2) / $c) | $r)
+}
+
+fn Rosetta::GospersHack::sequence($start, $count) {
+    my @out = ($start)
+    my $cur = $start
+    for my $i (~> 1:$count - 1) {
+        $cur = Rosetta::GospersHack::next($cur)
+        push @out, $cur
+    }
+    @out
+}
+
+fn Rosetta::GospersHack::popcount($n) {
+    my $c = 0
+    while ($n > 0) {
+        $c += $n & 1
+        $n = $n >> 1
+    }
+    $c
+}
+
+# 0b00010011 (19) -> 0b00010101 (21)
+assert_eq Rosetta::GospersHack::next(0b00010011), 0b00010101, "next(19) = 21"
+# 0b00010101 (21) -> 0b00010110 (22)
+assert_eq Rosetta::GospersHack::next(0b00010101), 0b00010110, "next(21) = 22"
+# 0b00010110 (22) -> 0b00011001 (25)
+assert_eq Rosetta::GospersHack::next(0b00010110), 0b00011001, "next(22) = 25"
+
+# Starting from 0b111 (7) — three 1-bits — first eight successors
+my @seq = Rosetta::GospersHack::sequence(0b111, 8)
+assert_eq join(",", @seq), "7,11,13,14,19,21,22,25", "3-bit sequence"
+
+# All elements share popcount with the seed
+my @pops = ~> @seq map { Rosetta::GospersHack::popcount(_) }
+assert_eq join(",", @pops), "3,3,3,3,3,3,3,3", "popcount preserved"
+
+# Pipeline form
+0b111 |> Rosetta::GospersHack::next |> assert_eq(11, "pipe next(7)")
+
+# Threaded sequence + pluck last
+my @full = Rosetta::GospersHack::sequence(0b111, 8)
+assert_eq $full[-1], 25, "sequence last element = 25"
+
+test_run

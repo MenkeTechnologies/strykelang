@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Validate International Securities Identification Number
+# 12-character ISIN: 2 country letters + 9 alphanumeric NSIN +
+# 1 check digit. Validation: convert each letter to two digits
+# (A → 10, B → 11, …, Z → 35), expand to a long digit string,
+# then apply Luhn-style mod-10 alternating-double check.
+
+fn Rosetta::Isin::char_value($c) {
+    return ord($c) - ord("0")               if $c =~ /[0-9]/
+    return ord(uc($c)) - ord("A") + 10     if $c =~ /[A-Za-z]/
+    -1
+}
+
+fn Rosetta::Isin::expand($s) {
+    my $out = ""
+    for my $ch (split //, $s) {
+        my $v = Rosetta::Isin::char_value($ch)
+        return undef if $v < 0
+        $out .= "$v"
+    }
+    $out
+}
+
+fn Rosetta::Isin::luhn_check($digits) {
+    my @d = split //, $digits
+    my $n = len(@d)
+    my $sum = 0
+    for my $i (0..$n - 1) {
+        my $v = $d[$n - 1 - $i] + 0
+        $v *= 2 if $i % 2 == 1
+        $v = ($v % 10) + int($v / 10) if $v > 9
+        $sum += $v
+    }
+    $sum % 10 == 0 ? 1 : 0
+}
+
+fn Rosetta::Isin::is_valid($s) {
+    return 0 if length($s) != 12
+    return 0 unless substr($s, 0, 2)  =~ /^[A-Z]{2}$/
+    return 0 unless substr($s, 2, 9)  =~ /^[A-Z0-9]{9}$/
+    return 0 unless substr($s, 11, 1) =~ /^[0-9]$/
+    my $expanded = Rosetta::Isin::expand($s)
+    return 0 unless defined $expanded
+    Rosetta::Isin::luhn_check($expanded)
+}
+
+# char_value
+assert_eq Rosetta::Isin::char_value("0"), 0,  "0 → 0"
+assert_eq Rosetta::Isin::char_value("9"), 9,  "9 → 9"
+assert_eq Rosetta::Isin::char_value("A"), 10, "A → 10"
+assert_eq Rosetta::Isin::char_value("Z"), 35, "Z → 35"
+
+# expand
+assert_eq Rosetta::Isin::expand("US0378331005"), "30280378331005", "expand US0378331005"
+
+# Sample valid ISINs (from rosetta task)
+my @valid = (
+    "US0378331005",   # Apple
+    "AU0000XVGZA3",
+    "GB0002634946",
+    "FR0000133308",
+)
+for my $i (@valid) {
+    assert_eq Rosetta::Isin::is_valid($i), 1, sprintf("%s valid", $i)
+}
+
+# Sample invalid ISINs
+my @invalid = (
+    "US0378331004",   # wrong check digit
+    "us0378331005",   # lowercase country code
+    "AU0000xVGZA3",   # lowercase in NSIN
+    "AU000XVGZA3",    # wrong length
+    "AU0000XVGZAD",   # alpha check digit
+)
+for my $i (@invalid) {
+    assert_eq Rosetta::Isin::is_valid($i), 0, sprintf("%s invalid", $i)
+}
+
+# Pipe form
+"US0378331005" |> Rosetta::Isin::is_valid |> assert_eq(1, "pipe Apple ISIN")
+
+test_run

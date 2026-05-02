@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find the intersection of two lines
+# Each line is two distinct points: (x1, y1) and (x2, y2). Solves the
+# determinant form for the intersection of the two infinite lines.
+# Returns undef if the lines are parallel.
+
+fn Rosetta::LineIntersect::find($a, $b, $c, $d) {
+    my ($x1, $y1) = @$a
+    my ($x2, $y2) = @$b
+    my ($x3, $y3) = @$c
+    my ($x4, $y4) = @$d
+    my $den = ($x1 - $x2) * ($y3 - $y4) - ($y1 - $y2) * ($x3 - $x4)
+    return undef if $den == 0
+    my $t1 = $x1 * $y2 - $y1 * $x2
+    my $t2 = $x3 * $y4 - $y3 * $x4
+    my $px = ($t1 * ($x3 - $x4) - ($x1 - $x2) * $t2) / $den
+    my $py = ($t1 * ($y3 - $y4) - ($y1 - $y2) * $t2) / $den
+    [$px, $py]
+}
+
+# Classic example: y = x  ∩  y = -x + 8  →  (4, 4)
+my $p = Rosetta::LineIntersect::find([4, 0], [6, 10], [0, 3], [10, 7])
+assert_near $p->[0], 5, 1e-9, "x of (4,0)-(6,10) ∩ (0,3)-(10,7)"
+assert_near $p->[1], 5, 1e-9, "y of (4,0)-(6,10) ∩ (0,3)-(10,7)"
+
+# Diagonals y = x and y = -x + 8 → (4, 4)
+my $q = Rosetta::LineIntersect::find([0, 0], [10, 10], [0, 8], [8, 0])
+assert_near $q->[0], 4, 1e-9, "x = 4 on y=x ∩ y=-x+8"
+assert_near $q->[1], 4, 1e-9, "y = 4 on y=x ∩ y=-x+8"
+
+# Parallel horizontals → undef
+my $par = Rosetta::LineIntersect::find([0, 0], [5, 0], [0, 1], [5, 1])
+assert_ok !defined $par, "parallel lines yield undef"
+
+# Coincident lines (also degenerate) → undef
+my $co = Rosetta::LineIntersect::find([0, 0], [2, 2], [1, 1], [3, 3])
+assert_ok !defined $co, "coincident lines yield undef"
+
+# Pipe: throw a tuple of 4 points through the intersector
+my @pts = ([0, 0], [4, 4], [0, 4], [4, 0])
+my $r = Rosetta::LineIntersect::find($pts[0], $pts[1], $pts[2], $pts[3])
+assert_near $r->[0], 2, 1e-9, "x = 2 (square diagonals)"
+assert_near $r->[1], 2, 1e-9, "y = 2 (square diagonals)"
+
+# Threaded form: build the intersection lazily
+my $thr = ~> ([1, 0], [3, 4], [0, 1], [4, 3]) fn { Rosetta::LineIntersect::find(_0, _1, _2, _3) }
+assert_near $thr->[0], 2, 1e-9, "threaded x"
+assert_near $thr->[1], 2, 1e-9, "threaded y"
+
+test_run

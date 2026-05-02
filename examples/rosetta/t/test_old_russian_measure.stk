@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Old Russian measure of length
+# Convert metres to/from old Russian length units. Reference values
+# (in metres):
+#   arshin   = 0.7112
+#   sazhen   = 3 arshin = 2.1336
+#   versta   = 500 sazhen = 1066.8
+#   vershok  = arshin / 16 = 0.04445
+#   piad     = arshin / 4 = 0.1778
+#   diuym    = arshin / 28 ≈ 0.0254 (1 inch)
+
+fn Rosetta::Russian::table() {
+    {
+        diuym   => 0.0254,
+        vershok => 0.04445,
+        piad    => 0.1778,
+        arshin  => 0.7112,
+        sazhen  => 2.1336,
+        versta  => 1066.8,
+    }
+}
+
+fn Rosetta::Russian::to_metres($value, $unit) {
+    my $t = Rosetta::Russian::table()
+    return undef unless exists $t->{$unit}
+    $value * $t->{$unit}
+}
+
+fn Rosetta::Russian::from_metres($metres, $unit) {
+    my $t = Rosetta::Russian::table()
+    return undef unless exists $t->{$unit}
+    $metres / $t->{$unit}
+}
+
+fn Rosetta::Russian::break_down($metres) {
+    my $t = Rosetta::Russian::table()
+    my %order = (versta => 0, sazhen => 1, arshin => 2, piad => 3, vershok => 4, diuym => 5)
+    my @units = sort { $order{$a} <=> $order{$b} } keys %$t
+    my $remaining = $metres
+    my %parts
+    for my $u (@units) {
+        next if $remaining < $t->{$u}
+        my $count = int($remaining / $t->{$u})
+        $parts{$u} = $count
+        $remaining -= $count * $t->{$u}
+    }
+    \%parts
+}
+
+# Direct
+assert_near Rosetta::Russian::to_metres(1, "arshin"),  0.7112, 1e-9, "1 arshin"
+assert_near Rosetta::Russian::to_metres(1, "sazhen"),  2.1336, 1e-9, "1 sazhen"
+assert_near Rosetta::Russian::to_metres(1, "versta"),  1066.8, 1e-9, "1 versta"
+assert_near Rosetta::Russian::to_metres(1, "diuym"),   0.0254, 1e-9, "1 diuym = 1 inch"
+assert_near Rosetta::Russian::to_metres(3, "arshin"),  Rosetta::Russian::to_metres(1, "sazhen"),
+    1e-9, "3 arshin = 1 sazhen"
+assert_near Rosetta::Russian::to_metres(500, "sazhen"), Rosetta::Russian::to_metres(1, "versta"),
+    1e-9, "500 sazhen = 1 versta"
+
+# Round-trip
+for my $unit ("diuym", "vershok", "piad", "arshin", "sazhen", "versta") {
+    my $m = Rosetta::Russian::to_metres(7, $unit)
+    my $back = Rosetta::Russian::from_metres($m, $unit)
+    assert_near $back, 7, 1e-9, sprintf("round-trip 7 %s", $unit)
+}
+
+# Invalid unit
+assert_ok !defined(Rosetta::Russian::to_metres(1, "foot")), "unknown unit rejected"
+
+# Break down
+my $bd = Rosetta::Russian::break_down(1500)
+assert_eq $bd->{versta}, 1, "1500 m has 1 versta"
+my $bd2 = Rosetta::Russian::break_down(1066.8)
+assert_eq $bd2->{versta}, 1, "exact 1 versta"
+# Break-down sums to a value at most equal to the original
+my $bd3 = Rosetta::Russian::break_down(2.5)
+my $sum = 0
+my $t = Rosetta::Russian::table()
+for my $u (keys %$bd3) { $sum += $bd3->{$u} * $t->{$u} }
+assert_ok $sum <= 2.5 + 1e-9, "break-down sum ≤ original"
+assert_ok $sum > 0, "break-down sum positive"
+
+# Pipe form
+1 |> fn { Rosetta::Russian::to_metres(_, "arshin") } |> assert_near(0.7112, 1e-9, "pipe 1 arshin")
+
+test_run

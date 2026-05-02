@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Walk a directory (Non-recursively + Recursively)
+# Walk a directory listing entries. Test fixture: /tmp scratch tree.
+
+fn Rosetta::Walk::list_immediate($dir) {
+    return [] unless -d $dir
+    opendir(my $dh, $dir) or return []
+    my @out
+    while (my $e = readdir($dh)) {
+        next if $e eq "." || $e eq ".."
+        push @out, $e
+    }
+    closedir($dh)
+    my @sorted = sort @out
+    \@sorted
+}
+
+fn Rosetta::Walk::recursive($dir, $rel) {
+    my @out
+    return @out unless -d $dir
+    my $entries = Rosetta::Walk::list_immediate($dir)
+    for my $e (@$entries) {
+        my $full = "$dir/$e"
+        my $r    = $rel eq "" ? $e : "$rel/$e"
+        push @out, $r
+        if (-d $full) {
+            push @out, Rosetta::Walk::recursive($full, $r)
+        }
+    }
+    @out
+}
+
+fn Rosetta::Walk::touch($path) {
+    open(my $fh, ">", $path) or return 0
+    close($fh)
+    1
+}
+
+# Build a scratch tree under /tmp
+my $base = "/tmp/stk_walk_$$"
+system("rm -rf $base 2>/dev/null")
+mkdir($base) or die "could not create $base"
+mkdir("$base/sub")
+mkdir("$base/sub/deep")
+Rosetta::Walk::touch("$base/a.txt")
+Rosetta::Walk::touch("$base/b.txt")
+Rosetta::Walk::touch("$base/sub/c.txt")
+Rosetta::Walk::touch("$base/sub/deep/d.txt")
+
+# Non-recursive listing
+my $top = Rosetta::Walk::list_immediate($base)
+my %top_set = map { $_ => 1 } @$top
+assert_eq exists($top_set{"a.txt"}), 1, "a.txt at top"
+assert_eq exists($top_set{"b.txt"}), 1, "b.txt at top"
+assert_eq exists($top_set{"sub"}),   1, "sub at top"
+assert_eq scalar(@$top), 3, "exactly 3 entries at top"
+
+# Sub directory listing
+my $sub = Rosetta::Walk::list_immediate("$base/sub")
+my %sub_set = map { $_ => 1 } @$sub
+assert_eq exists($sub_set{"c.txt"}),  1, "c.txt in sub"
+assert_eq exists($sub_set{"deep"}),   1, "deep in sub"
+
+# Recursive walk
+my @all = Rosetta::Walk::recursive($base, "")
+my %all_set = map { $_ => 1 } @all
+assert_eq exists($all_set{"a.txt"}),               1, "a.txt"
+assert_eq exists($all_set{"b.txt"}),               1, "b.txt"
+assert_eq exists($all_set{"sub"}),                 1, "sub"
+assert_eq exists($all_set{"sub/c.txt"}),           1, "sub/c.txt"
+assert_eq exists($all_set{"sub/deep"}),            1, "sub/deep"
+assert_eq exists($all_set{"sub/deep/d.txt"}),      1, "sub/deep/d.txt"
+
+# Walking a non-directory returns empty
+my $nope = Rosetta::Walk::list_immediate("/tmp/stk_no_such_$$")
+assert_eq scalar(@$nope), 0, "missing dir → empty"
+
+# Cleanup
+system("rm -rf $base")
+
+# Pipe form (uses immediate listing of /tmp)
+"/tmp" |> Rosetta::Walk::list_immediate |> fn { ref($_) } |> assert_eq("ARRAY", "pipe returns arrayref")
+
+test_run

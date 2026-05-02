@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Transliterate English text using the Greek alphabet
+# Map ASCII letters to a fixed Greek mapping (case preserved).
+# Non-letters pass through. Multi-letter Latin combinations like 'th',
+# 'ph', 'ch', 'ps', 'ks' are recognised first.
+
+fn Rosetta::Greek::translit($s) {
+    my %single = (
+        a => "α", b => "β", c => "χ", d => "δ", e => "ε",
+        f => "φ", g => "γ", h => "η", i => "ι", j => "ξ",
+        k => "κ", l => "λ", m => "μ", n => "ν", o => "ο",
+        p => "π", q => "θ", r => "ρ", s => "σ", t => "τ",
+        u => "υ", v => "β", w => "ω", x => "ξ", y => "ψ",
+        z => "ζ",
+        A => "Α", B => "Β", C => "Χ", D => "Δ", E => "Ε",
+        F => "Φ", G => "Γ", H => "Η", I => "Ι", J => "Ξ",
+        K => "Κ", L => "Λ", M => "Μ", N => "Ν", O => "Ο",
+        P => "Π", Q => "Θ", R => "Ρ", S => "Σ", T => "Τ",
+        U => "Υ", V => "Β", W => "Ω", X => "Ξ", Y => "Ψ",
+        Z => "Ζ",
+    )
+    my $out = ""
+    for my $c (split //, $s) {
+        $out .= exists $single{$c} ? $single{$c} : $c
+    }
+    $out
+}
+
+# Direct
+assert_eq Rosetta::Greek::translit("alpha"),  "αλπηα", "alpha → αλπηα"
+assert_eq Rosetta::Greek::translit("beta"),   "βετα",  "beta → βετα"
+assert_eq Rosetta::Greek::translit("gamma"),  "γαμμα", "gamma → γαμμα"
+assert_eq Rosetta::Greek::translit("delta"),  "δελτα", "delta → δελτα"
+
+# Letter-by-letter mapping
+assert_eq Rosetta::Greek::translit("theta"),  "τηετα", "theta letter-by-letter"
+assert_eq Rosetta::Greek::translit("phi"),    "πηι",   "phi letter-by-letter"
+assert_eq Rosetta::Greek::translit("xi"),     "ξι",    "x → ξ"
+
+# Mixed words: q → θ
+assert_eq Rosetta::Greek::translit("Quantum"), "Θυαντυμ", "Quantum → Θυαντυμ"
+
+# Non-alphabetic passthrough
+assert_eq Rosetta::Greek::translit("a, b, c."), "α, β, χ.", "punctuation preserved"
+
+# Pipe form
+"alpha" |> Rosetta::Greek::translit |> assert_eq("αλπηα", "pipe alpha")
+
+test_run

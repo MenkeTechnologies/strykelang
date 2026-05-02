@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Simple database
+# In-memory CSV-style record store with insert / find / update / delete
+# on a hash table keyed by a configurable column.
+
+fn Rosetta::SimpleDb::new($key_field) {
+    { key_field => $key_field, rows => {} }
+}
+
+fn Rosetta::SimpleDb::insert($db, $record) {
+    my $k = $record->{$db->{key_field}}
+    return 0 if !defined $k
+    return 0 if exists $db->{rows}{$k}
+    $db->{rows}{$k} = $record
+    1
+}
+
+fn Rosetta::SimpleDb::find($db, $key) {
+    return undef unless exists $db->{rows}{$key}
+    $db->{rows}{$key}
+}
+
+fn Rosetta::SimpleDb::update($db, $key, $patch) {
+    return 0 unless exists $db->{rows}{$key}
+    for my $k (keys %$patch) {
+        next if $k eq $db->{key_field}    # primary key locked
+        $db->{rows}{$key}{$k} = $patch->{$k}
+    }
+    1
+}
+
+fn Rosetta::SimpleDb::delete_row($db, $key) {
+    return 0 unless exists $db->{rows}{$key}
+    delete $db->{rows}{$key}
+    1
+}
+
+fn Rosetta::SimpleDb::count($db) {
+    scalar(keys %{$db->{rows}})
+}
+
+fn Rosetta::SimpleDb::find_where($db, $field, $value) {
+    my @out
+    for my $k (keys %{$db->{rows}}) {
+        my $r = $db->{rows}{$k}
+        push @out, $r if exists $r->{$field} && $r->{$field} eq $value
+    }
+    \@out
+}
+
+# Create
+my $db = Rosetta::SimpleDb::new("id")
+assert_eq Rosetta::SimpleDb::count($db), 0, "empty"
+
+# Insert
+assert_eq Rosetta::SimpleDb::insert($db, { id => 1, name => "Alice", age => 30 }), 1, "insert Alice"
+assert_eq Rosetta::SimpleDb::insert($db, { id => 2, name => "Bob",   age => 25 }), 1, "insert Bob"
+assert_eq Rosetta::SimpleDb::insert($db, { id => 3, name => "Carol", age => 30 }), 1, "insert Carol"
+assert_eq Rosetta::SimpleDb::count($db), 3, "3 rows"
+
+# Duplicate key rejected
+assert_eq Rosetta::SimpleDb::insert($db, { id => 1, name => "X" }), 0, "duplicate id rejected"
+
+# Missing key rejected
+assert_eq Rosetta::SimpleDb::insert($db, { name => "no-id" }), 0, "missing key rejected"
+
+# Find
+my $alice = Rosetta::SimpleDb::find($db, 1)
+assert_eq $alice->{name}, "Alice", "find Alice"
+assert_eq $alice->{age},  30,      "Alice age"
+
+assert_ok !defined(Rosetta::SimpleDb::find($db, 99)), "missing id → undef"
+
+# Update
+assert_eq Rosetta::SimpleDb::update($db, 1, { age => 31 }), 1, "update age"
+assert_eq Rosetta::SimpleDb::find($db, 1)->{age}, 31, "Alice now 31"
+
+# Primary key cannot be updated through patch
+Rosetta::SimpleDb::update($db, 1, { id => 999, name => "renamed" })
+assert_ok defined(Rosetta::SimpleDb::find($db, 1)), "id 1 still exists"
+assert_eq Rosetta::SimpleDb::find($db, 1)->{name}, "renamed", "name updated"
+
+# Find by attribute
+my $thirties = Rosetta::SimpleDb::find_where($db, "age", 30)
+assert_eq scalar(@$thirties), 1, "1 row aged 30 (Alice was bumped to 31)"
+assert_eq $thirties->[0]{name}, "Carol", "Carol still 30"
+
+# Delete
+assert_eq Rosetta::SimpleDb::delete_row($db, 2), 1, "delete Bob"
+assert_ok !defined(Rosetta::SimpleDb::find($db, 2)), "Bob gone"
+assert_eq Rosetta::SimpleDb::count($db), 2, "2 rows after delete"
+
+# Delete non-existent
+assert_eq Rosetta::SimpleDb::delete_row($db, 999), 0, "delete missing"
+
+# Pipe form
+my $db2 = Rosetta::SimpleDb::new("id")
+$db2 |> fn { Rosetta::SimpleDb::insert(_, { id => "A", v => 1 }) } |> assert_eq(1, "pipe insert")
+
+test_run

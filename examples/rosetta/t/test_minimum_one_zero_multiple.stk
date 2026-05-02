@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Minimum positive multiple in base 10 using only 0 and 1
+# Find the smallest positive multiple of n whose decimal representation
+# uses only the digits 0 and 1. (OEIS A004290.)
+# Approach: BFS over residues mod n; track the digit string.
+
+fn Rosetta::OneZero::find($n) {
+    return "0" if $n == 0
+    return "1" if $n == 1
+    my @parent = (undef) x $n
+    my @digit  = (undef) x $n
+    my @prev   = (undef) x $n
+    my $start  = 1 % $n
+    my @queue = ($start)
+    $parent[$start] = -1
+    $digit[$start]  = "1"
+    while (len(@queue) > 0) {
+        my $r = shift @queue
+        for my $d (0, 1) {
+            my $new_r = (($r * 10) + $d) % $n
+            next if defined $parent[$new_r]
+            $parent[$new_r] = $r
+            $digit[$new_r]  = "$d"
+            push @queue, $new_r
+            if ($new_r == 0) {
+                # reconstruct
+                my @path
+                my $cur = 0
+                while ($cur != -1 && defined $digit[$cur]) {
+                    unshift @path, $digit[$cur]
+                    $cur = $parent[$cur]
+                }
+                return join("", @path)
+            }
+        }
+    }
+    undef
+}
+
+# Direct values from rosetta task
+assert_eq Rosetta::OneZero::find(1),  "1",        "n=1"
+assert_eq Rosetta::OneZero::find(2),  "10",       "n=2"
+assert_eq Rosetta::OneZero::find(3),  "111",      "n=3"
+assert_eq Rosetta::OneZero::find(4),  "100",      "n=4"
+assert_eq Rosetta::OneZero::find(5),  "10",       "n=5"
+assert_eq Rosetta::OneZero::find(6),  "1110",     "n=6"
+assert_eq Rosetta::OneZero::find(7),  "1001",     "n=7"
+assert_eq Rosetta::OneZero::find(8),  "1000",     "n=8"
+assert_eq Rosetta::OneZero::find(9),  "111111111","n=9"
+assert_eq Rosetta::OneZero::find(10), "10",       "n=10"
+assert_eq Rosetta::OneZero::find(11), "11",       "n=11"
+assert_eq Rosetta::OneZero::find(12), "11100",    "n=12"
+
+# Property: every result is divisible by n
+for my $n (1..30) {
+    my $s = Rosetta::OneZero::find($n)
+    my $val = $s + 0
+    assert_eq $val % $n, 0, sprintf("result for n=%d is divisible by n", $n)
+    # Only 0 / 1 digits
+    my $bad = 0
+    for my $c (split //, $s) { $bad = 1 if $c ne "0" && $c ne "1" }
+    assert_eq $bad, 0, sprintf("result for n=%d is binary-digit only", $n)
+}
+
+# Pipe form (use a smaller verifiable input)
+12 |> Rosetta::OneZero::find |> assert_eq("11100", "pipe n=12")
+
+test_run

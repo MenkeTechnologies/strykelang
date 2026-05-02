@@ -1,0 +1,100 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word search (puzzle scan)
+# Given a 2-D grid of single characters and a list of target words,
+# locate each word along any of the eight straight directions.
+# Return matches as { word, row, col, dr, dc }.
+
+fn Rosetta::WordSearch::find($grid, $words) {
+    my $rows = len(@$grid)
+    return [] if $rows == 0
+    my $cols = len(@{$grid->[0]})
+    my @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0],
+                [1, 1], [1, -1], [-1, 1], [-1, -1])
+    my @hits
+    for my $w (@$words) {
+        my @chars = split //, uc($w)
+        my $L = len(@chars)
+        next if $L == 0
+        for my $r (0..$rows - 1) {
+            for my $c (0..$cols - 1) {
+                next if uc($grid->[$r][$c]) ne $chars[0]
+                for my $d (@dirs) {
+                    my $rr = $r + $d->[0] * ($L - 1)
+                    my $cc = $c + $d->[1] * ($L - 1)
+                    next if $rr < 0 || $rr >= $rows || $cc < 0 || $cc >= $cols
+                    my $ok = 1
+                    for my $k (1..$L - 1) {
+                        my $rk = $r + $d->[0] * $k
+                        my $ck = $c + $d->[1] * $k
+                        if (uc($grid->[$rk][$ck]) ne $chars[$k]) { $ok = 0; last }
+                    }
+                    if ($ok) {
+                        push @hits, {
+                            word => $w,
+                            row  => $r, col => $c,
+                            dr   => $d->[0], dc => $d->[1],
+                        }
+                    }
+                }
+            }
+        }
+    }
+    \@hits
+}
+
+# 4×4 grid
+my $grid = [
+    ["c", "a", "t", "x"],
+    ["d", "o", "g", "y"],
+    ["e", "n", "z", "k"],
+    ["f", "g", "p", "q"],
+]
+my $hits = Rosetta::WordSearch::find($grid, ["cat", "dog", "tag"])
+assert_ok len(@$hits) >= 2, "found at least 2 words"
+
+# 'cat' at (0,0) horizontal right
+my $found_cat = 0
+for my $h (@$hits) {
+    if ($h->{word} eq "cat" && $h->{row} == 0 && $h->{col} == 0
+        && $h->{dr} == 0 && $h->{dc} == 1) {
+        $found_cat = 1
+    }
+}
+assert_ok $found_cat, "cat at (0,0) horizontal"
+
+# 'dog' at (1,0) horizontal right
+my $found_dog = 0
+for my $h (@$hits) {
+    if ($h->{word} eq "dog" && $h->{row} == 1 && $h->{col} == 0
+        && $h->{dr} == 0 && $h->{dc} == 1) {
+        $found_dog = 1
+    }
+}
+assert_ok $found_dog, "dog at (1,0) horizontal"
+
+# Word not present
+my $miss = Rosetta::WordSearch::find($grid, ["xyz"])
+assert_eq scalar(@$miss), 0, "no match for 'xyz'"
+
+# Diagonals work
+my $diag = [
+    ["a", "x", "x"],
+    ["x", "b", "x"],
+    ["x", "x", "c"],
+]
+my $r = Rosetta::WordSearch::find($diag, ["abc"])
+assert_eq scalar(@$r), 1, "abc found diagonally"
+assert_eq $r->[0]{dr}, 1, "diagonal dr"
+assert_eq $r->[0]{dc}, 1, "diagonal dc"
+
+# Backwards (right-to-left)
+my $rev = [["c", "b", "a"]]
+my $r2 = Rosetta::WordSearch::find($rev, ["abc"])
+assert_eq scalar(@$r2), 1, "abc backwards"
+assert_eq $r2->[0]{dc}, -1, "backward dc"
+
+# Pipe form
+my $piped = Rosetta::WordSearch::find($grid, ["dog"])
+assert_eq len(@$piped), 1, "pipe dog count"
+
+test_run

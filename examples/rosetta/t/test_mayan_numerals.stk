@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mayan numerals
+# Vigesimal positional system: each digit is 0..19, written with dots
+# (•) for units and bars (—) for fives, plus a shell glyph (∅) for
+# zero. We render in a vertical stack with the highest power on top.
+
+fn Rosetta::Mayan::digit($d) {
+    return "∅" if $d == 0
+    my $bars  = int($d / 5)
+    my $units = $d % 5
+    my $bar_s  = "—" x $bars
+    my $unit_s = "•" x $units
+    my @parts
+    push @parts, $bar_s if length($bar_s) > 0
+    push @parts, $unit_s if length($unit_s) > 0
+    join(",", @parts)
+}
+
+fn Rosetta::Mayan::digits_of($n) {
+    return [0] if $n == 0
+    my @d
+    while ($n > 0) {
+        unshift @d, $n % 20
+        $n = int($n / 20)
+    }
+    \@d
+}
+
+fn Rosetta::Mayan::render($n) {
+    my $d = Rosetta::Mayan::digits_of($n)
+    join("\n", map { Rosetta::Mayan::digit($_) } @$d)
+}
+
+fn Rosetta::Mayan::from_digits($digits) {
+    my $v = 0
+    for my $d (@$digits) { $v = $v * 20 + $d }
+    $v
+}
+
+# Single-digit glyphs
+assert_eq Rosetta::Mayan::digit(0),  "∅",        "0 = shell"
+assert_eq Rosetta::Mayan::digit(1),  "•",        "1 = one dot"
+assert_eq Rosetta::Mayan::digit(4),  "••••",     "4 = four dots"
+assert_eq Rosetta::Mayan::digit(5),  "—",        "5 = one bar"
+assert_eq Rosetta::Mayan::digit(9),  "—,••••",   "9 = bar + 4 dots"
+assert_eq Rosetta::Mayan::digit(10), "——",       "10 = two bars"
+assert_eq Rosetta::Mayan::digit(15), "———",      "15 = three bars"
+assert_eq Rosetta::Mayan::digit(19), "———,••••", "19 = three bars + 4 dots"
+
+# Decompose into base-20 digits
+assert_eq join(",", @{Rosetta::Mayan::digits_of(0)}),     "0",       "0"
+assert_eq join(",", @{Rosetta::Mayan::digits_of(20)}),    "1,0",     "20 = (1, 0)"
+assert_eq join(",", @{Rosetta::Mayan::digits_of(400)}),   "1,0,0",   "400 = (1, 0, 0)"
+assert_eq join(",", @{Rosetta::Mayan::digits_of(4732)}),  "11,16,12","4732 = (11, 16, 12)"
+
+# Round-trip via from_digits
+my $rt_ok = 1
+for my $n (0, 1, 19, 20, 399, 400, 7999, 8000, 159999) {
+    my $back = Rosetta::Mayan::from_digits(Rosetta::Mayan::digits_of($n))
+    $rt_ok = 0 if $back != $n
+}
+assert_ok $rt_ok, "round-trip preserves values up to 159999"
+
+# Render multi-digit
+assert_eq Rosetta::Mayan::render(20),
+    "•\n∅",
+    "20 renders as • on top, shell below"
+assert_eq Rosetta::Mayan::render(0), "∅", "0 renders as a single shell"
+
+# Pipe form
+4732 |> Rosetta::Mayan::digits_of |> fn { join(",", @$_) } |> assert_eq("11,16,12", "pipe digits(4732)")
+
+test_run

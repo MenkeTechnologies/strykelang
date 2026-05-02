@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Voronoi diagram
+# Direct grid-rasterised approximation: for each pixel in a w × h
+# rectangle, find the nearest seed point. Result is a w × h grid of
+# seed indices.
+
+fn Rosetta::Voronoi::nearest($seeds, $x, $y) {
+    my $best = -1
+    my $best_d = 1e300
+    for my $i (0..len(@$seeds) - 1) {
+        my $s = $seeds->[$i]
+        my $dx = $x - $s->[0]
+        my $dy = $y - $s->[1]
+        my $d = $dx * $dx + $dy * $dy
+        if ($d < $best_d) { $best_d = $d; $best = $i }
+    }
+    $best
+}
+
+fn Rosetta::Voronoi::raster($seeds, $w, $h) {
+    my @grid
+    for my $y (0..$h - 1) {
+        my @row
+        for my $x (0..$w - 1) {
+            push @row, Rosetta::Voronoi::nearest($seeds, $x, $y)
+        }
+        push @grid, \@row
+    }
+    \@grid
+}
+
+fn Rosetta::Voronoi::cell_size($grid, $idx) {
+    my $count = 0
+    for my $row (@$grid) {
+        for my $cell (@$row) {
+            $count++ if $cell == $idx
+        }
+    }
+    $count
+}
+
+# Single seed: every cell maps to seed 0.
+my $g1 = Rosetta::Voronoi::raster([[5, 5]], 10, 10)
+my $all0 = 1
+for my $row (@$g1) {
+    for my $c (@$row) {
+        $all0 = 0 if $c != 0
+    }
+}
+assert_ok $all0, "single seed → uniform grid"
+
+# Two equidistant seeds split a 10×10 into halves.
+my $g2 = Rosetta::Voronoi::raster([[2, 5], [7, 5]], 10, 10)
+my $left = Rosetta::Voronoi::cell_size($g2, 0)
+my $right = Rosetta::Voronoi::cell_size($g2, 1)
+assert_eq $left + $right, 100, "all 100 cells assigned"
+assert_ok abs($left - $right) <= 10, "halves balanced"
+
+# Pixel ownership at seed location is the seed itself
+my $g3 = Rosetta::Voronoi::raster([[1, 1], [8, 1], [1, 8], [8, 8]], 10, 10)
+assert_eq $g3->[1][1], 0, "(1,1) is seed 0"
+assert_eq $g3->[1][8], 1, "(8,1) is seed 1"
+assert_eq $g3->[8][1], 2, "(1,8) is seed 2"
+assert_eq $g3->[8][8], 3, "(8,8) is seed 3"
+
+# Every cell index in {0..3}
+my $valid = 1
+for my $row (@$g3) {
+    for my $c (@$row) {
+        $valid = 0 if $c < 0 || $c > 3
+    }
+}
+assert_ok $valid, "all cells map to a valid seed"
+
+# Cell counts sum to total pixels
+my $total = 0
+for my $i (0..3) { $total += Rosetta::Voronoi::cell_size($g3, $i) }
+assert_eq $total, 100, "cell counts sum to 100"
+
+# Pipe form
+my $piped = Rosetta::Voronoi::raster([[5, 5]], 4, 4)
+assert_eq len(@$piped), 4, "pipe raster height"
+
+test_run

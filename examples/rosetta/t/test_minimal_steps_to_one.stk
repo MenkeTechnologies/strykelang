@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Minimal steps down to 1
+# Allowed moves at integer n > 1:
+#   subtract 1
+#   if 2 | n, divide by 2
+#   if 3 | n, divide by 3
+# Find the minimum number of operations to reach 1, plus a witnessing
+# path. Classic dynamic-programming problem.
+
+fn Rosetta::MinSteps::compute($n) {
+    return [0, [1]] if $n == 1
+    my @best = (0, 0)        # best[k] = (steps, parent)
+    my @parent = (0, 0)
+    for my $k (2..$n) {
+        my $b = $best[$k - 1] + 1
+        my $p = $k - 1
+        if ($k % 2 == 0 && $best[int($k / 2)] + 1 < $b) {
+            $b = $best[int($k / 2)] + 1; $p = int($k / 2)
+        }
+        if ($k % 3 == 0 && $best[int($k / 3)] + 1 < $b) {
+            $b = $best[int($k / 3)] + 1; $p = int($k / 3)
+        }
+        push @best, $b
+        push @parent, $p
+    }
+    # Reconstruct path
+    my @path
+    my $cur = $n
+    while ($cur > 1) { push @path, $cur; $cur = $parent[$cur] }
+    push @path, 1
+    [$best[$n], \@path]
+}
+
+# Direct values from rosetta task
+assert_eq Rosetta::MinSteps::compute(1)->[0], 0,  "f(1)  = 0"
+assert_eq Rosetta::MinSteps::compute(10)->[0], 3, "f(10) = 3 (10 → 9 → 3 → 1)"
+assert_eq Rosetta::MinSteps::compute(100)->[0], 7, "f(100) = 7"
+assert_eq Rosetta::MinSteps::compute(1000)->[0], 9, "f(1000) = 9"
+
+# Path validity: every step is one of the three legal moves
+my $r = Rosetta::MinSteps::compute(100)
+my $path = $r->[1]
+my $valid = 1
+for my $i (0..len(@$path) - 2) {
+    my $a = $path->[$i]
+    my $b = $path->[$i + 1]
+    my $ok = ($b == $a - 1)
+        || ($a % 2 == 0 && $b == int($a / 2))
+        || ($a % 3 == 0 && $b == int($a / 3))
+    $valid = 0 if !$ok
+}
+assert_ok $valid, "every move in path is legal"
+assert_eq $path->[-1], 1, "path ends at 1"
+
+# Path length matches step count
+assert_eq len(@$path) - 1, $r->[0], "path edges = step count"
+
+# Pipe form
+100 |> Rosetta::MinSteps::compute |> fn { $_->[0] } |> assert_eq(7, "pipe f(100)")
+
+test_run

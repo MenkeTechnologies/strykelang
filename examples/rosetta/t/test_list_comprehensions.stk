@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+# Rosetta Code: List comprehensions
+# Stryke's pipeline-style replacement: combine `~>` ranges, `map`, and
+# `grep` to express list comprehensions concisely.
+
+fn Rosetta::ListComp::pythagoras_triples($n) {
+    # All (a, b, c) with a ≤ b ≤ c, a²+b² = c², 1 ≤ a, b, c ≤ n.
+    my @out
+    for my $a (1..$n) {
+        for my $b ($a..$n) {
+            my $c2 = $a * $a + $b * $b
+            my $c = int(sqrt($c2))
+            push @out, [$a, $b, $c] if $c * $c == $c2 && $c <= $n && $b <= $c
+        }
+    }
+    @out
+}
+
+fn Rosetta::ListComp::squares($n) {
+    1:$n |> map { _ * _ }
+}
+
+fn Rosetta::ListComp::evens($n) {
+    1:$n |> grep { _ % 2 == 0 }
+}
+
+fn Rosetta::ListComp::pairs($a, $b) {
+    my @out
+    for my $x (1..$a) {
+        for my $y (1..$b) {
+            push @out, [$x, $y]
+        }
+    }
+    @out
+}
+
+# Squares
+my @sq = Rosetta::ListComp::squares(5)
+assert_eq join(",", @sq), "1,4,9,16,25", "squares 1..5"
+
+# Evens
+my @ev = Rosetta::ListComp::evens(10)
+assert_eq join(",", @ev), "2,4,6,8,10", "evens ≤ 10"
+
+# Pairs (a × b grid)
+my @pairs = Rosetta::ListComp::pairs(2, 3)
+assert_eq len(@pairs), 6, "2×3 = 6 pairs"
+assert_eq join("|", map { "$_->[0],$_->[1]" } @pairs),
+    "1,1|1,2|1,3|2,1|2,2|2,3", "row-major pairs"
+
+# Pythagorean triples up to 20
+my @tri = Rosetta::ListComp::pythagoras_triples(20)
+my @str = map { "($_->[0],$_->[1],$_->[2])" } @tri
+assert_eq join(" ", @str),
+    "(3,4,5) (5,12,13) (6,8,10) (8,15,17) (9,12,15) (12,16,20)",
+    "Pythagorean triples ≤ 20"
+
+# Threaded combination: even squares
+my @ev_sq = ~> 1:6 |> map { _ * _ } |> grep { _ % 2 == 0 }
+assert_eq join(",", @ev_sq), "4,16,36", "even squares of 1..6"
+
+# Pipe form
+my @sq6 = Rosetta::ListComp::squares(6)
+join(",", @sq6) |> assert_eq("1,4,9,16,25,36", "pipe squares")
+
+test_run

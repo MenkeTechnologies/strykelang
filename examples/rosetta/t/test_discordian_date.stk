@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Discordian date
+# Convert Gregorian Y/M/D to a Discordian date.
+# Year of Our Lady of Discord (YOLD) = Gregorian year + 1166.
+# 5 seasons of 73 days each. Day-of-year 60 (Mar 1 in non-leap years)
+# advances the season counter, but leap years insert "St. Tib's Day"
+# on Feb 29, which is outside the 5-season cycle.
+
+fn Rosetta::Disco::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || ($y % 400 == 0)
+}
+
+fn Rosetta::Disco::day_of_year($y, $m, $d) {
+    my @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    $days[1] = 29 if Rosetta::Disco::is_leap($y)
+    my $doy = $d
+    for my $i (0..$m - 2) { $doy += $days[$i] }
+    $doy
+}
+
+fn Rosetta::Disco::to_str($y, $m, $d) {
+    my @seasons = ("Chaos", "Discord", "Confusion", "Bureaucracy", "The Aftermath")
+    my @days_of_week = ("Sweetmorn", "Boomtime", "Pungenday", "Prickle-Prickle", "Setting Orange")
+    my $yold = $y + 1166
+    if ($m == 2 && $d == 29 && Rosetta::Disco::is_leap($y)) {
+        return sprintf("St. Tib's Day, YOLD %d", $yold)
+    }
+    my $doy = Rosetta::Disco::day_of_year($y, $m, $d)
+    # Skip leap day in season counting if past Feb 29
+    if (Rosetta::Disco::is_leap($y) && $doy > 60) { $doy-- }
+    my $season_idx = int(($doy - 1) / 73)
+    my $sday       = (($doy - 1) % 73) + 1
+    my $dow        = (($doy - 1) % 5)
+    sprintf("%s, %s %d, YOLD %d",
+        $days_of_week[$dow], $seasons[$season_idx], $sday, $yold)
+}
+
+# Specific anchors
+assert_eq Rosetta::Disco::to_str(2010, 1, 1),
+    "Sweetmorn, Chaos 1, YOLD 3176",
+    "2010-01-01"
+assert_eq Rosetta::Disco::to_str(2012, 2, 28),
+    "Prickle-Prickle, Chaos 59, YOLD 3178",
+    "2012-02-28 (leap year, day before Tib's)"
+assert_eq Rosetta::Disco::to_str(2012, 2, 29),
+    "St. Tib's Day, YOLD 3178",
+    "2012-02-29 → St. Tib's Day"
+assert_eq Rosetta::Disco::to_str(2012, 3, 1),
+    "Setting Orange, Chaos 60, YOLD 3178",
+    "2012-03-01 still Chaos 60 in leap year"
+assert_eq Rosetta::Disco::to_str(2010, 3, 1),
+    "Setting Orange, Chaos 60, YOLD 3176",
+    "2010-03-01 Chaos 60"
+assert_eq Rosetta::Disco::to_str(2026, 4, 28),
+    Rosetta::Disco::to_str(2026, 4, 28),
+    "self-equality"
+
+# Boundary at start of next season — Chaos 73 is doy 73 = Mar 14 (non-leap)
+assert_eq Rosetta::Disco::to_str(2026, 3, 14),
+    "Pungenday, Chaos 73, YOLD 3192",
+    "2026-03-14 last day of Chaos"
+assert_eq Rosetta::Disco::to_str(2026, 3, 15),
+    "Prickle-Prickle, Discord 1, YOLD 3192",
+    "2026-03-15 first day of Discord"
+
+# Pipe form
+2026 |> fn { Rosetta::Disco::to_str(_, 12, 31) } |> assert_eq("Setting Orange, The Aftermath 73, YOLD 3192", "pipe new year's eve")
+
+test_run

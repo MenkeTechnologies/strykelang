@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Set right-adjacent bits
+# Given a binary string and a count k, replace every '1' with k+1
+# consecutive '1's: the original bit and the k bits immediately to its
+# right are all turned on. Bits beyond the original length are
+# dropped.
+
+fn Rosetta::SetRight::apply($s, $k) {
+    my @bits = split //, $s
+    my $n = len(@bits)
+    my @out = (0) x $n
+    for my $i (0..$n - 1) {
+        if ($bits[$i] eq "1") {
+            for my $j ($i..$i + $k) {
+                $out[$j] = 1 if $j < $n
+            }
+        }
+    }
+    join("", @out)
+}
+
+# Direct cases from rosetta task
+assert_eq Rosetta::SetRight::apply("010000000000100000000010000000010000000100000010000010000100010010", 0),
+    "010000000000100000000010000000010000000100000010000010000100010010", "k=0 leaves untouched"
+
+assert_eq Rosetta::SetRight::apply("010000000000100000000010000000010000000100000010000010000100010010", 1),
+    "011000000000110000000011000000011000000110000011000011000110011011", "k=1"
+
+assert_eq Rosetta::SetRight::apply("010000000000100000000010000000010000000100000010000010000100010010", 2),
+    "011100000000111000000011100000011100000111000011100011100111011111", "k=2"
+
+assert_eq Rosetta::SetRight::apply("010000000000100000000010000000010000000100000010000010000100010010", 3),
+    "011110000000111100000011110000011110000111100011110011110111111111", "k=3"
+
+# Idempotence-ish: apply k=2 then k=2 again should equal apply k=2 once on the result.
+my $once  = Rosetta::SetRight::apply("0100100", 2)
+my $twice = Rosetta::SetRight::apply($once, 2)
+assert_eq Rosetta::SetRight::apply($once, 0), $once, "k=0 reapply identity"
+assert_ok $twice ge $once, "twice ≥ once (more 1s only)"
+
+# Pipe form
+"01001" |> fn { Rosetta::SetRight::apply(_, 1) } |> assert_eq("01101", "pipe k=1")
+
+# Edge cases
+assert_eq Rosetta::SetRight::apply("", 5), "", "empty input"
+assert_eq Rosetta::SetRight::apply("0", 3), "0", "all zeros stay zero"
+assert_eq Rosetta::SetRight::apply("1", 5), "1", "single 1 cannot extend past the end"
+assert_eq Rosetta::SetRight::apply("100", 5), "111", "extend cropped at right edge"
+
+test_run

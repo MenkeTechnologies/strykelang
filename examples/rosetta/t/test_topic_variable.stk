@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Topic variable
+# Stryke's topic is `_` (zero-arity sigil-less) inside fn / map / grep
+# blocks. This test exercises the topic across each primary form.
+
+fn Rosetta::Topic::sample_block() {
+    my @evens = (1, 2, 3, 4, 5) |> grep { _ % 2 == 0 }
+    my @doubled = @evens |> map { _ * 2 }
+    @doubled
+}
+
+fn Rosetta::Topic::sample_for() {
+    my @out
+    for my $n (1, 2, 3) {
+        push @out, $n * 10
+    }
+    @out
+}
+
+# Pipe + topic
+my @piped = (10, 20, 30) |> map { _ + 1 }
+assert_eq join(",", @piped), "11,21,31", "_ in map block"
+
+my @filtered = (1, 2, 3, 4, 5, 6) |> grep { _ > 3 }
+assert_eq join(",", @filtered), "4,5,6", "_ in grep block"
+
+my @nested = Rosetta::Topic::sample_block()
+assert_eq join(",", @nested), "4,8", "fn body uses _"
+
+# Threaded form
+my $sq = ~> 5 fn { _ * _ }
+assert_eq $sq, 25, "_ in threaded fn"
+
+# Reduce with _0 and _1
+my $sum = (1, 2, 3, 4, 5) |> reduce { _0 + _1 }
+assert_eq $sum, 15, "reduce _0 + _1"
+
+# Topic chain through three pipes
+my $r = ~> 3 |> fn { _ * _ } |> fn { _ + 1 } |> fn { _ * 2 }
+assert_eq $r, 20, "(((3·3)+1)·2)"
+
+# For-loop variable is explicit ($n), not _
+my @forced = Rosetta::Topic::sample_for()
+assert_eq join(",", @forced), "10,20,30", "for variable is explicit"
+
+# Topic preserved across pipe
+my @count = ~> 1:5 |> map { _ + 100 }
+assert_eq join(",", @count), "101,102,103,104,105", "topic on range"
+
+test_run

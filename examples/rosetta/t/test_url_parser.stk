@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL parser
+# Decompose a URL into scheme, user, password, host, port, path, query,
+# fragment. Pure-Stryke regex parser.
+
+fn Rosetta::Url::parse($url) {
+    return undef unless $url =~ m{^([a-zA-Z][a-zA-Z0-9+.\-]*):(?://([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:\#(.*))?$}
+    my $scheme    = $1
+    my $authority = defined $2 ? $2 : ""
+    my $path      = defined $3 ? $3 : ""
+    my $query     = defined $4 ? $4 : undef
+    my $fragment  = defined $5 ? $5 : undef
+    my ($userinfo, $hostport) = ("", $authority)
+    if (index($authority, "@") >= 0) {
+        my $idx = index($authority, "@")
+        $userinfo = substr($authority, 0, $idx)
+        $hostport = substr($authority, $idx + 1)
+    }
+    my ($user, $pass)
+    if ($userinfo ne "") {
+        my $colon = index($userinfo, ":")
+        if ($colon >= 0) {
+            $user = substr($userinfo, 0, $colon)
+            $pass = substr($userinfo, $colon + 1)
+        } else {
+            $user = $userinfo
+        }
+    }
+    my ($host, $port) = ($hostport, undef)
+    # IPv6 literal: bracketed
+    if (substr($hostport, 0, 1) eq "[") {
+        my $close = index($hostport, "]")
+        if ($close > 0) {
+            $host = substr($hostport, 1, $close - 1)
+            my $rest = substr($hostport, $close + 1)
+            $port = substr($rest, 1) + 0 if substr($rest, 0, 1) eq ":"
+        }
+    } elsif (index($hostport, ":") >= 0) {
+        my $idx = index($hostport, ":")
+        $host = substr($hostport, 0, $idx)
+        $port = substr($hostport, $idx + 1) + 0
+    }
+    {
+        scheme   => $scheme,
+        user     => $user,
+        pass     => $pass,
+        host     => $host,
+        port     => $port,
+        path     => $path,
+        query    => $query,
+        fragment => $fragment,
+    }
+}
+
+# Standard cases
+my $u = Rosetta::Url::parse("http://www.example.com/path?q=1#frag")
+assert_eq $u->{scheme}, "http",            "scheme"
+assert_eq $u->{host},   "www.example.com", "host"
+assert_eq $u->{path},   "/path",           "path"
+assert_eq $u->{query},  "q=1",             "query"
+assert_eq $u->{fragment}, "frag",          "fragment"
+
+# user:pass@host
+my $u2 = Rosetta::Url::parse('https://alice:secret@db.local:5432/db?ssl=1')
+assert_eq $u2->{user}, "alice",   "user"
+assert_eq $u2->{pass}, "secret",  "password"
+assert_eq $u2->{host}, "db.local","host"
+assert_eq $u2->{port}, 5432,      "port"
+assert_eq $u2->{path}, "/db",     "path"
+assert_eq $u2->{query},"ssl=1",   "query"
+
+# IPv6 literal
+my $u6 = Rosetta::Url::parse("http://[::1]:8080/")
+assert_eq $u6->{host}, "::1",     "ipv6 host"
+assert_eq $u6->{port}, 8080,      "ipv6 port"
+
+# mailto / urn — no authority
+my $um = Rosetta::Url::parse('mailto:user@example.com')
+assert_eq $um->{scheme}, "mailto", "mailto scheme"
+assert_eq $um->{path},   'user@example.com', "mailto path"
+
+# Malformed
+assert_ok !defined(Rosetta::Url::parse("not a url")), "garbage rejected"
+
+# Pipe form
+"http://x.y/p" |> Rosetta::Url::parse |> fn { $_->{host} } |> assert_eq("x.y", "pipe host")
+
+test_run

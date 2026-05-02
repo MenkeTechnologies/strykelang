@@ -4773,7 +4773,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.11.2"
+version = "0.11.3"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -6663,9 +6663,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.10.5"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f9b1bc257e0f13f76faed155252d967e3fcef43344aed350fc260d3d77e4a39"
+checksum = "3f7445bf17858eb11a55ecad07aff4e887f32975a4837e76675ff65f956cc595"
 dependencies = [
  "atty",
  "bincode",
@@ -6712,6 +6712,7 @@ dependencies = [
  "unicode-width 0.2.2",
  "walkdir",
  "zshrs-daemon",
+ "zshrs-parse",
  "zstd",
 ]
 
@@ -6745,6 +6746,15 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "walkdir",
+]
+
+[[package]]
+name = "zshrs-parse"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a67c2d558abc4ee089228684457b93775e137bc620a6dd24e943945a00d91129"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

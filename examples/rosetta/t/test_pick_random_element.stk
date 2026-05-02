@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pick random element
+# Pure utility on top of stryke's `rand` builtin. Returns one element
+# uniformly at random from a non-empty array.
+
+fn Rosetta::Pick::one(@arr) {
+    return undef if len(@arr) == 0
+    $arr[int(rand(len(@arr)))]
+}
+
+fn Rosetta::Pick::n($arr_ref, $n) {
+    my @out
+    for my $i (~> 1:$n) {
+        push @out, Rosetta::Pick::one(@$arr_ref)
+    }
+    @out
+}
+
+# Single-element array always returns that element
+my @single = ("only")
+for my $i (~> 1:50) {
+    assert_eq Rosetta::Pick::one(@single), "only", "single-element pick"
+}
+
+# Empty
+assert_ok !defined(Rosetta::Pick::one()), "empty array → undef"
+
+# Picks come from input set only
+my @set = (10, 20, 30, 40, 50)
+my %allowed = map { $_ => 1 } @set
+my @samples = Rosetta::Pick::n(\@set, 200)
+my $all_in = 1
+for my $s (@samples) { $all_in = 0 if !exists $allowed{$s} }
+assert_ok $all_in, "every pick belongs to source array"
+
+# Distribution sanity: every element appears at least once across 5000 picks
+my @big_samples = Rosetta::Pick::n(\@set, 5000)
+my %seen
+for my $s (@big_samples) { $seen{$s}++ }
+my $coverage = 1
+for my $e (@set) { $coverage = 0 if !exists $seen{$e} }
+assert_ok $coverage, "every input element appears in 5000 picks"
+
+# Pipe form
+my @vals = ("a", "b", "c")
+my $p = Rosetta::Pick::one(@vals)
+assert_ok defined($p), "pipe pick returns something"
+
+test_run

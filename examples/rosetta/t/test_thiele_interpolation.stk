@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Thiele's interpolation formula
+# Build the rho-table of inverse divided differences, then evaluate
+# the continued-fraction interpolant at a query x.
+
+fn Rosetta::Thiele::rho_table($xs, $ys) {
+    my $n = len(@$xs)
+    my @p
+    for my $i (0..$n - 1) { push @p, [($ys->[$i]) x $n] }
+    for my $j (1..$n - 1) {
+        for my $i (0..$n - 1 - $j) {
+            my $denom = $p[$i + 1][$j - 1] - $p[$i][$j - 1]
+            if (abs($denom) < 1e-15) {
+                $p[$i][$j] = 0
+            } else {
+                my $prev = $j >= 2 ? $p[$i + 1][$j - 2] : 0
+                $p[$i][$j] = $prev + ($xs->[$i + $j] - $xs->[$i]) / $denom
+            }
+        }
+    }
+    \@p
+}
+
+fn Rosetta::Thiele::eval($xs, $ys, $x) {
+    my $rho = Rosetta::Thiele::rho_table($xs, $ys)
+    my $n = len(@$xs)
+    my $f = 0
+    for (my $j = $n - 1; $j >= 1; $j--) {
+        my $prev = $j >= 2 ? $rho->[0][$j - 2] : 0
+        my $denom = $rho->[0][$j] + $f - $prev
+        if (abs($denom) < 1e-15) {
+            $f = 0
+        } else {
+            $f = ($x - $xs->[$j - 1]) / $denom
+        }
+    }
+    $rho->[0][0] + $f
+}
+
+# 1/(1+x²) — well-suited to Thiele's rational form
+my @rxs = (0, 1, 2, 3, 4, 5)
+my @rys = (1.0, 0.5, 0.2, 0.1, 1/17, 1/26)
+my $est = Rosetta::Thiele::eval(\@rxs, \@rys, 2.5)
+my $true_val = 1 / (1 + 2.5 * 2.5)
+assert_near $est, $true_val, 1e-3, "Thiele on 1/(1+x²) at 2.5"
+
+# Reproduces sample points exactly
+for my $i (0..5) {
+    my $v = Rosetta::Thiele::eval(\@rxs, \@rys, $rxs[$i])
+    assert_near $v, $rys[$i], 1e-9, sprintf("interp(x_%d) = y_%d", $i, $i)
+}
+
+# Pipe form
+2.5 |> fn { Rosetta::Thiele::eval(\@rxs, \@rys, _) } |> assert_near($true_val, 1e-3, "pipe rational")
+
+test_run

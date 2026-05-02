@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: URL decoding
+# Decode percent-encoded ASCII / UTF-8 sequences in a URL-encoded
+# string. Replaces %XX with the corresponding byte; non-encoded
+# characters pass through unchanged. '+' is left as-is (URL path
+# convention); the form-encoded variant treating '+' as space is
+# offered as a separate helper.
+
+fn Rosetta::UrlDecode::hex_to_int($c) {
+    return ord($c) - ord("0") if $c ge "0" && $c le "9"
+    return ord($c) - ord("a") + 10 if $c ge "a" && $c le "f"
+    return ord($c) - ord("A") + 10 if $c ge "A" && $c le "F"
+    -1
+}
+
+fn Rosetta::UrlDecode::decode($s) {
+    my $out = ""
+    my $i = 0
+    my $n = length($s)
+    while ($i < $n) {
+        my $c = substr($s, $i, 1)
+        if ($c eq "%" && $i + 2 < $n) {
+            my $h1 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 1, 1))
+            my $h2 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 2, 1))
+            if ($h1 >= 0 && $h2 >= 0) {
+                $out .= chr($h1 * 16 + $h2)
+                $i += 3
+                next
+            }
+        }
+        $out .= $c
+        $i++
+    }
+    $out
+}
+
+fn Rosetta::UrlDecode::decode_form($s) {
+    my $tmp = $s
+    $tmp =~ s/\+/ /g
+    Rosetta::UrlDecode::decode($tmp)
+}
+
+# Hex helper
+assert_eq Rosetta::UrlDecode::hex_to_int("0"), 0,  "hex 0"
+assert_eq Rosetta::UrlDecode::hex_to_int("9"), 9,  "hex 9"
+assert_eq Rosetta::UrlDecode::hex_to_int("A"), 10, "hex A"
+assert_eq Rosetta::UrlDecode::hex_to_int("f"), 15, "hex f"
+assert_eq Rosetta::UrlDecode::hex_to_int("z"), -1, "hex z invalid"
+
+# Direct cases (rosetta sample)
+assert_eq Rosetta::UrlDecode::decode("http%3A%2F%2Ffoo%20bar%2F"),
+    "http://foo bar/", "rosetta sample"
+assert_eq Rosetta::UrlDecode::decode("%21Hello"), "!Hello", "leading %21"
+assert_eq Rosetta::UrlDecode::decode("%24%24%24"), "\$\$\$", "%24 → \$"
+assert_eq Rosetta::UrlDecode::decode("plain"), "plain", "no encoding passes through"
+assert_eq Rosetta::UrlDecode::decode("a%2Bb"), "a+b", "encoded plus stays a literal +"
+assert_eq Rosetta::UrlDecode::decode("a+b"), "a+b", "raw + stays + (URL path mode)"
+
+# Form-encoded variant
+assert_eq Rosetta::UrlDecode::decode_form("hello+world"), "hello world", "form decode + → space"
+assert_eq Rosetta::UrlDecode::decode_form("a%2Bb"),       "a+b",         "form keeps encoded +"
+
+# Malformed: bare percent left alone
+assert_eq Rosetta::UrlDecode::decode("100% pure"), "100% pure", "bare % preserved"
+
+# Pipe form
+"hello%20world" |> Rosetta::UrlDecode::decode |> assert_eq("hello world", "pipe sample")
+
+test_run

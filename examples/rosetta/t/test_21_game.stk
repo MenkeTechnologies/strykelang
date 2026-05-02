@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 21 game
+# Two players alternate adding 1, 2, or 3 to a running total starting
+# at zero. Whoever reaches exactly 21 wins. Optimal strategy: make the
+# total congruent to 1 (mod 4) after your move (so 1, 5, 9, 13, 17, 21).
+# When the running total is already ≡ 1 (mod 4) before your turn,
+# you are in a losing position against perfect play and must hope the
+# opponent slips.
+
+fn Rosetta::Game21::optimal_move($total) {
+    my $r = $total % 4
+    # We want $total + $p ≡ 1 (mod 4) and 1 ≤ $p ≤ 3.
+    # So $p ≡ (1 - $r) (mod 4); if that ≡ 0, we're losing — pick 1.
+    my $p = ((1 - $r) % 4 + 4) % 4
+    $p == 0 ? 1 : $p
+}
+
+fn Rosetta::Game21::random_move($total) {
+    my $room = 21 - $total
+    $room < 3 ? $room : 1 + int(rand(3))
+}
+
+fn Rosetta::Game21::play(@strategies) {
+    my $total = 0
+    my $turn = 0
+    while ($total < 21) {
+        my $p = $strategies[$turn]->($total)
+        $p = 1 if $p < 1
+        $p = 3 if $p > 3
+        $p = 21 - $total if $total + $p > 21
+        $total += $p
+        return $turn if $total == 21
+        $turn = 1 - $turn
+    }
+    -1
+}
+
+fn Rosetta::Game21::is_winning_position($total) {
+    # Position is a *win for the player about to move* iff total mod 4 != 1.
+    $total % 4 != 1
+}
+
+# Optimal moves at every total below 21
+my @moves = ~> 0:20 |> map { Rosetta::Game21::optimal_move(_) }
+# After move from 0 we should reach 1; from 1 (losing) we pick 1; etc.
+assert_eq $moves[0], 1, "from 0 → +1 → 1"
+assert_eq $moves[1], 1, "from 1 (losing) → +1"
+assert_eq $moves[2], 3, "from 2 → +3 → 5"
+assert_eq $moves[3], 2, "from 3 → +2 → 5"
+assert_eq $moves[4], 1, "from 4 → +1 → 5"
+assert_eq $moves[16], 1, "from 16 → +1 → 17"
+assert_eq $moves[17], 1, "from 17 (losing) → +1"
+assert_eq $moves[18], 3, "from 18 → +3 → 21"
+assert_eq $moves[19], 2, "from 19 → +2 → 21"
+assert_eq $moves[20], 1, "from 20 → +1 → 21"
+
+# All optimal post-move totals (from a non-losing position) ≡ 1 (mod 4)
+0:20 \
+    |> grep { _ % 4 != 1 } \
+    |> map { (_ + Rosetta::Game21::optimal_move(_)) % 4 } \
+    |> all { _ == 1 } \
+    |> assert_eq(1, "every optimal post-move total ≡ 1 (mod 4)")
+
+# Losing positions (for the player to move) are exactly t ≡ 1 (mod 4)
+my @losing = ~> 0:21 |> grep { !Rosetta::Game21::is_winning_position(_) }
+assert_eq join(",", @losing), "1,5,9,13,17,21", "losing positions"
+
+# Pipe form
+0 |> Rosetta::Game21::optimal_move |> assert_eq(1, "pipe optimal(0)")
+
+# Optimal vs optimal: whoever moves first from 0 wins (0 is winning)
+my $opt = fn ($t) { Rosetta::Game21::optimal_move($t) }
+assert_eq Rosetta::Game21::play($opt, $opt), 0, "optimal vs optimal — first player wins"
+
+test_run

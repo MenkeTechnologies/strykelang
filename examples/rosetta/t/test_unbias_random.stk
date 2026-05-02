@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Unbias a random generator
+# Von Neumann's trick: given a biased coin (p_heads = p), draw two
+# coins; if HT keep H, if TH keep T, otherwise re-roll. The output
+# is uniformly distributed regardless of p (as long as 0 < p < 1).
+
+fn Rosetta::Unbias::biased_coin($p) {
+    rand() < $p ? 1 : 0
+}
+
+fn Rosetta::Unbias::unbiased($p) {
+    while (1) {
+        my $a = Rosetta::Unbias::biased_coin($p)
+        my $b = Rosetta::Unbias::biased_coin($p)
+        return 1 if $a == 1 && $b == 0
+        return 0 if $a == 0 && $b == 1
+    }
+}
+
+fn Rosetta::Unbias::frequency($coin_fn, $trials) {
+    my $heads = 0
+    for my $i (~> 1:$trials) {
+        $heads++ if $coin_fn->()
+    }
+    $heads / $trials
+}
+
+# Severely biased coin: p = 0.7
+my $biased_p = 0.7
+my $biased_freq = Rosetta::Unbias::frequency(
+    fn () { Rosetta::Unbias::biased_coin($biased_p) },
+    20000)
+assert_near $biased_freq, $biased_p, 0.02, "biased coin matches p"
+
+# Von Neumann unbiased should converge to 0.5
+my $fair_freq = Rosetta::Unbias::frequency(
+    fn () { Rosetta::Unbias::unbiased($biased_p) },
+    20000)
+assert_near $fair_freq, 0.5, 0.03, "unbiased coin converges to 0.5"
+
+# Even very biased: p = 0.9
+my $skewed_p = 0.9
+my $unbiased_skewed = Rosetta::Unbias::frequency(
+    fn () { Rosetta::Unbias::unbiased($skewed_p) },
+    20000)
+assert_near $unbiased_skewed, 0.5, 0.05, "still unbiased at p = 0.9"
+
+# Result is always 0 or 1
+my $only_bits = 1
+for my $i (~> 1:200) {
+    my $r = Rosetta::Unbias::unbiased(0.6)
+    $only_bits = 0 if $r != 0 && $r != 1
+}
+assert_ok $only_bits, "unbiased() returns only 0 or 1"
+
+# Pipe form
+0.5 |> fn { Rosetta::Unbias::biased_coin(_) } |> fn { $_ == 0 || $_ == 1 ? 1 : 0 } |> assert_eq(1, "pipe coin")
+
+test_run

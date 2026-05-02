@@ -12,4 +12,4 @@ FILENAME is the name of your new rosetta code example.
 
 do not litter $PWD with temp files, put them in /tmp
 
-You can not modify any files.
+You can not modify any current tests in t/.

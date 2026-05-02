@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numbers divisible by their individual digits, but not
+# by the product of their digits. (OEIS A036459 etc.)
+# n must be > 9, contain no zero digit, every digit must divide n,
+# and the product of digits must NOT divide n.
+
+fn Rosetta::DivDigits::digits($n) {
+    my @d
+    while ($n > 0) {
+        push @d, $n % 10
+        $n = int($n / 10)
+    }
+    @d
+}
+
+fn Rosetta::DivDigits::is($n) {
+    return 0 if $n < 10
+    my @d = Rosetta::DivDigits::digits($n)
+    my $prod = 1
+    for my $x (@d) {
+        return 0 if $x == 0
+        return 0 if $n % $x != 0
+        $prod *= $x
+    }
+    return 0 if $n % $prod == 0
+    1
+}
+
+# Sanity
+assert_eq Rosetta::DivDigits::is(12), 0, "12: 1·2=2, 12%2=0 → bad"
+assert_eq Rosetta::DivDigits::is(15), 0, "15: 1·5=5, 15%5=0 → bad"
+assert_eq Rosetta::DivDigits::is(20), 0, "20 has zero digit"
+assert_eq Rosetta::DivDigits::is(13), 0, "13: 13%3 != 0"
+# 24: digits 2, 4. 24%2=0 ✓, 24%4=0 ✓, prod=8, 24%8=0 → bad
+assert_eq Rosetta::DivDigits::is(24), 0, "24: prod 8 divides"
+# 48: digits 4, 8. 48%4=0, 48%8=0, prod=32, 48%32 != 0 → good
+assert_eq Rosetta::DivDigits::is(48), 1, "48 qualifies"
+
+# First few in OEIS A007424/A036459 — first 10:
+my @hits = ~> 10:200 |> grep { Rosetta::DivDigits::is(_) }
+assert_eq join(",", @hits[0..9]),
+    "22,33,44,48,55,66,77,88,99,122",
+    "first 10 qualifying numbers"
+
+# Properties
+for my $n (@hits[0..9]) {
+    my @d = Rosetta::DivDigits::digits($n)
+    my $prod = 1
+    my $all_div = 1
+    for my $x (@d) {
+        $all_div = 0 if $n % $x != 0
+        $prod *= $x
+    }
+    assert_ok $all_div, sprintf("%d: every digit divides", $n)
+    assert_ok $n % $prod != 0, sprintf("%d: product does NOT divide", $n)
+}
+
+# Pipe form
+48 |> Rosetta::DivDigits::is |> assert_eq(1, "pipe is(48)")
+
+test_run

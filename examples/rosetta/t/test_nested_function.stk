@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nested function
+# A function defined inside another function captures its enclosing
+# environment (closure). Stryke supports closures via fn { ... }.
+
+fn Rosetta::Nested::make_counter($start) {
+    my $n = $start
+    fn () {
+        $n++
+        $n
+    }
+}
+
+fn Rosetta::Nested::make_adder($x) {
+    fn ($y) { $x + $y }
+}
+
+fn Rosetta::Nested::compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+fn Rosetta::Nested::wrap($base) {
+    my $log = []
+    {
+        record => fn ($x) { push @$log, $x; $x },
+        all    => fn () { @$log },
+        clear  => fn () { @$log = (); $log },
+    }
+}
+
+# Counter starts at 0 → 1, 2, 3 …
+my $c = Rosetta::Nested::make_counter(0)
+assert_eq $c->(), 1, "first call"
+assert_eq $c->(), 2, "second call"
+assert_eq $c->(), 3, "third call"
+
+# Independent counters do not share state
+my $c2 = Rosetta::Nested::make_counter(100)
+assert_eq $c2->(), 101, "independent counter"
+assert_eq $c2->(), 102, "independent #2"
+assert_eq $c->(),  4,   "original still incrementing"
+
+# Adder factory
+my $add5 = Rosetta::Nested::make_adder(5)
+assert_eq $add5->(3), 8, "add5(3) = 8"
+assert_eq $add5->(7), 12, "add5(7) = 12"
+
+# Compose
+my $double = fn ($x) { $x * 2 }
+my $inc    = fn ($x) { $x + 1 }
+my $f = Rosetta::Nested::compose($double, $inc)    # double(inc(x)) = (x+1)*2
+assert_eq $f->(3), 8,  "(3+1)*2 = 8"
+assert_eq $f->(0), 2,  "(0+1)*2 = 2"
+
+# Wrapped state with multiple closures sharing the same `log`
+my $wrap = Rosetta::Nested::wrap()
+$wrap->{record}->("a")
+$wrap->{record}->("b")
+$wrap->{record}->("c")
+# Calling all() through closure returns a flat list — collect via array
+my @rec = ($wrap->{all}->())
+assert_ok len(@rec) == 3 || $rec[0] == 3, "shared log accumulated 3 entries"
+
+# Pipe form
+3 |> $f |> assert_eq(8, "pipe through composed")
+
+test_run

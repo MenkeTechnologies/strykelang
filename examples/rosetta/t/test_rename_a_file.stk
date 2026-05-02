@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rename a file
+# Use stryke's rename() builtin (POSIX rename(2)). Test under /tmp.
+
+fn Rosetta::Rename::move($src, $dst) {
+    return 0 unless -e $src
+    rename($src, $dst)
+}
+
+fn Rosetta::Rename::touch($path) {
+    open(my $fh, ">", $path) or return 0
+    close($fh)
+    1
+}
+
+# Scratch
+my $a = "/tmp/stk_rename_a_$$"
+my $b = "/tmp/stk_rename_b_$$"
+unlink($a); unlink($b)
+
+# Setup: create $a
+assert_eq Rosetta::Rename::touch($a), 1, "create source"
+assert_ok -e $a, "source exists"
+
+# Rename a → b
+assert_eq Rosetta::Rename::move($a, $b), 1, "rename a → b"
+assert_ok !-e $a, "source gone"
+assert_ok -e $b,  "dest exists"
+
+# Cannot rename non-existent
+assert_eq Rosetta::Rename::move("/tmp/stk_no_such_$$", "/tmp/stk_other_$$"),
+    0, "missing source rejected"
+
+# Rename within same directory: simple name change
+my $c = "/tmp/stk_rename_c_$$"
+assert_eq Rosetta::Rename::move($b, $c), 1, "rename b → c"
+assert_ok -e $c, "c exists"
+assert_ok !-e $b, "b gone"
+
+# Rename across directories under /tmp
+my $d = "/tmp/stk_rename_dir_$$"
+mkdir($d)
+my $inside = "$d/file"
+assert_eq Rosetta::Rename::move($c, $inside), 1, "move into subdir"
+assert_ok -e $inside, "file relocated"
+
+# Cleanup
+unlink($inside)
+rmdir($d)
+
+test_run

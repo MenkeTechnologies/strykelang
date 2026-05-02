@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Passphrase generator
+# XKCD-style passphrase: pick `n` words at random from a wordlist
+# and join with a separator. Provide minimum-entropy estimation.
+
+fn Rosetta::Passphrase::generate($wordlist, $n, $sep) {
+    return undef if $n < 1 || len(@$wordlist) == 0
+    my @picked
+    for my $i (~> 1:$n) {
+        push @picked, $wordlist->[int(rand(len(@$wordlist)))]
+    }
+    join($sep, @picked)
+}
+
+fn Rosetta::Passphrase::entropy_bits($wordlist_size, $n) {
+    return 0 if $wordlist_size <= 1 || $n < 1
+    $n * log($wordlist_size) / log(2)
+}
+
+# Generate from a small wordlist
+my @words = ("alpha", "beta", "gamma", "delta", "epsilon",
+             "zeta", "eta", "theta", "iota", "kappa",
+             "lambda", "mu", "nu", "xi", "omicron")
+for my $i (~> 1:30) {
+    my $pp = Rosetta::Passphrase::generate(\@words, 4, "-")
+    my @parts = split /-/, $pp
+    assert_eq scalar(@parts), 4, "4-word passphrase"
+    my %ws = map { $_ => 1 } @words
+    for my $p (@parts) {
+        assert_eq exists($ws{$p}), 1, "word $p in pool"
+    }
+}
+
+# Different separators
+my $space = Rosetta::Passphrase::generate(\@words, 3, " ")
+assert_ok index($space, " ") >= 0, "space separator works"
+
+my $dot = Rosetta::Passphrase::generate(\@words, 5, ".")
+my @parts5 = split /\./, $dot
+assert_eq scalar(@parts5), 5, "5-word with dot separator"
+
+# Reject zero count
+assert_ok !defined(Rosetta::Passphrase::generate(\@words, 0, "-")), "n=0 rejected"
+
+# Empty wordlist
+assert_ok !defined(Rosetta::Passphrase::generate([], 4, "-")), "empty pool rejected"
+
+# Entropy estimate: 4 words from 7776 (Diceware) ≈ 51.7 bits
+assert_near Rosetta::Passphrase::entropy_bits(7776, 4), 51.7, 0.1, "diceware 4-word entropy"
+assert_near Rosetta::Passphrase::entropy_bits(2048, 24), 264, 0.5, "BIP39 24-word entropy"
+
+# Pipe form
+\@words |> fn { Rosetta::Passphrase::generate(_, 3, "-") } |> fn { scalar(split /-/, $_) } |> assert_eq(3, "pipe 3 parts")
+
+test_run

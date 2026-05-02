@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Babylonian spiral
+# Starts at the origin. Each new lattice point sits at the smallest
+# integer squared distance greater than the previous step's squared
+# distance, while continuing to turn counterclockwise (positive 2-D
+# cross product against the prior direction). Among ties at the same
+# squared distance, pick the smallest positive turn (smallest cross).
+
+fn Rosetta::Babylonian::isqrt($n) {
+    return 0 if $n <= 0
+    my $r = int(sqrt($n))
+    while (($r + 1) * ($r + 1) <= $n) { $r++ }
+    while ($r * $r > $n) { $r-- }
+    $r
+}
+
+fn Rosetta::Babylonian::points($n) {
+    my @pts = ([0, 0])
+    return \@pts if $n < 2
+    push @pts, [0, 1]
+    return \@pts if $n < 3
+
+    my $last_dsq = 1
+    for my $step (~> 3:$n) {
+        my $cur = $pts[-1]
+        my $prev = $pts[-2]
+        my $ldx = $cur->[0] - $prev->[0]
+        my $ldy = $cur->[1] - $prev->[1]
+
+        my $dsq = $last_dsq
+        my $best
+        my $best_cross
+        while (!defined $best) {
+            $dsq++
+            my $root = Rosetta::Babylonian::isqrt($dsq)
+            for my $dx (-$root .. $root) {
+                my $rem = $dsq - $dx * $dx
+                next if $rem < 0
+                my $dy_abs = Rosetta::Babylonian::isqrt($rem)
+                next if $dy_abs * $dy_abs != $rem
+                my @dys = $dy_abs == 0 ? (0) : ($dy_abs, -$dy_abs)
+                for my $dy (@dys) {
+                    my $cross = $ldx * $dy - $ldy * $dx
+                    next if $cross <= 0
+                    if (!defined $best || $cross < $best_cross) {
+                        $best = [$dx, $dy]
+                        $best_cross = $cross
+                    }
+                }
+            }
+        }
+        push @pts, [$cur->[0] + $best->[0], $cur->[1] + $best->[1]]
+        $last_dsq = $dsq
+    }
+    \@pts
+}
+
+fn Rosetta::Babylonian::dsq_seq($pts) {
+    my @ds
+    for my $i (1..len(@$pts) - 1) {
+        my $dx = $pts->[$i][0] - $pts->[$i - 1][0]
+        my $dy = $pts->[$i][1] - $pts->[$i - 1][1]
+        push @ds, $dx * $dx + $dy * $dy
+    }
+    \@ds
+}
+
+# isqrt sanity
+assert_eq Rosetta::Babylonian::isqrt(0),  0, "isqrt(0)"
+assert_eq Rosetta::Babylonian::isqrt(1),  1, "isqrt(1)"
+assert_eq Rosetta::Babylonian::isqrt(15), 3, "isqrt(15)"
+assert_eq Rosetta::Babylonian::isqrt(16), 4, "isqrt(16)"
+assert_eq Rosetta::Babylonian::isqrt(99), 9, "isqrt(99)"
+
+# First 6 points: known from OEIS / Rosetta reference
+my $pts = Rosetta::Babylonian::points(6)
+assert_eq $pts->[0][0], 0, "p0.x = 0"
+assert_eq $pts->[0][1], 0, "p0.y = 0"
+assert_eq $pts->[1][0], 0, "p1.x = 0"
+assert_eq $pts->[1][1], 1, "p1.y = 1"
+
+# Squared step distances are strictly increasing
+my $ds = Rosetta::Babylonian::dsq_seq($pts)
+my $strict = 1
+for my $i (1..len(@$ds) - 1) {
+    $strict = 0 if $ds->[$i] <= $ds->[$i - 1]
+}
+assert_ok $strict, "squared step distances strictly increase"
+
+# Every squared step is realisable as sum of two squares — by construction
+# the squared distance equals dx² + dy² for the stored deltas. Verify this
+# by reconstruction.
+my $lattice_ok = 1
+for my $i (1..len(@$pts) - 1) {
+    my $dx = $pts->[$i][0] - $pts->[$i - 1][0]
+    my $dy = $pts->[$i][1] - $pts->[$i - 1][1]
+    $lattice_ok = 0 if $dx * $dx + $dy * $dy != $ds->[$i - 1]
+}
+assert_ok $lattice_ok, "every step lands on a lattice point"
+
+# Spiral always turns counterclockwise: cross of consecutive segments > 0
+my $cw_count = 0
+for my $i (2..len(@$pts) - 1) {
+    my $ax = $pts->[$i - 1][0] - $pts->[$i - 2][0]
+    my $ay = $pts->[$i - 1][1] - $pts->[$i - 2][1]
+    my $bx = $pts->[$i][0]     - $pts->[$i - 1][0]
+    my $by = $pts->[$i][1]     - $pts->[$i - 1][1]
+    $cw_count++ if $ax * $by - $ay * $bx <= 0
+}
+assert_eq $cw_count, 0, "no clockwise or straight turns"
+
+# Pipe form: count points
+my $pts10 = 10 |> Rosetta::Babylonian::points
+assert_eq len(@$pts10), 10, "pipe count"
+
+test_run

@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Magic constant
+# For an order-n magic square the magic constant M(n) is
+# n · (n² + 1) / 2 — the common row, column, and diagonal sum when
+# the square contains 1..n² exactly once.
+
+fn Rosetta::Magic::constant($n) {
+    return -1 if $n < 1
+    $n * ($n * $n + 1) / 2
+}
+
+fn Rosetta::Magic::sequence($k) {
+    1:$k |> map { Rosetta::Magic::constant(_) }
+}
+
+# Direct values for n = 3..10
+assert_eq Rosetta::Magic::constant(3),  15,  "M(3) = 15"
+assert_eq Rosetta::Magic::constant(4),  34,  "M(4) = 34"
+assert_eq Rosetta::Magic::constant(5),  65,  "M(5) = 65"
+assert_eq Rosetta::Magic::constant(6),  111, "M(6) = 111"
+assert_eq Rosetta::Magic::constant(7),  175, "M(7) = 175"
+assert_eq Rosetta::Magic::constant(8),  260, "M(8) = 260"
+assert_eq Rosetta::Magic::constant(9),  369, "M(9) = 369"
+assert_eq Rosetta::Magic::constant(10), 505, "M(10) = 505"
+
+# OEIS A006003: 0, 1, 5, 15, 34, 65, 111, 175, 260, 369, 505, 671, 870, …
+my @s = Rosetta::Magic::sequence(13)
+assert_eq join(",", @s),
+    "1,5,15,34,65,111,175,260,369,505,671,870,1105",
+    "first 13 magic constants"
+
+# Pipe form
+12 |> Rosetta::Magic::constant |> assert_eq(870, "pipe M(12)")
+
+# Closed form is a polynomial — verify generation matches direct compute
+for my $n (1..50) {
+    my $closed = $n * ($n * $n + 1) / 2
+    assert_eq Rosetta::Magic::constant($n), $closed, sprintf("M(%d) closed form", $n)
+}
+
+test_run

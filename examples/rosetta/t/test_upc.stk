@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+# Rosetta Code: UPC
+# Validate a UPC-A (12-digit) barcode using the standard mod-10
+# weighted-sum check.
+
+fn Rosetta::Upc::checksum($digits11) {
+    return -1 if length($digits11) != 11
+    my $sum = 0
+    for my $i (0..10) {
+        my $d = ord(substr($digits11, $i, 1)) - ord("0")
+        return -1 if $d < 0 || $d > 9
+        my $weight = ($i % 2 == 0) ? 3 : 1
+        $sum += $d * $weight
+    }
+    (10 - ($sum % 10)) % 10
+}
+
+fn Rosetta::Upc::is_valid($s) {
+    return 0 if length($s) != 12
+    my $cd = Rosetta::Upc::checksum(substr($s, 0, 11))
+    return 0 if $cd < 0
+    substr($s, 11, 1) eq "$cd"
+}
+
+fn Rosetta::Upc::complete($digits11) {
+    my $cd = Rosetta::Upc::checksum($digits11)
+    return undef if $cd < 0
+    "$digits11$cd"
+}
+
+fn Rosetta::Upc::clean($s) {
+    my $out = $s
+    $out =~ s/[\s\-]//g
+    $out
+}
+
+# Sample valid UPCs
+my @valid = (
+    "036000291452",   # Coca-Cola
+    "012345678905",
+    "075678164125",
+)
+for my $u (@valid) {
+    assert_eq Rosetta::Upc::is_valid($u), 1, sprintf("%s valid", $u)
+}
+
+# Wrong check digit invalidates
+assert_eq Rosetta::Upc::is_valid("036000291453"), 0, "wrong check digit"
+
+# Wrong length
+assert_eq Rosetta::Upc::is_valid("123"),          0, "too short"
+assert_eq Rosetta::Upc::is_valid("0360002914520"),0, "too long"
+
+# Non-numeric
+assert_eq Rosetta::Upc::is_valid("X36000291452"), 0, "non-digit rejected"
+
+# Compute check digit from prefix
+assert_eq Rosetta::Upc::checksum("03600029145"), 2, "check digit for Coca-Cola UPC"
+assert_eq Rosetta::Upc::checksum("01234567890"), 5, "check digit for 01234567890"
+
+# complete()
+assert_eq Rosetta::Upc::complete("03600029145"), "036000291452", "complete UPC"
+
+# Clean strips spaces and dashes
+assert_eq Rosetta::Upc::clean("0 36000-29145 2"), "036000291452", "clean strips"
+
+# Pipe form
+"03600029145" |> Rosetta::Upc::complete |> assert_eq("036000291452", "pipe complete")
+
+test_run

@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Roots of a quadratic function
+# Solve a x² + b x + c = 0 with numerically-stable formulae that
+# avoid catastrophic cancellation when b² ≫ 4ac.
+
+fn Rosetta::QuadRoots::solve($a, $b, $c) {
+    return undef if $a == 0
+    my $disc = $b * $b - 4 * $a * $c
+    if ($disc > 0) {
+        my $sq = sqrt($disc)
+        my $q  = $b >= 0 ? -0.5 * ($b + $sq) : -0.5 * ($b - $sq)
+        return [$q / $a, $c / $q]
+    }
+    if ($disc == 0) {
+        my $r = -$b / (2 * $a)
+        return [$r, $r]
+    }
+    # Complex roots — return [real, imag] pair
+    my $real = -$b / (2 * $a)
+    my $imag = sqrt(-$disc) / (2 * $a)
+    [{ real => $real, imag => $imag }, { real => $real, imag => -$imag }]
+}
+
+# Direct
+my $r = Rosetta::QuadRoots::solve(1, -3, 2)
+my @sorted = sort { $a <=> $b } @$r
+assert_near $sorted[0], 1, 1e-9, "x²-3x+2: smallest root = 1"
+assert_near $sorted[1], 2, 1e-9, "x²-3x+2: largest root = 2"
+
+# Double root: x²-2x+1 → x = 1 (mult 2)
+my $r2 = Rosetta::QuadRoots::solve(1, -2, 1)
+assert_near $r2->[0], 1, 1e-9, "double root = 1"
+assert_near $r2->[1], 1, 1e-9, "double root = 1"
+
+# No real roots: x²+x+1 → complex
+my $r3 = Rosetta::QuadRoots::solve(1, 1, 1)
+assert_eq ref($r3->[0]), "HASH", "complex root #1"
+assert_eq ref($r3->[1]), "HASH", "complex root #2"
+assert_near $r3->[0]{real}, -0.5, 1e-9, "real part"
+assert_near $r3->[0]{imag},  sqrt(3) / 2, 1e-9, "imag part +"
+assert_near $r3->[1]{imag}, -sqrt(3) / 2, 1e-9, "imag part -"
+
+# Stability test: 1, 200, -0.000015
+# Naive formula loses precision; numerically-stable version doesn't.
+my $rs = Rosetta::QuadRoots::solve(1, 200, -0.000015)
+my @ss = sort { $a <=> $b } @$rs
+# Expected roots ≈ -200.0000000750... and 7.49...e-8
+assert_near $ss[1],  7.5e-8, 1e-9, "small positive root preserved"
+assert_near $ss[0], -200.0,  1e-6, "large negative root"
+
+# Degenerate
+assert_ok !defined(Rosetta::QuadRoots::solve(0, 1, 1)), "a=0 rejected"
+
+# Pipe form
+my $piped = Rosetta::QuadRoots::solve(1, -5, 6)
+my @ps = sort { $a <=> $b } @$piped
+assert_near $ps[0], 2, 1e-9, "pipe x²-5x+6: 2"
+assert_near $ps[1], 3, 1e-9, "pipe x²-5x+6: 3"
+
+test_run

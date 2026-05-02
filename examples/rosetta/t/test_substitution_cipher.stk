@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Substitution cipher
+# Encode and decode using a fixed monoalphabetic substitution.
+# Case is preserved; non-alphabetic characters pass through.
+
+fn Rosetta::Subst::build_table($key) {
+    return undef if length($key) != 26
+    my %enc
+    my %dec
+    my @upper_in  = ("A".."Z")
+    my @upper_key = split //, uc($key)
+    for my $i (0..25) {
+        $enc{$upper_in[$i]} = $upper_key[$i]
+        $dec{$upper_key[$i]} = $upper_in[$i]
+    }
+    [\%enc, \%dec]
+}
+
+fn Rosetta::Subst::translate($s, $table, $direction) {
+    my @out
+    my $map = $direction eq "encode" ? $table->[0] : $table->[1]
+    for my $ch (split //, $s) {
+        if ($ch =~ /[A-Z]/) {
+            push @out, $map->{$ch}
+        } elsif ($ch =~ /[a-z]/) {
+            push @out, lc($map->{uc($ch)})
+        } else {
+            push @out, $ch
+        }
+    }
+    join("", @out)
+}
+
+fn Rosetta::Subst::encode($s, $key) {
+    my $t = Rosetta::Subst::build_table($key)
+    return undef unless defined $t
+    Rosetta::Subst::translate($s, $t, "encode")
+}
+
+fn Rosetta::Subst::decode($s, $key) {
+    my $t = Rosetta::Subst::build_table($key)
+    return undef unless defined $t
+    Rosetta::Subst::translate($s, $t, "decode")
+}
+
+# ROT13 (key = NOPQRSTUVWXYZABCDEFGHIJKLM)
+my $rot13 = "NOPQRSTUVWXYZABCDEFGHIJKLM"
+assert_eq Rosetta::Subst::encode("Hello, World!", $rot13), "Uryyb, Jbeyq!", "ROT13 encode"
+assert_eq Rosetta::Subst::decode("Uryyb, Jbeyq!", $rot13), "Hello, World!", "ROT13 decode (= self)"
+
+# Random-looking key
+my $key = "QWERTYUIOPASDFGHJKLZXCVBNM"
+my $plain = "ATTACK AT DAWN"
+my $enc = Rosetta::Subst::encode($plain, $key)
+assert_eq Rosetta::Subst::decode($enc, $key), $plain, "round-trip preserves plaintext"
+
+# Case preservation
+my $upper_pair = Rosetta::Subst::encode("AB", $key)
+my $expected_mixed = lc(substr($upper_pair, 0, 1)) . substr($upper_pair, 1, 1)
+assert_eq Rosetta::Subst::encode("aB", $key), $expected_mixed, "case preserved"
+
+# Non-alpha passthrough
+assert_eq Rosetta::Subst::encode("123-456", $key), "123-456", "digits and punctuation pass through"
+
+# Invalid key
+assert_ok !defined(Rosetta::Subst::encode("hi", "ABC")), "short key rejected"
+
+# Pipe form
+"Hello" |> fn { Rosetta::Subst::encode(_, $rot13) } |> assert_eq("Uryyb", "pipe ROT13('Hello')")
+
+test_run

@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wolstenholme numbers (OEIS A007406)
+# Numerators of generalised harmonic numbers H(n, 2) = Σ_{k=1..n} 1/k².
+# Compute the rational sum, reduce, return the numerator.
+
+fn Rosetta::Wolstenholme::gcd($a, $b) {
+    $a = abs($a); $b = abs($b)
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn Rosetta::Wolstenholme::add_frac($p1, $q1, $p2, $q2) {
+    my $num = $p1 * $q2 + $p2 * $q1
+    my $den = $q1 * $q2
+    my $g = Rosetta::Wolstenholme::gcd($num, $den)
+    [$num / $g, $den / $g]
+}
+
+fn Rosetta::Wolstenholme::numerator($n) {
+    my $p = 0; my $q = 1
+    for my $k (1..$n) {
+        my $r = Rosetta::Wolstenholme::add_frac($p, $q, 1, $k * $k)
+        ($p, $q) = ($r->[0], $r->[1])
+    }
+    $p
+}
+
+# OEIS A007406: 1, 5, 49, 205, 5269, 5369, 266681, 1077749, 9778141, 1968329, …
+assert_eq Rosetta::Wolstenholme::numerator(1),  1,        "W(1)  = 1"
+assert_eq Rosetta::Wolstenholme::numerator(2),  5,        "W(2)  = 5"
+assert_eq Rosetta::Wolstenholme::numerator(3),  49,       "W(3)  = 49"
+assert_eq Rosetta::Wolstenholme::numerator(4),  205,      "W(4)  = 205"
+assert_eq Rosetta::Wolstenholme::numerator(5),  5269,     "W(5)  = 5269"
+assert_eq Rosetta::Wolstenholme::numerator(6),  5369,     "W(6)  = 5369"
+assert_eq Rosetta::Wolstenholme::numerator(7),  266681,   "W(7)  = 266681"
+assert_eq Rosetta::Wolstenholme::numerator(8),  1077749,  "W(8)  = 1077749"
+assert_eq Rosetta::Wolstenholme::numerator(9),  9778141,  "W(9)  = 9778141"
+assert_eq Rosetta::Wolstenholme::numerator(10), 1968329,  "W(10) = 1968329"
+
+# Pipe form
+5 |> Rosetta::Wolstenholme::numerator |> assert_eq(5269, "pipe W(5)")
+
+# Threaded: first ten
+my @first10 = ~> 1:10 |> map { Rosetta::Wolstenholme::numerator(_) }
+assert_eq join(",", @first10),
+    "1,5,49,205,5269,5369,266681,1077749,9778141,1968329",
+    "first ten Wolstenholme numbers"
+
+test_run

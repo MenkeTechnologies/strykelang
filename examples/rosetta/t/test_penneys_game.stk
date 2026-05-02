@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Penney's game
+# Two players each pick a 3-bit head/tails sequence; coin is flipped
+# repeatedly; first sequence to appear wins. Penney showed every
+# 3-pattern is dominated by some other 3-pattern (the "second player
+# wins" surprise). The optimal counter-strategy: flip the second bit
+# of P1's sequence and prepend it.
+
+fn Rosetta::Penney::counter($pattern) {
+    return undef if length($pattern) != 3
+    my @b = split //, $pattern
+    my $flipped = $b[1] eq "H" ? "T" : "H"
+    $flipped . $b[0] . $b[1]
+}
+
+fn Rosetta::Penney::flip_seq($n) {
+    my @flips
+    for my $i (~> 1:$n) {
+        push @flips, rand() < 0.5 ? "H" : "T"
+    }
+    join("", @flips)
+}
+
+fn Rosetta::Penney::wins($p1, $p2, $stream) {
+    my $i = 0
+    while ($i + 2 < length($stream)) {
+        my $window = substr($stream, $i, 3)
+        return "P1" if $window eq $p1
+        return "P2" if $window eq $p2
+        $i++
+    }
+    "draw"
+}
+
+fn Rosetta::Penney::win_rate($p1, $p2, $trials, $stream_len) {
+    my $w1 = 0; my $w2 = 0; my $d = 0
+    for my $i (~> 1:$trials) {
+        my $r = Rosetta::Penney::wins($p1, $p2, Rosetta::Penney::flip_seq($stream_len))
+        if    ($r eq "P1") { $w1++ }
+        elsif ($r eq "P2") { $w2++ }
+        else                { $d++ }
+    }
+    [$w1, $w2, $d]
+}
+
+# Counter-strategy
+assert_eq Rosetta::Penney::counter("HHH"), "THH", "counter HHH = THH"
+assert_eq Rosetta::Penney::counter("HHT"), "THH", "counter HHT = THH"
+assert_eq Rosetta::Penney::counter("HTH"), "HHT", "counter HTH = HHT"
+assert_eq Rosetta::Penney::counter("HTT"), "HHT", "counter HTT = HHT"
+assert_eq Rosetta::Penney::counter("THH"), "TTH", "counter THH = TTH"
+assert_eq Rosetta::Penney::counter("THT"), "TTH", "counter THT = TTH"
+assert_eq Rosetta::Penney::counter("TTH"), "HTT", "counter TTH = HTT"
+assert_eq Rosetta::Penney::counter("TTT"), "HTT", "counter TTT = HTT"
+
+# wins() finds first match
+assert_eq Rosetta::Penney::wins("HHH", "TTH", "TTHHH"), "P2", "TTH at pos 0"
+assert_eq Rosetta::Penney::wins("HHH", "TTH", "HHHTT"), "P1", "HHH at pos 0"
+
+# Penney superiority: counter beats target on Monte Carlo
+my $r = Rosetta::Penney::win_rate("HHH", "THH", 200, 50)
+assert_ok $r->[1] > $r->[0], sprintf("THH beats HHH (%d vs %d)", $r->[1], $r->[0])
+
+# Pipe form
+"HHH" |> Rosetta::Penney::counter |> assert_eq("THH", "pipe counter")
+
+test_run

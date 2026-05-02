@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Naming conventions
+# Identify whether an identifier follows snake_case, camelCase,
+# PascalCase, kebab-case, or SCREAMING_SNAKE.
+
+fn Rosetta::Naming::classify($s) {
+    return "empty" if length($s) == 0
+    if ($s =~ /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/) { return "snake_case" }
+    if ($s =~ /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/) { return "SCREAMING_SNAKE" }
+    if ($s =~ /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/) { return "kebab-case" }
+    if ($s =~ /^[a-z]+([A-Z][a-z0-9]*)+$/)     { return "camelCase" }
+    if ($s =~ /^[A-Z][a-z0-9]*([A-Z][a-z0-9]*)+$/) { return "PascalCase" }
+    if ($s =~ /^[a-z][a-z0-9]*$/)              { return "lowercase" }
+    if ($s =~ /^[A-Z][a-z0-9]*$/)              { return "Capitalized" }
+    "mixed"
+}
+
+fn Rosetta::Naming::convert_to_snake($s) {
+    # Camel/Pascal → snake.
+    return lc($s) if $s !~ /[A-Z]/
+    my @out
+    my $i = 0
+    for my $c (split //, $s) {
+        if ($c =~ /[A-Z]/ && $i > 0) {
+            push @out, "_"
+        }
+        push @out, lc($c)
+        $i++
+    }
+    join("", @out)
+}
+
+# Classification cases
+assert_eq Rosetta::Naming::classify("foo_bar"),       "snake_case",      "foo_bar"
+assert_eq Rosetta::Naming::classify("FOO_BAR"),       "SCREAMING_SNAKE", "FOO_BAR"
+assert_eq Rosetta::Naming::classify("foo-bar"),       "kebab-case",      "foo-bar"
+assert_eq Rosetta::Naming::classify("fooBar"),        "camelCase",       "fooBar"
+assert_eq Rosetta::Naming::classify("FooBar"),        "PascalCase",      "FooBar"
+assert_eq Rosetta::Naming::classify("FooBarBaz"),     "PascalCase",      "FooBarBaz"
+assert_eq Rosetta::Naming::classify("foo"),           "lowercase",       "foo"
+assert_eq Rosetta::Naming::classify("Foo"),           "Capitalized",     "Foo"
+assert_eq Rosetta::Naming::classify("Foo_bar"),       "mixed",           "Foo_bar"
+assert_eq Rosetta::Naming::classify("foo_Bar"),       "mixed",           "foo_Bar"
+assert_eq Rosetta::Naming::classify(""),              "empty",           "empty"
+
+# Camel/Pascal → snake
+assert_eq Rosetta::Naming::convert_to_snake("fooBar"),    "foo_bar",     "camel→snake"
+assert_eq Rosetta::Naming::convert_to_snake("FooBarBaz"), "foo_bar_baz", "Pascal→snake"
+assert_eq Rosetta::Naming::convert_to_snake("foo"),       "foo",         "lowercase passes"
+assert_eq Rosetta::Naming::convert_to_snake("foo_bar"),   "foo_bar",     "snake passes"
+
+# Pipe form
+"FooBar" |> Rosetta::Naming::classify |> assert_eq("PascalCase", "pipe classify")
+
+test_run

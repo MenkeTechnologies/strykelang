@@ -1,0 +1,109 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ranking methods
+# Given a list of values, compute four ranking schemes:
+#   - standard ("1224"): tied entries share the lower rank, next rank skips
+#   - modified ("1334"): tied entries share the higher rank, next rank skips
+#   - dense    ("1223"): tied entries share, next rank does not skip
+#   - ordinal  ("1234"): unique ranks based on input order
+
+fn Rosetta::Rank::sort_indices_desc($values) {
+    my $n = len(@$values)
+    my @idx = (0..$n - 1)
+    @idx = sort {
+        ($values->[$b] <=> $values->[$a]) || ($a <=> $b)
+    } @idx
+    \@idx
+}
+
+fn Rosetta::Rank::standard($values) {
+    my $idx = Rosetta::Rank::sort_indices_desc($values)
+    my $n = len(@$idx)
+    my @ranks = (0) x $n
+    my $rank = 1
+    for my $i (0..$n - 1) {
+        if ($i > 0 && $values->[$idx->[$i]] != $values->[$idx->[$i - 1]]) {
+            $rank = $i + 1
+        }
+        $ranks[$idx->[$i]] = $rank
+    }
+    \@ranks
+}
+
+fn Rosetta::Rank::modified($values) {
+    my $idx = Rosetta::Rank::sort_indices_desc($values)
+    my $n = len(@$idx)
+    my @ranks = (0) x $n
+    for (my $i = $n - 1; $i >= 0; $i--) {
+        my $rank = $i + 1
+        # Walk forward to last index with same value
+        my $j = $i
+        while ($j > 0 && $values->[$idx->[$j - 1]] == $values->[$idx->[$i]]) {
+            $j--
+        }
+        # Modified rank = position of last entry in tie group
+        my $tie_end = $i
+        while ($tie_end + 1 < $n && $values->[$idx->[$tie_end + 1]] == $values->[$idx->[$i]]) {
+            $tie_end++
+        }
+        $ranks[$idx->[$i]] = $tie_end + 1
+    }
+    \@ranks
+}
+
+fn Rosetta::Rank::dense($values) {
+    my $idx = Rosetta::Rank::sort_indices_desc($values)
+    my $n = len(@$idx)
+    my @ranks = (0) x $n
+    my $rank = 1
+    for my $i (0..$n - 1) {
+        if ($i > 0 && $values->[$idx->[$i]] != $values->[$idx->[$i - 1]]) {
+            $rank++
+        }
+        $ranks[$idx->[$i]] = $rank
+    }
+    \@ranks
+}
+
+fn Rosetta::Rank::ordinal($values) {
+    my $idx = Rosetta::Rank::sort_indices_desc($values)
+    my $n = len(@$idx)
+    my @ranks = (0) x $n
+    for my $i (0..$n - 1) {
+        $ranks[$idx->[$i]] = $i + 1
+    }
+    \@ranks
+}
+
+# Sample dataset (ties on the highest two scores)
+my @scores = (44, 42, 42, 41, 41, 41, 39, 39, 38, 37, 30, 30, 29)
+my $std = Rosetta::Rank::standard(\@scores)
+assert_eq join(",", @$std), "1,2,2,4,4,4,7,7,9,10,11,11,13", "standard rank"
+
+my $mod = Rosetta::Rank::modified(\@scores)
+assert_eq join(",", @$mod), "1,3,3,6,6,6,8,8,9,10,12,12,13", "modified rank"
+
+my $den = Rosetta::Rank::dense(\@scores)
+assert_eq join(",", @$den), "1,2,2,3,3,3,4,4,5,6,7,7,8", "dense rank"
+
+my $ord = Rosetta::Rank::ordinal(\@scores)
+assert_eq join(",", @$ord), "1,2,3,4,5,6,7,8,9,10,11,12,13", "ordinal rank"
+
+# Single value
+assert_eq join(",", @{Rosetta::Rank::standard([42])}), "1", "single value standard"
+
+# All equal
+my $all_eq = Rosetta::Rank::standard([5, 5, 5, 5])
+assert_eq join(",", @$all_eq), "1,1,1,1", "all-equal standard"
+
+my $dense_eq = Rosetta::Rank::dense([5, 5, 5, 5])
+assert_eq join(",", @$dense_eq), "1,1,1,1", "all-equal dense"
+
+# Ordinal preserves input order
+my $ord2 = Rosetta::Rank::ordinal([10, 20, 30])
+assert_eq join(",", @$ord2), "3,2,1", "ordinal descending values"
+
+# Pipe form
+my $piped = Rosetta::Rank::standard(\@scores)
+assert_eq $piped->[0], 1, "pipe rank of first"
+
+test_run

@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Order two numerical lists
+# Lexicographic comparison of two arrays of numbers: -1 if a < b,
+# +1 if a > b, 0 if equal. Length-tiebreak: shorter is smaller when
+# it is a strict prefix.
+
+fn Rosetta::OrderLists::compare($x, $y) {
+    my $n = len(@$x) < len(@$y) ? len(@$x) : len(@$y)
+    for my $i (0..$n - 1) {
+        return -1 if $x->[$i] < $y->[$i]
+        return  1 if $x->[$i] > $y->[$i]
+    }
+    return -1 if len(@$x) < len(@$y)
+    return  1 if len(@$x) > len(@$y)
+    0
+}
+
+fn Rosetta::OrderLists::sort_lists($lists) {
+    sort { Rosetta::OrderLists::compare($a, $b) } @$lists
+}
+
+# Direct
+assert_eq Rosetta::OrderLists::compare([1, 2, 3], [1, 2, 4]),  -1, "[1,2,3] < [1,2,4]"
+assert_eq Rosetta::OrderLists::compare([1, 2, 4], [1, 2, 3]),   1, "[1,2,4] > [1,2,3]"
+assert_eq Rosetta::OrderLists::compare([1, 2, 3], [1, 2, 3]),   0, "equal"
+assert_eq Rosetta::OrderLists::compare([1, 2],    [1, 2, 0]),  -1, "shorter prefix loses"
+assert_eq Rosetta::OrderLists::compare([1, 2, 0], [1, 2]),      1, "longer wins"
+assert_eq Rosetta::OrderLists::compare([],        [1]),        -1, "empty < [1]"
+assert_eq Rosetta::OrderLists::compare([],        []),          0, "empty = empty"
+
+# Negatives
+assert_eq Rosetta::OrderLists::compare([-1, 0],  [0, 0]), -1, "negative-first loses"
+assert_eq Rosetta::OrderLists::compare([0, -1],  [0, 0]), -1, "second neg loses"
+
+# Sort a list-of-lists
+my @lists = ([1,2,3], [1,2], [2], [1,2,3,4], [1,1])
+my @sorted = Rosetta::OrderLists::sort_lists(\@lists)
+my @keys = map { join(",", @$_) } @sorted
+assert_eq join("|", @keys),
+    "1,1|1,2|1,2,3|1,2,3,4|2",
+    "lex sort"
+
+# Pipe form
+[1, 2] |> fn { Rosetta::OrderLists::compare(_, [1, 3]) } |> assert_eq(-1, "pipe cmp")
+
+test_run

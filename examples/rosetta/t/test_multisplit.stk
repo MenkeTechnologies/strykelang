@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multisplit
+# Split a string by *any* of a list of separator strings, taking the
+# longest match at each position. Return the list of pieces in order.
+
+fn Rosetta::Multisplit::split($s, $seps) {
+    my @parts
+    my @sep_sorted = sort { length($b) <=> length($a) } @$seps
+    my $i = 0
+    my $start = 0
+    my $n = length($s)
+    while ($i < $n) {
+        my $matched = 0
+        for my $sep (@sep_sorted) {
+            my $sl = length($sep)
+            if ($sl > 0 && $i + $sl <= $n && substr($s, $i, $sl) eq $sep) {
+                push @parts, substr($s, $start, $i - $start)
+                $i += $sl
+                $start = $i
+                $matched = 1
+                last
+            }
+        }
+        $i++ if !$matched
+    }
+    push @parts, substr($s, $start, $n - $start)
+    @parts
+}
+
+# Rosetta canonical: split "a!===b=!=c" on ["==", "!=", "="]
+# Longest-match-first eats "!=" then "==", giving 5 pieces with two empties.
+my @r = Rosetta::Multisplit::split("a!===b=!=c", ["==", "!=", "="])
+assert_eq join("|", @r), "a||b||c", "rosetta canonical sample"
+
+# Single delimiter
+my @r2 = Rosetta::Multisplit::split("a,b,c,d", [","])
+assert_eq join("|", @r2), "a|b|c|d", "csv-like"
+
+# Multiple non-overlapping
+my @r3 = Rosetta::Multisplit::split("foo--bar++baz", ["--", "++"])
+assert_eq join("|", @r3), "foo|bar|baz", "two delimiters"
+
+# Longest-match priority: "==" beats "=" at same offset
+my @r4 = Rosetta::Multisplit::split("==", ["=", "=="])
+assert_eq join("|", @r4), "|", "== consumed as single"
+
+# Empty haystack
+my @r5 = Rosetta::Multisplit::split("", [","])
+assert_eq join("|", @r5), "", "empty input → single empty piece"
+
+# No matches
+my @r6 = Rosetta::Multisplit::split("hello", [",", ";"])
+assert_eq join("|", @r6), "hello", "no separators present"
+
+# Pipe form
+"x:y;z" |> fn { Rosetta::Multisplit::split(_, [":", ";"]) } |> join("|") |> assert_eq("x|y|z", "pipe split")
+
+test_run

@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numerical integration
+# Implement four standard methods on a function f over [a, b] with n
+# subintervals: rectangle (left), rectangle (right), midpoint,
+# trapezoidal, and Simpson's rule.
+
+fn Rosetta::Integrate::rect_left($f, $a, $b, $n) {
+    my $h = ($b - $a) / $n
+    my $s = 0
+    for my $i (~> 0:$n - 1) { $s += $f->($a + $i * $h) }
+    $s * $h
+}
+
+fn Rosetta::Integrate::rect_right($f, $a, $b, $n) {
+    my $h = ($b - $a) / $n
+    my $s = 0
+    for my $i (~> 1:$n) { $s += $f->($a + $i * $h) }
+    $s * $h
+}
+
+fn Rosetta::Integrate::midpoint($f, $a, $b, $n) {
+    my $h = ($b - $a) / $n
+    my $s = 0
+    for my $i (~> 0:$n - 1) { $s += $f->($a + ($i + 0.5) * $h) }
+    $s * $h
+}
+
+fn Rosetta::Integrate::trapezoid($f, $a, $b, $n) {
+    my $h = ($b - $a) / $n
+    my $s = 0.5 * ($f->($a) + $f->($b))
+    for my $i (~> 1:$n - 1) { $s += $f->($a + $i * $h) }
+    $s * $h
+}
+
+fn Rosetta::Integrate::simpson($f, $a, $b, $n) {
+    return undef if $n % 2 != 0
+    my $h = ($b - $a) / $n
+    my $s = $f->($a) + $f->($b)
+    for my $i (~> 1:$n - 1) {
+        my $coeff = ($i % 2 == 1) ? 4 : 2
+        $s += $coeff * $f->($a + $i * $h)
+    }
+    $s * $h / 3
+}
+
+# x³ on [0, 1] = 0.25
+my $cubic = fn ($x) { $x * $x * $x }
+assert_near Rosetta::Integrate::rect_left($cubic, 0, 1, 1000),  0.25, 0.005, "left x³ ≈ 0.25"
+assert_near Rosetta::Integrate::rect_right($cubic, 0, 1, 1000), 0.25, 0.005, "right x³ ≈ 0.25"
+assert_near Rosetta::Integrate::midpoint($cubic, 0, 1, 1000),   0.25, 1e-6,  "midpoint x³ exact"
+assert_near Rosetta::Integrate::trapezoid($cubic, 0, 1, 1000),  0.25, 1e-6,  "trapezoid x³ exact"
+assert_near Rosetta::Integrate::simpson($cubic, 0, 1, 100),     0.25, 1e-12, "Simpson x³ exact"
+
+# 1/x on [1, 100] = ln(100) ≈ 4.6051701859880914
+my $inv = fn ($x) { 1 / $x }
+assert_near Rosetta::Integrate::trapezoid($inv, 1, 100, 1000), log(100), 0.01, "trap ln 100"
+assert_near Rosetta::Integrate::simpson($inv, 1, 100, 1000),   log(100), 1e-4, "Simpson ln 100"
+
+# x on [0, 5000] = 12,500,000
+my $linear = fn ($x) { $x }
+assert_near Rosetta::Integrate::trapezoid($linear, 0, 5000, 5000),
+    12500000, 1e-6, "trap of x"
+
+# Simpson rejects odd n
+assert_ok !defined(Rosetta::Integrate::simpson($cubic, 0, 1, 5)), "odd n rejected by Simpson"
+
+# Pipe form: integrand expression to result
+$cubic |> fn { Rosetta::Integrate::trapezoid(_, 0, 2, 1000) } |> assert_near(4, 1e-3, "pipe trap of x³ over 0..2")
+
+test_run

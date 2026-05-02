@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pig the dice game
+# Two-player race-to-100. On each turn the active player rolls a d6
+# repeatedly, accumulating a turn-score; rolling 1 ends the turn with
+# zero gain. The player may "hold" any time, banking the turn-score
+# to their total. Player whose total ≥ 100 wins.
+
+fn Rosetta::Pig::roll() {
+    1 + int(rand(6))
+}
+
+fn Rosetta::Pig::play($strategies, $target) {
+    my @totals = (0, 0)
+    my $turn = 0
+    my $rounds = 0
+    while ($totals[0] < $target && $totals[1] < $target) {
+        $rounds++
+        my $banked = 0
+        while (1) {
+            my $action = $strategies->[$turn]->($totals[$turn], $totals[1 - $turn], $banked)
+            last if $action eq "hold"
+            my $r = Rosetta::Pig::roll()
+            if ($r == 1) { $banked = 0; last }
+            $banked += $r
+        }
+        $totals[$turn] += $banked
+        last if $totals[$turn] >= $target
+        $turn = 1 - $turn
+        last if $rounds > 10000  # safety
+    }
+    [\@totals, $turn]
+}
+
+fn Rosetta::Pig::strat_hold_at($threshold) {
+    fn ($me, $opp, $banked) {
+        $banked >= $threshold ? "hold" : "roll"
+    }
+}
+
+# Roll is in 1..6
+my %seen
+for my $i (~> 1:300) { $seen{Rosetta::Pig::roll()}++ }
+for my $f (1..6) {
+    assert_ok exists($seen{$f}) && $seen{$f} > 0, "face $f appears in 300 rolls"
+}
+
+# Player who holds at 25 vs holds at 5: 25-strategy should win majority.
+my $aggro  = Rosetta::Pig::strat_hold_at(25)
+my $conservative = Rosetta::Pig::strat_hold_at(5)
+my $aggro_wins = 0
+my $conservative_wins = 0
+for my $i (~> 1:50) {
+    my $r = Rosetta::Pig::play([$aggro, $conservative], 100)
+    if ($r->[0][0] >= 100) { $aggro_wins++ }
+    else                   { $conservative_wins++ }
+}
+assert_ok $aggro_wins > $conservative_wins,
+    sprintf("hold-at-25 beats hold-at-5 (%d vs %d)", $aggro_wins, $conservative_wins)
+
+# Game terminates within 10k rounds
+my $always_hold = fn ($me, $opp, $banked) { "hold" }
+my $r = Rosetta::Pig::play([$always_hold, $always_hold], 1)
+# With both always-hold but target=1, neither ever scores; game hits safety cap.
+# Test that it returns safely.
+assert_ok defined($r), "game returns under degenerate strategy"
+
+# At least one player accumulates score across normal play
+my $r2 = Rosetta::Pig::play([$aggro, $aggro], 100)
+assert_ok $r2->[0][0] >= 100 || $r2->[0][1] >= 100, "someone reaches 100"
+
+# Pipe form
+20 |> Rosetta::Pig::strat_hold_at |> fn { $_->(50, 50, 25) } |> assert_eq("hold", "pipe strategy")
+
+test_run

@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Determine if two triangles overlap
+# Standard 2-D SAT (Separating Axis Theorem) on triangles.
+# Triangles are arrays of three [x, y] points. Returns 1 iff their
+# interiors intersect (touching counts as overlap by default).
+
+fn Rosetta::TriOverlap::cross_v($ax, $ay, $bx, $by) {
+    $ax * $by - $ay * $bx
+}
+
+fn Rosetta::TriOverlap::project($pts, $axis_x, $axis_y) {
+    my $min = $pts->[0][0] * $axis_x + $pts->[0][1] * $axis_y
+    my $max = $min
+    for my $i (1..len(@$pts) - 1) {
+        my $d = $pts->[$i][0] * $axis_x + $pts->[$i][1] * $axis_y
+        $min = $d if $d < $min
+        $max = $d if $d > $max
+    }
+    [$min, $max]
+}
+
+fn Rosetta::TriOverlap::overlaps($a, $b) {
+    for my $tri ($a, $b) {
+        for my $i (0..2) {
+            my $p1 = $tri->[$i]
+            my $p2 = $tri->[($i + 1) % 3]
+            # axis = perpendicular of edge
+            my $ex = $p2->[0] - $p1->[0]
+            my $ey = $p2->[1] - $p1->[1]
+            my $nx = -$ey
+            my $ny = $ex
+            my $pa = Rosetta::TriOverlap::project($a, $nx, $ny)
+            my $pb = Rosetta::TriOverlap::project($b, $nx, $ny)
+            return 0 if $pa->[1] < $pb->[0] || $pb->[1] < $pa->[0]
+        }
+    }
+    1
+}
+
+# Rosetta task standard cases
+my $t1 = [[0, 0], [5, 0], [0, 5]]
+my $t2 = [[0, 0], [5, 0], [0, 6]]
+assert_eq Rosetta::TriOverlap::overlaps($t1, $t2), 1, "shared edge counts as overlap"
+
+my $t3 = [[0, 0], [0, 5], [5, 0]]
+my $t4 = [[-10, 0], [-5, 0], [-1, 6]]
+assert_eq Rosetta::TriOverlap::overlaps($t3, $t4), 0, "well separated triangles"
+
+my $t5 = [[0, 0], [5, 0], [2.5, 5]]
+my $t6 = [[0, 4], [2.5, -1], [5, 4]]
+assert_eq Rosetta::TriOverlap::overlaps($t5, $t6), 1, "Star of David overlap"
+
+# One triangle entirely inside another
+my $big   = [[0, 0], [10, 0], [5, 10]]
+my $small = [[3, 1], [7, 1], [5, 4]]
+assert_eq Rosetta::TriOverlap::overlaps($big, $small), 1, "small inside big"
+assert_eq Rosetta::TriOverlap::overlaps($small, $big), 1, "argument order doesn't matter"
+
+# Touching at a vertex
+my $a = [[0, 0], [1, 0], [0, 1]]
+my $b = [[1, 0], [2, 0], [2, 1]]
+assert_eq Rosetta::TriOverlap::overlaps($a, $b), 1, "shared vertex counts"
+
+# Touching at an edge but not crossing
+my $c = [[0, 0], [4, 0], [2, 2]]
+my $d = [[0, 4], [4, 4], [2, 2]]
+assert_eq Rosetta::TriOverlap::overlaps($c, $d), 1, "shared apex"
+
+# Pipe form
+my $r = Rosetta::TriOverlap::overlaps($big, $small)
+$r |> assert_eq(1, "piped overlap check")
+
+test_run

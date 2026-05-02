@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sierpinski arrowhead curve
+# L-system: variables A, B; rules A → B+A+B, B → A-B-A. The "+" / "-"
+# directives turn the turtle by 60° / -60°. After n iterations the
+# arrowhead curve approximates the Sierpinski triangle.
+
+fn Rosetta::ArrowHead::expand($axiom, $depth) {
+    my $cur = $axiom
+    for my $i (~> 1:$depth) {
+        my @out
+        for my $c (split //, $cur) {
+            if    ($c eq "A") { push @out, "B+A+B" }
+            elsif ($c eq "B") { push @out, "A-B-A" }
+            else              { push @out, $c }
+        }
+        $cur = join("", @out)
+    }
+    $cur
+}
+
+fn Rosetta::ArrowHead::points($depth, $step) {
+    my $instr = Rosetta::ArrowHead::expand("A", $depth)
+    my $pi = 4 * atan2(1, 1)
+    my $angle = 0
+    my $x = 0
+    my $y = 0
+    my @pts = ([$x, $y])
+    for my $c (split //, $instr) {
+        if    ($c eq "A" || $c eq "B") {
+            $x += $step * cos($angle)
+            $y += $step * sin($angle)
+            push @pts, [$x, $y]
+        }
+        elsif ($c eq "+") { $angle += $pi / 3 }
+        elsif ($c eq "-") { $angle -= $pi / 3 }
+    }
+    \@pts
+}
+
+# Depth 0 expansion is just "A"
+assert_eq Rosetta::ArrowHead::expand("A", 0), "A", "depth 0"
+
+# Depth 1: A → B+A+B
+assert_eq Rosetta::ArrowHead::expand("A", 1), "B+A+B", "depth 1"
+
+# Depth 2: substitute again — each A → B+A+B and each B → A-B-A.
+assert_eq Rosetta::ArrowHead::expand("A", 2),
+    "A-B-A+B+A+B+A-B-A",
+    "depth 2"
+
+# Length of expansion: A_n + B_n where each iteration doubles letter count.
+my $depth4 = Rosetta::ArrowHead::expand("A", 4)
+my $letters = 0
+for my $c (split //, $depth4) { $letters++ if $c eq "A" || $c eq "B" }
+# At depth d the expansion has 3^d drawing letters? Actually each A and
+# B at level k → 3 letters at level k+1. So letters at depth d = 3^d.
+assert_eq $letters, 3 ** 4, "depth 4 has 3^4 letters"
+
+# Points: depth-d curve has letters + 1 vertices
+my $pts2 = Rosetta::ArrowHead::points(2, 1)
+my $expected_letters_2 = 9     # 3^2
+assert_eq len(@$pts2), $expected_letters_2 + 1, "depth 2 vertex count"
+
+# Curve starts at origin
+assert_near $pts2->[0][0], 0, 1e-9, "starts at x=0"
+assert_near $pts2->[0][1], 0, 1e-9, "starts at y=0"
+
+# Each segment has length = step
+my $seg_ok = 1
+my $pts4 = Rosetta::ArrowHead::points(4, 1)
+for my $i (1..len(@$pts4) - 1) {
+    my $dx = $pts4->[$i][0] - $pts4->[$i - 1][0]
+    my $dy = $pts4->[$i][1] - $pts4->[$i - 1][1]
+    my $len = sqrt($dx * $dx + $dy * $dy)
+    $seg_ok = 0 if abs($len - 1) > 1e-9
+}
+assert_ok $seg_ok, "every segment has length 1"
+
+# Pipe form
+"A" |> fn { Rosetta::ArrowHead::expand(_, 3) } |> length |> assert_ok("pipe expansion has chars")
+
+test_run

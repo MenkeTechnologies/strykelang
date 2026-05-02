@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Super-Poulet numbers (OEIS A050217)
+# A Poulet number n (Fermat pseudoprime to base 2: composite with
+# 2^(n-1) ≡ 1 (mod n)) is super-Poulet if every divisor d of n
+# satisfies 2^d ≡ 2 (mod d). Equivalently every divisor is also a
+# Poulet number or trivial.
+# First few: 341, 1387, 2047, 2701, 3277, 4033, 4369, 4681, 5461, …
+
+fn Rosetta::SuperPoulet::pow_mod($b, $e, $m) {
+    my $r = 1
+    $b = $b % $m
+    while ($e > 0) {
+        $r = ($r * $b) % $m if ($e & 1)
+        $e = $e >> 1
+        $b = ($b * $b) % $m
+    }
+    $r
+}
+
+fn Rosetta::SuperPoulet::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::SuperPoulet::divisors($n) {
+    my @d
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @d, $i
+            push @d, int($n / $i) if $i != int($n / $i)
+        }
+        $i++
+    }
+    sort { $a <=> $b } @d
+}
+
+fn Rosetta::SuperPoulet::is($n) {
+    return 0 if $n < 4
+    return 0 if $n % 2 == 0
+    return 0 if Rosetta::SuperPoulet::is_prime($n)
+    return 0 if Rosetta::SuperPoulet::pow_mod(2, $n - 1, $n) != 1
+    for my $d (Rosetta::SuperPoulet::divisors($n)) {
+        return 0 if Rosetta::SuperPoulet::pow_mod(2, $d, $d) != (2 % $d)
+    }
+    1
+}
+
+# Anchors
+assert_eq Rosetta::SuperPoulet::is(341),  1, "341 is super-Poulet"
+assert_eq Rosetta::SuperPoulet::is(1387), 1, "1387 is super-Poulet"
+assert_eq Rosetta::SuperPoulet::is(2047), 1, "2047 is super-Poulet"
+assert_eq Rosetta::SuperPoulet::is(2701), 1, "2701 is super-Poulet"
+
+# A Poulet number that's NOT super-Poulet: 561 (Carmichael, but its
+# divisor 33 has 2^33 ≢ 2 mod 33).
+assert_eq Rosetta::SuperPoulet::is(561), 0, "561 (Carmichael) not super-Poulet"
+
+# A composite that isn't even Poulet
+assert_eq Rosetta::SuperPoulet::is(15), 0, "15 not super-Poulet"
+
+# Primes are excluded
+assert_eq Rosetta::SuperPoulet::is(7),  0, "7 (prime) excluded"
+
+# First 5 super-Poulet numbers
+my @sp = ~> 4:5500 |> grep { Rosetta::SuperPoulet::is(_) }
+assert_eq join(",", @sp[0..4]), "341,1387,2047,2701,3277", "first 5 super-Poulet"
+
+# Pipe form
+341 |> Rosetta::SuperPoulet::is |> assert_eq(1, "pipe is(341)")
+
+test_run

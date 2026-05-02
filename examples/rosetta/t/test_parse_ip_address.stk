@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parse an IP Address
+# Accept IPv4 dotted quad with optional ":port", or IPv6 in bracketed
+# or bare form with optional ":port" suffix on the bracketed variant.
+# Return { kind, address (canonical), port (number or undef) } or
+# undef on failure.
+
+fn Rosetta::IP::parse_ipv4($s) {
+    return undef unless $s =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/
+    my @oct = ($1, $2, $3, $4)
+    for my $o (@oct) {
+        return undef if $o > 255
+        return undef if length("$o") > 1 && substr("$o", 0, 1) eq "0"
+    }
+    join(".", @oct)
+}
+
+fn Rosetta::IP::parse_ipv6($s) {
+    # Allow at most one "::" double-colon. Reject empty groups beyond
+    # that. Each non-empty group must be 1..4 hex chars.
+    return undef if $s eq ""
+    my $double_count = 0
+    my $i = 0
+    while (($i = index($s, "::", $i)) >= 0) { $double_count++; $i += 2 }
+    return undef if $double_count > 1
+    my @parts = split /:/, $s, -1
+    my $expected = 8
+    if ($double_count == 1) {
+        # split returns leading or trailing empty strings around "::"
+        # Count non-empty groups; the rest are zero-filled.
+        my @real
+        for my $p (@parts) { push @real, $p if length($p) > 0 }
+        return undef if len(@real) > 7
+    } else {
+        return undef if len(@parts) != 8
+    }
+    for my $p (@parts) {
+        next if $p eq ""
+        return undef if length($p) > 4
+        return undef unless $p =~ /^[0-9a-fA-F]+$/
+    }
+    lc($s)
+}
+
+fn Rosetta::IP::parse($s) {
+    # Bracketed IPv6 with optional :port: [::1]:8080 or [::1]
+    if (substr($s, 0, 1) eq "[") {
+        my $close = index($s, "]")
+        return undef if $close <= 0
+        my $addr = substr($s, 1, $close - 1)
+        my $rest = substr($s, $close + 1)
+        my $port
+        if (length($rest) > 0) {
+            return undef unless $rest =~ /^:(\d+)$/
+            $port = $1 + 0
+            return undef if $port > 65535
+        }
+        my $ok = Rosetta::IP::parse_ipv6($addr)
+        return undef unless defined $ok
+        return { kind => "ipv6", address => $ok, port => $port }
+    }
+    # IPv4 with optional :port
+    my $hostpart = $s
+    my $port
+    if (index($s, ":") >= 0 && index($s, "::") < 0) {
+        my @bits = split /:/, $s
+        if (len(@bits) == 2 && $bits[1] =~ /^\d+$/) {
+            $hostpart = $bits[0]
+            $port = $bits[1] + 0
+            return undef if $port > 65535
+        }
+    }
+    my $v4 = Rosetta::IP::parse_ipv4($hostpart)
+    if (defined $v4) {
+        return { kind => "ipv4", address => $v4, port => $port }
+    }
+    # Bare IPv6 (no brackets, no port)
+    my $v6 = Rosetta::IP::parse_ipv6($s)
+    return { kind => "ipv6", address => $v6, port => undef } if defined $v6
+    undef
+}
+
+# IPv4
+my $a = Rosetta::IP::parse("192.168.0.1")
+assert_eq $a->{kind},    "ipv4",        "v4 kind"
+assert_eq $a->{address}, "192.168.0.1", "v4 addr"
+assert_ok !defined($a->{port}), "v4 no port"
+
+my $b = Rosetta::IP::parse("127.0.0.1:8080")
+assert_eq $b->{kind}, "ipv4", "v4+port kind"
+assert_eq $b->{port}, 8080,   "v4 port"
+
+# Invalid IPv4
+assert_ok !defined(Rosetta::IP::parse("999.0.0.1")), "octet > 255 rejected"
+assert_ok !defined(Rosetta::IP::parse("10.0.01.1")), "leading-zero octet rejected"
+assert_ok !defined(Rosetta::IP::parse("1.2.3")),     "too few octets"
+
+# IPv6 bracketed
+my $c = Rosetta::IP::parse("[::1]:443")
+assert_eq $c->{kind},    "ipv6", "v6 bracket kind"
+assert_eq $c->{address}, "::1",  "v6 short loopback"
+assert_eq $c->{port},    443,    "v6 port"
+
+# IPv6 bare
+my $d = Rosetta::IP::parse("2001:db8::1")
+assert_eq $d->{kind},    "ipv6",        "bare v6 kind"
+assert_eq $d->{address}, "2001:db8::1", "bare v6 addr"
+
+# Full IPv6
+my $e = Rosetta::IP::parse("2001:0db8:0000:0000:0000:0000:0000:0001")
+assert_eq $e->{kind},    "ipv6", "full v6 kind"
+
+# Pipe form
+"::1" |> Rosetta::IP::parse |> fn { $_->{kind} } |> assert_eq("ipv6", "pipe ::1 kind")
+
+test_run

@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Penholodigital squares
+# A perfect square whose decimal digits are exactly {1, 2, 3, 4, 5,
+# 6, 7, 8, 9} — every non-zero digit appears exactly once.
+
+fn Rosetta::Penholo::is_pen($n) {
+    my $s = "$n"
+    return 0 if length($s) != 9
+    my %seen
+    for my $c (split //, $s) {
+        return 0 if $c eq "0"
+        return 0 if exists $seen{$c}
+        $seen{$c} = 1
+    }
+    1
+}
+
+fn Rosetta::Penholo::squares_below($limit) {
+    my @out
+    my $k = int(sqrt($limit))
+    while ($k * $k > $limit) { $k-- }
+    for my $r (1..$k) {
+        my $sq = $r * $r
+        push @out, $sq if Rosetta::Penholo::is_pen($sq)
+    }
+    @out
+}
+
+# Pen helper
+assert_eq Rosetta::Penholo::is_pen(123456789), 1, "123456789 itself is pen"
+assert_eq Rosetta::Penholo::is_pen(112345678), 0, "duplicate 1 disqualifies"
+assert_eq Rosetta::Penholo::is_pen(123456780), 0, "0 disqualifies"
+assert_eq Rosetta::Penholo::is_pen(12345),     0, "wrong length"
+
+# 11826² = 139,854,276 — the smallest penholodigital square.
+assert_eq Rosetta::Penholo::is_pen(11826 * 11826), 1, "11826² is pen"
+
+# Count of penholodigital squares ≤ 999_999_999 = 30 (well-known)
+my @all = Rosetta::Penholo::squares_below(999999999)
+assert_eq len(@all), 30, "30 penholodigital squares"
+assert_eq $all[0],  139854276, "smallest is 139854276"
+assert_eq $all[-1], 923187456, "largest is 923187456"
+
+# Square roots of all penholos
+my @roots = ~> @all |> map { int(sqrt(_)) }
+my $all_pos = 1
+for my $r (@roots) { $all_pos = 0 if $r * $r > 999999999 }
+assert_ok $all_pos, "every root squared still ≤ 999999999"
+
+# Pipe form
+139854276 |> Rosetta::Penholo::is_pen |> assert_eq(1, "pipe is_pen(139854276)")
+
+test_run

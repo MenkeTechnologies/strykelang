@@ -1,0 +1,85 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Last letter-first letter
+# Pokémon-style word chain: the next word must start with the last
+# letter of the previous word, and no word may repeat. Find the
+# longest possible chain.
+
+fn Rosetta::ChainWords::longest($words) {
+    my %used
+    my @best
+    Rosetta::ChainWords::dfs($words, \%used, [], \@best)
+    @best
+}
+
+fn Rosetta::ChainWords::dfs($words, $used, $cur, $best) {
+    if (len(@$cur) > len(@$best)) { @$best = @$cur }
+    my $head = len(@$cur) > 0 ? lc(substr($cur->[-1], -1)) : undef
+    for my $w (@$words) {
+        next if exists $used->{$w}
+        next if defined $head && lc(substr($w, 0, 1)) ne $head
+        $used->{$w} = 1
+        push @$cur, $w
+        Rosetta::ChainWords::dfs($words, $used, $cur, $best)
+        pop @$cur
+        delete $used->{$w}
+    }
+}
+
+fn Rosetta::ChainWords::is_valid_chain($chain) {
+    return 1 if len(@$chain) <= 1
+    my %seen = ($chain->[0] => 1)
+    for my $i (1..len(@$chain) - 1) {
+        return 0 if exists $seen{$chain->[$i]}
+        $seen{$chain->[$i]} = 1
+        return 0 if lc(substr($chain->[$i - 1], -1))
+                 ne lc(substr($chain->[$i], 0, 1))
+    }
+    1
+}
+
+# Tiny dictionary: chain "ant", "tea", "ape"... longest = ant→tea→ape but
+# ape ends with 'e' not connecting. Actually a→t→a→ longest is 2.
+# Rosetta sample: cat, tap, pencil, lemon, nice, eel
+my @small = ("cat", "tap", "pencil", "lemon", "nice", "eel")
+my @ch = Rosetta::ChainWords::longest(\@small)
+assert_ok len(@ch) >= 2, "found a chain"
+assert_eq Rosetta::ChainWords::is_valid_chain(\@ch), 1, "chain valid"
+
+# Pokémon trio: bulbasaur, raichu, ulysses-style
+my @poke = ("audino", "bagon", "baltoy", "banette", "bidoof", "braviary",
+            "bronzor", "carracosta", "charmeleon", "cresselia", "croagunk",
+            "darmanitan", "deino", "emboar", "emolga", "exeggcute", "gabite",
+            "girafarig", "gulpin", "haxorus", "heatmor", "heatran", "ivysaur",
+            "jellicent", "jumpluff", "kangaskhan", "kricketune", "landorus",
+            "ledyba", "loudred", "lumineon", "lunatone", "machamp",
+            "magnezone", "mamoswine", "nosepass", "petilil", "pidgeotto",
+            "pikachu", "pinsir", "poliwrath", "poochyena", "porygon2",
+            "porygonz", "registeel", "relicanth", "remoraid", "rufflet",
+            "sableye", "scolipede", "scrafty", "seaking", "sealeo",
+            "silcoon", "simisear", "snivy", "snorlax", "spoink", "starly",
+            "tirtouga", "trapinch", "treecko", "tyrogue", "vigoroth",
+            "vulpix", "wailord", "wartortle", "whismur", "wingull",
+            "yamask")
+my @pchain = Rosetta::ChainWords::longest(\@poke[0..14])    # subset for speed
+assert_ok Rosetta::ChainWords::is_valid_chain(\@pchain), "Pokémon subset chain valid"
+
+# Single word forms a trivial chain
+my @one = Rosetta::ChainWords::longest(["alpha"])
+assert_eq scalar(@one), 1, "single-word chain"
+assert_eq $one[0], "alpha", "single word preserved"
+
+# Disjoint dictionary: nothing chains
+my @disjoint = ("cat", "moon", "frog")
+my @no_chain = Rosetta::ChainWords::longest(\@disjoint)
+# Best is any single word
+assert_eq scalar(@no_chain), 1, "disjoint dict → length 1"
+
+# Validity helper
+assert_eq Rosetta::ChainWords::is_valid_chain(["cat", "tap", "pen"]), 1, "valid 3-chain"
+assert_eq Rosetta::ChainWords::is_valid_chain(["cat", "moon"]),       0, "invalid 2-chain"
+assert_eq Rosetta::ChainWords::is_valid_chain(["cat", "tap", "cat"]), 0, "repeats rejected"
+
+# Pipe form
+["cat", "tap", "pen"] |> Rosetta::ChainWords::is_valid_chain |> assert_eq(1, "pipe valid")
+
+test_run

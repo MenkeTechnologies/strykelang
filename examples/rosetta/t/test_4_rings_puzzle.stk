@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 4-rings or 4-squares puzzle
+# Place letters a..g into seven positions of a 4-ring chain so that:
+#     a + b = b + c + d = d + e + f = f + g
+# Each letter takes a value in [$low, $high]. If $unique is true, every
+# letter must be distinct. Returns the number of valid assignments.
+
+fn Rosetta::FourRings::count($low, $high, $unique) {
+    my $n = 0
+    for my $a ($low:$high) {
+        for my $b ($low:$high) {
+            my $s = $a + $b
+            for my $c ($low:$high) {
+                my $d = $s - $b - $c
+                next if $d < $low || $d > $high
+                for my $e ($low:$high) {
+                    my $f = $b + $c - $e
+                    next if $f < $low || $f > $high
+                    my $g = $s - $f
+                    next if $g < $low || $g > $high
+                    if ($unique) {
+                        my %seen
+                        $seen{$a}++; $seen{$b}++; $seen{$c}++
+                        $seen{$d}++; $seen{$e}++; $seen{$f}++; $seen{$g}++
+                        next if len(keys %seen) != 7
+                    }
+                    $n++
+                }
+            }
+        }
+    }
+    $n
+}
+
+# Reference numbers from the Rosetta Code task page
+assert_eq Rosetta::FourRings::count(1, 7, 1),  8,    "unique 1..7"
+assert_eq Rosetta::FourRings::count(3, 9, 1),  4,    "unique 3..9"
+assert_eq Rosetta::FourRings::count(0, 9, 0),  2860, "non-unique 0..9"
+
+# Pipe form — partial application via fn-wrapper
+0 |> fn { Rosetta::FourRings::count(_, 9, 0) } |> assert_eq(2860, "pipe non-unique 0..9")
+
+# Threaded computation
+my $u = ~> 1 fn { Rosetta::FourRings::count(_, 7, 1) }
+assert_eq $u, 8, "threaded unique 1..7"
+
+# Symmetry check: solutions come in pairs (reverse the chain)
+# so the count for unique 1..7 should be even.
+assert_eq Rosetta::FourRings::count(1, 7, 1) % 2, 0, "unique solutions are paired"
+
+test_run

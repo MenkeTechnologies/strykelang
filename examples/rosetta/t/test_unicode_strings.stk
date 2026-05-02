@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Unicode strings
+# Verify length, character access, comparison, and case operations
+# work correctly on Unicode strings in stryke.
+
+fn Rosetta::Unicode::char_count($s) {
+    my @chars = split //, $s
+    scalar(@chars)
+}
+
+fn Rosetta::Unicode::byte_count($s) {
+    length($s)
+}
+
+fn Rosetta::Unicode::reverse_str($s) {
+    join("", reverse split //, $s)
+}
+
+fn Rosetta::Unicode::starts_with($s, $prefix) {
+    return 0 if length($prefix) > length($s)
+    substr($s, 0, length($prefix)) eq $prefix
+}
+
+# Latin
+assert_eq Rosetta::Unicode::char_count("hello"),    5,  "ASCII char count"
+
+# Mixed Greek
+my $greek = "αβγ"
+assert_eq Rosetta::Unicode::char_count($greek),     3,  "3 Greek chars"
+
+# Mixed scripts
+my $mixed = "Hellöü"
+assert_eq Rosetta::Unicode::char_count($mixed),     6,  "6 mixed-script chars"
+
+# Reverse preserves character boundaries
+my $rev = Rosetta::Unicode::reverse_str("αβγδ")
+assert_eq $rev, "δγβα", "Greek reverse"
+
+my $rev2 = Rosetta::Unicode::reverse_str("café")
+assert_eq $rev2, "éfac", "Latin-1 reverse"
+
+# Comparison with Unicode
+my $a = "café"
+my $b = "café"
+assert_eq $a eq $b, 1, "string equality with combined chars (NFC == NFC)"
+
+# Case conversion
+assert_eq lc("ÄÖÜ"), "äöü", "uppercase German → lower"
+assert_eq uc("αβγ"), "ΑΒΓ", "lowercase Greek → upper"
+
+# Substring via character split (substr operates byte-wise)
+my @greek_chars = split //, "αβγδε"
+assert_eq join("", @greek_chars[1..2]), "βγ", "Greek substring via split"
+
+# Concatenation works across scripts
+assert_eq "a" . "α" . "あ", "aαあ", "concatenated multi-script"
+
+# Indexing returns characters
+my @chars = split //, "αβγ"
+assert_eq $chars[0], "α", "indexed alpha"
+assert_eq $chars[2], "γ", "indexed gamma"
+
+# starts_with
+assert_eq Rosetta::Unicode::starts_with("hello world", "hello"), 1, "ASCII prefix"
+assert_eq Rosetta::Unicode::starts_with("αβγδ", "αβ"),           1, "Greek prefix"
+assert_eq Rosetta::Unicode::starts_with("αβγδ", "βγ"),           0, "non-prefix rejected"
+
+# Pipe form
+"αβγ" |> Rosetta::Unicode::reverse_str |> assert_eq("γβα", "pipe reverse Greek")
+
+test_run

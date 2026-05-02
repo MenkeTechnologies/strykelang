@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Verify distribution uniformity / Naive
+# Sample a generator many times, count occurrences of each outcome,
+# and verify each count lies within ±tolerance of the expected mean.
+
+fn Rosetta::DistVerify::histogram($gen, $samples) {
+    my %h
+    for my $i (~> 1:$samples) {
+        $h{$gen->()}++
+    }
+    \%h
+}
+
+fn Rosetta::DistVerify::is_uniform($hist, $expected_count, $tolerance) {
+    my $low  = $expected_count * (1 - $tolerance)
+    my $high = $expected_count * (1 + $tolerance)
+    for my $k (keys %$hist) {
+        return 0 if $hist->{$k} < $low || $hist->{$k} > $high
+    }
+    1
+}
+
+fn Rosetta::DistVerify::dice_roll($sides) {
+    fn () { 1 + int(rand($sides)) }
+}
+
+# Fair 6-sided die
+my $d6 = Rosetta::DistVerify::dice_roll(6)
+my $h6 = Rosetta::DistVerify::histogram($d6, 60000)
+assert_eq scalar(keys %$h6), 6, "6 distinct outcomes"
+assert_eq Rosetta::DistVerify::is_uniform($h6, 10000, 0.05), 1,
+    "fair d6 within 5% of expected"
+
+# Fair 20-sided die
+my $d20 = Rosetta::DistVerify::dice_roll(20)
+my $h20 = Rosetta::DistVerify::histogram($d20, 100000)
+assert_eq scalar(keys %$h20), 20, "20 outcomes"
+assert_eq Rosetta::DistVerify::is_uniform($h20, 5000, 0.10), 1,
+    "fair d20 within 10% of expected"
+
+# Biased coin should fail uniformity
+my $biased = fn () { rand() < 0.7 ? "H" : "T" }
+my $hb = Rosetta::DistVerify::histogram($biased, 10000)
+assert_eq Rosetta::DistVerify::is_uniform($hb, 5000, 0.05), 0,
+    "biased coin fails uniformity"
+
+# Tiny histogram with all same outcome
+my $constant = fn () { "X" }
+my $hc = Rosetta::DistVerify::histogram($constant, 100)
+assert_eq scalar(keys %$hc), 1, "constant generator → 1 bucket"
+assert_eq $hc->{X}, 100, "all 100 land in X"
+
+test_run

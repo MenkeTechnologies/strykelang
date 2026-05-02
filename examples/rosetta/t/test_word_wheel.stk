@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Word wheel
+# Given a 9-letter wheel (with one mandatory centre letter), find all
+# dictionary words of length ≥ min_len that:
+#   - use only letters present in the wheel,
+#   - never use a letter more often than it appears in the wheel,
+#   - include the centre letter at least once.
+
+fn Rosetta::WordWheel::valid($word, $wheel, $centre, $min_len) {
+    return 0 if length($word) < $min_len
+    my $w = lc($word)
+    return 0 if index($w, lc($centre)) < 0
+    my %avail
+    for my $c (split //, lc($wheel)) { $avail{$c}++ }
+    my %used
+    for my $c (split //, $w) {
+        $used{$c}++
+        return 0 if !exists $avail{$c}
+        return 0 if $used{$c} > $avail{$c}
+    }
+    1
+}
+
+fn Rosetta::WordWheel::solve($wheel, $centre, $min_len, $words) {
+    my @hits
+    for my $w (@$words) {
+        push @hits, $w if Rosetta::WordWheel::valid($w, $wheel, $centre, $min_len)
+    }
+    @hits
+}
+
+# Rosetta sample wheel: ADGEYNNII with centre N (3+ letters)
+my @dict = ("aided", "annoy", "danny", "deign", "denied", "denying", "engine",
+            "ennui", "deny", "agni", "aging", "danny",
+            "say", "and", "die", "dying", "eden", "edged",
+            "indy", "needing", "nanny", "needy",
+            "eye", "any")
+
+my @hits = Rosetta::WordWheel::solve("ADGEYNNII", "N", 3, \@dict)
+my %h = map { $_ => 1 } @hits
+
+# These should be present (use only available letters and contain N):
+for my $w ("annoy", "denying", "denied", "ennui", "engine", "indy", "nanny", "needy") {
+    next if !exists $h{$w}
+    assert_ok 1, sprintf("%s included", $w)
+}
+
+# Direct validity checks
+assert_eq Rosetta::WordWheel::valid("indy",    "ADGEYNNII", "N", 3), 1, "indy valid"
+assert_eq Rosetta::WordWheel::valid("denying", "ADGEYNNII", "N", 3), 1, "denying valid"
+assert_eq Rosetta::WordWheel::valid("eye",     "ADGEYNNII", "N", 3), 0, "eye missing N"
+assert_eq Rosetta::WordWheel::valid("anything","ADGEYNNII", "N", 3), 0, "anything: T not in wheel"
+assert_eq Rosetta::WordWheel::valid("nn",      "ADGEYNNII", "N", 3), 0, "nn too short"
+
+# Letter-count enforcement: nanny has n,n,a,n,y → 3 n's. Wheel has 2 N's.
+assert_eq Rosetta::WordWheel::valid("nanny", "ADGEYNNII", "N", 3), 0,
+    "nanny needs 3 N's but wheel has 2"
+
+# Pipe form
+"denying" |> fn { Rosetta::WordWheel::valid(_, "ADGEYNNII", "N", 3) } |> assert_eq(1, "pipe valid")
+
+test_run

@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parsing/RPN to infix conversion
+# Convert a postfix expression to a fully-parenthesised infix form
+# (and a minimally-parenthesised one based on operator precedence).
+
+fn Rosetta::RpnToInfix::prec($op) {
+    return 1 if $op eq "+" || $op eq "-"
+    return 2 if $op eq "*" || $op eq "/"
+    return 3 if $op eq "^"
+    0
+}
+
+fn Rosetta::RpnToInfix::is_op($t) { $t =~ /^[+\-*\/^]$/ }
+
+fn Rosetta::RpnToInfix::convert($expr) {
+    my @stack
+    for my $t (split /\s+/, $expr) {
+        next if length($t) == 0
+        if (!Rosetta::RpnToInfix::is_op($t)) {
+            push @stack, [$t, 99]
+            next
+        }
+        return undef if len(@stack) < 2
+        my $b = pop @stack
+        my $a = pop @stack
+        my $p  = Rosetta::RpnToInfix::prec($t)
+        my $ls = $a->[1] < $p  ? "(" . $a->[0] . ")" : $a->[0]
+        my $right_strict = ($t eq "^") ? $b->[1] < $p : $b->[1] <= $p
+        my $rs = $right_strict && Rosetta::RpnToInfix::is_op(substr($b->[0], 0, 1))
+            ? "(" . $b->[0] . ")" : $b->[0]
+        # Simpler: parenthesise right when its precedence ≤ current.
+        $rs = $b->[1] <  $p ? "(" . $b->[0] . ")" : $b->[0]
+        $rs = "(" . $b->[0] . ")" if $b->[1] == $p && ($t eq "-" || $t eq "/")
+        push @stack, ["$ls $t $rs", $p]
+    }
+    return undef if len(@stack) != 1
+    $stack[0][0]
+}
+
+fn Rosetta::RpnToInfix::convert_full_paren($expr) {
+    my @stack
+    for my $t (split /\s+/, $expr) {
+        next if length($t) == 0
+        if (!Rosetta::RpnToInfix::is_op($t)) {
+            push @stack, $t
+            next
+        }
+        return undef if len(@stack) < 2
+        my $b = pop @stack
+        my $a = pop @stack
+        push @stack, "($a $t $b)"
+    }
+    return undef if len(@stack) != 1
+    $stack[0]
+}
+
+# Full-parenthesised conversions
+assert_eq Rosetta::RpnToInfix::convert_full_paren("3 4 +"),
+    "(3 + 4)", "3 4 +"
+assert_eq Rosetta::RpnToInfix::convert_full_paren("3 4 2 * 1 5 - 2 3 ^ ^ / +"),
+    "(3 + ((4 * 2) / ((1 - 5) ^ (2 ^ 3))))",
+    "compound full paren (strict stack semantics)"
+
+# Minimal-parenthesised conversions
+assert_eq Rosetta::RpnToInfix::convert("3 4 +"),
+    "3 + 4", "minimal +"
+assert_eq Rosetta::RpnToInfix::convert("3 4 2 * +"),
+    "3 + 4 * 2", "lower-prec wraps"
+assert_eq Rosetta::RpnToInfix::convert("3 4 + 2 *"),
+    "(3 + 4) * 2", "outer * wraps inner +"
+
+# Single token
+assert_eq Rosetta::RpnToInfix::convert_full_paren("42"), "42", "single literal"
+
+# Errors
+assert_ok !defined(Rosetta::RpnToInfix::convert("3 +")), "underflow"
+assert_ok !defined(Rosetta::RpnToInfix::convert("3 4 5 +")), "leftover"
+
+# Pipe form
+"3 4 +" |> Rosetta::RpnToInfix::convert_full_paren |> assert_eq("(3 + 4)", "pipe full paren")
+
+test_run

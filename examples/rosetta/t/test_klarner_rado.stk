@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Klarner-Rado sequence (OEIS A005658)
+# Smallest sequence that contains 1 and is closed under x → 2x and
+# x → 3x + 2.
+# First few: 1, 2, 4, 5, 8, 10, 11, 14, 16, 17, 20, 22, 23, 26, 28, …
+
+fn Rosetta::KlarnerRado::up_to($limit) {
+    my %seen = (1 => 1)
+    my @stack = (1)
+    while (len(@stack) > 0) {
+        my $x = pop @stack
+        for my $y (2 * $x, 3 * $x + 2) {
+            next if $y > $limit
+            next if exists $seen{$y}
+            $seen{$y} = 1
+            push @stack, $y
+        }
+    }
+    sort { $a <=> $b } keys %seen
+}
+
+# Closure under 2x and 3x+2 starting from 1, up to 30
+my @s = Rosetta::KlarnerRado::up_to(30)
+assert_eq join(",", @s),
+    "1,2,4,5,8,10,14,16,17,20,26,28",
+    "Klarner-Rado (2x, 3x+2) ≤ 30"
+
+# 11 is *not* reachable from these productions
+my @s32 = Rosetta::KlarnerRado::up_to(32)
+my %h = map { $_ => 1 } @s32
+assert_eq exists($h{11}), 0, "11 not reachable from 1 by 2x or 3x+2"
+assert_eq exists($h{32}), 1, "32 = 2·16 present"
+
+# Closure properties on the generated set
+my @big = Rosetta::KlarnerRado::up_to(500)
+my %bset = map { $_ => 1 } @big
+my $closure_ok = 1
+for my $x (@big) {
+    if (2 * $x <= 500) {
+        $closure_ok = 0 if !exists $bset{2 * $x}
+    }
+    if (3 * $x + 2 <= 500) {
+        $closure_ok = 0 if !exists $bset{3 * $x + 2}
+    }
+}
+assert_ok $closure_ok, "closed under both productions ≤ 500"
+
+# Pipe form
+30 |> Rosetta::KlarnerRado::up_to |> len |> assert_eq(12, "pipe count ≤ 30")
+
+test_run

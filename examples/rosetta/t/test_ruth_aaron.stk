@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ruth-Aaron numbers
+# Two consecutive integers (n, n+1) form a Ruth-Aaron pair if the sum
+# of distinct prime factors of n equals the sum of distinct prime
+# factors of n+1.
+# OEIS A039752: 5, 24, 49, 77, 104, 153, 369, 492, …
+# (5 because n=5: spf=5; n+1=6: spf=2+3=5.)
+
+fn Rosetta::RuthAaron::distinct_pfsum($n) {
+    my $s = 0
+    my $x = $n
+    my $p = 2
+    while ($p * $p <= $x) {
+        if ($x % $p == 0) {
+            $s += $p
+            while ($x % $p == 0) { $x = int($x / $p) }
+        }
+        $p = $p == 2 ? 3 : $p + 2
+    }
+    $s += $x if $x > 1
+    $s
+}
+
+fn Rosetta::RuthAaron::is($n) {
+    Rosetta::RuthAaron::distinct_pfsum($n)
+        == Rosetta::RuthAaron::distinct_pfsum($n + 1)
+}
+
+# Sanity on the helper
+assert_eq Rosetta::RuthAaron::distinct_pfsum(1),   0, "1 has no primes"
+assert_eq Rosetta::RuthAaron::distinct_pfsum(7),   7, "prime → itself"
+assert_eq Rosetta::RuthAaron::distinct_pfsum(12),  5, "12 = 2²·3 → 2+3"
+assert_eq Rosetta::RuthAaron::distinct_pfsum(100), 7, "100 = 2²·5² → 2+5"
+
+# Documented Ruth-Aaron pairs
+assert_eq Rosetta::RuthAaron::is(5),  1, "(5, 6) is RA"
+assert_eq Rosetta::RuthAaron::is(24), 1, "(24, 25) is RA"
+assert_eq Rosetta::RuthAaron::is(49), 1, "(49, 50) is RA"
+assert_eq Rosetta::RuthAaron::is(77), 1, "(77, 78) is RA"
+
+# A non-RA pair
+assert_eq Rosetta::RuthAaron::is(6),  0, "(6, 7) not RA"
+assert_eq Rosetta::RuthAaron::is(10), 0, "(10, 11) not RA"
+
+# First 8 Ruth-Aaron numbers
+my @r = ~> 2:500 |> grep { Rosetta::RuthAaron::is(_) }
+assert_eq join(",", @r[0..7]),
+    "5,24,49,77,104,153,369,492",
+    "first 8 RA numbers"
+
+# Pipe form
+5 |> Rosetta::RuthAaron::is |> assert_eq(1, "pipe is(5)")
+
+test_run

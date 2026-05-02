@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Unprimeable numbers (OEIS A118118)
+# A composite n is unprimeable if no single-digit substitution can
+# turn it into a prime (so changing any one digit to any of 0..9
+# always leaves a composite — leading zeros disallowed, n > 9).
+# First few: 200, 204, 206, 208, …
+
+fn Rosetta::Unprimeable::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Unprimeable::is($n) {
+    return 0 if $n < 10
+    return 0 if Rosetta::Unprimeable::is_prime($n)
+    my @d = split //, "$n"
+    my $L = scalar(@d)
+    for my $pos (0..$L - 1) {
+        for my $rep (0..9) {
+            next if $rep == int($d[$pos])
+            next if $pos == 0 && $rep == 0     # disallow leading zero
+            my @new = @d
+            $new[$pos] = $rep
+            my $cand = int(join("", @new))
+            return 0 if Rosetta::Unprimeable::is_prime($cand)
+        }
+    }
+    1
+}
+
+# 200 is unprimeable (rosetta task page reference)
+assert_eq Rosetta::Unprimeable::is(200), 1, "200 unprimeable"
+# 100 is NOT — replacing the trailing 0 with 3 gives 103 (prime)
+assert_eq Rosetta::Unprimeable::is(100), 0, "100 → 103 prime so not unprimeable"
+# Single digits are excluded
+assert_eq Rosetta::Unprimeable::is(4), 0, "single digits excluded"
+# A prime itself is not unprimeable
+assert_eq Rosetta::Unprimeable::is(13), 0, "primes excluded"
+
+# First few unprimeables (rosetta task: 35 such numbers ≤ 1000;
+# the smallest is 200).
+my @u = ~> 10:1000 |> grep { Rosetta::Unprimeable::is(_) }
+assert_ok len(@u) > 0, "found some unprimeables ≤ 1000"
+assert_eq $u[0], 200, "smallest unprimeable is 200"
+
+# Count unprimeables ≤ 1000 (computed from definition)
+assert_eq len(@u), 42, "42 unprimeables ≤ 1000"
+
+# Pipe form
+200 |> Rosetta::Unprimeable::is |> assert_eq(1, "pipe is(200)")
+
+test_run

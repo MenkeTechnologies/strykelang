@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Operator precedence
+# Stryke / Perl 5-style precedence table. We surface a hash mapping
+# operator names to (precedence, associativity) and assert the
+# canonical orderings.
+
+fn Rosetta::Prec::table() {
+    {
+        "++_"     => [22, "right"],   # autoincrement (prefix)
+        "_**"     => [21, "right"],   # exponentiation
+        "!"       => [20, "right"],
+        "*"       => [19, "left"],
+        "/"       => [19, "left"],
+        "%"       => [19, "left"],
+        "+"       => [18, "left"],
+        "-"       => [18, "left"],
+        "<<"      => [17, "left"],
+        ">>"      => [17, "left"],
+        "<"       => [16, "non"],
+        ">"       => [16, "non"],
+        "<="      => [16, "non"],
+        ">="      => [16, "non"],
+        "=="      => [15, "non"],
+        "!="      => [15, "non"],
+        "<=>"     => [15, "non"],
+        "&"       => [14, "left"],
+        "|"       => [13, "left"],
+        "^"       => [13, "left"],
+        "&&"      => [12, "left"],
+        "||"      => [11, "left"],
+        "?:"      => [10, "right"],
+        "="       => [9,  "right"],
+        ","       => [2,  "left"],
+        "and"     => [4,  "left"],
+        "or"      => [3,  "left"],
+        "not"     => [5,  "right"],
+    }
+}
+
+fn Rosetta::Prec::tighter_than($a, $b) {
+    my $t = Rosetta::Prec::table()
+    return undef unless exists $t->{$a} && exists $t->{$b}
+    $t->{$a}[0] > $t->{$b}[0] ? 1 : 0
+}
+
+fn Rosetta::Prec::assoc($op) {
+    my $t = Rosetta::Prec::table()
+    return undef unless exists $t->{$op}
+    $t->{$op}[1]
+}
+
+# Canonical orderings
+assert_eq Rosetta::Prec::tighter_than("*", "+"),  1, "× tighter than +"
+assert_eq Rosetta::Prec::tighter_than("+", "<"),  1, "+ tighter than <"
+assert_eq Rosetta::Prec::tighter_than("<", "=="), 1, "< tighter than =="
+assert_eq Rosetta::Prec::tighter_than("==","&&"), 1, "== tighter than &&"
+assert_eq Rosetta::Prec::tighter_than("&&","||"), 1, "&& tighter than ||"
+assert_eq Rosetta::Prec::tighter_than("||","?:"), 1, "|| tighter than ?:"
+assert_eq Rosetta::Prec::tighter_than("?:","="),  1, "?: tighter than ="
+assert_eq Rosetta::Prec::tighter_than("=", "or"), 1, "= tighter than or"
+assert_eq Rosetta::Prec::tighter_than("_**", "*"),1, "** tighter than ×"
+
+# Reverse comparisons
+assert_eq Rosetta::Prec::tighter_than("+", "*"),  0, "+ NOT tighter than ×"
+assert_eq Rosetta::Prec::tighter_than("&&", "*"), 0, "&& NOT tighter than ×"
+
+# Associativity
+assert_eq Rosetta::Prec::assoc("+"),    "left",  "+ left-assoc"
+assert_eq Rosetta::Prec::assoc("="),    "right", "= right-assoc"
+assert_eq Rosetta::Prec::assoc("=="),   "non",   "== non-assoc"
+assert_eq Rosetta::Prec::assoc("_**"),  "right", "** right-assoc"
+assert_eq Rosetta::Prec::assoc("?:"),   "right", "?: right-assoc"
+
+# Unknown operator
+assert_ok !defined(Rosetta::Prec::tighter_than("@", "&")), "unknown rejected"
+assert_ok !defined(Rosetta::Prec::assoc("@")),             "unknown assoc"
+
+# Pipe form
+"+" |> Rosetta::Prec::assoc |> assert_eq("left", "pipe + assoc")
+
+test_run
