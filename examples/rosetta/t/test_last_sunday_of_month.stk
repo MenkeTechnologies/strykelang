@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find the last Sunday of each month
+
+fn Rosetta::LastSunday::dow($y, $m, $d) {
+    my ($yy, $mm) = ($y, $m)
+    if ($mm < 3) { $mm += 12; $yy -= 1 }
+    my $K = $yy % 100
+    my $J = int($yy / 100)
+    (($d + int(13 * ($mm + 1) / 5) + $K + int($K / 4) + int($J / 4) + 5 * $J) % 7)
+}
+
+fn Rosetta::LastSunday::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || ($y % 400 == 0)
+}
+
+fn Rosetta::LastSunday::days_in($y, $m) {
+    my @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    my $d = $days[$m - 1]
+    $d = 29 if $m == 2 && Rosetta::LastSunday::is_leap($y)
+    $d
+}
+
+fn Rosetta::LastSunday::for_month($y, $m) {
+    my $last = Rosetta::LastSunday::days_in($y, $m)
+    # Zeller: 1 = Sunday
+    for (my $d = $last; $d >= $last - 6; $d--) {
+        return $d if Rosetta::LastSunday::dow($y, $m, $d) == 1
+    }
+    -1
+}
+
+fn Rosetta::LastSunday::for_year($y) {
+    1:12 |> map { Rosetta::LastSunday::for_month($y, _) }
+}
+
+# Reference values for 2013 from rosetta task
+my @y2013 = Rosetta::LastSunday::for_year(2013)
+assert_eq join(",", @y2013), "27,24,31,28,26,30,28,25,29,27,24,29", "Last Sundays of 2013"
+
+# Internal consistency for 2026
+my @y2026 = Rosetta::LastSunday::for_year(2026)
+my $ok_sun = 1
+my $ok_in_last = 1
+for my $m (1..12) {
+    my $d = $y2026[$m - 1]
+    $ok_sun = 0 if Rosetta::LastSunday::dow(2026, $m, $d) != 1
+    my $last = Rosetta::LastSunday::days_in(2026, $m)
+    $ok_in_last = 0 if $d > $last || $d < $last - 6
+}
+assert_ok $ok_sun,     "every 2026 result is a Sunday"
+assert_ok $ok_in_last, "every 2026 result is in the last week"
+
+# Pipe form
+2013 |> Rosetta::LastSunday::for_year |> join(",") |> assert_eq("27,24,31,28,26,30,28,25,29,27,24,29", "pipe 2013")
+
+test_run

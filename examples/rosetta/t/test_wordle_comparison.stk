@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wordle comparison
+# Given a target word and a guess of equal length, return a 5-letter
+# code: 'G' = green (right letter, right place), 'Y' = yellow (right
+# letter, wrong place but accounts for letter multiplicity), '-' for
+# absent. Each target letter can only feed one Y/G match.
+
+fn Rosetta::Wordle::compare($target, $guess) {
+    return undef if length($target) != length($guess)
+    my $n = length($target)
+    my @t = split //, $target
+    my @g = split //, $guess
+    my @res = ("-") x $n
+    my @consumed = (0) x $n
+    # Pass 1: greens
+    for my $i (0..$n - 1) {
+        if ($g[$i] eq $t[$i]) {
+            $res[$i] = "G"
+            $consumed[$i] = 1
+        }
+    }
+    # Pass 2: yellows
+    for my $i (0..$n - 1) {
+        next if $res[$i] eq "G"
+        for my $j (0..$n - 1) {
+            next if $consumed[$j]
+            next if $i == $j
+            if ($g[$i] eq $t[$j]) {
+                $res[$i] = "Y"
+                $consumed[$j] = 1
+                last
+            }
+        }
+    }
+    join("", @res)
+}
+
+# Direct cases
+assert_eq Rosetta::Wordle::compare("HELLO", "WORLD"), "-Y-G-", "HELLO vs WORLD: O→Y, L→G"
+assert_eq Rosetta::Wordle::compare("HELLO", "HELLO"), "GGGGG", "exact match all green"
+assert_eq Rosetta::Wordle::compare("ABCDE", "FGHIJ"), "-----", "no overlap"
+
+# Duplicate-letter handling: target HELLO, guess LLAMA
+# H=-, E=-, L=Y(matches L at pos 2), L=G(at pos 3), O=- → -YGY-? Let's trace
+# Greens: pos 3 (L), so consumed[3]=1
+# Yellows: pos 0 H against {0,1,2,4} t[0]=H green so consumed[0]=1 but it's not green... wait re-trace.
+# Actually target HELLO -> [H,E,L,L,O], guess LLAMA -> [L,L,A,M,A]
+# Greens pass: pos 0 L vs H no; pos 1 L vs E no; pos 2 A vs L no; pos 3 M vs L no; pos 4 A vs O no.
+# Yellows pass:
+#   pos 0 L: search consumed=0 j != 0: j=1 t[1]=E no, j=2 t[2]=L yes → Y, consume t[2]
+#   pos 1 L: j=0 H no, j=3 t[3]=L yes → Y, consume t[3]
+#   pos 2 A: no A in target → -
+#   pos 3 M: no → -
+#   pos 4 A: no → -
+# Result: YY---
+assert_eq Rosetta::Wordle::compare("HELLO", "LLAMA"), "YY---", "duplicates handled"
+
+# Duplicate guesses with single target letter: target ALOHA, guess AAAAA → G---G
+# t = [A,L,O,H,A], g = [A,A,A,A,A]
+# Greens: pos 0 A=A green, pos 4 A=A green; consumed [1,0,0,0,1]
+# Yellows: pos 1 A: search j=2,3 → no A; pos 2,3 same. → ----
+# Result: G---G
+assert_eq Rosetta::Wordle::compare("ALOHA", "AAAAA"), "G---G", "guess overflow on single A pair"
+
+# Mismatched lengths
+assert_ok !defined(Rosetta::Wordle::compare("CAT", "DOGS")), "length mismatch → undef"
+
+# Pipe form
+"PLANT" |> fn { Rosetta::Wordle::compare(_, "PLANK") } |> assert_eq("GGGG-", "pipe compare")
+
+# Threaded form: every guess against a shared target
+my @rows = ~> ("STARE", "BLOOM", "TRACE") |> map { Rosetta::Wordle::compare("CRANE", _) }
+assert_eq join("|", @rows), "--GYG|-----|-GGYG", "batch of guesses"
+
+test_run

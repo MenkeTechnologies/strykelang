@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Probabilistic choice
+# Sample from a discrete distribution given as a list of (value, weight)
+# pairs. Uses the cumulative-distribution + uniform-random method.
+
+fn Rosetta::ProbChoice::cumulative($pairs) {
+    my @cum
+    my $total = 0
+    for my $p (@$pairs) {
+        $total += $p->[1]
+        push @cum, [$p->[0], $total]
+    }
+    [\@cum, $total]
+}
+
+fn Rosetta::ProbChoice::pick($prepped) {
+    my ($cum, $total) = @$prepped
+    my $r = rand() * $total
+    for my $entry (@$cum) {
+        return $entry->[0] if $r < $entry->[1]
+    }
+    $cum->[-1][0]
+}
+
+fn Rosetta::ProbChoice::histogram($prepped, $n) {
+    my %h
+    for my $i (~> 1:$n) {
+        $h{Rosetta::ProbChoice::pick($prepped)}++
+    }
+    \%h
+}
+
+# Sanity on cumulative
+my $p = Rosetta::ProbChoice::cumulative([["a", 1], ["b", 2], ["c", 7]])
+assert_eq $p->[1], 10, "weights sum to 10"
+assert_eq $p->[0][0][0], "a", "first label"
+assert_eq $p->[0][0][1], 1,   "cum 1"
+assert_eq $p->[0][2][1], 10,  "cum 10"
+
+# Single deterministic outcome
+my $det = Rosetta::ProbChoice::cumulative([["only", 1]])
+for my $i (~> 1:50) {
+    assert_eq Rosetta::ProbChoice::pick($det), "only", "single-outcome pick"
+}
+
+# Empirical distribution matches theoretical within tolerance
+my $dist = Rosetta::ProbChoice::cumulative([
+    ["aleph",  1/5],
+    ["beth",   2/5],
+    ["gimel",  2/5],
+])
+my $h = Rosetta::ProbChoice::histogram($dist, 20000)
+my $aleph = ($h->{aleph} || 0) / 20000
+my $beth  = ($h->{beth}  || 0) / 20000
+my $gimel = ($h->{gimel} || 0) / 20000
+assert_ok abs($aleph - 0.2) < 0.03, sprintf("P(aleph) ≈ 0.2 (got %.3f)", $aleph)
+assert_ok abs($beth  - 0.4) < 0.03, sprintf("P(beth)  ≈ 0.4 (got %.3f)", $beth)
+assert_ok abs($gimel - 0.4) < 0.03, sprintf("P(gimel) ≈ 0.4 (got %.3f)", $gimel)
+
+# Picks always come from the input domain
+my %allowed = map { $_ => 1 } ("aleph", "beth", "gimel")
+my $coverage = 1
+for my $i (~> 1:500) {
+    my $x = Rosetta::ProbChoice::pick($dist)
+    $coverage = 0 if !exists $allowed{$x}
+}
+assert_ok $coverage, "every sampled value is in the domain"
+
+test_run

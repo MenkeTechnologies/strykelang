@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Round-robin tournament schedule
+# Build a single-round-robin schedule for n teams using the standard
+# circle method: fix team 0, rotate the remaining teams clockwise. If
+# n is odd we add a "BYE" team and rounds containing it are bye rounds
+# for the partner team.
+
+fn Rosetta::RoundRobin::schedule($n) {
+    my @teams = 0..$n - 1
+    my $bye = -1
+    if (len(@teams) % 2 == 1) {
+        $bye = $n
+        push @teams, $bye
+    }
+    my $m = len(@teams)
+    my $rounds = $m - 1
+    my @schedule
+    for my $r (0..$rounds - 1) {
+        my @round
+        for my $i (0..int($m / 2) - 1) {
+            push @round, [$teams[$i], $teams[$m - 1 - $i]]
+        }
+        push @schedule, \@round
+        # Rotate: keep teams[0] fixed, others shift right
+        my $last = $teams[-1]
+        for (my $i = $m - 1; $i > 1; $i--) {
+            $teams[$i] = $teams[$i - 1]
+        }
+        $teams[1] = $last
+    }
+    [\@schedule, $bye]
+}
+
+# Even teams: every team plays exactly n-1 games, no byes
+my $r4 = Rosetta::RoundRobin::schedule(4)
+my $sched4 = $r4->[0]
+assert_eq $r4->[1], -1, "no bye for 4 teams"
+assert_eq len(@$sched4), 3, "4 teams → 3 rounds"
+
+my %games_per_team
+for my $round (@$sched4) {
+    for my $g (@$round) {
+        $games_per_team{$g->[0]}++
+        $games_per_team{$g->[1]}++
+    }
+}
+for my $t (0..3) {
+    assert_eq $games_per_team{$t}, 3, sprintf("team %d plays 3 games", $t)
+}
+
+# Pairings unique across the tournament
+my %pair_seen
+my $unique = 1
+for my $round (@$sched4) {
+    for my $g (@$round) {
+        my @sorted = sort { $a <=> $b } ($g->[0], $g->[1])
+        my $key = "$sorted[0]-$sorted[1]"
+        $unique = 0 if exists $pair_seen{$key}
+        $pair_seen{$key} = 1
+    }
+}
+assert_ok $unique, "all pairings unique"
+assert_eq len(keys %pair_seen), 6, "C(4,2) = 6 pairings"
+
+# Odd teams: bye introduced
+my $r5 = Rosetta::RoundRobin::schedule(5)
+assert_eq $r5->[1], 5, "bye id = 5 for 5 teams"
+assert_eq len(@{$r5->[0]}), 5, "5 teams → 5 rounds (incl bye)"
+
+# Each real team gets exactly one bye round
+my %bye_count
+for my $round (@{$r5->[0]}) {
+    for my $g (@$round) {
+        if ($g->[0] == 5) { $bye_count{$g->[1]}++ }
+        if ($g->[1] == 5) { $bye_count{$g->[0]}++ }
+    }
+}
+for my $t (0..4) {
+    assert_eq $bye_count{$t}, 1, sprintf("team %d has exactly one bye", $t)
+}
+
+# Pipe form
+my $r6 = 6 |> Rosetta::RoundRobin::schedule
+assert_eq len(@{$r6->[0]}), 5, "pipe rounds for 6 teams"
+
+test_run

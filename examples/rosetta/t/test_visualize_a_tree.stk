@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Visualize a tree
+# Render a nested tree (each node is { name, children }) as ASCII art
+# using `├──`, `│  `, `└──`, and `   ` connectors.
+
+fn Rosetta::TreeViz::render($node) {
+    my @lines = ($node->{name})
+    Rosetta::TreeViz::render_children(\@lines, $node->{children}, "")
+    join("\n", @lines)
+}
+
+fn Rosetta::TreeViz::render_children($lines, $children, $prefix) {
+    return unless defined $children
+    my $n = len(@$children)
+    for my $i (0..$n - 1) {
+        my $is_last = ($i == $n - 1)
+        my $branch  = $is_last ? "└── " : "├── "
+        my $next    = $is_last ? "    " : "│   "
+        my $child   = $children->[$i]
+        push @$lines, $prefix . $branch . $child->{name}
+        Rosetta::TreeViz::render_children($lines, $child->{children}, $prefix . $next)
+    }
+}
+
+# Single node
+my $leaf = { name => "root", children => [] }
+assert_eq Rosetta::TreeViz::render($leaf), "root", "leaf root"
+
+# Two-level tree
+my $two = {
+    name => "root",
+    children => [
+        { name => "a", children => [] },
+        { name => "b", children => [] },
+    ],
+}
+assert_eq Rosetta::TreeViz::render($two),
+    "root\n├── a\n└── b",
+    "two-child tree"
+
+# Three-level tree
+my $three = {
+    name => "root",
+    children => [
+        { name => "a", children => [
+            { name => "a1", children => [] },
+            { name => "a2", children => [] },
+        ]},
+        { name => "b", children => [] },
+    ],
+}
+assert_eq Rosetta::TreeViz::render($three),
+    "root\n├── a\n│   ├── a1\n│   └── a2\n└── b",
+    "three-level tree"
+
+# Asymmetric tree
+my $asym = {
+    name => "X",
+    children => [
+        { name => "Y", children => [] },
+        { name => "Z", children => [
+            { name => "P", children => [
+                { name => "Q", children => [] },
+            ]},
+        ]},
+    ],
+}
+my $out = Rosetta::TreeViz::render($asym)
+assert_ok index($out, "├── Y") >= 0, "Y as branch"
+assert_ok index($out, "└── Z") >= 0, "Z as last"
+assert_ok index($out, "    └── P") >= 0, "P deep"
+assert_ok index($out, "        └── Q") >= 0, "Q deepest"
+
+# Pipe form
+$leaf |> Rosetta::TreeViz::render |> assert_eq("root", "pipe leaf")
+
+test_run

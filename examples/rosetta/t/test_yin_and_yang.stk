@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Yin and yang
+# Generate a yin-yang glyph as ASCII at radius `r`. Tile every (x, y)
+# in the bounding square according to the closed-form regions:
+#   1. inside the outer disk
+#   2. on the white half plus the white small disk minus the black dot
+# Returns a 2-D array of single-character strings.
+
+fn Rosetta::YinYang::cell($x, $y, $r) {
+    my $r2  = $r * $r
+    return " "  if $x * $x + $y * $y > $r2 + $r        # outside
+    # Inside outer disk
+    my $small_r2 = ($r / 2) * ($r / 2)
+    my $small_r2_dot = ($r / 6) * ($r / 6)
+    # White (top) half: y < 0 by default; we treat upper half as white.
+    my $top_half = $y < 0
+    # White small disk centred at (0, -r/2)
+    my $in_white_disk = ($x * $x + ($y + $r / 2) * ($y + $r / 2)) < $small_r2
+    # Black small disk centred at (0, +r/2)
+    my $in_black_disk = ($x * $x + ($y - $r / 2) * ($y - $r / 2)) < $small_r2
+    # Black dot inside white small disk
+    my $in_white_dot = ($x * $x + ($y + $r / 2) * ($y + $r / 2)) < $small_r2_dot
+    # White dot inside black small disk
+    my $in_black_dot = ($x * $x + ($y - $r / 2) * ($y - $r / 2)) < $small_r2_dot
+    return "#" if $in_white_dot     # black dot inside white disk
+    return "." if $in_black_dot     # white dot inside black disk
+    return "." if $in_white_disk
+    return "#" if $in_black_disk
+    return $top_half ? "." : "#"
+}
+
+fn Rosetta::YinYang::render($r) {
+    my @rows
+    for (my $y = -$r; $y <= $r; $y++) {
+        my @row
+        for (my $x = -$r; $x <= $r; $x++) {
+            push @row, Rosetta::YinYang::cell($x, $y, $r)
+        }
+        push @rows, join("", @row)
+    }
+    join("\n", @rows)
+}
+
+# Render at small radius to verify shape
+my $art = Rosetta::YinYang::render(8)
+assert_ok index($art, "#") >= 0, "contains black"
+assert_ok index($art, ".") >= 0, "contains white"
+assert_ok index($art, " ") >= 0, "contains background"
+
+# Both colours occupy roughly equal area
+my $blacks = 0; my $whites = 0
+for my $c (split //, $art) {
+    $blacks++ if $c eq "#"
+    $whites++ if $c eq "."
+}
+my $diff = abs($blacks - $whites)
+assert_ok $diff <= 30, sprintf("black/white roughly balanced (Δ = %d)", $diff)
+
+# At radius r the bounding box is (2r+1) × (2r+1) plus newlines
+my @lines = split /\n/, $art
+assert_eq scalar(@lines), 17, "17 rows for r=8"
+for my $line (@lines) {
+    assert_eq length($line), 17, "row width 17"
+}
+
+# Cell at exact origin: classify it
+my $origin = Rosetta::YinYang::cell(0, 0, 8)
+assert_ok $origin eq "#" || $origin eq ".", "origin is black or white"
+
+# Pipe form
+4 |> Rosetta::YinYang::render |> length |> fn { $_ > 0 } |> assert_eq(1, "pipe non-empty")
+
+test_run

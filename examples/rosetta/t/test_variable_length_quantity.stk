@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Variable-length quantity (MIDI-style VLQ)
+# Encode a non-negative integer as a sequence of 7-bit groups, big-end
+# first; every byte but the last has bit 7 set. Decode is the inverse.
+
+fn Rosetta::Vlq::encode($n) {
+    return [0] if $n == 0
+    return undef if $n < 0
+    my @rev
+    my $v = $n
+    while ($v > 0) {
+        push @rev, $v & 0x7F
+        $v = $v >> 7
+    }
+    my @out
+    for (my $i = len(@rev) - 1; $i >= 0; $i--) {
+        my $b = $rev[$i]
+        $b |= 0x80 if $i > 0
+        push @out, $b
+    }
+    \@out
+}
+
+fn Rosetta::Vlq::decode($bytes) {
+    my $v = 0
+    for my $i (0..len(@$bytes) - 1) {
+        my $b = $bytes->[$i]
+        $v = ($v << 7) | ($b & 0x7F)
+        if (($b & 0x80) == 0) {
+            return [$v, $i + 1]
+        }
+    }
+    undef  # unterminated
+}
+
+fn Rosetta::Vlq::hex($bytes) {
+    join(" ", map { sprintf("%02X", $_) } @$bytes)
+}
+
+# Canonical MIDI-spec sample table
+my @table = (
+    [0x00000000, "00"],
+    [0x00000040, "40"],
+    [0x0000007F, "7F"],
+    [0x00000080, "81 00"],
+    [0x00002000, "C0 00"],
+    [0x00003FFF, "FF 7F"],
+    [0x00004000, "81 80 00"],
+    [0x001FFFFF, "FF FF 7F"],
+    [0x00200000, "81 80 80 00"],
+    [0x08000000, "C0 80 80 00"],
+    [0x0FFFFFFF, "FF FF FF 7F"],
+)
+for my $row (@table) {
+    my ($n, $h) = @$row
+    my $bs = Rosetta::Vlq::encode($n)
+    assert_eq Rosetta::Vlq::hex($bs), $h, sprintf("encode 0x%X", $n)
+    my $r = Rosetta::Vlq::decode($bs)
+    assert_eq $r->[0], $n, sprintf("decode 0x%X", $n)
+    assert_eq $r->[1], len(@$bs), sprintf("decode 0x%X length", $n)
+}
+
+# Negative rejected
+assert_ok !defined(Rosetta::Vlq::encode(-1)), "negative rejected"
+
+# Round-trip every byte from 0..2000
+my $rt_ok = 1
+for my $n (0..2000) {
+    my $bs = Rosetta::Vlq::encode($n)
+    my $r  = Rosetta::Vlq::decode($bs)
+    $rt_ok = 0 if $r->[0] != $n
+}
+assert_ok $rt_ok, "0..2000 round-trip"
+
+# Pipe form
+0x80 |> Rosetta::Vlq::encode |> Rosetta::Vlq::hex |> assert_eq("81 00", "pipe encode 0x80")
+
+test_run

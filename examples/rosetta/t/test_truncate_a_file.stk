@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Truncate a file
+# Reduce the length of a file to N bytes (must be ≤ current size).
+# Returns 1 on success, 0 otherwise. Test scratch lives in /tmp.
+
+fn Rosetta::Truncate::file($path, $n) {
+    return 0 unless -e $path
+    return 0 if $n < 0
+    truncate($path, $n)
+}
+
+fn Rosetta::Truncate::write_file($path, $contents) {
+    open(my $fh, ">", $path) or return 0
+    print $fh $contents
+    close($fh)
+    1
+}
+
+fn Rosetta::Truncate::read_file($path) {
+    open(my $fh, "<", $path) or return undef
+    local $/ = undef
+    my $c = <$fh>
+    close($fh)
+    $c
+}
+
+# Scratch path
+my $tmp = "/tmp/stk_truncate_$$"
+unlink($tmp)
+
+# Create a 100-byte file
+my $payload = "x" x 100
+assert_eq Rosetta::Truncate::write_file($tmp, $payload), 1, "wrote 100 bytes"
+my $size_before = -s $tmp
+assert_eq $size_before, 100, "file is 100 bytes before"
+
+# Truncate to 50
+assert_eq Rosetta::Truncate::file($tmp, 50), 1, "truncate to 50 ok"
+my $size_50 = -s $tmp
+assert_eq $size_50, 50, "file is 50 bytes after"
+my $remainder = Rosetta::Truncate::read_file($tmp)
+assert_eq length($remainder), 50, "content length is 50"
+
+# Content prefix preserved
+assert_eq $remainder, "x" x 50, "first 50 bytes preserved"
+
+# Truncate to 0
+assert_eq Rosetta::Truncate::file($tmp, 0), 1, "truncate to 0 ok"
+my $size_0 = -s $tmp
+assert_eq $size_0, 0, "file is 0 bytes"
+
+# Non-existent file rejected
+my $missing = "/tmp/stk_no_such_$$"
+unlink($missing)
+assert_eq Rosetta::Truncate::file($missing, 10), 0, "missing file rejected"
+
+# Negative size rejected
+Rosetta::Truncate::write_file($tmp, "abc")
+assert_eq Rosetta::Truncate::file($tmp, -5), 0, "negative size rejected"
+
+# Cleanup
+unlink($tmp)
+
+test_run

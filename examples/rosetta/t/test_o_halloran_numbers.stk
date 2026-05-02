@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: O'Halloran numbers
+# An O'Halloran number cannot be expressed as the sum of unit-square
+# faces of any cuboid built from `n` unit cubes. The total face count
+# of a cuboid (a, b, c) with a ≤ b ≤ c is 2·(ab + bc + ac); even
+# integers ≥ 6 expressible this way are "Hamilton numbers" (cuboid
+# faces), and the rest of the even integers ≥ 6 are O'Halloran.
+# First few O'Halloran numbers: 6, 8, 12, 20, 24, 36, 44.
+
+fn Rosetta::OHalloran::reachable($limit) {
+    my %h
+    my $a = 1
+    while (2 * $a * (2 * $a) >= 0) {
+        last if $a * $a >= $limit
+        for my $b ($a..$limit) {
+            last if 2 * ($a * $b + $a + $b) > $limit
+            for my $c ($b..$limit) {
+                my $s = 2 * ($a * $b + $a * $c + $b * $c)
+                last if $s > $limit
+                $h{$s} = 1
+            }
+        }
+        $a++
+    }
+    \%h
+}
+
+fn Rosetta::OHalloran::list_below($limit) {
+    my $reach = Rosetta::OHalloran::reachable($limit)
+    my @out
+    for my $n (6..$limit) {
+        next if $n % 2 != 0
+        push @out, $n if !exists $reach->{$n}
+    }
+    @out
+}
+
+# Reachable spot checks
+my $r = Rosetta::OHalloran::reachable(50)
+assert_eq exists($r->{22}),  1, "22 = 2(1·1 + 1·5 + 1·5) reachable"
+my $r2 = Rosetta::OHalloran::reachable(100)
+assert_eq exists($r2->{6}), 1, "6 reachable from 1×1×1"
+
+# First O'Halloran numbers from rosetta task:
+# 6 is reachable, so smallest O'Halloran from rosetta page is actually 4
+# Let's recompute. 4 (even ≥ 6 is required so skip 4); 6 ✓ reachable.
+# So first non-reachable even ≥ 6: scan.
+my @small = Rosetta::OHalloran::list_below(120)
+assert_eq $small[0], 8, "smallest O'Halloran is 8"
+assert_eq join(",", @small),
+    "8,12,20,36,44,60,84,116",
+    "O'Halloran ≤ 120"
+
+# Pipe form
+8 |> fn {
+    my $h = Rosetta::OHalloran::reachable(50)
+    !exists $h->{$_}
+} |> assert_eq(1, "pipe 8 not reachable")
+
+test_run

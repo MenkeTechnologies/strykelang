@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Ormiston pairs
+# Two consecutive primes (p, q) form an Ormiston pair if q is a
+# permutation of the decimal digits of p. First few primes giving
+# Ormiston pairs: (1913, 1931), (18223, 18313), (19013, 19031), …
+
+fn Rosetta::Ormiston::digit_key($n) {
+    join("", sort split //, "$n")
+}
+
+fn Rosetta::Ormiston::pairs($limit) {
+    my @out
+    my $prev = 2
+    while ($prev < $limit) {
+        my $cand = $prev == 2 ? 3 : $prev + 2
+        while (!is_prime($cand)) { $cand += 2 }
+        last if $cand > $limit
+        if (Rosetta::Ormiston::digit_key($prev) eq Rosetta::Ormiston::digit_key($cand)) {
+            push @out, [$prev, $cand]
+        }
+        $prev = $cand
+    }
+    @out
+}
+
+# Helper sanity
+assert_eq is_prime(1913), 1, "1913 prime"
+assert_eq is_prime(1931), 1, "1931 prime"
+assert_eq Rosetta::Ormiston::digit_key(1913), Rosetta::Ormiston::digit_key(1931),
+    "1913 and 1931 same digit key"
+
+# First Ormiston pair
+my @p = Rosetta::Ormiston::pairs(2000)
+assert_eq len(@p), 1, "exactly one Ormiston pair below 2000"
+assert_eq $p[0][0], 1913, "first prime of first pair = 1913"
+assert_eq $p[0][1], 1931, "second prime of first pair = 1931"
+
+# Several Ormiston pairs in 1..20000 — at least the famous 1913/1931
+my @p5 = Rosetta::Ormiston::pairs(20000)
+assert_ok len(@p5) >= 1, "at least one Ormiston pair below 20000"
+assert_eq $p5[0]->[0], 1913, "first Ormiston first-prime is 1913"
+# Every recorded pair has the same digit-multiset by construction
+my $every_match = 1
+for my $pair (@p5) {
+    $every_match = 0 if Rosetta::Ormiston::digit_key($pair->[0]) ne Rosetta::Ormiston::digit_key($pair->[1])
+}
+assert_ok $every_match, "every pair shares its digit multiset"
+
+# Pipe form
+my @piped = 2000 |> Rosetta::Ormiston::pairs
+assert_eq len(@piped), 1, "pipe count below 2000"
+
+test_run

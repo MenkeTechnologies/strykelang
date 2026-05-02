@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Partial function application
+# Build closures that bind one or more arguments and accept the rest
+# later. Demonstrate that the result is a first-class function and
+# composes through `|>`.
+
+fn Rosetta::Partial::partial1($fn, $arg) {
+    fn ($rest) { $fn->($arg, $rest) }
+}
+
+fn Rosetta::Partial::partial2($fn, $a, $b) {
+    fn ($rest) { $fn->($a, $b, $rest) }
+}
+
+fn Rosetta::Partial::compose($f, $g) {
+    fn ($x) { $f->($g->($x)) }
+}
+
+# Bind first argument
+my $add  = fn ($a, $b) { $a + $b }
+my $add5 = Rosetta::Partial::partial1($add, 5)
+assert_eq $add5->(3),   8,  "5 + 3"
+assert_eq $add5->(-2),  3,  "5 + -2"
+assert_eq $add5->(100), 105, "5 + 100"
+
+# Bind two arguments
+my $clamp = fn ($lo, $hi, $x) {
+    $x < $lo ? $lo : ($x > $hi ? $hi : $x)
+}
+my $clamp_0_10 = Rosetta::Partial::partial2($clamp, 0, 10)
+assert_eq $clamp_0_10->(-5),  0,  "-5 clamped to 0"
+assert_eq $clamp_0_10->(7),   7,  "7 unchanged"
+assert_eq $clamp_0_10->(15),  10, "15 clamped to 10"
+
+# Compose
+my $double = fn ($x) { $x * 2 }
+my $inc    = fn ($x) { $x + 1 }
+my $inc_then_double = Rosetta::Partial::compose($double, $inc)
+assert_eq $inc_then_double->(3), 8, "(3 + 1) * 2 = 8"
+
+my $double_then_inc = Rosetta::Partial::compose($inc, $double)
+assert_eq $double_then_inc->(3), 7, "(3 * 2) + 1 = 7"
+
+# Multiple partial applications nest cleanly
+my $mul = fn ($a, $b) { $a * $b }
+my $double2 = Rosetta::Partial::partial1($mul, 2)
+my $triple  = Rosetta::Partial::partial1($mul, 3)
+my @doubled = (1, 2, 3) |> map { $double2->(_) }
+assert_eq join(",", @doubled), "2,4,6", "map double"
+my @tripled = (1, 2, 3) |> map { $triple->(_) }
+assert_eq join(",", @tripled), "3,6,9", "map triple"
+
+# Curry pattern using nested partials: f(a)(b) instead of f(a, b)
+my $curry_add = fn ($a) { fn ($b) { $a + $b } }
+my $add10 = $curry_add->(10)
+assert_eq $add10->(7), 17, "curried add"
+
+# Pipe form
+3 |> $double |> $inc |> assert_eq(7, "pipe x2 +1")
+
+test_run

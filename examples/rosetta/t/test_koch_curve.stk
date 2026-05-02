@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Koch curve
+# Iterate a polyline by replacing each segment with the four-segment
+# Koch motif. After `depth` iterations, each original segment is
+# replaced by 4^depth segments forming the classic snowflake fractal.
+
+fn Rosetta::Koch::iterate($pts, $depth) {
+    return $pts if $depth <= 0
+    my @new
+    push @new, $pts->[0]
+    my $pi = 4 * atan2(1, 1)
+    for my $i (0..len(@$pts) - 2) {
+        my $a = $pts->[$i]
+        my $b = $pts->[$i + 1]
+        my $dx = $b->[0] - $a->[0]
+        my $dy = $b->[1] - $a->[1]
+        my $p1 = [$a->[0] + $dx / 3,           $a->[1] + $dy / 3]
+        my $p3 = [$a->[0] + 2 * $dx / 3,       $a->[1] + 2 * $dy / 3]
+        # Peak: rotate (p3 - p1) by -60° around p1
+        my $vx = $p3->[0] - $p1->[0]
+        my $vy = $p3->[1] - $p1->[1]
+        my $cos60 = 0.5
+        my $sin60 = sqrt(3) / 2
+        my $rx = $cos60 * $vx + $sin60 * $vy
+        my $ry = -$sin60 * $vx + $cos60 * $vy
+        my $p2 = [$p1->[0] + $rx, $p1->[1] + $ry]
+        push @new, $p1, $p2, $p3, $b
+    }
+    Rosetta::Koch::iterate(\@new, $depth - 1)
+}
+
+fn Rosetta::Koch::snowflake($depth) {
+    my $h = sqrt(3) / 2
+    my $base = [
+        [0, 0],
+        [1, 0],
+        [0.5, $h],
+        [0, 0],
+    ]
+    Rosetta::Koch::iterate($base, $depth)
+}
+
+# Depth 0: just the base segment
+my $d0 = Rosetta::Koch::iterate([[0, 0], [1, 0]], 0)
+assert_eq len(@$d0), 2, "depth 0 → 2 points"
+
+# Each iteration multiplies segments by 4
+my $d1 = Rosetta::Koch::iterate([[0, 0], [1, 0]], 1)
+assert_eq len(@$d1) - 1, 4, "depth 1 → 4 segments"
+
+my $d2 = Rosetta::Koch::iterate([[0, 0], [1, 0]], 2)
+assert_eq len(@$d2) - 1, 16, "depth 2 → 16 segments"
+
+my $d3 = Rosetta::Koch::iterate([[0, 0], [1, 0]], 3)
+assert_eq len(@$d3) - 1, 64, "depth 3 → 64 segments"
+
+# Endpoints preserved
+assert_near $d3->[0][0],  0, 1e-9, "start x preserved"
+assert_near $d3->[-1][0], 1, 1e-9, "end x preserved"
+assert_near $d3->[0][1],  0, 1e-9, "start y preserved"
+assert_near $d3->[-1][1], 0, 1e-9, "end y preserved"
+
+# Snowflake: triangle with each side iterated → 3 × 4^depth segments
+my $sf2 = Rosetta::Koch::snowflake(2)
+assert_eq len(@$sf2) - 1, 3 * 16, "snowflake depth 2 → 48 segments"
+
+# Snowflake closes back to its starting point
+assert_near $sf2->[0][0],  $sf2->[-1][0], 1e-9, "closes x"
+assert_near $sf2->[0][1],  $sf2->[-1][1], 1e-9, "closes y"
+
+# Pipe form
+my $piped_sf = 2 |> Rosetta::Koch::snowflake
+assert_eq len(@$piped_sf) - 1, 48, "pipe snowflake d=2 segs"
+
+test_run

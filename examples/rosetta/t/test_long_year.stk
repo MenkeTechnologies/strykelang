@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Long year
+# An ISO 8601 "long year" has 53 ISO weeks. A year is long iff Jan 1
+# falls on a Thursday, OR the year is a leap year and Jan 1 falls on
+# a Wednesday.
+
+fn Rosetta::LongYear::dow($y, $m, $d) {
+    my ($yy, $mm) = ($y, $m)
+    if ($mm < 3) { $mm += 12; $yy -= 1 }
+    my $K = $yy % 100
+    my $J = int($yy / 100)
+    (($d + int(13 * ($mm + 1) / 5) + $K + int($K / 4) + int($J / 4) + 5 * $J) % 7)
+}
+
+fn Rosetta::LongYear::is_leap($y) {
+    ($y % 4 == 0 && $y % 100 != 0) || ($y % 400 == 0)
+}
+
+fn Rosetta::LongYear::is($y) {
+    # Zeller: 5 = Thursday, 4 = Wednesday
+    my $jan1 = Rosetta::LongYear::dow($y, 1, 1)
+    return 1 if $jan1 == 5
+    return 1 if $jan1 == 4 && Rosetta::LongYear::is_leap($y)
+    0
+}
+
+# Known long years from rosetta task — first ten years ≥ 2000:
+# 2004, 2009, 2015, 2020, 2026, 2032, 2037, 2043, 2048, 2054
+my @found = ~> 2000:2060 |> grep { Rosetta::LongYear::is(_) }
+assert_eq join(",", @found[0..9]),
+    "2004,2009,2015,2020,2026,2032,2037,2043,2048,2054",
+    "first 10 long years from 2000"
+
+# Frequency: across any 400-year cycle the count is 71.
+my @cycle = ~> 1600:1999 |> grep { Rosetta::LongYear::is(_) }
+assert_eq len(@cycle), 71, "71 long years per 400-year cycle"
+
+# Specific values
+assert_eq Rosetta::LongYear::is(2004), 1, "2004 is long"
+assert_eq Rosetta::LongYear::is(2024), 0, "2024 is not long"
+assert_eq Rosetta::LongYear::is(2026), 1, "2026 is long"
+
+# Pipe form
+2026 |> Rosetta::LongYear::is |> assert_eq(1, "pipe is(2026)")
+
+test_run

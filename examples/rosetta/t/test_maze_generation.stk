@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Maze generation
+# Generate a random rectangular maze using recursive backtracking
+# (depth-first search). The maze is represented as a w × h grid of
+# cells; each cell tracks the four wall booleans (N, S, E, W).
+# Initial state: all walls up. Carve a wall down whenever we cross
+# from one cell to a previously-unvisited neighbour.
+
+fn Rosetta::MazeGen::new_grid($w, $h) {
+    my @grid
+    for my $r (~> 1:$h) {
+        my @row
+        for my $c (~> 1:$w) {
+            push @row, { N => 1, S => 1, E => 1, W => 1, visited => 0 }
+        }
+        push @grid, \@row
+    }
+    \@grid
+}
+
+fn Rosetta::MazeGen::carve($grid, $w, $h) {
+    my @stack = ([0, 0])
+    $grid->[0][0]{visited} = 1
+    while (len(@stack) > 0) {
+        my $top = $stack[-1]
+        my ($r, $c) = @$top
+        my @candidates
+        push @candidates, ["N", -1, 0] if $r > 0      && !$grid->[$r - 1][$c]{visited}
+        push @candidates, ["S",  1, 0] if $r < $h - 1 && !$grid->[$r + 1][$c]{visited}
+        push @candidates, ["W",  0, -1] if $c > 0      && !$grid->[$r][$c - 1]{visited}
+        push @candidates, ["E",  0,  1] if $c < $w - 1 && !$grid->[$r][$c + 1]{visited}
+        if (len(@candidates) == 0) {
+            pop @stack
+            next
+        }
+        my $pick = $candidates[int(rand(len(@candidates)))]
+        my ($dir, $dr, $dc) = @$pick
+        my $nr = $r + $dr
+        my $nc = $c + $dc
+        $grid->[$r][$c]{$dir} = 0
+        my %opp = (N => "S", S => "N", E => "W", W => "E")
+        $grid->[$nr][$nc]{$opp{$dir}} = 0
+        $grid->[$nr][$nc]{visited} = 1
+        push @stack, [$nr, $nc]
+    }
+    $grid
+}
+
+fn Rosetta::MazeGen::generate($w, $h) {
+    my $g = Rosetta::MazeGen::new_grid($w, $h)
+    Rosetta::MazeGen::carve($g, $w, $h)
+}
+
+fn Rosetta::MazeGen::reachable($grid, $w, $h) {
+    # BFS from (0,0) to count reachable cells
+    my @queue = ([0, 0])
+    my %seen
+    $seen{"0,0"} = 1
+    while (len(@queue) > 0) {
+        my $cell = shift @queue
+        my ($r, $c) = @$cell
+        my @neighbours
+        push @neighbours, [$r - 1, $c] if !$grid->[$r][$c]{N}
+        push @neighbours, [$r + 1, $c] if !$grid->[$r][$c]{S}
+        push @neighbours, [$r, $c - 1] if !$grid->[$r][$c]{W}
+        push @neighbours, [$r, $c + 1] if !$grid->[$r][$c]{E}
+        for my $n (@neighbours) {
+            my $key = "$n->[0],$n->[1]"
+            next if exists $seen{$key}
+            $seen{$key} = 1
+            push @queue, $n
+        }
+    }
+    scalar(keys %seen)
+}
+
+# Generation produces a connected maze
+my $maze = Rosetta::MazeGen::generate(5, 5)
+assert_eq Rosetta::MazeGen::reachable($maze, 5, 5), 25, "5×5 fully connected"
+
+# Larger maze
+my $big = Rosetta::MazeGen::generate(10, 10)
+assert_eq Rosetta::MazeGen::reachable($big, 10, 10), 100, "10×10 fully connected"
+
+# Every cell visited
+my $all_visited = 1
+for my $row (@$big) {
+    for my $cell (@$row) {
+        $all_visited = 0 if !$cell->{visited}
+    }
+}
+assert_ok $all_visited, "every cell visited during carve"
+
+# Walls reciprocal: if cell A has its E wall down, cell to its right has W wall down
+my $reciprocal_ok = 1
+for my $r (0..9) {
+    for my $c (0..8) {
+        my $a = $maze_cell_e_open = !$big->[$r][$c]{E}
+        my $b = !$big->[$r][$c + 1]{W}
+        $reciprocal_ok = 0 if $a != $b
+    }
+}
+assert_ok $reciprocal_ok, "wall reciprocity holds"
+
+# 1×1 maze: still works
+my $tiny = Rosetta::MazeGen::generate(1, 1)
+assert_eq Rosetta::MazeGen::reachable($tiny, 1, 1), 1, "1×1 trivially connected"
+
+# Pipe form
+my $piped = Rosetta::MazeGen::generate(3, 3)
+assert_eq Rosetta::MazeGen::reachable($piped, 3, 3), 9, "pipe 3×3 connected"
+
+test_run

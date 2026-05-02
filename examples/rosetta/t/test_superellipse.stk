@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Superellipse
+# Compute boundary points of |x/a|^n + |y/b|^n = 1 for given a, b, n.
+# Sample t ∈ [0, 2π) and use the parametric form
+#     x(t) = sgn(cos t) · a · |cos t|^(2/n)
+#     y(t) = sgn(sin t) · b · |sin t|^(2/n)
+
+fn Rosetta::SuperEll::sgn($x) { $x > 0 ? 1 : ($x < 0 ? -1 : 0) }
+
+fn Rosetta::SuperEll::point($t, $a, $b, $n) {
+    my $c = cos($t)
+    my $s = sin($t)
+    my $x = Rosetta::SuperEll::sgn($c) * $a * abs($c) ** (2 / $n)
+    my $y = Rosetta::SuperEll::sgn($s) * $b * abs($s) ** (2 / $n)
+    [$x, $y]
+}
+
+fn Rosetta::SuperEll::sample($a, $b, $n, $count) {
+    my $pi = 4 * atan2(1, 1)
+    my @pts
+    for my $i (~> 0:$count - 1) {
+        my $t = 2 * $pi * $i / $count
+        push @pts, Rosetta::SuperEll::point($t, $a, $b, $n)
+    }
+    \@pts
+}
+
+fn Rosetta::SuperEll::on_curve($p, $a, $b, $n) {
+    abs(abs($p->[0] / $a) ** $n + abs($p->[1] / $b) ** $n - 1)
+}
+
+# n = 2 collapses to a regular ellipse / circle
+my $pi = 4 * atan2(1, 1)
+my $p = Rosetta::SuperEll::point(0, 1, 1, 2)
+assert_near $p->[0], 1, 1e-9, "circle (a=1) at t=0 → x=1"
+assert_near $p->[1], 0, 1e-9, "circle (a=1) at t=0 → y=0"
+
+my $p2 = Rosetta::SuperEll::point($pi / 2, 1, 1, 2)
+assert_near $p2->[0], 0, 1e-9, "circle at t=π/2 → x=0"
+assert_near $p2->[1], 1, 1e-9, "circle at t=π/2 → y=1"
+
+# Every sampled point lies on the curve
+my $pts = Rosetta::SuperEll::sample(2, 3, 2.5, 200)
+my $all_on = 1
+for my $q (@$pts) {
+    my $err = Rosetta::SuperEll::on_curve($q, 2, 3, 2.5)
+    $all_on = 0 if $err > 1e-9
+}
+assert_ok $all_on, "all 200 samples satisfy |x/a|^n + |y/b|^n = 1"
+
+# Astroid: n = 2/3 — vertices are (±a, 0) and (0, ±b)
+my $astroid_x = Rosetta::SuperEll::point(0, 1, 1, 2/3)
+assert_near $astroid_x->[0], 1, 1e-9, "astroid vertex x"
+my $astroid_y = Rosetta::SuperEll::point($pi / 2, 1, 1, 2/3)
+assert_near $astroid_y->[1], 1, 1e-9, "astroid vertex y"
+
+# Squircle: n = 4 with a = b = 1
+my $squircle = Rosetta::SuperEll::point($pi / 4, 1, 1, 4)
+# At t = π/4, x = y = (1/2)^(1/4)
+my $expected = (0.5) ** (1/4)
+assert_near $squircle->[0], $expected, 1e-9, "squircle at π/4"
+assert_near $squircle->[1], $expected, 1e-9, "squircle at π/4 y"
+
+# Pipe form
+0 |> fn { Rosetta::SuperEll::point(_, 5, 7, 4) } |> fn { $_->[0] } |> assert_near(5, 1e-9, "pipe x at t=0")
+
+test_run

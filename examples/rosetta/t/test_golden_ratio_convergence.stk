@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Golden ratio / Convergence
+# φ = (1 + √5) / 2 ≈ 1.6180339887498948
+# Iterate x_{n+1} = sqrt(1 + x_n) starting from x_0 = 1.
+# Returns [final, iterations] when |x_{n+1} - x_n| < epsilon.
+
+fn Rosetta::GoldenRatio::iterate($eps) {
+    my $x = 1
+    my $n = 0
+    while (1) {
+        my $nx = sqrt(1 + $x)
+        $n++
+        last if abs($nx - $x) < $eps
+        $x = $nx
+    }
+    [sqrt(1 + $x), $n]
+}
+
+fn Rosetta::GoldenRatio::closed() {
+    (1 + sqrt(5)) / 2
+}
+
+# Closed form
+assert_near Rosetta::GoldenRatio::closed(), 1.6180339887, 1e-9, "closed form φ"
+
+# Coarse epsilon converges fast
+my $r1 = Rosetta::GoldenRatio::iterate(1e-3)
+assert_near $r1->[0], 1.6180339887, 1e-3, "1e-3 value"
+assert_ok $r1->[1] >= 5,  "1e-3 took ≥ 5 iters"
+assert_ok $r1->[1] <= 30, "1e-3 took ≤ 30 iters"
+
+# Tight epsilon still converges, more iters
+my $r2 = Rosetta::GoldenRatio::iterate(1e-9)
+assert_near $r2->[0], Rosetta::GoldenRatio::closed(), 1e-8, "1e-9 matches closed form"
+assert_ok $r2->[1] > $r1->[1], "tighter eps needs more iters"
+
+# Pipe: epsilon -> result -> first element
+1e-6 |> Rosetta::GoldenRatio::iterate |> fn { _->[0] } |> assert_near(1.6180339887, 1e-5, "pipe form")
+
+# Ratios of consecutive Fibonacci numbers also converge to φ
+my @fib = (1, 1)
+for my $i (~> 1:18) { push @fib, $fib[-1] + $fib[-2] }
+my @ratios = ~> 1:(len(@fib) - 1) |> map { $fib[_] / $fib[_ - 1] }
+my $tail = $ratios[-1]
+assert_near $tail, Rosetta::GoldenRatio::closed(), 1e-7, "Fibonacci ratio → φ"
+
+test_run

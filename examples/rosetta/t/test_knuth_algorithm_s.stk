@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Knuth's algorithm S
+# Reservoir sampling: select k uniformly-at-random items from a stream
+# of unknown length without storing the entire stream.
+
+fn Rosetta::ReservoirS::sample($stream, $k) {
+    return [] if $k <= 0
+    my @res
+    my $i = 0
+    for my $item (@$stream) {
+        $i++
+        if (len(@res) < $k) {
+            push @res, $item
+        } else {
+            my $r = int(rand($i))
+            $res[$r] = $item if $r < $k
+        }
+    }
+    \@res
+}
+
+fn Rosetta::ReservoirS::frequency($stream, $k, $trials) {
+    my %seen
+    for my $i (~> 1:$trials) {
+        my $sample = Rosetta::ReservoirS::sample($stream, $k)
+        for my $v (@$sample) { $seen{$v}++ }
+    }
+    \%seen
+}
+
+# Sample size > stream length: returns whole stream
+my $small = Rosetta::ReservoirS::sample([1, 2, 3], 10)
+assert_eq scalar(@$small), 3, "k > N → returns N items"
+my %got = map { $_ => 1 } @$small
+assert_eq exists($got{1}), 1, "1 in sample"
+assert_eq exists($got{2}), 1, "2 in sample"
+assert_eq exists($got{3}), 1, "3 in sample"
+
+# k = 0 returns empty
+my $zero = Rosetta::ReservoirS::sample([1, 2, 3, 4, 5], 0)
+assert_eq scalar(@$zero), 0, "k = 0 → empty"
+
+# Negative k returns empty
+my $neg = Rosetta::ReservoirS::sample([1, 2, 3], -1)
+assert_eq scalar(@$neg), 0, "negative k → empty"
+
+# Always returns exactly k for stream ≥ k
+for my $i (~> 1:30) {
+    my $r = Rosetta::ReservoirS::sample([1..20], 5)
+    assert_eq scalar(@$r), 5, "5 items selected"
+    my $within = 1
+    for my $v (@$r) { $within = 0 if $v < 1 || $v > 20 }
+    assert_ok $within, "samples in 1..20"
+}
+
+# Distribution: each item should appear roughly equally often
+# across many runs.
+my $stream = [1..10]
+my $freq = Rosetta::ReservoirS::frequency($stream, 3, 3000)
+# Each item picked with P = k/N = 3/10. Expected count over 3000 trials = 900.
+my $balanced = 1
+for my $i (1..10) {
+    my $c = $freq->{$i} || 0
+    $balanced = 0 if abs($c - 900) > 200
+}
+assert_ok $balanced, "every element appears ~900 ± 200 times"
+
+# Pipe form
+[1, 2, 3, 4, 5] |> fn { Rosetta::ReservoirS::sample(_, 2) } |> fn { len(@$_) } |> assert_eq(2, "pipe size 2")
+
+test_run

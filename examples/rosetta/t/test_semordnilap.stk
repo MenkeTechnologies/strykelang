@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Semordnilap
+# A pair (a, b) of distinct words where a is the reverse of b.
+# Both must appear in the supplied dictionary.
+
+fn Rosetta::Semord::reverse_str($s) {
+    join("", reverse split //, $s)
+}
+
+fn Rosetta::Semord::pairs($words) {
+    my %set = map { $_ => 1 } @$words
+    my %seen
+    my @out
+    for my $w (@$words) {
+        my $r = Rosetta::Semord::reverse_str($w)
+        next if $r eq $w        # palindromes excluded
+        next if !exists $set{$r}
+        my @sorted = sort ($w, $r)
+        my $key = "$sorted[0]|$sorted[1]"
+        next if exists $seen{$key}
+        $seen{$key} = 1
+        push @out, [$w, $r]
+    }
+    @out
+}
+
+fn Rosetta::Semord::is_pair($a, $b) {
+    $a ne $b && Rosetta::Semord::reverse_str($a) eq $b
+}
+
+# Direct
+assert_eq Rosetta::Semord::is_pair("stressed", "desserts"), 1, "stressed ↔ desserts"
+assert_eq Rosetta::Semord::is_pair("level",    "level"),    0, "palindromes excluded"
+assert_eq Rosetta::Semord::is_pair("hello",    "world"),    0, "no relation"
+
+# Small dictionary
+my @dict = ("stressed", "desserts", "level", "lager", "regal",
+            "spans", "snaps", "loop", "pool", "wolf", "fish")
+my @ps = Rosetta::Semord::pairs(\@dict)
+assert_eq scalar(@ps), 4, "4 semordnilap pairs"
+
+# Specific pairs present
+my %got
+for my $p (@ps) {
+    my @sorted = sort @$p
+    $got{"$sorted[0]|$sorted[1]"} = 1
+}
+assert_eq exists($got{"desserts|stressed"}), 1, "stressed pair found"
+assert_eq exists($got{"lager|regal"}),       1, "lager pair found"
+assert_eq exists($got{"snaps|spans"}),       1, "snaps pair found"
+assert_eq exists($got{"loop|pool"}),         1, "loop pair found"
+
+# Ordering invariance: pairs(["a","b"]) == pairs(["b","a"])
+my @ab = Rosetta::Semord::pairs(["spans", "snaps"])
+my @ba = Rosetta::Semord::pairs(["snaps", "spans"])
+assert_eq scalar(@ab), 1, "ab order: 1 pair"
+assert_eq scalar(@ba), 1, "ba order: 1 pair"
+
+# Pipe form
+"stressed" |> Rosetta::Semord::reverse_str |> assert_eq("desserts", "pipe reverse")
+
+test_run

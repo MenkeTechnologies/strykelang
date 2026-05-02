@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Textonyms
+# On a phone keypad each digit (2..9) maps to multiple letters. Two
+# different words are textonyms iff they map to the same digit string.
+
+fn Rosetta::Textonyms::digit_for($c) {
+    my %m = (
+        a=>2,b=>2,c=>2, d=>3,e=>3,f=>3, g=>4,h=>4,i=>4,
+        j=>5,k=>5,l=>5, m=>6,n=>6,o=>6, p=>7,q=>7,r=>7,s=>7,
+        t=>8,u=>8,v=>8, w=>9,x=>9,y=>9,z=>9,
+    )
+    my $lc = lc($c)
+    exists $m{$lc} ? $m{$lc} : -1
+}
+
+fn Rosetta::Textonyms::encode($word) {
+    my $out = ""
+    for my $c (split //, $word) {
+        my $d = Rosetta::Textonyms::digit_for($c)
+        return undef if $d < 0
+        $out .= "$d"
+    }
+    $out
+}
+
+fn Rosetta::Textonyms::groups($words) {
+    my %g
+    for my $w (@$words) {
+        my $k = Rosetta::Textonyms::encode($w)
+        next unless defined $k
+        push @{$g{$k}}, $w
+    }
+    \%g
+}
+
+fn Rosetta::Textonyms::collisions($words) {
+    my $g = Rosetta::Textonyms::groups($words)
+    my @out
+    for my $k (sort keys %$g) {
+        push @out, $g->{$k} if len(@{$g->{$k}}) > 1
+    }
+    \@out
+}
+
+# digit_for spot checks
+assert_eq Rosetta::Textonyms::digit_for("a"), 2, "a→2"
+assert_eq Rosetta::Textonyms::digit_for("z"), 9, "z→9"
+assert_eq Rosetta::Textonyms::digit_for("E"), 3, "case-insensitive"
+assert_eq Rosetta::Textonyms::digit_for("!"), -1, "non-letter"
+
+# Encoding
+assert_eq Rosetta::Textonyms::encode("hello"), "43556", "hello"
+assert_eq Rosetta::Textonyms::encode("world"), "96753", "world"
+
+# Famous textonym pair: "good" and "home" → 4663
+assert_eq Rosetta::Textonyms::encode("good"), "4663", "good = 4663"
+assert_eq Rosetta::Textonyms::encode("home"), "4663", "home = 4663"
+
+# Collisions in a small dictionary
+my @dict = ("good", "home", "hood", "gone", "hone", "cat", "act",
+            "hello", "world", "abc", "bca")
+my $coll = Rosetta::Textonyms::collisions(\@dict)
+assert_ok len(@$coll) >= 1, "at least one collision group"
+
+# 4663 group has both "good" and "home"
+my $found_good_home = 0
+for my $g (@$coll) {
+    my %members = map { $_ => 1 } @$g
+    $found_good_home = 1 if exists $members{"good"} && exists $members{"home"}
+}
+assert_ok $found_good_home, "good ↔ home collide"
+
+# Words with non-letters are dropped
+my $g2 = Rosetta::Textonyms::groups(["foo", "f1o", "bar"])
+my %seen = map { $_ => 1 } map { @$_ } values %$g2
+my $f1o_present = exists($seen{f1o}) ? 1 : 0
+my $foo_present = exists($seen{foo}) ? 1 : 0
+assert_eq $f1o_present, 0, "non-letter word dropped"
+assert_eq $foo_present, 1, "letter-only word kept"
+
+# Pipe form
+"hello" |> Rosetta::Textonyms::encode |> assert_eq("43556", "pipe encode")
+
+test_run

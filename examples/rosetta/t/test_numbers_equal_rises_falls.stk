@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numbers with equal rises and falls (OEIS A296712)
+# A "rise" is a position where d[i+1] > d[i]; a "fall" where d[i+1] < d[i].
+# Numbers with equal counts begin
+# 1, 2, 3, …, 9, 11, 22, 33, …, 99, 100, 101, 110, …
+# (every single-digit number has 0 rises and 0 falls trivially.)
+
+fn Rosetta::RisesFalls::has_equal($n) {
+    my @d = split //, "$n"
+    my $rises = 0
+    my $falls = 0
+    for my $i (0..len(@d) - 2) {
+        $rises++ if $d[$i + 1] > $d[$i]
+        $falls++ if $d[$i + 1] < $d[$i]
+    }
+    $rises == $falls
+}
+
+fn Rosetta::RisesFalls::list_below($limit) {
+    1:$limit |> grep { Rosetta::RisesFalls::has_equal(_) }
+}
+
+# Single digits are trivially equal (0 == 0)
+for my $n (1..9) {
+    assert_eq Rosetta::RisesFalls::has_equal($n), 1, sprintf("%d has 0=0", $n)
+}
+
+# Repdigits qualify (all neutral)
+assert_eq Rosetta::RisesFalls::has_equal(11),  1, "11 equal"
+assert_eq Rosetta::RisesFalls::has_equal(99),  1, "99 equal"
+assert_eq Rosetta::RisesFalls::has_equal(666), 1, "666 equal"
+
+# Strict ascents are unequal
+assert_eq Rosetta::RisesFalls::has_equal(123), 0, "123 (2 rises, 0 falls)"
+assert_eq Rosetta::RisesFalls::has_equal(12),  0, "12 (1 rise, 0 falls)"
+
+# Equal counts despite mixed digits
+assert_eq Rosetta::RisesFalls::has_equal(121), 1, "121 (1 rise, 1 fall)"
+assert_eq Rosetta::RisesFalls::has_equal(132), 1, "132 (1 rise, 1 fall)"
+
+# OEIS A296712: a(100) = 220 (100th term).
+# Generate first 100 terms and check anchors.
+my @seq = Rosetta::RisesFalls::list_below(300)
+assert_eq $seq[0],  1,    "a(1) = 1"
+assert_eq $seq[10], 22,   "a(11) = 22"
+
+# Pipe form
+121 |> Rosetta::RisesFalls::has_equal |> assert_eq(1, "pipe is(121)")
+
+# Complementary counts: in 100..999, total = 900; equal = quite a few
+my $eq_count = ~> 100:999 |> grep { Rosetta::RisesFalls::has_equal(_) } |> len
+assert_ok $eq_count > 0, "some 3-digit numbers qualify"
+assert_ok $eq_count < 900, "but not all"
+
+test_run

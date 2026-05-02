@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mad Libs
+# Take a template containing <PLACEHOLDER> tokens and a hash of
+# substitutions; produce the filled-in story.
+
+fn Rosetta::MadLibs::placeholders($template) {
+    my @ph
+    my %seen
+    while ($template =~ /<([A-Za-z0-9_-]+)>/g) {
+        my $name = $1
+        next if exists $seen{$name}
+        $seen{$name} = 1
+        push @ph, $name
+    }
+    @ph
+}
+
+fn Rosetta::MadLibs::fill($template, $values) {
+    my $out = $template
+    for my $key (keys %$values) {
+        my $tag = "<$key>"
+        my $val = $values->{$key}
+        my $idx
+        while (($idx = index($out, $tag)) >= 0) {
+            $out = substr($out, 0, $idx) . $val . substr($out, $idx + length($tag))
+        }
+    }
+    $out
+}
+
+fn Rosetta::MadLibs::missing($template, $values) {
+    my @ph = Rosetta::MadLibs::placeholders($template)
+    my @missing
+    for my $p (@ph) {
+        push @missing, $p if !exists $values->{$p}
+    }
+    @missing
+}
+
+# Find placeholders
+my $tpl = "<NAME> the <ANIMAL> sat on a <OBJECT>."
+my @ph = Rosetta::MadLibs::placeholders($tpl)
+assert_eq join(",", @ph), "NAME,ANIMAL,OBJECT", "three placeholders"
+
+# Fill all
+my $story = Rosetta::MadLibs::fill($tpl, {
+    NAME   => "Alice",
+    ANIMAL => "fox",
+    OBJECT => "log",
+})
+assert_eq $story, "Alice the fox sat on a log.", "all placeholders filled"
+
+# Missing placeholders surface
+my @miss = Rosetta::MadLibs::missing($tpl, { NAME => "X" })
+assert_eq scalar(@miss), 2, "two missing"
+my %miss_set = map { $_ => 1 } @miss
+assert_eq exists($miss_set{ANIMAL}), 1, "ANIMAL missing"
+assert_eq exists($miss_set{OBJECT}), 1, "OBJECT missing"
+
+# Repeated placeholder gets repeated value
+my $repeat = Rosetta::MadLibs::fill("<X> + <X>", { X => "7" })
+assert_eq $repeat, "7 + 7", "repeated placeholder"
+
+# Template without any placeholders passes through
+assert_eq Rosetta::MadLibs::fill("plain text", {}), "plain text", "no placeholders"
+
+# Order-independence: order of values hash should not matter
+my $s1 = Rosetta::MadLibs::fill($tpl, { ANIMAL => "cat", NAME => "Bob", OBJECT => "mat" })
+my $s2 = Rosetta::MadLibs::fill($tpl, { OBJECT => "mat", NAME => "Bob", ANIMAL => "cat" })
+assert_eq $s1, $s2, "value-hash order doesn't matter"
+
+# Pipe form
+$tpl |> fn { Rosetta::MadLibs::fill(_, { NAME => "Eve", ANIMAL => "owl", OBJECT => "branch" }) }
+     |> assert_eq("Eve the owl sat on a branch.", "pipe fill")
+
+test_run

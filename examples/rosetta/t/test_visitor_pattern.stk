@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Visitor pattern
+# Decouple traversal from operation by passing a visitor that knows
+# how to handle each node kind. Demonstrate two visitors (sum, render)
+# over the same expression tree.
+
+fn Rosetta::Visitor::accept($node, $visitor) {
+    my $kind = $node->{kind}
+    return undef unless exists $visitor->{$kind}
+    $visitor->{$kind}->($node, $visitor)
+}
+
+fn Rosetta::Visitor::sum_visitor() {
+    {
+        num => fn ($n, $v) { $n->{value} },
+        add => fn ($n, $v) {
+            my $l = Rosetta::Visitor::accept($n->{left},  $v)
+            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            $l + $r
+        },
+        mul => fn ($n, $v) {
+            my $l = Rosetta::Visitor::accept($n->{left},  $v)
+            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            $l * $r
+        },
+        neg => fn ($n, $v) {
+            -Rosetta::Visitor::accept($n->{operand}, $v)
+        },
+    }
+}
+
+fn Rosetta::Visitor::render_visitor() {
+    {
+        num => fn ($n, $v) { "$n->{value}" },
+        add => fn ($n, $v) {
+            my $l = Rosetta::Visitor::accept($n->{left},  $v)
+            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            "($l + $r)"
+        },
+        mul => fn ($n, $v) {
+            my $l = Rosetta::Visitor::accept($n->{left},  $v)
+            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            "($l * $r)"
+        },
+        neg => fn ($n, $v) {
+            my $o = Rosetta::Visitor::accept($n->{operand}, $v)
+            "(-$o)"
+        },
+    }
+}
+
+# Build (3 + 4) * (-2)
+my $tree = {
+    kind => "mul",
+    left => {
+        kind  => "add",
+        left  => { kind => "num", value => 3 },
+        right => { kind => "num", value => 4 },
+    },
+    right => {
+        kind => "neg",
+        operand => { kind => "num", value => 2 },
+    },
+}
+
+# Sum visitor evaluates the tree
+my $sum_v = Rosetta::Visitor::sum_visitor()
+assert_eq Rosetta::Visitor::accept($tree, $sum_v), -14, "(3+4) * -2 = -14"
+
+# Render visitor produces an infix string
+my $ren_v = Rosetta::Visitor::render_visitor()
+assert_eq Rosetta::Visitor::accept($tree, $ren_v), "((3 + 4) * (-2))", "rendered tree"
+
+# Same tree, different operation — that's polymorphism by visitor.
+# Add a constant-folding scenario via a third visitor.
+my $count_v = {
+    num => fn ($n, $v) { 1 },
+    add => fn ($n, $v) {
+        my $l = Rosetta::Visitor::accept($n->{left}, $v)
+        my $r = Rosetta::Visitor::accept($n->{right}, $v)
+        $l + $r + 1
+    },
+    mul => fn ($n, $v) {
+        my $l = Rosetta::Visitor::accept($n->{left}, $v)
+        my $r = Rosetta::Visitor::accept($n->{right}, $v)
+        $l + $r + 1
+    },
+    neg => fn ($n, $v) {
+        Rosetta::Visitor::accept($n->{operand}, $v) + 1
+    },
+}
+# Tree has 3 nums, 1 add, 1 mul, 1 neg = 6 nodes
+assert_eq Rosetta::Visitor::accept($tree, $count_v), 6, "node count = 6"
+
+# Subtree
+my $sub = $tree->{left}
+assert_eq Rosetta::Visitor::accept($sub, $sum_v), 7,        "(3+4) = 7"
+assert_eq Rosetta::Visitor::accept($sub, $ren_v), "(3 + 4)","(3+4) rendered"
+
+# Pipe form
+$tree |> fn { Rosetta::Visitor::accept(_, $sum_v) } |> assert_eq(-14, "pipe evaluate")
+
+test_run

@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Magic 8-ball
+# Returns one of the 20 traditional answers uniformly at random.
+
+fn Rosetta::Magic8::answers() {
+    [
+        "It is certain.",
+        "It is decidedly so.",
+        "Without a doubt.",
+        "Yes, definitely.",
+        "You may rely on it.",
+        "As I see it, yes.",
+        "Most likely.",
+        "Outlook good.",
+        "Yes.",
+        "Signs point to yes.",
+        "Reply hazy, try again.",
+        "Ask again later.",
+        "Better not tell you now.",
+        "Cannot predict now.",
+        "Concentrate and ask again.",
+        "Don't count on it.",
+        "My reply is no.",
+        "My sources say no.",
+        "Outlook not so good.",
+        "Very doubtful.",
+    ]
+}
+
+fn Rosetta::Magic8::shake() {
+    my $a = Rosetta::Magic8::answers()
+    $a->[int(rand(20))]
+}
+
+fn Rosetta::Magic8::category($answer) {
+    my %positive = map { $_ => 1 } @{Rosetta::Magic8::answers()}[0..9]
+    my %neutral  = map { $_ => 1 } @{Rosetta::Magic8::answers()}[10..14]
+    my %negative = map { $_ => 1 } @{Rosetta::Magic8::answers()}[15..19]
+    return "positive" if exists $positive{$answer}
+    return "neutral"  if exists $neutral{$answer}
+    return "negative" if exists $negative{$answer}
+    "unknown"
+}
+
+# 20 distinct answers exist
+my $a = Rosetta::Magic8::answers()
+assert_eq len(@$a), 20, "20 answers"
+my %unique = map { $_ => 1 } @$a
+assert_eq scalar(keys %unique), 20, "all answers distinct"
+
+# Shake produces an answer from the set
+for my $i (~> 1:50) {
+    my $r = Rosetta::Magic8::shake()
+    assert_ok exists($unique{$r}), sprintf("shake #%d in answer set", $i)
+}
+
+# Categorisation
+assert_eq Rosetta::Magic8::category("Yes."), "positive", "Yes. is positive"
+assert_eq Rosetta::Magic8::category("Ask again later."), "neutral", "ask later is neutral"
+assert_eq Rosetta::Magic8::category("Very doubtful."), "negative", "very doubtful is negative"
+assert_eq Rosetta::Magic8::category("Random unrelated string"), "unknown", "unknown answer"
+
+# Distribution sanity: every category appears across many shakes
+my %cats
+for my $i (~> 1:1000) {
+    $cats{Rosetta::Magic8::category(Rosetta::Magic8::shake())}++
+}
+for my $c ("positive", "neutral", "negative") {
+    assert_ok exists($cats{$c}) && $cats{$c} > 0, "category $c appears"
+}
+
+# Pipe form (deterministic via category)
+"Yes." |> Rosetta::Magic8::category |> assert_eq("positive", "pipe category")
+
+test_run

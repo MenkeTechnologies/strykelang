@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polyspiral
+# Walk a turtle through n segments, where segment i has length i+1
+# (or any fixed step) and turn angle increments by `delta` degrees
+# each step. Returns the trajectory as a list of [x, y] points.
+
+fn Rosetta::Polyspiral::walk($n, $step, $delta_deg) {
+    my $pi = 4 * atan2(1, 1)
+    my $angle = 0
+    my $x = 0
+    my $y = 0
+    my @pts = ([$x, $y])
+    for my $i (1..$n) {
+        $x += $step * cos($angle)
+        $y += $step * sin($angle)
+        push @pts, [$x, $y]
+        $angle += $delta_deg * $pi / 180
+    }
+    \@pts
+}
+
+fn Rosetta::Polyspiral::walk_growing($n, $delta_deg) {
+    my $pi = 4 * atan2(1, 1)
+    my $angle = 0
+    my $x = 0
+    my $y = 0
+    my @pts = ([$x, $y])
+    for my $i (1..$n) {
+        $x += $i * cos($angle)
+        $y += $i * sin($angle)
+        push @pts, [$x, $y]
+        $angle += $delta_deg * $pi / 180
+    }
+    \@pts
+}
+
+# 90° turns with step 1: trajectory traces a square spiral
+my $sq = Rosetta::Polyspiral::walk(4, 1, 90)
+assert_eq len(@$sq), 5, "5 points (start + 4 segments)"
+assert_near $sq->[1][0], 1, 1e-9, "after 1: (1, 0)"
+assert_near $sq->[2][1], 1, 1e-9, "after 2: (1, 1)"
+assert_near $sq->[3][0], 0, 1e-9, "after 3: x back to 0"
+assert_near $sq->[4][0], 0, 1e-9, "after 4 returns to origin x"
+assert_near $sq->[4][1], 0, 1e-9, "after 4 returns to origin y"
+
+# 60° turns with step 1: hexagonal closure after 6 steps
+my $hex = Rosetta::Polyspiral::walk(6, 1, 60)
+assert_near $hex->[6][0], 0, 1e-9, "hexagon closes x"
+assert_near $hex->[6][1], 0, 1e-9, "hexagon closes y"
+
+# Growing spiral: each segment longer than the last
+my $gr = Rosetta::Polyspiral::walk_growing(10, 121)
+assert_eq len(@$gr), 11, "10 segments + 1 start"
+
+# Growing spiral never returns to origin (in this configuration)
+my $tail = $gr->[-1]
+assert_ok abs($tail->[0]) > 0.1 || abs($tail->[1]) > 0.1,
+    "growing spiral drifts from origin"
+
+# Trajectory length monotonic per segment in growing form
+my $monotonic = 1
+for my $i (1..len(@$gr) - 1) {
+    my $dx = $gr->[$i][0] - $gr->[$i - 1][0]
+    my $dy = $gr->[$i][1] - $gr->[$i - 1][1]
+    my $len = sqrt($dx * $dx + $dy * $dy)
+    $monotonic = 0 if abs($len - $i) > 1e-9
+}
+assert_ok $monotonic, "every segment in growing has length = step #"
+
+# Pipe form
+my $piped = Rosetta::Polyspiral::walk(4, 1, 90)
+assert_eq len(@$piped), 5, "pipe square count"
+
+test_run

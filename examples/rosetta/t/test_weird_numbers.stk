@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Weird numbers (OEIS A006037)
+# Abundant numbers (σ(n) > 2n) whose proper divisors cannot be summed
+# to n by any subset (i.e. abundant but not pseudoperfect).
+# First 25 weird numbers: 70, 836, 4030, 5830, 7192, 7912, …
+
+fn Rosetta::Weird::proper_divisors($n) {
+    return () if $n < 2
+    my @d = (1)
+    my $i = 2
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            push @d, $i
+            push @d, int($n / $i) if $i != int($n / $i)
+        }
+        $i++
+    }
+    sort { $a <=> $b } @d
+}
+
+fn Rosetta::Weird::sum_subset_to($target, $divisors) {
+    # Subset-sum DP. Early-exit when target reached.
+    my %reachable = (0 => 1)
+    for my $d (@$divisors) {
+        last if exists $reachable{$target}
+        my @keys = keys %reachable
+        for my $r (@keys) {
+            my $new = $r + $d
+            $reachable{$new} = 1 if $new <= $target
+        }
+    }
+    exists $reachable{$target} ? 1 : 0
+}
+
+fn Rosetta::Weird::is($n) {
+    my @divs = Rosetta::Weird::proper_divisors($n)
+    my $s = 0
+    for my $d (@divs) { $s += $d }
+    return 0 if $s <= $n            # not abundant
+    !Rosetta::Weird::sum_subset_to($n, \@divs)
+}
+
+# Sanity
+assert_eq join(",", Rosetta::Weird::proper_divisors(70)), "1,2,5,7,10,14,35", "divisors of 70"
+my $sum = 0
+for my $d (Rosetta::Weird::proper_divisors(70)) { $sum += $d }
+assert_eq $sum, 74, "σ*(70) = 74 > 70 → abundant"
+
+# 70 is the smallest weird number
+assert_eq Rosetta::Weird::is(70), 1, "70 is weird"
+
+# Pseudoperfect / non-weird abundant numbers
+assert_eq Rosetta::Weird::is(12),  0, "12 is pseudoperfect (1+2+3+6=12)"
+assert_eq Rosetta::Weird::is(20),  0, "20 = 1+4+5+10"
+assert_eq Rosetta::Weird::is(24),  0, "24 = 4+8+12"
+assert_eq Rosetta::Weird::is(836), 1, "836 is weird"
+
+# First few weird numbers
+my @w = ~> 2:5000 |> grep { Rosetta::Weird::is(_) }
+assert_eq join(",", @w), "70,836,4030", "weirds ≤ 5000"
+
+# Pipe form
+70 |> Rosetta::Weird::is |> assert_eq(1, "pipe is(70)")
+
+test_run

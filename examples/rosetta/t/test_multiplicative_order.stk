@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiplicative order
+# Smallest positive integer k such that a^k ≡ 1 (mod n), defined only
+# when gcd(a, n) = 1. Returns -1 when undefined.
+
+fn Rosetta::MultOrder::gcd($a, $b) {
+    $a = abs($a); $b = abs($b)
+    while ($b != 0) { ($a, $b) = ($b, $a % $b) }
+    $a
+}
+
+fn Rosetta::MultOrder::pow_mod($base, $exp, $mod) {
+    my $r = 1
+    $base = $base % $mod
+    while ($exp > 0) {
+        $r = ($r * $base) % $mod if ($exp & 1)
+        $exp = $exp >> 1
+        $base = ($base * $base) % $mod
+    }
+    $r
+}
+
+fn Rosetta::MultOrder::compute($a, $n) {
+    return -1 if Rosetta::MultOrder::gcd($a, $n) != 1
+    my $k = 1
+    my $cur = $a % $n
+    while ($cur != 1) {
+        $cur = ($cur * $a) % $n
+        $k++
+        return -1 if $k > $n
+    }
+    $k
+}
+
+# Classic small cases
+assert_eq Rosetta::MultOrder::compute(3, 7),  6, "ord_7(3) = 6"
+assert_eq Rosetta::MultOrder::compute(2, 7),  3, "ord_7(2) = 3"
+assert_eq Rosetta::MultOrder::compute(4, 7),  3, "ord_7(4) = 3"
+assert_eq Rosetta::MultOrder::compute(6, 7),  2, "ord_7(6) = 2"
+assert_eq Rosetta::MultOrder::compute(1, 13), 1, "ord_13(1) = 1"
+assert_eq Rosetta::MultOrder::compute(2, 13), 12, "ord_13(2) = 12 (primitive root)"
+assert_eq Rosetta::MultOrder::compute(7, 23), 22, "ord_23(7) = 22"
+assert_eq Rosetta::MultOrder::compute(37, 1000), 100, "ord_1000(37) = 100"
+
+# Undefined when gcd != 1
+assert_eq Rosetta::MultOrder::compute(2, 4), -1, "ord_4(2) undefined"
+assert_eq Rosetta::MultOrder::compute(6, 9), -1, "ord_9(6) undefined"
+
+# Property: a^ord ≡ 1 (mod n)
+my @as = (2, 3, 5, 7, 11)
+for my $a (@as) {
+    my $o = Rosetta::MultOrder::compute($a, 17)
+    assert_eq Rosetta::MultOrder::pow_mod($a, $o, 17), 1, sprintf("a=%d^ord ≡ 1 mod 17", $a)
+}
+
+# Property: ord divides φ(n). For n = 17 (prime), φ = 16, valid orders divide 16.
+my @divisors_of_16 = (1, 2, 4, 8, 16)
+for my $a (~> 1:16) {
+    my $o = Rosetta::MultOrder::compute($a, 17)
+    my $div_ok = 0
+    for my $d (@divisors_of_16) { $div_ok = 1 if $o == $d }
+    assert_eq $div_ok, 1, sprintf("ord_17(%d) divides 16", $a)
+}
+
+# Pipe form
+3 |> fn { Rosetta::MultOrder::compute(_, 7) } |> assert_eq(6, "pipe ord_7(3)")
+
+test_run

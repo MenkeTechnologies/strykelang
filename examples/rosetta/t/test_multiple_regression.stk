@@ -1,0 +1,113 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiple regression
+# Solve y = X · β + ε via the normal equations:
+#   β = (Xᵀ X)⁻¹ Xᵀ y
+# Implementation includes a transpose, matrix multiply, and 2×2 / 3×3
+# Gauss-Jordan inverse.
+
+fn Rosetta::MultiReg::transpose($m) {
+    my $rows = len(@$m)
+    my $cols = len(@{$m->[0]})
+    my @t
+    for my $c (0..$cols - 1) {
+        my @row
+        for my $r (0..$rows - 1) { push @row, $m->[$r][$c] }
+        push @t, \@row
+    }
+    \@t
+}
+
+fn Rosetta::MultiReg::matmul($a, $b) {
+    my $ar = len(@$a); my $ac = len(@{$a->[0]})
+    my $bc = len(@{$b->[0]})
+    my @out
+    for my $i (0..$ar - 1) {
+        my @row
+        for my $j (0..$bc - 1) {
+            my $s = 0
+            for my $k (0..$ac - 1) { $s += $a->[$i][$k] * $b->[$k][$j] }
+            push @row, $s
+        }
+        push @out, \@row
+    }
+    \@out
+}
+
+fn Rosetta::MultiReg::matvec($a, $v) {
+    my @out
+    for my $row (@$a) {
+        my $s = 0
+        for my $i (0..len(@$v) - 1) { $s += $row->[$i] * $v->[$i] }
+        push @out, $s
+    }
+    \@out
+}
+
+fn Rosetta::MultiReg::solve_linear($a, $b) {
+    # Solve square system $a * x = $b via Gauss-Jordan.
+    my $n = len(@$a)
+    my @aug
+    for my $i (0..$n - 1) {
+        push @aug, [@{$a->[$i]}, $b->[$i]]
+    }
+    for my $r (0..$n - 1) {
+        my $pivot = $r
+        while ($pivot < $n && abs($aug[$pivot][$r]) < 1e-12) { $pivot++ }
+        return undef if $pivot == $n
+        ($aug[$r], $aug[$pivot]) = ($aug[$pivot], $aug[$r]) if $pivot != $r
+        my $div = $aug[$r][$r]
+        for my $c ($r..$n) { $aug[$r][$c] /= $div }
+        for my $i (0..$n - 1) {
+            next if $i == $r
+            my $f = $aug[$i][$r]
+            next if abs($f) < 1e-15
+            for my $c ($r..$n) { $aug[$i][$c] -= $f * $aug[$r][$c] }
+        }
+    }
+    my @x
+    for my $i (0..$n - 1) { push @x, $aug[$i][$n] }
+    \@x
+}
+
+fn Rosetta::MultiReg::fit($xs, $ys) {
+    # $xs is m × p (m observations, p features incl. bias column).
+    my $xt = Rosetta::MultiReg::transpose($xs)
+    my $xtx = Rosetta::MultiReg::matmul($xt, $xs)
+    my $xty = Rosetta::MultiReg::matvec($xt, $ys)
+    Rosetta::MultiReg::solve_linear($xtx, $xty)
+}
+
+# Linear data y = 2x + 3
+my $X = [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5]]      # bias column + x
+my $y = [5, 7, 9, 11, 13]
+my $beta = Rosetta::MultiReg::fit($X, $y)
+assert_near $beta->[0], 3, 1e-9, "intercept = 3"
+assert_near $beta->[1], 2, 1e-9, "slope     = 2"
+
+# Two-feature plane: y = 1 + 2·x1 + 3·x2
+my $X2 = [
+    [1, 0, 0], [1, 1, 0], [1, 0, 1], [1, 1, 1],
+    [1, 2, 1], [1, 0, 2], [1, 2, 2],
+]
+my $y2 = [1, 3, 4, 6, 8, 7, 11]
+my $b2 = Rosetta::MultiReg::fit($X2, $y2)
+assert_near $b2->[0], 1, 1e-9, "intercept"
+assert_near $b2->[1], 2, 1e-9, "x1 coefficient"
+assert_near $b2->[2], 3, 1e-9, "x2 coefficient"
+
+# Helper sanity
+my $mt = Rosetta::MultiReg::transpose([[1, 2, 3], [4, 5, 6]])
+assert_eq join(",", @{$mt->[0]}), "1,4", "transpose row 0"
+assert_eq join(",", @{$mt->[2]}), "3,6", "transpose row 2"
+
+# matmul
+my $mm = Rosetta::MultiReg::matmul([[1, 2], [3, 4]], [[5], [6]])
+assert_eq $mm->[0][0], 17, "1*5 + 2*6"
+assert_eq $mm->[1][0], 39, "3*5 + 4*6"
+
+# Pipe form
+my $simple = Rosetta::MultiReg::fit([[1, 1], [1, 2]], [3, 5])
+assert_near $simple->[0], 1, 1e-9, "pipe intercept"
+assert_near $simple->[1], 2, 1e-9, "pipe slope"
+
+test_run

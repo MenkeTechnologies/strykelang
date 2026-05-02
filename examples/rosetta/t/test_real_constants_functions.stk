@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Real constants and functions
+# Demonstrate the common real-valued constants and functions
+# available in stryke without external libraries.
+
+fn Rosetta::RealCF::pi()  { 4 * atan2(1, 1) }
+fn Rosetta::RealCF::e()   { exp(1) }
+fn Rosetta::RealCF::tau() { 8 * atan2(1, 1) }
+fn Rosetta::RealCF::phi() { (1 + sqrt(5)) / 2 }
+
+# Constants
+assert_near Rosetta::RealCF::pi(),  3.14159265358979, 1e-12, "π"
+assert_near Rosetta::RealCF::e(),   2.71828182845905, 1e-12, "e"
+assert_near Rosetta::RealCF::tau(), 6.28318530717959, 1e-12, "τ = 2π"
+assert_near Rosetta::RealCF::phi(), 1.61803398874989, 1e-12, "φ"
+
+# sqrt
+assert_near sqrt(2),  1.41421356237310, 1e-12, "√2"
+assert_near sqrt(0),  0,                1e-12, "√0"
+assert_near sqrt(0.25), 0.5,            1e-12, "√(1/4)"
+
+# Powers
+assert_eq 2 ** 10, 1024,    "2^10"
+assert_eq 3 ** 4,  81,      "3^4"
+assert_near 2 ** 0.5, sqrt(2), 1e-12, "2^0.5 = √2"
+
+# Trigonometry: sin/cos at quarter turns
+my $pi = Rosetta::RealCF::pi()
+assert_near sin(0),       0,  1e-12, "sin(0)"
+assert_near sin($pi / 2), 1,  1e-12, "sin(π/2)"
+assert_near sin($pi),     0,  1e-12, "sin(π)"
+assert_near cos(0),       1,  1e-12, "cos(0)"
+assert_near cos($pi / 2), 0,  1e-12, "cos(π/2)"
+assert_near cos($pi),    -1,  1e-12, "cos(π)"
+
+# Inverse trig
+assert_near atan2(1, 1), $pi / 4, 1e-12, "atan2(1,1) = π/4"
+assert_near atan2(1, 0), $pi / 2, 1e-12, "atan2(1,0) = π/2"
+
+# Exponential and log
+assert_near exp(1), Rosetta::RealCF::e(), 1e-12, "exp(1) = e"
+assert_near log(Rosetta::RealCF::e()), 1, 1e-12, "log(e) = 1"
+assert_near log(1), 0, 1e-12, "log(1) = 0"
+assert_near exp(log(7)), 7, 1e-12, "exp(log(7)) = 7"
+
+# abs and floor
+assert_eq abs(-3.5), 3.5, "abs(-3.5)"
+assert_eq abs(3.5),  3.5, "abs(3.5)"
+assert_eq abs(0),    0,   "abs(0)"
+
+# Identities
+assert_near sin(0.7) ** 2 + cos(0.7) ** 2, 1, 1e-12, "sin²+cos²=1"
+
+# Pipe form
+2 |> sqrt |> assert_near(1.41421356, 1e-6, "pipe sqrt(2)")
+
+test_run

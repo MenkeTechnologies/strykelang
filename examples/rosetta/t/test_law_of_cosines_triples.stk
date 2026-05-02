@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Law of cosines — triples
+# Find all integer triangles with sides a ≤ b ≤ c ≤ N having an
+# integer angle (in degrees) between the two unequal-length sides
+# computed via the law of cosines: cos C = (a² + b² - c²) / (2ab).
+# Common variants include enumerating triples with C = 60° or 120°.
+
+fn Rosetta::LawCos::cos_angle($a, $b, $c) {
+    ($a * $a + $b * $b - $c * $c) / (2 * $a * $b)
+}
+
+fn Rosetta::LawCos::triples_with_angle($limit, $angle_deg) {
+    my $pi = 4 * atan2(1, 1)
+    my $target = cos($angle_deg * $pi / 180)
+    my @out
+    for my $a (1..$limit) {
+        for my $b ($a..$limit) {
+            for my $c (1..$limit) {
+                next if $c < abs($a - $b) || $c > $a + $b - 1
+                next if $c <= 0
+                my $cos_c = Rosetta::LawCos::cos_angle($a, $b, $c)
+                push @out, [$a, $b, $c] if abs($cos_c - $target) < 1e-9
+            }
+        }
+    }
+    @out
+}
+
+# Helper sanity
+assert_near Rosetta::LawCos::cos_angle(3, 4, 5), 0, 1e-12, "3-4-5: right angle"
+assert_near Rosetta::LawCos::cos_angle(1, 1, 1), 0.5, 1e-12, "equilateral: 60°"
+
+# 60° triples within 1..13
+my @t60 = Rosetta::LawCos::triples_with_angle(13, 60)
+my @keys60 = map { "$_->[0],$_->[1],$_->[2]" } @t60
+# At least the equilateral 1,1,1 and small (5,7,8): cos C = (25+49-64)/70 = 10/70 ≈ 0.143  no
+# Actual hits in 1..13 include: (1,1,1), (2,2,2), …, (3,8,7), (5,7,8), …
+assert_ok len(@t60) > 0, "60° triples exist"
+my $eq111 = 0
+for my $k (@keys60) { $eq111 = 1 if $k eq "1,1,1" }
+assert_ok $eq111, "equilateral 1,1,1 is a 60° triple"
+
+# 120° triples within 1..13
+my @t120 = Rosetta::LawCos::triples_with_angle(13, 120)
+assert_ok len(@t120) > 0, "120° triples exist"
+# (3, 5, 7): cos C = (9+25-49)/30 = -0.5 → 120°
+my $found357 = 0
+for my $tr (@t120) {
+    if (($tr->[0] == 3 && $tr->[1] == 5 && $tr->[2] == 7)) { $found357 = 1 }
+}
+assert_ok $found357, "(3, 5, 7) is a 120° triple"
+
+# 90° triples within 1..15 → Pythagorean triples
+my @t90 = Rosetta::LawCos::triples_with_angle(15, 90)
+my @py = map { "$_->[0],$_->[1],$_->[2]" } @t90
+assert_ok len(@t90) >= 1, "Pythagorean triples found"
+my $py345 = 0
+for my $k (@py) { $py345 = 1 if $k eq "3,4,5" }
+assert_ok $py345, "(3,4,5) is a 90° triple"
+
+# Pipe form
+3 |> fn { Rosetta::LawCos::cos_angle(_, 4, 5) } |> assert_near(0, 1e-12, "pipe right-angle")
+
+test_run

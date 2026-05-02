@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Upside-down numbers (a.k.a. strobogrammatic numbers)
+# A number that reads the same when rotated 180°. Digits 0,1,8 map to
+# themselves; 6↔9; 2,3,4,5,7 are invalid. OEIS A000787.
+
+fn Rosetta::UpsideDown::is($n) {
+    my %map = (
+        "0" => "0", "1" => "1", "8" => "8",
+        "6" => "9", "9" => "6",
+    )
+    my $s = "$n"
+    my @chars = split //, $s
+    my @rev
+    for my $c (reverse @chars) {
+        return 0 unless exists $map{$c}
+        push @rev, $map{$c}
+    }
+    return 0 if $chars[0] eq "0" && $n != 0
+    join("", @rev) eq $s
+}
+
+fn Rosetta::UpsideDown::list_below($limit) {
+    0:$limit |> grep { Rosetta::UpsideDown::is(_) }
+}
+
+# Sanity on rejected digits
+assert_eq Rosetta::UpsideDown::is(2), 0, "2 invalid"
+assert_eq Rosetta::UpsideDown::is(3), 0, "3 invalid"
+assert_eq Rosetta::UpsideDown::is(7), 0, "7 invalid"
+
+# Single digits that are valid
+assert_eq Rosetta::UpsideDown::is(0), 1, "0 strobogrammatic"
+assert_eq Rosetta::UpsideDown::is(1), 1, "1 strobogrammatic"
+assert_eq Rosetta::UpsideDown::is(8), 1, "8 strobogrammatic"
+
+# Two-digit strobogrammatic: 11, 69, 88, 96
+assert_eq Rosetta::UpsideDown::is(69), 1, "69 ↔ 96"
+assert_eq Rosetta::UpsideDown::is(96), 1, "96 ↔ 69"
+assert_eq Rosetta::UpsideDown::is(11), 1, "11 self"
+assert_eq Rosetta::UpsideDown::is(88), 1, "88 self"
+assert_eq Rosetta::UpsideDown::is(66), 0, "66 → 99 ≠ 66"
+
+# Three-digit: 101, 111, 181, 609, 619, 689, 808, 818, 888, 906, 916, 986
+assert_eq Rosetta::UpsideDown::is(818), 1, "818 self"
+assert_eq Rosetta::UpsideDown::is(689), 1, "689 ↔ 689"
+assert_eq Rosetta::UpsideDown::is(123), 0, "123 invalid digits"
+
+# First 30 below 10000
+my @small = Rosetta::UpsideDown::list_below(10000)
+assert_eq scalar(@small), 39, "39 strobogrammatic numbers ≤ 10000"
+assert_eq join(",", @small[0..7]), "0,1,8,11,69,88,96,101", "first 8"
+
+# Pipe form
+69 |> Rosetta::UpsideDown::is |> assert_eq(1, "pipe is(69)")
+
+test_run

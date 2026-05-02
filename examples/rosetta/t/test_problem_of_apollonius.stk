@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Problem of Apollonius
+# Given three circles (each with center (x, y) and radius r),
+# find a fourth circle tangent to all three. Using Descartes'
+# circle theorem with curvatures k = 1/r (signed by external/internal
+# tangency). Returns the radius of the externally-tangent circle.
+
+fn Rosetta::Apollonius::descartes($k1, $k2, $k3) {
+    my $sum = $k1 + $k2 + $k3
+    my $rad = sqrt($k1 * $k2 + $k2 * $k3 + $k1 * $k3)
+    [$sum + 2 * $rad, $sum - 2 * $rad]
+}
+
+fn Rosetta::Apollonius::full($c1, $c2, $c3, $sign1, $sign2, $sign3) {
+    # ci = [x, y, r], signi ∈ {+1, -1}: external/internal tangency.
+    my $k1 = $sign1 / $c1->[2]
+    my $k2 = $sign2 / $c2->[2]
+    my $k3 = $sign3 / $c3->[2]
+    my $ks = Rosetta::Apollonius::descartes($k1, $k2, $k3)
+    # Two solutions; pick the smaller-radius (more inscribed) one
+    my $k4_inner = $ks->[0]
+    my $k4_outer = $ks->[1]
+    my @solutions
+    for my $k4 ($k4_inner, $k4_outer) {
+        next if abs($k4) < 1e-12
+        my $r4 = abs(1 / $k4)
+        push @solutions, $r4
+    }
+    \@solutions
+}
+
+# Three mutually tangent unit circles
+my $c1 = [0, 0, 1]
+my $c2 = [2, 0, 1]
+my $c3 = [1, sqrt(3), 1]
+my $r = Rosetta::Apollonius::full($c1, $c2, $c3, 1, 1, 1)
+# Inner Soddy circle: r = (3 - 2*sqrt(3)) / 3 ≈ -0.155 (becomes 0.155 absolute)
+# Outer Soddy circle: r = (3 + 2*sqrt(3)) / 3 ≈ 2.155
+assert_eq scalar(@$r), 2, "two solutions"
+my $small = $r->[0] < $r->[1] ? $r->[0] : $r->[1]
+my $large = $r->[0] > $r->[1] ? $r->[0] : $r->[1]
+my $expected_small = 1 / (3 + 2 * sqrt(3))
+my $expected_large = 1 / abs(3 - 2 * sqrt(3))
+assert_near $small, $expected_small, 1e-9, "inner Soddy radius"
+assert_near $large, $expected_large, 1e-9, "outer Soddy radius"
+
+# Descartes pure curvature form
+my $k = Rosetta::Apollonius::descartes(1, 1, 1)
+assert_near $k->[0], 3 + 2 * sqrt(3),  1e-9, "Descartes k+ for unit triple"
+assert_near $k->[1], 3 - 2 * sqrt(3),  1e-9, "Descartes k- for unit triple"
+
+# Two equal circles (radius 1, centres at ±1, 0) and one tangent
+# externally above. Curvatures all +1.
+my $k_eq = Rosetta::Apollonius::descartes(1, 1, 0.5)
+assert_near $k_eq->[0], 2.5 + 2 * sqrt(2), 1e-9, "k+ for {1, 1, 0.5}"
+
+# Pipe form
+[1, 1, 1] |> fn { Rosetta::Apollonius::descartes($_->[0], $_->[1], $_->[2]) }
+         |> fn { $_->[0] }
+         |> assert_near(3 + 2 * sqrt(3), 1e-9, "pipe k+")
+
+test_run

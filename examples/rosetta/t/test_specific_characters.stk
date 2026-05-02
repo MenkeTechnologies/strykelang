@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Specific characters
+# Categorise each character of a string by class: digit, lowercase,
+# uppercase, whitespace, punctuation, control, other.
+
+fn Rosetta::SpecChar::classify($c) {
+    return "digit"     if $c =~ /\d/
+    return "lowercase" if $c =~ /[a-z]/
+    return "uppercase" if $c =~ /[A-Z]/
+    return "whitespace" if $c =~ /\s/
+    return "punctuation" if $c =~ /[[:punct:]]/
+    return "control"     if ord($c) < 32 || ord($c) == 127
+    "other"
+}
+
+fn Rosetta::SpecChar::summarize($s) {
+    my %counts
+    for my $c (split //, $s) {
+        $counts{Rosetta::SpecChar::classify($c)}++
+    }
+    \%counts
+}
+
+# Direct
+assert_eq Rosetta::SpecChar::classify("a"),  "lowercase", "a"
+assert_eq Rosetta::SpecChar::classify("Z"),  "uppercase", "Z"
+assert_eq Rosetta::SpecChar::classify("5"),  "digit",     "5"
+assert_eq Rosetta::SpecChar::classify(" "),  "whitespace","space"
+assert_eq Rosetta::SpecChar::classify("\t"), "whitespace","tab"
+assert_eq Rosetta::SpecChar::classify("\n"), "whitespace","newline"
+assert_eq Rosetta::SpecChar::classify(","),  "punctuation","comma"
+assert_eq Rosetta::SpecChar::classify("!"),  "punctuation","bang"
+assert_eq Rosetta::SpecChar::classify("\0"), "control",   "NUL"
+
+# Summary
+my $s = Rosetta::SpecChar::summarize("Hello, World! 123")
+assert_eq $s->{lowercase},    8, "8 lowercase"
+assert_eq $s->{uppercase},    2, "2 uppercase"
+assert_eq $s->{digit},        3, "3 digits"
+assert_eq $s->{whitespace},   2, "2 spaces"
+assert_eq $s->{punctuation},  2, "comma + bang"
+
+# Empty string
+my $e = Rosetta::SpecChar::summarize("")
+assert_eq scalar(keys %$e), 0, "empty input"
+
+# Pipe form
+"abc 123" |> Rosetta::SpecChar::summarize |> fn { $_->{digit} } |> assert_eq(3, "pipe digit count")
+
+test_run

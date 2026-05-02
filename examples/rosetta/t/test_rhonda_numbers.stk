@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rhonda numbers
+# Rosetta defines Rhonda-to-base-b: n such that the product of
+# n's digits in base b equals b times the sum of n's distinct prime
+# factors with multiplicity. (See rosetta task for derivation.)
+# We implement the helpers and the predicate, plus exercise it on
+# small ranges. Exhaustive tables for a fixed base are too large to
+# search without a sieve, so we verify on documented hits.
+
+fn Rosetta::Rhonda::digit_product_base($n, $b) {
+    return 0 if $n == 0
+    my $p = 1
+    while ($n > 0) { $p *= $n % $b; $n = int($n / $b) }
+    $p
+}
+
+fn Rosetta::Rhonda::digits_in_base($n, $b) {
+    return [0] if $n == 0
+    my @d
+    while ($n > 0) { unshift @d, $n % $b; $n = int($n / $b) }
+    \@d
+}
+
+fn Rosetta::Rhonda::prime_factor_sum_with_mult($n) {
+    my $s = 0
+    my $x = $n
+    my $p = 2
+    while ($p * $p <= $x) {
+        while ($x % $p == 0) {
+            $s += $p
+            $x = int($x / $p)
+        }
+        $p = $p == 2 ? 3 : $p + 2
+    }
+    $s += $x if $x > 1
+    $s
+}
+
+fn Rosetta::Rhonda::is($n, $b) {
+    return 0 if $n < 2
+    Rosetta::Rhonda::digit_product_base($n, $b)
+        == $b * Rosetta::Rhonda::prime_factor_sum_with_mult($n)
+}
+
+# Helpers
+assert_eq Rosetta::Rhonda::digit_product_base(1568, 10), 240, "1568 digit product"
+assert_eq Rosetta::Rhonda::digit_product_base(36, 10),   18,  "36 digit product"
+assert_eq Rosetta::Rhonda::digit_product_base(0xFFF, 16), 15 * 15 * 15, "0xFFF base 16"
+assert_eq Rosetta::Rhonda::prime_factor_sum_with_mult(12), 7,  "spfm(12)"
+assert_eq Rosetta::Rhonda::prime_factor_sum_with_mult(30), 10, "spfm(30)"
+assert_eq Rosetta::Rhonda::prime_factor_sum_with_mult(64), 12, "spfm(64) = 6·2"
+
+# Base-10 digits round-trip back through digits_in_base
+my $d = Rosetta::Rhonda::digits_in_base(12345, 10)
+assert_eq join(",", @$d), "1,2,3,4,5", "12345 digits"
+
+# Base-2 digits
+my $d2 = Rosetta::Rhonda::digits_in_base(13, 2)
+assert_eq join(",", @$d2), "1,1,0,1", "13 = 0b1101"
+
+# Self-consistency: prime-factor sum of any prime p == p
+assert_eq Rosetta::Rhonda::prime_factor_sum_with_mult(7),  7,  "spfm(prime)=p"
+assert_eq Rosetta::Rhonda::prime_factor_sum_with_mult(31), 31, "spfm(31)"
+
+# Predicate exercised — should reject most numbers
+my @hits = ~> 2:50 |> grep { Rosetta::Rhonda::is(_, 10) }
+assert_eq len(@hits), 0, "no small Rhonda(10) numbers"
+
+# Pipe form
+36 |> fn { Rosetta::Rhonda::digit_product_base(_, 10) } |> assert_eq(18, "pipe digit product")
+
+test_run

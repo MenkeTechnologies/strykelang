@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sequence: smallest number greater than previous term
+# with exactly n divisors. (OEIS A069654 prefix.)
+# a(n) = smallest k > a(n-1) with τ(k) = n; a(1) = 1.
+
+fn Rosetta::SmallestGreater::tau($n) {
+    my $c = 0
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $c++
+            $c++ if $i != int($n / $i)
+        }
+        $i++
+    }
+    $c
+}
+
+fn Rosetta::SmallestGreater::sequence($k) {
+    return [] if $k < 1
+    my @s = (1)
+    for my $n (2..$k) {
+        my $cur = $s[-1] + 1
+        while (Rosetta::SmallestGreater::tau($cur) != $n) { $cur++ }
+        push @s, $cur
+    }
+    \@s
+}
+
+# Direct values from OEIS
+my $s = Rosetta::SmallestGreater::sequence(15)
+# τ values: a(1)=1 (τ=1); a(2)=smallest>1 w/ τ=2 = 2; a(3)=smallest>2 w/ τ=3 = 4
+# a(4)=smallest>4 w/ τ=4 = 6; a(5)=smallest>6 w/ τ=5 = 16; a(6)=smallest>16 w/ τ=6 = 18
+# a(7)=smallest>18 w/ τ=7 = 64; a(8)=smallest>64 w/ τ=8 = 66; …
+assert_eq $s->[0], 1,  "a(1) = 1"
+assert_eq $s->[1], 2,  "a(2) = 2"
+assert_eq $s->[2], 4,  "a(3) = 4"
+assert_eq $s->[3], 6,  "a(4) = 6"
+assert_eq $s->[4], 16, "a(5) = 16"
+assert_eq $s->[5], 18, "a(6) = 18"
+assert_eq $s->[6], 64, "a(7) = 64"
+
+# Check τ matches
+for my $n (1..15) {
+    next if $n == 1     # τ(1) = 1, the starting case
+    assert_eq Rosetta::SmallestGreater::tau($s->[$n - 1]), $n,
+        sprintf("τ(a(%d)) = %d", $n, $n)
+}
+
+# Strictly increasing
+for my $i (1..14) {
+    assert_ok $s->[$i] > $s->[$i - 1], sprintf("strictly increasing at %d", $i)
+}
+
+# Pipe form
+8 |> Rosetta::SmallestGreater::sequence |> fn { $_->[7] } |> assert_eq(66, "pipe a(8)")
+
+test_run

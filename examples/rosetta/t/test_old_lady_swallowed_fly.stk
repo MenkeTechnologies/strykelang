@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Old lady swallowed a fly
+# Build the cumulative-recursive nursery rhyme. Each verse appends the
+# next animal at the head of the chain and unwinds back through every
+# previously swallowed creature ("That wriggled and jiggled and tickled
+# inside her").
+
+fn Rosetta::OldLady::verse_block($items, $reasons) {
+    my @lines
+    my $first = $items->[-1]
+    push @lines, sprintf("There was an old lady who swallowed a %s.", $first)
+    push @lines, $reasons->{$first} if exists $reasons->{$first}
+    for (my $i = len(@$items) - 1; $i > 0; $i--) {
+        my $cur  = $items->[$i]
+        my $prev = $items->[$i - 1]
+        push @lines, sprintf("She swallowed the %s to catch the %s,", $cur, $prev)
+        push @lines, $reasons->{$prev} if exists $reasons->{$prev}
+    }
+    push @lines, "I don't know why she swallowed a fly — perhaps she'll die!"
+    join("\n", @lines)
+}
+
+fn Rosetta::OldLady::full_song() {
+    my @creatures = ("fly", "spider", "bird", "cat", "dog", "goat", "cow", "horse")
+    my %reasons = (
+        "spider" => "That wriggled and jiggled and tickled inside her.",
+    )
+    my @verses
+    for my $i (0..len(@creatures) - 1) {
+        my @sofar = @creatures[0..$i]
+        if ($creatures[$i] eq "horse") {
+            push @verses, "There was an old lady who swallowed a horse...\nShe's dead, of course!"
+            last
+        }
+        push @verses, Rosetta::OldLady::verse_block(\@sofar, \%reasons)
+    }
+    join("\n\n", @verses)
+}
+
+# Verse 1 (fly only) ends with the "perhaps she'll die" refrain
+my $v1 = Rosetta::OldLady::verse_block(["fly"], {})
+assert_ok index($v1, "swallowed a fly") >= 0,
+    "fly verse mentions swallowing a fly"
+assert_ok index($v1, "perhaps she'll die!") >= 0,
+    "fly verse ends with the death refrain"
+
+# Verse 2 introduces the spider with the recursive line
+my $v2 = Rosetta::OldLady::verse_block(["fly", "spider"], { "spider" => "That wriggled and jiggled and tickled inside her." })
+assert_ok index($v2, "wriggled and jiggled") >= 0, "spider gets the wriggle line"
+assert_ok index($v2, "to catch the fly") >= 0,    "spider chain connects to fly"
+
+# Final verse: horse kills her off
+my $song = Rosetta::OldLady::full_song()
+assert_ok index($song, "She's dead, of course!") >= 0, "horse verse closes with epitaph"
+
+# Every creature except horse is mentioned in the chain
+for my $c ("fly", "spider", "bird", "cat", "dog", "goat", "cow") {
+    assert_ok index($song, "swallowed the $c") >= 0 || index($song, "swallowed a $c") >= 0,
+        sprintf("%s appears in the song", $c)
+}
+
+# Pipe form
+() |> fn { Rosetta::OldLady::full_song() } |> length |> fn { $_ > 500 } |> assert_eq(1, "pipe song length > 500 chars")
+
+test_run

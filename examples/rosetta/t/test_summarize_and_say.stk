@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Summarize and say sequence
+# Conway-style "self-summarising" iteration: at each step describe
+# the digit counts of the current number to form the next.
+# E.g. 0 → "10" (one zero) → "1110" (one one one zero) → "3110" → …
+# A number is a self-number if iteration eventually loops back to it.
+
+fn Rosetta::Summarize::next($n) {
+    # Look-and-say: count consecutive runs left-to-right.
+    my @chars = split //, "$n"
+    return 10 if len(@chars) == 0
+    my $out = ""
+    my $i = 0
+    while ($i < len(@chars)) {
+        my $cur = $chars[$i]
+        my $run = 1
+        while ($i + $run < len(@chars) && $chars[$i + $run] eq $cur) { $run++ }
+        $out .= $run
+        $out .= $cur
+        $i += $run
+    }
+    $out + 0
+}
+
+fn Rosetta::Summarize::orbit($start, $max_steps) {
+    my @seq = ($start)
+    my %seen = ($start => 0)
+    for my $i (~> 1:$max_steps) {
+        my $nxt = Rosetta::Summarize::next($seq[-1])
+        if (exists $seen{$nxt}) {
+            return [\@seq, $seen{$nxt}]
+        }
+        push @seq, $nxt
+        $seen{$nxt} = len(@seq) - 1
+    }
+    [\@seq, -1]
+}
+
+# Direct
+assert_eq Rosetta::Summarize::next(0),     10,     "0 → '10'"
+assert_eq Rosetta::Summarize::next(10),    1110,   "10 → '1110'"
+assert_eq Rosetta::Summarize::next(1110),  3110,   "1110 → '3110'"
+assert_eq Rosetta::Summarize::next(3110),  132110, "3110 → '132110'"
+assert_eq Rosetta::Summarize::next(132110),1113122110, "132110 → '1113122110'"
+
+# 22 is a fixed point: '22' has two 2s → 22
+assert_eq Rosetta::Summarize::next(22), 22, "22 is a fixed point"
+
+# Orbit from 0 cycles to a fixed point at depth >= 1
+my $r = Rosetta::Summarize::orbit(0, 50)
+assert_ok len(@{$r->[0]}) > 1, "orbit advances"
+assert_ok $r->[1] >= 0, "orbit forms a cycle"
+
+# Orbit starting at 22 cycles immediately (period 1)
+my $r22 = Rosetta::Summarize::orbit(22, 5)
+assert_eq $r22->[0][0], 22, "starts at 22"
+assert_eq $r22->[1], 0, "cycle index = 0 (immediate)"
+
+# Pipe form
+0 |> Rosetta::Summarize::next |> assert_eq(10, "pipe next(0)")
+
+# Iterating six times from 0
+my @six = (0)
+for my $i (~> 1:6) { push @six, Rosetta::Summarize::next($six[-1]) }
+assert_eq join(",", @six),
+    "0,10,1110,3110,132110,1113122110,311311222110",
+    "first six steps from 0"
+
+test_run

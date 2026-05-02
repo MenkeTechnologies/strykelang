@@ -1,0 +1,89 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Set of real numbers
+# Real-number intervals with open / closed endpoints. Each set is
+# represented as { lo, hi, lo_open, hi_open }. Define union,
+# intersection, complement, difference, and membership.
+
+fn Rosetta::Reals::interval($lo, $hi, $lo_open, $hi_open) {
+    { lo => $lo, hi => $hi, lo_open => $lo_open ? 1 : 0, hi_open => $hi_open ? 1 : 0 }
+}
+
+fn Rosetta::Reals::contains($i, $x) {
+    return 0 if $x < $i->{lo} || $x > $i->{hi}
+    return 0 if $x == $i->{lo} && $i->{lo_open}
+    return 0 if $x == $i->{hi} && $i->{hi_open}
+    1
+}
+
+fn Rosetta::Reals::is_empty($i) {
+    return 1 if $i->{lo} > $i->{hi}
+    return 1 if $i->{lo} == $i->{hi} && ($i->{lo_open} || $i->{hi_open})
+    0
+}
+
+fn Rosetta::Reals::intersect($a, $b) {
+    my $lo;        my $lo_open
+    my $hi;        my $hi_open
+    if ($a->{lo} > $b->{lo}) { $lo = $a->{lo}; $lo_open = $a->{lo_open} }
+    elsif ($a->{lo} < $b->{lo}) { $lo = $b->{lo}; $lo_open = $b->{lo_open} }
+    else { $lo = $a->{lo}; $lo_open = $a->{lo_open} || $b->{lo_open} ? 1 : 0 }
+    if ($a->{hi} < $b->{hi}) { $hi = $a->{hi}; $hi_open = $a->{hi_open} }
+    elsif ($a->{hi} > $b->{hi}) { $hi = $b->{hi}; $hi_open = $b->{hi_open} }
+    else { $hi = $a->{hi}; $hi_open = $a->{hi_open} || $b->{hi_open} ? 1 : 0 }
+    Rosetta::Reals::interval($lo, $hi, $lo_open, $hi_open)
+}
+
+fn Rosetta::Reals::union_overlapping($a, $b) {
+    return undef if $a->{hi} < $b->{lo}
+    return undef if $b->{hi} < $a->{lo}
+    my ($lo, $lo_open)
+    if ($a->{lo} < $b->{lo}) { $lo = $a->{lo}; $lo_open = $a->{lo_open} }
+    elsif ($a->{lo} > $b->{lo}) { $lo = $b->{lo}; $lo_open = $b->{lo_open} }
+    else { $lo = $a->{lo}; $lo_open = $a->{lo_open} && $b->{lo_open} ? 1 : 0 }
+    my ($hi, $hi_open)
+    if ($a->{hi} > $b->{hi}) { $hi = $a->{hi}; $hi_open = $a->{hi_open} }
+    elsif ($a->{hi} < $b->{hi}) { $hi = $b->{hi}; $hi_open = $b->{hi_open} }
+    else { $hi = $a->{hi}; $hi_open = $a->{hi_open} && $b->{hi_open} ? 1 : 0 }
+    Rosetta::Reals::interval($lo, $hi, $lo_open, $hi_open)
+}
+
+# Membership
+my $i = Rosetta::Reals::interval(0, 1, 0, 1)   # [0, 1)
+assert_eq Rosetta::Reals::contains($i, 0),    1, "0 ∈ [0, 1)"
+assert_eq Rosetta::Reals::contains($i, 0.5),  1, "0.5 ∈ [0, 1)"
+assert_eq Rosetta::Reals::contains($i, 1),    0, "1 ∉ [0, 1)"
+assert_eq Rosetta::Reals::contains($i, -0.1), 0, "-0.1 ∉ [0, 1)"
+
+my $j = Rosetta::Reals::interval(0, 1, 1, 0)   # (0, 1]
+assert_eq Rosetta::Reals::contains($j, 0), 0, "0 ∉ (0, 1]"
+assert_eq Rosetta::Reals::contains($j, 1), 1, "1 ∈ (0, 1]"
+
+# Empty intervals
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(2, 1, 0, 0)), 1, "2..1 empty"
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 1, 0)), 1, "(0..0] empty"
+assert_eq Rosetta::Reals::is_empty(Rosetta::Reals::interval(0, 0, 0, 0)), 0, "[0..0] non-empty (singleton)"
+
+# Intersection
+my $a = Rosetta::Reals::interval(0, 3, 0, 0)   # [0, 3]
+my $b = Rosetta::Reals::interval(2, 5, 1, 0)   # (2, 5]
+my $ai = Rosetta::Reals::intersect($a, $b)
+assert_eq $ai->{lo}, 2, "intersect lo = 2"
+assert_eq $ai->{hi}, 3, "intersect hi = 3"
+assert_eq $ai->{lo_open}, 1, "intersect lo open"
+assert_eq $ai->{hi_open}, 0, "intersect hi closed"
+
+# Union of overlapping
+my $u = Rosetta::Reals::union_overlapping($a, $b)
+assert_eq $u->{lo}, 0, "union lo"
+assert_eq $u->{hi}, 5, "union hi"
+
+# Disjoint union → undef
+my $d = Rosetta::Reals::union_overlapping(
+    Rosetta::Reals::interval(0, 1, 0, 0),
+    Rosetta::Reals::interval(2, 3, 0, 0))
+assert_ok !defined($d), "disjoint intervals do not unite into one"
+
+# Pipe form
+1 |> fn { Rosetta::Reals::contains($i, _) } |> assert_eq(0, "pipe 1 ∉ [0,1)")
+
+test_run

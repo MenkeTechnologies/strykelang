@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Cistercian numerals (1–9999)
+# Each integer 0..9999 is rendered as one stylised glyph composed of
+# four quadrant strokes attached to a vertical stem. Encode the four
+# quadrants as digits (units, tens, hundreds, thousands) and render
+# a tiny ASCII grid where each non-zero quadrant is marked with the
+# digit itself in its corner. Used to verify decomposition + drawing.
+
+fn Rosetta::Cistercian::quadrants($n) {
+    return undef if $n < 0 || $n > 9999
+    [$n % 10, int($n / 10) % 10, int($n / 100) % 10, int($n / 1000) % 10]
+}
+
+fn Rosetta::Cistercian::render($n) {
+    my $q = Rosetta::Cistercian::quadrants($n)
+    return undef unless defined $q
+    my ($u, $t, $h, $th) = @$q
+    my @rows = (
+        sprintf("%s|%s", $th == 0 ? " " : $th, $h == 0 ? " " : $h),
+        " | ",
+        sprintf("%s|%s", $t  == 0 ? " " : $t,  $u == 0 ? " " : $u),
+    )
+    join("\n", @rows)
+}
+
+# Quadrant decomposition
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(0)}),    "0,0,0,0", "0 quadrants"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(1)}),    "1,0,0,0", "1 = U=1"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(20)}),   "0,2,0,0", "20 = T=2"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(300)}),  "0,0,3,0", "300 = H=3"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(4000)}), "0,0,0,4", "4000 = TH=4"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(9999)}), "9,9,9,9", "9999 all corners"
+assert_eq join(",", @{Rosetta::Cistercian::quadrants(1234)}), "4,3,2,1", "1234 → 4,3,2,1"
+
+# Out-of-range
+assert_ok !defined(Rosetta::Cistercian::quadrants(-1)),    "negative rejected"
+assert_ok !defined(Rosetta::Cistercian::quadrants(10000)), "10000 rejected"
+
+# Render basic glyph for 6831 (a common rosetta example)
+my $g = Rosetta::Cistercian::render(6831)
+assert_eq $g,
+    "6|8\n | \n3|1",
+    "render 6831 grid"
+
+# Reconstruction round-trip via quadrants
+my $all_round = 1
+for my $n (0:99) {
+    my $q = Rosetta::Cistercian::quadrants($n)
+    my $back = $q->[0] + 10 * $q->[1] + 100 * $q->[2] + 1000 * $q->[3]
+    $all_round = 0 if $back != $n
+}
+assert_ok $all_round, "0..99 round-trip exact"
+
+# Pipe form
+1234 |> Rosetta::Cistercian::quadrants |> fn { join(",", @$_) } |> assert_eq("4,3,2,1", "pipe quadrants(1234)")
+
+test_run

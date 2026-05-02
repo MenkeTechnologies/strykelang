@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wasteful, equidigital and frugal numbers
+# Compare the digit count of n with the digit count of its prime
+# factorisation written with multiplicities (excluding exponents of 1).
+# Wasteful: factor digits > n digits.
+# Equidigital: equal.
+# Frugal: factor digits < n digits.
+
+fn Rosetta::WEF::factor_digit_len($n) {
+    return 1 if $n == 1
+    my $len = 0
+    my $x = $n
+    my $p = 2
+    while ($p * $p <= $x) {
+        my $e = 0
+        while ($x % $p == 0) { $x = int($x / $p); $e++ }
+        if ($e > 0) {
+            $len += length("$p")
+            $len += length("$e") if $e > 1
+        }
+        $p = $p == 2 ? 3 : $p + 2
+    }
+    if ($x > 1) { $len += length("$x") }
+    $len
+}
+
+fn Rosetta::WEF::classify($n) {
+    return "n/a" if $n < 2
+    my $nl = length("$n")
+    my $fl = Rosetta::WEF::factor_digit_len($n)
+    return "wasteful"    if $fl > $nl
+    return "equidigital" if $fl == $nl
+    "frugal"
+}
+
+# Spot checks (factor digit length includes prime + exponent when exp > 1)
+assert_eq Rosetta::WEF::factor_digit_len(125),  2, "125 = 5³ → '5','3' = 2 chars"
+assert_eq Rosetta::WEF::factor_digit_len(10),   2, "10 = 2·5 → '2','5' = 2 chars"
+assert_eq Rosetta::WEF::factor_digit_len(1024), 3, "1024 = 2¹⁰ → '2','10' = 3 chars"
+assert_eq Rosetta::WEF::classify(4),    "wasteful",    "4 = 2² → '2','2' wasteful"
+assert_eq Rosetta::WEF::classify(125),  "frugal",      "125 = 5³ → '53' frugal (2 < 3)"
+assert_eq Rosetta::WEF::classify(10),   "equidigital", "10 = 2·5 → '25' equidigital"
+assert_eq Rosetta::WEF::classify(1024), "frugal",      "1024 = 2¹⁰ → '210' frugal (3 < 4)"
+
+# First few frugal numbers (OEIS A046759): 125, 128, 243, 256, 343, 512, 625, …
+my @frugals = ~> 2:1000 |> grep { Rosetta::WEF::classify(_) eq "frugal" }
+assert_eq join(",", @frugals[0..6]), "125,128,243,256,343,512,625", "first 7 frugal numbers"
+
+# Equidigital count (A046758) below 100
+my @equi = ~> 2:100 |> grep { Rosetta::WEF::classify(_) eq "equidigital" }
+assert_ok len(@equi) > 0, "some equidigital numbers ≤ 100"
+
+# Most numbers are wasteful by far
+my $waste_count = ~> 2:200 |> grep { Rosetta::WEF::classify(_) eq "wasteful" } |> len
+assert_ok $waste_count > 100, "wasteful dominates ≤ 200"
+
+# Pipe form
+125 |> Rosetta::WEF::classify |> assert_eq("frugal", "pipe classify(125)")
+
+test_run

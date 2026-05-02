@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: N'th
+# Append the appropriate ordinal suffix (st, nd, rd, th) to a positive
+# integer.
+
+fn Rosetta::Nth::suffix($n) {
+    return "th" if $n < 0
+    my $mod100 = $n % 100
+    return "th" if $mod100 >= 11 && $mod100 <= 13
+    my $last = $n % 10
+    return "st" if $last == 1
+    return "nd" if $last == 2
+    return "rd" if $last == 3
+    "th"
+}
+
+fn Rosetta::Nth::ordinal($n) {
+    "$n" . Rosetta::Nth::suffix($n)
+}
+
+fn Rosetta::Nth::range($lo, $hi) {
+    $lo:$hi |> map { Rosetta::Nth::ordinal(_) }
+}
+
+# Spot checks
+assert_eq Rosetta::Nth::ordinal(1),  "1st",  "1st"
+assert_eq Rosetta::Nth::ordinal(2),  "2nd",  "2nd"
+assert_eq Rosetta::Nth::ordinal(3),  "3rd",  "3rd"
+assert_eq Rosetta::Nth::ordinal(4),  "4th",  "4th"
+assert_eq Rosetta::Nth::ordinal(11), "11th", "11th (special)"
+assert_eq Rosetta::Nth::ordinal(12), "12th", "12th (special)"
+assert_eq Rosetta::Nth::ordinal(13), "13th", "13th (special)"
+assert_eq Rosetta::Nth::ordinal(21), "21st", "21st"
+assert_eq Rosetta::Nth::ordinal(22), "22nd", "22nd"
+assert_eq Rosetta::Nth::ordinal(23), "23rd", "23rd"
+assert_eq Rosetta::Nth::ordinal(101),"101st","101st"
+assert_eq Rosetta::Nth::ordinal(111),"111th","111th"
+assert_eq Rosetta::Nth::ordinal(113),"113th","113th"
+assert_eq Rosetta::Nth::ordinal(123),"123rd","123rd"
+
+# Range used by rosetta task
+my @first_25 = Rosetta::Nth::range(1, 25)
+assert_eq join(" ", @first_25),
+    "1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th 11th 12th 13th 14th 15th 16th 17th 18th 19th 20th 21st 22nd 23rd 24th 25th",
+    "1..25 ordinals"
+
+my @teens = Rosetta::Nth::range(250, 265)
+assert_eq join(" ", @teens),
+    "250th 251st 252nd 253rd 254th 255th 256th 257th 258th 259th 260th 261st 262nd 263rd 264th 265th",
+    "250..265 ordinals"
+
+# Pipe form
+21 |> Rosetta::Nth::ordinal |> assert_eq("21st", "pipe 21st")
+
+test_run

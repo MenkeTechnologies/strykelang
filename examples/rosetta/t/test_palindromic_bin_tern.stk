@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Find palindromic numbers in both binary and ternary bases
+# (OEIS A060792). The expansion in base 2 and the expansion in base 3
+# must each read the same forwards and backwards. By convention only
+# odd numbers can be ternary-palindromes with leading digit > 0 here,
+# since even numbers end in 0 in binary.
+
+fn Rosetta::PalBinTer::base($n, $b) {
+    return "0" if $n == 0
+    my $s = ""
+    while ($n > 0) {
+        $s = ($n % $b) . $s
+        $n = int($n / $b)
+    }
+    $s
+}
+
+fn Rosetta::PalBinTer::is_pal($s) {
+    $s eq scalar reverse($s)
+}
+
+fn Rosetta::PalBinTer::is($n) {
+    Rosetta::PalBinTer::is_pal(Rosetta::PalBinTer::base($n, 2))
+        && Rosetta::PalBinTer::is_pal(Rosetta::PalBinTer::base($n, 3))
+}
+
+# Base conversions
+assert_eq Rosetta::PalBinTer::base(0,    2), "0",    "0 base 2"
+assert_eq Rosetta::PalBinTer::base(10,   2), "1010", "10 base 2"
+assert_eq Rosetta::PalBinTer::base(6643, 2), "1100111110011", "6643 base 2"
+assert_eq Rosetta::PalBinTer::base(6643, 3), "100010001",     "6643 base 3"
+
+# Palindrome check
+assert_eq Rosetta::PalBinTer::is_pal("1010"),          0, "1010 not palindrome"
+assert_eq Rosetta::PalBinTer::is_pal("1100111110011"), 1, "1100111110011 palindrome"
+
+# Trivial cases
+assert_eq Rosetta::PalBinTer::is(0), 1, "0 is palindromic in both"
+assert_eq Rosetta::PalBinTer::is(1), 1, "1 is palindromic in both"
+
+# Smallest non-trivial case is 6643
+assert_eq Rosetta::PalBinTer::is(6643), 1, "6643 is palindromic in both"
+
+# Pipe form
+6643 |> Rosetta::PalBinTer::is |> assert_eq(1, "pipe is(6643)")
+
+# Threaded scan: nothing between 2 and 6642 qualifies
+my @hits = ~> 2:6642 |> grep { Rosetta::PalBinTer::is(_) }
+assert_eq len(@hits), 0, "no dual-pal between 2 and 6642"
+
+# First 3 dual palindromes
+my @found = (0, 1)
+for my $n (2:7000) {
+    push @found, $n if Rosetta::PalBinTer::is($n)
+    last if len(@found) >= 3
+}
+assert_eq join(",", @found), "0,1,6643", "first three dual-pal"
+
+test_run

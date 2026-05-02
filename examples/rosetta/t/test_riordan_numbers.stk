@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Riordan numbers (OEIS A005043)
+# Count of Motzkin paths from (0,0) to (n,0) with no horizontal steps
+# at zero level. Recurrence: r(0)=1, r(1)=0,
+#   (n+1)·r(n) = (n-1) · (2·r(n-1) + 3·r(n-2))
+
+fn Rosetta::Riordan::sequence($n) {
+    return [1] if $n == 0
+    my @r = (1, 0)
+    for my $k (2..$n) {
+        my $val = (($k - 1) * (2 * $r[$k - 1] + 3 * $r[$k - 2])) / ($k + 1)
+        push @r, $val
+    }
+    \@r
+}
+
+# OEIS A005043 first 16 terms
+my $r = Rosetta::Riordan::sequence(15)
+assert_eq join(",", @$r),
+    "1,0,1,1,3,6,15,36,91,232,603,1585,4213,11298,30537,83097",
+    "first 16 values from the recurrence"
+
+# Recurrence sanity check
+for my $k (2..14) {
+    my $expected = (($k - 1) * (2 * $r->[$k - 1] + 3 * $r->[$k - 2])) / ($k + 1)
+    assert_eq $r->[$k], $expected, sprintf("r(%d) recurrence", $k)
+}
+
+# Pipe form
+10 |> Rosetta::Riordan::sequence |> fn { $_->[10] } |> assert_eq(603, "pipe r(10)")
+
+# r(0) = 1
+assert_eq Rosetta::Riordan::sequence(0)->[0], 1, "r(0) = 1"
+
+# r(2) = 1: there is one valid Motzkin path
+assert_eq $r->[2], 1, "r(2) = 1"
+
+test_run

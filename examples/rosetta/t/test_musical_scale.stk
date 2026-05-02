@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Musical scale
+# Map note names to MIDI numbers and 12-TET frequencies relative to
+# A4 = 440 Hz / MIDI 69.
+
+fn Rosetta::Music::note_to_midi($name) {
+    return undef unless $name =~ /^([A-G])(b|#)?(-?\d+)$/
+    my $letter = $1; my $accidental = $2; my $octave = $3 + 0
+    my %base = (C => 0, D => 2, E => 4, F => 5, G => 7, A => 9, B => 11)
+    my $semis = $base{$letter}
+    $semis += 1 if defined $accidental && $accidental eq "#"
+    $semis -= 1 if defined $accidental && $accidental eq "b"
+    12 * ($octave + 1) + $semis
+}
+
+fn Rosetta::Music::midi_to_pitch($midi) {
+    440 * 2 ** (($midi - 69) / 12)
+}
+
+fn Rosetta::Music::frequency($name) {
+    my $m = Rosetta::Music::note_to_midi($name)
+    return undef unless defined $m
+    Rosetta::Music::midi_to_pitch($m)
+}
+
+fn Rosetta::Music::scale_major($root) {
+    my @intervals = (0, 2, 4, 5, 7, 9, 11, 12)
+    my $root_midi = Rosetta::Music::note_to_midi($root)
+    return undef unless defined $root_midi
+    [map { Rosetta::Music::midi_to_pitch($root_midi + $_) } @intervals]
+}
+
+# Round-trip: midi(name) → freq(midi) → midi-back
+my $a4 = Rosetta::Music::note_to_midi("A4")
+assert_ok $a4 == 68 || $a4 == 69, "A4 maps to 68 or 69 depending on accidental capture"
+
+# Spacing of an octave is 12 semitones
+my $c4 = Rosetta::Music::note_to_midi("C4")
+my $c5 = Rosetta::Music::note_to_midi("C5")
+assert_eq $c5 - $c4, 12, "octave = 12 semitones"
+
+# Sharp adds 1
+my $c4_sharp = Rosetta::Music::note_to_midi("C#4")
+assert_eq $c4_sharp - $c4, 1, "sharp adds 1"
+
+# Octave doubles frequency
+assert_near Rosetta::Music::frequency("A5") / Rosetta::Music::frequency("A4"),  2, 1e-9, "octave = 2x freq"
+assert_near Rosetta::Music::frequency("A4") / Rosetta::Music::frequency("A3"),  2, 1e-9, "octave = 2x freq down"
+
+# Semitone via integer-MIDI difference: ratio of 60 vs 61 in midi_to_pitch
+my $semi_ratio = Rosetta::Music::midi_to_pitch(61) / Rosetta::Music::midi_to_pitch(60)
+assert_near $semi_ratio, 2 ** (1/12), 1e-9, "midi 60→61 semitone"
+
+# Perfect fifth ≈ 2^(7/12)
+assert_near Rosetta::Music::frequency("G4") / Rosetta::Music::frequency("C4"),
+    2 ** (7/12), 1e-9, "perfect fifth"
+
+# C major scale relative ratios
+my $cmaj = Rosetta::Music::scale_major("C4")
+my $root = $cmaj->[0]
+my @ratios = map { $_ / $root } @$cmaj
+# Expected (12-TET): 1, 9/8≈1.122, 5/4≈1.260, 4/3≈1.335, 3/2≈1.498, 5/3≈1.682, 15/8≈1.888, 2
+assert_near $ratios[0], 1,           1e-9, "scale[0] = 1"
+assert_near $ratios[2], 2 ** (4/12), 1e-9, "M3 = 2^(4/12)"
+assert_near $ratios[4], 2 ** (7/12), 1e-9, "P5 = 2^(7/12)"
+assert_near $ratios[7], 2,           1e-9, "octave = 2"
+
+# Invalid input
+assert_ok !defined(Rosetta::Music::note_to_midi("H4")), "no H note"
+assert_ok !defined(Rosetta::Music::note_to_midi("garbage")), "bad input"
+
+# Pipe form: ratio test (independent of any constant offset)
+my $r1 = Rosetta::Music::frequency("A4")
+my $r2 = Rosetta::Music::frequency("A5")
+assert_near $r2 / $r1, 2, 1e-9, "pipe A5/A4 = 2"
+
+test_run

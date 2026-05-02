@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sailors, coconuts and a monkey
+# Five sailors and a monkey are stranded; they collect a pile of N
+# coconuts. Each sailor in turn (1..5) wakes, divides the pile into 5
+# equal heaps, gives 1 coconut to the monkey, hides one heap, and
+# pushes the other four heaps back together. In the morning all
+# divide the remainder into 5 equal heaps, again giving 1 to the
+# monkey. Find the smallest N (and parametric solution for k sailors).
+
+fn Rosetta::Coconuts::valid($n, $sailors) {
+    my $cur = $n
+    for my $i (~> 1:$sailors) {
+        return 0 if $cur < $sailors + 1
+        return 0 if ($cur - 1) % $sailors != 0
+        my $kept = ($cur - 1) / $sailors      # one heap to hide
+        return 0 if $kept < 1
+        $cur = $kept * ($sailors - 1)
+    }
+    return 0 if $cur < $sailors + 1
+    return 0 if ($cur - 1) % $sailors != 0
+    1
+}
+
+fn Rosetta::Coconuts::find_smallest($sailors) {
+    my $n = $sailors
+    while (!Rosetta::Coconuts::valid($n, $sailors)) {
+        $n++
+        return -1 if $n > 200000
+    }
+    $n
+}
+
+# Classic 5-sailor solution: 15621
+assert_eq Rosetta::Coconuts::find_smallest(5), 15621, "5 sailors → 15621 coconuts"
+
+# Smaller cases — k^(k+1) - (k - 1) family
+assert_eq Rosetta::Coconuts::find_smallest(2), 15,    "2 sailors → 15"
+assert_eq Rosetta::Coconuts::find_smallest(3), 79,    "3 sailors → 79"
+assert_eq Rosetta::Coconuts::find_smallest(4), 1021,  "4 sailors → 1021"
+
+# Validity check
+assert_eq Rosetta::Coconuts::valid(15621, 5), 1, "15621 is valid for 5 sailors"
+assert_eq Rosetta::Coconuts::valid(15620, 5), 0, "15620 is NOT valid"
+
+# General formula: smallest = sailors^sailors - (sailors - 1)
+# Verify for 5: 5^5 - 4 = 3125 - 4 = 3121 ≠ 15621. Hmm — formula is for the
+# version where the *morning* division also gives 1 to the monkey:
+# smallest = sailors^(sailors+1) - (sailors-1) for that variant.
+# 5^6 - 4 = 15625 - 4 = 15621 ✓
+my $formula5 = 5 * 5 * 5 * 5 * 5 * 5 - 4
+assert_eq $formula5, Rosetta::Coconuts::find_smallest(5),
+    "formula s^(s+1) - (s-1) matches"
+
+# Pipe form
+5 |> Rosetta::Coconuts::find_smallest |> assert_eq(15621, "pipe smallest(5)")
+
+test_run

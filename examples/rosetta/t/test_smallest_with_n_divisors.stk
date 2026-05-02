@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sequence: smallest number with exactly n divisors
+# (alternative variant). OEIS A005179: 1, 2, 4, 6, 16, 12, 64, 24,
+# 36, 48, 1024, 60, …
+# We compute by simple search starting at 1.
+
+fn Rosetta::SmallestN::tau($n) {
+    my $c = 0
+    my $i = 1
+    while ($i * $i <= $n) {
+        if ($n % $i == 0) {
+            $c++
+            $c++ if $i != int($n / $i)
+        }
+        $i++
+    }
+    $c
+}
+
+fn Rosetta::SmallestN::find($n) {
+    return -1 if $n < 1
+    my $k = 1
+    while (Rosetta::SmallestN::tau($k) != $n) { $k++ }
+    $k
+}
+
+# τ() helper
+assert_eq Rosetta::SmallestN::tau(1), 1, "τ(1) = 1"
+assert_eq Rosetta::SmallestN::tau(64), 7, "τ(64) = 7 (1,2,4,8,16,32,64)"
+
+# OEIS A005179 — first 12 terms
+my @a = ~> 1:12 |> map { Rosetta::SmallestN::find(_) }
+assert_eq join(",", @a),
+    "1,2,4,6,16,12,64,24,36,48,1024,60",
+    "first 12 of A005179"
+
+# A few specific
+assert_eq Rosetta::SmallestN::find(1),  1,    "n=1 → 1"
+assert_eq Rosetta::SmallestN::find(2),  2,    "n=2 → 2"
+assert_eq Rosetta::SmallestN::find(7),  64,   "n=7 → 64"
+assert_eq Rosetta::SmallestN::find(11), 1024, "n=11 → 1024"
+
+# Pipe form
+12 |> Rosetta::SmallestN::find |> assert_eq(60, "pipe n=12")
+
+test_run

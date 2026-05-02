@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Two bullet roulette
+# A revolver has 6 chambers. Two bullets are placed in adjacent
+# chambers. Spin once, fire — if it clicks, what's the chance of
+# survival on a second pull *without* re-spinning, vs spinning again?
+# The classic answer: don't spin → P(survive) = 3/4 = 75%.
+#                     spin again → P(survive) = 4/6 = 66.7%.
+# We verify by exhaustive enumeration over all 6 starting chambers.
+
+fn Rosetta::Roulette::loaded_pattern() {
+    # 1 = bullet, 0 = empty. Two bullets in adjacent slots.
+    [1, 1, 0, 0, 0, 0]
+}
+
+fn Rosetta::Roulette::p_survive_no_spin() {
+    my $cyl = Rosetta::Roulette::loaded_pattern()
+    my $n = len(@$cyl)
+    my $first_safe = 0
+    my $second_also_safe = 0
+    for my $start (0..$n - 1) {
+        if ($cyl->[$start] == 0) {
+            $first_safe++
+            my $next = ($start + 1) % $n
+            $second_also_safe++ if $cyl->[$next] == 0
+        }
+    }
+    $second_also_safe / $first_safe   # conditional probability
+}
+
+fn Rosetta::Roulette::p_survive_spin_again() {
+    my $cyl = Rosetta::Roulette::loaded_pattern()
+    my $n = len(@$cyl)
+    my $empty = 0
+    for my $c (@$cyl) { $empty++ if $c == 0 }
+    $empty / $n
+}
+
+# Scenario probabilities
+assert_near Rosetta::Roulette::p_survive_no_spin(),     0.75, 1e-12, "P(survive | no re-spin)"
+assert_near Rosetta::Roulette::p_survive_spin_again(),  4/6,  1e-12, "P(survive | re-spin)"
+
+# Sanity: no-spin strategy strictly better
+assert_ok Rosetta::Roulette::p_survive_no_spin() > Rosetta::Roulette::p_survive_spin_again(),
+    "no-spin strictly safer"
+
+# Layout consistency
+my $cyl = Rosetta::Roulette::loaded_pattern()
+my $loaded = 0
+for my $c (@$cyl) { $loaded += $c }
+assert_eq $loaded, 2, "exactly two bullets"
+assert_eq len(@$cyl), 6, "six chambers"
+
+# Bullets are adjacent
+my $adjacent = 0
+for my $i (0..5) {
+    my $j = ($i + 1) % 6
+    $adjacent = 1 if $cyl->[$i] == 1 && $cyl->[$j] == 1
+}
+assert_ok $adjacent, "bullets are adjacent"
+
+# Pipe form
+() |> fn { Rosetta::Roulette::p_survive_no_spin() } |> assert_near(0.75, 1e-12, "pipe no-spin probability")
+
+test_run

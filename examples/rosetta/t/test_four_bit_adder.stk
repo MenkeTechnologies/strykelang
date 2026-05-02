@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Four bit adder
+# Builds a 4-bit ripple-carry adder out of NAND gates only.
+# Inputs are little-endian arrays of 4 bits (a[0] is LSB).
+# Returns [sum_bits, carry_out].
+
+fn Rosetta::FourBitAdder::nand($a, $b) { 1 - ($a & $b) }
+
+fn Rosetta::FourBitAdder::not_g($a) {
+    Rosetta::FourBitAdder::nand($a, $a)
+}
+
+fn Rosetta::FourBitAdder::and_g($a, $b) {
+    Rosetta::FourBitAdder::not_g(Rosetta::FourBitAdder::nand($a, $b))
+}
+
+fn Rosetta::FourBitAdder::or_g($a, $b) {
+    Rosetta::FourBitAdder::nand(
+        Rosetta::FourBitAdder::not_g($a),
+        Rosetta::FourBitAdder::not_g($b))
+}
+
+fn Rosetta::FourBitAdder::xor_g($a, $b) {
+    my $n = Rosetta::FourBitAdder::nand($a, $b)
+    Rosetta::FourBitAdder::and_g(
+        Rosetta::FourBitAdder::or_g($a, $b),
+        $n)
+}
+
+fn Rosetta::FourBitAdder::half_adder($a, $b) {
+    [Rosetta::FourBitAdder::xor_g($a, $b),
+     Rosetta::FourBitAdder::and_g($a, $b)]
+}
+
+fn Rosetta::FourBitAdder::full_adder($a, $b, $cin) {
+    my $h1 = Rosetta::FourBitAdder::half_adder($a, $b)
+    my $h2 = Rosetta::FourBitAdder::half_adder($h1->[0], $cin)
+    [$h2->[0], Rosetta::FourBitAdder::or_g($h1->[1], $h2->[1])]
+}
+
+fn Rosetta::FourBitAdder::add4($a, $b) {
+    my @sum
+    my $c = 0
+    for my $i (0:3) {
+        my $r = Rosetta::FourBitAdder::full_adder($a->[$i], $b->[$i], $c)
+        push @sum, $r->[0]
+        $c = $r->[1]
+    }
+    [\@sum, $c]
+}
+
+fn Rosetta::FourBitAdder::to_bits($n) {
+    [($n & 1), (($n >> 1) & 1), (($n >> 2) & 1), (($n >> 3) & 1)]
+}
+
+fn Rosetta::FourBitAdder::from_bits($bits, $carry) {
+    $bits->[0] + 2 * $bits->[1] + 4 * $bits->[2] + 8 * $bits->[3] + 16 * $carry
+}
+
+# Gate truth tables
+assert_eq Rosetta::FourBitAdder::nand(0, 0), 1, "nand(0,0)"
+assert_eq Rosetta::FourBitAdder::nand(1, 1), 0, "nand(1,1)"
+assert_eq Rosetta::FourBitAdder::and_g(1, 1), 1, "and(1,1)"
+assert_eq Rosetta::FourBitAdder::or_g(0, 1),  1, "or(0,1)"
+assert_eq Rosetta::FourBitAdder::xor_g(1, 1), 0, "xor(1,1)"
+assert_eq Rosetta::FourBitAdder::xor_g(0, 1), 1, "xor(0,1)"
+
+# Half-adder: 1 + 1 = 10
+my $h = Rosetta::FourBitAdder::half_adder(1, 1)
+assert_eq $h->[0], 0, "half-adder sum"
+assert_eq $h->[1], 1, "half-adder carry"
+
+# Full adder: 1 + 1 + 1 = 11
+my $f = Rosetta::FourBitAdder::full_adder(1, 1, 1)
+assert_eq $f->[0], 1, "full-adder sum"
+assert_eq $f->[1], 1, "full-adder carry"
+
+# Exhaustive 4-bit add: every (a, b) in 0..15 matches integer addition
+my $all_ok = 1
+for my $a (0:15) {
+    for my $b (0:15) {
+        my $r = Rosetta::FourBitAdder::add4(
+            Rosetta::FourBitAdder::to_bits($a),
+            Rosetta::FourBitAdder::to_bits($b))
+        my $got = Rosetta::FourBitAdder::from_bits($r->[0], $r->[1])
+        $all_ok = 0 if $got != $a + $b
+    }
+}
+assert_eq $all_ok, 1, "all 256 4-bit additions correct"
+
+# Pipe specific case: 7 + 9 = 16
+my $bits_a = Rosetta::FourBitAdder::to_bits(7)
+my $bits_b = Rosetta::FourBitAdder::to_bits(9)
+my $r79 = Rosetta::FourBitAdder::add4($bits_a, $bits_b)
+assert_eq Rosetta::FourBitAdder::from_bits($r79->[0], $r79->[1]), 16, "7 + 9 = 16"
+assert_eq $r79->[1], 1, "7 + 9 carry-out"
+
+# Threaded form
+my $thr = ~> [Rosetta::FourBitAdder::to_bits(13), Rosetta::FourBitAdder::to_bits(2)] \
+    fn { Rosetta::FourBitAdder::add4(_->[0], _->[1]) }
+assert_eq Rosetta::FourBitAdder::from_bits($thr->[0], $thr->[1]), 15, "threaded 13 + 2"
+
+test_run

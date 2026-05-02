@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+# Rosetta Code: World Cup group stage
+# Four teams, each pair plays once → 6 games. Each game has 3 outcomes
+# (W, D, L). Enumerate all 3^6 = 729 outcome tables; for each, compute
+# group standings (3 pts win, 1 pt draw); compute the probability
+# distribution over final ranks for one team.
+
+fn Rosetta::WorldCup::all_pairs() {
+    [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
+}
+
+fn Rosetta::WorldCup::points_for_outcome($pair, $outcome) {
+    # Returns [pts_team_a, pts_team_b].
+    return [3, 0] if $outcome == 0   # team a wins
+    return [0, 3] if $outcome == 1   # team b wins
+    return [1, 1]                    # draw
+}
+
+fn Rosetta::WorldCup::all_standings() {
+    my $pairs = Rosetta::WorldCup::all_pairs()
+    my @results
+    for my $code (0..728) {
+        my @outs
+        my $c = $code
+        for my $p (0..5) {
+            push @outs, $c % 3
+            $c = int($c / 3)
+        }
+        my @pts = (0, 0, 0, 0)
+        for my $i (0..5) {
+            my $pair = $pairs->[$i]
+            my $game = Rosetta::WorldCup::points_for_outcome($pair, $outs[$i])
+            $pts[$pair->[0]] += $game->[0]
+            $pts[$pair->[1]] += $game->[1]
+        }
+        push @results, \@pts
+    }
+    \@results
+}
+
+fn Rosetta::WorldCup::rank_distribution() {
+    my $standings = Rosetta::WorldCup::all_standings()
+    my @rank_counts = (0, 0, 0, 0)
+    for my $std (@$standings) {
+        my @sorted = sort { $b <=> $a } @$std
+        my $team0_pts = $std->[0]
+        my $rank = 0
+        for my $i (0..3) {
+            $rank++ if $sorted[$i] > $team0_pts
+        }
+        $rank_counts[$rank]++
+    }
+    [@rank_counts]
+}
+
+# Six games, every pair once
+my $pairs = Rosetta::WorldCup::all_pairs()
+assert_eq scalar(@$pairs), 6, "6 game pairs"
+
+# 3^6 = 729 total outcome tables
+my $standings = Rosetta::WorldCup::all_standings()
+assert_eq scalar(@$standings), 729, "729 outcome tables"
+
+# Sum of points across 4 teams in any single table lies in [12, 18]:
+# each draw contributes 2, each decisive contributes 3, over 6 games.
+my $sum_ok = 1
+for my $s (@$standings) {
+    my $sum = 0
+    for my $p (@$s) { $sum += $p }
+    $sum_ok = 0 if $sum < 12 || $sum > 18
+}
+assert_ok $sum_ok, "totals lie in [12, 18]"
+
+# Total = 18 only when all 6 games are decisive (2^6 = 64 outcomes).
+my $count_18 = 0
+for my $s (@$standings) {
+    my $sum = 0
+    for my $p (@$s) { $sum += $p }
+    $count_18++ if $sum == 18
+}
+assert_eq $count_18, 64, "64 outcomes with no draws"
+
+# Total = 12 only when every game is a draw (1 outcome).
+my $count_12 = 0
+for my $s (@$standings) {
+    my $sum = 0
+    for my $p (@$s) { $sum += $p }
+    $count_12++ if $sum == 12
+}
+assert_eq $count_12, 1, "exactly 1 all-draws outcome"
+
+# Rank distribution for team 0: each rank has 729 / something
+my $r = Rosetta::WorldCup::rank_distribution()
+my $tot = 0
+for my $c (@$r) { $tot += $c }
+assert_eq $tot, 729, "rank counts sum to 729"
+
+# Every rank slot has at least one outcome (no rank is unreachable)
+for my $i (0..3) {
+    assert_ok $r->[$i] > 0, sprintf("rank %d has > 0 outcomes", $i)
+}
+
+# Pipe form
+my $pp = Rosetta::WorldCup::all_pairs()
+assert_eq len(@$pp), 6, "pipe pair count"
+
+test_run

@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Five weekends
+# A 31-day month whose first day is a Friday contains five Fridays,
+# five Saturdays, and five Sundays — i.e. five weekends. Find every
+# such month between 1900-01 and 2100-12 inclusive, count them, and
+# verify the first/last entries.
+
+fn Rosetta::FiveWeekends::dow($y, $m, $d) {
+    my ($yy, $mm) = ($y, $m)
+    if ($mm < 3) { $mm += 12; $yy -= 1 }
+    my $K = $yy % 100
+    my $J = int($yy / 100)
+    (($d + int(13 * ($mm + 1) / 5) + $K + int($K / 4) + int($J / 4) + 5 * $J) % 7)
+}
+
+fn Rosetta::FiveWeekends::has_five($y, $m) {
+    my @big = (1, 3, 5, 7, 8, 10, 12)
+    my $is_31 = 0
+    for my $b (@big) { $is_31 = 1 if $b == $m }
+    return 0 unless $is_31
+    # Zeller: 6 = Friday
+    Rosetta::FiveWeekends::dow($y, $m, 1) == 6
+}
+
+fn Rosetta::FiveWeekends::scan($y_lo, $y_hi) {
+    my @hits
+    for my $y ($y_lo..$y_hi) {
+        for my $m (1..12) {
+            push @hits, sprintf("%04d-%02d", $y, $m) if Rosetta::FiveWeekends::has_five($y, $m)
+        }
+    }
+    @hits
+}
+
+# Rosetta task: 1900-01-01 .. 2100-12-31 inclusive yields 201 months.
+my @full = Rosetta::FiveWeekends::scan(1900, 2100)
+assert_eq len(@full), 201, "201 five-weekend months in 1900..2100"
+assert_eq $full[0], "1901-03", "first hit is 1901-03"
+assert_eq $full[-1], "2100-10", "last hit is 2100-10"
+
+# Sanity: every hit's first day is a Friday
+my $every = 1
+for my $tag (@full) {
+    my @parts = split /-/, $tag
+    my $y = int($parts[0])
+    my $m = int($parts[1])
+    $every = 0 if Rosetta::FiveWeekends::dow($y, $m, 1) != 6
+}
+assert_ok $every, "every hit starts on a Friday"
+
+# Pipe form
+1980 |> fn { Rosetta::FiveWeekends::scan(_, 1989) } |> len |> assert_eq(11, "1980s count")
+
+# Threaded
+my @t = ~> [2000, 2010] fn { Rosetta::FiveWeekends::scan(_->[0], _->[1]) }
+assert_eq $t[0], "2000-12", "2000-12 is first in 2000..2010"
+
+test_run

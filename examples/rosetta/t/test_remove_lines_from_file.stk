@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Remove lines from a file
+# Delete `count` lines starting at 1-indexed `start`. Files of fewer
+# lines than start+count-1 raise an error. Test fixture under /tmp.
+
+fn Rosetta::RmLines::write_file($path, $contents) {
+    open(my $fh, ">", $path) or return 0
+    print $fh $contents
+    close($fh)
+    1
+}
+
+fn Rosetta::RmLines::read_file($path) {
+    open(my $fh, "<", $path) or return undef
+    my $c = ""
+    while (my $line = <$fh>) { $c .= $line }
+    close($fh)
+    $c
+}
+
+fn Rosetta::RmLines::remove($path, $start, $count) {
+    my $content = Rosetta::RmLines::read_file($path)
+    return 0 unless defined $content
+    my @lines = split /\n/, $content, -1
+    return 0 if $start < 1
+    return 0 if $start + $count - 1 > len(@lines)
+    # Remove $count lines starting at index $start - 1
+    splice(@lines, $start - 1, $count)
+    Rosetta::RmLines::write_file($path, join("\n", @lines))
+}
+
+# Scratch
+my $tmp = "/tmp/stk_rmlines_$$"
+unlink($tmp)
+
+# Build 10-line file
+my $lines = join("\n", map { "line $_" } (1..10)) . "\n"
+Rosetta::RmLines::write_file($tmp, $lines)
+my @initial = split /\n/, Rosetta::RmLines::read_file($tmp), -1
+assert_eq scalar(@initial), 11, "11 'lines' (10 + trailing empty)"
+
+# Remove 3 lines starting at 4
+assert_eq Rosetta::RmLines::remove($tmp, 4, 3), 1, "remove 3 lines from 4"
+my @after = split /\n/, Rosetta::RmLines::read_file($tmp), -1
+my @keep_set = map { "line $_" } (1, 2, 3, 7, 8, 9, 10)
+my $still_has_kept = 1
+for my $w (@keep_set) {
+    my $found = 0
+    for my $line (@after) { $found = 1 if $line eq $w }
+    $still_has_kept = 0 unless $found
+}
+assert_ok $still_has_kept, "kept lines still present"
+
+# Removed lines absent
+my $absent = 1
+for my $i (4..6) {
+    my $needle = "line $i"
+    for my $line (@after) {
+        $absent = 0 if $line eq $needle
+    }
+}
+assert_ok $absent, "lines 4-6 removed"
+
+# Out-of-range fails
+my $bad = Rosetta::RmLines::remove($tmp, 100, 1)
+assert_eq $bad, 0, "out-of-range start rejected"
+
+# Negative start fails
+my $bad2 = Rosetta::RmLines::remove($tmp, 0, 1)
+assert_eq $bad2, 0, "start = 0 rejected"
+
+# Cleanup
+unlink($tmp)
+
+test_run

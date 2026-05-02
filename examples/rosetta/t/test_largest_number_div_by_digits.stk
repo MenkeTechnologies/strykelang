@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Largest number divisible by its digits
+# Find the largest base-10 integer ≤ a limit that has no zero or
+# repeated digits and is divisible by each of its digits.
+# OEIS A115569 / Rosetta task: answer is 9867312 (largest ever).
+
+fn Rosetta::LargestDivByDigits::digits($n) {
+    my @d
+    while ($n > 0) {
+        push @d, $n % 10
+        $n = int($n / 10)
+    }
+    @d
+}
+
+fn Rosetta::LargestDivByDigits::qualifies($n) {
+    my @d = Rosetta::LargestDivByDigits::digits($n)
+    my %seen
+    for my $x (@d) {
+        return 0 if $x == 0
+        return 0 if exists $seen{$x}
+        $seen{$x} = 1
+        return 0 if $n % $x != 0
+    }
+    1
+}
+
+fn Rosetta::LargestDivByDigits::find_largest($limit) {
+    for (my $n = $limit; $n > 0; $n--) {
+        return $n if Rosetta::LargestDivByDigits::qualifies($n)
+    }
+    -1
+}
+
+# Smaller witness: 9876312 fails (9876312 / 7 isn't an integer);
+# 9867312 is the answer to the full task.
+assert_eq Rosetta::LargestDivByDigits::qualifies(9867312), 1, "9867312 qualifies"
+assert_eq Rosetta::LargestDivByDigits::qualifies(9876543), 0, "9876543 fails"
+assert_eq Rosetta::LargestDivByDigits::qualifies(112), 0, "112 has repeated 1"
+assert_eq Rosetta::LargestDivByDigits::qualifies(120), 0, "120 has zero digit"
+
+# Largest below 1000
+assert_eq Rosetta::LargestDivByDigits::find_largest(999), 936,
+    "largest ≤ 999 with the property is 936 (936/9=104, 936/3=312, 936/6=156)"
+
+# Largest ≤ 9999999 — full rosetta answer is 9867312
+assert_eq Rosetta::LargestDivByDigits::find_largest(9999999), 9867312,
+    "global answer is 9867312"
+
+# Pipe form
+9867312 |> Rosetta::LargestDivByDigits::qualifies |> assert_eq(1, "pipe qualifies(9867312)")
+
+test_run

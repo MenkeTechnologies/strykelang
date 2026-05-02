@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parsing/RPN calculator algorithm
+# Evaluate postfix expressions with +, -, *, /, ^ operators.
+# Tokens are whitespace-separated.
+
+fn Rosetta::Rpn::eval_token($stack, $tok) {
+    if ($tok =~ /^-?\d+(\.\d+)?$/) {
+        push @$stack, $tok + 0
+        return 1
+    }
+    return 0 if len(@$stack) < 2
+    my $b = pop @$stack
+    my $a = pop @$stack
+    if    ($tok eq "+") { push @$stack, $a + $b }
+    elsif ($tok eq "-") { push @$stack, $a - $b }
+    elsif ($tok eq "*") { push @$stack, $a * $b }
+    elsif ($tok eq "/") { push @$stack, $a / $b }
+    elsif ($tok eq "^") { push @$stack, $a ** $b }
+    else { return 0 }
+    1
+}
+
+fn Rosetta::Rpn::eval($expr) {
+    my @stack
+    my @tokens = split /\s+/, $expr
+    for my $t (@tokens) {
+        next if length($t) == 0
+        return undef unless Rosetta::Rpn::eval_token(\@stack, $t)
+    }
+    return undef if len(@stack) != 1
+    $stack[0]
+}
+
+fn Rosetta::Rpn::trace($expr) {
+    my @stack
+    my @lines
+    my @tokens = split /\s+/, $expr
+    for my $t (@tokens) {
+        next if length($t) == 0
+        Rosetta::Rpn::eval_token(\@stack, $t)
+        push @lines, sprintf("%-3s -> %s", $t, join(" ", @stack))
+    }
+    join("\n", @lines)
+}
+
+# Direct calculations
+assert_eq Rosetta::Rpn::eval("3 4 +"), 7, "3 4 +"
+assert_eq Rosetta::Rpn::eval("5 1 2 + 4 * + 3 -"), 14, "rosetta canonical"
+# Stack trace: 3, 8, -4, 2, 3 → ^ → (2^3=8) stack [3,8,-4,8] → ^ →
+# (-4)^8 = 65536 → / → 8/65536 → + → 3 + that.
+assert_eq Rosetta::Rpn::eval("3 4 2 * 1 5 - 2 3 ^ ^ / +"),
+    3 + 8 / ((-4) ** (2 ** 3)),
+    "compound expression"
+
+# Single value
+assert_eq Rosetta::Rpn::eval("42"), 42, "single number"
+
+# Negative numbers
+assert_eq Rosetta::Rpn::eval("-3 4 +"),    1, "negative literal"
+assert_eq Rosetta::Rpn::eval("3 -4 +"),   -1, "negative second"
+
+# Errors
+assert_ok !defined(Rosetta::Rpn::eval("3 +")),       "underflow rejected"
+assert_ok !defined(Rosetta::Rpn::eval("foo")),       "non-numeric rejected"
+assert_ok !defined(Rosetta::Rpn::eval("3 4 5 +")),   "leftover stack rejected"
+
+# Trace shows intermediate stacks
+my $tr = Rosetta::Rpn::trace("3 4 +")
+assert_ok index($tr, "3   -> 3") >= 0, "trace pushes 3"
+assert_ok index($tr, "+   -> 7") >= 0, "trace adds to 7"
+
+# Pipe form
+"3 4 *" |> Rosetta::Rpn::eval |> assert_eq(12, "pipe 3 4 *")
+
+test_run

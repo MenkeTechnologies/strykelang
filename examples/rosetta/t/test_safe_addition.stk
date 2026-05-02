@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Safe addition
+# Interval arithmetic: every quantity carries an [lo, hi] window;
+# addition combines two windows so the true value provably lies in
+# the result. Implementations also support subtract / multiply / pow.
+
+fn Rosetta::SafeAdd::interval($lo, $hi) { [$lo, $hi] }
+
+fn Rosetta::SafeAdd::add($a, $b) {
+    [$a->[0] + $b->[0], $a->[1] + $b->[1]]
+}
+
+fn Rosetta::SafeAdd::sub_v($a, $b) {
+    [$a->[0] - $b->[1], $a->[1] - $b->[0]]
+}
+
+fn Rosetta::SafeAdd::mul($a, $b) {
+    my @vals = (
+        $a->[0] * $b->[0], $a->[0] * $b->[1],
+        $a->[1] * $b->[0], $a->[1] * $b->[1],
+    )
+    my $lo = $vals[0]; my $hi = $vals[0]
+    for my $v (@vals[1..3]) {
+        $lo = $v if $v < $lo
+        $hi = $v if $v > $hi
+    }
+    [$lo, $hi]
+}
+
+fn Rosetta::SafeAdd::contains($i, $v) {
+    $v >= $i->[0] && $v <= $i->[1]
+}
+
+fn Rosetta::SafeAdd::width($i) { $i->[1] - $i->[0] }
+
+# Direct
+my $a = Rosetta::SafeAdd::interval(1, 2)
+my $b = Rosetta::SafeAdd::interval(3, 5)
+my $sum = Rosetta::SafeAdd::add($a, $b)
+assert_eq $sum->[0], 4, "[1,2] + [3,5] lo = 4"
+assert_eq $sum->[1], 7, "[1,2] + [3,5] hi = 7"
+
+# Subtraction widens
+my $diff = Rosetta::SafeAdd::sub_v($a, $b)
+assert_eq $diff->[0], -4, "[1,2] - [3,5] lo = -4"
+assert_eq $diff->[1], -1, "[1,2] - [3,5] hi = -1"
+
+# Multiply across sign change
+my $cd = Rosetta::SafeAdd::mul(
+    Rosetta::SafeAdd::interval(-2, 3),
+    Rosetta::SafeAdd::interval(-1, 4),
+)
+assert_eq $cd->[0], -8, "[-2,3] * [-1,4] lo = -8"
+assert_eq $cd->[1], 12, "[-2,3] * [-1,4] hi = 12"
+
+# Containment
+assert_eq Rosetta::SafeAdd::contains(Rosetta::SafeAdd::interval(0, 10), 5), 1, "5 ∈ [0,10]"
+assert_eq Rosetta::SafeAdd::contains(Rosetta::SafeAdd::interval(0, 10), 15), 0, "15 ∉ [0,10]"
+
+# Width
+assert_eq Rosetta::SafeAdd::width(Rosetta::SafeAdd::interval(2, 7)), 5, "width = 5"
+
+# Floating-point rounding capture: 0.1 + 0.2 may not equal 0.3 exactly,
+# but a small epsilon-padded interval contains 0.3.
+my $point_a = Rosetta::SafeAdd::interval(0.099999999, 0.100000001)
+my $point_b = Rosetta::SafeAdd::interval(0.199999999, 0.200000001)
+my $r = Rosetta::SafeAdd::add($point_a, $point_b)
+assert_eq Rosetta::SafeAdd::contains($r, 0.3), 1, "0.3 in safe-added interval"
+
+# Pipe form
+$a |> fn { Rosetta::SafeAdd::add(_, $b) } |> fn { $_->[0] } |> assert_eq(4, "pipe sum lo")
+
+test_run

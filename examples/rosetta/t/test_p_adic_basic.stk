@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+# Rosetta Code: P-Adic numbers, basic
+# Compute the p-adic valuation v_p(n) of an integer (highest power
+# of p dividing n) and the p-adic absolute value |n|_p = p^(-v_p(n)).
+
+fn Rosetta::PAdic::valuation($n, $p) {
+    return 1e308 if $n == 0     # convention: v_p(0) = ∞
+    return undef if $p < 2
+    my $v = 0
+    my $x = abs($n)
+    while ($x % $p == 0) { $x = int($x / $p); $v++ }
+    $v
+}
+
+fn Rosetta::PAdic::norm($n, $p) {
+    return 0 if $n == 0
+    1 / ($p ** Rosetta::PAdic::valuation($n, $p))
+}
+
+fn Rosetta::PAdic::digits($n, $p, $count) {
+    # Return the first `count` p-adic digits of a non-negative integer.
+    my @d
+    my $x = abs($n)
+    for my $i (~> 1:$count) {
+        push @d, $x % $p
+        $x = int($x / $p)
+    }
+    @d
+}
+
+# Direct
+assert_eq Rosetta::PAdic::valuation(12, 2), 2, "v_2(12) = 2"
+assert_eq Rosetta::PAdic::valuation(12, 3), 1, "v_3(12) = 1"
+assert_eq Rosetta::PAdic::valuation(12, 5), 0, "v_5(12) = 0"
+assert_eq Rosetta::PAdic::valuation(81, 3), 4, "v_3(81) = 4"
+assert_eq Rosetta::PAdic::valuation(1024, 2), 10, "v_2(1024) = 10"
+
+# Norm
+assert_near Rosetta::PAdic::norm(12, 2), 1/4, 1e-12, "|12|_2 = 1/4"
+assert_near Rosetta::PAdic::norm(12, 3), 1/3, 1e-12, "|12|_3 = 1/3"
+assert_near Rosetta::PAdic::norm(12, 5), 1,   1e-12, "|12|_5 = 1"
+assert_eq   Rosetta::PAdic::norm(0, 2),  0,         "|0|_p = 0"
+
+# Triangle inequality (strong / ultrametric):
+# |a + b|_p ≤ max(|a|_p, |b|_p)
+my $a = 24
+my $b = 18
+my $sum = Rosetta::PAdic::norm($a + $b, 2)
+my $best = Rosetta::PAdic::norm($a, 2)
+my $other = Rosetta::PAdic::norm($b, 2)
+$best = $other if $other > $best
+assert_ok $sum <= $best + 1e-12, "ultrametric inequality"
+
+# Multiplicativity: |a · b|_p = |a|_p · |b|_p
+my $prod = Rosetta::PAdic::norm($a * $b, 3)
+my $expected = Rosetta::PAdic::norm($a, 3) * Rosetta::PAdic::norm($b, 3)
+assert_near $prod, $expected, 1e-12, "multiplicative"
+
+# 2-adic digits of 13: 13 = 1101₂
+my @d = Rosetta::PAdic::digits(13, 2, 6)
+assert_eq join(",", @d), "1,0,1,1,0,0", "13 in base 2"
+
+# 3-adic digits of 17: 17 = 122₃
+my @d3 = Rosetta::PAdic::digits(17, 3, 5)
+assert_eq join(",", @d3), "2,2,1,0,0", "17 in base 3"
+
+# Pipe form
+12 |> fn { Rosetta::PAdic::valuation(_, 2) } |> assert_eq(2, "pipe v_2(12)")
+
+test_run

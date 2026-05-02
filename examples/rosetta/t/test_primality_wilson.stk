@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Primality by Wilson's theorem
+# Wilson's theorem: an integer n > 1 is prime iff (n - 1)! ≡ -1 (mod n),
+# equivalently (n - 1)! mod n == n - 1.
+
+fn Rosetta::Wilson::factorial_mod($n, $m) {
+    my $r = 1
+    for my $i (~> 1:$n) {
+        $r = ($r * $i) % $m
+    }
+    $r
+}
+
+fn Rosetta::Wilson::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n == 2
+    Rosetta::Wilson::factorial_mod($n - 1, $n) == $n - 1 ? 1 : 0
+}
+
+# Direct values
+assert_eq Rosetta::Wilson::is_prime(2),  1, "2 prime"
+assert_eq Rosetta::Wilson::is_prime(3),  1, "3 prime"
+assert_eq Rosetta::Wilson::is_prime(5),  1, "5 prime"
+assert_eq Rosetta::Wilson::is_prime(7),  1, "7 prime"
+assert_eq Rosetta::Wilson::is_prime(11), 1, "11 prime"
+assert_eq Rosetta::Wilson::is_prime(13), 1, "13 prime"
+
+assert_eq Rosetta::Wilson::is_prime(4),  0, "4 composite"
+assert_eq Rosetta::Wilson::is_prime(6),  0, "6 composite"
+assert_eq Rosetta::Wilson::is_prime(9),  0, "9 composite"
+assert_eq Rosetta::Wilson::is_prime(15), 0, "15 composite"
+assert_eq Rosetta::Wilson::is_prime(91), 0, "91 = 7×13"
+
+# Compare with stryke's builtin is_prime
+my $agree_count = 0
+for my $n (2..100) {
+    my $builtin = is_prime($n) ? 1 : 0
+    my $wilson  = Rosetta::Wilson::is_prime($n)
+    $agree_count++ if $builtin == $wilson
+}
+assert_eq $agree_count, 99, "Wilson agrees with builtin on 2..100"
+
+# Edge cases
+assert_eq Rosetta::Wilson::is_prime(1), 0, "1 not prime"
+assert_eq Rosetta::Wilson::is_prime(0), 0, "0 not prime"
+
+# Pipe form
+17 |> Rosetta::Wilson::is_prime |> assert_eq(1, "pipe 17 prime")
+
+test_run

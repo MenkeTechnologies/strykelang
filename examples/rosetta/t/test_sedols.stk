@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SEDOLs
+# A SEDOL is a 7-character security identifier used by the LSE.
+# Characters 1..6 are alphanumeric (vowels excluded). The 7th is a
+# weighted-sum check digit using weights (1, 3, 1, 7, 3, 9, 1).
+# Letters map to ord(c) - ord('A') + 10.
+
+fn Rosetta::Sedol::char_value($c) {
+    return -1 if $c =~ /[AEIOU]/
+    return ord($c) - ord("0") if $c =~ /[0-9]/
+    return ord($c) - ord("A") + 10 if $c =~ /[A-Z]/
+    -1
+}
+
+fn Rosetta::Sedol::checksum($six) {
+    my @w = (1, 3, 1, 7, 3, 9)
+    my $sum = 0
+    for my $i (0..5) {
+        my $v = Rosetta::Sedol::char_value(substr($six, $i, 1))
+        return -1 if $v < 0
+        $sum += $v * $w[$i]
+    }
+    (10 - ($sum % 10)) % 10
+}
+
+fn Rosetta::Sedol::is_valid($s) {
+    return 0 if length($s) != 7
+    my $cd = Rosetta::Sedol::checksum(substr($s, 0, 6))
+    return 0 if $cd < 0
+    substr($s, 6, 1) eq "$cd"
+}
+
+fn Rosetta::Sedol::complete($six) {
+    my $cd = Rosetta::Sedol::checksum($six)
+    return undef if $cd < 0
+    "$six$cd"
+}
+
+# char_value spot checks
+assert_eq Rosetta::Sedol::char_value("0"), 0,  "0 → 0"
+assert_eq Rosetta::Sedol::char_value("9"), 9,  "9 → 9"
+assert_eq Rosetta::Sedol::char_value("B"), 11, "B → 11 (A skipped not... wait)"
+# Actually rosetta convention: A=10, but A is also a vowel and SEDOLs forbid vowels.
+# We still accept char_value('A') as a numeric mapping for completeness.
+assert_eq Rosetta::Sedol::char_value("A"), -1, "vowel A rejected"
+assert_eq Rosetta::Sedol::char_value("E"), -1, "vowel E rejected"
+assert_eq Rosetta::Sedol::char_value("Z"), 35, "Z → 35"
+
+# Rosetta canonical sample: ten SEDOLs and their check digits
+my @samples = (
+    ["710889",  "9"],
+    ["B0YBKJ",  "7"],
+    ["406566",  "3"],
+    ["B0YBLH",  "2"],
+    ["228276",  "5"],
+    ["B0YBKL",  "9"],
+    ["557910",  "7"],
+    ["B0YBKR",  "5"],
+    ["585284",  "2"],
+    ["B0YBKT",  "7"],
+)
+for my $s (@samples) {
+    my ($six, $cd) = @$s
+    assert_eq Rosetta::Sedol::checksum($six), int($cd),
+        sprintf("checksum(%s) = %s", $six, $cd)
+    assert_eq Rosetta::Sedol::is_valid("$six$cd"), 1,
+        sprintf("%s%s validates", $six, $cd)
+}
+
+# complete
+assert_eq Rosetta::Sedol::complete("710889"), "7108899", "complete '710889' → 7108899"
+
+# Invalid SEDOLs
+assert_eq Rosetta::Sedol::is_valid("710889X"), 0, "wrong check digit"
+assert_eq Rosetta::Sedol::is_valid("AEIO123"), 0, "vowels not allowed"
+assert_eq Rosetta::Sedol::is_valid("123"),     0, "wrong length"
+
+# Pipe form
+"710889" |> Rosetta::Sedol::complete |> assert_eq("7108899", "pipe complete")
+
+test_run

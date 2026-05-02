@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: McNuggets problem
+# A McNugget number is a non-negative integer expressible as 6a + 9b + 20c
+# with a, b, c ≥ 0. The largest non-McNugget number is 43 (Frobenius
+# number for {6, 9, 20}).
+
+fn Rosetta::McNuggets::is($n) {
+    return 1 if $n == 0
+    return 0 if $n < 0
+    for my $a (0..int($n / 6)) {
+        my $r1 = $n - 6 * $a
+        for my $b (0..int($r1 / 9)) {
+            my $r2 = $r1 - 9 * $b
+            return 1 if $r2 % 20 == 0
+        }
+    }
+    0
+}
+
+fn Rosetta::McNuggets::frobenius($limit) {
+    my $last_no = 0
+    for my $n (~> 1:$limit) {
+        $last_no = $n if !Rosetta::McNuggets::is($n)
+    }
+    $last_no
+}
+
+# Frobenius number for {6, 9, 20}
+assert_eq Rosetta::McNuggets::frobenius(200), 43, "largest non-McNugget = 43"
+
+# Specific McNuggets
+assert_eq Rosetta::McNuggets::is(6),  1, "6 is a McNugget"
+assert_eq Rosetta::McNuggets::is(9),  1, "9 is a McNugget"
+assert_eq Rosetta::McNuggets::is(20), 1, "20 is a McNugget"
+assert_eq Rosetta::McNuggets::is(43), 0, "43 is NOT a McNugget"
+assert_eq Rosetta::McNuggets::is(44), 1, "44 = 6+6+12+20"
+assert_eq Rosetta::McNuggets::is(45), 1, "45 = 9+9+9+9+9"
+
+# All n > 43 are McNumbers
+my @holdouts = ~> 44:100 |> grep { !Rosetta::McNuggets::is(_) }
+assert_eq len(@holdouts), 0, "everything > 43 is McNumber"
+
+# First few non-McNuggets
+my @no = ~> 0:43 |> grep { !Rosetta::McNuggets::is(_) }
+assert_eq join(",", @no), "1,2,3,4,5,7,8,10,11,13,14,16,17,19,22,23,25,28,31,34,37,43", "non-McNuggets ≤ 43"
+
+# Pipe form
+43 |> Rosetta::McNuggets::is |> assert_eq(0, "pipe is(43)")
+
+test_run

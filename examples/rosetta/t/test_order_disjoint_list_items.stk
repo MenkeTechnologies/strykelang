@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Order disjoint list items
+# Reorder one list so the items in a second (disjoint) list appear
+# in the second list's order, while items not in the second list
+# stay in their original positions.
+
+fn Rosetta::OrderDisjoint::reorder($items, $order) {
+    my %tag = map { $_ => 1 } @$order
+    # Indices in $items that hold tagged elements (in original order)
+    my @slots
+    for my $i (0..len(@$items) - 1) {
+        push @slots, $i if exists $tag{$items->[$i]}
+    }
+    return [@$items] if len(@slots) != len(@$order)
+    my @out = @$items
+    for my $k (0..len(@$order) - 1) {
+        $out[$slots[$k]] = $order->[$k]
+    }
+    \@out
+}
+
+# Rosetta canonical
+my $r1 = Rosetta::OrderDisjoint::reorder(
+    ["the", "cat", "sat", "on", "the", "mat"],
+    ["mat", "cat"])
+assert_eq join(" ", @$r1), "the mat sat on the cat", "rosetta canonical"
+
+# Multiple repeats: keep the matching positions in order
+my $r2 = Rosetta::OrderDisjoint::reorder(
+    ["A", "B", "C", "A", "B", "C", "A", "B", "C"],
+    ["C", "A", "C", "B", "A", "B"])
+# original positions of "match" tags: 0,1,2,3,4,5,6,7,8 — but C/A/B are *all*
+# in tag set, so indices = 0..8. The order list has 6 elements but original
+# has 9 → the function returns original unchanged.
+assert_eq join(",", @$r2),
+    join(",", "A","B","C","A","B","C","A","B","C"),
+    "size mismatch leaves original unchanged"
+
+# Smaller exact-size example
+my $r3 = Rosetta::OrderDisjoint::reorder(
+    ["A", "B", "C", "A"],
+    ["C", "A", "B", "A"])
+# Slots: 0(A), 1(B), 2(C), 3(A). Replace in order with C,A,B,A.
+assert_eq join("", @$r3), "CABA", "exact-size reorder"
+
+# Empty order: passthrough
+my $r4 = Rosetta::OrderDisjoint::reorder(["a","b","c"], [])
+assert_eq join("", @$r4), "abc", "empty order leaves list alone"
+
+# Pipe form
+my $r5 = ["x","y","z"] |> fn { Rosetta::OrderDisjoint::reorder(_, ["z","x"]) }
+# tag set {x,z}; slots 0,2 — replace with z,x → "z y x"
+assert_eq join(" ", @$r5), "z y x", "pipe reorder"
+
+test_run

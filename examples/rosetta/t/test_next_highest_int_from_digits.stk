@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Next highest int from digits
+# Given a non-negative integer, return the smallest integer using the
+# same digits that is strictly greater than the input. Returns -1 if
+# no such permutation exists (digits are already in decreasing order).
+# This is the standard "next permutation" algorithm in lex order.
+
+fn Rosetta::NextHigh::compute($n) {
+    my @d = split //, "$n"
+    my $i = len(@d) - 2
+    while ($i >= 0 && $d[$i] >= $d[$i + 1]) { $i-- }
+    return -1 if $i < 0
+    my $j = len(@d) - 1
+    while ($d[$j] <= $d[$i]) { $j-- }
+    ($d[$i], $d[$j]) = ($d[$j], $d[$i])
+    my @suffix = @d[$i + 1..len(@d) - 1]
+    @suffix = sort @suffix
+    @d = (@d[0..$i], @suffix)
+    join("", @d) + 0
+}
+
+# Direct cases
+assert_eq Rosetta::NextHigh::compute(12),       21,      "12 → 21"
+assert_eq Rosetta::NextHigh::compute(21),       -1,      "21 → no higher"
+assert_eq Rosetta::NextHigh::compute(123),      132,     "123 → 132"
+assert_eq Rosetta::NextHigh::compute(132),      213,     "132 → 213"
+assert_eq Rosetta::NextHigh::compute(1234),     1243,    "1234 → 1243"
+assert_eq Rosetta::NextHigh::compute(4321),     -1,      "4321 → no higher"
+assert_eq Rosetta::NextHigh::compute(2071),     2107,    "2071 → 2107"
+assert_eq Rosetta::NextHigh::compute(414),      441,     "414 → 441"
+assert_eq Rosetta::NextHigh::compute(123456789),123456798, "123456789 → 123456798"
+
+# Property: result has same digit multiset as input
+for my $n (123, 4567, 13579, 24680, 9870654321) {
+    my $next = Rosetta::NextHigh::compute($n)
+    next if $next == -1
+    my @d_in   = sort split //, "$n"
+    my @d_out  = sort split //, "$next"
+    assert_eq join("", @d_in), join("", @d_out), sprintf("%d preserves digit multiset", $n)
+    assert_ok $next > $n, sprintf("%d → %d strictly greater", $n, $next)
+}
+
+# Pipe form
+12345 |> Rosetta::NextHigh::compute |> assert_eq(12354, "pipe 12345 → 12354")
+
+test_run

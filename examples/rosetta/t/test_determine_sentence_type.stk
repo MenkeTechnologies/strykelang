@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Determine sentence type
+# Classify a string by its terminating punctuation:
+#   "?"  → question
+#   "!"  → exclamation
+#   "."  → declarative
+#   anything else → none/unknown
+# Whitespace at the end is stripped before inspection.
+
+fn Rosetta::SentType::classify($s) {
+    my $t = $s
+    $t =~ s/\s+$//
+    my $last = substr($t, -1)
+    if    ($last eq "?") { "question"   }
+    elsif ($last eq "!") { "exclamation" }
+    elsif ($last eq ".") { "declarative" }
+    else                 { "unknown"     }
+}
+
+fn Rosetta::SentType::classify_all($paragraph) {
+    # Split on terminator boundaries, keep the terminators.
+    my @parts
+    my $buf = ""
+    for my $ch (split //, $paragraph) {
+        $buf .= $ch
+        if ($ch eq "?" || $ch eq "!" || $ch eq ".") {
+            push @parts, $buf
+            $buf = ""
+        }
+    }
+    push @parts, $buf if $buf =~ /\S/
+    my @out
+    for my $p (@parts) {
+        my $trim = $p
+        $trim =~ s/^\s+//
+        push @out, Rosetta::SentType::classify($trim) if length($trim) > 0
+    }
+    @out
+}
+
+# Direct
+assert_eq Rosetta::SentType::classify("Are you ok?"),  "question",    "ends with ?"
+assert_eq Rosetta::SentType::classify("Watch out!"),   "exclamation", "ends with !"
+assert_eq Rosetta::SentType::classify("It rains."),    "declarative", "ends with ."
+assert_eq Rosetta::SentType::classify("no terminator"),"unknown",     "no terminator"
+
+# Trailing whitespace ignored
+assert_eq Rosetta::SentType::classify("Why!  "),       "exclamation", "trailing space ignored"
+
+# Paragraph parsing
+my @cls = Rosetta::SentType::classify_all("Hello world. Are you there? Yes!")
+assert_eq join(",", @cls), "declarative,question,exclamation",
+    "three sentences classified"
+
+# Mixed paragraph with no terminator at end
+my @cls2 = Rosetta::SentType::classify_all("One. Two? Three! Trailing")
+assert_eq join(",", @cls2),
+    "declarative,question,exclamation,unknown",
+    "trailing fragment marked unknown"
+
+# Pipe form
+"Wow!" |> Rosetta::SentType::classify |> assert_eq("exclamation", "pipe Wow!")
+
+test_run

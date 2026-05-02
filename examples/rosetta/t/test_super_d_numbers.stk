@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Super-d numbers
+# A super-d number for d (2 ≤ d ≤ 9) is a positive integer n such that
+# d × n^d contains the digit d repeated d times in succession in its
+# decimal representation.
+
+fn Rosetta::SuperD::powmul($n, $d) {
+    my $r = 1
+    for my $i (~> 1:$d) { $r *= $n }
+    $d * $r
+}
+
+fn Rosetta::SuperD::has_run($n, $digit, $k) {
+    my $needle = "$digit" x $k
+    index("$n", $needle) >= 0
+}
+
+fn Rosetta::SuperD::is($n, $d) {
+    Rosetta::SuperD::has_run(Rosetta::SuperD::powmul($n, $d), $d, $d)
+}
+
+fn Rosetta::SuperD::first($d, $count) {
+    my @out
+    my $n = 1
+    while (len(@out) < $count) {
+        push @out, $n if Rosetta::SuperD::is($n, $d)
+        $n++
+    }
+    @out
+}
+
+# 3 * 261^3 = 53338743 → contains "333" consecutively.
+assert_eq Rosetta::SuperD::powmul(261, 3), 53338743, "3 * 261^3"
+assert_eq Rosetta::SuperD::has_run(53338743, 3, 3), 1, "53338743 has run of 3 threes"
+assert_eq Rosetta::SuperD::is(261, 3), 1, "261 is super-3"
+
+# First super-3 numbers
+my @s3 = Rosetta::SuperD::first(3, 5)
+assert_eq join(",", @s3), "261,462,471,481,558", "first 5 super-3 numbers"
+
+# First super-4
+my @s4 = Rosetta::SuperD::first(4, 3)
+assert_eq join(",", @s4), "1168,4972,7423", "first 3 super-4 numbers"
+
+# Pipe form
+261 |> fn { Rosetta::SuperD::is(_, 3) } |> assert_eq(1, "pipe is(261, 3)")
+
+# Threaded
+my $first5 = ~> 5 fn { Rosetta::SuperD::first(_, 1)->[0] }
+assert_ok $first5 > 0, "some super-5 number exists"
+
+test_run

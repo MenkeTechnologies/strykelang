@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Euclidean rhythm — Bjorklund's algorithm.
+# Distributes `k` pulses as evenly as possible across `n` slots.
+# Output is rotated so the pattern starts on a pulse.
+
+fn Rosetta::Euclidean::build($pattern, $level, $counts, $remainders) {
+    if ($level == -1) {
+        push @$pattern, 0
+    } elsif ($level == -2) {
+        push @$pattern, 1
+    } else {
+        for my $i (~> 1:$counts->[$level]) {
+            Rosetta::Euclidean::build($pattern, $level - 1, $counts, $remainders)
+        }
+        if ($remainders->[$level] != 0) {
+            Rosetta::Euclidean::build($pattern, $level - 2, $counts, $remainders)
+        }
+    }
+}
+
+fn Rosetta::Euclidean::rotate_to_pulse($pattern) {
+    my @p = @$pattern
+    return \@p if len(@p) == 0
+    my $i = 0
+    while ($i < len(@p) && $p[$i] != 1) { $i++ }
+    return \@p if $i == 0 || $i == len(@p)
+    my @rot = (@p[$i..len(@p) - 1], @p[0..$i - 1])
+    \@rot
+}
+
+fn Rosetta::Euclidean::rhythm($slots, $pulses) {
+    return [] if $slots <= 0 || $pulses < 0
+    return [(0) x $slots] if $pulses == 0
+    return [(1) x $slots] if $pulses >= $slots
+
+    my @counts
+    my @remainders = ($pulses)
+    my $divisor = $slots - $pulses
+    my $level = 0
+    while (1) {
+        push @counts, int($divisor / $remainders[$level])
+        push @remainders, $divisor % $remainders[$level]
+        $divisor = $remainders[$level]
+        $level++
+        last if $remainders[$level] <= 1
+    }
+    push @counts, $divisor
+
+    my @pattern
+    Rosetta::Euclidean::build(\@pattern, $level, \@counts, \@remainders)
+    Rosetta::Euclidean::rotate_to_pulse(\@pattern)
+}
+
+fn Rosetta::Euclidean::str($pattern) {
+    join("", @$pattern)
+}
+
+# Cuban tresillo bell: E(5, 8) = 10110110
+my $tresillo = Rosetta::Euclidean::rhythm(8, 5)
+assert_eq Rosetta::Euclidean::str($tresillo), "10110110", "tresillo E(5,8)"
+
+# Standard 4-on-the-floor: E(4, 12)
+my $r4_12 = Rosetta::Euclidean::rhythm(12, 4)
+assert_eq Rosetta::Euclidean::str($r4_12), "100100100100", "E(4,12)"
+
+# Bossa Nova bell: E(5, 16)
+my $bossa = Rosetta::Euclidean::rhythm(16, 5)
+assert_eq Rosetta::Euclidean::str($bossa), "1001001001001000", "bossa E(5,16)"
+
+# E(3, 8) — Cuban cinquillo's complement
+my $r3_8 = Rosetta::Euclidean::rhythm(8, 3)
+assert_eq Rosetta::Euclidean::str($r3_8), "10010010", "E(3,8)"
+
+# E(2, 5)
+my $r2_5 = Rosetta::Euclidean::rhythm(5, 2)
+assert_eq Rosetta::Euclidean::str($r2_5), "10100", "E(2,5)"
+
+# Edge cases
+assert_eq Rosetta::Euclidean::str(Rosetta::Euclidean::rhythm(4, 0)), "0000", "no pulses"
+assert_eq Rosetta::Euclidean::str(Rosetta::Euclidean::rhythm(4, 4)), "1111", "all pulses"
+assert_eq Rosetta::Euclidean::str(Rosetta::Euclidean::rhythm(4, 5)), "1111", "saturated"
+
+# Pulse count is preserved
+my @rhythms = ~> 1:8 |> map { Rosetta::Euclidean::rhythm(16, _) }
+my @pcounts = ~> @rhythms |> map { my $r = _; ~> @$r |> grep { _ == 1 } |> len }
+assert_eq join(",", @pcounts), "1,2,3,4,5,6,7,8", "pulse counts preserved"
+
+# All resulting rhythms have length 16
+my @lengths = ~> @rhythms |> map { len(@$_) }
+assert_eq join(",", @lengths), "16,16,16,16,16,16,16,16", "lengths preserved"
+
+# Pipe form
+8 |> fn { Rosetta::Euclidean::rhythm(_, 5) } |> Rosetta::Euclidean::str |> assert_eq("10110110", "pipe tresillo")
+
+test_run

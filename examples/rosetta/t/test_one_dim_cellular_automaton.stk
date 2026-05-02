@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: One-dimensional cellular automaton
+# Wolfram-style elementary CA. Given an 8-bit rule number, evolve a
+# 1-D bit string by applying the rule to every 3-cell neighbourhood,
+# wrapping at the edges (toroidal world).
+
+fn Rosetta::Ca1d::step($cells, $rule) {
+    my $n = len(@$cells)
+    my @next
+    for my $i (0..$n - 1) {
+        my $left  = $cells->[($i - 1 + $n) % $n]
+        my $cur   = $cells->[$i]
+        my $right = $cells->[($i + 1) % $n]
+        my $idx = ($left << 2) | ($cur << 1) | $right
+        push @next, ($rule >> $idx) & 1
+    }
+    \@next
+}
+
+fn Rosetta::Ca1d::evolve($cells, $rule, $steps) {
+    my @gens = ($cells)
+    for my $i (~> 1:$steps) {
+        push @gens, Rosetta::Ca1d::step($gens[-1], $rule)
+    }
+    \@gens
+}
+
+fn Rosetta::Ca1d::row_str($cells) {
+    join("", map { $_ == 1 ? "#" : "." } @$cells)
+}
+
+# Rule 90 (Sierpinski): each cell ← left XOR right
+my $start = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+my $g90 = Rosetta::Ca1d::evolve($start, 90, 4)
+assert_eq Rosetta::Ca1d::row_str($g90->[0]), ".......#.......",  "gen 0"
+assert_eq Rosetta::Ca1d::row_str($g90->[1]), "......#.#......",  "gen 1 (rule 90)"
+assert_eq Rosetta::Ca1d::row_str($g90->[2]), ".....#...#.....",  "gen 2"
+assert_eq Rosetta::Ca1d::row_str($g90->[3]), "....#.#.#.#....",  "gen 3"
+
+# Rule 30 (chaotic) — just check evolution is deterministic
+my $g30 = Rosetta::Ca1d::evolve($start, 30, 10)
+my $g30b = Rosetta::Ca1d::evolve($start, 30, 10)
+for my $i (0..10) {
+    assert_eq Rosetta::Ca1d::row_str($g30->[$i]),
+        Rosetta::Ca1d::row_str($g30b->[$i]),
+        sprintf("rule 30 deterministic gen %d", $i)
+}
+
+# Rule 0 → all dead
+my $g0 = Rosetta::Ca1d::evolve($start, 0, 1)
+my $all0 = 1
+for my $c (@{$g0->[1]}) { $all0 = 0 if $c != 0 }
+assert_ok $all0, "rule 0 zeroes the grid"
+
+# Rule 255 → all alive
+my $g255 = Rosetta::Ca1d::evolve($start, 255, 1)
+my $all1 = 1
+for my $c (@{$g255->[1]}) { $all1 = 0 if $c != 1 }
+assert_ok $all1, "rule 255 fills the grid"
+
+# Pipe form
+my $stepped = $start |> fn { Rosetta::Ca1d::step(_, 90) }
+assert_eq Rosetta::Ca1d::row_str($stepped), "......#.#......", "pipe step rule 90"
+
+test_run

@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sierpinski pentagon
+# Recursively replace each pentagon with five smaller pentagons (one
+# at each vertex region) at scale 1/(1+φ) = 1/φ². Returns the list
+# of small-pentagon centres at depth d (5^d centres).
+
+fn Rosetta::SierpPent::vertices($cx, $cy, $r) {
+    my $pi = 4 * atan2(1, 1)
+    my @pts
+    for my $k (0..4) {
+        my $angle = $pi / 2 + 2 * $pi * $k / 5
+        push @pts, [$cx + $r * cos($angle), $cy + $r * sin($angle)]
+    }
+    \@pts
+}
+
+fn Rosetta::SierpPent::recurse($cx, $cy, $r, $depth) {
+    return [[$cx, $cy, $r]] if $depth <= 0
+    my $pents = Rosetta::SierpPent::vertices($cx, $cy, $r)
+    my $phi = (1 + sqrt(5)) / 2
+    my $new_r = $r / ($phi * $phi)
+    my @out
+    for my $v (@$pents) {
+        # Each child pentagon is centred along the line from origin
+        # to vertex, scaled inward.
+        my $dx = $v->[0] - $cx
+        my $dy = $v->[1] - $cy
+        my $shrink = 1 - 1 / ($phi * $phi)
+        my $new_cx = $cx + $dx * $shrink
+        my $new_cy = $cy + $dy * $shrink
+        push @out, @{Rosetta::SierpPent::recurse($new_cx, $new_cy, $new_r, $depth - 1)}
+    }
+    \@out
+}
+
+fn Rosetta::SierpPent::count_at($depth) {
+    5 ** $depth
+}
+
+# Depth 0: one pentagon
+my $d0 = Rosetta::SierpPent::recurse(0, 0, 1, 0)
+assert_eq len(@$d0), 1, "depth 0 → 1 pentagon"
+
+# Depth 1: 5 pentagons
+my $d1 = Rosetta::SierpPent::recurse(0, 0, 1, 1)
+assert_eq len(@$d1), 5, "depth 1 → 5"
+
+# Depth 3: 125 pentagons
+my $d3 = Rosetta::SierpPent::recurse(0, 0, 1, 3)
+assert_eq len(@$d3), 125, "depth 3 → 125"
+
+# Depth 5: 3125 pentagons (large but tractable)
+my $d5 = Rosetta::SierpPent::recurse(0, 0, 1, 5)
+assert_eq len(@$d5), 3125, "depth 5 → 3125"
+
+# count_at sanity
+for my $d (0..6) {
+    assert_eq Rosetta::SierpPent::count_at($d), 5 ** $d,
+        sprintf("count_at(%d) = 5^%d", $d, $d)
+}
+
+# Children at depth 1 lie at five distinct positions
+my %seen
+for my $p (@$d1) {
+    my $key = sprintf("%.6f,%.6f", $p->[0], $p->[1])
+    $seen{$key}++
+}
+assert_eq scalar(keys %seen), 5, "5 distinct child positions"
+
+# Pipe form
+3 |> Rosetta::SierpPent::count_at |> assert_eq(125, "pipe count_at(3)")
+
+test_run

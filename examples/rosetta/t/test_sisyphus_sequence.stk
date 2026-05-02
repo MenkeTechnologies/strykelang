@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sisyphus sequence (OEIS A350877)
+# a(1) = 1. For n ≥ 2: if n is prime, a(n) = a(n-1) - n; otherwise
+# a(n) = a(n-1) + n. Sequence pushes upward at composites and tumbles
+# back down at primes.
+
+fn Rosetta::Sisyphus::is_prime($n) {
+    return 0 if $n < 2
+    return 1 if $n < 4
+    return 0 if $n % 2 == 0
+    my $i = 3
+    while ($i * $i <= $n) {
+        return 0 if $n % $i == 0
+        $i += 2
+    }
+    1
+}
+
+fn Rosetta::Sisyphus::sequence($k) {
+    return [] if $k < 1
+    my @s = (1)
+    for my $n (2..$k) {
+        my $prev = $s[-1]
+        push @s, Rosetta::Sisyphus::is_prime($n) ? $prev - $n : $prev + $n
+    }
+    \@s
+}
+
+# First 30 terms of A350877
+my $s = Rosetta::Sisyphus::sequence(30)
+assert_eq join(",", @$s),
+    "1,-1,-4,0,-5,1,-6,2,11,21,10,22,9,23,38,54,37,55,36,56,77,99,76,100,125,151,178,206,177,207",
+    "first 30 Sisyphus terms"
+
+# Sanity: every prime index strictly decreases, every composite ≥ 4 increases
+my $every_drop = 1
+my $every_rise = 1
+for my $i (1..29) {
+    my $delta = $s->[$i] - $s->[$i - 1]
+    if (Rosetta::Sisyphus::is_prime($i + 1)) {
+        $every_drop = 0 if $delta != -($i + 1)
+    } else {
+        $every_rise = 0 if $delta != $i + 1
+    }
+}
+assert_ok $every_drop, "primes drop by exactly their index"
+assert_ok $every_rise, "composites rise by exactly their index"
+
+# Pipe form
+20 |> Rosetta::Sisyphus::sequence |> fn { $_->[-1] } |> assert_eq(56, "pipe a(20) = 56")
+
+test_run
