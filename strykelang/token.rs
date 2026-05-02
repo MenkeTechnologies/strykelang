@@ -174,6 +174,8 @@ impl Token {
                 | Token::QW(_)
                 | Token::Regex(_, _, _)
                 | Token::FileTest(_)
+                | Token::ThreadArrow
+                | Token::ThreadArrowLast
         )
     }
 }

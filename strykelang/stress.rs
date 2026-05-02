@@ -237,8 +237,7 @@ pub(crate) fn stress_alloc(args: &[PerlValue], _line: usize) -> Result<PerlValue
             s.spawn(|| {
                 let mut local: i64 = 0;
                 while start.elapsed() < dur {
-                    let mut v: Vec<u8> = Vec::with_capacity(size);
-                    v.resize(size, 0);
+                    let mut v: Vec<u8> = vec![0; size];
                     v[size - 1] = 1;
                     std::hint::black_box(v);
                     local += 1;
@@ -412,9 +411,8 @@ pub(crate) fn stress_net(args: &[PerlValue], line: usize) -> Result<PerlValue> {
                 let mut local: i64 = 0;
                 while start.elapsed() < dur && !streams.is_empty() {
                     for st in streams.iter_mut() {
-                        match st.write(payload) {
-                            Ok(n) => local += n as i64,
-                            Err(_) => {}
+                        if let Ok(n) = st.write(payload) {
+                            local += n as i64
                         }
                     }
                 }
@@ -995,10 +993,7 @@ pub(crate) fn stress_freq(_args: &[PerlValue], _line: usize) -> Result<PerlValue
             let path = e.path();
             let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if !name.starts_with("cpu")
-                || !name[3..]
-                    .chars()
-                    .next()
-                    .map_or(false, |c| c.is_ascii_digit())
+                || !name[3..].chars().next().is_some_and(|c| c.is_ascii_digit())
             {
                 continue;
             }
@@ -1043,11 +1038,7 @@ fn read_avg_freq_khz() -> Option<f64> {
     for e in entries.flatten() {
         let path = e.path();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-        if !name.starts_with("cpu")
-            || !name[3..]
-                .chars()
-                .next()
-                .map_or(false, |c| c.is_ascii_digit())
+        if !name.starts_with("cpu") || !name[3..].chars().next().is_some_and(|c| c.is_ascii_digit())
         {
             continue;
         }
@@ -1070,11 +1061,7 @@ fn read_max_freq_khz() -> Option<f64> {
     for e in entries.flatten() {
         let path = e.path();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-        if !name.starts_with("cpu")
-            || !name[3..]
-                .chars()
-                .next()
-                .map_or(false, |c| c.is_ascii_digit())
+        if !name.starts_with("cpu") || !name[3..].chars().next().is_some_and(|c| c.is_ascii_digit())
         {
             continue;
         }

@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Dating agency
+
+struct Person { name, gender, interests }
+
+fn Rosetta::Dating::match($p1, $p2) {
+    return 0 if $p1->{gender} eq $p2->{gender}
+    my %i1
+    for my $i (@{$p1->{interests}}) { $i1{$i} = 1 }
+    
+    my $common = 0
+    for my $i (@{$p2->{interests}}) {
+        $common++ if exists $i1{$i}
+    }
+    $common
+}
+
+my $alice = Person("Alice", "F", ["reading", "hiking", "coding"])
+my $bob = Person("Bob", "M", ["hiking", "coding", "gaming"])
+my $eve = Person("Eve", "F", ["reading", "coding"])
+
+assert_eq Rosetta::Dating::match($alice, $bob), 2, "Alice and Bob match"
+assert_eq Rosetta::Dating::match($alice, $eve), 0, "Alice and Eve don't match (same gender)"
+
+test_run

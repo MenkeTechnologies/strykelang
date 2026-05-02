@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compiler/AST interpreter
+
+fn Rosetta::AST::eval($node) {
+    if (ref($node) eq "ARRAY") {
+        my ($op, $left, $right) = @$node
+        if ($op eq "+") {
+            return Rosetta::AST::eval($left) + Rosetta::AST::eval($right)
+        } elsif ($op eq "-") {
+            return Rosetta::AST::eval($left) - Rosetta::AST::eval($right)
+        } elsif ($op eq "*") {
+            return Rosetta::AST::eval($left) * Rosetta::AST::eval($right)
+        } elsif ($op eq "/") {
+            return Rosetta::AST::eval($left) / Rosetta::AST::eval($right)
+        }
+    } else {
+        # Literal value
+        return $node
+    }
+}
+
+my $ast = ["+", 10, ["*", 5, 6]]
+my $res = Rosetta::AST::eval($ast)
+
+assert_eq $res, 40, "AST correctly evaluated 10 + (5 * 6) = 40"
+
+test_run

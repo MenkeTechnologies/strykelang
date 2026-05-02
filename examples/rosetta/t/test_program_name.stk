@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Program name
+
+fn Rosetta::ProgramName::get() {
+    # In Stryke, $0 contains the name of the program being executed.
+    $0
+}
+
+my $name = Rosetta::ProgramName::get()
+assert_ok defined($name), "Program name is defined"
+# When running via stryke test, $0 might be "-e" or a temp file path or the actual file path.
+# We just check that it's a string.
+assert_ok length($name) > 0, "Program name has length"
+
+test_run

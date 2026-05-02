@@ -666,7 +666,7 @@ pub(crate) fn ai_tokens_of(args: &[PerlValue], _line: usize) -> Result<PerlValue
     let approx = if s.is_empty() {
         0
     } else {
-        ((s.chars().count() + 3) / 4).max(1) as i64
+        s.chars().count().div_ceil(4).max(1) as i64
     };
     Ok(PerlValue::integer(approx))
 }
@@ -2475,7 +2475,7 @@ pub(crate) fn ai_estimate(args: &[PerlValue], _line: usize) -> Result<PerlValue>
     let prompt = args.first().map(|v| v.to_string()).unwrap_or_default();
     let opts = parse_opts(&args[1.min(args.len())..]);
     let model = opt_str(&opts, "model", &config().lock().model);
-    let in_tokens = ((prompt.chars().count() + 3) / 4).max(1) as f64;
+    let in_tokens = prompt.chars().count().div_ceil(4).max(1) as f64;
     let out_tokens = opts
         .get("out_tokens")
         .map(|v| v.to_number())
@@ -2877,7 +2877,7 @@ pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlVa
             .conn
             .prepare("SELECT id, content, embedding, COALESCE(metadata, '') FROM ai_memory")
             .map_err(|e| PerlError::runtime(format!("ai_memory: prepare: {}", e), line))?;
-        let mut iter = stmt
+        let iter = stmt
             .query_map([], |r| {
                 let id: String = r.get(0)?;
                 let content: String = r.get(1)?;
@@ -2886,10 +2886,8 @@ pub(crate) fn ai_memory_recall(args: &[PerlValue], line: usize) -> Result<PerlVa
                 Ok((id, content, blob_to_vec(&blob), meta))
             })
             .map_err(|e| PerlError::runtime(format!("ai_memory: query: {}", e), line))?;
-        while let Some(r) = iter.next() {
-            if let Ok(row) = r {
-                rows.push(row);
-            }
+        for row in iter.flatten() {
+            rows.push(row);
         }
     }
 
@@ -5141,7 +5139,7 @@ pub(crate) fn ai_pmap(args: &[PerlValue], line: usize) -> Result<PerlValue> {
     let serialized: Vec<serde_json::Value> = shards
         .iter()
         .map(|shard| {
-            let arr: Vec<serde_json::Value> = shard.iter().map(|v| perl_value_to_json(v)).collect();
+            let arr: Vec<serde_json::Value> = shard.iter().map(perl_value_to_json).collect();
             serde_json::Value::Array(arr)
         })
         .collect();
@@ -5168,7 +5166,7 @@ fn shard_items(items: &[PerlValue], n: usize) -> Vec<Vec<PerlValue>> {
     if n == 0 {
         return vec![items.to_vec()];
     }
-    let chunk = (items.len() + n - 1) / n;
+    let chunk = items.len().div_ceil(n);
     let mut out = Vec::with_capacity(n);
     for c in items.chunks(chunk.max(1)) {
         out.push(c.to_vec());
@@ -5580,8 +5578,7 @@ pub(crate) fn web_search_tool(_args: &[PerlValue], line: usize) -> Result<PerlVa
                 .or_else(|| args.as_hash_ref().map(|h| h.read().clone()))
                 .and_then(|m| m.get("limit").map(|v| v.to_int()))
                 .unwrap_or(5)
-                .max(1)
-                .min(20);
+                .clamp(1, 20);
             run_web_search(&q, limit)
         }),
     );
@@ -5720,7 +5717,7 @@ fn run_brave_search(q: &str, limit: i64, key: &str) -> Result<PerlValue> {
     let url = format!(
         "https://api.search.brave.com/res/v1/web/search?q={}&count={}",
         urlencoding(q),
-        limit.max(1).min(20)
+        limit.clamp(1, 20)
     );
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(15))

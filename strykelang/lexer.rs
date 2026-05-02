@@ -4,6 +4,9 @@ use crate::token::{keyword_or_ident, Token};
 /// Private-use character for a literal `$` inside double-quoted / `qq` strings (from `\$` in source).
 /// The parser maps this to `$` without variable interpolation (CPAN `eval qq/…/` code generators).
 pub const LITERAL_DOLLAR_IN_DQUOTE: char = '\u{E000}';
+/// Private-use character for a literal `@` inside double-quoted / `qq` strings (from `\@` in source).
+/// Mirrors `LITERAL_DOLLAR_IN_DQUOTE`; suppresses array interpolation so `"\@x"` is the literal `@x`.
+pub const LITERAL_AT_IN_DQUOTE: char = '\u{E001}';
 
 /// Resolve `\N{U+XXXX}` hex codepoints and `\N{LATIN SMALL LETTER E}` Unicode character names.
 fn parse_unicode_name(name: &str) -> Option<char> {
@@ -600,6 +603,7 @@ impl Lexer {
                     Some('f') => s.push('\x0C'),
                     Some('e') => s.push('\x1B'),
                     Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                    Some('@') => s.push(LITERAL_AT_IN_DQUOTE),
                     Some('c') => {
                         let ch = self
                             .advance()
@@ -772,6 +776,7 @@ impl Lexer {
                             Some('f') => s.push('\x0C'),
                             Some('e') => s.push('\x1B'),
                             Some('$') => s.push(LITERAL_DOLLAR_IN_DQUOTE),
+                            Some('@') => s.push(LITERAL_AT_IN_DQUOTE),
                             Some('c') => {
                                 let ch = self.advance().ok_or_else(|| {
                                     self.syntax_err("Unterminated \\c escape", self.line)
@@ -2107,7 +2112,28 @@ impl Lexer {
                             '<' => '>',
                             c => c,
                         };
-                        let pattern = self.read_escaped_until(close)?;
+                        // Regex pattern: preserve backslash escapes raw so the
+                        // regex engine sees `\$`, `\@`, `\d`, etc. as written.
+                        // Do NOT route through `read_escaped_until` — that's
+                        // for double-quoted strings and rewrites `\$` to a
+                        // private-use sentinel that the regex compiler can't
+                        // decode (would silently strip the `$`).
+                        let mut pattern = String::new();
+                        loop {
+                            match self.advance() {
+                                Some('\\') => {
+                                    pattern.push('\\');
+                                    if let Some(c) = self.advance() {
+                                        pattern.push(c);
+                                    }
+                                }
+                                Some(c) if c == close => break,
+                                Some(c) => pattern.push(c),
+                                None => {
+                                    return Err(self.syntax_err("Unterminated qr regex", self.line))
+                                }
+                            }
+                        }
                         let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                         self.last_was_term = true;
                         return Ok(Token::Regex(pattern, flags, delim));

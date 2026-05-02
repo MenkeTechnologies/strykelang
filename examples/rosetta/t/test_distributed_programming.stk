@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Distributed programming
+
+fn Rosetta::Distributed::demo() {
+    # In Stryke, we can use the async keyword to run expressions in the background
+    # and wait for their results. This is a form of local distribution across cores.
+    
+    my $p1 = async {
+        # Simulate some work
+        sleep(0.1)
+        20 + 1
+    }
+    
+    my $p2 = async {
+        # Simulate some work
+        sleep(0.1)
+        20 + 1
+    }
+    
+    # Wait for results and sum them
+    await($p1) + await($p2)
+}
+
+my $res = Rosetta::Distributed::demo()
+assert_eq $res, 42, "Distributed (async) sum correct"
+
+test_run

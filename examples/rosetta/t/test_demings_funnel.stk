@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Deming's funnel
+
+fn Rosetta::Deming::simulate($rule, $num_drops) {
+    my $target = 0.0
+    my $funnel = 0.0
+    my $sum_sq = 0.0
+    
+    for (1..$num_drops) {
+        # Drop marble with random error (normal distribution approximation)
+        my $error = (rand() + rand() + rand() + rand() + rand() + rand() - 3.0) / 3.0
+        my $landed = $funnel + $error
+        
+        $sum_sq += ($landed - $target)**2
+        
+        # Adjust funnel for next drop
+        if ($rule == 1) {
+            # Rule 1: No adjustment
+        } elsif ($rule == 2) {
+            # Rule 2: Adjust by -(error)
+            $funnel -= ($landed - $target)
+        } elsif ($rule == 3) {
+            # Rule 3: Adjust to -(error from target)
+            $funnel = $target - ($landed - $target)
+        } elsif ($rule == 4) {
+            # Rule 4: Adjust to where it landed
+            $funnel = $landed
+        }
+    }
+    
+    sqrt($sum_sq / $num_drops) # RMSE
+}
+
+# Rule 1 should be stable.
+my $rmse1 = Rosetta::Deming::simulate(1, 1000)
+# Rule 4 is known to be the worst (random walk).
+my $rmse4 = Rosetta::Deming::simulate(4, 1000)
+
+assert_ok $rmse1 < $rmse4, "Rule 1 is better than Rule 4"
+
+test_run

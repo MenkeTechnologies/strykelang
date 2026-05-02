@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitcoin/address validation
+
+fn Rosetta::Bitcoin::validate($addr) {
+    my $decoded = base58_decode($addr)
+    my $hex = unpack("H*", $decoded)
+    return 0 if length($hex) != 50
+    
+    my $payload_hex = substr($hex, 0, 42)
+    my $checksum_hex = substr($hex, 42, 8)
+    
+    # Double SHA256 of payload
+    my $payload_bin = pack("H*", $payload_hex)
+    my $hash1_hex = sha256($payload_bin)
+    my $hash1_bin = pack("H*", $hash1_hex)
+    my $hash2_hex = sha256($hash1_bin)
+    
+    # Compare first 8 hex chars of hash2 with checksum_hex
+    my $expected_checksum_hex = uc(substr($hash2_hex, 0, 8))
+    
+    # unpack("H*") returns uppercase? I'll check.
+    # Actually I'll just use lc() for both.
+    lc($checksum_hex) eq lc($expected_checksum_hex)
+}
+
+my $addr1 = "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i"
+my $addr2 = "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62j"
+
+assert_eq Rosetta::Bitcoin::validate($addr1), 1, "Valid Bitcoin address"
+assert_eq Rosetta::Bitcoin::validate($addr2), 0, "Invalid Bitcoin address"
+
+test_run

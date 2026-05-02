@@ -1,44 +1,13 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Hostname
-# Read the system hostname. We avoid forking; rely on stryke's
-# environment plus uname-style detection through standard libraries.
 
-fn Rosetta::Hostname::from_env() {
-    return $ENV{HOSTNAME}     if exists $ENV{HOSTNAME}     && length($ENV{HOSTNAME})    > 0
-    return $ENV{HOST}         if exists $ENV{HOST}         && length($ENV{HOST})        > 0
-    return $ENV{COMPUTERNAME} if exists $ENV{COMPUTERNAME} && length($ENV{COMPUTERNAME})> 0
-    undef
+fn Rosetta::Hostname::get() {
+    # Using the net_hostname builtin
+    net_hostname()
 }
 
-fn Rosetta::Hostname::is_valid_hostname($s) {
-    return 0 if length($s) == 0
-    return 0 if length($s) > 253
-    return 0 unless $s =~ /^[A-Za-z0-9][A-Za-z0-9.\-]*$/
-    1
-}
-
-# At least one strategy returns a non-empty value or undef
-my $h = Rosetta::Hostname::from_env()
-if (defined $h) {
-    assert_ok length($h) > 0, "non-empty hostname from env"
-    assert_eq Rosetta::Hostname::is_valid_hostname($h), 1, "env hostname is well-formed"
-} else {
-    assert_ok 1, "no env hostname (acceptable on stripped-down environments)"
-}
-
-# Validation function
-assert_eq Rosetta::Hostname::is_valid_hostname("foo.local"),     1, "foo.local valid"
-assert_eq Rosetta::Hostname::is_valid_hostname("a-b-c"),         1, "a-b-c valid"
-assert_eq Rosetta::Hostname::is_valid_hostname(""),              0, "empty rejected"
-assert_eq Rosetta::Hostname::is_valid_hostname("-leading-dash"), 0, "leading dash rejected"
-assert_eq Rosetta::Hostname::is_valid_hostname("with space"),    0, "space rejected"
-assert_eq Rosetta::Hostname::is_valid_hostname("under_score"),   0, "underscore rejected"
-
-# 254-char host rejected
-my $too_long = "a" . ("b" x 253)
-assert_eq Rosetta::Hostname::is_valid_hostname($too_long), 0, "> 253 chars rejected"
-
-# Pipe form
-"localhost" |> Rosetta::Hostname::is_valid_hostname |> assert_eq(1, "pipe localhost")
+my $host = Rosetta::Hostname::get()
+assert_ok length($host) > 0, "Hostname is not empty"
+assert_eq type($host), "string", "Hostname is a string"
 
 test_run

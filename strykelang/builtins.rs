@@ -3186,7 +3186,7 @@ pub(crate) fn try_builtin(
 
         // ── Conversion utilities ─────────────────────────────────────────
         "to_string_val" | "tstr" => Some(builtin_to_string_val(interp, args)),
-        "type_of" | "typeof" => Some(builtin_type_of(args)),
+        "type_of" | "typeof" | "type" => Some(builtin_type_of(args)),
         "byte_size" | "bsize" => Some(builtin_byte_size(args)),
 
         // ── DSP / Signal ─────────────────────────────────────────────────

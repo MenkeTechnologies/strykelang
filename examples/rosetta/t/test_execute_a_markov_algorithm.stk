@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute a Markov algorithm
+
+fn Rosetta::Markov::execute($text, @rules) {
+    my $work = $text
+    my $changed = 1
+    while ($changed) {
+        $changed = 0
+        for my $rule (@rules) {
+            my ($pattern, $replacement, $terminal) = @$rule
+            if ($work =~ s/$pattern/$replacement/) {
+                $changed = 1
+                return $work if $terminal
+                last # Restart from first rule
+            }
+        }
+    }
+    $work
+}
+
+# Example from Rosetta Code
+# A -> apple
+# B -> bag
+# S -> shop
+# T -> the
+# the shopkeeper -> a shopkeeper
+# ...
+my @rules = (
+    ["A", "apple", 0],
+    ["B", "bag", 0],
+    ["S", "shop", 0],
+    ["T", "the", 0],
+    ["the shopkeeper", "a shopkeeper", 0],
+    ["apple", "A", 0],
+    ["bag", "B", 0],
+    ["shop", "S", 0]
+)
+
+# Test with a simpler set
+my @simple_rules = (
+    ["I", "1", 0],
+    ["II", "2", 0],
+    ["III", "3", 0],
+    ["4", ".IV", 1] # terminal
+)
+
+my $res = Rosetta::Markov::execute("I II III 4", (["III", "3", 0], ["II", "2", 0], ["I", "1", 0], ["4", "IV", 1]))
+assert_eq $res, "1 2 3 IV", "Markov algorithm execution"
+
+test_run

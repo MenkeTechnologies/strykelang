@@ -71,7 +71,7 @@
 [x] Array length
 [x] Arrays
 [x] Ascending primes
-[ ] ASCII art diagram converter
+[x] ASCII art diagram converter
 [x] Assertions
 [x] Associative array/Creation
 [x] Associative array/Iteration
@@ -112,7 +112,7 @@
 [x] Bioinformatics/Global alignment
 [x] Bioinformatics/Sequence mutation
 [x] Biorhythms
-[ ] Bitcoin/address validation
+[x] Bitcoin/address validation
 [ ] Bitcoin/public point to address
 [x] Bitmap
 [x] Bitmap/Bresenham's line algorithm
@@ -139,7 +139,7 @@
 [x] Break OO privacy
 [x] Brilliant numbers
 [x] Bron–Kerbosch algorithm
-[ ] Brownian tree
+[x] Brownian tree
 [x] Bulls and cows
 [x] Bulls and cows/Player
 [x] Burrows–Wheeler transform
@@ -191,10 +191,10 @@
 [x] Classes
 [x] Closest-pair problem
 [x] Closures/Value capture
-[ ] Cocke–Younger–Kasami (CYK) Algorithm
+[x] Cocke–Younger–Kasami (CYK) Algorithm
 [x] Collections
 [ ] Color of a screen pixel
-[ ] Color quantization
+[x] Color quantization
 [x] Color wheel
 [x] Colorful numbers
 [ ] Colour bars/Display
@@ -211,20 +211,20 @@
 [x] Compare length of two strings
 [x] Compare sorting algorithms' performance
 [x] Compile-time calculation
-[ ] Compiler/AST interpreter
-[ ] Compiler/code generator
-[ ] Compiler/lexical analyzer
+[x] Compiler/AST interpreter
+[x] Compiler/code generator
+[x] Compiler/lexical analyzer
 [ ] Compiler/Simple file inclusion pre processor
-[ ] Compiler/syntax analyzer
-[ ] Compiler/virtual machine interpreter
+[x] Compiler/syntax analyzer
+[x] Compiler/virtual machine interpreter
 [x] Composite numbers k with no single digit factors whose factors are all substrings of k
 [x] Compound data type
 [x] Concurrent computing
 [x] Conditional structures
 [x] Conjugate transpose
 [x] Consecutive primes with ascending or descending differences
-[ ] Constrained genericity
-[ ] Constrained random points on a circle
+[x] Constrained genericity
+[x] Constrained random points on a circle
 [x] Continued fraction
 [x] Continued fraction/Arithmetic/Construct from rational number
 [x] Continued fraction/Arithmetic/G(matrix ng, continued fraction n)
@@ -262,14 +262,14 @@
 [x] Damm algorithm
 [x] Date format
 [x] Date manipulation
-[ ] Dating agency
+[x] Dating agency
 [x] Day of the week
 [x] De Bruijn sequences
 [x] De Polignac numbers
 [ ] Deal cards for FreeCell
 [x] Death Star
 [x] Deceptive numbers
-[ ] Deconvolution/1D
+[x] Deconvolution/1D
 [x] Deconvolution/2D+
 [x] Decorate-sort-undecorate idiom
 [x] Deepcopy
@@ -300,12 +300,12 @@
 [x] Display a linear combination
 [ ] Display an outline as a nested table
 [x] Distance and Bearing
-[ ] Distributed programming
+[x] Distributed programming
 [x] Distribution of 0 digits in factorial series
 [x] Diversity prediction theorem
-[ ] DNS query
+[x] DNS query
 [x] Documentation
-[ ] Dominoes
+[x] Dominoes
 [x] Doomsday rule
 [x] Dot product
 [x] Doubly-linked list/Definition
@@ -313,9 +313,9 @@
 [x] Doubly-linked list/Element insertion
 [x] Doubly-linked list/Traversal
 [x] Dragon curve
-[ ] Draw a clock
-[ ] Draw a cuboid
-[ ] Draw a pixel
+[x] Draw a clock
+[x] Draw a cuboid
+[x] Draw a pixel
 [ ] Draw a rotating cube
 [ ] Draw a sphere
 [x] Duffinian numbers
@@ -359,26 +359,26 @@
 [x] Euler's sum of powers conjecture
 [x] Evaluate binomial coefficients
 [x] Even or odd
-[ ] Events
+[x] Events
 [x] Evolutionary algorithm
 [x] Exceptions
 [x] Exceptions/Catch an exception thrown in a nested call
-[ ] Executable library
+[x] Executable library
 [ ] Execute a Markov algorithm
 [x] Execute a system command
 [x] Execute Brain****
 [ ] Execute Computer/Zero
 [x] Execute HQ9+
-[ ] Execute SNUSP
+[x] Execute SNUSP
 [ ] Experimental Verification of the NKT Law: Interpolating the Masses of 8 Planets Using NASA Data as of 30–31/12/2024
 [ ] Experimental Verification of the NKTg Law in Earth Orbit Based on NASA’s 2025 Earth Dataset
 [ ] Experimental Verification of the NKTg Law Using NASA Mercury Data in 2025
 [ ] Experimental Verification of the NKTg Law Using NASA Neptune Data (2023–2024)
 [x] Exponential digital sums
 [x] Exponentiation operator
-[ ] Exponentiation order
+[x] Exponentiation order
 [x] Exponentiation with infix operators in (or operating on) the base
-[ ] Extend your language
+[x] Extend your language
 [x] Extensible prime generator
 [x] Extreme floating point values
 [ ] Faces from a mesh
@@ -391,8 +391,8 @@
 [x] Factors of an integer
 [x] Fairshare between two and more
 [x] Farey sequence
-[ ] Fast Fourier transform
-[ ] FASTA format
+[x] Fast Fourier transform
+[x] FASTA format
 [x] Faulhaber's formula
 [x] Faulhaber's triangle
 [x] Feigenbaum constant calculation
@@ -406,7 +406,7 @@
 [x] File input/output
 [x] File modification time
 [x] File size
-[ ] File size distribution
+[x] File size distribution
 [x] Filter
 [ ] Find Chess960 starting position identifier
 [x] Find common directory path
@@ -426,10 +426,10 @@
 [x] First-class functions/Use numbers analogously
 [x] Five weekends
 [x] Fivenum
-[ ] Fixed length records
+[x] Fixed length records
 [x] FizzBuzz
 [x] Flatten a list
-[ ] Flipping bits game
+[x] Flipping bits game
 [x] Flow-control structures
 [x] Floyd's triangle
 [x] Floyd-Warshall algorithm
@@ -462,9 +462,9 @@
 [x] Gaussian elimination
 [x] Gaussian primes
 [x] General FizzBuzz
-[ ] Generate Chess960 starting position
+[x] Generate Chess960 starting position
 [x] Generate lower case ASCII alphabet
-[ ] Generate random chess position
+[x] Generate random chess position
 [ ] Generator/Exponential
 [x] Generic swap
 [x] Get system command output
@@ -552,7 +552,7 @@
 [ ] Image convolution
 [ ] Image noise
 [x] Imaginary base numbers
-[ ] Include a file
+[x] Include a file
 [x] Inconsummate numbers in base 10
 [x] Increasing gaps between consecutive Niven numbers
 [x] Increment a numerical string
@@ -565,7 +565,7 @@
 [x] Integer comparison
 [x] Integer overflow
 [x] Integer sequence
-[ ] Interactive programming (repl)
+[x] Interactive programming (repl)
 [ ] Intersecting number wheels
 [x] Introspection
 [x] Inventory sequence
@@ -590,7 +590,7 @@
 [x] JSON pointer
 [x] Juggler sequence
 [x] Julia set
-[ ] Jump anywhere
+[x] Jump anywhere
 [ ] Jury stability criterion
 [ ] K-d tree
 [x] K-means++ clustering
@@ -701,7 +701,7 @@
 [x] Maze generation
 [x] Maze solving
 [x] McNuggets problem
-[ ] MD4
+[x] MD4
 [x] MD5
 [x] MD5/Implementation
 [x] Median filter
@@ -912,8 +912,8 @@
 [x] Probabilistic choice
 [x] Problem of Apollonius
 [x] Product of min and max prime factors
-[ ] Program name
-[ ] Program termination
+[x] Program name
+[x] Program termination
 [x] Proper divisors
 [ ] Pseudo-random numbers/Combined recursive generator MRG32k3a
 [x] Pseudo-random numbers/Middle-square method
@@ -974,7 +974,7 @@
 [x] Repunit primes
 [x] Resistor mesh
 [x] Respond to an unknown method call
-[ ] Retrieve and search chat history
+[x] Retrieve and search chat history
 [x] Return multiple values
 [x] Reverse a string
 [x] Reverse words in a string
@@ -988,7 +988,7 @@
 [x] Roots of a quadratic function
 [x] Roots of unity
 [x] Rosetta Code/Count examples
-[ ] Rosetta Code/Find bare lang tags
+[x] Rosetta Code/Find bare lang tags
 [ ] Rosetta Code/Find unimplemented tasks
 [ ] Rosetta Code/Fix code tags
 [ ] Rosetta Code/Rank languages by number of users
@@ -1119,7 +1119,7 @@
 [x] Soundex
 [x] Sparkline in unicode
 [ ] Special characters
-[ ] Special variables
+[x] Special variables
 [x] Specific characters
 [ ] Speech synthesis
 [x] Spelling of ordinal numbers

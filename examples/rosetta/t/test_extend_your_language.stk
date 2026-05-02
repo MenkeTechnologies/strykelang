@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Extend your language
+
+# Stryke can be extended by defining functions that work with the pipe operator.
+# This allows creating a DSL-like syntax.
+
+fn Rosetta::Extend::repeat_str($str, $n) {
+    my $res = ""
+    for (1..$n) { $res .= $str }
+    $res
+}
+
+# We can "extend" the language with a custom operator-like function
+my $out = "abc" |> Rosetta::Extend::repeat_str(3)
+assert_eq $out, "abcabcabc", "Language extended with pipeable repeat function"
+
+# Another way to extend is via the ~> operator which works on arrays
+fn Rosetta::Extend::sum_sq(@nums) {
+    my $total = 0
+    for my $n (@nums) { $total += $n * $n }
+    $total
+}
+
+my $total = ~> (1, 2, 3) Rosetta::Extend::sum_sq
+assert_eq $total, 14, "Language extended with array pipeline function"
+
+test_run

@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Constrained random points on a circle
+
+fn Rosetta::RandomCircle::generate($num_points, $min_r, $max_r) {
+    my @points
+    for (my $i = 0; $i < $num_points; $i++) {
+        # Using rejection sampling for simplicity and to follow "constrained" theme
+        while (1) {
+            my $x = rand() * 2 * $max_r - $max_r
+            my $y = rand() * 2 * $max_r - $max_r
+            my $r = sqrt($x*$x + $y*$y)
+            if ($r >= $min_r && $r <= $max_r) {
+                push @points, [$x, $y]
+                last
+            }
+        }
+    }
+    \@points
+}
+
+my $pts = Rosetta::RandomCircle::generate(100, 10, 15)
+assert_eq len(@$pts), 100, "Generated 100 points"
+
+# Verify a random point
+my $p = $pts->[int(rand(100))]
+my $dist = sqrt($p->[0]**2 + $p->[1]**2)
+assert_ok $dist >= 10 && $dist <= 15, "Point is within constraints"
+
+test_run

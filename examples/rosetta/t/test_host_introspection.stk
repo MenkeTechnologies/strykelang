@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Host introspection
+
+fn Rosetta::HostIntrospection::get_info() {
+    my %info
+    $info{hostname} = net_hostname()
+    
+    my @interfaces = net_interfaces()
+    $info{interfaces} = \@interfaces
+    
+    \%info
+}
+
+my $info = Rosetta::HostIntrospection::get_info()
+assert_ok length($info->{hostname}) > 0, "Hostname present"
+assert_ok len(@{$info->{interfaces}}) > 0, "Interfaces found"
+
+# Check fields of first interface
+my $if0 = $info->{interfaces}->[0]
+assert_ok exists $if0->{name}, "Interface has name"
+assert_ok exists $if0->{mac}, "Interface has mac"
+
+test_run

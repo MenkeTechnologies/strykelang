@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File size distribution
+
+fn Rosetta::FileSize::distribution($bucket_size, @sizes) {
+    my %dist
+    for my $size (@sizes) {
+        my $bucket = int($size / $bucket_size) * $bucket_size
+        $dist{$bucket}++
+    }
+    \%dist
+}
+
+my @sizes = (10, 15, 25, 45, 105, 120, 500)
+my $dist = Rosetta::FileSize::distribution(100, @sizes)
+
+assert_eq $dist->{0}, 4, "4 files < 100"
+assert_eq $dist->{100}, 2, "2 files 100-199"
+assert_eq $dist->{500}, 1, "1 file 500-599"
+
+test_run

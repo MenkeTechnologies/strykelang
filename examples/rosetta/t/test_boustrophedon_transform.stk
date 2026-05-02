@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Boustrophedon transform
+
+fn Rosetta::Boustrophedon::transform(@seq) {
+    # T_{n,0} = a_n
+    # T_{n,k} = T_{n, k-1} + T_{n-1, n-k}
+    
+    my @triangle
+    push @triangle, [$seq[0]]
+    
+    my $len = len(@seq)
+    for (my $n = 1; $n < $len; $n++) {
+        my @row
+        for (0..$n) { push @row, 0 }
+        
+        $row[0] = $seq[$n]
+        for (my $k = 1; $k <= $n; $k++) {
+            $row[$k] = $row[$k-1] + $triangle[$n-1]->[$n-$k]
+        }
+        push @triangle, \@row
+    }
+    
+    my @res
+    for my $row (@triangle) {
+        push @res, $row->[len(@$row)-1]
+    }
+    \@res
+}
+
+# Example: a = (1, 0, 0, 0, 0, ...)
+my @a = (1, 0, 0, 0, 0, 0)
+my $res = Rosetta::Boustrophedon::transform(@a)
+
+# Expected b: 1, 1, 1, 2, 5, 16
+assert_eq $res->[0], 1, "b_0"
+assert_eq $res->[1], 1, "b_1"
+assert_eq $res->[2], 1, "b_2"
+assert_eq $res->[3], 2, "b_3"
+assert_eq $res->[4], 5, "b_4"
+assert_eq $res->[5], 16, "b_5"
+
+test_run

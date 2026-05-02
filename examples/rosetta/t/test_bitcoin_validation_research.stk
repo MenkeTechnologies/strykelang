@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitcoin/address validation
+
+fn Rosetta::Bitcoin::validate($addr) {
+    # 1. Decode base58
+    my $decoded = base58_decode($addr)
+    return 0 if length($decoded) != 25
+    
+    # 2. Extract parts
+    my $prefix = substr($decoded, 0, 1)
+    my $payload = substr($decoded, 0, 21)
+    my $checksum = substr($decoded, 21, 4)
+    
+    # 3. Double SHA256 of payload
+    my $hash1 = sha256($payload)
+    # sha256 returns hex string or binary? 
+    # Usually in Stryke it returns hex. I'll check.
+    
+    # If it returns hex, I need to convert to binary or use binary variant if exists.
+    # I'll check sha256 output.
+}
+
+# Check sha256 output format
+my $h = sha256("abc")
+p "SHA256 LEN: " . length($h)
+p "SHA256: $h"
+
+test_run

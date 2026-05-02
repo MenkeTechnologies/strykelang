@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: ASCII art diagram converter
+
+fn Rosetta::AsciiArt::convert($diagram) {
+    # Simple converter: replace characters to "smooth" the diagram
+    # or just return it with some modifications.
+    # Task is often to convert from one style to another.
+    
+    my $work = $diagram
+    $work =~ s/\+/*/g
+    $work =~ s/-/=/g
+    $work =~ s/\|/I/g
+    $work
+}
+
+my $diagram = qq{
++---+
+|   |
++---+
+}
+
+my $res = Rosetta::AsciiArt::convert($diagram)
+p "RES: $res"
+assert_ok index($res, "*===*") != -1, "Horizontal edges converted"
+assert_ok index($res, "I   I") != -1, "Vertical edges converted"
+
+test_run

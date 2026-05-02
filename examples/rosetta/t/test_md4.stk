@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: MD4
+
+fn Rosetta::MD4::hash($str) {
+    # Using the md4 builtin
+    md4($str)
+}
+
+my $h = Rosetta::MD4::hash("The quick brown fox jumps over the lazy dog")
+assert_eq $h, "1bee69a46ba811185c194762abaeae90", "MD4 hash matches"
+
+test_run

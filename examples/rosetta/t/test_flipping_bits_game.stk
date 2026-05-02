@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Flipping bits game
+
+fn Rosetta::FlippingBits::flip($n, @bits) {
+    # Flip the first $n bits
+    for (my $i = 0; $i < $n; $i++) {
+        $bits[$i] = $bits[$i] == 0 ? 1 : 0
+    }
+    \@bits
+}
+
+fn Rosetta::FlippingBits::is_solved(@bits) {
+    # Game is solved when all bits are 0
+    my $sum = 0
+    for my $b (@bits) { $sum += $b }
+    $sum == 0
+}
+
+my @bits = (1, 1, 0, 1)
+@bits = @{Rosetta::FlippingBits::flip(2, @bits)}
+assert_eq join(",", @bits), "0,0,0,1", "Flipped first 2 bits"
+
+@bits = @{Rosetta::FlippingBits::flip(4, @bits)}
+assert_eq join(",", @bits), "1,1,1,0", "Flipped all 4 bits"
+
+assert_eq Rosetta::FlippingBits::is_solved(0, 0, 0), 1, "Solved state detected"
+assert_eq Rosetta::FlippingBits::is_solved(0, 1, 0), 0, "Unsolved state detected"
+
+test_run

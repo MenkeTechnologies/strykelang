@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Dominoes
+
+fn Rosetta::Dominoes::find_chain($dominoes, $current_chain, $res_ref) {
+    if (len(@$dominoes) == 0) {
+        # Check if it's a loop
+        if ($current_chain->[0]->[0] == $current_chain->[len(@$current_chain)-1]->[1]) {
+            push @$res_ref, [@$current_chain]
+            return 1
+        }
+        return 0
+    }
+    
+    my $last_val = $current_chain->[len(@$current_chain)-1]->[1]
+    
+    for (my $i = 0; $i < len(@$dominoes); $i++) {
+        my $d = $dominoes->[$i]
+        # Try both orientations
+        my @orientations = ([$d->[0], $d->[1]], [$d->[1], $d->[0]])
+        
+        for my $o (@orientations) {
+            if ($o->[0] == $last_val) {
+                my @remaining = @$dominoes
+                splice @remaining, $i, 1
+                
+                my @new_chain = @$current_chain
+                push @new_chain, $o
+                
+                if (Rosetta::Dominoes::find_chain(\@remaining, \@new_chain, $res_ref)) {
+                    return 1
+                }
+            }
+        }
+    }
+    0
+}
+
+fn Rosetta::Dominoes::solve(@dominoes) {
+    my @res
+    for (my $i = 0; $i < len(@dominoes); $i++) {
+        my $d = $dominoes[$i]
+        my @remaining = @dominoes
+        splice @remaining, $i, 1
+        
+        # Start with first domino
+        if (Rosetta::Dominoes::find_chain(\@remaining, [[$d->[0], $d->[1]]], \@res)) {
+            return $res[0]
+        }
+    }
+    undef
+}
+
+my @doms = ([1, 2], [2, 3], [3, 1])
+my $chain = Rosetta::Dominoes::solve(@doms)
+assert_ok defined($chain), "Chain found for [1,2], [2,3], [3,1]"
+assert_eq len(@$chain), 3, "Chain length correct"
+
+my @bad = ([1, 2], [4, 5])
+my $no_chain = Rosetta::Dominoes::solve(@bad)
+assert_ok !defined($no_chain), "No chain for disconnected dominoes"
+
+test_run

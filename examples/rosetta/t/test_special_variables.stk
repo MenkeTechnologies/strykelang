@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Special variables
+
+fn Rosetta::SpecialVars::check() {
+    my @vars
+    push @vars, defined($0)
+    push @vars, defined(%ENV)
+    push @vars, defined(@ARGV)
+    \@vars
+}
+
+my $res = Rosetta::SpecialVars::check()
+assert_eq $res->[0], 1, "0 is defined"
+assert_eq $res->[1], 1, "ENV is defined"
+assert_eq $res->[2], 1, "ARGV is defined"
+
+test_run

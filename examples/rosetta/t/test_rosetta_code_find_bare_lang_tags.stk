@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rosetta Code/Find bare lang tags
+
+fn Rosetta::BareLangTags::find($text) {
+    my @found
+    # Match <lang> but NOT <lang something>
+    # We use a while loop with regex
+    while ($text =~ /<lang>([\s\S]*?)<\/lang>/g) {
+        push @found, $1
+    }
+    \@found
+}
+
+my $sample = qq{
+<lang perl>print "hi"</lang>
+<lang>print "bare"</lang>
+<lang python>print "hello"</lang>
+<lang>
+print "another bare"
+</lang>
+}
+
+my $res = Rosetta::BareLangTags::find($sample)
+assert_eq len(@$res), 2, "Found 2 bare lang tags"
+assert_eq trim($res->[0]), 'print "bare"', "First bare tag content"
+assert_eq trim($res->[1]), 'print "another bare"', "Second bare tag content"
+
+test_run

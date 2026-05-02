@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compiler/lexical analyzer
+
+fn Rosetta::Lexer::tokenize($src) {
+    my @tokens
+    my $work = $src
+    while (length($work) > 0) {
+        if ($work =~ s/^\s*(\d+)//) {
+            push @tokens, ["Integer", $1]
+        } elsif ($work =~ s/^\s*([a-zA-Z_]\w*)//) {
+            push @tokens, ["Identifier", $1]
+        } elsif ($work =~ s/^\s*(\+|-|\*|\/|=)//) {
+            push @tokens, ["Op", $1]
+        } elsif ($work =~ s/^\s*(;)//) {
+            push @tokens, ["Semicolon", $1]
+        } else {
+            # Skip unrecognized characters to avoid infinite loop
+            $work =~ s/^.//
+        }
+    }
+    \@tokens
+}
+
+my $src = "x = 10 + 20;"
+my $tokens = Rosetta::Lexer::tokenize($src)
+
+assert_eq len(@$tokens), 6, "Number of tokens matches"
+assert_eq $tokens->[0]->[0], "Identifier", "Token 0 type"
+assert_eq $tokens->[0]->[1], "x", "Token 0 value"
+assert_eq $tokens->[1]->[0], "Op", "Token 1 type"
+assert_eq $tokens->[1]->[1], "=", "Token 1 value"
+assert_eq $tokens->[2]->[0], "Integer", "Token 2 type"
+assert_eq $tokens->[2]->[1], "10", "Token 2 value"
+assert_eq $tokens->[5]->[0], "Semicolon", "Token 5 type"
+
+test_run

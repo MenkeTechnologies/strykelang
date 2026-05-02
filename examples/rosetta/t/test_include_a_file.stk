@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Include a file
+
+fn Rosetta::Include::demo() {
+    # In Stryke, we can use require to include a file.
+    # We will create a temporary file to include so this test is self-contained.
+    my $tmp_file = "/tmp/rosetta_include_test.stk"
+    
+    # Write a simple function to the file
+    write_file($tmp_file, "fn Rosetta::IncludedFile::hello() { \"Hello from included file!\" }; 1;")
+    
+    # Include it
+    require $tmp_file
+    
+    # Call the included function
+    Rosetta::IncludedFile::hello()
+}
+
+my $res = Rosetta::Include::demo()
+assert_eq $res, "Hello from included file!", "Successfully included file and executed its function"
+
+test_run
