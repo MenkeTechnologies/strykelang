@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Events
+
+struct RosettaEventsEmitter { listeners }
+
+fn Rosetta::Events::init($emitter) {
+    $emitter->{listeners} = +{}
+}
+
+fn Rosetta::Events::on($emitter, $event, $callback) {
+    if (!exists $emitter->{listeners}->{$event}) {
+        $emitter->{listeners}->{$event} = []
+    }
+    push @{$emitter->{listeners}->{$event}}, $callback
+}
+
+fn Rosetta::Events::emit($emitter, $event, $data) {
+    if (exists $emitter->{listeners}->{$event}) {
+        for my $cb (@{$emitter->{listeners}->{$event}}) {
+            $cb->($data)
+        }
+    }
+}
+
+my $emitter = RosettaEventsEmitter(+{})
+my $out = +{ received => undef }
+Rosetta::Events::on($emitter, "test", sub { $out->{received} = $_[0] })
+Rosetta::Events::emit($emitter, "test", "Hello Events")
+
+assert_eq $out->{received}, "Hello Events", "Event received correctly"
+
+test_run

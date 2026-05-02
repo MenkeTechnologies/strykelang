@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compiler/code generator
+
+fn Rosetta::CodeGen::generate($tokens) {
+    my @instructions
+    my $i = 0
+    while ($i < len(@$tokens)) {
+        my $t = $tokens->[$i]
+        if ($t->[0] eq "Identifier") {
+            my $name = $t->[1]
+            if ($i + 1 < len(@$tokens) && $tokens->[$i+1]->[1] eq "=") {
+                # Assignment: name = expr;
+                # We need to evaluate expr first. 
+                # This is a very simple generator, only supports identifier = integer op integer;
+                my $v1 = $tokens->[$i+2]->[1]
+                my $op = $tokens->[$i+3]->[1]
+                my $v2 = $tokens->[$i+4]->[1]
+                
+                push @instructions, ["PUSH", $v1]
+                push @instructions, ["PUSH", $v2]
+                if ($op eq "+") { push @instructions, ["ADD", undef] }
+                elsif ($op eq "-") { push @instructions, ["SUB", undef] }
+                push @instructions, ["STORE", $name]
+                $i += 6 # identifier, =, integer, op, integer, ;
+            }
+        } else {
+            $i++
+        }
+    }
+    \@instructions
+}
+
+# Tokens for: x = 10 + 20;
+my $tokens = [
+    ["Identifier", "x"],
+    ["Op", "="],
+    ["Integer", 10],
+    ["Op", "+"],
+    ["Integer", 20],
+    ["Semicolon", ";"]
+]
+
+my $code = Rosetta::CodeGen::generate($tokens)
+assert_eq len(@$code), 4, "Number of instructions matches"
+assert_eq $code->[0]->[0], "PUSH", "First instr PUSH"
+assert_eq $code->[0]->[1], 10, "First value 10"
+assert_eq $code->[2]->[0], "ADD", "Third instr ADD"
+assert_eq $code->[3]->[0], "STORE", "Last instr STORE"
+assert_eq $code->[3]->[1], "x", "Stored in x"
+
+test_run

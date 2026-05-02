@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Enforced immutability
+
+fn Rosetta::Immutability::create_constant($val) {
+    # Using a closure to enforce immutability of a value
+    sub { $val }
+}
+
+my $const_42 = Rosetta::Immutability::create_constant(42)
+
+assert_eq $const_42->(), 42, "Constant value is 42"
+
+# Attempting to change it is impossible as $val is lexically scoped
+# and only accessible through the getter sub.
+
+test_run

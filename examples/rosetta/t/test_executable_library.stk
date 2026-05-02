@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Executable library
+
+fn Rosetta::Library::func() {
+    "Library function called"
+}
+
+# The task is to show how a file can be both a library and an executable.
+# In Stryke, we check if the script being run is this file.
+
+my $is_main = ($0 =~ /test_executable_library\.stk$/)
+
+if ($is_main) {
+    # If run directly
+    my $res = Rosetta::Library::func()
+    # For the test, we'll assert here
+    assert_eq $res, "Library function called", "Main execution works"
+}
+
+assert_eq Rosetta::Library::func(), "Library function called", "Function call works"
+
+test_run

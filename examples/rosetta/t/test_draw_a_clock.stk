@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Draw a clock
+
+fn Rosetta::Clock::draw($time_str) {
+    # We'll just format the time into a simple ASCII "clock" face
+    # In a real GUI, this would involve drawing lines for hands.
+    # For Rosetta Code CLI, this format is usually accepted.
+    my ($h, $m, $s) = split ":", $time_str
+    
+    my $clock = qq{
+      .--.
+     | $h |
+     | $m |
+     | $s |
+      '--'
+}
+    $clock |> trim
+}
+
+my $sample = "10:15:30"
+my $clock = Rosetta::Clock::draw($sample)
+
+assert_ok index($clock, "| 10 |") != -1, "Hours displayed"
+assert_ok index($clock, "| 15 |") != -1, "Minutes displayed"
+assert_ok index($clock, "| 30 |") != -1, "Seconds displayed"
+
+test_run

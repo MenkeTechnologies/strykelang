@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bernstein basis polynomials
+
+fn Rosetta::Bernstein::binomial($n, $k) {
+    return 0 if $k < 0 || $k > $n
+    fact($n) / (fact($k) * fact($n - $k))
+}
+
+fn Rosetta::Bernstein::calculate($i, $n, $t) {
+    Rosetta::Bernstein::binomial($n, $i) * ($t**$i) * ((1 - $t)**($n - $i))
+}
+
+# Example: n=3, i=2, t=0.5
+# B_{2,3}(0.5) = binom(3,2) * 0.5^2 * 0.5^1 = 3 * 0.25 * 0.5 = 0.375
+my $val = Rosetta::Bernstein::calculate(2, 3, 0.5)
+assert_eq $val, 0.375, "Bernstein basis B_{2,3}(0.5) is 0.375"
+
+test_run

@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitcoin/public point to address
+
+fn Rosetta::Bitcoin::pubkey_to_address($pubkey_hex) {
+    # 1. HASH160
+    my $pubkey_bin = pack("H*", $pubkey_hex)
+    my $sha256_hex = sha256($pubkey_bin)
+    
+    my $sha256_bin = pack("H*", $sha256_hex)
+    my $ripemd160_hex = ripemd160($sha256_bin)
+    
+    # 2. Add network byte
+    my $mainnet_hex = "00" . $ripemd160_hex
+    my $mainnet_bin = pack("H*", $mainnet_hex)
+    
+    # 3. Add 4-byte checksum
+    my $hash1_hex = sha256($mainnet_bin)
+    my $hash2_hex = sha256(pack("H*", $hash1_hex))
+    my $checksum = substr($hash2_hex, 0, 8)
+    
+    # 4. Final binary data
+    my $final_hex = $mainnet_hex . $checksum
+    my $final_bin = pack("H*", $final_hex)
+    
+    # 5. Base58 encode
+    base58_encode($final_bin)
+}
+
+# Example from Rosetta Code
+my $pubkey = "0450863AD64A87AE8A2FE83C1AF1A8403CB53F53E486D8511DAD8A04887E5B23522CD470243453A299FA9E77237716103ABC11A1DF38855ED6F2EE187E9C582BA6"
+my $addr = Rosetta::Bitcoin::pubkey_to_address($pubkey)
+
+# The expected address for this specific pubkey in some examples might be different
+# depending on compressed/uncompressed.
+# "04" prefix means uncompressed.
+p "GOT ADDR: $addr"
+
+# Wikipedia "Base58Check encoding" canonical example: HASH160 of this
+# uncompressed pubkey is 010966776006953D5567439E5E39F86A0D273BEE which
+# encodes to mainnet address 16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM.
+assert_eq $addr, "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM", "Bitcoin public key to address"
+
+test_run

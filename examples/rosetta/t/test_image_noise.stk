@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Image noise
+
+fn Rosetta::ImageNoise::generate($width, $height) {
+    # Generate a grayscale noise image
+    my @image
+    for (my $y = 0; $y < $height; $y++) {
+        my @row
+        for (my $x = 0; $x < $width; $x++) {
+            # Random value between 0 and 255
+            my $pixel = int(rand(256))
+            push @row, $pixel
+        }
+        push @image, \@row
+    }
+    \@image
+}
+
+my $width = 10
+my $height = 10
+my $noise = Rosetta::ImageNoise::generate($width, $height)
+
+assert_eq len(@$noise), $height, "Image height correct"
+assert_eq len(@{$noise->[0]}), $width, "Image width correct"
+
+# Check if values are within bounds
+my $valid = 1
+for my $row (@$noise) {
+    for my $pixel (@$row) {
+        $valid = 0 if $pixel < 0 || $pixel > 255
+    }
+}
+assert_eq $valid, 1, "All pixels are within 0-255"
+
+test_run

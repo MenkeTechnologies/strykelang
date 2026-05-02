@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compiler/virtual machine interpreter
+
+fn Rosetta::VM::run($code) {
+    my @stack
+    my %memory
+    my $pc = 0
+    
+    while ($pc < len(@$code)) {
+        my $instr = $code->[$pc]
+        my ($op, $val) = @$instr
+        
+        if ($op eq "PUSH") {
+            push @stack, $val
+        } elsif ($op eq "ADD") {
+            my $b = pop @stack
+            my $a = pop @stack
+            push @stack, $a + $b
+        } elsif ($op eq "SUB") {
+            my $b = pop @stack
+            my $a = pop @stack
+            push @stack, $a - $b
+        } elsif ($op eq "STORE") {
+            $memory{$val} = pop @stack
+        } elsif ($op eq "LOAD") {
+            push @stack, $memory{$val}
+        }
+        $pc++
+    }
+    \%memory
+}
+
+# Code for: x = 10 + 20 - 5
+my $code = [
+    ["PUSH", 10],
+    ["PUSH", 20],
+    ["ADD", undef],
+    ["PUSH", 5],
+    ["SUB", undef],
+    ["STORE", "x"]
+]
+
+my $mem = Rosetta::VM::run($code)
+assert_eq $mem->{x}, 25, "VM correctly executed code and stored result in x"
+
+test_run

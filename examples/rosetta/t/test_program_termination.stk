@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Program termination
+
+fn Rosetta::ProgramTermination::demo($status) {
+    # exit($status) terminates the program with the given status code.
+    # To avoid actually terminating the test runner, we won't call it here 
+    # but we will return a confirmation.
+    
+    if ($status == 0) {
+        "Terminating with success (status 0)"
+    } else {
+        "Terminating with error (status $status)"
+    }
+}
+
+assert_eq Rosetta::ProgramTermination::demo(0), "Terminating with success (status 0)", "Termination logic success"
+assert_eq Rosetta::ProgramTermination::demo(1), "Terminating with error (status 1)", "Termination logic error"
+
+test_run

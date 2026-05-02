@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Display an outline as a nested table
+
+fn Rosetta::Outline::to_table($node, $depth, $res_ref) {
+    my ($label, $children) = @$node
+    
+    if (len(@$children) == 0) {
+        # Leaf node
+        my @row
+        for (0..($depth)) { push @row, "" }
+        $row[$depth] = $label
+        push @$res_ref, \@row
+        return
+    }
+    
+    # Non-leaf node
+    my $start_idx = len(@$res_ref)
+    for my $child (@$children) {
+        Rosetta::Outline::to_table($child, $depth + 1, $res_ref)
+    }
+    
+    # Put the parent label at the start row of its children
+    $res_ref->[$start_idx]->[$depth] = $label
+}
+
+fn Rosetta::Outline::pretty_format($outline) {
+    my @rows
+    Rosetta::Outline::to_table($outline, 0, \@rows)
+    
+    # Determine max depth
+    my $max_d = 0
+    for my $row (@rows) { $max_d = len(@$row) if len(@$row) > $max_d }
+    
+    my $out = ""
+    for my $row (@rows) {
+        my @line
+        for (my $i = 0; $i < $max_d; $i++) {
+            my $val = defined $row->[$i] ? $row->[$i] : ""
+            push @line, sprintf("%-10s", $val)
+        }
+        $out .= join(" | ", @line) . "\n"
+    }
+    $out
+}
+
+my $outline = ["Food", [
+    ["Fruit", [
+        ["Apple", []],
+        ["Banana", []]
+    ]],
+    ["Vegetable", [
+        ["Carrot", []]
+    ]]
+]]
+
+my $table = Rosetta::Outline::pretty_format($outline)
+# p $table
+
+assert_ok index($table, "Food       | Fruit      | Apple") != -1, "First row correct"
+assert_ok index($table, "           |            | Banana") != -1, "Second row correct"
+assert_ok index($table, "           | Vegetable  | Carrot") != -1, "Third row correct"
+
+test_run

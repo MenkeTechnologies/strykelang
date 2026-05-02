@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FASTA format
+
+fn Rosetta::Fasta::parse($text) {
+    my %sequences
+    my @lines = split "\n", $text
+    my $current_id = undef
+    
+    for my $line (@lines) {
+        if ($line =~ /^>(.*)/) {
+            $current_id = $1
+            $sequences{$current_id} = ""
+        } elsif (defined $current_id) {
+            # Strip whitespace
+            my $seq = $line |> trim
+            $sequences{$current_id} .= $seq
+        }
+    }
+    \%sequences
+}
+
+my $data = qq{
+>Rosetta_Code
+MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKGVVVVKN
+REMEVVVELLLGAICVM
+>Another_Sequence
+VGDGTQDNLSGAEKGVVVVKN
+}
+
+my $res = Rosetta::Fasta::parse($data)
+assert_eq exists $res->{Rosetta_Code}, 1, "Found Rosetta_Code"
+assert_eq length($res->{Rosetta_Code}), 77, "Rosetta_Code length matches"
+assert_eq $res->{Another_Sequence}, "VGDGTQDNLSGAEKGVVVVKN", "Another_Sequence matches"
+
+test_run

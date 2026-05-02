@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Generate random chess position
+
+fn Rosetta::RandomChess::generate() {
+    my @pieces = ("K", "Q", "R", "R", "B", "B", "N", "N")
+    my @white = map { _ . "w" } @pieces
+    my @black = map { _ . "b" } @pieces
+    
+    # Add some pawns
+    for (1..8) { push @white, "Pw"; push @black, "Pb" }
+    
+    my @all = (@white, @black)
+    shuffle(@all)
+    
+    my @board
+    for (0..63) { push @board, "." }
+    
+    my @squares = 0:63
+    shuffle(@squares)
+    
+    # Place a random number of pieces
+    my $count = int(rand(len(@all))) + 2 # at least 2 kings
+    for (my $i = 0; $i < $count; $i++) {
+        my $sq = $squares[$i]
+        $board[$sq] = $all[$i]
+    }
+    
+    # Ensure kings are present (very basic legal check)
+    if (!(~> @board grep { /Kw/ })) { $board[$squares[len(@board)-1]] = "Kw" }
+    if (!(~> @board grep { /Kb/ })) { $board[$squares[len(@board)-2]] = "Kb" }
+    
+    \@board
+}
+
+my $board = Rosetta::RandomChess::generate()
+assert_eq len(@$board), 64, "Board has 64 squares"
+my @kw = ~> @$board grep { /Kw/ }
+assert_ok len(@kw) >= 1, "White king present"
+my @kb = ~> @$board grep { /Kb/ }
+assert_ok len(@kb) >= 1, "Black king present"
+
+test_run

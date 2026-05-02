@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Constrained genericity
+
+fn Rosetta::Generic::process($obj) {
+    # In Stryke, we can use eval to catch method call failures on objects.
+    my $res
+    eval {
+        $res = $obj->calculate()
+    };
+    if ($@) {
+        die "Object does not respond to 'calculate' or execution failed"
+    }
+    $res
+}
+
+class Adder {
+    fn calculate() { 42 }
+}
+
+class Subtractor {
+    # No calculate method
+}
+
+my $a = Adder()
+my $s = Subtractor()
+
+assert_eq Rosetta::Generic::process($a), 42, "Works with Adder"
+
+# Test failure case
+my $ok = 1
+eval {
+    Rosetta::Generic::process($s)
+};
+if ($@) {
+    $ok = 0
+}
+assert_eq $ok, 0, "Fails with Subtractor"
+
+test_run

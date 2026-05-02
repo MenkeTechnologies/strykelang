@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::error::{ErrorKind, PerlError, PerlResult};
 use crate::interpreter::Interpreter;
-use crate::lexer::{Lexer, LITERAL_DOLLAR_IN_DQUOTE};
+use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 
 /// True when `[` after `expr` is chained array access (`$r->{k}[0]`, `$a[1][2]`, `$$r[0]`).
@@ -14924,6 +14924,11 @@ impl Parser {
         'istr: while i < chars.len() {
             if chars[i] == LITERAL_DOLLAR_IN_DQUOTE {
                 literal.push('$');
+                i += 1;
+                continue;
+            }
+            if chars[i] == LITERAL_AT_IN_DQUOTE {
+                literal.push('@');
                 i += 1;
                 continue;
             }

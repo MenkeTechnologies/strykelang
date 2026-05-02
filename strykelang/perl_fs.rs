@@ -30,8 +30,18 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
 /// `{abc}` brace expansion — both wired through to the expander in
 /// zshrs ≥0.10.4.
 fn stryke_glob(pattern: &str) -> Vec<String> {
-    zsh::glob::glob_with_options(
-        pattern,
+    // zshrs glob fails to match wildcards behind a leading `./` (works for
+    // literal filenames but not patterns like `./lib/*.stk`). Strip the
+    // prefix before delegating, then re-prepend it to each result so callers
+    // see the path they asked for. `./` is semantic-equivalent to no prefix
+    // (current directory), so this normalisation is safe.
+    let (stripped, had_dot_slash) = if let Some(rest) = pattern.strip_prefix("./") {
+        (rest, true)
+    } else {
+        (pattern, false)
+    };
+    let results = zsh::glob::glob_with_options(
+        stripped,
         zsh::glob::GlobOptions {
             null_glob: true,
             mark_dirs: false,
@@ -45,7 +55,21 @@ fn stryke_glob(pattern: &str) -> Vec<String> {
             bare_glob_qual: true,
             brace_ccl: true,
         },
-    )
+    );
+    if had_dot_slash {
+        results
+            .into_iter()
+            .map(|p| {
+                if p.starts_with("./") {
+                    p
+                } else {
+                    format!("./{}", p)
+                }
+            })
+            .collect()
+    } else {
+        results
+    }
 }
 
 /// `slurp`/`cat`/`c` payload — accepts a literal path OR a zsh-style glob

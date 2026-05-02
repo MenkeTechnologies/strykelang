@@ -430,13 +430,10 @@ fn register_filter(args: &[PerlValue], line: usize, before: bool) -> Result<Perl
                 line,
             )
         })?;
-    let only = opts
-        .get("only")
-        .map(|v| split_action_list(v))
-        .unwrap_or_default();
+    let only = opts.get("only").map(split_action_list).unwrap_or_default();
     let except = opts
         .get("except")
-        .map(|v| split_action_list(v))
+        .map(split_action_list)
         .unwrap_or_default();
     let entry = FilterEntry {
         method,
@@ -973,9 +970,7 @@ pub(crate) fn web_jwt_decode(args: &[PerlValue], _line: usize) -> Result<PerlVal
         Ok(s) => s,
         Err(_) => return Ok(PerlValue::UNDEF),
     };
-    crate::native_data::json_decode(json)
-        .map(|v| v)
-        .or(Ok(PerlValue::UNDEF))
+    crate::native_data::json_decode(json).or(Ok(PerlValue::UNDEF))
 }
 
 fn hmac_sha256_b64(input: &str, key: &str) -> String {
@@ -1366,7 +1361,7 @@ fn inline_md(s: &str) -> String {
     while i < bytes.len() {
         // Bold: **...**
         if i + 1 < bytes.len() && bytes[i] == b'*' && bytes[i + 1] == b'*' {
-            if let Some(end) = find_close_marker(&bytes, i + 2, b"**") {
+            if let Some(end) = find_close_marker(bytes, i + 2, b"**") {
                 let inner = std::str::from_utf8(&bytes[i + 2..end]).unwrap_or("");
                 out.push_str(&format!("<strong>{}</strong>", inner));
                 i = end + 2;
@@ -1375,7 +1370,7 @@ fn inline_md(s: &str) -> String {
         }
         // Italic: *...*
         if bytes[i] == b'*' {
-            if let Some(end) = find_close_marker(&bytes, i + 1, b"*") {
+            if let Some(end) = find_close_marker(bytes, i + 1, b"*") {
                 let inner = std::str::from_utf8(&bytes[i + 1..end]).unwrap_or("");
                 out.push_str(&format!("<em>{}</em>", inner));
                 i = end + 1;
@@ -1384,7 +1379,7 @@ fn inline_md(s: &str) -> String {
         }
         // Inline code: `...`
         if bytes[i] == b'`' {
-            if let Some(end) = find_close_marker(&bytes, i + 1, b"`") {
+            if let Some(end) = find_close_marker(bytes, i + 1, b"`") {
                 let inner = std::str::from_utf8(&bytes[i + 1..end]).unwrap_or("");
                 out.push_str(&format!("<code>{}</code>", inner));
                 i = end + 1;
@@ -1393,9 +1388,9 @@ fn inline_md(s: &str) -> String {
         }
         // Links: [text](href)
         if bytes[i] == b'[' {
-            if let Some(close_text) = find_close_marker(&bytes, i + 1, b"]") {
+            if let Some(close_text) = find_close_marker(bytes, i + 1, b"]") {
                 if close_text + 1 < bytes.len() && bytes[close_text + 1] == b'(' {
-                    if let Some(close_url) = find_close_marker(&bytes, close_text + 2, b")") {
+                    if let Some(close_url) = find_close_marker(bytes, close_text + 2, b")") {
                         let text = std::str::from_utf8(&bytes[i + 1..close_text]).unwrap_or("");
                         let url =
                             std::str::from_utf8(&bytes[close_text + 2..close_url]).unwrap_or("");
@@ -3408,7 +3403,7 @@ fn encode_session_payload(map: &IndexMap<String, PerlValue>) -> String {
 
 fn base64url_encode(input: &[u8]) -> String {
     const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let mut out = String::with_capacity((input.len() * 4 + 2) / 3);
+    let mut out = String::with_capacity((input.len() * 4).div_ceil(3));
     let mut i = 0;
     while i + 3 <= input.len() {
         let n = ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);

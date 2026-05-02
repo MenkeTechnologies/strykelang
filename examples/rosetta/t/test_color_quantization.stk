@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Color quantization
+
+fn Rosetta::ColorQuant::quantize($color, $bits) {
+    # Simple quantization: reduce precision of each component
+    my $shift = 8 - $bits
+    my $r = ($color->{r} >> $shift) << $shift
+    my $g = ($color->{g} >> $shift) << $shift
+    my $b = ($color->{b} >> $shift) << $shift
+    { r => $r, g => $g, b => $b }
+}
+
+my $color = { r => 255, g => 128, b => 64 }
+my $q4 = Rosetta::ColorQuant::quantize($color, 4)
+
+assert_eq $q4->{r}, 240, "Red quantized to 4 bits"
+assert_eq $q4->{g}, 128, "Green quantized to 4 bits"
+assert_eq $q4->{b}, 64, "Blue quantized to 4 bits"
+
+my $q2 = Rosetta::ColorQuant::quantize($color, 2)
+assert_eq $q2->{r}, 192, "Red quantized to 2 bits"
+
+test_run

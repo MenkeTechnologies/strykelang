@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Interactive programming (repl)
+
+fn Rosetta::Repl::demo() {
+    # Stryke has a built-in REPL that can be launched using:
+    # stryke -i
+    # Since we cannot easily test an interactive REPL inside a non-interactive test script,
+    # we just document its usage here.
+    "stryke -i"
+}
+
+my $cmd = Rosetta::Repl::demo()
+assert_eq $cmd, "stryke -i", "REPL command documented"
+
+test_run

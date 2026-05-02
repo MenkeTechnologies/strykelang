@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute Computer/Zero
+
+fn Rosetta::ComputerZero::run($code) {
+    my $acc = 0
+    my $pc = 0
+    my %memory
+    
+    # Initialize memory with code (addresses 0-9)
+    for (my $i = 0; $i < len(@$code); $i++) {
+        $memory{$i} = $code->[$i]
+    }
+    
+    while ($pc < 100) {
+        my $instr = $memory{$pc}
+        # Instruction format: Opcode (first digit), Address (rest)
+        # We'll use a simplified version: string commands for clarity
+        my ($op, $addr) = @$instr
+        
+        if ($op eq "LAD") { # Load
+            $acc = $memory{$addr}
+        } elsif ($op eq "SAD") { # Store
+            $memory{$addr} = $acc
+        } elsif ($op eq "ADD") { # Add
+            $acc = ($acc + $memory{$addr}) & 0xFF
+        } elsif ($op eq "SUB") { # Subtract
+            $acc = ($acc - $memory{$addr}) & 0xFF
+        } elsif ($op eq "JMP") { # Jump
+            $pc = $addr
+            next
+        } elsif ($op eq "JAZ") { # Jump if zero
+            if ($acc == 0) { $pc = $addr; next }
+        } elsif ($op eq "STP") { # Stop
+            last
+        }
+        $pc++
+    }
+    \%memory
+}
+
+# Example program: Store 10 at addr 5, 20 at addr 6, add them, store at addr 7
+my $prog = [
+    ["LAD", 8],
+    ["ADD", 9],
+    ["SAD", 7],
+    ["STP", 0],
+    undef, # spacer
+    undef,
+    undef,
+    0, # addr 7: result
+    10, # addr 8: value 1
+    20  # addr 9: value 2
+]
+
+my $mem = Rosetta::ComputerZero::run($prog)
+assert_eq $mem->{7}, 30, "Computer/Zero execution: 10 + 20 = 30"
+
+test_run

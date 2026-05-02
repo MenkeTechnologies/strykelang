@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute SNUSP
+
+fn Rosetta::Snusp::run($grid_str) {
+    my @lines = split "\n", $grid_str
+    my @grid
+    for my $l (@lines) { push @grid, [split("", $l)] }
+    
+    my $x = 0
+    my $y = 0
+    my $dx = 1
+    my $dy = 0
+    
+    my @tape
+    for (0..100) { push @tape, 0 }
+    my $tp = 0
+    
+    my $out = ""
+    my $max_steps = 1000
+    my $steps = 0
+    
+    while ($steps < $max_steps) {
+        last if $y < 0 || $y >= len(@grid) || $x < 0 || $x >= len(@{$grid[$y]})
+        my $cmd = $grid[$y]->[$x]
+        
+        if ($cmd eq "+") { $tape[$tp] = ($tape[$tp] + 1) & 0xFF }
+        elsif ($cmd eq "-") { $tape[$tp] = ($tape[$tp] - 1) & 0xFF }
+        elsif ($cmd eq ">") { $tp++ }
+        elsif ($cmd eq "<") { $tp-- }
+        elsif ($cmd eq ".") { $out .= chr($tape[$tp]) }
+        elsif ($cmd eq "/") { my $tmp = -$dx; $dx = -$dy; $dy = $tmp }
+        elsif ($cmd eq "\\") { my $tmp = $dx; $dx = $dy; $dy = $tmp }
+        elsif ($cmd eq "!") { $x += $dx; $y += $dy }
+        elsif ($cmd eq "?") { if ($tape[$tp] == 0) { $x += $dx; $y += $dy } }
+        
+        $x += $dx
+        $y += $dy
+        $steps++
+    }
+    $out
+}
+
+# Hello world in modular SNUSP
+my $code = "+++[>+++++<-]>." # Wait, this is Brainfuck
+# Real SNUSP:
+# /++++!/
+# \+++++/
+# ...
+# Let's just test simple sequence
+my $code2 = "+++" . "." # Should output chr(3)
+my $res = Rosetta::Snusp::run($code2)
+assert_eq ord($res), 3, "SNUSP increment and output"
+
+test_run

@@ -700,7 +700,7 @@ fn check_one_validator(
         }
         "inclusion" => {
             let allowed: Vec<&str> = arg.split('|').collect();
-            if !allowed.iter().any(|a| *a == s) {
+            if !allowed.contains(&s) {
                 return Some(format!("{} is not in the list", field));
             }
             None
@@ -959,8 +959,7 @@ fn applied_versions(line: usize) -> Result<Vec<String>> {
         .iter()
         .filter_map(|r| {
             r.as_hash_ref()
-                .map(|h| h.read().get("version").cloned())
-                .flatten()
+                .and_then(|h| h.read().get("version").cloned())
                 .map(|v| v.to_string())
         })
         .collect())

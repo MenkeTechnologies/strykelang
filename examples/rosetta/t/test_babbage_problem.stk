@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Babbage problem
+
+fn Rosetta::Babbage::solve() {
+    # Smallest positive integer whose square ends in 269,696
+    my $target = 269696
+    my $i = 1
+    while (1) {
+        my $sq = $i * $i
+        if ($sq % 1000000 == $target) {
+            return $i
+        }
+        $i++
+    }
+}
+
+my $res = Rosetta::Babbage::solve()
+assert_eq $res, 25264, "Babbage problem solution"
+my $sq_mod = ($res * $res) % 1000000
+assert_eq $sq_mod, 269696, "Verification of square"
+
+test_run

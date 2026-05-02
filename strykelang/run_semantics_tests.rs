@@ -5069,7 +5069,7 @@ fn range_hex_uppercase_wins_when_either_endpoint_has_it() {
     assert_eq!(
         rs(r#"join ",", (0x00:0xFF:3)"#)
             .split(',')
-            .last()
+            .next_back()
             .unwrap()
             .to_string(),
         "0xFF"

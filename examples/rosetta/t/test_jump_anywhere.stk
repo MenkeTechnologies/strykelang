@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jump anywhere
+
+my $val = 0
+my $skip = 1
+
+if ($skip) {
+    goto SKIP_INC
+}
+
+$val++
+
+SKIP_INC:
+assert_eq $val, 0, "Jumped over increment using goto"
+
+test_run

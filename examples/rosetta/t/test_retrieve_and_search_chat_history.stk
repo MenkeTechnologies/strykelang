@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Retrieve and search chat history
+
+fn Rosetta::ChatHistory::search($history, $query) {
+    # history is an array of +{ user => ..., text => ..., timestamp => ... }
+    # Search for user or text matching the query
+    ~> @$history grep { $_->{user} =~ /$query/i || $_->{text} =~ /$query/i }
+}
+
+my @history = (
+    +{ user => "Alice", text => "Hello everyone!", timestamp => 1714650000 },
+    +{ user => "Bob",   text => "Hi Alice, how are you?", timestamp => 1714650060 },
+    +{ user => "Alice", text => "I am doing great, just coding in Stryke.", timestamp => 1714650120 }
+)
+
+my @results = Rosetta::ChatHistory::search(\@history, "great")
+assert_eq len(@results), 1, "Found one message with 'great'"
+assert_eq $results[0]->{user}, "Alice", "Message was from Alice"
+
+my @all = Rosetta::ChatHistory::search(\@history, "Alice")
+assert_eq len(@all), 3, "Found three messages mentioning Alice (as user or in text)"
+
+test_run
