@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Undefined values
+
+fn Rosetta::Undef::demo() {
+    my $var = undef
+    my $is_def = defined($var)
+    
+    my %h
+    my $exists = exists $h{foo}
+    
+    ($var, $is_def, $exists)
+}
+
+my ($v, $d, $e) = Rosetta::Undef::demo()
+assert_eq $v, undef, "Variable is undef"
+assert_eq $d, 0, "defined() returns false"
+assert_eq $e, 0, "exists in hash returns false"
+
+test_run

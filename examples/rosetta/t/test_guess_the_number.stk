@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Guess the number
+
+fn Rosetta::GuessNumber::play($secret, @guesses) {
+    my @results
+    for my $guess (@guesses) {
+        if ($guess < $secret) {
+            push @results, "Too low"
+        } elsif ($guess > $secret) {
+            push @results, "Too high"
+        } else {
+            push @results, "Correct"
+            last
+        }
+    }
+    \@results
+}
+
+my $secret = 42
+my $res = Rosetta::GuessNumber::play($secret, (10, 50, 42))
+
+assert_eq $res->[0], "Too low", "First guess too low"
+assert_eq $res->[1], "Too high", "Second guess too high"
+assert_eq $res->[2], "Correct", "Third guess correct"
+
+test_run

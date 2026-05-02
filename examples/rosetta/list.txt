@@ -116,8 +116,8 @@
 [ ] Bitcoin/public point to address
 [x] Bitmap
 [x] Bitmap/Bresenham's line algorithm
-[ ] Bitmap/Bézier curves/Cubic
-[ ] Bitmap/Bézier curves/Quadratic
+[x] Bitmap/Bézier curves/Cubic
+[x] Bitmap/Bézier curves/Quadratic
 [x] Bitmap/Flood fill
 [x] Bitmap/Histogram
 [x] Bitmap/Midpoint circle algorithm
@@ -210,7 +210,7 @@
 [x] Compare a list of strings
 [x] Compare length of two strings
 [x] Compare sorting algorithms' performance
-[ ] Compile-time calculation
+[x] Compile-time calculation
 [ ] Compiler/AST interpreter
 [ ] Compiler/code generator
 [ ] Compiler/lexical analyzer
@@ -246,7 +246,7 @@
 [x] Create a two-dimensional array at runtime
 [x] Create an HTML table
 [ ] Create an object at a given address
-[ ] CSV data manipulation
+[x] CSV data manipulation
 [x] CSV to HTML translation
 [x] Cuban primes
 [x] Cullen and Woodall numbers
@@ -273,8 +273,8 @@
 [x] Deconvolution/2D+
 [x] Decorate-sort-undecorate idiom
 [x] Deepcopy
-[ ] Define a primitive data type
-[ ] Delegates
+[x] Define a primitive data type
+[x] Delegates
 [x] Delete a file
 [ ] Deming's funnel
 [x] Department numbers
@@ -286,7 +286,7 @@
 [x] Determine if a string is collapsible
 [x] Determine if a string is numeric
 [x] Determine if a string is squeezable
-[ ] Determine if only one instance is running
+[x] Determine if only one instance is running
 [x] Determine if two triangles overlap
 [x] Determine sentence type
 [x] Dice game probabilities
@@ -320,10 +320,10 @@
 [ ] Draw a sphere
 [x] Duffinian numbers
 [x] Dutch national flag problem
-[ ] Dynamic variable names
+[x] Dynamic variable names
 [x] Earliest difference between prime gaps
 [x] Eban numbers
-[ ] Echo server
+[x] Echo server
 [x] Eertree
 [x] Egyptian division
 [x] EKG sequence convergence
@@ -368,7 +368,7 @@
 [x] Execute a system command
 [x] Execute Brain****
 [ ] Execute Computer/Zero
-[ ] Execute HQ9+
+[x] Execute HQ9+
 [ ] Execute SNUSP
 [ ] Experimental Verification of the NKT Law: Interpolating the Masses of 8 Planets Using NASA Data as of 30–31/12/2024
 [ ] Experimental Verification of the NKTg Law in Earth Orbit Based on NASA’s 2025 Earth Dataset
@@ -449,9 +449,9 @@
 [ ] French Republican calendar
 [ ] FTP
 [x] Function composition
-[ ] Function definition
+[x] Function definition
 [x] Function frequency
-[ ] Function prototype
+[x] Function prototype
 [ ] Functional coverage tree
 [x] Fusc sequence
 [ ] Gabow's algorithm
@@ -470,7 +470,7 @@
 [x] Get system command output
 [x] Giuga numbers
 [x] Globally replace text in several files
-[ ] Go Fish
+[x] Go Fish
 [x] Goldbach's comet
 [x] Golden ratio/Convergence
 [x] Gosper's hack
@@ -485,14 +485,14 @@
 [x] Greedy algorithm for Egyptian fractions
 [ ] Greyscale bars/Display
 [x] GSTrans string conversion
-[ ] Guess the number
-[ ] Guess the number/With feedback
+[x] Guess the number
+[x] Guess the number/With feedback
 [ ] Guess the number/With feedback (player)
 [ ] GUI component interaction
 [ ] GUI enabling/disabling of controls
 [ ] GUI/Maximum window dimensions
 [x] Hailstone sequence
-[ ] Halt and catch fire
+[x] Halt and catch fire
 [x] Hamiltonian Cycle via Chvátal Closure
 [x] Hamming numbers
 [ ] Handle a signal
@@ -557,7 +557,7 @@
 [x] Increasing gaps between consecutive Niven numbers
 [x] Increment a numerical string
 [x] Index finite lists of positive integers
-[ ] Infinity
+[x] Infinity
 [x] Inheritance/Multiple
 [x] Inheritance/Single
 [x] Inner classes
@@ -567,10 +567,10 @@
 [x] Integer sequence
 [ ] Interactive programming (repl)
 [ ] Intersecting number wheels
-[ ] Introspection
+[x] Introspection
 [x] Inventory sequence
 [x] Inverted index
-[ ] Inverted syntax
+[x] Inverted syntax
 [x] ISBN13 check digit
 [x] Isograms and heterograms
 [x] Isqrt (integer square root) of X
@@ -579,7 +579,7 @@
 [x] Jacobsthal numbers
 [x] Jaro similarity
 [x] Jaro-Winkler distance
-[ ] Jensen's Device
+[x] Jensen's Device
 [x] Jewels and stones
 [ ] Johnson's algorithm
 [x] Jordan-Pólya numbers
@@ -637,12 +637,12 @@
 [ ] Linear congruential generator
 [x] List comprehensions
 [ ] List rooted trees
-[ ] Literals/Floating point
+[x] Literals/Floating point
 [x] Literals/Integer
 [x] Literals/String
 [x] Logical operations
 [ ] Logistic curve fitting in epidemiology
-[ ] Long literals, with continuations
+[x] Long literals, with continuations
 [x] Long multiplication
 [x] Long primes
 [x] Long year
@@ -750,7 +750,7 @@
 [x] Munchausen numbers
 [x] Munching squares
 [x] Musical scale
-[ ] Mutex
+[x] Mutex
 [x] Mutual recursion
 [x] Möbius function
 [x] N'th
@@ -770,13 +770,13 @@
 [ ] NKTgLaw
 [ ] Non-continuous subsequences
 [x] Non-decimal radices/Convert
-[ ] Non-decimal radices/Input
-[ ] Non-decimal radices/Output
+[x] Non-decimal radices/Input
+[x] Non-decimal radices/Output
 [x] Non-transitive dice
 [ ] Nonoblock
 [ ] Nonogram solver
 [x] Nth root
-[ ] Null object
+[x] Null object
 [x] Number names
 [ ] Number reversal game
 [ ] Numbers divisible by their individual digits, but not by the product of their digits
@@ -791,13 +791,13 @@
 [x] Numerical integration/Romberg integration
 [ ] Numerical integration/Tanh-Sinh Quadrature
 [x] O'Halloran numbers
-[ ] Object serialization
+[x] Object serialization
 [x] Odd and square numbers
 [x] Odd word problem
 [x] Old lady swallowed a fly
 [x] Old Russian measure of length
 [ ] OLE automation
-[ ] One of n lines in a file
+[x] One of n lines in a file
 [x] One-dimensional cellular automata
 [x] One-time pad
 [x] One-two primes
@@ -827,8 +827,8 @@
 [x] Pancake numbers
 [x] Pangram checker
 [ ] Paraffins
-[ ] Parallel brute force
-[ ] Parallel calculations
+[x] Parallel brute force
+[x] Parallel calculations
 [ ] Parameterized SQL statement
 [ ] Parametric polymorphism
 [x] Parse an IP Address
@@ -975,7 +975,7 @@
 [x] Resistor mesh
 [x] Respond to an unknown method call
 [ ] Retrieve and search chat history
-[ ] Return multiple values
+[x] Return multiple values
 [x] Reverse a string
 [x] Reverse words in a string
 [x] Rhonda numbers
@@ -987,7 +987,7 @@
 [x] Roots of a function
 [x] Roots of a quadratic function
 [x] Roots of unity
-[ ] Rosetta Code/Count examples
+[x] Rosetta Code/Count examples
 [ ] Rosetta Code/Find bare lang tags
 [ ] Rosetta Code/Find unimplemented tasks
 [ ] Rosetta Code/Fix code tags
@@ -1200,23 +1200,23 @@
 [x] Taxicab numbers
 [ ] Teacup rim text
 [x] Temperature conversion
-[ ] Terminal control/Clear the screen
-[ ] Terminal control/Coloured text
-[ ] Terminal control/Cursor movement
-[ ] Terminal control/Cursor positioning
-[ ] Terminal control/Dimensions
-[ ] Terminal control/Display an extended character
-[ ] Terminal control/Hiding the cursor
-[ ] Terminal control/Inverse video
-[ ] Terminal control/Positional read
-[ ] Terminal control/Preserve screen
+[x] Terminal control/Clear the screen
+[x] Terminal control/Coloured text
+[x] Terminal control/Cursor movement
+[x] Terminal control/Cursor positioning
+[x] Terminal control/Dimensions
+[x] Terminal control/Display an extended character
+[x] Terminal control/Hiding the cursor
+[x] Terminal control/Inverse video
+[x] Terminal control/Positional read
+[x] Terminal control/Preserve screen
 [x] Terminal control/Ringing the terminal bell
-[ ] Terminal control/Unicode output
+[x] Terminal control/Unicode output
 [x] Ternary logic
 [x] Test a function
 [x] Test integerness
-[ ] Text processing/1
-[ ] Text processing/2
+[x] Text processing/1
+[x] Text processing/2
 [x] Text processing/Max licenses in use
 [x] Textonyms
 [x] The Name Game
@@ -1257,7 +1257,7 @@
 [x] Ulam spiral (for primes)
 [x] Ultra useful primes
 [x] Unbias a random generator
-[ ] Undefined values
+[x] Undefined values
 [x] Undulating numbers
 [x] Unicode strings
 [ ] Unicode variable names

@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Literals/Floating point
+
+fn Rosetta::FloatLiterals::demo() {
+    my $a = 3.14159
+    my $b = 1.0e-10
+    my $c = 2.0
+    my $d = 0.5
+    
+    ($a, $b, $c, $d)
+}
+
+my ($a, $b, $c, $d) = Rosetta::FloatLiterals::demo()
+assert_eq $a, 3.14159, "Standard decimal"
+assert_eq $b, 1e-10, "Scientific notation"
+assert_eq $c, 2.0, "Trailing dot"
+assert_eq $d, 0.5, "Leading dot"
+
+test_run

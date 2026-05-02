@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitmap/Bézier curves/Quadratic
+
+fn Rosetta::Bezier::quadratic($p0, $p1, $p2, $steps) {
+    my @points
+    for (my $i = 0; $i <= $steps; $i++) {
+        my $t = $i / $steps
+        my $omt = 1 - $t
+        # B(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
+        my $x = $omt**2 * $p0->[0] + 2 * $omt * $t * $p1->[0] + $t**2 * $p2->[0]
+        my $y = $omt**2 * $p0->[1] + 2 * $omt * $t * $p1->[1] + $t**2 * $p2->[1]
+        push @points, [$x, $y]
+    }
+    \@points
+}
+
+my $p0 = [0, 0]
+my $p1 = [5, 10]
+my $p2 = [10, 0]
+my $curve = Rosetta::Bezier::quadratic($p0, $p1, $p2, 10)
+
+assert_eq len(@$curve), 11, "Curve has 11 points"
+assert_eq $curve->[0]->[0], 0, "Start x"
+assert_eq $curve->[10]->[0], 10, "End x"
+assert_eq $curve->[5]->[0], 5, "Midpoint x"
+assert_eq $curve->[5]->[1], 5, "Midpoint y"
+
+test_run

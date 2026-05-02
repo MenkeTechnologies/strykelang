@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Inverted syntax
+
+fn Rosetta::InvertedSyntax::demo($val) {
+    my $res = ""
+    $res = "positive" if $val > 0
+    $res = "negative" if $val < 0
+    $res = "zero" if $val == 0
+    $res
+}
+
+assert_eq Rosetta::InvertedSyntax::demo(5), "positive", "if modifier positive"
+assert_eq Rosetta::InvertedSyntax::demo(-5), "negative", "if modifier negative"
+assert_eq Rosetta::InvertedSyntax::demo(0), "zero", "if modifier zero"
+
+test_run

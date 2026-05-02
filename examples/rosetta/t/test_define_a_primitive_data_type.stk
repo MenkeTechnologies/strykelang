@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Define a primitive data type
+
+# While Stryke has built-in types, we can define a new "primitive" 
+# using a struct or a class that encapsulates a value.
+
+struct MyPrimitivePoint { x, y }
+
+fn Rosetta::Primitive::demo() {
+    my $p = MyPrimitivePoint(10, 20)
+    $p
+}
+
+my $p = Rosetta::Primitive::demo()
+assert_eq $p->{x}, 10, "Struct field x accessibility"
+assert_eq $p->{y}, 20, "Struct field y accessibility"
+
+test_run

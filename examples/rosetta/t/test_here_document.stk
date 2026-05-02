@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Here document
+
+fn Rosetta::HereDoc::demo() {
+    # Using qq{} as a block string / here-doc equivalent
+    my $str = qq{
+Line 1
+Line 2
+}
+    $str |> trim
+}
+
+my $out = Rosetta::HereDoc::demo()
+assert_eq $out, "Line 1\nLine 2", "Here document matches"
+
+test_run

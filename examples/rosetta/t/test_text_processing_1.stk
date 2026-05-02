@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Text processing/1
+
+fn Rosetta::TextProcessing1::process($text) {
+    # Task: Read values and calculate averages
+    my @lines = split "\n", $text
+    my $total = 0
+    my $count = 0
+    for my $line (@lines) {
+        if ($line =~ /Value:\s*(\d+)/) {
+            $total += $1
+            $count++
+        }
+    }
+    $count > 0 ? $total / $count : 0
+}
+
+my $input = "Data Point 1\nValue: 10\nData Point 2\nValue: 20\nData Point 3\nValue: 30"
+my $avg = Rosetta::TextProcessing1::process($input)
+assert_eq $avg, 20, "Text processing/1 average"
+
+test_run

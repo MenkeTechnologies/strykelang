@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-decimal radices/Output
+
+fn Rosetta::RadixOutput::to_radix($n) {
+    my $hex = sprintf("%x", $n)
+    my $oct = sprintf("%o", $n)
+    my $bin = sprintf("%b", $n) # Stryke sprintf supports %b for binary
+    
+    ($hex, $oct, $bin)
+}
+
+my ($h, $o, $b) = Rosetta::RadixOutput::to_radix(255)
+assert_eq $h, "ff", "Hexadecimal output"
+assert_eq $o, "377", "Octal output"
+assert_eq $b, "11111111", "Binary output"
+
+test_run

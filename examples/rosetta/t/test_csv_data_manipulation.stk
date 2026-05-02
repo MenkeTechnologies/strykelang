@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: CSV data manipulation
+
+fn Rosetta::CsvData::add_column($csv, $col_name, $val_sub) {
+    my @lines = split "\n", $csv
+    my @new_lines
+    
+    # Header
+    my $header = shift @lines
+    push @new_lines, "$header,$col_name"
+    
+    # Data
+    my $i = 0
+    for my $line (@lines) {
+        my $new_val = $val_sub->($line, $i)
+        push @new_lines, "$line,$new_val"
+        $i++
+    }
+    
+    join "\n", @new_lines
+}
+
+my $csv = "Name,Age\nAlice,30\nBob,25"
+my $new_csv = Rosetta::CsvData::add_column($csv, "City", sub {
+    my ($line, $idx) = @_
+    $idx == 0 ? "New York" : "London"
+})
+
+assert_eq index($new_csv, "Name,Age,City") != -1, 1, "Header updated"
+assert_eq index($new_csv, "Alice,30,New York") != -1, 1, "Alice updated"
+assert_eq index($new_csv, "Bob,25,London") != -1, 1, "Bob updated"
+
+test_run

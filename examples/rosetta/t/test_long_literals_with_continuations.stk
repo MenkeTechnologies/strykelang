@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Long literals, with continuations
+
+fn Rosetta::LongLiterals::demo() {
+    # Statement continuation using \
+    my $sum = 1 + \
+              2 + \
+              3
+              
+    # String continuation using .
+    my $str = "This is a very long string " .
+              "that is continued on the next line."
+              
+    ($sum, $str)
+}
+
+my ($s, $t) = Rosetta::LongLiterals::demo()
+assert_eq $s, 6, "Statement continuation"
+assert_eq $t, "This is a very long string that is continued on the next line.", "String continuation"
+
+test_run

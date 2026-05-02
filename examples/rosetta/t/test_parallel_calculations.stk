@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parallel calculations
+
+fn Rosetta::ParallelCalc::factorize_all(@nums) {
+    # pmap automatically parallelizes the work across all cores.
+    my @res = ~> @nums pmap {
+        my $n = _
+        my @factors
+        for (my $i = 1; $i <= sqrt($n); $i++) {
+            if ($n % $i == 0) {
+                push @factors, $i
+                push @factors, $n / $i if $i * $i != $n
+            }
+        }
+        [sort { $a <=> $b } @factors]
+    }
+    \@res
+}
+
+my @nums = (12, 18, 20)
+my $res = Rosetta::ParallelCalc::factorize_all(@nums)
+
+assert_eq join(",", @{$res->[0]}), "1,2,3,4,6,12", "Factors of 12"
+assert_eq join(",", @{$res->[1]}), "1,2,3,6,9,18", "Factors of 18"
+assert_eq join(",", @{$res->[2]}), "1,2,4,5,10,20", "Factors of 20"
+
+test_run

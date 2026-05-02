@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fork
+
+fn Rosetta::Fork::run() {
+    my $pid = fork()
+    if (!defined $pid) {
+        die "Fork failed"
+    }
+    if ($pid == 0) {
+        # Child process
+        exit 0
+    } else {
+        # Parent process
+        waitpid($pid, 0)
+        return $pid
+    }
+}
+
+my $pid = Rosetta::Fork::run()
+assert_ok $pid > 0, "Successfully forked child process"
+
+test_run

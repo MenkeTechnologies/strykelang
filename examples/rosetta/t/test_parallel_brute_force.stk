@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parallel brute force
+
+fn Rosetta::ParallelBruteForce::find_md5_prefix($prefix, $max_attempts) {
+    # Parallel brute force to find a number whose MD5 starts with $prefix
+    # We use mysync to share the found result and stop others.
+    mysync $found = undef
+    
+    # Check in chunks to reduce overhead
+    my $chunk_size = 1000
+    for (my $start = 0; $start < $max_attempts; $start += $chunk_size) {
+        my $end = $start + $chunk_size - 1
+        $start:$end |> pmap {
+            return if defined $found
+            my $hash = md5(_)
+            if ($hash =~ /^$prefix/) {
+                $found = _
+            }
+        };
+        last if defined $found
+    }
+    $found
+}
+
+# Find a number whose MD5 starts with '00'
+my $res = Rosetta::ParallelBruteForce::find_md5_prefix("00", 100000)
+assert_ok defined($res), "Found a matching number"
+my $hash = md5($res)
+assert_eq substr($hash, 0, 2), "00", "MD5 prefix matches"
+
+test_run

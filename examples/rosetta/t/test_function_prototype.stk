@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Function prototype
+
+# Stryke supports explicit function signatures with parameters.
+fn Rosetta::FuncProto::multiply($a, $b) {
+    $a * $b
+}
+
+# It also supports type constraints in some contexts, but simple parameters act as prototypes.
+my $res = Rosetta::FuncProto::multiply(6, 7)
+assert_eq $res, 42, "Function prototype parameters used successfully"
+
+test_run

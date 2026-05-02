@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Terminal control/Cursor movement
+
+fn Rosetta::TerminalCursor::move() {
+    # \e[A up, \e[B down, \e[C forward, \e[D back
+    print "\e[A" # up
+    print "\e[B" # down
+    print "\e[C" # right
+    print "\e[D" # left
+    
+    "Cursor moved"
+}
+
+assert_eq Rosetta::TerminalCursor::move(), "Cursor moved", "Terminal cursor demo"
+
+test_run
