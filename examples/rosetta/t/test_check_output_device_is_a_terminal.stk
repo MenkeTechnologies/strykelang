@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Check output device is a terminal
+
+fn Rosetta::IsOutputTerminal::check() {
+    my $is_term = has_stdout_tty()
+    
+    "Is STDOUT a terminal?" |> p
+    ($is_term ? "Yes" : "No") |> p
+    
+    # Assertions
+    assert_ok defined($is_term), "has_stdout_tty() returns a defined value"
+}
+
+Rosetta::IsOutputTerminal::check()
+test_run

@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Check input device is a terminal
+
+fn Rosetta::IsTerminal::check() {
+    # In Stryke, we can use has_stdin_tty().
+    my $is_term = has_stdin_tty()
+    
+    "Is STDIN a terminal?" |> p
+    ($is_term ? "Yes" : "No") |> p
+    
+    # Assertions
+    # In a CI environment, this might be false, but the function should exist.
+    assert_ok defined($is_term), "has_stdin_tty() returns a defined value"
+}
+
+Rosetta::IsTerminal::check()
+test_run

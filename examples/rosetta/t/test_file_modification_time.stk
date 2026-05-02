@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File modification time
+
+fn Rosetta::FileMTime::demo() {
+    my $file = "/tmp/rosetta_mtime.txt"
+    write_file($file, "test")
+    
+    # Get modification time
+    my $mtime = file_mtime($file)
+    
+    "File modification time of '$file': $mtime" |> p
+    
+    # Assertions
+    assert_ok defined($mtime), "Modification time should be defined"
+    assert_ok $mtime > 0, "Modification time should be greater than 0"
+    
+    # Clean up
+    unlink($file)
+}
+
+Rosetta::FileMTime::demo()
+test_run

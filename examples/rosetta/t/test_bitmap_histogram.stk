@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitmap/Histogram
+
+fn Rosetta::BitmapHistogram::calculate($img) {
+    my %hist = ( r => {}, g => {}, b => {} )
+    
+    for my $row (@$img) {
+        for my $pixel (@$row) {
+            $hist{r}->{$pixel->{r}}++
+            $hist{g}->{$pixel->{g}}++
+            $hist{b}->{$pixel->{b}}++
+        }
+    }
+    return \%hist
+}
+
+fn Rosetta::BitmapHistogram::demo() {
+    # Simple 2x2 image
+    my $img = [
+        [ {r=>255, g=>0, b=>0}, {r=>0, g=>255, b=>0} ],
+        [ {r=>0, g=>0, b=>255}, {r=>255, g=>255, b=>255} ]
+    ]
+    
+    my $h = Rosetta::BitmapHistogram::calculate($img)
+    
+    "Bitmap Histogram (Color Counts):" |> p
+    "Red channel counts:" |> p
+    for my $val (sort { $a <=> $b } keys %{$h->{r}}) {
+        p "  $val: " . $h->{r}->{$val}
+    }
+    
+    # Assertions
+    assert_eq $h->{r}->{255}, 2, "Red value 255 appears twice"
+    assert_eq $h->{r}->{0}, 2, "Red value 0 appears twice"
+    assert_eq $h->{g}->{255}, 2, "Green value 255 appears twice"
+    assert_eq $h->{b}->{255}, 2, "Blue value 255 appears twice"
+}
+
+Rosetta::BitmapHistogram::demo()
+test_run

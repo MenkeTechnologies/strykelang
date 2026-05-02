@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Animation
+
+fn Rosetta::Animation::marquee($text, $width, $frames) {
+    my $pad = " " x $width
+    my $full = $pad . $text . $pad
+    my $len = length($full)
+    my @rendered
+    
+    for my $i (0:($frames - 1)) {
+        my $pos = $i % ($len - $width + 1)
+        my $frame = substr($full, $pos, $width)
+        print "\r[$frame]"
+        sleep 0.05
+        push @rendered, $frame
+    }
+    print "\n"
+    return \@rendered
+}
+
+fn Rosetta::Animation::demo() {
+    "Basic Marquee Animation (10 frames):" |> p
+    my $out = Rosetta::Animation::marquee("Hello Rosetta", 15, 10)
+    
+    # Assertions
+    assert_eq len(@$out), 10, "10 frames rendered"
+    assert_eq length($out->[0]), 15, "Frame 1 width is correct"
+    assert_ok $out->[0] =~ /^ +$/, "First frame is all spaces"
+    assert_ok $out->[-1] =~ /^ +Hello Ros$/, "10th frame shifted characters in"
+}
+
+Rosetta::Animation::demo()
+test_run

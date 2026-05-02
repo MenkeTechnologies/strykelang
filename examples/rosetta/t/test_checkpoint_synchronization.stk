@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Checkpoint synchronization
+
+fn Rosetta::CheckpointSync::step($worker, $step) {
+    sleep 0.1 * rand() # simulate work
+    "Worker $worker completed step $step"
+}
+
+fn Rosetta::CheckpointSync::demo() {
+    my $workers = 5
+    my $steps = 3
+    
+    "Checkpoint Synchronization using pmap (Scatter/Gather):" |> p
+    
+    my @all_results
+    for my $s (1:$steps) {
+        "Starting Step $s..." |> p
+        # pmap acts as a barrier: all workers must finish before moving to next step
+        my @results = ~> 1:$workers map { Rosetta::CheckpointSync::step(_, $s) }
+        "Step $s completed by all workers." |> p
+        push @all_results, [@results]
+    }
+    
+    assert_eq len(@all_results), 3, "3 steps completed"
+    assert_eq len(@{$all_results[0]}), 5, "5 workers in step 1"
+    assert_ok $all_results[-1]->[0] =~ /completed step 3/, "Last step was step 3"
+}
+
+Rosetta::CheckpointSync::demo()
+test_run

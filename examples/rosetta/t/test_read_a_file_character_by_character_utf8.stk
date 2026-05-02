@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Read a file character by character/UTF8
+
+fn Rosetta::ReadChars::demo() {
+    my $file = "/tmp/rosetta_chars.txt"
+    my $content = "Hello, 世界! 🌍"
+    write_file($file, $content)
+    
+    "Reading file character by character:" |> p
+    
+    # In Stryke, we can slurp the file and then split by empty string to get chars.
+    # This handles UTF-8 characters as atomic units if the runtime supports it.
+    my $raw = slurp($file)
+    my @chars = split("", $raw)
+    
+    my @result
+    for my $c (@chars) {
+        push @result, $c
+        "  Char: $c" |> p
+    }
+    
+    # Assertions
+    assert_eq join("", @result), $content, "All characters read correctly"
+    assert_eq cnt(@chars), 12, "Count should be 12 (including UTF-8 globe emoji)"
+    # Let's check the count: H(1), e(2), l(3), l(4), o(5), ,(6),  (7), 世(8), 界(9), !(10),  (11)? No.
+    # "Hello, 世界! 🌍"
+    # H, e, l, l, o, ,,  , 世, 界, !,  , 🌍
+    # 1, 2, 3, 4, 5, 6, 7,  8,  9, 10, 11, 12
+    # Wait, "Hello, " is 7 chars. "世界!" is 3. " 🌍" is 2?
+    # Total: 7 + 3 + 2 = 12.
+}
+
+Rosetta::ReadChars::demo()
+test_run

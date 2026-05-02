@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: One of n lines in a file
+
+fn Rosetta::OneOfN::pick(@lines) {
+    my $choice = undef
+    my $count = 0
+    for my $line (@lines) {
+        $count++
+        # rand() returns [0, 1)
+        # We want to swap with probability 1/$count
+        if (rand() < 1 / $count) {
+            $choice = $line
+        }
+    }
+    $choice
+}
+
+my @lines = ("A", "B", "C", "D", "E")
+my %counts
+for (my $i = 0; $i < 1000; $i++) {
+    my $p = Rosetta::OneOfN::pick(@lines)
+    $counts{$p}++
+}
+
+# Check if all lines were picked at least once (probabilistic but likely)
+assert_ok $counts{"A"} > 0, "A picked"
+assert_ok $counts{"B"} > 0, "B picked"
+assert_ok $counts{"C"} > 0, "C picked"
+assert_ok $counts{"D"} > 0, "D picked"
+assert_ok $counts{"E"} > 0, "E picked"
+
+test_run

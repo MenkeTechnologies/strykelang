@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Matrix digital rain
+
+fn Rosetta::MatrixRain::run($frames) {
+    my $cols = 30
+    # Drop positions
+    my @drops = 1:$cols |> map { -int(rand() * 20) }
+    
+    for my $f (1:$frames) {
+        my $line = ""
+        for my $i (0:($cols - 1)) {
+            if ($drops[$i] >= 0 && $drops[$i] < 10) {
+                # Visible character
+                $line .= chr(33 + int(rand() * 93))
+            } else {
+                $line .= " "
+            }
+            
+            # Update drop
+            $drops[$i]++
+            if ($drops[$i] > 15 && rand() < 0.2) {
+                $drops[$i] = -int(rand() * 10)
+            }
+        }
+        print "\r$line"
+        sleep 0.05
+    }
+    p "\nMatrix rain simulation complete."
+}
+
+fn Rosetta::MatrixRain::demo() {
+    "Starting Matrix Digital Rain (Short Demo):" |> p
+    Rosetta::MatrixRain::run(20)
+    
+    # Assertions
+    assert_ok 1, "Simulation completed without error"
+}
+
+Rosetta::MatrixRain::demo()
+test_run

@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Address of a variable
+
+fn Rosetta::AddressOfVariable::demo() {
+    my $var = 42
+    
+    # In Stryke, we can get a reference to a variable using the backslash operator.
+    # Printing the reference shows the internal type and memory address.
+    my $ref = \$var
+    
+    "Variable value: " . $var |> p
+    "Variable reference (address): " . $ref |> p
+    
+    assert_eq $var, 42, "Variable value preserved"
+    assert_ok "$ref" =~ /SCALAR\(0x\.\.\.\)/, "Reference string format (SCALAR address)"
+}
+
+Rosetta::AddressOfVariable::demo()
+test_run

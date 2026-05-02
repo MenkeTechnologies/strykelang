@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: DNS query
+
+fn Rosetta::DNSQuery::demo() {
+    my $host = "google.com"
+    
+    # Stryke has dns_resolve builtin
+    my $ip = dns_resolve($host)
+    
+    "DNS resolution for '$host': $ip" |> p
+    
+    # Assertions
+    assert_ok defined($ip), "IP should be defined"
+    # Basic check for IPv4 format
+    assert_ok $ip =~ /^\d+\.\d+\.\d+\.\d+$/, "IP matches IPv4 pattern"
+}
+
+Rosetta::DNSQuery::demo()
+test_run

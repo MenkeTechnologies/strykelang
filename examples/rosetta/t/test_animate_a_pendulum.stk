@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Animate a pendulum
+
+fn Rosetta::Pendulum::calc_x($i) {
+    # Simple harmonic motion approximation
+    my $angle = sin($i * 0.3) * 0.8
+    return 20 + int(sin($angle) * 15)
+}
+
+fn Rosetta::Pendulum::animate($frames) {
+    "Pendulum Animation (Terminal):" |> p
+    for my $i (0:$frames) {
+        my $x = Rosetta::Pendulum::calc_x($i)
+        
+        # Build the line
+        my @chars = 0:40 |> map { " " }
+        $chars[$x] = "O"
+        $chars[20] = "|" if $x != 20 # pivot point
+        
+        my $line = join("", @chars)
+        print "\r$line";
+        sleep 0.05
+    }
+    p "\nAnimation complete."
+    
+    # Assertions to make it a "real" test
+    assert_eq Rosetta::Pendulum::calc_x(0), 20, "At i=0, x should be center (20)"
+    my $x1 = Rosetta::Pendulum::calc_x(1)
+    assert_ok $x1 > 20, "At i=1, x should move right ($x1)"
+}
+
+# We limit frames for the test to keep it short
+Rosetta::Pendulum::animate(20)
+test_run

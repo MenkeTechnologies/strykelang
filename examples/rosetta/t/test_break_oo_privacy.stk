@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Break OO privacy
+
+class Secret {
+    _private_data: Str = "hidden"
+    
+    fn get_data {
+        return "You can only see this"
+    }
+}
+
+fn Rosetta::Privacy::demo() {
+    my $s = Secret()
+    
+    "OO Privacy Test:" |> p
+    "  Normal access: " . $s->get_data() |> p
+    
+    # Breaking privacy: accessing the field starting with _ directly.
+    "  Breaking privacy: " . $s->_private_data |> p
+    
+    # Assertions
+    assert_eq $s->get_data(), "You can only see this", "Public method works"
+    assert_eq $s->_private_data, "hidden", "Private field accessed directly"
+}
+
+Rosetta::Privacy::demo()
+test_run

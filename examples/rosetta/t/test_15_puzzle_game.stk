@@ -1,0 +1,93 @@
+#!/usr/bin/env stryke
+# Rosetta Code: 15 puzzle game
+
+fn Rosetta::FifteenPuzzle::create() {
+    # Create solved puzzle
+    my @grid = (
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+        [9, 10, 11, 12],
+        [13, 14, 15, 0]
+    )
+    return { grid => \@grid, empty_r => 3, empty_c => 3 }
+}
+
+fn Rosetta::FifteenPuzzle::move($state, $num) {
+    my $grid = $state->{grid}
+    my $er = $state->{empty_r}
+    my $ec = $state->{empty_c}
+    
+    # Find num
+    my $nr = -1
+    my $nc = -1
+    for my $r (0:3) {
+        for my $c (0:3) {
+            if ($grid->[$r]->[$c] == $num) {
+                $nr = $r
+                $nc = $c
+            }
+        }
+    }
+    
+    if ($nr == -1) { return 0 } # Not found
+    
+    # Check if adjacent to empty space
+    if (abs($nr - $er) + abs($nc - $ec) == 1) {
+        # Swap
+        $grid->[$er]->[$ec] = $num
+        $grid->[$nr]->[$nc] = 0
+        $state->{empty_r} = $nr
+        $state->{empty_c} = $nc
+        return 1 # Moved
+    }
+    return 0 # Invalid move
+}
+
+fn Rosetta::FifteenPuzzle::is_solved($state) {
+    my $expected = 1
+    my $grid = $state->{grid}
+    for my $r (0:3) {
+        for my $c (0:3) {
+            if ($r == 3 && $c == 3) {
+                return $grid->[$r]->[$c] == 0 ? 1 : 0
+            }
+            if ($grid->[$r]->[$c] != $expected) {
+                return 0
+            }
+            $expected++
+        }
+    }
+    return 1
+}
+
+fn Rosetta::FifteenPuzzle::demo() {
+    my $state = Rosetta::FifteenPuzzle::create()
+    
+    "15 Puzzle Game Demo:" |> p
+    assert_eq Rosetta::FifteenPuzzle::is_solved($state), 1, "Initial state is solved"
+    
+    # Move 15 down (to empty space)
+    my $moved = Rosetta::FifteenPuzzle::move($state, 15)
+    assert_eq $moved, 1, "Move 15 valid"
+    assert_eq $state->{grid}->[3]->[3], 15, "15 moved to 3,3"
+    assert_eq $state->{empty_r}, 3, "Empty row is 3"
+    assert_eq $state->{empty_c}, 2, "Empty col is 2"
+    assert_eq Rosetta::FifteenPuzzle::is_solved($state), 0, "State is no longer solved"
+    
+    # Move 11 down
+    $moved = Rosetta::FifteenPuzzle::move($state, 11)
+    assert_eq $moved, 1, "Move 11 valid"
+    
+    # Move 11 back up
+    $moved = Rosetta::FifteenPuzzle::move($state, 11)
+    assert_eq $moved, 1, "Move 11 back valid"
+    
+    # Move 15 back right
+    $moved = Rosetta::FifteenPuzzle::move($state, 15)
+    assert_eq $moved, 1, "Move 15 back valid"
+    
+    assert_eq Rosetta::FifteenPuzzle::is_solved($state), 1, "State is solved again"
+}
+
+Rosetta::FifteenPuzzle::demo()
+test_run

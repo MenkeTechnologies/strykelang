@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Animated Spinners
+
+fn Rosetta::AnimatedSpinners::spin($duration_sec) {
+    my @spinners = ("|", "/", "-", "\\")
+    my $start = time()
+    my $i = 0
+    while (time() - $start < $duration_sec) {
+        my $char = $spinners[$i % len(@spinners)]
+        print "\r$char Spinning..."
+        sleep 0.1
+        $i++
+    }
+    print "\rDone!       \n"
+    return $i
+}
+
+fn Rosetta::AnimatedSpinners::demo() {
+    "Testing Animated Spinners (0.5 seconds):" |> p
+    my $frames = Rosetta::AnimatedSpinners::spin(0.5)
+    
+    # Assertions
+    assert_ok $frames >= 4, "Spinner ran for at least 4 frames"
+}
+
+Rosetta::AnimatedSpinners::demo()
+test_run

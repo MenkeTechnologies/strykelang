@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Flow-control structures
+
+fn Rosetta::FlowControl::test_if($n) {
+    if ($n > 0) { 
+        "positive" 
+    } elsif ($n < 0) { 
+        "negative" 
+    } else { 
+        "zero" 
+    }
+}
+
+fn Rosetta::FlowControl::test_for($n) {
+    my @res
+    for (my $i = 0; $i < $n; $i++) { 
+        push @res, $i 
+    }
+    join(",", @res)
+}
+
+fn Rosetta::FlowControl::test_while($n) {
+    my $i = 0
+    my @res
+    while ($i < $n) { 
+        push @res, $i
+        $i++ 
+    }
+    join(",", @res)
+}
+
+fn Rosetta::FlowControl::test_pipe($n) {
+    join(",", ~> 0:($n - 1))
+}
+
+assert_eq Rosetta::FlowControl::test_if(5), "positive", "if"
+assert_eq Rosetta::FlowControl::test_if(-5), "negative", "elsif"
+assert_eq Rosetta::FlowControl::test_if(0), "zero", "else"
+
+assert_eq Rosetta::FlowControl::test_for(3), "0,1,2", "for loop"
+assert_eq Rosetta::FlowControl::test_while(3), "0,1,2", "while loop"
+assert_eq Rosetta::FlowControl::test_pipe(3), "0,1,2", "pipe syntax"
+
+test_run

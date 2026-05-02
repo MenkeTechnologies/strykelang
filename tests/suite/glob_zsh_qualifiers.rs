@@ -46,9 +46,7 @@ fn glob_slash_qualifier_lists_directories_recursively() {
     let p = dir.to_str().unwrap();
     let code = format!(r#"chdir("{p}"); my @d = glob("**(/)"); join(",", sort @d)"#);
     let out = eval_string(&code);
-    assert!(out.contains("./sub"), "got {out}");
-    assert!(out.contains("./sub/deeper"), "got {out}");
-    // No regular files leak into the directory listing.
+    assert_eq!(out, "sub,sub/deeper", "got {out}");
     assert!(!out.contains("file1.txt"), "got {out}");
     std::fs::remove_dir_all(&dir).ok();
 }

@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Get system command output
+
+fn Rosetta::SysOut::get_uptime() {
+    # Using qx{} to capture output
+    my $out = qx{uptime}
+    $out |> trim
+}
+
+fn Rosetta::SysOut::get_echo($msg) {
+    # Using pipe syntax with qx
+    my $out = qx{echo "$msg"}
+    $out |> trim
+}
+
+my $u = Rosetta::SysOut::get_uptime()
+assert_ok length($u) > 0, "Uptime output is not empty"
+
+my $e = Rosetta::SysOut::get_echo("hello world")
+assert_eq $e, "hello world", "Echo output matches"
+
+test_run

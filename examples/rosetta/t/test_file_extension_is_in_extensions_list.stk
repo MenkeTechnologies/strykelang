@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File extension is in extensions list
+
+fn Rosetta::FileExt::check($filename, $extensions) {
+    # Extract extension using regex
+    if ($filename =~ /\.([^.]+)$/) {
+        my $ext = $1
+        for my $e (@$extensions) {
+            if ($ext eq $e) { return 1 }
+        }
+    }
+    return 0
+}
+
+fn Rosetta::FileExt::demo() {
+    my $file = "test.txt"
+    my @exts = ("txt", "doc", "pdf")
+    
+    my $res = Rosetta::FileExt::check($file, \@exts)
+    "Is extension of '$file' in [" . join(", ", @exts) . "]? " . ($res ? "Yes" : "No") |> p
+    
+    # Assertions
+    assert_eq Rosetta::FileExt::check("test.txt", ["txt", "pdf"]), 1, ".txt in [txt, pdf]"
+    assert_eq Rosetta::FileExt::check("test.png", ["txt", "pdf"]), 0, ".png not in [txt, pdf]"
+    assert_eq Rosetta::FileExt::check("noext", ["txt"]), 0, "no extension"
+}
+
+Rosetta::FileExt::demo()
+test_run

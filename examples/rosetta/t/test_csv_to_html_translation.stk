@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: CSV to HTML translation
+
+fn Rosetta::CsvToHtml::convert($csv) {
+    my $html = "<table>\n"
+    my @lines = split "\n", $csv
+    for my $line (@lines) {
+        $html .= "  <tr>"
+        my @cols = split ",", $line
+        for my $col (@cols) {
+            $html .= "<td>" . $col . "</td>"
+        }
+        $html .= "</tr>\n"
+    }
+    $html .= "</table>"
+    $html
+}
+
+my $csv = "Character,Speech\n\"Theyp, theyp\",He's dead\n\"Theyp, theyp\",He's still dead"
+# Simple split for the task
+my $html = Rosetta::CsvToHtml::convert("A,B,C\n1,2,3")
+
+assert_eq index($html, "<tr><td>A</td><td>B</td><td>C</td></tr>") != -1, 1, "Header row"
+assert_eq index($html, "<tr><td>1</td><td>2</td><td>3</td></tr>") != -1, 1, "Data row"
+
+test_run

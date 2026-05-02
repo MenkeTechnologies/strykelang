@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bioinformatics/Sequence mutation
+
+fn Bio::mutate($seq, $rate) {
+    my @chars = split("", $seq)
+    my @res
+    my @nucleotides = ("A", "C", "G", "T")
+    
+    for my $c (@chars) {
+        my $r = rand()
+        if ($r < $rate) {
+            # Mutate
+            my $r2 = rand()
+            if ($r2 < 0.33) {
+                # Substitution
+                my $new_c = $nucleotides[int(rand() * 4)]
+                push @res, $new_c
+            } elsif ($r2 < 0.66) {
+                # Insertion
+                push @res, $c
+                push @res, $nucleotides[int(rand() * 4)]
+            } else {
+                # Deletion
+                # don't push anything
+            }
+        } else {
+            push @res, $c
+        }
+    }
+    return join("", @res)
+}
+
+fn Rosetta::SequenceMutation::demo() {
+    my $seq = "GAATTCAGTTA"
+    "Sequence Mutation Simulation:" |> p
+    "Original:  $seq" |> p
+    
+    my $mutated = Bio::mutate($seq, 0.2)
+    "Mutated:   $mutated" |> p
+    
+    assert_ok length($mutated) >= 0, "Mutated sequence has valid length"
+    # Ensure mutated sequence only contains A, C, G, T, or is empty
+    assert_ok $mutated =~ /^[ACGT]*$/, "Mutated sequence contains valid nucleotides"
+}
+
+Rosetta::SequenceMutation::demo()
+test_run

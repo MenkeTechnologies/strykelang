@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File size
+
+fn Rosetta::FileSize::demo() {
+    my $file = "/tmp/rosetta_size.txt"
+    my $content = "1234567890" # 10 bytes
+    write_file($file, $content)
+    
+    # Get file size
+    my $size = file_size($file)
+    
+    "File size of '$file': $size bytes" |> p
+    
+    # Assertions
+    assert_eq $size, 10, "File size should be 10 bytes"
+    
+    # Clean up
+    unlink($file)
+}
+
+Rosetta::FileSize::demo()
+test_run
