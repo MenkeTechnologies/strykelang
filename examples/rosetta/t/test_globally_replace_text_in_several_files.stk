@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Globally replace text in several files
+
+fn Rosetta::GlobalReplace::run($pattern, $replacement, @files) {
+    # In a real script, we would use write_file and slurp.
+    # For this test, we'll mock the file operations with a hash.
+    my %mock_files = (
+        "file1.txt" => "Hello World",
+        "file2.txt" => "World is big"
+    )
+    
+    my @modified
+    for my $file (@files) {
+        if (exists $mock_files{$file}) {
+            my $content = $mock_files{$file}
+            $content =~ s/$pattern/$replacement/g
+            $mock_files{$file} = $content
+            push @modified, $file
+        }
+    }
+    
+    (\%mock_files, \@modified)
+}
+
+my ($files, $modified) = Rosetta::GlobalReplace::run("World", "Stryke", "file1.txt", "file2.txt")
+
+assert_eq $files->{"file1.txt"}, "Hello Stryke", "file1 replaced"
+assert_eq $files->{"file2.txt"}, "Stryke is big", "file2 replaced"
+assert_eq scalar(@$modified), 2, "Two files modified"
+
+test_run

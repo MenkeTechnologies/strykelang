@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abelian sandpile model
+
+fn Rosetta::Sandpile::run($size, $grains) {
+    # Initialize a square grid of 0s
+    my @grid = 1:$size |> map { my @r = 1:$size |> map { 0 }; \@r }
+    
+    my $mid = int($size / 2)
+    $grid[$mid]->[$mid] = $grains
+    
+    my $toppled = 1
+    while ($toppled) {
+        $toppled = 0
+        for my $y (0:($size - 1)) {
+            for my $x (0:($size - 1)) {
+                if ($grid[$y]->[$x] >= 4) {
+                    my $count = int($grid[$y]->[$x] / 4)
+                    $grid[$y]->[$x] %= 4
+                    
+                    # Distribute to neighbors
+                    for my $d ([-1, 0], [1, 0], [0, -1], [0, 1]) {
+                        my $ny = $y + $d->[0]
+                        my $nx = $x + $d->[1]
+                        if ($ny >= 0 && $ny < $size && $nx >= 0 && $nx < $size) {
+                            $grid[$ny]->[$nx] += $count
+                        }
+                    }
+                    $toppled = 1
+                }
+            }
+        }
+    }
+    return \@grid
+}
+
+fn Rosetta::Sandpile::display($grid) {
+    for my $row (@$grid) {
+        @$row |> join(" ") |> p
+    }
+}
+
+fn Rosetta::Sandpile::demo() {
+    "Abelian Sandpile Model (10x10, 64 grains):" |> p
+    my $grid = Rosetta::Sandpile::run(10, 64)
+    Rosetta::Sandpile::display($grid)
+    
+    # Test assertions
+    assert_eq $grid->[5]->[5], 0, "Center should be 0 after toppling 64"
+    assert_eq $grid->[4]->[5], 2, "Neighbor (4,5) should have 2 grains"
+    assert_eq $grid->[5]->[4], 2, "Neighbor (5,4) should have 2 grains"
+    
+    my $total = 0
+    for my $row (@$grid) {
+        for my $cell (@$row) {
+            $total += $cell
+        }
+    }
+    assert_eq $total, 64, "Total grains must remain constant (64)"
+}
+
+Rosetta::Sandpile::demo()
+test_run

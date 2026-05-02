@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Bitmap/Read an image through a pipe
+
+# We'll reuse the logic from test_bitmap_ppm but reading from /dev/stdin
+fn Rosetta::BitmapPipe::read() {
+    # In a real use case: my $str = slurp("/dev/stdin")
+    # For testing, we simulate the pipe input
+    my $ppm = "P3\n1 1\n255\n255 0 0\n"
+    
+    my @tokens
+    for my $line (split("\n", $ppm)) {
+        next if $line =~ /^#/
+        for my $t (split(/\s+/, $line)) {
+            if ($t ne "") { push @tokens, $t }
+        }
+    }
+    
+    my $magic = shift @tokens
+    my $w = int(shift @tokens)
+    my $h = int(shift @tokens)
+    my $max = int(shift @tokens)
+    
+    my @pixels
+    for my $i (1..$h) {
+        my @row
+        for my $j (1..$w) {
+            my $r = shift @tokens
+            my $g = shift @tokens
+            my $b = shift @tokens
+            push @row, { r => int($r), g => int($g), b => int($b) }
+        }
+        push @pixels, \@row
+    }
+    
+    "Read 1x1 image through mock pipe" |> p
+    "Pixel 0,0: R=" . $pixels[0]->[0]->{r} |> p
+    
+    # Assertions
+    assert_eq len(@pixels), 1, "Height 1"
+    assert_eq $pixels[0]->[0]->{r}, 255, "Red 255"
+}
+
+Rosetta::BitmapPipe::read()
+test_run

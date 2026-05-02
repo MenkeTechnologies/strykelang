@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Web scraping
+
+fn Rosetta::WebScraping::scrape($url) {
+    # fetch is a stryke builtin for HTTP GET
+    my $html = fetch($url)
+    
+    # Extract the title using regex
+    if ($html =~ /<title>(.*?)<\/title>/i) {
+        return $1
+    }
+    return undef
+}
+
+fn Rosetta::WebScraping::demo() {
+    my $url = "https://example.com"
+    "Fetching $url and scraping title..." |> p
+    
+    my $title = Rosetta::WebScraping::scrape($url)
+    "Scraped title: $title" |> p
+    
+    # Assertions
+    assert_ok defined($title), "Title should be defined"
+    assert_eq $title, "Example Domain", "Title should match example.com"
+}
+
+Rosetta::WebScraping::demo()
+test_run

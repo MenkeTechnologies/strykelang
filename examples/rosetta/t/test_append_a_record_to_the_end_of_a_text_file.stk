@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Append a record to the end of a text file
+
+fn Rosetta::AppendRecord::demo() {
+    my $file = "/tmp/rosetta_append_record.txt"
+    
+    # Create file with initial content
+    write_file($file, "Record 1\nRecord 2\n")
+    
+    "Before append:" |> p
+    slurp($file) |> p
+    
+    # Append a new record
+    append_file($file, "Record 3\n")
+    
+    "After append:" |> p
+    my $content = slurp($file)
+    $content |> p
+    
+    assert_eq $content, "Record 1\nRecord 2\nRecord 3\n", "Content after append"
+}
+
+Rosetta::AppendRecord::demo()
+test_run

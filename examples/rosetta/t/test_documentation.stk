@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Documentation
+
+# In Stryke, documentation is primarily done via comments.
+# This example demonstrates how to document functions and scripts.
+
+# Rosetta::Doc::add
+# Adds two numbers and returns the result.
+# @param $a First number
+# @param $b Second number
+# @return Sum of $a and $b
+fn Rosetta::Doc::add($a, $b) {
+    # Perform the addition
+    $a + $b
+}
+
+# The main part of the script
+my $sum = Rosetta::Doc::add(10, 20)
+assert_eq $sum, 30, "Documentation example addition works"
+
+test_run

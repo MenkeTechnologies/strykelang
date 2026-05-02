@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute HQ9+
+
+fn Rosetta::HQ9Plus::execute($code) {
+    my $accumulator = 0
+    my @lines = split "", $code
+    my $output = ""
+    
+    for my $char (@lines) {
+        if ($char eq "H") {
+            $output .= "Hello, world!\n"
+        } elsif ($char eq "Q") {
+            $output .= $code . "\n"
+        } elsif ($char eq "9") {
+            $output .= Rosetta::HQ9Plus::lyrics()
+        } elsif ($char eq "+") {
+            $accumulator++
+        }
+    }
+    $output
+}
+
+fn Rosetta::HQ9Plus::lyrics() {
+    my $res = ""
+    for (my $i = 99; $i > 0; $i--) {
+        my $next = $i - 1
+        $res .= "$i bottles of beer on the wall, $i bottles of beer.\n"
+        $res .= "Take one down, pass it around, $next bottles of beer on the wall.\n"
+    }
+    $res .= "No more bottles of beer on the wall, no more bottles of beer.\n"
+    $res .= "Go to the store and buy some more, 99 bottles of beer on the wall.\n"
+    $res
+}
+
+my $code = "HQ+"
+my $out = Rosetta::HQ9Plus::execute($code)
+assert_eq index($out, "Hello, world!") != -1, 1, "H command"
+assert_eq index($out, "HQ+") != -1, 1, "Q command"
+
+test_run

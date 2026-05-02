@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Collections
+
+fn Rosetta::Collections::demo() {
+    "Collections in Stryke:" |> p
+    
+    # Array
+    my @array = (1, 2, 3, 4, 5)
+    "  Array: " . join(", ", @array) |> p
+    push @array, 6
+    my $popped = pop @array
+    
+    # Hash
+    my %hash = ( a => 1, b => 2 )
+    "  Hash keys: " . join(", ", keys %hash) |> p
+    $hash{c} = 3
+    my $deleted = delete $hash{b}
+    
+    # Assertions
+    assert_eq len(@array), 5, "Array length 5 after push/pop"
+    assert_eq $popped, 6, "Popped element is 6"
+    assert_eq len(keys %hash), 2, "Hash has 2 keys after add/delete"
+    assert_eq $hash{c}, 3, "Hash newly added key value"
+}
+
+Rosetta::Collections::demo()
+test_run

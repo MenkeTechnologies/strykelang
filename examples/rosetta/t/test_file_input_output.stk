@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: File input/output
+
+fn Rosetta::FileIO::demo() {
+    my $file = "/tmp/rosetta_io.txt"
+    my $content = "Hello, Rosetta Code!\nLine 2"
+    
+    # Write to file
+    write_file($file, $content)
+    
+    # Read from file
+    my $read = slurp($file)
+    
+    "File Content:" |> p
+    $read |> p
+    
+    # Assertions
+    assert_eq $read, $content, "Content read matches content written"
+    
+    # Clean up
+    # In Stryke, we don't have a direct 'unlink' or 'delete_file' but we can use 'rm' via system
+    system("rm $file")
+}
+
+Rosetta::FileIO::demo()
+test_run

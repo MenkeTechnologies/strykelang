@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Calendar
+
+fn Rosetta::Calendar::is_leap_year($year) {
+    if ($year % 400 == 0) { return 1 }
+    if ($year % 100 == 0) { return 0 }
+    if ($year % 4 == 0) { return 1 }
+    return 0
+}
+
+fn Rosetta::Calendar::days_in_month($month, $year) {
+    if ($month == 2) {
+        return Rosetta::Calendar::is_leap_year($year) ? 29 : 28
+    }
+    if ($month == 4 || $month == 6 || $month == 9 || $month == 11) {
+        return 30
+    }
+    return 31
+}
+
+# 0=Sunday, 1=Monday...
+fn Rosetta::Calendar::day_of_week($y, $m, $d) {
+    my @t = (0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
+    $y -= 1 if $m < 3
+    return ($y + int($y / 4) - int($y / 100) + int($y / 400) + $t[$m - 1] + $d) % 7
+}
+
+fn Rosetta::Calendar::rtrim($str) {
+    $str =~ s/\s+$//
+    return $str
+}
+
+fn Rosetta::Calendar::generate($year, $month) {
+    my @months = ("", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    
+    my $header = "   " . $months[$month] . " " . $year
+    my $days = "Su Mo Tu We Th Fr Sa"
+    my @lines = ($header, $days)
+    
+    my $first_day = Rosetta::Calendar::day_of_week($year, $month, 1)
+    my $num_days = Rosetta::Calendar::days_in_month($month, $year)
+    
+    my $current_line = ""
+    # pad first week
+    if ($first_day > 0) {
+        for my $i (1:$first_day) {
+            $current_line .= "   "
+        }
+    }
+    
+    for my $d (1:$num_days) {
+        $current_line .= sprintf("%2d ", $d)
+        if (($first_day + $d) % 7 == 0) {
+            push @lines, Rosetta::Calendar::rtrim($current_line)
+            $current_line = ""
+        }
+    }
+    if ($current_line ne "") {
+        push @lines, Rosetta::Calendar::rtrim($current_line)
+    }
+    
+    return \@lines
+}
+
+fn Rosetta::Calendar::demo() {
+    my $cal = Rosetta::Calendar::generate(1969, 7)
+    
+    "Calendar for July 1969:" |> p
+    for my $line (@$cal) {
+        $line |> p
+    }
+    
+    # Assertions
+    assert_eq len(@$cal), 7, "Calendar has 7 lines (2 header + 5 weeks)"
+    assert_ok $cal->[0] =~ /July 1969/, "Header is correct"
+    assert_ok $cal->[2] =~ /       1  2  3  4  5/, "First week starts on Tuesday"
+    
+    # Test Leap Year 2024
+    my $cal2 = Rosetta::Calendar::generate(2024, 2)
+    assert_ok $cal2->[-1] =~ /29/, "Leap year February has 29 days"
+}
+
+Rosetta::Calendar::demo()
+test_run

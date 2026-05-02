@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Abstract type
+
+# In Stryke, a 'trait' acts as an abstract type (interface).
+# It defines method signatures that implementing classes must provide.
+trait AbstractShape {
+    fn area
+}
+
+# Square is a concrete type that implements the Shape trait.
+class AbstractSquare impl AbstractShape {
+    side: Float = 0.0
+    fn area { $self->side * $self->side }
+}
+
+# Circle is another concrete type that implements the Shape trait.
+class AbstractCircle impl AbstractShape {
+    radius: Float = 0.0
+    fn area { 3.14159 * $self->radius * $self->radius }
+}
+
+fn Rosetta::AbstractType::demo() {
+    my $s = AbstractSquare(side => 4.0)
+    my $c = AbstractCircle(radius => 3.0)
+    
+    "Abstract type example (using traits):" |> p
+    ("Square (side=4) area: " . $s->area()) |> p
+    ("Circle (radius=3) area: " . $c->area()) |> p
+    
+    assert_eq $s->area(), 16.0, "Square area calculation"
+    assert_ok $c->area() > 28.27 && $c->area() < 28.28, "Circle area calculation (approx 28.274)"
+}
+
+Rosetta::AbstractType::demo()
+test_run

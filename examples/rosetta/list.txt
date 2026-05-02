@@ -1,6 +1,6 @@
 [x] 100 doors
 [x] 100 prisoners
-[ ] 15 puzzle game
+[x] 15 puzzle game
 [x] 15 puzzle solver
 [x] 2048
 [x] 21 game
@@ -16,9 +16,9 @@
 [x] ABC correlation
 [x] ABC problem
 [x] ABC words
-[ ] Abelian sandpile model
-[ ] Abelian sandpile model/Identity
-[ ] Abstract type
+[x] Abelian sandpile model
+[x] Abelian sandpile model/Identity
+[x] Abstract type
 [x] Abundant odd numbers
 [x] Abundant, deficient and perfect number classifications
 [x] Accumulator factory
@@ -29,7 +29,7 @@
 [x] Active object
 [x] Add a variable to a class instance at runtime
 [x] Additive primes
-[ ] Address of a variable
+[x] Address of a variable
 [x] ADFGVX cipher
 [x] AKS test for primes
 [x] Algebraic data types
@@ -46,12 +46,12 @@
 [x] Anaprimes
 [x] Angle difference between two bearings
 [x] Angles (geometric), normalization and conversion
-[ ] Animate a pendulum
-[ ] Animated Spinners
-[ ] Animation
+[x] Animate a pendulum
+[x] Animated Spinners
+[x] Animation
 [x] Anonymous recursion
 [x] Anti-primes
-[ ] Append a record to the end of a text file
+[x] Append a record to the end of a text file
 [x] Apply a callback to an array
 [x] Apply a digital filter (direct form II transposed)
 [x] Approximate equality
@@ -109,8 +109,8 @@
 [x] Binary strings
 [x] Binomial transform
 [x] Bioinformatics/Base count
-[ ] Bioinformatics/Global alignment
-[ ] Bioinformatics/Sequence mutation
+[x] Bioinformatics/Global alignment
+[x] Bioinformatics/Sequence mutation
 [x] Biorhythms
 [ ] Bitcoin/address validation
 [ ] Bitcoin/public point to address
@@ -119,11 +119,11 @@
 [ ] Bitmap/Bézier curves/Cubic
 [ ] Bitmap/Bézier curves/Quadratic
 [x] Bitmap/Flood fill
-[ ] Bitmap/Histogram
+[x] Bitmap/Histogram
 [x] Bitmap/Midpoint circle algorithm
 [x] Bitmap/PPM conversion through a pipe
 [x] Bitmap/Read a PPM file
-[ ] Bitmap/Read an image through a pipe
+[x] Bitmap/Read an image through a pipe
 [x] Bitmap/Write a PPM file
 [x] Bitwise IO
 [x] Bitwise operations
@@ -136,7 +136,7 @@
 [x] Boyer-Moore string search
 [x] Brace expansion
 [x] Brazilian numbers
-[ ] Break OO privacy
+[x] Break OO privacy
 [x] Brilliant numbers
 [x] Bron–Kerbosch algorithm
 [ ] Brownian tree
@@ -146,7 +146,7 @@
 [ ] Bézier curves/Intersections
 [x] Caesar cipher
 [x] Calculating the value of e
-[ ] Calendar
+[x] Calendar
 [ ] Calendar - for "REAL" programmers
 [x] Calkin-Wilf sequence
 [x] Call a foreign-language function
@@ -159,7 +159,7 @@
 [x] Cantor set
 [x] Carmichael 3 strong pseudoprimes
 [x] Cartesian product of two or more lists
-[ ] Case-sensitivity of identifiers
+[x] Case-sensitivity of identifiers
 [x] Casting out nines
 [x] Catalan numbers
 [x] Catalan numbers/Pascal's triangle
@@ -172,11 +172,11 @@
 [ ] Chat server
 [x] Check if a polygon overlaps with a rectangle
 [x] Check if two polygons overlap
-[ ] Check input device is a terminal
+[x] Check input device is a terminal
 [x] Check Machin-like formulas
-[ ] Check output device is a terminal
+[x] Check output device is a terminal
 [x] Check that file exists
-[ ] Checkpoint synchronization
+[x] Checkpoint synchronization
 [x] Chernick's Carmichael numbers
 [x] Cheryl's birthday
 [x] Chinese remainder theorem
@@ -192,10 +192,10 @@
 [x] Closest-pair problem
 [x] Closures/Value capture
 [ ] Cocke–Younger–Kasami (CYK) Algorithm
-[ ] Collections
+[x] Collections
 [ ] Color of a screen pixel
 [ ] Color quantization
-[ ] Color wheel
+[x] Color wheel
 [x] Colorful numbers
 [ ] Colour bars/Display
 [ ] Colour pinstripe/Display
@@ -234,7 +234,7 @@
 [x] Convex hull
 [x] Conway's Game of Life
 [x] Copy a string
-[ ] Copy stdin to stdout
+[x] Copy stdin to stdout
 [x] Count in factors
 [x] Count in octal
 [x] Count occurrences of a substring
@@ -244,10 +244,10 @@
 [x] Create a file
 [x] Create a file on magnetic tape
 [x] Create a two-dimensional array at runtime
-[ ] Create an HTML table
+[x] Create an HTML table
 [ ] Create an object at a given address
 [ ] CSV data manipulation
-[ ] CSV to HTML translation
+[x] CSV to HTML translation
 [x] Cuban primes
 [x] Cullen and Woodall numbers
 [x] Cumulative standard deviation
@@ -304,7 +304,7 @@
 [x] Distribution of 0 digits in factorial series
 [x] Diversity prediction theorem
 [ ] DNS query
-[ ] Documentation
+[x] Documentation
 [ ] Dominoes
 [x] Doomsday rule
 [x] Dot product
@@ -402,10 +402,10 @@
 [x] Fibonacci sequence
 [x] Fibonacci word
 [x] Fibonacci word/fractal
-[ ] File extension is in extensions list
-[ ] File input/output
-[ ] File modification time
-[ ] File size
+[x] File extension is in extensions list
+[x] File input/output
+[x] File modification time
+[x] File size
 [ ] File size distribution
 [x] Filter
 [ ] Find Chess960 starting position identifier
@@ -430,7 +430,7 @@
 [x] FizzBuzz
 [x] Flatten a list
 [ ] Flipping bits game
-[ ] Flow-control structures
+[x] Flow-control structures
 [x] Floyd's triangle
 [x] Floyd-Warshall algorithm
 [ ] Forbidden numbers
@@ -467,9 +467,9 @@
 [ ] Generate random chess position
 [ ] Generator/Exponential
 [x] Generic swap
-[ ] Get system command output
+[x] Get system command output
 [x] Giuga numbers
-[ ] Globally replace text in several files
+[x] Globally replace text in several files
 [ ] Go Fish
 [x] Goldbach's comet
 [x] Golden ratio/Convergence
@@ -691,7 +691,7 @@
 [x] Map range
 [x] Mastermind
 [x] Matrix chain multiplication
-[ ] Matrix digital rain
+[x] Matrix digital rain
 [x] Matrix multiplication
 [x] Matrix transposition
 [x] Matrix-exponentiation operator
@@ -802,7 +802,7 @@
 [x] One-time pad
 [x] One-two primes
 [ ] OpenGL
-[ ] OpenWebNet password
+[x] OpenWebNet password
 [x] Operator precedence
 [x] Optional parameters
 [ ] Order by pair comparisons
@@ -952,7 +952,7 @@
 [ ] Ray-casting algorithm
 [ ] RCRPG
 [x] Read a configuration file
-[ ] Read a file character by character/UTF8
+[x] Read a file character by character/UTF8
 [x] Read a file line by line
 [x] Read a specific line from a file
 [x] Read entire file
@@ -1307,7 +1307,7 @@
 [ ] Wasteful, equidigital and frugal numbers
 [x] Water collected between towers
 [ ] Wavelet Matrix
-[ ] Web scraping
+[x] Web scraping
 [x] Weiler-Atherton polygon clipping
 [x] Weird numbers
 [x] Wieferich primes

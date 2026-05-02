@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Case-sensitivity of identifiers
+
+fn Rosetta::CaseSensitivity::demo() {
+    # In Stryke, identifiers are case-sensitive.
+    my $foo = "lowercase"
+    my $Foo = "MixedCase"
+    my $FOO = "UPPERCASE"
+    
+    "Case sensitivity test:" |> p
+    "  \$foo: $foo" |> p
+    "  \$Foo: $Foo" |> p
+    "  \$FOO: $FOO" |> p
+    
+    # Assertions
+    assert_eq $foo, "lowercase", "lowercase variable"
+    assert_eq $Foo, "MixedCase", "MixedCase variable"
+    assert_eq $FOO, "UPPERCASE", "UPPERCASE variable"
+    assert_ok $foo ne $Foo, "\$foo and \$Foo are different"
+    assert_ok $Foo ne $FOO, "\$Foo and \$FOO are different"
+}
+
+Rosetta::CaseSensitivity::demo()
+test_run
