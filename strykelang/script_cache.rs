@@ -378,7 +378,7 @@ impl ScriptCache {
                 )
             })
             .collect();
-        out.sort_by(|a, b| b.5.cmp(&a.5));
+        out.sort_by_key(|x| std::cmp::Reverse(x.5));
         out.into_iter()
             .map(|(p, pk, ck, ver, ts, _)| (p, pk, ck, ver, ts))
             .collect()

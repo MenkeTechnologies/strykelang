@@ -35,8 +35,7 @@ fn duration_arg(args: &[PerlValue], default_secs: f64) -> Duration {
         .first()
         .map(|v| v.to_number())
         .unwrap_or(default_secs)
-        .max(0.001)
-        .min(3600.0);
+        .clamp(0.001, 3600.0);
     Duration::from_secs_f64(secs)
 }
 
@@ -284,7 +283,7 @@ pub(crate) fn stress_mmap(args: &[PerlValue], line: usize) -> Result<PerlValue> 
 // ── Disk kernels ──────────────────────────────────────────────────────
 
 /// `stress_disk(path, secs, mb_per_write)` — sustained sequential write
-/// + fsync + read across all cores. Each core writes/reads its own
+/// then fsync then read across all cores. Each core writes/reads its own
 /// file in `path` (or /tmp).
 pub(crate) fn stress_disk(args: &[PerlValue], _line: usize) -> Result<PerlValue> {
     use std::fs;
@@ -640,12 +639,15 @@ pub(crate) fn stress_regex(args: &[PerlValue], _line: usize) -> Result<PerlValue
     let n = cores();
     let total = AtomicI64::new(0);
     let start = Instant::now();
+    // Compile once and share — every worker scans the same pattern.
+    // Avoid actual catastrophic backtracking that would never terminate;
+    // pick a heavy-but-bounded shape.
+    let re = regex::Regex::new(r"(?:[a-z0-9]+_)+(?:[a-z0-9]+)").unwrap();
+    let re_ref = &re;
     std::thread::scope(|s| {
         for _ in 0..n {
             s.spawn(|| {
-                // Avoid actual catastrophic backtracking that would
-                // never terminate; pick a heavy-but-bounded shape.
-                let re = regex::Regex::new(r"(?:[a-z0-9]+_)+(?:[a-z0-9]+)").unwrap();
+                let re = re_ref;
                 let inputs = [
                     "neon_void_quasar_axion_pulse_stryke_phantom_kernel",
                     "stack_lattice_vector_kernel_phantom_aurora_nova",

@@ -4,11 +4,11 @@
 //! What this module ships TODAY:
 //!
 //!   * `ai($prompt, opts...)`         — single-shot, no-tools call to the
-//!                                       configured provider
+//!     configured provider
 //!   * `prompt($prompt, opts...)`     — alias for `ai`
 //!   * `stream_prompt($prompt, opts)` — streaming variant; returns one
-//!                                       concatenated string for v0
-//!                                       (real `Stream<Str>` is Phase 5)
+//!     concatenated string for v0
+//!     (real `Stream<Str>` is Phase 5)
 //!   * `chat($messages, opts...)`     — explicit message-list version
 //!   * `embed($text)` / `embed(@texts)` — text embedding via Voyage AI
 //!   * `tokens_of($text)`             — char/4 heuristic
@@ -2106,9 +2106,10 @@ pub(crate) fn ai_match(args: &[PerlValue], line: usize) -> Result<PerlValue> {
         .to_string()
         .to_ascii_lowercase();
     Ok(PerlValue::integer(
-        if raw.contains("true") && !raw.contains("false") {
-            1
-        } else if raw.starts_with('y') || raw.starts_with("\"y") {
+        if (raw.contains("true") && !raw.contains("false"))
+            || raw.starts_with('y')
+            || raw.starts_with("\"y")
+        {
             1
         } else {
             0
@@ -2557,6 +2558,7 @@ fn history_slot() -> &'static Mutex<std::collections::VecDeque<HistoryEntry>> {
     HISTORY.get_or_init(|| Mutex::new(std::collections::VecDeque::with_capacity(HISTORY_CAP)))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn record_history(
     provider: &str,
     model: &str,

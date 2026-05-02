@@ -120,6 +120,15 @@ struct CookieOpts {
     same_site: Option<String>,
 }
 
+/// `(status, headers, body, cookies)` — what an action returns to the
+/// outer HTTP loop after the dispatcher peels it off the request state.
+type DispatchResult = (
+    u16,
+    Vec<(String, String)>,
+    String,
+    Vec<(String, String, CookieOpts)>,
+);
+
 thread_local! {
     static CURRENT: RefCell<RequestState> = RefCell::new(RequestState {
         status: 200,
@@ -708,14 +717,19 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 // ── Cache / i18n / log / response helpers / signed payloads ───────────
 
-static CACHE: OnceLock<Mutex<IndexMap<String, (String, Option<i64>)>>> = OnceLock::new();
-static LOCALE: OnceLock<Mutex<IndexMap<String, IndexMap<String, String>>>> = OnceLock::new();
+/// `(value, optional_unix_expiry_secs)`.
+type CacheEntry = (String, Option<i64>);
+type CacheMap = IndexMap<String, CacheEntry>;
+type LocaleMap = IndexMap<String, IndexMap<String, String>>;
 
-fn cache_slot() -> &'static Mutex<IndexMap<String, (String, Option<i64>)>> {
+static CACHE: OnceLock<Mutex<CacheMap>> = OnceLock::new();
+static LOCALE: OnceLock<Mutex<LocaleMap>> = OnceLock::new();
+
+fn cache_slot() -> &'static Mutex<CacheMap> {
     CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-fn locale_slot() -> &'static Mutex<IndexMap<String, IndexMap<String, String>>> {
+fn locale_slot() -> &'static Mutex<LocaleMap> {
     LOCALE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
@@ -908,7 +922,7 @@ pub(crate) fn web_unsigned(args: &[PerlValue], _line: usize) -> Result<PerlValue
     };
     let secret = secret_key();
     let expected = sha256_hex((secret + payload).as_bytes());
-    if constant_time_eq(mac.as_bytes(), expected[..32].as_bytes()) {
+    if constant_time_eq(mac.as_bytes(), &expected.as_bytes()[..32]) {
         Ok(PerlValue::string(payload.to_string()))
     } else {
         Ok(PerlValue::UNDEF)
@@ -1723,7 +1737,7 @@ pub(crate) fn web_token_consume(args: &[PerlValue], _line: usize) -> Result<Perl
         Err(_) => return Ok(PerlValue::UNDEF),
     };
     let want = sha256_hex((secret_key() + payload).as_bytes());
-    if !constant_time_eq(mac.as_bytes(), want[..32].as_bytes()) {
+    if !constant_time_eq(mac.as_bytes(), &want.as_bytes()[..32]) {
         return Ok(PerlValue::UNDEF);
     }
     let parts: Vec<&str> = payload.splitn(3, '|').collect();
@@ -2922,12 +2936,7 @@ impl Interpreter {
         session: IndexMap<String, PerlValue>,
         flash_in: IndexMap<String, PerlValue>,
         line: usize,
-    ) -> (
-        u16,
-        Vec<(String, String)>,
-        String,
-        Vec<(String, String, CookieOpts)>,
-    ) {
+    ) -> DispatchResult {
         let (resource, act) = match action.split_once('#') {
             Some((r, a)) => (r, a),
             None => {

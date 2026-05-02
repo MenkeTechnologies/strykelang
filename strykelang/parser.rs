@@ -8003,11 +8003,10 @@ impl Parser {
                     let index_result = self.parse_expression();
                     self.suppress_tilde_range = self.suppress_tilde_range.saturating_sub(1);
                     let index = index_result?;
-                    let close_match = match (&opener, self.peek()) {
-                        (Token::LogNot, Token::LogNot) => true,
-                        (Token::BitNot, Token::BitNot) => true,
-                        _ => false,
-                    };
+                    let close_match = matches!(
+                        (&opener, self.peek()),
+                        (Token::LogNot, Token::LogNot) | (Token::BitNot, Token::BitNot)
+                    );
                     if !close_match {
                         let want = if matches!(opener, Token::LogNot) {
                             "!"
