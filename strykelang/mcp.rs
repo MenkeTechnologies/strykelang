@@ -23,10 +23,8 @@
 //!   * `mcp_prompt($h, "name", +{...args})`
 //!   * `mcp_close($h)`
 //!   * `mcp_attach_to_ai($h)`                        — register a connected
-//!                                                     server's tools so the
-//!                                                     next `ai($prompt,
-//!                                                     auto_mcp => 1)` call
-//!                                                     auto-includes them
+//!     server's tools so the next `ai($prompt, auto_mcp => 1)` call
+//!     auto-includes them
 //!   * `mcp_detach_from_ai($h)`
 //!   * `mcp_attached()`                              — list of attached IDs
 
