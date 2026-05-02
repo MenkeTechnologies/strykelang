@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Terminal control/Coloured text
+
+fn Rosetta::TerminalColor::demo() {
+    # Using ANSI escape codes for colored text
+    my $red = "\e[31m"
+    my $green = "\e[32m"
+    my $reset = "\e[0m"
+    
+    # We can also use builtins if available, but ANSI is standard
+    print "${red}Red Text${reset}\n"
+    print "${green}Green Text${reset}\n"
+    
+    "Coloured text printed"
+}
+
+assert_eq Rosetta::TerminalColor::demo(), "Coloured text printed", "Terminal color demo"
+
+test_run

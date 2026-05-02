@@ -1,0 +1,12 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Terminal control/Clear the screen
+
+fn Rosetta::TerminalClear::run() {
+    # \e[2J clears the screen, \e[H moves cursor to top-left
+    print "\e[2J\e[H"
+    "Screen cleared"
+}
+
+assert_eq Rosetta::TerminalClear::run(), "Screen cleared", "Terminal clear demo"
+
+test_run

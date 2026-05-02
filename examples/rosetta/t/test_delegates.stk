@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Delegates
+
+# In Stryke, sub references and closures are the idiomatic way to implement delegates.
+
+fn Rosetta::Delegates::execute($delegate, $value) {
+    # Call the delegate with the provided value
+    $delegate->($value)
+}
+
+# Define a delegate (sub reference)
+my $double = sub { $_[0] * 2 }
+
+my $res = Rosetta::Delegates::execute($double, 21)
+assert_eq $res, 42, "Delegate (sub reference) executed correctly"
+
+# Closure as a delegate
+my $factor = 10
+my $multiply = sub { $_[0] * $factor }
+assert_eq Rosetta::Delegates::execute($multiply, 5), 50, "Closure delegate executed correctly"
+
+test_run

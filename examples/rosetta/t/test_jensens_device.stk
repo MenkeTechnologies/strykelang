@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Jensen's Device
+
+# Jensen's device demonstrates call-by-name using closures.
+fn Rosetta::JensensDevice::sum($n, $term_func) {
+    my $total = 0
+    for (my $i = 1; $i <= $n; $i++) {
+        # The term_func is a closure that may depend on external state
+        $total += $term_func->($i)
+    }
+    $total
+}
+
+# Example: Sum of i^2 for i=1..10
+my $sum_sq = Rosetta::JensensDevice::sum(10, sub {
+    my $i = $_[0]
+    $i * $i
+})
+
+assert_eq $sum_sq, 385, "Sum of squares 1..10"
+
+test_run

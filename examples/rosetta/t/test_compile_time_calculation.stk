@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compile-time calculation
+
+# In Stryke, BEGIN blocks are executed during the compilation phase.
+my $val
+
+BEGIN {
+    # This calculation happens at compile time
+    my $res = 1
+    for (my $i = 1; $i <= 10; $i++) {
+        $res *= $i
+    }
+    # We can use a package variable to communicate back if lexicals are tricky
+    $Rosetta::CompileTime::fact10 = $res
+}
+
+fn Rosetta::CompileTime::get_val() {
+    $Rosetta::CompileTime::fact10
+}
+
+assert_eq Rosetta::CompileTime::get_val(), 3628800, "10! calculated at compile time"
+
+test_run

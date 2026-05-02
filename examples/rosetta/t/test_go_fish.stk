@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Go Fish
+
+fn Rosetta::GoFish::init_deck() {
+    my @ranks = (2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K", "A")
+    my @suits = ("H", "D", "C", "S")
+    my @deck
+    for my $r (@ranks) {
+        for my $s (@suits) {
+            push @deck, "$r$s"
+        }
+    }
+    shuffle(@deck)
+}
+
+fn Rosetta::GoFish::deal(@deck) {
+    my @hand
+    for (1..7) {
+        push @hand, shift @deck
+    }
+    \@hand
+}
+
+fn Rosetta::GoFish::has_rank($hand, $rank) {
+    # Use ~> to grep idiomaticly
+    ~> @$hand grep { /^$rank/ }
+}
+
+my @deck = Rosetta::GoFish::init_deck()
+my $player1 = Rosetta::GoFish::deal(@deck)
+
+assert_eq len(@$player1), 7, "Hand has 7 cards"
+# Just a smoke test for logic
+my $rank = substr($player1->[0], 0, 1)
+my @found = Rosetta::GoFish::has_rank($player1, $rank)
+assert_ok len(@found) >= 1, "Should find at least one card of the rank it has"
+
+test_run

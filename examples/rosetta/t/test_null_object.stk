@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Null object
+
+class Logger {
+    fn log($msg) { p "LOG: $msg" }
+}
+
+class NullLogger {
+    fn log($msg) { } # Does nothing
+}
+
+fn Rosetta::NullObject::do_work($logger) {
+    $logger->log("Starting work")
+    # ... work ...
+    $logger->log("Finished work")
+    "done"
+}
+
+my $real_logger = Logger()
+my $null_logger = NullLogger()
+
+assert_eq Rosetta::NullObject::do_work($real_logger), "done", "Works with real logger"
+assert_eq Rosetta::NullObject::do_work($null_logger), "done", "Works with null logger"
+
+test_run

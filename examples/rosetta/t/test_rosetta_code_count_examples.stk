@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rosetta Code/Count examples
+
+fn Rosetta::Count::run($file_path) {
+    my $content = slurp($file_path)
+    my @lines = split "\n", $content
+    
+    my $done = 0
+    my $total = 0
+    
+    for my $line (@lines) {
+        if ($line =~ /^\[[x ]\]/) {
+            $total++
+            $done++ if $line =~ /^\[x\]/
+        }
+    }
+    
+    ($done, $total)
+}
+
+# In this workspace, list.txt is in the current directory.
+my ($done, $total) = Rosetta::Count::run("list.txt")
+
+assert_ok $done > 0, "At least some examples are done"
+assert_ok $total > $done, "Total is greater than done"
+
+test_run

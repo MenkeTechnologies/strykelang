@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Exponentiation order
+
+fn Rosetta::ExpOrder::check() {
+    # In Stryke, the exponentiation operator ** is right-associative.
+    # 2 ** 3 ** 2 is evaluated as 2 ** (3 ** 2) = 2 ** 9 = 512.
+    # If it were left-associative, it would be (2 ** 3) ** 2 = 8 ** 2 = 64.
+    2 ** 3 ** 2
+}
+
+my $res = Rosetta::ExpOrder::check()
+assert_eq $res, 512, "Exponentiation (**) is right-associative"
+
+test_run

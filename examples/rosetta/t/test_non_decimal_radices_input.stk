@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-decimal radices/Input
+
+fn Rosetta::RadixInput::demo() {
+    my $hex = 0xFF
+    my $bin = 0b1010
+    my $oct = 0123 # Octal starts with 0
+    
+    ($hex, $bin, $oct)
+}
+
+my ($h, $b, $o) = Rosetta::RadixInput::demo()
+assert_eq $h, 255, "Hexadecimal input"
+assert_eq $b, 10, "Binary input"
+assert_eq $o, 83, "Octal input"
+
+test_run

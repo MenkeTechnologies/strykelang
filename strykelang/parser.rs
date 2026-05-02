@@ -4444,14 +4444,12 @@ impl Parser {
     fn parse_struct_decl(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // struct
-        let name = match self.advance() {
-            (Token::Ident(n), _) => n,
-            (tok, err_line) => {
-                return Err(
-                    self.syntax_err(format!("Expected struct name, got {:?}", tok), err_line)
-                )
-            }
-        };
+        let name = self.parse_package_qualified_identifier().map_err(|_| {
+            self.syntax_err(
+                format!("Expected struct name, got {:?}", self.peek()),
+                self.peek_line(),
+            )
+        })?;
         self.expect(&Token::LBrace)?;
         let mut fields = Vec::new();
         let mut methods = Vec::new();
@@ -4540,12 +4538,12 @@ impl Parser {
     fn parse_enum_decl(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // enum
-        let name = match self.advance() {
-            (Token::Ident(n), _) => n,
-            (tok, err_line) => {
-                return Err(self.syntax_err(format!("Expected enum name, got {:?}", tok), err_line))
-            }
-        };
+        let name = self.parse_package_qualified_identifier().map_err(|_| {
+            self.syntax_err(
+                format!("Expected enum name, got {:?}", self.peek()),
+                self.peek_line(),
+            )
+        })?;
         self.expect(&Token::LBrace)?;
         let mut variants = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
@@ -4586,47 +4584,46 @@ impl Parser {
         use crate::ast::{ClassDef, ClassField, ClassMethod, ClassStaticField, Visibility};
         let line = self.peek_line();
         self.advance(); // class
-        let name = match self.advance() {
-            (Token::Ident(n), _) => n,
-            (tok, err_line) => {
-                return Err(self.syntax_err(format!("Expected class name, got {:?}", tok), err_line))
-            }
-        };
+        let name = self.parse_package_qualified_identifier().map_err(|_| {
+            self.syntax_err(
+                format!("Expected class name, got {:?}", self.peek()),
+                self.peek_line(),
+            )
+        })?;
 
-        // Parse `extends Parent1, Parent2`
+        // Parse `extends Parent1, Parent2` (each may be namespaced: `Foo::Base`)
         let mut extends = Vec::new();
         if matches!(self.peek(), Token::Ident(ref s) if s == "extends") {
             self.advance(); // extends
             loop {
-                match self.advance() {
-                    (Token::Ident(parent), _) => extends.push(parent),
-                    (tok, err_line) => {
-                        return Err(self.syntax_err(
-                            format!("Expected parent class name after `extends`, got {:?}", tok),
-                            err_line,
-                        ))
-                    }
-                }
+                let parent = self.parse_package_qualified_identifier().map_err(|_| {
+                    self.syntax_err(
+                        format!(
+                            "Expected parent class name after `extends`, got {:?}",
+                            self.peek()
+                        ),
+                        self.peek_line(),
+                    )
+                })?;
+                extends.push(parent);
                 if !self.eat(&Token::Comma) {
                     break;
                 }
             }
         }
 
-        // Parse `impl Trait1, Trait2`
+        // Parse `impl Trait1, Trait2` (each may be namespaced: `Foo::Trait`)
         let mut implements = Vec::new();
         if matches!(self.peek(), Token::Ident(ref s) if s == "impl") {
             self.advance(); // impl
             loop {
-                match self.advance() {
-                    (Token::Ident(trait_name), _) => implements.push(trait_name),
-                    (tok, err_line) => {
-                        return Err(self.syntax_err(
-                            format!("Expected trait name after `impl`, got {:?}", tok),
-                            err_line,
-                        ))
-                    }
-                }
+                let trait_name = self.parse_package_qualified_identifier().map_err(|_| {
+                    self.syntax_err(
+                        format!("Expected trait name after `impl`, got {:?}", self.peek()),
+                        self.peek_line(),
+                    )
+                })?;
+                implements.push(trait_name);
                 if !self.eat(&Token::Comma) {
                     break;
                 }
@@ -4823,12 +4820,12 @@ impl Parser {
         use crate::ast::{ClassMethod, TraitDef, Visibility};
         let line = self.peek_line();
         self.advance(); // trait
-        let name = match self.advance() {
-            (Token::Ident(n), _) => n,
-            (tok, err_line) => {
-                return Err(self.syntax_err(format!("Expected trait name, got {:?}", tok), err_line))
-            }
-        };
+        let name = self.parse_package_qualified_identifier().map_err(|_| {
+            self.syntax_err(
+                format!("Expected trait name, got {:?}", self.peek()),
+                self.peek_line(),
+            )
+        })?;
 
         self.expect(&Token::LBrace)?;
         let mut methods = Vec::new();
@@ -9950,16 +9947,18 @@ impl Parser {
                 use crate::ast::SortComparator;
                 if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
+                    let block_end_line = self.prev_line();
                     let _ = self.eat(&Token::Comma);
                     let list = if self.in_pipe_rhs()
-                        && matches!(
+                        && (matches!(
                             self.peek(),
                             Token::Semicolon
                                 | Token::RBrace
                                 | Token::RParen
                                 | Token::Eof
                                 | Token::PipeForward
-                        ) {
+                        ) || self.peek_line() > block_end_line)
+                    {
                         self.pipe_placeholder_list(line)
                     } else {
                         self.parse_expression()?
@@ -12223,6 +12222,7 @@ impl Parser {
         // Accept the canonical `pmap_on $c, { BLOCK } @list` LSP-doc form too.
         self.eat(&Token::Comma);
         let block = self.parse_block_or_bareword_block()?;
+        let block_end_line = self.prev_line();
         self.eat(&Token::Comma);
         let line = self.peek_line();
         if let Token::Ident(ref kw) = self.peek().clone() {
@@ -12244,7 +12244,8 @@ impl Parser {
         let empty_list_ok = matches!(
             self.peek(),
             Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
-        ) || (self.in_pipe_rhs() && matches!(self.peek(), Token::Comma));
+        ) || (self.in_pipe_rhs()
+            && (matches!(self.peek(), Token::Comma) || self.peek_line() > block_end_line));
         if empty_list_ok {
             return Ok((
                 cluster,
@@ -12295,6 +12296,7 @@ impl Parser {
         &mut self,
     ) -> PerlResult<(Block, Expr, Option<Expr>)> {
         let block = self.parse_block_or_bareword_block()?;
+        let block_end_line = self.prev_line();
         self.eat(&Token::Comma);
         let line = self.peek_line();
         if let Token::Ident(ref kw) = self.peek().clone() {
@@ -12316,11 +12318,14 @@ impl Parser {
         // enclosing context. Inside a pipe-forward RHS, a trailing `,` also
         // counts — `foo(bar, @a |> pmap { $_ * 2 }, baz)`. `|>` is also a
         // terminator — left-associative chaining leaves the outer `|>` for
-        // the enclosing pipe-forward loop.
+        // the enclosing pipe-forward loop. A newline after the block also
+        // terminates in pipe-RHS — the LHS supplies the list, so we must NOT
+        // greedily eat the next statement (matches `parse_block_list`).
         let empty_list_ok = matches!(
             self.peek(),
             Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
-        ) || (self.in_pipe_rhs() && matches!(self.peek(), Token::Comma));
+        ) || (self.in_pipe_rhs()
+            && (matches!(self.peek(), Token::Comma) || self.peek_line() > block_end_line));
         if empty_list_ok {
             return Ok((
                 block,

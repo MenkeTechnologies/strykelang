@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mutex
+
+fn Rosetta::Mutex::demo() {
+    # mysync declares variables shared across parallel blocks with atomic updates.
+    mysync $counter = 0
+    
+    # Run a parallel loop that increments the counter
+    1:5 |> pmap {
+        $counter++
+    }
+    
+    $counter
+}
+
+my $count = Rosetta::Mutex::demo()
+p "COUNT: $count"
+assert_eq $count, 5, "Mutex (mysync) shared counter works correctly"
+
+test_run

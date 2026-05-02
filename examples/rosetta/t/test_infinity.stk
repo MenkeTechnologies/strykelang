@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Infinity
+
+fn Rosetta::Infinity::get_inf() {
+    1e1000
+}
+
+fn Rosetta::Infinity::is_inf($x) {
+    # In Stryke, we can check if it's infinity by comparing with a large number
+    # or by stringifying.
+    "$x" eq "inf"
+}
+
+my $inf = Rosetta::Infinity::get_inf()
+assert_eq Rosetta::Infinity::is_inf($inf), 1, "Value is infinity"
+assert_ok $inf > 1e308, "Infinity is greater than a large number"
+
+test_run

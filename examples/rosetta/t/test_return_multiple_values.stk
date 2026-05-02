@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Return multiple values
+
+fn Rosetta::MultiReturn::demo() {
+    # Functions in Stryke can return multiple values as a list.
+    my $a = 10
+    my $b = 20
+    my @c = (30, 40)
+    
+    ($a, $b, @c)
+}
+
+# Capture multiple values
+my ($x, $y, $z1, $z2) = Rosetta::MultiReturn::demo()
+
+assert_eq $x, 10, "First value captured"
+assert_eq $y, 20, "Second value captured"
+assert_eq $z1, 30, "Third value captured"
+assert_eq $z2, 40, "Fourth value captured"
+
+test_run

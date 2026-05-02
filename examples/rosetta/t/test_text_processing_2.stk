@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Text processing/2
+
+fn Rosetta::TextProcessing2::format_table(@data) {
+    # Task: Format data into a fixed-width table
+    my $res = ""
+    for my $row (@data) {
+        $res .= sprintf("%-10s | %5d | %8.2f\n", $row->[0], $row->[1], $row->[2])
+    }
+    $res
+}
+
+my @data = (
+    ["Apples", 10, 1.50],
+    ["Bananas", 5, 0.75],
+    ["Cherries", 100, 12.00]
+)
+
+my $table = Rosetta::TextProcessing2::format_table(@data)
+assert_ok index($table, "Apples     |    10 |     1.50") != -1, "Row 1 formatted"
+assert_ok index($table, "Cherries   |   100 |    12.00") != -1, "Row 3 formatted"
+
+test_run

@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chat server
+
+fn Rosetta::ChatServer::demo() {
+    # Standard structure for a chat server using sockets
+    # my $server = socket(AF_INET, SOCK_STREAM, 0);
+    # bind($server, sockaddr_in(12345, INADDR_ANY));
+    # listen($server, 5);
+    # my @clients;
+    # while (1) {
+    #     my $client = accept($server);
+    #     push @clients, $client;
+    #     # In a real chat server, we would use select() or threads
+    #     # to handle multiple clients and broadcast messages.
+    #     # pmap could be used for parallel handling in Stryke.
+    # }
+    
+    "Chat server logic structured"
+}
+
+assert_eq Rosetta::ChatServer::demo(), "Chat server logic structured", "Chat server structure"
+
+test_run

@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Introspection
+
+fn Rosetta::Introspection::check_builtin($name) {
+    # Using the reflection hash %all
+    exists $all{$name}
+}
+
+fn Rosetta::Introspection::get_category($name) {
+    $all{$name}
+}
+
+assert_eq Rosetta::Introspection::check_builtin("pmap"), 1, "pmap exists"
+assert_eq Rosetta::Introspection::get_category("pmap"), "parallel", "pmap category is parallel"
+assert_eq Rosetta::Introspection::check_builtin("nonexistent_builtin"), 0, "nonexistent does not exist"
+
+test_run
