@@ -1,0 +1,54 @@
+# Maintainers
+
+Day-to-day maintenance, issue triage, release engineering, and operational
+governance for stryke.
+
+This file describes the *operational* side of the project. For original
+authorship and creator attribution, see [CREATORS.md](CREATORS.md).
+Direction-setting and new-primitive work flows from the creator;
+maintenance flows through this file.
+
+## Current Maintainers
+
+_To be populated when the maintainer team is assembled._
+
+| Handle | Role | Areas |
+|---|---|---|
+| (TBD) | Lead maintainer | release management, CI |
+| (TBD) | Builtins / runtime | `builtins.rs`, `interpreter.rs`, `vm.rs` |
+| (TBD) | Parser / compiler | `parser.rs`, `compiler.rs`, `ast.rs` |
+| (TBD) | Parallel / cluster | `par_*`, `cluster.rs`, `agent.rs`, `controller.rs` |
+| (TBD) | LSP / docs | `lsp.rs`, `docs/` |
+
+## Responsibilities
+
+- **Issue triage** — labeling, reproducing, routing to the right area.
+- **Pull-request review** — first review on incoming PRs; merging once
+  reviewed and CI green.
+- **Release engineering** — versioning, tagging, publishing to crates.io.
+- **CI / build hygiene** — keeping `cargo test` / `cargo build` green
+  across macOS aarch64, Linux x86_64, Linux aarch64.
+- **Compatibility** — preserving the Perl 5 spec floor and the
+  `--compat` / `--no-interop` boundaries; no silent breakage of
+  existing scripts.
+
+Direction-setting (new language features, new primitives, new
+subsystems, breaking design changes) is **not** a maintainer
+responsibility — see [CREATORS.md](CREATORS.md).
+
+## Contributing
+
+Run `cargo test --bin stryke` before opening a PR. CI runs the full
+suite (`cargo test`, the parity harness, and the Rosetta corpus) on
+every push. PRs that touch the dispatch table must include
+`refresh_stashes`-style category metadata so reflection stays in sync
+(see `build.rs` and `tests/suite/reflection.rs`).
+
+## Governance
+
+- Maintainers are added by consensus of existing maintainers.
+- The creator retains a final veto on direction-setting changes
+  (new builtins, new opcodes, new compatibility flags, breaking
+  semantics).
+- Operational decisions (CI policy, issue labels, release cadence)
+  are maintainer-only.
