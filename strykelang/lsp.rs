@@ -1196,6 +1196,13 @@ enum LineCompletionMode {
 }
 
 fn completion_words() -> &'static Vec<String> {
+    builtin_completion_words()
+}
+
+/// Sorted, deduplicated list of all stryke builtin / keyword names used by the
+/// LSP completion engine. Exposed for REPL tab-completion so the two surfaces
+/// stay in sync (single source of truth: `lsp_completion_words.txt`).
+pub fn builtin_completion_words() -> &'static Vec<String> {
     COMPLETION_WORDS.get_or_init(|| {
         let mut v: Vec<String> = include_str!("lsp_completion_words.txt")
             .lines()
