@@ -746,6 +746,8 @@ pub(crate) fn try_builtin(
         "random_string" => Some(builtin_random_string(args)),
         "random_alpha" => Some(builtin_random_alpha(args)),
         "random_digit" => Some(builtin_random_digit()),
+        // ── Symbol-table introspection ──
+        "refresh_stashes" => Some(builtin_refresh_stashes(interp)),
         // ── System introspection ──
         "os_name" => Some(builtin_os_name()),
         "os_arch" => Some(builtin_os_arch()),
@@ -8935,6 +8937,25 @@ fn builtin_par_bench(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
     );
     Ok(PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(h))))
 }
+/// `refresh_stashes` — rebuild `%main::` / `%Foo::` package stashes from the
+/// current symbol table. Returns the number of packages now visible. The REPL
+/// invokes this between lines automatically; scripts that mutate the symbol
+/// table mid-run can call it explicitly to update the stash hashes.
+fn builtin_refresh_stashes(interp: &mut Interpreter) -> PerlResult<PerlValue> {
+    interp.refresh_package_stashes();
+    // Count distinct `Pkg::` keys now installed. `subs` is the most reliable
+    // package-name source.
+    let mut pkgs: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for k in interp.subs.keys() {
+        if let Some(i) = k.rfind("::") {
+            pkgs.insert(&k[..i]);
+        } else {
+            pkgs.insert("main");
+        }
+    }
+    Ok(PerlValue::integer(pkgs.len() as i64))
+}
+
 /// `pid` — Pid. Returns an integer.
 fn builtin_pid() -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(std::process::id() as i64))

@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Percentage difference between images
+
+fn Rosetta::ImgDiff::diff($img1, $img2) {
+    my $rows = len(@$img1)
+    my $cols = len(@{$img1->[0]})
+    my $diff_sum = 0.0
+    
+    for my $r (0 .. $rows - 1) {
+        for my $c (0 .. $cols - 1) {
+            my $p1 = $img1->[$r][$c]
+            my $p2 = $img2->[$r][$c]
+            
+            my $dr = abs($p1->[0] - $p2->[0])
+            my $dg = abs($p1->[1] - $p2->[1])
+            my $db = abs($p1->[2] - $p2->[2])
+            
+            $diff_sum += ($dr + $dg + $db) / (3.0 * 255.0)
+        }
+    }
+    
+    ($diff_sum / ($rows * $cols)) * 100.0
+}
+
+my $img1 = [
+    [[255, 0, 0], [0, 255, 0]],
+    [[0, 0, 255], [255, 255, 255]]
+]
+
+my $img2 = [
+    [[255, 0, 0], [0, 255, 0]],
+    [[0, 0, 255], [0, 0, 0]]
+]
+
+my $diff = Rosetta::ImgDiff::diff($img1, $img2)
+# Only bottom right pixel is different (white vs black).
+# White [255,255,255] vs Black [0,0,0] -> diff is 1.0 (100% diff for this pixel)
+# Total pixels = 4. Total diff = 1.0. Avg diff = 0.25 (25%)
+assert_ok abs($diff - 25.0) < 0.01, "Difference is 25%"
+
+# Same images
+my $diff_same = Rosetta::ImgDiff::diff($img1, $img1)
+assert_ok abs($diff_same - 0.0) < 0.01, "Same images have 0% difference"
+
+test_run

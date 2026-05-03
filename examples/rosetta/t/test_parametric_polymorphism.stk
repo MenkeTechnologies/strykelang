@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parametric polymorphism
+
+# In a dynamically typed language like Stryke, parametric polymorphism
+# is achieved naturally because functions accept any type of arguments.
+
+class Rosetta::Tree {
+    fn new($class, $val, $l, $r) {
+        bless { value => $val, left => $l, right => $r }, $class
+    }
+}
+
+# The same replace function works for numbers, strings, objects
+fn Rosetta::Poly::replace_val($tree, $new_val) {
+    $tree->{value} = $new_val
+    $tree
+}
+
+my $t1 = Rosetta::Tree->new(42, undef, undef)
+Rosetta::Poly::replace_val($t1, 100)
+assert_eq $t1->{value}, 100, "Integer polymorphism"
+
+my $t2 = Rosetta::Tree->new("Hello", undef, undef)
+Rosetta::Poly::replace_val($t2, "World")
+assert_eq $t2->{value}, "World", "String polymorphism"
+
+test_run

@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Piprimes
+
+fn Rosetta::Piprimes::is_prime($n) {
+    if ($n < 2) { return 0 }
+    if ($n == 2) { return 1 }
+    if ($n % 2 == 0) { return 0 }
+    
+    my $limit = int(sqrt($n))
+    for (my $i = 3; $i <= $limit; $i += 2) {
+        if ($n % $i == 0) { return 0 }
+    }
+    1
+}
+
+fn Rosetta::Piprimes::find() {
+    my $pi = "31415926535897932384626433832795028841971693993751"
+    my @primes
+    for my $i (1 .. 6) {
+        my $prefix = substr($pi, 0, $i)
+        my $num = int($prefix)
+        if (Rosetta::Piprimes::is_prime($num)) {
+            push @primes, $num
+        }
+    }
+    \@primes
+}
+
+my $piprimes = Rosetta::Piprimes::find()
+assert_eq len(@$piprimes), 3, "Found 3 piprimes in first 6 digits"
+assert_eq $piprimes->[0], 3, "n=1 is prime"
+assert_eq $piprimes->[1], 31, "n=2 is prime"
+assert_eq $piprimes->[2], 314159, "n=6 is prime"
+
+test_run

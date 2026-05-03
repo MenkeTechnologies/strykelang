@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Plot coordinate pairs
+
+fn Rosetta::Plot::plot(@points) {
+    my $min_x = 999; my $max_x = -999; my $min_y = 999; my $max_y = -999
+    for my $p (@points) {
+        my ($x, $y) = @$p
+        $min_x = $x if $x < $min_x
+        $max_x = $x if $x > $max_x
+        $min_y = $y if $y < $min_y
+        $max_y = $y if $y > $max_y
+    }
+    
+    my %grid
+    for my $p (@points) {
+        my ($x, $y) = @$p
+        if (!exists $grid{$x}) { $grid{$x} = {} }
+        $grid{$x}{$y} = 1
+    }
+    
+    my $out = ""
+    for (my $y = $max_y; $y >= $min_y; $y--) {
+        for (my $x = $min_x; $x <= $max_x; $x++) {
+            $out .= ($grid{$x}{$y} ? "*" : " ")
+        }
+        $out .= "\n"
+    }
+    $out
+}
+
+my @p = ([0, 0], [1, 1], [2, 2], [3, 1], [4, 0])
+my $graph = Rosetta::Plot::plot(@p)
+
+# p $graph
+# Expected:
+#   *  
+#  * * 
+# *   *
+
+assert_ok length($graph) > 0, "Graph generated"
+assert_ok index($graph, "*") != -1, "Graph contains plot points"
+
+test_run
