@@ -1175,6 +1175,81 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
       </section>
 
       <section class="tutorial-section">
+        <h2>Inventions</h2>
+        <p>Designs that originated in stryke. Other languages are invited to absorb, adapt, or build on any of these under MIT — see <a href="../CREATORS.md">CREATORS.md § Porting stryke ideas</a> for the attribution norm. The list also doubles as the canonical reference porters cite.</p>
+
+        <table class="reflection-table">
+          <thead>
+            <tr><th>Invention</th><th>Form</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Three-axis threading-operator family</strong></td>
+              <td><code>|&gt;</code> &middot; <code>~&gt;</code> &middot; <code>-&gt;&gt;</code></td>
+              <td>One operator family with three distinct semantics (pipe-forward, Racket-style, Clojure-style), each accepting bare-fn / arrow-block / placeholder forms per stage. Collapses what Clojure does with three separate macros (<code>-&gt;</code>, <code>-&gt;&gt;</code>, <code>as-&gt;</code>) into one.</td>
+            </tr>
+            <tr>
+              <td><strong>Implicit-positional closure params with depth</strong></td>
+              <td><code>_0</code> &middot; <code>_0&lt;</code> &middot; <code>_0&lt;&lt;</code> &middot; <code>_N&lt;&lt;&lt;&lt;</code></td>
+              <td>Two-axis closure-arg notation: <code>N</code> selects positional slot, <code>&lt;</code> count selects closure-nesting depth outward. Four-way alias for slot 0 (<code>_</code>, <code>$_</code>, <code>_0</code>, <code>$_0</code>) unifies Scala / Perl / Mathematica / sigil-positional traditions.</td>
+            </tr>
+            <tr>
+              <td><strong>Polymorphic literal-typed range</strong></td>
+              <td><code>1:10</code> &middot; <code>'a':'z'</code> &middot; <code>'I':'X'</code> &middot; <code>'2026-01-01':'2026-12-31'</code></td>
+              <td>Range syntax where literal type infers range type — integer / character / roman numeral / ISO date / RFC3339 datetime / dotted-quad IP. Step semantics inferred from inferred type.</td>
+            </tr>
+            <tr>
+              <td><strong>Parse-time idiomatic firewall</strong></td>
+              <td><code>--no-interop</code></td>
+              <td>Parser-enforced rejection of Perl-isms (<code>sub</code>, <code>say</code>, <code>$a</code>/<code>$b</code> globals, <code>scalar</code>, etc.) in favor of stryke idioms (<code>fn</code>, <code>p</code>, <code>$_0</code>/<code>$_1</code>, <code>len</code>). Documented rules become parser errors so LLMs and bots can't ignore them.</td>
+            </tr>
+            <tr>
+              <td><strong>AOP intercepts as language primitive</strong></td>
+              <td><code>before</code> &middot; <code>after</code> &middot; <code>around</code> &middot; <code>intercept</code></td>
+              <td>Pre / post / around hooks first-class in the language. Not a library — the parser, compiler, and VM all know about the intercept layer.</td>
+            </tr>
+            <tr>
+              <td><strong>AI primitives as syntactic forms</strong></td>
+              <td><code>ai</code> &middot; <code>tool fn</code> &middot; <code>mcp_server_start</code></td>
+              <td>Calling Anthropic / OpenAI is a builtin verb on par with <code>print</code>. Tool-use, batch fan-out, and MCP server / client are language-level constructs, not third-party crates.</td>
+            </tr>
+            <tr>
+              <td><strong>Encyclopedic-stdlib design axis</strong></td>
+              <td>~4,000 callables, zero-import</td>
+              <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq.</td>
+            </tr>
+            <tr>
+              <td><strong>Live-binding hash with kind strings</strong></td>
+              <td><code>%parameters</code></td>
+              <td>zsh-<code>$parameters</code> analogue: keys are sigil-prefixed names (<code>$x</code>, <code>@a</code>, <code>%h</code>), values are kind strings (<code>"scalar"</code>, <code>"array"</code>, <code>"hash"</code>, <code>"atomic_array"</code>, ...). Rebuilt on every read so the snapshot is always current.</td>
+            </tr>
+            <tr>
+              <td><strong>Lazy package-stash refresh</strong></td>
+              <td><code>%main::</code> &middot; <code>%Foo::</code></td>
+              <td>Per-package symbol-table stashes refreshed lazily on every read so newly-defined subs / <code>our</code> vars are visible immediately. Symbol-name → kind string (<code>"scalar"</code> / <code>"sub"</code>).</td>
+            </tr>
+            <tr>
+              <td><strong>Compiled Unix shell substrate</strong></td>
+              <td><code>fusevm</code> + zshrs</td>
+              <td>First compiled Unix shell. Stryke and zshrs share a bytecode VM and Cranelift JIT path; the shell hosts the scripting language with zero-fork dispatch via <code>@expr</code> syntax.</td>
+            </tr>
+            <tr>
+              <td><strong>Distributed compute as primitive</strong></td>
+              <td><code>cluster([...])</code> &middot; <code>pmap_on $c { } @list</code></td>
+              <td>Multi-host SSH worker pool as a language-level value; <code>pmap_on</code> fans a parallel map across persistent remote workers with fault tolerance. Not a framework, not a library — a builtin pair.</td>
+            </tr>
+            <tr>
+              <td><strong>AOT script binary deployment</strong></td>
+              <td><code>s build script.stk</code></td>
+              <td>Single static binary output from a script. No runtime install on target, no <code>node_modules</code>, no <code>bundle install</code>, no Docker required — <code>scp ./binary prod:</code> is the deploy.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p style="font-size:11px;color:var(--text-muted);margin-top:1rem;">When a port lands in another language, a one-sentence credit in that language's docs (feature reference / release notes / &ldquo;Influences&rdquo; section) referring to stryke as the invention source is the asked attribution form. See <a href="../CREATORS.md#porting-stryke-ideas-to-other-languages">CREATORS.md</a> for the exact wording.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Repository &amp; links</h2>
         <ul>
           <li><strong>Source</strong> — <a href="https://github.com/MenkeTechnologies/strykelang">GitHub repo</a></li>
