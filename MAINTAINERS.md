@@ -3,10 +3,11 @@
 Day-to-day maintenance, issue triage, release engineering, and operational
 governance for stryke.
 
-This file describes the *operational* side of the project. For original
-authorship and creator attribution, see [CREATORS.md](CREATORS.md).
-Direction-setting and new-primitive work flows from the creator;
-maintenance flows through this file.
+This file describes the project's *current* governance and contribution
+flow. For original authorship and the historical record, see
+[CREATORS.md](CREATORS.md). Authority is fully with the maintainer team
+named here — the project is independent of its creator and no
+external party retains veto, direction-setting, or approval rights.
 
 ## Current Maintainers
 
@@ -33,8 +34,9 @@ _To be populated when the maintainer team is assembled._
   existing scripts.
 
 Direction-setting (new language features, new primitives, new
-subsystems, breaking design changes) is **not** a maintainer
-responsibility — see [CREATORS.md](CREATORS.md).
+subsystems, breaking design changes) is also a maintainer
+responsibility — typically through an RFC or major-feature
+proposal process owned by the maintainer team.
 
 ## Contributing
 
@@ -46,9 +48,10 @@ every push. PRs that touch the dispatch table must include
 
 ## Governance
 
-- Maintainers are added by consensus of existing maintainers.
-- The creator retains a final veto on direction-setting changes
-  (new builtins, new opcodes, new compatibility flags, breaking
-  semantics).
-- Operational decisions (CI policy, issue labels, release cadence)
-  are maintainer-only.
+- Maintainers are added and removed by consensus of existing maintainers.
+- All project decisions — operational (CI, releases, labels) and
+  directional (language design, new primitives, breaking changes) —
+  are owned by the active maintainer team.
+- The creator has no ongoing authority over the project. Attribution
+  in [CREATORS.md](CREATORS.md) is historical record, not a governance
+  role.
