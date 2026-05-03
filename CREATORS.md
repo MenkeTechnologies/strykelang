@@ -13,12 +13,12 @@ For governance, contribution flow, and current maintainers, see
 
 ## Porting stryke ideas to other languages
 
-The synthesis above is offered as **prior art for the language-design
-commons**, not as fenced IP. Any language — Perl, Ruby, Python, Raku,
-zsh, fish, nushell, OCaml, Scala, a new project, anything — is welcome
-to absorb, adapt, or fully port any stryke-originated idea. No
-permission needed beyond what the MIT license already grants. Examples
-of inventions that other languages should feel free to take:
+The synthesis above is offered as a contribution to the
+language-design tradition. Any language — Perl, Ruby, Python,
+Raku, zsh, fish, nushell, OCaml, Scala, a new project, anything —
+is invited to absorb, adapt, or build on any stryke-originated idea.
+No permission needed beyond what the MIT license already grants.
+Examples of inventions other languages can take:
 
 - The three-axis threading-operator family (`|>` / `~>` / `->>`) with
   bare-fn / arrow-block / placeholder forms in one operator family.
@@ -34,9 +34,10 @@ of inventions that other languages should feel free to take:
   minimal, libraries optional" → "core encyclopedic, libraries
   unnecessary").
 
-What [MAINTAINERS.md](MAINTAINERS.md) governs is the *official
-strykelang upstream* — protecting it from identity-dissolving
-changes. It does not restrict anyone from copying stryke's ideas
-elsewhere.
+The ideas living elsewhere is the goal — that's how a language
+contributes to the field. [MAINTAINERS.md](MAINTAINERS.md)
+describes how the *official strykelang upstream* keeps itself
+recognizable as stryke across maintainer rotations, separate from
+how the ideas travel.
 
 License: MIT (see [LICENSE](LICENSE)).
