@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Send email
+
+fn Rosetta::Mail::compose($from, $to, $subject, $body) {
+    "From: $from\nTo: $to\nSubject: $subject\n\n$body"
+}
+
+fn Rosetta::Mail::send($outbox, $message) {
+    push @$outbox, $message
+    scalar(@$outbox)
+}
+
+my @outbox
+my $message = Rosetta::Mail::compose('me@example.com', 'you@example.com', "Hi", "Hello there")
+
+assert_eq Rosetta::Mail::send(\@outbox, $message), 1, "message appended to outbox"
+assert_eq substr($outbox[0], 0, 20), 'From: me@example.com', "message contains From header"
+assert_eq $outbox[0] =~ /Hello there$/, 1, "message contains body"
+
+test_run

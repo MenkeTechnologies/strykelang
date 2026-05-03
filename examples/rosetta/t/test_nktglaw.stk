@@ -1,0 +1,11 @@
+#!/usr/bin/env stryke
+# Rosetta Code: NKTgLaw
+
+fn Rosetta::NKTg::eval($n, $k, $t, $g) {
+    ($n * $k * $t) / $g
+}
+
+assert_eq Rosetta::NKTg::eval(2, 3, 5, 2), 15, "NKTgLaw evaluation is stable"
+assert_eq Rosetta::NKTg::eval(1, 4, 8, 4), 8, "second evaluation matches arithmetic expectation"
+
+test_run

@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: OpenGL
+
+fn Rosetta::OpenGL::new() {
+    my @commands
+    { commands => \@commands, color => "white" }
+}
+
+fn Rosetta::OpenGL::clear($ctx) { push @{$ctx->{commands}}, "clear" }
+fn Rosetta::OpenGL::color($ctx, $name) { $ctx->{color} = $name; push @{$ctx->{commands}}, "color:$name" }
+fn Rosetta::OpenGL::triangle($ctx, @verts) { push @{$ctx->{commands}}, "triangle:$ctx->{color}:" . join(";", @verts) }
+
+my $ctx = Rosetta::OpenGL::new()
+Rosetta::OpenGL::clear($ctx)
+Rosetta::OpenGL::color($ctx, "green")
+Rosetta::OpenGL::triangle($ctx, "0,0", "1,0", "0,1")
+
+assert_eq join(",", @{$ctx->{commands}}), "clear,color:green,triangle:green:0,0;1,0;0,1", "OpenGL command stream recorded"
+assert_eq $ctx->{color}, "green", "current draw color tracked"
+
+test_run

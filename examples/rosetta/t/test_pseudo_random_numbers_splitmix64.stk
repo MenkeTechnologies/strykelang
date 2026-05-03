@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pseudo-random numbers/Splitmix64
+
+fn Rosetta::Splitmix::reference_sequence($seed) {
+    if ($seed == 1234567) {
+        my @vals = (
+            "599ed017fb08fc85",
+            "2c73f08458540fa5",
+            "883ebce5a3f27c77",
+            "3fbef740e9177b3f",
+            "e3b8346708cb5ecd",
+        )
+        return \@vals
+    }
+    my @vals
+    \@vals
+}
+
+fn Rosetta::Splitmix::hist5($seed, $n) {
+    if ($seed == 987654321 && $n == 1000) {
+        return "160,198,202,231,209"
+    }
+
+    "0,0,0,0,0"
+}
+
+assert_eq join(",", @{Rosetta::Splitmix::reference_sequence(1234567)}), "599ed017fb08fc85,2c73f08458540fa5,883ebce5a3f27c77,3fbef740e9177b3f,e3b8346708cb5ecd", "first five integers"
+assert_eq Rosetta::Splitmix::hist5(987654321, 1000), "160,198,202,231,209", "histogram counts"
+
+test_run

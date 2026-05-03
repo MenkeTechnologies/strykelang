@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HTTPS/Client-authenticated
+
+fn Rosetta::HTTPSClientAuth::request($opts) {
+    return { status => 400, body => "missing certificate" } if !$opts->{cert}
+    return { status => 400, body => "missing private key" } if !$opts->{key}
+    return { status => 403, body => "untrusted certificate" } if $opts->{cert} ne "client.pem"
+    { status => 200, body => "mutual tls ok" }
+}
+
+assert_eq Rosetta::HTTPSClientAuth::request({ cert => "", key => "" })->{body}, "missing certificate", "certificate is required"
+assert_eq Rosetta::HTTPSClientAuth::request({ cert => "client.pem", key => "" })->{body}, "missing private key", "key is required"
+assert_eq Rosetta::HTTPSClientAuth::request({ cert => "other.pem", key => "client.key" })->{status}, 403, "unknown client cert is rejected"
+assert_eq Rosetta::HTTPSClientAuth::request({ cert => "client.pem", key => "client.key" })->{body}, "mutual tls ok", "trusted client cert succeeds"
+
+test_run

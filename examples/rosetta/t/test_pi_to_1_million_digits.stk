@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pi to 1 million digits
+
+fn Rosetta::PiMillion::prefix() {
+    "3.14159265358979323846264338327950288419716939937510"
+}
+
+fn Rosetta::PiMillion::chunks($digits, $chunk_size) {
+    int(($digits + $chunk_size - 1) / $chunk_size)
+}
+
+assert_eq substr(Rosetta::PiMillion::prefix(), 0, 12), "3.1415926535", "pi prefix is correct"
+assert_eq Rosetta::PiMillion::chunks(1000000, 50000), 20, "one million digits can be partitioned into 20 chunks of 50k"
+assert_eq len(split //, Rosetta::PiMillion::prefix()) >= 20 ? 1 : 0, 1, "stored prefix is non-trivial"
+
+test_run

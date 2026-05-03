@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: List rooted trees
+
+fn Rosetta::RootedTrees::assemble($remaining, $parts, $last, $out) {
+    if ($remaining == 0) {
+        push @$out, "(" . join("", @$parts) . ")"
+        return
+    }
+
+    for my $size (1 .. $remaining) {
+        my $subs = Rosetta::RootedTrees::trees($size)
+        for my $sub (@$subs) {
+            next if defined($last) && $last ne "" && $sub lt $last
+            my @next = (@$parts, $sub)
+            Rosetta::RootedTrees::assemble($remaining - $size, \@next, $sub, $out)
+        }
+    }
+}
+
+fn Rosetta::RootedTrees::trees($n) {
+    return ["()"] if $n == 1
+    my @raw
+    my $start = []
+    Rosetta::RootedTrees::assemble($n - 1, $start, undef, \@raw)
+    my %seen
+    for my $s (@raw) { $seen{$s} = 1 }
+    my @sorted = sort keys %seen
+    \@sorted
+}
+
+assert_eq len(@{Rosetta::RootedTrees::trees(1)}), 1, "A000081(1)"
+assert_eq len(@{Rosetta::RootedTrees::trees(2)}), 1, "A000081(2)"
+assert_eq len(@{Rosetta::RootedTrees::trees(3)}), 2, "A000081(3)"
+assert_eq len(@{Rosetta::RootedTrees::trees(4)}), 4, "A000081(4)"
+assert_eq len(@{Rosetta::RootedTrees::trees(5)}), 9, "A000081(5)"
+assert_eq join(" ", @{Rosetta::RootedTrees::trees(3)}), "((())) (()())", "3-bag examples"
+
+test_run

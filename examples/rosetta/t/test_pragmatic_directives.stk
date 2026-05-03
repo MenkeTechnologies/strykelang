@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pragmatic directives
+
+fn Rosetta::Pragmas::base() {
+    { strict => 0, warnings => 0, trace => 0 }
+}
+
+fn Rosetta::Pragmas::with($env, $name, $value) {
+    {
+        strict => $env->{strict},
+        warnings => $env->{warnings},
+        trace => $env->{trace},
+        $name => $value,
+    }
+}
+
+fn Rosetta::Pragmas::check_assign($env, $declared) {
+    return "error" if $env->{strict} && !$declared
+    return "warn" if $env->{warnings} && !$declared
+    "ok"
+}
+
+fn Rosetta::Pragmas::describe($env) {
+    "strict=$env->{strict} warnings=$env->{warnings} trace=$env->{trace}"
+}
+
+my $base = Rosetta::Pragmas::base()
+my $warn = Rosetta::Pragmas::with($base, "warnings", 1)
+my $strict = Rosetta::Pragmas::with($warn, "strict", 1)
+
+assert_eq Rosetta::Pragmas::describe($base), "strict=0 warnings=0 trace=0", "base environment is unchanged"
+assert_eq Rosetta::Pragmas::check_assign($warn, 0), "warn", "warnings mode flags undeclared assignment"
+assert_eq Rosetta::Pragmas::check_assign($strict, 0), "error", "strict mode upgrades to error"
+assert_eq Rosetta::Pragmas::check_assign($strict, 1), "ok", "declared variable is accepted"
+
+test_run

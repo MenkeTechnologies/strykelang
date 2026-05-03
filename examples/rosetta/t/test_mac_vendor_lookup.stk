@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: MAC vendor lookup
+
+fn Rosetta::MAC::normalize($mac) {
+    my @chars = grep { $_ ne ":" && $_ ne "-" } split //, uc($mac)
+    join("", @chars)
+}
+
+fn Rosetta::MAC::lookup($table, $mac) {
+    my $norm = Rosetta::MAC::normalize($mac)
+    my $oui = substr($norm, 0, 6)
+    exists $table->{$oui} ? $table->{$oui} : "Unknown"
+}
+
+my %table = (
+    "00163E" => "Apple",
+    "3C5A37" => "Google",
+    "F4F5E8" => "Cisco",
+)
+
+assert_eq Rosetta::MAC::lookup(\%table, "00:16:3e:aa:bb:cc"), "Apple", "lookup normalizes colon-separated MAC"
+assert_eq Rosetta::MAC::lookup(\%table, "3c-5a-37-00-00-01"), "Google", "lookup normalizes dash-separated MAC"
+assert_eq Rosetta::MAC::lookup(\%table, "aa:bb:cc:dd:ee:ff"), "Unknown", "unknown OUI falls back"
+
+test_run

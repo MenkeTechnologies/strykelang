@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Keyboard input/Obtain a Y or N response
+
+fn Rosetta::YesNo::flush($buffer) { @$buffer = (); $buffer }
+
+fn Rosetta::YesNo::read($stale, $future) {
+    Rosetta::YesNo::flush($stale)
+    for my $ch (@$future) {
+        my $u = uc($ch)
+        return $u if $u eq "Y" || $u eq "N"
+    }
+    undef
+}
+
+my @stale = ("Y")
+assert_eq Rosetta::YesNo::read(\@stale, ["x", "n"]), "N", "stale buffer flushed before reading"
+assert_eq len(@stale), 0, "stale buffer emptied"
+assert_eq Rosetta::YesNo::read([], ["?", "y"]), "Y", "reads yes without enter"
+assert_eq Rosetta::YesNo::read([], ["?", "!"]), undef, "no valid response yields undef"
+
+test_run

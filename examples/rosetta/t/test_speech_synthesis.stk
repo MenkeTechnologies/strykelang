@@ -1,0 +1,13 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Speech synthesis
+
+fn Rosetta::Speech::say($voice, $text) {
+    { voice => $voice, phonemes => join("-", map { lc($_) } split //, $text) }
+}
+
+my $utterance = Rosetta::Speech::say("Ada", "Hi")
+
+assert_eq $utterance->{voice}, "Ada", "voice name recorded"
+assert_eq $utterance->{phonemes}, "h-i", "text expanded into deterministic phoneme stream"
+
+test_run

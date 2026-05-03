@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Simulate input/Mouse
+
+fn Rosetta::SimMouse::new() {
+    my @events
+    { x => 0, y => 0, down => 0, events => \@events }
+}
+
+fn Rosetta::SimMouse::move($mouse, $x, $y) {
+    $mouse->{x} = $x
+    $mouse->{y} = $y
+    push @{$mouse->{events}}, "move:$x,$y"
+}
+
+fn Rosetta::SimMouse::press($mouse) {
+    $mouse->{down} = 1
+    push @{$mouse->{events}}, "down"
+}
+
+fn Rosetta::SimMouse::release($mouse) {
+    $mouse->{down} = 0
+    push @{$mouse->{events}}, "up"
+}
+
+my $mouse = Rosetta::SimMouse::new()
+Rosetta::SimMouse::move($mouse, 10, 20)
+Rosetta::SimMouse::press($mouse)
+Rosetta::SimMouse::move($mouse, 15, 25)
+Rosetta::SimMouse::release($mouse)
+
+assert_eq join(",", @{$mouse->{events}}), "move:10,20,down,move:15,25,up", "mouse event stream recorded"
+assert_eq "$mouse->{x},$mouse->{y}", "15,25", "mouse ends at dragged position"
+assert_eq $mouse->{down}, 0, "mouse button released"
+
+test_run

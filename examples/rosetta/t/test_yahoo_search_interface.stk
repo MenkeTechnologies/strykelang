@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Yahoo! search interface
+
+fn Rosetta::Yahoo::search($index, $query) {
+    my @matches
+    for my $entry (@$index) {
+        if ($entry->{title} =~ /\Q$query\E/i || $entry->{url} =~ /\Q$query\E/i) {
+            push @matches, $entry
+        }
+    }
+    \@matches
+}
+
+my @index = (
+    { title => "Rosetta Code", url => "https://rosettacode.org" },
+    { title => "Yahoo Finance", url => "https://finance.yahoo.com" },
+    { title => "Perl", url => "https://perl.org" },
+)
+
+my $matches = Rosetta::Yahoo::search(\@index, "yahoo")
+
+assert_eq len(@$matches), 1, "single yahoo result matched"
+assert_eq $matches->[0]{title}, "Yahoo Finance", "matching result returned"
+assert_eq len(@{Rosetta::Yahoo::search(\@index, "code")}), 1, "title matching works"
+
+test_run

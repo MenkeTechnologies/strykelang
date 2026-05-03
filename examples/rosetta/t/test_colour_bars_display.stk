@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Colour bars/Display
+
+fn Rosetta::ColourBars::row($width) {
+    my @bars = qw(K R G B M C Y W)
+    my $bar_w = int($width / len(@bars))
+    my $line = ""
+    for my $bar (@bars) {
+        $line .= $bar x $bar_w
+    }
+    $line
+}
+
+fn Rosetta::ColourBars::render($width, $height) {
+    my $line = Rosetta::ColourBars::row($width)
+    my @rows = ~> 1 .. $height map { $line }
+    \@rows
+}
+
+fn Rosetta::ColourBars::unique($text) {
+    my %seen
+    for my $ch (split //, $text) { $seen{$ch} = 1 if $ch =~ /[A-Z]/ }
+    scalar(keys %seen)
+}
+
+my $bars = Rosetta::ColourBars::render(32, 4)
+my $joined = join("\n", @$bars)
+
+assert_eq len(@$bars), 4, "4 display rows"
+assert_eq len($bars->[0]), 32, "8 equal bars fill width 32"
+assert_eq $bars->[0], "KKKKRRRRGGGGBBBBMMMMCCCCYYYYWWWW", "expected bar order"
+assert_eq Rosetta::ColourBars::unique($joined), 8, "all eight colors represented"
+
+test_run

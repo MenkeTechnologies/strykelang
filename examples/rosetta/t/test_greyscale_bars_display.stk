@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Greyscale bars/Display
+
+fn Rosetta::Greyscale::shade($level) {
+    my $palette = ".,:;ox%#@"
+    my $idx = int($level * (len($palette) - 1))
+    substr($palette, $idx, 1)
+}
+
+fn Rosetta::Greyscale::row($width, $bars, $reverse) {
+    my $bar_w = int($width / $bars)
+    my $line = ""
+    for my $i (0 .. $bars - 1) {
+        my $level = $i / ($bars - 1)
+        $level = 1 - $level if $reverse
+        $line .= Rosetta::Greyscale::shade($level) x $bar_w
+    }
+    substr($line, 0, $width)
+}
+
+fn Rosetta::Greyscale::render($width) {
+    [
+        Rosetta::Greyscale::row($width, 8, 0),
+        Rosetta::Greyscale::row($width, 16, 1),
+        Rosetta::Greyscale::row($width, 32, 0),
+        Rosetta::Greyscale::row($width, 64, 1),
+    ]
+}
+
+fn Rosetta::Greyscale::unique($text) {
+    my %seen
+    for my $ch (split //, $text) { $seen{$ch} = 1 if $ch !~ /\s/ }
+    scalar(keys %seen)
+}
+
+my $rows = Rosetta::Greyscale::render(64)
+
+assert_eq len(@$rows), 4, "four greyscale rows"
+assert_eq len($rows->[0]), 64, "rows span full width"
+assert_eq substr($rows->[0], 0, 1), ".", "top row starts at black"
+assert_eq substr($rows->[0], -1, 1), "@", "top row ends at white"
+assert_eq substr($rows->[1], 0, 1), "@", "second row reverses from white"
+assert_eq Rosetta::Greyscale::unique(join("\n", @$rows)) >= 6, 1, "multiple greys represented"
+
+test_run

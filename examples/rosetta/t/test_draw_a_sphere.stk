@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Draw a sphere
+
+fn Rosetta::Sphere::clamp01($x) {
+    return 0 if $x < 0
+    return 1 if $x > 1
+    $x
+}
+
+fn Rosetta::Sphere::shade($brightness) {
+    my $palette = ".,-~:;=!*#$@"
+    my $b = Rosetta::Sphere::clamp01($brightness)
+    my $idx = int($b * (len($palette) - 1))
+    substr($palette, $idx, 1)
+}
+
+fn Rosetta::Sphere::draw($radius) {
+    my ($lx, $ly, $lz) = (-0.577350269, -0.577350269, 0.577350269)
+    my @lines
+
+    for my $y (-$radius..$radius) {
+        my $line = ""
+        for my $xi ((-$radius * 2)..($radius * 2)) {
+            my $x = $xi / 2
+            my $rr = $radius * $radius
+            my $d2 = $x * $x + $y * $y
+
+            if ($d2 <= $rr) {
+                my $z = sqrt($rr - $d2)
+                my $nx = $x / $radius
+                my $ny = $y / $radius
+                my $nz = $z / $radius
+                my $diffuse = $nx * $lx + $ny * $ly + $nz * $lz
+                my $brightness = 0.15 + 0.85 * Rosetta::Sphere::clamp01($diffuse)
+                $line .= Rosetta::Sphere::shade($brightness)
+            } else {
+                $line .= " "
+            }
+        }
+        push @lines, $line
+    }
+
+    \@lines
+}
+
+fn Rosetta::Sphere::non_space_count($text) {
+    my $copy = $text
+    $copy =~ s/\s//g
+    len($copy)
+}
+
+fn Rosetta::Sphere::unique_shades($text) {
+    my %seen
+    for my $ch (split //, $text) {
+        next if $ch =~ /\s/
+        $seen{$ch} = 1
+    }
+    scalar(keys %seen)
+}
+
+my $sphere = Rosetta::Sphere::draw(8)
+my $rendered = @$sphere |> join("\n")
+
+assert_eq len(@$sphere), 17, "2r+1 rows for radius 8"
+assert_eq len($sphere->[0]), 33, "4r+1 columns for radius 8"
+assert_eq Rosetta::Sphere::non_space_count($rendered) > 0, 1, "sphere contains visible pixels"
+assert_eq $sphere->[8] =~ /\S/, 1, "equator row contains shading"
+assert_eq Rosetta::Sphere::unique_shades($rendered) >= 4, 1, "multiple shading levels used"
+
+my $small = Rosetta::Sphere::draw(4) |> join("\n")
+assert_eq Rosetta::Sphere::non_space_count($small) > 0, 1, "small sphere also renders"
+
+test_run

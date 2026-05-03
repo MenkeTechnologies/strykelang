@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: FTP
+
+fn Rosetta::FTP::new() {
+    my %files = ("/pub/readme.txt" => "hello", "/pub/data.csv" => "1,2,3")
+    { connected => 0, cwd => "/", files => \%files }
+}
+
+fn Rosetta::FTP::connect($ftp, $host) {
+    $ftp->{connected} = ($host eq "ftp.example.com") ? 1 : 0
+    $ftp->{connected}
+}
+
+fn Rosetta::FTP::cwd($ftp, $dir) {
+    $ftp->{cwd} = $dir if $ftp->{connected}
+    $ftp->{cwd}
+}
+
+fn Rosetta::FTP::get($ftp, $path) {
+    return "not connected" if !$ftp->{connected}
+    exists $ftp->{files}{$path} ? $ftp->{files}{$path} : "missing"
+}
+
+my $ftp = Rosetta::FTP::new()
+
+assert_eq Rosetta::FTP::connect($ftp, "ftp.example.com"), 1, "connect succeeds for known host"
+assert_eq Rosetta::FTP::cwd($ftp, "/pub"), "/pub", "cwd changes after connect"
+assert_eq Rosetta::FTP::get($ftp, "/pub/readme.txt"), "hello", "file download returns contents"
+assert_eq Rosetta::FTP::get($ftp, "/pub/nope.txt"), "missing", "missing file is reported"
+
+test_run

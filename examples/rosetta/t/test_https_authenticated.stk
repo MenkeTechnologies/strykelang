@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: HTTPS/Authenticated
+
+fn Rosetta::HTTPSAuth::request($headers) {
+    return { status => 401, body => "missing auth" } if !exists $headers->{Authorization}
+    return { status => 403, body => "forbidden" } if $headers->{Authorization} ne "Bearer token-123"
+    { status => 200, body => "ok" }
+}
+
+assert_eq Rosetta::HTTPSAuth::request({})->{status}, 401, "request without auth is rejected"
+assert_eq Rosetta::HTTPSAuth::request({ Authorization => "Bearer bad" })->{status}, 403, "wrong token is forbidden"
+assert_eq Rosetta::HTTPSAuth::request({ Authorization => "Bearer token-123" })->{body}, "ok", "correct token succeeds"
+
+test_run

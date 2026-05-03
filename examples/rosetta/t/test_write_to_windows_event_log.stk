@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Write to Windows event log
+
+fn Rosetta::EventLog::new() {
+    my @entries
+    { entries => \@entries }
+}
+
+fn Rosetta::EventLog::write($log, $source, $level, $message) {
+    push @{$log->{entries}}, "$source|$level|$message"
+    len(@{$log->{entries}})
+}
+
+my $log = Rosetta::EventLog::new()
+Rosetta::EventLog::write($log, "Rosetta", "INFO", "started")
+Rosetta::EventLog::write($log, "Rosetta", "WARN", "low disk")
+
+assert_eq len(@{$log->{entries}}), 2, "two event log entries written"
+assert_eq $log->{entries}[1], "Rosetta|WARN|low disk", "second log entry preserved"
+
+test_run

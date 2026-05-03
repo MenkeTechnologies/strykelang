@@ -1,0 +1,109 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Draw a rotating cube
+
+fn Rosetta::RotCube::blank($w, $h) {
+    my @rows
+    for my $y (0 .. $h - 1) {
+        push @rows, " " x $w
+    }
+    \@rows
+}
+
+fn Rosetta::RotCube::set_pixel($rows, $x, $y, $ch) {
+    return if $y < 0 || $y >= len(@$rows)
+    return if $x < 0 || $x >= len($rows->[0])
+    substr($rows->[$y], $x, 1, $ch)
+}
+
+fn Rosetta::RotCube::draw_line($rows, $x0, $y0, $x1, $y1) {
+    my $dx = abs($x1 - $x0)
+    my $sx = $x0 < $x1 ? 1 : -1
+    my $dy = -abs($y1 - $y0)
+    my $sy = $y0 < $y1 ? 1 : -1
+    my $err = $dx + $dy
+
+    while (1) {
+        Rosetta::RotCube::set_pixel($rows, $x0, $y0, "#")
+        last if $x0 == $x1 && $y0 == $y1
+        my $e2 = 2 * $err
+        if ($e2 >= $dy) { $err += $dy; $x0 += $sx }
+        if ($e2 <= $dx) { $err += $dx; $y0 += $sy }
+    }
+}
+
+fn Rosetta::RotCube::vertices() {
+    [
+        [-1, -1, -1], [-1, -1,  1], [-1,  1, -1], [-1,  1,  1],
+        [ 1, -1, -1], [ 1, -1,  1], [ 1,  1, -1], [ 1,  1,  1],
+    ]
+}
+
+fn Rosetta::RotCube::edges() {
+    [
+        [0, 1], [1, 3], [3, 2], [2, 0],
+        [4, 5], [5, 7], [7, 6], [6, 4],
+        [0, 4], [1, 5], [2, 6], [3, 7],
+    ]
+}
+
+fn Rosetta::RotCube::rotate($pt, $ax, $ay) {
+    my ($x, $y, $z) = @$pt
+
+    my $cy = cos($ay)
+    my $sy = sin($ay)
+    my $x1 = $x * $cy + $z * $sy
+    my $z1 = -$x * $sy + $z * $cy
+
+    my $cx = cos($ax)
+    my $sx = sin($ax)
+    my $y2 = $y * $cx - $z1 * $sx
+    my $z2 = $y * $sx + $z1 * $cx
+
+    [$x1, $y2, $z2]
+}
+
+fn Rosetta::RotCube::project($pt, $size) {
+    my ($x, $y, $z) = @$pt
+    my $scale = 7 / ($z + 4)
+    my $cx = int($size / 2)
+    my $cy = int($size / 2)
+    [
+        int($cx + $x * $scale * 2.8),
+        int($cy - $y * $scale * 2.2),
+    ]
+}
+
+fn Rosetta::RotCube::frame($angle) {
+    my $size = 25
+    my $rows = Rosetta::RotCube::blank($size, $size)
+    my @points = ~> @{Rosetta::RotCube::vertices()} map {
+        Rosetta::RotCube::rotate(_, 0.615479709, $angle) |> Rosetta::RotCube::project($size)
+    }
+
+    for my $edge (@{Rosetta::RotCube::edges()}) {
+        my $a = $points[$edge->[0]]
+        my $b = $points[$edge->[1]]
+        Rosetta::RotCube::draw_line($rows, $a->[0], $a->[1], $b->[0], $b->[1])
+    }
+    $rows
+}
+
+fn Rosetta::RotCube::rendered_frame($angle) {
+    Rosetta::RotCube::frame($angle) |> fn { join("\n", @$_) }
+}
+
+fn Rosetta::RotCube::count_pixels($text) {
+    my $copy = $text
+    $copy =~ s/[^#]//g
+    len($copy)
+}
+
+my $f0 = Rosetta::RotCube::rendered_frame(0.0)
+my $f1 = Rosetta::RotCube::rendered_frame(0.5)
+
+assert_eq len(split("\n", $f0)), 25, "25 rows in cube frame"
+assert_eq Rosetta::RotCube::count_pixels($f0) > 20, 1, "frame draws visible wireframe"
+assert_eq index($f0, "#") >= 0, 1, "frame contains drawing characters"
+assert_eq $f0 ne $f1, 1, "rotation changes the frame"
+
+test_run

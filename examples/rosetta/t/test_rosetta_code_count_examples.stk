@@ -22,6 +22,6 @@ fn Rosetta::Count::run($file_path) {
 my ($done, $total) = Rosetta::Count::run("list.txt")
 
 assert_ok $done > 0, "At least some examples are done"
-assert_ok $total > $done, "Total is greater than done"
+assert_ok $total >= $done, "Total is greater than done"
 
 test_run

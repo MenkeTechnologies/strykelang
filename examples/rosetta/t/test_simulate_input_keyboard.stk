@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Simulate input/Keyboard
+
+fn Rosetta::SimKey::new() {
+    my @queue
+    { queue => \@queue }
+}
+
+fn Rosetta::SimKey::send($kbd, $text) {
+    push @{$kbd->{queue}}, split //, $text
+}
+
+fn Rosetta::SimKey::read($kbd, $n) {
+    my @out
+    for my $i (1 .. $n) {
+        last if !len(@{$kbd->{queue}})
+        push @out, shift @{$kbd->{queue}}
+    }
+    join("", @out)
+}
+
+my $kbd = Rosetta::SimKey::new()
+Rosetta::SimKey::send($kbd, "abc")
+Rosetta::SimKey::send($kbd, "12")
+
+assert_eq Rosetta::SimKey::read($kbd, 4), "abc1", "simulated keystrokes are read in order"
+assert_eq Rosetta::SimKey::read($kbd, 4), "2", "queue drains completely"
+
+test_run

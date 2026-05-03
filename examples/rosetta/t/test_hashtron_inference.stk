@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hashtron inference
+
+fn Rosetta::Hashtron::hash_feature($name) {
+    my $sum = 0
+    for my $ch (split //, $name) { $sum += ord($ch) }
+    $sum % 8
+}
+
+fn Rosetta::Hashtron::infer($weights, $features) {
+    my $score = 0
+    for my $feature (@$features) {
+        my $bucket = Rosetta::Hashtron::hash_feature($feature)
+        $score += $weights->[$bucket]
+    }
+    $score > 0 ? 1 : 0
+}
+
+my @weights = (1, 1, -1, 0, -2, 1, 0, 1)
+
+assert_eq Rosetta::Hashtron::hash_feature("cat"), 0, "feature hash bucket is stable"
+assert_eq Rosetta::Hashtron::infer(\@weights, ["cat", "bird"]), 1, "positive aggregate score classifies as true"
+assert_eq Rosetta::Hashtron::infer(\@weights, ["dog"]), 0, "negative aggregate score classifies as false"
+
+test_run

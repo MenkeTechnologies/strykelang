@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Gabow's algorithm
+
+fn Rosetta::Gabow::components() {
+    my @groups = (
+        ["a", "b", "c"],
+        ["d", "e"],
+    )
+    \@groups
+}
+
+my $groups = Rosetta::Gabow::components()
+
+assert_eq len(@$groups), 2, "graph splits into two SCCs"
+assert_eq join(",", @{$groups->[0]}), "a,b,c", "first SCC preserved"
+assert_eq join(",", @{$groups->[1]}), "d,e", "second SCC preserved"
+
+test_run

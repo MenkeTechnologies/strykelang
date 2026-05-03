@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Window creation
+
+fn Rosetta::WindowCreate::create($title, $width, $height) {
+    { title => $title, width => $width, height => $height, visible => 1 }
+}
+
+my $window = Rosetta::WindowCreate::create("Rosetta", 640, 480)
+
+assert_eq $window->{title}, "Rosetta", "window title is set"
+assert_eq "$window->{width}x$window->{height}", "640x480", "window dimensions are set"
+assert_eq $window->{visible}, 1, "window starts visible"
+
+test_run

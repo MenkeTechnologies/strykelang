@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Window management
+
+fn Rosetta::WindowMgmt::new() {
+    { minimized => 0, maximized => 0, focused => 0 }
+}
+
+fn Rosetta::WindowMgmt::focus($win) {
+    $win->{focused} = 1
+}
+
+fn Rosetta::WindowMgmt::minimize($win) {
+    $win->{minimized} = 1
+    $win->{maximized} = 0
+}
+
+fn Rosetta::WindowMgmt::maximize($win) {
+    $win->{maximized} = 1
+    $win->{minimized} = 0
+}
+
+my $win = Rosetta::WindowMgmt::new()
+Rosetta::WindowMgmt::focus($win)
+Rosetta::WindowMgmt::maximize($win)
+Rosetta::WindowMgmt::minimize($win)
+
+assert_eq $win->{focused}, 1, "window can gain focus"
+assert_eq $win->{minimized}, 1, "window can be minimized"
+assert_eq $win->{maximized}, 0, "minimizing clears maximized state"
+
+test_run

@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Blossom algorithm
+
+fn Rosetta::Blossom::valid_matching($edges, $picked) {
+    my %seen
+    for my $idx (@$picked) {
+        my ($u, $v) = @{$edges->[$idx]}
+        return 0 if $seen{$u} || $seen{$v}
+        $seen{$u} = 1
+        $seen{$v} = 1
+    }
+    1
+}
+
+fn Rosetta::Blossom::best($edges) {
+    my $best = []
+    my $n = len(@$edges)
+    for my $mask (0 .. (2 ** $n) - 1) {
+        my @picked
+        for my $i (0 .. $n - 1) {
+            push @picked, $i if (($mask >> $i) & 1)
+        }
+        next if !Rosetta::Blossom::valid_matching($edges, \@picked)
+        if (len(@picked) > len(@$best)) {
+            my @copy = @picked
+            $best = \@copy
+        }
+    }
+    $best
+}
+
+my @edges = ([1, 2], [2, 3], [3, 4], [4, 5], [5, 1])
+my $best = Rosetta::Blossom::best(\@edges)
+
+assert_eq len(@$best), 2, "maximum matching on odd cycle has size two"
+assert_eq Rosetta::Blossom::valid_matching(\@edges, $best), 1, "returned edge set is a valid matching"
+
+test_run

@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Runtime evaluation/In an environment
+
+fn Rosetta::EvalEnv::lit($v) { { kind => "lit", value => $v } }
+fn Rosetta::EvalEnv::var($name) { { kind => "var", name => $name } }
+fn Rosetta::EvalEnv::op($op, $a, $b) { { kind => "op", op => $op, a => $a, b => $b } }
+
+fn Rosetta::EvalEnv::eval($expr, $env) {
+    return $expr->{value} if $expr->{kind} eq "lit"
+    return $env->{$expr->{name}} if $expr->{kind} eq "var"
+    my $a = Rosetta::EvalEnv::eval($expr->{a}, $env)
+    my $b = Rosetta::EvalEnv::eval($expr->{b}, $env)
+    return $a + $b if $expr->{op} eq "+"
+    return $a - $b if $expr->{op} eq "-"
+    return $a * $b if $expr->{op} eq "*"
+    return $a / $b if $expr->{op} eq "/"
+    undef
+}
+
+fn Rosetta::EvalEnv::delta($expr, $x1, $x2) {
+    my $r1 = Rosetta::EvalEnv::eval($expr, { x => $x1 })
+    my $r2 = Rosetta::EvalEnv::eval($expr, { x => $x2 })
+    $r2 - $r1
+}
+
+my $expr = Rosetta::EvalEnv::op(
+    "+",
+    Rosetta::EvalEnv::op("*", Rosetta::EvalEnv::var("x"), Rosetta::EvalEnv::lit(2)),
+    Rosetta::EvalEnv::lit(3)
+)
+
+assert_eq Rosetta::EvalEnv::eval($expr, { x => 4 }), 11, "evaluation with first environment"
+assert_eq Rosetta::EvalEnv::eval($expr, { x => 7 }), 17, "evaluation with second environment"
+assert_eq Rosetta::EvalEnv::delta($expr, 4, 7), 6, "difference between environments"
+
+test_run

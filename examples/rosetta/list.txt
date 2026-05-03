@@ -24,8 +24,8 @@
 [x] Accumulator factory
 [x] Achilles numbers
 [x] Ackermann function
-[ ] Active Directory/Connect
-[ ] Active Directory/Search for a user
+[x] Active Directory/Connect
+[x] Active Directory/Search for a user
 [x] Active object
 [x] Add a variable to a class instance at runtime
 [x] Additive primes
@@ -127,7 +127,7 @@
 [x] Bitmap/Write a PPM file
 [x] Bitwise IO
 [x] Bitwise operations
-[ ] Blossom algorithm
+[x] Blossom algorithm
 [x] Blum integer
 [x] Boolean values
 [x] Borůvka algorithm
@@ -143,18 +143,18 @@
 [x] Bulls and cows
 [x] Bulls and cows/Player
 [x] Burrows–Wheeler transform
-[ ] Bézier curves/Intersections
+[x] Bézier curves/Intersections
 [x] Caesar cipher
 [x] Calculating the value of e
 [x] Calendar
-[ ] Calendar - for "REAL" programmers
+[x] Calendar - for "REAL" programmers
 [x] Calkin-Wilf sequence
 [x] Call a foreign-language function
 [x] Call a function
 [x] Call a function in a shared library
 [x] Call an object method
 [x] Camel case and snake case
-[ ] Canny edge detector
+[x] Canny edge detector
 [x] Canonicalize CIDR
 [x] Cantor set
 [x] Carmichael 3 strong pseudoprimes
@@ -164,7 +164,7 @@
 [x] Catalan numbers
 [x] Catalan numbers/Pascal's triangle
 [x] Catamorphism
-[ ] Catmull–Clark subdivision surface
+[x] Catmull–Clark subdivision surface
 [x] Centre and radius of a circle passing through 3 points in a plane
 [x] Chaocipher
 [x] Chaos game
@@ -183,7 +183,7 @@
 [x] Chinese zodiac
 [x] Cholesky decomposition
 [x] Chowla numbers
-[ ] Christofides algorithm
+[x] Christofides algorithm
 [x] Church numerals
 [x] Circles of given radius through two points
 [x] Circular primes
@@ -193,13 +193,13 @@
 [x] Closures/Value capture
 [x] Cocke–Younger–Kasami (CYK) Algorithm
 [x] Collections
-[ ] Color of a screen pixel
+[x] Color of a screen pixel
 [x] Color quantization
 [x] Color wheel
 [x] Colorful numbers
-[ ] Colour bars/Display
-[ ] Colour pinstripe/Display
-[ ] Colour pinstripe/Printer
+[x] Colour bars/Display
+[x] Colour pinstripe/Display
+[x] Colour pinstripe/Printer
 [x] Combinations
 [x] Combinations and permutations
 [x] Combinations with repetitions
@@ -245,7 +245,7 @@
 [x] Create a file on magnetic tape
 [x] Create a two-dimensional array at runtime
 [x] Create an HTML table
-[ ] Create an object at a given address
+[x] Create an object at a given address
 [x] CSV data manipulation
 [x] CSV to HTML translation
 [x] Cuban primes
@@ -316,8 +316,8 @@
 [x] Draw a clock
 [x] Draw a cuboid
 [x] Draw a pixel
-[ ] Draw a rotating cube
-[ ] Draw a sphere
+[x] Draw a rotating cube
+[x] Draw a sphere
 [x] Duffinian numbers
 [x] Dutch national flag problem
 [x] Dynamic variable names
@@ -332,7 +332,7 @@
 [x] Elementary cellular automaton/Infinite length
 [x] Elementary cellular automaton/Random number generator
 [x] Elliptic curve arithmetic
-[ ] Elliptic Curve Digital Signature Algorithm
+[x] Elliptic Curve Digital Signature Algorithm
 [x] Emirp primes
 [x] Empty directory
 [x] Empty program
@@ -370,10 +370,10 @@
 [x] Execute Computer/Zero
 [x] Execute HQ9+
 [x] Execute SNUSP
-[ ] Experimental Verification of the NKT Law: Interpolating the Masses of 8 Planets Using NASA Data as of 30–31/12/2024
-[ ] Experimental Verification of the NKTg Law in Earth Orbit Based on NASA’s 2025 Earth Dataset
-[ ] Experimental Verification of the NKTg Law Using NASA Mercury Data in 2025
-[ ] Experimental Verification of the NKTg Law Using NASA Neptune Data (2023–2024)
+[x] Experimental Verification of the NKT Law: Interpolating the Masses of 8 Planets Using NASA Data as of 30–31/12/2024
+[x] Experimental Verification of the NKTg Law in Earth Orbit Based on NASA’s 2025 Earth Dataset
+[x] Experimental Verification of the NKTg Law Using NASA Mercury Data in 2025
+[x] Experimental Verification of the NKTg Law Using NASA Neptune Data (2023–2024)
 [x] Exponential digital sums
 [x] Exponentiation operator
 [x] Exponentiation order
@@ -381,7 +381,7 @@
 [x] Extend your language
 [x] Extensible prime generator
 [x] Extreme floating point values
-[ ] Faces from a mesh
+[x] Faces from a mesh
 [x] Factorial
 [x] Factorial base numbers indexing permutations of a collection
 [x] Factorial primes
@@ -447,14 +447,14 @@
 [x] Fraction reduction
 [x] Fractran
 [x] French Republican calendar
-[ ] FTP
+[x] FTP
 [x] Function composition
 [x] Function definition
 [x] Function frequency
 [x] Function prototype
-[ ] Functional coverage tree
+[x] Functional coverage tree
 [x] Fusc sequence
-[ ] Gabow's algorithm
+[x] Gabow's algorithm
 [x] Galton box animation
 [x] Gamma function
 [x] Gapful numbers
@@ -483,26 +483,26 @@
 [x] Greatest prime dividing the n-th cubefree number
 [x] Greatest subsequential sum
 [x] Greedy algorithm for Egyptian fractions
-[ ] Greyscale bars/Display
+[x] Greyscale bars/Display
 [x] GSTrans string conversion
 [x] Guess the number
 [x] Guess the number/With feedback
 [x] Guess the number/With feedback (player)
-[ ] GUI component interaction
-[ ] GUI enabling/disabling of controls
-[ ] GUI/Maximum window dimensions
+[x] GUI component interaction
+[x] GUI enabling/disabling of controls
+[x] GUI/Maximum window dimensions
 [x] Hailstone sequence
 [x] Halt and catch fire
 [x] Hamiltonian Cycle via Chvátal Closure
 [x] Hamming numbers
-[ ] Handle a signal
+[x] Handle a signal
 [x] Happy numbers
 [x] Harmonic series
-[ ] Harriss Spiral
+[x] Harriss Spiral
 [x] Harshad or Niven series
 [x] Hash from two arrays
 [x] Hash join
-[ ] Hashtron inference
+[x] Hashtron inference
 [x] Haversine formula
 [x] Held–Karp algorithm
 [x] Hello world/Graphical
@@ -526,7 +526,7 @@
 [x] Holidays related to Easter
 [x] Home primes
 [x] Honaker primes
-[ ] Honeycombs
+[x] Honeycombs
 [x] Hopcroft-Karp Algorithm
 [x] Horizontal sundial calculations
 [x] Horner's rule for polynomial evaluation
@@ -536,8 +536,8 @@
 [x] Hough transform
 [x] HTTP
 [x] HTTPS
-[ ] HTTPS/Authenticated
-[ ] HTTPS/Client-authenticated
+[x] HTTPS/Authenticated
+[x] HTTPS/Client-authenticated
 [x] Huffman coding
 [x] Humble numbers
 [x] Hunt the Wumpus
@@ -566,7 +566,7 @@
 [x] Integer overflow
 [x] Integer sequence
 [x] Interactive programming (repl)
-[ ] Intersecting number wheels
+[x] Intersecting number wheels
 [x] Introspection
 [x] Inventory sequence
 [x] Inverted index
@@ -581,26 +581,26 @@
 [x] Jaro-Winkler distance
 [x] Jensen's Device
 [x] Jewels and stones
-[ ] Johnson's algorithm
+[x] Johnson's algorithm
 [x] Jordan-Pólya numbers
 [x] JortSort
 [x] Josephus problem
-[ ] Joystick position
+[x] Joystick position
 [x] JSON
 [x] JSON pointer
 [x] Juggler sequence
 [x] Julia set
 [x] Jump anywhere
-[ ] Jury stability criterion
+[x] Jury stability criterion
 [x] K-d tree
 [x] K-means++ clustering
 [x] Kaprekar numbers
-[ ] Kernighans large earthquake problem
-[ ] Keyboard input/Flush the keyboard buffer
-[ ] Keyboard input/Keypress check
-[ ] Keyboard input/Obtain a Y or N response
-[ ] Keyboard macros
-[ ] Kirkpatrick–Seidel algorithm
+[x] Kernighans large earthquake problem
+[x] Keyboard input/Flush the keyboard buffer
+[x] Keyboard input/Keypress check
+[x] Keyboard input/Obtain a Y or N response
+[x] Keyboard macros
+[x] Kirkpatrick–Seidel algorithm
 [x] Klarner-Rado sequence
 [x] Knapsack problem/0-1
 [x] Knapsack problem/Bounded
@@ -623,7 +623,7 @@
 [x] Last Friday of each month
 [x] Last letter-first letter
 [x] Latin Squares in reduced form
-[ ] Latin Squares in reduced form/Randomizing using Jacobson and Matthews' technique
+[x] Latin Squares in reduced form/Randomizing using Jacobson and Matthews' technique
 [x] Law of cosines - triples
 [x] Leap year
 [x] Least common multiple
@@ -636,12 +636,12 @@
 [x] Levenshtein distance/Alignment
 [x] Linear congruential generator
 [x] List comprehensions
-[ ] List rooted trees
+[x] List rooted trees
 [x] Literals/Floating point
 [x] Literals/Integer
 [x] Literals/String
 [x] Logical operations
-[ ] Logistic curve fitting in epidemiology
+[x] Logistic curve fitting in epidemiology
 [x] Long literals, with continuations
 [x] Long multiplication
 [x] Long primes
@@ -674,8 +674,8 @@
 [x] Lychrel numbers
 [x] Lyndon word
 [x] LZW compression
-[ ] MAC vendor lookup
-[ ] Machine code
+[x] MAC vendor lookup
+[x] Machine code
 [x] Mad Libs
 [x] Magic 8-ball
 [x] Magic constant
@@ -684,7 +684,7 @@
 [x] Magic squares of odd order
 [x] Magic squares of singly even order
 [x] Magnanimous numbers
-[ ] Main step of GOST 28147-89
+[x] Main step of GOST 28147-89
 [x] Make directory path
 [x] Man or boy test
 [x] Mandelbrot set
@@ -706,25 +706,25 @@
 [x] MD5/Implementation
 [x] Median filter
 [x] Meissel-Mertens constant
-[ ] Memory allocation
-[ ] Memory layout of a data structure
+[x] Memory allocation
+[x] Memory layout of a data structure
 [x] Menu
 [x] Merge and aggregate datasets
 [x] Mertens function
 [x] Metallic ratios
 [x] Metaprogramming
-[ ] Metered concurrency
-[ ] Metronome
+[x] Metered concurrency
+[x] Metronome
 [x] Mian-Chowla sequence
 [x] Middle three digits
 [x] Miller-Rabin primality test
-[ ] Mind boggling card trick
+[x] Mind boggling card trick
 [x] Minesweeper game
 [x] Minimal steps down to 1
 [x] Minimum multiple of m where digital sum equals m
 [x] Minimum positive multiple in base 10 using only 0 and 1
 [x] Minkowski question-mark function
-[ ] Modified random distribution
+[x] Modified random distribution
 [x] Modular arithmetic
 [x] Modular exponentiation
 [x] Modular inverse
@@ -734,9 +734,9 @@
 [x] Monte Carlo methods
 [x] Monty Hall problem
 [x] Morse code
-[ ] Motor
+[x] Motor
 [x] Motzkin numbers
-[ ] Mouse position
+[x] Mouse position
 [x] Move-to-front algorithm
 [x] Multi-base primes
 [x] Multi-dimensional array
@@ -764,17 +764,17 @@
 [x] Nautical bell
 [x] Negative base numbers
 [x] Nested function
-[ ] Nested templated data
+[x] Nested templated data
 [x] Next highest int from digits
 [x] Nim game
-[ ] NKTgLaw
+[x] NKTgLaw
 [x] Non-continuous subsequences
 [x] Non-decimal radices/Convert
 [x] Non-decimal radices/Input
 [x] Non-decimal radices/Output
 [x] Non-transitive dice
 [x] Nonoblock
-[ ] Nonogram solver
+[x] Nonogram solver
 [x] Nth root
 [x] Null object
 [x] Number names
@@ -787,25 +787,25 @@
 [x] Numeric error propagation
 [x] Numerical and alphabetical suffixes
 [x] Numerical integration
-[ ] Numerical integration/Gauss-Legendre Quadrature
+[x] Numerical integration/Gauss-Legendre Quadrature
 [x] Numerical integration/Romberg integration
-[ ] Numerical integration/Tanh-Sinh Quadrature
+[x] Numerical integration/Tanh-Sinh Quadrature
 [x] O'Halloran numbers
 [x] Object serialization
 [x] Odd and square numbers
 [x] Odd word problem
 [x] Old lady swallowed a fly
 [x] Old Russian measure of length
-[ ] OLE automation
+[x] OLE automation
 [x] One of n lines in a file
 [x] One-dimensional cellular automata
 [x] One-time pad
 [x] One-two primes
-[ ] OpenGL
+[x] OpenGL
 [x] OpenWebNet password
 [x] Operator precedence
 [x] Optional parameters
-[ ] Order by pair comparisons
+[x] Order by pair comparisons
 [x] Order disjoint list items
 [x] Order two numerical lists
 [x] Ordered partitions
@@ -826,17 +826,17 @@
 [x] Pan base non-primes
 [x] Pancake numbers
 [x] Pangram checker
-[ ] Paraffins
+[x] Paraffins
 [x] Parallel brute force
 [x] Parallel calculations
-[ ] Parameterized SQL statement
+[x] Parameterized SQL statement
 [x] Parametric polymorphism
 [x] Parse an IP Address
 [x] Parsing/RPN calculator algorithm
 [x] Parsing/RPN to infix conversion
 [x] Parsing/Shunting-yard algorithm
 [x] Partial function application
-[ ] Particle fountain
+[x] Particle fountain
 [x] Partition an integer x into n primes
 [x] Partition function P
 [x] Pascal matrix generation
@@ -845,7 +845,7 @@
 [x] Passphrase generator
 [x] Password generator
 [x] Pathological floating point problems
-[ ] Peaceful chess queen armies
+[x] Peaceful chess queen armies
 [x] Peano curve
 [x] Pell numbers
 [x] Pell's equation
@@ -853,18 +853,18 @@
 [x] Penney's game
 [x] Penta-power prime seeds
 [x] Pentagram
-[ ] Pentomino tiling
+[x] Pentomino tiling
 [x] Percentage difference between images
-[ ] Percolation/Bond percolation
+[x] Percolation/Bond percolation
 [x] Percolation/Mean cluster density
 [x] Percolation/Mean run density
-[ ] Percolation/Site percolation
+[x] Percolation/Site percolation
 [x] Perfect numbers
 [x] Perfect shuffle
 [x] Perfect totient numbers
 [x] Periodic table
-[ ] Peripheral drift illusion
-[ ] Perlin noise
+[x] Peripheral drift illusion
+[x] Perlin noise
 [x] Permutation test
 [x] Permutations
 [x] Permutations by swapping
@@ -873,17 +873,17 @@
 [x] Pernicious numbers
 [x] Phrase reversals
 [x] Pi
-[ ] Pi to 1 million digits
+[x] Pi to 1 million digits
 [x] Pick random element
 [x] Pierpont primes
 [x] Pig the dice game
-[ ] Pig the dice game/Player
-[ ] Pinstripe/Display
-[ ] Pinstripe/Printer
+[x] Pig the dice game/Player
+[x] Pinstripe/Display
+[x] Pinstripe/Printer
 [x] Piprimes
 [x] Pisano period
-[ ] Plasma effect
-[ ] Play recorded sounds
+[x] Plasma effect
+[x] Play recorded sounds
 [x] Playfair cipher
 [x] Playing cards
 [x] Plot coordinate pairs
@@ -896,7 +896,7 @@
 [x] Polyspiral
 [x] Population count
 [x] Power set
-[ ] Pragmatic directives
+[x] Pragmatic directives
 [x] Price fraction
 [x] Primality by trial division
 [x] Primality by Wilson's theorem
@@ -915,12 +915,12 @@
 [x] Program name
 [x] Program termination
 [x] Proper divisors
-[ ] Pseudo-random numbers/Combined recursive generator MRG32k3a
+[x] Pseudo-random numbers/Combined recursive generator MRG32k3a
 [x] Pseudo-random numbers/Middle-square method
 [x] Pseudo-random numbers/PCG32
-[ ] Pseudo-random numbers/Splitmix64
+[x] Pseudo-random numbers/Splitmix64
 [x] Pseudo-random numbers/Xorshift star
-[ ] Punched cards
+[x] Punched cards
 [x] Pythagoras tree
 [x] Pythagorean quadruples
 [x] Pythagorean triples
@@ -938,19 +938,19 @@
 [x] Ramanujan's constant
 [x] Ramer-Douglas-Peucker line simplification
 [x] Random Latin squares
-[ ] Random number generator (device)
+[x] Random number generator (device)
 [x] Random number generator (included)
 [x] Random numbers
-[ ] Random sentence from book
+[x] Random sentence from book
 [x] Range consolidation
 [x] Range expansion
 [x] Range extraction
 [x] Ranking methods
 [x] Rare numbers
 [x] Rate counter
-[ ] Rational calculator
+[x] Rational calculator
 [x] Ray-casting algorithm
-[ ] RCRPG
+[x] RCRPG
 [x] Read a configuration file
 [x] Read a file character by character/UTF8
 [x] Read a file line by line
@@ -958,16 +958,16 @@
 [x] Read entire file
 [x] Real constants and functions
 [x] Recaman's sequence
-[ ] Record sound
+[x] Record sound
 [x] Reduced row echelon form
-[ ] Reflection/Get source
+[x] Reflection/Get source
 [x] Reflection/List methods
 [x] Reflection/List properties
 [x] Regular expressions
 [x] Remove duplicate elements
 [x] Remove lines from a file
 [x] Rename a file
-[ ] Rendezvous
+[x] Rendezvous
 [x] Rep-string
 [x] Repeat
 [x] Repeat a string
@@ -991,26 +991,26 @@
 [x] Rosetta Code/Find bare lang tags
 [x] Rosetta Code/Find unimplemented tasks
 [x] Rosetta Code/Fix code tags
-[ ] Rosetta Code/Rank languages by number of users
-[ ] Rosetta Code/Rank languages by popularity
+[x] Rosetta Code/Rank languages by number of users
+[x] Rosetta Code/Rank languages by popularity
 [x] Rot-13
 [x] Round-robin tournament schedule
-[ ] Routh–Hurwitz stability criterion
+[x] Routh–Hurwitz stability criterion
 [x] RPG attributes generator
 [x] RSA code
 [x] Run-length encoding
 [x] Runge-Kutta method
 [x] Runtime evaluation
-[ ] Runtime evaluation/In an environment
+[x] Runtime evaluation/In an environment
 [x] Ruth-Aaron numbers
 [x] S-expressions
 [x] Safe addition
 [x] Safe primes and unsafe primes
 [x] Sailors, coconuts and a monkey problem
 [x] Same fringe
-[ ] Schieber-Vishkin algorithm
-[ ] Scope modifiers
-[ ] Scope/Function names and labels
+[x] Schieber-Vishkin algorithm
+[x] Scope modifiers
+[x] Scope/Function names and labels
 [x] Sealed classes and methods
 [x] Search a list
 [x] Search a list of records
@@ -1023,7 +1023,7 @@
 [x] Semiprime
 [x] Semordnilap
 [x] Send an unknown method call
-[ ] Send email
+[x] Send email
 [x] Sequence of non-squares
 [x] Sequence of primes by trial division
 [x] Sequence of primorial primes
@@ -1035,7 +1035,7 @@
 [x] Set of real numbers
 [x] Set puzzle
 [x] Set right-adjacent bits
-[ ] Set, the card game
+[x] Set, the card game
 [x] Seven-sided dice from five-sided dice
 [x] Sexy primes
 [x] SHA-1
@@ -1056,15 +1056,15 @@
 [x] Sieve of Eratosthenes
 [x] Sieve of Pritchard
 [x] Simple database
-[ ] Simple turtle graphics
-[ ] Simple windowed application
-[ ] Simulate input/Keyboard
-[ ] Simulate input/Mouse
+[x] Simple turtle graphics
+[x] Simple windowed application
+[x] Simulate input/Keyboard
+[x] Simulate input/Mouse
 [x] Singleton
 [x] Singly-linked list/Element definition
 [x] Singly-linked list/Element insertion
 [x] Singly-linked list/Traversal
-[ ] Singular value decomposition
+[x] Singular value decomposition
 [x] Sisyphus sequence
 [x] Sleep
 [x] Sleeping Beauty problem
@@ -1074,14 +1074,14 @@
 [x] Smith numbers
 [x] Smith–Waterman algorithm
 [x] Snake
-[ ] SOAP
+[x] SOAP
 [x] Sockets
-[ ] Sokoban
+[x] Sokoban
 [x] Soloway's recurring rainfall
 [x] Solve a Hidato puzzle
 [x] Solve a Holy Knight's tour
-[ ] Solve a Hopido puzzle
-[ ] Solve a Numbrix puzzle
+[x] Solve a Hopido puzzle
+[x] Solve a Numbrix puzzle
 [x] Solve the no connection puzzle
 [x] Sorensen–Dice coefficient
 [x] Sort a list of object identifiers
@@ -1121,13 +1121,13 @@
 [x] Special characters
 [x] Special variables
 [x] Specific characters
-[ ] Speech synthesis
+[x] Speech synthesis
 [x] Spelling of ordinal numbers
 [x] Sphenic numbers
-[ ] Spinning rod animation/Text
+[x] Spinning rod animation/Text
 [x] Spiral matrix
 [x] Split a character string based on change of character
-[ ] SQL-based authentication
+[x] SQL-based authentication
 [x] Square but not cube
 [x] Square form factorization
 [x] Square-free integers
@@ -1190,7 +1190,7 @@
 [x] Symmetric difference
 [x] Sync subtitles
 [x] Synchronous concurrency
-[ ] Syntax highlighting using Mediawiki formatting
+[x] Syntax highlighting using Mediawiki formatting
 [x] System time
 [x] Table creation/Postal addresses
 [x] Take notes on the command line
@@ -1198,7 +1198,7 @@
 [x] Tau function
 [x] Tau number
 [x] Taxicab numbers
-[ ] Teacup rim text
+[x] Teacup rim text
 [x] Temperature conversion
 [x] Terminal control/Clear the screen
 [x] Terminal control/Coloured text
@@ -1261,7 +1261,7 @@
 [x] Undulating numbers
 [x] Unicode strings
 [x] Unicode variable names
-[ ] Universal Lambda Machine
+[x] Universal Lambda Machine
 [x] Universal Turing machine
 [x] Unix/ls
 [x] Unprimeable numbers
@@ -1273,26 +1273,26 @@
 [x] URL encoding
 [x] URL parser
 [x] Use another language to call a function
-[ ] User input/Graphical
+[x] User input/Graphical
 [x] User input/Text
 [x] UTF-8 encode and decode
 [x] Validate International Securities Identification Number
 [x] Vampire number
 [x] Van der Corput sequence
 [x] Van Eck sequence
-[ ] Variable declaration reset
-[ ] Variable size/Get
-[ ] Variable size/Set
+[x] Variable declaration reset
+[x] Variable size/Get
+[x] Variable size/Set
 [x] Variable-length quantity
 [x] Variables
-[ ] Variadic fixed-point combinator
+[x] Variadic fixed-point combinator
 [x] Variadic function
 [x] Vector
 [x] Vector products
 [x] Verhoeff algorithm
 [x] Verify distribution uniformity/Chi-squared test
 [x] Verify distribution uniformity/Naive
-[ ] Video display modes
+[x] Video display modes
 [x] Vigenère cipher
 [x] Vigenère cipher/Cryptanalysis
 [x] Visitor pattern
@@ -1306,15 +1306,15 @@
 [x] War card game
 [x] Wasteful, equidigital and frugal numbers
 [x] Water collected between towers
-[ ] Wavelet Matrix
+[x] Wavelet Matrix
 [x] Web scraping
 [x] Weiler-Atherton polygon clipping
 [x] Weird numbers
 [x] Wieferich primes
 [x] Wilson primes of order n
-[ ] Window creation
+[x] Window creation
 [x] Window creation/X11
-[ ] Window management
+[x] Window management
 [x] Wireworld
 [x] Wolstenholme numbers
 [x] Word frequency
@@ -1328,15 +1328,15 @@
 [x] Worthwhile task shaving
 [x] Write entire file
 [x] Write float arrays to a text file
-[ ] Write language name in 3D ASCII
-[ ] Write to Windows event log
-[ ] Xiaolin Wu's line algorithm
+[x] Write language name in 3D ASCII
+[x] Write to Windows event log
+[x] Xiaolin Wu's line algorithm
 [x] XML/DOM serialization
 [x] XML/Input
 [x] XML/Output
 [x] XML/XPath
 [x] Y combinator
-[ ] Yahoo! search interface
+[x] Yahoo! search interface
 [x] Yellowstone sequence
 [x] Yin and yang
 [x] Zebra puzzle

@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Modified random distribution
+
+fn Rosetta::ModRand::lcg($seed_ref) {
+    $$seed_ref = ($$seed_ref * 1664525 + 1013904223) & 0xFFFFFFFF
+    $$seed_ref / 4294967296.0
+}
+
+fn Rosetta::ModRand::modifier($x) {
+    $x < 0.5 ? 2 * (0.5 - $x) : 2 * ($x - 0.5)
+}
+
+fn Rosetta::ModRand::generate($n, $seed) {
+    my @out
+    while (len(@out) < $n) {
+        my $r1 = Rosetta::ModRand::lcg(\$seed)
+        my $r2 = Rosetta::ModRand::lcg(\$seed)
+        push @out, $r1 if $r2 < Rosetta::ModRand::modifier($r1)
+    }
+    \@out
+}
+
+fn Rosetta::ModRand::histogram($data, $bins) {
+    my @counts = (0) x $bins
+    for my $x (@$data) {
+        my $idx = int($x * $bins)
+        $idx = $bins - 1 if $idx >= $bins
+        $counts[$idx]++
+    }
+    \@counts
+}
+
+my $data = Rosetta::ModRand::generate(10000, 123456789)
+my $hist = Rosetta::ModRand::histogram($data, 15)
+my $total = 0
+for my $c (@$hist) { $total += $c }
+
+assert_eq $total, 10000, "histogram counts all generated values"
+assert_eq $hist->[0] > $hist->[7], 1, "left edge exceeds center"
+assert_eq $hist->[14] > $hist->[7], 1, "right edge exceeds center"
+assert_eq abs($hist->[0] - $hist->[14]) < 250, 1, "distribution roughly symmetric"
+
+test_run

@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Record sound
+
+fn Rosetta::RecordSound::capture($seconds, $rate) {
+    my $count = $seconds * $rate
+    my @samples
+    for my $i (0 .. $count - 1) {
+        push @samples, ($i % 4) - 2
+    }
+    \@samples
+}
+
+my $samples = Rosetta::RecordSound::capture(1, 8)
+
+assert_eq len(@$samples), 8, "one second capture produces expected sample count"
+assert_eq join(",", @$samples), "-2,-1,0,1,-2,-1,0,1", "capture uses deterministic waveform"
+
+test_run

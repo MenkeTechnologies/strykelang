@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SOAP
+
+fn Rosetta::SOAP::request($method, $arg) {
+    "<Envelope><Body><$method><value>$arg</value></$method></Body></Envelope>"
+}
+
+fn Rosetta::SOAP::response_value($xml) {
+    my @parts = split /<value>|<\/value>/, $xml
+    $parts[1]
+}
+
+my $xml = Rosetta::SOAP::request("Add", 42)
+
+assert_eq $xml =~ /<Envelope>/, 1, "SOAP envelope generated"
+assert_eq $xml =~ /<Add>/, 1, "method wrapper generated"
+assert_eq Rosetta::SOAP::response_value("<Envelope><Body><value>42</value></Body></Envelope>"), "42", "response parser extracts value"
+
+test_run

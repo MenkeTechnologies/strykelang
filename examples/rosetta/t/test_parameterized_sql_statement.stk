@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Parameterized SQL statement
+
+fn Rosetta::ParamSQL::prepare_demo() {
+    my $db = sqlite(":memory:")
+    $db->exec("CREATE TABLE players (name TEXT, score INTEGER, active INTEGER, jerseyNum INTEGER PRIMARY KEY)")
+    $db->exec("INSERT INTO players VALUES (?, ?, ?, ?)", "Jones, Bob", 0, 0, 99)
+    $db->exec("INSERT INTO players VALUES (?, ?, ?, ?)", "Jesten, Jim", 0, 0, 100)
+    $db
+}
+
+fn Rosetta::ParamSQL::execute_update($db) {
+    my $sql = "UPDATE players SET name = ?, score = ?, active = ? WHERE jerseyNum = ?"
+    $db->exec($sql, "Smith, Steve", 42, 1, 99)
+    ($sql, $db->query("SELECT * FROM players WHERE jerseyNum = ?", 99)->[0])
+}
+
+my $db = Rosetta::ParamSQL::prepare_demo()
+my ($sql, $row) = Rosetta::ParamSQL::execute_update($db)
+my $other = $db->query("SELECT * FROM players WHERE jerseyNum = ?", 100)->[0]
+
+assert_eq $sql =~ /\?/, 1, "statement uses placeholders"
+assert_eq $row->{name}, "Smith, Steve", "name updated through parameters"
+assert_eq $row->{score}, 42, "score updated through parameters"
+assert_eq $row->{active}, 1, "active updated through parameters"
+assert_eq $row->{jerseyNum}, 99, "correct row updated"
+assert_eq $other->{name}, "Jesten, Jim", "other row unchanged"
+
+test_run

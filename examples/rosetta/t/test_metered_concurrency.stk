@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Metered concurrency
+
+fn Rosetta::Semaphore::new($max) { { max => $max, count => 0 } }
+
+fn Rosetta::Semaphore::acquire($sem) {
+    return 0 if $sem->{count} >= $sem->{max}
+    $sem->{count}++
+    1
+}
+
+fn Rosetta::Semaphore::release($sem) {
+    $sem->{count}-- if $sem->{count} > 0
+    $sem->{count}
+}
+
+fn Rosetta::Semaphore::run($workers, $max) {
+    my $sem = Rosetta::Semaphore::new($max)
+    my @queue = @$workers
+    my @running
+    my @log
+    my $tick = 0
+    my $max_seen = 0
+
+    while (len(@queue) > 0 || len(@running) > 0) {
+        while (len(@queue) > 0 && Rosetta::Semaphore::acquire($sem)) {
+            my $id = shift @queue
+            push @running, { id => $id, left => 2 }
+            push @log, "t${tick}: worker $id acquired"
+            $max_seen = $sem->{count} if $sem->{count} > $max_seen
+        }
+
+        $tick++
+        my @next
+        for my $job (@running) {
+            $job->{left}--
+            if ($job->{left} == 0) {
+                Rosetta::Semaphore::release($sem)
+                push @log, "t${tick}: worker $job->{id} released"
+            } else {
+                push @next, $job
+            }
+        }
+        @running = @next
+    }
+
+    (\@log, $max_seen)
+}
+
+my ($log, $max_seen) = Rosetta::Semaphore::run([1, 2, 3, 4, 5], 3)
+
+assert_eq $max_seen, 3, "no more than max workers active"
+assert_eq $log->[0], "t0: worker 1 acquired", "first worker acquires immediately"
+assert_eq $log->[2], "t0: worker 3 acquired", "third worker also acquires immediately"
+assert_eq $log->[3] =~ /released/, 1, "releases happen before later acquires complete"
+
+test_run

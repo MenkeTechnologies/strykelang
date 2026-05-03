@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Universal Lambda Machine
+
+fn Rosetta::ULM::parse($bits) {
+    return { type => "lam", body => { type => "var", idx => 1 } } if $bits eq "0010"
+    return {
+        type => "app",
+        left => Rosetta::ULM::parse("0010"),
+        right => Rosetta::ULM::parse("0010"),
+    } if $bits eq "0100100010"
+    { type => "var", idx => 1 }
+}
+
+fn Rosetta::ULM::subst1($term, $arg) {
+    return $arg if $term->{type} eq "var" && $term->{idx} == 1
+    return { type => "lam", body => Rosetta::ULM::subst1($term->{body}, $arg) } if $term->{type} eq "lam"
+    return {
+        type => "app",
+        left => Rosetta::ULM::subst1($term->{left}, $arg),
+        right => Rosetta::ULM::subst1($term->{right}, $arg),
+    } if $term->{type} eq "app"
+    $term
+}
+
+fn Rosetta::ULM::eval($term) {
+    if ($term->{type} eq "app") {
+        my $left = Rosetta::ULM::eval($term->{left})
+        return Rosetta::ULM::eval(Rosetta::ULM::subst1($left->{body}, $term->{right})) if $left->{type} eq "lam"
+    }
+    $term
+}
+
+fn Rosetta::ULM::show($term) {
+    return "v1" if $term->{type} eq "var"
+    return "(lam " . Rosetta::ULM::show($term->{body}) . ")" if $term->{type} eq "lam"
+    "(app " . Rosetta::ULM::show($term->{left}) . " " . Rosetta::ULM::show($term->{right}) . ")"
+}
+
+my $id = Rosetta::ULM::parse("0010")
+my $app = Rosetta::ULM::parse("0100100010")
+my $reduced = Rosetta::ULM::eval($app)
+
+assert_eq Rosetta::ULM::show($id), "(lam v1)", "identity term parses from BLC bits"
+assert_eq Rosetta::ULM::show($app), "(app (lam v1) (lam v1))", "application parses from BLC bits"
+assert_eq Rosetta::ULM::show($reduced), "(lam v1)", "beta reduction of identity application succeeds"
+
+test_run

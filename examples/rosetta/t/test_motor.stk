@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Motor
+
+fn Rosetta::Motor::new() {
+    { enabled => 0, speed => 0, direction => 1, shaft => 0 }
+}
+
+fn Rosetta::Motor::enable($motor) { $motor->{enabled} = 1 }
+fn Rosetta::Motor::disable($motor) { $motor->{enabled} = 0 }
+fn Rosetta::Motor::set_speed($motor, $speed) { $motor->{speed} = $speed }
+fn Rosetta::Motor::reverse($motor) { $motor->{direction} = -$motor->{direction} }
+
+fn Rosetta::Motor::tick($motor, $seconds) {
+    return $motor->{shaft} if !$motor->{enabled}
+    $motor->{shaft} += $motor->{speed} * $motor->{direction} * $seconds
+    $motor->{shaft}
+}
+
+my $motor = Rosetta::Motor::new()
+Rosetta::Motor::set_speed($motor, 120)
+assert_eq Rosetta::Motor::tick($motor, 2), 0, "disabled motor does not move"
+Rosetta::Motor::enable($motor)
+assert_eq Rosetta::Motor::tick($motor, 2), 240, "enabled motor advances shaft"
+Rosetta::Motor::reverse($motor)
+assert_eq Rosetta::Motor::tick($motor, 1), 120, "reverse changes shaft direction"
+Rosetta::Motor::disable($motor)
+assert_eq Rosetta::Motor::tick($motor, 3), 120, "disabled motor stays put"
+
+test_run

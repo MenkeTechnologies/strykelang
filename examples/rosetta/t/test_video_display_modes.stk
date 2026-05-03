@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Video display modes
+
+fn Rosetta::VideoModes::modes() {
+    my @modes = (
+        { width => 800, height => 600, refresh => 60 },
+        { width => 1280, height => 720, refresh => 60 },
+        { width => 1920, height => 1080, refresh => 144 },
+    )
+    \@modes
+}
+
+fn Rosetta::VideoModes::best($modes) {
+    my @sorted = sort { ($b->{width} * $b->{height}) <=> ($a->{width} * $a->{height}) || $b->{refresh} <=> $a->{refresh} } @$modes
+    $sorted[0]
+}
+
+my $modes = Rosetta::VideoModes::modes()
+my $best = Rosetta::VideoModes::best($modes)
+
+assert_eq len(@$modes), 3, "three video modes enumerated"
+assert_eq "$best->{width}x$best->{height}\@$best->{refresh}", "1920x1080@144", "best mode chosen by resolution then refresh"
+
+test_run

@@ -1,0 +1,33 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Memory allocation
+
+fn Rosetta::MemoryAlloc::alloc_array($n, $fill) {
+    my @out
+    for my $i (1 .. $n) { push @out, $fill }
+    \@out
+}
+
+fn Rosetta::MemoryAlloc::alloc_scalar($value) { \$value }
+
+fn Rosetta::MemoryAlloc::free_array($ref) {
+    @$ref = ()
+    undef
+}
+
+fn Rosetta::MemoryAlloc::stack_demo() {
+    my $stack_value = 7
+    $stack_value
+}
+
+my $heap = Rosetta::MemoryAlloc::alloc_array(5, 9)
+my $scalar_ref = Rosetta::MemoryAlloc::alloc_scalar(42)
+
+assert_eq len(@$heap), 5, "allocated heap-like array"
+assert_eq $heap->[0], 9, "array initialized"
+assert_eq $$scalar_ref, 42, "allocated scalar reference"
+assert_eq Rosetta::MemoryAlloc::stack_demo(), 7, "stack/local example"
+
+$heap = Rosetta::MemoryAlloc::free_array($heap)
+assert_eq defined($heap), 0, "deallocated array reference"
+
+test_run

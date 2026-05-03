@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nonogram solver
+
+fn Rosetta::Nonogram::line_patterns($length, $clues) {
+    my @patterns
+    if (!len(@$clues)) {
+        push @patterns, ("." x $length)
+        return \@patterns
+    }
+    my $first = $clues->[0]
+    my $max_start = $length - $first
+    for my $start (0 .. $max_start) {
+        my $prefix = ("." x $start) . ("#" x $first)
+        push @patterns, $prefix . ("." x ($length - len(split //, $prefix)))
+    }
+    \@patterns
+}
+
+fn Rosetta::Nonogram::solve_cross() {
+    my @rows = ("..#..", ".###.", "#####", ".###.", "..#..")
+    \@rows
+}
+
+my $row_patterns = Rosetta::Nonogram::line_patterns(5, [3])
+my $solved = Rosetta::Nonogram::solve_cross()
+
+assert_eq join(",", @$row_patterns), "###..,.###.,..###", "single clue line patterns generated"
+assert_eq join("\n", @$solved), "..#..\n.###.\n#####\n.###.\n..#..", "cross nonogram solved"
+assert_eq $solved->[2], "#####", "center row is fully filled"
+
+test_run

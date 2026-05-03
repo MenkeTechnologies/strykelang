@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Active Directory/Connect
+
+fn Rosetta::ADConnect::server() {
+    { host => "dc.example.com", bind_dn => "cn=admin,dc=example,dc=com", password => "s3cret" }
+}
+
+fn Rosetta::ADConnect::connect($server, $bind_dn, $password) {
+    return { ok => 0, error => "invalid credentials" }
+        if $bind_dn ne $server->{bind_dn} || $password ne $server->{password}
+    { ok => 1, host => $server->{host}, bind_dn => $bind_dn }
+}
+
+my $server = Rosetta::ADConnect::server()
+my $ok = Rosetta::ADConnect::connect($server, "cn=admin,dc=example,dc=com", "s3cret")
+my $bad = Rosetta::ADConnect::connect($server, "cn=admin,dc=example,dc=com", "bad")
+
+assert_eq $ok->{ok}, 1, "valid bind succeeds"
+assert_eq $ok->{host}, "dc.example.com", "session records target host"
+assert_eq $bad->{ok}, 0, "invalid bind fails"
+assert_eq $bad->{error}, "invalid credentials", "failure exposes reason"
+
+test_run

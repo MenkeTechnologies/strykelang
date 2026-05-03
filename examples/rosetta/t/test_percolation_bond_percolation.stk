@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Percolation/Bond percolation
+
+fn Rosetta::BondPerc::key($r, $c) { "$r,$c" }
+
+fn Rosetta::BondPerc::percolates($n, $edges) {
+    my %adj
+    for my $r (0 .. $n - 1) {
+        for my $c (0 .. $n - 1) {
+            $adj{Rosetta::BondPerc::key($r, $c)} = []
+        }
+    }
+    for my $e (@$edges) {
+        my ($r1, $c1, $r2, $c2) = @$e
+        push @{$adj{Rosetta::BondPerc::key($r1, $c1)}}, [$r2, $c2]
+        push @{$adj{Rosetta::BondPerc::key($r2, $c2)}}, [$r1, $c1]
+    }
+
+    my @queue = map { [0, $_] } (0 .. $n - 1)
+    my %seen
+    while (len(@queue) > 0) {
+        my $cur = shift @queue
+        my ($r, $c) = @$cur
+        my $k = Rosetta::BondPerc::key($r, $c)
+        next if $seen{$k}
+        $seen{$k} = 1
+        return 1 if $r == $n - 1
+        for my $nxt (@{$adj{$k}}) { push @queue, $nxt }
+    }
+    0
+}
+
+assert_eq Rosetta::BondPerc::percolates(3, [[0,0,1,0],[1,0,2,0]]), 1, "open vertical bonds percolate"
+assert_eq Rosetta::BondPerc::percolates(3, [[0,0,1,0],[1,1,2,1]]), 0, "disconnected bonds do not percolate"
+
+test_run

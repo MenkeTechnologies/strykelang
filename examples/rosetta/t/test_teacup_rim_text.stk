@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Teacup rim text
+
+fn Rosetta::Teacup::render($text) {
+    my @rows
+    push @rows, "  " . $text
+    push @rows, " /" . ("-" x len(split //, $text)) . "\\"
+    push @rows, "| " . (" " x len(split //, $text)) . " |"
+    push @rows, " \\____/"
+    \@rows
+}
+
+my $cup = Rosetta::Teacup::render("TEA")
+
+assert_eq $cup->[0], "  TEA", "rim text rendered above cup"
+assert_eq $cup->[1], " /---\\", "cup lip matches text width"
+assert_eq len(@$cup), 4, "teacup uses four text rows"
+assert_eq $cup->[3], " \\____/", "cup base rendered"
+
+test_run

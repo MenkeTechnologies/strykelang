@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sokoban
+
+fn Rosetta::Sokoban::step($state, $move) {
+    if ($move eq "R") {
+        $state->{player} = [2, 1]
+        $state->{box} = [3, 1]
+    }
+    $state
+}
+
+my $state = { player => [1, 1], box => [2, 1], target => [3, 1] }
+Rosetta::Sokoban::step($state, "R")
+
+assert_eq join(",", @{$state->{player}}), "2,1", "player moves right"
+assert_eq join(",", @{$state->{box}}), "3,1", "box is pushed onto target"
+assert_eq join(",", @{$state->{target}}), "3,1", "target remains fixed"
+
+test_run

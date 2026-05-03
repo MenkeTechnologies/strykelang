@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nested templated data
+
+fn Rosetta::NestedTemplate::box($type, $value) {
+    { kind => "Box", type => $type, value => $value }
+}
+
+fn Rosetta::NestedTemplate::pair($left_type, $right_type, $left, $right) {
+    {
+        kind => "Pair",
+        left_type => $left_type,
+        right_type => $right_type,
+        left => $left,
+        right => $right,
+    }
+}
+
+fn Rosetta::NestedTemplate::vec($item_type, $items) {
+    { kind => "Vec", item_type => $item_type, items => $items }
+}
+
+my $nested = Rosetta::NestedTemplate::box(
+    "Vec<Pair<Int,Str>>",
+    Rosetta::NestedTemplate::vec("Pair<Int,Str>", [
+        Rosetta::NestedTemplate::pair("Int", "Str", 1, "one"),
+        Rosetta::NestedTemplate::pair("Int", "Str", 2, "two"),
+    ])
+)
+
+assert_eq $nested->{type}, "Vec<Pair<Int,Str>>", "outer template metadata"
+assert_eq $nested->{value}{items}[0]{left}, 1, "nested left value"
+assert_eq $nested->{value}{items}[1]{right}, "two", "nested right value"
+assert_eq $nested->{value}{item_type}, "Pair<Int,Str>", "inner template metadata"
+
+test_run

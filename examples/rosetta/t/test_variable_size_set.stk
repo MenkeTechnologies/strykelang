@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Variable size/Set
+
+fn Rosetta::VarSizeSet::resize_array($ary, $size, $fill) {
+    while (len(@$ary) < $size) { push @$ary, $fill }
+    while (len(@$ary) > $size) { pop @$ary }
+    $ary
+}
+
+fn Rosetta::VarSizeSet::resize_string($text, $size, $fill) {
+    my @chars = split //, $text
+    while (len(@chars) < $size) { push @chars, $fill }
+    while (len(@chars) > $size) { pop @chars }
+    join("", @chars)
+}
+
+my @vals = (1, 2)
+Rosetta::VarSizeSet::resize_array(\@vals, 5, 9)
+assert_eq join(",", @vals), "1,2,9,9,9", "array grows with fill value"
+Rosetta::VarSizeSet::resize_array(\@vals, 3, 0)
+assert_eq join(",", @vals), "1,2,9", "array shrinks to requested size"
+assert_eq Rosetta::VarSizeSet::resize_string("tea", 5, "."), "tea..", "string grows with fill character"
+assert_eq Rosetta::VarSizeSet::resize_string("rosetta", 4, "."), "rose", "string shrinks to requested size"
+
+test_run

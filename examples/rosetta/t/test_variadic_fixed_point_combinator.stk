@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Variadic fixed-point combinator
+
+fn Rosetta::VFix::apply($name, @args) {
+    return Rosetta::VFix::sum_to(@args) if $name eq "sum_to"
+    return Rosetta::VFix::pow_acc(@args) if $name eq "pow_acc"
+    "unknown"
+}
+
+fn Rosetta::VFix::sum_to($n, $acc) {
+    return $acc if $n == 0
+    Rosetta::VFix::apply("sum_to", $n - 1, $acc + $n)
+}
+
+fn Rosetta::VFix::pow_acc($base, $exp, $acc) {
+    return $acc if $exp == 0
+    Rosetta::VFix::apply("pow_acc", $base, $exp - 1, $acc * $base)
+}
+
+assert_eq Rosetta::VFix::apply("sum_to", 5, 0), 15, "fixed-point style dispatcher supports variadic recursion"
+assert_eq Rosetta::VFix::apply("pow_acc", 3, 4, 1), 81, "second variadic recursive builder works"
+
+test_run

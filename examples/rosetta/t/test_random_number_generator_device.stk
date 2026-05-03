@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Random number generator (device)
+
+fn Rosetta::RngDevice::new() {
+    my @bytes = (17, 34, 51, 68, 85)
+    { bytes => \@bytes }
+}
+
+fn Rosetta::RngDevice::read_byte($dev) {
+    shift @{$dev->{bytes}}
+}
+
+my $dev = Rosetta::RngDevice::new()
+
+assert_eq Rosetta::RngDevice::read_byte($dev), 17, "first device byte read"
+assert_eq Rosetta::RngDevice::read_byte($dev), 34, "second device byte read"
+assert_eq join(",", @{$dev->{bytes}}), "51,68,85", "remaining entropy preserved"
+
+test_run

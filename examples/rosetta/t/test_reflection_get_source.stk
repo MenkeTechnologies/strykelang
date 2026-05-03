@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reflection/Get source
+
+fn Rosetta::Reflect::registry() {
+    {
+        "Rosetta::Reflect::hello" => 'fn Rosetta::Reflect::hello() { "hello" }',
+        "Rosetta::Reflect::sum" => 'fn Rosetta::Reflect::sum($a, $b) { $a + $b }',
+    }
+}
+
+fn Rosetta::Reflect::source_for($registry, $name) {
+    exists $registry->{$name} ? $registry->{$name} : "missing"
+}
+
+my $registry = Rosetta::Reflect::registry()
+
+assert_eq Rosetta::Reflect::source_for($registry, "Rosetta::Reflect::hello"), 'fn Rosetta::Reflect::hello() { "hello" }', "source is returned for known function"
+assert_eq Rosetta::Reflect::source_for($registry, "Rosetta::Reflect::sum") =~ /\$a \+ \$b/, 1, "source text includes function body"
+assert_eq Rosetta::Reflect::source_for($registry, "Rosetta::Reflect::none"), "missing", "unknown function reports missing"
+
+test_run
