@@ -209,9 +209,9 @@ These are explicitly **not** on the roadmap:
 
 ## Contact
 
-- **Repository:** https://github.com/MenkeTechnologies/strykelang
-- **Issues:** https://github.com/MenkeTechnologies/strykelang/issues
-- **Discussions:** https://github.com/MenkeTechnologies/strykelang/discussions
+- **Repository:** [GitHub](https://github.com/MenkeTechnologies/strykelang)
+- **Issues:** [tracker](https://github.com/MenkeTechnologies/strykelang/issues)
+- **Discussions:** [forum](https://github.com/MenkeTechnologies/strykelang/discussions)
 
 ---
 

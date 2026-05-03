@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.11.7 · 3565 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.11.8 · 3565 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -1744,7 +1744,7 @@ slurp(&quot;data.csv&quot;) |&gt; fcsv |&gt; grep { _-&gt;{age} &gt; 25 }
         <h3><a class="doc-anchor" href="#doc-xopen">#</a> <code>xopen</code></h3>
         <p><code>xopen</code> (alias <code>xo</code>) opens a file or URL with the system default handler — <code>open</code> on macOS, <code>xdg-open</code> on Linux, <code>start</code> on Windows. Returns the path unchanged so it can sit transparently in a pipeline. This is the missing link between generating output files and viewing them: pipe the path through <code>xopen</code> and the OS opens it in the appropriate app (browser for HTML, viewer for PDF, editor for text).</p>
         <pre><code class="lang-perl">fr |&gt; map +{name =&gt; _, size =&gt; format_bytes(size)} |&gt; th |&gt; to_file(&quot;report.html&quot;) |&gt; xopen
-xopen &quot;https://github.com/MenkeTechnologies/stryke&quot;
+xopen &quot;https://example.com&quot;
 xopen &quot;output.pdf&quot;
 </code></pre>
       </article>
@@ -23414,7 +23414,7 @@ p reflect_point(3, 4, &#39;origin&#39;)  # [-3, -4]
       </article>
       <article class="doc-entry" id="doc-refresh-stashes">
         <h3><a class="doc-anchor" href="#doc-refresh-stashes">#</a> <code>refresh_stashes</code></h3>
-        <p><code>refresh_stashes</code> — uncategorized builtin.</p>
+        <p><code>refresh_stashes</code> — symbol table builtin.</p>
         <pre><code class="lang-perl">my $result = refresh_stashes $x 
 # or in a pipeline:
 @list |&gt; map refresh_stashes |&gt; p

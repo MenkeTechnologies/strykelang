@@ -2,7 +2,7 @@
 
 - **Status**: Draft
 - **Created**: 2026-04-26
-- **Author**: MenkeTechnologies
+- **Author**: stryke maintainers
 
 ## Summary
 
