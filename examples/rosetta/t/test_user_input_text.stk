@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: User input/Text
+
+fn Rosetta::UserInput::get_text($mock_input) {
+    # In a real environment, this would be:
+    # my $line = <STDIN>; chomp $line; $line
+    $mock_input
+}
+
+fn Rosetta::UserInput::get_int($mock_input) {
+    # In a real environment, this would be:
+    # my $line = <STDIN>; chomp $line; int($line)
+    int($mock_input)
+}
+
+# Test
+my $text = Rosetta::UserInput::get_text("Rosetta Code")
+my $val  = Rosetta::UserInput::get_int("42")
+
+assert_eq $text, "Rosetta Code", "Text input"
+assert_eq $val, 42, "Integer input"
+
+test_run

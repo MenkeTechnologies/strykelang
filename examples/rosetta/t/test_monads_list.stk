@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Monads/List monad
+
+# The List monad 'bind' (or 'flat_map') applies a function that returns a list
+# to each element of a list and flattens the result.
+
+fn Rosetta::ListMonad::bind($list, $func) {
+    # Using flat_map logic
+    my @res
+    for my $val (@$list) {
+        my $sub_list = $func->($val)
+        push @res, @$sub_list
+    }
+    \@res
+}
+
+# Example: return both positive and negative version of a number
+fn Rosetta::ListMonad::plus_minus($x) {
+    [$x, -$x]
+}
+
+# Example: return the number and its square
+fn Rosetta::ListMonad::sq($x) {
+    [$x, $x * $x]
+}
+
+my $l1 = [1, 2, 3]
+my $res1 = Rosetta::ListMonad::bind($l1, fn { Rosetta::ListMonad::plus_minus($_[0]) })
+# Expected: [1, -1, 2, -2, 3, -3]
+
+assert_eq join(",", @$res1), "1,-1,2,-2,3,-3", "plus_minus bind"
+
+# Chain bind: plus_minus then square
+my $res2 = Rosetta::ListMonad::bind($res1, fn { Rosetta::ListMonad::sq($_[0]) })
+# Expected: [1, 1, -1, 1, 2, 4, -2, 4, 3, 9, -3, 9]
+
+assert_eq join(",", @$res2), "1,1,-1,1,2,4,-2,4,3,9,-3,9", "chained bind"
+
+test_run

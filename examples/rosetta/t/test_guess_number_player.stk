@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Guess the number/With feedback (player)
+
+fn Rosetta::GuessNumberPlayer::play($secret) {
+    # The computer guesses the number between 1 and 100
+    my $min = 1
+    my $max = 100
+    my $guesses = 0
+    my $guess
+    
+    while ($min <= $max) {
+        $guesses++
+        $guess = int(($min + $max) / 2)
+        
+        # Simulate user feedback
+        if ($guess == $secret) {
+            return $guesses
+        } elsif ($guess < $secret) {
+            $min = $guess + 1
+        } else {
+            $max = $guess - 1
+        }
+    }
+    return -1
+}
+
+# Test with different secrets
+my $g1 = Rosetta::GuessNumberPlayer::play(42)
+assert_ok $g1 > 0, "Guessed 42 in $g1 tries"
+
+my $g2 = Rosetta::GuessNumberPlayer::play(100)
+assert_ok $g2 > 0, "Guessed 100 in $g2 tries"
+
+my $g3 = Rosetta::GuessNumberPlayer::play(1)
+assert_ok $g3 > 0, "Guessed 1 in $g3 tries"
+
+test_run

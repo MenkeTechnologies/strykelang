@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Polymorphic copy
+
+class Rosetta::PolyCopy::Animal {
+    fn clone($self) {
+        die "Not implemented"
+    }
+    
+    fn speak($self) {
+        die "Not implemented"
+    }
+}
+
+class Rosetta::PolyCopy::Dog extends Rosetta::PolyCopy::Animal {
+    fn new($class, $name) {
+        bless { name => $name }, $class
+    }
+    
+    fn clone($self) {
+        Rosetta::PolyCopy::Dog->new($self->{name})
+    }
+    
+    fn speak($self) {
+        "Woof, my name is " . $self->{name}
+    }
+}
+
+class Rosetta::PolyCopy::Cat extends Rosetta::PolyCopy::Animal {
+    fn new($class, $name) {
+        bless { name => $name }, $class
+    }
+    
+    fn clone($self) {
+        Rosetta::PolyCopy::Cat->new($self->{name})
+    }
+    
+    fn speak($self) {
+        "Meow, I am " . $self->{name}
+    }
+}
+
+fn Rosetta::PolyCopy::demo() {
+    # Array of polymorphic objects
+    my @animals = (
+        Rosetta::PolyCopy::Dog->new("Rex"),
+        Rosetta::PolyCopy::Cat->new("Whiskers")
+    )
+    
+    # Polymorphic copy
+    my @copies
+    for my $animal (@animals) {
+        push @copies, $animal->clone()
+    }
+    
+    # Verify behavior
+    assert_eq $animals[0]->speak(), "Woof, my name is Rex", "Dog original speaks"
+    assert_eq $copies[0]->speak(), "Woof, my name is Rex", "Dog copy speaks"
+    assert_eq $animals[1]->speak(), "Meow, I am Whiskers", "Cat original speaks"
+    assert_eq $copies[1]->speak(), "Meow, I am Whiskers", "Cat copy speaks"
+    
+    # Check identity by modifying the copy
+    $copies[0]->{name} = "Fido"
+    assert_eq $animals[0]->speak(), "Woof, my name is Rex", "Dog original unchanged"
+    assert_eq $copies[0]->speak(), "Woof, my name is Fido", "Dog copy changed"
+    
+    $copies[1]->{name} = "Garfield"
+    assert_eq $animals[1]->speak(), "Meow, I am Whiskers", "Cat original unchanged"
+    assert_eq $copies[1]->speak(), "Meow, I am Garfield", "Cat copy changed"
+}
+
+Rosetta::PolyCopy::demo()
+test_run

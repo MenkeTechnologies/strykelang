@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Numbers k such that the last letter of k is the same as the first letter of k+1
+
+fn Rosetta::Cardinal::say($n) {
+    return "negative " . Rosetta::Cardinal::say(-$n) if $n < 0
+    return "zero" if $n == 0
+    Rosetta::Cardinal::trim(Rosetta::Cardinal::big($n))
+}
+
+fn Rosetta::Cardinal::trim($s) {
+    my $r = $s
+    $r =~ s/^\s+|\s+$//g
+    $r =~ s/\s+/ /g
+    $r
+}
+
+fn Rosetta::Cardinal::big($n) {
+    return "" if $n == 0
+    my $billion  = 1000000000
+    my $million  = 1000000
+    my $thousand = 1000
+    if ($n >= $billion) {
+        return Rosetta::Cardinal::big(int($n / $billion)) . " billion " . Rosetta::Cardinal::big($n % $billion)
+    }
+    if ($n >= $million) {
+        return Rosetta::Cardinal::big(int($n / $million)) . " million " . Rosetta::Cardinal::big($n % $million)
+    }
+    if ($n >= $thousand) {
+        return Rosetta::Cardinal::big(int($n / $thousand)) . " thousand " . Rosetta::Cardinal::big($n % $thousand)
+    }
+    Rosetta::Cardinal::under_thousand($n)
+}
+
+fn Rosetta::Cardinal::under_thousand($n) {
+    my @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                 "ten", "eleven", "twelve", "thirteen", "fourteen",
+                 "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
+    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    my $s = ""
+    my $x = $n
+    if ($x >= 100) {
+        $s .= $units[int($x / 100)] . " hundred"
+        $x %= 100
+        $s .= " and" if $x > 0
+    }
+    if ($x >= 20) {
+        $s .= " " . $tens[int($x / 10)]
+        $x %= 10
+        $s .= "-" . $units[$x] if $x > 0
+    } elsif ($x > 0) {
+        $s .= " " . $units[$x]
+    }
+    $s
+}
+
+fn Rosetta::NumbersLastFirst::check($k) {
+    my $name_k = Rosetta::Cardinal::say($k)
+    my $name_kp1 = Rosetta::Cardinal::say($k + 1)
+    
+    $name_k =~ s/[^a-z]//g
+    $name_kp1 =~ s/[^a-z]//g
+    
+    my $last = substr($name_k, -1)
+    my $first = substr($name_kp1, 0, 1)
+    
+    $last eq $first
+}
+
+assert_ok Rosetta::NumbersLastFirst::check(18), "18 works: eighteen (n), nineteen (n)"
+assert_ok Rosetta::NumbersLastFirst::check(28), "28 works: twenty-eight (t), twenty-nine (t)"
+assert_ok Rosetta::NumbersLastFirst::check(38), "38 works: thirty-eight (t), thirty-nine (t)"
+assert_ok Rosetta::NumbersLastFirst::check(79), "79 works: seventy-nine (e), eighty (e)"
+assert_ok Rosetta::NumbersLastFirst::check(81), "81 works: eighty-one (e), eighty-two (e)"
+assert_ok Rosetta::NumbersLastFirst::check(83), "83 works"
+assert_ok Rosetta::NumbersLastFirst::check(85), "85 works"
+assert_ok Rosetta::NumbersLastFirst::check(97), "97 works: ninety-seven (n), ninety-eight (n)"
+
+# Check some that should fail
+assert_ok !Rosetta::NumbersLastFirst::check(1), "1 fails: one (e), two (t)"
+assert_ok !Rosetta::NumbersLastFirst::check(2), "2 fails: two (o), three (t)"
+assert_ok !Rosetta::NumbersLastFirst::check(3), "3 fails: three (e), four (f)"
+
+# Using pipeline to find matches in 1..200
+my @matches = 1..200 |> grep { Rosetta::NumbersLastFirst::check(_) }
+assert_eq len(@matches), 17, "Found 17 matches in 1..200"
+
+test_run

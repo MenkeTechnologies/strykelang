@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Special characters
+
+fn Rosetta::SpecialChars::demo() {
+    my $newline = "Line 1\nLine 2"
+    my $tab = "Col 1\tCol 2"
+    my $escaped_quote = "He said \"Hello\""
+    my $backslash = "Path\\to\\file"
+    
+    # Check lengths and content
+    assert_eq length($newline), 13, "Newline escape works"
+    assert_ok index($newline, "\n") != -1, "Contains newline"
+    
+    assert_eq length($tab), 11, "Tab escape works"
+    assert_ok index($tab, "\t") != -1, "Contains tab"
+    
+    assert_ok index($escaped_quote, "\"") != -1, "Contains quote"
+    assert_eq length($backslash), 12, "Backslash escape works"
+}
+
+Rosetta::SpecialChars::demo()
+test_run

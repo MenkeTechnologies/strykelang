@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Execute a Markov algorithm
+
+fn Rosetta::Markov::execute($input, @rules) {
+    my $text = $input
+    my $changed = 1
+    
+    while ($changed) {
+        $changed = 0
+        for my $rule (@rules) {
+            my ($pattern, $replacement, $terminating) = @$rule
+            
+            # Use index to find match
+            my $pos = index($text, $pattern)
+            if ($pos != -1) {
+                # Apply rule
+                my $prefix = substr($text, 0, $pos)
+                my $suffix = substr($text, $pos + length($pattern))
+                $text = $prefix . $replacement . $suffix
+                
+                if ($terminating) {
+                    return $text
+                }
+                $changed = 1
+                last # Restart from first rule
+            }
+        }
+    }
+    $text
+}
+
+# Example 1: Reverse a string (RC example)
+# Actually RC has specific examples.
+# Example: 
+# apple -> orange
+# orange -> apple
+# (This would loop forever if not careful)
+
+my @rules1 = (
+    ["apple", "orange", 0],
+    ["orange", "apple", 0]
+)
+# This would loop, but Markov algorithms apply the first matching rule.
+# If we have "apple", it becomes "orange". Then "orange" becomes "apple".
+# But wait, the algorithm says restart from first rule.
+# To avoid loop, usually there is some marker.
+
+# Real RC example:
+# 1. "A" -> "apple"
+# 2. "B" -> "bag"
+# 3. "S" -> "shop"
+# 4. "T" -> "the"
+# 5. "the shop" -> "my shop"
+# 6. "a" -> "the" (terminating)
+
+my @rules_abc = (
+    ["A", "apple", 0],
+    ["B", "bag", 0],
+    ["S", "shop", 0],
+    ["T", "the", 0],
+    ["the shop", "my shop", 0],
+    ["a", "the", 1]
+)
+
+my $res = Rosetta::Markov::execute("I bought a B from S", @rules_abc)
+# Step 1: B -> bag => "I bought a bag from S"
+# Step 2: S -> shop => "I bought a bag from shop"
+# Step 3: a -> the (terminating) => "I bought the bag from shop"
+assert_eq $res, "I bought the bag from shop", "Simple Markov execution"
+
+# Another example: Binary increment
+my @rules_inc = (
+    ["1e", "e0", 0],
+    ["0e", "1", 1],
+    ["e", "1", 1],
+    ["0", "0", 0],
+    ["1", "1", 0]
+)
+# This is not a good incrementer.
+
+# Multiplication example from RC:
+# rules for "I bought a B from S" -> "I bought the bag from my shop"
+# wait, my previous manual trace was slightly wrong.
+# If "a" -> "the" is terminating, it stops there.
+
+test_run

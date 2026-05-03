@@ -1,0 +1,22 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Unix/ls
+
+fn Rosetta::UnixLS::list($dir) {
+    # Use glob to list files in the directory
+    my @files = glob("$dir/*")
+    
+    # Strip directory prefix for the output
+    ~> @files map {
+        my $f = _
+        $f =~ s/^$dir\///
+        $f
+    }
+}
+
+# Test with 't' directory
+my @t_files = Rosetta::UnixLS::list("t")
+
+assert_ok len(@t_files) > 0, "Found files in t/"
+assert_ok len(grep { _ eq "test_a_plus_b.stk" } @t_files) > 0, "Found test_a_plus_b.stk"
+
+test_run

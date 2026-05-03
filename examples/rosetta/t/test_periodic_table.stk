@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Periodic table
+
+fn Rosetta::Periodic::get_table() {
+    {
+        H  => { name => "Hydrogen",   weight => 1.008,  number => 1  },
+        He => { name => "Helium",     weight => 4.0026, number => 2  },
+        Li => { name => "Lithium",    weight => 6.94,   number => 3  },
+        Be => { name => "Beryllium", weight => 9.0122, number => 4  },
+        B  => { name => "Boron",     weight => 10.81,  number => 5  },
+        C  => { name => "Carbon",    weight => 12.011, number => 6  },
+        N  => { name => "Nitrogen",  weight => 14.007, number => 7  },
+        O  => { name => "Oxygen",    weight => 15.999, number => 8  },
+        F  => { name => "Fluorine",  weight => 18.998, number => 9  },
+        Ne => { name => "Neon",      weight => 20.180, number => 10 }
+    }
+}
+
+fn Rosetta::Periodic::query($symbol) {
+    my $table = Rosetta::Periodic::get_table()
+    if (exists $table->{$symbol}) {
+        return $table->{$symbol}
+    }
+    undef
+}
+
+my $h = Rosetta::Periodic::query("H")
+assert_eq $h->{name}, "Hydrogen", "H is Hydrogen"
+assert_eq $h->{number}, 1, "H atomic number 1"
+
+my $c = Rosetta::Periodic::query("C")
+assert_eq $c->{name}, "Carbon", "C is Carbon"
+assert_eq $c->{number}, 6, "C atomic number 6"
+
+my $missing = Rosetta::Periodic::query("U")
+assert_ok !defined($missing), "U is missing in simplified table"
+
+test_run

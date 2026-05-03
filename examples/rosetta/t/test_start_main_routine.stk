@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Start from a main routine
+
+fn Rosetta::MainRoutine::main() {
+    "Program started from main"
+}
+
+# The task is about ensuring there's a clear entry point.
+# In many languages, this is literal. In Stryke/Perl, we can just call it.
+
+my $res = Rosetta::MainRoutine::main()
+assert_eq $res, "Program started from main", "Entry point main called"
+
+test_run

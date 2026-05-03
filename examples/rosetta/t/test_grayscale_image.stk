@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Grayscale image
+
+fn Rosetta::Grayscale::convert($rgb) {
+    my ($r, $g, $b) = @$rgb
+    my $gray = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b)
+    int($gray + 0.5)
+}
+
+fn Rosetta::Grayscale::convert_grid($grid) {
+    # Use parallel map for grid conversion, ensuring results are array refs
+    [ ~> @$grid map {
+        my $row = _
+        [ ~> @$row map { Rosetta::Grayscale::convert(_) } ]
+    } ]
+}
+
+my $color1 = [255, 0, 0] # Pure red
+my $g1 = Rosetta::Grayscale::convert($color1)
+assert_eq $g1, 54, "Red (255,0,0) -> 54"
+
+my $color2 = [0, 255, 0] # Pure green
+my $g2 = Rosetta::Grayscale::convert($color2)
+assert_eq $g2, 182, "Green (0,255,0) -> 182"
+
+my $color3 = [0, 0, 255] # Pure blue
+my $g3 = Rosetta::Grayscale::convert($color3)
+assert_eq $g3, 18, "Blue (0,0,255) -> 18"
+
+my $grid = [
+    [[255, 0, 0], [0, 255, 0]],
+    [[0, 0, 255], [255, 255, 255]]
+]
+my $gray_grid = Rosetta::Grayscale::convert_grid($grid)
+
+assert_eq $gray_grid->[0][0], 54, "Grid [0][0]"
+assert_eq $gray_grid->[1][1], 255, "Grid [1][1] (White remains white)"
+
+test_run

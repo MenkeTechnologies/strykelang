@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Short-circuit evaluation
+
+fn Rosetta::ShortCircuit::side_effect($val, $log_ref) {
+    push @$log_ref, $val
+    $val
+}
+
+# Test AND short-circuit
+my @log_and
+my $res_and = Rosetta::ShortCircuit::side_effect(0, \@log_and) && Rosetta::ShortCircuit::side_effect(1, \@log_and)
+assert_eq $res_and, 0, "AND result is 0"
+assert_eq len(@log_and), 1, "AND short-circuited after first term"
+assert_eq $log_and[0], 0, "Log recorded 0"
+
+# Test OR short-circuit
+my @log_or
+my $res_or = Rosetta::ShortCircuit::side_effect(1, \@log_or) || Rosetta::ShortCircuit::side_effect(0, \@log_or)
+assert_eq $res_or, 1, "OR result is 1"
+assert_eq len(@log_or), 1, "OR short-circuited after first term"
+assert_eq $log_or[0], 1, "Log recorded 1"
+
+# Test full evaluation
+my @log_full
+my $res_full = Rosetta::ShortCircuit::side_effect(1, \@log_full) && Rosetta::ShortCircuit::side_effect(2, \@log_full)
+assert_eq $res_full, 2, "AND with true terms results in last term"
+assert_eq len(@log_full), 2, "Both terms evaluated"
+
+test_run

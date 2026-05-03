@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Chaocipher
+
+fn Rosetta::Chaocipher::permute_left($alpha, $char) {
+    my @a = split("", $alpha)
+    while ($a[0] ne $char) {
+        push @a, shift @a
+    }
+    my $c = splice(@a, 1, 1)
+    splice(@a, 13, 0, $c)
+    join("", @a)
+}
+
+fn Rosetta::Chaocipher::permute_right($alpha, $char) {
+    my @a = split("", $alpha)
+    while ($a[0] ne $char) {
+        push @a, shift @a
+    }
+    push @a, shift @a
+    my $c = splice(@a, 2, 1)
+    splice(@a, 13, 0, $c)
+    join("", @a)
+}
+
+fn Rosetta::Chaocipher::encrypt($plain, $left, $right) {
+    my $l = $left
+    my $r = $right
+    my $cipher = ""
+    
+    for my $p (split("", $plain)) {
+        my $idx = index($r, $p)
+        my $c = substr($l, $idx, 1)
+        $cipher .= $c
+        
+        $l = Rosetta::Chaocipher::permute_left($l, $c)
+        $r = Rosetta::Chaocipher::permute_right($r, $p)
+    }
+    $cipher
+}
+
+my $l_init = "HXUCZVAMDSLKPEFJRIGTWOBNYQ"
+my $r_init = "PTLNBQDEOYSFAVZKGJRIHWXUMC"
+my $plain = "WELLDONEISBETTERTHANWELLSAID"
+
+my $cipher = Rosetta::Chaocipher::encrypt($plain, $l_init, $r_init)
+p "Chaocipher: $cipher"
+
+assert_eq $cipher, "OAHQHCNYNXTSZJRRHJBYHQKSOUJY", "Chaocipher encryption matches RC example"
+
+test_run

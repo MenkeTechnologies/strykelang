@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Compiler/Simple file inclusion pre processor
+
+fn Rosetta::Inclusion::process($path, $seen) {
+    # Check for circular inclusion
+    if ($seen->{$path}) {
+        return "ERROR: Circular inclusion of $path"
+    }
+    $seen->{$path} = 1
+    
+    my $content = slurp($path)
+    my @lines = split("\n", $content)
+    
+    my @processed
+    for my $line (@lines) {
+        if ($line =~ /^\s*#include\s+"([^"]+)"/) {
+            my $inc_path = $1
+            # In a real compiler, we would handle relative paths.
+            # Here we assume they are in /tmp for the test.
+            push @processed, Rosetta::Inclusion::process("/tmp/$inc_path", $seen)
+        } else {
+            push @processed, $line
+        }
+    }
+    
+    delete $seen->{$path}
+    join("\n", @processed)
+}
+
+# Setup test files in /tmp
+my $f1 = "/tmp/f1.txt"
+my $f2 = "/tmp/f2.txt"
+my $f3 = "/tmp/f3.txt"
+
+# f1.txt:
+# Start f1
+# #include "f2.txt"
+# End f1
+open my $fh1, '>', $f1
+print $fh1 "Start f1\n#include \"f2.txt\"\nEnd f1"
+close $fh1
+
+# f2.txt:
+# Start f2
+# #include "f3.txt"
+# End f2
+open my $fh2, '>', $f2
+print $fh2 "Start f2\n#include \"f3.txt\"\nEnd f2"
+close $fh2
+
+# f3.txt:
+# Content of f3
+open my $fh3, '>', $f3
+print $fh3 "Content of f3"
+close $fh3
+
+# Process f1.txt
+my %seen = ()
+my $result = Rosetta::Inclusion::process($f1, \%seen)
+
+my $expected = "Start f1\nStart f2\nContent of f3\nEnd f2\nEnd f1"
+assert_eq $result, $expected, "Nested file inclusion"
+
+# Test circular inclusion
+my $c1 = "/tmp/c1.txt"
+my $c2 = "/tmp/c2.txt"
+open my $fhc1, '>', $c1
+print $fhc1 "#include \"c2.txt\""
+close $fhc1
+open my $fhc2, '>', $c2
+print $fhc2 "#include \"c1.txt\""
+close $fhc2
+
+my %seen2 = ()
+my $res2 = Rosetta::Inclusion::process($c1, \%seen2)
+assert_ok $res2 =~ /Circular/, "Circular inclusion detected"
+
+# Cleanup
+unlink $f1, $f2, $f3, $c1, $c2
+
+test_run

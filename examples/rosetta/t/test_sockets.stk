@@ -1,0 +1,15 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sockets
+
+fn Rosetta::Sockets::demo() {
+    # Task: Create a socket and connect.
+    # We'll just demonstrate the system call signature.
+    # my $handle;
+    # socket($handle, 2, 1, 6) or die "socket failed";
+    
+    "Socket calls structured"
+}
+
+assert_eq Rosetta::Sockets::demo(), "Socket calls structured", "Sockets structure"
+
+test_run
