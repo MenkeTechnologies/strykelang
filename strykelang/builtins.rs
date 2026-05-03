@@ -10462,6 +10462,22 @@ fn builtin_net_interfaces() -> PerlResult<PerlValue> {
     }
     unsafe { libc::freeifaddrs(ifap) };
 
+    // Linux: getifaddrs gives IPs but MACs come from sysfs.
+    // `/sys/class/net/<iface>/address` is canonical.
+    #[cfg(target_os = "linux")]
+    for (name, info) in map.iter_mut() {
+        if info.mac.is_some() {
+            continue;
+        }
+        let path = format!("/sys/class/net/{}/address", name);
+        if let Ok(s) = std::fs::read_to_string(&path) {
+            let mac = s.trim().to_string();
+            if !mac.is_empty() && mac != "00:00:00:00:00:00" {
+                info.mac = Some(mac);
+            }
+        }
+    }
+
     let mut result = Vec::new();
     for (name, info) in &map {
         let mut h = indexmap::IndexMap::new();
