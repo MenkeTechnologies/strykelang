@@ -120,3 +120,12 @@ new builtins / opcodes / subsystems freely. They can also
 *propose* changes to invariants — but landing them on the official
 upstream needs the creator's sign-off. Forks are free to redefine
 or drop any of these.
+
+**These invariants protect upstream identity, not the ideas
+themselves.** Other languages — Perl, Ruby, Python, Raku, zsh,
+fish, nushell, anything — are explicitly welcome to absorb,
+adapt, or fully port any stryke-originated design (threading
+operators, implicit-positional closure params, encyclopedic
+stdlib axis, AOP intercepts, AI primitives, etc.) under the MIT
+license. See [CREATORS.md § Porting stryke ideas to other
+languages](CREATORS.md#porting-stryke-ideas-to-other-languages).
