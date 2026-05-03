@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Multiton
+
+my %instances;
+
+class Rosetta::Multiton::Logger {
+    name: Str = ""
+
+    # Static method to get an instance by name
+    fn get($name) {
+        if (!exists $instances{$name}) {
+            $instances{$name} = Rosetta::Multiton::Logger(name => $name)
+        }
+        $instances{$name}
+    }
+
+    fn log($msg) {
+        p "[$self->name] $msg"
+    }
+}
+
+# Test the multiton
+my $log1 = Rosetta::Multiton::Logger::get("main")
+my $log2 = Rosetta::Multiton::Logger::get("worker")
+my $log3 = Rosetta::Multiton::Logger::get("main")
+
+assert_eq $log1->name, "main", "log1 name is main"
+assert_eq $log2->name, "worker", "log2 name is worker"
+assert_eq $log3->name, "main", "log3 name is main"
+
+# Modify log1 and check if log3 reflects it
+$log1->name("main-updated")
+assert_eq $log3->name, "main-updated", "log3 reflects change in log1 (same instance)"
+assert_eq $log2->name, "worker", "log2 unaffected (different instance)"
+
+$log1->log("Hello from main")
+$log2->log("Hello from worker")
+
+test_run

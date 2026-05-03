@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reflection/List methods
+
+fn Rosetta::Reflection::list_methods($obj) {
+    # In Stryke, class instances have a methods() method that returns a list of methods.
+    # We collect them into an array reference.
+    my @m = $obj->methods()
+    \@m
+}
+
+class Rosetta::Reflection::TestClass {
+    fn foo { }
+    fn bar { }
+    fn baz { }
+}
+
+my $o = Rosetta::Reflection::TestClass()
+my $methods = Rosetta::Reflection::list_methods($o)
+
+# Sort them for consistent comparison
+my @sorted = sort @$methods
+
+assert_eq join(",", @sorted), "bar,baz,foo", "Listed methods of TestClass"
+
+# Test with another class
+class Rosetta::Reflection::EmptyClass { }
+my $oe = Rosetta::Reflection::EmptyClass()
+my $em = Rosetta::Reflection::list_methods($oe)
+assert_eq len(@$em), 0, "Empty class has no methods"
+
+test_run

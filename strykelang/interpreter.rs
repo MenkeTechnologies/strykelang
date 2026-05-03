@@ -1608,6 +1608,15 @@ impl Interpreter {
             return;
         }
         self.reflection_hashes_ready = true;
+        // Package stashes (`%main::` / `%Pkg::`) are Perl-spec, install in
+        // every mode — `--compat` does not turn off the symbol table.
+        self.refresh_package_stashes();
+        // Everything below is stryke-only. `--compat` skips the entire block
+        // so a Perl 5 script sees no extension hashes and can use `%all` /
+        // `%b` / `%parameters` / `%stryke::*` etc. as ordinary user hashes.
+        if crate::compat_mode() {
+            return;
+        }
         let builtins_map = crate::builtins::builtins_hash_map();
         let perl_compats_map = crate::builtins::perl_compats_hash_map();
         let extensions_map = crate::builtins::extensions_hash_map();
@@ -1648,14 +1657,9 @@ impl Interpreter {
                 self.scope.declare_hash_global_frozen(name, val);
             }
         }
-        // Initial population of `%main::` / `%Pkg::`. Refreshed per REPL line
-        // and on demand via the `refresh_stashes()` builtin.
-        self.refresh_package_stashes();
         // Initial install of `%parameters` (zsh-`$parameters` analogue).
         // Refreshed automatically on every read via `touch_env_hash`.
-        // Stryke-only extension — gated off in `--compat` so Perl 5 scripts
-        // can declare their own `%parameters` without colliding.
-        if !crate::compat_mode() && !self.scope.has_lexical_hash("parameters") {
+        if !self.scope.has_lexical_hash("parameters") {
             self.refresh_parameters_hash();
         }
     }

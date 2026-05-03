@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Sync subtitles
+
+fn Rosetta::Subtitles::to_ms($time_str) {
+    if ($time_str =~ /(\d+):(\d+):(\d+),(\d+)/) {
+        my $h = int($1)
+        my $m = int($2)
+        my $s = int($3)
+        my $ms = int($4)
+        return $h * 3600000 + $m * 60000 + $s * 1000 + $ms
+    }
+    0
+}
+
+fn Rosetta::Subtitles::from_ms($ms) {
+    my $h = int($ms / 3600000)
+    $ms %= 3600000
+    my $m = int($ms / 60000)
+    $ms %= 60000
+    my $s = int($ms / 1000)
+    my $mils = $ms % 1000
+    sprintf("%02d:%02d:%02d,%03d", $h, $m, $s, $mils)
+}
+
+fn Rosetta::Subtitles::shift($srt, $offset_ms) {
+    my @lines = split "\n", $srt
+    my @new_lines
+    for my $line (@lines) {
+        if ($line =~ /([\d:,]+)\s+-->\s+([\d:,]+)/) {
+            my $t1 = $1
+            my $t2 = $2
+            my $start = Rosetta::Subtitles::to_ms($t1) + $offset_ms
+            my $end = Rosetta::Subtitles::to_ms($t2) + $offset_ms
+            push @new_lines, Rosetta::Subtitles::from_ms($start) . " --> " . Rosetta::Subtitles::from_ms($end)
+        } else {
+            push @new_lines, $line
+        }
+    }
+    join("\n", @new_lines)
+}
+
+my $sample = qq{1
+00:00:20,000 --> 00:00:24,400
+Hello world
+
+2
+00:00:24,600 --> 00:00:27,800
+Goodbye world};
+
+# Shift by 1.5 seconds (1500 ms)
+my $shifted = Rosetta::Subtitles::shift($sample, 1500)
+
+assert_ok $shifted =~ /00:00:21,500 --> 00:00:25,900/, "First timestamp shifted"
+assert_ok $shifted =~ /00:00:26,100 --> 00:00:29,300/, "Second timestamp shifted"
+assert_ok $shifted =~ /Hello world/, "Content preserved"
+
+test_run

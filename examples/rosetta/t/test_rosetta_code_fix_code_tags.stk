@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rosetta Code/Fix code tags
+
+fn Rosetta::FixCodeTags::fix($text) {
+    # Replace <code lang="foo">...</code> with <lang foo>...</lang>
+    $text =~ s/<code\s+lang="([^"]+)">([\s\S]*?)<\/code>/<lang $1>$2<\/lang>/gr
+}
+
+my $sample = qq{
+Here is some code:
+<code lang="perl">
+print "hello";
+</code>
+And another one:
+<code lang="python">print "world"</code>
+};
+
+my $fixed = Rosetta::FixCodeTags::fix($sample)
+
+assert_ok $fixed =~ /<lang perl>/, "Replaced perl code tag"
+assert_ok $fixed =~ /<lang python>/, "Replaced python code tag"
+assert_ok $fixed !~ /<code/, "No more code tags"
+
+# Test multi-line
+my $sample2 = '<code lang="stk">line1\nline2</code>'
+my $fixed2 = Rosetta::FixCodeTags::fix($sample2)
+assert_eq $fixed2, '<lang stk>line1\nline2</lang>', "Fixed multi-line code tag"
+
+test_run

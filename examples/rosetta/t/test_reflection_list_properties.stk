@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Reflection/List properties
+
+fn Rosetta::Reflection::list_properties($obj) {
+    if (ref($obj) eq "HASH") {
+        return [sort keys %$obj]
+    }
+    # For blessed objects, they are often hashes too
+    if (ref($obj)) {
+        return [sort keys %$obj]
+    }
+    []
+}
+
+# Test with a hash
+my $h = +{ name => "Alice", age => 30, city => "New York" }
+my $p1 = Rosetta::Reflection::list_properties($h)
+assert_eq join(",", @$p1), "age,city,name", "Hash properties"
+
+# Test with a class instance
+class Rosetta::Reflection::Person {
+    name: Str = ""
+    age: Int = 0
+}
+
+my $p = Rosetta::Reflection::Person(name => "Bob", age => 25)
+# In Stryke, class instances might be inspectable via keys if they are hash-backed.
+# If not, this might return empty or error.
+my $p2 = Rosetta::Reflection::list_properties($p)
+
+# We check if we can at least get something or if it handles it gracefully.
+p "Person properties: " . join(",", @$p2)
+
+test_run
