@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Table creation/Postal addresses
+
+fn Rosetta::PostalDB::setup() {
+    my $db = sqlite(":memory:")
+    
+    # Create the table
+    $db->exec(qq{
+        CREATE TABLE addresses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            street TEXT,
+            city TEXT,
+            state TEXT,
+            zip TEXT
+        )
+    })
+    
+    $db
+}
+
+my $db = Rosetta::PostalDB::setup()
+
+# Insert a sample address
+$db->exec(
+    "INSERT INTO addresses (name, street, city, state, zip) VALUES (?, ?, ?, ?, ?)",
+    "John Doe", "123 Main St", "Anytown", "CA", "12345"
+)
+
+# Verify the data
+my $rows = $db->query("SELECT * FROM addresses WHERE name = ?", "John Doe")
+assert_eq cnt($rows), 1, "One address found"
+assert_eq $rows->[0]->{street}, "123 Main St", "Street matches"
+assert_eq $rows->[0]->{city}, "Anytown", "City matches"
+assert_eq $rows->[0]->{state}, "CA", "State matches"
+assert_eq $rows->[0]->{zip}, "12345", "Zip matches"
+
+test_run

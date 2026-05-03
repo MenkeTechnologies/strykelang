@@ -622,7 +622,7 @@
 [x] Largest proper divisor of n
 [x] Last Friday of each month
 [x] Last letter-first letter
-[ ] Latin Squares in reduced form
+[x] Latin Squares in reduced form
 [ ] Latin Squares in reduced form/Randomizing using Jacobson and Matthews' technique
 [x] Law of cosines - triples
 [x] Leap year
@@ -746,7 +746,7 @@
 [x] Multiplication tables
 [x] Multiplicative order
 [x] Multisplit
-[ ] Multiton
+[x] Multiton
 [x] Munchausen numbers
 [x] Munching squares
 [x] Musical scale
@@ -917,7 +917,7 @@
 [x] Proper divisors
 [ ] Pseudo-random numbers/Combined recursive generator MRG32k3a
 [x] Pseudo-random numbers/Middle-square method
-[ ] Pseudo-random numbers/PCG32
+[x] Pseudo-random numbers/PCG32
 [ ] Pseudo-random numbers/Splitmix64
 [x] Pseudo-random numbers/Xorshift star
 [ ] Punched cards
@@ -961,8 +961,8 @@
 [ ] Record sound
 [x] Reduced row echelon form
 [ ] Reflection/Get source
-[ ] Reflection/List methods
-[ ] Reflection/List properties
+[x] Reflection/List methods
+[x] Reflection/List properties
 [x] Regular expressions
 [x] Remove duplicate elements
 [x] Remove lines from a file
@@ -980,7 +980,7 @@
 [x] Reverse words in a string
 [x] Rhonda numbers
 [x] Riordan numbers
-[ ] RIPEMD-160
+[x] RIPEMD-160
 [x] Rock-paper-scissors
 [x] Roman numerals/Decode
 [x] Roman numerals/Encode
@@ -990,7 +990,7 @@
 [x] Rosetta Code/Count examples
 [x] Rosetta Code/Find bare lang tags
 [x] Rosetta Code/Find unimplemented tasks
-[ ] Rosetta Code/Fix code tags
+[x] Rosetta Code/Fix code tags
 [ ] Rosetta Code/Rank languages by number of users
 [ ] Rosetta Code/Rank languages by popularity
 [x] Rot-13
@@ -1015,7 +1015,7 @@
 [x] Search a list
 [x] Search a list of records
 [x] Search in paragraph's text
-[ ] Secure temporary file
+[x] Secure temporary file
 [x] SEDOLs
 [x] Selectively replace multiple instances of a character within a string
 [x] Self numbers
@@ -1033,7 +1033,7 @@
 [x] Set
 [x] Set consolidation
 [x] Set of real numbers
-[ ] Set puzzle
+[x] Set puzzle
 [x] Set right-adjacent bits
 [ ] Set, the card game
 [x] Seven-sided dice from five-sided dice
@@ -1188,11 +1188,11 @@
 [x] Sutherland-Hodgman polygon clipping
 [x] Sylvester's sequence
 [x] Symmetric difference
-[ ] Sync subtitles
-[ ] Synchronous concurrency
+[x] Sync subtitles
+[x] Synchronous concurrency
 [ ] Syntax highlighting using Mediawiki formatting
 [x] System time
-[ ] Table creation/Postal addresses
+[x] Table creation/Postal addresses
 [x] Take notes on the command line
 [x] Tarjan
 [x] Tau function
@@ -1238,7 +1238,7 @@
 [x] Towers of Hanoi
 [x] Trabb Pardo–Knuth algorithm
 [x] Transliterate English text using the Greek alphabet
-[ ] Tree datastructures
+[x] Tree datastructures
 [x] Tree from nesting levels
 [x] Tree traversal
 [x] Triangular numbers
@@ -1297,7 +1297,7 @@
 [x] Vigenère cipher/Cryptanalysis
 [x] Visitor pattern
 [x] Visualize a tree
-[ ] Vogel's approximation method
+[x] Vogel's approximation method
 [x] Voronoi diagram
 [x] Wagstaff primes
 [x] Walk a directory/Non-recursively

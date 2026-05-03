@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.11.2 · 3547 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.11.7 · 3565 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -205,7 +205,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2618</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2636</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -8187,7 +8187,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2618 topics</p>
+      <p class="chapter-meta">2636 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -13822,6 +13822,14 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
 @list |&gt; map factorial |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-faf">
+        <h3><a class="doc-anchor" href="#doc-faf">#</a> <code>faf</code></h3>
+        <p><code>faf</code> — stress testing builtin. Alias for <code>fire_and_forget</code>.</p>
+        <pre><code class="lang-perl">my $result = faf $x 
+# or in a pipeline:
+@list |&gt; map faf |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-falf">
         <h3><a class="doc-anchor" href="#doc-falf">#</a> <code>falf</code></h3>
         <p><code>falf</code> — python/ruby stdlib builtin. Alias for <code>filterfalse</code>.</p>
@@ -15864,6 +15872,14 @@ my $reconstructed = idft($spectrum)
         <pre><code class="lang-perl">my $result = ilerp $x 
 # or in a pipeline:
 @list |&gt; map ilerp |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-image">
+        <h3><a class="doc-anchor" href="#doc-image">#</a> <code>image</code></h3>
+        <p><code>image</code> — ai primitives (docs/ai_primitives.md) builtin. Alias for <code>ai</code>.</p>
+        <pre><code class="lang-perl">my $result = image $x 
+# or in a pipeline:
+@list |&gt; map image |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-impedance-rlc">
@@ -21284,6 +21300,14 @@ p max(map { abs } @$norm)   # 1
 @list |&gt; map omit_keys |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-on-chunk">
+        <h3><a class="doc-anchor" href="#doc-on-chunk">#</a> <code>on_chunk</code></h3>
+        <p><code>on_chunk</code> — ai primitives (docs/ai_primitives.md) builtin. Alias for <code>stream_prompt</code>.</p>
+        <pre><code class="lang-perl">my $result = on_chunk $x 
+# or in a pipeline:
+@list |&gt; map on_chunk |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-one">
         <h3><a class="doc-anchor" href="#doc-one">#</a> <code>one</code></h3>
         <p><code>one</code> — python/ruby stdlib builtin.</p>
@@ -21898,6 +21922,14 @@ p pc / ly   # ~3.26 light years
         <pre><code class="lang-perl">my $result = pctrank $x 
 # or in a pipeline:
 @list |&gt; map pctrank |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pdf">
+        <h3><a class="doc-anchor" href="#doc-pdf">#</a> <code>pdf</code></h3>
+        <p><code>pdf</code> — ai primitives (docs/ai_primitives.md) builtin. Alias for <code>ai</code>.</p>
+        <pre><code class="lang-perl">my $result = pdf $x 
+# or in a pipeline:
+@list |&gt; map pdf |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-peak-detect">
@@ -23380,6 +23412,14 @@ p reflect_point(3, 4, &#39;origin&#39;)  # [-3, -4]
 @list |&gt; map reflpt |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-refresh-stashes">
+        <h3><a class="doc-anchor" href="#doc-refresh-stashes">#</a> <code>refresh_stashes</code></h3>
+        <p><code>refresh_stashes</code> — uncategorized builtin.</p>
+        <pre><code class="lang-perl">my $result = refresh_stashes $x 
+# or in a pipeline:
+@list |&gt; map refresh_stashes |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-regex-extract">
         <h3><a class="doc-anchor" href="#doc-regex-extract">#</a> <code>regex_extract</code></h3>
         <p><code>regex_extract</code> — file stat / path builtin.</p>
@@ -24464,6 +24504,14 @@ my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
 @list |&gt; map safe_sqrt |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-salloc">
+        <h3><a class="doc-anchor" href="#doc-salloc">#</a> <code>salloc</code></h3>
+        <p><code>salloc</code> — stress / telemetry extensions builtin. Alias for <code>stress_alloc</code>.</p>
+        <pre><code class="lang-perl">my $result = salloc $x 
+# or in a pipeline:
+@list |&gt; map salloc |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sample-n">
         <h3><a class="doc-anchor" href="#doc-sample-n">#</a> <code>sample_n</code></h3>
         <p><code>sample_n</code> — collection (batch 2) builtin. Alias for <code>random_sample</code>.</p>
@@ -24524,6 +24572,14 @@ my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
         <pre><code class="lang-perl">my $result = saturate $x 
 # or in a pipeline:
 @list |&gt; map saturate |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sbranch">
+        <h3><a class="doc-anchor" href="#doc-sbranch">#</a> <code>sbranch</code></h3>
+        <p><code>sbranch</code> — stress / telemetry extensions builtin. Alias for <code>stress_branch</code>.</p>
+        <pre><code class="lang-perl">my $result = sbranch $x 
+# or in a pipeline:
+@list |&gt; map sbranch |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-scale">
@@ -24594,6 +24650,14 @@ p @$p   # (4, 6)
 p scentroid($psd)   # brightness measure
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-schema">
+        <h3><a class="doc-anchor" href="#doc-schema">#</a> <code>schema</code></h3>
+        <p><code>schema</code> — ai primitives (docs/ai_primitives.md) builtin. Alias for <code>ai</code>.</p>
+        <pre><code class="lang-perl">my $result = schema $x 
+# or in a pipeline:
+@list |&gt; map schema |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-schwarz">
         <h3><a class="doc-anchor" href="#doc-schwarz">#</a> <code>schwarz</code></h3>
         <p><code>schwarzschild_radius($mass)</code> (alias <code>schwarz</code>) — event horizon radius rs = 2GM/c² of a black hole.</p>
@@ -24615,6 +24679,14 @@ p schwarz(5.972e24)   # ~0.009 m (Earth as black hole)
         <pre><code class="lang-perl">my $result = sdivs $x 
 # or in a pipeline:
 @list |&gt; map sdivs |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sdns">
+        <h3><a class="doc-anchor" href="#doc-sdns">#</a> <code>sdns</code></h3>
+        <p><code>sdns</code> — stress / telemetry extensions builtin. Alias for <code>stress_dns</code>.</p>
+        <pre><code class="lang-perl">my $result = sdns $x 
+# or in a pipeline:
+@list |&gt; map sdns |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sdx">
@@ -24788,6 +24860,14 @@ my @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <pre><code class="lang-perl">my $result = setservent $x 
 # or in a pipeline:
 @list |&gt; map setservent |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sfork">
+        <h3><a class="doc-anchor" href="#doc-sfork">#</a> <code>sfork</code></h3>
+        <p><code>sfork</code> — stress / telemetry extensions builtin. Alias for <code>stress_fork</code>.</p>
+        <pre><code class="lang-perl">my $result = sfork $x 
+# or in a pipeline:
+@list |&gt; map sfork |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sgnum">
@@ -25093,6 +25173,14 @@ f |&gt; map +{ _ =&gt; size } |&gt; tj |&gt; p   # [{name =&gt; bytes}, ...]
 f |&gt; filter { size &gt; 1024 } |&gt; e p    # files larger than 1 KiB
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sjson">
+        <h3><a class="doc-anchor" href="#doc-sjson">#</a> <code>sjson</code></h3>
+        <p><code>sjson</code> — stress / telemetry extensions builtin. Alias for <code>stress_json</code>.</p>
+        <pre><code class="lang-perl">my $result = sjson $x 
+# or in a pipeline:
+@list |&gt; map sjson |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-skew">
         <h3><a class="doc-anchor" href="#doc-skew">#</a> <code>skew</code></h3>
         <p><code>skew</code> — math / numeric (uncategorized batch) builtin. Alias for <code>skewness</code>.</p>
@@ -25243,6 +25331,14 @@ f |&gt; filter { size &gt; 1024 } |&gt; e p    # files larger than 1 KiB
         <pre><code class="lang-perl">my $result = smap $x 
 # or in a pipeline:
 @list |&gt; map smap |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-smmap">
+        <h3><a class="doc-anchor" href="#doc-smmap">#</a> <code>smmap</code></h3>
+        <p><code>smmap</code> — stress / telemetry extensions builtin. Alias for <code>stress_mmap</code>.</p>
+        <pre><code class="lang-perl">my $result = smmap $x 
+# or in a pipeline:
+@list |&gt; map smmap |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-smoothstep">
@@ -25526,6 +25622,14 @@ p spearman(\@x, \@y)   # high positive correlation
 @list |&gt; map speed_of_light |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-spew">
+        <h3><a class="doc-anchor" href="#doc-spew">#</a> <code>spew</code></h3>
+        <p><code>spew</code> — filesystem extensions builtin. Alias for <code>spurt</code>.</p>
+        <pre><code class="lang-perl">my $result = spew $x 
+# or in a pipeline:
+@list |&gt; map spew |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sphere-surface">
         <h3><a class="doc-anchor" href="#doc-sphere-surface">#</a> <code>sphere_surface</code></h3>
         <p><code>sphere_surface</code> — geometry / physics builtin.</p>
@@ -25718,12 +25822,28 @@ p spearman(\@x, \@y)   # high positive correlation
 @list |&gt; map squish |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sregex">
+        <h3><a class="doc-anchor" href="#doc-sregex">#</a> <code>sregex</code></h3>
+        <p><code>sregex</code> — stress / telemetry extensions builtin. Alias for <code>stress_regex</code>.</p>
+        <pre><code class="lang-perl">my $result = sregex $x 
+# or in a pipeline:
+@list |&gt; map sregex |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-srton">
         <h3><a class="doc-anchor" href="#doc-srton">#</a> <code>srton</code></h3>
         <p><code>srton</code> — haskell list functions builtin. Alias for <code>sort_on</code>.</p>
         <pre><code class="lang-perl">my $result = srton $x 
 # or in a pipeline:
 @list |&gt; map srton |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-ssort">
+        <h3><a class="doc-anchor" href="#doc-ssort">#</a> <code>ssort</code></h3>
+        <p><code>ssort</code> — stress / telemetry extensions builtin. Alias for <code>stress_sort</code>.</p>
+        <pre><code class="lang-perl">my $result = ssort $x 
+# or in a pipeline:
+@list |&gt; map ssort |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-stack-new">
@@ -25836,6 +25956,14 @@ p spearman(\@x, \@y)   # high positive correlation
         <pre><code class="lang-perl">my $result = step $x 
 # or in a pipeline:
 @list |&gt; map step |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sthread">
+        <h3><a class="doc-anchor" href="#doc-sthread">#</a> <code>sthread</code></h3>
+        <p><code>sthread</code> — stress / telemetry extensions builtin. Alias for <code>stress_thread</code>.</p>
+        <pre><code class="lang-perl">my $result = sthread $x 
+# or in a pipeline:
+@list |&gt; map sthread |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-stirling">
@@ -26762,6 +26890,14 @@ p $allowed-&gt;contains(&quot;foo&quot;)
 @list |&gt; map tomorrow |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-tools">
+        <h3><a class="doc-anchor" href="#doc-tools">#</a> <code>tools</code></h3>
+        <p><code>tools</code> — ai primitives (docs/ai_primitives.md) builtin. Alias for <code>ai</code>.</p>
+        <pre><code class="lang-perl">my $result = tools $x 
+# or in a pipeline:
+@list |&gt; map tools |&gt; p
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-top">
         <h3><a class="doc-anchor" href="#doc-top">#</a> <code>top</code></h3>
         <p><code>top</code> — pipeline / string helpers builtin.</p>
@@ -27177,6 +27313,14 @@ p trapz(\@y, 0.01)  # ≈ 0.3333
         <pre><code class="lang-perl">my $result = txbtwn $x 
 # or in a pipeline:
 @list |&gt; map txbtwn |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-type">
+        <h3><a class="doc-anchor" href="#doc-type">#</a> <code>type</code></h3>
+        <p><code>type</code> — misc / utility builtin. Alias for <code>type_of</code>.</p>
+        <pre><code class="lang-perl">my $result = type $x 
+# or in a pipeline:
+@list |&gt; map type |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-type-each">
