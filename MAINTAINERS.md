@@ -5,9 +5,11 @@ governance for stryke.
 
 This file describes the project's *current* governance and contribution
 flow. For original authorship and the historical record, see
-[CREATORS.md](CREATORS.md). Authority is fully with the maintainer team
-named here — the project is independent of its creator and no
-external party retains veto, direction-setting, or approval rights.
+[CREATORS.md](CREATORS.md). Day-to-day authority rests with the
+maintainer team named here. The creator retains final approval on
+major decisions to the official upstream (see Governance below);
+the MIT license guarantees the right to fork at any time without
+permission, in which case this governance does not apply.
 
 ## Current Maintainers
 
@@ -34,9 +36,10 @@ _To be populated when the maintainer team is assembled._
   existing scripts.
 
 Direction-setting (new language features, new primitives, new
-subsystems, breaking design changes) is also a maintainer
-responsibility — typically through an RFC or major-feature
-proposal process owned by the maintainer team.
+subsystems, breaking design changes) is proposed and developed
+by the maintainer team — typically through an RFC process —
+and submitted to the creator for final approval before landing
+on the official upstream. Forks are not bound by this step.
 
 ## Contributing
 
@@ -49,9 +52,22 @@ every push. PRs that touch the dispatch table must include
 ## Governance
 
 - Maintainers are added and removed by consensus of existing maintainers.
-- All project decisions — operational (CI, releases, labels) and
-  directional (language design, new primitives, breaking changes) —
-  are owned by the active maintainer team.
-- The creator has no ongoing authority over the project. Attribution
-  in [CREATORS.md](CREATORS.md) is historical record, not a governance
-  role.
+- **Operational decisions** (CI policy, issue labels, release cadence,
+  patch releases, bug fixes, new builtins that follow existing patterns,
+  performance work that preserves semantics, docs, tests) are
+  maintainer-only — no creator approval needed.
+- **Major decisions** (new language semantics, breaking compatibility
+  changes, removal of existing features, top-level architectural
+  pivots, license changes, governance changes to this document)
+  require final approval from the creator before landing on the
+  official upstream. The maintainer team owns the proposal,
+  development, and review; the creator's role is a yes/no on the
+  final shape.
+- The maintainer team may proceed without creator involvement on any
+  decision the creator declines to engage with within a reasonable
+  window (default: 30 days from formal proposal).
+- **Forks are unrestricted.** The MIT license guarantees the right to
+  fork the project at any time. This governance applies only to the
+  official upstream `strykelang` repository; forks are free to set
+  their own governance and proceed without creator approval on any
+  change.
