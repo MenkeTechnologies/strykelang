@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Monads/Maybe monad
+
+# In Stryke, we can represent 'Nothing' with undef.
+# The Maybe monad 'bind' (or 'flat_map') handles undef by short-circuiting.
+
+fn Rosetta::MaybeMonad::bind($val, $func) {
+    if (!defined $val) {
+        return undef
+    }
+    $func->($val)
+}
+
+# Example operations
+fn Rosetta::MaybeMonad::safe_div($x, $y) {
+    if ($y == 0) { return undef }
+    $x / $y
+}
+
+fn Rosetta::MaybeMonad::safe_sqrt($x) {
+    if ($x < 0) { return undef }
+    sqrt($x)
+}
+
+# Calculation: sqrt(x / y)
+fn Rosetta::MaybeMonad::calc($x, $y) {
+    my $res1 = Rosetta::MaybeMonad::safe_div($x, $y)
+    
+    # Using bind logic
+    Rosetta::MaybeMonad::bind($res1, fn { Rosetta::MaybeMonad::safe_sqrt($_[0]) })
+}
+
+# Test cases
+my $v1 = Rosetta::MaybeMonad::calc(100, 4)
+assert_eq $v1, 5, "sqrt(100/4) = 5"
+
+my $v2 = Rosetta::MaybeMonad::calc(100, 0)
+assert_ok !defined($v2), "sqrt(100/0) is undef"
+
+my $v3 = Rosetta::MaybeMonad::calc(-100, 4)
+assert_ok !defined($v3), "sqrt(-100/4) is undef"
+
+test_run

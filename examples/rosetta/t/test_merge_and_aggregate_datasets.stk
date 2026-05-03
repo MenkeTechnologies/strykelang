@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Merge and aggregate datasets
+
+fn Rosetta::MergeAggregate::process($patients, $visits) {
+    # 1. Join
+    my %patient_map
+    for my $p (@$patients) {
+        $patient_map{$p->{id}} = $p
+    }
+    
+    my %agg
+    for my $v (@$visits) {
+        my $id = $v->{id}
+        my $score = $v->{score}
+        
+        if (!exists $agg{$id}) {
+            $agg{$id} = {
+                id => $id,
+                name => $patient_map{$id}->{last_name},
+                visits => 0,
+                sum => 0.0
+            }
+        }
+        $agg{$id}->{visits}++
+        $agg{$id}->{sum} += $score
+    }
+    
+    # 2. Aggregate (calculate average)
+    my @results
+    for my $id (sort { $a <=> $b } keys %agg) {
+        my $data = $agg{$id}
+        my $avg = $data->{sum} / $data->{visits}
+        push @results, {
+            id => $id,
+            name => $data->{name},
+            visits => $data->{visits},
+            avg => $avg
+        }
+    }
+    \@results
+}
+
+my $patients = [
+    { id => 1001, last_name => "Hopper" },
+    { id => 4004, last_name => "Wirth" },
+    { id => 3003, last_name => "Kemeny" },
+    { id => 2002, last_name => "Gosling" },
+    { id => 5005, last_name => "Knuth" }
+]
+
+my $visits = [
+    { id => 2002, date => "2020-09-10", score => 6.8 },
+    { id => 1001, date => "2020-09-17", score => 5.5 },
+    { id => 4004, date => "2020-09-24", score => 8.4 },
+    { id => 2002, date => "2020-10-08", score => 0.0 }, # Note: missing score might be 0, assuming 0 here
+    { id => 1001, date => "2020-10-15", score => 6.6 },
+    { id => 3003, date => "2020-10-22", score => 7.3 }
+]
+
+my $res = Rosetta::MergeAggregate::process($patients, $visits)
+
+assert_eq len(@$res), 4, "4 patients had visits"
+assert_eq $res->[0]->{name}, "Hopper", "First patient Hopper"
+assert_ok abs($res->[0]->{avg} - 6.05) < 0.001, "Hopper avg 6.05"
+assert_eq $res->[1]->{name}, "Gosling", "Second patient Gosling"
+assert_ok abs($res->[1]->{avg} - 3.4) < 0.001, "Gosling avg 3.4"
+
+test_run

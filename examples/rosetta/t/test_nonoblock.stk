@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Nonoblock
+
+fn Rosetta::Nonoblock::gen($lengths, $cells) {
+    my $sum_len = 0
+    for my $l (@$lengths) { $sum_len += $l }
+    my $num_blocks = len(@$lengths)
+    
+    # Minimum space needed: blocks + (num_blocks - 1) gaps
+    my $min_space = $sum_len + $num_blocks - 1
+    return ([]) if $min_space > $cells
+    
+    Rosetta::Nonoblock::recurse($lengths, $cells, 0)
+}
+
+fn Rosetta::Nonoblock::recurse($lengths, $cells, $idx) {
+    if ($idx == len(@$lengths)) {
+        return ("0" x $cells)
+    }
+    
+    my $l = $lengths->[$idx]
+    my @res
+    
+    # Try all starting positions for current block
+    my $rem_sum = 0
+    for (my $j = $idx + 1; $j < len(@$lengths); $j++) {
+        $rem_sum += $lengths->[$j] + 1
+    }
+    
+    for (my $start = 0; $start <= $cells - $l - $rem_sum; $start++) {
+        my $prefix = ("0" x $start) . ("1" x $l)
+        
+        my $next_cells = $cells - length($prefix)
+        if ($idx < len(@$lengths) - 1) {
+            $prefix .= "0"
+            $next_cells--
+        }
+        
+        my @suffixes = Rosetta::Nonoblock::recurse($lengths, $next_cells, $idx + 1)
+        for my $s (@suffixes) {
+            push @res, $prefix . $s
+        }
+    }
+    @res
+}
+
+# Example: lengths [2, 1], cells 5
+my @res = Rosetta::Nonoblock::gen([2, 1], 5)
+
+assert_eq len(@res), 3, "Lengths [2, 1] in 5 cells has 3 possibilities"
+assert_ok len(grep { _ eq "11010" } @res) > 0, "Contains 11010"
+assert_ok len(grep { _ eq "11001" } @res) > 0, "Contains 11001"
+assert_ok len(grep { _ eq "01101" } @res) > 0, "Contains 01101"
+
+test_run

@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Idiomatically determine all the characters that can be used for symbols
+
+fn Rosetta::IdiomSymbols::get_symbols() {
+    # In Stryke/Perl-like languages, symbols (identifiers) usually start with
+    # a letter or underscore, and can contain digits.
+    # The task asks for all characters that can be used.
+    
+    ~> 0:127 grep { 
+        my $c = chr(_); 
+        $c =~ /[a-zA-Z0-9_]/ 
+    } map { chr(_) } |> join ""
+}
+
+fn Rosetta::IdiomSymbols::is_symbol_char($c) {
+    $c =~ /^[a-zA-Z0-9_]$/
+}
+
+my $syms = Rosetta::IdiomSymbols::get_symbols()
+# p "Symbols: $syms"
+
+assert_ok index($syms, "a") != -1, "a is symbol char"
+assert_ok index($syms, "Z") != -1, "Z is symbol char"
+assert_ok index($syms, "0") != -1, "0 is symbol char"
+assert_ok index($syms, "_") != -1, "_ is symbol char"
+assert_ok index($syms, "!") == -1, "! is not symbol char"
+
+test_run

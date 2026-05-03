@@ -1,0 +1,14 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Shell one-liner
+
+fn Rosetta::ShellOneLiner::demo() {
+    # Task: Execute a command from the shell that performs a simple action.
+    # In Stryke, we can use qx{} or backticks.
+    
+    my $res = `stryke -e 'print "Hello from one-liner\n"'` |> trim
+    $res
+}
+
+assert_eq Rosetta::ShellOneLiner::demo(), "Hello from one-liner", "One-liner executed via shell"
+
+test_run

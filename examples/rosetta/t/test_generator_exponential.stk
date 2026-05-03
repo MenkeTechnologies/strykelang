@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Generator/Exponential
+
+# A generator of powers of $m
+fn Rosetta::GenExp::power_gen($m) {
+    my $n = 0
+    fn {
+        my $res = $m ** $n
+        $n++
+        $res
+    }
+}
+
+# Instead of actual infinite generators for squares and cubes which the RC task asks,
+# the standard RC task "Generator/Exponential" usually generates a sequence
+# by yielding.
+# We can create a sequence generator from a function.
+fn Rosetta::GenExp::seq_gen($func) {
+    my $n = 0
+    fn {
+        my $res = $func->($n)
+        $n++
+        $res
+    }
+}
+
+# A filter generator that takes an input generator and filters it
+# based on a stream of values to exclude (like cubes)
+# The RC task specifically says:
+# Create a generator of squares. Create a generator of cubes.
+# Filter squares to remove those that are also cubes.
+
+fn Rosetta::GenExp::filter_gen($gen_squares, $gen_cubes) {
+    my $curr_cube = $gen_cubes->()
+    fn {
+        while (1) {
+            my $s = $gen_squares->()
+            while ($curr_cube < $s) {
+                $curr_cube = $gen_cubes->()
+            }
+            if ($s != $curr_cube) {
+                return $s
+            }
+        }
+    }
+}
+
+my $squares = Rosetta::GenExp::seq_gen(fn { $_[0] ** 2 })
+my $cubes   = Rosetta::GenExp::seq_gen(fn { $_[0] ** 3 })
+
+my $filtered = Rosetta::GenExp::filter_gen($squares, $cubes)
+
+# Filter out 6th powers (0, 1, 64...)
+# Squares: 0, 1, 4, 9, 16, 25, 36, 49, 64, 81...
+# Cubes: 0, 1, 8, 27, 64, 125...
+# Filtered should be: 4, 9, 16, 25, 36, 49, 81... (0, 1, 64 removed)
+
+my @res
+for (1..7) {
+    push @res, $filtered->()
+}
+
+assert_eq $res[0], 4, "1st filtered is 4"
+assert_eq $res[1], 9, "2nd is 9"
+assert_eq $res[2], 16, "3rd is 16"
+assert_eq $res[3], 25, "4th is 25"
+assert_eq $res[4], 36, "5th is 36"
+assert_eq $res[5], 49, "6th is 49"
+assert_eq $res[6], 81, "7th is 81"
+
+test_run

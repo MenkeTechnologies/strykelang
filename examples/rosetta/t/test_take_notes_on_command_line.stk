@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Take notes on the command line
+
+fn Rosetta::TakeNotes::add_note($file, $note) {
+    # Append the note to the file with a newline
+    open my $fh, '>>', $file or die "Could not open $file"
+    print $fh "$note\n"
+    close $fh
+}
+
+fn Rosetta::TakeNotes::read_notes($file) {
+    # Read all notes from the file
+    my $content = slurp($file)
+    $content
+}
+
+# Test
+my $tmp_file = "/tmp/stryke_notes_test.txt"
+if (-f $tmp_file) {
+    unlink $tmp_file
+}
+
+# Add some notes
+Rosetta::TakeNotes::add_note($tmp_file, "First note")
+Rosetta::TakeNotes::add_note($tmp_file, "Second note about Stryke")
+
+# Read them back
+my $notes = Rosetta::TakeNotes::read_notes($tmp_file)
+
+assert_ok index($notes, "First note") != -1, "First note was recorded"
+assert_ok index($notes, "Second note") != -1, "Second note was recorded"
+assert_ok index($notes, "\n") != -1, "Notes have newlines"
+
+# Clean up
+unlink $tmp_file
+
+test_run

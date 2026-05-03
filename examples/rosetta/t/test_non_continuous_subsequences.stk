@@ -1,0 +1,82 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Non-continuous subsequences
+
+fn Rosetta::NonContig::get_subsequences(@items) {
+    my $n = len(@items)
+    my @res
+    # Power set using bitmask
+    for my $i (1 .. (2**$n - 1)) {
+        my @sub
+        for my $j (0 .. $n - 1) {
+            if (($i >> $j) & 1) {
+                push @sub, $items[$j]
+            }
+        }
+        push @res, \@sub
+    }
+    @res
+}
+
+fn Rosetta::NonContig::get_indices_subsequences($n) {
+    my @indices = 0 .. $n - 1
+    my @res
+    for my $i (1 .. (2**$n - 1)) {
+        my @idx_sub
+        for my $j (0 .. $n - 1) {
+            if (($i >> $j) & 1) {
+                push @idx_sub, $j
+            }
+        }
+        push @res, \@idx_sub
+    }
+    @res
+}
+
+fn Rosetta::NonContig::is_contiguous($idx_sub_ref) {
+    my @indices = @$idx_sub_ref
+    return 1 if len(@indices) <= 1
+    
+    # Check if they form a contiguous range: i, i+1, i+2...
+    for my $i (0 .. len(@indices) - 2) {
+        if ($indices[$i+1] != $indices[$i] + 1) {
+            return 0
+        }
+    }
+    1
+}
+
+fn Rosetta::NonContig::solve(@items) {
+    my $n = len(@items)
+    my @all_idx_subs = Rosetta::NonContig::get_indices_subsequences($n)
+    
+    my @non_contig
+    for my $idx_sub (@all_idx_subs) {
+        if (!Rosetta::NonContig::is_contiguous($idx_sub)) {
+            my @val_sub
+            for my $i (@$idx_sub) { push @val_sub, $items[$i] }
+            push @non_contig, \@val_sub
+        }
+    }
+    @non_contig
+}
+
+# Example [1, 2, 3]
+# Continuous: [1], [2], [3], [1,2], [2,3], [1,2,3]
+# Non-continuous: [1,3]
+my @res3 = Rosetta::NonContig::solve(1, 2, 3)
+assert_eq len(@res3), 1, "n=3 has 1 non-contig subseq"
+assert_eq join(",", @{$res3[0]}), "1,3", "[1,3] is non-contig"
+
+# Example [1, 2, 3, 4]
+my @res4 = Rosetta::NonContig::solve(1, 2, 3, 4)
+# Total subs: 2^4 - 1 = 15
+# Contiguous:
+# len 1: [1], [2], [3], [4] (4)
+# len 2: [1,2], [2,3], [3,4] (3)
+# len 3: [1,2,3], [2,3,4] (2)
+# len 4: [1,2,3,4] (1)
+# Total contig: 4+3+2+1 = 10
+# Non-contig: 15 - 10 = 5
+assert_eq len(@res4), 5, "n=4 has 5 non-contig subseqs"
+
+test_run

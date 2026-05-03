@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Forest Fire
+
+fn Rosetta::ForestFire::step($grid, $p, $f) {
+    my $rows = len(@$grid)
+    my $cols = len(@{$grid->[0]})
+    
+    # State: 0 = Empty, 1 = Tree, 2 = Fire
+    
+    # Use pmap (~> map) for row updates to follow idiomatic stryke patterns
+    ~> 0..($rows - 1) map {
+        my $r = _
+        my @new_row
+        for my $c (0..($cols - 1)) {
+            my $cell = $grid->[$r][$c]
+            if ($cell == 2) {
+                # 1. Any burning cell turns into an empty cell
+                $new_row[$c] = 0
+            } elsif ($cell == 1) {
+                # 2. Any tree will burn if at least one neighbor is burning
+                my $on_fire = 0
+                for my $dr (-1..1) {
+                    for my $dc (-1..1) {
+                        next if $dr == 0 && $dc == 0
+                        my $nr = $r + $dr
+                        my $nc = $c + $dc
+                        if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
+                            if ($grid->[$nr][$nc] == 2) { $on_fire = 1 }
+                        }
+                    }
+                }
+                # 3. A tree ignites with probability f even if no neighbor is burning
+                if ($on_fire || rand() < $f) {
+                    $new_row[$c] = 2
+                } else {
+                    $new_row[$c] = 1
+                }
+            } else {
+                # 4. Any empty cell fills with a tree with probability p
+                $new_row[$c] = (rand() < $p ? 1 : 0)
+            }
+        }
+        \@new_row
+    }
+}
+
+# Test specific scenarios
+# A tree surrounded by empty cells and no lightning should stay a tree
+my $grid1 = [[0, 0, 0], [0, 1, 0], [0, 0, 0]]
+my $next1 = Rosetta::ForestFire::step($grid1, 0.0, 0.0)
+assert_eq $next1->[1][1], 1, "Tree remains tree if no fire/lightning"
+
+# A tree next to a fire should ignite
+my $grid2 = [[0, 2, 0], [0, 1, 0], [0, 0, 0]]
+my $next2 = Rosetta::ForestFire::step($grid2, 0.0, 0.0)
+assert_eq $next2->[1][1], 2, "Tree ignites if neighbor is fire"
+
+# A fire should become empty
+my $next2_fire = $next2->[0][1]
+assert_eq $next2->[0][1], 0, "Fire becomes empty"
+
+# Empty cell with p=1 should become tree
+my $grid3 = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+my $next3 = Rosetta::ForestFire::step($grid3, 1.0, 0.0)
+assert_eq $next3->[1][1], 1, "Empty becomes tree with p=1"
+
+test_run

@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Horse racing
+
+fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
+    my @horses
+    for (0 .. $num_horses - 1) {
+        push @horses, { id => _, pos => 0 }
+    }
+    
+    my $winner = -1
+    while ($winner == -1) {
+        # Parallel update of positions? 
+        # Using ~> map to simulate movement in parallel turns
+        @horses = ~> @horses map {
+            my $h = _
+            $h->{pos} += int(rand(5)) + 1 # move 1-5 units
+            $h
+        }
+        
+        # Check for winners
+        for my $h (@horses) {
+            if ($h->{pos} >= $track_length) {
+                $winner = $h->{id}
+                last
+            }
+        }
+    }
+    $winner
+}
+
+my $win = Rosetta::HorseRacing::simulate(5, 50)
+assert_ok $win >= 0 && $win < 5, "Winner is one of the horses"
+
+test_run

@@ -1,0 +1,50 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Menu
+
+# The function receives an array of strings, and a mock input function.
+# It returns the selected string, prompting until a valid choice is made.
+fn Rosetta::Menu::select($items, $mock_inputs) {
+    if (len(@$items) == 0) { return "" }
+    
+    my $input_idx = 0
+    while (1) {
+        # 1. Print menu
+        for my $i (0 .. len(@$items) - 1) {
+            my $num = $i + 1
+            # print "$num. $items->[$i]\n"
+        }
+        # print "Choice: "
+        
+        # 2. Get input
+        if ($input_idx >= len(@$mock_inputs)) {
+            return "" # out of mock inputs
+        }
+        my $choice = $mock_inputs->[$input_idx]
+        $input_idx++
+        
+        # 3. Validate
+        if ($choice =~ /^\d+$/) {
+            my $idx = int($choice) - 1
+            if ($idx >= 0 && $idx < len(@$items)) {
+                return $items->[$idx]
+            }
+        }
+        # print "Invalid choice, please try again.\n"
+    }
+}
+
+my @items = ("fee fie", "huff and puff", "mirror mirror", "tick tock")
+
+# Test 1: Valid choice immediately
+my $res1 = Rosetta::Menu::select(\@items, ["2"])
+assert_eq $res1, "huff and puff", "Selects the second item"
+
+# Test 2: Invalid choices then valid
+my $res2 = Rosetta::Menu::select(\@items, ["", "0", "5", "abc", "3"])
+assert_eq $res2, "mirror mirror", "Handles invalid inputs and eventually selects the third item"
+
+# Test 3: Empty items
+my $res3 = Rosetta::Menu::select([], ["1"])
+assert_eq $res3, "", "Returns empty string if items array is empty"
+
+test_run

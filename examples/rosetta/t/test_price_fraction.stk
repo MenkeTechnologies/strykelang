@@ -1,0 +1,41 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Price fraction
+
+fn Rosetta::PriceFraction::gcd($a, $b) {
+    while ($b) {
+        ($a, $b) = ($b, $a % $b)
+    }
+    $a
+}
+
+fn Rosetta::PriceFraction::to_mixed($decimal) {
+    my $whole = int($decimal)
+    my $frac_dec = $decimal - $whole
+    
+    return "$whole" if $frac_dec == 0
+    
+    # Simple conversion using 10^n as denominator
+    # For common prices, we usually want specific denominators like 2, 4, 8, 16, 32.
+    # Let's try to find the simplest fraction.
+    
+    # Approximation for precision
+    my $denom = 1000000
+    my $num = int($frac_dec * $denom + 0.5)
+    
+    my $common = Rosetta::PriceFraction::gcd($num, $denom)
+    $num /= $common
+    $denom /= $common
+    
+    if ($whole == 0) {
+        return "$num/$denom"
+    } else {
+        return "$whole $num/$denom"
+    }
+}
+
+assert_eq Rosetta::PriceFraction::to_mixed(1.25), "1 1/4", "1.25 -> 1 1/4"
+assert_eq Rosetta::PriceFraction::to_mixed(0.5), "1/2", "0.5 -> 1/2"
+assert_eq Rosetta::PriceFraction::to_mixed(3.125), "3 1/8", "3.125 -> 3 1/8"
+assert_eq Rosetta::PriceFraction::to_mixed(2.0), "2", "2.0 -> 2"
+
+test_run

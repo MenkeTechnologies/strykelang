@@ -1,0 +1,25 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Named parameters
+
+fn Rosetta::NamedParams::print_name(%args) {
+    my $first = exists $args{first} ? $args{first} : "Unknown"
+    my $last  = exists $args{last}  ? $args{last}  : "Stranger"
+    "$first $last"
+}
+
+# In Stryke, passing a hash to a function with %args signature
+# automatically slurps key-value pairs.
+
+my $res1 = Rosetta::NamedParams::print_name(first => "John", last => "Doe")
+assert_eq $res1, "John Doe", "Passed both parameters"
+
+my $res2 = Rosetta::NamedParams::print_name(first => "Jane")
+assert_eq $res2, "Jane Stranger", "Passed only first parameter"
+
+my $res3 = Rosetta::NamedParams::print_name(last => "Smith")
+assert_eq $res3, "Unknown Smith", "Passed only last parameter"
+
+my $res4 = Rosetta::NamedParams::print_name()
+assert_eq $res4, "Unknown Stranger", "Passed no parameters"
+
+test_run
