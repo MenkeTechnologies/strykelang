@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Particle fountain
+
+fn Rosetta::Fountain::step($particles, $gravity) {
+    my @next
+    for my $p (@$particles) {
+        my $vx = $p->{vx}
+        my $vy = $p->{vy} + $gravity
+        push @next, { x => $p->{x} + $vx, y => $p->{y} + $vy, vx => $vx, vy => $vy }
+    }
+    \@next
+}
+
+my @particles = (
+    { x => 0, y => 0, vx => 1, vy => -3 },
+    { x => 0, y => 0, vx => -1, vy => -2 },
+)
+my $next = Rosetta::Fountain::step(\@particles, 1)
+
+assert_eq "$next->[0]{x},$next->[0]{y}", "1,-2", "first particle advances with gravity"
+assert_eq "$next->[1]{x},$next->[1]{y}", "-1,-1", "second particle advances with gravity"
+
+test_run

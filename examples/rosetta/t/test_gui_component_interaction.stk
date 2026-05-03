@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: GUI component interaction
+
+fn Rosetta::GUIInteract::app() {
+    { input => "", label => "", clicks => 0 }
+}
+
+fn Rosetta::GUIInteract::type_text($app, $text) {
+    $app->{input} = $text
+}
+
+fn Rosetta::GUIInteract::click_copy($app) {
+    $app->{label} = $app->{input}
+    $app->{clicks}++
+}
+
+my $app = Rosetta::GUIInteract::app()
+Rosetta::GUIInteract::type_text($app, "Rosetta")
+Rosetta::GUIInteract::click_copy($app)
+
+assert_eq $app->{label}, "Rosetta", "button click transfers textbox into label"
+assert_eq $app->{clicks}, 1, "click count increments"
+
+test_run

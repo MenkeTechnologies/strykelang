@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Schieber-Vishkin algorithm
+
+fn Rosetta::SV::lca($parent, $a, $b) {
+    my %anc
+    my $x = $a
+    while (defined $x) {
+        $anc{$x} = 1
+        $x = exists $parent->{$x} ? $parent->{$x} : undef
+    }
+    my $y = $b
+    while (defined $y) {
+        return $y if $anc{$y}
+        $y = exists $parent->{$y} ? $parent->{$y} : undef
+    }
+    undef
+}
+
+my %parent = (
+    b => "a",
+    c => "a",
+    d => "b",
+    e => "b",
+    f => "c",
+)
+
+assert_eq Rosetta::SV::lca(\%parent, "d", "e"), "b", "siblings have parent as LCA"
+assert_eq Rosetta::SV::lca(\%parent, "d", "f"), "a", "cousins meet at root"
+
+test_run

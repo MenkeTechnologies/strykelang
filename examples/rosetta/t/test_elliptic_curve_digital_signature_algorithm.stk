@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Elliptic Curve Digital Signature Algorithm
+
+fn Rosetta::ECDSA::inv($a, $n) {
+    my $x = $a % $n
+    $x += $n if $x < 0
+    for my $i (1 .. $n - 1) {
+        return $i if (($x * $i) % $n) == 1
+    }
+    0
+}
+
+fn Rosetta::ECDSA::add($p, $q, $a, $mod) {
+    return $q if !defined $p
+    return $p if !defined $q
+    if ($p->[0] == $q->[0] && (($p->[1] + $q->[1]) % $mod) == 0) { return undef }
+
+    my $m
+    if ($p->[0] == $q->[0] && $p->[1] == $q->[1]) {
+        $m = ((3 * $p->[0] * $p->[0] + $a) * Rosetta::ECDSA::inv(2 * $p->[1], $mod)) % $mod
+    } else {
+        $m = (($q->[1] - $p->[1]) * Rosetta::ECDSA::inv($q->[0] - $p->[0], $mod)) % $mod
+    }
+    $m += $mod if $m < 0
+    my $x = (($m * $m) - $p->[0] - $q->[0]) % $mod
+    $x += $mod if $x < 0
+    my $y = ($m * ($p->[0] - $x) - $p->[1]) % $mod
+    $y += $mod if $y < 0
+    my @pt = ($x, $y)
+    \@pt
+}
+
+fn Rosetta::ECDSA::mul($k, $p, $a, $mod) {
+    my $res = undef
+    my $cur = $p
+    my $n = $k
+    while ($n > 0) {
+        $res = Rosetta::ECDSA::add($res, $cur, $a, $mod) if ($n % 2) == 1
+        $cur = Rosetta::ECDSA::add($cur, $cur, $a, $mod)
+        $n = int($n / 2)
+    }
+    $res
+}
+
+fn Rosetta::ECDSA::sign($z, $priv, $k) {
+    my $g = [5, 1]
+    my $r_pt = Rosetta::ECDSA::mul($k, $g, 2, 17)
+    my $r = $r_pt->[0] % 19
+    my $s = (Rosetta::ECDSA::inv($k, 19) * ($z + ($r * $priv))) % 19
+    my @sig = ($r, $s)
+    \@sig
+}
+
+fn Rosetta::ECDSA::verify($z, $pub, $sig) {
+    my $g = [5, 1]
+    my $w = Rosetta::ECDSA::inv($sig->[1], 19)
+    my $u1 = ($z * $w) % 19
+    my $u2 = ($sig->[0] * $w) % 19
+    my $pt = Rosetta::ECDSA::add(
+        Rosetta::ECDSA::mul($u1, $g, 2, 17),
+        Rosetta::ECDSA::mul($u2, $pub, 2, 17),
+        2,
+        17,
+    )
+    ($pt->[0] % 19) == $sig->[0] ? 1 : 0
+}
+
+my $priv = 7
+my $pub = Rosetta::ECDSA::mul($priv, [5, 1], 2, 17)
+my $sig = Rosetta::ECDSA::sign(9, $priv, 1)
+
+assert_eq join(",", @$sig), "5,6", "toy-curve signature is stable"
+assert_eq Rosetta::ECDSA::verify(9, $pub, $sig), 1, "signature verifies against matching public key"
+assert_eq Rosetta::ECDSA::verify(8, $pub, $sig), 0, "changed message hash fails verification"
+
+test_run

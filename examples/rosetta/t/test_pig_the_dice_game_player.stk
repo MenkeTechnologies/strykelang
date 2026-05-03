@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pig the dice game/Player
+
+fn Rosetta::Pig::choose($score, $turn_total, $opponent) {
+    return "hold" if $score + $turn_total >= 100
+    return "hold" if $turn_total >= 20
+    return "hold" if $score > $opponent && $turn_total >= 15
+    "roll"
+}
+
+assert_eq Rosetta::Pig::choose(70, 20, 65), "hold", "player banks 20 points"
+assert_eq Rosetta::Pig::choose(92, 8, 50), "hold", "player banks winning turn"
+assert_eq Rosetta::Pig::choose(60, 15, 40), "hold", "leader plays slightly safer"
+assert_eq Rosetta::Pig::choose(40, 12, 50), "roll", "player keeps rolling below threshold"
+
+test_run

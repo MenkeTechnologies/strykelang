@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Punched cards
+
+fn Rosetta::PunchedCard::render($text) {
+    my @rows
+    for my $bit (7, 6, 5, 4, 3, 2, 1, 0) {
+        my @chars
+        for my $ch (split //, $text) {
+            my $code = ord($ch)
+            push @chars, (($code >> $bit) & 1) ? "o" : "."
+        }
+        push @rows, join("", @chars)
+    }
+    \@rows
+}
+
+my $rows = Rosetta::PunchedCard::render("AB")
+
+assert_eq len(@$rows), 8, "8 punch rows for ASCII byte"
+assert_eq $rows->[1], "oo", "second row has both 64-bit punches"
+assert_eq join(",", @$rows), "..,oo,..,..,..,..,.o,o.", "rendered punch pattern"
+assert_eq len(split //, $rows->[0]), 2, "one card column per character"
+
+test_run

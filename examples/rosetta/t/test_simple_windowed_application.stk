@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Simple windowed application
+
+fn Rosetta::SimpleApp::new() {
+    { title => "Hello", clicks => 0, label => "Ready" }
+}
+
+fn Rosetta::SimpleApp::click($app) {
+    $app->{clicks}++
+    $app->{label} = "Clicked $app->{clicks}"
+}
+
+my $app = Rosetta::SimpleApp::new()
+Rosetta::SimpleApp::click($app)
+Rosetta::SimpleApp::click($app)
+
+assert_eq $app->{title}, "Hello", "window title initialized"
+assert_eq $app->{clicks}, 2, "button clicks counted"
+assert_eq $app->{label}, "Clicked 2", "label updated from click handler"
+
+test_run

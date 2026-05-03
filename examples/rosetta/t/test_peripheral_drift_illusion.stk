@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Peripheral drift illusion
+
+fn Rosetta::Drift::render() {
+    my @rows = (
+        '  oO@Oo  ',
+        ' o@..@o ',
+        'O..@@..O',
+        ' o@..@o ',
+        '  oO@Oo  ',
+    )
+    \@rows
+}
+
+my $illusion = Rosetta::Drift::render()
+
+assert_eq len(@$illusion), 5, "illusion uses five rows"
+assert_eq $illusion->[2], "O..@@..O", "center band rendered"
+assert_eq substr($illusion->[0], 4, 1), "@", "high-contrast markers present"
+
+test_run

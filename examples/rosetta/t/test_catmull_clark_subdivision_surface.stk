@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Catmull–Clark subdivision surface
+
+fn Rosetta::CatmullClark::face_center($face) {
+    my ($sx, $sy) = (0, 0)
+    for my $p (@$face) {
+        $sx += $p->[0]
+        $sy += $p->[1]
+    }
+    [ $sx / len(@$face), $sy / len(@$face) ]
+}
+
+fn Rosetta::CatmullClark::edge_centers($face) {
+    my @edges
+    for my $i (0 .. len(@$face) - 1) {
+        my $a = $face->[$i]
+        my $b = $face->[($i + 1) % len(@$face)]
+        push @edges, [ ($a->[0] + $b->[0]) / 2, ($a->[1] + $b->[1]) / 2 ]
+    }
+    \@edges
+}
+
+my $face = [[0, 0], [2, 0], [2, 2], [0, 2]]
+my $center = Rosetta::CatmullClark::face_center($face)
+my $edges = Rosetta::CatmullClark::edge_centers($face)
+
+assert_eq join(",", @$center), "1,1", "face center computed"
+assert_eq len(@$edges), 4, "quad yields four edge centers"
+assert_eq join(",", @{$edges->[0]}), "1,0", "first edge midpoint computed"
+
+test_run

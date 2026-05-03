@@ -1,0 +1,46 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rendezvous
+
+fn Rosetta::Rendezvous::printer($name, $reserve) {
+    { name => $name, reserve => $reserve, ink => 5, log => [] }
+}
+
+fn Rosetta::Rendezvous::print_line($printer, $line) {
+    if ($printer->{ink} <= 0) {
+        if (defined $printer->{reserve}) {
+            return Rosetta::Rendezvous::print_line($printer->{reserve}, $line)
+        }
+        die "Out_Of_Ink"
+    }
+    my $rendered = ""
+    for my $ch (split //, $line) { $rendered .= $ch }
+    push @{$printer->{log}}, $printer->{name} . ":" . $rendered
+    $printer->{ink}--
+    $rendered
+}
+
+fn Rosetta::Rendezvous::run($printer, $lines1, $lines2) {
+    my @out
+    while (len(@$lines1) > 0 || len(@$lines2) > 0) {
+        push @out, Rosetta::Rendezvous::print_line($printer, shift(@$lines1)) if len(@$lines1) > 0
+        push @out, Rosetta::Rendezvous::print_line($printer, shift(@$lines2)) if len(@$lines2) > 0
+    }
+    \@out
+}
+
+my $reserve = Rosetta::Rendezvous::printer("reserve", undef)
+my $main = Rosetta::Rendezvous::printer("main", $reserve)
+my @a = ("a1", "a2", "a3", "a4", "a5")
+my @b = ("b1", "b2", "b3", "b4", "b5")
+my $printed = Rosetta::Rendezvous::run($main, \@a, \@b)
+
+assert_eq len(@$printed), 10, "ten lines printed before ink runs out"
+assert_eq len(@{$main->{log}}), 5, "main printer used for first five lines"
+assert_eq len(@{$reserve->{log}}), 5, "reserve printer used after redirect"
+
+my $caught = 0
+eval { Rosetta::Rendezvous::print_line($main, "overflow") }
+if ($@) { $caught = 1 }
+assert_eq $caught, 1, "out of ink propagates to caller"
+
+test_run

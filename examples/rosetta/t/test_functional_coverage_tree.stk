@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Functional coverage tree
+
+fn Rosetta::Coverage::node($name, $weight, $coverage, $children) {
+    { name => $name, weight => $weight, coverage => $coverage, children => $children || [] }
+}
+
+fn Rosetta::Coverage::score($node) {
+    my $children = $node->{children}
+    if (len(@$children) == 0) {
+        return defined($node->{coverage}) ? $node->{coverage} : 0.0
+    }
+
+    my $num = 0.0
+    my $den = 0.0
+    for my $child (@$children) {
+        my $w = defined($child->{weight}) ? $child->{weight} : 1.0
+        $num += $w * Rosetta::Coverage::score($child)
+        $den += $w
+    }
+    $den == 0 ? 0.0 : $num / $den
+}
+
+fn Rosetta::Coverage::sample_tree() {
+    Rosetta::Coverage::node("cleaning", undef, undef, [
+        Rosetta::Coverage::node("house1", 40, undef, [
+            Rosetta::Coverage::node("bedrooms", undef, 0.25),
+            Rosetta::Coverage::node("bathrooms", undef, undef, [
+                Rosetta::Coverage::node("bathroom1", undef, 0.5),
+                Rosetta::Coverage::node("bathroom2", undef, undef),
+                Rosetta::Coverage::node("outside_lavatory", undef, 1.0),
+            ]),
+            Rosetta::Coverage::node("attic", undef, 0.75),
+            Rosetta::Coverage::node("kitchen", undef, 0.1),
+            Rosetta::Coverage::node("living_rooms", undef, undef, [
+                Rosetta::Coverage::node("lounge", undef, undef),
+                Rosetta::Coverage::node("dining_room", undef, undef),
+                Rosetta::Coverage::node("conservatory", undef, undef),
+                Rosetta::Coverage::node("playroom", undef, 1.0),
+            ]),
+            Rosetta::Coverage::node("basement", undef, undef),
+            Rosetta::Coverage::node("garage", undef, undef),
+            Rosetta::Coverage::node("garden", undef, 0.8),
+        ]),
+        Rosetta::Coverage::node("house2", 60, undef, [
+            Rosetta::Coverage::node("upstairs", undef, undef, [
+                Rosetta::Coverage::node("bedrooms", undef, undef, [
+                    Rosetta::Coverage::node("suite_1", undef, undef),
+                    Rosetta::Coverage::node("suite_2", undef, undef),
+                    Rosetta::Coverage::node("bedroom_3", undef, undef),
+                    Rosetta::Coverage::node("bedroom_4", undef, undef),
+                ]),
+                Rosetta::Coverage::node("bathroom", undef, undef),
+                Rosetta::Coverage::node("toilet", undef, undef),
+                Rosetta::Coverage::node("attics", undef, 0.6),
+            ]),
+            Rosetta::Coverage::node("groundfloor", undef, undef, [
+                Rosetta::Coverage::node("kitchen", undef, undef),
+                Rosetta::Coverage::node("living_rooms", undef, undef, [
+                    Rosetta::Coverage::node("lounge", undef, undef),
+                    Rosetta::Coverage::node("dining_room", undef, undef),
+                    Rosetta::Coverage::node("conservatory", undef, undef),
+                    Rosetta::Coverage::node("playroom", undef, undef),
+                ]),
+                Rosetta::Coverage::node("wet_room_and_toilet", undef, undef),
+                Rosetta::Coverage::node("garage", undef, undef),
+                Rosetta::Coverage::node("garden", undef, 0.9),
+                Rosetta::Coverage::node("hot_tub_suite", undef, 1.0),
+            ]),
+            Rosetta::Coverage::node("basement", undef, undef, [
+                Rosetta::Coverage::node("cellars", undef, 1.0),
+                Rosetta::Coverage::node("wine_cellar", undef, 1.0),
+                Rosetta::Coverage::node("cinema", undef, undef),
+            ]),
+        ]),
+    ])
+}
+
+my $tree = Rosetta::Coverage::sample_tree()
+my $house1 = Rosetta::Coverage::score($tree->{children}[0])
+my $house2 = Rosetta::Coverage::score($tree->{children}[1])
+my $total  = Rosetta::Coverage::score($tree)
+
+assert_ok abs($house1 - 0.33125) < 1e-12, "house1 weighted score"
+assert_ok abs($house2 - 0.3777777778) < 1e-9, "house2 weighted score"
+assert_ok abs($total - 0.3591666667) < 1e-9, "overall weighted coverage"
+
+test_run

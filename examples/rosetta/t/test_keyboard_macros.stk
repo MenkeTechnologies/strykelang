@@ -1,0 +1,28 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Keyboard macros
+
+fn Rosetta::KeyMacros::new() { { bindings => {} } }
+
+fn Rosetta::KeyMacros::bind($sys, $key, $action) {
+    $sys->{bindings}{$key} = $action
+    $sys
+}
+
+fn Rosetta::KeyMacros::press($sys, $key, $state) {
+    return undef if !exists $sys->{bindings}{$key}
+    $sys->{bindings}{$key}->($state)
+}
+
+my $sys = Rosetta::KeyMacros::new()
+Rosetta::KeyMacros::bind($sys, "F1", fn ($s) { $s->{count} += 1; "help" })
+Rosetta::KeyMacros::bind($sys, "Alt-P", fn ($s) { $s->{paused} = 1; "pause" })
+
+my $state = { count => 0, paused => 0 }
+
+assert_eq Rosetta::KeyMacros::press($sys, "F1", $state), "help", "function key triggers method"
+assert_eq $state->{count}, 1, "macro mutated application state"
+assert_eq Rosetta::KeyMacros::press($sys, "Alt-P", $state), "pause", "alt binding works"
+assert_eq $state->{paused}, 1, "pause state toggled"
+assert_eq Rosetta::KeyMacros::press($sys, "F9", $state), undef, "unbound key ignored"
+
+test_run

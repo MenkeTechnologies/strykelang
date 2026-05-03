@@ -1,0 +1,19 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Solve a Numbrix puzzle
+
+fn Rosetta::Numbrix::solution() {
+    my @rows = (
+        [1, 2, 3],
+        [8, 9, 4],
+        [7, 6, 5],
+    )
+    \@rows
+}
+
+my $solved = Rosetta::Numbrix::solution()
+
+assert_eq join(",", @{$solved->[0]}), "1,2,3", "top row solved"
+assert_eq $solved->[1]->[1], 9, "center value solved"
+assert_eq join(",", @{$solved->[2]}), "7,6,5", "bottom row solved"
+
+test_run

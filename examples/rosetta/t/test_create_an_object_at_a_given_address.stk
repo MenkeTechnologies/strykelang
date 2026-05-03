@@ -1,0 +1,38 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Create an object at a given address
+
+my %OBJECT_MEMORY
+
+fn Rosetta::ObjectAtAddress::create_origin($value) {
+    my $seed = $value
+    my $addr = "" . \$seed
+    $OBJECT_MEMORY{$addr} = $value
+    { address => $addr }
+}
+
+fn Rosetta::ObjectAtAddress::object_at($address) {
+    { address => $address }
+}
+
+fn Rosetta::ObjectAtAddress::read($obj) {
+    $OBJECT_MEMORY{$obj->{address}}
+}
+
+fn Rosetta::ObjectAtAddress::write($obj, $value) {
+    $OBJECT_MEMORY{$obj->{address}} = $value
+    $obj
+}
+
+my $origin = Rosetta::ObjectAtAddress::create_origin(1234)
+my $alias = Rosetta::ObjectAtAddress::object_at($origin->{address})
+
+assert_eq $alias->{address}, $origin->{address}, "alias points at same address"
+assert_eq Rosetta::ObjectAtAddress::read($alias), 1234, "aliased object sees original value"
+
+Rosetta::ObjectAtAddress::write($origin, 5678)
+assert_eq Rosetta::ObjectAtAddress::read($alias), 5678, "changing origin is visible through alias"
+
+Rosetta::ObjectAtAddress::write($alias, 99)
+assert_eq Rosetta::ObjectAtAddress::read($origin), 99, "changing alias updates original location"
+
+test_run

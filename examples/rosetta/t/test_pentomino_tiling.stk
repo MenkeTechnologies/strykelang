@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Pentomino tiling
+
+fn Rosetta::Pentomino::sample() {
+    my @rows = (
+        "ABC",
+        "ABC",
+        "ABC",
+        "ABC",
+        "ABC",
+    )
+    \@rows
+}
+
+fn Rosetta::Pentomino::count_cells($rows, $ch) {
+    my $count = 0
+    for my $row (@$rows) {
+        for my $cell (split //, $row) {
+            $count++ if $cell eq $ch
+        }
+    }
+    $count
+}
+
+my $rows = Rosetta::Pentomino::sample()
+
+assert_eq len(@$rows), 5, "sample tiling has five rows"
+assert_eq Rosetta::Pentomino::count_cells($rows, "A"), 5, "first pentomino covers five cells"
+assert_eq Rosetta::Pentomino::count_cells($rows, "B"), 5, "second pentomino covers five cells"
+assert_eq Rosetta::Pentomino::count_cells($rows, "C"), 5, "third pentomino covers five cells"
+
+test_run

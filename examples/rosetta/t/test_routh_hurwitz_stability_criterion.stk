@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Routh-Hurwitz stability criterion
+
+fn Rosetta::Routh::first_column_cubic($a3, $a2, $a1, $a0) {
+    my $third = (($a2 * $a1) - ($a3 * $a0)) / $a2
+    my @col = ($a3, $a2, $third, $a0)
+    \@col
+}
+
+fn Rosetta::Routh::stable_cubic($a3, $a2, $a1, $a0) {
+    return 0 if $a3 <= 0 || $a2 <= 0 || $a1 <= 0 || $a0 <= 0
+    (($a2 * $a1) - ($a3 * $a0)) > 0 ? 1 : 0
+}
+
+my $col = Rosetta::Routh::first_column_cubic(1, 6, 11, 6)
+
+assert_eq Rosetta::Routh::stable_cubic(1, 6, 11, 6), 1, "cubic with roots -1 -2 -3 is stable"
+assert_eq Rosetta::Routh::stable_cubic(1, 2, 1, 4), 0, "cubic with negative third-row pivot is unstable"
+assert_eq join(",", @$col), "1,6,10,6", "first column is constructed correctly"
+
+test_run

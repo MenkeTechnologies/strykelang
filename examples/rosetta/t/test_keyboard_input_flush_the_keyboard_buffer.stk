@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Keyboard input/Flush the keyboard buffer
+
+fn Rosetta::KeyboardFlush::flush($buffer) {
+    @$buffer = ()
+    $buffer
+}
+
+my @buf = ("a", "b", "c")
+Rosetta::KeyboardFlush::flush(\@buf)
+
+assert_eq len(@buf), 0, "buffer flushed without waiting"
+
+my @empty
+Rosetta::KeyboardFlush::flush(\@empty)
+assert_eq len(@empty), 0, "flushing empty buffer is harmless"
+
+test_run

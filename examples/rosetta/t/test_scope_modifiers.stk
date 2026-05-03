@@ -1,0 +1,17 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Scope modifiers
+
+fn Rosetta::ScopeMods::can_access($modifier, $viewer) {
+    return 1 if $modifier eq "public"
+    return $viewer ne "world" if $modifier eq "protected"
+    return $viewer eq "owner" if $modifier eq "private"
+    0
+}
+
+assert_eq Rosetta::ScopeMods::can_access("public", "world"), 1, "public is visible everywhere"
+assert_eq Rosetta::ScopeMods::can_access("protected", "subclass"), 1, "protected is visible to subclass"
+assert_eq Rosetta::ScopeMods::can_access("protected", "world"), 0, "protected hides from world"
+assert_eq Rosetta::ScopeMods::can_access("private", "owner"), 1, "private is visible to owner"
+assert_eq Rosetta::ScopeMods::can_access("private", "subclass"), 0, "private hides from subclass"
+
+test_run

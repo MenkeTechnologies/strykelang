@@ -1,0 +1,29 @@
+#!/usr/bin/env stryke
+# Rosetta Code: OLE automation
+
+fn Rosetta::OLE::spreadsheet() {
+    { cells => { A1 => 10, A2 => 32 }, title => "Sheet1" }
+}
+
+fn Rosetta::OLE::get($sheet, $name) {
+    exists $sheet->{$name} ? $sheet->{$name} : $sheet->{cells}{$name}
+}
+
+fn Rosetta::OLE::set($sheet, $name, $value) {
+    if ($name =~ /^[A-Z]/) { $sheet->{cells}{$name} = $value }
+    else { $sheet->{$name} = $value }
+}
+
+fn Rosetta::OLE::call($sheet, $method, @args) {
+    return Rosetta::OLE::get($sheet, $args[0]) + Rosetta::OLE::get($sheet, $args[1]) if $method eq "sum"
+    "unknown"
+}
+
+my $sheet = Rosetta::OLE::spreadsheet()
+Rosetta::OLE::set($sheet, "A3", 5)
+
+assert_eq Rosetta::OLE::get($sheet, "title"), "Sheet1", "property access works"
+assert_eq Rosetta::OLE::get($sheet, "A3"), 5, "cell assignment works"
+assert_eq Rosetta::OLE::call($sheet, "sum", "A1", "A2"), 42, "method invocation works"
+
+test_run

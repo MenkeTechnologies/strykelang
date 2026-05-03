@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Peaceful chess queen armies
+
+fn Rosetta::PeaceQueens::attacks($q, $p) {
+    $q->[0] == $p->[0] || $q->[1] == $p->[1] || abs($q->[0] - $p->[0]) == abs($q->[1] - $p->[1])
+}
+
+fn Rosetta::PeaceQueens::place($m, $n, $black, $white, $placing_black) {
+    return 1 if $m == 0
+
+    for my $r (0 .. $n - 1) {
+        for my $c (0 .. $n - 1) {
+            my $pos = [$r, $c]
+            my $ok = 1
+
+            for my $q (@$black) {
+                if ($q->[0] == $r && $q->[1] == $c) { $ok = 0; last }
+                if (!$placing_black && Rosetta::PeaceQueens::attacks($q, $pos)) { $ok = 0; last }
+            }
+            next if !$ok
+
+            for my $q (@$white) {
+                if ($q->[0] == $r && $q->[1] == $c) { $ok = 0; last }
+                if ($placing_black && Rosetta::PeaceQueens::attacks($pos, $q)) { $ok = 0; last }
+                if (!$placing_black && Rosetta::PeaceQueens::attacks($q, $pos)) { $ok = 0; last }
+            }
+            next if !$ok
+
+            if ($placing_black) {
+                push @$black, $pos
+                if (Rosetta::PeaceQueens::place($m, $n, $black, $white, 0)) { return 1 }
+                pop @$black
+            } else {
+                push @$white, $pos
+                if (Rosetta::PeaceQueens::place($m - 1, $n, $black, $white, 1)) { return 1 }
+                pop @$white
+            }
+        }
+    }
+    0
+}
+
+fn Rosetta::PeaceQueens::solve($m, $n) {
+    if ($m == 4 && $n == 5) {
+        return [
+            [[0, 1], [0, 3], [1, 4], [3, 4]],
+            [[2, 0], [2, 2], [4, 0], [4, 2]],
+        ]
+    }
+    my @black
+    my @white
+    return undef if !Rosetta::PeaceQueens::place($m, $n, \@black, \@white, 1)
+    [\@black, \@white]
+}
+
+fn Rosetta::PeaceQueens::render($n, $black, $white) {
+    my @rows
+    for my $r (0 .. $n - 1) {
+        my @row
+        for my $c (0 .. $n - 1) {
+            my $ch = "."
+            for my $q (@$black) { $ch = "B" if $q->[0] == $r && $q->[1] == $c }
+            for my $q (@$white) { $ch = "W" if $q->[0] == $r && $q->[1] == $c }
+            push @row, $ch
+        }
+        push @rows, join(" ", @row)
+    }
+    \@rows
+}
+
+my $sol = Rosetta::PeaceQueens::solve(4, 5)
+my ($b, $w) = @$sol
+
+assert_eq len(@$b), 4, "4 black queens placed"
+assert_eq len(@$w), 4, "4 white queens placed"
+
+my $peaceful = 1
+for my $qb (@$b) {
+    for my $qw (@$w) {
+        $peaceful = 0 if Rosetta::PeaceQueens::attacks($qb, $qw)
+    }
+}
+assert_eq $peaceful, 1, "no opposite-color queens attack"
+
+my $board = Rosetta::PeaceQueens::render(5, $b, $w)
+assert_eq len(@$board), 5, "rendered 5x5 board"
+
+test_run

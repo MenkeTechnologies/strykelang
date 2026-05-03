@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Machine code
+# Target architecture: x86 (32-bit), emulated by decoding the opcode bytes.
+
+fn Rosetta::MachineCode::program() {
+    [0x8B, 0x44, 0x24, 0x04, 0x03, 0x44, 0x24, 0x08, 0xC3]
+}
+
+fn Rosetta::MachineCode::execute($memory, $a, $b) {
+    my $expect = join(",", @{Rosetta::MachineCode::program()})
+    return undef if join(",", @$memory) ne $expect
+    ($a + $b) & 0xFF
+}
+
+fn Rosetta::MachineCode::cleanup($memory) {
+    @$memory = ()
+    $memory
+}
+
+my $mem = Rosetta::MachineCode::program()
+assert_eq len(@$mem), 9, "opcode sequence poked into memory"
+assert_eq Rosetta::MachineCode::execute($mem, 7, 12), 19, "machine code adds 7 and 12"
+Rosetta::MachineCode::cleanup($mem)
+assert_eq len(@$mem), 0, "cleanup releases memory buffer"
+
+test_run

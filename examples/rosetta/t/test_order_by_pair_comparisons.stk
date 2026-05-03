@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Order by pair comparisons
+
+fn Rosetta::PairOrder::sort($items, $cmp) {
+    my @sorted
+    my $comparisons = 0
+
+    for my $item (@$items) {
+        my $lo = 0
+        my $hi = len(@sorted)
+        while ($lo < $hi) {
+            my $mid = int(($lo + $hi) / 2)
+            $comparisons++
+            my $r = $cmp->($item, $sorted[$mid])
+            if ($r < 0) {
+                $hi = $mid
+            } else {
+                $lo = $mid + 1
+            }
+        }
+        splice @sorted, $lo, 0, $item
+    }
+
+    (\@sorted, $comparisons)
+}
+
+my @items = qw(violet red green indigo blue yellow orange)
+my @rainbow = qw(red orange yellow green blue indigo violet)
+my %rank
+for my $i (0 .. $#rainbow) { $rank{$rainbow[$i]} = $i }
+
+my ($sorted, $comparisons) = Rosetta::PairOrder::sort(\@items, fn ($a, $b) {
+    $rank{$a} <=> $rank{$b}
+})
+
+assert_eq join(" ", @$sorted), "red orange yellow green blue indigo violet", "rainbow ordered by pair comparisons"
+assert_eq $comparisons <= 14, 1, "binary insertion keeps comparisons low"
+
+test_run

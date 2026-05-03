@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Memory layout of a data structure
+
+fn Rosetta::RS232::pack($pins) {
+    my %bit = (
+        carrier_detect => 0,
+        received_data => 1,
+        transmitted_data => 2,
+        data_terminal_ready => 3,
+        signal_ground => 4,
+        data_set_ready => 5,
+        request_to_send => 6,
+        clear_to_send => 7,
+        ring_indicator => 8,
+    )
+
+    my $word = 0
+    for my $name (keys %bit) {
+        if ($pins->{$name}) {
+            $word |= 1 << $bit{$name}
+        }
+    }
+    $word
+}
+
+fn Rosetta::RS232::unpack($word) {
+    {
+        carrier_detect => ($word >> 0) & 1,
+        received_data => ($word >> 1) & 1,
+        transmitted_data => ($word >> 2) & 1,
+        data_terminal_ready => ($word >> 3) & 1,
+        signal_ground => ($word >> 4) & 1,
+        data_set_ready => ($word >> 5) & 1,
+        request_to_send => ($word >> 6) & 1,
+        clear_to_send => ($word >> 7) & 1,
+        ring_indicator => ($word >> 8) & 1,
+    }
+}
+
+my $packed = Rosetta::RS232::pack({
+    transmitted_data => 1,
+    clear_to_send => 1,
+    ring_indicator => 1,
+})
+my $pins = Rosetta::RS232::unpack($packed)
+
+assert_eq $packed, 388, "bit layout matches TD|CTS|RI"
+assert_eq $pins->{transmitted_data}, 1, "TD unpacked"
+assert_eq $pins->{clear_to_send}, 1, "CTS unpacked"
+assert_eq $pins->{ring_indicator}, 1, "RI unpacked"
+assert_eq $pins->{received_data}, 0, "unset bit remains clear"
+
+test_run

@@ -1,0 +1,20 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rosetta Code/Rank languages by popularity
+
+fn Rosetta::RankPopularity::rank($rows) {
+    my @sorted = sort { $b->{popularity} <=> $a->{popularity} || $a->{language} cmp $b->{language} } @$rows
+    \@sorted
+}
+
+my @rows = (
+    { language => "Python", popularity => 99.0 },
+    { language => "Rust", popularity => 81.5 },
+    { language => "Ruby", popularity => 70.2 },
+)
+
+my $ranked = Rosetta::RankPopularity::rank(\@rows)
+
+assert_eq join(",", map { $_->{language} } @$ranked), "Python,Rust,Ruby", "languages sort by popularity descending"
+assert_eq $ranked->[2]{popularity}, 70.2, "lowest popularity appears last"
+
+test_run

@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Mouse position
+
+fn Rosetta::Mouse::new() {
+    { x => 0, y => 0, left => 0, right => 0 }
+}
+
+fn Rosetta::Mouse::move($mouse, $x, $y) {
+    $mouse->{x} = $x
+    $mouse->{y} = $y
+}
+
+fn Rosetta::Mouse::press($mouse, $button) {
+    $mouse->{$button} = 1
+}
+
+fn Rosetta::Mouse::release($mouse, $button) {
+    $mouse->{$button} = 0
+}
+
+fn Rosetta::Mouse::snapshot($mouse) {
+    "($mouse->{x},$mouse->{y}) left=$mouse->{left} right=$mouse->{right}"
+}
+
+my $mouse = Rosetta::Mouse::new()
+Rosetta::Mouse::move($mouse, 320, 200)
+Rosetta::Mouse::press($mouse, "left")
+
+assert_eq Rosetta::Mouse::snapshot($mouse), "(320,200) left=1 right=0", "snapshot includes coordinates and buttons"
+Rosetta::Mouse::release($mouse, "left")
+Rosetta::Mouse::press($mouse, "right")
+assert_eq Rosetta::Mouse::snapshot($mouse), "(320,200) left=0 right=1", "button state changes are visible"
+
+test_run

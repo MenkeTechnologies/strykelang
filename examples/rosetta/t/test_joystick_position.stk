@@ -1,0 +1,35 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Joystick position
+
+fn Rosetta::Joystick::new() {
+    my @buttons = (0, 0, 0, 0)
+    { x => 0, y => 0, buttons => \@buttons }
+}
+
+fn Rosetta::Joystick::move($stick, $x, $y) {
+    $stick->{x} = $x
+    $stick->{y} = $y
+}
+
+fn Rosetta::Joystick::press($stick, $index) {
+    $stick->{buttons}[$index] = 1
+}
+
+fn Rosetta::Joystick::release($stick, $index) {
+    $stick->{buttons}[$index] = 0
+}
+
+fn Rosetta::Joystick::snapshot($stick) {
+    "x=$stick->{x} y=$stick->{y} buttons=" . join("", @{$stick->{buttons}})
+}
+
+my $stick = Rosetta::Joystick::new()
+Rosetta::Joystick::move($stick, -12, 34)
+Rosetta::Joystick::press($stick, 0)
+Rosetta::Joystick::press($stick, 2)
+
+assert_eq Rosetta::Joystick::snapshot($stick), "x=-12 y=34 buttons=1010", "snapshot includes axes and buttons"
+Rosetta::Joystick::release($stick, 0)
+assert_eq Rosetta::Joystick::snapshot($stick), "x=-12 y=34 buttons=0010", "button release updates snapshot"
+
+test_run

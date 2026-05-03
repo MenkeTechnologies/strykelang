@@ -1,0 +1,27 @@
+#!/usr/bin/env stryke
+# Rosetta Code: SQL-based authentication
+
+fn Rosetta::SQLAuth::hash_pw($pw) {
+    join(":", map { ord($_) } split //, $pw)
+}
+
+fn Rosetta::SQLAuth::database() {
+    my %users = (
+        alice => Rosetta::SQLAuth::hash_pw("wonderland"),
+        bob => Rosetta::SQLAuth::hash_pw("builder"),
+    )
+    \%users
+}
+
+fn Rosetta::SQLAuth::authenticate($db, $user, $pw) {
+    return 0 if !exists $db->{$user}
+    $db->{$user} eq Rosetta::SQLAuth::hash_pw($pw) ? 1 : 0
+}
+
+my $db = Rosetta::SQLAuth::database()
+
+assert_eq Rosetta::SQLAuth::authenticate($db, "alice", "wonderland"), 1, "known user authenticates"
+assert_eq Rosetta::SQLAuth::authenticate($db, "alice", "wrong"), 0, "wrong password fails"
+assert_eq Rosetta::SQLAuth::authenticate($db, "mallory", "whatever"), 0, "unknown user fails"
+
+test_run

@@ -1,0 +1,21 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Rosetta Code/Rank languages by number of users
+
+fn Rosetta::RankUsers::rank($rows) {
+    my @sorted = sort { $b->{users} <=> $a->{users} || $a->{language} cmp $b->{language} } @$rows
+    \@sorted
+}
+
+my @rows = (
+    { language => "Python", users => 1200 },
+    { language => "Go", users => 480 },
+    { language => "Rust", users => 620 },
+)
+
+my $ranked = Rosetta::RankUsers::rank(\@rows)
+
+assert_eq $ranked->[0]{language}, "Python", "highest user count ranks first"
+assert_eq $ranked->[1]{language}, "Rust", "second highest user count ranks second"
+assert_eq join(",", map { $_->{users} } @$ranked), "1200,620,480", "ranking preserves descending counts"
+
+test_run

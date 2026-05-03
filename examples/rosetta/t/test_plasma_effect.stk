@@ -1,0 +1,24 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Plasma effect
+
+fn Rosetta::Plasma::render($w, $h) {
+    my @rows
+    my @chars = split //, " .:-=+*#%@"
+    for my $y (0 .. $h - 1) {
+        my @row
+        for my $x (0 .. $w - 1) {
+            my $v = (($x * $x) + ($y * 3) + ($x * 5)) % len(@chars)
+            push @row, $chars[$v]
+        }
+        push @rows, join("", @row)
+    }
+    \@rows
+}
+
+my $rows = Rosetta::Plasma::render(6, 3)
+
+assert_eq len(@$rows), 3, "plasma render has expected height"
+assert_eq len(split //, $rows->[0]), 6, "plasma render has expected width"
+assert_eq $rows->[0] ne $rows->[1] ? 1 : 0, 1, "adjacent rows vary"
+
+test_run

@@ -1,0 +1,31 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Canny edge detector
+
+fn Rosetta::Canny::edges($img, $threshold) {
+    my @out
+    for my $y (0 .. len(@$img) - 1) {
+        my @row
+        for my $x (0 .. len(@{$img->[0]}) - 1) {
+            if ($x == 0 || $x == len(@{$img->[0]}) - 1) {
+                push @row, 0
+            } else {
+                my $gx = abs($img->[$y]->[$x + 1] - $img->[$y]->[$x - 1])
+                push @row, ($gx >= $threshold) ? 1 : 0
+            }
+        }
+        push @out, \@row
+    }
+    \@out
+}
+
+my @img = (
+    [0, 0, 10, 10],
+    [0, 0, 10, 10],
+    [0, 0, 10, 10],
+)
+my $edges = Rosetta::Canny::edges(\@img, 5)
+
+assert_eq join(",", @{$edges->[0]}), "0,1,1,0", "vertical edge detected in first row"
+assert_eq join(",", @{$edges->[1]}), "0,1,1,0", "vertical edge detected in middle row"
+
+test_run

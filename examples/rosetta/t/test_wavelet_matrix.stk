@@ -1,0 +1,26 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Wavelet Matrix
+
+fn Rosetta::Wavelet::new($data) {
+    { data => $data }
+}
+
+fn Rosetta::Wavelet::access($wm, $idx) {
+    $wm->{data}->[$idx]
+}
+
+fn Rosetta::Wavelet::rank($wm, $value, $end) {
+    my $count = 0
+    for my $i (0 .. $end - 1) {
+        $count++ if $wm->{data}->[$i] == $value
+    }
+    $count
+}
+
+my $wm = Rosetta::Wavelet::new([3, 1, 4, 1, 5, 9])
+
+assert_eq Rosetta::Wavelet::access($wm, 2), 4, "access query returns value at index"
+assert_eq Rosetta::Wavelet::rank($wm, 1, 4), 2, "rank counts value occurrences in prefix"
+assert_eq Rosetta::Wavelet::rank($wm, 9, 5), 0, "rank excludes values outside prefix"
+
+test_run

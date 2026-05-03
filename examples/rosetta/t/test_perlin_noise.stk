@@ -1,0 +1,32 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Perlin noise
+
+fn Rosetta::Perlin::fade($t) {
+    $t * $t * $t * ($t * ($t * 6 - 15) + 10)
+}
+
+fn Rosetta::Perlin::lerp($a, $b, $t) {
+    $a + (($b - $a) * $t)
+}
+
+fn Rosetta::Perlin::grad($hash, $x) {
+    ($hash % 2 == 0 ? 1 : -1) * $x
+}
+
+fn Rosetta::Perlin::noise1d($x) {
+    my @perm = (151, 160)
+    my $x0 = int($x)
+    my $xf = $x - $x0
+    my $u = Rosetta::Perlin::fade($xf)
+    my $g0 = Rosetta::Perlin::grad($perm[$x0 % 2], $xf)
+    my $g1 = Rosetta::Perlin::grad($perm[($x0 + 1) % 2], $xf - 1)
+    Rosetta::Perlin::lerp($g0, $g1, $u)
+}
+
+my $n0 = Rosetta::Perlin::noise1d(0.25)
+my $n1 = Rosetta::Perlin::noise1d(0.75)
+
+assert_eq int($n0 * 1000), -301, "first sample is stable"
+assert_eq int($n1 * 1000), -301, "second sample is stable"
+
+test_run

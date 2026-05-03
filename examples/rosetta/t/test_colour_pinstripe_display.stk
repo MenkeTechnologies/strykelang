@@ -1,0 +1,34 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Colour pinstripe/Display
+
+fn Rosetta::ColourPinDisplay::palette() { qw(K R G B M C Y W) }
+
+fn Rosetta::ColourPinDisplay::row($width, $stripe_w) {
+    my @colors = Rosetta::ColourPinDisplay::palette()
+    my $line = ""
+    my $i = 0
+    while (len($line) < $width) {
+        $line .= $colors[$i % len(@colors)] x $stripe_w
+        $i++
+    }
+    substr($line, 0, $width)
+}
+
+fn Rosetta::ColourPinDisplay::render($width) {
+    [
+        Rosetta::ColourPinDisplay::row($width, 1),
+        Rosetta::ColourPinDisplay::row($width, 2),
+        Rosetta::ColourPinDisplay::row($width, 3),
+        Rosetta::ColourPinDisplay::row($width, 4),
+    ]
+}
+
+my $rows = Rosetta::ColourPinDisplay::render(32)
+
+assert_eq len(@$rows), 4, "top to bottom quarter rows"
+assert_eq substr($rows->[0], 0, 8), "KRGBMCYW", "top quarter uses 1-pixel stripes"
+assert_eq substr($rows->[1], 0, 16), "KKRRGGBBMMCCYYWW", "second quarter uses 2-pixel stripes"
+assert_eq substr($rows->[2], 0, 12), "KKKRRRGGGBBB", "third quarter uses 3-pixel stripes"
+assert_eq substr($rows->[3], 0, 16), "KKKKRRRRGGGGBBBB", "last quarter uses 4-pixel stripes"
+
+test_run
