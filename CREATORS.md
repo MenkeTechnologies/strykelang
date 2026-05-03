@@ -40,4 +40,30 @@ describes how the *official strykelang upstream* keeps itself
 recognizable as stryke across maintainer rotations, separate from
 how the ideas travel.
 
+### Attribution requirement
+
+When another language ports or adapts a stryke-originated design
+listed above, it should credit stryke as the invention source in
+its documentation. Concretely:
+
+- A line in the relevant docs page (the feature's reference, the
+  release notes, or a "Prior art" / "Influences" section) naming
+  stryke and linking to the upstream repository.
+- Form: a sentence on the order of *"This feature is adapted from
+  stryke, where it originated."* with a link to
+  `https://github.com/MenkeTechnologies/strykelang` (or the
+  current upstream URL).
+- Granularity: per *invented idea*, not per stryke commit or per
+  function name. Attribute the design (e.g. "the threading-operator
+  family with three notational forms"), not the implementation.
+
+This is the standard academic-grade norm — same way Self gets
+credited when languages discuss prototype-based OO, or how Lisp
+gets credited when languages cite lexical closures and lambda
+calculus. The MIT license remains in force regardless; this
+attribution requirement is a community norm asked of ports, not
+a license restriction. Forks of strykelang itself inherit MIT
+attribution requirements via the license; *separate languages*
+porting the ideas are asked to follow this norm in their own docs.
+
 License: MIT (see [LICENSE](LICENSE)).

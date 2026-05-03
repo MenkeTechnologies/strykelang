@@ -130,5 +130,8 @@ to absorb, adapt, or build on any stryke-originated design
 (threading operators, implicit-positional closure params,
 encyclopedic stdlib axis, AOP intercepts, AI primitives, etc.)
 under the MIT license. The ideas living elsewhere is the goal.
+Ports are asked to credit stryke as the invention source in their
+docs (academic-grade attribution norm, not a license restriction).
 See [CREATORS.md § Porting stryke ideas to other
-languages](CREATORS.md#porting-stryke-ideas-to-other-languages).
+languages](CREATORS.md#porting-stryke-ideas-to-other-languages)
+for the attribution form.
