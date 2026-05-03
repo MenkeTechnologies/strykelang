@@ -12912,6 +12912,8 @@ impl Parser {
             | "random_int" | "random_float" | "random_bool"
             | "random_choice" | "random_between"
             | "random_string" | "random_alpha" | "random_digit"
+            // ── symbol table ────────────────────────────────────────────────
+            | "refresh_stashes"
             // ── system introspection ────────────────────────────────────────
             | "os_name" | "os_arch" | "num_cpus"
             | "pid" | "ppid" | "uid" | "gid"

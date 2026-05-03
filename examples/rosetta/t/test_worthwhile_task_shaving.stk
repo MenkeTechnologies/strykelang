@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Worthwhile task shaving
+
+fn Rosetta::WorthwhileTaskShaving::max_automation_time($saved_per_task_sec, $frequency_per_day, $years) {
+    # 365.2425 days in a year (average)
+    my $days = $years * 365.2425
+    my $total_saved_sec = $saved_per_task_sec * $frequency_per_day * $days
+    
+    $total_saved_sec
+}
+
+# Tests based on XKCD 1205: Is It Worth the Time?
+# Across 5 years:
+
+# 1 second, 50 times a day
+my $res1 = Rosetta::WorthwhileTaskShaving::max_automation_time(1, 50, 5)
+# 1 * 50 * 365.2425 * 5 = 91310.625 seconds
+# 91310.625 / 3600 = 25.36 hours (approx 1 day)
+assert_ok $res1 > 91000 && $res1 < 92000, "1 sec, 50/day, 5 years should be ~1 day"
+
+# 1 minute, 1 time a day
+my $res2 = Rosetta::WorthwhileTaskShaving::max_automation_time(60, 1, 5)
+# 60 * 1 * 365.2425 * 5 = 109572.75 seconds
+# 109572.75 / 3600 = 30.43 hours
+assert_ok $res2 > 109000 && $res2 < 110000, "1 min, 1/day, 5 years should be ~30 hours"
+
+# 30 minutes, 1 time a week
+my $res3 = Rosetta::WorthwhileTaskShaving::max_automation_time(1800, 1.0/7.0, 5)
+# 1800 * (1/7) * 365.2425 * 5 = 469597.5 seconds
+assert_ok $res3 > 469000 && $res3 < 470000, "30 min, 1/week, 5 years should be ~130 hours"
+
+# Demonstrate using pipes
+my @scenarios = (
+    (1, 50, 5),
+    (60, 1, 5),
+    (1800, 1.0/7.0, 5)
+)
+
+~> @scenarios map {
+    my $s = _
+    Rosetta::WorthwhileTaskShaving::max_automation_time($s[0], $s[1], $s[2])
+} |> map { _ / 3600 } |> map { "Hours worth spending: $_" } |> p
+
+test_run

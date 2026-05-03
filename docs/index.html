@@ -268,7 +268,7 @@ s 'p to_yaml read_json "data.json"'</pre>
 
       <section class="tutorial-section">
         <h2>Language reflection</h2>
-        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>stryke_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Eight hashes — every direct lookup is O(1)</strong>.</p>
+        <p>Everything the parser and dispatcher know about is exposed as plain Perl hashes, populated from the source of truth at compile time. <code>build.rs</code> parses category-labeled section comments in <code>is_perl5_core</code> / <code>stryke_extension_name</code>, the <code>try_builtin</code> match arms, and LSP hover docs in <code>doc_for_label_text</code>. <strong>Nine hashes — every direct lookup is O(1)</strong>. Plus per-package symbol-table stashes (<code>%main::</code>, <code>%Foo::</code>, …) and the live-binding view (<code>%parameters</code>).</p>
 
         <h3>Forward maps</h3>
         <table class="reflection-table">
@@ -296,6 +296,30 @@ s 'p to_yaml read_json "data.json"'</pre>
           </tbody>
         </table>
 
+        <h3>Live-binding view (zsh <code>$parameters</code> analogue)</h3>
+        <p><code>%parameters</code> is rebuilt on every read so it always reflects the current scope. Keys are sigil-prefixed names (<code>$x</code>, <code>@a</code>, <code>%h</code>, <code>$Pkg::var</code>); values are kind strings.</p>
+        <table class="reflection-table">
+          <thead>
+            <tr><th>Hash</th><th>Key → Value</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>%parameters</code></td><td>sigil-prefixed name → kind (<code>"scalar"</code> / <code>"array"</code> / <code>"hash"</code> / <code>"atomic_array"</code> / <code>"atomic_hash"</code> / <code>"shared_array"</code> / <code>"shared_hash"</code>). Includes lexicals (<code>my $x</code>) and globals (<code>our $X</code>) and the reflection / stash hashes themselves.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Package stashes (Perl-spec symbol table)</h3>
+        <p>Per-package <code>%Pkg::</code> hashes show what each package <em>declares</em> — populated from <code>our</code> declarations and <code>sub</code> definitions, exactly like Perl 5. Lexical <code>my</code> bindings never enter a stash. Refreshed lazily on every read so newly-defined subs appear immediately.</p>
+        <table class="reflection-table">
+          <thead>
+            <tr><th>Hash</th><th>Key → Value</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>%main::</code> / <code>%Foo::</code> / <code>%Foo::Bar::</code></td><td>unqualified symbol name → kind (<code>"scalar"</code> / <code>"sub"</code>). Built from <code>our $X</code> + <code>sub foo { }</code> in that package. Stryke-spec note: <code>our @arr</code> / <code>our %h</code> currently do not enter the stash (only <code>our $scalar</code> and <code>sub</code>).</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong><code>--compat</code> boundary:</strong> the eight reflection hashes (<code>%b</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> + their <code>%stryke::*</code> long names) and <code>%parameters</code> are stryke-only — <code>--compat</code> turns them off entirely so they don't collide with user-declared hashes of the same name. Package stashes (<code>%main::</code>) and <code>%ENV</code> / <code>%INC</code> / <code>%SIG</code> stay on in every mode (Perl 5 spec).</p>
+
         <h3>Examples</h3>
         <div class="oneliner">s 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
         <div class="oneliner">s 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
@@ -312,6 +336,10 @@ s 'p to_yaml read_json "data.json"'</pre>
         <div class="oneliner">s 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
         <div class="oneliner">s 'my %f; $f{$b{_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
         <div class="oneliner">s 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">s 'p sort keys %{ merge_hash(\%all, \%parameters) }'  <span class="comment"># every callable + every live binding, sorted</span></div>
+        <div class="oneliner">s 'my @scalars = grep { /^\$/ } keys %parameters; p @scalars'  <span class="comment"># live scalars only</span></div>
+        <div class="oneliner">s 'package Foo; our $X = 1; sub hello {} ; p sort keys %Foo::'  <span class="comment"># X, hello (our + sub, not my)</span></div>
+        <div class="oneliner">s '--compat' -e 'print scalar keys %all'  <span class="comment"># 0 — extensions off in --compat</span></div>
 
         <h3>Notes</h3>
         <ul>
@@ -371,7 +399,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
           <div class="cat-card"><h4>Random</h4><p><code>rand srand coin_flip dice_roll random_int random_float random_bool random_choice random_between random_string random_alpha random_digit random_password random_hex_str</code></p></div>
           <div class="cat-card"><h4>Data Structures</h4><p><code>set heap deque stack_new queue_new lru_new counter counter_most_common defaultdict ordered_set bitset_new bitset_set bitset_test bitset_clear</code></p></div>
           <div class="cat-card"><h4>Async / Timing</h4><p><code>async spawn await timer bench trace eval_timeout retry rate_limit every gen</code></p></div>
-          <div class="cat-card"><h4>Reflection</h4><p>Eight O(1) hashes — <code>%b</code> builtins, <code>%all</code> every spelling, <code>%pc</code> perl_compats, <code>%e</code> extensions, <code>%a</code> aliases, <code>%d</code> descriptions, <code>%c</code> categories, <code>%p</code> primaries.</p></div>
+          <div class="cat-card"><h4>Reflection</h4><p>Nine O(1) hashes — <code>%b</code> builtins, <code>%all</code> every spelling, <code>%pc</code> perl_compats, <code>%e</code> extensions, <code>%a</code> aliases, <code>%d</code> descriptions, <code>%c</code> categories, <code>%p</code> primaries, <code>%parameters</code> live bindings. Plus per-package stashes (<code>%main::</code>, <code>%Foo::</code>).</p></div>
         </div>
       </section>
 
@@ -1036,7 +1064,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.cache/stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
-          <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The five reflection hashes above are part of the completion surface.</li>
+          <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
 
