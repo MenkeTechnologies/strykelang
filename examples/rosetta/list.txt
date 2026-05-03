@@ -1325,7 +1325,7 @@
 [x] Wordiff
 [x] Wordle comparison
 [x] World Cup group stage
-[ ] Worthwhile task shaving
+[x] Worthwhile task shaving
 [x] Write entire file
 [x] Write float arrays to a text file
 [ ] Write language name in 3D ASCII

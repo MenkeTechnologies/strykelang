@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Set, the card game
+
+fn Rosetta::SetCardGame::is_set($c1, $c2, $c3) {
+    # Each card is an array of 4 integers (0, 1, or 2) representing attributes.
+    # We use array references and arrow access.
+    
+    (0, 1, 2, 3) |> all {
+        my $i = _
+        ($c1->[$i] + $c2->[$i] + $c3->[$i]) % 3 == 0
+    }
+}
+
+# Test Cases
+my @card1 = (0, 1, 2, 0)
+my @card2 = (1, 1, 1, 1)
+my @card3 = (2, 1, 0, 2)
+assert_eq Rosetta::SetCardGame::is_set(\@card1, \@card2, \@card3), 1, "Valid set (0,1,2,0; 1,1,1,1; 2,1,0,2)"
+
+my @card4 = (0, 0, 0, 0)
+assert_eq Rosetta::SetCardGame::is_set(\@card1, \@card2, \@card4), 0, "Invalid set (0,1,2,0; 1,1,1,1; 0,0,0,0)"
+
+my @card5 = (1, 2, 0, 1)
+assert_eq Rosetta::SetCardGame::is_set(\@card2, \@card3, \@card5), 0, "Invalid set (1,1,1,1; 2,1,0,2; 1,2,0,1)"
+
+# Demonstrate finding sets in a small collection
+my @deck = (
+    [0, 1, 2, 0],
+    [1, 1, 1, 1],
+    [2, 1, 0, 2],
+    [0, 0, 0, 0],
+    [1, 2, 0, 1]
+)
+
+"Finding sets in a small deck..." |> p
+my $n = len(@deck)
+for (my $i = 0; $i < $n; $i++) {
+    for (my $j = $i + 1; $j < $n; $j++) {
+        for (my $k = $j + 1; $k < $n; $k++) {
+            if (Rosetta::SetCardGame::is_set($deck[$i], $deck[$j], $deck[$k])) {
+                "Set found: indices ($i, $j, $k)" |> p
+            }
+        }
+    }
+}
+
+test_run
