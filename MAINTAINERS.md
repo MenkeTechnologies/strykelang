@@ -56,13 +56,12 @@ every push. PRs that touch the dispatch table must include
   patch releases, bug fixes, new builtins that follow existing patterns,
   performance work that preserves semantics, docs, tests) are
   maintainer-only — no creator approval needed.
-- **Major decisions** (new language semantics, breaking compatibility
-  changes, removal of existing features, top-level architectural
-  pivots, license changes, governance changes to this document)
+- **Major decisions that touch a protected invariant** (see below)
   require final approval from the creator before landing on the
   official upstream. The maintainer team owns the proposal,
   development, and review; the creator's role is a yes/no on the
-  final shape.
+  final shape. Decisions that don't touch any protected invariant
+  fall under operational and don't need creator approval.
 - The maintainer team may proceed without creator involvement on any
   decision the creator declines to engage with within a reasonable
   window (default: 30 days from formal proposal).
@@ -71,3 +70,53 @@ every push. PRs that touch the dispatch table must include
   official upstream `strykelang` repository; forks are free to set
   their own governance and proceed without creator approval on any
   change.
+
+### Protected invariants
+
+The veto exists for one purpose: **stryke must remain stryke**. It
+is not a Linus-style permanent dictatorship and it is not a
+quality-of-PR review. It exists to prevent the failure mode that
+killed Raku (Perl 6) and that Python 4 was deliberately structured
+to avoid — a generational rewrite that dissolves the language's
+identity, splits the community, and leaves the old version to
+stagnate.
+
+Changes to any of the following require creator approval before
+landing on the official upstream:
+
+1. **Perl 5 compatibility floor.** `--compat` must continue to run
+   Perl 5 code. Dropping this turns stryke into a different
+   language wearing the same name.
+2. **Threading-operator family.** `|>`, `~>`, `->>`, and the
+   implicit-positional closure parameters (`_0` / `_1` / `$_<<`)
+   are stryke's syntactic calling card. They cannot be removed,
+   renamed, or re-semanticized.
+3. **Encyclopedic stdlib axis.** The "core encyclopedic, libraries
+   unnecessary" design — 4,000+ callable spellings shipped in the
+   binary — is the inverted-philosophy claim. A maintainer-driven
+   move toward "core minimal, libraries optional" requires
+   approval.
+4. **NaN-boxed bytecode VM (fusevm).** Replacing the value
+   representation or the VM substrate dissolves stryke's
+   relationship with the surrounding compiled-shell stack.
+5. **Sigils.** `$`, `@`, `%`, `&`. Removing them == becoming Ruby
+   or Python in stryke clothes.
+6. **Min-chars / power-user defaults.** The language defaults to
+   terse forms (`p` not `print_line`, `_0` not `arg_zero`). Adding
+   newbie-mode syntactic alternatives or verbose-default modes
+   needs approval.
+7. **Cranelift JIT path.** Removing JIT or downgrading hot-block
+   native code emission to interpreter-only requires approval.
+8. **`--no-interop` boundary.** The mode that enforces stryke
+   idioms over Perl-isms must remain functional.
+9. **Parallel-as-syntactic-primitive.** `pmap` / `pgrep` / `pfor`
+   etc. live in core, not in a library. Demoting them to an
+   optional crate requires approval.
+10. **License (MIT).** Any change to or replacement of the
+    license requires approval.
+
+Maintainers can extend, optimize, document, refactor, and ship
+new builtins / opcodes / subsystems freely. They can also
+*propose* changes to invariants — but landing them on the official
+upstream needs the creator's sign-off. Forks are free to redefine
+or drop any of these.
