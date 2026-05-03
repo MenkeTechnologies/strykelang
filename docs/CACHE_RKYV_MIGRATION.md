@@ -21,7 +21,7 @@ The dependency `rusqlite = "0.32"` (with bundled SQLite) is still needed for str
 
 `zshrs/src/daemon/shard.rs` (430 LOC) ships an rkyv-based shard pattern at `~/.cache/zshrs/images/{hash8}-{slug}.rkyv`. The pattern: file-per-shard, atomic-rename writes, advisory `flock`, mmap + `check_archived_root` reads, zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards driven by a daemon; the SQLite cache stryke inherited was the older zshrs design from before the rkyv shard layer existed.
 
-stryke embeds in zshrs (per the MenkeTechnologies stack architecture). Aligning their persistence layers — same crate, same pattern, same crash-safety story — reduces the surface area both projects need to maintain.
+stryke embeds in zshrs as part of a shared CLI stack. Aligning their persistence layers — same crate, same pattern, same crash-safety story — reduces the surface area both projects need to maintain.
 
 ### 2. SQLite was over-engineered for the access pattern
 
@@ -141,7 +141,7 @@ Estimated win from phase 2: skip ~1-3 µs of bincode-decode per cache hit on top
 
 ## Why this fits the endgame brand
 
-Per the project priority framing: anything in the MenkeTechnologies stack must be **world's first** AND **world's fastest**. The cache layer alone isn't a "world's first" feature, but the consolidation it enables is:
+Per the project priority framing: anything in this stack must be **world's first** AND **world's fastest**. The cache layer alone isn't a "world's first" feature, but the consolidation it enables is:
 
 - zshrs and stryke share a persistence pattern (same crate, same code shape) → maintenance debt cut.
 - A daemonized shell (zshrs) hosting an embedded scripting language (stryke) that uses the same archived bytecode store is novel — no other shell+language combo does this.

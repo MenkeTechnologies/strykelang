@@ -309,7 +309,7 @@ spec:
     spec:
       containers:
       - name: agent
-        image: ghcr.io/menketechnologies/stryke:latest
+        image: ghcr.io/REPLACE_WITH_YOUR_REGISTRY/stryke:latest
         args: ["agent", "--master", "stryke-master.stryke-system:9999"]
         resources:
           requests:
@@ -333,7 +333,7 @@ spec:
   - name: app
     image: your-app:latest
   - name: stryke-agent
-    image: ghcr.io/menketechnologies/stryke:latest
+    image: ghcr.io/REPLACE_WITH_YOUR_REGISTRY/stryke:latest
     args: ["agent", "--master", "stryke-master:9999"]
 ```
 
@@ -623,7 +623,7 @@ Document:
 - **Kubernetes Operator** — (roadmap)
 - **Helm Chart** — (roadmap)
 
-Contact: enterprise@menketechnologies.com
+Contact: see repository issue tracker
 
 ---
 
