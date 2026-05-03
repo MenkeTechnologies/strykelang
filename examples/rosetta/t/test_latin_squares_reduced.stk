@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Latin Squares in reduced form
+
+fn Rosetta::LatinSquares::is_valid($square, $n, $r, $c, $val) {
+    # Check row
+    for my $i (0:$c-1) {
+        if ($square->[$r]->[$i] == $val) { return 0 }
+    }
+    # Check column
+    for my $i (0:$r-1) {
+        if ($square->[$i]->[$c] == $val) { return 0 }
+    }
+    1
+}
+
+fn Rosetta::LatinSquares::solve($n) {
+    my @square
+    for my $i (0:$n-1) {
+        $square[$i] = []
+        for my $j (0:$n-1) {
+            $square[$i]->[$j] = 0
+        }
+    }
+    
+    # Fill first row and first column for reduced form
+    for my $i (0:$n-1) {
+        $square[0]->[$i] = $i + 1
+        $square[$i]->[0] = $i + 1
+    }
+    
+    my @results
+    Rosetta::LatinSquares::backtrack(\@square, $n, 1, 1, \@results)
+    \@results
+}
+
+fn Rosetta::LatinSquares::backtrack($square, $n, $r, $c, $results) {
+    if ($r == $n) {
+        # Found a solution, deep copy it
+        my @copy
+        for my $i (0:$n-1) {
+            $copy[$i] = [@{$square->[$i]}]
+        }
+        push @$results, \@copy
+        return
+    }
+    
+    my $next_r = $r
+    my $next_c = $c + 1
+    if ($next_c == $n) {
+        $next_r = $r + 1
+        $next_c = 1
+    }
+    
+    for my $val (1:$n) {
+        if (Rosetta::LatinSquares::is_valid($square, $n, $r, $c, $val)) {
+            $square->[$r]->[$c] = $val
+            Rosetta::LatinSquares::backtrack($square, $n, $next_r, $next_c, $results)
+            $square->[$r]->[$c] = 0
+        }
+    }
+}
+
+# Test order 3
+my $res3 = Rosetta::LatinSquares::solve(3)
+assert_eq len(@$res3), 1, "Order 3 has 1 reduced Latin square"
+assert_eq join(",", @{$res3->[0]->[1]}), "2,3,1", "Order 3 second row"
+assert_eq join(",", @{$res3->[0]->[2]}), "3,1,2", "Order 3 third row"
+
+# Test order 4
+my $res4 = Rosetta::LatinSquares::solve(4)
+assert_eq len(@$res4), 4, "Order 4 has 4 reduced Latin squares"
+
+# Test order 2
+my $res2 = Rosetta::LatinSquares::solve(2)
+assert_eq len(@$res2), 1, "Order 2 has 1 reduced Latin square"
+assert_eq join(",", @{$res2->[0]->[0]}), "1,2", "Order 2 first row"
+assert_eq join(",", @{$res2->[0]->[1]}), "2,1", "Order 2 second row"
+
+test_run

@@ -1648,6 +1648,118 @@ impl Interpreter {
                 self.scope.declare_hash_global_frozen(name, val);
             }
         }
+        // Initial population of `%main::` / `%Pkg::`. Refreshed per REPL line
+        // and on demand via the `refresh_stashes()` builtin.
+        self.refresh_package_stashes();
+        // Initial install of `%parameters` (zsh-`$parameters` analogue).
+        // Refreshed automatically on every read via `touch_env_hash`.
+        // Stryke-only extension — gated off in `--compat` so Perl 5 scripts
+        // can declare their own `%parameters` without colliding.
+        if !crate::compat_mode() && !self.scope.has_lexical_hash("parameters") {
+            self.refresh_parameters_hash();
+        }
+    }
+
+    /// Rebuild `%parameters` (zsh-`$parameters` analogue) from the current
+    /// scope. Maps every live sigil-prefixed name (`$x`, `@a`, `%h`, …) to its
+    /// kind string (`"scalar"`, `"array"`, `"hash"`, `"atomic_array"`,
+    /// `"atomic_hash"`, `"shared_array"`, `"shared_hash"`). Installed as a
+    /// frozen global hash so user code can read it but not assign into it
+    /// (parallel to `%all` / `%b` / `%stryke::*`). Refreshed automatically on
+    /// every `%parameters` read via the `touch_env_hash` hook, so the snapshot
+    /// is always current — the user never needs to call this directly.
+    pub fn refresh_parameters_hash(&mut self) {
+        let pairs = self.scope.parameters_pairs();
+        let mut h: indexmap::IndexMap<String, PerlValue> =
+            indexmap::IndexMap::with_capacity(pairs.len());
+        for (name, kind) in pairs {
+            h.insert(name, PerlValue::string(kind.to_string()));
+        }
+        // declare_hash_global_frozen overwrites unconditionally, so each
+        // refresh replaces the prior snapshot.
+        self.scope.declare_hash_global_frozen("parameters", h);
+    }
+
+    /// Populate `%main::` / `%Foo::` package stashes with current symbol-table
+    /// state so `keys %main::` and `keys %Foo::` enumerate live names. Maps
+    /// each unqualified name → its kind string (`"scalar"`, `"array"`,
+    /// `"hash"`, `"sub"`). Stryke has no real Perl typeglob layer; the kind
+    /// string is the most useful per-symbol value we can offer.
+    ///
+    /// Callable repeatedly — overwrites prior stashes — so the REPL refreshes
+    /// after every line and scripts can call it explicitly via the
+    /// `refresh_stashes()` builtin if they want post-eval visibility.
+    pub fn refresh_package_stashes(&mut self) {
+        use indexmap::IndexMap;
+
+        let mut by_pkg: std::collections::HashMap<String, IndexMap<String, PerlValue>> =
+            std::collections::HashMap::new();
+
+        let record = |pkg: &str, sym: &str, kind: &str,
+                      map: &mut std::collections::HashMap<
+            String,
+            IndexMap<String, PerlValue>,
+        >| {
+            map.entry(pkg.to_string())
+                .or_default()
+                .insert(sym.to_string(), PerlValue::string(kind.to_string()));
+        };
+
+        // Subs: keys like "main::foo" / "Foo::Bar::baz".
+        for key in self.subs.keys() {
+            if let Some(idx) = key.rfind("::") {
+                let (pkg, rest) = key.split_at(idx);
+                let sym = &rest[2..];
+                if pkg.is_empty() || sym.is_empty() {
+                    continue;
+                }
+                record(pkg, sym, "sub", &mut by_pkg);
+            } else {
+                // Bare-name sub (no package qualifier) lives in main::.
+                record("main", key, "sub", &mut by_pkg);
+            }
+        }
+
+        // Package-qualified scalars / arrays / hashes from every frame.
+        for frame in self.scope.frames_for_introspection() {
+            let (scalars, arrays, hashes) = frame;
+            for name in scalars {
+                if let Some(idx) = name.rfind("::") {
+                    let (pkg, rest) = name.split_at(idx);
+                    let sym = &rest[2..];
+                    if !pkg.is_empty() && !sym.is_empty() {
+                        record(pkg, sym, "scalar", &mut by_pkg);
+                    }
+                }
+            }
+            for name in arrays {
+                if let Some(idx) = name.rfind("::") {
+                    let (pkg, rest) = name.split_at(idx);
+                    let sym = &rest[2..];
+                    if !pkg.is_empty() && !sym.is_empty() {
+                        record(pkg, sym, "array", &mut by_pkg);
+                    }
+                }
+            }
+            for name in hashes {
+                if let Some(idx) = name.rfind("::") {
+                    let (pkg, rest) = name.split_at(idx);
+                    let sym = &rest[2..];
+                    if !pkg.is_empty() && !sym.is_empty() {
+                        record(pkg, sym, "hash", &mut by_pkg);
+                    }
+                }
+            }
+        }
+
+        // Install each `%Pkg::` in the global frame. Lexer emits the trailing
+        // `::` as part of the name, so the stash hash lives under that exact
+        // key. `declare_hash_global_frozen` overwrites any prior copy.
+        for (pkg, mut entries) in by_pkg {
+            entries.sort_keys();
+            let key = format!("{}::", pkg);
+            self.scope.declare_hash_global_frozen(&key, entries);
+        }
     }
 
     /// `overload::import` / `overload::unimport` — core stubs used by CPAN modules (e.g.
@@ -2472,6 +2584,23 @@ impl Interpreter {
     pub(crate) fn touch_env_hash(&mut self, hash_name: &str) {
         if hash_name == "ENV" {
             self.materialize_env_if_needed();
+        } else if hash_name == "parameters"
+            && !crate::compat_mode()
+            && !self.scope.has_lexical_hash("parameters")
+        {
+            // `%parameters` (zsh `$parameters` analogue) — rebuild on every
+            // read so it always reflects current scope state. Frozen install,
+            // so user code can read but not assign into it. Stryke-only;
+            // `--compat` skips the auto-refresh so Perl 5 scripts that use
+            // `%parameters` for their own purposes are unaffected.
+            self.ensure_reflection_hashes();
+            self.refresh_parameters_hash();
+        } else if hash_name.ends_with("::") && hash_name.len() > 2 {
+            // `%main::` / `%Foo::` — repopulate from current symbol table on
+            // every read so newly-defined subs / `our` vars become visible
+            // without an explicit `refresh_stashes()` call. Cheap: walks
+            // `subs` keys + frame name lists, no value cloning.
+            self.refresh_package_stashes();
         } else if !self.reflection_hashes_ready && !self.scope.has_lexical_hash(hash_name) {
             match hash_name {
                 "b"

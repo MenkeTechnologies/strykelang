@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Fractal tree (ASCII)
+
+fn Rosetta::FractalTree::draw($depth, $x, $y, $angle, $len, $grid) {
+    if ($depth == 0) { return }
+    
+    # Calculate end point
+    # angle 0 is up, angle > 0 is right, angle < 0 is left
+    my $PI = 3.14159265
+    my $rad = $angle * $PI / 180.0
+    
+    # In ASCII, y increases downwards, so up is -cos(rad)?
+    # Let's simplify: 0 is Up, 45 is Right-Up, -45 is Left-Up.
+    my $nx = int($x + $len * sin($rad) + 0.5)
+    my $ny = int($y - $len * cos($rad) + 0.5)
+    
+    # Draw line (simplified to just end point for ASCII grid)
+    # Actually we should draw the segment.
+    Rosetta::FractalTree::line($x, $y, $nx, $ny, $grid)
+    
+    # Recurse
+    Rosetta::FractalTree::draw($depth - 1, $nx, $ny, $angle - 20, $len * 0.8, $grid)
+    Rosetta::FractalTree::draw($depth - 1, $nx, $ny, $angle + 20, $len * 0.8, $grid)
+}
+
+fn Rosetta::FractalTree::line($x1, $y1, $x2, $y2, $grid) {
+    # Bresenham-like or simple linear interpolation
+    my $dx = $x2 - $x1
+    my $dy = $y2 - $y1
+    my $steps = abs($dx) > abs($dy) ? abs($dx) : abs($dy)
+    if ($steps == 0) {
+        $grid->{$x1}{$y1} = 1
+        return
+    }
+    
+    for (my $i = 0; $i <= $steps; $i++) {
+        my $px = int($x1 + $i * $dx / $steps + 0.5)
+        my $py = int($y1 + $i * $dy / $steps + 0.5)
+        if (!exists $grid->{$px}) { $grid->{$px} = {} }
+        $grid->{$px}{$py} = 1
+    }
+}
+
+fn Rosetta::FractalTree::to_string($grid) {
+    my $min_x = 999; my $max_x = -999; my $min_y = 999; my $max_y = -999
+    for my $x (keys %$grid) {
+        for my $y (keys %{$grid->{$x}}) {
+            $min_x = $x if $x < $min_x
+            $max_x = $x if $x > $max_x
+            $min_y = $y if $y < $min_y
+            $max_y = $y if $y > $max_y
+        }
+    }
+    
+    my $out = ""
+    for (my $y = $min_y; $y <= $max_y; $y++) {
+        for (my $x = $min_x; $x <= $max_x; $x++) {
+            $out .= ($grid->{$x}{$y} ? "*" : " ")
+        }
+        $out .= "\n"
+    }
+    $out
+}
+
+my %grid
+Rosetta::FractalTree::draw(4, 20, 20, 0, 5, \%grid)
+my $tree = Rosetta::FractalTree::to_string(\%grid)
+# p $tree
+
+assert_ok length($tree) > 0, "Tree generated"
+assert_ok index($tree, "*") != -1, "Tree has characters"
+
+test_run

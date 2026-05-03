@@ -1,0 +1,65 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Set puzzle
+
+# A card is represented as an array of 4 attributes (0, 1, or 2).
+# A set of 3 cards is valid if for each attribute, the sum of values is divisible by 3.
+
+fn Rosetta::SetPuzzle::is_set($c1, $c2, $c3) {
+    ~> 0:3 all {
+        my $i = _
+        ($c1->[$i] + $c2->[$i] + $c3->[$i]) % 3 == 0
+    }
+}
+
+fn Rosetta::SetPuzzle::find_sets(@cards) {
+    my $n = len(@cards)
+    my @sets
+    
+    # Using traditional loops for triple nested iteration
+    for my $i (0:$n-3) {
+        for my $j ($i+1:$n-2) {
+            for my $k ($j+1:$n-1) {
+                if (Rosetta::SetPuzzle::is_set($cards[$i], $cards[$j], $cards[$k])) {
+                    push @sets, [$cards[$i], $cards[$j], $cards[$k]]
+                }
+            }
+        }
+    }
+    \@sets
+}
+
+# Test with known cases
+my @cards = (
+    [0, 0, 0, 0], [1, 1, 1, 1], [2, 2, 2, 2], # Set 1: all different/same
+    [0, 1, 2, 0], [0, 1, 2, 1], [0, 1, 2, 2], # Set 2: first 3 same, last different
+    [1, 0, 0, 0], [2, 0, 0, 0],               # [0,0,0,0], [1,0,0,0], [2,0,0,0] is Set 3
+    [1, 1, 0, 0]                              # Just another card
+)
+
+my $sets = Rosetta::SetPuzzle::find_sets(@cards)
+
+assert_ok len(@$sets) >= 3, "Found at least 3 sets"
+
+# Check if Set 1 is found
+my $has_set1 = 0
+for my $s (@$sets) {
+    if ($s->[0]->[0] == 0 && $s->[1]->[0] == 1 && $s->[2]->[0] == 2 &&
+        $s->[0]->[1] == 0 && $s->[1]->[1] == 1 && $s->[2]->[1] == 2) {
+        $has_set1 = 1
+        last
+    }
+}
+assert_ok $has_set1, "Found the all-different set"
+
+# Check if Set 3 is found
+my $has_set3 = 0
+for my $s (@$sets) {
+    if ($s->[0]->[0] == 0 && $s->[1]->[0] == 1 && $s->[2]->[0] == 2 &&
+        $s->[0]->[1] == 0 && $s->[1]->[1] == 0 && $s->[2]->[1] == 0) {
+        $has_set3 = 1
+        last
+    }
+}
+assert_ok $has_set3, "Found the [0,0,0,0], [1,0,0,0], [2,0,0,0] set"
+
+test_run

@@ -2193,6 +2193,106 @@ impl Scope {
         }
     }
 
+    /// Per-frame view of binding *names* (not values) for introspection
+    /// pipelines that need to walk every name in every frame without
+    /// reaching into private fields. Returns `(scalars, arrays, hashes)`.
+    /// Atomic / shared variants are folded into the matching kind so the
+    /// caller doesn't need to know the storage form.
+    pub fn frames_for_introspection(&self) -> Vec<(Vec<&str>, Vec<&str>, Vec<&str>)> {
+        self.frames
+            .iter()
+            .map(|f| {
+                let mut scalars: Vec<&str> = f.scalars.iter().map(|(n, _)| n.as_str()).collect();
+                // `my $x` ends up in scalar_slots; names live alongside.
+                scalars.extend(f.scalar_slot_names.iter().filter_map(|opt| match opt {
+                    Some(n) if !n.is_empty() => Some(n.as_str()),
+                    _ => None,
+                }));
+                let mut arrays: Vec<&str> = f.arrays.iter().map(|(n, _)| n.as_str()).collect();
+                arrays.extend(f.atomic_arrays.iter().map(|(n, _)| n.as_str()));
+                arrays.extend(f.shared_arrays.iter().map(|(n, _)| n.as_str()));
+                let mut hashes: Vec<&str> = f.hashes.iter().map(|(n, _)| n.as_str()).collect();
+                hashes.extend(f.atomic_hashes.iter().map(|(n, _)| n.as_str()));
+                hashes.extend(f.shared_hashes.iter().map(|(n, _)| n.as_str()));
+                scalars.sort_unstable();
+                arrays.sort_unstable();
+                hashes.sort_unstable();
+                (scalars, arrays, hashes)
+            })
+            .collect()
+    }
+
+    /// Sigil-prefixed name → variable-class string (`"scalar"`, `"array"`,
+    /// `"hash"`, `"atomic_array"`, `"atomic_hash"`, `"shared_array"`,
+    /// `"shared_hash"`) for every binding in every frame. Backs the
+    /// `parameters()` builtin (zsh-`$parameters` analogue). Walks frames
+    /// outermost → innermost so an inner shadow wins on duplicate names.
+    pub fn parameters_pairs(&self) -> Vec<(String, &'static str)> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut out: Vec<(String, &'static str)> = Vec::new();
+        // Iterate innermost first so the closest shadow registers first;
+        // `seen` then suppresses outer duplicates.
+        for frame in self.frames.iter().rev() {
+            // Slot-allocated lexical scalars (`my $x` lands here). Names live
+            // in `scalar_slot_names`; empty / None entries are anonymous
+            // padding slots and skipped.
+            for slot_name in &frame.scalar_slot_names {
+                if let Some(n) = slot_name {
+                    if !n.is_empty() {
+                        let s = format!("${}", n);
+                        if seen.insert(s.clone()) {
+                            out.push((s, "scalar"));
+                        }
+                    }
+                }
+            }
+            for (name, _) in &frame.scalars {
+                let s = format!("${}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "scalar"));
+                }
+            }
+            for (name, _) in &frame.arrays {
+                let s = format!("@{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "array"));
+                }
+            }
+            for (name, _) in &frame.hashes {
+                let s = format!("%{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "hash"));
+                }
+            }
+            for (name, _) in &frame.atomic_arrays {
+                let s = format!("@{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "atomic_array"));
+                }
+            }
+            for (name, _) in &frame.atomic_hashes {
+                let s = format!("%{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "atomic_hash"));
+                }
+            }
+            for (name, _) in &frame.shared_arrays {
+                let s = format!("@{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "shared_array"));
+                }
+            }
+            for (name, _) in &frame.shared_hashes {
+                let s = format!("%{}", name);
+                if seen.insert(s.clone()) {
+                    out.push((s, "shared_hash"));
+                }
+            }
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    }
+
     /// Sigil-prefixed names (`$x`, `@a`, `%h`) from all frames, for REPL tab-completion.
     pub fn repl_binding_names(&self) -> Vec<String> {
         let mut seen = HashSet::new();

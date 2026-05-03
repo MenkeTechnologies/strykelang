@@ -346,6 +346,10 @@ pub fn run(cli: &Cli) {
     };
 
     loop {
+        // Refresh `%main::` / `%Pkg::` so each prompt sees the current symbol
+        // table (subs / `our` declarations added on the prior line).
+        interp.refresh_package_stashes();
+
         if let Ok(mut g) = dynamic.lock() {
             *g = interp.repl_completion_names();
         }

@@ -443,10 +443,10 @@
 [x] Four bit adder
 [x] Four is magic
 [x] Four is the number of letters in the ...
-[ ] Fractal tree
+[x] Fractal tree
 [x] Fraction reduction
 [x] Fractran
-[ ] French Republican calendar
+[x] French Republican calendar
 [ ] FTP
 [x] Function composition
 [x] Function definition
@@ -474,7 +474,7 @@
 [x] Goldbach's comet
 [x] Golden ratio/Convergence
 [x] Gosper's hack
-[ ] Gotchas
+[x] Gotchas
 [x] Graph colouring
 [x] Gray code
 [x] Grayscale image
@@ -540,7 +540,7 @@
 [ ] HTTPS/Client-authenticated
 [x] Huffman coding
 [x] Humble numbers
-[ ] Hunt the Wumpus
+[x] Hunt the Wumpus
 [x] I before E except after C
 [x] I'm a software engineer, get me out of here
 [x] IBAN
@@ -696,7 +696,7 @@
 [x] Matrix transposition
 [x] Matrix-exponentiation operator
 [x] Maximum triangle path sum
-[ ] Mayan calendar
+[x] Mayan calendar
 [x] Mayan numerals
 [x] Maze generation
 [x] Maze solving
@@ -711,7 +711,7 @@
 [x] Menu
 [x] Merge and aggregate datasets
 [x] Mertens function
-[ ] Metallic ratios
+[x] Metallic ratios
 [x] Metaprogramming
 [ ] Metered concurrency
 [ ] Metronome
@@ -815,7 +815,7 @@
 [x] Own digits power sum
 [x] P-Adic numbers, basic
 [x] P-Adic square roots
-[ ] P-value correction
+[x] P-value correction
 [x] Padovan n-step number sequences
 [x] Padovan sequence
 [x] Pairs with common factors
@@ -830,7 +830,7 @@
 [x] Parallel brute force
 [x] Parallel calculations
 [ ] Parameterized SQL statement
-[ ] Parametric polymorphism
+[x] Parametric polymorphism
 [x] Parse an IP Address
 [x] Parsing/RPN calculator algorithm
 [x] Parsing/RPN to infix conversion
@@ -854,7 +854,7 @@
 [x] Penta-power prime seeds
 [x] Pentagram
 [ ] Pentomino tiling
-[ ] Percentage difference between images
+[x] Percentage difference between images
 [ ] Percolation/Bond percolation
 [x] Percolation/Mean cluster density
 [x] Percolation/Mean run density
@@ -880,13 +880,13 @@
 [ ] Pig the dice game/Player
 [ ] Pinstripe/Display
 [ ] Pinstripe/Printer
-[ ] Piprimes
+[x] Piprimes
 [x] Pisano period
 [ ] Plasma effect
 [ ] Play recorded sounds
 [x] Playfair cipher
 [x] Playing cards
-[ ] Plot coordinate pairs
+[x] Plot coordinate pairs
 [x] Pointers and references
 [x] Poker hand analyser
 [x] Polymorphic copy
@@ -937,9 +937,9 @@
 [x] Ramanujan primes/twins
 [x] Ramanujan's constant
 [x] Ramer-Douglas-Peucker line simplification
-[ ] Random Latin squares
+[x] Random Latin squares
 [ ] Random number generator (device)
-[ ] Random number generator (included)
+[x] Random number generator (included)
 [x] Random numbers
 [ ] Random sentence from book
 [x] Range consolidation
@@ -947,9 +947,9 @@
 [x] Range extraction
 [x] Ranking methods
 [x] Rare numbers
-[ ] Rate counter
+[x] Rate counter
 [ ] Rational calculator
-[ ] Ray-casting algorithm
+[x] Ray-casting algorithm
 [ ] RCRPG
 [x] Read a configuration file
 [x] Read a file character by character/UTF8
@@ -989,7 +989,7 @@
 [x] Roots of unity
 [x] Rosetta Code/Count examples
 [x] Rosetta Code/Find bare lang tags
-[ ] Rosetta Code/Find unimplemented tasks
+[x] Rosetta Code/Find unimplemented tasks
 [ ] Rosetta Code/Fix code tags
 [ ] Rosetta Code/Rank languages by number of users
 [ ] Rosetta Code/Rank languages by popularity

@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Hunt the Wumpus (Simplified)
+
+fn Rosetta::Wumpus::get_adj() {
+    # Dodecahedron adjacency list
+    [
+        [1, 4, 7],   # 0
+        [0, 2, 9],   # 1
+        [1, 3, 11],  # 2
+        [2, 4, 13],  # 3
+        [0, 3, 5],   # 4
+        [4, 6, 14],  # 5
+        [5, 7, 16],  # 6
+        [0, 6, 8],   # 7
+        [7, 9, 17],  # 8
+        [1, 8, 10],  # 9
+        [9, 11, 18], # 10
+        [2, 10, 12], # 11
+        [11, 13, 19],# 12
+        [3, 12, 14], # 13
+        [5, 13, 15], # 14
+        [14, 16, 19],# 15
+        [6, 15, 17], # 16
+        [8, 16, 18], # 17
+        [10, 17, 19],# 18
+        [12, 15, 18] # 19
+    ]
+}
+
+fn Rosetta::Wumpus::sense($player, $wumpus, $pits, $bats, $adj) {
+    my @warnings
+    for my $neighbor (@{$adj->[$player]}) {
+        if ($neighbor == $wumpus) { push @warnings, "I smell a Wumpus!" }
+        if (grep { _ == $neighbor } @$pits) { push @warnings, "I feel a draft!" }
+        if (grep { _ == $neighbor } @$bats) { push @warnings, "Bats nearby!" }
+    }
+    \@warnings
+}
+
+# Setup a fixed game state for testing
+my $adj = Rosetta::Wumpus::get_adj()
+my $wumpus = 19
+my @pits = (3, 12)
+my @bats = (5)
+
+# Test sensing
+my $warn1 = Rosetta::Wumpus::sense(18, $wumpus, \@pits, \@bats, $adj)
+# 18 is adjacent to 10, 17, 19 (Wumpus)
+my $c1 = @$warn1 |> grep { _ =~ /Wumpus/ } |> len()
+assert_ok $c1 > 0, "Sensed Wumpus near 18"
+
+my $warn2 = Rosetta::Wumpus::sense(4, $wumpus, \@pits, \@bats, $adj)
+# 4 is adjacent to 0, 3 (Pit), 5 (Bat)
+my $c2 = @$warn2 |> grep { _ =~ /draft/ } |> len()
+assert_ok $c2 > 0, "Sensed Pit near 4"
+
+my $c3 = @$warn2 |> grep { _ =~ /Bats/ } |> len()
+assert_ok $c3 > 0, "Sensed Bats near 4"
+
+test_run

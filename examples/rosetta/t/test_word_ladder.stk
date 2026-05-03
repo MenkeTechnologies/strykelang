@@ -1,49 +1,53 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Word ladder
 
-fn Rosetta::WordLadder::solve($start, $end, $words) {
+fn Rosetta::WordLadder::is_adjacent($w1, $w2) {
+    return 0 if length($w1) != length($w2)
+    my $diff = 0
+    for my $i (0:length($w1)-1) {
+        if (substr($w1, $i, 1) ne substr($w2, $i, 1)) {
+            $diff++
+            return 0 if $diff > 1
+        }
+    }
+    $diff == 1
+}
+
+fn Rosetta::WordLadder::solve($start, $end, $dictionary) {
     return [$start] if $start eq $end
     
-    my %dict
-    $dict{$_} = 1 for @$words
-    
     my @queue = ([$start])
-    my %seen = ($start => 1)
+    my %visited; $visited{$start} = 1
     
-    while (len(@queue)) {
+    while (len(@queue) > 0) {
         my $path = shift @queue
-        my $word = $path->[-1]
+        my $word = $path->[len(@$path)-1]
         
-        my @chars = chars($word)
-        for (my $i = 0; $i < len(@chars); $i++) {
-            my $orig = $chars[$i]
-            for my $c ("a".."z") {
-                next if $c eq $orig
-                $chars[$i] = $c
-                my $next_word = join("", @chars)
-                
-                if ($next_word eq $end) {
-                    my @final_path = (@$path, $end)
-                    return join("->", @final_path)
-                }
-                
-                if ($dict{$next_word} && !$seen{$next_word}) {
-                    $seen{$next_word} = 1
-                    push @queue, [@$path, $next_word]
-                }
+        for my $next (@$dictionary) {
+            if (!exists $visited{$next} && Rosetta::WordLadder::is_adjacent($word, $next)) {
+                my @new_path = (@$path, $next)
+                if ($next eq $end) { return \@new_path }
+                $visited{$next} = 1
+                push @queue, \@new_path
             }
-            $chars[$i] = $orig
         }
     }
     undef
 }
 
-my @word_list = qw(cold cord word ward warm)
-my $res = Rosetta::WordLadder::solve("cold", "warm", \@word_list)
-assert_eq $res, "cold->cord->word->ward->warm", "cold to warm ladder"
+# Test with a small dictionary
+my @dict = qw(boy bay may man mat hat cat)
+my $res = Rosetta::WordLadder::solve("boy", "cat", \@dict)
 
-my @word_list2 = qw(hot dot dog log cog)
-my $res2 = Rosetta::WordLadder::solve("hot", "dog", \@word_list2)
-assert_eq $res2, "hot->dot->dog", "hot to dog ladder"
+assert_ok defined($res), "Found a path from boy to cat"
+assert_eq join("->", @$res), "boy->bay->may->mat->cat", "Correct path"
+
+# Test another path
+my $res2 = Rosetta::WordLadder::solve("hat", "man", \@dict)
+assert_eq join("->", @$res2), "hat->mat->man", "Correct path for hat->man"
+
+# Test no path
+my $res3 = Rosetta::WordLadder::solve("boy", "hat", ["boy", "bay"])
+assert_ok !defined($res3), "No path found when dictionary is small"
 
 test_run

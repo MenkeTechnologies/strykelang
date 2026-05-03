@@ -4368,6 +4368,9 @@ impl<'a> VM<'a> {
                         let n = *n as usize;
                         // Pops are last-to-first on the stack; reverse to source (left-to-right) order,
                         // then flatten nested arrays in place (Perl list literal semantics).
+                        // Hashes flatten to alternating key/value entries — Perl's
+                        // `(%a, %b)` splat-merge idiom relies on this; without it
+                        // each hash collapses to its scalar bucket-fill string.
                         let mut stack_vals = Vec::with_capacity(n);
                         for _ in 0..n {
                             stack_vals.push(self.pop());
@@ -4377,6 +4380,11 @@ impl<'a> VM<'a> {
                         for v in stack_vals {
                             if let Some(items) = v.as_array_vec() {
                                 arr.extend(items);
+                            } else if let Some(map) = v.as_hash_map() {
+                                for (k, vv) in map {
+                                    arr.push(PerlValue::string(k));
+                                    arr.push(vv);
+                                }
                             } else {
                                 arr.push(v);
                             }
@@ -5931,6 +5939,11 @@ impl<'a> VM<'a> {
                     }
                     Op::MakeHashBindingRef(name_idx) => {
                         let name = &names[*name_idx as usize];
+                        // Lazy-init hook: `\%all` / `\%parameters` / `\%main::`
+                        // bypass `Op::GetHash`, so without this call the
+                        // reference is taken before the hash is populated and
+                        // the user gets an empty hashref.
+                        self.interp.touch_env_hash(name);
                         let arc = self.interp.scope.promote_hash_to_shared(name);
                         self.push(PerlValue::hash_ref(arc));
                         Ok(())

@@ -1,0 +1,16 @@
+#!/usr/bin/env stryke
+# Rosetta Code: Metallic ratios
+
+fn Rosetta::MetallicRatios::compute($n) {
+    ($n + sqrt($n * $n + 4)) / 2.0
+}
+
+my @names = ("Golden", "Silver", "Bronze", "Copper", "Nickel", "Aluminum", "Iron", "Tin", "Lead", "Zinc")
+
+my $golden = Rosetta::MetallicRatios::compute(1)
+my $silver = Rosetta::MetallicRatios::compute(2)
+
+assert_ok abs($golden - 1.6180339887) < 0.0000001, "Golden ratio"
+assert_ok abs($silver - 2.4142135623) < 0.0000001, "Silver ratio"
+
+test_run
