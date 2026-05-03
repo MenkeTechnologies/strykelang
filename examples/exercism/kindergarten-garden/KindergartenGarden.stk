@@ -5,5 +5,5 @@ my %_POS = map { ($_KIDS[_], _ * 2) } 0..len(@_KIDS) - 1
 
 fn Exercism::KindergartenGarden::plants($diagram, $student) {
     my $p = $_POS{$student}
-    [~> $diagram split(/\n/) map { $_PLANT{substr(_, $p, 1)}, $_PLANT{substr(_, $p + 1, 1)} }]
+    [~> $diagram split(/\n/) map { $_PLANT{_[$p]}, $_PLANT{_[$p+1]} }]
 }

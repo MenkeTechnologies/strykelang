@@ -15665,7 +15665,8 @@ fn builtin_partition_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array(result))
 }
 
-/// `map_indexed FN, LIST` — maps with index as second argument.
+/// `map_indexed LIST..., FN` — each call receives `(item, index)` in `@_` / `_0` / `_1`.
+/// `map_indexed FN, LIST` is still accepted for `->>` thread-last desugar (`[FN, LIST]`).
 fn builtin_map_indexed(
     interp: &mut Interpreter,
     args: &[PerlValue],
@@ -15674,14 +15675,28 @@ fn builtin_map_indexed(
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
     }
-    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let Some(sub) = f.as_code_ref() else {
+    let (f, xs) = if args.last().is_some_and(|v| v.as_code_ref().is_some()) {
+        (
+            args.last().cloned().unwrap_or(PerlValue::UNDEF),
+            flatten_args(&args[..args.len().saturating_sub(1)]),
+        )
+    } else if args.first().is_some_and(|v| v.as_code_ref().is_some()) {
+        (
+            args.first().cloned().unwrap_or(PerlValue::UNDEF),
+            flatten_args(&args[1..]),
+        )
+    } else {
         return Err(PerlError::runtime(
-            "map_indexed: first argument must be a code reference",
+            "map_indexed: expected LIST..., CODE (or CODE, LIST for thread-last `->>`)",
             line,
         ));
     };
-    let xs = flatten_args(&args[1..]);
+    let Some(sub) = f.as_code_ref() else {
+        return Err(PerlError::runtime(
+            "map_indexed: code reference missing",
+            line,
+        ));
+    };
     let mut result = Vec::with_capacity(xs.len());
     for (i, x) in xs.into_iter().enumerate() {
         let mapped = exec_to_perl_result(

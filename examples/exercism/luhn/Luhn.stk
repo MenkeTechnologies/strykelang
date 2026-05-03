@@ -2,6 +2,5 @@
 fn Exercism::Luhn::is_luhn_valid {
     my $c = _ =~ s/\s+//gr
     return 0 unless len($c) > 1 && $c =~ /^\d+$/
-    my $i = 0
-    (~> $c rev chars map { _ *= 2 if $i++ % 2 == 1; _ > 9 ? _ - 9 : _ } sum) % 10 == 0
+    (~> $c rev chars mapi { _ *= 2 if odd _1 ; _ > 9 ? _ - 9 : _ } sum) % 10 == 0
 }
