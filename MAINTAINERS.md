@@ -56,12 +56,12 @@ every push. PRs that touch the dispatch table must include
   patch releases, bug fixes, new builtins that follow existing patterns,
   performance work that preserves semantics, docs, tests) are
   maintainer-only — no creator approval needed.
-- **Major decisions that touch a protected invariant** (see below)
-  require final approval from the creator before landing on the
-  official upstream. The maintainer team owns the proposal,
-  development, and review; the creator's role is a yes/no on the
-  final shape. Decisions that don't touch any protected invariant
-  fall under operational and don't need creator approval.
+- **Major decisions that touch a core invariant** (see below) are
+  reviewed with the creator before landing on the official upstream.
+  The maintainer team owns the proposal, development, and review;
+  the creator's role is a final yes/no on the shape. Decisions
+  that don't touch any core invariant fall under operational and
+  don't need creator review.
 - The maintainer team may proceed without creator involvement on any
   decision the creator declines to engage with within a reasonable
   window (default: 30 days from formal proposal).
@@ -71,18 +71,20 @@ every push. PRs that touch the dispatch table must include
   their own governance and proceed without creator approval on any
   change.
 
-### Protected invariants
+### Core invariants
 
-The veto exists for one purpose: **stryke must remain stryke**. It
-is not a Linus-style permanent dictatorship and it is not a
-quality-of-PR review. It exists to prevent the failure mode that
-killed Raku (Perl 6) and that Python 4 was deliberately structured
-to avoid — a generational rewrite that dissolves the language's
-identity, splits the community, and leaves the old version to
-stagnate.
+These describe the load-bearing pieces of stryke's identity — what
+makes stryke recognizable as stryke across decades and across
+maintainer rotations. They reflect a generational lesson from past
+language transitions: a language is most useful when it stays itself
+long enough for its design to compound. Raku and Python 3 are
+worked examples of how much momentum a from-scratch rewrite costs.
 
-Changes to any of the following require creator approval before
-landing on the official upstream:
+The invariants are not a fence against change — maintainers ship
+features, opcodes, builtins, refactors, and perf work freely.
+They mark the difference between *extending* the language and
+*replacing* it. Changes to any of the following are reviewed
+with the creator before landing on the official upstream:
 
 1. **Perl 5 compatibility floor.** `--compat` must continue to run
    Perl 5 code. Dropping this turns stryke into a different
@@ -121,11 +123,12 @@ new builtins / opcodes / subsystems freely. They can also
 upstream needs the creator's sign-off. Forks are free to redefine
 or drop any of these.
 
-**These invariants protect upstream identity, not the ideas
-themselves.** Other languages — Perl, Ruby, Python, Raku, zsh,
-fish, nushell, anything — are explicitly welcome to absorb,
-adapt, or fully port any stryke-originated design (threading
-operators, implicit-positional closure params, encyclopedic
-stdlib axis, AOP intercepts, AI primitives, etc.) under the MIT
-license. See [CREATORS.md § Porting stryke ideas to other
+**Stryke's design ideas are part of its contribution to the
+language-design tradition.** Other languages — Perl, Ruby, Python,
+Raku, zsh, fish, nushell, OCaml, anything — are explicitly invited
+to absorb, adapt, or build on any stryke-originated design
+(threading operators, implicit-positional closure params,
+encyclopedic stdlib axis, AOP intercepts, AI primitives, etc.)
+under the MIT license. The ideas living elsewhere is the goal.
+See [CREATORS.md § Porting stryke ideas to other
 languages](CREATORS.md#porting-stryke-ideas-to-other-languages).
