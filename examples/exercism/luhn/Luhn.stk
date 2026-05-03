@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
-fn Exercism::Luhn::is_luhn_valid($s) {
-    my $c = $s =~ s/\s+//gr
-    return 0 unless length($c) > 1 && $c =~ /^\d+$/
+fn Exercism::Luhn::is_luhn_valid {
+    my $c = _ =~ s/\s+//gr
+    return 0 unless len($c) > 1 && $c =~ /^\d+$/
     my $i = 0
-    sum(map { my $d = _; $d *= 2 if $i++ % 2 == 1; $d > 9 ? $d - 9 : $d } chars(rev $c)) % 10 == 0 ? 1 : 0
+    (~> $c rev chars map { _ *= 2 if $i++ % 2 == 1; _ > 9 ? _ - 9 : _ } sum) % 10 == 0
 }

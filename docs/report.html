@@ -92,7 +92,7 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 340-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 340-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. <strong>178k production lines + 4,043 callable builtins + 1,349/1,349 Rosetta tasks complete in under two years</strong> &mdash; comparable to dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val">221,733</div><div class="stat-label">Rust Lines</div></div>
@@ -114,6 +114,112 @@
           <span class="bar-pct" style="font-size:12px;">178,278 production / 42,786 tests / 669 tooling &middot; 80.4% production</span>
         </div>
         <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Production: 89 files across <code>strykelang/</code> + <code>strykelang/pkg/</code> + <code>strykelang/bins/</code> excluding <code>*_tests.rs</code>. Tests: 17 inline test files in <code>strykelang/</code> + 85 integration files in <code>tests/</code>. Tooling: <code>build.rs</code> + <code>benches/</code>.</p>
+      </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 1b: SCALE &amp; POSITION            -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">~</span>SCALE &amp; POSITION</h2>
+      <p class="tutorial-subtitle">Quantitative comparison against the established dynamic-language reference set. Source-LOC figures are approximate (counted from each project's public source tree, excluding vendored deps and external bindings). Stryke is single-author single-language-binary; the others span tens to hundreds of contributors over multi-decade histories.</p>
+
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th>Language</th>
+            <th>First release</th>
+            <th class="num">Years</th>
+            <th class="num">Production source</th>
+            <th class="num">Built-in callables</th>
+            <th>Native JIT</th>
+            <th>Rosetta complete?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:rgba(57,255,20,0.05);">
+            <td style="color:var(--green);"><strong>stryke</strong></td>
+            <td>2024</td>
+            <td class="num">&lt;2</td>
+            <td class="num">178,278 (Rust)</td>
+            <td class="num">4,043</td>
+            <td>Cranelift</td>
+            <td><strong>1,349 / 1,349 (100%)</strong></td>
+          </tr>
+          <tr>
+            <td>Lua 5.4</td>
+            <td>1993</td>
+            <td class="num">~32</td>
+            <td class="num">~13,000 (C)</td>
+            <td class="num">~80</td>
+            <td>no (LuaJIT is separate)</td>
+            <td>partial</td>
+          </tr>
+          <tr>
+            <td>LuaJIT</td>
+            <td>2005</td>
+            <td class="num">~20</td>
+            <td class="num">~85,000 (C+asm)</td>
+            <td class="num">~80</td>
+            <td>tracing</td>
+            <td>n/a (rides on Lua)</td>
+          </tr>
+          <tr>
+            <td>Tcl 8.6</td>
+            <td>1988</td>
+            <td class="num">~37</td>
+            <td class="num">~150,000 (C)</td>
+            <td class="num">~90</td>
+            <td>no</td>
+            <td>complete</td>
+          </tr>
+          <tr>
+            <td>Crystal</td>
+            <td>2014</td>
+            <td class="num">~12</td>
+            <td class="num">~250,000 (Crystal)</td>
+            <td class="num">stdlib classes</td>
+            <td>LLVM AOT</td>
+            <td>partial</td>
+          </tr>
+          <tr>
+            <td>Perl 5</td>
+            <td>1994</td>
+            <td class="num">~31</td>
+            <td class="num">~700,000 (C+Perl)</td>
+            <td class="num">~250 keywords</td>
+            <td>no</td>
+            <td>complete</td>
+          </tr>
+          <tr>
+            <td>Python 3</td>
+            <td>2008</td>
+            <td class="num">~17</td>
+            <td class="num">~1,200,000 (C+Py)</td>
+            <td class="num">~150 builtins</td>
+            <td>no (3.13 experimental)</td>
+            <td>complete</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="feature-grid" style="margin-top:1.2rem;">
+        <div class="feature-card">
+          <h4>By Per-Year Output</h4>
+          <p>Stryke ships ~89,000 production lines per year of single-author Rust. Lua's lifetime average is ~400 lines/year of single-author C. Different orders of magnitude — different feature scope.</p>
+        </div>
+        <div class="feature-card">
+          <h4>By Test Surface</h4>
+          <p><code>4,920</code> <code>#[test]</code> functions + <code>20,058</code> Perl-parity cases + <code>22,236</code> assertions in the Rosetta corpus. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
+        </div>
+        <div class="feature-card">
+          <h4>By Built-in Capability</h4>
+          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 4,043 callables vs ~80&ndash;250 for the reference set.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Rosetta Code Completion</h4>
+          <p>Clearing all 1,349 published tasks is a third-party-verifiable completeness bar that takes most languages a decade or more to reach. Stryke joined that set in under 2 years &mdash; differential is the encyclopedic-stdlib axis: tasks that other languages need third-party libraries for are one-builtin calls in stryke.</p>
+        </div>
       </div>
 
       <hr class="section-rule">

@@ -14,5 +14,5 @@ fn Exercism::RobotName::_unique {
 }
 
 fn Exercism::RobotName::new        { { name => Exercism::RobotName::_unique() } }
-fn Exercism::RobotName::name       { _0->{name} }
-fn Exercism::RobotName::reset_name { my $r = _0; delete $_USED{$r->{name}}; $r->{name} = Exercism::RobotName::_unique(); $r }
+fn Exercism::RobotName::name       { _->{name} }
+fn Exercism::RobotName::reset_name { my $r = _; delete $_USED{$r->{name}}; $r->{name} = Exercism::RobotName::_unique(); $r }
