@@ -1,2 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::TwoFer::two_fer { "One for #{_0 // 'you'}, one for me." }
+fn Exercism::TwoFer::two_fer { "One for #{_ // 'you'}, one for me." }

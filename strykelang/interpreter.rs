@@ -1699,15 +1699,15 @@ impl Interpreter {
         let mut by_pkg: std::collections::HashMap<String, IndexMap<String, PerlValue>> =
             std::collections::HashMap::new();
 
-        let record = |pkg: &str, sym: &str, kind: &str,
-                      map: &mut std::collections::HashMap<
-            String,
-            IndexMap<String, PerlValue>,
-        >| {
-            map.entry(pkg.to_string())
-                .or_default()
-                .insert(sym.to_string(), PerlValue::string(kind.to_string()));
-        };
+        let record =
+            |pkg: &str,
+             sym: &str,
+             kind: &str,
+             map: &mut std::collections::HashMap<String, IndexMap<String, PerlValue>>| {
+                map.entry(pkg.to_string())
+                    .or_default()
+                    .insert(sym.to_string(), PerlValue::string(kind.to_string()));
+            };
 
         // Subs: keys like "main::foo" / "Foo::Bar::baz".
         for key in self.subs.keys() {

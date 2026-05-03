@@ -2236,13 +2236,11 @@ impl Scope {
             // Slot-allocated lexical scalars (`my $x` lands here). Names live
             // in `scalar_slot_names`; empty / None entries are anonymous
             // padding slots and skipped.
-            for slot_name in &frame.scalar_slot_names {
-                if let Some(n) = slot_name {
-                    if !n.is_empty() {
-                        let s = format!("${}", n);
-                        if seen.insert(s.clone()) {
-                            out.push((s, "scalar"));
-                        }
+            for n in frame.scalar_slot_names.iter().flatten() {
+                if !n.is_empty() {
+                    let s = format!("${}", n);
+                    if seen.insert(s.clone()) {
+                        out.push((s, "scalar"));
                     }
                 }
             }
