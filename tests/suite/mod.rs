@@ -8,6 +8,7 @@ mod behavior_pin_2026_05;
 mod behavior_pin_2026_05_b;
 mod behavior_pin_2026_05_c;
 mod behavior_pin_2026_05_d;
+mod behavior_pin_2026_05_e;
 mod bigint_compat;
 mod builtins;
 mod class_oop;
