@@ -1601,6 +1601,78 @@ Severity: **bug** (calling-convention surprise; existing tests show the
 list-first form is the contract).
 
 
+## BUG-064 — `PI` / `TAU` / `E` (uppercase) constants are barewords
+
+```sh
+$ stryke -e 'print pi'
+3.14159265358979
+$ stryke -e 'print PI'
+PI
+$ stryke -e 'print E'
+E
+$ stryke -e 'print e'
+Unexpected token Eof at -e line 1.
+```
+
+`pi` and `tau` work as built-in constants; uppercase aliases are missing
+and `e` is a parser-level token-fragment (since `eq`/`each` start with
+`e`). Workaround: `exp(1)` for Euler's number.
+
+Tests: `pi_constant_known_value`, `tau_constant_is_two_pi`,
+`pi_uppercase_is_not_a_constant_today`, `e_alone_is_parse_error_today`,
+`exp_one_yields_e`.
+
+Severity: **bug** (low impact; aliases would resolve it).
+
+
+## BUG-065 — `head(N, LIST)` returns just `N` instead of first N elements
+
+```sh
+$ stryke -e 'my @r = head(qw(a b c d e), 3); print "@r"'
+a b c
+$ stryke -e 'my @r = head(3, qw(a b c d e)); print "@r"'
+3
+```
+
+The `(LIST, N)` order is the working contract — same as `take`, `drop`,
+`tail`. The `(N, LIST)` form silently returns `(N)`.
+
+Tests: `head_list_then_n_returns_first_n`,
+`head_n_first_returns_just_n_today`,
+`tail_list_then_count_returns_last_n`.
+
+Severity: **bug** (calling-convention surprise).
+
+
+## BUG-066 — `pairwise { $a + $b } @a, @b` returns empty list
+
+```sh
+$ stryke -e 'my @a = (1,2,3); my @b = (10,20,30);
+            my @r = pairwise { $a + $b } @a, @b;
+            print scalar @r'
+0
+$ perl -MList::Util=pairwise -e '...'
+3                       # (11, 22, 33)
+```
+
+Stryke's `pairwise` builtin parses but produces nothing. Workaround:
+manual `map` over indices.
+
+Tests: `pairwise_block_form_returns_empty_today`.
+
+Severity: **bug**.
+
+
+## BUG-067 — `find_index` not built-in
+
+`find { ... } LIST` works (returns the matching value), but Perl's
+`find_index` (returns the index of the first match) is missing.
+
+Tests: `find_index_is_not_a_builtin_today`.
+
+Severity: **bug** (parity gap with `List::Util`).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
