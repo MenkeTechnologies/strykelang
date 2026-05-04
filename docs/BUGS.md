@@ -2206,6 +2206,121 @@ Severity: **bug** (very high impact — breaks every `($head, @tail) = @_`
 idiom).
 
 
+## BUG-089 — Closures don't observe outer-scope mutations (capture-by-value)
+
+```sh
+$ stryke -e '
+my $x = 5;
+my $f = sub { $x };
+$x = 10;
+print $f->()'
+5                              # Perl prints 10
+$ stryke -e '
+my $count = 0;
+my $inc = sub { $count++ };
+$inc->(); $inc->(); $inc->();
+print $count'
+0                              # Perl prints 3
+```
+
+A closure that references an outer-scope `my` variable receives a
+snapshot of that variable's value, not a reference to its storage. The
+following Perl idioms break:
+
+- Outer counter: `my $n = 0; my $inc = sub { $n++ }; $inc->(); print $n`
+- Cached state: any mutation through the closure stays local to the
+  closure's snapshot
+- Observer pattern: external updates are invisible to subscribed
+  closures
+
+What still works:
+
+- Factory pattern: `sub make_X { my $n; sub { ... } }` — internal `my`
+  variables ARE shared between repeat calls of the inner closure, so
+  `make_counter()` returns a working counter.
+- For-loop iteration: `for my $i (LIST) { push @fs, sub { $i } }` — each
+  iteration's `$i` is a fresh `my` and the closure captures it correctly.
+- `map { my $captured = $x; sub { $captured } } LIST` — explicit
+  per-iteration `my` binding works.
+
+Tests: `closure_does_not_see_outer_var_mutation_today`,
+`closure_modifying_outer_scalar_does_not_propagate_today`,
+`closure_does_not_observe_outer_array_push_today`,
+`closure_does_not_observe_outer_hash_extension_today`,
+`fn_factory_returning_sub_captures_factory_param`,
+`for_loop_closure_captures_each_iteration_var`,
+`factory_with_internal_state_is_a_working_counter`,
+`map_inside_closure_captures_unique_per_iteration`.
+
+Severity: **bug** (very high impact). Combined with BUG-095 (slurpy
+destructure leak) this breaks most stateful HOF patterns.
+
+
+## BUG-090 — Slurpy `@rest` / `%rest` in destructure captures the FULL list
+
+```sh
+$ stryke -e 'my ($a, $b, @rest) = (1, 2, 3, 4, 5); print scalar @rest'
+5                              # @rest captured all 5; should be 3
+$ stryke -e 'my ($a, %h) = (1, "k1", "v1", "k2", "v2"); print scalar keys %h'
+2                              # keys "1" and "v1" — slurped from offset 0
+```
+
+Stryke binds the leading scalars correctly but the slurpy `@`/`%`
+captures starting from index 0, not from the position implied by the
+preceding scalars. Pure-scalar destructure (`my ($a, $b) = ...`) and
+explicit `shift; shift; my @rest = @_` both work.
+
+Tests: `slurpy_array_destructure_from_literal_list_captures_all_today`,
+`slurpy_array_destructure_from_at_underscore_captures_all_today`,
+`slurpy_hash_destructure_captures_all_today`,
+`pure_scalar_destructure_works`,
+`shift_then_shift_extracts_correctly`.
+
+Severity: **bug** (very high impact — breaks every `($head, @tail) =
+@_` idiom across the codebase).
+
+
+## BUG-097 — `print {$fh} ...` braces form does not honor the filehandle
+
+```sh
+$ stryke -e '
+open my $fh, ">", "/tmp/out" or die;
+print {$fh} "data\n";
+close $fh;
+print "file: ", -s "/tmp/out"'
+CODE(__ANON__)file: 0          # the brace expression is evaluated and printed
+```
+
+Stryke parses `print {$fh} ...` as `print { ... }` where the braces
+introduce a hashref-or-block context, not as the filehandle-disambiguator
+form. Workaround: `print $fh "data\n"` (no braces) when `$fh` is a
+simple scalar.
+
+Tests: `print_braces_filehandle_form_does_not_write_to_handle_today`,
+`print_to_filehandle_writes_to_stdout_today` (BUG-085 cousin).
+
+Severity: **bug**.
+
+
+## BUG-098 — `eof($fh)` always returns false
+
+```sh
+$ stryke -e '
+open my $fh, "<", "/tmp/x";
+my $line = <$fh>;          # "x\n", file's only line
+print eof($fh) ? "Y" : "N"'
+N                              # should be Y
+```
+
+The `eof` builtin reports false even after all data has been consumed.
+Workaround: detect end via undef return from `<$fh>`.
+
+Tests: `eof_always_returns_false_today`,
+`readline_on_eof_filehandle_returns_undef`.
+
+Severity: **bug**.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
