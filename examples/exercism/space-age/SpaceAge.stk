@@ -10,5 +10,5 @@ my $_EARTH_SEC = 31557600.0
 fn Exercism::SpaceAge::on_planet($planet, $secs) {
     my $p = $_P{lc $planet}
     die "unknown planet: $planet" unless defined $p
-    sprintf("%.2f", $secs / ($_EARTH_SEC * $p)) + 0
+    sprintf("%.2f", $secs / ($_EARTH_SEC * $p))
 }

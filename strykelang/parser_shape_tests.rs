@@ -393,6 +393,45 @@ fn shape_sub_decl_qualified_name() {
     }
 }
 
+/// `fn name = EXPR` — stryke single-expression body (same as one-stmt block).
+#[test]
+fn shape_fn_named_eq_body() {
+    let k = first_stmt("fn Foo::bar = 1 + 2;");
+    let StmtKind::SubDecl { name, body, .. } = k else {
+        panic!("expected SubDecl");
+    };
+    assert_eq!(name, "Foo::bar");
+    assert_eq!(body.len(), 1);
+}
+
+/// `fn ($s) = EXPR` — anonymous coderef with signature and `=` body.
+#[test]
+fn shape_fn_anon_eq_body_with_sig() {
+    let k = first_stmt("my $c = fn ($s) = uc($s);");
+    let StmtKind::My(decls) = k else {
+        panic!("expected my");
+    };
+    let crate::ast::VarDecl {
+        initializer: Some(init),
+        ..
+    } = &decls[0]
+    else {
+        panic!("expected initializer");
+    };
+    assert!(matches!(
+        init.kind,
+        ExprKind::CodeRef { ref params, ref body } if !params.is_empty() && body.len() == 1
+    ));
+}
+
+#[test]
+fn shape_fn_eq_body_rejects_top_level_comma() {
+    assert!(
+        crate::parse("fn x = 1, 2;").is_err(),
+        "top-level comma after `fn =` must be rejected"
+    );
+}
+
 #[test]
 fn shape_package() {
     assert!(matches!(

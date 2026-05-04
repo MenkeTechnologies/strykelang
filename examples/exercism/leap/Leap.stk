@@ -1,2 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::Leap::is_leap_year { _ % 4 == 0 && _ % 100 != 0 || _ % 400 == 0 }
+fn Exercism::Leap::is_leap_year = _ % 4 == 0 && _ % 100 != 0 || _ % 400 == 0

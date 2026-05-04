@@ -1468,6 +1468,25 @@ fn outer_topic_in_thread_sub_stage() {
     assert_eq!(eval_int(r#"$_ = 50; t 10 >{ $_ + $_< }"#), 60);
 }
 
+#[test]
+fn outer_positional_topic_in_lazy_filter() {
+    // `fi { ... }` is a lazy iterator that runs in a fresh interpreter seeded
+    // by `restore_capture`. Without max_active_slot bookkeeping in the
+    // restore, the next `set_topic(item)` call would not shift slot 1's chain,
+    // and `_1<` would fall back to `_` (the loop iter) instead of the
+    // enclosing function's second positional. Regression for the Hamming-style
+    // pattern: `fi { _<[_] != _1<[_] }`.
+    assert_eq!(
+        eval_int(
+            r#"fn h {
+                 ~> 0:len(_)-1 fi { _<[_] != _1<[_] } len
+               }
+               h("ABCD", "AXCY")"#
+        ),
+        2
+    );
+}
+
 // ── nested implicit param matrix: `_N<+` reaches the Nth positional N
 // frames up. Stryke-only (no other language has nested implicit
 // positionals). See scope.rs::set_closure_args / set_topic. ──

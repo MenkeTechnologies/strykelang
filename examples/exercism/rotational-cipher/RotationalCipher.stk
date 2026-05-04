@@ -1,8 +1,7 @@
 #!/usr/bin/env stryke
-fn Exercism::RotationalCipher::caesar_cipher($s, $k) {
-    ~> $s chars map {
-        /[A-Z]/ ? chr((ord(_) - ord("A") + $k) % 26 + ord("A"))
-      : /[a-z]/ ? chr((ord(_) - ord("a") + $k) % 26 + ord("a"))
+fn Exercism::RotationalCipher::caesar_cipher =
+    ~> _ chars map {
+        /[A-Z]/ ? chr((ord(_) - ord("A") + _1<) % 26 + ord("A"))
+      : /[a-z]/ ? chr((ord(_) - ord("a") + _1<) % 26 + ord("a"))
       : _
-    } |> join ""
-}
+    } join("")

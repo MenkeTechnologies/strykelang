@@ -4,6 +4,4 @@ fn Exercism::Grains::grains_on_square($n) {
     2 ** ($n - 1)
 }
 
-fn Exercism::Grains::total_grains() {
-    ~> 1:64 map {Exercism::Grains::grains_on_square} sum
-}
+fn Exercism::Grains::total_grains() = ~> 1:64 map {Exercism::Grains::grains_on_square} sum

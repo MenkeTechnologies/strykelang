@@ -9,5 +9,5 @@ fn Exercism::MatchingBrackets::has_matching_brackets($s) {
             return 0 unless @stk && $c eq $_M{pop @stk}
         }
     }
-    len(@stk) == 0 ? 1 : 0
+    len(@stk) == 0
 }

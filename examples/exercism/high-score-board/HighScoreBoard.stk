@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 our %SCORES
 
-fn Exercism::HighScoreBoard::set_player_scores      { my %x = @_; $SCORES{$_} = $x{$_} for keys %x }
-fn Exercism::HighScoreBoard::get_player_score       { $SCORES{$_0} }
-fn Exercism::HighScoreBoard::increase_player_scores { my %x = @_; $SCORES{$_} += $x{$_} for keys %x }
-fn Exercism::HighScoreBoard::sort_players_by_name   { sort keys %SCORES }
-fn Exercism::HighScoreBoard::sort_players_by_score  { sort { $SCORES{$_1} <=> $SCORES{$_0} } keys %SCORES }
-fn Exercism::HighScoreBoard::delete_player          { delete $SCORES{$_0} }
+fn Exercism::HighScoreBoard::set_player_scores      = do { my %x = @_; $SCORES{_} = $x{_} for keys %x }
+fn Exercism::HighScoreBoard::get_player_score       = $SCORES{_}
+fn Exercism::HighScoreBoard::increase_player_scores = do{ my %x = @_; $SCORES{_} += $x{_} for keys %x }
+fn Exercism::HighScoreBoard::sort_players_by_name   = sort keys %SCORES
+fn Exercism::HighScoreBoard::sort_players_by_score  = sort { $SCORES{_1} <=> $SCORES{_0} } keys %SCORES
+fn Exercism::HighScoreBoard::delete_player          = delete $SCORES{_}

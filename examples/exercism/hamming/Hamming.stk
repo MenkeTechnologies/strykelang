@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-fn Exercism::Hamming::hamming_distance($a, $b) {
-    die "left and right strands must be of equal length" if len($a) != len($b)
-    ~> 0:len($a)-1 fi { $a[_] != $b[_] } len
+fn Exercism::Hamming::hamming_distance {
+    die "left and right strands must be of equal length" if len(_) != len(_1)
+    ~> 0:len(_)-1 fi { _<[_] != _1<[_] } len
 }

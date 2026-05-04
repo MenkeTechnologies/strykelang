@@ -1814,6 +1814,12 @@ fn typed_sub_params_runtime_checks() {
 }
 
 #[test]
+fn fn_eq_body_named_and_anon() {
+    assert_eq!(ri(r#"my $f = fn ($a, $b) = $a + $b; $f->(3, 4)"#), 7);
+    assert_eq!(ri(r#"fn add ($a, $b) = $a + $b; add(10, 32)"#), 42);
+}
+
+#[test]
 fn pack_unpack_and_length() {
     assert_eq!(ri(r#"unpack("C", "A");"#), 65);
     assert_eq!(ri(r#"length pack("C3", 1, 2, 3);"#), 3);

@@ -19,5 +19,5 @@ fn Exercism::SimpleCipher::_process($self, $in, $decode) {
     } |> join("")
 }
 
-fn Exercism::SimpleCipher::encode($self, $plain) { Exercism::SimpleCipher::_process($self, $plain, 0) }
-fn Exercism::SimpleCipher::decode($self, $ciph)  { Exercism::SimpleCipher::_process($self, $ciph, 1) }
+fn Exercism::SimpleCipher::encode($self, $plain) = Exercism::SimpleCipher::_process($self, $plain, 0)
+fn Exercism::SimpleCipher::decode($self, $ciph)  = Exercism::SimpleCipher::_process($self, $ciph, 1)
