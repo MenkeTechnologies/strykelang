@@ -1482,6 +1482,125 @@ Tests: `sprintf_a_hex_float_emits_decimal_today`.
 Severity: **bug** (low impact).
 
 
+## BUG-058 — `chunk(N, LIST)` returns one arrayref instead of N-sized groups
+
+```sh
+$ stryke -e 'my @r = chunk(2, 1..6); print scalar @r'
+1
+$ stryke -e 'my @r = chunk_n(2, 1..6); print scalar @r'
+3
+```
+
+The `chunk` builtin behaves as a no-op grouping (single arrayref). The
+`chunk_n` builtin does what users probably mean. Either rename `chunk` →
+`chunk_n` and add an alias, or fix `chunk` to mean N-sized groups.
+
+Tests: `chunk_alone_returns_one_arrayref_today`,
+`chunk_n_groups_into_runs_of_n`,
+`chunk_while_groups_consecutive_runs`.
+
+Severity: **bug** (high friction; the conventional name is broken).
+
+
+## BUG-059 — `partition(sub { ... }, LIST)` returns empty arrays
+
+```sh
+$ stryke -e 'my @r = partition(sub { $_ > 3 }, 1..6);
+            print "0=[", join(",",@{$r[0]}), "] 1=[", join(",",@{$r[1]}), "]"'
+0=[] 1=[]
+$ stryke -e 'my @r = partition { _ > 3 } 1..6;
+            print "0=[", join(",",@{$r[0]}), "] 1=[", join(",",@{$r[1]}), "]"'
+0=[4,5,6] 1=[1,2,3]
+```
+
+Stryke's block form (no `sub` keyword) works correctly. The Perl-style
+`sub { ... }` form parses but silently returns empty.
+
+Tests: `partition_block_form_splits_into_yes_and_no`,
+`partition_sub_form_returns_empty_arrays_today`.
+
+Severity: **bug**.
+
+
+## BUG-060 — Range flip-flop in scalar context evaluates as a list-range
+
+```sh
+$ stryke -e 'for my $i (1..6) { print "$i;" if $i == 2 .. $i == 4 }'
+1;3;4;5;6;
+$ perl   -e 'for my $i (1..6) { print "$i;" if $i == 2 .. $i == 4 }'
+2;3;4;
+```
+
+The flip-flop operator (Perl `..` in scalar context) is meant to track a
+state machine: false until the left side becomes true (state on, emit a
+firing token), true until the right side becomes true (state off). Stryke
+evaluates `0 .. 0` as the list-range `(0)` — a non-empty list, therefore
+truthy — and `1 .. 0` as the empty descending list.
+
+Workaround: build the state machine manually with a closure-captured flag.
+
+Tests: `range_flip_flop_in_conditional_evaluates_as_list_today`.
+
+Severity: **bug**.
+
+
+## BUG-061 — `pairs()` returns Pair objects that don't array-deref
+
+```sh
+$ stryke -e 'my @r = pairs(a => 1, b => 2); print ref $r[0]'
+Pair
+$ stryke -e 'my @r = pairs(a => 1, b => 2); my @kv = @{$r[0]}'
+Can't dereference non-reference as array at -e line 1.
+```
+
+In Perl's `List::Util`, `pairs(...)` returns blessed two-element arrayrefs
+that respond to both `->key`/`->value` and `@{$_}` patterns. Stryke's
+Pair type only supports the method form.
+
+Tests: `pairs_returns_pair_ref_kind_today`,
+`pair_object_does_not_array_deref_today`.
+
+Severity: **bug** (compat).
+
+
+## BUG-062 — `group_by(sub { ... }, LIST)` parse error
+
+```sh
+$ stryke -e 'my %g = group_by(sub { $_ % 2 }, 1..6)'
+Expected Comma, got Semicolon at -e line 1.
+```
+
+Same root cause as BUG-059 (partition): the `sub { ... }` calling
+convention isn't accepted. Block form (`group_by { _ % 2 } 1..6`) parses
+but produces a hash with a stringified-arrayref key. No working form
+discovered yet.
+
+Tests: `group_by_with_sub_keyword_is_parse_error_today`.
+
+Severity: **bug**.
+
+
+## BUG-063 — `take(N, LIST)` / `step(N, LIST)` argument order returns empty
+
+```sh
+$ stryke -e 'my @r = take(3, 1..10); print "@r"'
+
+$ stryke -e 'my @r = take(qw(a b c d), 2); print "@r"'
+a b
+```
+
+Stryke's signature is `take(LIST, COUNT)` — list first. The Perl-ish
+`take(N, LIST)` ordering returns nothing. `step` has the same shape.
+
+Tests: `take_list_then_count_keeps_first_n`,
+`take_n_first_signature_returns_empty_today`,
+`take_bareword_with_n_first_returns_empty_today`,
+`step_with_n_first_signature_returns_empty_today`.
+
+Severity: **bug** (calling-convention surprise; existing tests show the
+list-first form is the contract).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
