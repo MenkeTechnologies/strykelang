@@ -317,7 +317,7 @@ fn aop_intercept_name_visible_in_after() {
 
 #[test]
 fn aop_after_dollar_question_is_zero_not_return_value_today() {
-    // BUG-045: documentation says `$?` in after-advice carries the original
+    // BUG-044: documentation says `$?` in after-advice carries the original
     // sub's return value. Today it stays 0.
     assert_eq!(
         eval_int(
