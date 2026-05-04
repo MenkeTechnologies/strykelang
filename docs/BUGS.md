@@ -1807,6 +1807,125 @@ Tests: `perl5_super_one_level_chain_works`,
 Severity: **bug**. Limits practical class hierarchies.
 
 
+## BUG-073 — `BUILDARGS` method on a class is never invoked
+
+```sh
+$ stryke -e '
+class Cat {
+  name: Str = "?"
+  fn BUILDARGS { print "BUILDARGS "; @_ }
+  fn BUILD     { print "BUILD " }
+}
+Cat(name => "Felix")'
+BUILD                       # BUILDARGS missing
+```
+
+`BUILD` is invoked correctly. `BUILDARGS` (the Moose-style hook for
+preprocessing constructor arguments) is silently skipped. Workaround:
+override `Self.new` to do the preprocessing directly.
+
+Tests: `class_buildargs_method_not_invoked_today`,
+`class_build_method_runs_at_construction`.
+
+Severity: **bug** (compat with Moose-shaped class libraries).
+
+
+## BUG-074 — `struct` lacks a `Pkg::new(...)` constructor
+
+```sh
+$ stryke -e 'struct Pt { x => Int, y => Int } Pt::new(3, 4)'
+Undefined subroutine &Pt::new at -e line 1.
+$ stryke -e 'struct Pt { x => Int, y => Int } Pt(3, 4)'
+                       # works
+```
+
+Use the bareword constructor (`Pt(...)`). The Perl-classic `Pkg::new(...)`
+form is only generated for `class` definitions, not `struct`s.
+
+Tests: `struct_does_not_have_pkg_new_today`,
+`struct_positional_construction_assigns_fields`.
+
+Severity: **bug** (small surface).
+
+
+## BUG-075 — `refaddr(\@a)` returns a fresh address per `\@a` evaluation
+
+```sh
+$ stryke -e 'my @a; print refaddr(\@a) == refaddr(\@a) ? "eq" : "ne"'
+ne
+$ perl -MScalar::Util=refaddr -e 'my @a; print refaddr(\@a) == refaddr(\@a) ? "eq" : "ne"'
+eq
+```
+
+Each `\@a` evaluation creates a new ref-cell; stryke's `refaddr` returns
+the cell's address rather than the underlying array's address. Aliased
+copies (`my $s = $r`) do share the same refaddr, so propagating a captured
+ref still works.
+
+Tests: `refaddr_of_repeated_backslash_at_returns_different_addresses_today`,
+`refaddr_of_aliased_scalar_is_same`.
+
+Severity: **bug**. Common idiom for ref-identity tests
+(`refaddr(\@a) == refaddr(\@b)`) gives wrong answers.
+
+
+## BUG-076 — `\N` (numeric backref) in `s///` replacement is interpreted as escape
+
+```sh
+$ stryke -e 'my $s = "ab123cd"; $s =~ s/(\d+)/[\1]/; print $s'
+ab[<SOH>]cd                 # `\1` → 0x01 control char
+$ stryke -e 'my $s = "ab123cd"; $s =~ s/(\d+)/[$1]/; print $s'
+ab[123]cd                   # `$1` works
+```
+
+Use `$1`/`$2`/… in replacements; the `\N` form is treated as a control
+character escape (`\1` → SOH, etc.).
+
+Tests: `backslash_one_in_substitution_inserts_soh_today`,
+`dollar_one_in_substitution_inserts_capture`.
+
+Severity: **bug** (compat).
+
+
+## BUG-077 — Postfix `for` modifier rejected on `my @r = ...` form
+
+```sh
+$ stryke -e 'sub f { @_ } my @r = f($_) for (1, 2, 3)'
+postfix `for` is not supported on this statement form at -e line 1.
+```
+
+Other postfix-`for` forms work (`$x .= "y" for 1..3` is fine). The
+`my @r = EXPR for LIST` shape is parser-rejected.
+
+Tests: `postfix_for_on_my_at_assign_is_rejected_today`,
+`postfix_for_on_simple_expression_works`.
+
+Severity: **bug**.
+
+
+## BUG-078 — BEGIN blocks run but their writes to package vars are lost
+
+```sh
+$ stryke -e '
+our $log = "";
+BEGIN { $main::log .= "B:" }
+$log .= "M:";
+print "[$log]"'
+[M:]                        # B: lost
+```
+
+When BEGIN's `print`/`die` side effect is observed via stdout/stderr, it
+runs as expected. But mutating `our`-declared globals from inside BEGIN
+does not persist into the main body. Probably the BEGIN block's
+compilation phase resets after main-body parsing assigns the initial
+value.
+
+Tests: `begin_block_mutations_to_package_vars_lost_today`,
+`begin_runs_before_main_code_in_declaration_order` (the parse-only check).
+
+Severity: **bug**.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
