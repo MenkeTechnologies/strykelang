@@ -450,6 +450,191 @@ something other than `m` (or `s`, `tr`, `y`, `qr`, `q`, `qq`, `qw`).
 Severity: **polish**.
 
 
+## PARITY-013 — `length` ignores `use utf8` and always returns byte count
+
+```sh
+$ stryke -e 'use utf8; print length("héllo")'
+6                       # stryke
+$ perl   -e 'use utf8; print length("héllo")'
+5
+```
+
+Without `use utf8;` both produce 6 (correct byte count). The pragma is the
+issue: stryke does not switch `length` to character semantics.
+
+Tests: `length_returns_byte_count_for_unicode_string`,
+`length_with_use_utf8_still_counts_bytes_today`.
+
+Severity: **parity**.
+
+
+## PARITY-014 — `substr($s, $off, $len) = $rep` lvalue not supported
+
+```sh
+$ stryke -e 'my $s = "Hello"; substr($s, 0, 1) = "J"; print $s'
+VM compile error (unsupported): Assign to complex lvalue at -e line 0.
+```
+
+Workaround: 4-arg `substr($s, $off, $len, $rep)` is fully supported and
+returns the replaced segment. The lvalue form is a Perl idiom that needs
+VM lowering work.
+
+Tests: `substr_lvalue_assignment_not_supported_today`,
+`substr_four_arg_replaces_in_place_and_returns_old` (the workaround).
+
+Severity: **parity**.
+
+
+## BUG-010 — `return (LIST)` collapses to last comma operand
+
+```sh
+$ stryke -e 'sub xs { return (1, 2, 3) } my @a = xs(); print "@a"'
+3
+$ perl   -e 'sub xs { return (1, 2, 3) } my @a = xs(); print "@a"'
+1 2 3
+```
+
+Implicit return at the end of a sub body works correctly:
+```sh
+$ stryke -e 'sub xs { (1, 2, 3) } my @a = xs(); print "@a"'
+1 2 3
+```
+
+Only `return (...)` with parens around a comma-list is wrong. Returning a
+named array (`return @x`) is also fine.
+
+Tests: `explicit_return_paren_list_collapses_to_last_today`,
+`implicit_list_return_yields_full_list`,
+`return_array_var_passes_through_full_list`.
+
+Severity: **bug**. Affects every multi-value early-return pattern.
+
+
+## BUG-011 — `my $s = list_returning_sub()` concatenates instead of taking last
+
+```sh
+$ stryke -e 'sub xs { (1,2,3) } my $s = xs(); print $s'
+123
+$ perl   -e 'sub xs { (1,2,3) } my $s = xs(); print $s'
+3
+```
+
+`scalar xs()` correctly returns `3`, so the keyword path works. The
+implicit-scalar-context path (assignment to a scalar lvalue) does not.
+
+Tests: `list_returning_sub_in_scalar_context_concatenates_today`,
+`list_in_scalar_context_via_scalar_keyword_takes_last`.
+
+Severity: **bug**. Common Perl pattern (e.g. `my $count = xs();` for the
+"return last/array length"-style API).
+
+
+## BUG-012 — `each %hash` always returns an empty list
+
+```sh
+$ stryke -e 'my %h = (a=>1); my @kv = each %h; print scalar @kv'
+0
+$ perl   -e 'my %h = (a=>1); my @kv = each %h; print scalar @kv'
+2
+```
+
+The companion `while (my ($k, $v) = each %h)` form is rejected at VM
+lowering with "my/our/state/local in expression context with multiple or
+non-scalar decls". `keys`/`values` work correctly, so iteration is
+possible — just not in the `each` style.
+
+Tests: `each_returns_empty_list_today`,
+`while_my_pair_each_rejected_at_runtime_today`.
+
+Severity: **bug**. Standard hash iterator; many libraries use it.
+
+
+## BUG-013 — Backticks in list context return one big string instead of one-string-per-line
+
+```sh
+$ stryke -e 'my @lines = `printf "a\nb\nc\n"`; print scalar @lines'
+1
+$ perl   -e 'my @lines = `printf "a\nb\nc\n"`; print scalar @lines'
+3
+```
+
+Tests: `backticks_list_context_returns_single_string_today`,
+`backticks_scalar_context_returns_full_string` (the form that works).
+
+Severity: **bug**. Most shell-glue idioms break.
+
+
+## BUG-014 — `$ENV{X} = ...` not propagated to subprocesses
+
+```sh
+$ stryke -e '$ENV{STRYKE_X} = "hi"; system "env | grep STRYKE_X"'
+                       # (no output)
+$ perl   -e '$ENV{STRYKE_X} = "hi"; system "env | grep STRYKE_X"'
+STRYKE_X=hi
+```
+
+The variable is visible from inside stryke (`$ENV{STRYKE_X}` reads
+`"hi"`), but child processes do not see it. Inherited environment
+variables (HOME, PATH, …) are passed through normally.
+
+Tests: `env_set_visible_within_stryke`,
+`env_set_not_propagated_to_subprocess_today`.
+
+Severity: **bug**. Commonly used to pass config to wrapped shell calls.
+
+
+## BUG-015 — Reference `==` always returns true (placeholder address)
+
+Stryke deliberately stringifies refs as `KIND(0x...)` with a literal
+placeholder rather than a live address (this is a documented design
+choice). The numeric form of a ref is therefore always 0, and `==` between
+any two refs is always true:
+
+```sh
+$ stryke -e 'my @a; my @b; print \@a == \@b ? "eq" : "ne"'
+eq
+$ stryke -e 'my @a; print 0 + \@a'
+0
+```
+
+Tests: `ref_numeric_value_is_zero_today`.
+
+Severity: **bug**. The fix is either to expose live addresses (loses the
+deterministic-output property) or to compare refs by identity for `==`
+without going through numification.
+
+
+## BUG-016 — `m//g` in list context concatenates captures per match
+
+```sh
+$ stryke -e 'my @m = "a1 b2 c3" =~ /(\w)(\d)/g; print scalar @m, " / @m"'
+3 / a1 b2 c3
+$ perl   -e 'my @m = "a1 b2 c3" =~ /(\w)(\d)/g; print scalar @m, " / @m"'
+6 / a 1 b 2 c 3
+```
+
+stryke returns 3 elements (one per match, with captures concatenated);
+Perl returns 6 (each capture as its own element).
+
+Tests: `regex_g_flag_returns_full_matches_today`.
+
+Severity: **bug**. Idiomatic capture extraction breaks.
+
+
+## BUG-017 — `sprintf "%+d"` ignores the `+` flag
+
+```sh
+$ stryke -e 'print sprintf("%+5d", 3)'
+   3
+$ perl   -e 'print sprintf("%+5d", 3)'
+   +3
+```
+
+Tests: `printf_plus_flag_ignored_today`.
+
+Severity: **bug** (low impact). Affects readable signed output.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
