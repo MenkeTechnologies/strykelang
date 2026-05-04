@@ -1073,6 +1073,130 @@ Tests: `pos_outside_while_loop_is_undef_today`,
 Severity: **bug** (low impact).
 
 
+## BUG-039 — `<*.ext>` angle-bracket glob shorthand not parsed
+
+```sh
+$ stryke -e 'my @f = </etc/host*>; print scalar @f'
+Unexpected token NumLt at -e line 1.
+$ stryke -e 'my @f = glob "/etc/host*"; print scalar @f'
+3
+```
+
+Workaround: use the `glob` function form, which works correctly.
+
+Tests: `angle_bracket_glob_form_is_parse_error_today`,
+`glob_function_form_lists_matches`.
+
+Severity: **bug** (small surface).
+
+
+## BUG-040 — `tie $var, $class, ...` does not invoke FETCH/STORE
+
+```sh
+$ stryke -e '
+package T; sub TIESCALAR { my ($cls, $v) = @_; bless \$v, $cls }
+sub FETCH { "fetched:" . ${$_[0]} }
+sub STORE { ${$_[0]} = $_[1] . "!" }
+package main;
+my $x; tie $x, "T", "init"; print $x; $x = "new"; print "/", $x'
+/new                    # stryke (FETCH never fires)
+$ perl ...
+fetched:init/fetched:new!
+```
+
+`tie` does not error, but neither FETCH nor STORE is called on subsequent
+reads/writes; the variable behaves as untied.
+
+Tests: `tie_scalar_fetch_store_not_invoked_today`.
+
+Severity: **bug**. Tied vars are how DBM/file-backed scalars work in
+Perl modules.
+
+
+## BUG-041 — `\@` prototype does not auto-take ref of array argument
+
+```sh
+$ stryke -e 'sub f (\@) { sort @{$_[0]} }
+            my @a = (3,1,2);
+            my @r = f(@a);
+            print "@r"'
+Can't dereference non-reference as array at -e line 1.
+$ perl ...
+1 2 3
+```
+
+The Perl convention is that `\@` in a prototype causes `f(@a)` to be
+silently rewritten as `f(\@a)` so the callee receives a single arrayref
+in `$_[0]`. Stryke passes the flattened array elements instead.
+
+Workaround: drop the prototype and have callers pass `\@a` explicitly.
+
+Tests: `backslash_at_prototype_does_not_auto_take_ref_today`.
+
+Severity: **bug**.
+
+
+## BUG-042 — `delete @array[indices]` (slice form) is rejected
+
+```sh
+$ stryke -e 'my @a = (10..15); delete @a[1..3]; print "@a"'
+delete requires hash or array element at -e line 1.
+$ perl ...
+10  14 15               # 11,12,13 → undef
+```
+
+Single-element `delete $a[2]` works correctly. The slice variant raises a
+runtime error. Workaround: `splice @a, $start, $count`.
+
+Tests: `delete_array_slice_is_rejected_today`,
+`splice_workaround_for_array_slice_delete_works`.
+
+Severity: **bug**.
+
+
+## BUG-043 — `delete @hash{KEYS}` (slice form) is rejected
+
+```sh
+$ stryke -e 'my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; print join(",", sort keys %h)'
+delete requires hash or array element at -e line 1.
+$ perl ...
+c
+```
+
+Same root cause as BUG-042: only single-element delete is implemented.
+Workaround: loop over keys with single-element delete.
+
+Tests: `delete_hash_slice_is_rejected_today`.
+
+Severity: **bug**.
+
+
+## BUG-044 — AOP `after` block sees `$?` as 0, not the original return value
+
+```sh
+$ stryke -e '
+fn payload { 42 }
+after "payload" { print "got $? "; }
+payload();'
+got 0
+```
+
+The `aop.rs` module's preamble explicitly documents `$?` as the original
+return value:
+
+> after  "<glob>" { ... }   # run after; sees $INTERCEPT_MS, $INTERCEPT_US, $? (retval)
+
+Stryke populates the timing variables (`$INTERCEPT_MS`, `$INTERCEPT_US`)
+correctly and exposes the sub name in `$INTERCEPT_NAME`, but `$?` is
+always 0 inside the after block. Workaround: use `around` with `proceed()`
+and inspect the return value directly.
+
+Tests: `aop_after_dollar_question_is_zero_not_return_value_today`,
+`aop_intercept_name_visible_in_after` (the parts that work).
+
+Severity: **bug**. Documented behavior diverges from observed.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
