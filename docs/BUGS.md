@@ -1926,6 +1926,142 @@ Tests: `begin_block_mutations_to_package_vars_lost_today`,
 Severity: **bug**.
 
 
+## BUG-079 — `sprintf "%n"` is a no-op
+
+```sh
+$ stryke -e 'my $n; sprintf("hello%n", $n); print defined($n) ? "set:$n" : "U"'
+U
+```
+
+Perl populates the referenced scalar with the count of bytes emitted so
+far. Stryke leaves the variable undef. `%n` is a known security hole in
+C-style printf and many languages omit it on purpose — pin the omission
+so the test catches accidental partial implementations.
+
+Tests: `sprintf_n_does_not_populate_count_today`.
+
+Severity: **bug** / parity (low impact).
+
+
+## BUG-080 — `sprintf "%p"` and `"%A"` not implemented
+
+```sh
+$ stryke -e 'printf "%p", "hello"'
+hello                           # %p ignored
+$ stryke -e 'printf "%A", 1.5'
+1.5                             # %A ignored
+```
+
+Both specifiers fall through to the value's stringification. `%p`
+(pointer) is rarely used; `%A` is the uppercase form of `%a` (hex float)
+which BUG-057 already covers.
+
+Tests: `sprintf_p_prints_value_as_string_today`,
+`sprintf_capital_a_does_not_emit_hex_float_today`.
+
+Severity: **bug** (low impact).
+
+
+## BUG-081 — `use integer` pragma is not honored
+
+```sh
+$ stryke -e 'use integer; print 7 / 3'
+2.33333333333333                # CLI: float division
+$ stryke ...via lib eval...
+Can't locate integer.pm in @INC
+```
+
+The CLI silently ignores `use integer`; the library `eval` API tries to
+load `integer.pm` from @INC and fails. Either path should switch `/` to
+integer truncation when `use integer` is in scope.
+
+Tests: `use_integer_pragma_lib_path_tries_to_load_integer_pm_today`,
+`use_integer_pragma_at_least_parses`.
+
+Severity: **bug**.
+
+
+## BUG-082 — `0o` octal prefix not recognized
+
+```sh
+$ stryke -e 'print 0o777'
+0
+$ stryke -e 'print 0777'
+511
+$ perl   -e 'print 0o777'
+511
+```
+
+Perl 5.34+ accepts `0o777` as a synonym for `0777`. Stryke parses `0o`
+as the integer zero followed by an unrelated identifier, so `0o777`
+evaluates to `0`. Bare leading-zero octals (`0644`, `0755`) work
+correctly.
+
+Tests: `octal_o_prefix_returns_zero_today`,
+`classic_zero_prefix_octal_works`,
+`octal_literal_pattern_matches_perl`.
+
+Severity: **bug** (parity; small surface).
+
+
+## BUG-083 — Regex `/n` flag (no auto-capture) not supported
+
+```sh
+$ stryke -e '"abc" =~ /(\w+)/n'                  # CLI
+Undefined subroutine &n at -e line 1.
+```
+
+Perl 5.22+ added `/n` to disable auto-numbered captures. Stryke parses
+the trailing `n` as a bareword sub. CLI raises an undefined-sub error;
+the library `eval` API silently returns the string `"n"`.
+
+Tests: `regex_n_flag_silently_returns_n_in_lib_eval_today`.
+
+Severity: **bug**. Workaround: turn captures into `(?:...)` non-capturing
+groups manually.
+
+
+## BUG-084 — Possessive quantifiers (`a++`, `\d++`) act like greedy `+`
+
+```sh
+$ stryke -e 'print "aaab" =~ /a++ab/ ? "Y" : "N"'
+Y                               # should be N (no backtrack from a++)
+$ perl   -e 'print "aaab" =~ /a++ab/ ? "Y" : "N"'
+N
+```
+
+Stryke's regex engine treats `a++` identically to `a+` — backtracking
+proceeds normally. Atomic groups (`(?>a+)`) work correctly (BUG-024
+companion); only possessive-quantifier suffixes are missing.
+
+Tests: `possessive_quantifier_does_not_prevent_backtrack_today`,
+`greedy_a_plus_with_backtrack_matches`.
+
+Severity: **bug** (regex parity).
+
+
+## BUG-085 — `printf $fh "fmt", args` writes to STDOUT, ignoring the filehandle
+
+```sh
+$ stryke -e '
+open my $fh, ">", "/tmp/o" or die;
+print  $fh "plain\n";
+printf $fh "n=%d\n", 42;
+close $fh'
+n=42                            # printf went to terminal, not file
+$ cat /tmp/o
+plain                           # only the print made it to disk
+```
+
+`print $fh ...` honors the filehandle correctly; `printf $fh ...` does
+not. Workaround: use `print $fh sprintf("fmt", args)` until printf is
+fixed.
+
+Tests: `printf_to_filehandle_writes_to_stdout_today`.
+
+Severity: **bug** (surprising; affects CSV/log writers).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
