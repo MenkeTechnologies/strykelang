@@ -2045,7 +2045,8 @@ impl Parser {
                 Token::Ident(ref name) if name == "fn" => {
                     self.advance(); // consume `fn`
                     let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
-                    let body = self.parse_block()?;
+                    self.parse_sub_attributes()?;
+                    let body = self.parse_fn_eq_body_or_block(false)?;
                     let code_ref = Expr {
                         kind: ExprKind::CodeRef { params, body },
                         line: stage_line,
@@ -4297,6 +4298,31 @@ impl Parser {
         Ok(())
     }
 
+    /// After `fn` + optional `(SIG)` + attrs: `{ ... }` or stryke-only `= EXPR` (one assign-level
+    /// expression; no top-level `,`). `sub` always requires `{ ... }`.
+    fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> PerlResult<Block> {
+        if !is_sub_keyword && self.eat(&Token::Assign) {
+            let expr = self.parse_assign_expr()?;
+            if matches!(self.peek(), Token::Comma) {
+                return Err(self.syntax_err(
+                    "`fn ... =` allows only a single expression; use `fn ... { ... }` for multiple statements",
+                    self.peek_line(),
+                ));
+            }
+            let eline = expr.line;
+            self.eat(&Token::Semicolon);
+            let mut body = vec![Statement {
+                label: None,
+                kind: StmtKind::Expression(expr),
+                line: eline,
+            }];
+            Self::default_topic_for_sole_bareword(&mut body);
+            Ok(body)
+        } else {
+            self.parse_block()
+        }
+    }
+
     fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // 'sub' or 'fn'
@@ -4335,7 +4361,7 @@ impl Parser {
                 self.declared_subs.insert(name.clone());
                 let (params, prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 self.parse_sub_attributes()?;
-                let body = self.parse_block()?;
+                let body = self.parse_fn_eq_body_or_block(is_sub_keyword)?;
                 Ok(Statement {
                     label: None,
                     kind: StmtKind::SubDecl {
@@ -4358,7 +4384,7 @@ impl Parser {
                 // Statement-level anonymous sub: `fn { }`, `sub () { }`, `sub :lvalue { }`
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 self.parse_sub_attributes()?;
-                let body = self.parse_block()?;
+                let body = self.parse_fn_eq_body_or_block(is_sub_keyword)?;
                 Ok(Statement {
                     label: None,
                     kind: StmtKind::Expression(Expr {
@@ -11877,7 +11903,8 @@ impl Parser {
             "fn" => {
                 // Anonymous fn — stryke syntax for anonymous subroutines
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
-                let body = self.parse_block()?;
+                self.parse_sub_attributes()?;
+                let body = self.parse_fn_eq_body_or_block(false)?;
                 Ok(Expr {
                     kind: ExprKind::CodeRef { params, body },
                     line,

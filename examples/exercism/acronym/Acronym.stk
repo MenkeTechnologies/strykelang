@@ -1,4 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::Acronym::abbreviate {
-    ~> (_ =~ /\b[^a-z]?\K[a-z][\w']*/gi) map { _[0] } join("") uc
-}
+fn Exercism::Acronym::abbreviate = ~> (_ =~ /\b[^a-z]?\K[a-z][\w']*/gi) map { _[0] } join("") uc

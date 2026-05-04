@@ -46,6 +46,30 @@ fn capture_skip_bootstrap_hash(name: &str) -> bool {
     matches!(name, "INC" | "ENV" | "SIG" | "^HOOK")
 }
 
+/// Parse a positional topic-slot scalar name (no leading sigil) and return the
+/// slot index N. Recognizes `_N` and the outer-chain forms `_N<`, `_N<<`,
+/// `_N<<<`, `_N<<<<`. Returns `None` for `_`, `_<`, etc. (slot 0, which never
+/// needs to bump `max_active_slot`).
+#[inline]
+fn parse_positional_topic_slot(name: &str) -> Option<usize> {
+    let bytes = name.as_bytes();
+    if bytes.len() < 2 || bytes[0] != b'_' || !bytes[1].is_ascii_digit() {
+        return None;
+    }
+    let mut i = 1;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    let digits = &name[1..i];
+    while i < bytes.len() && bytes[i] == b'<' {
+        i += 1;
+    }
+    if i != bytes.len() {
+        return None;
+    }
+    digits.parse().ok().filter(|&n: &usize| n >= 1)
+}
+
 /// Saved bindings for `local $x` / `local @a` / `local %h` — restored on [`Scope::pop_frame`].
 #[derive(Clone, Debug)]
 enum LocalRestore {
@@ -2458,6 +2482,17 @@ impl Scope {
                 }
             } else if let Some(stripped) = name.strip_prefix('$') {
                 self.declare_scalar(stripped, val.clone());
+                // Topic positional slot like `_1`, `_2<`, `_12<<<<` — bump
+                // `max_active_slot` so the next `set_topic` shifts that slot's
+                // outer-topic chain. Without this, lazy iterators built from a
+                // fresh `Interpreter` (FilterStreamIterator etc.) lose `_1<`
+                // because `set_topic`'s shift loop runs `1..=max_active_slot`
+                // and that high-water mark resets to 0 in a fresh scope.
+                if let Some(slot) = parse_positional_topic_slot(stripped) {
+                    if slot > self.max_active_slot {
+                        self.max_active_slot = slot;
+                    }
+                }
             } else if let Some(rest) = name.strip_prefix("@frozen:") {
                 let arr = val.as_array_vec().unwrap_or_else(|| val.to_list());
                 self.declare_array_frozen(rest, arr, true);

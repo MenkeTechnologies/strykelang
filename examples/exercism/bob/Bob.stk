@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
-fn Exercism::Bob::hey($s) {
-    $s = $s =~ s/\s+//gr
+fn Exercism::Bob::hey {
+    $s = _ =~ s/\s+//gr
     return "Fine. Be that way!"        if length($s) == 0
     my $shouting  = $s =~ /[A-Z]/ && $s !~ /[a-z]/
     my $question  = $s =~ /\?$/

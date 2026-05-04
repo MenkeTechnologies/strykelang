@@ -1,4 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::RnaTranscription::to_rna {
-    _ =~ tr/GCTA/CGAU/r
-}
+fn Exercism::RnaTranscription::to_rna = _ =~ tr/GCTA/CGAU/r

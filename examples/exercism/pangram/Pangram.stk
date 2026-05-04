@@ -1,2 +1,3 @@
 #!/usr/bin/env stryke
-fn Exercism::Pangram::is_pangram($s) { "a":"z" |> all { index(lc $s, _) >= 0 } }
+
+fn Exercism::Pangram::is_pangram = "a"~"z" |> all { index(lc _<, _) >= 0 }

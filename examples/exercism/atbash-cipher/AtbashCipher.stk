@@ -1,10 +1,6 @@
 #!/usr/bin/env stryke
-my %_AT = map { (chr(97 + _), chr(122 - _)) } 0..25
+my %h = map { (chr(97 + _), chr(122 - _)) } 0..25
 
-fn Exercism::AtbashCipher::decode_atbash($s) {
-    ~> $s lc chars map { /\d/ ? _ : $_AT{$_} // "" } |> join ""
-}
+fn Exercism::AtbashCipher::decode_atbash = ~> _ lc chars map { /\d/ ? _ : $h{_} // "" } join("")
 
-fn Exercism::AtbashCipher::encode_atbash($s) {
-    Exercism::AtbashCipher::decode_atbash($s) =~ s/(.{5})(?=.)/$1 /gr
-}
+fn Exercism::AtbashCipher::encode_atbash = Exercism::AtbashCipher::decode_atbash(_) =~ s/(.{5})(?=.)/$1 /gr

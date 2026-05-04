@@ -1,4 +1,3 @@
 #!/usr/bin/env stryke
-fn Exercism::Raindrops::raindrop {
-    (_%3==0?"Pling":"") . (_%5==0?"Plang":"") . (_%7==0?"Plong":"") || _
-}
+
+fn Exercism::Raindrops::raindrop = (_%3==0?"Pling":"") . (_%5==0?"Plang":"") . (_%7==0?"Plong":"") || _

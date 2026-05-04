@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 fn Exercism::LinkedList::new   { { head => undef, tail => undef, count => 0 } }
-fn Exercism::LinkedList::count { _0->{count} }
+fn Exercism::LinkedList::count { _->{count} }
 
 fn Exercism::LinkedList::push($d, $v) {
     my $n = { value => $v, prev => $d->{tail}, next => undef }

@@ -1,5 +1,2 @@
 #!/usr/bin/env stryke
-fn Exercism::MicroBlog::truncate_post {
-    my @c = chars(_)
-    join "", @c[0..min(4, len(@c)-1)]
-}
+fn Exercism::MicroBlog::truncate_post = ~> _ graphemes take(5) join("")
