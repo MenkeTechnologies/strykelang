@@ -2062,6 +2062,150 @@ Tests: `printf_to_filehandle_writes_to_stdout_today`.
 Severity: **bug** (surprising; affects CSV/log writers).
 
 
+## BUG-086 — `use constant { ... }` hashref form rejected; list form collapses
+
+```sh
+$ stryke -e 'use constant ARR => (1, 2, 3); my @a = ARR; print "@a"'
+3                              # only last comma operand kept
+$ perl   -e 'use constant ARR => (1, 2, 3); my @a = ARR; print "@a"'
+1 2 3
+
+$ stryke -e 'use constant { ZERO => 0, ONE => 1 }; print ZERO'
+use constant: expected list of NAME => VALUE pairs at -e line 1.
+```
+
+Single-value `use constant NAME => VALUE` works. The hashref-block form
+and the multi-value `(LIST)` form both fail. Workaround: declare each
+constant separately, or wrap a list constant in an arrayref:
+`use constant DAYS => [qw(mon tue wed)]`.
+
+Tests: `use_constant_simple_scalar`, `use_constant_arithmetic`,
+`use_constant_arrayref_holds_list`,
+`use_constant_paren_list_collapses_to_last_today`,
+`use_constant_hashref_form_is_rejected_today`,
+`use_constant_qw_becomes_arrayref_string`.
+
+Severity: **bug** (parity with the canonical Perl idioms).
+
+
+## BUG-087 — `use warnings` does not emit warnings
+
+```sh
+$ stryke -e 'use warnings; my $x; my $y = $x + 1; print $y'
+1                              # no warning
+$ perl   -e 'use warnings; my $x; my $y = $x + 1; print $y'
+Use of uninitialized value $x in addition (+) at -e line 1.
+1
+```
+
+Stryke parses `use warnings` and `no warnings` without error but no
+diagnostic ever fires. CLI flags `-w` and `-W` are also no-ops.
+
+Tests: `use_warnings_silent_on_undef_arithmetic_today`,
+`use_warnings_silent_on_string_in_numeric_today`,
+`no_warnings_pragma_runs_without_error`,
+`lib_eval_runs_undef_arith_without_warnings`.
+
+Severity: **bug**. Many test harnesses rely on `use warnings FATAL =>
+'all'` to surface latent bugs.
+
+
+## BUG-088 — `(&@)` block prototype with trailing args drops the trailing args
+
+```sh
+$ stryke -e '
+sub myff (&@) { my $cb = shift; print "after-shift count=", scalar @_ }
+myff { 1 } 5, 7'
+after-shift count=0           # trailing args were not passed
+```
+
+Stryke parses `myff { ... } 5, 7` as `myff({...}); 5; 7;` — three
+top-level comma operands. Workaround: explicit-paren call form
+`myff(sub { ... }, 5, 7)` does pass all args correctly.
+
+Tests: `block_at_prototype_with_trailing_args_evaluates_trailing_as_statements_today`,
+`block_prototype_passes_block_as_first_arg`.
+
+Severity: **bug** (common idiom for `apply(\&block, list)` style APIs).
+
+
+## BUG-093 — `intercept_remove(NAME, KIND)` does not actually remove advice
+
+```sh
+$ stryke -e '
+fn payload { print "G;" }
+before "payload" { print "B;" }
+after  "payload" { print "A;" }
+payload();
+intercept_remove("payload", "before");
+payload();              # B; still fires'
+B;G;A; B;G;A;
+```
+
+`intercept_clear(NAME)` (which removes ALL advice for the named target)
+DOES work; only the per-kind variant is broken.
+
+Tests: `intercept_clear_removes_all_advice_for_target`,
+`intercept_remove_does_not_remove_advice_today`,
+`intercept_remove_unknown_kind_does_not_panic`.
+
+Severity: **bug**.
+
+
+## BUG-094 — Three-level `eval { die ... } / die $@` chain drops innermost log mutations
+
+```sh
+$ stryke -e '
+my $log = "";
+eval {
+  eval {
+    eval { die "in\n" };
+    $log .= "L1:" . $@;             # this mutation is lost
+    die $@;
+  };
+  $log .= "L2:" . $@;
+  die $@;
+};
+$log .= "L3:" . $@;
+print $log'
+L2:in
+L3:in
+                                    # L1: never made it into $log
+```
+
+The L1 append happens *between* the innermost `eval` ending and the
+re-`die`; somewhere in that window the lexical `$log`'s mutation is
+dropped. Two-level chains preserve all writes correctly (the existing
+`nested_eval_die_rethrow_preserves_message` test pins that).
+
+Tests: `three_level_die_rethrow_drops_innermost_log_today`,
+`nested_eval_die_rethrow_preserves_message` (the 2-level form that
+works).
+
+Severity: **bug**.
+
+
+## BUG-095 — `my ($scalar, @rest) = @_` slurps the FULL @_ into @rest
+
+```sh
+$ stryke -e '
+sub myff { my ($cb, @rest) = @_; print scalar @rest }
+myff(sub { 1 }, 5, 7)'
+3                              # @rest captured all 3 — should be 2 (5, 7)
+```
+
+`my ($cb, $val) = @_` and `my $cb = shift; my $val = shift` both work
+correctly. Only the slurpy-array destructuring form is wrong. Compounds
+with BUG-037 (closure coderef + flattened array → scalar count) when
+trying to forward args via `$cb->(@rest)`.
+
+Tests: `destructuring_my_scalar_array_returns_full_at_underscore_today`,
+`coderef_call_with_named_array_arg_loses_args_today`.
+
+Severity: **bug** (very high impact — breaks every `($head, @tail) = @_`
+idiom).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
