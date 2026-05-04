@@ -25,6 +25,7 @@ These break common Perl idioms across the codebase:
 | BUG-089 | Closures capture outer-scope `my` vars by value — outer counter idiom broken |
 | BUG-090 | `my ($head, @tail) = LIST` slurps full LIST into `@tail` |
 | BUG-095 | `my ($cb, @rest) = @_` slurps full `@_` into `@rest` (same root as BUG-090) |
+| BUG-101 | `my ($x) = @arr` returns scalar count instead of first element |
 | BUG-010 | `return (1, 2, 3)` collapses to last comma operand |
 | BUG-011 | `my $s = list_sub()` concatenates instead of taking last element |
 | BUG-018 | `local $/; <$fh>` does not enable slurp mode |
@@ -2341,6 +2342,88 @@ Tests: `eof_always_returns_false_today`,
 `readline_on_eof_filehandle_returns_undef`.
 
 Severity: **bug**.
+
+
+## BUG-091 — `@{$h_ref}{KEYS}` hash-slice through arrayref-deref errors
+
+```sh
+$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my $r = \%h;
+            my @v = @{$r}{qw(a c)};
+            print "@v"'
+Can't dereference non-reference as array at -e line 1.
+```
+
+The arrow-form workaround is fine: `($r->{a}, $r->{c})` does what one
+would want.
+
+Tests: `hash_slice_through_hashref_via_at_brace_deref_fails_today`,
+`hash_slice_through_hashref_via_arrow_keys_works`.
+
+Severity: **bug**.
+
+
+## BUG-092 — Ternary inside `"@{[ ... ]}"` interpolation rejected at parse time
+
+```sh
+$ stryke -e 'my $x = 5; my $s = "@{[ $x > 0 ? "pos" : "neg" ]}"; print $s'
+Unterminated @{ ... } in double-quoted string at -e line 1.
+```
+
+Stryke's interpolation parser bails on the inner `?`/`:` pair. Workaround:
+move the ternary out: `my $r = $x > 0 ? "pos" : "neg"; my $s = "...$r..."`.
+
+Tests: `ternary_inside_interpolated_anon_array_is_rejected_today`,
+`ternary_outside_interpolation_works`.
+
+Severity: **bug** (parser).
+
+
+## BUG-099 — `reverse()` with bare empty parens is a parse error
+
+```sh
+$ stryke -e 'my @r = reverse(); print scalar @r'
+Unexpected token RParen at -e line 1.
+```
+
+Calling `reverse` on an empty list should yield the empty list. The
+empty-parens form is rejected; passing an empty array variable
+(`reverse @empty`) works.
+
+Tests: `reverse_with_bare_empty_parens_is_parse_error_today`,
+`reverse_of_empty_array_var_returns_empty`.
+
+Severity: **bug** (small surface).
+
+
+## BUG-101 — `my ($x) = @arr` returns scalar count, not first element
+
+```sh
+$ stryke -e 'my @a = (10, 20, 30); my ($x) = @a; print $x'
+3                              # count, not 10
+$ perl   -e 'my @a = (10, 20, 30); my ($x) = @a; print $x'
+10
+$ stryke -e 'sub t { my ($x) = @_; print $x } t("hello", "world")'
+2                              # count, not "hello"
+```
+
+In Perl, parens around the LHS make the assignment list-context: `my
+($x) = LIST` binds `$x` to the first element. Stryke treats it as
+scalar-context (same as `my $x = @arr`), giving the count.
+
+The literal-list source DOES work: `my ($x) = ("hello")` binds correctly.
+Only `@_` and named-array sources fail. Same family as BUG-090
+(slurpy destructure leaks).
+
+Workarounds: `my $x = shift` or `my $x = $_[0]`.
+
+Tests: `single_scalar_destructure_from_array_var_returns_count_today`,
+`single_scalar_destructure_from_at_underscore_returns_count_today`,
+`single_scalar_destructure_from_literal_list_works`,
+`shift_workaround_for_first_element_works`,
+`dollar_underscore_zero_workaround_for_first_element_works`.
+
+Severity: **bug** (very high impact). Affects every `my ($self) = @_;`
+or `my ($cb) = @_;` extraction pattern in OO + functional code.
 
 
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
