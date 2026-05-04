@@ -1,17 +1,39 @@
 # BUGS.md — Known parity gaps and surprising behaviors
 
 Captured 2026-05-04 from a behavior-pinning sweep against `stryke v0.11.12` on
-macOS aarch64.
+macOS aarch64. The sweep produced 17 batches of pin tests
+(`tests/suite/behavior_pin_2026_05_a..q.rs`, ~750 cases total) and the entries
+below.
 
-Each entry is paired with a test in `tests/suite/behavior_pin_2026_05.rs`
-that locks the *current* output. When a bug is fixed, update the corresponding
-test rather than deleting it — the test then becomes the regression guard.
+Each entry is paired with one or more pin tests that lock the *current*
+output. When a bug is fixed, update the corresponding test rather than
+deleting it — the test then becomes the regression guard.
 
 Severity legend:
 
 - `parity` — diverges from Perl 5; intentional or accidental TBD
 - `bug` — observably wrong vs documented intent
 - `polish` — non-critical UX/error-message issue
+
+## High-impact bugs (worth fixing first)
+
+These break common Perl idioms across the codebase:
+
+| ID | Summary |
+|----|---------|
+| BUG-037 | Closure-captured coderefs called with `@_` flatten to scalar count |
+| BUG-089 | Closures capture outer-scope `my` vars by value — outer counter idiom broken |
+| BUG-090 | `my ($head, @tail) = LIST` slurps full LIST into `@tail` |
+| BUG-095 | `my ($cb, @rest) = @_` slurps full `@_` into `@rest` (same root as BUG-090) |
+| BUG-010 | `return (1, 2, 3)` collapses to last comma operand |
+| BUG-011 | `my $s = list_sub()` concatenates instead of taking last element |
+| BUG-018 | `local $/; <$fh>` does not enable slurp mode |
+| BUG-019 | `for (@a) { $_ *= 10 }` does not alias array element for mutation |
+
+These compound: BUG-095 breaks every `($cb, @rest) = @_; $cb->(@rest)`
+pattern, BUG-089 breaks every state-tracking closure, and BUG-037 breaks
+every coderef-call-with-array-arg. Together they make most functional-
+style libraries unusable until fixed.
 
 
 ## PARITY-001 — Magic string increment is not implemented
