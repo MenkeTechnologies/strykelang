@@ -635,6 +635,233 @@ Tests: `printf_plus_flag_ignored_today`.
 Severity: **bug** (low impact). Affects readable signed output.
 
 
+## PARITY-015 — `"Inf"` and `"NaN"` strings numify to 0
+
+```sh
+$ stryke -e 'print "Inf" + 1, "/", "NaN" + 0'
+1/0
+$ perl   -e 'print "Inf" + 1, "/", "NaN" + 0'
+Inf/NaN
+```
+
+Float overflow produces `"inf"` (e.g. `9 ** 9 ** 9`) and `sqrt(-1)` produces
+`"nan"`, so the float internals support specials — only the string-to-num
+parser doesn't recognise them.
+
+Tests: `numeric_inf_string_does_not_become_infinity_today`,
+`numeric_overflow_yields_inf`, `sqrt_negative_yields_nan`.
+
+Severity: **parity**.
+
+
+## BUG-018 — `local $/` does not enable slurp mode
+
+```sh
+$ stryke -e 'open my $fh, "<", "/etc/hosts"; local $/; my $x = <$fh>; print length($x)'
+1                       # stryke
+$ perl   -e 'open my $fh, "<", "/etc/hosts"; local $/; my $x = <$fh>; print length($x)'
+357                     # whole file (whatever its size is)
+```
+
+Reading via `<$fh>` ignores `$/` undef and stops at the first newline (or
+even after one byte for some inputs). The `-0777` slurp flag is also
+broken on stdin.
+
+Tests: `open_then_slurp_with_undef_separator_reads_only_first_line_today`.
+
+Severity: **bug**. Slurping a file is one of Perl's most common idioms.
+
+
+## BUG-019 — `for (@arr) { $_ ... }` does not alias array elements
+
+```sh
+$ stryke -e 'my @a = (1..3); for (@a) { $_ *= 10 } print "@a"'
+1 2 3
+$ perl   -e 'my @a = (1..3); for (@a) { $_ *= 10 } print "@a"'
+10 20 30
+```
+
+The named-loop-var form (`for my $x (@a)`) has the same bug. The
+explicit-index form (`for my $i (0..$#a) { $a[$i] *= 10 }`) works.
+
+Tests: `for_dollar_underscore_does_not_alias_array_element_today`,
+`for_named_loop_var_does_not_alias_array_element_today`,
+`for_index_assignment_works`.
+
+Severity: **bug**. Affects every in-place mutation idiom.
+
+
+## BUG-020 — `$\`` (pre-match) does not parse outside string interpolation
+
+```sh
+$ stryke -e '"hello world" =~ /world/; my $p = $`; print "[$p]"'
+Expected variable name after $ at -e line 1.
+```
+
+Workaround: `use English; my $p = $PREMATCH;` — that does parse and
+captures correctly.
+
+Tests: `premuf_via_english_alias_works`.
+
+Severity: **bug** (low impact; rare idiom).
+
+
+## BUG-021 — Scalar-ref to arrayref unwrap fails
+
+```sh
+$ stryke -e 'my $x = [1,2,3]; my $r = \$x; print $$r->[0]'
+Can't use arrow deref on non-array-ref at -e line 1.
+$ perl   -e 'my $x = [1,2,3]; my $r = \$x; print $$r->[0]'
+1
+```
+
+Same with `${$r}->[0]`. The double-deref to reach an arrayref through a
+scalar-ref intermediary is rejected.
+
+Tests: `scalar_ref_to_arrayref_unwrap_fails_today`.
+
+Severity: **bug**.
+
+
+## BUG-022 — `weaken` runs but `isweak` always returns 0
+
+```sh
+$ stryke -e 'my $a = [1]; my $b = $a; weaken($b); print isweak($b) ? "weak" : "strong"'
+strong
+$ perl -MScalar::Util=weaken,isweak -e '...'
+weak
+```
+
+Tests: `weaken_does_not_make_isweak_true_today`.
+
+Severity: **bug**. Weak-ref semantics are needed for cycle-breaking; if
+`weaken` is a no-op then long-lived parent/child structures will leak.
+
+
+## BUG-023 — Autovivification of nested hash/array fails
+
+```sh
+$ stryke -e 'my %h; $h{k}[0] = "first"; print "@{$h{k}}"'
+Can't assign to arrow array deref on non-array-ref at -e line 1.
+$ perl   -e 'my %h; $h{k}[0] = "first"; print "@{$h{k}}"'
+first
+```
+
+Workaround: pre-allocate the inner ref:
+`$h{k} = []; $h{k}[0] = "first";`.
+
+Tests: `autoviv_hash_then_array_index_fails_today`.
+
+Severity: **bug**. Autovivification is a major Perl ergonomic feature.
+
+
+## BUG-024 — `given/when` fails inside subs and with arrayref patterns
+
+Two related failures, both raise "unexpected control flow in tree-assisted
+opcode":
+
+```sh
+# 1. arrayref smart-match
+$ stryke -e 'use feature "switch"; my $x = 3;
+             given ($x) { when ([1..5]) { print "low" } default { print "?" } }'
+unexpected control flow in tree-assisted opcode
+
+# 2. given/when wrapped in a sub
+$ stryke -e 'use feature "switch";
+             sub g { my $x = $_[0]; given ($x) { when ("hi") { return "M" } default { return "N" } } }
+             print g("hi")'
+unexpected control flow in tree-assisted opcode
+```
+
+Top-level `given/when` with scalar literals or `/regex/` works fine.
+
+Tests: `given_when_arrayref_range_fails_today`,
+`given_when_inside_sub_fails_today`.
+
+Severity: **bug**. The sub-wrapped form is the way most code uses
+given/when.
+
+
+## BUG-025 — `$SIG{__WARN__}` handler is not invoked
+
+The variable is assignable and reads back as a CODE ref, but `warn` does
+not route through it. Captured indirectly: stderr still receives the warn
+text and the handler's body never executes.
+
+Tests: `sig_warn_assignment_succeeds` (the assignment does work).
+
+Severity: **bug**. Affects logging libraries and test frameworks that
+intercept warnings.
+
+
+## BUG-026 — `$s x= N` compound assignment is rejected
+
+```sh
+$ stryke -e 'my $s = "ab"; $s x= 3'
+Unexpected token Assign at -e line 1.
+```
+
+Workaround: `$s = $s x N`.
+
+Tests: `x_compound_assign_is_parse_error_today`,
+`x_compound_workaround_works`.
+
+Severity: **bug** (parse-time; small surface).
+
+
+## BUG-027 — `$#arr = N` does not change array length
+
+```sh
+$ stryke -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
+5 / 1 2 3 4 5
+$ perl   -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
+3 / 1 2 3
+```
+
+Both truncation (`$#a = $smaller`) and extension (`$#a = $bigger`, fills
+with undef) are no-ops.
+
+Tests: `dollar_hash_array_lvalue_does_not_truncate_today`.
+
+Severity: **bug**.
+
+
+## BUG-028 — `@hash{@array_var}` slice returns empty list
+
+```sh
+$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my @v = @h{("a","c")};   print "@v"'
+1 3
+$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my @ks = ("a","c");
+             my @v = @h{@ks}; print "@v"'
+                                    # (empty)
+```
+
+The literal-list form works; the array-var form does not. The arrayref
+deref form (`@h{@$kref}`) is also broken.
+
+Tests: `hash_slice_with_literal_keys_returns_correct_values`,
+`hash_slice_with_array_var_keys_returns_empty_today`.
+
+Severity: **bug**.
+
+
+## BUG-029 — `$&` does not interpolate inside double-quoted strings
+
+```sh
+$ stryke -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
+[$&]                    # stryke (literal)
+$ perl   -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
+[XYZ]
+```
+
+`my $m = $&` works correctly; only the interpolation form is broken.
+
+Tests: `match_dollar_amp_captures_whole_match` (the form that works),
+`match_dollar_amp_does_not_interpolate_today`.
+
+Severity: **bug** (interpolation parser).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
