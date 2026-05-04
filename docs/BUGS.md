@@ -1197,6 +1197,112 @@ Tests: `aop_after_dollar_question_is_zero_not_return_value_today`,
 Severity: **bug**. Documented behavior diverges from observed.
 
 
+## PARITY-017 — Embedded code blocks `(?{ ... })` not supported in regex
+
+```sh
+$ stryke -e '"abc" =~ /a(?{ "side" })b/'
+Invalid regex /a(?{ "side" })b/: PCRE2: error compiling pattern at offset 3: unrecognized character after (? or (?-
+```
+
+stryke uses PCRE2, which deliberately omits Perl's `(?{...})` (embedded
+code) and `(??{...})` (deferred-eval pattern) extensions because they
+require runtime escape into the host language. Recursive patterns
+(`(?R)`), conditional patterns (`(?(1)yes|no)`) and atomic groups
+(`(?>...)`) all work.
+
+Tests: `embedded_code_in_regex_is_rejected_today`,
+`regex_recursion_via_question_r_works`,
+`regex_conditional_pattern_works`,
+`regex_atomic_group_prevents_backtrack`.
+
+Severity: **parity** (intentional engine choice).
+
+
+## BUG-046 — `trait` cannot declare fields
+
+```sh
+$ stryke -e 'trait Counter { count: Int = 0; fn inc { 1 } }'
+Expected `fn` in trait definition at -e line 1.
+```
+
+Stryke's `trait` blocks accept only `fn` declarations; fields must live
+in the impl'ing class. Moose `role`s by contrast can declare attributes.
+
+Tests: `trait_with_field_is_parse_error_today`.
+
+Severity: **parity / design choice**. Worth deciding whether to keep
+trait-as-method-only or extend to attributes.
+
+
+## BUG-047 — `ARRAY` / `ArrayRef` / `HashRef` field/param types fail to match
+
+```sh
+$ stryke -e 'class S { items: ARRAY = [] } S()'
+class S field `items`: expected ARRAY, got ARRAY at -e line 1.
+$ stryke -e 'class S { items: ArrayRef = [] } S()'
+class S field `items`: expected ArrayRef, got ARRAY at -e line 1.
+$ stryke -e 'class S { items: Array = [] } S()'
+                       # works
+```
+
+Stryke's supported type names are `Int`, `Str`, `Float`, `Bool`,
+`Array`, `Hash`, `Ref`, `Any` (any unrecognized name becomes
+`Struct(name)`, which always type-mismatches the runtime tag for
+arrayrefs/hashrefs). Anyone coming from Moose-land will reach for
+`ArrayRef`/`HashRef` first and get a confusing error.
+
+Tests: `class_field_array_uppercase_keyword_does_not_match_array_default_today`,
+`class_field_arrayref_keyword_does_not_match_array_default_today`,
+`class_field_array_type_accepts_arrayref_default` (the form that works).
+
+Severity: **bug** (high friction). Either accept the Moose names as
+aliases or improve the error message to say "did you mean `Array`?".
+
+
+## BUG-048 — `ref()` on stryke-native class instances returns the empty string
+
+```sh
+$ stryke -e 'class C { v: Int = 0 } my $c = C(v => 5);
+            print "[", ref($c), "]/", $c->isa("C") ? "Y" : "N"'
+[]/Y
+$ stryke -e 'my $h = bless { v => 0 }, "H"; print ref($h)'
+H
+```
+
+`isa()` works correctly; the bug is specific to `ref()`. Moose-style
+`ref($obj) eq "ClassName"` checks across the codebase silently fail,
+which can quietly route data through default branches.
+
+Tests: `ref_of_stryke_class_instance_is_empty_today`,
+`ref_of_blessed_hashref_returns_class_name`.
+
+Severity: **bug**.
+
+
+## BUG-049 — `sprintf` star-width / dynamic-precision (`%*d`, `%.*f`) not implemented
+
+```sh
+$ stryke -e 'print sprintf("%*d", 5, 42)'
+5d
+$ perl   -e 'print sprintf("%*d", 5, 42)'
+   42
+
+$ stryke -e 'print sprintf("%.*f", 3, 3.14159)'
+3f
+$ perl   -e 'print sprintf("%.*f", 3, 3.14159)'
+3.142
+```
+
+Stryke leaves the `*` literal in the format and consumes the next arg
+for the (now broken) format spec. Workaround: build the format string
+dynamically: `sprintf("%${w}d", $n)` works.
+
+Tests: `sprintf_star_width_emits_literal_today`,
+`sprintf_star_precision_emits_literal_today`.
+
+Severity: **bug** (low impact; common in column-formatted output).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
