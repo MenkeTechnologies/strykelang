@@ -2426,6 +2426,69 @@ Severity: **bug** (very high impact). Affects every `my ($self) = @_;`
 or `my ($cb) = @_;` extraction pattern in OO + functional code.
 
 
+## BUG-102 — `refaddr(\&fn)` differs between repeated evaluations
+
+```sh
+$ stryke -e 'sub myff { 1 }
+            my $r1 = \&myff; my $r2 = \&myff;
+            print refaddr($r1) == refaddr($r2) ? "eq" : "ne"'
+ne
+$ perl -MScalar::Util=refaddr -e '...'
+eq
+```
+
+Same root issue as BUG-075 (refaddr of `\@a`): each `\&fn` creates a
+fresh ref-cell rather than returning the underlying CV's address. Pure
+copy via `=` keeps the same refaddr.
+
+Tests: `refaddr_of_repeated_backslash_amp_returns_different_today`.
+
+Severity: **bug** (parity).
+
+
+## BUG-103 — `prototype($coderef)` empty for anonymous-sub refs
+
+```sh
+$ stryke -e 'my $r = sub ($) { 42 }; print prototype($r)'
+                                # empty
+$ stryke -e 'sub myff ($) { 42 } print prototype(\&myff)'
+$
+```
+
+Named-sub coderefs report their prototype correctly. Anonymous-sub
+coderefs return empty.
+
+Tests: `prototype_of_anonymous_sub_coderef_is_empty_today`,
+`prototype_of_named_sub_via_amp_ref_works`.
+
+Severity: **bug** (small surface; a workaround is to assign the anon
+sub to a typeglob with a name).
+
+
+## BUG-104 — `print $x - $y, list` parses `$x` as an indirect filehandle
+
+```sh
+$ stryke -e 'my $x = 5; my $y = 3; print $x - $y, "end"'
+print on unopened filehandle 5 at -e line 1.
+$ stryke -e 'my $x = 5; my $y = 3; print $x + $y, "end"'
+8end                              # `+` form works
+$ stryke -e 'my $x = 5; my $y = 3; print(($x - $y), "end")'
+2end                              # parens work
+$ perl   -e 'my $x = 5; my $y = 3; print $x - $y, "end"'
+2end                              # Perl handles it
+```
+
+The `-` form trips stryke's indirect-filehandle parser because `-`
+also means unary minus. The `+` form is unambiguous. Workaround: wrap
+the expression in parens, or store the result in a temporary first.
+
+Tests: `print_scalar_minus_scalar_with_trailing_args_parses_as_filehandle_today`,
+`print_scalar_plus_scalar_with_trailing_args_works`,
+`print_paren_workaround_for_minus_form_works`.
+
+Severity: **bug** (parser ambiguity).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
