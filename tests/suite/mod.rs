@@ -5,6 +5,7 @@ mod aop;
 mod aot_build;
 mod bare_regex_slash;
 mod behavior_pin_2026_05;
+mod behavior_pin_2026_05_b;
 mod bigint_compat;
 mod builtins;
 mod class_oop;
