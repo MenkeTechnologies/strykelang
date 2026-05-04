@@ -1673,6 +1673,140 @@ Tests: `find_index_is_not_a_builtin_today`.
 Severity: **bug** (parity gap with `List::Util`).
 
 
+## BUG-068 — AOP advice cannot mutate `@INTERCEPT_ARGS` or call `proceed(NEW_ARGS)`
+
+```sh
+$ stryke -e '
+fn greet($name) { "hi $name" }
+around "greet" {
+  $INTERCEPT_ARGS[0] = uc($INTERCEPT_ARGS[0]);   # ignored
+  proceed(uc($INTERCEPT_ARGS[0]));               # also ignored
+}
+print greet("world")'
+hi world
+```
+
+Both the in-place mutation of `@INTERCEPT_ARGS` and the explicit-args
+form `proceed(LIST)` get dropped — the original args reach the wrapped
+sub. This makes around-advice unable to rewrite arguments.
+
+Tests: `intercept_args_array_visible_in_before` (read-only access works),
+`intercept_args_mutation_does_not_propagate_today`,
+`proceed_with_explicit_args_does_not_override_today`.
+
+Severity: **bug**. Argument-rewriting is a common AOP use case.
+
+
+## BUG-069 — Multiple `around` advice for the same target does not compose
+
+```sh
+$ stryke -e '
+fn val { 1 }
+around "val" { proceed() + 10 }
+around "val" { proceed() * 100 }
+print val()'
+11                       # only first registration applied
+```
+
+Perl-style aspect ordering would either compose both (e.g. 110) or stack
+in declaration order. Stryke uses only the first registered around block.
+
+Tests: `multiple_around_advice_does_not_compose_today`,
+`multiple_before_and_after_fire_in_order` (the form that does work).
+
+Severity: **bug**.
+
+
+## BUG-070 — Explicit `return` inside `around` body is rejected by lowering
+
+```sh
+$ stryke -e '
+fn val { 1 }
+around "val" { my $r = proceed(); return $r + 10 }
+val()'
+AOP around advice body for `val` could not be lowered to bytecode
+(likely contains a construct unsupported by block lowering, e.g. a literal `return`);
+rewrite the body without it at -e line 3.
+```
+
+Implicit final-expression form (`{ proceed() + 10 }`) works. The error
+message is helpful and tells the user to rewrite — pinned both forms so
+the workaround stays valid if/when the underlying limitation is lifted.
+
+Tests: `explicit_return_in_around_block_is_rejected_today`,
+`implicit_final_value_in_around_is_used_as_return`.
+
+Severity: **bug**.
+
+
+## BUG-071 — `before`-advice `die` does not propagate to the caller's `eval`
+
+```sh
+$ stryke -e '
+fn payload { print "G " }
+before "payload" { print "B "; die "blocked\n" }
+eval { payload() };
+print "[$@]"'
+B G G []        # before ran, original ran twice (?), $@ is empty
+```
+
+The `before` block's `die` neither aborts the call nor reaches `$@`
+through the surrounding `eval`. Workarounds: handle the early-abort case
+inside `before` itself, or move the gate into `around { ... }` and skip
+`proceed()`.
+
+Tests: `before_advice_die_does_not_propagate_today`.
+
+Severity: **bug**.
+
+
+## BUG-072 — `--lint` accepts strict-violating sources that runtime catches
+
+```sh
+$ stryke --lint -e 'use strict; $undeclared_xx = 5'
+-e compile OK
+$ stryke -e 'use strict; $undeclared_xx = 5'
+Global symbol "$undeclared_xx" requires explicit package name (did you
+forget to declare "my $undeclared_xx"?) at -e line 1.
+```
+
+Perl's `perl -c` catches this at compile time. Stryke's `--lint` only
+runs through bytecode lowering and doesn't apply the strict-pragma
+checker. Workaround: run the script for real (or wrap in `eval` and
+inspect `$@`).
+
+Tests: `parse_ok_for_strict_violator_but_runtime_fails`.
+
+Severity: **bug** (the whole purpose of `--lint` is compile-time
+verification).
+
+
+## BUG-003 (expanded) — Three-level Perl-5 ISA + `SUPER::` chain also stack-overflows
+
+The original BUG-003 was filed against stryke-native `class extends` +
+`SUPER::`. This iteration confirmed the issue is broader: a three-class
+Perl-5-style hierarchy (`our @ISA = ("Parent")`) where each level calls
+`$self->SUPER::name` on the way up also overflows the stack:
+
+```sh
+$ stryke -e '
+package A; sub new { bless {}, shift } sub name { "A" }
+package B; our @ISA = ("A"); sub name { my $self = shift; $self->SUPER::name . "B" }
+package C; our @ISA = ("B"); sub name { my $self = shift; $self->SUPER::name . "C" }
+package main;
+print C->new->name'
+thread 'main' has overflowed its stack
+```
+
+Two-level chains (`A` → `B`) work; three or more crash. Method-resolution
+state seems to lose its position cursor on the second hop.
+
+Tests: `perl5_super_one_level_chain_works`,
+`perl5_three_level_super_chain_at_least_parses`.
+
+Severity: **bug**. Limits practical class hierarchies.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
