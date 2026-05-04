@@ -494,3 +494,102 @@ fn dollar_underscore_zero_workaround_for_first_element_works() {
         "hello"
     );
 }
+
+// ── refaddr of `\&fn` differs between repeated evaluations (BUG-102) ───────
+
+#[test]
+fn refaddr_of_repeated_backslash_amp_returns_different_today() {
+    // BUG-102: in Perl, multiple `\&myff` references all share the sub's
+    // CV address. In stryke, each `\&myff` evaluation creates a new
+    // coderef wrapper.
+    assert_eq!(
+        eval_int(
+            r#"sub myff { 1 }
+               my $r1 = \&myff; my $r2 = \&myff;
+               refaddr($r1) == refaddr($r2) ? 1 : 0"#
+        ),
+        0
+    );
+}
+
+// ── prototype on anonymous-sub coderef returns empty (BUG-103) ─────────────
+
+#[test]
+fn prototype_of_anonymous_sub_coderef_is_empty_today() {
+    // BUG-103: Perl's `prototype($coderef)` returns the prototype string
+    // for both named and anonymous subs. Stryke returns it correctly only
+    // for named subs.
+    assert_eq!(
+        eval_string(r#"my $r = sub ($) { 42 }; prototype($r)"#),
+        ""
+    );
+}
+
+#[test]
+fn prototype_of_named_sub_via_amp_ref_works() {
+    assert_eq!(
+        eval_string(r#"sub myff ($) { 42 } prototype(\&myff)"#),
+        "$"
+    );
+}
+
+// ── `print $a - $b, ...` parses leading scalar as filehandle (BUG-104) ────
+
+#[test]
+fn print_scalar_minus_scalar_with_trailing_args_parses_as_filehandle_today() {
+    // BUG-104: `print $x - $y, "end"` should print the result of `$x-$y`
+    // followed by "end". Stryke parses `$x` as an indirect filehandle
+    // (because `-` is a valid unary operator for what follows). Plus form
+    // (`$x + $y, "end"`) parses correctly because `+$expr` is a no-op
+    // unary.
+    use stryke::error::ErrorKind;
+    let kind = eval_err_kind(r#"my $x = 5; my $y = 3; print $x - $y, "end""#);
+    assert!(
+        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::IO),
+        "expected filehandle error, got {:?}",
+        kind
+    );
+}
+
+#[test]
+fn print_scalar_plus_scalar_with_trailing_args_works() {
+    // The `+` form does parse correctly.
+    let f = std::env::temp_dir().join(format!(
+        "stryke_pin_print_plus_{}", std::process::id()
+    ));
+    let path = f.to_string_lossy().to_string();
+    let _ = eval_string(&format!(
+        r#"my $x = 5; my $y = 3;
+           open my $fh, ">", "{0}" or die;
+           my $orig = select $fh;
+           print $x + $y, " end";
+           select $orig;
+           close $fh;
+           "OK""#,
+        path
+    ));
+    let body = std::fs::read_to_string(&f).unwrap_or_default();
+    let _ = std::fs::remove_file(&f);
+    assert_eq!(body, "8 end");
+}
+
+#[test]
+fn print_paren_workaround_for_minus_form_works() {
+    let f = std::env::temp_dir().join(format!(
+        "stryke_pin_print_paren_{}", std::process::id()
+    ));
+    let path = f.to_string_lossy().to_string();
+    let _ = eval_string(&format!(
+        r#"my $x = 5; my $y = 3;
+           open my $fh, ">", "{0}" or die;
+           my $orig = select $fh;
+           print(($x - $y), " end");
+           select $orig;
+           close $fh;
+           "OK""#,
+        path
+    ));
+    let body = std::fs::read_to_string(&f).unwrap_or_default();
+    let _ = std::fs::remove_file(&f);
+    assert_eq!(body, "2 end");
+}
