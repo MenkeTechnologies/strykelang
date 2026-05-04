@@ -862,6 +862,139 @@ Tests: `match_dollar_amp_captures_whole_match` (the form that works),
 Severity: **bug** (interpolation parser).
 
 
+## PARITY-016 — `ref $@ eq "Class"` parses with the wrong precedence
+
+```sh
+$ stryke -e 'package E; sub new { bless {}, shift } package main;
+             eval { die E->new }; print ref $@ eq "E" ? "Y" : "N"'
+N
+$ stryke -e 'package E; sub new { bless {}, shift } package main;
+             eval { die E->new }; print((ref $@) eq "E" ? "Y" : "N")'
+Y
+```
+
+Stryke parses `ref $@ eq "E"` as `ref ($@ eq "E")` — the named-unary
+operator's argument absorbs the `eq` expression — instead of `(ref $@) eq
+"E"` per Perl precedence.
+
+Tests: `ref_dollar_at_eq_string_precedence_today`,
+`die_with_blessed_object_preserves_class` (the form that works).
+
+Severity: **parity**. Common idiom for typed-exception dispatch.
+
+
+## BUG-030 — `system()` return value is exit code, not Perl's status word
+
+```sh
+$ stryke -e 'my $r = system("false"); print "r=$r ?=$?"'
+r=1 ?=256
+$ perl   -e 'my $r = system("false"); print "r=$r ?=$?"'
+r=256 ?=256
+```
+
+`$?` is set correctly (exit-code << 8). Only the *return value* of
+`system()` is wrong — it returns the bare exit code instead of the same
+value as `$?`.
+
+Tests: `system_false_returns_exit_code_not_status_word_today`,
+`system_true_returns_zero_in_both` (where the values happen to coincide).
+
+Severity: **bug**.
+
+
+## BUG-031 — `system(LIST)` form drops exit code from `$?`
+
+```sh
+$ stryke -e 'system("sh", "-c", "exit 7"); print "?=", $?'
+?=0
+$ stryke -e 'system("sh -c \"exit 7\""); print "?=", $?'
+?=1792                  # single-string shell form: correct
+$ perl   -e 'system("sh", "-c", "exit 7"); print "?=", $?'
+?=1792
+```
+
+Tests: `system_list_form_loses_exit_code_today`,
+`system_string_form_propagates_exit_code`.
+
+Severity: **bug**.
+
+
+## BUG-032 — `$&` not interpolated in `s///` replacement string
+
+```sh
+$ stryke -e 'my $s = "abc 123"; $s =~ s/(\d+)/$&/g; print $s'
+abc $&
+$ perl   -e 'my $s = "abc 123"; $s =~ s/(\d+)/$&/g; print $s'
+abc 123
+```
+
+Numbered captures (`$1`, `$2`, …) DO interpolate in replacements; only
+`$&` is broken. (Same root issue as BUG-029 for double-quoted strings.)
+
+Tests: `dollar_amp_not_interpolated_in_replacement_today`,
+`captures_dollar_one_dollar_two_work_in_replacement`.
+
+Severity: **bug**.
+
+
+## BUG-033 — Multiple heredocs on a single line not supported
+
+```sh
+$ stryke -e 'print <<A, <<B;
+A1
+A
+B1
+B
+'
+Undefined subroutine &B1 at -e line 5.
+```
+
+Stryke consumes the first heredoc body correctly but then parses the
+second body as code instead of as the second heredoc's content.
+Workaround: split into separate prints.
+
+Tests: `multiple_heredocs_on_same_line_not_supported_today`.
+
+Severity: **bug**.
+
+
+## BUG-034 — `sprintf "%#x"` / `"%#o"` ignore the `#` flag
+
+```sh
+$ stryke -e 'printf "%#x %#o\n", 255, 8'
+ff 10
+$ perl   -e 'printf "%#x %#o\n", 255, 8'
+0xff 010
+```
+
+Tests: `sprintf_hash_flag_does_not_add_prefix_today`,
+`sprintf_capital_x_uppercase_hex` (the form that works).
+
+Severity: **bug** (low impact). `%X` and `%x` themselves work; only the
+`#` prefix flag is missing.
+
+
+## BUG-035 — `open "-|", "cmd", "arg"` list form drops the extra args
+
+```sh
+$ stryke -e 'open my $fh, "-|", "echo", "hi"; my $l = <$fh>; print "[", $l, "]"'
+[
+]                       # `echo` ran with no arg, only "\n" came back
+$ stryke -e 'open my $fh, "-|", "echo hi"; my $l = <$fh>; print "[", $l, "]"'
+[hi
+]                       # single-string shell form works
+$ perl   -e 'open my $fh, "-|", "echo", "hi"; my $l = <$fh>; print "[", $l, "]"'
+[hi
+]
+```
+
+Tests: `pipe_open_read_string_form_captures_subprocess_stdout`,
+`pipe_open_read_list_form_drops_args_today`.
+
+Severity: **bug**. The list form is the safe (no-shell-quoting) idiom and
+should be preferred.
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
