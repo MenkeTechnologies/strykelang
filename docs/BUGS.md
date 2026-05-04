@@ -1303,6 +1303,185 @@ Tests: `sprintf_star_width_emits_literal_today`,
 Severity: **bug** (low impact; common in column-formatted output).
 
 
+## PARITY-018 — `printf "%d"` with float overflow saturates instead of wrapping
+
+```sh
+$ stryke -e 'printf "%d", 1e20'
+9223372036854775807                 # i64::MAX
+$ perl   -e 'printf "%d", 1e20'
+-1                                  # wraps modulo 2^64
+```
+
+Stryke uses Rust's `as i64` which saturates; Perl uses C's `long`-style
+cast which wraps. Neither matches a useful "bigint" answer — the value
+1e20 simply doesn't fit in 64 bits.
+
+Tests: `printf_d_with_large_float_saturates_to_i64_max_today`.
+
+Severity: **parity** (defined behavior; differs from Perl).
+
+
+## BUG-050 — `$SIG{__DIE__}` handler is not invoked
+
+```sh
+$ stryke -e '$SIG{__DIE__} = sub { print "trapped" }; eval { die "x" }; print "after"'
+after
+$ perl   -e '$SIG{__DIE__} = sub { print "trapped" }; eval { die "x" }; print "after"'
+trappedafter
+```
+
+`$SIG{__WARN__}` (BUG-025) and `$SIG{__DIE__}` share the same root cause:
+hash-store side of `%SIG` works (`ref` returns CODE), but the runtime
+hooks that fire signal-pseudo-handlers don't dispatch through `%SIG`.
+
+Tests: `sig_die_handler_not_invoked_today`,
+`sig_handler_assignment_returns_code_ref`.
+
+Severity: **bug**.
+
+
+## BUG-051 — PerlIO layers in `open` mode strings are rejected
+
+```sh
+$ stryke -e 'open my $fh, ">:utf8", "/tmp/x"'
+Unknown open mode '>:utf8' at -e line 1.
+$ stryke -e 'open my $fh, "<:raw", "/tmp/x"'
+Unknown open mode '<:raw' at -e line 1.
+```
+
+Workaround: the bare `>` / `<` modes work; data is byte-stream by
+default. Programs that need encoding can `Encode::decode("UTF-8", $bytes)`
+once the data is read in. (Encode itself is not loaded today either —
+see BUG-052.)
+
+Tests: `open_with_utf8_layer_is_rejected_today`.
+
+Severity: **bug**.
+
+
+## BUG-052 — `prototype("BUILTIN")` returns empty for built-ins
+
+```sh
+$ stryke -e 'print "[", prototype("push"), "]"'
+[]
+$ stryke -e 'print "[", prototype("scalar"), "]"'
+[]
+$ perl   -e 'print "[", prototype("push"), "]/[", prototype("scalar"), "]"'
+[+@]/[$]
+```
+
+User-defined subs still report their prototypes correctly:
+
+```sh
+$ stryke -e 'sub myf ($) { 1 } print prototype \&myf'
+$
+```
+
+Tests: `prototype_of_push_is_empty_today`,
+`prototype_of_scalar_is_empty_today`,
+`prototype_of_user_sub_returns_proto_string`.
+
+Severity: **bug**.
+
+
+## BUG-053 — `exists &name` (sub existence check) is a parse error
+
+```sh
+$ stryke -e 'sub myf { 1 } exists &main::myf'
+Unexpected token BitAnd at -e line 1.
+$ perl   -e 'sub myf { 1 } print exists &main::myf ? "Y" : "N"'
+Y
+```
+
+Workaround: `defined &name` works and is functionally equivalent for
+declared subs.
+
+Tests: `exists_ampersand_subname_is_parse_error_today`,
+`defined_ampersand_subname_works`.
+
+Severity: **bug**.
+
+
+## BUG-054 — `looks_like_number` not a builtin
+
+Stryke ships many `Scalar::Util` functions as built-ins (`reftype`,
+`blessed`, `weaken`, `refaddr`) but `looks_like_number` is missing.
+
+```sh
+$ stryke -e 'print looks_like_number("3.14")'
+Undefined subroutine &looks_like_number at -e line 1.
+```
+
+Workaround: regex-based check, e.g. `m/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/`.
+
+Tests: `looks_like_number_is_not_a_builtin_today`,
+`reftype_unblessed_arrayref_is_array`,
+`blessed_returns_class_for_blessed_ref`.
+
+Severity: **bug**.
+
+
+## BUG-055 — `\U` / `\L` not honored in `s///` replacement
+
+```sh
+$ stryke -e 'my $s = "abc def"; $s =~ s/\b(\w)/\U$1/g; print $s'
+\Uabc \Udef
+$ perl   -e 'my $s = "abc def"; $s =~ s/\b(\w)/\U$1/g; print $s'
+Abc Def
+```
+
+`\U`/`\L`/`\u`/`\l` work correctly inside double-quoted string
+interpolation; only the substitution-replacement path is broken.
+Workaround: the `/e` flag with a `uc()`/`lc()` call:
+
+```sh
+$ stryke -e 'my $s = "abc def"; $s =~ s/\b(\w)/uc($1)/ge; print $s'
+Abc Def
+```
+
+Tests: `upper_case_escape_in_substitution_is_literal_today`,
+`s_e_flag_with_uc_call_works`,
+`upper_case_escape_uppercases_until_e` (the interpolation path that works).
+
+Severity: **bug**.
+
+
+## BUG-056 — `%-` (named multi-capture hash) keeps only the last match
+
+```sh
+$ stryke -e '"abc 123 def 456" =~ /(?<wd>\w+)/g; print join(",", @{$-{wd}})'
+456
+$ perl   -e '"abc 123 def 456" =~ /(?<wd>\w+)/g; print join(",", @{$-{wd}})'
+abc,123,def,456
+```
+
+`%+` (single-match named hash) works correctly. `%-` is for accumulating
+all `/g` matches; stryke overwrites instead of appending.
+
+Tests: `percent_minus_multi_capture_returns_only_last_today`,
+`percent_plus_named_capture_works`.
+
+Severity: **bug**.
+
+
+## BUG-057 — `sprintf "%a"` (hex-float) not implemented
+
+```sh
+$ stryke -e 'printf "%a", 1.5'
+1.5
+$ perl   -e 'printf "%a", 1.5'
+0x1.8p+0
+```
+
+Stryke ignores the `%a` specifier and prints the value with default
+formatting. Hex-float output is rare in scripting but used by some
+numerical-debugging tooling.
+
+Tests: `sprintf_a_hex_float_emits_decimal_today`.
+
+Severity: **bug** (low impact).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
