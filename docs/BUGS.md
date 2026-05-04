@@ -995,6 +995,84 @@ Severity: **bug**. The list form is the safe (no-shell-quoting) idiom and
 should be preferred.
 
 
+## BUG-036 — `$obj->can("method")` returns a coderef that doesn't actually invoke
+
+```sh
+$ stryke -e '
+package Cat; sub new { bless {}, shift } sub meow { "meow!" }
+package main;
+my $c = Cat->new;
+my $m = $c->can("meow");
+print "ref=", ref($m), " direct=", $c->meow, " via=", $m->($c) // "U"'
+ref=CODE direct=meow! via=U
+
+$ perl ...
+ref=CODE direct=meow! via=meow!
+```
+
+`can` correctly returns a CODE reference for an existing method, but
+calling that ref with the receiver as the first arg returns undef instead
+of running the method body. Direct invocation works.
+
+Tests: `can_returns_coderef_but_invocation_returns_undef_today`,
+`can_returns_truthy_for_existing_method`,
+`can_returns_falsy_for_missing_method`.
+
+Severity: **bug**. Common idiom: `$obj->can($method) and $obj->$method(...)`
+relies on the returned ref actually calling through.
+
+
+## BUG-037 — Closures pass `@_` as scalar count when invoking a captured coderef
+
+```sh
+$ stryke -e '
+sub mydbl { my $x = shift; $x * 2 }
+my $f = \&mydbl;
+my $h = sub { $f->(@_) };
+print $h->(5)'
+2                       # stryke (= scalar(@_) * 2)
+$ perl ...
+10                      # perl (= 5 * 2)
+```
+
+Inside a closure body, calling a captured coderef with `@_` as argument
+flattens `@_` to its element count instead of its contents. The same body
+called directly by name (`mydbl(@_)` rather than `$f->(@_)`) works
+correctly. Manifests in:
+
+- `compose(f, g)`-style HOFs where the inner closure is `sub { $f->($g->(@_)) }`
+- curry/partial application where the outer arg is captured and `@_` carries the rest
+- any code that hands a coderef into a higher-order combinator
+
+Tests: `closure_calling_coderef_with_at_underscore_flattens_to_count_today`,
+`closure_calling_sigfn_via_coderef_with_array_arg_breaks_today`,
+`direct_call_inside_closure_works` (the form that works),
+`closure_calling_sigfn_via_coderef_with_indexed_arg_works` (workaround
+using `$_[0]` per-index access).
+
+Severity: **bug** (high impact). Most functional-style libraries are
+unusable until this is fixed.
+
+
+## BUG-038 — `pos($s)` returns undef outside the `while (//g)` form
+
+```sh
+$ stryke -e 'my $s = "abc"; $s =~ /a/g; print defined(pos($s)) ? "Y" : "N"'
+N
+$ perl   -e 'my $s = "abc"; $s =~ /a/g; print defined(pos($s)) ? "Y" : "N"'
+Y
+```
+
+The `while ($s =~ /g)` loop form correctly reports `pos()` at each
+iteration; pinning the working form ensures we don't lose it. Stand-alone
+`/g` followed by `pos()` returns undef.
+
+Tests: `pos_outside_while_loop_is_undef_today`,
+`pos_advances_with_each_g_match`.
+
+Severity: **bug** (low impact).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
