@@ -12523,7 +12523,19 @@ impl Interpreter {
         args: &[PerlValue],
         line: usize,
     ) -> Result<String, FlowOrError> {
-        perl_sprintf_format_with(fmt, args, |v| self.stringify_value(v.clone(), line))
+        // Step 1: build the output and collect any `%n` store-targets.
+        let (out, pending_n) = {
+            let mut stringify =
+                |v: &PerlValue| -> Result<String, FlowOrError> {
+                    self.stringify_value(v.clone(), line)
+                };
+            perl_sprintf_format_full(fmt, args, &mut stringify)?
+        };
+        // Step 2: apply any `%n` writes through the proper scope path.
+        for (target, count) in pending_n {
+            self.assign_scalar_ref_deref(target, PerlValue::integer(count), line)?;
+        }
+        Ok(out)
     }
 
     /// Expand a compiled [`crate::format::FormatTemplate`] using current expression evaluation.
@@ -19633,6 +19645,56 @@ fn perl_exponent_form(rust_repr: &str, upper: bool) -> String {
     rust_repr.to_string()
 }
 
+/// Hex-float format (`%a` / `%A`). Produces strings like `0x1.8p+0` for
+/// 1.5 — sign, normalized hex mantissa, then `p[+-]N` decimal exponent of
+/// the radix-2 form. Matches C99 / POSIX `%a`.
+fn perl_hex_float(n: f64, upper: bool) -> String {
+    if n.is_nan() {
+        return if upper { "NAN" } else { "nan" }.to_string();
+    }
+    if n.is_infinite() {
+        let sign = if n.is_sign_negative() { "-" } else { "" };
+        let body = if upper { "INF" } else { "inf" };
+        return format!("{}{}", sign, body);
+    }
+    let prefix = if upper { "0X" } else { "0x" };
+    let p_letter = if upper { 'P' } else { 'p' };
+    let bits = n.to_bits();
+    let sign_bit = bits >> 63;
+    let exp_bits = (bits >> 52) & 0x7FF;
+    let mant_bits = bits & 0x000F_FFFF_FFFF_FFFF;
+    let sign_str = if sign_bit == 1 { "-" } else { "" };
+    if exp_bits == 0 && mant_bits == 0 {
+        return format!("{}{}{}{}{}", sign_str, prefix, "0", p_letter, "+0");
+    }
+    let (lead_digit, exp_unbiased): (u64, i32) = if exp_bits == 0 {
+        // Subnormal: implicit leading 0, exponent fixed at -1022.
+        (0, -1022)
+    } else {
+        (1, (exp_bits as i32) - 1023)
+    };
+    let exp_sign = if exp_unbiased >= 0 { "+" } else { "-" };
+    let exp_abs = exp_unbiased.unsigned_abs();
+    if mant_bits == 0 {
+        return format!(
+            "{}{}{}{}{}{}",
+            sign_str, prefix, lead_digit, p_letter, exp_sign, exp_abs
+        );
+    }
+    // 52 mantissa bits = 13 hex digits.
+    let mant_hex = format!("{:013x}", mant_bits);
+    let trimmed = mant_hex.trim_end_matches('0');
+    let mant_str = if upper {
+        trimmed.to_uppercase()
+    } else {
+        trimmed.to_string()
+    };
+    format!(
+        "{}{}{}.{}{}{}{}",
+        sign_str, prefix, lead_digit, mant_str, p_letter, exp_sign, exp_abs
+    )
+}
+
 /// Format a value with `%g`-style "shortest of %e or %f, strip trailing
 /// zeros". Precision is the number of *significant* digits (default 6).
 fn perl_g_form(n: f64, prec: usize, upper: bool) -> String {
@@ -19684,14 +19746,19 @@ fn perl_g_form(n: f64, prec: usize, upper: bool) -> String {
     }
 }
 
-pub(crate) fn perl_sprintf_format_with<F>(
+/// Public sprintf entry point. Returns the formatted string plus the list
+/// of `%n` store-targets and counts that the caller should apply via
+/// [`Interpreter::assign_scalar_ref_deref`]. Callers that don't use `%n`
+/// can ignore the second tuple element.
+pub(crate) fn perl_sprintf_format_full<F>(
     fmt: &str,
     args: &[PerlValue],
-    mut string_for_s: F,
-) -> Result<String, FlowOrError>
+    string_for_s: &mut F,
+) -> Result<(String, Vec<(PerlValue, i64)>), FlowOrError>
 where
     F: FnMut(&PerlValue) -> Result<String, FlowOrError>,
 {
+    let mut pending_n: Vec<(PerlValue, i64)> = Vec::new();
     let mut result = String::new();
     let mut arg_idx = 0;
     let chars: Vec<char> = fmt.chars().collect();
@@ -19717,11 +19784,50 @@ where
                 continue;
             }
 
+            // Positional `%N$...`: take this conversion's value from args[N-1]
+            // instead of advancing the sequential cursor. Must be the very
+            // first thing after `%`. We peek for `digits$` and rewind if the
+            // `$` isn't there (the digits could just be a width).
+            let mut positional: Option<usize> = None;
+            {
+                let saved = i;
+                let mut digits = String::new();
+                let mut j = i;
+                while j < chars.len() && chars[j].is_ascii_digit() {
+                    digits.push(chars[j]);
+                    j += 1;
+                }
+                if j < chars.len() && chars[j] == '$' && !digits.is_empty() {
+                    if let Ok(n) = digits.parse::<usize>() {
+                        if n >= 1 {
+                            positional = Some(n - 1);
+                            i = j + 1; // consume the digits and the '$'
+                        }
+                    }
+                }
+                if positional.is_none() {
+                    i = saved;
+                }
+            }
+
             // Parse format specifier
             let mut flags = String::new();
             while i < chars.len() && "-+ #0".contains(chars[i]) {
                 flags.push(chars[i]);
                 i += 1;
+            }
+            // Vector flag: `v` (separator = ".") or `*v` (separator = next arg).
+            // When set, the conversion runs once per byte of the value's
+            // string form, joining results with the separator.
+            let mut vector_sep: Option<String> = None;
+            if i < chars.len() && chars[i] == 'v' {
+                vector_sep = Some(".".to_string());
+                i += 1;
+            } else if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == 'v' {
+                let sep_arg = args.get(arg_idx).cloned().unwrap_or(PerlValue::UNDEF);
+                arg_idx += 1;
+                vector_sep = Some(sep_arg.to_string());
+                i += 2;
             }
             // Width: either `*` (consume an arg) or run of digits.
             let mut width = String::new();
@@ -19767,8 +19873,17 @@ where
             let spec = chars[i];
             i += 1;
 
-            let arg = args.get(arg_idx).cloned().unwrap_or(PerlValue::UNDEF);
-            arg_idx += 1;
+            // For vector conversions the conversion's value-arg is the
+            // string whose bytes we'll iterate; for non-vector, it's the
+            // value we format. Either way the index resolution is the
+            // same: positional or sequential.
+            let arg = if let Some(idx) = positional {
+                args.get(idx).cloned().unwrap_or(PerlValue::UNDEF)
+            } else {
+                let v = args.get(arg_idx).cloned().unwrap_or(PerlValue::UNDEF);
+                arg_idx += 1;
+                v
+            };
 
             let w: usize = width.parse().unwrap_or(0);
             let p: usize = precision.parse().unwrap_or(6);
@@ -19800,6 +19915,69 @@ where
                     format!("{:>width$}", body, width = width)
                 }
             };
+
+            // Format a single integer with the inner spec for `%v...`. No
+            // width/precision is applied here — those are deferred to the
+            // joined result. Supports the common int-shape conversions.
+            let format_int_for_vector = |n: i64, spec: char| -> String {
+                match spec {
+                    'd' | 'i' => format!("{}", n),
+                    'u' => format!("{}", n as u64),
+                    'x' => {
+                        if hash && n != 0 {
+                            format!("0x{:x}", n)
+                        } else {
+                            format!("{:x}", n)
+                        }
+                    }
+                    'X' => {
+                        if hash && n != 0 {
+                            format!("0X{:X}", n)
+                        } else {
+                            format!("{:X}", n)
+                        }
+                    }
+                    'o' => {
+                        if hash && n != 0 {
+                            format!("0{:o}", n)
+                        } else {
+                            format!("{:o}", n)
+                        }
+                    }
+                    'b' => {
+                        if hash && n != 0 {
+                            format!("0b{:b}", n)
+                        } else {
+                            format!("{:b}", n)
+                        }
+                    }
+                    'c' => char::from_u32(n as u32)
+                        .map(|c| c.to_string())
+                        .unwrap_or_default(),
+                    _ => format!("{}", n),
+                }
+            };
+
+            // `%v` short-circuit: format each byte of the arg's string form
+            // with the inner spec, join with `vector_sep`, then pad/align
+            // the joined string. Skips the regular per-spec match below.
+            if let Some(ref sep) = vector_sep {
+                let s = arg.to_string();
+                let parts: Vec<String> = s
+                    .bytes()
+                    .map(|b| format_int_for_vector(b as i64, spec))
+                    .collect();
+                let body = parts.join(sep);
+                let final_body = if width.is_empty() {
+                    body
+                } else if left_align {
+                    format!("{:<width$}", body, width = w)
+                } else {
+                    format!("{:>width$}", body, width = w)
+                };
+                result.push_str(&final_body);
+                continue;
+            }
 
             let formatted = match spec {
                 'd' | 'i' => {
@@ -19933,6 +20111,35 @@ where
                 'c' => char::from_u32(arg.to_int() as u32)
                     .map(|c| c.to_string())
                     .unwrap_or_default(),
+                'a' | 'A' => {
+                    let upper = spec == 'A';
+                    let body0 = perl_hex_float(arg.to_number(), upper);
+                    let body = if plus && !body0.starts_with('-') {
+                        format!("+{}", body0)
+                    } else if space && !body0.starts_with('-') {
+                        format!(" {}", body0)
+                    } else {
+                        body0
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
+                }
+                'p' => {
+                    // Stryke uses placeholder addresses for refs; emit the
+                    // same `0x...` form here so output stays deterministic
+                    // and machine-comparable across runs.
+                    pad_align("0x...", w, left_align, false)
+                }
+                'n' => {
+                    // Write the number of bytes emitted so far into the
+                    // referent of the arg (must be a scalar ref, e.g.
+                    // `\$count`). `%n` does NOT consume an output slot, so
+                    // the formatted body is empty. The store is queued and
+                    // applied by the caller after formatting finishes —
+                    // works for both `HeapObject::ScalarRef` and the
+                    // `ScalarBindingRef` shape that `\$my_var` produces.
+                    pending_n.push((arg.clone(), result.len() as i64));
+                    String::new()
+                }
                 _ => arg.to_string(),
             };
 
@@ -19942,7 +20149,7 @@ where
             i += 1;
         }
     }
-    Ok(result)
+    Ok((result, pending_n))
 }
 
 #[cfg(test)]

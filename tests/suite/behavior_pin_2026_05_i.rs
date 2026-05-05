@@ -448,10 +448,13 @@ fn printf_d_with_large_float_saturates_to_i64_max_today() {
 // ── %a hex-float format not implemented today ───────────────────────────────
 
 #[test]
-fn sprintf_a_hex_float_emits_decimal_today() {
-    // BUG-057: Perl's `%a` produces hex-float like `0x1.8p+0` for 1.5.
-    // Stryke renders the value as a plain decimal.
-    assert_eq!(eval_string(r#"sprintf("%a", 1.5)"#), "1.5");
+fn sprintf_a_hex_float_emits_c99_form() {
+    // BUG-057 FIXED: %a emits hex-float matching C99/POSIX: sign,
+    // normalized hex mantissa, then `p[+-]N` decimal exponent.
+    assert_eq!(eval_string(r#"sprintf("%a", 1.5)"#), "0x1.8p+0");
+    assert_eq!(eval_string(r#"sprintf("%a", 0.5)"#), "0x1p-1");
+    assert_eq!(eval_string(r#"sprintf("%a", -1.5)"#), "-0x1.8p+0");
+    assert_eq!(eval_string(r#"sprintf("%a", 0)"#), "0x0p+0");
 }
 
 // ── localtime vector formatting ─────────────────────────────────────────────
