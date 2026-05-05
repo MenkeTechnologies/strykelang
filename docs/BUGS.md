@@ -24,6 +24,12 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-014** — `substr($s, $o, $l) = $rhs` lvalue assignment now
+  works. Both the bytecode compiler and tree-walking interpreter
+  recognize an `Assign { target: Substr { replacement: None }, value }`
+  shape and rewrite it to the 4-arg form `substr($s, $o, $l, $rhs)`.
+  Two-arg, three-arg, negative-offset, zero-length insert/append, and
+  the explicit 4-arg form all match Perl across 8 differential cases.
 - **PARITY-005** — `%` now uses Perl-style floored division so the
   result has the sign of the divisor (or is zero). New helper
   `value::perl_mod_i64` wraps the snap. Float operands are truncated
@@ -539,7 +545,7 @@ Tests: `length_returns_byte_count_for_unicode_string`,
 Severity: **parity**.
 
 
-## PARITY-014 — `substr($s, $off, $len) = $rep` lvalue not supported
+## PARITY-014 — `substr($s, $off, $len) = $rep` lvalue not supported — **FIXED**
 
 ```sh
 $ stryke -e 'my $s = "Hello"; substr($s, 0, 1) = "J"; print $s'
