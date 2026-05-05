@@ -2489,6 +2489,53 @@ Tests: `print_scalar_minus_scalar_with_trailing_args_parses_as_filehandle_today`
 Severity: **bug** (parser ambiguity).
 
 
+## BUG-105 — `to_json` on a circular reference crashes the process
+
+```sh
+$ stryke -e '
+my $a = {};
+$a->{self} = $a;
+my $j = eval { to_json($a) };
+print defined($j) ? "ok" : "err: $@"'
+thread 'main' has overflowed its stack
+fatal runtime error: stack overflow, aborting
+```
+
+The `eval { }` cannot catch this — it's a Rust-level stack overflow,
+not a Perl-level die. Both direct cycles (`$a->{self} = $a`) and
+indirect ones (A points to B, B points to A) trigger the crash. Most
+JSON encoders detect cycles and either bail with a Perl-level error or
+emit a sentinel.
+
+Tests: `to_json_circular_at_least_parses`,
+`to_json_basic_round_trip_works`.
+
+Severity: **bug** (process-level crash; cannot be guarded against from
+user code).
+
+
+## BUG-106 — `to_json($data, $opts_hashref)` serializes both args as an array
+
+```sh
+$ stryke -e 'print to_json({a=>1, b=>2}, {pretty => 1})'
+[{"a":1,"b":2},{"pretty":1}]
+$ perl -MJSON::PP -e 'print JSON::PP->new->pretty->encode({a=>1, b=>2})'
+{
+   "a" : 1,
+   "b" : 2
+}
+```
+
+Stryke's `to_json` does not recognize a second-argument options hashref
+— both args are flattened into a top-level JSON array. Workaround: use
+`to_yaml` for human-readable output (which works), or implement
+pretty-printing manually.
+
+Tests: `to_json_two_arg_pretty_form_serializes_as_array_today`.
+
+Severity: **bug** (low impact; rarely needed for machine-read JSON).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
