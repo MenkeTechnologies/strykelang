@@ -7,27 +7,36 @@ use crate::common::*;
 // ── sprintf %n / %p / %A not implemented ───────────────────────────────────
 
 #[test]
-fn sprintf_n_does_not_populate_count_today() {
-    // BUG-079: `%n` should write the count of chars output so far into the
-    // referenced scalar. Stryke leaves the var undef. (`%n` is a security
-    // hole in C — many languages omit it on purpose.)
+fn sprintf_n_writes_byte_count_through_scalar_ref() {
+    // BUG-079 FIXED: `%n` writes the number of bytes emitted so far into
+    // the referent of the arg (which must be a scalar ref).
     assert_eq!(
-        eval_int(r#"my $n; sprintf("hello%n", $n); defined($n) ? 1 : 0"#),
-        0
+        eval_int(r#"my $n; sprintf("hello%n world", \$n); $n"#),
+        5
+    );
+    // Also works mid-format with width: "%5d:" produces 6 bytes of output
+    // before the %n point, so $n should be 6.
+    assert_eq!(
+        eval_int(r#"my $n; sprintf("%5d:%n done", 42, \$n); $n"#),
+        6
     );
 }
 
 #[test]
-fn sprintf_p_prints_value_as_string_today() {
-    // BUG-080: Perl's `%p` shows the SV's internal address. Stryke ignores
-    // the format and prints the value's stringification.
-    assert_eq!(eval_string(r#"sprintf("%p", "hello")"#), "hello");
+fn sprintf_p_emits_deterministic_address_placeholder() {
+    // BUG-080 FIXED: `%p` produces the same `0x...` placeholder used for
+    // ref stringification across stryke. Live addresses are deliberately
+    // not exposed (deterministic-output design choice).
+    assert_eq!(eval_string(r#"sprintf("%p", "hello")"#), "0x...");
+    assert_eq!(eval_string(r#"sprintf("%p", 42)"#), "0x...");
 }
 
 #[test]
-fn sprintf_capital_a_does_not_emit_hex_float_today() {
-    // BUG-080b: `%A` is `%a` with uppercase letters. Both are unimplemented.
-    assert_eq!(eval_string(r#"sprintf("%A", 1.5)"#), "1.5");
+fn sprintf_capital_a_emits_uppercase_hex_float() {
+    // BUG-080b FIXED: %A is %a with uppercase letters in the prefix and
+    // mantissa (matching C99 / Perl).
+    assert_eq!(eval_string(r#"sprintf("%A", 1.5)"#), "0X1.8P+0");
+    assert_eq!(eval_string(r#"sprintf("%A", 0.5)"#), "0X1P-1");
 }
 
 // ── %g and %G work, but %G uppercases the exponent letter only ──────────────

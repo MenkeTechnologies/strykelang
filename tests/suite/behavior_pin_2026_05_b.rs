@@ -313,20 +313,29 @@ fn sprintf_e_format_uses_perl_exponent_form() {
 }
 
 #[test]
-fn sprintf_v_format_emits_literal_today() {
-    // PARITY-008: %v not implemented; %vd → literal "d" follows the value.
+fn sprintf_v_format_yields_dot_joined_byte_values() {
+    // PARITY-008 FIXED: `%vd` formats each byte of the arg as a decimal,
+    // joined by ".".
     assert_eq!(
         eval_string(r#"sprintf("%vd", "1.2.3")"#),
-        "1.2.3d"
+        "49.46.50.46.51"  // ASCII for '1','.','2','.','3'
     );
+    assert_eq!(eval_string(r#"sprintf("%vd", "abc")"#), "97.98.99");
+    assert_eq!(eval_string(r#"sprintf("%vx", "AB")"#), "41.42");
 }
 
 #[test]
-fn sprintf_positional_arg_emits_literal_today() {
-    // PARITY-009: stryke ignores positional `%2$s` and emits literal "s" twice.
+fn sprintf_positional_arg_picks_arg_at_index() {
+    // PARITY-009 FIXED: `%N$X` picks args[N-1] for the conversion's value
+    // without advancing the sequential cursor.
     assert_eq!(
         eval_string(r#"sprintf("%2\$s %1\$s", "world", "hello")"#),
-        "worlds hellos"
+        "hello world"
+    );
+    // Same arg used twice.
+    assert_eq!(
+        eval_string(r#"sprintf("%1\$s-%1\$s", "echo")"#),
+        "echo-echo"
     );
 }
 
