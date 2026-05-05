@@ -120,6 +120,68 @@ fn substr_lvalue_zero_length_at_end_appends() {
     );
 }
 
+// ── vec / bit-field lvalue ──────────────────────────────────────────────────
+
+#[test]
+fn vec_lvalue_byte_assignment() {
+    // PARITY-010 FIXED: `vec($s, $offset, $bits) = N` compiles and assigns.
+    assert_eq!(
+        eval_string(r#"my $s = ""; vec($s, 0, 8) = 65; $s"#),
+        "A"
+    );
+    assert_eq!(
+        eval_string(r#"my $s = ""; vec($s, 0, 8) = 0x41; vec($s, 1, 8) = 0x42; $s"#),
+        "AB"
+    );
+}
+
+#[test]
+fn vec_read_8_bit() {
+    // 8-bit reads return individual byte values.
+    assert_eq!(
+        eval_string(r#"my $s = "AB"; join("/", vec($s, 0, 8), vec($s, 1, 8))"#),
+        "65/66"
+    );
+}
+
+#[test]
+fn vec_lvalue_16_bit_big_endian() {
+    // Perl's `vec` uses big-endian byte order for multi-byte BITS, so
+    // vec($s, 0, 16) = 0x1234 stores 0x12 then 0x34.
+    assert_eq!(
+        eval_int(r#"my $s = ""; vec($s, 0, 16) = 0x1234; vec($s, 0, 16)"#),
+        0x1234
+    );
+}
+
+#[test]
+fn vec_lvalue_32_bit_round_trip() {
+    // 32-bit big-endian round-trip + byte-by-byte read.
+    assert_eq!(
+        eval_string(
+            r#"my $s = ""; vec($s, 0, 32) = 0xDEADBEEF;
+               sprintf("%08x", vec($s, 0, 32))"#
+        ),
+        "deadbeef"
+    );
+    assert_eq!(
+        eval_string(
+            r#"my $s = ""; vec($s, 0, 32) = 0xDEADBEEF;
+               join("/", map { vec($s, $_, 8) } 0..3)"#
+        ),
+        "222/173/190/239"
+    );
+}
+
+#[test]
+fn vec_read_zero_pads_past_end() {
+    // Reading past the end returns zero-padded bytes (Perl behavior).
+    assert_eq!(
+        eval_int(r#"my $s = "AB"; vec($s, 0, 32)"#),
+        ((0x41u32 << 24) | (0x42u32 << 16)) as i64
+    );
+}
+
 // ── index / rindex / x ───────────────────────────────────────────────────────
 
 #[test]
