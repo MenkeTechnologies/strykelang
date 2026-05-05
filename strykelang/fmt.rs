@@ -765,6 +765,11 @@ pub fn format_expr(e: &Expr) -> String {
             hash,
             keys.iter().map(format_expr).collect::<Vec<_>>().join(", ")
         ),
+        ExprKind::HashKvSlice { hash, keys } => format!(
+            "%{}{{{}}}",
+            hash,
+            keys.iter().map(format_expr).collect::<Vec<_>>().join(", ")
+        ),
         ExprKind::HashSliceDeref { container, keys } => format!(
             "@{}{{{}}}",
             format_expr(container),

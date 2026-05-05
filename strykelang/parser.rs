@@ -8321,6 +8321,21 @@ impl Parser {
             }
             Token::HashVar(name) => {
                 self.advance();
+                // `%h{KEYS}` — Perl 5.20+ key-value slice. Parser-level
+                // disambiguation: `%h` immediately followed by `{` is a kv-
+                // slice; `%h` alone (or followed by `=`, list ops, etc.) is
+                // the bare hash. (BUG-008)
+                if matches!(self.peek(), Token::LBrace)
+                    && self.suppress_scalar_hash_brace == 0
+                {
+                    self.advance(); // {
+                    let keys = self.parse_slice_arg_list(true)?;
+                    self.expect(&Token::RBrace)?;
+                    return Ok(Expr {
+                        kind: ExprKind::HashKvSlice { hash: name, keys },
+                        line,
+                    });
+                }
                 Ok(Expr {
                     kind: ExprKind::HashVar(name),
                     line,

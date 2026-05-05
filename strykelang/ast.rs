@@ -767,6 +767,12 @@ pub enum ExprKind {
         hash: String,
         keys: Vec<Expr>,
     },
+    /// `%h{KEYS}` — Perl 5.20+ key-value slice: returns a flat list of
+    /// (key, value, key, value, ...) pairs instead of just values. (BUG-008)
+    HashKvSlice {
+        hash: String,
+        keys: Vec<Expr>,
+    },
     /// `@$container{keys}` — hash slice when the hash is reached via a scalar ref (Perl `@$href{k1,k2}`).
     HashSliceDeref {
         container: Box<Expr>,
