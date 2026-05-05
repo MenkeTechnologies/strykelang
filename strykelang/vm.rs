@@ -4003,13 +4003,13 @@ impl<'a> VM<'a> {
                             let _ = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() + 1));
+                                .atomic_mutate_post(en, |v| crate::interpreter::perl_inc(v));
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() + 1));
+                                .atomic_mutate_post(en, |v| crate::interpreter::perl_inc(v));
                             self.push(old);
                         }
                         Ok(())
@@ -4034,17 +4034,16 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::PreIncSlot(slot) => {
-                        let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
-                        let new_val = PerlValue::integer(val);
+                        let cur = self.interp.scope.get_scalar_slot(*slot);
+                        let new_val = crate::interpreter::perl_inc(&cur);
                         self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                         self.push(new_val);
                         Ok(())
                     }
                     Op::PreIncSlotVoid(slot) => {
-                        let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
-                        self.interp
-                            .scope
-                            .set_scalar_slot(*slot, PerlValue::integer(val));
+                        let cur = self.interp.scope.get_scalar_slot(*slot);
+                        let new_val = crate::interpreter::perl_inc(&cur);
+                        self.interp.scope.set_scalar_slot(*slot, new_val);
                         Ok(())
                     }
                     Op::PreDecSlot(slot) => {
@@ -4057,14 +4056,13 @@ impl<'a> VM<'a> {
                     Op::PostIncSlot(slot) => {
                         // Fuse PostIncSlot+Pop: if next op discards the old value, skip stack work.
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
-                            let val = self.interp.scope.get_scalar_slot(*slot).to_int() + 1;
-                            self.interp
-                                .scope
-                                .set_scalar_slot(*slot, PerlValue::integer(val));
+                            let cur = self.interp.scope.get_scalar_slot(*slot);
+                            let new_val = crate::interpreter::perl_inc(&cur);
+                            self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.ip += 1; // skip Pop
                         } else {
                             let old = self.interp.scope.get_scalar_slot(*slot);
-                            let new_val = PerlValue::integer(old.to_int() + 1);
+                            let new_val = crate::interpreter::perl_inc(&old);
                             self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.push(old);
                         }

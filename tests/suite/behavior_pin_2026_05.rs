@@ -76,25 +76,77 @@ fn fn_eq_body_package_qualified() {
     );
 }
 
-// ── stryke `++` is numeric-only (no Perl magic string increment) ──────────────
+// ── Perl magic string increment (PARITY-001 FIXED) ────────────────────────────
 //
-// Pinned as a deliberate stryke behavior. Perl 5 evaluates `"b"++` to `"c"` via
-// magic string increment; stryke instead numifies the operand. Tracked in
-// `docs/BUGS.md` (PARITY-001).
+// `++` on a string that matches `^[A-Za-z]+[0-9]*$` (or empty) magic-
+// increments through letters and digits with carry. Pure-digit strings,
+// mixed strings (digits-then-letters, embedded punctuation, etc.), undef,
+// and real numerics all fall back to plain numeric +1.
 
 #[test]
-fn postfix_inc_on_alpha_string_yields_one() {
-    assert_eq!(eval_int(r#"my $x = "b"; $x++; $x"#), 1);
+fn postfix_inc_on_alpha_string_advances_letter() {
+    assert_eq!(eval_string(r#"my $x = "b"; $x++; $x"#), "c");
 }
 
 #[test]
-fn postfix_inc_on_alphanumeric_string_yields_one() {
-    assert_eq!(eval_int(r#"my $x = "Az"; $x++; $x"#), 1);
+fn postfix_inc_on_alphanumeric_string_carries_through_letters() {
+    assert_eq!(eval_string(r#"my $x = "Az"; $x++; $x"#), "Ba");
 }
 
 #[test]
-fn postfix_inc_on_pure_digit_string_increments() {
+fn postfix_inc_on_z_carries_to_double_letter() {
+    assert_eq!(eval_string(r#"my $x = "zz"; $x++; $x"#), "aaa");
+    assert_eq!(eval_string(r#"my $x = "ZZ"; $x++; $x"#), "AAA");
+    assert_eq!(eval_string(r#"my $x = "Zz"; $x++; $x"#), "AAa");
+}
+
+#[test]
+fn postfix_inc_with_digit_suffix_carries_to_letter() {
+    assert_eq!(eval_string(r#"my $x = "a9"; $x++; $x"#), "b0");
+    assert_eq!(eval_string(r#"my $x = "Az9"; $x++; $x"#), "Ba0");
+    assert_eq!(eval_string(r#"my $x = "zz9"; $x++; $x"#), "aaa0");
+}
+
+#[test]
+fn postfix_inc_on_empty_string_yields_one() {
+    assert_eq!(eval_string(r#"my $x = ""; $x++; $x"#), "1");
+}
+
+#[test]
+fn postfix_inc_on_pure_digit_string_increments_numerically() {
     assert_eq!(eval_int(r#"my $x = "9"; $x++; $x"#), 10);
+    assert_eq!(eval_int(r#"my $x = "99"; $x++; $x"#), 100);
+}
+
+#[test]
+fn postfix_inc_on_mixed_or_punctuated_string_falls_back_to_numeric() {
+    // Strings that don't match the magic pattern (digits before letters,
+    // embedded punctuation, leading whitespace) numify to 0 and increment
+    // to 1.
+    assert_eq!(eval_int(r#"my $x = "9a"; $x++; $x"#), 10);
+    assert_eq!(eval_int(r#"my $x = "a9b"; $x++; $x"#), 1);
+    assert_eq!(eval_int(r#"my $x = "abc_"; $x++; $x"#), 1);
+}
+
+#[test]
+fn pre_inc_on_alpha_string_advances_letter() {
+    assert_eq!(eval_string(r#"my $x = "B"; ++$x"#), "C");
+}
+
+#[test]
+fn dec_has_no_magic_form_and_numifies() {
+    // `--` always numifies; "A" → 0 → -1.
+    assert_eq!(eval_int(r#"my $x = "A"; --$x"#), -1);
+}
+
+#[test]
+fn inc_on_undef_yields_one() {
+    assert_eq!(eval_int(r#"my $x; $x++; $x"#), 1);
+}
+
+#[test]
+fn inc_on_int_value_stays_numeric() {
+    assert_eq!(eval_int(r#"my $x = 5; $x++; $x"#), 6);
 }
 
 // ── `(my $copy = $orig) =~ s///` idiom ────────────────────────────────────────
