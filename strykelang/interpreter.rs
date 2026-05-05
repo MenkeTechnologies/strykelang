@@ -7257,6 +7257,18 @@ impl Interpreter {
                 label,
                 continue_block,
             } => {
+                // Perl's `for ARRAY` aliases the loop variable to each array
+                // element. Mutations through `$_` / `$loopvar` propagate back
+                // to the array. We approximate by detecting a bare-`@arr`
+                // source, and after each iteration writing the loop var's
+                // current value back into the corresponding array slot.
+                // Complex sources (`@a, @b`, `1..10`, `keys %h`, etc.) keep
+                // copy semantics — Perl's aliasing only fires on real lvalue
+                // sources too. (BUG-019)
+                let alias_array_name = match &list.kind {
+                    ExprKind::ArrayVar(name) => Some(name.clone()),
+                    _ => None,
+                };
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
                 self.scope_push_hook();
@@ -7267,17 +7279,35 @@ impl Interpreter {
                     self.scope
                         .set_scalar(var, items[i].clone())
                         .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
+                    let mut do_alias_writeback = alias_array_name.is_some();
                     'inner: loop {
                         match self.exec_block_smart(body) {
                             Ok(_) => break 'inner,
                             Err(FlowOrError::Flow(Flow::Last(ref l)))
                                 if l == label || l.is_none() =>
                             {
+                                if let Some(name) = alias_array_name.as_ref() {
+                                    let v = self.scope.get_scalar(var).clone();
+                                    let _ = self.scope.set_array_element(
+                                        name,
+                                        i as i64,
+                                        v,
+                                    );
+                                }
                                 break 'outer;
                             }
                             Err(FlowOrError::Flow(Flow::Next(ref l)))
                                 if l == label || l.is_none() =>
                             {
+                                if let Some(name) = alias_array_name.as_ref() {
+                                    let v = self.scope.get_scalar(var).clone();
+                                    let _ = self.scope.set_array_element(
+                                        name,
+                                        i as i64,
+                                        v,
+                                    );
+                                    do_alias_writeback = false;
+                                }
                                 if let Some(cb) = continue_block {
                                     let _ = self.exec_block_smart(cb);
                                 }
@@ -7293,6 +7323,16 @@ impl Interpreter {
                                 self.scope_pop_hook();
                                 return Err(e);
                             }
+                        }
+                    }
+                    if do_alias_writeback {
+                        if let Some(name) = alias_array_name.as_ref() {
+                            let v = self.scope.get_scalar(var).clone();
+                            let _ = self.scope.set_array_element(
+                                name,
+                                i as i64,
+                                v,
+                            );
                         }
                     }
                     if let Some(cb) = continue_block {

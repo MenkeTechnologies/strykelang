@@ -71,27 +71,51 @@ fn underscore_topic_used_by_default_in_uc() {
 }
 
 #[test]
-fn for_dollar_underscore_does_not_alias_array_element_today() {
-    // BUG-018: `for (@a) { $_ *= 10 }` should mutate @a in place. Stryke
-    // copies instead of aliasing.
+fn for_dollar_underscore_aliases_array_element() {
+    // BUG-019 FIXED: `for (@a) { $_ *= 10 }` mutates @a in place — the
+    // loop variable is aliased to the array element and the write-back
+    // is emitted at the end of each iteration.
     assert_eq!(
         eval_string(r#"my @a = (1..3); for (@a) { $_ *= 10 } "@a""#),
-        "1 2 3"
+        "10 20 30"
     );
 }
 
 #[test]
-fn for_named_loop_var_does_not_alias_array_element_today() {
-    // BUG-018b: even a named loop var doesn't alias.
+fn for_named_loop_var_aliases_array_element() {
+    // BUG-019b FIXED: named loop var also aliases, matching Perl.
     assert_eq!(
         eval_string(r#"my @a = (1..3); for my $x (@a) { $x *= 10 } "@a""#),
-        "1 2 3"
+        "10 20 30"
     );
+}
+
+#[test]
+fn for_alias_respects_last_and_next() {
+    // `last` writes back the current iteration's value before exiting;
+    // `next` writes back before continuing.
+    assert_eq!(
+        eval_string(r#"my @a = (1..5); for (@a) { last if $_ == 3; $_ = -$_ } "@a""#),
+        "-1 -2 3 4 5"
+    );
+    assert_eq!(
+        eval_string(r#"my @a = (1..5); for (@a) { next if $_ == 3; $_ = -$_ } "@a""#),
+        "-1 -2 3 -4 -5"
+    );
+}
+
+#[test]
+fn for_alias_only_for_simple_array_source() {
+    // Aliasing only fires when the source is a bare-`@arr` lvalue. A range
+    // or list is not an lvalue, so the loop var is just a copy. This
+    // matches Perl 5: `for my $i (1..3) { $i *= 10 }` mutates a temporary,
+    // not the literal range.
+    let _ = eval_string(r#"for my $i (1..3) { $i *= 10 } "ok""#);
 }
 
 #[test]
 fn for_index_assignment_works() {
-    // The workaround that does mutate the array.
+    // The previously-only-working workaround keeps working.
     assert_eq!(
         eval_string(r#"my @a = (1..3); for my $i (0..$#a) { $a[$i] *= 10 } "@a""#),
         "10 20 30"
