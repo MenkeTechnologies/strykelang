@@ -24,6 +24,12 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **BUG-057, BUG-079, BUG-080, PARITY-008, PARITY-009** — sprintf `%a` /
+  `%A` (C99 hex-float), `%n` (write byte-count through scalar ref),
+  `%p` (deterministic placeholder), `%v...` (vectorize per-byte through
+  inner conversion, `.`-joined), and `%N$X` positional args. All match
+  Perl modulo the `%p` design choice (stryke uses `0x...` placeholder
+  rather than live SV addresses).
 
 ## High-impact bugs (worth fixing first)
 
@@ -233,7 +239,7 @@ Tests: `sprintf_e_format_omits_plus_and_zero_pad_today`.
 Severity: **parity**.
 
 
-## PARITY-008 — `sprintf "%v..."` not implemented
+## PARITY-008 — `sprintf "%v..."` not implemented — **FIXED**
 
 `%v` is supposed to interpret the argument as a version string (one byte
 per dot-separated component). Stryke emits the raw value followed by the
@@ -251,7 +257,7 @@ Tests: `sprintf_v_format_emits_literal_today`.
 Severity: **parity** (rarely used).
 
 
-## PARITY-009 — `sprintf` positional `%N$s` not implemented
+## PARITY-009 — `sprintf` positional `%N$s` not implemented — **FIXED**
 
 ```sh
 $ stryke -e 'print sprintf("%2\$s %1\$s", "world", "hello")'
@@ -1512,7 +1518,7 @@ Tests: `percent_minus_multi_capture_returns_only_last_today`,
 Severity: **bug**.
 
 
-## BUG-057 — `sprintf "%a"` (hex-float) not implemented
+## BUG-057 — `sprintf "%a"` (hex-float) not implemented — **FIXED**
 
 ```sh
 $ stryke -e 'printf "%a", 1.5'
@@ -1974,7 +1980,7 @@ Tests: `begin_block_mutations_to_package_vars_lost_today`,
 Severity: **bug**.
 
 
-## BUG-079 — `sprintf "%n"` is a no-op
+## BUG-079 — `sprintf "%n"` is a no-op — **FIXED**
 
 ```sh
 $ stryke -e 'my $n; sprintf("hello%n", $n); print defined($n) ? "set:$n" : "U"'
@@ -1991,7 +1997,7 @@ Tests: `sprintf_n_does_not_populate_count_today`.
 Severity: **bug** / parity (low impact).
 
 
-## BUG-080 — `sprintf "%p"` and `"%A"` not implemented
+## BUG-080 — `sprintf "%p"` and `"%A"` not implemented — **FIXED**
 
 ```sh
 $ stryke -e 'printf "%p", "hello"'
