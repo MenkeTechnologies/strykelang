@@ -322,6 +322,37 @@ impl Parser {
         PerlError::new(ErrorKind::Syntax, message, line, self.error_file.clone())
     }
 
+    /// Coderef-in-block-position helper for tier-2 list builtins (`any`,
+    /// `all`, `none`, `first`, `take_while`, …). Returns `Some([f, list])`
+    /// when the next tokens look like `$f [,] LIST` (or `$f` alone in
+    /// pipe-RHS); `None` when the caller should fall through to the block
+    /// form. The first arg is any coderef-shaped expression — runtime
+    /// checks `as_code_ref()` and dispatches.
+    fn try_parse_coderef_listop_args(
+        &mut self,
+        line: usize,
+    ) -> PerlResult<Option<Vec<Expr>>> {
+        if !matches!(self.peek(), Token::ScalarVar(_) | Token::Backslash) {
+            return Ok(None);
+        }
+        let f = self.parse_assign_expr_stop_at_pipe()?;
+        let _ = self.eat(&Token::Comma);
+        let list = if self.in_pipe_rhs()
+            && matches!(
+                self.peek(),
+                Token::Semicolon
+                    | Token::RBrace
+                    | Token::RParen
+                    | Token::Eof
+                    | Token::PipeForward
+            ) {
+            self.pipe_placeholder_list(line)
+        } else {
+            self.parse_expression()?
+        };
+        Ok(Some(vec![f, list]))
+    }
+
     fn alloc_rate_limit_slot(&mut self) -> u32 {
         let s = self.next_rate_limit_slot;
         self.next_rate_limit_slot = self.next_rate_limit_slot.saturating_add(1);
@@ -10023,8 +10054,20 @@ impl Parser {
                                 line,
                             },
                             _ => {
-                                // Non-literal (e.g. `defined`): lift bareword to call
-                                Self::lift_bareword_to_topic_call(expr)
+                                // Non-literal (e.g. `defined`, scalar coderef var,
+                                // hash slot): lift barewords to topic-call, then
+                                // route through GrepExprComma so the runtime
+                                // coderef-dispatch in Op::GrepWithExpr handles
+                                // both truthiness AND coderef-call uniformly.
+                                let expr = Self::lift_bareword_to_topic_call(expr);
+                                return Ok(Expr {
+                                    kind: ExprKind::GrepExprComma {
+                                        expr: Box::new(expr),
+                                        list: Box::new(list),
+                                        keyword,
+                                    },
+                                    line,
+                                });
                             }
                         };
                         let block = vec![Statement {
@@ -10115,13 +10158,25 @@ impl Parser {
                         line,
                     })
                 } else if matches!(self.peek(), Token::ScalarVar(_)) {
-                    // `sort $coderef (LIST)` — comparator is first; list often parenthesized
+                    // `sort $coderef (LIST)` — comparator is first; list often parenthesized.
+                    // Pipe-RHS form `|> sort $coderef` uses placeholder LHS as the list.
                     self.suppress_indirect_paren_call =
                         self.suppress_indirect_paren_call.saturating_add(1);
                     let code = self.parse_assign_expr()?;
                     self.suppress_indirect_paren_call =
                         self.suppress_indirect_paren_call.saturating_sub(1);
-                    let list = if matches!(self.peek(), Token::LParen) {
+                    let _ = self.eat(&Token::Comma);
+                    let list = if self.in_pipe_rhs()
+                        && matches!(
+                            self.peek(),
+                            Token::Semicolon
+                                | Token::RBrace
+                                | Token::RParen
+                                | Token::Eof
+                                | Token::PipeForward
+                        ) {
+                        self.pipe_placeholder_list(line)
+                    } else if matches!(self.peek(), Token::LParen) {
                         self.advance();
                         let e = self.parse_expression()?;
                         self.expect(&Token::RParen)?;
@@ -11211,6 +11266,18 @@ impl Parser {
                         line,
                     });
                 }
+                // Coderef-in-block-position: `any $f LIST` / `any $f, LIST` /
+                // `LIST |> any $f`. Same shape as the block form but uses a
+                // value expression where `{ BLOCK }` would go.
+                if let Some(args) = self.try_parse_coderef_listop_args(line)? {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.clone(),
+                            args,
+                        },
+                        line,
+                    });
+                }
                 // `any BLOCK LIST` without parens.
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
@@ -11249,6 +11316,16 @@ impl Parser {
                         line,
                     });
                 }
+                // Coderef-in-block-position: `first $f LIST` / `LIST |> first $f`.
+                if let Some(args) = self.try_parse_coderef_listop_args(line)? {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: "first".to_string(),
+                            args,
+                        },
+                        line,
+                    });
+                }
                 // `first BLOCK LIST` without parens.
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
@@ -11274,6 +11351,16 @@ impl Parser {
             }
             "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
             | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
+                // Coderef-in-block-position: `take_while $f LIST` etc.
+                if let Some(args) = self.try_parse_coderef_listop_args(line)? {
+                    return Ok(Expr {
+                        kind: ExprKind::FuncCall {
+                            name: name.to_string(),
+                            args,
+                        },
+                        line,
+                    });
+                }
                 let (block, list, progress) = self.parse_block_then_list_optional_progress()?;
                 if progress.is_some() {
                     return Err(

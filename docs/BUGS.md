@@ -2396,42 +2396,71 @@ Severity: **bug** (very high impact — breaks every `($head, @tail) = @_`
 idiom).
 
 
-## ~~BUG-089~~ DESIGN-001 — Closures capture outer-scope vars by value (not by reference)
+## ~~BUG-089~~ DESIGN-001 — Closures capture outer-scope vars by value, writes are a compile-time error
 
-**Not a bug — intentional language-design choice.** Stryke closures
-snapshot outer-scope `my` variables at capture time rather than holding
-a live reference to their storage. This matches Rust's `move ||`
-closure semantics (and most modern parallel-friendly languages),
-trades shared-mutable state for race-free dispatch into the parallel
-runtime (`pmap`, `pfor`, `cluster`, async/spawn blocks), and removes
-an entire class of "is this closure-mutating-outer-var safe across
-threads?" questions from the language.
+**Not a bug — intentional language-design choice, strictly enforced.**
+Stryke closures snapshot outer-scope `my` variables at capture time
+rather than holding a live reference to their storage. This matches
+Rust's `move ||` closure semantics, trades shared-mutable state for
+race-free dispatch into the parallel runtime (`pmap`, `pfor`,
+`cluster`, async/spawn blocks), and removes an entire class of "is
+this closure-mutating-outer-var safe across threads?" questions from
+the language.
 
-What this means for code:
+**Strict enforcement** (compile-time): writes to an outer-scope `my`
+variable from inside any sub body (`sub { }` / `fn { }` /
+`sub foo { }`) are rejected by the compiler with this diagnostic:
 
-- Inner factory state IS shared across calls of the inner closure
-  (factory pattern works exactly like Perl):
+```
+cannot modify outer-scope `my $count` from inside a closure —
+stryke closures capture by value to keep parallel dispatch
+race-free. Use `mysync $count` for shared mutable state, or
+`--compat` for Perl 5 shared-storage semantics
+```
+
+The three opt-out paths:
+
+| Path | Storage | Use case |
+|------|---------|----------|
+| `mysync $x` | atomic shared cell | counters, accumulators, factory state, observer registries |
+| `our $x` / `$main::x` | package global | cross-module shared state (always shared, every mode) |
+| `--compat` mode | Perl 5 shared-storage | porting Perl code unchanged |
+
+Reads of outer-scope `my` are fine — you get the snapshot value at
+capture time. Mutations through *aggregate references* are fine too
+— `my $h = {}; my $f = sub { $h->{k} = 42 }` works because the
+ref-identity (the Arc to the underlying hash) is preserved across
+capture; only the scalar `$h` itself isn't shared.
+
+`defer { ... }` is exempt — it runs synchronously at scope exit with
+intentionally shared state. The check fires only on subs stored as
+closure values.
+
+What this means for common patterns:
+
+- Factory with internal state (now requires `mysync`):
   ```
-  fn make_counter { my $n = 0; sub { ++$n } }
+  fn make_counter { mysync $n = 0; sub { ++$n } }
   my $c = make_counter(); $c->(); $c->(); $c->();   # 3
   ```
-- For-loop iteration captures each iteration's fresh `my $i` correctly:
+- For-loop iteration captures each iteration's fresh `my $i` correctly
+  (no `mysync` needed — read-only):
   ```
   my @fs; for my $i (1..3) { push @fs, sub { $i } }   # [1, 2, 3]
   ```
 - `map { my $captured = $x; sub { $captured } } LIST` — explicit
-  per-iteration `my` binding works.
+  per-iteration `my` snapshot, read-only in the closure.
 
 What requires an idiom change vs Perl:
 
-- Outer counter: use a factory wrapper or pass a ref-to-scalar:
+- Outer counter: declare `mysync $n` (or use `--compat`):
   ```
-  # Idiomatic stryke
-  fn counter { my $n = 0; sub { ++$n } }
+  # Idiomatic stryke (parallel-safe atomic counter)
+  mysync $n = 0;
+  my $inc = sub { $n++ };
 
-  # Or explicit ref through:
-  my $n = 0; my $ref = \$n;
-  my $inc = sub { ${$ref}++ };
+  # Perl-compat (shared storage)
+  # stryke --compat -e 'my $n = 0; my $inc = sub { $n++ };'
   ```
 - Observer pattern: pass a hash/array ref through the closure (ref
   identity preserved across the snapshot — only scalars are

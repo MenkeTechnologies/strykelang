@@ -1,7 +1,7 @@
 # lib/state_machine.stk — state machine patterns and FSM implementations
 
 fn make_traffic_light {
-    my $state = "red"
+    mysync $state = "red"
     my $transitions = {
         red    => "green",
         green  => "yellow",
@@ -19,8 +19,8 @@ fn make_traffic_light {
 }
 
 fn make_door_fsm {
-    my $state = "closed"
-    my $locked = 0
+    mysync $state = "closed"
+    mysync $locked = 0
 
     my $open = fn {
         return "already open" if $state eq "open"
@@ -54,7 +54,7 @@ fn make_door_fsm {
 }
 
 fn make_counter_fsm($min, $max) {
-    my $value = $min
+    mysync $value = $min
 
     my $increment = fn {
         return 0 if $value >= $max
@@ -80,7 +80,7 @@ fn make_counter_fsm($min, $max) {
 }
 
 fn make_toggle_fsm {
-    my $on = 0
+    mysync $on = 0
 
     my $toggle = fn {
         $on = !$on
@@ -95,8 +95,8 @@ fn make_toggle_fsm {
 }
 
 fn make_parser_fsm {
-    my $state = "start"
-    my $tokens = []
+    mysync $state = "start"
+    mysync $tokens = []
 
     my $feed = fn($char) {
         if ($state eq "start") {
@@ -133,8 +133,8 @@ fn make_parser_fsm {
 }
 
 fn make_vending_machine($price) {
-    my $balance = 0
-    my $item_dispensed = 0
+    mysync $balance = 0
+    mysync $item_dispensed = 0
 
     my $insert = fn($amount) {
         return "already paid" if $balance >= $price
@@ -166,9 +166,9 @@ fn make_vending_machine($price) {
 }
 
 fn make_game_state {
-    my $state = "menu"
-    my $score = 0
-    my $lives = 3
+    mysync $state = "menu"
+    mysync $score = 0
+    mysync $lives = 3
 
     my $start = fn {
         return "already playing" if $state eq "playing"
@@ -218,8 +218,8 @@ fn make_game_state {
 }
 
 fn make_connection_fsm {
-    my $state = "disconnected"
-    my $retries = 0
+    mysync $state = "disconnected"
+    mysync $retries = 0
 
     my $connect = fn {
         return "already connected" if $state eq "connected"

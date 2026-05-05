@@ -4,7 +4,7 @@
 # environment (closure). Stryke supports closures via fn { ... }.
 
 fn Rosetta::Nested::make_counter($start) {
-    my $n = $start
+    mysync $n = $start
     fn () {
         $n++
         $n

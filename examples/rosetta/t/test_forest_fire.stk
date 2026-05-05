@@ -47,21 +47,21 @@ fn Rosetta::ForestFire::step($grid, $p, $f) {
 # Test specific scenarios
 # A tree surrounded by empty cells and no lightning should stay a tree
 my $grid1 = [[0, 0, 0], [0, 1, 0], [0, 0, 0]]
-my $next1 = Rosetta::ForestFire::step($grid1, 0.0, 0.0)
-assert_eq $next1->[1][1], 1, "Tree remains tree if no fire/lightning"
+my @next1 = Rosetta::ForestFire::step($grid1, 0.0, 0.0)
+assert_eq $next1[1][1], 1, "Tree remains tree if no fire/lightning"
 
 # A tree next to a fire should ignite
 my $grid2 = [[0, 2, 0], [0, 1, 0], [0, 0, 0]]
-my $next2 = Rosetta::ForestFire::step($grid2, 0.0, 0.0)
-assert_eq $next2->[1][1], 2, "Tree ignites if neighbor is fire"
+my @next2 = Rosetta::ForestFire::step($grid2, 0.0, 0.0)
+assert_eq $next2[1][1], 2, "Tree ignites if neighbor is fire"
 
 # A fire should become empty
-my $next2_fire = $next2->[0][1]
-assert_eq $next2->[0][1], 0, "Fire becomes empty"
+my $next2_fire = $next2[0][1]
+assert_eq $next2[0][1], 0, "Fire becomes empty"
 
 # Empty cell with p=1 should become tree
 my $grid3 = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-my $next3 = Rosetta::ForestFire::step($grid3, 1.0, 0.0)
-assert_eq $next3->[1][1], 1, "Empty becomes tree with p=1"
+my @next3 = Rosetta::ForestFire::step($grid3, 1.0, 0.0)
+assert_eq $next3[1][1], 1, "Empty becomes tree with p=1"
 
 test_run

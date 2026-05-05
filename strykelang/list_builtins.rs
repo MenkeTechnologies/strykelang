@@ -930,8 +930,10 @@ fn any_all_none(
         return Ok(PerlValue::integer(if empty_ok { 1 } else { 0 }));
     }
     for it in items {
-        interp.scope.set_topic(it);
-        let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
+        // Pass `it` as positional arg so stryke lambdas `fn ($x) { ... }`
+        // see it via @_; `set_topic` keeps `_`-style block readers working.
+        interp.scope.set_topic(it.clone());
+        let v = interp.call_sub(&code, vec![it], WantarrayCtx::Scalar, 0)?;
         let t = v.is_true();
         match mode {
             AnyMode::Any if t => return Ok(PerlValue::integer(1)),
@@ -963,7 +965,7 @@ fn first_native(interp: &mut VMHelper, args: &[PerlValue], _want: WantarrayCtx) 
     let items: Vec<PerlValue> = args[1..].to_vec();
     for it in items {
         interp.scope.set_topic(it.clone());
-        let v = interp.call_sub(&code, vec![], WantarrayCtx::Scalar, 0)?;
+        let v = interp.call_sub(&code, vec![it.clone()], WantarrayCtx::Scalar, 0)?;
         if v.is_true() {
             return Ok(it);
         }

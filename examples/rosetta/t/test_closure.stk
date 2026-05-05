@@ -2,9 +2,10 @@
 # Rosetta Code: Closures/Value Capture
 
 fn Rosetta::Closure::make_counter_inner($count) {
+    mysync $shared = $count
     fn {
-        $count = $count + 1
-        $count
+        $shared = $shared + 1
+        $shared
     }
 }
 

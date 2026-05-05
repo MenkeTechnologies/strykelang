@@ -249,7 +249,7 @@ assert_eq $chain(5), 17, "compose_all: ((5+3)*2)+1=17"
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn make_counter {
-    my $count = 0
+    mysync $count = 0
     fn { ++$count }
 }
 

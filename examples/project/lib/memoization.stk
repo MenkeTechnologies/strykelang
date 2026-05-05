@@ -23,7 +23,7 @@ fn fib_no_memo($n) {
 
 fn make_cached_adder {
     my %cache
-    my $calls = 0
+    mysync $calls = 0
 
     my $add = fn($a, $b) {
         my $key = "$a,$b"
@@ -118,7 +118,7 @@ fn is_prime_memo($n) {
 }
 
 fn make_call_counter($fn) {
-    my $count = 0
+    mysync $count = 0
 
     my $wrapped = fn {
         $count++
@@ -132,8 +132,8 @@ fn make_call_counter($fn) {
 }
 
 fn make_once($fn) {
-    my $called = 0
-    my $result
+    mysync $called = 0
+    mysync $result
 
     fn {
         unless ($called) {
@@ -174,7 +174,7 @@ fn count_primes_memo($max) {
 }
 
 fn make_debounced($delay_ms, $fn) {
-    my $last_call = 0
+    mysync $last_call = 0
 
     fn {
         my $now = time() * 1000
