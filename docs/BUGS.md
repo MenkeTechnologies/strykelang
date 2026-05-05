@@ -15,6 +15,16 @@ Severity legend:
 - `bug` — observably wrong vs documented intent
 - `polish` — non-critical UX/error-message issue
 
+## Recently fixed
+
+- **BUG-025, BUG-050** — `$SIG{__WARN__}` / `$SIG{__DIE__}` handlers now
+  fire (commit 3669fb30a3).
+- **BUG-017, BUG-034, BUG-049, PARITY-006, PARITY-007** — sprintf `+` /
+  `#` flags, `*` width and `.*` precision, `%g` shortest-form selection,
+  and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
+  `1.234568e4`) are now all matching Perl exactly across 38 tested
+  format specifiers.
+
 ## High-impact bugs (worth fixing first)
 
 These break common Perl idioms across the codebase:
@@ -192,7 +202,7 @@ Severity: **parity**. Worth deciding whether this is intentional (faster /
 matches Rust ergonomics) or a parity bug.
 
 
-## PARITY-006 — `sprintf "%g"` falls back to `%f` formatting
+## PARITY-006 — `sprintf "%g"` falls back to `%f` formatting — **FIXED**
 
 ```sh
 $ stryke -e 'printf "%g\n", 0.0001; printf "%g\n", 1234567'
@@ -209,7 +219,7 @@ Severity: **parity**. `%g`'s job is shortest-of-`%e`-or-`%f`; stryke just
 uses `%f`.
 
 
-## PARITY-007 — `sprintf "%e"` omits the `+` sign and zero-pad on the exponent
+## PARITY-007 — `sprintf "%e"` omits the `+` sign and zero-pad on the exponent — **FIXED**
 
 ```sh
 $ stryke -e 'printf "%e\n", 12345.6789'
@@ -644,7 +654,7 @@ Tests: `regex_g_flag_returns_full_matches_today`.
 Severity: **bug**. Idiomatic capture extraction breaks.
 
 
-## BUG-017 — `sprintf "%+d"` ignores the `+` flag
+## BUG-017 — `sprintf "%+d"` ignores the `+` flag — **FIXED**
 
 ```sh
 $ stryke -e 'print sprintf("%+5d", 3)'
@@ -988,7 +998,7 @@ Tests: `multiple_heredocs_on_same_line_not_supported_today`.
 Severity: **bug**.
 
 
-## BUG-034 — `sprintf "%#x"` / `"%#o"` ignore the `#` flag
+## BUG-034 — `sprintf "%#x"` / `"%#o"` ignore the `#` flag — **FIXED**
 
 ```sh
 $ stryke -e 'printf "%#x %#o\n", 255, 8'
@@ -1309,7 +1319,7 @@ Tests: `ref_of_stryke_class_instance_is_empty_today`,
 Severity: **bug**.
 
 
-## BUG-049 — `sprintf` star-width / dynamic-precision (`%*d`, `%.*f`) not implemented
+## BUG-049 — `sprintf` star-width / dynamic-precision (`%*d`, `%.*f`) not implemented — **FIXED**
 
 ```sh
 $ stryke -e 'print sprintf("%*d", 5, 42)'
