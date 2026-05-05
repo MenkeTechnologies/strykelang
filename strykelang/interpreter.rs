@@ -486,7 +486,9 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
             kind: DerefKind::Call,
             ..
         } => WantarrayCtx::Scalar,
-        ExprKind::HashSliceDeref { .. } | ExprKind::HashSlice { .. } => WantarrayCtx::List,
+        ExprKind::HashSliceDeref { .. }
+        | ExprKind::HashSlice { .. }
+        | ExprKind::HashKvSlice { .. } => WantarrayCtx::List,
         ExprKind::ArraySlice { indices, .. } => {
             if indices.len() > 1 {
                 WantarrayCtx::List
@@ -7258,18 +7260,6 @@ impl Interpreter {
                 label,
                 continue_block,
             } => {
-                // Perl's `for ARRAY` aliases the loop variable to each array
-                // element. Mutations through `$_` / `$loopvar` propagate back
-                // to the array. We approximate by detecting a bare-`@arr`
-                // source, and after each iteration writing the loop var's
-                // current value back into the corresponding array slot.
-                // Complex sources (`@a, @b`, `1..10`, `keys %h`, etc.) keep
-                // copy semantics — Perl's aliasing only fires on real lvalue
-                // sources too. (BUG-019)
-                let alias_array_name = match &list.kind {
-                    ExprKind::ArrayVar(name) => Some(name.clone()),
-                    _ => None,
-                };
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
                 let items = list_val.to_list();
                 self.scope_push_hook();
@@ -7280,35 +7270,17 @@ impl Interpreter {
                     self.scope
                         .set_scalar(var, items[i].clone())
                         .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
-                    let mut do_alias_writeback = alias_array_name.is_some();
                     'inner: loop {
                         match self.exec_block_smart(body) {
                             Ok(_) => break 'inner,
                             Err(FlowOrError::Flow(Flow::Last(ref l)))
                                 if l == label || l.is_none() =>
                             {
-                                if let Some(name) = alias_array_name.as_ref() {
-                                    let v = self.scope.get_scalar(var).clone();
-                                    let _ = self.scope.set_array_element(
-                                        name,
-                                        i as i64,
-                                        v,
-                                    );
-                                }
                                 break 'outer;
                             }
                             Err(FlowOrError::Flow(Flow::Next(ref l)))
                                 if l == label || l.is_none() =>
                             {
-                                if let Some(name) = alias_array_name.as_ref() {
-                                    let v = self.scope.get_scalar(var).clone();
-                                    let _ = self.scope.set_array_element(
-                                        name,
-                                        i as i64,
-                                        v,
-                                    );
-                                    do_alias_writeback = false;
-                                }
                                 if let Some(cb) = continue_block {
                                     let _ = self.exec_block_smart(cb);
                                 }
@@ -7324,16 +7296,6 @@ impl Interpreter {
                                 self.scope_pop_hook();
                                 return Err(e);
                             }
-                        }
-                    }
-                    if do_alias_writeback {
-                        if let Some(name) = alias_array_name.as_ref() {
-                            let v = self.scope.get_scalar(var).clone();
-                            let _ = self.scope.set_array_element(
-                                name,
-                                i as i64,
-                                v,
-                            );
                         }
                     }
                     if let Some(cb) = continue_block {
@@ -8892,6 +8854,21 @@ impl Interpreter {
                 for key_expr in keys {
                     for k in self.eval_hash_slice_key_components(key_expr)? {
                         result.push(self.scope.get_hash_element(hash, &k));
+                    }
+                }
+                Ok(PerlValue::array(result))
+            }
+            ExprKind::HashKvSlice { hash, keys } => {
+                // `%h{KEYS}` — Perl 5.20+ key-value slice. Returns a flat
+                // (key, value, key, value, ...) list. (BUG-008)
+                self.check_strict_hash_var(hash, line)?;
+                self.touch_env_hash(hash);
+                let mut result = Vec::new();
+                for key_expr in keys {
+                    for k in self.eval_hash_slice_key_components(key_expr)? {
+                        let v = self.scope.get_hash_element(hash, &k);
+                        result.push(PerlValue::string(k));
+                        result.push(v);
                     }
                 }
                 Ok(PerlValue::array(result))
@@ -13812,71 +13789,6 @@ impl Interpreter {
 
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
-            // `vec($s, $offset, $bits) = $rhs` — set the requested bit
-            // field in $s and write the modified string back through the
-            // string lvalue. Bits must be 1, 2, 4, 8, 16, or 32.
-            ExprKind::FuncCall { name, args } if name == "vec" && args.len() == 3 => {
-                let src = self.eval_expr(&args[0])?;
-                let offset = self.eval_expr(&args[1])?.to_int();
-                let bits = self.eval_expr(&args[2])?.to_int();
-                if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
-                    return Err(FlowOrError::Error(PerlError::runtime(
-                        format!("Illegal number of bits in vec ({})", bits),
-                        target.line,
-                    )));
-                }
-                if offset < 0 {
-                    return Err(FlowOrError::Error(PerlError::runtime(
-                        "Negative offset to vec in lvalue context",
-                        target.line,
-                    )));
-                }
-                let value = val.to_int() as u64;
-                // Preserve raw bytes — vec writes can produce non-UTF-8
-                // sequences, so a String round-trip would corrupt bytes via
-                // U+FFFD replacement.
-                let mut bytes: Vec<u8> = if let Some(b) = src.as_bytes_arc() {
-                    (*b).clone()
-                } else {
-                    src.to_string().into_bytes()
-                };
-                let bit_offset = (offset as usize) * (bits as usize);
-                let byte_offset = bit_offset / 8;
-                let bit_within = bit_offset % 8;
-                let bits_us = bits as usize;
-                let needed_len = if bits_us <= 8 {
-                    byte_offset + 1
-                } else {
-                    byte_offset + (bits_us / 8)
-                };
-                if bytes.len() < needed_len {
-                    bytes.resize(needed_len, 0);
-                }
-                if bits_us <= 8 {
-                    let mask = ((1u16 << bits_us) - 1) as u8;
-                    let v = (value as u8) & mask;
-                    bytes[byte_offset] &= !(mask << bit_within);
-                    bytes[byte_offset] |= v << bit_within;
-                } else if bits_us == 16 {
-                    // Perl uses big-endian for multi-byte BITS.
-                    let v = (value & 0xFFFF) as u16;
-                    bytes[byte_offset] = ((v >> 8) & 0xFF) as u8;
-                    bytes[byte_offset + 1] = (v & 0xFF) as u8;
-                } else {
-                    // 32 (big-endian)
-                    let v = (value & 0xFFFF_FFFF) as u32;
-                    bytes[byte_offset] = ((v >> 24) & 0xFF) as u8;
-                    bytes[byte_offset + 1] = ((v >> 16) & 0xFF) as u8;
-                    bytes[byte_offset + 2] = ((v >> 8) & 0xFF) as u8;
-                    bytes[byte_offset + 3] = (v & 0xFF) as u8;
-                }
-                let new_val = match String::from_utf8(bytes) {
-                    Ok(s) => PerlValue::string(s),
-                    Err(e) => PerlValue::bytes(Arc::new(e.into_bytes())),
-                };
-                self.assign_value(&args[0], new_val)?;
-                Ok(PerlValue::integer(value as i64))
-            }
             // `substr($s, $o, $l) = $rhs` — equivalent to the 4-arg form
             // `substr($s, $o, $l, $rhs)`. Evaluate the offset/length
             // sub-exprs, splice the new substring into the target, then

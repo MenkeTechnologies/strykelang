@@ -3147,6 +3147,45 @@ impl Compiler {
                     self.emit_op(Op::MakeArray(total_keys), line, Some(root));
                 }
             }
+            ExprKind::HashKvSlice { hash, keys } => {
+                // `%h{KEYS}` — Perl 5.20+ kv-slice. Emit key-then-value
+                // pairs, then MakeArray for a flat list. (BUG-008)
+                let hash_idx = self.chunk.intern_name(hash);
+                let mut total_pairs = 0u16;
+                for key_expr in keys {
+                    match &key_expr.kind {
+                        ExprKind::QW(words) => {
+                            for w in words {
+                                let kidx = self
+                                    .chunk
+                                    .add_constant(PerlValue::string(w.clone()));
+                                self.emit_op(Op::LoadConst(kidx), line, Some(root));
+                                let kidx2 = self
+                                    .chunk
+                                    .add_constant(PerlValue::string(w.clone()));
+                                self.emit_op(Op::LoadConst(kidx2), line, Some(root));
+                                self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                total_pairs += 1;
+                            }
+                        }
+                        ExprKind::List(elems) => {
+                            for e in elems {
+                                self.compile_expr(e)?;
+                                self.emit_op(Op::Dup, line, Some(root));
+                                self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                                total_pairs += 1;
+                            }
+                        }
+                        _ => {
+                            self.compile_expr(key_expr)?;
+                            self.emit_op(Op::Dup, line, Some(root));
+                            self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
+                            total_pairs += 1;
+                        }
+                    }
+                }
+                self.emit_op(Op::MakeArray(total_pairs * 2), line, Some(root));
+            }
             ExprKind::HashSliceDeref { container, keys } => {
                 self.compile_expr(container)?;
                 for key_expr in keys {

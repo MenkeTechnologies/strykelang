@@ -377,19 +377,29 @@ fn caller_zero_omits_subroutine_name_today() {
     assert!(out.ends_with(","), "expected trailing empty subname, got {:?}", out);
 }
 
-// ── `kv-slice` returns full hash today (should return subset) ────────────────
-//
-// BUG-006: `%h{KEYS}` should yield key-value pairs only for KEYS.
-// stryke today returns the full hash.
+// ── `kv-slice` yields key-value pairs (BUG-008 FIXED) ────────────────────────
 
 #[test]
-fn kv_slice_returns_full_hash_today() {
+fn kv_slice_returns_subset_with_key_value_pairs() {
+    // BUG-008 FIXED: `%h{KEYS}` is Perl 5.20+ key-value slice. Returns a
+    // flat (key, value, key, value, ...) list, so assigning to `%sub`
+    // produces a hash containing only the requested keys.
     let out = eval_string(
         r#"my %h = (a=>1, b=>2, c=>3);
            my %sub = %h{qw(a c)};
            join(",", map { "$_=$sub{$_}" } sort keys %sub)"#,
     );
-    assert_eq!(out, "a=1,b=2,c=3");
+    assert_eq!(out, "a=1,c=3");
+}
+
+#[test]
+fn kv_slice_into_array_yields_alternating_key_value_pairs() {
+    let out = eval_string(
+        r#"my %h = (a=>1, b=>2, c=>3);
+           my @kv = %h{qw(a c)};
+           join(",", @kv)"#,
+    );
+    assert_eq!(out, "a,1,c,3");
 }
 
 // ── `exists` chain on missing intermediate hash ───────────────────────────────
