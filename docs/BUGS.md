@@ -17,6 +17,12 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-009** — `exists $h{x}{y}{z}` and `exists $a[5][0]` now soft-fail
+  to 0 at any missing or non-container intermediate level (was: erroring
+  with "exists argument is not a HASH/ARRAY reference"). Multi-level
+  chains route through `Op::ExistsExpr` + `eval_expr_exists_mode` which
+  propagates undef instead of erroring on intermediate derefs. Matches
+  Perl 5 across 13 differential cases.
 - **BUG-019** — `for (@arr) { $_ *= 10 }` now mutates `@arr` in place.
   Bytecode compiler detects a bare-`@arr` source and emits an
   `Op::SetArrayElem` write-back at the merged step target so both
@@ -549,23 +555,29 @@ Tests: `kv_slice_returns_full_hash_today`.
 Severity: **bug**. Was added to Perl in 5.20; widely used.
 
 
-## BUG-009 — `exists $h{x}{y}` errors when `$h{x}` is missing
+## BUG-009 — `exists $h{x}{y}` errors when `$h{x}` is missing — **FIXED**
 
-```sh
-$ stryke -e 'my %h = (a => {b => 1}); say exists $h{x}{y} ? 1 : 0'
-exists argument is not a HASH reference at -e line 1.
-$ perl   -e 'my %h = (a => {b => 1}); say exists $h{x}{y} ? 1 : 0'
-0
-```
+The deepest exists test now soft-fails to false at any missing or
+non-container intermediate. `exists_arrow_hash_element` and
+`exists_arrow_array_element` both return `Ok(false)` when the container
+is undef or any non-ref scalar (instead of erroring). The bytecode
+compiler routes multi-level deref chains (`exists $h{x}{y}{z}`,
+`exists $a[5][0]`, etc.) through `Op::ExistsExpr` so the chain walk
+runs through `eval_exists_operand` + the new
+`eval_expr_exists_mode` helper, which propagates undef instead of
+erroring on intermediate `ArrowDeref` evaluations.
 
-The intermediate hash should be auto-vivified to an empty hashref for the
-purpose of `exists`, then the inner check returns false. Stryke fails the
-deref step instead.
+Differential-tested against Perl 5.42 across 13 cases including
+two-level, three-level, hash-then-array, array-then-array,
+present-then-missing, scalar-as-intermediate.
 
-Tests: `exists_on_missing_intermediate_errors_today`,
-`exists_on_present_chain_returns_true`.
+Tests: `exists_on_missing_intermediate_returns_false` (was
+`_errors_today`), `exists_on_present_chain_returns_true`,
+`exists_on_three_level_missing_returns_false`,
+`exists_through_array_chain_soft_fails`,
+`exists_through_non_ref_intermediate_returns_false`.
 
-Severity: **bug**.
+Severity: **bug** (FIXED).
 
 
 ## POLISH-003 — `say BAREWORD()->method()` parses BAREWORD as a filehandle
