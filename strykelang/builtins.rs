@@ -1513,6 +1513,7 @@ pub(crate) fn try_builtin(
             )
         }
         "vec" => Some(builtin_vec(args, line)),
+        "vec_set_value" => Some(builtin_vec_set_value(args, line)),
         "dump" => Some(builtin_dump()),
         "reset" => Some(Ok(PerlValue::integer(1))),
         "formline" => Some(interp.builtin_formline(args, line)),
@@ -26160,8 +26161,14 @@ fn builtin_vec(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.len() < 3 {
         return Err(PerlError::runtime("vec: not enough arguments", line));
     }
-    let s = args[0].to_string();
-    let bytes = s.as_bytes();
+    // Prefer raw byte representation so previous vec() lvalue writes (which
+    // may have produced non-UTF-8 sequences) round-trip correctly.
+    let bytes_owned: Vec<u8> = if let Some(b) = args[0].as_bytes_arc() {
+        (*b).clone()
+    } else {
+        args[0].to_string().into_bytes()
+    };
+    let bytes = bytes_owned.as_slice();
     let offset = args[1].to_int() as usize;
     let bits = args[2].to_int() as usize;
     if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
@@ -26182,22 +26189,92 @@ fn builtin_vec(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         let val = (byte >> bit_within) & mask;
         Ok(PerlValue::integer(val as i64))
     } else if bits == 16 {
-        if byte_offset + 1 >= bytes.len() {
-            return Ok(PerlValue::integer(0));
-        }
-        let val = (bytes[byte_offset] as u16) | ((bytes[byte_offset + 1] as u16) << 8);
+        // Perl's `vec` uses big-endian byte order for multi-byte BITS, and
+        // pads with zero when the read runs past the end of the string.
+        let b0 = *bytes.get(byte_offset).unwrap_or(&0);
+        let b1 = *bytes.get(byte_offset + 1).unwrap_or(&0);
+        let val = ((b0 as u16) << 8) | (b1 as u16);
         Ok(PerlValue::integer(val as i64))
     } else {
-        // 32
-        if byte_offset + 3 >= bytes.len() {
-            return Ok(PerlValue::integer(0));
-        }
-        let val = (bytes[byte_offset] as u32)
-            | ((bytes[byte_offset + 1] as u32) << 8)
-            | ((bytes[byte_offset + 2] as u32) << 16)
-            | ((bytes[byte_offset + 3] as u32) << 24);
+        // 32 (big-endian, zero-padded past end)
+        let b0 = *bytes.get(byte_offset).unwrap_or(&0);
+        let b1 = *bytes.get(byte_offset + 1).unwrap_or(&0);
+        let b2 = *bytes.get(byte_offset + 2).unwrap_or(&0);
+        let b3 = *bytes.get(byte_offset + 3).unwrap_or(&0);
+        let val =
+            ((b0 as u32) << 24) | ((b1 as u32) << 16) | ((b2 as u32) << 8) | (b3 as u32);
         Ok(PerlValue::integer(val as i64))
     }
+}
+
+// ── vec_set_value() ─────────────────────────────────────────────────
+// Internal 4-arg helper used by the `vec(...) = $rhs` lvalue rewrite in
+// the bytecode compiler (PARITY-010). Returns the modified string; the
+// compiler arranges for it to be assigned back to the original lvalue.
+fn builtin_vec_set_value(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+    if args.len() != 4 {
+        return Err(PerlError::runtime(
+            format!("vec_set_value: expected 4 args, got {}", args.len()),
+            line,
+        ));
+    }
+    let offset = args[1].to_int();
+    let bits = args[2].to_int();
+    let value = args[3].to_int() as u64;
+    if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
+        return Err(PerlError::runtime(
+            format!("Illegal number of bits in vec ({})", bits),
+            line,
+        ));
+    }
+    if offset < 0 {
+        return Err(PerlError::runtime(
+            "Negative offset to vec in lvalue context",
+            line,
+        ));
+    }
+    // Preserve raw bytes — vec writes can produce non-UTF-8 sequences, so a
+    // String round-trip would corrupt bytes via U+FFFD replacement.
+    let mut bytes: Vec<u8> = if let Some(b) = args[0].as_bytes_arc() {
+        (*b).clone()
+    } else {
+        args[0].to_string().into_bytes()
+    };
+    let bits_us = bits as usize;
+    let bit_offset = (offset as usize) * bits_us;
+    let byte_offset = bit_offset / 8;
+    let bit_within = bit_offset % 8;
+    let needed_len = if bits_us <= 8 {
+        byte_offset + 1
+    } else {
+        byte_offset + (bits_us / 8)
+    };
+    if bytes.len() < needed_len {
+        bytes.resize(needed_len, 0);
+    }
+    if bits_us <= 8 {
+        let mask = ((1u16 << bits_us) - 1) as u8;
+        let v = (value as u8) & mask;
+        bytes[byte_offset] &= !(mask << bit_within);
+        bytes[byte_offset] |= v << bit_within;
+    } else if bits_us == 16 {
+        // Perl uses big-endian for multi-byte BITS.
+        let v = (value & 0xFFFF) as u16;
+        bytes[byte_offset] = ((v >> 8) & 0xFF) as u8;
+        bytes[byte_offset + 1] = (v & 0xFF) as u8;
+    } else {
+        let v = (value & 0xFFFF_FFFF) as u32;
+        bytes[byte_offset] = ((v >> 24) & 0xFF) as u8;
+        bytes[byte_offset + 1] = ((v >> 16) & 0xFF) as u8;
+        bytes[byte_offset + 2] = ((v >> 8) & 0xFF) as u8;
+        bytes[byte_offset + 3] = (v & 0xFF) as u8;
+    }
+    // If the result is valid UTF-8, return a string for friendlier interop;
+    // otherwise return bytes so the raw sequence survives further reads.
+    Ok(match String::from_utf8(bytes) {
+        Ok(s) => PerlValue::string(s),
+        Err(e) => PerlValue::bytes(std::sync::Arc::new(e.into_bytes())),
+    })
 }
 
 // ── dump() ─────────────────────────────────────────────────────────

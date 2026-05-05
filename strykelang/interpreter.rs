@@ -13744,6 +13744,71 @@ impl Interpreter {
 
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
+            // `vec($s, $offset, $bits) = $rhs` — set the requested bit
+            // field in $s and write the modified string back through the
+            // string lvalue. Bits must be 1, 2, 4, 8, 16, or 32.
+            ExprKind::FuncCall { name, args } if name == "vec" && args.len() == 3 => {
+                let src = self.eval_expr(&args[0])?;
+                let offset = self.eval_expr(&args[1])?.to_int();
+                let bits = self.eval_expr(&args[2])?.to_int();
+                if !matches!(bits, 1 | 2 | 4 | 8 | 16 | 32) {
+                    return Err(FlowOrError::Error(PerlError::runtime(
+                        format!("Illegal number of bits in vec ({})", bits),
+                        target.line,
+                    )));
+                }
+                if offset < 0 {
+                    return Err(FlowOrError::Error(PerlError::runtime(
+                        "Negative offset to vec in lvalue context",
+                        target.line,
+                    )));
+                }
+                let value = val.to_int() as u64;
+                // Preserve raw bytes — vec writes can produce non-UTF-8
+                // sequences, so a String round-trip would corrupt bytes via
+                // U+FFFD replacement.
+                let mut bytes: Vec<u8> = if let Some(b) = src.as_bytes_arc() {
+                    (*b).clone()
+                } else {
+                    src.to_string().into_bytes()
+                };
+                let bit_offset = (offset as usize) * (bits as usize);
+                let byte_offset = bit_offset / 8;
+                let bit_within = bit_offset % 8;
+                let bits_us = bits as usize;
+                let needed_len = if bits_us <= 8 {
+                    byte_offset + 1
+                } else {
+                    byte_offset + (bits_us / 8)
+                };
+                if bytes.len() < needed_len {
+                    bytes.resize(needed_len, 0);
+                }
+                if bits_us <= 8 {
+                    let mask = ((1u16 << bits_us) - 1) as u8;
+                    let v = (value as u8) & mask;
+                    bytes[byte_offset] &= !(mask << bit_within);
+                    bytes[byte_offset] |= v << bit_within;
+                } else if bits_us == 16 {
+                    // Perl uses big-endian for multi-byte BITS.
+                    let v = (value & 0xFFFF) as u16;
+                    bytes[byte_offset] = ((v >> 8) & 0xFF) as u8;
+                    bytes[byte_offset + 1] = (v & 0xFF) as u8;
+                } else {
+                    // 32 (big-endian)
+                    let v = (value & 0xFFFF_FFFF) as u32;
+                    bytes[byte_offset] = ((v >> 24) & 0xFF) as u8;
+                    bytes[byte_offset + 1] = ((v >> 16) & 0xFF) as u8;
+                    bytes[byte_offset + 2] = ((v >> 8) & 0xFF) as u8;
+                    bytes[byte_offset + 3] = (v & 0xFF) as u8;
+                }
+                let new_val = match String::from_utf8(bytes) {
+                    Ok(s) => PerlValue::string(s),
+                    Err(e) => PerlValue::bytes(Arc::new(e.into_bytes())),
+                };
+                self.assign_value(&args[0], new_val)?;
+                Ok(PerlValue::integer(value as i64))
+            }
             // `substr($s, $o, $l) = $rhs` — equivalent to the 4-arg form
             // `substr($s, $o, $l, $rhs)`. Evaluate the offset/length
             // sub-exprs, splice the new substring into the target, then

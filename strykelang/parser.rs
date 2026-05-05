@@ -12838,6 +12838,7 @@ impl Parser {
             | "stdin"
             // ── internal ────────────────────────────────────────────────────
             | "__stryke_rust_compile"
+            | "vec_set_value"
             // ── short aliases ───────────────────────────────────────────────
             | "p" | "rev"
             // ── trivial numeric / predicate builtins ────────────────────────

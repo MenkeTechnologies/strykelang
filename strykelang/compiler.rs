@@ -3911,6 +3911,38 @@ impl Compiler {
                     self.compile_expr(&rewritten)?;
                     return Ok(());
                 }
+                // `vec($s, $o, $b) = $rhs` — set the requested bit field
+                // in $s and write back. Lower to:
+                //     $s = vec_set_value($s, $o, $b, $rhs);
+                // where `vec_set_value` is a 4-arg pure builtin that
+                // returns the modified string. This lets every supported
+                // lvalue shape for `$s` (plain scalar, array element,
+                // hash element, etc.) reuse its existing assign path.
+                if let ExprKind::FuncCall { name, args } = &target.kind {
+                    if name == "vec" && args.len() == 3 {
+                        let new_call = Expr {
+                            kind: ExprKind::FuncCall {
+                                name: "vec_set_value".to_string(),
+                                args: vec![
+                                    args[0].clone(),
+                                    args[1].clone(),
+                                    args[2].clone(),
+                                    (**value).clone(),
+                                ],
+                            },
+                            line: target.line,
+                        };
+                        let rewritten = Expr {
+                            kind: ExprKind::Assign {
+                                target: Box::new(args[0].clone()),
+                                value: Box::new(new_call),
+                            },
+                            line,
+                        };
+                        self.compile_expr(&rewritten)?;
+                        return Ok(());
+                    }
+                }
                 if let (ExprKind::Typeglob(lhs), ExprKind::Typeglob(rhs)) =
                     (&target.kind, &value.kind)
                 {
