@@ -394,19 +394,15 @@ fn kv_slice_returns_full_hash_today() {
 
 // ── `exists` chain on missing intermediate hash ───────────────────────────────
 //
-// BUG-007: `exists $h{x}{y}` when $h{x} is missing currently raises a runtime
-// error instead of returning false.
+// BUG-009 FIXED: `exists $h{x}{y}` when $h{x} is missing now returns false
+// (was: erroring with "exists argument is not a HASH reference"). Multi-
+// level chains soft-fail at any missing intermediate, matching Perl 5.
 
 #[test]
-fn exists_on_missing_intermediate_errors_today() {
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"my %h = (a => {b => 1}); exists $h{x}{y} ? 1 : 0"#,
-    );
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime/type error for missing intermediate, got {:?}",
-        kind
+fn exists_on_missing_intermediate_returns_false() {
+    assert_eq!(
+        eval_int(r#"my %h = (a => {b => 1}); exists $h{x}{y} ? 1 : 0"#),
+        0
     );
 }
 
@@ -415,6 +411,45 @@ fn exists_on_present_chain_returns_true() {
     assert_eq!(
         eval_int(r#"my %h = (a => {b => 1}); exists $h{a}{b} ? 1 : 0"#),
         1
+    );
+}
+
+#[test]
+fn exists_on_three_level_missing_returns_false() {
+    assert_eq!(
+        eval_int(
+            r#"my %h = (a => {b => {c => 1}}); exists $h{x}{y}{z} ? 1 : 0"#
+        ),
+        0
+    );
+    assert_eq!(
+        eval_int(
+            r#"my %h = (a => {b => {c => 1}}); exists $h{a}{b}{c} ? 1 : 0"#
+        ),
+        1
+    );
+}
+
+#[test]
+fn exists_through_array_chain_soft_fails() {
+    // exists $a[5][0] where @a only has indices 0..1 — Perl returns false
+    // at the deepest test without erroring on the undef intermediate.
+    assert_eq!(
+        eval_int(r#"my @a = ([1,2,3], [4,5,6]); exists $a[5][0] ? 1 : 0"#),
+        0
+    );
+    assert_eq!(
+        eval_int(r#"my @a = ([1,2,3], [4,5,6]); exists $a[0][1] ? 1 : 0"#),
+        1
+    );
+}
+
+#[test]
+fn exists_through_non_ref_intermediate_returns_false() {
+    // $h{a} = 5 (scalar) — `exists $h{a}{x}` returns false in Perl.
+    assert_eq!(
+        eval_int(r#"my %h = (a => 5); exists $h{a}{x} ? 1 : 0"#),
+        0
     );
 }
 

@@ -2729,10 +2729,11 @@ impl Interpreter {
                 line,
             ));
         }
-        Err(PerlError::runtime(
-            "exists argument is not a HASH reference",
-            line,
-        ))
+        // `exists $h{x}{y}` when `$h{x}` is undef OR a non-hash scalar: Perl
+        // returns false for the deepest test without erroring. Stryke
+        // previously errored on the intermediate. Match Perl. (BUG-009)
+        let _ = line;
+        Ok(false)
     }
 
     /// `delete $href->{k}` / `delete $obj->{k}` — same container rules as [`Self::exists_arrow_hash_element`].
@@ -2782,10 +2783,10 @@ impl Interpreter {
             };
             return Ok(i < arr.len());
         }
-        Err(PerlError::runtime(
-            "exists argument is not an ARRAY reference",
-            line,
-        ))
+        // `exists $a[5][0]` when `$a[5]` is missing OR a non-array scalar:
+        // Perl returns false at the deepest test without erroring. (BUG-009)
+        let _ = line;
+        Ok(false)
     }
 
     /// `delete $aref->[$i]` — sets element to undef, returns previous value (Perl array `delete`).
@@ -19171,6 +19172,56 @@ impl Interpreter {
         }
     }
 
+    /// Evaluate a deref-chain in "exists mode" — like [`Self::eval_expr`] but
+    /// recursively walks `ArrowDeref` chains and turns undef-intermediate
+    /// derefs into undef (instead of erroring). Used by
+    /// [`Self::eval_exists_operand`] so `exists $h{x}{y}{z}` returns 0 for
+    /// any missing level. (BUG-009)
+    fn eval_expr_exists_mode(&mut self, expr: &Expr) -> Result<PerlValue, FlowOrError> {
+        match &expr.kind {
+            ExprKind::ArrowDeref {
+                expr: inner,
+                index,
+                kind: DerefKind::Hash,
+            } => {
+                let inner_val = self.eval_expr_exists_mode(inner)?;
+                if inner_val.is_undef() {
+                    return Ok(PerlValue::UNDEF);
+                }
+                if let Some(r) = inner_val.as_hash_ref() {
+                    let k = self.eval_expr(index)?.to_string();
+                    return Ok(r.read().get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                }
+                if let Some(b) = inner_val.as_blessed_ref() {
+                    let data = b.data.read();
+                    if let Some(r) = data.as_hash_ref() {
+                        let k = self.eval_expr(index)?.to_string();
+                        return Ok(r.read().get(&k).cloned().unwrap_or(PerlValue::UNDEF));
+                    }
+                }
+                Ok(PerlValue::UNDEF)
+            }
+            ExprKind::ArrowDeref {
+                expr: inner,
+                index,
+                kind: DerefKind::Array,
+            } => {
+                let inner_val = self.eval_expr_exists_mode(inner)?;
+                if inner_val.is_undef() {
+                    return Ok(PerlValue::UNDEF);
+                }
+                if let Some(r) = inner_val.as_array_ref() {
+                    let idx = self.eval_expr(index)?.to_int();
+                    let arr = r.read();
+                    let i = if idx < 0 { (arr.len() as i64 + idx).max(0) as usize } else { idx as usize };
+                    return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
+                }
+                Ok(PerlValue::UNDEF)
+            }
+            _ => self.eval_expr(expr),
+        }
+    }
+
     pub(crate) fn eval_exists_operand(
         &mut self,
         expr: &Expr,
@@ -19221,7 +19272,17 @@ impl Interpreter {
                 kind: DerefKind::Hash,
             } => {
                 let k = self.eval_expr(index)?.to_string();
-                let container = self.eval_expr(inner)?;
+                // Evaluate the chain in "exists mode" — undef intermediates
+                // propagate as undef instead of erroring on missing-key
+                // deref, matching Perl's `exists $h{x}{y}{z}` returning 0
+                // for any missing level. (BUG-009)
+                let container = match self.eval_expr_exists_mode(inner) {
+                    Ok(v) => v,
+                    Err(_) => return Ok(PerlValue::integer(0)),
+                };
+                if container.is_undef() {
+                    return Ok(PerlValue::integer(0));
+                }
                 let yes = self.exists_arrow_hash_element(container, &k, line)?;
                 Ok(PerlValue::integer(if yes { 1 } else { 0 }))
             }
@@ -19237,7 +19298,13 @@ impl Interpreter {
                     )
                     .into());
                 }
-                let container = self.eval_expr(inner)?;
+                let container = match self.eval_expr_exists_mode(inner) {
+                    Ok(v) => v,
+                    Err(_) => return Ok(PerlValue::integer(0)),
+                };
+                if container.is_undef() {
+                    return Ok(PerlValue::integer(0));
+                }
                 let idx = self.eval_expr(index)?.to_int();
                 let yes = self.exists_arrow_array_element(container, idx, line)?;
                 Ok(PerlValue::integer(if yes { 1 } else { 0 }))
