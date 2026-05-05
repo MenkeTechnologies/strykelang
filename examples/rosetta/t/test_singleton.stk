@@ -3,7 +3,7 @@
 # Module-level singleton: every call to `instance()` returns the same
 # object. Demonstrate identity, mutation propagation, and reset.
 
-my $Rosetta_Singleton_instance = undef
+mysync $Rosetta_Singleton_instance = undef
 
 fn Rosetta::Singleton::instance() {
     if (!defined $Rosetta_Singleton_instance) {

@@ -615,6 +615,7 @@ impl<'a> VM<'a> {
         op_count: &mut u64,
     ) -> PerlResult<()> {
         let idx = expr_idx as usize;
+        let dispatch_coderef = !crate::compat_mode();
         if let Some(&(start, end)) = self
             .map_expr_bytecode_ranges
             .get(idx)
@@ -622,25 +623,53 @@ impl<'a> VM<'a> {
         {
             let mut result = Vec::new();
             for item in list {
-                self.interp.scope.set_topic(item);
+                self.interp.scope.set_topic(item.clone());
                 let val = self.run_block_region(start, end, op_count)?;
+                let val = self.maybe_call_coderef_with_item(val, &item, dispatch_coderef)?;
                 Self::extend_map_outputs(&mut result, val, peel_array_ref);
             }
             self.push(PerlValue::array(result));
         } else {
-            let e = &self.map_expr_entries[idx];
+            let e = self.map_expr_entries[idx].clone();
             let mut result = Vec::new();
             for item in list {
-                self.interp.scope.set_topic(item);
+                self.interp.scope.set_topic(item.clone());
                 let val = vm_interp_result(
-                    self.interp.eval_expr_ctx(e, WantarrayCtx::List),
+                    self.interp.eval_expr_ctx(&e, WantarrayCtx::List),
                     self.line(),
                 )?;
+                let val = self.maybe_call_coderef_with_item(val, &item, dispatch_coderef)?;
                 Self::extend_map_outputs(&mut result, val, peel_array_ref);
             }
             self.push(PerlValue::array(result));
         }
         Ok(())
+    }
+
+    /// If `val` is a code reference and `dispatch` is true (i.e. not in
+    /// `--compat` mode), call it with `item` as the sole argument and
+    /// return the call result. Otherwise return `val` unchanged. Powers
+    /// the "coderef-in-expr-position" feature for `grep $f, @l`,
+    /// `map $f, @l`, and pipe-forward `|> grep $f`.
+    fn maybe_call_coderef_with_item(
+        &mut self,
+        val: PerlValue,
+        item: &PerlValue,
+        dispatch: bool,
+    ) -> PerlResult<PerlValue> {
+        if !dispatch {
+            return Ok(val);
+        }
+        if let Some(sub) = val.as_code_ref() {
+            let sub = sub.clone();
+            let line = self.line();
+            return Ok(vm_interp_result(
+                self.interp
+                    .call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line),
+                line,
+            )?);
+        }
+        Ok(val)
     }
 
     /// Consecutive groups: key from block with `$_`; keys compared with [`PerlValue::str_eq`].
@@ -6714,6 +6743,7 @@ impl<'a> VM<'a> {
                     Op::GrepWithExpr(expr_idx) => {
                         let list = self.pop().to_list();
                         let idx = *expr_idx as usize;
+                        let dispatch_coderef = !crate::compat_mode();
                         if let Some(&(start, end)) = self
                             .grep_expr_bytecode_ranges
                             .get(idx)
@@ -6723,6 +6753,11 @@ impl<'a> VM<'a> {
                             for item in list {
                                 self.interp.scope.set_topic(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
+                                let val = self.maybe_call_coderef_with_item(
+                                    val,
+                                    &item,
+                                    dispatch_coderef,
+                                )?;
                                 let keep = if let Some(re) = val.as_regex() {
                                     re.is_match(&item.to_string())
                                 } else {
@@ -6735,11 +6770,16 @@ impl<'a> VM<'a> {
                             self.push(PerlValue::array(result));
                             Ok(())
                         } else {
-                            let e = &self.grep_expr_entries[idx];
+                            let e = self.grep_expr_entries[idx].clone();
                             let mut result = Vec::new();
                             for item in list {
                                 self.interp.scope.set_topic(item.clone());
-                                let val = vm_interp_result(self.interp.eval_expr(e), self.line())?;
+                                let val = vm_interp_result(self.interp.eval_expr(&e), self.line())?;
+                                let val = self.maybe_call_coderef_with_item(
+                                    val,
+                                    &item,
+                                    dispatch_coderef,
+                                )?;
                                 let keep = if let Some(re) = val.as_regex() {
                                     re.is_match(&item.to_string())
                                 } else {
@@ -6841,8 +6881,15 @@ impl<'a> VM<'a> {
                         };
                         let interp = &mut self.interp;
                         items.sort_by(|a, b| {
+                            // `set_sort_pair` keeps Perl-style `$a`/`$b` access;
+                            // positional args let stryke lambdas read via @_.
                             interp.scope.set_sort_pair(a.clone(), b.clone());
-                            match interp.call_sub(sub.as_ref(), vec![], want, line) {
+                            match interp.call_sub(
+                                sub.as_ref(),
+                                vec![a.clone(), b.clone()],
+                                want,
+                                line,
+                            ) {
                                 Ok(v) => {
                                     let n = v.to_int();
                                     if n < 0 {

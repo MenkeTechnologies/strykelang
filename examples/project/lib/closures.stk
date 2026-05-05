@@ -59,12 +59,12 @@ fn ring_buffer_state($val) {
 # ── Basic closure capture ──────────────────────────────────────────
 
 fn make_counter {
-    my $count = 0
+    mysync $count = 0
     fn { ++$count }
 }
 
 fn make_counter_with_start($start) {
-    my $count = $start
+    mysync $count = $start
     fn { ++$count }
 }
 
@@ -79,7 +79,7 @@ fn make_multiplier($factor) {
 # ── Multiple closures sharing state (scalars) ──────────────────────
 
 fn make_counter_pair {
-    my $count = 0
+    mysync $count = 0
     my $inc = fn { ++$count }
     my $get = fn { $count }
     ($inc, $get)
@@ -127,7 +127,7 @@ fn make_closures_with_explicit_capture {
 # ── Closure modifying outer scope ──────────────────────────────────
 
 fn closure_modifies_outer {
-    my $x = 10
+    mysync $x = 10
     my $modifier = fn ($delta) { $x += $delta }
     $modifier(5)
     $modifier(3)
@@ -161,7 +161,7 @@ fn apply_n_times($f, $n) {
 # ── Closure returning closure ──────────────────────────────────────
 
 fn make_accumulator {
-    my $total = 0
+    mysync $total = 0
     fn ($n) {
         $total += $n
         fn { $total }
@@ -169,7 +169,7 @@ fn make_accumulator {
 }
 
 fn make_toggle {
-    my $state = 0
+    mysync $state = 0
     fn {
         $state = !$state
         $state ? "on" : "off"
@@ -190,11 +190,11 @@ fn outer_scope_test {
 }
 
 fn shadowing_with_modification {
-    my $val = 10
+    mysync $val = 10
     my $outer_mod = fn { $val *= 2 }
     $outer_mod()
     my $after_outer = $val
-    my $val_inner = 100
+    mysync $val_inner = 100
     my $inner_mod = fn { $val_inner += 5 }
     $inner_mod()
     my $inner_val = $val_inner

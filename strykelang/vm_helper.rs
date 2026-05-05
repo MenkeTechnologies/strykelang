@@ -4232,10 +4232,17 @@ impl VMHelper {
             "take_while" => {
                 let mut out = Vec::new();
                 for item in items {
-                    self.scope_push_hook();
+                    // `call_sub` binds the item to @_/positional params (so
+                    // stryke lambdas work) and to `$_` via `set_closure_args`
+                    // (so `_`-using blocks work). Replaces the old
+                    // `exec_block(&sub.body)` path which only set the topic.
                     self.scope.set_topic(item.clone());
-                    let pred = self.exec_block(&sub.body)?;
-                    self.scope_pop_hook();
+                    let pred = self.call_sub(
+                        &sub,
+                        vec![item.clone()],
+                        WantarrayCtx::Scalar,
+                        line,
+                    )?;
                     if !pred.is_true() {
                         break;
                     }
@@ -4250,10 +4257,9 @@ impl VMHelper {
             "drop_while" | "skip_while" => {
                 let mut i = 0usize;
                 while i < items.len() {
-                    self.scope_push_hook();
-                    self.scope.set_topic(items[i].clone());
-                    let pred = self.exec_block(&sub.body)?;
-                    self.scope_pop_hook();
+                    let it = items[i].clone();
+                    self.scope.set_topic(it.clone());
+                    let pred = self.call_sub(&sub, vec![it], WantarrayCtx::Scalar, line)?;
                     if !pred.is_true() {
                         break;
                     }
@@ -4269,10 +4275,13 @@ impl VMHelper {
             "reject" => {
                 let mut out = Vec::new();
                 for item in items {
-                    self.scope_push_hook();
                     self.scope.set_topic(item.clone());
-                    let pred = self.exec_block(&sub.body)?;
-                    self.scope_pop_hook();
+                    let pred = self.call_sub(
+                        &sub,
+                        vec![item.clone()],
+                        WantarrayCtx::Scalar,
+                        line,
+                    )?;
                     if !pred.is_true() {
                         out.push(item);
                     }
@@ -4296,7 +4305,12 @@ impl VMHelper {
                 let mut no = Vec::new();
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let pred = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    let pred = self.call_sub(
+                        &sub,
+                        vec![item.clone()],
+                        WantarrayCtx::Scalar,
+                        line,
+                    )?;
                     if pred.is_true() {
                         yes.push(item);
                     } else {
@@ -4315,7 +4329,12 @@ impl VMHelper {
                 let mut best: Option<(PerlValue, PerlValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let key = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    let key = self.call_sub(
+                        &sub,
+                        vec![item.clone()],
+                        WantarrayCtx::Scalar,
+                        line,
+                    )?;
                     best = Some(match best {
                         None => (item, key),
                         Some((bv, bk)) => {
@@ -4333,7 +4352,12 @@ impl VMHelper {
                 let mut best: Option<(PerlValue, PerlValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let key = self.call_sub(&sub, vec![], WantarrayCtx::Scalar, line)?;
+                    let key = self.call_sub(
+                        &sub,
+                        vec![item.clone()],
+                        WantarrayCtx::Scalar,
+                        line,
+                    )?;
                     best = Some(match best {
                         None => (item, key),
                         Some((bv, bk)) => {
@@ -10480,6 +10504,19 @@ impl VMHelper {
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
+                    // Coderef-in-block-position: `map $f, @l` calls `$f($_)`
+                    // when `$f` is a code reference. Skipped under `--compat`
+                    // (Perl semantics: re-evaluate expr per iteration as value).
+                    let val = if !crate::compat_mode() {
+                        if let Some(sub) = val.as_code_ref() {
+                            let sub = sub.clone();
+                            self.call_sub(&sub, vec![item.clone()], WantarrayCtx::List, line)?
+                        } else {
+                            val
+                        }
+                    } else {
+                        val
+                    };
                     result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 if ctx == WantarrayCtx::List {
@@ -10548,6 +10585,19 @@ impl VMHelper {
                 for item in items {
                     self.scope.set_topic(item.clone());
                     let val = self.eval_expr(expr)?;
+                    // Coderef-in-block-position: `grep $f, @l` calls `$f($_)`
+                    // when `$f` is a code reference, then filters by truthiness
+                    // of the call result. Skipped under `--compat`.
+                    let val = if !crate::compat_mode() {
+                        if let Some(sub) = val.as_code_ref() {
+                            let sub = sub.clone();
+                            self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?
+                        } else {
+                            val
+                        }
+                    } else {
+                        val
+                    };
                     let keep = if let Some(re) = val.as_regex() {
                         re.is_match(&item.to_string())
                     } else {
@@ -10578,8 +10628,12 @@ impl VMHelper {
                         };
                         let sub = sub.clone();
                         items.sort_by(|a, b| {
+                            // `set_sort_pair` keeps Perl-style `$a`/`$b` package-
+                            // global access for `sub cmp { $a <=> $b }`. Passing
+                            // `(a, b)` as positional args lets stryke lambdas
+                            // `fn ($a, $b) { $b <=> $a }` receive them via @_.
                             self.scope.set_sort_pair(a.clone(), b.clone());
-                            match self.call_sub(&sub, vec![], ctx, line) {
+                            match self.call_sub(&sub, vec![a.clone(), b.clone()], ctx, line) {
                                 Ok(v) => {
                                     let n = v.to_int();
                                     if n < 0 {

@@ -19,12 +19,12 @@ fn Rosetta::DB::test() {
     $rows
 }
 
-my $res = Rosetta::DB::test()
+my @res = Rosetta::DB::test()
 
 # Should have 2 rows: Quicksort and N-Queens
-assert_eq cnt($res), 2, "sqlite row count"
-assert_eq $res->[0]->{name}, "Quicksort", "sqlite row 0 name"
-assert_eq $res->[1]->{name}, "N-Queens", "sqlite row 1 name"
+assert_eq cnt(@res), 2, "sqlite row count"
+assert_eq $res[0]{name}, "Quicksort", "sqlite row 0 name"
+assert_eq $res[1]{name}, "N-Queens", "sqlite row 1 name"
 
 # Test last_insert_rowid if supported (I saw it in native_data.rs)
 my $db = sqlite(":memory:")

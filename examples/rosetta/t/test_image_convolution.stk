@@ -51,15 +51,15 @@ my $kernel = [
     [0.111, 0.111, 0.111]
 ]
 
-my $res = Rosetta::ImageConvolution::convolve($img, $kernel)
+my @res = Rosetta::ImageConvolution::convolve($img, $kernel)
 
 # Center pixel should be (50 + 8*10) / 9 = 130 / 9 = 14.444
-my $center = $res->[1][1]
+my $center = $res[1][1]
 assert_ok abs($center - 14.444) < 0.1, "Center pixel blurred correctly"
 
 # Corner pixel 0,0: overlaps with 4 pixels of the image
 # (10 + 10 + 10 + 50) / 9 = 80 / 9 = 8.888
-my $corner = $res->[0][0]
+my $corner = $res[0][0]
 assert_ok abs($corner - 8.888) < 0.1, "Corner pixel blurred correctly"
 
 test_run

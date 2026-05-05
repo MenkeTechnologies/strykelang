@@ -3,7 +3,7 @@
 
 # A generator of powers of $m
 fn Rosetta::GenExp::power_gen($m) {
-    my $n = 0
+    mysync $n = 0
     fn {
         my $res = $m ** $n
         $n++
@@ -16,7 +16,7 @@ fn Rosetta::GenExp::power_gen($m) {
 # by yielding.
 # We can create a sequence generator from a function.
 fn Rosetta::GenExp::seq_gen($func) {
-    my $n = 0
+    mysync $n = 0
     fn {
         my $res = $func->($n)
         $n++

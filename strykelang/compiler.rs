@@ -224,6 +224,10 @@ pub struct Compiler {
     /// closure-write check (DESIGN-001) can detect outer-scope `my`
     /// writes. Map/grep/sort blocks are NOT in this set.
     sub_body_block_indices: std::collections::HashSet<u16>,
+    /// Per-block signature params (parallel to `chunk.blocks`) used by the
+    /// 4th-pass compile to register CodeRef params in the new sub-body
+    /// scope layer.
+    code_ref_block_params: Vec<Vec<crate::ast::SubSigParam>>,
     /// Snapshot of `scope_stack` taken when each block was added. The 4th pass
     /// (`compile_program`) defers map/grep/sort block compilation until after
     /// every sub body has finished, by which point the parent scope_stack has
@@ -312,6 +316,7 @@ impl Compiler {
             force_name_for_sort_pair: false,
             sort_pair_block_indices: std::collections::HashSet::new(),
             sub_body_block_indices: std::collections::HashSet::new(),
+            code_ref_block_params: Vec::new(),
             block_scope_snapshots: Vec::new(),
         }
     }
@@ -596,6 +601,43 @@ impl Compiler {
             is_sub_body: true,
             ..Default::default()
         });
+    }
+
+    /// Register a signature parameter (`fn foo($x, @args, %opts) { ... }`) in
+    /// the current scope layer so the closure-write check (DESIGN-001)
+    /// recognises writes to the param as local — not outer-scope `my`.
+    fn register_sig_param(&mut self, p: &crate::ast::SubSigParam) {
+        use crate::ast::SubSigParam;
+        let layer = self.scope_stack.last_mut().expect("scope stack");
+        match p {
+            SubSigParam::Scalar(name, _, _) => {
+                layer.declared_scalars.insert(name.clone());
+            }
+            SubSigParam::Array(name, _) => {
+                layer.declared_arrays.insert(name.clone());
+            }
+            SubSigParam::Hash(name, _) => {
+                layer.declared_hashes.insert(name.clone());
+            }
+            SubSigParam::ArrayDestruct(elems) => {
+                for el in elems {
+                    match el {
+                        crate::ast::MatchArrayElem::CaptureScalar(n) => {
+                            layer.declared_scalars.insert(n.clone());
+                        }
+                        crate::ast::MatchArrayElem::RestBind(n) => {
+                            layer.declared_arrays.insert(n.clone());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            SubSigParam::HashDestruct(pairs) => {
+                for (_, var) in pairs {
+                    layer.declared_scalars.insert(var.clone());
+                }
+            }
+        }
     }
 
     fn pop_scope_layer(&mut self) {
@@ -1236,22 +1278,31 @@ impl Compiler {
         self.chunk.emit(Op::Halt, 0);
 
         // Third pass: compile sub bodies after Halt
-        let mut entries: Vec<(String, Vec<Statement>, String)> = Vec::new();
+        let mut entries: Vec<(String, Vec<Statement>, String, Vec<crate::ast::SubSigParam>)> = Vec::new();
         let mut pending_pkg = String::new();
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Package { name } => pending_pkg = name.clone(),
-                StmtKind::SubDecl { name, body, .. } => {
-                    entries.push((name.clone(), body.clone(), pending_pkg.clone()));
+                StmtKind::SubDecl { name, body, params, .. } => {
+                    entries.push((name.clone(), body.clone(), pending_pkg.clone(), params.clone()));
                 }
                 _ => {}
             }
         }
 
-        for (name, body, sub_pkg) in &entries {
+        for (name, body, sub_pkg, params) in &entries {
             let saved_pkg = self.current_package.clone();
             self.current_package = sub_pkg.clone();
             self.push_scope_layer_with_slots();
+            // Register signature parameters in the new scope layer so the
+            // closure-write check (DESIGN-001) recognises writes to params
+            // as local — not outer-scope `my`. Without this, mutating a
+            // sub parameter inside a `for` block (or any nested
+            // statement-block) would falsely trigger the closure-write
+            // diagnostic.
+            for p in params {
+                self.register_sig_param(p);
+            }
             let entry_ip = self.chunk.len();
             let q = self.qualify_sub_key(name);
             let name_idx = self.chunk.intern_name(&q);
@@ -1314,6 +1365,13 @@ impl Compiler {
                     is_sub_body: true,
                     ..Default::default()
                 });
+                // Register the closure's signature params in the new layer
+                // so the closure-write check sees them as locally declared.
+                if let Some(params) = self.code_ref_block_params.get(i).cloned() {
+                    for p in &params {
+                        self.register_sig_param(p);
+                    }
+                }
             }
             let result = self.try_compile_block_region(&b);
             self.force_name_for_sort_pair = false;
@@ -5593,18 +5651,17 @@ impl Compiler {
                     }
                     "any" | "all" | "none" | "first" | "take_while" | "drop_while" | "tap"
                     | "peek" => {
-                        // Two shapes: `any { BLOCK } @list` (2 args) and the slurpy
-                        // `(&@)` form `any(fn { ... }, 1, 2, 3)` (N >= 1 args). Both
-                        // start with a coderef; the rest is evaluated in list context.
+                        // Three shapes:
+                        //   `any { BLOCK } @list`           — block form
+                        //   `any(fn { ... }, 1, 2, 3)`      — slurpy `(&@)` form
+                        //   `any($coderef, @list)`          — coderef-in-block-position
+                        //   `any($f, @list)` (no parens)    — same, runtime dispatch
+                        // Builtin runtime checks `as_code_ref()` and dispatches; if
+                        // the first arg isn't a coderef the builtin uses its
+                        // value-shape semantics. Compiler stays out of the way.
                         if args.is_empty() {
                             return Err(CompileError::Unsupported(
                             "any/all/none/first/take_while/drop_while/tap/peek expect BLOCK, LIST"
-                                .into(),
-                        ));
-                        }
-                        if !matches!(&args[0].kind, ExprKind::CodeRef { .. }) {
-                            return Err(CompileError::Unsupported(
-                            "any/all/none/first/take_while/drop_while/tap/peek: first argument must be a { BLOCK }"
                                 .into(),
                         ));
                         }
@@ -6636,6 +6693,22 @@ impl Compiler {
             // ── Eval / Do / Require ──
             ExprKind::Eval(e) => {
                 self.compile_expr(e)?;
+                // `eval { BLOCK }` runs synchronously and is intentionally
+                // shared-state with the enclosing scope (it's used for error
+                // catching, not stored as a closure value). Un-mark the
+                // CodeRef's block so the closure-write check (DESIGN-001)
+                // doesn't fire on writes to outer-scope `my` from inside
+                // the eval body.
+                if let ExprKind::CodeRef { .. } = &e.kind {
+                    if let Some(max_idx) = self
+                        .sub_body_block_indices
+                        .iter()
+                        .copied()
+                        .max()
+                    {
+                        self.sub_body_block_indices.remove(&max_idx);
+                    }
+                }
                 self.emit_op(Op::CallBuiltin(BuiltinId::Eval as u16, 1), line, Some(root));
             }
             ExprKind::Do(e) => {
@@ -7050,6 +7123,13 @@ impl Compiler {
             ExprKind::CodeRef { body, params } => {
                 let block_idx = self.add_deferred_block(body.clone());
                 self.sub_body_block_indices.insert(block_idx);
+                // Stash params alongside the block index so the 4th-pass
+                // compile can register them in the new sub-body layer (so
+                // the closure-write check sees them as locally declared).
+                while self.code_ref_block_params.len() <= block_idx as usize {
+                    self.code_ref_block_params.push(Vec::new());
+                }
+                self.code_ref_block_params[block_idx as usize] = params.clone();
                 let sig_idx = self.chunk.add_code_ref_sig(params.clone());
                 self.emit_op(Op::MakeCodeRef(block_idx, sig_idx), line, Some(root));
             }
