@@ -17,6 +17,12 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-015** — `"Inf"` / `"Infinity"` / `"NaN"` strings (case-
+  insensitive, optional leading sign) now numify to actual float
+  specials. `format_float` also prints `Inf` / `-Inf` / `NaN` (Perl's
+  capitalization) instead of libc's lowercase default. Covers
+  `"Inf" + 1`, `9 ** 9 ** 9`, `sqrt(-1)`, `log(0)`, `log(-1)`, and
+  `0 ** -1`, all matching Perl 5.42 exactly.
 - **BUG-025, BUG-050** — `$SIG{__WARN__}` / `$SIG{__DIE__}` handlers now
   fire (commit 3669fb30a3).
 - **BUG-017, BUG-034, BUG-049, PARITY-006, PARITY-007** — sprintf `+` /
@@ -712,23 +718,22 @@ Tests: `printf_plus_flag_ignored_today`.
 Severity: **bug** (low impact). Affects readable signed output.
 
 
-## PARITY-015 — `"Inf"` and `"NaN"` strings numify to 0
+## PARITY-015 — `"Inf"` and `"NaN"` strings numify to 0 — **FIXED**
 
-```sh
-$ stryke -e 'print "Inf" + 1, "/", "NaN" + 0'
-1/0
-$ perl   -e 'print "Inf" + 1, "/", "NaN" + 0'
-Inf/NaN
-```
+`parse_number` now recognises `Inf` / `Infinity` / `NaN` (case-insensitive,
+optional leading `+` / `-`) at the start of `value::parse_number` before the
+regular numeric tokenizer runs. `format_float` also short-circuits NaN /
+±Infinity to print `"NaN"` / `"Inf"` / `"-Inf"` instead of the libc lowercase
+default — matching Perl across `9 ** 9 ** 9`, `sqrt(-1)`, `log(0)`, `log(-1)`,
+and `0 ** -1`.
 
-Float overflow produces `"inf"` (e.g. `9 ** 9 ** 9`) and `sqrt(-1)` produces
-`"nan"`, so the float internals support specials — only the string-to-num
-parser doesn't recognise them.
+Tests: `numeric_inf_string_becomes_infinity` (covering `"Inf"`, `"inf"`,
+`"Infinity"`, `"-Inf"`, `"+Inf"`, `"NaN"`, `"nan"`),
+`numeric_overflow_yields_inf`, `sqrt_negative_yields_nan`,
+`log_zero_is_negative_infinity`, `log_negative_one_is_nan`,
+`zero_to_negative_one_is_inf`.
 
-Tests: `numeric_inf_string_does_not_become_infinity_today`,
-`numeric_overflow_yields_inf`, `sqrt_negative_yields_nan`.
-
-Severity: **parity**.
+Severity: **parity** (FIXED).
 
 
 ## BUG-018 — `local $/` does not enable slurp mode
