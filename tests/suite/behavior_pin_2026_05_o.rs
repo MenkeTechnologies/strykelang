@@ -217,16 +217,17 @@ fn block_at_prototype_with_trailing_args_evaluates_trailing_as_statements_today(
 }
 
 #[test]
-fn coderef_call_with_named_array_arg_loses_args_today() {
-    // BUG-037 broader: passing `@args` to a captured `$cb` ref from inside a
-    // sub body collapses the array. `$cb->(@args)` reaches `$cb` as if no
-    // args were passed; `$_[0]` is undef → multiplied = 0.
+fn coderef_call_with_named_array_arg_passes_through() {
+    // Was BUG-037-related: passing `@args` to a captured `$cb` ref from
+    // inside a sub body. After BUG-090 (`my ($cb, @args) = @_` slurpy
+    // destructure) was fixed, `@args = (5)` and `$cb->(@args)` now
+    // delivers $_[0]=5 to the coderef → 5 * 2 = 10.
     assert_eq!(
         eval_int(
             r#"sub myff { my ($cb, @args) = @_; $cb->(@args) }
                myff(sub { ($_[0] // 0) * 2 }, 5)"#
         ),
-        0
+        10
     );
 }
 
@@ -352,22 +353,14 @@ fn use_constant_evaluated_at_definition_time() {
 // ── Explicit-paren call form for `(&@)` ────────────────────────────────────
 
 #[test]
-fn destructuring_my_scalar_array_returns_full_at_underscore_today() {
-    // BUG-095: `my ($cb, @rest) = @_` should bind $cb to the first element
-    // of @_ and @rest to the remainder. Stryke binds $cb correctly but
-    // @rest captures the FULL @_ (including the first element), so
-    // `$rest[0]` is `$cb`.
+fn destructuring_my_scalar_array_takes_at_underscore_tail() {
+    // BUG-090 / BUG-095 FIXED: `my ($cb, @rest) = @_` binds $cb to the
+    // first element and @rest to the tail (5, 7) — not the full @_.
     let out = eval_string(
-        r#"sub myff { my ($cb, @rest) = @_; ref(\$rest[0]) . ":" . scalar(@rest) }
+        r#"sub myff { my ($cb, @rest) = @_; "@rest/" . scalar(@rest) }
            myff(sub { 1 }, 5, 7)"#,
     );
-    // First @rest entry is a SCALAR ref to a CODE value; @rest has all 3
-    // elements (cb + 5 + 7), not just (5, 7).
-    assert!(
-        out.starts_with("SCALAR:") && out.ends_with(":3"),
-        "expected destructuring leak, got {:?}",
-        out
-    );
+    assert_eq!(out, "5 7/2");
 }
 
 // ── intercept_remove on missing kind no-ops ────────────────────────────────

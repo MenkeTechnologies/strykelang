@@ -100,6 +100,10 @@ pub enum Op {
     /// Pop index spec (scalar or array from [`Op::Range`]); push one `PerlValue::array` of elements
     /// read from the named array. Used for `@name[...]` slice rvalues.
     ArraySlicePart(u16),
+    /// Push `array[start..]` as a `PerlValue::array`. Used for slurpy-tail
+    /// destructure: `my ($a, $b, @rest) = LIST` reads `tmp[2..]` into
+    /// `@rest`. (BUG-090) — operands: `(name_idx, start)`.
+    GetArrayFromIndex(u16, u16),
     /// Pop `b`, pop `a` (arrays); push concatenation `a` followed by `b` (Perl slice / list glue).
     ArrayConcatTwo,
     /// `exists $a[$i]` — stack: `[index]` → 0/1 (stash-qualified array name pool index).

@@ -9696,6 +9696,18 @@ impl Parser {
                         kind: ExprKind::ScalarVar("_".into()),
                         line: self.peek_line(),
                     }
+                } else if matches!(self.peek(), Token::LParen)
+                    && matches!(self.peek_at(1), Token::RParen)
+                {
+                    // `rev()` — empty parens default to `$_` (matches Perl's
+                    // `length()` / `uc()` etc. and the `|> rev()` pipe form).
+                    let pl = self.peek_line();
+                    self.advance(); // (
+                    self.advance(); // )
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: pl,
+                    }
                 } else {
                     self.parse_one_arg()?
                 };
