@@ -17,6 +17,12 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-090** — `my ($head, @tail) = LIST` (and the canonical
+  `my ($self, @args) = @_` sub-arg idiom) now binds `@tail` to the
+  *tail* of the list, not the full list. New `Op::GetArrayFromIndex`
+  reads `tmp[start..]` for the slurpy decl. Hash variant
+  `my ($a, %h) = (...)` builds `%h` from the tail's alternating
+  key-value pairs.
 - **BUG-009** — `exists $h{x}{y}{z}` and `exists $a[5][0]` now soft-fail
   to 0 at any missing or non-container intermediate level (was: erroring
   with "exists argument is not a HASH/ARRAY reference"). Multi-level
@@ -2436,28 +2442,27 @@ Severity: **bug** (very high impact). Combined with BUG-095 (slurpy
 destructure leak) this breaks most stateful HOF patterns.
 
 
-## BUG-090 — Slurpy `@rest` / `%rest` in destructure captures the FULL list
+## BUG-090 — Slurpy `@rest` / `%rest` in destructure captures the FULL list — **FIXED**
 
-```sh
-$ stryke -e 'my ($a, $b, @rest) = (1, 2, 3, 4, 5); print scalar @rest'
-5                              # @rest captured all 5; should be 3
-$ stryke -e 'my ($a, %h) = (1, "k1", "v1", "k2", "v2"); print scalar keys %h'
-2                              # keys "1" and "v1" — slurped from offset 0
-```
+`compile_var_declarations` was emitting `Op::GetArray(tmp)` for every
+slurpy position regardless of where in the list it sat. New
+`Op::GetArrayFromIndex(name_idx, start)` pushes `tmp[start..]` and the
+compiler emits it for the slurpy `@rest` / `%rest` decl, with `start`
+set to the decl's index in the destructure pattern. Single-scalar leads
+(`my ($a, @rest) = …`) and multi-scalar leads (`my ($a, $b, $c, @rest)
+= …`) all read the correct tail now. Hash slurp gets the same treatment
+— `my ($a, %h) = (1, k1, v1, k2, v2)` builds `%h` from `tmp[1..]` as
+alternating key-value pairs.
 
-Stryke binds the leading scalars correctly but the slurpy `@`/`%`
-captures starting from index 0, not from the position implied by the
-preceding scalars. Pure-scalar destructure (`my ($a, $b) = ...`) and
-explicit `shift; shift; my @rest = @_` both work.
+Tests: `slurpy_array_destructure_from_literal_list_takes_tail` (was
+`_captures_all_today`), `slurpy_array_destructure_from_at_underscore_takes_tail`,
+`slurpy_hash_destructure_takes_tail`,
+`destructuring_my_scalar_array_takes_at_underscore_tail`,
+`coderef_call_with_named_array_arg_passes_through` (the canonical
+`my ($cb, @args) = @_; $cb->(@args)` idiom now propagates args).
 
-Tests: `slurpy_array_destructure_from_literal_list_captures_all_today`,
-`slurpy_array_destructure_from_at_underscore_captures_all_today`,
-`slurpy_hash_destructure_captures_all_today`,
-`pure_scalar_destructure_works`,
-`shift_then_shift_extracts_correctly`.
-
-Severity: **bug** (very high impact — breaks every `($head, @tail) =
-@_` idiom across the codebase).
+Severity: **bug** (FIXED — affected every `($head, @tail) = @_`
+idiom across the codebase).
 
 
 ## BUG-097 — `print {$fh} ...` braces form does not honor the filehandle
