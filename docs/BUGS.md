@@ -2536,6 +2536,34 @@ Tests: `to_json_two_arg_pretty_form_serializes_as_array_today`.
 Severity: **bug** (low impact; rarely needed for machine-read JSON).
 
 
+## BUG-107 — `"$Pkg::Var"` interpolation drops the package prefix
+
+```sh
+$ stryke -e 'package Foo; our $bar = "hello"; package main; print "[$Foo::bar]"'
+[::bar]                              # `Foo` part lost
+$ stryke -e 'package Foo; our $bar = "hello"; package main; print $Foo::bar'
+hello                                # bare-code path works
+$ perl   -e '...'
+[hello]                              # Perl interpolates correctly
+```
+
+The interpolation parser stops at the first non-identifier character of
+`$Foo` and treats `::bar` as a literal suffix. Workarounds:
+
+- Bare-code form: `print $Foo::bar` (no string interpolation)
+- `${\ EXPR }` escape: works in CLI direct print
+  (`print "${\\\$Foo::bar}"`) but is empty when assigned into a string
+  via the library `eval` API. The most reliable workaround is to copy
+  to a same-package lexical first: `my $copy = $Foo::bar; "$copy"`.
+
+Tests: `package_qualified_scalar_interpolates_with_dropped_prefix_today`,
+`package_qualified_scalar_in_bare_code_works`,
+`package_qualified_scalar_via_code_deref_in_lib_eval_returns_empty_today`.
+
+Severity: **bug** (parser; common idiom for accessing module-level vars
+in error messages and logs).
+
+
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
 
 These are known design choices, listed here so a future contributor doesn't
