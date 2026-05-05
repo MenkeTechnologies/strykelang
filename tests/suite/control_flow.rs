@@ -62,10 +62,11 @@ fn foreach_uses_default_dollar_underscore() {
 }
 
 /// Bare `name;` / `{ name }` is a call with no explicit args; `@_` is `($_)` in the loop.
+/// `$acc` is `mysync` because the named function `add` mutates it (DESIGN-001).
 #[test]
 fn foreach_bareword_stmt_calls_sub_with_topic() {
     assert_eq!(
-        eval_int("my $acc = 0; fn add { $acc = $acc + shift } for (1, 2, 3) { add } $acc"),
+        eval_int("mysync $acc = 0; fn add { $acc = $acc + shift } for (1, 2, 3) { add } $acc"),
         6
     );
 }

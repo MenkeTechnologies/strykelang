@@ -97,9 +97,11 @@ fn typed_my_rejects_wrong_type() {
 
 #[test]
 fn par_pipeline_counts_last_stage() {
+    // `$n` is `mysync` because the source closure mutates it across
+    // parallel-pipeline calls (DESIGN-001 — atomic shared cell).
     assert_eq!(
         eval_string(
-            r#"my $n = 0;
+            r#"mysync $n = 0;
             par_pipeline(
                 source => fn { $n++; $n <= 3 ? $n : undef },
                 stages => [ fn { $_ * 2 } ],
@@ -301,9 +303,11 @@ fn par_pipeline_stream_bare_block_syntax() {
 /// Streaming pipeline with named form (source => CODE, stages => [...], workers => [...]).
 #[test]
 fn par_pipeline_stream_named_form() {
+    // `mysync $n` for the same reason as `par_pipeline_counts_last_stage` —
+    // shared mutable counter across parallel-pipeline calls.
     assert_eq!(
         eval_string(
-            r#"my $n = 0;
+            r#"mysync $n = 0;
             par_pipeline_stream(
                 source => fn { $n++; $n <= 5 ? $n : undef },
                 stages => [ fn { $_ * 10 } ],

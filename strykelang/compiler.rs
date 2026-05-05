@@ -134,6 +134,16 @@ struct ScopeLayer {
     mysync_arrays: HashSet<String>,
     /// `mysync %name` — same as [`Self::mysync_arrays`].
     mysync_hashes: HashSet<String>,
+    /// `mysync $name` — opt-in shared closure capture (Arc-cell). Closures may
+    /// freely mutate these; default `my` scalars trigger a compile-time error
+    /// if a closure writes to them from inside a sub body. (DESIGN-001)
+    mysync_scalars: HashSet<String>,
+    /// True when this layer was entered for an anonymous-or-named sub body
+    /// (`sub { ... }` / `fn { ... }` / `sub foo { ... }`). Used by the
+    /// closure-write check to detect when a write crosses a sub-body
+    /// boundary (DESIGN-001). False for `map`/`grep`/`sort` block layers
+    /// (those are not closures in the value-snapshot sense).
+    is_sub_body: bool,
 }
 
 /// Loop context for resolving `last`/`next` jumps.
@@ -208,6 +218,12 @@ pub struct Compiler {
     /// comparator bodies that bind `$a`/`$b` magic globals. The deferred 4th pass
     /// turns on [`Self::force_name_for_sort_pair`] only for these blocks.
     sort_pair_block_indices: std::collections::HashSet<u16>,
+    /// Block indices that came from an anonymous-or-named sub-body
+    /// (`sub { ... }` / `fn { ... }`). The 4th-pass compile pushes a
+    /// `is_sub_body: true` scope layer before compiling these so the
+    /// closure-write check (DESIGN-001) can detect outer-scope `my`
+    /// writes. Map/grep/sort blocks are NOT in this set.
+    sub_body_block_indices: std::collections::HashSet<u16>,
     /// Snapshot of `scope_stack` taken when each block was added. The 4th pass
     /// (`compile_program`) defers map/grep/sort block compilation until after
     /// every sub body has finished, by which point the parent scope_stack has
@@ -295,6 +311,7 @@ impl Compiler {
             strict_vars: false,
             force_name_for_sort_pair: false,
             sort_pair_block_indices: std::collections::HashSet::new(),
+            sub_body_block_indices: std::collections::HashSet::new(),
             block_scope_snapshots: Vec::new(),
         }
     }
@@ -576,6 +593,7 @@ impl Compiler {
     fn push_scope_layer_with_slots(&mut self) {
         self.scope_stack.push(ScopeLayer {
             use_slots: true,
+            is_sub_body: true,
             ..Default::default()
         });
     }
@@ -857,6 +875,58 @@ impl Compiler {
                     });
                 }
                 return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// Closure-write rule (DESIGN-001): writing to an outer-scope `my $x`
+    /// from inside a sub body silently mutates only the closure's snapshot
+    /// — the outer scope keeps its own value, which is almost always a
+    /// bug. Reject at compile time and point the user at `mysync $x` (for
+    /// shared mutable state) or `--compat` (for Perl 5 shared semantics).
+    ///
+    /// Returns Ok(()) when:
+    ///   - `name` is declared in the innermost sub-body layer (locally owned).
+    ///   - `name` is `mysync` (atomic shared cell — safe to mutate).
+    ///   - `name` is `our` (package global — explicitly cross-scope state).
+    ///   - `--compat` mode is active (Perl 5 shared-storage semantics).
+    ///   - `name` is undeclared (caught by strict-vars elsewhere).
+    fn check_closure_write_to_outer_my(
+        &self,
+        name: &str,
+        line: usize,
+    ) -> Result<(), CompileError> {
+        if crate::compat_mode() {
+            return Ok(());
+        }
+        // Walk innermost-first. Look for the boundary: any layer between us
+        // and the declaring layer that is a sub body (`is_sub_body`) means
+        // the variable was declared outside the closure we're currently in.
+        let mut crossed_sub_body = false;
+        for layer in self.scope_stack.iter().rev() {
+            if layer.declared_scalars.contains(name) {
+                if !crossed_sub_body {
+                    return Ok(());
+                }
+                if layer.mysync_scalars.contains(name) {
+                    return Ok(());
+                }
+                if layer.declared_our_scalars.contains(name) {
+                    return Ok(());
+                }
+                return Err(CompileError::Frozen {
+                    line,
+                    detail: format!(
+                        "cannot modify outer-scope `my ${name}` from inside a closure — \
+                         stryke closures capture by value to keep parallel dispatch race-free. \
+                         Use `mysync ${name}` for shared mutable state, or `--compat` for Perl 5 \
+                         shared-storage semantics"
+                    ),
+                });
+            }
+            if layer.is_sub_body {
+                crossed_sub_body = true;
             }
         }
         Ok(())
@@ -1232,10 +1302,42 @@ impl Compiler {
             // any outer `my $a`/`my $b` slot binding doesn't shadow the per-iter values.
             let is_sort_pair = self.sort_pair_block_indices.contains(&(i as u16));
             self.force_name_for_sort_pair = is_sort_pair;
+            // Sub-body blocks (`sub { ... }` / `fn { ... }`): push a fresh
+            // `is_sub_body: true` layer so the closure-write check
+            // (DESIGN-001) can flag outer-scope `my` writes from inside the
+            // body. Map/grep/sort blocks don't push this layer — they share
+            // the enclosing scope normally.
+            let pushed_sub_body = self.sub_body_block_indices.contains(&(i as u16));
+            if pushed_sub_body {
+                self.scope_stack.push(ScopeLayer {
+                    use_slots: true,
+                    is_sub_body: true,
+                    ..Default::default()
+                });
+            }
             let result = self.try_compile_block_region(&b);
             self.force_name_for_sort_pair = false;
-            if let Ok(range) = result {
-                self.chunk.block_bytecode_ranges[i] = Some(range);
+            if pushed_sub_body {
+                self.scope_stack.pop();
+            }
+            match result {
+                Ok(range) => {
+                    self.chunk.block_bytecode_ranges[i] = Some(range);
+                }
+                Err(CompileError::Frozen { .. }) => {
+                    // Real error (e.g. closure-write to outer-`my`,
+                    // assignment to `frozen` binding). Restore scope and
+                    // propagate.
+                    if let Some(orig) = saved_scope_stack {
+                        self.scope_stack = orig;
+                    }
+                    return Err(result.unwrap_err());
+                }
+                Err(CompileError::Unsupported(_)) => {
+                    // Block lowering not yet supported — leave the
+                    // bytecode_ranges entry as None; runtime will fall
+                    // back to AST execution of the block body.
+                }
             }
             if let Some(orig) = saved_scope_stack {
                 self.scope_stack = orig;
@@ -1799,6 +1901,9 @@ impl Compiler {
                     let name_idx = self.chunk.intern_name(&decl.name);
                     self.register_declare(Sigil::Scalar, &decl.name, false);
                     self.chunk.emit(Op::DeclareMySyncScalar(name_idx), line);
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.mysync_scalars.insert(decl.name.clone());
+                    }
                 }
                 Sigil::Array => {
                     let stash = self.qualify_stash_array_name(&decl.name);
@@ -3330,6 +3435,7 @@ impl Compiler {
                 UnaryOp::PreIncrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
+                        self.check_closure_write_to_outer_my(name, line)?;
                         let idx = self.intern_scalar_var_for_ops(name);
                         self.emit_pre_inc(idx, line, Some(root));
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
@@ -3521,6 +3627,7 @@ impl Compiler {
                 UnaryOp::PreDecrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_scalar_mutable(name, line)?;
+                        self.check_closure_write_to_outer_my(name, line)?;
                         let idx = self.intern_scalar_var_for_ops(name);
                         self.emit_pre_dec(idx, line, Some(root));
                     } else if let ExprKind::ArrayElement { array, index } = &expr.kind {
@@ -3729,6 +3836,7 @@ impl Compiler {
             ExprKind::PostfixOp { expr, op } => {
                 if let ExprKind::ScalarVar(name) = &expr.kind {
                     self.check_scalar_mutable(name, line)?;
+                    self.check_closure_write_to_outer_my(name, line)?;
                     let idx = self.intern_scalar_var_for_ops(name);
                     match op {
                         PostfixOp::Increment => {
@@ -5168,9 +5276,25 @@ impl Compiler {
                                 "defer__internal expects exactly one argument".into(),
                             ));
                         }
-                        // Compile the coderef argument
+                        // Compile the coderef argument; afterwards, un-mark
+                        // the defer block as a sub-body so the closure-write
+                        // check (DESIGN-001) doesn't flag mutations of outer
+                        // `my` vars from inside `defer { ... }`. defer runs
+                        // synchronously at scope exit and is intentionally
+                        // shared-state with the enclosing scope.
                         self.compile_expr(&args[0])?;
-                        // Register it for execution on scope exit
+                        if let ExprKind::CodeRef { .. } = &args[0].kind {
+                            // The most-recently-pushed CodeRef block index is
+                            // the highest one in `sub_body_block_indices`.
+                            if let Some(max_idx) = self
+                                .sub_body_block_indices
+                                .iter()
+                                .copied()
+                                .max()
+                            {
+                                self.sub_body_block_indices.remove(&max_idx);
+                            }
+                        }
                         self.emit_op(Op::DeferBlock, line, Some(root));
                     }
                     "deque" => {
@@ -6925,6 +7049,7 @@ impl Compiler {
             }
             ExprKind::CodeRef { body, params } => {
                 let block_idx = self.add_deferred_block(body.clone());
+                self.sub_body_block_indices.insert(block_idx);
                 let sig_idx = self.chunk.add_code_ref_sig(params.clone());
                 self.emit_op(Op::MakeCodeRef(block_idx, sig_idx), line, Some(root));
             }
@@ -7826,6 +7951,7 @@ impl Compiler {
             ExprKind::ScalarVar(name) => {
                 self.check_strict_scalar_access(name, line)?;
                 self.check_scalar_mutable(name, line)?;
+                self.check_closure_write_to_outer_my(name, line)?;
                 let idx = self.intern_scalar_var_for_ops(name);
                 if keep {
                     self.emit_set_scalar_keep(idx, line, ast);
