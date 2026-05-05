@@ -5,13 +5,12 @@ fn Rosetta::NegativeBase::encode($n, $b) {
     return "0" if $n == 0
     my @digits
     my $x = $n
+    my $abs_b = $b < 0 ? -$b : $b
     while ($x != 0) {
-        my $r = $x % $b
-        $x = int($x / $b)
-        if ($r < 0) {
-            $r -= $b
-            $x += 1
-        }
+        # Non-negative residue in [0, |b|), regardless of Perl/C modulo flavor.
+        my $r = (($x % $abs_b) + $abs_b) % $abs_b
+        # Exact integer quotient: $x - $r is divisible by $b.
+        $x = ($x - $r) / $b
         push @digits, $r
     }
     @digits = rev @digits

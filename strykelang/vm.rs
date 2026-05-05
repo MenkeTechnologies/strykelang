@@ -3162,6 +3162,18 @@ impl<'a> VM<'a> {
                         self.push(PerlValue::array(out));
                         Ok(())
                     }
+                    Op::GetArrayFromIndex(idx, start) => {
+                        let n = names[*idx as usize].as_str();
+                        let arr = self.interp.scope.get_array(n);
+                        let start = *start as usize;
+                        let out: Vec<PerlValue> = if start >= arr.len() {
+                            Vec::new()
+                        } else {
+                            arr[start..].to_vec()
+                        };
+                        self.push(PerlValue::array(out));
+                        Ok(())
+                    }
                     Op::ArrayConcatTwo => {
                         let b = self.pop();
                         let a = self.pop();

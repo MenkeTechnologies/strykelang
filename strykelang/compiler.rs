@@ -1548,12 +1548,18 @@ impl Compiler {
                         let name_idx = self
                             .chunk
                             .intern_name(&self.qualify_stash_array_name(&decl.name));
-                        self.chunk.emit(Op::GetArray(tmp_name), line);
+                        // Slurpy `@rest` at position `i` takes `tmp[i..]` (the
+                        // tail), not the whole list. (BUG-090)
+                        self.chunk
+                            .emit(Op::GetArrayFromIndex(tmp_name, i as u16), line);
                         self.emit_declare_array(name_idx, line, frozen);
                     }
                     Sigil::Hash => {
                         let name_idx = self.chunk.intern_name(&decl.name);
-                        self.chunk.emit(Op::GetArray(tmp_name), line);
+                        // Slurpy `%rest` at position `i` takes `tmp[i..]`
+                        // pairs, not the whole list. (BUG-090)
+                        self.chunk
+                            .emit(Op::GetArrayFromIndex(tmp_name, i as u16), line);
                         self.emit_declare_hash(name_idx, line, frozen);
                     }
                     Sigil::Typeglob => {

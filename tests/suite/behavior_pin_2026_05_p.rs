@@ -119,39 +119,40 @@ fn closure_does_not_observe_outer_hash_extension_today() {
     );
 }
 
-// ── Destructuring: ($head, @tail) = @list slurps the FULL list today ────────
+// ── Destructuring: ($head, @tail) = LIST takes the tail (BUG-090 FIXED) ─────
 
 #[test]
-fn slurpy_array_destructure_from_literal_list_captures_all_today() {
-    // BUG-090: `my ($a, $b, @rest) = (1..5)` should bind $a=1, $b=2,
-    // @rest=(3,4,5). Stryke binds @rest=(1,2,3,4,5) — the full list.
+fn slurpy_array_destructure_from_literal_list_takes_tail() {
+    // BUG-090 FIXED: `my ($a, $b, @rest) = (1..5)` binds $a=1, $b=2,
+    // @rest=(3,4,5). Slurpy `@rest` at position 2 reads `tmp[2..]`.
     let out = eval_string(
         r#"my ($a, $b, @rest) = (1, 2, 3, 4, 5);
            "$a/$b/[@rest]/" . scalar(@rest)"#,
     );
-    assert_eq!(out, "1/2/[1 2 3 4 5]/5");
+    assert_eq!(out, "1/2/[3 4 5]/3");
 }
 
 #[test]
-fn slurpy_array_destructure_from_at_underscore_captures_all_today() {
-    // BUG-090b: same in sub @_ context.
+fn slurpy_array_destructure_from_at_underscore_takes_tail() {
+    // BUG-090b FIXED: same in sub @_ context — the canonical
+    // `($self, @args) = @_` idiom now works.
     let out = eval_string(
         r#"sub myff { my ($a, @rest) = @_; "$a/[@rest]/" . scalar(@rest) }
            myff(10, 20, 30, 40)"#,
     );
-    assert_eq!(out, "10/[10 20 30 40]/4");
+    assert_eq!(out, "10/[20 30 40]/3");
 }
 
 #[test]
-fn slurpy_hash_destructure_captures_all_today() {
-    // BUG-090c: hash variant — `my ($a, %h) = (1, k1=>"v1", k2=>"v2")`
-    // should bind $a=1 and %h=(k1=>v1, k2=>v2). Stryke slurps everything,
-    // making %h = (1=>k1, v1=>k2). Pin observed: keys are "1" and "v1".
+fn slurpy_hash_destructure_takes_tail() {
+    // BUG-090c FIXED: hash variant — `my ($a, %h) = (1, k1=>v1, k2=>v2)`
+    // binds $a=1 and %h=(k1=>v1, k2=>v2). Slurpy `%h` at position 1
+    // reads `tmp[1..]` as alternating key-value pairs.
     let out = eval_string(
         r#"my ($a, %h) = (1, "k1", "v1", "k2", "v2");
            "$a/" . join(",", sort keys %h)"#,
     );
-    assert_eq!(out, "1/1,v1");
+    assert_eq!(out, "1/k1,k2");
 }
 
 // ── Destructuring: pure scalar list works correctly ────────────────────────

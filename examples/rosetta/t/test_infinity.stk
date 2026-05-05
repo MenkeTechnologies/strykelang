@@ -7,8 +7,9 @@ fn Rosetta::Infinity::get_inf() {
 
 fn Rosetta::Infinity::is_inf($x) {
     # In Stryke, we can check if it's infinity by comparing with a large number
-    # or by stringifying.
-    "$x" eq "inf"
+    # or by stringifying. Stryke prints Perl-style "Inf" (capitalized) like
+    # Perl 5, not libc's lowercase "inf".
+    "$x" eq "Inf"
 }
 
 my $inf = Rosetta::Infinity::get_inf()

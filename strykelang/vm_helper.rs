@@ -19112,6 +19112,23 @@ impl VMHelper {
                         return Ok(r.read().get(&k).cloned().unwrap_or(PerlValue::UNDEF));
                     }
                 }
+                // Struct / class instance — look up the field by name and
+                // return its value. Without this, `exists $struct->{f}->{k}`
+                // soft-fails to false even when the field is a real hashref.
+                if let Some(s) = inner_val.as_struct_inst() {
+                    let k = self.eval_expr(index)?.to_string();
+                    if let Some(idx) = s.def.field_index(&k) {
+                        return Ok(s.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                    }
+                    return Ok(PerlValue::UNDEF);
+                }
+                if let Some(c) = inner_val.as_class_inst() {
+                    let k = self.eval_expr(index)?.to_string();
+                    if let Some(idx) = c.def.field_index(&k) {
+                        return Ok(c.get_field(idx).unwrap_or(PerlValue::UNDEF));
+                    }
+                    return Ok(PerlValue::UNDEF);
+                }
                 Ok(PerlValue::UNDEF)
             }
             ExprKind::ArrowDeref {
