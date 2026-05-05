@@ -411,23 +411,28 @@ fn hash_slice_with_array_var_keys_returns_empty_today() {
 // ── String numeric coercion ───────────────────────────────────────────────────
 
 #[test]
-fn numeric_inf_string_does_not_become_infinity_today() {
-    // PARITY-015: Perl 5 numifies `"Inf"` and `"NaN"` to actual float specials.
-    // Stryke gives 0.
-    assert_eq!(eval_int(r#""Inf" + 1"#), 1);
-    assert_eq!(eval_int(r#""NaN" + 0"#), 0);
+fn numeric_inf_string_becomes_infinity() {
+    // PARITY-015 FIXED: Perl 5 numifies "Inf"/"Infinity"/"NaN" (case-insensitive,
+    // optional sign) to actual float specials. Match that.
+    assert_eq!(eval_string(r#""Inf" + 1"#), "Inf");
+    assert_eq!(eval_string(r#""Infinity" + 1"#), "Inf");
+    assert_eq!(eval_string(r#""inf" + 1"#), "Inf");
+    assert_eq!(eval_string(r#""-Inf" + 1"#), "-Inf");
+    assert_eq!(eval_string(r#""+Inf" + 1"#), "Inf");
+    assert_eq!(eval_string(r#""NaN" + 0"#), "NaN");
+    assert_eq!(eval_string(r#""nan" + 0"#), "NaN");
 }
 
 #[test]
 fn numeric_overflow_yields_inf() {
-    // 9 ** 9 ** 9 overflows IEEE 754 — stryke returns "inf".
-    assert_eq!(eval_string("9 ** 9 ** 9"), "inf");
-    assert_eq!(eval_string("-(9 ** 9 ** 9)"), "-inf");
+    // 9 ** 9 ** 9 overflows IEEE 754 — Perl prints "Inf".
+    assert_eq!(eval_string("9 ** 9 ** 9"), "Inf");
+    assert_eq!(eval_string("-(9 ** 9 ** 9)"), "-Inf");
 }
 
 #[test]
 fn sqrt_negative_yields_nan() {
-    assert_eq!(eval_string("sqrt(-1)"), "nan");
+    assert_eq!(eval_string("sqrt(-1)"), "NaN");
 }
 
 // ── Math builtins ────────────────────────────────────────────────────────────

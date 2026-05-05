@@ -2694,6 +2694,25 @@ fn parse_number(s: &str) -> f64 {
     if s.is_empty() {
         return 0.0;
     }
+    // Perl 5.22+ recognizes "Inf" / "Infinity" / "NaN" (case-insensitive,
+    // optional leading sign) as float specials. We accept the same forms.
+    {
+        let bytes = s.as_bytes();
+        let (sign, rest) = match bytes.first() {
+            Some(b'+') => (1.0_f64, &s[1..]),
+            Some(b'-') => (-1.0_f64, &s[1..]),
+            _ => (1.0_f64, s),
+        };
+        if rest.eq_ignore_ascii_case("inf") || rest.eq_ignore_ascii_case("infinity") {
+            return sign * f64::INFINITY;
+        }
+        if rest.eq_ignore_ascii_case("nan") {
+            // Perl's sign on NaN is preserved through arithmetic; here we
+            // just return the canonical NaN bit pattern. Sign on NaN is
+            // not observable via `==` anyway.
+            return f64::NAN;
+        }
+    }
     // Perl extracts leading numeric portion
     let mut end = 0;
     let bytes = s.as_bytes();
@@ -2725,6 +2744,13 @@ fn parse_number(s: &str) -> f64 {
 }
 
 fn format_float(f: f64) -> String {
+    // Perl prints float specials as "Inf" / "-Inf" / "NaN".
+    if f.is_nan() {
+        return "NaN".to_string();
+    }
+    if f.is_infinite() {
+        return if f.is_sign_negative() { "-Inf".to_string() } else { "Inf".to_string() };
+    }
     if f.fract() == 0.0 && f.abs() < 1e16 {
         format!("{}", f as i64)
     } else {
@@ -4498,9 +4524,9 @@ mod tests {
         let v_int = PerlValue::integer(large_int);
         assert_eq!(v_int.to_string(), "10000000000");
 
-        // Float that needs boxing (e.g. Infinity)
+        // Float that needs boxing (e.g. Infinity); Perl prints "Inf".
         let v_inf = PerlValue::float(f64::INFINITY);
-        assert_eq!(v_inf.to_string(), "inf");
+        assert_eq!(v_inf.to_string(), "Inf");
     }
 
     #[test]
