@@ -62,10 +62,10 @@ fn die_with_blessed_object_preserves_class() {
 }
 
 #[test]
-fn ref_dollar_at_eq_string_precedence_today() {
-    // BUG-032: `ref $@ eq "MyErr"` parses as `ref ($@ eq "MyErr")` (named-unary
-    // arg eats the binary expression). Pin: with parens it works, without
-    // them it does not.
+fn ref_dollar_at_eq_string_precedence() {
+    // PARITY-016 FIXED: `ref $@ eq "MyErr"` now parses as `(ref $@) eq "MyErr"`
+    // — named-unary precedence sits above `eq`. With and without parens
+    // give the same result, matching Perl 5.
     let with_parens = eval_string(
         r#"package MyErr; sub new { bless {}, $_[0] }
            package main;
@@ -80,7 +80,7 @@ fn ref_dollar_at_eq_string_precedence_today() {
            eval { die MyErr->new };
            (ref $@ eq "MyErr") ? "Y" : "N""#,
     );
-    assert_eq!(without_parens, "N");
+    assert_eq!(without_parens, "Y");
 }
 
 // ── Nested eval propagation ──────────────────────────────────────────────────

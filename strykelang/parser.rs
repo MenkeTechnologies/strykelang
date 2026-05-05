@@ -9627,7 +9627,8 @@ impl Parser {
             }
             "rev" => {
                 // `rev` — context-aware reverse: string in scalar, list in list context.
-                // Defaults to $_ when no argument given.
+                // List-operator precedence (so `rev 1..3` parses as `rev(1..3)`, not
+                // `(rev 1)..3`). Defaults to $_ when no argument given.
                 // Only use pipe placeholder when directly in pipe RHS (not inside a block).
                 // RBrace means we're inside a block like `map { rev }` - use $_ default.
                 let a = if self.in_pipe_rhs()
@@ -9636,8 +9637,23 @@ impl Parser {
                         Token::Semicolon | Token::RParen | Token::Eof | Token::PipeForward
                     ) {
                     self.pipe_placeholder_list(line)
+                } else if matches!(
+                    self.peek(),
+                    Token::Semicolon
+                        | Token::RBrace
+                        | Token::RParen
+                        | Token::RBracket
+                        | Token::Eof
+                        | Token::Comma
+                        | Token::FatArrow
+                        | Token::PipeForward
+                ) {
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: self.peek_line(),
+                    }
                 } else {
-                    self.parse_one_arg_or_default()?
+                    self.parse_one_arg()?
                 };
                 Ok(Expr {
                     kind: ExprKind::Rev(Box::new(a)),
@@ -14140,7 +14156,11 @@ impl Parser {
                 line,
             });
         }
-        self.parse_one_arg()
+        // Named-unary precedence: parenless arg only goes down to shift level,
+        // so surrounding `eq` / `==` / `?:` / `&&` / `||` stay outside. Without
+        // this, `ref $x eq "FOO"` mis-parses as `ref ($x eq "FOO")`.
+        // (PARITY-016 — also fixes `length $s == 3 ? "Y" : "N"` etc.)
+        self.parse_named_unary_arg()
     }
 
     /// Array operand for `shift` / `pop`: default `@_`, or `shift(@a)` / `shift()` (empty parens = `@_`).
