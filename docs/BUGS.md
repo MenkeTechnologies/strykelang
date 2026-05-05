@@ -24,6 +24,12 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-002** — `(my $copy = $orig) =~ s///` and the matching
+  `tr///` form now bind the substitution to `$copy` (the freshly
+  declared variable inside the parens), leaving `$orig` untouched.
+  `assign_value` learned to recognize `MyExpr` as an lvalue and write
+  through to the declared variable's name slot without re-running the
+  initializer.
 - **PARITY-001** — magic string increment (`"b"++ → "c"`, `"Az"++ →
   "Ba"`, `"zz"++ → "aaa"`, `""++ → "1"`, `"a9"++ → "b0"`). Decrement
   has no magic counterpart in Perl 5 and stays numeric. Pure-digit
@@ -87,7 +93,7 @@ work; today it does not. Fix would live near the postfix-inc lowering on
 strings in `interpreter.rs` / `vm.rs`.
 
 
-## PARITY-002 — `(my $copy = $orig) =~ s///` / `=~ tr///` does not bind to the copy
+## PARITY-002 — `(my $copy = $orig) =~ s///` / `=~ tr///` does not bind to the copy — **FIXED**
 
 The classic Perl copy-and-substitute idiom is a no-op in stryke: both `s///`
 and `tr///` leave both vars equal to the original.
