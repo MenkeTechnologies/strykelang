@@ -357,8 +357,8 @@ fn vec_illegal_bits_is_runtime_error() {
 }
 
 #[test]
-fn division_by_zero_is_runtime_error() {
-    assert_eq!(eval_err_kind("1/0"), ErrorKind::Runtime);
+fn division_by_zero_uses_division_by_zero_kind() {
+    assert_eq!(eval_err_kind("1/0"), ErrorKind::DivisionByZero);
 }
 
 // ── subs / context ──

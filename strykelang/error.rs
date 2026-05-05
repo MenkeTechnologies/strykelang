@@ -66,6 +66,14 @@ impl PerlError {
         Self::new(ErrorKind::Die, message, line, "-e")
     }
 
+    /// Constructor for division-by-zero errors. The user-visible message
+    /// and Display formatting are unchanged from `runtime(...)`; only the
+    /// `kind` differs, so callers (try/catch, error filters) can match
+    /// `ErrorKind::DivisionByZero` specifically.
+    pub fn division_by_zero(message: impl Into<String>, line: usize) -> Self {
+        Self::new(ErrorKind::DivisionByZero, message, line, "-e")
+    }
+
     pub fn die_with_value(value: PerlValue, message: String, line: usize) -> Self {
         let mut e = Self::new(ErrorKind::Die, message, line, "-e");
         e.die_value = Some(value);

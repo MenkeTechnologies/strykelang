@@ -12855,7 +12855,9 @@ impl Interpreter {
             BinOp::Div => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     if b == 0 {
-                        return Err(PerlError::runtime("Illegal division by zero", _line).into());
+                        return Err(
+                            PerlError::division_by_zero("Illegal division by zero", _line).into(),
+                        );
                     }
                     if a % b == 0 {
                         PerlValue::integer(a / b)
@@ -12865,7 +12867,9 @@ impl Interpreter {
                 } else {
                     let d = rv.to_number();
                     if d == 0.0 {
-                        return Err(PerlError::runtime("Illegal division by zero", _line).into());
+                        return Err(
+                            PerlError::division_by_zero("Illegal division by zero", _line).into(),
+                        );
                     }
                     PerlValue::float(lv.to_number() / d)
                 }
@@ -12873,7 +12877,7 @@ impl Interpreter {
             BinOp::Mod => {
                 let d = rv.to_int();
                 if d == 0 {
-                    return Err(PerlError::runtime("Illegal modulus zero", _line).into());
+                    return Err(PerlError::division_by_zero("Illegal modulus zero", _line).into());
                 }
                 PerlValue::integer(lv.to_int() % d)
             }

@@ -19,13 +19,13 @@ fn parse_invalid_sigil_sequence_is_syntax() {
 }
 
 #[test]
-fn division_by_zero_runtime() {
-    assert_eq!(eval_err_kind("7 / 0"), ErrorKind::Runtime);
+fn division_by_zero_kind() {
+    assert_eq!(eval_err_kind("7 / 0"), ErrorKind::DivisionByZero);
 }
 
 #[test]
-fn modulo_by_zero_runtime() {
-    assert_eq!(eval_err_kind("7 % 0"), ErrorKind::Runtime);
+fn modulo_by_zero_kind() {
+    assert_eq!(eval_err_kind("7 % 0"), ErrorKind::DivisionByZero);
 }
 
 #[test]
