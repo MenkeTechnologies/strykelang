@@ -2580,7 +2580,9 @@ fn array_element_lookup_truncates_float_subscript_toward_zero() {
 
 #[test]
 fn modulo_negative_dividend_snapshot() {
-    assert_eq!(eval_int(r#"(-5) % 3"#), -2);
+    // Perl-style floored mod: result has sign of divisor (or zero).
+    // (-5) mod 3 = 1 because (-5) = -2 * 3 + 1.
+    assert_eq!(eval_int(r#"(-5) % 3"#), 1);
 }
 
 #[test]

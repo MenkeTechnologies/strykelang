@@ -3595,7 +3595,7 @@ impl<'a> VM<'a> {
                                     line,
                                 ));
                             }
-                            Ok(PerlValue::integer(a % b))
+                            Ok(PerlValue::integer(crate::value::perl_mod_i64(a, b)))
                         })
                     }
                     Op::Pow => {

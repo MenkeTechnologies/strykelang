@@ -94,8 +94,10 @@ fn floating_division_truncates_toward_zero() {
 }
 
 #[test]
-fn modulo_preserves_sign_of_dividend() {
-    assert_eq!(eval_int("-7 % 3"), -1);
+fn modulo_uses_perl_floored_division() {
+    // Perl 5 floored mod: result has the sign of the divisor.
+    // (-7) mod 3 = 2 because (-7) = -3 * 3 + 2.
+    assert_eq!(eval_int("-7 % 3"), 2);
 }
 
 #[test]

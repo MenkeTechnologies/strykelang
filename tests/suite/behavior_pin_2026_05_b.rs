@@ -268,24 +268,34 @@ fn chomp_single_scalar_strips_newline_and_returns_count() {
     );
 }
 
-// ── Modulo sign follows C, not Perl ──────────────────────────────────────────
+// ── Modulo follows Perl-style floored division (PARITY-005 FIXED) ───────────
 //
-// PARITY-005: stryke uses sign-of-dividend (Rust/C semantics); Perl 5 uses
-// sign-of-divisor. Pinned at current values.
+// Result has the sign of the divisor (or is zero), matching Perl 5.
 
 #[test]
-fn mod_negative_dividend_positive_divisor_returns_negative() {
-    assert_eq!(eval_int("-7 % 3"), -1);
+fn mod_negative_dividend_positive_divisor_returns_positive() {
+    assert_eq!(eval_int("-7 % 3"), 2);
 }
 
 #[test]
-fn mod_positive_dividend_negative_divisor_returns_positive() {
-    assert_eq!(eval_int("7 % -3"), 1);
+fn mod_positive_dividend_negative_divisor_returns_negative() {
+    assert_eq!(eval_int("7 % -3"), -2);
+}
+
+#[test]
+fn mod_negative_dividend_negative_divisor_returns_negative() {
+    assert_eq!(eval_int("-7 % -3"), -1);
 }
 
 #[test]
 fn mod_positive_positive_matches_perl() {
     assert_eq!(eval_int("7 % 3"), 1);
+}
+
+#[test]
+fn mod_compound_assign_uses_floored_division() {
+    assert_eq!(eval_int(r#"my $x = -7; $x %= 3; $x"#), 2);
+    assert_eq!(eval_int(r#"my $x = 7; $x %= -3; $x"#), -2);
 }
 
 // ── sprintf format-specifier coverage ────────────────────────────────────────
