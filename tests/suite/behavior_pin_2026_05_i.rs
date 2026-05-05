@@ -101,18 +101,89 @@ fn sig_handler_assignment_returns_code_ref() {
     );
 }
 
+// The handler sites use `our` for the captured state since closures over
+// `my` variables don't propagate mutations back today (BUG-089). Once that
+// bug is fixed, these can be rewritten to use plain `my`.
+
 #[test]
-fn sig_die_handler_not_invoked_today() {
-    // BUG-050: $SIG{__DIE__} handler is not called when `die` runs inside
-    // an `eval` block. Pin observed value (handler did not fire).
+fn sig_die_handler_runs_inside_eval() {
+    // BUG-050 FIXED: `$SIG{__DIE__}` is invoked when `die` runs inside an
+    // `eval { }` block; the original error still propagates afterwards.
     assert_eq!(
         eval_int(
-            r#"my $caught = 0;
-               $SIG{__DIE__} = sub { $caught = 1 };
+            r#"our $caught = 0;
+               $SIG{__DIE__} = sub { $main::caught = 1 };
                eval { die "x" };
                $caught"#
         ),
-        0
+        1
+    );
+}
+
+#[test]
+fn sig_die_handler_can_swap_error_by_redieing() {
+    // The handler can `die` itself to substitute a different error; the
+    // outer `eval` then sees that swapped message in `$@`.
+    let out = eval_string(
+        r#"$SIG{__DIE__} = sub { die "swap:" . $_[0] };
+           eval { die "orig\n" };
+           $@"#,
+    );
+    assert!(out.starts_with("swap:orig"), "got {:?}", out);
+}
+
+#[test]
+fn sig_die_handler_recursion_guard_prevents_loop() {
+    // The handler's own `die` doesn't re-enter the handler infinitely.
+    let out = eval_string(
+        r#"our $count = 0;
+           $SIG{__DIE__} = sub { $main::count++; die "x" };
+           eval { die "orig" };
+           $count"#,
+    );
+    // Handler ran exactly once for the original die.
+    assert_eq!(out, "1");
+}
+
+#[test]
+fn sig_warn_handler_runs_on_warn() {
+    // BUG-025 FIXED: `$SIG{__WARN__}` is invoked when `warn` runs.
+    assert_eq!(
+        eval_int(
+            r#"our $caught = 0;
+               $SIG{__WARN__} = sub { $main::caught = 1 };
+               warn "test\n";
+               $caught"#
+        ),
+        1
+    );
+}
+
+#[test]
+fn sig_warn_handler_receives_message_with_newline() {
+    // The handler gets the formatted message (including the newline-or-
+    // line-info suffix) as `$_[0]`.
+    let out = eval_string(
+        r#"our $captured = "";
+           $SIG{__WARN__} = sub { $main::captured = $_[0] };
+           warn "hi\n";
+           $captured"#,
+    );
+    assert_eq!(out, "hi\n");
+}
+
+#[test]
+fn sig_warn_handler_recursion_guard_prevents_loop() {
+    // A `__WARN__` handler that calls `warn` again does not re-enter the
+    // handler — the inner warn falls back to stderr.
+    assert_eq!(
+        eval_int(
+            r#"our $depth = 0;
+               $SIG{__WARN__} = sub { $main::depth++; warn "nested\n" };
+               warn "outer\n";
+               $depth"#
+        ),
+        1
     );
 }
 

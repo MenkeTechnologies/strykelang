@@ -2535,6 +2535,55 @@ impl Interpreter {
         }
     }
 
+    /// Dispatch `$SIG{__WARN__}` if a coderef is installed; fall back to stderr.
+    /// Recursion is guarded by temporarily clearing the slot during dispatch so
+    /// a `__WARN__` handler that itself calls `warn` does not loop.
+    pub(crate) fn fire_pseudosig_warn(&mut self, msg: &str, line: usize) -> PerlResult<()> {
+        self.touch_env_hash("SIG");
+        let slot = self.scope.get_hash_element("SIG", "__WARN__");
+        if let Some(sub) = slot.as_code_ref() {
+            let prev = slot;
+            let _ = self
+                .scope
+                .set_hash_element("SIG", "__WARN__", PerlValue::UNDEF);
+            let arg = PerlValue::string(msg.to_string());
+            let r = self.call_sub(&sub, vec![arg], WantarrayCtx::Void, line);
+            let _ = self.scope.set_hash_element("SIG", "__WARN__", prev);
+            return match r {
+                Ok(_) => Ok(()),
+                Err(FlowOrError::Flow(_)) => Ok(()),
+                Err(FlowOrError::Error(e)) => Err(e),
+            };
+        }
+        eprint!("{}", msg);
+        Ok(())
+    }
+
+    /// Dispatch `$SIG{__DIE__}` if a coderef is installed. Perl semantics:
+    /// the handler runs even when the die is going to be caught by an `eval`,
+    /// and the die still propagates afterwards. If the handler itself dies,
+    /// that error replaces the original. Recursion is guarded by temporarily
+    /// clearing the slot during dispatch.
+    pub(crate) fn fire_pseudosig_die(&mut self, msg: &str, line: usize) -> PerlResult<()> {
+        self.touch_env_hash("SIG");
+        let slot = self.scope.get_hash_element("SIG", "__DIE__");
+        if let Some(sub) = slot.as_code_ref() {
+            let prev = slot;
+            let _ = self
+                .scope
+                .set_hash_element("SIG", "__DIE__", PerlValue::UNDEF);
+            let arg = PerlValue::string(msg.to_string());
+            let r = self.call_sub(&sub, vec![arg], WantarrayCtx::Void, line);
+            let _ = self.scope.set_hash_element("SIG", "__DIE__", prev);
+            return match r {
+                Ok(_) => Ok(()),
+                Err(FlowOrError::Flow(_)) => Ok(()),
+                Err(FlowOrError::Error(e)) => Err(e),
+            };
+        }
+        Ok(())
+    }
+
     /// POSIX default for signals we deliver via `perl_signal::poll` (Unix).
     #[inline]
     fn default_sig_action(sig: &str) -> PerlResult<()> {
@@ -10131,6 +10180,7 @@ impl Interpreter {
                     } else {
                         current.to_string()
                     };
+                    self.fire_pseudosig_die(&msg, line)?;
                     return Err(PerlError::die(msg, line).into());
                 }
                 // Single ref argument: store the ref value in $@
@@ -10142,6 +10192,7 @@ impl Interpreter {
                         || v.as_code_ref().is_some()
                     {
                         let msg = v.to_string();
+                        self.fire_pseudosig_die(&msg, line)?;
                         return Err(PerlError::die_with_value(v, msg, line).into());
                     }
                 }
@@ -10157,6 +10208,7 @@ impl Interpreter {
                     msg.push_str(&self.die_warn_at_suffix(line));
                     msg.push('\n');
                 }
+                self.fire_pseudosig_die(&msg, line)?;
                 Err(PerlError::die(msg, line).into())
             }
             ExprKind::Warn(args) => {
@@ -10172,7 +10224,7 @@ impl Interpreter {
                     msg.push_str(&self.die_warn_at_suffix(line));
                     msg.push('\n');
                 }
-                eprint!("{}", msg);
+                self.fire_pseudosig_warn(&msg, line)?;
                 Ok(PerlValue::integer(1))
             }
 
