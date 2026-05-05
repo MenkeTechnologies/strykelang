@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.11.8 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3500+ builtins</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.11.14 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3500+ builtins</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -785,16 +785,18 @@ fe80::ff~fe80::fc~-1          <span class="comment"># IPv6 reverse step</span>
 
       <section class="tutorial-section">
         <h2>Topic chain — <code>_&lt;</code> and the positional matrix</h2>
-        <p>Inside a closure (map/grep/sort block, sub body, fan/fan_cap), <code>_&lt;</code> reads the topic of the enclosing scope — the value <code>_</code> held in the frame that called this closure. The chain extends up to four frames: <code>_&lt;&lt;</code>, <code>_&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;</code>. Numeric positional slots get the same matrix: <code>_0&lt;</code>, <code>_1&lt;&lt;</code>, …, <code>_N&lt;&lt;&lt;&lt;</code>. Bareword and sigil forms (<code>$_&lt;</code>) are equivalent.</p>
+        <p>Inside a closure (map/grep/sort block, sub body, fan/fan_cap), <code>_&lt;</code> reads the topic of the enclosing scope — the value <code>_</code> held in the frame that called this closure. The chain extends up to <strong>five</strong> frames: <code>_&lt;&lt;</code>, <code>_&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;</code>, <code>_&lt;&lt;&lt;&lt;&lt;</code>. Numeric positional slots get the same matrix: <code>_0&lt;</code>, <code>_1&lt;&lt;</code>, …, <code>_N&lt;&lt;&lt;&lt;&lt;</code>. Bareword and sigil forms (<code>$_&lt;</code>) are equivalent.</p>
+        <p><strong>Indexed-ascent <code>_&lt;N</code></strong> — past depth 2, counting chevrons gets error-prone. The lexer accepts <code>_&lt;N</code> (where N is a positive integer) as syntactic sugar for N chevrons: <code>_&lt;3</code> ≡ <code>_&lt;&lt;&lt;</code>, <code>$_2&lt;5</code> ≡ <code>$_2&lt;&lt;&lt;&lt;&lt;</code>. The disambiguator preserves slice syntax: <code>_&lt;3&gt;</code> and <code>_&lt;3:5&gt;</code> remain string slices; <code>_&lt;3</code> (without trailing <code>&gt;</code> or <code>:</code>) is the indexed-ascent form.</p>
 <pre><span class="comment"># Nested map — `_&lt;` reaches the outer iter's `_`:</span>
 map { my @inner = (1, 2); map { _&lt; + _ } @inner } (10, 20)
 <span class="comment"># 11, 12, 21, 22</span>
 
-<span class="comment"># Inside a 3-arg sub, _0&lt;&lt;&lt;&lt; reaches arg 0 four frames up:</span>
+<span class="comment"># Inside a 3-arg sub, _0&lt;5 (≡ _0&lt;&lt;&lt;&lt;&lt;) reaches arg 0 five frames up:</span>
 fn deep($_0, $_1, $_2) {
-  ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
-    p _0&lt;&lt;&lt;&lt;, _1&lt;&lt;&lt;&lt;, _2&lt;&lt;&lt;&lt;
-  } } } }
+  ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
+    p _0&lt;5, _1&lt;5, _2&lt;5      <span class="comment"># preferred: indexed form</span>
+    p _0&lt;&lt;&lt;&lt;&lt;, _1&lt;&lt;&lt;&lt;&lt;     <span class="comment"># equivalent: chevron form</span>
+  } } } } }
 }</pre>
         <p><strong>Iter re-entry</strong> — the chain shifts on the FIRST <code>set_topic</code> call in a given frame; subsequent iterations of the same loop only refresh <code>_</code>, so <code>_&lt;</code> keeps pointing at the enclosing scope's topic instead of rolling to the previous iter's value. Bound-but-undef chain entries fall back to <code>_</code> so <code>$h-&gt;{_&lt;}</code> at the outermost iter reads the iteration key.</p>
       </section>

@@ -5,9 +5,9 @@ use crate::bytecode::{
     BuiltinId, Chunk, Op, RuntimeAdviceDecl, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN,
     GP_START,
 };
-use crate::vm_helper::{assign_rhs_wantarray, VMHelper, WantarrayCtx};
 use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
+use crate::vm_helper::{assign_rhs_wantarray, VMHelper, WantarrayCtx};
 
 /// True when EXPR as the *tail* of a `map { … }` block would produce a different value in
 /// list context than in scalar context — Range (flip-flop vs list), comma lists, `reverse` /
@@ -934,11 +934,7 @@ impl Compiler {
     ///   - `name` is `our` (package global — explicitly cross-scope state).
     ///   - `--compat` mode is active (Perl 5 shared-storage semantics).
     ///   - `name` is undeclared (caught by strict-vars elsewhere).
-    fn check_closure_write_to_outer_my(
-        &self,
-        name: &str,
-        line: usize,
-    ) -> Result<(), CompileError> {
+    fn check_closure_write_to_outer_my(&self, name: &str, line: usize) -> Result<(), CompileError> {
         if crate::compat_mode() {
             return Ok(());
         }
@@ -1278,13 +1274,21 @@ impl Compiler {
         self.chunk.emit(Op::Halt, 0);
 
         // Third pass: compile sub bodies after Halt
-        let mut entries: Vec<(String, Vec<Statement>, String, Vec<crate::ast::SubSigParam>)> = Vec::new();
+        let mut entries: Vec<(String, Vec<Statement>, String, Vec<crate::ast::SubSigParam>)> =
+            Vec::new();
         let mut pending_pkg = String::new();
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Package { name } => pending_pkg = name.clone(),
-                StmtKind::SubDecl { name, body, params, .. } => {
-                    entries.push((name.clone(), body.clone(), pending_pkg.clone(), params.clone()));
+                StmtKind::SubDecl {
+                    name, body, params, ..
+                } => {
+                    entries.push((
+                        name.clone(),
+                        body.clone(),
+                        pending_pkg.clone(),
+                        params.clone(),
+                    ));
                 }
                 _ => {}
             }
@@ -3332,13 +3336,9 @@ impl Compiler {
                     match &key_expr.kind {
                         ExprKind::QW(words) => {
                             for w in words {
-                                let kidx = self
-                                    .chunk
-                                    .add_constant(PerlValue::string(w.clone()));
+                                let kidx = self.chunk.add_constant(PerlValue::string(w.clone()));
                                 self.emit_op(Op::LoadConst(kidx), line, Some(root));
-                                let kidx2 = self
-                                    .chunk
-                                    .add_constant(PerlValue::string(w.clone()));
+                                let kidx2 = self.chunk.add_constant(PerlValue::string(w.clone()));
                                 self.emit_op(Op::LoadConst(kidx2), line, Some(root));
                                 self.emit_op(Op::GetHashElem(hash_idx), line, Some(root));
                                 total_pairs += 1;
@@ -5344,11 +5344,7 @@ impl Compiler {
                         if let ExprKind::CodeRef { .. } = &args[0].kind {
                             // The most-recently-pushed CodeRef block index is
                             // the highest one in `sub_body_block_indices`.
-                            if let Some(max_idx) = self
-                                .sub_body_block_indices
-                                .iter()
-                                .copied()
-                                .max()
+                            if let Some(max_idx) = self.sub_body_block_indices.iter().copied().max()
                             {
                                 self.sub_body_block_indices.remove(&max_idx);
                             }
@@ -6700,12 +6696,7 @@ impl Compiler {
                 // doesn't fire on writes to outer-scope `my` from inside
                 // the eval body.
                 if let ExprKind::CodeRef { .. } = &e.kind {
-                    if let Some(max_idx) = self
-                        .sub_body_block_indices
-                        .iter()
-                        .copied()
-                        .max()
-                    {
+                    if let Some(max_idx) = self.sub_body_block_indices.iter().copied().max() {
                         self.sub_body_block_indices.remove(&max_idx);
                     }
                 }

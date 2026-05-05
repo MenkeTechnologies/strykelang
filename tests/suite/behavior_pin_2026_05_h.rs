@@ -9,9 +9,11 @@ use crate::common::*;
 #[test]
 fn trait_provides_method_to_class() {
     assert_eq!(
-        eval_string(r#"trait Speak { fn say_hi { "hi" } }
+        eval_string(
+            r#"trait Speak { fn say_hi { "hi" } }
                        class Cat impl Speak { }
-                       Cat()->say_hi"#),
+                       Cat()->say_hi"#
+        ),
         "hi"
     );
 }
@@ -88,7 +90,10 @@ fn final_class_cannot_be_extended() {
            class E extends D { fn other { 3 } }"#,
     );
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected error, got {:?}",
         kind
     );
@@ -96,10 +101,7 @@ fn final_class_cannot_be_extended() {
 
 #[test]
 fn final_class_methods_invoke_normally() {
-    assert_eq!(
-        eval_int(r#"final class D { fn doit { 2 } } D()->doit"#),
-        2
-    );
+    assert_eq!(eval_int(r#"final class D { fn doit { 2 } } D()->doit"#), 2);
 }
 
 // ── Field types: Int / Str / Float / Bool / Array / Hash / Ref / Any ────────
@@ -107,9 +109,7 @@ fn final_class_methods_invoke_normally() {
 #[test]
 fn class_field_int_type_check_rejects_string() {
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"class Counter { value: Int = 0 } Counter(value => "abc")"#,
-    );
+    let kind = eval_err_kind(r#"class Counter { value: Int = 0 } Counter(value => "abc")"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected type error, got {:?}",
@@ -164,9 +164,7 @@ fn class_field_arrayref_keyword_does_not_match_array_default_today() {
 #[test]
 fn typed_param_with_int_rejects_float() {
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"fn typed_add($x: Int, $y: Int) { $x + $y } typed_add(2.5, 3)"#,
-    );
+    let kind = eval_err_kind(r#"fn typed_add($x: Int, $y: Int) { $x + $y } typed_add(2.5, 3)"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected type error, got {:?}",
@@ -177,9 +175,7 @@ fn typed_param_with_int_rejects_float() {
 #[test]
 fn typed_param_with_str_rejects_int() {
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"fn greet($name: Str) { "hi $name" } greet(42)"#,
-    );
+    let kind = eval_err_kind(r#"fn greet($name: Str) { "hi $name" } greet(42)"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected type error, got {:?}",
@@ -226,7 +222,10 @@ fn embedded_code_in_regex_is_rejected_today() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind(r#""abc" =~ /a(?{ "side" })b/"#);
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Regex | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Regex | ErrorKind::Syntax
+        ),
         "expected error, got {:?}",
         kind
     );
@@ -243,10 +242,7 @@ fn regex_recursion_via_question_r_works() {
 
 #[test]
 fn regex_conditional_pattern_works() {
-    assert_eq!(
-        eval_int(r#""ab1" =~ /(a)b(?(1)\d|x)/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""ab1" =~ /(a)b(?(1)\d|x)/ ? 1 : 0"#), 1);
 }
 
 #[test]
@@ -312,10 +308,7 @@ fn nan_does_not_equal_itself() {
 
 #[test]
 fn nan_is_not_equal_to_itself() {
-    assert_eq!(
-        eval_int(r#"my $n = sqrt(-1); $n != $n ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $n = sqrt(-1); $n != $n ? 1 : 0"#), 1);
 }
 
 #[test]
@@ -425,10 +418,7 @@ fn argv_is_empty_when_invoked_via_lib_eval() {
 
 #[test]
 fn shift_at_argv_returns_undef_when_empty() {
-    assert_eq!(
-        eval_int(r#"defined(shift @ARGV) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"defined(shift @ARGV) ? 1 : 0"#), 0);
 }
 
 // ── Trait method visibility & ordering ───────────────────────────────────────
@@ -437,9 +427,11 @@ fn shift_at_argv_returns_undef_when_empty() {
 fn trait_method_lookup_yields_trait_implementation() {
     // No conflict — trait method exposed directly through the impl'ing class.
     assert_eq!(
-        eval_int(r#"trait T { fn answer { 42 } }
+        eval_int(
+            r#"trait T { fn answer { 42 } }
                     class K impl T { }
-                    K()->answer"#),
+                    K()->answer"#
+        ),
         42
     );
 }
@@ -448,9 +440,11 @@ fn trait_method_lookup_yields_trait_implementation() {
 fn class_method_overrides_trait_method() {
     // Local fn definition wins over the trait's same-named method.
     assert_eq!(
-        eval_string(r#"trait T { fn name { "trait" } }
+        eval_string(
+            r#"trait T { fn name { "trait" } }
                        class K impl T { fn name { "class" } }
-                       K()->name"#),
+                       K()->name"#
+        ),
         "class"
     );
 }

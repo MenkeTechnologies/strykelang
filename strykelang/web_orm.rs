@@ -18,9 +18,9 @@
 //!     `up` (or `down`) method in order.
 
 use crate::error::PerlError;
-use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::native_data::{exec_sql, perl_to_sql_value, query_sql};
 use crate::value::PerlValue;
+use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use rusqlite::Connection;

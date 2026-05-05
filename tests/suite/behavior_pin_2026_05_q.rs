@@ -182,14 +182,11 @@ fn bugs_md_has_minimum_documented_entry_count() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("docs")
         .join("BUGS.md");
-    let body = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {:?}: {}", path, e));
+    let body = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {:?}: {}", path, e));
     let count = body
         .lines()
         .filter(|l| {
-            l.starts_with("## BUG-")
-                || l.starts_with("## PARITY-")
-                || l.starts_with("## POLISH-")
+            l.starts_with("## BUG-") || l.starts_with("## PARITY-") || l.starts_with("## POLISH-")
         })
         .count();
     assert!(
@@ -204,8 +201,7 @@ fn bugs_md_contains_required_sections() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("docs")
         .join("BUGS.md");
-    let body = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {:?}: {}", path, e));
+    let body = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {:?}: {}", path, e));
     assert!(
         body.contains("## How to add to this file"),
         "missing instructions section"
@@ -274,10 +270,7 @@ fn string_concat_with_float_coerces_to_decimal() {
 
 #[test]
 fn sort_default_lex_with_numeric_strings() {
-    assert_eq!(
-        eval_string(r#"join(",", sort qw(10 2 30 4))"#),
-        "10,2,30,4"
-    );
+    assert_eq!(eval_string(r#"join(",", sort qw(10 2 30 4))"#), "10,2,30,4");
 }
 
 #[test]
@@ -299,10 +292,7 @@ fn descending_range_yields_empty_list() {
 
 #[test]
 fn reverse_of_ascending_range_yields_descending() {
-    assert_eq!(
-        eval_string(r#"my @a = reverse(1..5); "@a""#),
-        "5 4 3 2 1"
-    );
+    assert_eq!(eval_string(r#"my @a = reverse(1..5); "@a""#), "5 4 3 2 1");
 }
 
 // ── Sprintf `[%s]` on undef gives `[]` ─────────────────────────────────────
@@ -317,9 +307,7 @@ fn sprintf_s_on_undef_yields_empty_brackets() {
 #[test]
 fn chomp_on_clean_string_returns_zero_and_no_change() {
     assert_eq!(
-        eval_string(
-            r#"my $s = "abc"; my $n = chomp($s); "n=$n s=[$s]""#
-        ),
+        eval_string(r#"my $s = "abc"; my $n = chomp($s); "n=$n s=[$s]""#),
         "n=0 s=[abc]"
     );
 }
@@ -341,7 +329,10 @@ fn scalar_on_array_slice_returns_count_today() {
     // Pin observed: `scalar @a[1, 3]` returns the slice's element count
     // (2), not the last element. Matches Perl's "list in scalar context →
     // count" — this is correct, not a bug.
-    assert_eq!(eval_int(r#"my @a = (10, 20, 30, 40, 50); scalar(@a[1, 3])"#), 2);
+    assert_eq!(
+        eval_int(r#"my @a = (10, 20, 30, 40, 50); scalar(@a[1, 3])"#),
+        2
+    );
 }
 
 // ── String split with limit on empty input ─────────────────────────────────
@@ -384,20 +375,14 @@ fn reverse_with_bare_empty_parens_is_parse_error_today() {
 
 #[test]
 fn missing_array_element_is_undef() {
-    assert_eq!(
-        eval_int(r#"my @a = (1, 2); defined($a[10]) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @a = (1, 2); defined($a[10]) ? 1 : 0"#), 0);
 }
 
 // ── Reading a missing hash key returns undef ───────────────────────────────
 
 #[test]
 fn missing_hash_key_is_undef() {
-    assert_eq!(
-        eval_int(r#"my %h = (a => 1); defined($h{z}) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my %h = (a => 1); defined($h{z}) ? 1 : 0"#), 0);
 }
 
 // ── Array assignment from a sub-returning-list works for scalar param case ─
@@ -430,10 +415,7 @@ fn non_empty_array_is_true_in_boolean() {
 
 #[test]
 fn exists_with_false_value_still_true() {
-    assert_eq!(
-        eval_int(r#"my %h = (a => 0); exists $h{a} ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my %h = (a => 0); exists $h{a} ? 1 : 0"#), 1);
 }
 
 // ── 0 == "" in string-numeric comparison ───────────────────────────────────
@@ -455,10 +437,7 @@ fn single_scalar_destructure_from_array_var_returns_count_today() {
     // BUG-101: `my ($x) = @arr` is supposed to be LIST context (parens
     // make it a list assignment) and bind $x to the first element. Stryke
     // treats it as scalar context and returns the count.
-    assert_eq!(
-        eval_int(r#"my @a = (10, 20, 30); my ($x) = @a; $x"#),
-        3
-    );
+    assert_eq!(eval_int(r#"my @a = (10, 20, 30); my ($x) = @a; $x"#), 3);
 }
 
 #[test]
@@ -473,10 +452,7 @@ fn single_scalar_destructure_from_at_underscore_returns_count_today() {
 #[test]
 fn single_scalar_destructure_from_literal_list_works() {
     // The literal-list source form does work: `my ($x) = (literal)` binds.
-    assert_eq!(
-        eval_string(r#"my ($x) = ("hello"); $x"#),
-        "hello"
-    );
+    assert_eq!(eval_string(r#"my ($x) = ("hello"); $x"#), "hello");
 }
 
 #[test]
@@ -519,18 +495,12 @@ fn prototype_of_anonymous_sub_coderef_is_empty_today() {
     // BUG-103: Perl's `prototype($coderef)` returns the prototype string
     // for both named and anonymous subs. Stryke returns it correctly only
     // for named subs.
-    assert_eq!(
-        eval_string(r#"my $r = sub ($) { 42 }; prototype($r)"#),
-        ""
-    );
+    assert_eq!(eval_string(r#"my $r = sub ($) { 42 }; prototype($r)"#), "");
 }
 
 #[test]
 fn prototype_of_named_sub_via_amp_ref_works() {
-    assert_eq!(
-        eval_string(r#"sub myff ($) { 42 } prototype(\&myff)"#),
-        "$"
-    );
+    assert_eq!(eval_string(r#"sub myff ($) { 42 } prototype(\&myff)"#), "$");
 }
 
 // ── `print $a - $b, ...` parses leading scalar as filehandle (BUG-104) ────
@@ -554,9 +524,7 @@ fn print_scalar_minus_scalar_with_trailing_args_parses_as_filehandle_today() {
 #[test]
 fn print_scalar_plus_scalar_with_trailing_args_works() {
     // The `+` form does parse correctly.
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_print_plus_{}", std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_print_plus_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
         r#"my $x = 5; my $y = 3;
@@ -583,10 +551,7 @@ fn print_scalar_plus_scalar_with_trailing_args_works() {
 #[test]
 fn to_json_circular_at_least_parses() {
     assert!(
-        stryke::parse(
-            r#"my $a = {}; $a->{self} = $a; my $j = to_json($a)"#
-        )
-        .is_ok(),
+        stryke::parse(r#"my $a = {}; $a->{self} = $a; my $j = to_json($a)"#).is_ok(),
         "parse must succeed even though execution stack-overflows"
     );
 }
@@ -603,18 +568,12 @@ fn to_json_basic_round_trip_works() {
 
 #[test]
 fn from_json_null_returns_undef() {
-    assert_eq!(
-        eval_int(r#"defined(from_json("null")) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"defined(from_json("null")) ? 1 : 0"#), 0);
 }
 
 #[test]
 fn from_json_true_returns_truthy_one() {
-    assert_eq!(
-        eval_int(r#"my $r = from_json("true"); $r ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $r = from_json("true"); $r ? 1 : 0"#), 1);
 }
 
 // ── `"$Pkg::Var"` interpolation drops the package prefix (BUG-107) ─────────
@@ -646,9 +605,7 @@ fn package_qualified_scalar_via_code_deref_in_lib_eval_returns_empty_today() {
     // form `print "${\$Foo::bar}"` does work; only the
     // assigned-into-string form is broken.)
     assert_eq!(
-        eval_string(
-            r#"package Foo; our $bar = "hello"; package main; "value:${\$Foo::bar}""#
-        ),
+        eval_string(r#"package Foo; our $bar = "hello"; package main; "value:${\$Foo::bar}""#),
         "value:"
     );
 }
@@ -668,9 +625,7 @@ fn to_json_two_arg_pretty_form_serializes_as_array_today() {
 
 #[test]
 fn print_paren_workaround_for_minus_form_works() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_print_paren_{}", std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_print_paren_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
         r#"my $x = 5; my $y = 3;

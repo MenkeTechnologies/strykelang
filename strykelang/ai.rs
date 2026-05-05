@@ -34,8 +34,8 @@
 //! `model="claude-opus-4-5"`).
 
 use crate::error::PerlError;
-use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::value::PerlValue;
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};

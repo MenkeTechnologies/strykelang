@@ -16,8 +16,8 @@
 //! PASS 4 (next):         Migrations (create_table/add_column/Migrator).
 
 use crate::error::PerlError;
-use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::value::PerlValue;
+use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use regex::Regex;

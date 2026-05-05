@@ -1253,8 +1253,13 @@ impl Lexer {
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let ident = self.read_package_qualified_identifier();
                 // `$_<`, `$_<<`, … — outer topic chain (stryke extension). Also
-                // applies to positional slots: `$_0<<<<`, `$_1<<<<`, etc. The
-                // canonical scope key is `_<<<<` (slot 0) or `_N<<<<` (slot N).
+                // applies to positional slots: `$_0<<<<<`, `$_1<<<<<`, etc. The
+                // canonical scope key is `_<<<<<` (slot 0) or `_N<<<<<` (slot N).
+                //
+                // Indexed-ascent shortcut: `$_<N` ≡ `$_<<<...<` (N chevrons),
+                // with N a positive integer. `$_<3` is much more readable than
+                // `$_<<<` past depth 2. The lexer synthesizes the chevron form
+                // so the rest of the system (scope keys, parse) is unchanged.
                 let is_topic_slot = ident == "_"
                     || (ident.len() > 1
                         && ident.starts_with('_')
@@ -1264,6 +1269,37 @@ impl Lexer {
                     while self.peek() == Some('<') {
                         self.advance();
                         lts.push('<');
+                    }
+                    // Indexed-ascent: after a single `<`, if the next chars are
+                    // digits NOT followed by `>` or `:` (which would make it a
+                    // string slice like `$_<1:5>`), expand `<N` to N chevrons.
+                    if lts.len() == 1 && self.peek().is_some_and(|c| c.is_ascii_digit()) {
+                        let mut peek_off = 0usize;
+                        while self
+                            .peek_at(peek_off)
+                            .is_some_and(|c| c.is_ascii_digit())
+                        {
+                            peek_off += 1;
+                        }
+                        let trailing = self.peek_at(peek_off);
+                        let is_slice = matches!(trailing, Some(':') | Some('>'));
+                        if !is_slice {
+                            let mut digits = String::new();
+                            for _ in 0..peek_off {
+                                if let Some(c) = self.advance() {
+                                    digits.push(c);
+                                }
+                            }
+                            if let Ok(n) = digits.parse::<usize>() {
+                                if n >= 1 {
+                                    // Replace the single `<` already collected
+                                    // with N chevrons (we already consumed 1).
+                                    for _ in 1..n {
+                                        lts.push('<');
+                                    }
+                                }
+                            }
+                        }
                     }
                     if !lts.is_empty() {
                         return format!("{}{}", ident, lts);
@@ -1950,22 +1986,68 @@ impl Lexer {
                 if is_topic_slot {
                     // Greedy `<` chevrons for the outer-topic chain, BUT only
                     // when the chevron run isn't followed by a slice index.
-                    // `_<1:5>` is a string slice; `_<<<<` is the 4-deep
+                    // `_<1:5>` is a string slice; `_<<<<<` is the 5-deep
                     // outer-topic. Disambiguate by peeking past the run: if
                     // the first non-`<` char is a digit, `-`, `:`, or `>`,
                     // we're in a slice — bail out and let the parser handle
                     // `<...>` as postfix subscript.
+                    //
+                    // Indexed-ascent shortcut: `_<N` ≡ `_<<<...<` (N chevrons)
+                    // when N is digits NOT followed by `>` or `:`. So `_<3` is
+                    // a depth-3 reference (more readable than `_<<<`), while
+                    // `_<3>` and `_<3:5>` remain string slices.
                     let mut peek_off = 0usize;
                     while self.peek_at(peek_off) == Some('<') {
                         peek_off += 1;
                     }
                     let trailing = self.peek_at(peek_off);
-                    let is_slice = peek_off > 0
-                        && matches!(trailing, Some(c) if c.is_ascii_digit() || c == '-' || c == ':' || c == '>');
-                    if !is_slice {
-                        for _ in 0..peek_off {
-                            self.advance();
+                    // Single `<` followed by digits: try indexed-ascent first.
+                    // Only triggers for one-chevron runs because `_<<3` would
+                    // mean "depth 2 of position 3" (which is not how the
+                    // grammar works) — we only allow `_<digits` at depth 1.
+                    let mut indexed_ascent: Option<usize> = None;
+                    if peek_off == 1
+                        && trailing.is_some_and(|c: char| c.is_ascii_digit())
+                    {
+                        let mut off = 1usize;
+                        while self.peek_at(off).is_some_and(|c| c.is_ascii_digit()) {
+                            off += 1;
+                        }
+                        let after_digits = self.peek_at(off);
+                        let still_a_slice =
+                            matches!(after_digits, Some(':') | Some('>'));
+                        if !still_a_slice {
+                            // Parse the digit run.
+                            let mut digits = String::new();
+                            for k in 1..off {
+                                if let Some(c) = self.peek_at(k) {
+                                    digits.push(c);
+                                }
+                            }
+                            if let Ok(n) = digits.parse::<usize>() {
+                                if n >= 1 {
+                                    indexed_ascent = Some(n);
+                                    // Consume `<` + the digits.
+                                    self.advance();
+                                    for _ in 1..off {
+                                        self.advance();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let Some(n) = indexed_ascent {
+                        for _ in 0..n {
                             ident.push('<');
+                        }
+                    } else {
+                        let is_slice = peek_off > 0
+                            && matches!(trailing, Some(c) if c.is_ascii_digit() || c == '-' || c == ':' || c == '>');
+                        if !is_slice {
+                            for _ in 0..peek_off {
+                                self.advance();
+                                ident.push('<');
+                            }
                         }
                     }
                 }

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.11.8 · 3565 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.11.14 · 3566 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -205,7 +205,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2636</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2637</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -8187,7 +8187,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2636 topics</p>
+      <p class="chapter-meta">2637 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -27858,6 +27858,14 @@ p @$c   # (0, 0, 1)
         <pre><code class="lang-perl">my $result = vec_scale $x 
 # or in a pipeline:
 @list |&gt; map vec_scale |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-vec-set-value">
+        <h3><a class="doc-anchor" href="#doc-vec-set-value">#</a> <code>vec_set_value</code></h3>
+        <p><code>vec_set_value</code> — internal builtin.</p>
+        <pre><code class="lang-perl">my $result = vec_set_value $x 
+# or in a pipeline:
+@list |&gt; map vec_set_value |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-vec-sub">

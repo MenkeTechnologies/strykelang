@@ -2394,10 +2394,8 @@ impl VMHelper {
                 if !self.subs.contains_key(&pkg_key) {
                     let src = if let Some(s) = self.subs.get(v) {
                         Some(s.clone())
-                    } else if let Some(s) = self.subs.get(&format!("main::{}", v)) {
-                        Some(s.clone())
                     } else {
-                        None
+                        self.subs.get(&format!("main::{}", v)).cloned()
                     };
                     if let Some(sub) = src {
                         self.subs.insert(pkg_key, sub);
@@ -4237,12 +4235,8 @@ impl VMHelper {
                     // (so `_`-using blocks work). Replaces the old
                     // `exec_block(&sub.body)` path which only set the topic.
                     self.scope.set_topic(item.clone());
-                    let pred = self.call_sub(
-                        &sub,
-                        vec![item.clone()],
-                        WantarrayCtx::Scalar,
-                        line,
-                    )?;
+                    let pred =
+                        self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?;
                     if !pred.is_true() {
                         break;
                     }
@@ -4276,12 +4270,8 @@ impl VMHelper {
                 let mut out = Vec::new();
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let pred = self.call_sub(
-                        &sub,
-                        vec![item.clone()],
-                        WantarrayCtx::Scalar,
-                        line,
-                    )?;
+                    let pred =
+                        self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?;
                     if !pred.is_true() {
                         out.push(item);
                     }
@@ -4305,12 +4295,8 @@ impl VMHelper {
                 let mut no = Vec::new();
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let pred = self.call_sub(
-                        &sub,
-                        vec![item.clone()],
-                        WantarrayCtx::Scalar,
-                        line,
-                    )?;
+                    let pred =
+                        self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?;
                     if pred.is_true() {
                         yes.push(item);
                     } else {
@@ -4329,12 +4315,8 @@ impl VMHelper {
                 let mut best: Option<(PerlValue, PerlValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let key = self.call_sub(
-                        &sub,
-                        vec![item.clone()],
-                        WantarrayCtx::Scalar,
-                        line,
-                    )?;
+                    let key =
+                        self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?;
                     best = Some(match best {
                         None => (item, key),
                         Some((bv, bk)) => {
@@ -4352,12 +4334,8 @@ impl VMHelper {
                 let mut best: Option<(PerlValue, PerlValue)> = None;
                 for item in items {
                     self.scope.set_topic(item.clone());
-                    let key = self.call_sub(
-                        &sub,
-                        vec![item.clone()],
-                        WantarrayCtx::Scalar,
-                        line,
-                    )?;
+                    let key =
+                        self.call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line)?;
                     best = Some(match best {
                         None => (item, key),
                         Some((bv, bk)) => {
@@ -9202,7 +9180,7 @@ impl VMHelper {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_strict_scalar_var(name, line)?;
                         let n = self.english_scalar_name(name);
-                        return Ok(self.scope.atomic_mutate(n, |v| perl_inc(v)));
+                        return Ok(self.scope.atomic_mutate(n, perl_inc));
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
                         if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -12662,10 +12640,9 @@ impl VMHelper {
     ) -> Result<String, FlowOrError> {
         // Step 1: build the output and collect any `%n` store-targets.
         let (out, pending_n) = {
-            let mut stringify =
-                |v: &PerlValue| -> Result<String, FlowOrError> {
-                    self.stringify_value(v.clone(), line)
-                };
+            let mut stringify = |v: &PerlValue| -> Result<String, FlowOrError> {
+                self.stringify_value(v.clone(), line)
+            };
             perl_sprintf_format_full(fmt, args, &mut stringify)?
         };
         // Step 2: apply any `%n` writes through the proper scope path.
@@ -19197,7 +19174,11 @@ impl VMHelper {
                 if let Some(r) = inner_val.as_array_ref() {
                     let idx = self.eval_expr(index)?.to_int();
                     let arr = r.read();
-                    let i = if idx < 0 { (arr.len() as i64 + idx).max(0) as usize } else { idx as usize };
+                    let i = if idx < 0 {
+                        (arr.len() as i64 + idx).max(0) as usize
+                    } else {
+                        idx as usize
+                    };
                     return Ok(arr.get(i).cloned().unwrap_or(PerlValue::UNDEF));
                 }
                 Ok(PerlValue::UNDEF)
@@ -20165,12 +20146,11 @@ where
     let mut i = 0;
 
     // Helper to consume the next arg as an i64 (used for `*` width / precision).
-    let take_arg_int =
-        |args: &[PerlValue], idx: &mut usize| -> i64 {
-            let v = args.get(*idx).cloned().unwrap_or(PerlValue::UNDEF);
-            *idx += 1;
-            v.to_int()
-        };
+    let take_arg_int = |args: &[PerlValue], idx: &mut usize| -> i64 {
+        let v = args.get(*idx).cloned().unwrap_or(PerlValue::UNDEF);
+        *idx += 1;
+        v.to_int()
+    };
 
     while i < chars.len() {
         if chars[i] == '%' {

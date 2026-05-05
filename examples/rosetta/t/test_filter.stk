@@ -6,7 +6,7 @@ fn Rosetta::Filter::positive(@nums) {
 }
 
 fn Rosetta::Filter::by_predicate($pred, @nums) {
-    @nums |> filter { $pred->(_) }
+    @nums |> filter $pred
 }
 
 my @pos = Rosetta::Filter::positive(-2, -1, 0, 1, 2, 3)

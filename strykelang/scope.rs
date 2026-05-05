@@ -1161,14 +1161,14 @@ impl Scope {
         Ok(())
     }
 
-    /// Topic-slot key for slot N at chain level L (0 = current, 1..4 = outer
+    /// Topic-slot key for slot N at chain level L (0 = current, 1..5 = outer
     /// frames). Slot 0's canonical form is bare `_` / `_<` / `_<<` / ... so
     /// direct `$_ = …` assignments and existing `$_<` consumers see the
     /// expected key. The `_0<+` form is the alias, written in lockstep by
     /// `declare_topic_slot`. For slot N ≥ 1 the canonical key is `_N<+`.
     #[inline]
     fn topic_slot_key(slot: usize, level: usize) -> String {
-        debug_assert!(level <= 4);
+        debug_assert!(level <= 5);
         if slot == 0 {
             if level == 0 {
                 "_".to_string()
@@ -1213,9 +1213,9 @@ impl Scope {
     /// Use this for single-arg closures (map, grep, etc.) so both `$_` and `$_0` work.
     /// This declares them in the current scope (not global), suitable for sub calls.
     ///
-    /// Shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`) on the
-    /// FIRST call in a given frame so nested blocks can peek up to 4 frames
-    /// out. Subsequent calls in the same frame (the next iteration of the
+    /// Shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`,
+    /// `$_<<<<<`) on the FIRST call in a given frame so nested blocks can
+    /// peek up to 5 frames out. Subsequent calls in the same frame (the next iteration of the
     /// SAME `map`/`grep`/etc.) only refresh `_` and `_0` so `_<` keeps
     /// pointing at the **enclosing scope's** topic, not the previous
     /// iteration's value. This is the "frame-based" reading: from inside a
@@ -1255,9 +1255,9 @@ impl Scope {
 
     /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all
     /// args. Also sets `$_` to the first argument (if any) and shifts the
-    /// outer-topic chain on EVERY positional slot ever activated, so a 4-deep
-    /// nested block can read `_2<<<<` to reach the third positional argument
-    /// from 4 frames up. (Stryke-only — no other language has nested implicit
+    /// outer-topic chain on EVERY positional slot ever activated, so a 5-deep
+    /// nested block can read `_2<<<<<` to reach the third positional argument
+    /// from 5 frames up. (Stryke-only — no other language has nested implicit
     /// positionals.)
     ///
     /// The shift fires on slots `0..=max(args.len()-1, max_active_slot)`. A
@@ -1283,13 +1283,14 @@ impl Scope {
     /// Shift slot N's outer-topic chain by one level and install `val` as the
     /// new current value. Internal helper for [`set_topic`] / [`set_closure_args`].
     ///
-    /// Writes ALL 5 levels unconditionally — even when the previous values
+    /// Writes ALL 6 levels unconditionally — even when the previous values
     /// are `undef` — so chain semantics stay intact across frames that don't
     /// bind every active slot. Without the unconditional write, a stale value
     /// at `_N<` would persist across multiple "no slot N here" frames and
-    /// `_N<<<<` would never reach 4 frames back.
+    /// `_N<<<<<` would never reach 5 frames back.
     #[inline]
     fn shift_slot_chain(&mut self, slot: usize, val: PerlValue) {
+        let l4 = self.get_scalar(&Self::topic_slot_key(slot, 4));
         let l3 = self.get_scalar(&Self::topic_slot_key(slot, 3));
         let l2 = self.get_scalar(&Self::topic_slot_key(slot, 2));
         let l1 = self.get_scalar(&Self::topic_slot_key(slot, 1));
@@ -1300,6 +1301,7 @@ impl Scope {
         self.declare_topic_slot(slot, 2, l1);
         self.declare_topic_slot(slot, 3, l2);
         self.declare_topic_slot(slot, 4, l3);
+        self.declare_topic_slot(slot, 5, l4);
     }
 
     /// Set the canonical sort/reduce binding pair: `$a` / `$b` (Perl-isms) AND

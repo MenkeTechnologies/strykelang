@@ -279,9 +279,8 @@ fn delete_array_slice_is_rejected_today() {
 fn delete_hash_slice_is_rejected_today() {
     // BUG-043: `delete @h{qw(a b)}` similarly rejected.
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; join(",", sort keys %h)"#,
-    );
+    let kind =
+        eval_err_kind(r#"my %h = (a=>1, b=>2, c=>3); delete @h{qw(a b)}; join(",", sort keys %h)"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected runtime error, got {:?}",
@@ -336,9 +335,7 @@ fn aop_after_dollar_question_is_zero_not_return_value_today() {
 #[test]
 fn hash_reverse_swaps_keys_and_values() {
     assert_eq!(
-        eval_string(
-            r#"my %h = (a=>1, b=>2); my %r = reverse %h; "$r{1}/$r{2}""#
-        ),
+        eval_string(r#"my %h = (a=>1, b=>2); my %r = reverse %h; "$r{1}/$r{2}""#),
         "a/b"
     );
 }
@@ -347,10 +344,7 @@ fn hash_reverse_swaps_keys_and_values() {
 
 #[test]
 fn trim_via_substitute_r_flag() {
-    assert_eq!(
-        eval_string(r#""  trimme  " =~ s/^\s+|\s+$//gr"#),
-        "trimme"
-    );
+    assert_eq!(eval_string(r#""  trimme  " =~ s/^\s+|\s+$//gr"#), "trimme");
 }
 
 // ── async/await over array of futures ───────────────────────────────────────
@@ -369,10 +363,7 @@ fn async_array_then_await_all() {
 
 #[test]
 fn async_returns_asynctask_ref_kind() {
-    assert_eq!(
-        eval_string(r#"my $f = async { 42 }; ref($f)"#),
-        "ASYNCTASK"
-    );
+    assert_eq!(eval_string(r#"my $f = async { 42 }; ref($f)"#), "ASYNCTASK");
 }
 
 // ── Print returns 1; explicit `return;` yields undef ────────────────────────
@@ -386,50 +377,32 @@ fn print_in_scalar_context_returns_one() {
 
 #[test]
 fn explicit_bare_return_yields_undef() {
-    assert_eq!(
-        eval_int(r#"sub myr { return; } defined(myr()) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"sub myr { return; } defined(myr()) ? 1 : 0"#), 0);
 }
 
 // ── Non-greedy and alternation captures ─────────────────────────────────────
 
 #[test]
 fn non_greedy_a_plus_question_takes_one() {
-    assert_eq!(
-        eval_string(r#""aaaa" =~ /(a+?)/; $1"#),
-        "a"
-    );
+    assert_eq!(eval_string(r#""aaaa" =~ /(a+?)/; $1"#), "a");
 }
 
 #[test]
 fn greedy_a_plus_takes_all() {
-    assert_eq!(
-        eval_string(r#""aaaa" =~ /(a+)/; $1"#),
-        "aaaa"
-    );
+    assert_eq!(eval_string(r#""aaaa" =~ /(a+)/; $1"#), "aaaa");
 }
 
 #[test]
 fn alternation_capture_returns_match() {
-    assert_eq!(
-        eval_string(r#""cat" =~ /^(cat|dog|bird)$/; $1"#),
-        "cat"
-    );
-    assert_eq!(
-        eval_int(r#""elephant" =~ /^(cat|dog|bird)$/ ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_string(r#""cat" =~ /^(cat|dog|bird)$/; $1"#), "cat");
+    assert_eq!(eval_int(r#""elephant" =~ /^(cat|dog|bird)$/ ? 1 : 0"#), 0);
 }
 
 // ── Lookbehind only ─────────────────────────────────────────────────────────
 
 #[test]
 fn lookbehind_two_chars_then_match() {
-    assert_eq!(
-        eval_int(r#""abc" =~ /(?<=ab)c/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abc" =~ /(?<=ab)c/ ? 1 : 0"#), 1);
 }
 
 // ── Array concatenation flattens ────────────────────────────────────────────

@@ -2,8 +2,8 @@
 //! that imports this module and `tests/suite/*`.
 
 use stryke::error::ErrorKind;
-use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
+use stryke::vm_helper::VMHelper;
 
 /// Parse and execute Perl code; panics on parse or runtime error.
 pub fn eval(code: &str) -> PerlValue {

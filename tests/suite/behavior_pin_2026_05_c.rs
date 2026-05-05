@@ -70,9 +70,7 @@ fn substr_negative_offset() {
 #[test]
 fn substr_four_arg_replaces_in_place_and_returns_old() {
     assert_eq!(
-        eval_string(
-            r#"my $s = "Hello World"; my $r = substr($s, 6, 5, "Stryke"); "s=$s r=$r""#
-        ),
+        eval_string(r#"my $s = "Hello World"; my $r = substr($s, 6, 5, "Stryke"); "s=$s r=$r""#),
         "s=Hello Stryke r=World"
     );
 }
@@ -125,10 +123,7 @@ fn substr_lvalue_zero_length_at_end_appends() {
 #[test]
 fn vec_lvalue_byte_assignment() {
     // PARITY-010 FIXED: `vec($s, $offset, $bits) = N` compiles and assigns.
-    assert_eq!(
-        eval_string(r#"my $s = ""; vec($s, 0, 8) = 65; $s"#),
-        "A"
-    );
+    assert_eq!(eval_string(r#"my $s = ""; vec($s, 0, 8) = 65; $s"#), "A");
     assert_eq!(
         eval_string(r#"my $s = ""; vec($s, 0, 8) = 0x41; vec($s, 1, 8) = 0x42; $s"#),
         "AB"
@@ -438,10 +433,7 @@ fn list_returning_sub_in_scalar_context_yields_last() {
     // a scalar yields the last element of the list (Perl wantarray
     // semantics). Coercion happens at Op::ReturnValue when the caller's
     // wantarray context is Scalar.
-    assert_eq!(
-        eval_string(r#"sub xs { (1, 2, 3) } my $s = xs(); $s"#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"sub xs { (1, 2, 3) } my $s = xs(); $s"#), "3");
 }
 
 #[test]
@@ -471,7 +463,10 @@ fn while_my_pair_each_rejected_at_runtime_today() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind(r#"my %h = (a=>1); while (my ($k, $v) = each %h) {}"#);
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected error of some kind, got {:?}",
         kind
     );
@@ -705,10 +700,7 @@ fn hash_to_array_flattens_to_kv_pairs() {
 
 #[test]
 fn printf_negative_width_left_justifies() {
-    assert_eq!(
-        eval_string(r#"sprintf("%-5d|", -3)"#),
-        "-3   |"
-    );
+    assert_eq!(eval_string(r#"sprintf("%-5d|", -3)"#), "-3   |");
 }
 
 #[test]

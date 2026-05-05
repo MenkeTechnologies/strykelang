@@ -40,8 +40,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::Block;
-use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::value::{PerlSub, PerlValue};
+use crate::vm_helper::{FlowOrError, VMHelper};
 
 /// Frame-kind discriminator. Stored as the first byte of every wire payload after the
 /// length prefix. Sub-byte values are reserved (anything outside the documented set is

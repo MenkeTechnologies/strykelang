@@ -2749,7 +2749,11 @@ fn format_float(f: f64) -> String {
         return "NaN".to_string();
     }
     if f.is_infinite() {
-        return if f.is_sign_negative() { "-Inf".to_string() } else { "Inf".to_string() };
+        return if f.is_sign_negative() {
+            "-Inf".to_string()
+        } else {
+            "Inf".to_string()
+        };
     }
     if f.fract() == 0.0 && f.abs() < 1e16 {
         format!("{}", f as i64)

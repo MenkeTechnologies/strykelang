@@ -94,7 +94,10 @@ fn closure_modifying_outer_scalar_is_compile_error() {
            $inc->()"#,
     );
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Syntax | ErrorKind::Type),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Syntax | ErrorKind::Type
+        ),
         "expected closure-write error, got {:?}",
         kind
     );
@@ -182,10 +185,7 @@ fn slurpy_hash_destructure_takes_tail() {
 
 #[test]
 fn pure_scalar_destructure_works() {
-    assert_eq!(
-        eval_string(r#"my ($a, $b) = (1, 2); "$a/$b""#),
-        "1/2"
-    );
+    assert_eq!(eval_string(r#"my ($a, $b) = (1, 2); "$a/$b""#), "1/2");
 }
 
 #[test]
@@ -289,10 +289,7 @@ fn keys_then_for_iterates_in_insertion_order() {
 
 #[test]
 fn flock_locks_and_releases_file() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_flock_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_flock_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let n = eval_int(&format!(
         r#"open my $fh, ">", "{0}" or die;
@@ -311,10 +308,7 @@ fn flock_locks_and_releases_file() {
 
 #[test]
 fn sysopen_creates_writable_file() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_sysopen_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_sysopen_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     // O_WRONLY|O_CREAT|O_TRUNC = 0x202|0x40|0x200 (varies by platform).
     // Use Fcntl-style constants if available; otherwise a plain open will
@@ -332,10 +326,7 @@ fn sysopen_creates_writable_file() {
 
 #[test]
 fn append_mode_does_not_truncate() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_append_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_append_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
         r#"open my $fh, ">", "{0}"; print $fh "first\n"; close $fh;
@@ -352,10 +343,7 @@ fn append_mode_does_not_truncate() {
 
 #[test]
 fn open_read_mode_reads_lines() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_read_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_read_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     std::fs::write(&f, "alpha\nbeta\ngamma\n").unwrap();
     let n = eval_int(&format!(
@@ -376,10 +364,7 @@ fn eof_always_returns_false_today() {
     // BUG-098: `eof($fh)` should return true after the last line has been
     // read. Stryke returns 0/false in both before-read and after-read
     // states.
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_eof_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_eof_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     std::fs::write(&f, "x\n").unwrap();
     let n = eval_int(&format!(
@@ -398,10 +383,7 @@ fn eof_always_returns_false_today() {
 
 #[test]
 fn chmod_then_dash_x_returns_truth() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_x_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_x_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let n = eval_int(&format!(
         r#"open my $fh, ">", "{0}" or die; close $fh;
@@ -419,10 +401,7 @@ fn chmod_then_dash_x_returns_truth() {
 
 #[test]
 fn readline_on_eof_filehandle_returns_undef() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_eof2_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_eof2_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     std::fs::write(&f, "").unwrap();
     let n = eval_int(&format!(
@@ -440,10 +419,7 @@ fn readline_on_eof_filehandle_returns_undef() {
 
 #[test]
 fn read_line_in_scalar_returns_first_line_with_terminator() {
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_line_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_line_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     std::fs::write(&f, "alpha\nbeta\n").unwrap();
     let s = eval_string(&format!(
@@ -461,19 +437,13 @@ fn read_line_in_scalar_returns_first_line_with_terminator() {
 
 #[test]
 fn unlink_returns_count_of_deleted_files() {
-    let a = std::env::temp_dir().join(format!(
-        "stryke_pin_ua_{}", std::process::id()
-    ));
-    let b = std::env::temp_dir().join(format!(
-        "stryke_pin_ub_{}", std::process::id()
-    ));
+    let a = std::env::temp_dir().join(format!("stryke_pin_ua_{}", std::process::id()));
+    let b = std::env::temp_dir().join(format!("stryke_pin_ub_{}", std::process::id()));
     std::fs::write(&a, "").unwrap();
     std::fs::write(&b, "").unwrap();
     let pa = a.to_string_lossy().to_string();
     let pb = b.to_string_lossy().to_string();
-    let n = eval_int(&format!(
-        r#"unlink "{}", "{}""#, pa, pb
-    ));
+    let n = eval_int(&format!(r#"unlink "{}", "{}""#, pa, pb));
     let _ = std::fs::remove_file(&a);
     let _ = std::fs::remove_file(&b);
     assert_eq!(n, 2);
@@ -487,9 +457,7 @@ fn print_braces_filehandle_form_does_not_write_to_handle_today() {
     // when `$fh` is a non-trivial expression. Stryke parses `{$fh}` as a
     // hash-deref or block, then prints the result to STDOUT instead. The
     // file is left empty.
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_brace_{}", std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_brace_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
         r#"open my $fh, ">", "{0}" or die;

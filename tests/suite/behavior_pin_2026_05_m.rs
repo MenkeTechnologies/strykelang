@@ -26,9 +26,7 @@ fn begin_block_mutations_to_package_vars_lost_today() {
 fn end_blocks_run_in_lifo_order_at_exit() {
     // We can't observe END from inside `eval` (it fires at interpreter exit,
     // not at lib eval). Just confirm the source parses.
-    assert!(
-        stryke::parse(r#"END { 1 } END { 2 } print "main""#).is_ok()
-    );
+    assert!(stryke::parse(r#"END { 1 } END { 2 } print "main""#).is_ok());
 }
 
 #[test]
@@ -94,9 +92,7 @@ fn class_self_dot_new_can_be_overridden() {
 #[test]
 fn struct_positional_construction_assigns_fields() {
     assert_eq!(
-        eval_string(
-            r#"struct Pt { x => Int, y => Int } my $p = Pt(3, 4); "$p->{x}/$p->{y}""#
-        ),
+        eval_string(r#"struct Pt { x => Int, y => Int } my $p = Pt(3, 4); "$p->{x}/$p->{y}""#),
         "3/4"
     );
 }
@@ -106,9 +102,7 @@ fn struct_does_not_have_pkg_new_today() {
     // BUG-074: structs lack a `Pkg::new(...)` constructor. Use the bareword
     // form `Pt(3, 4)`.
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"struct Pt { x => Int, y => Int } Pt::new(3, 4)"#,
-    );
+    let kind = eval_err_kind(r#"struct Pt { x => Int, y => Int } Pt::new(3, 4)"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::UndefinedSubroutine),
         "expected undefined-subroutine, got {:?}",
@@ -155,9 +149,7 @@ fn enum_members_compare_unequal_to_other_member() {
 #[test]
 fn class_field_setter_rejects_wrong_type() {
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"class P { x: Int = 0 } my $p = P(); $p->x("string")"#,
-    );
+    let kind = eval_err_kind(r#"class P { x: Int = 0 } my $p = P(); $p->x("string")"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected type error, got {:?}",
@@ -176,11 +168,12 @@ fn class_field_setter_accepts_correct_type() {
 #[test]
 fn class_private_field_rejects_external_access() {
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"class Frozen { priv v: Int = 0 } my $f = Frozen(); $f->v"#,
-    );
+    let kind = eval_err_kind(r#"class Frozen { priv v: Int = 0 } my $f = Frozen(); $f->v"#);
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected access error, got {:?}",
         kind
     );
@@ -238,26 +231,17 @@ fn dollar_one_in_substitution_inserts_capture() {
 
 #[test]
 fn named_backref_via_g_brace() {
-    assert_eq!(
-        eval_int(r#""abcabc" =~ /^(?<w>\w+)\g{w}$/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abcabc" =~ /^(?<w>\w+)\g{w}$/ ? 1 : 0"#), 1);
 }
 
 #[test]
 fn named_backref_via_k_angle() {
-    assert_eq!(
-        eval_int(r#""abcabc" =~ /^(?<w>\w+)\k<w>$/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abcabc" =~ /^(?<w>\w+)\k<w>$/ ? 1 : 0"#), 1);
 }
 
 #[test]
 fn numeric_backref_g_brace() {
-    assert_eq!(
-        eval_int(r#""abcabc" =~ /^(\w+)\g{1}$/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abcabc" =~ /^(\w+)\g{1}$/ ? 1 : 0"#), 1);
 }
 
 // ── Regex (?(DEFINE)...) named subroutine reference ─────────────────────────
@@ -282,19 +266,19 @@ fn regex_named_subroutine_pattern_compiles() {
 fn multiline_qq_includes_newlines_in_length() {
     // qq{...} body: "\nhello\ngoodbye\n" = 1 + 5 + 1 + 7 + 1 = 15 bytes.
     assert_eq!(
-        eval_int(r#"my $s = qq{
+        eval_int(
+            r#"my $s = qq{
 hello
 goodbye
-}; length($s)"#),
+}; length($s)"#
+        ),
         15
     );
 }
 
 #[test]
 fn heredoc_code_interp_via_dollar_brace_backslash() {
-    let out = eval_string(
-        "my $x = 10; my $s = <<\"EOF\";\nv=$x d=${\\ ($x*2)}\nEOF\n$s",
-    );
+    let out = eval_string("my $x = 10; my $s = <<\"EOF\";\nv=$x d=${\\ ($x*2)}\nEOF\n$s");
     assert_eq!(out, "v=10 d=20\n");
 }
 
@@ -317,10 +301,7 @@ fn multiline_regex_m_g_collects_per_line_matches() {
 #[test]
 fn fn_with_attribute_pure_runs_normally() {
     // Stryke parses `:pure` as an attribute hint and the function still runs.
-    assert_eq!(
-        eval_int(r#"fn add($a, $b) :pure { $a + $b } add(2, 3)"#),
-        5
-    );
+    assert_eq!(eval_int(r#"fn add($a, $b) :pure { $a + $b } add(2, 3)"#), 5);
 }
 
 // ── Reverse a string in scalar context ─────────────────────────────────────
@@ -338,9 +319,7 @@ fn postfix_for_on_my_at_assign_is_rejected_today() {
     // supported on this statement form". Workaround: write the loop
     // explicitly.
     use stryke::error::ErrorKind;
-    let kind = parse_err_kind(
-        r#"sub myff { @_ } my @r = myff($_ > 0 ? "p" : "n") for (-1, 1)"#,
-    );
+    let kind = parse_err_kind(r#"sub myff { @_ } my @r = myff($_ > 0 ? "p" : "n") for (-1, 1)"#);
     assert!(
         matches!(kind, ErrorKind::Syntax),
         "expected syntax error, got {:?}",
@@ -350,10 +329,7 @@ fn postfix_for_on_my_at_assign_is_rejected_today() {
 
 #[test]
 fn postfix_for_on_simple_expression_works() {
-    assert_eq!(
-        eval_string(r#"my $r = ""; $r .= "x" for 1..3; $r"#),
-        "xxx"
-    );
+    assert_eq!(eval_string(r#"my $r = ""; $r .= "x" for 1..3; $r"#), "xxx");
 }
 
 // ── Integer wrap / overflow ────────────────────────────────────────────────
@@ -361,10 +337,7 @@ fn postfix_for_on_simple_expression_works() {
 #[test]
 fn i64_max_plus_one_wraps_to_min() {
     // 9_223_372_036_854_775_807 + 1 wraps in i64.
-    assert_eq!(
-        eval_int("9223372036854775807 + 1"),
-        i64::MIN
-    );
+    assert_eq!(eval_int("9223372036854775807 + 1"), i64::MIN);
 }
 
 #[test]
@@ -429,9 +402,7 @@ fn shared_hashref_writes_visible_through_all_aliases() {
 #[test]
 fn chained_assignment_propagates_value() {
     assert_eq!(
-        eval_string(
-            r#"my ($a, $b, $c); $a = $b = $c = 5; "a=$a b=$b c=$c""#
-        ),
+        eval_string(r#"my ($a, $b, $c); $a = $b = $c = 5; "a=$a b=$b c=$c""#),
         "a=5 b=5 c=5"
     );
 }
@@ -559,10 +530,7 @@ END
 
 #[test]
 fn slash_tmp_is_writable_directory() {
-    assert_eq!(
-        eval_int(r#"-d "/tmp" && -w "/tmp" ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"-d "/tmp" && -w "/tmp" ? 1 : 0"#), 1);
 }
 
 #[test]

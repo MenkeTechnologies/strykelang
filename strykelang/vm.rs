@@ -12,16 +12,16 @@ use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam}
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::vm_helper::{
-    fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
-    FlowOrError, VMHelper, WantarrayCtx,
-};
 use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
     perl_list_range_expand, PerlAsyncTask, PerlBarrier, PerlHeap, PerlSub, PerlValue,
     PipelineInner, PipelineOp,
+};
+use crate::vm_helper::{
+    fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
+    FlowOrError, VMHelper, WantarrayCtx,
 };
 use parking_lot::Mutex;
 use std::sync::Barrier;
@@ -663,11 +663,11 @@ impl<'a> VM<'a> {
         if let Some(sub) = val.as_code_ref() {
             let sub = sub.clone();
             let line = self.line();
-            return Ok(vm_interp_result(
+            return vm_interp_result(
                 self.interp
                     .call_sub(&sub, vec![item.clone()], WantarrayCtx::Scalar, line),
                 line,
-            )?);
+            );
         }
         Ok(val)
     }
@@ -2289,7 +2289,7 @@ impl<'a> VM<'a> {
                     match result {
                         Ok(v) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Flow(
-                                crate::vm_helper::Flow::Return(v),
+                            crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
@@ -2371,7 +2371,7 @@ impl<'a> VM<'a> {
                     match out {
                         Ok(v) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Flow(
-                                crate::vm_helper::Flow::Return(v),
+                            crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
@@ -2402,7 +2402,7 @@ impl<'a> VM<'a> {
                     match result {
                         Ok(v) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Flow(
-                                crate::vm_helper::Flow::Return(v),
+                            crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
                         Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
@@ -2457,7 +2457,7 @@ impl<'a> VM<'a> {
                                             return Err(e)
                                         }
                                         Err(crate::vm_helper::FlowOrError::Flow(
-                                                crate::vm_helper::Flow::Return(v),
+                                            crate::vm_helper::Flow::Return(v),
                                         )) => self.push(v),
                                         _ => self.push(PerlValue::UNDEF),
                                     }
@@ -4047,13 +4047,13 @@ impl<'a> VM<'a> {
                             let _ = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| crate::vm_helper::perl_inc(v));
+                                .atomic_mutate_post(en, crate::vm_helper::perl_inc);
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| crate::vm_helper::perl_inc(v));
+                                .atomic_mutate_post(en, crate::vm_helper::perl_inc);
                             self.push(old);
                         }
                         Ok(())
@@ -4194,10 +4194,7 @@ impl<'a> VM<'a> {
                         // whole list propagates and a `my $x = sub_returning_list()`
                         // sees the array stringified rather than its last element.
                         // (BUG-010 / BUG-011)
-                        let val = if matches!(
-                            self.interp.wantarray_kind,
-                            WantarrayCtx::Scalar
-                        ) {
+                        let val = if matches!(self.interp.wantarray_kind, WantarrayCtx::Scalar) {
                             if let Some(items) = val.as_array_vec() {
                                 items.last().cloned().unwrap_or(PerlValue::UNDEF)
                             } else {
@@ -5361,9 +5358,7 @@ impl<'a> VM<'a> {
                                 crate::map_stream::SubstStreamIterator::new(
                                     source,
                                     re,
-                                    crate::vm_helper::normalize_replacement_backrefs(
-                                        &replacement,
-                                    ),
+                                    crate::vm_helper::normalize_replacement_backrefs(&replacement),
                                     global,
                                 ),
                             )));
@@ -6351,7 +6346,7 @@ impl<'a> VM<'a> {
                             match result {
                                 Ok(v) => self.push(v),
                                 Err(crate::vm_helper::FlowOrError::Flow(
-                                        crate::vm_helper::Flow::Return(v),
+                                    crate::vm_helper::Flow::Return(v),
                                 )) => self.push(v),
                                 Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                                 Err(_) => self.push(PerlValue::UNDEF),
@@ -6673,9 +6668,7 @@ impl<'a> VM<'a> {
                                             result.push(item);
                                         }
                                     }
-                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
-                                        return Err(e)
-                                    }
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                                     Err(_) => {}
                                 }
                             }
@@ -6730,9 +6723,7 @@ impl<'a> VM<'a> {
                                 self.interp.scope.set_topic(item);
                                 match self.interp.exec_block(&block) {
                                     Ok(_) => {}
-                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
-                                        return Err(e)
-                                    }
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                                     Err(_) => {}
                                 }
                             }
@@ -8960,9 +8951,7 @@ impl<'a> VM<'a> {
                     msg.push_str(&self.interp.die_warn_at_suffix(line));
                     msg.push('\n');
                 }
-                if let Err(e) = self.interp.fire_pseudosig_die(&msg, line) {
-                    return Err(e);
-                }
+                self.interp.fire_pseudosig_die(&msg, line)?;
                 Err(PerlError::die(msg, line))
             }
             Some(BuiltinId::Warn) => {

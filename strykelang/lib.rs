@@ -29,7 +29,6 @@ pub mod error;
 mod fib_like_tail;
 pub mod fmt;
 pub mod format;
-pub mod vm_helper;
 mod jit;
 mod jwt;
 pub mod lexer;
@@ -77,6 +76,7 @@ pub mod stress;
 pub mod token;
 pub mod value;
 pub mod vm;
+pub mod vm_helper;
 pub mod web;
 pub mod web_orm;
 
@@ -120,7 +120,6 @@ static NO_INTEROP_MODE: AtomicBool = AtomicBool::new(false);
 /// can opt into bigint semantics without dragging in the rest of compat.
 static BIGINT_PRAGMA: AtomicBool = AtomicBool::new(false);
 
-
 /// Enable Perl 5 strict-compatibility mode (disables all stryke extensions).
 pub fn set_compat_mode(on: bool) {
     COMPAT_MODE.store(on, Ordering::Relaxed);
@@ -143,7 +142,6 @@ pub fn set_bigint_pragma(on: bool) {
 pub fn bigint_pragma() -> bool {
     BIGINT_PRAGMA.load(Ordering::Relaxed)
 }
-
 
 /// Enable no-interop mode (rejects Perl-isms, forces idiomatic stryke).
 pub fn set_no_interop_mode(on: bool) {

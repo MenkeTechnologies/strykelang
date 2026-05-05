@@ -12,9 +12,9 @@ use crossbeam::channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
 
 use crate::error::{PerlError, PerlResult};
-use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, PerlValue};
+use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 struct ParPipelineSpec {
     source: Arc<PerlSub>,

@@ -10,16 +10,10 @@ use crate::common::*;
 fn sprintf_n_writes_byte_count_through_scalar_ref() {
     // BUG-079 FIXED: `%n` writes the number of bytes emitted so far into
     // the referent of the arg (which must be a scalar ref).
-    assert_eq!(
-        eval_int(r#"my $n; sprintf("hello%n world", \$n); $n"#),
-        5
-    );
+    assert_eq!(eval_int(r#"my $n; sprintf("hello%n world", \$n); $n"#), 5);
     // Also works mid-format with width: "%5d:" produces 6 bytes of output
     // before the %n point, so $n should be 6.
-    assert_eq!(
-        eval_int(r#"my $n; sprintf("%5d:%n done", 42, \$n); $n"#),
-        6
-    );
+    assert_eq!(eval_int(r#"my $n; sprintf("%5d:%n done", 42, \$n); $n"#), 6);
 }
 
 #[test]
@@ -61,9 +55,7 @@ fn hash_literal_keys_in_insertion_order() {
 #[test]
 fn hash_progressive_assignment_preserves_order() {
     assert_eq!(
-        eval_string(
-            r#"my %h; $h{$_} = 1 for qw(z x y a m); join(",", keys %h)"#
-        ),
+        eval_string(r#"my %h; $h{$_} = 1 for qw(z x y a m); join(",", keys %h)"#),
         "z,x,y,a,m"
     );
 }
@@ -71,9 +63,7 @@ fn hash_progressive_assignment_preserves_order() {
 #[test]
 fn hash_delete_preserves_remaining_order() {
     assert_eq!(
-        eval_string(
-            r#"my %h = (a=>1, b=>2, c=>3); delete $h{b}; join(",", keys %h)"#
-        ),
+        eval_string(r#"my %h = (a=>1, b=>2, c=>3); delete $h{b}; join(",", keys %h)"#),
         "a,c"
     );
 }
@@ -84,10 +74,7 @@ fn hash_delete_preserves_remaining_order() {
 fn float_range_with_half_step_yields_integer_only() {
     // Perl: `(0.5..2.5)` is the same as `(0..2)` because `..` truncates
     // toward zero on both ends. Pin the same.
-    assert_eq!(
-        eval_string(r#"my @a = (0.5..2.5); "@a""#),
-        "0 1 2"
-    );
+    assert_eq!(eval_string(r#"my @a = (0.5..2.5); "@a""#), "0 1 2");
 }
 
 // ── Integer % div semantics in default mode ────────────────────────────────
@@ -229,18 +216,12 @@ fn interpolated_string_pattern_matches() {
 
 #[test]
 fn qr_pattern_can_be_reused() {
-    assert_eq!(
-        eval_int(r#"my $r = qr/abc/; "abcdef" =~ $r ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $r = qr/abc/; "abcdef" =~ $r ? 1 : 0"#), 1);
 }
 
 #[test]
 fn qr_pattern_with_modifier_keeps_modifier() {
-    assert_eq!(
-        eval_int(r#"my $r = qr/abc/i; "ABCdef" =~ $r ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $r = qr/abc/i; "ABCdef" =~ $r ? 1 : 0"#), 1);
 }
 
 // ── Hash slice assignment ──────────────────────────────────────────────────
@@ -274,10 +255,7 @@ fn printf_to_filehandle_writes_to_stdout_today() {
     // BUG-085: `printf $fh "fmt", ...` should write to `$fh`. Stryke
     // ignores the filehandle and writes to STDOUT (the file ends up empty).
     // Plain `print $fh "..."` does honor the filehandle correctly.
-    let f = std::env::temp_dir().join(format!(
-        "stryke_pin_printf_{}",
-        std::process::id()
-    ));
+    let f = std::env::temp_dir().join(format!("stryke_pin_printf_{}", std::process::id()));
     let path = f.to_string_lossy().to_string();
     let _ = eval_string(&format!(
         r#"open my $fh, ">", "{}" or die;
@@ -298,10 +276,7 @@ fn printf_to_filehandle_writes_to_stdout_today() {
 #[test]
 fn print_to_stdout_with_array_uses_no_separator_default() {
     // We confirm via sprintf-like inversion: `join "" @a` == raw print.
-    assert_eq!(
-        eval_string(r#"my @a = (1,2,3); join("", @a)"#),
-        "123"
-    );
+    assert_eq!(eval_string(r#"my @a = (1,2,3); join("", @a)"#), "123");
 }
 
 // ── die with newline strips line-info; without newline appends it ──────────
@@ -354,9 +329,7 @@ fn percent_d_truncates_negative_float_toward_zero() {
 
 #[test]
 fn split_emulating_dash_capital_f_pattern_parses() {
-    assert!(
-        stryke::parse(r#"my @F = split(/:/, "a:b:c"); print "@F""#).is_ok()
-    );
+    assert!(stryke::parse(r#"my @F = split(/:/, "a:b:c"); print "@F""#).is_ok());
 }
 
 // ── Parallel control: --threads accepts (parse-level pin only) ─────────────

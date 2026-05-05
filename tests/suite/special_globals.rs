@@ -1,10 +1,10 @@
 //! High-impact Perl globals: `$]`, `$;`, `$^*`, `$ARGV` + `<>`, `@-` / `@+`, `$^S`, `%INC` / `%SIG`.
 
 use crate::common::*;
-use stryke::vm_helper::VMHelper;
 use stryke::parse;
 use stryke::perl_bracket_version;
 use stryke::value::PerlValue;
+use stryke::vm_helper::VMHelper;
 
 #[test]
 fn bracket_version_matches_helper() {
