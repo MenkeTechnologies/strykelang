@@ -24,6 +24,11 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-004** — division-by-zero (and modulus-by-zero) now raise
+  `ErrorKind::DivisionByZero` instead of `ErrorKind::Runtime`. The
+  user-visible message ("Illegal division by zero" / "Illegal modulus
+  zero") is unchanged. Lets `try`/`catch` and lib-API consumers match
+  the kind specifically.
 - **PARITY-003** — `use bigint;` (and `use bignum;` / `use bigrat;`)
   now activates BigInt promotion for `**`, `+`, `-`, `*`, and `*=`.
   Same numeric-promotion path as `--compat` but gated by the source-
@@ -140,7 +145,7 @@ is a known limitation rather than oversight. Worth pinning so the float
 formatter doesn't change shape silently.
 
 
-## PARITY-004 — Division by zero surfaces as `ErrorKind::Runtime`, not `DivisionByZero`
+## PARITY-004 — Division by zero surfaces as `ErrorKind::Runtime`, not `DivisionByZero` — **FIXED**
 
 `ErrorKind::DivisionByZero` exists as a variant in `error.rs:17`, but the
 1/0 path raises a `Runtime` error with message `"Illegal division by zero"`.
