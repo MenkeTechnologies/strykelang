@@ -17,6 +17,12 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-012** — `use overload "+" => sub { ... }` now accepts
+  anonymous-sub handlers. Parser promotes the anon body to a synthetic
+  top-level `__overload_anon_N` SubDecl; install_use_overload_pairs
+  re-binds it under the current package so dispatch resolves
+  `Pkg::__overload_anon_N`. Named-sub form (`"+" => "add"`) keeps
+  working.
 - **PARITY-011** — `CORE::keyword(...)` now parses identically to bare
   `keyword(...)`. Parser strips a leading `CORE::` prefix before the
   keyword-dispatch match, so `CORE::length` produces `ExprKind::Length`,
@@ -384,18 +390,23 @@ Tests: `core_prefix_routes_to_builtin_keyword` (8 builtins),
 Severity: **parity** (FIXED).
 
 
-## PARITY-012 — `use overload "+" => sub { ... }` rejects anonymous-sub handlers
+## PARITY-012 — `use overload "+" => sub { ... }` rejects anonymous-sub handlers — **FIXED**
 
-```sh
-$ stryke -e 'package N; use overload "+" => sub { 1 }'
-overload handler must be a string literal, number (e.g. fallback => 1),
-or \&subname (method in current package) at -e line 1.
-```
+`expr_to_overload_sub` now recognises `ExprKind::CodeRef { params, body }`
+(an anonymous `sub { ... }` block) in the value position of a `use
+overload` pair. The parser promotes the anon body to a synthetic top-
+level `SubDecl` named `__overload_anon_N` (incrementing counter), and
+the overload-pair value records that synthetic name. At install time
+(`Interpreter::install_use_overload_pairs`), if the value starts with
+`__overload_anon_`, the synthetic sub is re-bound under the current
+package as `Pkg::__overload_anon_N` so the operator-dispatch lookup
+(`Pkg::sub_short`) at runtime resolves.
 
-Workaround: declare a named sub and pass `\&name`. Perl 5 accepts
-anonymous subs directly.
+Tests: `use_overload_accepts_anonymous_subroutine_for_op_plus`,
+`use_overload_accepts_anonymous_subroutine_for_stringify`,
+`use_overload_named_handler_still_works` (backward compat).
 
-Severity: **parity**.
+Severity: **parity** (FIXED).
 
 
 ## BUG-002 — Blessed arrayrefs stringify with `HASH` tag
