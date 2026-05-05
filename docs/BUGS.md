@@ -17,6 +17,13 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-010** — `vec($s, $offset, $bits) = N` lvalue now works in
+  both the VM and tree-walking interpreter. Compiler rewrites the
+  assignment to `$s = vec_set_value(...)`; interpreter handles the
+  `FuncCall { name == "vec" }` target inline. While fixing the lvalue,
+  the existing 16/32-bit `vec` *read* path was also corrected — Perl
+  uses big-endian byte order for multi-byte BITS, and zero-pads
+  past-the-end reads (stryke previously did neither).
 - **PARITY-013** — `length` now respects `use utf8;`. With the pragma
   active, scalar args count Unicode codepoints; without it, UTF-8
   bytes. Raw byte buffers always return byte count. Honored by both
@@ -329,15 +336,31 @@ Tests: `sprintf_positional_arg_emits_literal_today`.
 Severity: **parity** (i18n-relevant).
 
 
-## PARITY-010 — `vec($s, $offset, $bits) = N` rejected as complex lvalue
+## PARITY-010 — `vec($s, $offset, $bits) = N` rejected as complex lvalue — **FIXED**
 
-```sh
-$ stryke -e 'my $s = ""; vec($s, 0, 8) = 65; print $s'
-VM compile error (unsupported): Assign to complex lvalue at -e line 0.
-```
+`vec(...) = $rhs` is now supported in both the bytecode VM and the tree-
+walking interpreter. The compiler rewrites `vec($s, $o, $b) = $rhs` into
+`$s = vec_set_value($s, $o, $b, $rhs)` (a new internal helper builtin
+that returns the modified bit-buffer). The interpreter's `assign_value`
+recognises the `FuncCall { name == "vec", args }` lvalue shape and does
+the in-place bit set inline.
 
-Severity: **parity**. `vec` lvalue assignment is the standard way to do
-bit-packing in Perl 5.
+While fixing the lvalue path, the existing `vec` *read* impl was also
+corrected: Perl uses **big-endian** byte order for multi-byte BITS (16 /
+32) and zero-pads past the end of the string. Stryke previously read
+little-endian and returned 0 on out-of-range reads.
+
+Tests: `vec_lvalue_byte_assignment`, `vec_read_8_bit`,
+`vec_lvalue_16_bit_big_endian`, `vec_lvalue_32_bit_round_trip`,
+`vec_read_zero_pads_past_end`.
+
+Known limitation: writes that produce non-UTF-8 bytes (e.g.,
+`vec($s, 7, 1) = 1` → byte 0x80) round-trip through `PerlValue::bytes`,
+but downstream `substr` / `ord` on those byte values still apply
+UTF-8/Latin-1 decoding, which can corrupt single-byte indexing. This is
+the same string-vs-bytes interaction that affects `pack` output.
+
+Severity: **parity** (FIXED for the documented lvalue case).
 
 
 ## PARITY-011 — `CORE::*` namespace not available
