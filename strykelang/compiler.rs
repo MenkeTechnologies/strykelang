@@ -5942,22 +5942,33 @@ impl Compiler {
                     kind: DerefKind::Hash,
                 } = &inner.kind
                 {
-                    self.compile_arrow_hash_base_expr(container)?;
-                    self.compile_expr(index)?;
-                    self.emit_op(Op::ExistsArrowHashElem, line, Some(root));
+                    // Multi-level chains (e.g. `exists $h{x}{y}{z}`) need
+                    // undef-tolerant intermediate eval — route through
+                    // `ExistsExpr` (which calls `eval_exists_operand` and
+                    // soft-fails on undef intermediates). (BUG-009)
+                    if matches!(container.kind, ExprKind::ArrowDeref { .. }) {
+                        let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
+                        self.emit_op(Op::ExistsExpr(pool), line, Some(root));
+                    } else {
+                        self.compile_arrow_hash_base_expr(container)?;
+                        self.compile_expr(index)?;
+                        self.emit_op(Op::ExistsArrowHashElem, line, Some(root));
+                    }
                 } else if let ExprKind::ArrowDeref {
                     expr: container,
                     index,
                     kind: DerefKind::Array,
                 } = &inner.kind
                 {
-                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
+                    if !arrow_deref_arrow_subscript_is_plain_scalar_index(index)
+                        || matches!(container.kind, ExprKind::ArrowDeref { .. })
+                    {
+                        let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
+                        self.emit_op(Op::ExistsExpr(pool), line, Some(root));
+                    } else {
                         self.compile_expr(container)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::ExistsArrowArrayElem, line, Some(root));
-                    } else {
-                        let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
-                        self.emit_op(Op::ExistsExpr(pool), line, Some(root));
                     }
                 } else {
                     let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
