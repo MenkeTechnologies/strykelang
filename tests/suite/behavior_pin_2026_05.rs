@@ -298,19 +298,41 @@ fn min_max_variadic() {
     assert_eq!(eval_int("max(3, 1, 2)"), 3);
 }
 
-// ── `1/0` raises an error ────────────────────────────────────────────────────
+// ── `1/0` raises `ErrorKind::DivisionByZero` (PARITY-004 FIXED) ──────────────
 //
-// Today stryke reports `1 / 0` as `ErrorKind::Runtime` even though
-// `ErrorKind::DivisionByZero` exists as a variant. The error message text is
-// "Illegal division by zero". Tracked in `docs/BUGS.md` (PARITY-004).
+// `/` and `%` now route through `ErrorKind::DivisionByZero`. The
+// user-visible message ("Illegal division by zero" / "Illegal modulus
+// zero") is unchanged.
 
 #[test]
-fn division_by_zero_is_runtime_error_today() {
+fn division_by_zero_uses_division_by_zero_kind() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind("1 / 0");
     assert!(
-        matches!(kind, ErrorKind::Runtime),
-        "current behavior: division-by-zero surfaces as Runtime, got {:?}",
+        matches!(kind, ErrorKind::DivisionByZero),
+        "expected DivisionByZero, got {:?}",
+        kind
+    );
+}
+
+#[test]
+fn modulus_zero_uses_division_by_zero_kind() {
+    use stryke::error::ErrorKind;
+    let kind = eval_err_kind("1 % 0");
+    assert!(
+        matches!(kind, ErrorKind::DivisionByZero),
+        "expected DivisionByZero, got {:?}",
+        kind
+    );
+}
+
+#[test]
+fn float_division_by_zero_uses_division_by_zero_kind() {
+    use stryke::error::ErrorKind;
+    let kind = eval_err_kind("1.5 / 0.0");
+    assert!(
+        matches!(kind, ErrorKind::DivisionByZero),
+        "expected DivisionByZero, got {:?}",
         kind
     );
 }

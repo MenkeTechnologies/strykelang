@@ -36,8 +36,8 @@ fn run_last_expression_string_value() {
 
 #[test]
 fn run_returns_err_on_division_by_zero() {
-    let e = run("1/0").expect_err("runtime error");
-    assert_eq!(e.kind, ErrorKind::Runtime);
+    let e = run("1/0").expect_err("division-by-zero error");
+    assert_eq!(e.kind, ErrorKind::DivisionByZero);
 }
 
 #[test]

@@ -3560,7 +3560,7 @@ impl<'a> VM<'a> {
                         self.push_binop_with_overload(BinOp::Div, a, b, |a, b| {
                             if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
                                 if y == 0 {
-                                    return Err(PerlError::runtime(
+                                    return Err(PerlError::division_by_zero(
                                         "Illegal division by zero",
                                         line,
                                     ));
@@ -3573,7 +3573,7 @@ impl<'a> VM<'a> {
                             } else {
                                 let d = b.to_number();
                                 if d == 0.0 {
-                                    return Err(PerlError::runtime(
+                                    return Err(PerlError::division_by_zero(
                                         "Illegal division by zero",
                                         line,
                                     ));
@@ -3590,7 +3590,10 @@ impl<'a> VM<'a> {
                             let b = b.to_int();
                             let a = a.to_int();
                             if b == 0 {
-                                return Err(PerlError::runtime("Illegal modulus zero", line));
+                                return Err(PerlError::division_by_zero(
+                                    "Illegal modulus zero",
+                                    line,
+                                ));
                             }
                             Ok(PerlValue::integer(a % b))
                         })
