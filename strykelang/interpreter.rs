@@ -3855,6 +3855,12 @@ impl Interpreter {
 
     /// Register subs, run `use` in source order, collect `BEGIN`/`END` (before `BEGIN` execution).
     pub(crate) fn prepare_program_top_level(&mut self, program: &Program) -> PerlResult<()> {
+        // Reset per-interpreter pragma flags. Each new program scan starts
+        // clean; pragmas activate only when the program contains `use utf8;`
+        // / `use bigint;` etc. (Globals like `BIGINT_PRAGMA` stay sticky
+        // across runs in the same process — bigint tests that need
+        // isolation use subprocess invocation.)
+        self.utf8_pragma = false;
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Package { name } => {
@@ -11543,9 +11549,16 @@ impl Interpreter {
                 } else if let Some(h) = val.as_hash_map() {
                     PerlValue::integer(h.len() as i64)
                 } else if let Some(b) = val.as_bytes_arc() {
+                    // Raw byte buffer: always byte count, regardless of utf8 pragma.
                     PerlValue::integer(b.len() as i64)
                 } else {
-                    PerlValue::integer(val.to_string().len() as i64)
+                    let s = val.to_string();
+                    let n = if self.utf8_pragma {
+                        s.chars().count()
+                    } else {
+                        s.len()
+                    };
+                    PerlValue::integer(n as i64)
                 })
             }
             ExprKind::Substr {

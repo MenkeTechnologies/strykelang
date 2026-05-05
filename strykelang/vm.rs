@@ -8574,9 +8574,16 @@ impl<'a> VM<'a> {
                 } else if let Some(h) = val.as_hash_map() {
                     PerlValue::integer(h.len() as i64)
                 } else if let Some(b) = val.as_bytes_arc() {
+                    // Raw byte buffer: always byte count, regardless of utf8 pragma.
                     PerlValue::integer(b.len() as i64)
                 } else {
-                    PerlValue::integer(val.to_string().len() as i64)
+                    let s = val.to_string();
+                    let n = if self.interp.utf8_pragma {
+                        s.chars().count()
+                    } else {
+                        s.len()
+                    };
+                    PerlValue::integer(n as i64)
                 })
             }
             Some(BuiltinId::Defined) => {
