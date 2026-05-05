@@ -488,3 +488,31 @@ fn sort_numeric_comparator_orders_correctly() {
         "5,7,30"
     );
 }
+
+// ── CORE:: namespace ────────────────────────────────────────────────────────
+
+#[test]
+fn core_prefix_routes_to_builtin_keyword() {
+    // PARITY-011 FIXED: `CORE::keyword(...)` parses identically to bare
+    // `keyword(...)` so the same `ExprKind::Length` / `Print` / etc. is
+    // produced. Matches Perl 5's documented `CORE::` namespace.
+    assert_eq!(eval_int(r#"CORE::length("abc")"#), 3);
+    assert_eq!(eval_int(r#"CORE::abs(-5)"#), 5);
+    assert_eq!(eval_int(r#"CORE::ord("A")"#), 65);
+    assert_eq!(eval_string(r#"CORE::chr(65)"#), "A");
+    assert_eq!(eval_int(r#"CORE::int(3.7)"#), 3);
+    assert_eq!(eval_string(r#"CORE::uc("abc")"#), "ABC");
+    assert_eq!(eval_string(r#"CORE::lc("ABC")"#), "abc");
+    assert_eq!(eval_int(r#"my @a = (1,2,3); CORE::scalar(@a)"#), 3);
+}
+
+#[test]
+fn core_prefix_works_inside_print_arg() {
+    // `print CORE::length(...)` — the inner CORE:: call has to parse as a
+    // builtin call, not as an unknown sub, even when nested inside a list
+    // operator.
+    assert_eq!(
+        eval_string(r#"my $r = ""; $r .= CORE::uc("abc"); $r .= "/"; $r .= CORE::length("hello"); $r"#),
+        "ABC/5"
+    );
+}

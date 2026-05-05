@@ -8712,6 +8712,16 @@ impl Parser {
             }
         }
 
+        // `CORE::length(...)` etc. — strip the explicit core-dispatch prefix so
+        // the keyword arms below match the bare name and produce the same
+        // `ExprKind::Length` / `ExprKind::Print` / etc. as the unprefixed form.
+        // Matches Perl 5's `CORE::` namespace, which routes back to the
+        // built-in implementation regardless of any same-named user sub.
+        // (PARITY-011)
+        if let Some(rest) = name.strip_prefix("CORE::") {
+            name = rest.to_string();
+        }
+
         match name.as_str() {
             "__FILE__" => Ok(Expr {
                 kind: ExprKind::MagicConst(MagicConstKind::File),
