@@ -20,9 +20,7 @@ fn use_constant_arithmetic() {
 fn use_constant_arrayref_holds_list() {
     // Array-of-strings constants must be wrapped in an arrayref.
     assert_eq!(
-        eval_string(
-            r#"use constant DAYS => [qw(mon tue wed)]; join(",", @{DAYS()})"#
-        ),
+        eval_string(r#"use constant DAYS => [qw(mon tue wed)]; join(",", @{DAYS()})"#),
         "mon,tue,wed"
     );
 }
@@ -45,7 +43,10 @@ fn use_constant_hashref_form_is_rejected_today() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind(r#"use constant { ZERO => 0, ONE => 1 }; ZERO"#);
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected error, got {:?}",
         kind
     );
@@ -79,26 +80,17 @@ fn use_warnings_silent_on_undef_arithmetic_today() {
     // BUG-087: Perl with `use warnings` emits "Use of uninitialized value"
     // for `$undef + 1`. Stryke runs silently. Pin: the program returns 1
     // (undef → 0 numerically) without diagnostics.
-    assert_eq!(
-        eval_int(r#"use warnings; my $x; my $y = $x + 1; $y"#),
-        1
-    );
+    assert_eq!(eval_int(r#"use warnings; my $x; my $y = $x + 1; $y"#), 1);
 }
 
 #[test]
 fn use_warnings_silent_on_string_in_numeric_today() {
-    assert_eq!(
-        eval_int(r#"use warnings; "abc" + 1"#),
-        1
-    );
+    assert_eq!(eval_int(r#"use warnings; "abc" + 1"#), 1);
 }
 
 #[test]
 fn no_warnings_pragma_runs_without_error() {
-    assert_eq!(
-        eval_int(r#"no warnings; my $x; my $y = $x + 1; $y"#),
-        1
-    );
+    assert_eq!(eval_int(r#"no warnings; my $x; my $y = $x + 1; $y"#), 1);
 }
 
 // ── Math edge values ────────────────────────────────────────────────────────
@@ -247,9 +239,7 @@ fn multiline_g_m_walks_all_kv_pairs() {
 #[test]
 fn substitution_with_m_flag_per_line() {
     assert_eq!(
-        eval_string(
-            r#"my $s = "abc\ndef\nghi"; $s =~ s/^(\w+)$/<$1>/gm; $s"#
-        ),
+        eval_string(r#"my $s = "abc\ndef\nghi"; $s =~ s/^(\w+)$/<$1>/gm; $s"#),
         "<abc>\n<def>\n<ghi>"
     );
 }
@@ -287,10 +277,7 @@ fn i64_min_literal_via_subtraction_wraps_to_i64_max() {
     // `-9223372036854775808` cannot be parsed as a literal because the
     // positive form doesn't fit in i64. Build i64::MIN by subtraction and
     // confirm the wrap.
-    assert_eq!(
-        eval_int("(-9223372036854775807) - 1 - 1"),
-        i64::MAX
-    );
+    assert_eq!(eval_int("(-9223372036854775807) - 1 - 1"), i64::MAX);
 }
 
 // ── Complex regex with captured groups vs /m anchor ────────────────────────
@@ -332,10 +319,7 @@ fn use_constant_qw_becomes_arrayref_string() {
 fn lib_eval_runs_undef_arith_without_warnings() {
     // Pinned at the actual numeric result (1) — this would warn under Perl
     // -w, but stryke produces no diagnostic.
-    assert_eq!(
-        eval_int(r#"my $x; my $y = $x + 1; $y"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $x; my $y = $x + 1; $y"#), 1);
 }
 
 // ── Use constant computed at compile time ──────────────────────────────────
@@ -381,10 +365,7 @@ fn intercept_remove_unknown_kind_does_not_panic() {
 
 #[test]
 fn pi_squared_is_close_to_known_value() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.4f", pi * pi)"#),
-        "9.8696"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.4f", pi * pi)"#), "9.8696");
 }
 
 // ── String ranges with mixed chars ─────────────────────────────────────────
@@ -392,10 +373,7 @@ fn pi_squared_is_close_to_known_value() {
 #[test]
 fn string_range_letters_and_digits_advance_lex() {
     // "a"..."d" steps through lex chars.
-    assert_eq!(
-        eval_string(r#"join(",", "a"..."d")"#),
-        "a,b,c,d"
-    );
+    assert_eq!(eval_string(r#"join(",", "a"..."d")"#), "a,b,c,d");
 }
 
 // ── Array slice with stride via grep ────────────────────────────────────────

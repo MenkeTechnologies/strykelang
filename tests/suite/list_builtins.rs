@@ -1,8 +1,8 @@
 //! Tests for stryke list builtins (sum, min, max, uniq, reduce, zip, pairs, ...)
 //! for `%INC` / `require`. Use `Interpreter::new()` so subs are registered (tests may add `vendor/perl` to `@INC`).
 
-use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
+use stryke::vm_helper::VMHelper;
 use stryke::{parse, vendor_perl_inc_path};
 
 fn with_vendor_inc() -> VMHelper {

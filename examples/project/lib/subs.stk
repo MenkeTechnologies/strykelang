@@ -126,11 +126,11 @@ fn compose_fn($f, $g) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn apply_to_each($fn, @items) {
-    map { $fn(_) } @items
+    map $fn, @items
 }
 
 fn filter_with($fn, @items) {
-    grep { $fn(_) } @items
+    grep $fn, @items
 }
 
 fn reduce_with($fn, $init, @items) {

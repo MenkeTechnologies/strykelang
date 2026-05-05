@@ -116,9 +116,9 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{default_libcall_names, Linkage, Module};
 
 use crate::bytecode::Op;
-use crate::vm_helper::WantarrayCtx;
 use crate::nanbox;
 use crate::value::PerlValue;
+use crate::vm_helper::WantarrayCtx;
 
 type LinearFn0 = unsafe extern "C" fn() -> i64;
 /// Slot table, plain name table, compiled-sub arg table (fixed order; unused pointers may be null).
@@ -4323,8 +4323,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_uses_jit_path_for_pure_int() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(40), 1);
@@ -4339,8 +4339,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_uses_jit_with_integer_load_const() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         let idx = c.add_constant(PerlValue::integer(40));
@@ -4356,8 +4356,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_get_scalar_plain_add() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         let idx = c.intern_name("v");
@@ -4374,8 +4374,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_lognot() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(0), 1);
@@ -4389,8 +4389,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_num_cmp() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(2), 1);
@@ -4455,8 +4455,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_declare_slot_post_inc() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(10), 1);
@@ -4487,8 +4487,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_pow_slot_to_const_exp() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(2), 1);
@@ -5005,8 +5005,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_block_jit_for_loop() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         // for ($i=0; $i<10; $i++) { $sum += $i } → 45
         let mut c = Chunk::new();
@@ -5039,8 +5039,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_block_jit_conditional() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         // if (1) { 42 } else { 0 }
         let mut c = Chunk::new();
@@ -5153,8 +5153,8 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_set_scalar_plain() {
-        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
+        use crate::vm_helper::VMHelper;
 
         let mut c = Chunk::new();
         let idx = c.intern_name("x");

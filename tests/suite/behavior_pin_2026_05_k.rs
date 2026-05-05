@@ -100,10 +100,7 @@ fn head_list_then_n_returns_first_n() {
 fn head_n_first_returns_just_n_today() {
     // BUG-065: passing `head(N, LIST)` (Perl-ish ordering) returns just the
     // count `N`, not the first N elements.
-    assert_eq!(
-        eval_string(r#"my @r = head(3, qw(a b c d e)); "@r""#),
-        "3"
-    );
+    assert_eq!(eval_string(r#"my @r = head(3, qw(a b c d e)); "@r""#), "3");
 }
 
 #[test]
@@ -120,10 +117,7 @@ fn tail_no_count_returns_last_element_only() {
 #[test]
 fn tail_list_then_count_returns_last_n() {
     // `tail(LIST, N)` returns the last N items, mirroring `head(LIST, N)`.
-    assert_eq!(
-        eval_string(r#"my @r = tail(1..5, 2); "@r""#),
-        "4 5"
-    );
+    assert_eq!(eval_string(r#"my @r = tail(1..5, 2); "@r""#), "4 5");
 }
 
 // ── enumerate / counter / find / max_by / min_by ────────────────────────────
@@ -188,20 +182,14 @@ fn zip_three_equal_arrays_yields_three_triplets() {
 #[test]
 fn zip_unequal_arrays_pads_to_longer() {
     // Stryke pads shorter input with undef so the result has max-length rows.
-    assert_eq!(
-        eval_int(r#"my @r = zip [1,2], [10,20,30]; scalar @r"#),
-        3
-    );
+    assert_eq!(eval_int(r#"my @r = zip [1,2], [10,20,30]; scalar @r"#), 3);
 }
 
 // ── Path manipulation ──────────────────────────────────────────────────────
 
 #[test]
 fn basename_strips_directory_prefix() {
-    assert_eq!(
-        eval_string(r#"basename("/usr/local/bin/foo")"#),
-        "foo"
-    );
+    assert_eq!(eval_string(r#"basename("/usr/local/bin/foo")"#), "foo");
 }
 
 #[test]
@@ -285,10 +273,7 @@ fn at_prefix_undeclared_array_evaluates_to_empty_list() {
     // From inside the library `eval` API, `@undeclared_name` is treated as
     // an empty array, not as a stryke shell-dispatch. The `@`-prefix is a
     // CLI/embedding feature, not a source-level construct.
-    assert_eq!(
-        eval_int(r#"my @r = @stk_test_undefined_xx; scalar @r"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @r = @stk_test_undefined_xx; scalar @r"#), 0);
 }
 
 // ── `find_index` not implemented ────────────────────────────────────────────
@@ -352,7 +337,10 @@ fn psort_sorts_via_comparator() {
 
 #[test]
 fn x_operator_and_repeat_builtin_agree() {
-    assert_eq!(eval_string(r#""ab" x 3"#), eval_string(r#"repeat("ab", 3)"#));
+    assert_eq!(
+        eval_string(r#""ab" x 3"#),
+        eval_string(r#"repeat("ab", 3)"#)
+    );
 }
 
 // ── enumerate edge case: empty list ─────────────────────────────────────────

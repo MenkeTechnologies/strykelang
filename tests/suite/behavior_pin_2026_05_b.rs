@@ -175,10 +175,7 @@ fn destroy_runs_at_scope_exit() {
 
 #[test]
 fn pipe_with_array_var_through_map_and_sum() {
-    assert_eq!(
-        eval_int(r#"my @a = (1..5); sum(@a |> map { _ * 2 })"#),
-        30
-    );
+    assert_eq!(eval_int(r#"my @a = (1..5); sum(@a |> map { _ * 2 })"#), 30);
 }
 
 #[test]
@@ -250,10 +247,7 @@ fn psort_orders_numbers_ascending() {
 
 #[test]
 fn async_await_returns_value() {
-    assert_eq!(
-        eval_int(r#"my $f = async { 42 }; await $f"#),
-        42
-    );
+    assert_eq!(eval_int(r#"my $f = async { 42 }; await $f"#), 42);
 }
 
 // ── `chomp` array form is a wart ──────────────────────────────────────────────
@@ -306,7 +300,10 @@ fn sprintf_g_format_picks_shortest_representation() {
     // zeros, matching Perl's libc-style format.
     assert_eq!(eval_string(r#"sprintf("%g", 0.0001)"#), "0.0001");
     assert_eq!(eval_string(r#"sprintf("%g", 1234567)"#), "1.23457e+06");
-    assert_eq!(eval_string(r#"sprintf("%g", 1.234567890123456)"#), "1.23457");
+    assert_eq!(
+        eval_string(r#"sprintf("%g", 1.234567890123456)"#),
+        "1.23457"
+    );
     assert_eq!(eval_string(r#"sprintf("%g", 0.00001)"#), "1e-05");
     assert_eq!(eval_string(r#"sprintf("%G", 1.234e-5)"#), "1.234E-05");
 }
@@ -314,10 +311,7 @@ fn sprintf_g_format_picks_shortest_representation() {
 #[test]
 fn sprintf_e_format_uses_perl_exponent_form() {
     // PARITY-007 FIXED: exponent has explicit sign and is zero-padded to 2.
-    assert_eq!(
-        eval_string(r#"sprintf("%e", 12345.6789)"#),
-        "1.234568e+04"
-    );
+    assert_eq!(eval_string(r#"sprintf("%e", 12345.6789)"#), "1.234568e+04");
     assert_eq!(eval_string(r#"sprintf("%.0e", 12345)"#), "1e+04");
     assert_eq!(eval_string(r#"sprintf("%E", 12345.6789)"#), "1.234568E+04");
 }
@@ -328,7 +322,7 @@ fn sprintf_v_format_yields_dot_joined_byte_values() {
     // joined by ".".
     assert_eq!(
         eval_string(r#"sprintf("%vd", "1.2.3")"#),
-        "49.46.50.46.51"  // ASCII for '1','.','2','.','3'
+        "49.46.50.46.51" // ASCII for '1','.','2','.','3'
     );
     assert_eq!(eval_string(r#"sprintf("%vd", "abc")"#), "97.98.99");
     assert_eq!(eval_string(r#"sprintf("%vx", "AB")"#), "41.42");
@@ -374,7 +368,11 @@ fn caller_zero_omits_subroutine_name_today() {
     // First two are package + filename, both populated. Fourth (sub name) is
     // currently empty — pin that.
     assert!(out.starts_with("main,-e,"), "unexpected prefix: {:?}", out);
-    assert!(out.ends_with(","), "expected trailing empty subname, got {:?}", out);
+    assert!(
+        out.ends_with(","),
+        "expected trailing empty subname, got {:?}",
+        out
+    );
 }
 
 // ── `kv-slice` yields key-value pairs (BUG-008 FIXED) ────────────────────────
@@ -427,15 +425,11 @@ fn exists_on_present_chain_returns_true() {
 #[test]
 fn exists_on_three_level_missing_returns_false() {
     assert_eq!(
-        eval_int(
-            r#"my %h = (a => {b => {c => 1}}); exists $h{x}{y}{z} ? 1 : 0"#
-        ),
+        eval_int(r#"my %h = (a => {b => {c => 1}}); exists $h{x}{y}{z} ? 1 : 0"#),
         0
     );
     assert_eq!(
-        eval_int(
-            r#"my %h = (a => {b => {c => 1}}); exists $h{a}{b}{c} ? 1 : 0"#
-        ),
+        eval_int(r#"my %h = (a => {b => {c => 1}}); exists $h{a}{b}{c} ? 1 : 0"#),
         1
     );
 }
@@ -457,10 +451,7 @@ fn exists_through_array_chain_soft_fails() {
 #[test]
 fn exists_through_non_ref_intermediate_returns_false() {
     // $h{a} = 5 (scalar) — `exists $h{a}{x}` returns false in Perl.
-    assert_eq!(
-        eval_int(r#"my %h = (a => 5); exists $h{a}{x} ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my %h = (a => 5); exists $h{a}{x} ? 1 : 0"#), 0);
 }
 
 // ── `Util->greet(...)` of `fn Self.greet($name)` passes class as $name ───────
@@ -490,14 +481,8 @@ fn try_catch_catches_die_string() {
 
 #[test]
 fn die_with_arrayref_preserves_ref_in_dollar_at() {
-    assert_eq!(
-        eval_int(r#"eval { die [10, 20, 30] }; scalar @{$@}"#),
-        3
-    );
-    assert_eq!(
-        eval_string(r#"eval { die [10, 20, 30] }; ref $@"#),
-        "ARRAY"
-    );
+    assert_eq!(eval_int(r#"eval { die [10, 20, 30] }; scalar @{$@}"#), 3);
+    assert_eq!(eval_string(r#"eval { die [10, 20, 30] }; ref $@"#), "ARRAY");
 }
 
 // ── Subroutine signatures (Perl 5.20+ style) ─────────────────────────────────
@@ -513,9 +498,7 @@ fn use_feature_signatures_works() {
 #[test]
 fn prototype_returns_string() {
     assert_eq!(
-        eval_string(
-            r#"sub myfx ($) { $_[0] } my $r = \&myfx; prototype($r)"#
-        ),
+        eval_string(r#"sub myfx ($) { $_[0] } my $r = \&myfx; prototype($r)"#),
         "$"
     );
 }

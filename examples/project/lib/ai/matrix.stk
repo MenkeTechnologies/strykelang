@@ -26,7 +26,7 @@ class Matrix {
 
     fn map($func) {
         my $new_data = [map {
-            [map { $func->(_) } @$_]
+            [map $func, @$_]
         } @{$self->data}]
         Matrix::from_array($new_data)
     }

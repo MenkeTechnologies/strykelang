@@ -236,7 +236,10 @@ fn clamp_direct_multi_value_list() {
 fn redefining_builtin_id_is_rejected() {
     let res = stryke::parse(r#"sub id { $_[0] }"#)
         .and_then(|p| stryke::vm_helper::VMHelper::new().execute(&p));
-    assert!(res.is_err(), "redefining `id` (a stryke builtin) must error");
+    assert!(
+        res.is_err(),
+        "redefining `id` (a stryke builtin) must error"
+    );
 }
 
 #[test]
@@ -270,7 +273,10 @@ fn succ_on_string_numifies_to_zero_plus_one() {
 
 #[test]
 fn signum_three_way() {
-    assert_eq!(eval_string(r#"join(",", signum(-7), signum(0), signum(7))"#), "-1,0,1");
+    assert_eq!(
+        eval_string(r#"join(",", signum(-7), signum(0), signum(7))"#),
+        "-1,0,1"
+    );
 }
 
 #[test]
@@ -385,7 +391,10 @@ fn pow_2_64_uses_float_notation() {
 #[test]
 fn print_default_separator_is_empty() {
     // No $, set; print concatenates list items.
-    assert_eq!(eval_string(r#"my @a=(1,2,3); my $s=""; for (@a){$s.=$_} $s"#), "123");
+    assert_eq!(
+        eval_string(r#"my @a=(1,2,3); my $s=""; for (@a){$s.=$_} $s"#),
+        "123"
+    );
 }
 
 #[test]
@@ -408,10 +417,7 @@ fn last_index_dollar_hash() {
 
 #[test]
 fn eval_die_with_hashref_preserves_ref() {
-    assert_eq!(
-        eval_int(r#"eval { die { code => 42 } }; $@->{code}"#),
-        42
-    );
+    assert_eq!(eval_int(r#"eval { die { code => 42 } }; $@->{code}"#), 42);
     assert_eq!(
         eval_string(r#"eval { die { code => 42 } }; ref $@"#),
         "HASH"
@@ -439,7 +445,10 @@ fn spaceship_three_way_numbers() {
 #[test]
 fn exists_distinct_from_defined_for_undef_value() {
     assert_eq!(eval_int(r#"my %h = (a => undef); exists $h{a} ? 1 : 0"#), 1);
-    assert_eq!(eval_int(r#"my %h = (a => undef); defined $h{a} ? 1 : 0"#), 0);
+    assert_eq!(
+        eval_int(r#"my %h = (a => undef); defined $h{a} ? 1 : 0"#),
+        0
+    );
 }
 
 // ── `qw//` produces a list ────────────────────────────────────────────────────
@@ -510,18 +519,12 @@ fn sprintf_hex_octal_binary() {
 
 #[test]
 fn split_on_comma_pattern() {
-    assert_eq!(
-        eval_string(r#"join("|", split(/,/, "a,b,c"))"#),
-        "a|b|c"
-    );
+    assert_eq!(eval_string(r#"join("|", split(/,/, "a,b,c"))"#), "a|b|c");
 }
 
 #[test]
 fn split_empty_pattern_splits_into_chars() {
-    assert_eq!(
-        eval_string(r#"join("|", split(//, "abc"))"#),
-        "a|b|c"
-    );
+    assert_eq!(eval_string(r#"join("|", split(//, "abc"))"#), "a|b|c");
 }
 
 // ── Anonymous sub via `sub` and `fn` keywords are equivalent at call site ────

@@ -4,9 +4,9 @@ use std::process::Command;
 use std::sync::Arc;
 
 use crate::error::{PerlError, PerlResult};
-use crate::vm_helper::VMHelper;
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::value::{CaptureResult, PerlValue};
+use crate::vm_helper::VMHelper;
 
 /// Run `cmd` through `sh -c` and return stdout as a string (Perl `` `...` `` / `qx`).
 /// Updates [`VMHelper::child_exit_status`] (`$?`) like [`run_capture`] and `system`.

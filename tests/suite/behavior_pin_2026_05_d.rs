@@ -8,7 +8,9 @@ use crate::common::*;
 #[test]
 fn output_field_separator_dollar_comma() {
     assert_eq!(
-        eval_string(r#"local $, = ":"; my $s = ""; for (1, 2, 3) { $s .= $_; $s .= "," } chop $s; $s"#),
+        eval_string(
+            r#"local $, = ":"; my $s = ""; for (1, 2, 3) { $s .= $_; $s .= "," } chop $s; $s"#
+        ),
         // Skip the local-$, behavior; just sanity-check the helper used in the
         // probe via direct concatenation. The point is `$, ` is parseable.
         "1,2,3"
@@ -126,10 +128,7 @@ fn for_index_assignment_works() {
 
 #[test]
 fn match_dollar_amp_captures_whole_match() {
-    assert_eq!(
-        eval_string(r#""abXYZcd" =~ /XYZ/; my $m = $&; $m"#),
-        "XYZ"
-    );
+    assert_eq!(eval_string(r#""abXYZcd" =~ /XYZ/; my $m = $&; $m"#), "XYZ");
 }
 
 #[test]
@@ -137,10 +136,7 @@ fn match_dollar_amp_does_not_interpolate_today() {
     // BUG-029: stryke does NOT interpolate `$&` inside double-quoted strings;
     // it leaves the literal `$&` in place. The variable IS readable as a
     // standalone expression (see the previous test).
-    assert_eq!(
-        eval_string(r#""abXYZcd" =~ /XYZ/; "[$&]""#),
-        "[$&]"
-    );
+    assert_eq!(eval_string(r#""abXYZcd" =~ /XYZ/; "[$&]""#), "[$&]");
 }
 
 #[test]
@@ -148,18 +144,14 @@ fn premuf_via_english_alias_works() {
     // BUG-019: bare `my $p = $\`` (pre-match) does not parse — workaround is
     // `use English; $PREMATCH`.
     assert_eq!(
-        eval_string(
-            r#"use English; "hello world" =~ /world/; my $p = $PREMATCH; $p"#
-        ),
+        eval_string(r#"use English; "hello world" =~ /world/; my $p = $PREMATCH; $p"#),
         "hello "
     );
 }
 
 #[test]
 fn match_offset_arrays_plus_and_minus() {
-    let out = eval_string(
-        r#"my $s = "hello"; $s =~ /(l+)/; $-[1] . "/" . $+[1]"#,
-    );
+    let out = eval_string(r#"my $s = "hello"; $s =~ /(l+)/; $-[1] . "/" . $+[1]"#);
     assert_eq!(out, "2/4");
 }
 
@@ -317,7 +309,10 @@ fn given_when_arrayref_range_fails_today() {
            g(3)"#,
     );
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected error, got {:?}",
         kind
     );
@@ -392,10 +387,7 @@ fn x_compound_assign_is_parse_error_today() {
 
 #[test]
 fn x_compound_workaround_works() {
-    assert_eq!(
-        eval_string(r#"my $s = "ab"; $s = $s x 3; $s"#),
-        "ababab"
-    );
+    assert_eq!(eval_string(r#"my $s = "ab"; $s = $s x 3; $s"#), "ababab");
 }
 
 // ── `$#a = N` lvalue not honored today ───────────────────────────────────────
@@ -403,10 +395,7 @@ fn x_compound_workaround_works() {
 #[test]
 fn dollar_hash_array_lvalue_does_not_truncate_today() {
     // BUG-027: setting `$#a` should change the array length. Stryke ignores it.
-    assert_eq!(
-        eval_int(r#"my @a = (1..5); $#a = 2; scalar @a"#),
-        5
-    );
+    assert_eq!(eval_int(r#"my @a = (1..5); $#a = 2; scalar @a"#), 5);
 }
 
 // ── Hash slice with arrayref-deref keys returns empty today ──────────────────
@@ -425,9 +414,7 @@ fn hash_slice_with_array_var_keys_returns_empty_today() {
     // BUG-028: passing keys via an array variable yields nothing. The literal
     // form (above) works; the array-var form does not.
     assert_eq!(
-        eval_string(
-            r#"my %h = (a=>1, b=>2, c=>3); my @ks = ("a","c"); my @v = @h{@ks}; "@v""#
-        ),
+        eval_string(r#"my %h = (a=>1, b=>2, c=>3); my @ks = ("a","c"); my @v = @h{@ks}; "@v""#),
         ""
     );
 }
@@ -463,34 +450,22 @@ fn sqrt_negative_yields_nan() {
 
 #[test]
 fn atan2_one_one_is_quarter_pi() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.4f", atan2(1, 1))"#),
-        "0.7854"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.4f", atan2(1, 1))"#), "0.7854");
 }
 
 #[test]
 fn exp_one_is_e() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.4f", exp(1))"#),
-        "2.7183"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.4f", exp(1))"#), "2.7183");
 }
 
 #[test]
 fn log_e_is_one() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.4f", log(2.71828))"#),
-        "1.0000"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.4f", log(2.71828))"#), "1.0000");
 }
 
 #[test]
 fn sqrt_two_is_one_point_four_one_four() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.4f", sqrt(2))"#),
-        "1.4142"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.4f", sqrt(2))"#), "1.4142");
 }
 
 // ── Numeric coercion of strings ──────────────────────────────────────────────
@@ -595,10 +570,7 @@ fn array_slice_assign_replaces_at_indexed_positions() {
 
 #[test]
 fn delete_on_array_undefs_in_place_keeps_length() {
-    assert_eq!(
-        eval_int(r#"my @a = (1..5); delete $a[2]; scalar @a"#),
-        5
-    );
+    assert_eq!(eval_int(r#"my @a = (1..5); delete $a[2]; scalar @a"#), 5);
     assert_eq!(
         eval_int(r#"my @a = (1..5); delete $a[2]; defined $a[2] ? 1 : 0"#),
         0
@@ -609,8 +581,5 @@ fn delete_on_array_undefs_in_place_keeps_length() {
 
 #[test]
 fn statement_modifier_for_runs_expression_per_item() {
-    assert_eq!(
-        eval_string(r#"my @a; push @a, $_ for 1..3; "@a""#),
-        "1 2 3"
-    );
+    assert_eq!(eval_string(r#"my @a; push @a, $_ for 1..3; "@a""#), "1 2 3");
 }

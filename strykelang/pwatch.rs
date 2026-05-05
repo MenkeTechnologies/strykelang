@@ -7,9 +7,9 @@ use std::sync::Arc;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{PerlError, PerlResult};
-use crate::vm_helper::{VMHelper, WantarrayCtx};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, PerlValue};
+use crate::vm_helper::{VMHelper, WantarrayCtx};
 
 /// Expand `pattern`, register native watches, then block dispatching each matching path to `sub` on a
 /// rayon worker (`$_` = path string).

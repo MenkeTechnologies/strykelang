@@ -3,8 +3,8 @@
 use crate::common::eval_err_kind;
 
 use stryke::error::ErrorKind;
-use stryke::vm_helper::{VMHelper, FEAT_SAY};
 use stryke::parse;
+use stryke::vm_helper::{VMHelper, FEAT_SAY};
 
 #[test]
 fn use_strict_refs_only() {

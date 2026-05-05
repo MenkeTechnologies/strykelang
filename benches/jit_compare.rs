@@ -3,8 +3,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use stryke::bytecode::{Chunk, Op};
-use stryke::vm_helper::VMHelper;
 use stryke::vm::VM;
+use stryke::vm_helper::VMHelper;
 
 /// `for ($i=0; $i<limit; $i++) { $sum += $i }` — returns sum of `0..limit-1`.
 fn block_jit_sum_chunk(limit: i64) -> Chunk {

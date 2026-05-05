@@ -10,11 +10,11 @@ use rayon::prelude::*;
 
 use stryke::ast::Program;
 use stryke::error::{ErrorKind, PerlError};
-use stryke::vm_helper::VMHelper;
 use stryke::perl_fs::{
     decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
     read_logical_line_perl_compat,
 };
+use stryke::vm_helper::VMHelper;
 
 mod repl;
 
@@ -2204,8 +2204,8 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
 /// `stryke BUILTIN [ARGS...]` — invoke a builtin function directly from CLI.
 /// Hierarchy: subcommand → builtin → script. Use `--script` to force script lookup.
 fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
-    use stryke::vm_helper::VMHelper;
     use stryke::value::PerlValue;
+    use stryke::vm_helper::VMHelper;
 
     let mut interp = VMHelper::new();
     let argv_values: Vec<PerlValue> = argv.iter().map(|s| PerlValue::string(s.clone())).collect();

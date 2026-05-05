@@ -1,9 +1,9 @@
 //! Unit tests for `Interpreter`: defaults, `set_file`, and `execute` behavior.
 
 use crate::ast::StmtKind;
-use crate::vm_helper::VMHelper;
 use crate::parse;
 use crate::value::PerlValue;
+use crate::vm_helper::VMHelper;
 
 #[test]
 fn destroy_runs_when_lexical_overwritten_with_undef() {

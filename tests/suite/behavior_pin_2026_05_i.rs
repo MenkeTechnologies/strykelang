@@ -193,9 +193,7 @@ fn sig_warn_handler_recursion_guard_prevents_loop() {
 fn open_with_utf8_layer_is_rejected_today() {
     // BUG-051: `>:utf8` and `<:raw` open modes raise "Unknown open mode".
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"my $f = "/tmp/stryke_pin_utf8_open"; open my $fh, ">:utf8", $f"#,
-    );
+    let kind = eval_err_kind(r#"my $f = "/tmp/stryke_pin_utf8_open"; open my $fh, ">:utf8", $f"#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::IO),
         "expected error, got {:?}",
@@ -219,10 +217,7 @@ fn prototype_of_scalar_is_empty_today() {
 
 #[test]
 fn prototype_of_user_sub_returns_proto_string() {
-    assert_eq!(
-        eval_string(r#"sub myf ($) { $_[0] } prototype \&myf"#),
-        "$"
-    );
+    assert_eq!(eval_string(r#"sub myf ($) { $_[0] } prototype \&myf"#), "$");
     assert_eq!(
         eval_string(r#"sub myf (\@) { $_[0] } prototype \&myf"#),
         "\\@"
@@ -248,10 +243,7 @@ fn exists_ampersand_subname_is_parse_error_today() {
 
 #[test]
 fn defined_ampersand_subname_works() {
-    assert_eq!(
-        eval_int(r#"sub myff { 1 } defined &myff ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"sub myff { 1 } defined &myff ? 1 : 0"#), 1);
 }
 
 // ── Coderef invocation forms (\&sub, &$ref, &$ref(), &$ref(args)) ───────────
@@ -303,26 +295,17 @@ fn reftype_hashref_is_hash() {
 
 #[test]
 fn blessed_returns_class_for_blessed_ref() {
-    assert_eq!(
-        eval_string(r#"my $b = bless {}, "C"; blessed($b)"#),
-        "C"
-    );
+    assert_eq!(eval_string(r#"my $b = bless {}, "C"; blessed($b)"#), "C");
 }
 
 #[test]
 fn blessed_returns_undef_for_unblessed_ref() {
-    assert_eq!(
-        eval_int(r#"defined(blessed([1,2])) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"defined(blessed([1,2])) ? 1 : 0"#), 0);
 }
 
 #[test]
 fn blessed_returns_undef_for_plain_string() {
-    assert_eq!(
-        eval_int(r#"defined(blessed("hello")) ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"defined(blessed("hello")) ? 1 : 0"#), 0);
 }
 
 #[test]
@@ -355,34 +338,22 @@ fn ref_of_anon_sub_is_code() {
 
 #[test]
 fn upper_case_escape_uppercases_until_e() {
-    assert_eq!(
-        eval_string(r#"my $w = "abc"; "\U$w\E end""#),
-        "ABC end"
-    );
+    assert_eq!(eval_string(r#"my $w = "abc"; "\U$w\E end""#), "ABC end");
 }
 
 #[test]
 fn lower_case_escape_lowercases_until_e() {
-    assert_eq!(
-        eval_string(r#"my $w = "ABC"; "\L$w\E end""#),
-        "abc end"
-    );
+    assert_eq!(eval_string(r#"my $w = "ABC"; "\L$w\E end""#), "abc end");
 }
 
 #[test]
 fn ucfirst_escape_uppercases_first_char_only() {
-    assert_eq!(
-        eval_string(r#"my $w = "abc"; "\u$w end""#),
-        "Abc end"
-    );
+    assert_eq!(eval_string(r#"my $w = "abc"; "\u$w end""#), "Abc end");
 }
 
 #[test]
 fn lcfirst_escape_lowercases_first_char_only() {
-    assert_eq!(
-        eval_string(r#"my $w = "ABC"; "\l$w end""#),
-        "aBC end"
-    );
+    assert_eq!(eval_string(r#"my $w = "ABC"; "\l$w end""#), "aBC end");
 }
 
 // ── \U/\L do NOT work in s/// replacement today ──────────────────────────────
@@ -439,10 +410,7 @@ fn percent_plus_named_capture_works() {
 fn printf_d_with_large_float_saturates_to_i64_max_today() {
     // PARITY-018: Perl's `printf "%d", 1e20` wraps and yields -1. Stryke
     // saturates because Rust's `as i64` saturates on overflow.
-    assert_eq!(
-        eval_string(r#"sprintf("%d", 1e20)"#),
-        "9223372036854775807"
-    );
+    assert_eq!(eval_string(r#"sprintf("%d", 1e20)"#), "9223372036854775807");
 }
 
 // ── %a hex-float format not implemented today ───────────────────────────────
@@ -525,10 +493,7 @@ fn splice_replaces_range_with_more_elements() {
 
 #[test]
 fn array_slice_negative_range_yields_tail() {
-    assert_eq!(
-        eval_string(r#"my @a = (10..20); "@a[-3..-1]""#),
-        "18 19 20"
-    );
+    assert_eq!(eval_string(r#"my @a = (10..20); "@a[-3..-1]""#), "18 19 20");
 }
 
 // ── Stringy range with letters ──────────────────────────────────────────────
@@ -537,10 +502,7 @@ fn array_slice_negative_range_yields_tail() {
 fn alpha_range_three_dot_form_works_like_two_dot() {
     // In list context `..` and `...` are equivalent. The flip-flop forms
     // differ only inside conditionals.
-    assert_eq!(
-        eval_string(r#"my @a = ("a"..."f"); "@a""#),
-        "a b c d e f"
-    );
+    assert_eq!(eval_string(r#"my @a = ("a"..."f"); "@a""#), "a b c d e f");
 }
 
 // ── Sub returns CODE(__ANON__) under string concat ──────────────────────────

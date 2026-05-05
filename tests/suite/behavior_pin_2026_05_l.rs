@@ -101,7 +101,10 @@ fn explicit_return_in_around_block_is_rejected_today() {
            val()"#,
     );
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected lowering error, got {:?}",
         kind
     );
@@ -195,7 +198,10 @@ fn parse_ok_for_strict_violator_but_runtime_fails() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind(r#"use strict; $undeclared_xx = 5"#);
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax),
+        matches!(
+            kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+        ),
         "expected runtime/strict error, got {:?}",
         kind
     );
@@ -283,18 +289,12 @@ fn class_state_persists_across_method_chain() {
 
 #[test]
 fn substitution_on_topic_modifies_topic() {
-    assert_eq!(
-        eval_string(r#"$_ = "abc"; s/a/A/; $_"#),
-        "Abc"
-    );
+    assert_eq!(eval_string(r#"$_ = "abc"; s/a/A/; $_"#), "Abc");
 }
 
 #[test]
 fn uppercase_via_uc_on_topic() {
-    assert_eq!(
-        eval_string(r#"$_ = "abc"; uc"#),
-        "ABC"
-    );
+    assert_eq!(eval_string(r#"$_ = "abc"; uc"#), "ABC");
 }
 
 // ── Class with `Array` field accumulates across operations ──────────────────
@@ -416,10 +416,7 @@ fn negative_index_in_array_slice_with_negative_range() {
 #[test]
 fn reduce_with_initial_via_unshift() {
     // Perl idiom: prepend the initial value into the list.
-    assert_eq!(
-        eval_int(r#"reduce { $a + $b } 0, 1..10"#),
-        55
-    );
+    assert_eq!(eval_int(r#"reduce { $a + $b } 0, 1..10"#), 55);
 }
 
 #[test]
@@ -444,10 +441,7 @@ fn splice_with_zero_count_just_inserts() {
 
 #[test]
 fn hash_deref_scalar_form() {
-    assert_eq!(
-        eval_int(r#"my $h = {a=>1, b=>2}; $h->{a} + $h->{b}"#),
-        3
-    );
+    assert_eq!(eval_int(r#"my $h = {a=>1, b=>2}; $h->{a} + $h->{b}"#), 3);
 }
 
 #[test]

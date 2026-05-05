@@ -49,20 +49,14 @@ fn stddev_one_through_five_known_value() {
 
 #[test]
 fn minmax_returns_pair() {
-    assert_eq!(
-        eval_string(r#"join("/", minmax(7, 2, 9, 1, 5))"#),
-        "1/9"
-    );
+    assert_eq!(eval_string(r#"join("/", minmax(7, 2, 9, 1, 5))"#), "1/9");
 }
 
 // ── Sorting variants ────────────────────────────────────────────────────────
 
 #[test]
 fn sorted_returns_ascending_default() {
-    assert_eq!(
-        eval_string(r#"my @r = sorted(3, 1, 2); "@r""#),
-        "1 2 3"
-    );
+    assert_eq!(eval_string(r#"my @r = sorted(3, 1, 2); "@r""#), "1 2 3");
 }
 
 #[test]
@@ -96,20 +90,14 @@ fn take_list_then_count_keeps_first_n() {
     // Stryke's signature is `take(LIST, N)` — list first, count last (the
     // existing `take_first_n_from_list` test in `builtins.rs` documents
     // this). Passing `(N, LIST)` returns an empty list.
-    assert_eq!(
-        eval_string(r#"my @r = take(qw(a b c d), 2); "@r""#),
-        "a b"
-    );
+    assert_eq!(eval_string(r#"my @r = take(qw(a b c d), 2); "@r""#), "a b");
 }
 
 #[test]
 fn take_n_first_signature_returns_empty_today() {
     // BUG-063: the Perl-ish `take(N, LIST)` ordering produces nothing.
     // Pin until the calling convention is unified or aliased.
-    assert_eq!(
-        eval_int(r#"my @r = take(3, 1..10); scalar @r"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @r = take(3, 1..10); scalar @r"#), 0);
 }
 
 #[test]
@@ -176,10 +164,7 @@ fn chunk_while_groups_consecutive_runs() {
 fn chunk_alone_returns_one_arrayref_today() {
     // BUG-058: bare `chunk(2, ...)` returns a single arrayref containing all
     // elements. Use `chunk_n` for the conventional behavior.
-    assert_eq!(
-        eval_int(r#"my @r = chunk(2, 1..6); scalar @r"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my @r = chunk(2, 1..6); scalar @r"#), 1);
 }
 
 // ── partition ───────────────────────────────────────────────────────────────
@@ -229,38 +214,26 @@ fn range_flip_flop_in_conditional_evaluates_as_list_today() {
 
 #[test]
 fn range_with_step_yields_strided_list() {
-    assert_eq!(
-        eval_string(r#"my @a = range(1, 10, 2); "@a""#),
-        "1 3 5 7 9"
-    );
+    assert_eq!(eval_string(r#"my @a = range(1, 10, 2); "@a""#), "1 3 5 7 9");
 }
 
 #[test]
 fn step_with_n_first_signature_returns_empty_today() {
     // BUG-063b: `step(N, LIST)` returns nothing. The `range(start, end,
     // step)` builtin (below) is the way to get a strided list.
-    assert_eq!(
-        eval_int(r#"my @a = step(2, 1..10); scalar @a"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @a = step(2, 1..10); scalar @a"#), 0);
 }
 
 // ── reverse / shuffle / sample ──────────────────────────────────────────────
 
 #[test]
 fn reverse_list_in_print_with_join() {
-    assert_eq!(
-        eval_string(r#"join(",", reverse 1..5)"#),
-        "5,4,3,2,1"
-    );
+    assert_eq!(eval_string(r#"join(",", reverse 1..5)"#), "5,4,3,2,1");
 }
 
 #[test]
 fn shuffle_returns_same_count() {
-    assert_eq!(
-        eval_int(r#"my @r = shuffle 1..5; scalar @r"#),
-        5
-    );
+    assert_eq!(eval_int(r#"my @r = shuffle 1..5; scalar @r"#), 5);
 }
 
 #[test]
@@ -287,10 +260,7 @@ fn sample_returns_subset_of_input() {
 
 #[test]
 fn for_modifier_appends_to_string() {
-    assert_eq!(
-        eval_string(r#"my $r = ""; $r .= $_ for 1..3; $r"#),
-        "123"
-    );
+    assert_eq!(eval_string(r#"my $r = ""; $r .= $_ for 1..3; $r"#), "123");
 }
 
 #[test]
@@ -370,9 +340,7 @@ fn pair_object_does_not_array_deref_today() {
     // Pair has its own accessor methods (`->key`, `->value`) but the
     // arrayref-style interface from List::Util's `pairs` is missing.
     use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
-        r#"my @r = pairs(a => 1, b => 2); my @kv = @{$r[0]}; "@kv""#,
-    );
+    let kind = eval_err_kind(r#"my @r = pairs(a => 1, b => 2); my @kv = @{$r[0]}; "@kv""#);
     assert!(
         matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
         "expected runtime error, got {:?}",
@@ -384,18 +352,12 @@ fn pair_object_does_not_array_deref_today() {
 
 #[test]
 fn two_dot_range_inclusive() {
-    assert_eq!(
-        eval_int(r#"my @a = (1..10); scalar @a"#),
-        10
-    );
+    assert_eq!(eval_int(r#"my @a = (1..10); scalar @a"#), 10);
 }
 
 #[test]
 fn three_dot_range_in_list_context_is_two_dot_synonym() {
-    assert_eq!(
-        eval_string(r#"my @a = (1...5); "@a""#),
-        "1 2 3 4 5"
-    );
+    assert_eq!(eval_string(r#"my @a = (1...5); "@a""#), "1 2 3 4 5");
 }
 
 // ── Defined-or, logical-or, logical-and short-circuit ──────────────────────
@@ -407,18 +369,12 @@ fn defined_or_returns_left_when_zero_present() {
 
 #[test]
 fn logical_or_replaces_zero_with_default() {
-    assert_eq!(
-        eval_string(r#"my $x = 0; $x || "default""#),
-        "default"
-    );
+    assert_eq!(eval_string(r#"my $x = 0; $x || "default""#), "default");
 }
 
 #[test]
 fn logical_and_returns_right_when_left_is_truthy() {
-    assert_eq!(
-        eval_string(r#"my $x = "ok"; $x && "yes""#),
-        "yes"
-    );
+    assert_eq!(eval_string(r#"my $x = "ok"; $x && "yes""#), "yes");
 }
 
 // ── Regex in conditional + capture binding ───────────────────────────────────
@@ -453,10 +409,7 @@ fn parse_accepts_simple_assignment() {
 #[test]
 fn take_bareword_with_n_first_returns_empty_today() {
     // Same calling-convention quirk without parens.
-    assert_eq!(
-        eval_int(r#"my @r = take 3, 1..10; scalar @r"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @r = take 3, 1..10; scalar @r"#), 0);
 }
 
 // ── group_by parse error today ──────────────────────────────────────────────
@@ -466,9 +419,7 @@ fn group_by_with_sub_keyword_is_parse_error_today() {
     // BUG-062: `group_by(sub { ... }, list)` fails with "Expected Comma, got
     // Semicolon" on the call. Same root issue as partition's sub-form.
     use stryke::error::ErrorKind;
-    let kind = parse_err_kind(
-        r#"my %g = group_by(sub { $_ % 2 }, 1..6);"#,
-    );
+    let kind = parse_err_kind(r#"my %g = group_by(sub { $_ % 2 }, 1..6);"#);
     assert!(
         matches!(kind, ErrorKind::Syntax),
         "expected syntax error, got {:?}",

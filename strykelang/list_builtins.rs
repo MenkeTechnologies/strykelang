@@ -71,8 +71,8 @@ use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::vm_helper::{ExecResult, VMHelper, WantarrayCtx};
 use crate::value::{BlessedRef, HeapObject, PerlValue};
+use crate::vm_helper::{ExecResult, VMHelper, WantarrayCtx};
 
 /// Dispatch a list builtin by bare name. Stryke exposes every list builtin as a
 /// bare-name builtin; callers pass the unqualified name (e.g. `"sum"`, `"reduce"`).
@@ -667,10 +667,7 @@ fn windowed_with_want(
     })
 }
 
-fn sample_native(
-    interp: &mut VMHelper,
-    args: &[PerlValue],
-) -> crate::error::PerlResult<PerlValue> {
+fn sample_native(interp: &mut VMHelper, args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(PerlValue::array(vec![]));
     }
@@ -1205,8 +1202,8 @@ fn arg_to_list(v: &PerlValue) -> Vec<PerlValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vm_helper::{VMHelper, WantarrayCtx};
     use crate::value::PerlValue;
+    use crate::vm_helper::{VMHelper, WantarrayCtx};
 
     fn call_native(
         interp: &mut VMHelper,

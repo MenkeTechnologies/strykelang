@@ -77,9 +77,11 @@ fn does_returns_false_for_unrelated_class() {
 #[test]
 fn anon_sub_returns_anon_sub_chain() {
     assert_eq!(
-        eval_int(r#"my $f = sub { my $n = shift; sub { $n + shift } };
+        eval_int(
+            r#"my $f = sub { my $n = shift; sub { $n + shift } };
                     my $g = $f->(10);
-                    $g->(5)"#),
+                    $g->(5)"#
+        ),
         15
     );
 }
@@ -87,9 +89,11 @@ fn anon_sub_returns_anon_sub_chain() {
 #[test]
 fn fn_factory_captures_outer_param() {
     assert_eq!(
-        eval_int(r#"fn maker($n) { sub { $n + shift } }
+        eval_int(
+            r#"fn maker($n) { sub { $n + shift } }
                     my $f = maker(100);
-                    $f->(7)"#),
+                    $f->(7)"#
+        ),
         107
     );
 }
@@ -170,9 +174,7 @@ fn top_level_coderef_call_with_scalar_then_array_works() {
 #[test]
 fn match_string_dispatches_on_value() {
     assert_eq!(
-        eval_string(
-            r#"match("hi") { "hi" => "greet", "bye" => "farewell", _ => "?" }"#
-        ),
+        eval_string(r#"match("hi") { "hi" => "greet", "bye" => "farewell", _ => "?" }"#),
         "greet"
     );
 }
@@ -216,9 +218,7 @@ fn hoh_double_key_chain() {
 #[test]
 fn aoh_index_then_key() {
     assert_eq!(
-        eval_string(
-            r#"my @aoh = ({n=>"a", v=>1}, {n=>"b", v=>2}); $aoh[1]{n}"#
-        ),
+        eval_string(r#"my @aoh = ({n=>"a", v=>1}, {n=>"b", v=>2}); $aoh[1]{n}"#),
         "b"
     );
 }
@@ -251,26 +251,17 @@ fn pos_outside_while_loop_is_undef_today() {
 
 #[test]
 fn alpha_range_a_to_e() {
-    assert_eq!(
-        eval_string(r#"join(",", "a".."e")"#),
-        "a,b,c,d,e"
-    );
+    assert_eq!(eval_string(r#"join(",", "a".."e")"#), "a,b,c,d,e");
 }
 
 #[test]
 fn mixed_alphanum_range_increments_numeric_part() {
-    assert_eq!(
-        eval_string(r#"join(",", "a1".."a5")"#),
-        "a1,a2,a3,a4,a5"
-    );
+    assert_eq!(eval_string(r#"join(",", "a1".."a5")"#), "a1,a2,a3,a4,a5");
 }
 
 #[test]
 fn reverse_of_numeric_range_descends() {
-    assert_eq!(
-        eval_string(r#"join(",", reverse(1..5))"#),
-        "5,4,3,2,1"
-    );
+    assert_eq!(eval_string(r#"join(",", reverse(1..5))"#), "5,4,3,2,1");
 }
 
 // ── @ISA modifications at runtime ───────────────────────────────────────────
@@ -295,10 +286,7 @@ fn at_isa_modification_after_object_creation_picks_up_new_methods() {
 
 #[test]
 fn study_is_accepted_and_does_not_change_match() {
-    assert_eq!(
-        eval_int(r#"study "abc"; "abc" =~ /b/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"study "abc"; "abc" =~ /b/ ? 1 : 0"#), 1);
 }
 
 #[test]

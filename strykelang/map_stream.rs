@@ -7,9 +7,9 @@ use parking_lot::Mutex;
 
 use crate::ast::Expr;
 use crate::error::{PerlError, PerlResult};
-use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlIterator, PerlSub, PerlValue, PipelineOp};
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct VecPullIter {
     items: Arc<Vec<PerlValue>>,
@@ -144,6 +144,26 @@ impl MapStreamIterator {
                 MapStreamMode::Expr(expr) => {
                     match interp.eval_expr_ctx(expr.as_ref(), WantarrayCtx::List) {
                         Ok(val) => {
+                            // Coderef-in-block-position: when the streaming
+                            // expr evaluates to a code ref, call it with the
+                            // current topic as the sole arg. Skipped under
+                            // `--compat`.
+                            let val = if !crate::compat_mode() {
+                                if let Some(sub) = val.as_code_ref() {
+                                    let sub = sub.clone();
+                                    let topic = interp.scope.get_scalar("_");
+                                    match interp.call_sub(&sub, vec![topic], WantarrayCtx::List, 0)
+                                    {
+                                        Ok(v) => v,
+                                        Err(FlowOrError::Error(e)) => return Err(e),
+                                        Err(FlowOrError::Flow(_)) => continue,
+                                    }
+                                } else {
+                                    val
+                                }
+                            } else {
+                                val
+                            };
                             let extended = val.map_flatten_outputs(self.peel);
                             if extended.is_empty() {
                                 continue;
@@ -255,8 +275,36 @@ impl PerlIterator for FilterStreamIterator {
                     Err(_) => continue,
                 },
                 FilterStreamMode::Expr(expr) => match interp.eval_expr(expr.as_ref()) {
-                    Ok(v) if v.is_true() => return Some(item),
-                    Ok(_) => continue,
+                    Ok(val) => {
+                        // Coderef-in-block-position: call the coderef with
+                        // the current item and use the call result for
+                        // truthiness. Skipped under `--compat`.
+                        let v = if !crate::compat_mode() {
+                            if let Some(sub) = val.as_code_ref() {
+                                let sub = sub.clone();
+                                match interp.call_sub(
+                                    &sub,
+                                    vec![item.clone()],
+                                    WantarrayCtx::Scalar,
+                                    0,
+                                ) {
+                                    Ok(v) => v,
+                                    Err(FlowOrError::Error(e)) => {
+                                        panic!("filter iterator: {e}")
+                                    }
+                                    Err(_) => continue,
+                                }
+                            } else {
+                                val
+                            }
+                        } else {
+                            val
+                        };
+                        if v.is_true() {
+                            return Some(item);
+                        }
+                        continue;
+                    }
                     Err(FlowOrError::Error(e)) => panic!("filter iterator: {e}"),
                     Err(_) => continue,
                 },

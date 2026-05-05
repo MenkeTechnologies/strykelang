@@ -789,8 +789,8 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
 // binary's interactive state — only call it from a dedicated MCP
 // server entry point.
 
-use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::value::{PerlSub, PerlValue as PV};
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 
 struct ServerTool {
     name: String,

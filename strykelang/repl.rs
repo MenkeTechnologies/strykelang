@@ -35,9 +35,9 @@ use reedline::{
 
 use crate::Cli;
 use stryke::error::ErrorKind;
-use stryke::vm_helper::{repl_arrow_method_completions, VMHelper, ReplCompletionSnapshot};
 use stryke::lsp::builtin_completion_words;
 use stryke::token::KEYWORDS;
+use stryke::vm_helper::{repl_arrow_method_completions, ReplCompletionSnapshot, VMHelper};
 
 /// Builtin names not yet captured in `lsp_completion_words.txt`.
 const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", "spawn"];

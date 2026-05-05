@@ -40,10 +40,7 @@ fn system_list_form_loses_exit_code_today() {
 fn system_string_form_propagates_exit_code() {
     // The single-string form does propagate. Pin both this and the broken
     // list form so the asymmetry is visible.
-    assert_eq!(
-        eval_int(r#"system("sh -c \"exit 7\""); $?"#),
-        1792
-    );
+    assert_eq!(eval_int(r#"system("sh -c \"exit 7\""); $?"#), 1792);
 }
 
 // ── die with a blessed object: ref($@) returns class ────────────────────────
@@ -127,26 +124,20 @@ fn captures_dollar_one_dollar_two_work_in_replacement() {
 #[test]
 fn heredoc_indented_strips_leading_indent() {
     assert_eq!(
-        eval_string(
-            "my $x = <<~END;\n    line1\n    line2\n    END\n$x"
-        ),
+        eval_string("my $x = <<~END;\n    line1\n    line2\n    END\n$x"),
         "line1\nline2\n"
     );
 }
 
 #[test]
 fn heredoc_single_quoted_does_not_interpolate() {
-    let out = eval_string(
-        "my $name = \"world\"; my $x = <<'END';\nhello $name\nEND\n$x",
-    );
+    let out = eval_string("my $name = \"world\"; my $x = <<'END';\nhello $name\nEND\n$x");
     assert_eq!(out, "hello $name\n");
 }
 
 #[test]
 fn heredoc_double_quoted_interpolates() {
-    let out = eval_string(
-        "my $name = \"world\"; my $x = <<\"END\";\nhello $name\nEND\n$x",
-    );
+    let out = eval_string("my $name = \"world\"; my $x = <<\"END\";\nhello $name\nEND\n$x");
     assert_eq!(out, "hello world\n");
 }
 
@@ -157,7 +148,13 @@ fn multiple_heredocs_on_same_line_not_supported_today() {
     use stryke::error::ErrorKind;
     let kind = eval_err_kind("print <<A, <<B;\nA1\nA\nB1\nB\n");
     assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax | ErrorKind::UndefinedSubroutine),
+        matches!(
+            kind,
+            ErrorKind::Runtime
+                | ErrorKind::Type
+                | ErrorKind::Syntax
+                | ErrorKind::UndefinedSubroutine
+        ),
         "expected error, got {:?}",
         kind
     );
@@ -177,18 +174,12 @@ fn qq_interpolates() {
 
 #[test]
 fn qw_returns_list() {
-    assert_eq!(
-        eval_string(r#"my @a = qw(a b c); "@a""#),
-        "a b c"
-    );
+    assert_eq!(eval_string(r#"my @a = qw(a b c); "@a""#), "a b c");
 }
 
 #[test]
 fn qr_creates_compiled_regex_with_modifier() {
-    assert_eq!(
-        eval_int(r#"my $r = qr/abc/i; "ABC" =~ $r ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#"my $r = qr/abc/i; "ABC" =~ $r ? 1 : 0"#), 1);
 }
 
 // ── sprintf format flags (working and broken) ────────────────────────────────
@@ -210,10 +201,7 @@ fn sprintf_hash_flag_adds_prefix() {
 
 #[test]
 fn sprintf_u_renders_negative_one_as_max_unsigned() {
-    assert_eq!(
-        eval_string(r#"sprintf("%u", -1)"#),
-        "18446744073709551615"
-    );
+    assert_eq!(eval_string(r#"sprintf("%u", -1)"#), "18446744073709551615");
 }
 
 // ── Math builtins ────────────────────────────────────────────────────────────
@@ -241,38 +229,23 @@ fn round_uses_round_half_up() {
 
 #[test]
 fn posix_alpha_class_matches_letters() {
-    assert_eq!(
-        eval_int(r#""abc123" =~ /[[:alpha:]]+/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abc123" =~ /[[:alpha:]]+/ ? 1 : 0"#), 1);
 }
 
 #[test]
 fn posix_digit_class_matches_digits() {
-    assert_eq!(
-        eval_int(r#""abc123" =~ /[[:digit:]]+/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abc123" =~ /[[:digit:]]+/ ? 1 : 0"#), 1);
 }
 
 #[test]
 fn posix_space_class_matches_whitespace() {
-    assert_eq!(
-        eval_int(r#""abc 123" =~ /[[:space:]]/ ? 1 : 0"#),
-        1
-    );
+    assert_eq!(eval_int(r#""abc 123" =~ /[[:space:]]/ ? 1 : 0"#), 1);
 }
 
 #[test]
 fn posix_lower_class_anchored_match() {
-    assert_eq!(
-        eval_int(r#""abc" =~ /^[[:lower:]]+$/ ? 1 : 0"#),
-        1
-    );
-    assert_eq!(
-        eval_int(r#""ABC" =~ /^[[:lower:]]+$/ ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#""abc" =~ /^[[:lower:]]+$/ ? 1 : 0"#), 1);
+    assert_eq!(eval_int(r#""ABC" =~ /^[[:lower:]]+$/ ? 1 : 0"#), 0);
 }
 
 #[test]
@@ -398,10 +371,7 @@ fn array_index_with_undef_value_exists_but_not_defined() {
 
 #[test]
 fn array_index_out_of_bounds_does_not_exist() {
-    assert_eq!(
-        eval_int(r#"my @a = (1, 2); exists $a[5] ? 1 : 0"#),
-        0
-    );
+    assert_eq!(eval_int(r#"my @a = (1, 2); exists $a[5] ? 1 : 0"#), 0);
 }
 
 // ── Nested string repetition (x in list context) ────────────────────────────
@@ -475,10 +445,7 @@ fn match_three_captures_reorder() {
 #[test]
 fn sort_default_is_lexicographic_not_numeric() {
     // 30 < 5 lexicographically.
-    assert_eq!(
-        eval_string(r#"join(",", sort 5, 30, 7)"#),
-        "30,5,7"
-    );
+    assert_eq!(eval_string(r#"join(",", sort 5, 30, 7)"#), "30,5,7");
 }
 
 #[test]
@@ -512,7 +479,9 @@ fn core_prefix_works_inside_print_arg() {
     // builtin call, not as an unknown sub, even when nested inside a list
     // operator.
     assert_eq!(
-        eval_string(r#"my $r = ""; $r .= CORE::uc("abc"); $r .= "/"; $r .= CORE::length("hello"); $r"#),
+        eval_string(
+            r#"my $r = ""; $r .= CORE::uc("abc"); $r .= "/"; $r .= CORE::length("hello"); $r"#
+        ),
         "ABC/5"
     );
 }

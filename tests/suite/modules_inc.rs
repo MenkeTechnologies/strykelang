@@ -1,7 +1,7 @@
 //! `@INC`, `%INC`, `require`, and `use` loading (pure stryke `.pm` files).
 
-use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
+use stryke::vm_helper::VMHelper;
 use stryke::{parse, parse_and_run_string};
 
 fn fixture_inc() -> String {

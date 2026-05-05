@@ -1,8 +1,8 @@
 use crate::ast::*;
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::vm_helper::VMHelper;
 use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
+use crate::vm_helper::VMHelper;
 
 /// True when `[` after `expr` is chained array access (`$r->{k}[0]`, `$a[1][2]`, `$$r[0]`).
 /// False for `(sort ...)[0]` / `@{ ... }[i]` — those slice a list value, not an array ref container.
@@ -328,10 +328,7 @@ impl Parser {
     /// pipe-RHS); `None` when the caller should fall through to the block
     /// form. The first arg is any coderef-shaped expression — runtime
     /// checks `as_code_ref()` and dispatches.
-    fn try_parse_coderef_listop_args(
-        &mut self,
-        line: usize,
-    ) -> PerlResult<Option<Vec<Expr>>> {
+    fn try_parse_coderef_listop_args(&mut self, line: usize) -> PerlResult<Option<Vec<Expr>>> {
         if !matches!(self.peek(), Token::ScalarVar(_) | Token::Backslash) {
             return Ok(None);
         }
@@ -340,11 +337,7 @@ impl Parser {
         let list = if self.in_pipe_rhs()
             && matches!(
                 self.peek(),
-                Token::Semicolon
-                    | Token::RBrace
-                    | Token::RParen
-                    | Token::Eof
-                    | Token::PipeForward
+                Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof | Token::PipeForward
             ) {
             self.pipe_placeholder_list(line)
         } else {
@@ -512,7 +505,7 @@ impl Parser {
             let synthetics = std::mem::take(&mut self.pending_synthetic_subs);
             let mut combined = Vec::with_capacity(synthetics.len() + statements.len());
             combined.extend(synthetics);
-            combined.extend(statements.drain(..));
+            combined.append(&mut statements);
             statements = combined;
         }
         Ok(Program { statements })
@@ -5789,10 +5782,8 @@ impl Parser {
             if matches!(self.peek(), Token::Comma | Token::FatArrow) {
                 let mut items = vec![first];
                 while self.eat(&Token::Comma) || self.eat(&Token::FatArrow) {
-                    if matches!(
-                        self.peek(),
-                        Token::Semicolon | Token::RBrace | Token::Eof
-                    ) || self.peek_is_postfix_stmt_modifier_keyword()
+                    if matches!(self.peek(), Token::Semicolon | Token::RBrace | Token::Eof)
+                        || self.peek_is_postfix_stmt_modifier_keyword()
                     {
                         break;
                     }
@@ -8379,9 +8370,7 @@ impl Parser {
                 // disambiguation: `%h` immediately followed by `{` is a kv-
                 // slice; `%h` alone (or followed by `=`, list ops, etc.) is
                 // the bare hash. (BUG-008)
-                if matches!(self.peek(), Token::LBrace)
-                    && self.suppress_scalar_hash_brace == 0
-                {
+                if matches!(self.peek(), Token::LBrace) && self.suppress_scalar_hash_brace == 0 {
                     self.advance(); // {
                     let keys = self.parse_slice_arg_list(true)?;
                     self.expect(&Token::RBrace)?;
@@ -9940,15 +9929,7 @@ impl Parser {
                     // Lift bareword to FuncCall($_) so `map sha512, @list`
                     // calls sha512($_) for each element instead of stringifying.
                     let expr = Self::lift_bareword_to_topic_call(expr);
-                    let list_expr = if self.in_pipe_rhs()
-                        && matches!(
-                            self.peek(),
-                            Token::Semicolon
-                                | Token::RBrace
-                                | Token::RParen
-                                | Token::Eof
-                                | Token::PipeForward
-                        ) {
+                    let list_expr = if self.pipe_supplies_slurped_list_operand() {
                         self.pipe_placeholder_list(line)
                     } else {
                         self.expect(&Token::Comma)?;
@@ -10009,16 +9990,7 @@ impl Parser {
                     })
                 } else {
                     let expr = self.parse_assign_expr_stop_at_pipe()?;
-                    if self.in_pipe_rhs()
-                        && matches!(
-                            self.peek(),
-                            Token::Semicolon
-                                | Token::RBrace
-                                | Token::RParen
-                                | Token::Eof
-                                | Token::PipeForward
-                        )
-                    {
+                    if self.pipe_supplies_slurped_list_operand() {
                         // Pipe-RHS blockless form: `|> grep EXPR`
                         // For literals, desugar to `$_ eq/== EXPR` so
                         // `|> filter 't'` keeps only elements equal to 't'.
@@ -15363,11 +15335,40 @@ impl Parser {
                         name.push(chars[i]);
                         i += 1;
                     }
-                    // `$_<`, `$_<<`, … — outer topic (stryke extension); only for bare `_`.
-                    if name == "_" {
-                        while i < chars.len() && chars[i] == '<' {
-                            name.push('<');
-                            i += 1;
+                    // `$_<`, `$_<<`, … — outer topic (stryke extension). Also
+                    // `$_N<`, `$_N<<` for positional aliases. And the indexed
+                    // shortcut `$_<N` ≡ `$_<<<...<` (N chevrons), so `"$_<3"`
+                    // and `"$_<<<"` interpolate identically.
+                    let is_topic_slot = name == "_"
+                        || (name.len() > 1
+                            && name.starts_with('_')
+                            && name[1..].bytes().all(|b| b.is_ascii_digit()));
+                    if is_topic_slot {
+                        // Try indexed-ascent first: `<` immediately followed by digits.
+                        let try_indexed = chars.get(i) == Some(&'<')
+                            && chars.get(i + 1).is_some_and(|c| c.is_ascii_digit());
+                        let mut handled_indexed = false;
+                        if try_indexed {
+                            let mut j = i + 1;
+                            while j < chars.len() && chars[j].is_ascii_digit() {
+                                j += 1;
+                            }
+                            let digits: String = chars[i + 1..j].iter().collect();
+                            if let Ok(n) = digits.parse::<usize>() {
+                                if n >= 1 {
+                                    for _ in 0..n {
+                                        name.push('<');
+                                    }
+                                    i = j;
+                                    handled_indexed = true;
+                                }
+                            }
+                        }
+                        if !handled_indexed {
+                            while i < chars.len() && chars[i] == '<' {
+                                name.push('<');
+                                i += 1;
+                            }
                         }
                     }
                     // `--no-interop`: `$a` / `$b` are Perl-isms; reject inside
@@ -15485,9 +15486,7 @@ impl Parser {
                 } else {
                     let c = chars[i];
                     let probe = c.to_string();
-                    if VMHelper::is_special_scalar_name_for_get(&probe)
-                        || matches!(c, '\'' | '`')
-                    {
+                    if VMHelper::is_special_scalar_name_for_get(&probe) || matches!(c, '\'' | '`') {
                         i += 1;
                         // Check for hash element access: `$+{key}`, `$-{key}`, etc.
                         if i < chars.len() && chars[i] == '{' {

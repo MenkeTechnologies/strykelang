@@ -10,9 +10,9 @@ use std::thread::{self, JoinHandle};
 use crossbeam::channel::{unbounded, Receiver, Sender};
 
 use crate::error::{PerlError, PerlResult};
-use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlPpool, PerlSub, PerlValue};
+use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 
 /// Shared pool state (jobs in, results out-of-order; `PerlPpool::collect` reorders).
 pub struct PpoolInner {

@@ -2,7 +2,7 @@
 # Rosetta Code: Apply a callback to an array
 
 fn Rosetta::Callback::apply($cb, @arr) {
-    @arr |> map { $cb->(_) }
+    @arr |> map $cb
 }
 
 my @vals = (1, 2, 3)

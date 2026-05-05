@@ -373,23 +373,26 @@ my @r = @huge |> pmap_on $cluster heavy
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-**Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every closure iter shifts an outer-topic chain across all positional slots, up to 4 frames back. Read the previous topic with `_<`, two back with `_<<`, up to four back with `_<<<<`. Same for every positional slot: `_1<<`, `_2<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
+**Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every closure iter shifts an outer-topic chain across all positional slots, up to 5 frames back. Read the previous topic with `_<`, two back with `_<<`, up to five back with `_<<<<<`. Same for every positional slot: `_1<<`, `_2<<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
+
+**Indexed-ascent shortcut `_<N`** — past depth 2, counting chevrons gets error-prone. The lexer accepts `_<N` (where N is a positive integer) as syntactic sugar for `_<<<...<` (N chevrons). So `_<3` ≡ `_<<<` (more readable past depth 2), `_<5` ≡ `_<<<<<`, etc. Mixed forms work too: `$_2<3` reaches positional 2 from 3 frames up. Disambiguator: `_<3>` and `_<3:5>` remain string-slice syntax; `_<3` (without trailing `>` or `:`) is indexed-ascent.
 
 The matrix:
 
 ```
 slot 0 — bare `_` aliases `_0`, FOUR equivalent spellings per level:
-  current  _   ≡ $_   ≡ _0   ≡ $_0
-  1 up     _<  ≡ $_<  ≡ _0<  ≡ $_0<
-  2 up     _<< ≡ $_<< ≡ _0<< ≡ $_0<<
-  3 up     _<<< ≡ $_<<< ≡ _0<<< ≡ $_0<<<
-  4 up     _<<<< ≡ $_<<<< ≡ _0<<<< ≡ $_0<<<<
+  current  _    ≡ $_    ≡ _0    ≡ $_0
+  1 up     _<   ≡ $_<   ≡ _0<   ≡ $_0<       (also: _<1, $_<1)
+  2 up     _<<  ≡ $_<<  ≡ _0<<  ≡ $_0<<      (also: _<2, $_<2)
+  3 up     _<<< ≡ $_<<< ≡ _0<<< ≡ $_0<<<     (also: _<3, $_<3)
+  4 up     _<<<<  ≡ $_<<<<  ≡ _0<<<<  ≡ $_0<<<<   (also: _<4, $_<4)
+  5 up     _<<<<< ≡ $_<<<<< ≡ _0<<<<< ≡ $_0<<<<<  (also: _<5, $_<5)
 
-slot N ≥ 1 — two spellings per level:
+slot N ≥ 1 — two spellings per level (plus indexed form):
   current  _N   ≡ $_N
-  1 up     _N<  ≡ $_N<       (e.g. _1< == $_1<)
+  1 up     _N<  ≡ $_N<        (also: _N<1, $_N<1)
   ...
-  4 up     _N<<<< ≡ $_N<<<<
+  5 up     _N<<<<< ≡ $_N<<<<<  (also: _N<5, $_N<5)
 ```
 
 The `<` glyph is iconic: "back/before/earlier" is universal in math and ASCII (`<-`, `<<`, version comparison). `_` is "the topic" (Perl `$_`, Ruby `_1`, Scala `_`). Composition tells you the meaning at sight.
@@ -422,7 +425,7 @@ fan_cap 1 { $_ = "inner"; "$_< $_" }           # "outer inner"
 $_ = 50; ~> 10 >{ $_ + $_< }                   # 60
 ```
 
-Implementation: `strykelang/scope.rs::set_closure_args` shifts every active slot's chain on each frame entry; `strykelang/lexer.rs` lexes `_<+` and `_N<+` (bare and `$`-prefixed) as single tokens. Regression tests in `tests/suite/language_extensions.rs` (`nested_positional_outer_topic_reaches_4_frames_up`, `slot_0_has_four_equivalent_spellings_at_every_level`, `slot_n_two_spellings_per_level`).
+Implementation: `strykelang/scope.rs::set_closure_args` shifts every active slot's chain on each frame entry; `strykelang/lexer.rs` lexes `_<+`, `_N<+`, and the indexed-ascent forms `_<N`/`_M<N` (bare and `$`-prefixed) as single tokens. Depth cap is hardcoded at 5 levels (`debug_assert!(level <= 5)` in `scope.rs::topic_slot_key`); past depth 5 the chain falls off and reads return undef. Bumping the cap is a one-line change.
 
 ---
 
@@ -1030,7 +1033,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my $t = tally("a","b","a")  # {a => 2, b => 1}
   ```
 - **Bare `_` as topic shorthand** — in any expression position, bare `_` is equivalent to `$_`. Inspired by Raku's WhateverCode and Scala's placeholder syntax. Enables ultra-concise blocks: `map{_*2}` instead of `map{$_ * 2}`. The sigil-free form compresses better — no spaces needed around `_` when adjacent to operators.
-- **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 4 levels (`$_<` through `$_<<<<`). See [\[0x03\]](#0x03-parallel-primitives).
+- **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 5 levels (`$_<` through `$_<<<<<`, or the indexed form `$_<5`). See [\[0x03\]](#0x03-parallel-primitives).
 - **`fore`** (`e`) — side-effect-only list iterator (like `map` but void, returns item count). Works with `{ BLOCK } LIST`, blockless `e EXPR, LIST`, and pipe-forward `|> e p`. Use for print/log/accumulator loops.
 - **Pipe-forward `|>`** — parse-time desugaring (zero runtime cost); threads the LHS as the **first** argument of the RHS call, left-associative. `map`, `grep`/`filter`, `sort`, and `e` accept **blockless expressions** on the RHS of `|>` — no `{ }` required for simple transforms:
 
@@ -1285,6 +1288,24 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | combinators | `^` `-` `,` chain | negate / toggle follow-symlinks / OR / chained-AND |
 
   **Blockless `|>` rules for `grep`/`filter`**: string literals test `$_ eq EXPR`, numbers test `$_ == EXPR`, regexes test `$_ =~ EXPR`, anything else (e.g. `defined`) uses standard Perl grep semantics (sets `$_`, evaluates expression).
+
+  **Coderef-in-block-position** — wherever a `{ BLOCK }` is accepted (`grep`, `map`, `sort`, `first`, `any`, `all`, `none`, `take_while`, `drop_while`, `reject`, `partition`, `min_by`, `max_by`, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the `{ $f($_) }` / `{ $f->($_) }` boilerplate.
+
+  ```perl
+  my $is_big = fn ($x) { $x > 3 }
+  my @r = grep $is_big, @l                # was: grep { $is_big->($_) } @l
+  my @r = @l |> grep $is_big              # pipe-forward variant
+  my @r = first $is_big, @l               # tier-2 builtin, no parens, no block
+  my @r = take_while $is_big, @l
+
+  # Sort comparators receive ($a, $b) positionally — no $a/$b global magic:
+  my $cmp = fn ($a, $b) { $b <=> $a }     # or fn { _0 <=> _1 } using positional aliases
+  my @s = sort $cmp @l                    # descending
+  ```
+
+  **Threading (`~>`) excluded** — whitespace-delimited stages can't disambiguate `~> @l grep $f` from "two stages", so threading still requires `{ $f(_) }`. Use `|>` for the bare-coderef form, or stay with `{ }` blocks under `~>`.
+
+  Under `--compat`: dispatch is skipped, restoring Perl's "evaluate EXPR per element, filter by truthiness" semantics. A coderef value is always truthy, so `grep $f, @l` keeps every element under `--compat`.
 
   Precedence: `|>` binds **looser** than `||` but **tighter** than `?:` / `and`/`or`/`not` — the slot sits between `parse_ternary` and `parse_or_word` in the parser stack. So `$x + 1 |> f` parses as `f($x + 1)`, and `0 || 1 |> yes` parses as `yes(0 || 1)`. The RHS must be a call, builtin, method invocation, bareword, or coderef expression; bare binary expressions / literals on the right are a parse error (`42 |> 1 + 2` is rejected).
 
