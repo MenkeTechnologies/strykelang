@@ -805,13 +805,20 @@ Severity: **bug**. The sub-wrapped form is the way most code uses
 given/when.
 
 
-## BUG-025 — `$SIG{__WARN__}` handler is not invoked
+## BUG-025 — `$SIG{__WARN__}` handler is not invoked — **FIXED**
 
-The variable is assignable and reads back as a CODE ref, but `warn` does
-not route through it. Captured indirectly: stderr still receives the warn
-text and the handler's body never executes.
+**FIXED** in commit (pending) — interpreter and bytecode VM now route the
+`warn` builtin through `$SIG{__WARN__}` when a coderef is installed.
+Recursion guard: the slot is temporarily cleared during dispatch so a
+handler that itself calls `warn` falls back to stderr instead of looping.
 
-Tests: `sig_warn_assignment_succeeds` (the assignment does work).
+Original report: variable is assignable and reads back as a CODE ref,
+but `warn` did not route through it.
+
+Tests: `sig_warn_assignment_succeeds` (assignment side, unchanged),
+`sig_warn_handler_runs_on_warn`,
+`sig_warn_handler_receives_message_with_newline`,
+`sig_warn_handler_recursion_guard_prevents_loop`.
 
 Severity: **bug**. Affects logging libraries and test frameworks that
 intercept warnings.
@@ -1344,21 +1351,29 @@ Tests: `printf_d_with_large_float_saturates_to_i64_max_today`.
 Severity: **parity** (defined behavior; differs from Perl).
 
 
-## BUG-050 — `$SIG{__DIE__}` handler is not invoked
+## BUG-050 — `$SIG{__DIE__}` handler is not invoked — **FIXED**
+
+**FIXED** in commit (pending) — `die` now fires `$SIG{__DIE__}` before
+propagating the error. The handler can re-`die` to substitute a
+different exception (the swapped error reaches `$@` instead of the
+original). Recursion guard: the slot is temporarily cleared during
+dispatch so a handler's own `die` does not re-enter the handler.
 
 ```sh
-$ stryke -e '$SIG{__DIE__} = sub { print "trapped" }; eval { die "x" }; print "after"'
-after
-$ perl   -e '$SIG{__DIE__} = sub { print "trapped" }; eval { die "x" }; print "after"'
-trappedafter
+# After fix:
+$ stryke -e '$SIG{__DIE__} = sub { print "trapped: $_[0]" }; eval { die "boom\n" }; print "after err=[$@]"'
+trapped: boom
+after err=[boom
+]
+$ stryke -e '$SIG{__DIE__} = sub { die "swap:" . $_[0] }; eval { die "orig\n" }; print "[$@]"'
+[swap:orig
+]
 ```
 
-`$SIG{__WARN__}` (BUG-025) and `$SIG{__DIE__}` share the same root cause:
-hash-store side of `%SIG` works (`ref` returns CODE), but the runtime
-hooks that fire signal-pseudo-handlers don't dispatch through `%SIG`.
-
-Tests: `sig_die_handler_not_invoked_today`,
-`sig_handler_assignment_returns_code_ref`.
+Tests: `sig_handler_assignment_returns_code_ref`,
+`sig_die_handler_runs_inside_eval`,
+`sig_die_handler_can_swap_error_by_redieing`,
+`sig_die_handler_recursion_guard_prevents_loop`.
 
 Severity: **bug**.
 
