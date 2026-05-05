@@ -9101,9 +9101,7 @@ impl Interpreter {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_strict_scalar_var(name, line)?;
                         let n = self.english_scalar_name(name);
-                        return Ok(self
-                            .scope
-                            .atomic_mutate(n, |v| PerlValue::integer(v.to_int() + 1)));
+                        return Ok(self.scope.atomic_mutate(n, |v| perl_inc(v)));
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
                         if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -9136,7 +9134,7 @@ impl Interpreter {
                         }
                     }
                     let val = self.eval_expr(expr)?;
-                    let new_val = PerlValue::integer(val.to_int() + 1);
+                    let new_val = perl_inc(&val);
                     self.assign_value(expr, new_val.clone())?;
                     Ok(new_val)
                 }
@@ -9242,7 +9240,7 @@ impl Interpreter {
                     self.check_strict_scalar_var(name, line)?;
                     let n = self.english_scalar_name(name);
                     let f: fn(&PerlValue) -> PerlValue = match op {
-                        PostfixOp::Increment => |v| PerlValue::integer(v.to_int() + 1),
+                        PostfixOp::Increment => |v| perl_inc(v),
                         PostfixOp::Decrement => |v| PerlValue::integer(v.to_int() - 1),
                     };
                     return Ok(self.scope.atomic_mutate_post(n, f));
@@ -9289,7 +9287,7 @@ impl Interpreter {
                 let val = self.eval_expr(expr)?;
                 let old = val.clone();
                 let new_val = match op {
-                    PostfixOp::Increment => PerlValue::integer(val.to_int() + 1),
+                    PostfixOp::Increment => perl_inc(&val),
                     PostfixOp::Decrement => PerlValue::integer(val.to_int() - 1),
                 };
                 self.assign_value(expr, new_val)?;
@@ -19625,6 +19623,102 @@ fn par_walk_recursive(
 /// Reformat Rust's `{:e}` / `{:E}` exponent style (`1.234568e4`) to the
 /// Perl/C convention (`1.234568e+04`). Adds a sign character to the
 /// exponent and zero-pads it to at least two digits.
+/// Perl-style magical string increment.
+///
+/// Returns `Some(new)` when `s` matches `^[A-Za-z]+[0-9]*$` (i.e. some
+/// letters, optionally followed by digits, ending at the end of string)
+/// or is the empty string (which becomes `"1"`). Returns `None` for any
+/// other shape — pure digits, leading whitespace, mixed letters/digits,
+/// embedded punctuation, etc. — so the caller can fall back to a plain
+/// numeric increment.
+///
+/// Carry rules:
+/// - In the digit suffix, `9 -> 0` carries left.
+/// - In the letter prefix, `z -> a` and `Z -> A` carry left.
+/// - When a carry exits the leftmost letter, a fresh `a` or `A` is
+///   prepended (case-matched to the first character of the original).
+///
+/// Decrement has no magic counterpart in Perl 5; this helper is for `++`
+/// only.
+fn perl_magic_str_inc(s: &str) -> Option<String> {
+    if s.is_empty() {
+        return Some("1".to_string());
+    }
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+        i += 1;
+    }
+    let letters_end = i;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i != bytes.len() {
+        return None;
+    }
+    if letters_end == 0 {
+        // Pure digits: Perl handles these as plain numbers, so defer.
+        return None;
+    }
+
+    let mut result: Vec<u8> = bytes.to_vec();
+    let mut carry = true;
+    let mut idx = result.len();
+
+    // Phase 1: digits, right to left.
+    while carry && idx > letters_end {
+        idx -= 1;
+        if result[idx] == b'9' {
+            result[idx] = b'0';
+            // carry stays true
+        } else {
+            result[idx] += 1;
+            carry = false;
+        }
+    }
+
+    // Phase 2: letters, right to left.
+    while carry && idx > 0 {
+        idx -= 1;
+        let c = result[idx];
+        if c == b'z' {
+            result[idx] = b'a';
+        } else if c == b'Z' {
+            result[idx] = b'A';
+        } else {
+            result[idx] += 1;
+            carry = false;
+        }
+    }
+
+    // Phase 3: prepend a fresh letter if the carry escaped.
+    if carry {
+        let prepend = if bytes[0].is_ascii_uppercase() {
+            b'A'
+        } else {
+            b'a'
+        };
+        let mut grown = Vec::with_capacity(result.len() + 1);
+        grown.push(prepend);
+        grown.extend_from_slice(&result);
+        return String::from_utf8(grown).ok();
+    }
+
+    String::from_utf8(result).ok()
+}
+
+/// `++$x` semantics: try magic string increment first when the value is
+/// already a string; fall back to a numeric +1 for everything else
+/// (integers, floats, undef, plain numeric strings).
+pub(crate) fn perl_inc(v: &PerlValue) -> PerlValue {
+    if let Some(s) = v.as_str() {
+        if let Some(new_s) = perl_magic_str_inc(&s) {
+            return PerlValue::string(new_s);
+        }
+    }
+    PerlValue::integer(v.to_int() + 1)
+}
+
 fn perl_exponent_form(rust_repr: &str, upper: bool) -> String {
     let marker = if upper { 'E' } else { 'e' };
     if let Some(pos) = rust_repr.find(marker) {
