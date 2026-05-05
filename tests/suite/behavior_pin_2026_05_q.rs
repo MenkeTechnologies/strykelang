@@ -573,6 +573,63 @@ fn print_scalar_plus_scalar_with_trailing_args_works() {
     assert_eq!(body, "8 end");
 }
 
+// ── to_json on circular references stack-overflows the process (BUG-105) ──
+//
+// We can't run the failing case from inside `eval` (a Rust-level stack
+// overflow crashes the test binary). Just confirm the source parses so a
+// future fix can replace this with a real runtime test that asserts a
+// proper Perl-level error.
+
+#[test]
+fn to_json_circular_at_least_parses() {
+    assert!(
+        stryke::parse(
+            r#"my $a = {}; $a->{self} = $a; my $j = to_json($a)"#
+        )
+        .is_ok(),
+        "parse must succeed even though execution stack-overflows"
+    );
+}
+
+#[test]
+fn to_json_basic_round_trip_works() {
+    // Pin the working baseline so a circular-detection fix doesn't
+    // regress simple cases.
+    assert_eq!(
+        eval_string(r#"to_json({a => 1, b => [2, 3]})"#),
+        r#"{"a":1,"b":[2,3]}"#
+    );
+}
+
+#[test]
+fn from_json_null_returns_undef() {
+    assert_eq!(
+        eval_int(r#"defined(from_json("null")) ? 1 : 0"#),
+        0
+    );
+}
+
+#[test]
+fn from_json_true_returns_truthy_one() {
+    assert_eq!(
+        eval_int(r#"my $r = from_json("true"); $r ? 1 : 0"#),
+        1
+    );
+}
+
+#[test]
+fn to_json_two_arg_pretty_form_serializes_as_array_today() {
+    // BUG-106: `to_json($data, { pretty => 1 })` should produce pretty-
+    // formatted JSON. Stryke treats both args as a top-level array and
+    // serializes the pair.
+    let s = eval_string(r#"to_json({a=>1, b=>2}, {pretty => 1})"#);
+    assert!(
+        s.starts_with("[{") && s.contains("\"pretty\":1"),
+        "expected two-arg array form, got {:?}",
+        s
+    );
+}
+
 #[test]
 fn print_paren_workaround_for_minus_form_works() {
     let f = std::env::temp_dir().join(format!(
