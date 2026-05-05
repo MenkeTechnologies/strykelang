@@ -39,10 +39,15 @@ fn length_returns_byte_count_for_unicode_string() {
 }
 
 #[test]
-fn length_with_use_utf8_still_counts_bytes_today() {
-    // PARITY-013: stryke ignores `use utf8;` for length() — Perl 5 returns 5
-    // (chars) here.
-    assert_eq!(eval_int(r#"use utf8; length("héllo")"#), 6);
+fn length_with_use_utf8_returns_char_count() {
+    // PARITY-013 FIXED: with `use utf8;` length() counts Unicode codepoints,
+    // not UTF-8 bytes — matching Perl 5.
+    assert_eq!(eval_int(r#"use utf8; length("héllo")"#), 5);
+    assert_eq!(eval_int(r#"use utf8; length("日本語")"#), 3);
+    assert_eq!(eval_int(r#"use utf8; length("café")"#), 4);
+    // Without the pragma, byte count.
+    assert_eq!(eval_int(r#"length("héllo")"#), 6);
+    assert_eq!(eval_int(r#"length("日本語")"#), 9);
 }
 
 // ── substr: read forms work, 4-arg replacement works, lvalue does not ────────
