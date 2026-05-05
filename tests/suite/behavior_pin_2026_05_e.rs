@@ -516,3 +516,54 @@ fn core_prefix_works_inside_print_arg() {
         "ABC/5"
     );
 }
+
+// ── use overload anon-sub handlers ──────────────────────────────────────────
+
+#[test]
+fn use_overload_accepts_anonymous_subroutine_for_op_plus() {
+    // PARITY-012 FIXED: `use overload "+" => sub { ... }` parses (was
+    // rejected with "overload handler must be a string literal..."). The
+    // anon body is promoted to a synthetic top-level SubDecl, and the
+    // dispatch path resolves it under the using package.
+    assert_eq!(
+        eval_int(
+            r#"package N;
+               use overload "+" => sub { 99 };
+               package main;
+               my $n = bless {}, "N";
+               $n + 5"#
+        ),
+        99
+    );
+}
+
+#[test]
+fn use_overload_accepts_anonymous_subroutine_for_stringify() {
+    assert_eq!(
+        eval_string(
+            r#"package N;
+               use overload q{""} => sub { "N!" };
+               package main;
+               my $n = bless {}, "N";
+               "$n""#
+        ),
+        "N!"
+    );
+}
+
+#[test]
+fn use_overload_named_handler_still_works() {
+    // Backward compat: the previously-supported named-sub form keeps working.
+    assert_eq!(
+        eval_int(
+            r#"package N;
+               sub new { bless {}, shift }
+               sub add { my ($s, $o) = @_; 42 }
+               use overload "+" => "add";
+               package main;
+               my $n = N->new;
+               $n + 1"#
+        ),
+        42
+    );
+}
