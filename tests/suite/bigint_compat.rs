@@ -98,3 +98,72 @@ fn compat_bigint_truthiness() {
         "0"
     );
 }
+
+// ── `use bigint;` pragma activates BigInt promotion in native mode (PARITY-003 FIXED)
+//
+// Same numeric-promotion path as `--compat`, but gated by the source-level
+// pragma instead of the CLI flag. Both pragmas flip the same global flag at
+// program start; subprocess-isolated tests prevent state from leaking
+// between cases.
+
+#[test]
+fn pragma_use_bigint_promotes_pow_to_bigint() {
+    assert_eq!(
+        run_native("use bigint; print 2 ** 64"),
+        "18446744073709551616"
+    );
+}
+
+#[test]
+fn pragma_use_bigint_promotes_pow_to_2_to_100() {
+    assert_eq!(
+        run_native("use bigint; print 2 ** 100"),
+        "1267650600228229401496703205376"
+    );
+}
+
+#[test]
+fn pragma_use_bigint_promotes_repeated_mul() {
+    assert_eq!(
+        run_native("use bigint; my $x = 1; for (1..100) { $x *= 2 } print $x"),
+        "1267650600228229401496703205376"
+    );
+}
+
+#[test]
+fn pragma_use_bigint_promotes_add_overflow() {
+    assert_eq!(
+        run_native("use bigint; print 9223372036854775807 + 1"),
+        "9223372036854775808"
+    );
+}
+
+#[test]
+fn pragma_use_bigint_promotes_sub_overflow() {
+    assert_eq!(
+        run_native("use bigint; print -9223372036854775807 - 2"),
+        "-9223372036854775809"
+    );
+}
+
+#[test]
+fn pragma_use_bigint_factorial_30() {
+    assert_eq!(
+        run_native("use bigint; my $f = 1; $f *= $_ for 1..30; print $f"),
+        "265252859812191058636308480000000"
+    );
+}
+
+#[test]
+fn pragma_use_bignum_is_synonym_for_bigint() {
+    assert_eq!(
+        run_native("use bignum; print 2 ** 80"),
+        "1208925819614629174706176"
+    );
+}
+
+#[test]
+fn native_without_pragma_still_falls_back_to_float() {
+    // Without `use bigint;` (and no `--compat`), 2 ** 64 still uses f64.
+    assert_eq!(run_native("print 2 ** 64"), "1.84467440737096e+19");
+}

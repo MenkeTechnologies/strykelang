@@ -3584,6 +3584,16 @@ impl Interpreter {
             "Env" => self.apply_use_env(imports, line),
             "open" => self.apply_use_open(imports, line),
             "constant" => self.apply_use_constant(imports, line),
+            "bigint" | "bignum" | "bigrat" => {
+                // Activate BigInt promotion for `**` (and any other op
+                // that consults the bigint pragma). `bignum` and
+                // `bigrat` are routed here too — stryke doesn't yet
+                // distinguish them from `bigint` for arithmetic, but
+                // accepting them prevents the default-load path from
+                // searching @INC for a CPAN module that won't parse.
+                crate::set_bigint_pragma(true);
+                Ok(())
+            }
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
             _ => {
                 self.require_execute(module, line)?;
@@ -3627,6 +3637,10 @@ impl Interpreter {
             }
             "open" => {
                 self.open_pragma_utf8 = false;
+                Ok(())
+            }
+            "bigint" | "bignum" | "bigrat" => {
+                crate::set_bigint_pragma(false);
                 Ok(())
             }
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
@@ -12864,7 +12878,12 @@ impl Interpreter {
                 PerlValue::integer(lv.to_int() % d)
             }
             BinOp::Pow => {
-                if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
+                // Under `--compat` or `use bigint;`, `compat_pow` promotes
+                // to `BigInt` on overflow; otherwise it falls back to f64
+                // (matches Perl's default i64-overflow-to-NV behavior).
+                if crate::compat_mode() || crate::bigint_pragma() {
+                    crate::value::compat_pow(lv, rv)
+                } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     let int_pow = (b >= 0)
                         .then(|| u32::try_from(b).ok())
                         .flatten()
