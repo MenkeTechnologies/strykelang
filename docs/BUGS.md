@@ -17,6 +17,11 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-013** — `length` now respects `use utf8;`. With the pragma
+  active, scalar args count Unicode codepoints; without it, UTF-8
+  bytes. Raw byte buffers always return byte count. Honored by both
+  tree-walking interpreter and bytecode VM. Per-interpreter flag (not
+  a process global) so concurrent test workers don't bleed.
 - **PARITY-016** — Named-unary precedence: `ref $@ eq "E"`,
   `length $s == 3 ? "Y" : "N"`, and similar idioms now parse as
   `(ref $@) eq "E"` / `(length $s) == 3 ? "Y" : "N"` — matching Perl.
@@ -542,22 +547,22 @@ something other than `m` (or `s`, `tr`, `y`, `qr`, `q`, `qq`, `qw`).
 Severity: **polish**.
 
 
-## PARITY-013 — `length` ignores `use utf8` and always returns byte count
+## PARITY-013 — `length` ignores `use utf8` and always returns byte count — **FIXED**
 
-```sh
-$ stryke -e 'use utf8; print length("héllo")'
-6                       # stryke
-$ perl   -e 'use utf8; print length("héllo")'
-5
-```
-
-Without `use utf8;` both produce 6 (correct byte count). The pragma is the
-issue: stryke does not switch `length` to character semantics.
+`length` now consults the per-interpreter `utf8_pragma` flag set by
+`use utf8;` / `no utf8;`. With the pragma on, scalar args count Unicode
+codepoints (`s.chars().count()`); without it, they count UTF-8 bytes
+(`s.len()`). Raw byte buffers (`as_bytes_arc`) always return byte count,
+matching Perl's `bytes::length` semantics. Both the tree-walking
+interpreter and the bytecode VM (`BuiltinId::Length` reading
+`self.interp.utf8_pragma`) honor the flag. The flag is per-interpreter,
+not global, so concurrent test workers don't bleed pragma state.
 
 Tests: `length_returns_byte_count_for_unicode_string`,
-`length_with_use_utf8_still_counts_bytes_today`.
+`length_with_use_utf8_returns_char_count` (covers `héllo` → 5,
+`日本語` → 3, `café` → 4 with the pragma; bytes without it).
 
-Severity: **parity**.
+Severity: **parity** (FIXED).
 
 
 ## PARITY-014 — `substr($s, $off, $len) = $rep` lvalue not supported — **FIXED**
