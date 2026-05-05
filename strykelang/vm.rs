@@ -4159,6 +4159,24 @@ impl<'a> VM<'a> {
                         // variable, its frame will be destroyed below — so we must
                         // snapshot the data into an Arc-based ref now.
                         let val = self.resolve_binding_ref(val);
+                        // Caller-context coercion: `return LIST` from a sub called
+                        // in scalar context yields the **last** element of the
+                        // list (Perl wantarray semantics). Without this, the
+                        // whole list propagates and a `my $x = sub_returning_list()`
+                        // sees the array stringified rather than its last element.
+                        // (BUG-010 / BUG-011)
+                        let val = if matches!(
+                            self.interp.wantarray_kind,
+                            WantarrayCtx::Scalar
+                        ) {
+                            if let Some(items) = val.as_array_vec() {
+                                items.last().cloned().unwrap_or(PerlValue::UNDEF)
+                            } else {
+                                val
+                            }
+                        } else {
+                            val
+                        };
                         if let Some(frame) = self.call_stack.pop() {
                             if frame.block_region {
                                 return Err(PerlError::runtime(

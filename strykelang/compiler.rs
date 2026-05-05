@@ -2346,13 +2346,20 @@ impl Compiler {
             }
             StmtKind::Return(val) => {
                 if let Some(expr) = val {
-                    // Compile in List context for expressions that need it to return
-                    // their contents (arrays, ranges), but use default for others so
-                    // that `return (1, 2, 3)` in scalar context gives last element.
+                    // `return` propagates the caller's wantarray context, so the
+                    // operand should be evaluated in list context here. Caller-
+                    // side scalar coercion (Op::CallSub in scalar slot) takes the
+                    // last element from the returned list — matching Perl's
+                    // `return (1, 2, 3)` semantics. (BUG-010)
                     match &expr.kind {
                         ExprKind::Range { .. }
                         | ExprKind::SliceRange { .. }
-                        | ExprKind::ArrayVar(_) => {
+                        | ExprKind::ArrayVar(_)
+                        | ExprKind::List(_)
+                        | ExprKind::HashVar(_)
+                        | ExprKind::HashSlice { .. }
+                        | ExprKind::HashKvSlice { .. }
+                        | ExprKind::ArraySlice { .. } => {
                             self.compile_expr_ctx(expr, WantarrayCtx::List)?;
                         }
                         _ => {

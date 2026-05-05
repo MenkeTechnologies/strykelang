@@ -17,6 +17,16 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-082** — Lexer now recognises Perl 5.34+'s `0o777` / `0O777`
+  octal prefix alongside `0x`, `0b`, and bare-`0`. Underscore
+  separators (`0o7_7_7`) supported.
+- **BUG-010 / BUG-011** — `return (1, 2, 3)` and `return 1, 2, 3` (no
+  parens) both return the full list now — `return` is a list operator
+  per Perl semantics. The compiler evaluates the operand in list
+  context for list-shaped exprs, and `Op::ReturnValue` coerces to the
+  last element when the caller's wantarray context is `Scalar`. Fixes
+  every multi-value early-return idiom AND `my $x = sub_returning_
+  list()` taking the last element instead of stringifying the array.
 - **BUG-090** — `my ($head, @tail) = LIST` (and the canonical
   `my ($self, @args) = @_` sub-arg idiom) now binds `@tail` to the
   *tail* of the list, not the full list. New `Op::GetArrayFromIndex`
@@ -655,48 +665,50 @@ Tests: `substr_lvalue_assignment_not_supported_today`,
 Severity: **parity**.
 
 
-## BUG-010 — `return (LIST)` collapses to last comma operand
+## BUG-010 — `return (LIST)` collapses to last comma operand — **FIXED**
 
-```sh
-$ stryke -e 'sub xs { return (1, 2, 3) } my @a = xs(); print "@a"'
-3
-$ perl   -e 'sub xs { return (1, 2, 3) } my @a = xs(); print "@a"'
-1 2 3
-```
+The bytecode compiler now compiles the operand of `return` in **list
+context** for any list-shaped expression (`ExprKind::List`,
+`ExprKind::Range`, `ExprKind::ArrayVar`, `ExprKind::HashVar`,
+`ExprKind::HashSlice` / `HashKvSlice` / `ArraySlice` / `SliceRange`),
+matching Perl's list-operator semantics for `return`. The previous
+"compile in scalar context to give last element" comment was the wrong
+shape — Perl's rule is "return propagates the caller's wantarray
+context", and the **caller** decides whether to coerce to scalar.
 
-Implicit return at the end of a sub body works correctly:
-```sh
-$ stryke -e 'sub xs { (1, 2, 3) } my @a = xs(); print "@a"'
-1 2 3
-```
+Caller-side scalar coercion happens at `Op::ReturnValue`: if
+`self.interp.wantarray_kind` is `Scalar` and the returned value is a
+list/array, take the last element. That makes `my $x = sub_returning
+_list()` yield the last element (Perl wantarray semantics) — also fixes
+BUG-011 in the same dispatch.
 
-Only `return (...)` with parens around a comma-list is wrong. Returning a
-named array (`return @x`) is also fine.
+Parser: `parse_return` was extended to accept a comma-list operand —
+Perl's `return` is a list operator, so `return 1, 2, 3` (no parens)
+returns the full list (1, 2, 3). Stops at postfix-statement-modifier
+keywords (`if`, `unless`, etc.) so `return 1, 2, 3 if 1` still parses
+correctly.
 
-Tests: `explicit_return_paren_list_collapses_to_last_today`,
-`implicit_list_return_yields_full_list`,
-`return_array_var_passes_through_full_list`.
+Tests: `explicit_return_paren_list_returns_full_list` (was
+`_collapses_to_last_today`), `explicit_return_with_bare_commas_returns_full_list`,
+`return_array_var_passes_through_full_list`,
+`sub_return_list_in_scalar_context_yields_last_element`.
 
-Severity: **bug**. Affects every multi-value early-return pattern.
+Severity: **bug** (FIXED — affected every multi-value early-return
+pattern).
 
 
-## BUG-011 — `my $s = list_returning_sub()` concatenates instead of taking last
+## BUG-011 — `my $s = list_returning_sub()` concatenates instead of taking last — **FIXED**
 
-```sh
-$ stryke -e 'sub xs { (1,2,3) } my $s = xs(); print $s'
-123
-$ perl   -e 'sub xs { (1,2,3) } my $s = xs(); print $s'
-3
-```
+Fixed alongside BUG-010. `Op::ReturnValue` now coerces the returned
+value to its last element when the caller's wantarray context is
+`Scalar`, matching Perl's wantarray semantics. `my $s = xs()` and
+`scalar xs()` now agree.
 
-`scalar xs()` correctly returns `3`, so the keyword path works. The
-implicit-scalar-context path (assignment to a scalar lvalue) does not.
+Tests: `list_returning_sub_in_scalar_context_yields_last` (was
+`_concatenates_today`), `return_list_in_scalar_context_yields_last_element`
+(was `_stringifies`), `list_in_scalar_context_via_scalar_keyword_takes_last`.
 
-Tests: `list_returning_sub_in_scalar_context_concatenates_today`,
-`list_in_scalar_context_via_scalar_keyword_takes_last`.
-
-Severity: **bug**. Common Perl pattern (e.g. `my $count = xs();` for the
-"return last/array length"-style API).
+Severity: **bug** (FIXED).
 
 
 ## BUG-012 — `each %hash` always returns an empty list
@@ -2167,27 +2179,19 @@ Tests: `use_integer_pragma_lib_path_tries_to_load_integer_pm_today`,
 Severity: **bug**.
 
 
-## BUG-082 — `0o` octal prefix not recognized
+## BUG-082 — `0o` octal prefix not recognized — **FIXED**
 
-```sh
-$ stryke -e 'print 0o777'
-0
-$ stryke -e 'print 0777'
-511
-$ perl   -e 'print 0o777'
-511
-```
+Lexer now recognises the Perl 5.34+ `0o` / `0O` prefix alongside `0x`
+(hex), `0b` (binary), and bare-`0` (legacy octal). After the prefix it
+reads the same digit pool as bare-`0` octals (decimal digits 0-7 plus
+`_` separators), and converts via `i64::from_str_radix(.., 8)`.
+Underscore separators (`0o7_7_7`) work, matching Perl.
 
-Perl 5.34+ accepts `0o777` as a synonym for `0777`. Stryke parses `0o`
-as the integer zero followed by an unrelated identifier, so `0o777`
-evaluates to `0`. Bare leading-zero octals (`0644`, `0755`) work
-correctly.
-
-Tests: `octal_o_prefix_returns_zero_today`,
+Tests: `octal_o_prefix_returns_511` (was `_returns_zero_today`),
 `classic_zero_prefix_octal_works`,
 `octal_literal_pattern_matches_perl`.
 
-Severity: **bug** (parity; small surface).
+Severity: **bug** (parity, FIXED).
 
 
 ## BUG-083 — Regex `/n` flag (no auto-capture) not supported
@@ -2392,54 +2396,59 @@ Severity: **bug** (very high impact — breaks every `($head, @tail) = @_`
 idiom).
 
 
-## BUG-089 — Closures don't observe outer-scope mutations (capture-by-value)
+## ~~BUG-089~~ DESIGN-001 — Closures capture outer-scope vars by value (not by reference)
 
-```sh
-$ stryke -e '
-my $x = 5;
-my $f = sub { $x };
-$x = 10;
-print $f->()'
-5                              # Perl prints 10
-$ stryke -e '
-my $count = 0;
-my $inc = sub { $count++ };
-$inc->(); $inc->(); $inc->();
-print $count'
-0                              # Perl prints 3
-```
+**Not a bug — intentional language-design choice.** Stryke closures
+snapshot outer-scope `my` variables at capture time rather than holding
+a live reference to their storage. This matches Rust's `move ||`
+closure semantics (and most modern parallel-friendly languages),
+trades shared-mutable state for race-free dispatch into the parallel
+runtime (`pmap`, `pfor`, `cluster`, async/spawn blocks), and removes
+an entire class of "is this closure-mutating-outer-var safe across
+threads?" questions from the language.
 
-A closure that references an outer-scope `my` variable receives a
-snapshot of that variable's value, not a reference to its storage. The
-following Perl idioms break:
+What this means for code:
 
-- Outer counter: `my $n = 0; my $inc = sub { $n++ }; $inc->(); print $n`
-- Cached state: any mutation through the closure stays local to the
-  closure's snapshot
-- Observer pattern: external updates are invisible to subscribed
-  closures
-
-What still works:
-
-- Factory pattern: `sub make_X { my $n; sub { ... } }` — internal `my`
-  variables ARE shared between repeat calls of the inner closure, so
-  `make_counter()` returns a working counter.
-- For-loop iteration: `for my $i (LIST) { push @fs, sub { $i } }` — each
-  iteration's `$i` is a fresh `my` and the closure captures it correctly.
+- Inner factory state IS shared across calls of the inner closure
+  (factory pattern works exactly like Perl):
+  ```
+  fn make_counter { my $n = 0; sub { ++$n } }
+  my $c = make_counter(); $c->(); $c->(); $c->();   # 3
+  ```
+- For-loop iteration captures each iteration's fresh `my $i` correctly:
+  ```
+  my @fs; for my $i (1..3) { push @fs, sub { $i } }   # [1, 2, 3]
+  ```
 - `map { my $captured = $x; sub { $captured } } LIST` — explicit
   per-iteration `my` binding works.
 
-Tests: `closure_does_not_see_outer_var_mutation_today`,
-`closure_modifying_outer_scalar_does_not_propagate_today`,
-`closure_does_not_observe_outer_array_push_today`,
-`closure_does_not_observe_outer_hash_extension_today`,
+What requires an idiom change vs Perl:
+
+- Outer counter: use a factory wrapper or pass a ref-to-scalar:
+  ```
+  # Idiomatic stryke
+  fn counter { my $n = 0; sub { ++$n } }
+
+  # Or explicit ref through:
+  my $n = 0; my $ref = \$n;
+  my $inc = sub { ${$ref}++ };
+  ```
+- Observer pattern: pass a hash/array ref through the closure (ref
+  identity preserved across the snapshot — only scalars are
+  copied-by-value).
+
+Tests pinning the documented behaviour:
+`closure_captures_outer_var_by_value` (was `_does_not_see_outer_var_mutation_today`),
+`closure_modifying_outer_scalar_stays_local` (was `_does_not_propagate_today`),
+`closure_does_not_observe_outer_array_push` (was `_today`),
+`closure_does_not_observe_outer_hash_extension` (was `_today`),
 `fn_factory_returning_sub_captures_factory_param`,
 `for_loop_closure_captures_each_iteration_var`,
 `factory_with_internal_state_is_a_working_counter`,
 `map_inside_closure_captures_unique_per_iteration`.
 
-Severity: **bug** (very high impact). Combined with BUG-095 (slurpy
-destructure leak) this breaks most stateful HOF patterns.
+Status: **DESIGN** (not a bug). Documented behaviour, distinguishes
+stryke from Perl 5, motivated by parallel-safety.
 
 
 ## BUG-090 — Slurpy `@rest` / `%rest` in destructure captures the FULL list — **FIXED**
