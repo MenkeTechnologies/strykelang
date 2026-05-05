@@ -24,6 +24,13 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-001** — magic string increment (`"b"++ → "c"`, `"Az"++ →
+  "Ba"`, `"zz"++ → "aaa"`, `""++ → "1"`, `"a9"++ → "b0"`). Decrement
+  has no magic counterpart in Perl 5 and stays numeric. Pure-digit
+  and mixed (e.g. `"9a"`) strings continue to fall back to numeric
+  increment. Wired through both the tree-walking interpreter
+  (`PreIncrement` / `PostfixOp::Increment`) and the bytecode VM
+  (`PostInc`, `PostIncSlot`, `PreIncSlot`, `PreIncSlotVoid`).
 - **BUG-057, BUG-079, BUG-080, PARITY-008, PARITY-009** — sprintf `%a` /
   `%A` (C99 hex-float), `%n` (write byte-count through scalar ref),
   `%p` (deterministic placeholder), `%v...` (vectorize per-byte through
@@ -53,7 +60,7 @@ every coderef-call-with-array-arg. Together they make most functional-
 style libraries unusable until fixed.
 
 
-## PARITY-001 — Magic string increment is not implemented
+## PARITY-001 — Magic string increment is not implemented — **FIXED**
 
 `++` on a string operand numifies the operand to 0 then increments. Perl 5
 performs magic string increment (`"b"++ → "c"`, `"Az"++ → "Ba"`, `"zz"++ → "aaa"`).
