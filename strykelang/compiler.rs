@@ -2165,6 +2165,17 @@ impl Compiler {
                 label,
                 continue_block,
             } => {
+                // Perl `for ARRAY` aliases the loop variable to each array
+                // element — mutations through the loop var propagate back to
+                // the array. We approximate by detecting a bare-`@arr` source
+                // and emitting a write-back step at the end of each iteration
+                // (before the counter increment, after the body and any
+                // continue block). Complex sources (lists, ranges, `keys`)
+                // keep copy semantics, matching Perl. (BUG-019)
+                let alias_array_name_idx: Option<u16> = match &list.kind {
+                    ExprKind::ArrayVar(name) => Some(self.chunk.intern_name(name)),
+                    _ => None,
+                };
                 // PushFrame isolates __foreach_list__ / __foreach_i__ from outer/nested loops.
                 self.emit_push_frame(line);
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
@@ -2244,6 +2255,23 @@ impl Compiler {
                     std::mem::take(&mut self.loop_stack.last_mut().expect("loop").continue_jumps);
                 for j in cont_jumps {
                     self.chunk.patch_jump_to(j, step_ip);
+                }
+                // Alias write-back: $arr[$i] = $loopvar; (BUG-019). Runs at
+                // the merged step_ip target so both normal-completion and
+                // `next` paths write the loop var's current value back to the
+                // source array element.
+                if let Some(arr_idx) = alias_array_name_idx {
+                    if let Some(s) = var_slot_opt {
+                        self.chunk.emit(Op::GetScalarSlot(s), line);
+                    } else {
+                        self.emit_get_scalar(var_name, line, None);
+                    }
+                    if let Some(s) = counter_slot_opt {
+                        self.chunk.emit(Op::GetScalarSlot(s), line);
+                    } else {
+                        self.emit_get_scalar(counter_name, line, None);
+                    }
+                    self.chunk.emit(Op::SetArrayElem(arr_idx), line);
                 }
                 if let Some(cb) = continue_block {
                     self.compile_block_no_frame(cb)?;
