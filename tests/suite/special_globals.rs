@@ -1,7 +1,7 @@
 //! High-impact Perl globals: `$]`, `$;`, `$^*`, `$ARGV` + `<>`, `@-` / `@+`, `$^S`, `%INC` / `%SIG`.
 
 use crate::common::*;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::parse;
 use stryke::perl_bracket_version;
 use stryke::value::PerlValue;
@@ -50,7 +50,7 @@ fn diamond_sets_argv_scalar() {
     let path = base.to_string_lossy().into_owned();
 
     let program = parse("my $line = <>; length($line) + length($ARGV)").expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp
         .scope
         .declare_array("ARGV", vec![PerlValue::string(path.clone())]);
@@ -78,7 +78,7 @@ fn require_populates_inc_hash() {
     "#
     ))
     .expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("run");
     assert!(v.to_int() >= 1);
     assert!(interp.scope.exists_hash_element("INC", "Trivial.pm"));

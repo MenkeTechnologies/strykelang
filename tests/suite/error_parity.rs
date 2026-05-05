@@ -105,7 +105,7 @@ parity_test!(warn_literal, r#"warn "watch out""#);
 
 // ── I/O ──────────────────────────────────────────────────────────────────
 // SEMANTIC GAP: stryke `open` dies on failure; Perl returns false + sets $!.
-// Fixing this is a bigger change than a message tweak — see interpreter.rs
+// Fixing this is a bigger change than a message tweak — see vm_helper
 // `open_builtin_execute`. Promote to assertive once fixed.
 parity_test!(
     #[ignore = "TODO: open should return false + set $! on failure, not die"]

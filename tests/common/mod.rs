@@ -2,13 +2,13 @@
 //! that imports this module and `tests/suite/*`.
 
 use stryke::error::ErrorKind;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
 
 /// Parse and execute Perl code; panics on parse or runtime error.
 pub fn eval(code: &str) -> PerlValue {
     let program = stryke::parse(code).expect("parse failed");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.execute(&program).expect("execution failed")
 }
 
@@ -22,7 +22,7 @@ pub fn eval_int(code: &str) -> i64 {
 
 pub fn eval_err_kind(code: &str) -> ErrorKind {
     let program = stryke::parse(code).expect("parse failed");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.execute(&program).unwrap_err().kind
 }
 

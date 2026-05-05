@@ -11,7 +11,7 @@
 //!   simple numeric literals (regression guard).
 //!
 //! ## Scalar context — numeric line flip-flop
-//! - Driven by `$.` ([`stryke::interpreter::Interpreter::scalar_flipflop_dot_line`]). Inactive → empty
+//! - Driven by `$.` ([`stryke::vm_helper::VMHelper::scalar_flipflop_dot_line`]). Inactive → empty
 //!   string (`""`, false). Active lines emit `"1"`, `"2"`, …; the **closing** line uses a `"E0"` suffix
 //!   (Perl `pp_flop` stringification).
 //!

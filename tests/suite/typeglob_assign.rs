@@ -59,7 +59,7 @@ fn vm_compiles_dynamic_typeglob_expr() {
     let code = r#"no strict 'vars';
         *{"STDOUT"};"#;
     let program = stryke::parse(code).expect("parse");
-    let mut interp = stryke::interpreter::Interpreter::new();
+    let mut interp = stryke::vm_helper::VMHelper::new();
     assert!(
         stryke::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for dynamic typeglob (Op::LoadDynamicTypeglob)"

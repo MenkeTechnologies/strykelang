@@ -361,7 +361,10 @@ fn bitwise_xor_integers() {
 
 #[test]
 fn negative_modulo() {
-    assert_eq!(ri("-7 % 3;"), -1);
+    // Perl uses floored modulo (sign-of-divisor): -7 % 3 == 2, not -1.
+    // Stryke matched after the PARITY-005 fix; this assertion was a stale
+    // pin asserting the previous C-style truncated result.
+    assert_eq!(ri("-7 % 3;"), 2);
 }
 
 #[test]

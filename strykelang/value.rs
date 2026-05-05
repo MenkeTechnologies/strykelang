@@ -726,7 +726,7 @@ pub struct PerlSub {
     pub closure_env: Option<Vec<(String, PerlValue)>>,
     /// Prototype string from `sub name (PROTO) { }`, or `None`.
     pub prototype: Option<String>,
-    /// When set, [`Interpreter::call_sub`](crate::interpreter::Interpreter::call_sub) may evaluate
+    /// When set, [`Interpreter::call_sub`](crate::vm_helper::VMHelper::call_sub) may evaluate
     /// this sub with an explicit stack instead of recursive scope frames.
     pub fib_like: Option<FibLikeRecAddPattern>,
 }

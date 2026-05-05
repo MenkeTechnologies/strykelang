@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
 use crate::token::Token;
 
@@ -15363,7 +15363,7 @@ impl Parser {
                 } else {
                     let c = chars[i];
                     let probe = c.to_string();
-                    if Interpreter::is_special_scalar_name_for_get(&probe)
+                    if VMHelper::is_special_scalar_name_for_get(&probe)
                         || matches!(c, '\'' | '`')
                     {
                         i += 1;

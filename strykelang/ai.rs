@@ -34,7 +34,7 @@
 //! `model="claude-opus-4-5"`).
 
 use crate::error::PerlError;
-use crate::interpreter::{FlowOrError, Interpreter, WantarrayCtx};
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::value::PerlValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -1367,7 +1367,7 @@ fn truncate(s: &str, n: usize) -> String {
 // result back, repeat until the model returns a final text answer or
 // `max_turns` is hit.
 
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn ai_agent(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let prompt = args
             .first()
@@ -3009,7 +3009,7 @@ fn mock_embedding(text: &str) -> Vec<f32> {
 // text chunk as the model produces it. The full text is also returned
 // at the end so existing buffered call sites still work.
 
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn ai_stream_with_callback(
         &mut self,
         args: &[PerlValue],
@@ -3160,7 +3160,7 @@ impl Interpreter {
     }
 }
 
-impl Interpreter {
+impl VMHelper {
     fn ai_stream_openai(
         &mut self,
         prompt: &str,
@@ -4523,7 +4523,7 @@ pub(crate) fn ai_translate(args: &[PerlValue], line: usize) -> Result<PerlValue>
 /// `ai_budget($usd_max, sub { ... })` — runs the block, fails the
 /// program with a runtime error if cost during the block exceeds
 /// `$usd_max`. Restores the prior global cap on exit.
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn ai_budget(&mut self, args: &[PerlValue], line: usize) -> Result<PerlValue> {
         let cap = args
             .first()
@@ -4553,14 +4553,14 @@ impl Interpreter {
                 }
                 Ok(v)
             }
-            Err(crate::interpreter::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
-            Err(crate::interpreter::FlowOrError::Error(e)) => Err(e),
+            Err(crate::vm_helper::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+            Err(crate::vm_helper::FlowOrError::Error(e)) => Err(e),
         }
     }
 }
 
 pub(crate) fn ai_budget_dispatch(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> Result<PerlValue> {

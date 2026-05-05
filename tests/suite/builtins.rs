@@ -1,5 +1,5 @@
 use crate::common::*;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 
 #[test]
 fn array_ref() {
@@ -146,7 +146,7 @@ fn numeric_functions() {
 fn die_in_eval() {
     let code = r#"eval { die "test error\n" }; $@ eq "test error\n" ? 1 : 0"#;
     let program = stryke::parse(code).expect("parse failed");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let result = interp.execute(&program);
     assert!(result.is_ok());
 }

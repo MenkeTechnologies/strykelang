@@ -109,7 +109,7 @@ pub(crate) fn merge_preduce_init_partials(
             return preduce_init_merge_maps(m1, m2);
         }
     }
-    let mut local_interp = Interpreter::new();
+    let mut local_interp = VMHelper::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
     local_interp.enable_parallel_guard();
@@ -142,7 +142,7 @@ pub(crate) fn fold_preduce_init_step(
     acc: PerlValue,
     item: PerlValue,
 ) -> PerlValue {
-    let mut local_interp = Interpreter::new();
+    let mut local_interp = VMHelper::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
     local_interp.enable_parallel_guard();
@@ -524,7 +524,7 @@ pub(crate) fn assign_rhs_wantarray(target: &Expr) -> WantarrayCtx {
 /// Memoized inputs + result for a non-`g` `regex_match_execute` call. Populated on every
 /// successful match and consulted at the top of the next call; on exact-match (same pattern,
 /// flags, multiline, and haystack content) we skip regex execution + capture-var scope population
-/// entirely, replaying the stored `PerlValue` result. See [`Interpreter::regex_match_memo`].
+/// entirely, replaying the stored `PerlValue` result. See [`VMHelper::regex_match_memo`].
 #[derive(Clone)]
 pub(crate) struct RegexMatchMemo {
     pub pattern: String,
@@ -566,7 +566,8 @@ impl IoWrite for IoSharedFileWrite {
     }
 }
 
-pub struct Interpreter {
+/// There is no Tree walking Interpreter, this is Just a Virtual Machine helper struct
+pub struct VMHelper {
     pub scope: Scope,
     pub(crate) subs: HashMap<String, Arc<PerlSub>>,
     /// AOP advice registry — populated by `Op::RegisterAdvice` from `before|after|around` decls.
@@ -1346,13 +1347,13 @@ fn pw_home_dir_for_login_name(login: &std::ffi::OsStr) -> Option<std::ffi::OsStr
     Some(std::ffi::OsString::from_vec(dir_bytes.to_vec()))
 }
 
-impl Default for Interpreter {
+impl Default for VMHelper {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// How [`Interpreter::apply_regex_captures`] updates `@^CAPTURE_ALL`.
+/// How [`VMHelper::apply_regex_captures`] updates `@^CAPTURE_ALL`.
 #[derive(Clone, Copy)]
 pub(crate) enum CaptureAllMode {
     /// Non-`g` match: clear `@^CAPTURE_ALL` (matches Perl 5.42+ empty `@^CAPTURE_ALL` when not using `/g`).
@@ -1363,7 +1364,7 @@ pub(crate) enum CaptureAllMode {
     Skip,
 }
 
-impl Interpreter {
+impl VMHelper {
     pub fn new() -> Self {
         let mut scope = Scope::new();
         scope.declare_array("INC", vec![PerlValue::string(".".to_string())]);
@@ -1791,8 +1792,8 @@ impl Interpreter {
 
     /// Fork interpreter state for `-n`/`-p` over multiple `@ARGV` files in parallel (rayon).
     /// Clears file descriptors and I/O handles (each worker only runs the line loop).
-    pub fn line_mode_worker_clone(&self) -> Interpreter {
-        Interpreter {
+    pub fn line_mode_worker_clone(&self) -> VMHelper {
+        VMHelper {
             scope: self.scope.clone(),
             subs: self.subs.clone(),
             intercepts: self.intercepts.clone(),
@@ -1993,7 +1994,7 @@ impl Interpreter {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
                 let out = crate::par_list::pfirst_run(list, &pmap_progress, |item| {
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp
@@ -2033,7 +2034,7 @@ impl Interpreter {
                 let (scope_capture, atomic_arrays, atomic_hashes) =
                     self.scope.capture_with_atomics();
                 let b = crate::par_list::pany_run(list, &pmap_progress, |item| {
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp
@@ -6027,7 +6028,7 @@ impl Interpreter {
         let join = Arc::new(ParkMutex::new(None));
         let result2 = result.clone();
         let h = std::thread::spawn(move || {
-            let mut interp = Interpreter::new();
+            let mut interp = VMHelper::new();
             interp.subs = subs;
             interp.scope.restore_capture(&scalars);
             interp.scope.restore_atomics(&aar, &ahash);
@@ -6067,7 +6068,7 @@ impl Interpreter {
         let inc = self.scope.get_array("INC");
         let (tx, rx) = channel::<PerlResult<PerlValue>>();
         let _handle = std::thread::spawn(move || {
-            let mut interp = Interpreter::new();
+            let mut interp = VMHelper::new();
             interp.subs = subs;
             interp.struct_defs = struct_defs;
             interp.enum_defs = enum_defs;
@@ -10766,7 +10767,7 @@ impl Interpreter {
                         .into_par_iter()
                         .enumerate()
                         .map(|(i, item)| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -10792,7 +10793,7 @@ impl Interpreter {
                     let results: Vec<PerlValue> = items
                         .into_par_iter()
                         .map(|item| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -10844,7 +10845,7 @@ impl Interpreter {
                 let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
                     .into_par_iter()
                     .map(|(chunk_idx, chunk)| {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp
@@ -10908,7 +10909,7 @@ impl Interpreter {
                 let results: Vec<PerlValue> = items
                     .into_par_iter()
                     .filter_map(|item| {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp
@@ -10955,7 +10956,7 @@ impl Interpreter {
                     if first_err.lock().is_some() {
                         return;
                     }
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp
@@ -11017,7 +11018,7 @@ impl Interpreter {
                         .into_par_iter()
                         .map(|i| {
                             fan_progress.start_worker(i);
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.suppress_stdout = show_progress;
                             local_interp.scope.restore_capture(&scope_capture);
@@ -11051,7 +11052,7 @@ impl Interpreter {
                         return;
                     }
                     fan_progress.start_worker(i);
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.suppress_stdout = show_progress;
                     local_interp.scope.restore_capture(&scope_capture);
@@ -11263,7 +11264,7 @@ impl Interpreter {
                         let subs = self.subs.clone();
                         let scope_capture = self.scope.capture();
                         items.par_sort_by(|a, b| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.scope.set_sort_pair(a.clone(), b.clone());
@@ -11304,7 +11305,7 @@ impl Interpreter {
                 let scope_capture = self.scope.capture();
                 let mut acc = items[0].clone();
                 for b in items.into_iter().skip(1) {
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp.scope.set_sort_pair(acc, b);
@@ -11347,7 +11348,7 @@ impl Interpreter {
                         x
                     })
                     .reduce_with(|a, b| {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp.scope.set_sort_pair(a, b);
@@ -11431,7 +11432,7 @@ impl Interpreter {
                 let subs = self.subs.clone();
                 let scope_capture = self.scope.capture();
                 if items.len() == 1 {
-                    let mut local_interp = Interpreter::new();
+                    let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
                     local_interp.scope.set_topic(items[0].clone());
@@ -11444,7 +11445,7 @@ impl Interpreter {
                 let result = items
                     .into_par_iter()
                     .map(|item| {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp.scope.set_topic(item);
@@ -11456,7 +11457,7 @@ impl Interpreter {
                         val
                     })
                     .reduce_with(|a, b| {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp.scope.set_sort_pair(a, b);
@@ -11495,7 +11496,7 @@ impl Interpreter {
                             pmap_progress.tick();
                             return v.clone();
                         }
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp.scope.set_topic(item.clone());
@@ -16815,7 +16816,7 @@ impl Interpreter {
         let results: Vec<PerlValue> = items
             .into_par_iter()
             .map(|item| {
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
                 local_interp
@@ -16852,7 +16853,7 @@ impl Interpreter {
         let mut kept: Vec<(usize, PerlValue)> = indexed
             .into_par_iter()
             .filter_map(|(i, item)| {
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
                 local_interp
@@ -16892,7 +16893,7 @@ impl Interpreter {
         let mut mapped: Vec<(usize, PerlValue)> = indexed
             .into_par_iter()
             .map(|(i, item)| {
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
                 local_interp
@@ -17013,7 +17014,7 @@ impl Interpreter {
                     v = v
                         .into_par_iter()
                         .filter_map(|item| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -17047,7 +17048,7 @@ impl Interpreter {
                         if first_err.lock().is_some() {
                             return;
                         }
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp
@@ -17100,7 +17101,7 @@ impl Interpreter {
                     let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
                         .into_par_iter()
                         .map(|(chunk_idx, chunk)| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -17141,7 +17142,7 @@ impl Interpreter {
                                 let subs = self.subs.clone();
                                 let scope_capture = self.scope.capture();
                                 v.par_sort_by(|a, b| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.enable_parallel_guard();
@@ -17186,7 +17187,7 @@ impl Interpreter {
                                 pmap_progress.tick();
                                 return cached.clone();
                             }
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.enable_parallel_guard();
@@ -17222,7 +17223,7 @@ impl Interpreter {
                             x
                         })
                         .reduce_with(|a, b| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.enable_parallel_guard();
@@ -17286,7 +17287,7 @@ impl Interpreter {
                     let subs = self.subs.clone();
                     let scope_capture = self.scope.capture();
                     if v.len() == 1 {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
                         local_interp.scope.set_topic(v[0].clone());
@@ -17299,7 +17300,7 @@ impl Interpreter {
                     let result = v
                         .into_par_iter()
                         .map(|item| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.scope.set_topic(item);
@@ -17311,7 +17312,7 @@ impl Interpreter {
                             val
                         })
                         .reduce_with(|a, b| {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp.scope.set_sort_pair(a, b);
@@ -17443,7 +17444,7 @@ impl Interpreter {
                                     if err_w.lock().is_some() {
                                         break;
                                     }
-                                    let mut interp = Interpreter::new();
+                                    let mut interp = VMHelper::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -17468,7 +17469,7 @@ impl Interpreter {
                                     if err_w.lock().is_some() {
                                         break;
                                     }
-                                    let mut interp = Interpreter::new();
+                                    let mut interp = VMHelper::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -17514,7 +17515,7 @@ impl Interpreter {
                                     if err_w.lock().is_some() {
                                         break;
                                     }
-                                    let mut interp = Interpreter::new();
+                                    let mut interp = VMHelper::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp
@@ -17554,7 +17555,7 @@ impl Interpreter {
                                     if err_w.lock().is_some() {
                                         break;
                                     }
-                                    let mut interp = Interpreter::new();
+                                    let mut interp = VMHelper::new();
                                     interp.subs = subs.clone();
                                     interp.scope.restore_capture(&capture);
                                     interp
@@ -17603,7 +17604,7 @@ impl Interpreter {
                                     {
                                         cached.clone()
                                     } else {
-                                        let mut interp = Interpreter::new();
+                                        let mut interp = VMHelper::new();
                                         interp.subs = subs.clone();
                                         interp.scope.restore_capture(&capture);
                                         interp
@@ -19338,7 +19339,7 @@ impl Interpreter {
                     .unwrap_or(slice.len());
                 let line_bytes = &slice[s..e];
                 let line_str = crate::par_lines::line_to_perl_string(line_bytes);
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
                 local_interp
@@ -19401,7 +19402,7 @@ impl Interpreter {
             let pmap_progress = PmapProgress::new(true, paths.len());
             paths.into_par_iter().try_for_each(|p| {
                 let s = p.to_string_lossy().into_owned();
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
                 local_interp
@@ -19790,7 +19791,7 @@ fn par_walk_invoke_entry(
     line: usize,
 ) -> Result<(), FlowOrError> {
     let s = path.to_string_lossy().into_owned();
-    let mut local_interp = Interpreter::new();
+    let mut local_interp = VMHelper::new();
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
     local_interp
@@ -20076,7 +20077,7 @@ fn perl_g_form(n: f64, prec: usize, upper: bool) -> String {
 
 /// Public sprintf entry point. Returns the formatted string plus the list
 /// of `%n` store-targets and counts that the caller should apply via
-/// [`Interpreter::assign_scalar_ref_deref`]. Callers that don't use `%n`
+/// [`VMHelper::assign_scalar_ref_deref`]. Callers that don't use `%n`
 /// can ignore the second tuple element.
 pub(crate) fn perl_sprintf_format_full<F>(
     fmt: &str,
@@ -20482,11 +20483,11 @@ where
 
 #[cfg(test)]
 mod regex_expand_tests {
-    use super::Interpreter;
+    use super::VMHelper;
 
     #[test]
     fn compile_regex_quotemeta_qe_matches_literal() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let re = i.compile_regex(r"\Qa.c\E", "", 1).expect("regex");
         assert!(re.is_match("a.c"));
         assert!(!re.is_match("abc"));
@@ -20496,7 +20497,7 @@ mod regex_expand_tests {
     /// stay literal (not rewritten to `(?:\n?\z)`).
     #[test]
     fn compile_regex_char_class_leading_close_bracket_is_literal() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let re = i.compile_regex(r"[]\[^$.*/]", "", 1).expect("regex");
         assert!(re.is_match("$"));
         assert!(re.is_match("]"));
@@ -20506,42 +20507,42 @@ mod regex_expand_tests {
 
 #[cfg(test)]
 mod special_scalar_name_tests {
-    use super::Interpreter;
+    use super::VMHelper;
 
     #[test]
     fn special_scalar_name_for_get_matches_magic_globals() {
-        assert!(Interpreter::is_special_scalar_name_for_get("0"));
-        assert!(Interpreter::is_special_scalar_name_for_get("!"));
-        assert!(Interpreter::is_special_scalar_name_for_get("^W"));
-        assert!(Interpreter::is_special_scalar_name_for_get("^O"));
-        assert!(Interpreter::is_special_scalar_name_for_get("^MATCH"));
-        assert!(Interpreter::is_special_scalar_name_for_get("<"));
-        assert!(Interpreter::is_special_scalar_name_for_get("?"));
-        assert!(Interpreter::is_special_scalar_name_for_get("|"));
-        assert!(Interpreter::is_special_scalar_name_for_get("^UNICODE"));
-        assert!(Interpreter::is_special_scalar_name_for_get("\""));
-        assert!(!Interpreter::is_special_scalar_name_for_get("foo"));
-        assert!(!Interpreter::is_special_scalar_name_for_get("plainvar"));
+        assert!(VMHelper::is_special_scalar_name_for_get("0"));
+        assert!(VMHelper::is_special_scalar_name_for_get("!"));
+        assert!(VMHelper::is_special_scalar_name_for_get("^W"));
+        assert!(VMHelper::is_special_scalar_name_for_get("^O"));
+        assert!(VMHelper::is_special_scalar_name_for_get("^MATCH"));
+        assert!(VMHelper::is_special_scalar_name_for_get("<"));
+        assert!(VMHelper::is_special_scalar_name_for_get("?"));
+        assert!(VMHelper::is_special_scalar_name_for_get("|"));
+        assert!(VMHelper::is_special_scalar_name_for_get("^UNICODE"));
+        assert!(VMHelper::is_special_scalar_name_for_get("\""));
+        assert!(!VMHelper::is_special_scalar_name_for_get("foo"));
+        assert!(!VMHelper::is_special_scalar_name_for_get("plainvar"));
     }
 
     #[test]
     fn special_scalar_name_for_set_matches_set_special_var_arms() {
-        assert!(Interpreter::is_special_scalar_name_for_set("0"));
-        assert!(Interpreter::is_special_scalar_name_for_set("^D"));
-        assert!(Interpreter::is_special_scalar_name_for_set("^H"));
-        assert!(Interpreter::is_special_scalar_name_for_set("^WARNING_BITS"));
-        assert!(Interpreter::is_special_scalar_name_for_set("ARGV"));
-        assert!(Interpreter::is_special_scalar_name_for_set("|"));
-        assert!(Interpreter::is_special_scalar_name_for_set("?"));
-        assert!(Interpreter::is_special_scalar_name_for_set("^UNICODE"));
-        assert!(Interpreter::is_special_scalar_name_for_set("."));
-        assert!(!Interpreter::is_special_scalar_name_for_set("foo"));
-        assert!(!Interpreter::is_special_scalar_name_for_set("__PACKAGE__"));
+        assert!(VMHelper::is_special_scalar_name_for_set("0"));
+        assert!(VMHelper::is_special_scalar_name_for_set("^D"));
+        assert!(VMHelper::is_special_scalar_name_for_set("^H"));
+        assert!(VMHelper::is_special_scalar_name_for_set("^WARNING_BITS"));
+        assert!(VMHelper::is_special_scalar_name_for_set("ARGV"));
+        assert!(VMHelper::is_special_scalar_name_for_set("|"));
+        assert!(VMHelper::is_special_scalar_name_for_set("?"));
+        assert!(VMHelper::is_special_scalar_name_for_set("^UNICODE"));
+        assert!(VMHelper::is_special_scalar_name_for_set("."));
+        assert!(!VMHelper::is_special_scalar_name_for_set("foo"));
+        assert!(!VMHelper::is_special_scalar_name_for_set("__PACKAGE__"));
     }
 
     #[test]
     fn caret_and_id_specials_roundtrip_get() {
-        let i = Interpreter::new();
+        let i = VMHelper::new();
         assert_eq!(i.get_special_var("^O").to_string(), super::perl_osname());
         assert_eq!(
             i.get_special_var("^V").to_string(),
@@ -20557,7 +20558,7 @@ mod special_scalar_name_tests {
 
     #[test]
     fn scalar_flip_flop_three_dot_same_dollar_dot_second_eval_stays_active() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         i.last_readline_handle.clear();
         i.line_number = 3;
         i.prepare_flip_flop_vm_slots(1);
@@ -20577,7 +20578,7 @@ mod special_scalar_name_tests {
 
     #[test]
     fn scalar_flip_flop_three_dot_deactivates_when_past_left_line_and_dot_matches_right() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         i.last_readline_handle.clear();
         i.line_number = 2;
         i.prepare_flip_flop_vm_slots(1);

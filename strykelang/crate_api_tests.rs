@@ -1,6 +1,6 @@
 //! Unit tests for the crate root API: `parse`, `run`, `parse_and_run_string`, `try_vm_execute`.
 
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 use crate::{lint_program, parse, parse_and_run_string, parse_with_file, run, try_vm_execute};
 
 fn run_int(code: &str) -> i64 {
@@ -128,7 +128,7 @@ fn parse_with_file_includes_path_in_syntax_error_display() {
 
 #[test]
 fn parse_and_run_string_shares_interpreter_state() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     parse_and_run_string("my $crate_api_z = 100;", &mut i).expect("first");
     let v = parse_and_run_string("$crate_api_z + 1;", &mut i).expect("second");
     assert_eq!(v.to_int(), 101);
@@ -137,7 +137,7 @@ fn parse_and_run_string_shares_interpreter_state() {
 #[test]
 fn try_vm_execute_runs_simple_literal_program() {
     let p = parse("42").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some());
     assert_eq!(out.unwrap().expect("vm").to_int(), 42);
@@ -157,7 +157,7 @@ fn run_pos_assign_named_scalar_reads_back() {
 #[test]
 fn try_vm_execute_pos_assign_sets_regex_pos() {
     let p = parse(r#"$_ = ""; pos = 3; pos"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -191,7 +191,7 @@ fn try_vm_execute_pos_deref_scalar_assign() {
         pos $$t"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -208,7 +208,7 @@ fn try_vm_execute_map_expr_comma_length_builtin() {
         join(",", map length, qw(a bb))"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -226,7 +226,7 @@ fn try_vm_execute_tell_after_print_to_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"open F, ">", "{ps}"; print F "xyzzy"; my $p = tell F; close F; $p"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "tell after print should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 5);
@@ -236,7 +236,7 @@ fn try_vm_execute_tell_after_print_to_file() {
 #[test]
 fn try_vm_execute_quotemeta_builtin() {
     let p = parse(r#"quotemeta("a.c")"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "quotemeta should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), r"a\.c");
@@ -251,7 +251,7 @@ fn try_vm_execute_do_block_propagates_list_context_to_grep() {
         len @u"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -269,7 +269,7 @@ fn try_vm_execute_chomp_scalar_returns_removed_count() {
         $n * 100 + length($s)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "chomp should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 102);
@@ -281,7 +281,7 @@ fn try_vm_execute_subst_pattern_expands_env_brace() {
     let home = std::env::var("HOME").expect("HOME");
     let src = format!(r#"$_ = "{home}/tail"; s@$ENV{{HOME}}@~@; $_;"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -300,7 +300,7 @@ fn try_vm_execute_subst_replacement_expands_env_brace() {
         $_"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -317,7 +317,7 @@ fn try_vm_execute_my_array_assign_do_block_list_rhs() {
         $a[0] * 100 + $a[1] * 10 + $a[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -334,7 +334,7 @@ fn try_vm_execute_my_hash_assign_do_block_list_rhs() {
         $h{"a"} * 10 + $h{"b"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -346,7 +346,7 @@ fn try_vm_execute_my_hash_assign_do_block_list_rhs() {
 #[test]
 fn try_vm_execute_tell_stdout_returns_negative_one() {
     let p = parse("tell STDOUT").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "tell STDOUT should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), -1);
@@ -355,7 +355,7 @@ fn try_vm_execute_tell_stdout_returns_negative_one() {
 #[test]
 fn try_vm_execute_core_tell_stdout() {
     let p = parse("CORE::tell STDOUT").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "CORE::tell should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), -1);
@@ -370,7 +370,7 @@ fn try_vm_execute_array_assign_flattens_hash() {
         len @a"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -383,7 +383,7 @@ fn try_vm_execute_array_assign_flattens_hash() {
 #[test]
 fn try_vm_execute_fileno_stdout() {
     let p = parse("fileno STDOUT").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "fileno should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -403,7 +403,7 @@ fn try_vm_execute_getc_reads_from_open_file() {
         $s;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "getc on file should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "QZ");
@@ -413,13 +413,13 @@ fn try_vm_execute_getc_reads_from_open_file() {
 #[test]
 fn try_vm_execute_binmode_stdout() {
     let p = parse("binmode STDOUT").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "binmode should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
 }
 
-/// `$"` drives `join` glue and [`Interpreter::list_separator`] (array interpolation uses same store).
+/// `$"` drives `join` glue and [`VMHelper::list_separator`] (array interpolation uses same store).
 #[test]
 fn try_vm_execute_join_uses_list_separator_glue() {
     let p = parse(
@@ -428,7 +428,7 @@ fn try_vm_execute_join_uses_list_separator_glue() {
         join $", ("aa", "bb", "cc")"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -446,7 +446,7 @@ fn try_vm_execute_qq_array_respects_custom_list_separator() {
         "@a""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -462,7 +462,7 @@ fn try_vm_execute_scalar_keys_hash_count() {
         scalar keys %h"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -478,7 +478,7 @@ fn try_vm_execute_scalar_values_hash_count() {
         scalar values %h"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "scalar values on hash should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -487,7 +487,7 @@ fn try_vm_execute_scalar_values_hash_count() {
 #[test]
 fn try_vm_execute_join_reverse_list() {
     let p = parse(r#"join(",", rev (30, 20, 10))"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "reverse list then join should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "10,20,30");
@@ -508,7 +508,7 @@ fn try_vm_execute_sysseek_seek_set_then_tell() {
         $p;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "sysseek then tell should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -529,7 +529,7 @@ fn try_vm_execute_eof_false_while_input_handle_open() {
         $n;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "eof on open handle should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -549,7 +549,7 @@ fn try_vm_execute_eof_true_after_input_handle_closed() {
         eof("E");"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "eof after close should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -573,7 +573,7 @@ fn try_vm_execute_truncate_path_shortens_file() {
         $ok * 100 + length $s;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "truncate path should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 102);
@@ -583,7 +583,7 @@ fn try_vm_execute_truncate_path_shortens_file() {
 #[test]
 fn try_vm_execute_split_with_limit() {
     let p = parse(r#"len split(",", "aa,bb,cc,dd", 2)"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "split with LIMIT should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -592,7 +592,7 @@ fn try_vm_execute_split_with_limit() {
 #[test]
 fn try_vm_execute_pack_unsigned_char() {
     let p = parse(r#"ord substr(pack("C", 77), 0, 1)"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "pack C should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 77);
@@ -601,7 +601,7 @@ fn try_vm_execute_pack_unsigned_char() {
 #[test]
 fn try_vm_execute_unpack_after_pack_unsigned_char() {
     let p = parse(r#"scalar unpack("C", pack("C", 91))"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "unpack after pack should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 91);
@@ -610,7 +610,7 @@ fn try_vm_execute_unpack_after_pack_unsigned_char() {
 #[test]
 fn try_vm_execute_eval_string_expression() {
     let p = parse(r#"eval '31 + 11'"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -622,7 +622,7 @@ fn try_vm_execute_eval_string_expression() {
 #[test]
 fn try_vm_execute_eval_block_expression() {
     let p = parse(r#"eval { 50 - 8 }"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "eval block should compile on VM (EvalBlock)");
     assert_eq!(out.unwrap().expect("vm").to_int(), 42);
@@ -637,7 +637,7 @@ fn try_vm_execute_filetest_s_nonempty_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"-s "{ps}";"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "-s on nonempty file should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2); // -s returns file size (2 bytes for "hi")
@@ -653,7 +653,7 @@ fn try_vm_execute_filetest_z_empty_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"-z "{ps}";"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "-z on empty file should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -663,7 +663,7 @@ fn try_vm_execute_filetest_z_empty_file() {
 #[test]
 fn try_vm_execute_sleep_zero() {
     let p = parse("sleep 0").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "sleep should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -684,7 +684,7 @@ fn try_vm_execute_glob_lists_matching_files_in_dir() {
         len @g;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "glob should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -695,7 +695,7 @@ fn try_vm_execute_glob_lists_matching_files_in_dir() {
 #[test]
 fn try_vm_execute_qx_scalar_reads_stdout() {
     let p = parse(r#"scalar `printf '%s' vm_qx_ok`"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "qx / readpipe should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "vm_qx_ok");
@@ -708,7 +708,7 @@ fn try_vm_execute_prototype_coderef() {
         prototype \&demo"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "prototype on coderef should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "$");
@@ -717,7 +717,7 @@ fn try_vm_execute_prototype_coderef() {
 #[test]
 fn try_vm_execute_study_non_empty_string() {
     let p = parse(r#"study "pq""#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "study should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -726,7 +726,7 @@ fn try_vm_execute_study_non_empty_string() {
 #[test]
 fn try_vm_execute_hex_and_oct_literals() {
     let p = parse(r#"hex("2a") + oct("10")"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "hex and oct should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 42 + 8);
@@ -740,7 +740,7 @@ fn try_vm_execute_select_default_output_handle_roundtrip() {
         $was . ":" . $prev"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -752,7 +752,7 @@ fn try_vm_execute_select_default_output_handle_roundtrip() {
 #[test]
 fn try_vm_execute_abs_int_sqrt_builtins() {
     let p = parse(r#"abs(-11) + int(3.9) + sqrt(36)"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -764,7 +764,7 @@ fn try_vm_execute_abs_int_sqrt_builtins() {
 #[test]
 fn try_vm_execute_defined_builtin() {
     let p = parse(r#"defined("ok") * 100 + defined(undef)"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "defined should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 100);
@@ -778,7 +778,7 @@ fn try_vm_execute_ref_scalar_reference() {
         ref \$q"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "ref should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "SCALAR");
@@ -792,7 +792,7 @@ fn try_vm_execute_bless_sets_ref_package() {
         ref $o"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "bless and ref should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "Zoo");
@@ -807,7 +807,7 @@ fn try_vm_execute_delete_hash_key_and_exists() {
         $d * 10 + $still"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -820,7 +820,7 @@ fn try_vm_execute_delete_hash_key_and_exists() {
 fn try_vm_execute_sin_cos_atan2_log_exp() {
     let p = parse(r#"int(100 * atan2(1, 1)) + int(sin(0) + cos(0)) + int(log(exp(4)))"#)
         .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -834,7 +834,7 @@ fn try_vm_execute_index_rindex_substr() {
     let p =
         parse(r#"index("abca", "a") + 10 * rindex("abca", "a") + length substr("abcdef", 1, 3)"#)
             .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "index, rindex, substr should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 33);
@@ -847,7 +847,7 @@ fn try_vm_execute_splice_returns_removed_slice() {
         join("-", splice @v, 1, 2)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "splice should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "20-30");
@@ -861,7 +861,7 @@ fn try_vm_execute_unshift_prepends() {
         $w[0] * 10 + $w[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "unshift should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 89);
@@ -870,7 +870,7 @@ fn try_vm_execute_unshift_prepends() {
 #[test]
 fn try_vm_execute_fc_foldcase() {
     let p = parse(r#"fc("AbC")"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "fc should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "abc");
@@ -885,7 +885,7 @@ fn try_vm_execute_slurp_reads_whole_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"length(slurp "{ps}");"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "slurp should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 8);
@@ -904,7 +904,7 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
         $st[7];"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 7);
@@ -914,7 +914,7 @@ fn try_vm_execute_stat_file_size_at_index_seven() {
 #[test]
 fn try_vm_execute_stat_missing_path_empty_list() {
     let p = parse(r#"my @st = stat("stryke___stat___no_such___file"); len @st"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat missing path should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -934,7 +934,7 @@ fn try_vm_execute_readline_scalar_first_line() {
         length $ln;"#
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "readline scalar should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 6);
@@ -951,7 +951,7 @@ fn try_vm_execute_mkdir_and_d_filetest() {
         (-d "{pb}") * 10 + (-e "{pb}");"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "mkdir should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 11);
@@ -961,7 +961,7 @@ fn try_vm_execute_mkdir_and_d_filetest() {
 #[test]
 fn try_vm_execute_capture_true_reports_zero_exit() {
     let p = parse(r#"my $r = capture("true"); $r->exitcode"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "capture should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -976,7 +976,7 @@ fn try_vm_execute_filetest_e_and_f_nonempty_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"((-e "{ps}") * 10) + (-f "{ps}");"#,);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "-e and -f should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 11);
@@ -1002,7 +1002,7 @@ fn try_vm_execute_opendir_readdir_finds_known_file() {
         scalar grep {{ $_ eq "needle.txt" }} @ents;"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1028,7 +1028,7 @@ fn try_vm_execute_rewinddir_resets_telldir() {
         $z;"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1050,7 +1050,7 @@ fn try_vm_execute_readlink_returns_symlink_target() {
     let sl = link.to_string_lossy();
     let src = format!(r#"(readlink "{sl}") eq "rel_tg" ? 1 : 0;"#,);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "readlink should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -1073,7 +1073,7 @@ fn try_vm_execute_hard_link_shares_file_contents() {
         (slurp "{sb}") eq "shared" ? 1 : 0;"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "link() should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -1099,7 +1099,7 @@ fn try_vm_execute_lstat_symlink_size_differs_from_stat() {
         $st[7] * 100 + $l[7];"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "stat/lstat should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 118);
@@ -1115,7 +1115,7 @@ fn try_vm_execute_unlink_removes_file() {
     let ps = path.to_string_lossy();
     let src = format!(r#"unlink "{ps}";"#);
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "unlink should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -1130,7 +1130,7 @@ fn try_vm_execute_wantarray_scalar_vs_list_in_sub() {
         $s * 100 + $L[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "wantarray in sub should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 905);
@@ -1152,7 +1152,7 @@ fn try_vm_execute_rename_file() {
         length(slurp "{s2}");"#,
     );
     let p = parse(&src).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "rename should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -1169,7 +1169,7 @@ fn try_vm_execute_srand_makes_rand_repeatable() {
         ($a == $b) ? 1 : 0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1181,7 +1181,7 @@ fn try_vm_execute_srand_makes_rand_repeatable() {
 #[test]
 fn try_vm_execute_lc_uc_concat() {
     let p = parse(r#"lc("Ab") . uc("cD")"#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "lc and uc should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "abCD");
@@ -1190,7 +1190,7 @@ fn try_vm_execute_lc_uc_concat() {
 #[test]
 fn try_vm_execute_scalar_reverse_string() {
     let p = parse(r#"scalar rev "Perl""#).expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1207,7 +1207,7 @@ fn try_vm_execute_chop_shortens_string() {
         $g"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "chop should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "x");
@@ -1228,7 +1228,7 @@ fn try_vm_execute_use_overload_add_and_qq_stringify() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1251,7 +1251,7 @@ fn try_vm_execute_use_overload_unary_neg() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "overload neg should compile on VM path");
     assert_eq!(out.unwrap().expect("vm").to_int(), 77);
@@ -1271,7 +1271,7 @@ fn try_vm_execute_use_overload_concat_string_on_lhs() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1294,7 +1294,7 @@ fn try_vm_execute_sprintf_percent_s_overload_stringify() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1317,7 +1317,7 @@ fn try_vm_execute_join_overload_stringify() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "join with overloaded elt should stay on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "[9]-z");
@@ -1337,7 +1337,7 @@ fn try_vm_execute_use_overload_bool_unary_not() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "overload bool + ! should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1);
@@ -1356,7 +1356,7 @@ fn try_vm_execute_use_overload_not_keyword_with_bool() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1380,7 +1380,7 @@ fn try_vm_execute_use_overload_nomethod_binop() {
     "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "nomethod binop should stay on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 88);
@@ -1395,7 +1395,7 @@ fn try_vm_execute_qq_named_array_element() {
         "n$a[0]""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "qq array element should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "n33");
@@ -1410,7 +1410,7 @@ fn try_vm_execute_qq_braced_scalar_trailing_literal() {
         "k${u}zz""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1429,7 +1429,7 @@ fn try_vm_execute_named_array_slice_list_assign() {
         $a[0] + $a[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1446,7 +1446,7 @@ fn try_vm_execute_qq_braced_scalar_leading_and_trailing_literals() {
         "M${u}N""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1464,7 +1464,7 @@ fn try_vm_execute_qq_mixed_braced_and_plain_scalar() {
         "p${x}q$y""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1483,7 +1483,7 @@ fn try_vm_execute_named_array_slice_single_index_list_rhs() {
         $a[0] + $a[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1501,7 +1501,7 @@ fn try_vm_execute_named_array_slice_three_indices_list_assign() {
         $a[0] * 100 + $a[1] * 10 + $a[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1520,7 +1520,7 @@ fn try_vm_execute_qq_literal_then_two_scalars() {
         "p$x$y""#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1537,7 +1537,7 @@ fn try_vm_execute_scalar_defined_or_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1555,7 +1555,7 @@ fn try_vm_execute_scalar_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "$x //= should skip RHS when LHS is defined");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -1569,7 +1569,7 @@ fn try_vm_execute_scalar_log_or_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1587,7 +1587,7 @@ fn try_vm_execute_scalar_log_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "$x ||= should skip RHS when LHS is true");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -1601,7 +1601,7 @@ fn try_vm_execute_scalar_log_and_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1619,7 +1619,7 @@ fn try_vm_execute_scalar_log_and_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1637,7 +1637,7 @@ fn try_vm_execute_array_elem_defined_or_assign() {
         $a[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1656,7 +1656,7 @@ fn try_vm_execute_array_elem_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1674,7 +1674,7 @@ fn try_vm_execute_array_elem_log_or_assign() {
         $a[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1692,7 +1692,7 @@ fn try_vm_execute_hash_elem_defined_or_assign() {
         $h{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1711,7 +1711,7 @@ fn try_vm_execute_hash_elem_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1729,7 +1729,7 @@ fn try_vm_execute_hash_elem_log_or_assign() {
         $h{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1747,7 +1747,7 @@ fn try_vm_execute_array_elem_log_and_assign() {
         $a[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1766,7 +1766,7 @@ fn try_vm_execute_hash_elem_log_and_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1784,7 +1784,7 @@ fn try_vm_execute_arrow_hash_log_and_assign() {
         $h->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1796,7 +1796,7 @@ fn try_vm_execute_arrow_hash_log_and_assign() {
 #[test]
 fn try_vm_execute_indirect_coderef_call() {
     let p = parse("my $inc = fn { $_[0] + 1 }; $inc(41)").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1813,7 +1813,7 @@ fn try_vm_execute_sort_with_coderef_comparator() {
         join(",", sort $cmp (3, 1, 2))"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1831,7 +1831,7 @@ fn try_vm_execute_symbolic_scalar_deref() {
         $$r"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1850,7 +1850,7 @@ fn try_vm_execute_symbolic_scalar_ref_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1869,7 +1869,7 @@ fn try_vm_execute_symbolic_scalar_ref_compound_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1888,7 +1888,7 @@ fn try_vm_execute_symbolic_scalar_ref_defined_or_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1908,7 +1908,7 @@ fn try_vm_execute_symbolic_scalar_ref_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "$$r //= should skip RHS when LHS is defined");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -1924,7 +1924,7 @@ fn try_vm_execute_symbolic_scalar_ref_log_or_assign() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1944,7 +1944,7 @@ fn try_vm_execute_symbolic_scalar_ref_log_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "$$r ||= should skip RHS when LHS is true");
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -1959,7 +1959,7 @@ fn try_vm_execute_arrow_hash_compound_assign() {
         $h->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1977,7 +1977,7 @@ fn try_vm_execute_arrow_hash_defined_or_assign() {
         $h->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -1996,7 +1996,7 @@ fn try_vm_execute_arrow_hash_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2014,7 +2014,7 @@ fn try_vm_execute_scalar_deref_hash_defined_or_assign() {
         $h{x}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2033,7 +2033,7 @@ fn try_vm_execute_scalar_deref_hash_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2051,7 +2051,7 @@ fn try_vm_execute_arrow_hash_log_or_assign() {
         $h->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2070,7 +2070,7 @@ fn try_vm_execute_arrow_hash_log_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2088,7 +2088,7 @@ fn try_vm_execute_arrow_hash_assign() {
         $h->{"a"} + $h->{"b"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2106,7 +2106,7 @@ fn try_vm_execute_arrow_hash_assign_returns_rhs() {
         $x + $h->{"k"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2124,7 +2124,7 @@ fn try_vm_execute_arrow_array_assign_returns_rhs() {
         $x + $a->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2142,7 +2142,7 @@ fn try_vm_execute_arrow_array_compound_assign() {
         $a->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2160,7 +2160,7 @@ fn try_vm_execute_arrow_array_defined_or_assign() {
         $a->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2179,7 +2179,7 @@ fn try_vm_execute_arrow_array_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2197,7 +2197,7 @@ fn try_vm_execute_arrow_array_log_or_assign() {
         $a->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2216,7 +2216,7 @@ fn try_vm_execute_arrow_array_log_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2235,7 +2235,7 @@ fn try_vm_execute_empty_named_array_slice_assign_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for @a[] =, got {:?}", out);
@@ -2256,7 +2256,7 @@ fn try_vm_execute_empty_named_hash_slice_assign_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for @h{{}} =, got {:?}", out);
@@ -2278,7 +2278,7 @@ fn try_vm_execute_empty_arrow_array_slice_assign_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for @$r[] =, got {:?}", out);
@@ -2301,7 +2301,7 @@ fn try_vm_execute_empty_hash_slice_deref_assign_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for @$r{{}} =, got {:?}", out);
@@ -2323,7 +2323,7 @@ fn try_vm_execute_empty_hash_slice_deref_plus_eq_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for @$r{{}} +=, got {:?}", out);
@@ -2381,7 +2381,7 @@ fn try_vm_execute_exists_delete_href() {
         $e . "," . $d . "," . $e2"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2437,7 +2437,7 @@ fn try_vm_execute_exists_delete_named_array() {
         $e0 . "," . $e1 . "," . $d . "," . $e2"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2495,7 +2495,7 @@ fn try_vm_execute_exists_delete_aref() {
         $e0 . "," . $e1 . "," . $d . "," . $e2"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2552,7 +2552,7 @@ fn try_vm_execute_keys_values_hashref_scalar_context() {
         (len keys $r) + (len values $r)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2626,7 +2626,7 @@ fn try_vm_execute_scalar_at_aref_is_length() {
         len @$a"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "len @$a should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
@@ -2640,7 +2640,7 @@ fn try_vm_execute_scalar_at_aref_empty_is_zero() {
         len @$a"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2678,7 +2678,7 @@ fn try_vm_execute_scalar_braced_aref_is_length() {
         len @{$a}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "len @{{$a}} should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 5);
@@ -2692,7 +2692,7 @@ fn try_vm_execute_scalar_braced_sub_returning_aref_is_length() {
         len @{mk()}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -2710,7 +2710,7 @@ fn try_vm_execute_assignment_rhs_at_aref_yields_length() {
         $n"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "my $n = @$a should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
@@ -2724,7 +2724,7 @@ fn try_vm_execute_assign_named_array_to_scalar_is_length() {
         $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "my $x = @y should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
@@ -2760,7 +2760,7 @@ fn try_vm_execute_scalar_percent_empty_hash_is_zero() {
         scalar %h"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some());
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -2803,7 +2803,7 @@ fn try_vm_execute_scalar_percent_href_nonempty_fill_string() {
         scalar %$r"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "scalar %$r should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "2/3");
@@ -2817,7 +2817,7 @@ fn try_vm_execute_scalar_percent_href_empty_is_zero() {
         scalar %$r"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some());
     assert_eq!(out.unwrap().expect("vm").to_int(), 0);
@@ -2855,7 +2855,7 @@ fn try_vm_execute_scalar_named_array_length() {
         len @u"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "len @u should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 4);
@@ -2869,7 +2869,7 @@ fn try_vm_execute_join_scalar_at_aref_single_argument() {
         join "-", len @$a"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3054,7 +3054,7 @@ fn try_vm_execute_splice_aref_returns_removed_slice() {
         join("-", splice @$v, 1, 2)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "splice on array ref should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "20-30");
@@ -3069,7 +3069,7 @@ fn try_vm_execute_splice_aref_negative_offset_removed_tail() {
         $r . "|" . join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3087,7 +3087,7 @@ fn try_vm_execute_splice_aref_negative_length_preserves_tail() {
         $r . "|" . join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3105,7 +3105,7 @@ fn try_vm_execute_splice_aref_negative_offset_with_replacement() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3123,7 +3123,7 @@ fn try_vm_execute_splice_aref_three_replacements_mutates_target() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3141,7 +3141,7 @@ fn try_vm_execute_splice_aref_zero_length_insert() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "splice LENGTH0 insert should compile on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-2-3");
@@ -3156,7 +3156,7 @@ fn try_vm_execute_push_aref_splice_list_chain() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3174,7 +3174,7 @@ fn try_vm_execute_splice_aref_with_replacements_mutates_target() {
         ($removed eq "2-3" && $v->[1] == 9 && $v->[2] == 8 && $v->[3] == 4) ? 1 : 0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3191,7 +3191,7 @@ fn try_vm_execute_scalar_splice_aref_returns_last_removed() {
         scalar splice @$a, 0, 2"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3212,7 +3212,7 @@ fn try_vm_execute_push_pop_shift_unshift_aref() {
         $n + $p + $s + $u + $a->[0] + $a->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3230,7 +3230,7 @@ fn try_vm_execute_named_array_splice_negative_offset_replacement() {
         join "-", @a"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "named splice with negative OFFSET on VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3-88-5");
@@ -3245,7 +3245,7 @@ fn try_vm_execute_unshift_splice_aref_chain() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "unshift with splice on same aref");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3");
@@ -3259,7 +3259,7 @@ fn try_vm_execute_grep_block_aref() {
         len grep { $_ > 1 } @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "grep block over array ref");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
@@ -3274,7 +3274,7 @@ fn try_vm_execute_map_block_aref() {
         $m[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "map block over array ref");
     assert_eq!(out.unwrap().expect("vm").to_int(), 6);
@@ -3288,7 +3288,7 @@ fn try_vm_execute_scalar_keys_hashref() {
         scalar keys %$h"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "scalar keys on hashref");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3);
@@ -3304,7 +3304,7 @@ fn try_vm_execute_for_loop_over_aref() {
         $s"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "for-loop over array ref");
     assert_eq!(out.unwrap().expect("vm").to_int(), 6);
@@ -3320,7 +3320,7 @@ fn try_vm_execute_splice_aref_variable_offset() {
         join "-", @$v"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "splice on aref with scalar OFFSET variable");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-4");
@@ -3336,7 +3336,7 @@ fn try_vm_execute_concat_two_arefs() {
         join "-", @x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "list concat of two arefs");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-2-3-4");
@@ -3350,7 +3350,7 @@ fn try_vm_execute_scalar_splice_named_negative_offset() {
         $n . "|" . join("-", @a)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "scalar splice named array negative OFFSET");
     assert_eq!(out.unwrap().expect("vm").to_string(), "4|1-2-5");
@@ -3364,7 +3364,7 @@ fn try_vm_execute_splice_named_three_replacements_return_removed() {
         join("-", @a) . "|" . join("-", @b)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3382,7 +3382,7 @@ fn try_vm_execute_splice_aref_three_replacements_return_removed() {
         join("-", @$v) . "|" . join("-", @b)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "aref splice three replacements, list return");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1-9-8-7-4|2-3");
@@ -3398,7 +3398,7 @@ fn try_vm_execute_shift_then_pop_aref() {
         $x . "|" . join("-", @$v)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "shift then pop on same aref");
     assert_eq!(out.unwrap().expect("vm").to_string(), "3|2");
@@ -3413,7 +3413,7 @@ fn try_vm_execute_empty_arrow_array_slice_preinc_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for ++@$r[1..0], got {:?}", out);
@@ -3435,7 +3435,7 @@ fn try_vm_execute_empty_array_slice_preinc_vm_runtime_error() {
         0"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     let Some(Err(e)) = out else {
         panic!("expected VM runtime error for ++@a[], got {:?}", out);
@@ -3474,7 +3474,7 @@ fn try_vm_execute_arrow_array_defined_or_range_subscript() {
         $a->[0] . "," . $a->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3492,7 +3492,7 @@ fn try_vm_execute_arrow_array_assign() {
         $a->[0] + $a->[1] + $a->[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3510,7 +3510,7 @@ fn try_vm_execute_arrow_array_slice_through_atref_read() {
         join(",", @$r[1,2])"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3528,7 +3528,7 @@ fn try_vm_execute_arrow_array_slice_through_atref_read_single() {
         @$r[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3547,7 +3547,7 @@ fn try_vm_execute_arrow_array_slice_through_atref_assign_list() {
         $r->[1] . "," . $r->[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3565,7 +3565,7 @@ fn try_vm_execute_arrow_array_pre_inc_only() {
         $a->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 10);
 }
@@ -3579,7 +3579,7 @@ fn try_vm_execute_arrow_hash_pre_inc_only() {
         $h->{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 10);
 }
@@ -3597,7 +3597,7 @@ fn try_vm_execute_arrow_array_hash_pre_post_inc() {
         $pre_a + $post_a + $a->[0] + $pre_h + $post_h + $h->{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3617,7 +3617,7 @@ fn try_vm_execute_symbolic_scalar_ref_pre_post_inc() {
         $pre + $post + $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3639,7 +3639,7 @@ fn try_vm_execute_symbolic_array_hash_ref_assign() {
         join(",", @$r) . ";" . join(",", sort keys %$hr)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3657,7 +3657,7 @@ fn try_vm_execute_hash_slice_deref() {
         join(",", @$r{"a", "b"})"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3676,7 +3676,7 @@ fn try_vm_execute_hash_slice_deref_assign() {
         $r->{"a"} . "," . $r->{"b"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3695,7 +3695,7 @@ fn try_vm_execute_named_hash_slice_assign() {
         $h{"a"} . "," . $h{"b"} . "," . $h{"c"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "%h{{k1,k2}} = should compile (SetHashSlice)");
     assert_eq!(out.unwrap().expect("vm").to_string(), "100,2,300");
@@ -3713,7 +3713,7 @@ fn try_vm_execute_named_hash_slice_compound_assign_multi_key() {
         $first * 10 + $second"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3749,7 +3749,7 @@ fn try_vm_execute_named_hash_slice_multi_key_defined_or() {
         $h{"a"} . "," . $h{"b"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3794,7 +3794,7 @@ fn try_vm_execute_hash_slice_deref_multi_key_defined_or() {
         $r->{"a"} . "," . $r->{"b"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3840,7 +3840,7 @@ fn try_vm_execute_named_hash_slice_multi_key_pre_inc() {
         $pre * 100 + $first * 10 + $second_def"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3886,7 +3886,7 @@ fn try_vm_execute_hash_slice_deref_compound_assign() {
         $r->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3909,7 +3909,7 @@ fn try_vm_execute_hash_slice_deref_compound_assign_multi_key() {
         $first * 10 + $second"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3950,7 +3950,7 @@ fn try_vm_execute_hash_slice_deref_multi_key_pre_inc() {
         $pre * 100 + $first * 10 + $second_def"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3972,7 +3972,7 @@ fn try_vm_execute_hash_slice_deref_multi_key_post_inc() {
         $post . ":" . $first . ":" . $second_def"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -3992,7 +3992,7 @@ fn try_vm_execute_hash_slice_deref_multi_key_post_dec() {
         $r->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4039,7 +4039,7 @@ fn try_vm_execute_hash_slice_deref_defined_or_assign() {
         $r->{"a"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4059,7 +4059,7 @@ fn try_vm_execute_hash_slice_deref_defined_or_assign_short_circuit() {
         $runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4078,7 +4078,7 @@ fn try_vm_execute_hash_slice_deref_pre_inc_only() {
         $r->{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 10);
 }
@@ -4094,7 +4094,7 @@ fn try_vm_execute_hash_slice_deref_pre_post_inc() {
         $pre + $post + $r->{"x"}"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4114,7 +4114,7 @@ fn try_vm_execute_multi_index_array_slice_assign() {
         join(",", @$r)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4133,7 +4133,7 @@ fn try_vm_execute_named_array_slice_assign_list() {
         join(",", @a)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4151,7 +4151,7 @@ fn try_vm_execute_named_array_slice_assign_range_subscript() {
         $a[0] . "," . $a[1] . "," . $a[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "@a[0..1] = list should compile");
     assert_eq!(out.unwrap().expect("vm").to_string(), "7,8,0");
@@ -4169,7 +4169,7 @@ fn try_vm_execute_multi_index_array_slice_compound_assign() {
         $a * 10 + $b_def"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "multi-index compound assign should compile");
     assert_eq!(out.unwrap().expect("vm").to_int(), 101);
@@ -4186,7 +4186,7 @@ fn try_vm_execute_multi_index_array_slice_pre_inc() {
         $pre * 10 + $first"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "multi-index pre-inc should compile");
     assert_eq!(out.unwrap().expect("vm").to_int(), 3110);
@@ -4202,7 +4202,7 @@ fn try_vm_execute_multi_index_array_slice_post_dec() {
         $post . ":" . $r->[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "multi-index postfix -- should compile");
     assert_eq!(out.unwrap().expect("vm").to_string(), "200:100");
@@ -4218,7 +4218,7 @@ fn try_vm_execute_multi_index_arrow_slice_defined_or_assign() {
         $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4236,7 +4236,7 @@ fn try_vm_execute_multi_index_arrow_slice_defined_or_assign_fills_undef_last() {
         $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some());
     assert_eq!(out.unwrap().expect("vm").to_string(), "1,6");
@@ -4252,7 +4252,7 @@ fn try_vm_execute_multi_index_arrow_slice_log_or_assign() {
         $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "multi-index ||= should compile to VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "0,4");
@@ -4268,7 +4268,7 @@ fn try_vm_execute_multi_index_arrow_slice_log_and_assign() {
         $r->[0] . "," . $r->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "multi-index &&= should compile to VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1,0");
@@ -4285,7 +4285,7 @@ fn try_vm_execute_named_array_multi_slice_pre_inc() {
         $pre * 10 + $first"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4306,7 +4306,7 @@ fn try_vm_execute_named_array_slice_pre_inc_range_and_list_subscript() {
         $x * 1000 + $y * 10 + $a[0] + $b[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4325,7 +4325,7 @@ fn try_vm_execute_named_array_multi_slice_defined_or_assign() {
         $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "named multi-index //= should compile to VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1,0");
@@ -4340,7 +4340,7 @@ fn try_vm_execute_named_array_multi_slice_log_or_assign() {
         $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4358,7 +4358,7 @@ fn try_vm_execute_named_array_multi_slice_log_and_assign() {
         $a[0] . "," . $a[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "named multi-index &&= should compile to VM");
     assert_eq!(out.unwrap().expect("vm").to_string(), "1,0");
@@ -4373,7 +4373,7 @@ fn try_vm_execute_named_array_multi_slice_plus_assign() {
         $a[0] + $a[1] + $a[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "named multi-index += should compile to VM");
     assert_eq!(out.unwrap().expect("vm").to_int(), 10 + 20 + 37);
@@ -4388,7 +4388,7 @@ fn try_vm_execute_arrow_array_slice_read_range_subscript() {
         join(",", @$r[0..1])"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4407,7 +4407,7 @@ fn try_vm_execute_arrow_array_slice_pre_inc_range() {
         $pre . ":" . $r->[0] . ":" . $r->[1]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "++@$r[0..1] should compile");
     assert_eq!(out.unwrap().expect("vm").to_string(), "201:100:201");
@@ -4423,7 +4423,7 @@ fn try_vm_execute_arrow_array_slice_assign_range_subscript() {
         $r->[0] . "," . $r->[1] . "," . $r->[2]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "@$r[0..1] = list should compile");
     assert_eq!(out.unwrap().expect("vm").to_string(), "7,8,0");
@@ -4447,7 +4447,7 @@ fn try_vm_execute_next_nested_in_if() {
         $sum"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "nested next in if should compile");
     // 1 + 2 + 4 + 5 = 12
@@ -4472,7 +4472,7 @@ fn try_vm_execute_last_nested_in_if() {
         $sum * 10 + $i"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "nested last in if should compile");
     // sum = 1+2+3 = 6; i = 4 → 64
@@ -4499,7 +4499,7 @@ fn try_vm_execute_last_label_from_nested() {
         $hit"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4523,7 +4523,7 @@ fn try_vm_execute_redo_while_restarts_body() {
         "#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "redo in while should compile on VM path");
     assert_eq!(out.unwrap().expect("vm").to_int(), 2);
@@ -4540,7 +4540,7 @@ fn try_vm_execute_strict_vars_happy_path() {
         $x + $y"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4560,7 +4560,7 @@ fn try_vm_execute_strict_vars_rejects_undeclared_scalar() {
         $undeclared"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4582,7 +4582,7 @@ fn try_vm_execute_strict_vars_allows_underscore_and_foreach_var() {
         r#"use strict; fn add_all() { my $s = 0; for my $x (@_) { $s += $x }; $s }; add_all(1, 2, 3, 4, 5)"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4603,7 +4603,7 @@ fn try_vm_execute_strict_refs_via_transitive_helper() {
         $a[0]"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     // This one may either compile (and error at runtime via SymbolicDeref) or bail to tree.
     // Either way, the user must see an error mentioning "strict refs".
@@ -4636,7 +4636,7 @@ fn try_vm_execute_compound_assign_on_slot_lexical_in_sub() {
         foo()"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4660,7 +4660,7 @@ fn try_vm_execute_concat_compound_assign_on_slot_lexical_in_sub() {
         foo()"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4685,7 +4685,7 @@ fn try_vm_execute_top_level_goto_forward() {
         END: $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "top-level `goto LABEL` should compile");
     assert_eq!(
@@ -4710,7 +4710,7 @@ fn try_vm_execute_sub_body_goto_forward() {
         foo()"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "sub-body `goto LABEL` should compile");
     assert_eq!(out.unwrap().expect("vm").to_int(), 10);
@@ -4735,7 +4735,7 @@ fn try_vm_execute_goto_backward_unconditional_after_return() {
         $sum"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     // The `if` wraps `goto` in a frame, so the VM's frame-crossing guard rejects this
     // case — the tree fallback takes over and errors with "goto outside goto-aware block".
@@ -4770,7 +4770,7 @@ fn try_vm_execute_goto_backward_same_frame() {
         DONE: $x"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4789,7 +4789,7 @@ fn try_vm_execute_goto_unknown_label_errors() {
         goto NO_SUCH"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     // Either VM returns Some(Err) (if compile-error promotion is wired) or None→tree errors.
     let out = try_vm_execute(&p, &mut i);
     if let Some(r) = out {
@@ -4817,7 +4817,7 @@ fn try_vm_execute_while_with_continue_block() {
         $sum * 10 + $i"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "while + continue block should compile");
     assert_eq!(out.unwrap().expect("vm").to_int(), 105);
@@ -4841,7 +4841,7 @@ fn try_vm_execute_foreach_with_continue_block() {
         $body * 100 + $cont"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "foreach + continue block should compile");
     assert_eq!(out.unwrap().expect("vm").to_int(), 1010);
@@ -4864,7 +4864,7 @@ fn try_vm_execute_while_continue_with_top_level_next() {
         $cont_runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -4889,7 +4889,7 @@ fn try_vm_execute_until_with_continue_block() {
         $i * 10 + $cont_runs"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "until + continue block should compile");
     // i ends at 3, cont_runs = 3
@@ -4928,7 +4928,7 @@ fn try_vm_execute_rejects_aggregate_symbolic_inc_dec_directly() {
     ];
     for (src, want_agg, want_op) in cases {
         let p = parse(src).expect("parse");
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let out = try_vm_execute(&p, &mut i);
         assert!(
             out.is_some(),
@@ -4962,7 +4962,7 @@ fn try_vm_execute_rejects_aggregate_symbolic_inc_dec_directly() {
 /// Perl 5 rejects `++@{...}`, `%{...}++`, etc.; we must not treat them as numeric ops on length.
 #[test]
 fn symbolic_array_hash_deref_inc_dec_errors_like_perl() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse(
         r#"no strict 'vars'
         my $r = [1, 2, 3]
@@ -5011,7 +5011,7 @@ fn try_vm_execute_grep_expr_comma() {
         join(",", grep $_ > 1, (1, 2, 3))"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -5027,7 +5027,7 @@ fn try_vm_execute_map_expr_comma() {
         join(",", map $_ * 2, (1, 2, 3))"#,
     )
     .expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(
         out.is_some(),
@@ -5039,7 +5039,7 @@ fn try_vm_execute_map_expr_comma() {
 #[test]
 fn try_vm_execute_runs_begin_block_before_main() {
     let p = parse("BEGIN { 1; } 2").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 2);
 }
@@ -5047,7 +5047,7 @@ fn try_vm_execute_runs_begin_block_before_main() {
 #[test]
 fn lint_program_accepts_vm_compilable_program() {
     let p = parse("42").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     assert!(lint_program(&p, &mut i).is_ok());
 }
 
@@ -5063,12 +5063,12 @@ fn bench_builtin_reports_stats() {
 #[test]
 fn try_vm_execute_runs_given_when_and_algebraic_match() {
     let p_given = parse(r#"given (7) { when (7) { 99; } default { -1; } }"#).expect("parse given");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p_given, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 99);
 
     let p_match = parse(r#"match (2) { _ => 3 + 4, }"#).expect("parse match");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let out = try_vm_execute(&p_match, &mut i).expect("vm path");
     assert_eq!(out.expect("vm").to_int(), 7);
 }

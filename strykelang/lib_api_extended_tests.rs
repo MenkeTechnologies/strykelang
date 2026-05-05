@@ -1,6 +1,6 @@
 //! Extended tests for the crate root API.
 
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 use crate::{
     compat_mode, convert_to_stryke, deconvert_to_perl, format_program, lint_program, parse,
     parse_and_run_string_in_file, run, script_cache, set_compat_mode, try_vm_execute,
@@ -9,7 +9,7 @@ use std::fs;
 
 #[test]
 fn test_lint_program() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
 
     // Correct program
     let p1 = parse("my $x = 1; $x + 2").expect("parse");
@@ -39,7 +39,7 @@ fn test_format_and_convert_roundtrip() {
 
 #[test]
 fn test_parse_and_run_string_in_file() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let code = "__FILE__ . ':' . __LINE__";
     let res = parse_and_run_string_in_file(code, &mut interp, "custom_file.pl").expect("run");
     assert_eq!(res.to_string(), "custom_file.pl:1");
@@ -85,7 +85,7 @@ fn test_rkyv_cache_save_load() {
 #[test]
 fn test_try_vm_execute_fallback() {
     let p = parse("1 + 1").expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let res = try_vm_execute(&p, &mut interp)
         .expect("should return Some")
         .expect("run");

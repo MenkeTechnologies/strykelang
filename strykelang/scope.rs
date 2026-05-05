@@ -29,7 +29,7 @@ type SharedHashEntry = (
     Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
 );
 
-/// Arrays installed by [`crate::interpreter::Interpreter::new`] on the outer frame. They must not be
+/// Arrays installed by [`crate::vm_helper::VMHelper::new`] on the outer frame. They must not be
 /// copied into [`Scope::capture`] / [`Scope::restore_capture`] for closures, or the restored copy
 /// would shadow the live handles (stale `@INC`, `%ENV`, topic `@_`, etc.).
 #[inline]

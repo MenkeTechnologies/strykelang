@@ -30,7 +30,7 @@ use std::ffi::{CStr, CString};
 use std::os::unix::io::AsRawFd;
 
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::{Interpreter, LogLevelFilter, WantarrayCtx};
+use crate::vm_helper::{VMHelper, LogLevelFilter, WantarrayCtx};
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::perl_regex::perl_quotemeta;
 use crate::value::{PerlAsyncTask, PerlSub, PerlValue};
@@ -257,7 +257,7 @@ fn builtin_dirname(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `fileparse` — Fileparse. Returns a string.
 fn builtin_fileparse(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -343,7 +343,7 @@ fn builtin_uname() -> PerlResult<PerlValue> {
 
 /// If `name` is a known builtin, evaluate and return `Some`. Otherwise `None` (try user sub).
 pub(crate) fn try_builtin(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     name: &str,
     args: &[PerlValue],
     line: usize,
@@ -3741,7 +3741,7 @@ fn format_log_hash_kv(v: &PerlValue, line: usize) -> PerlResult<String> {
 
 /// `log_line` — Log line. Returns an integer.
 fn builtin_log_line(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
     level: LogLevelFilter,
@@ -3777,7 +3777,7 @@ fn builtin_log_line(
 
 /// `log_json` — Log json. Returns an integer.
 fn builtin_log_json(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -3828,7 +3828,7 @@ fn builtin_log_json(
 
 /// `log_level` — Log level. Returns a string.
 fn builtin_log_level(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -4413,7 +4413,7 @@ fn builtin_move(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// First `$n` elements: operands are **list values then count** (`take @l, N`); see
 /// [`crate::list_builtins::head_tail_take_impl`]. Unary `take(N)` uses an empty list.
-fn builtin_take(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_take(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     crate::list_builtins::head_tail_take_impl(
         args,
         crate::list_builtins::HeadTailTake::Take,
@@ -4422,12 +4422,12 @@ fn builtin_take(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
 }
 
 /// `tail` — Tail.
-fn builtin_tail(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tail(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     crate::list_builtins::extension_tail_impl(args, interp.wantarray_kind)
 }
 
 /// `drop` — Drop.
-fn builtin_drop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_drop(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     crate::list_builtins::extension_drop_impl(args, interp.wantarray_kind)
 }
 
@@ -4474,7 +4474,7 @@ fn builtin_count_size_cnt(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `size` — byte size of a file, like Perl's `-s`.
 /// No args → `-s $_`. One arg → `-s arg`. Multiple args / flattened list → array of sizes.
 /// Returns `undef` for paths that can't be stat'd.
-fn builtin_file_size(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_file_size(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let size_of = |v: &PerlValue| -> PerlValue {
         let path = v.to_string();
         match std::fs::metadata(&path) {
@@ -4502,7 +4502,7 @@ fn builtin_file_size(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// One-level list flatten: plain arrays and arrayrefs expand like `flat_map` / [`PerlValue::map_flatten_outputs`].
-fn builtin_flatten(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_flatten(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut out = Vec::new();
     for a in args {
         out.extend(a.map_flatten_outputs(true));
@@ -4515,7 +4515,7 @@ fn builtin_flatten(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `with_index LIST` — each element is an arrayref `[$item, $index]` (0-based).
-fn builtin_with_index(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_with_index(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let wa = interp.wantarray_kind;
     let mut out = Vec::with_capacity(args.len());
     for (i, item) in args.iter().cloned().enumerate() {
@@ -4568,7 +4568,7 @@ fn builtin_which_all(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 }
 
 /// `interleave @a, @b, ...` — round-robin merge of lists.
-fn builtin_interleave(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_interleave(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lists: Vec<Vec<PerlValue>> = args.iter().map(|a| a.map_flatten_outputs(true)).collect();
     let max_len = lists.iter().map(|l| l.len()).max().unwrap_or(0);
     let mut out = Vec::with_capacity(lists.len() * max_len);
@@ -4889,7 +4889,7 @@ fn stringify_escape(s: &str) -> String {
 }
 
 /// `input` — read all of stdin. `input $fh` / `input "path"` — read from filehandle or file.
-fn builtin_input(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_input(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     use std::io::Read;
     if args.is_empty() {
         let mut buf = String::new();
@@ -4926,7 +4926,7 @@ fn builtin_input(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
 /// `lines STRING` — split string into array on newlines (no trailing empty).
 /// `lines ITERATOR` — flat-map each element's lines (streaming).
 /// Returns a streaming iterator for lazy consumption.
-fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lines(_interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     if let Some(v) = args.first() {
         if v.is_iterator() {
             let source = v.clone().into_iterator();
@@ -4948,7 +4948,7 @@ fn builtin_lines(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 
 /// `words STRING` — split on whitespace into array.
 /// `words ITERATOR` — flat-map each element's words (streaming).
-fn builtin_words(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_words(_interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     if let Some(v) = args.first() {
         if v.is_iterator() {
             let source = v.clone().into_iterator();
@@ -4969,7 +4969,7 @@ fn builtin_words(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `digits STRING` — extract all digit characters from a string.
-fn builtin_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_digits(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .chars()
@@ -4980,7 +4980,7 @@ fn builtin_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `letters STRING` — extract all alphabetic characters from a string.
-fn builtin_letters(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_letters(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .chars()
@@ -4991,7 +4991,7 @@ fn builtin_letters(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `letters_uc STRING` — extract only uppercase letters from a string.
-fn builtin_letters_uc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_letters_uc(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .chars()
@@ -5002,7 +5002,7 @@ fn builtin_letters_uc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `letters_lc STRING` — extract only lowercase letters from a string.
-fn builtin_letters_lc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_letters_lc(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .chars()
@@ -5013,7 +5013,7 @@ fn builtin_letters_lc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `punctuation STRING` — extract all punctuation characters from a string.
-fn builtin_punctuation(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_punctuation(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .chars()
@@ -5026,7 +5026,7 @@ fn builtin_punctuation(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 /// `numbers STRING` — extract all numbers (int and float, including negatives)
 /// from a string and return them as numeric values.
 /// `"temp 98.6F, -20C, ver 3"` → `[98.6, -20, 3]`
-fn builtin_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_numbers(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out: Vec<PerlValue> = Vec::new();
     let bytes = s.as_bytes();
@@ -5079,7 +5079,7 @@ fn builtin_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 /// Unlike `chars` which splits on code points, `graphemes` keeps
 /// combining characters and emoji sequences together:
 /// `"café"` → 4 graphemes (not 5 code points if `é` is decomposed).
-fn builtin_graphemes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_graphemes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     // Simple grapheme segmentation: keep combining marks with their base.
     // This handles the common cases (accented chars, emoji ZWJ sequences)
@@ -5142,7 +5142,7 @@ fn is_combining_or_extend(c: char) -> bool {
 /// `columns STRING` or `columns STRING, WIDTHS` — split fixed-width columnar text.
 /// Without widths: auto-detect columns from whitespace boundaries (like `awk`).
 /// With widths arrayref: split at fixed positions `columns($line, [8, 20, 10])`.
-fn builtin_columns(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_columns(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     // Check for explicit widths as second arg
     let widths_arg = if args.len() >= 2 {
@@ -5193,7 +5193,7 @@ fn builtin_columns(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `sentences STRING` — split text on sentence boundaries (`.` `!` `?` followed by whitespace or end).
-fn builtin_sentences(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sentences(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out: Vec<PerlValue> = Vec::new();
     let mut start = 0;
@@ -5228,7 +5228,7 @@ fn builtin_sentences(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `paragraphs STRING` — split text on blank lines (one or more empty lines).
-fn builtin_paragraphs(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_paragraphs(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: Vec<PerlValue> = s
         .split("\n\n")
@@ -5241,7 +5241,7 @@ fn builtin_paragraphs(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 
 /// `sections STRING` — split text on markdown-style headers (`# ...`, `## ...`, etc.)
 /// or lines of `===`/`---`. Returns arrayrefs of `[heading, body]`.
-fn builtin_sections(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sections(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out: Vec<PerlValue> = Vec::new();
     let mut current_heading = String::new();
@@ -5281,7 +5281,7 @@ fn builtin_sections(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 /// `chars STRING` — split into individual characters (no empty leading element).
 /// `chars ITERATOR` — flat-map each element's characters (streaming).
 /// Returns a streaming iterator for lazy consumption.
-fn builtin_chars(_interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_chars(_interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     if let Some(v) = args.first() {
         if v.is_iterator() {
             let source = v.clone().into_iterator();
@@ -5352,7 +5352,7 @@ fn builtin_avg(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `xopen PATH` — open a file/URL with the system handler (`open` on macOS,
 /// `xdg-open` on Linux, `start` on Windows). Returns the path unchanged so
 /// it can sit in a pipeline: `... |> to_file("r.html") |> xopen`.
-fn builtin_xopen(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_xopen(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     use std::process::Command;
     let path = first_arg_or_topic(interp, args).to_string();
     #[cfg(target_os = "macos")]
@@ -5373,7 +5373,7 @@ fn builtin_xopen(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlR
 /// `preview SVG_STRING` — wrap SVG/HTML content in an HTML page, write to a temp
 /// file, and open in the default browser. Returns the temp path for chaining.
 /// Detects whether the input is already a full HTML document or raw SVG.
-fn builtin_preview(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_preview(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     let content = first_arg_or_topic(interp, args).to_string();
     let html = if content.trim_start().starts_with("<!DOCTYPE")
@@ -5480,7 +5480,7 @@ body::before {
 
 /// `clip VALUE` — copy text to system clipboard. Returns the text unchanged
 /// for pipeline chaining. Uses `pbcopy` on macOS, `xclip`/`xsel` on Linux.
-fn builtin_clip(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_clip(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
     let text = first_arg_or_topic(interp, args).to_string();
@@ -5742,7 +5742,7 @@ fn builtin_sparkline(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `bar_chart HASHREF` — horizontal bar chart with colored bars.
-fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bar_chart(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let val = first_arg_or_topic(interp, args);
     let hr = match val.as_hash_ref() {
         Some(h) => h,
@@ -5808,7 +5808,7 @@ fn builtin_bar_chart(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 /// Nested hashes represent call stacks; leaf values are weights.
 /// Flat hashrefs render like a single-level flame. Width is proportional
 /// to weight relative to the total at each level.
-fn builtin_flame(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_flame(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let val = first_arg_or_topic(interp, args);
     let hr = match val.as_hash_ref() {
         Some(h) => h,
@@ -6024,7 +6024,7 @@ fn builtin_histo(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `gauge VALUE` or `gauge(VALUE, MAX)` — single-value horizontal gauge bar.
 /// `gauge(0.73)` → `[███████░░░] 73%`
 /// `gauge(45, 100)` → `[████░░░░░░] 45%`
-fn builtin_gauge(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gauge(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (val, max_val) = if args.len() >= 2 {
         (args[0].to_number(), args[1].to_number())
     } else {
@@ -6071,7 +6071,7 @@ static SPINNER_NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 
 /// `spinner_start("msg")` — start an animated spinner on stderr.
 /// Returns an integer handle to pass to `spinner_stop`.
-fn builtin_spinner_start(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_spinner_start(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     let msg = first_arg_or_topic(interp, args).to_string();
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -6108,7 +6108,7 @@ fn builtin_spinner_start(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
 }
 
 /// `spinner_stop($handle)` — stop a spinner started with `spinner_start`.
-fn builtin_spinner_stop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_spinner_stop(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let id = first_arg_or_topic(interp, args).to_int() as u64;
     if let Some(done) = SPINNER_REGISTRY.lock().unwrap().remove(&id) {
         done.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -6118,7 +6118,7 @@ fn builtin_spinner_stop(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::integer(1))
 }
 
-fn builtin_pager(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pager(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
 
@@ -6859,7 +6859,7 @@ fn builtin_expt(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Grab the first arg, or `$_` if the call had none.
-fn first_arg_or_topic(interp: &Interpreter, args: &[PerlValue]) -> PerlValue {
+fn first_arg_or_topic(interp: &VMHelper, args: &[PerlValue]) -> PerlValue {
     args.first()
         .cloned()
         .unwrap_or_else(|| interp.scope.get_scalar("_"))
@@ -6871,32 +6871,32 @@ fn bool_iv(b: bool) -> PerlValue {
 }
 
 /// `even` — Even. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_even(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_even(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_int() % 2 == 0))
 }
 /// `odd` — Odd. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_odd(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_odd(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_int() % 2 != 0))
 }
 /// `zero` — Zero. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_zero(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_zero(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() == 0.0))
 }
 /// `nonzero` — Nonzero. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_nonzero(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_nonzero(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() != 0.0))
 }
 /// `positive` — Positive. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_positive(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_positive(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() > 0.0))
 }
 /// `negative` — Negative. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_negative(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_negative(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() < 0.0))
 }
 
 /// `sign N` — `-1` / `0` / `1`. Sign of 0 is 0 (not +0 / -0).
-fn builtin_sign(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sign(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::integer(match n.partial_cmp(&0.0) {
         Some(std::cmp::Ordering::Less) => -1,
@@ -6906,7 +6906,7 @@ fn builtin_sign(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
 }
 
 /// `negate` — Negate. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_negate(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_negate(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(if let Some(n) = v.as_integer() {
         PerlValue::integer(n.wrapping_neg())
@@ -6916,7 +6916,7 @@ fn builtin_negate(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `double` — Double. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_double(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_double(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(if let Some(n) = v.as_integer() {
         PerlValue::integer(n.wrapping_mul(2))
@@ -6926,7 +6926,7 @@ fn builtin_double(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `triple` — Triple. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_triple(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_triple(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(if let Some(n) = v.as_integer() {
         PerlValue::integer(n.wrapping_mul(3))
@@ -6936,7 +6936,7 @@ fn builtin_triple(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 }
 
 /// `half N` — always float to avoid silent truncation of odd integers.
-fn builtin_half(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_half(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number() / 2.0,
     ))
@@ -6944,12 +6944,12 @@ fn builtin_half(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
 
 /// `identity X` / `id X` — returns its argument unchanged. Useful as a
 /// sentinel in higher-order code (`sort_by identity, @list` is stable sort).
-fn builtin_identity(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_identity(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(first_arg_or_topic(interp, args))
 }
 
 /// `is_empty` — Test whether the argument is empty. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_empty(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_empty(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     if v.is_undef() {
         return Ok(bool_iv(true));
@@ -6958,7 +6958,7 @@ fn builtin_is_empty(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `is_blank` — Test whether the argument is blank. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_blank(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_blank(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     if v.is_undef() {
         return Ok(bool_iv(true));
@@ -6969,7 +6969,7 @@ fn builtin_is_blank(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 /// `is_numeric X` — true iff the string representation parses as a number
 /// (same heuristic as Perl's "looks like number": optional sign, digits,
 /// decimal point, optional `e`/`E` exponent).
-fn builtin_is_numeric(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_numeric(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     if v.is_integer_like() || v.is_float_like() {
         return Ok(bool_iv(true));
@@ -6987,42 +6987,42 @@ fn str_all_chars<F: Fn(char) -> bool>(s: &str, f: F) -> bool {
     !s.is_empty() && s.chars().all(f)
 }
 /// `is_upper` — Test whether the argument is upper. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_upper(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_upper(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_uppercase() || !c.is_alphabetic(),
     )))
 }
 /// `is_lower` — Test whether the argument is lower. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_lower(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_lower(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_lowercase() || !c.is_alphabetic(),
     )))
 }
 /// `is_alpha` — Test whether the argument is alpha. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_alpha(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_alpha(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_alphabetic(),
     )))
 }
 /// `is_digit` — Test whether the argument is digit. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_digit(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_digit(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_ascii_digit(),
     )))
 }
 /// `is_alnum` — Test whether the argument is alnum. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_alnum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_alnum(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_alphanumeric(),
     )))
 }
 /// `is_space` — Test whether the argument is space. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_space(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_space(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(str_all_chars(
         &first_arg_or_topic(interp, args).to_string(),
         |c| c.is_whitespace(),
@@ -7031,7 +7031,7 @@ fn builtin_is_space(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 
 // ── String substring predicates / transforms ─────────────────────────────
 /// `starts_with` — Starts with. Returns 1 (true) or 0 (false).
-fn builtin_starts_with(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_starts_with(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     // `starts_with NEEDLE` → test `$_`; `starts_with HAY, NEEDLE` → test explicit.
     let (hay, needle) = if args.len() >= 2 {
         (args[0].to_string(), args[1].to_string())
@@ -7044,7 +7044,7 @@ fn builtin_starts_with(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     Ok(bool_iv(hay.starts_with(&needle)))
 }
 /// `ends_with` — Ends with. Returns 1 (true) or 0 (false).
-fn builtin_ends_with(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ends_with(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (hay, needle) = if args.len() >= 2 {
         (args[0].to_string(), args[1].to_string())
     } else {
@@ -7056,7 +7056,7 @@ fn builtin_ends_with(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(bool_iv(hay.ends_with(&needle)))
 }
 /// `contains` — Contains. Returns 1 (true) or 0 (false).
-fn builtin_contains(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_contains(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (hay, needle) = if args.len() >= 2 {
         (args[0].to_string(), args[1].to_string())
     } else {
@@ -7069,7 +7069,7 @@ fn builtin_contains(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `capitalize` — Capitalize. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_capitalize(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_capitalize(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = String::with_capacity(s.len());
     let mut cs = s.chars();
@@ -7087,7 +7087,7 @@ fn builtin_capitalize(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `swap_case` — Swap case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_swap_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_swap_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -7107,7 +7107,7 @@ fn builtin_swap_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `repeat STRING, N` or `STRING |> repeat N`.
-fn builtin_repeat(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_repeat(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (s, n) = if args.len() >= 2 {
         (args[0].to_string(), args[1].to_int().max(0) as usize)
     } else {
@@ -7156,32 +7156,32 @@ fn builtin_is_ref(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `is_undef` — Test whether the argument is undef. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_undef(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_undef(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_undef()))
 }
 /// `is_defined` — Test whether the argument is defined. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_defined(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_defined(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(!first_arg_or_topic(interp, args).is_undef()))
 }
 /// `is_string` — Test whether the argument is string. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_string(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_string(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(bool_iv(
         v.is_string_like() && !v.is_integer_like() && !v.is_float_like(),
     ))
 }
 /// `is_int` — Test whether the argument is int. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_int(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_integer_like()))
 }
 /// `is_float` — Test whether the argument is float. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_float(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_float(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_float_like()))
 }
 
 // ── Numeric helpers ──────────────────────────────────────────────────────
 /// `round N` — nearest integer. `round N, PLACES` — round to PLACES decimals.
-fn builtin_round(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_round(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (n, places) = if args.len() >= 2 {
         (args[0].to_number(), args[1].to_int() as i32)
     } else {
@@ -7196,26 +7196,26 @@ fn builtin_round(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
     }
 }
 /// `floor` — Floor. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_floor(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_floor(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_number().floor() as i64,
     ))
 }
 /// `ceil` — Ceil. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_ceil(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ceil(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_number().ceil() as i64,
     ))
 }
 /// `trunc N` — drop the fractional part. Distinct from Perl core `truncate`
 /// (which resizes files); named `trunc` to avoid the collision.
-fn builtin_trunc(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_trunc(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_number().trunc() as i64,
     ))
 }
 /// `gcd` — Gcd. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_gcd(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gcd(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (mut a, mut b) = if args.len() >= 2 {
         (args[0].to_int(), args[1].to_int())
     } else {
@@ -7231,7 +7231,7 @@ fn builtin_gcd(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::integer(a))
 }
 /// `lcm` — Lcm. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_lcm(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lcm(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (a, b) = if args.len() >= 2 {
         (args[0].to_int(), args[1].to_int())
     } else {
@@ -7263,13 +7263,13 @@ fn builtin_max2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a.max(b)))
 }
 /// `log2` — Log2. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_log2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_log2(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().log2(),
     ))
 }
 /// `log10` — Log10. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_log10(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_log10(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().log10(),
     ))
@@ -7281,19 +7281,19 @@ fn builtin_hypot(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a.hypot(b)))
 }
 /// `rad_to_deg` — Rad to deg. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_rad_to_deg(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_rad_to_deg(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().to_degrees(),
     ))
 }
 /// `deg_to_rad` — Deg to rad. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_deg_to_rad(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_deg_to_rad(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().to_radians(),
     ))
 }
 /// `pow2 N` — `2 ** N`. Integer when N >= 0 and fits; else float.
-fn builtin_pow2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pow2(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if (0..63).contains(&n) {
         Ok(PerlValue::integer(1i64 << n))
@@ -7373,7 +7373,7 @@ fn builtin_has_all_keys(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // ── Numeric: seq / predicates ────────────────────────────────────────────
 /// `factorial` — Factorial. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_factorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_factorial(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(PerlValue::UNDEF);
@@ -7385,7 +7385,7 @@ fn builtin_factorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(PerlValue::integer(r))
 }
 /// `fibonacci` — Fibonacci. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_fibonacci(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_fibonacci(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(PerlValue::UNDEF);
@@ -7399,7 +7399,7 @@ fn builtin_fibonacci(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(PerlValue::integer(a))
 }
 /// `is_prime` — Test whether the argument is prime. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_prime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 2 {
         return Ok(bool_iv(false));
@@ -7420,7 +7420,7 @@ fn builtin_is_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
     Ok(bool_iv(true))
 }
 /// `is_square` — Test whether the argument is square. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_square(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_square(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(bool_iv(false));
@@ -7429,18 +7429,18 @@ fn builtin_is_square(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(bool_iv(r * r == n || (r + 1) * (r + 1) == n))
 }
 /// `is_pow2` — Test whether the argument is pow2. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_pow2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_pow2(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(bool_iv(n > 0 && (n & (n - 1)) == 0))
 }
 /// `cbrt` — Cbrt. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_cbrt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cbrt(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().cbrt(),
     ))
 }
 /// `exp2` — Exp2. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_exp2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_exp2(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().exp2(),
     ))
@@ -7455,7 +7455,7 @@ fn builtin_percent(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(100.0 * x / t))
 }
 /// `inverse` — Inverse. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_inverse(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_inverse(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     if n == 0.0 {
         return Ok(PerlValue::UNDEF);
@@ -7519,7 +7519,7 @@ fn builtin_variance(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // ── String: case / spacing / counts ──────────────────────────────────────
 /// `title_case` — Title case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_title_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_title_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = String::with_capacity(s.len());
     let mut at_word_start = true;
@@ -7541,7 +7541,7 @@ fn builtin_title_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     Ok(PerlValue::string(out))
 }
 /// `squish S` — collapse runs of whitespace to single spaces, trim ends.
-fn builtin_squish(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_squish(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let squished: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
     Ok(PerlValue::string(squished))
@@ -7559,16 +7559,16 @@ fn pad_with(ch: char, s: &str, width: usize, left: bool) -> String {
     }
 }
 /// `pad_left` — Pad left. Returns a string.
-fn builtin_pad_left(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pad_left(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (s, w, ch) = pad_args(interp, args);
     Ok(PerlValue::string(pad_with(ch, &s, w, true)))
 }
 /// `pad_right` — Pad right. Returns a string.
-fn builtin_pad_right(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pad_right(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (s, w, ch) = pad_args(interp, args);
     Ok(PerlValue::string(pad_with(ch, &s, w, false)))
 }
-fn pad_args(interp: &Interpreter, args: &[PerlValue]) -> (String, usize, char) {
+fn pad_args(interp: &VMHelper, args: &[PerlValue]) -> (String, usize, char) {
     // `pad_left STR, WIDTH, [CHAR]` or `pad_left WIDTH` (topic = $_).
     let (s, w, ch) = if args.len() >= 2 {
         (
@@ -7590,7 +7590,7 @@ fn pad_args(interp: &Interpreter, args: &[PerlValue]) -> (String, usize, char) {
     (s, w, ch)
 }
 /// `center STR, WIDTH, [CHAR]` — center STR in WIDTH; extra padding on the right.
-fn builtin_center(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_center(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (s, w, ch) = pad_args(interp, args);
     let len = s.chars().count();
     if len >= w {
@@ -7604,7 +7604,7 @@ fn builtin_center(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
     Ok(PerlValue::string(format!("{lp}{s}{rp}")))
 }
 /// `truncate_at STR, N` — if longer than N chars, truncate and append `…`.
-fn builtin_truncate_at(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_truncate_at(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let (s, n) = if args.len() >= 2 {
         (args[0].to_string(), args[1].to_int().max(0) as usize)
     } else {
@@ -7625,7 +7625,7 @@ fn builtin_truncate_at(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     Ok(PerlValue::string(format!("{head}…")))
 }
 /// `reverse_str` — Reverse str. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_reverse_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_reverse_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s: String = first_arg_or_topic(interp, args)
         .to_string()
         .chars()
@@ -7634,13 +7634,13 @@ fn builtin_reverse_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     Ok(PerlValue::string(s))
 }
 /// `char_count` — Char count. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_char_count(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_char_count(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_string().chars().count() as i64,
     ))
 }
 /// `word_count` — Word count. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_word_count(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_word_count(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -7649,7 +7649,7 @@ fn builtin_word_count(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `line_count` — Line count. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_line_count(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_line_count(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_string().lines().count() as i64,
     ))
@@ -7681,7 +7681,7 @@ fn builtin_xor_bool(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `bool_to_int` — Bool to int. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_bool_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bool_to_int(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_true()))
 }
 
@@ -7772,35 +7772,35 @@ fn builtin_swap_pairs(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Base conversion
 // ─────────────────────────────────────────────────────────────────────────
 /// `to_bin` — Format the input as bin. Defaults to `$_`.
-fn builtin_to_bin(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_bin(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!(
         "{:b}",
         first_arg_or_topic(interp, args).to_int()
     )))
 }
 /// `to_hex` — Format the input as hex. Defaults to `$_`.
-fn builtin_to_hex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_hex(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!(
         "{:x}",
         first_arg_or_topic(interp, args).to_int()
     )))
 }
 /// `to_oct` — Format the input as oct. Defaults to `$_`.
-fn builtin_to_oct(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_oct(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!(
         "{:o}",
         first_arg_or_topic(interp, args).to_int()
     )))
 }
 /// `from_bin` — Parse a bin string and return the numeric value. Returns `undef` on invalid input.
-fn builtin_from_bin(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_from_bin(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(i64::from_str_radix(s.trim_start_matches("0b"), 2)
         .map(PerlValue::integer)
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `from_hex` — Parse a hex string and return the numeric value. Returns `undef` on invalid input.
-fn builtin_from_hex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_from_hex(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(
         i64::from_str_radix(s.trim_start_matches("0x").trim_start_matches("0X"), 16)
@@ -7809,7 +7809,7 @@ fn builtin_from_hex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
     )
 }
 /// `from_oct` — Parse a oct string and return the numeric value. Returns `undef` on invalid input.
-fn builtin_from_oct(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_from_oct(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(
         i64::from_str_radix(s.trim_start_matches("0o").trim_start_matches('0'), 8)
@@ -7859,25 +7859,25 @@ fn builtin_from_base(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `popcount` — Popcount. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_popcount(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_popcount(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_int().count_ones() as i64,
     ))
 }
 /// `leading_zeros` — Leading zeros. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_leading_zeros(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_leading_zeros(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_int().leading_zeros() as i64,
     ))
 }
 /// `trailing_zeros` — Trailing zeros. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_trailing_zeros(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_trailing_zeros(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_int().trailing_zeros() as i64,
     ))
 }
 /// `bit_length` — Bit length. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_bit_length(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bit_length(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(PerlValue::integer(if n == 0 {
         0
@@ -7907,7 +7907,7 @@ fn builtin_bit_xor(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bin_int_op(args, |a, b| a ^ b))
 }
 /// `bit_not` — Bit not. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_bit_not(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bit_not(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         !first_arg_or_topic(interp, args).to_int(),
     ))
@@ -7943,7 +7943,7 @@ fn builtin_bit_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Unit conversions — topic-default; one line each.
 // ─────────────────────────────────────────────────────────────────────────
 fn unit_scale(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     f: impl Fn(f64) -> f64,
 ) -> PerlResult<PerlValue> {
@@ -7952,175 +7952,175 @@ fn unit_scale(
     )))
 }
 /// `c_to_f` — Unit conversion: `c to f`. Computes `c * 9.0 / 5.0 + 32.0` from the input.
-fn builtin_c_to_f(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_c_to_f(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |c| c * 9.0 / 5.0 + 32.0)
 }
 /// `f_to_c` — Unit conversion: `f to c`. Computes `(f - 32.0` from the input.
-fn builtin_f_to_c(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_f_to_c(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |f| (f - 32.0) * 5.0 / 9.0)
 }
 /// `c_to_k` — Unit conversion: `c to k`. Computes `c + 273.15` from the input.
-fn builtin_c_to_k(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_c_to_k(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |c| c + 273.15)
 }
 /// `k_to_c` — Unit conversion: `k to c`. Computes `k - 273.15` from the input.
-fn builtin_k_to_c(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_k_to_c(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| k - 273.15)
 }
 /// `f_to_k` — Unit conversion: `f to k`. Computes `(f - 32.0` from the input.
-fn builtin_f_to_k(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_f_to_k(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |f| (f - 32.0) * 5.0 / 9.0 + 273.15)
 }
 /// `k_to_f` — Unit conversion: `k to f`. Computes `(k - 273.15` from the input.
-fn builtin_k_to_f(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_k_to_f(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| (k - 273.15) * 9.0 / 5.0 + 32.0)
 }
 
 /// `miles_to_km` — Unit conversion: `miles to km`. Computes `m * 1.609344` from the input.
-fn builtin_miles_to_km(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_miles_to_km(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m * 1.609344)
 }
 /// `km_to_miles` — Unit conversion: `km to miles`. Computes `km / 1.609344` from the input.
-fn builtin_km_to_miles(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_km_to_miles(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |km| km / 1.609344)
 }
 /// `miles_to_m` — Unit conversion: `miles to m`. Computes `m * 1609.344` from the input.
-fn builtin_miles_to_m(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_miles_to_m(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m * 1609.344)
 }
 /// `m_to_miles` — Unit conversion: `m to miles`. Computes `m / 1609.344` from the input.
-fn builtin_m_to_miles(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_m_to_miles(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 1609.344)
 }
 /// `feet_to_m` — Unit conversion: `feet to m`. Computes `f * 0.3048` from the input.
-fn builtin_feet_to_m(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_feet_to_m(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |f| f * 0.3048)
 }
 /// `m_to_feet` — Unit conversion: `m to feet`. Computes `m / 0.3048` from the input.
-fn builtin_m_to_feet(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_m_to_feet(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 0.3048)
 }
 /// `inches_to_cm` — Unit conversion: `inches to cm`. Computes `i * 2.54` from the input.
-fn builtin_inches_to_cm(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_inches_to_cm(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |i| i * 2.54)
 }
 /// `cm_to_inches` — Unit conversion: `cm to inches`. Computes `c / 2.54` from the input.
-fn builtin_cm_to_inches(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cm_to_inches(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |c| c / 2.54)
 }
 /// `yards_to_m` — Unit conversion: `yards to m`. Computes `y * 0.9144` from the input.
-fn builtin_yards_to_m(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_yards_to_m(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |y| y * 0.9144)
 }
 /// `m_to_yards` — Unit conversion: `m to yards`. Computes `m / 0.9144` from the input.
-fn builtin_m_to_yards(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_m_to_yards(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 0.9144)
 }
 
 /// `kg_to_lbs` — Unit conversion: `kg to lbs`. Computes `k * 2.20462262185` from the input.
-fn builtin_kg_to_lbs(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kg_to_lbs(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| k * 2.20462262185)
 }
 /// `lbs_to_kg` — Unit conversion: `lbs to kg`. Computes `l / 2.20462262185` from the input.
-fn builtin_lbs_to_kg(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lbs_to_kg(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |l| l / 2.20462262185)
 }
 /// `g_to_oz` — Unit conversion: `g to oz`. Computes `g / 28.349523125` from the input.
-fn builtin_g_to_oz(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_g_to_oz(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |g| g / 28.349523125)
 }
 /// `oz_to_g` — Unit conversion: `oz to g`. Computes `o * 28.349523125` from the input.
-fn builtin_oz_to_g(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_oz_to_g(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |o| o * 28.349523125)
 }
 /// `stone_to_kg` — Unit conversion: `stone to kg`. Computes `s * 6.35029318` from the input.
-fn builtin_stone_to_kg(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_stone_to_kg(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |s| s * 6.35029318)
 }
 /// `kg_to_stone` — Unit conversion: `kg to stone`. Computes `k / 6.35029318` from the input.
-fn builtin_kg_to_stone(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kg_to_stone(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| k / 6.35029318)
 }
 
 /// `bytes_to_kb` — Unit conversion: `bytes to kb`. Computes `b / 1024.0` from the input.
-fn builtin_bytes_to_kb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bytes_to_kb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b / 1024.0)
 }
 /// `kb_to_bytes` — Unit conversion: `kb to bytes`. Computes `k * 1024.0` from the input.
-fn builtin_kb_to_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kb_to_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| k * 1024.0)
 }
 /// `bytes_to_mb` — Unit conversion: `bytes to mb`. Computes `b / (1024.0 * 1024.0` from the input.
-fn builtin_bytes_to_mb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bytes_to_mb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b / (1024.0 * 1024.0))
 }
 /// `mb_to_bytes` — Unit conversion: `mb to bytes`. Computes `m * 1024.0 * 1024.0` from the input.
-fn builtin_mb_to_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mb_to_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m * 1024.0 * 1024.0)
 }
 /// `bytes_to_gb` — Unit conversion: `bytes to gb`. Computes `b / (1024.0 * 1024.0 * 1024.0` from the input.
-fn builtin_bytes_to_gb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bytes_to_gb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b / (1024.0 * 1024.0 * 1024.0))
 }
 /// `gb_to_bytes` — Unit conversion: `gb to bytes`. Computes `g * 1024.0 * 1024.0 * 1024.0` from the input.
-fn builtin_gb_to_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gb_to_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |g| g * 1024.0 * 1024.0 * 1024.0)
 }
 /// `kb_to_mb` — Unit conversion: `kb to mb`. Computes `k / 1024.0` from the input.
-fn builtin_kb_to_mb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_kb_to_mb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |k| k / 1024.0)
 }
 /// `mb_to_gb` — Unit conversion: `mb to gb`. Computes `m / 1024.0` from the input.
-fn builtin_mb_to_gb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mb_to_gb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 1024.0)
 }
 /// `bits_to_bytes` — Unit conversion: `bits to bytes`. Computes `b / 8.0` from the input.
-fn builtin_bits_to_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bits_to_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b / 8.0)
 }
 /// `bytes_to_bits` — Unit conversion: `bytes to bits`. Computes `b * 8.0` from the input.
-fn builtin_bytes_to_bits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bytes_to_bits(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b * 8.0)
 }
 
 /// `s_to_min` — Unit conversion: `s to min`. Computes `s / 60.0` from the input.
-fn builtin_s_to_min(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s_to_min(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |s| s / 60.0)
 }
 /// `min_to_s` — Unit conversion: `min to s`. Computes `m * 60.0` from the input.
-fn builtin_min_to_s(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_min_to_s(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m * 60.0)
 }
 /// `s_to_h` — Unit conversion: `s to h`. Computes `s / 3600.0` from the input.
-fn builtin_s_to_h(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s_to_h(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |s| s / 3600.0)
 }
 /// `h_to_s` — Unit conversion: `h to s`. Computes `h * 3600.0` from the input.
-fn builtin_h_to_s(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h_to_s(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |h| h * 3600.0)
 }
 /// `s_to_d` — Unit conversion: `s to d`. Computes `s / 86400.0` from the input.
-fn builtin_s_to_d(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s_to_d(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |s| s / 86400.0)
 }
 /// `d_to_s` — Unit conversion: `d to s`. Computes `d * 86400.0` from the input.
-fn builtin_d_to_s(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_d_to_s(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |d| d * 86400.0)
 }
 /// `min_to_h` — Unit conversion: `min to h`. Computes `m / 60.0` from the input.
-fn builtin_min_to_h(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_min_to_h(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 60.0)
 }
 /// `h_to_min` — Unit conversion: `h to min`. Computes `h * 60.0` from the input.
-fn builtin_h_to_min(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h_to_min(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |h| h * 60.0)
 }
 /// `h_to_d` — Unit conversion: `h to d`. Computes `h / 24.0` from the input.
-fn builtin_h_to_d(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_h_to_d(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |h| h / 24.0)
 }
 /// `d_to_h` — Unit conversion: `d to h`. Computes `d * 24.0` from the input.
-fn builtin_d_to_h(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_d_to_h(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |d| d * 24.0)
 }
 
@@ -8128,7 +8128,7 @@ fn builtin_d_to_h(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
 // Date helpers
 // ─────────────────────────────────────────────────────────────────────────
 /// `is_leap_year` — Test whether the argument is leap year. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_leap_year(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_leap_year(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let y = first_arg_or_topic(interp, args).to_int();
     Ok(bool_iv((y % 4 == 0 && y % 100 != 0) || y % 400 == 0))
 }
@@ -8253,7 +8253,7 @@ fn builtin_rgb_to_hex(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!("#{:02x}{:02x}{:02x}", r, g, b)))
 }
 /// `hex_to_rgb "#rrggbb"` → arrayref `[r, g, b]`.
-fn builtin_hex_to_rgb(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hex_to_rgb(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let s = s.trim_start_matches('#');
     if s.len() != 6 {
@@ -8383,12 +8383,12 @@ fn builtin_color256(args: &[PerlValue], fg: bool) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!("\x1b[{};5;{}m", layer, n)))
 }
 
-fn builtin_ansi_wrap(interp: &Interpreter, args: &[PerlValue], code: u8) -> PerlResult<PerlValue> {
+fn builtin_ansi_wrap(interp: &VMHelper, args: &[PerlValue], code: u8) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!("\x1b[{}m{}\x1b[0m", code, s)))
 }
 /// `strip_ansi S` — drop SGR / CSI sequences.
-fn builtin_strip_ansi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_strip_ansi(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(strip_ansi_codes(&s)))
 }
@@ -8420,7 +8420,7 @@ pub(crate) fn strip_ansi_codes(s: &str) -> String {
 // Network / validation
 // ─────────────────────────────────────────────────────────────────────────
 /// `ipv4_to_int` — Ipv4 to int. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_ipv4_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ipv4_to_int(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<u32> = s.split('.').filter_map(|p| p.parse().ok()).collect();
     if parts.len() != 4 || parts.iter().any(|&p| p > 255) {
@@ -8431,7 +8431,7 @@ fn builtin_ipv4_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     ))
 }
 /// `int_to_ipv4` — Int to ipv4. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_int_to_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_int_to_ipv4(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int() as u32;
     Ok(PerlValue::string(format!(
         "{}.{}.{}.{}",
@@ -8442,7 +8442,7 @@ fn builtin_int_to_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     )))
 }
 /// `is_valid_ipv4` — Test whether the argument is valid ipv4. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_valid_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_ipv4(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<_> = s.split('.').collect();
     if parts.len() != 4 {
@@ -8453,12 +8453,12 @@ fn builtin_is_valid_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     })))
 }
 /// `is_valid_ipv6` — Test whether the argument is valid ipv6. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_valid_ipv6(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_ipv6(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(s.parse::<std::net::Ipv6Addr>().is_ok()))
 }
 /// `is_valid_email` — Test whether the argument is valid email. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_valid_email(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_email(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     // Minimal RFC-5322 lite: exactly one `@`, non-empty local + domain, domain has a dot.
     let Some((local, dom)) = s.split_once('@') else {
@@ -8473,7 +8473,7 @@ fn builtin_is_valid_email(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
     ))
 }
 /// `is_valid_url` — Test whether the argument is valid url. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_valid_url(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_url(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         s.starts_with("http://")
@@ -8487,7 +8487,7 @@ fn builtin_is_valid_url(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
 // Path helpers
 // ─────────────────────────────────────────────────────────────────────────
 /// `path_ext` — Path ext. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_path_ext(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_ext(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         std::path::Path::new(&s)
@@ -8498,7 +8498,7 @@ fn builtin_path_ext(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
     ))
 }
 /// `path_stem` — Path stem. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_path_stem(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_stem(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         std::path::Path::new(&s)
@@ -8509,7 +8509,7 @@ fn builtin_path_stem(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     ))
 }
 /// `path_parent` — Path parent. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_path_parent(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_parent(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         std::path::Path::new(&s)
@@ -8528,7 +8528,7 @@ fn builtin_path_join(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(p.to_string_lossy().into_owned()))
 }
 /// `path_split` — Path split. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_path_split(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_split(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<PerlValue> = std::path::Path::new(&s)
         .components()
@@ -8708,7 +8708,7 @@ impl IntoIfFinite for f64 {
 // String quote / escape / extract
 // ─────────────────────────────────────────────────────────────────────────
 /// `quote` — Quote. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_quote(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_quote(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!(
         "\"{}\"",
@@ -8716,7 +8716,7 @@ fn builtin_quote(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
     )))
 }
 /// `single_quote` — Single quote. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_single_quote(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_single_quote(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!(
         "'{}'",
@@ -8724,7 +8724,7 @@ fn builtin_single_quote(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     )))
 }
 /// `unquote` — Unquote. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_unquote(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_unquote(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let t = s.trim();
     for (l, r) in [('"', '"'), ('\'', '\''), ('`', '`')] {
@@ -8749,7 +8749,7 @@ fn builtin_extract_between(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(s[start..start + j].to_string()))
 }
 /// `ellipsis` — Ellipsis.
-fn builtin_ellipsis(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ellipsis(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_truncate_at(interp, args)
 }
 
@@ -8761,7 +8761,7 @@ fn builtin_coin_flip() -> PerlResult<PerlValue> {
     Ok(bool_iv(rand::random::<bool>()))
 }
 /// `dice_roll` — Dice roll. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_dice_roll(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dice_roll(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sides = first_arg_or_topic(interp, args).to_int().max(2);
     Ok(PerlValue::integer(
         1 + (rand::random::<u64>() % sides as u64) as i64,
@@ -8942,7 +8942,7 @@ fn builtin_par_bench(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
 /// current symbol table. Returns the number of packages now visible. The REPL
 /// invokes this between lines automatically; scripts that mutate the symbol
 /// table mid-run can call it explicitly to update the stash hashes.
-fn builtin_refresh_stashes(interp: &mut Interpreter) -> PerlResult<PerlValue> {
+fn builtin_refresh_stashes(interp: &mut VMHelper) -> PerlResult<PerlValue> {
     interp.refresh_package_stashes();
     // Count distinct `Pkg::` keys now installed. `subs` is the most reliable
     // package-name source.
@@ -9326,7 +9326,7 @@ fn builtin_mounts() -> PerlResult<PerlValue> {
 
 /// Open a git repo from CWD or optional path arg.
 fn open_git_repo(
-    _interp: &Interpreter,
+    _interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<git2::Repository> {
@@ -9340,7 +9340,7 @@ fn open_git_repo(
 }
 
 /// `git_log [PATH] [, N]` — last N commits as array of hashrefs.
-fn builtin_git_log(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_git_log(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let repo = open_git_repo(interp, &[], line)?;
     let limit = args.first().map(|v| v.to_int() as usize).unwrap_or(20);
     let mut revwalk = repo
@@ -9378,7 +9378,7 @@ fn builtin_git_log(interp: &Interpreter, args: &[PerlValue], line: usize) -> Per
 
 /// `git_status` — working tree status as array of hashrefs {path, status}.
 fn builtin_git_status(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9417,7 +9417,7 @@ fn builtin_git_status(
 
 /// `git_diff` — diff of working tree vs HEAD as string.
 fn builtin_git_diff(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9440,7 +9440,7 @@ fn builtin_git_diff(
 
 /// `git_branches` — list branches as array of hashrefs {name, is_head}.
 fn builtin_git_branches(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9466,7 +9466,7 @@ fn builtin_git_branches(
 
 /// `git_tags` — list tags as array of strings.
 fn builtin_git_tags(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9516,7 +9516,7 @@ fn builtin_git_blame(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// `git_authors` — unique authors as array of hashrefs {name, email, commits}.
 fn builtin_git_authors(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9560,7 +9560,7 @@ fn builtin_git_authors(
 
 /// `git_files` — list tracked files as array of strings.
 fn builtin_git_files(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9647,7 +9647,7 @@ fn builtin_git_show(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// `git_root` — return the repo root path.
 fn builtin_git_root(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -9661,7 +9661,7 @@ fn builtin_git_root(
 
 /// `disk_total PATH` — Total disk space in bytes (default path `/`).
 #[cfg(unix)]
-fn builtin_disk_total(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_total(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let path = if args.is_empty() {
         first_arg_or_topic(interp, args).to_string()
     } else {
@@ -9677,13 +9677,13 @@ fn builtin_disk_total(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
         .unwrap_or(PerlValue::UNDEF))
 }
 #[cfg(not(unix))]
-fn builtin_disk_total(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_total(_interp: &VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::UNDEF)
 }
 
 /// `disk_free PATH` — Free disk space in bytes (superuser, default `/`).
 #[cfg(unix)]
-fn builtin_disk_free(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_free(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let path = if args.is_empty() {
         first_arg_or_topic(interp, args).to_string()
     } else {
@@ -9699,13 +9699,13 @@ fn builtin_disk_free(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
         .unwrap_or(PerlValue::UNDEF))
 }
 #[cfg(not(unix))]
-fn builtin_disk_free(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_free(_interp: &VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::UNDEF)
 }
 
 /// `disk_avail PATH` — Available disk space in bytes (non-root, default `/`).
 #[cfg(unix)]
-fn builtin_disk_avail(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_avail(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let path = if args.is_empty() {
         first_arg_or_topic(interp, args).to_string()
     } else {
@@ -9721,13 +9721,13 @@ fn builtin_disk_avail(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
         .unwrap_or(PerlValue::UNDEF))
 }
 #[cfg(not(unix))]
-fn builtin_disk_avail(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_avail(_interp: &VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::UNDEF)
 }
 
 /// `disk_used PATH` — Used disk space in bytes (default `/`).
 #[cfg(unix)]
-fn builtin_disk_used(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_used(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let path = if args.is_empty() {
         first_arg_or_topic(interp, args).to_string()
     } else {
@@ -9743,7 +9743,7 @@ fn builtin_disk_used(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
         .unwrap_or(PerlValue::UNDEF))
 }
 #[cfg(not(unix))]
-fn builtin_disk_used(_interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_disk_used(_interp: &VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::UNDEF)
 }
 
@@ -9911,7 +9911,7 @@ fn builtin_proc_mem() -> PerlResult<PerlValue> {
 // ── du / process builtins ──────────────────────────────────────────────
 
 /// `du PATH` — recursive directory size in bytes.
-fn builtin_du(_interp: &Interpreter, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_du(_interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let path = if args.is_empty() || args[0].to_string().is_empty() {
         ".".to_string()
     } else {
@@ -9940,7 +9940,7 @@ fn builtin_du(_interp: &Interpreter, args: &[PerlValue], _line: usize) -> PerlRe
 
 /// `du_tree PATH [, depth]` — directory sizes as array of hashrefs {path, size}, sorted desc.
 fn builtin_du_tree(
-    _interp: &Interpreter,
+    _interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10064,7 +10064,7 @@ fn test_skip(msg: &str) {
     eprintln!("  \x1b[33m↷\x1b[0m skipped: {}", msg);
 }
 
-fn assert_label(_interp: &Interpreter, args: &[PerlValue], default: &str) -> String {
+fn assert_label(_interp: &VMHelper, args: &[PerlValue], default: &str) -> String {
     args.last()
         .filter(|v| v.is_string_like() && args.len() > required_args_for_assert(default))
         .map(|v| v.to_string())
@@ -10080,7 +10080,7 @@ fn required_args_for_assert(kind: &str) -> usize {
 
 /// `assert_eq A, B [, MSG]`
 fn builtin_assert_eq(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10098,7 +10098,7 @@ fn builtin_assert_eq(
 
 /// `assert_ne A, B [, MSG]`
 fn builtin_assert_ne(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10116,7 +10116,7 @@ fn builtin_assert_ne(
 
 /// `assert_ok VALUE [, MSG]` — passes if value is truthy.
 fn builtin_assert_ok(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10133,7 +10133,7 @@ fn builtin_assert_ok(
 
 /// `assert_err VALUE [, MSG]` — passes if value is falsy/undef.
 fn builtin_assert_err(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10150,7 +10150,7 @@ fn builtin_assert_err(
 
 /// `assert_true VALUE [, MSG]`
 fn builtin_assert_true(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10159,7 +10159,7 @@ fn builtin_assert_true(
 
 /// `assert_false VALUE [, MSG]`
 fn builtin_assert_false(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10232,7 +10232,7 @@ fn builtin_assert_le(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
 
 /// `assert_match PATTERN, STRING [, MSG]` — passes if regex matches.
 fn builtin_assert_match(
-    _interp: &Interpreter,
+    _interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10293,7 +10293,7 @@ fn builtin_assert_near(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue
 
 /// `assert_dies { BLOCK } [, MSG]` — passes if block throws an error.
 fn builtin_assert_dies(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10303,7 +10303,7 @@ fn builtin_assert_dies(
         .unwrap_or_else(|| "assert_dies".into());
     if let Some(code) = args.first().and_then(|v| v.as_code_ref()) {
         // Try to execute the code ref — if it dies, that's a pass
-        let mut test_interp = Interpreter::new();
+        let mut test_interp = VMHelper::new();
         test_interp.subs = interp.subs.clone();
         match test_interp.exec_block(&code.body) {
             Err(_) => {
@@ -10323,7 +10323,7 @@ fn builtin_assert_dies(
 
 /// `test_run` / `run_tests` — print test summary and exit with appropriate code.
 fn builtin_test_run(
-    _interp: &Interpreter,
+    _interp: &VMHelper,
     _args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10367,7 +10367,7 @@ fn builtin_test_run(
 /// Pair with postfix `if`/`unless` to gate on a condition:
 /// `test_skip "needs --compat" unless compat_mode`.
 fn builtin_test_skip(
-    _interp: &Interpreter,
+    _interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -11069,52 +11069,52 @@ fn builtin_flatten_deep(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Trig / math (batch 2)
 // ─────────────────────────────────────────────────────────────────────────
 /// `tan` — Unit conversion: `tan`.
-fn builtin_tan(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tan(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::tan)
 }
 /// `asin` — Unit conversion: `asin`.
-fn builtin_asin(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_asin(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::asin)
 }
 /// `acos` — Unit conversion: `acos`.
-fn builtin_acos(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_acos(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::acos)
 }
 /// `atan` — Unit conversion: `atan`.
-fn builtin_atan(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_atan(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::atan)
 }
 /// `sinh` — Unit conversion: `sinh`.
-fn builtin_sinh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sinh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::sinh)
 }
 /// `cosh` — Unit conversion: `cosh`.
-fn builtin_cosh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cosh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::cosh)
 }
 /// `tanh` — Unit conversion: `tanh`.
-fn builtin_tanh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tanh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::tanh)
 }
 /// `asinh` — Unit conversion: `asinh`.
-fn builtin_asinh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_asinh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::asinh)
 }
 /// `acosh` — Unit conversion: `acosh`.
-fn builtin_acosh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_acosh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::acosh)
 }
 /// `atanh` — Unit conversion: `atanh`.
-fn builtin_atanh(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_atanh(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, f64::atanh)
 }
 /// `sqr` — Sqr. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_sqr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sqr(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(n * n))
 }
 /// `cube_fn` — Cube fn. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_cube_fn(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cube_fn(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(n * n * n))
 }
@@ -11148,19 +11148,19 @@ fn builtin_floor_div(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(a.div_euclid(b)))
 }
 /// `is_finite` — Test whether the argument is finite. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_finite(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_finite(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args).to_number().is_finite(),
     ))
 }
 /// `is_infinite` — Test whether the argument is infinite. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_infinite(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_infinite(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args).to_number().is_infinite(),
     ))
 }
 /// `is_nan` — Test whether the argument is nan. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_nan(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_nan(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args).to_number().is_nan(),
     ))
@@ -11184,7 +11184,7 @@ fn builtin_max_abs(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `saturate` — Saturate. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_saturate(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_saturate(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().clamp(0.0, 1.0),
     ))
@@ -11213,14 +11213,14 @@ fn rot_shift(s: &str, shift: i32) -> String {
         .collect()
 }
 /// `rot13` — Rot13. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_rot13(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_rot13(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(rot_shift(
         &first_arg_or_topic(interp, args).to_string(),
         13,
     )))
 }
 /// `rot47` — Rot47. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_rot47(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_rot47(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.chars()
@@ -11241,7 +11241,7 @@ fn builtin_caesar(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(rot_shift(&s, shift)))
 }
 /// `reverse_words` — Reverse words. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_reverse_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_reverse_words(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace().rev().collect::<Vec<_>>().join(" "),
@@ -11253,14 +11253,14 @@ fn count_chars_in(s: &str, set: &str) -> i64 {
         .count() as i64
 }
 /// `count_vowels` — Count vowels in the input. Defaults to `$_`.
-fn builtin_count_vowels(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_vowels(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(count_chars_in(
         &first_arg_or_topic(interp, args).to_string(),
         "aeiou",
     )))
 }
 /// `count_consonants` — Count consonants in the input. Defaults to `$_`.
-fn builtin_count_consonants(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_consonants(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::integer(
         s.chars()
@@ -11269,14 +11269,14 @@ fn builtin_count_consonants(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
     ))
 }
 /// `is_vowel` — Test whether the argument is vowel. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_vowel(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_vowel(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         s.len() == 1 && "aeiouAEIOU".contains(s.chars().next().unwrap()),
     ))
 }
 /// `is_consonant` — Test whether the argument is consonant. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_consonant(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_consonant(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let Some(c) = s.chars().next() else {
         return Ok(bool_iv(false));
@@ -11286,14 +11286,14 @@ fn builtin_is_consonant(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 /// `first_word` — First word. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_first_word(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_first_word(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace().next().unwrap_or("").to_string(),
     ))
 }
 /// `last_word` — Last word. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_last_word(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_last_word(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace().next_back().unwrap_or("").to_string(),
@@ -11326,13 +11326,13 @@ fn builtin_mid_str(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `lowercase` — Lowercase. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_lowercase(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lowercase(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string().to_lowercase(),
     ))
 }
 /// `uppercase` — Uppercase. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_uppercase(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_uppercase(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string().to_uppercase(),
     ))
@@ -11344,7 +11344,7 @@ fn words_iter(s: &str) -> Vec<String> {
         .collect()
 }
 /// `pascal_case` — Pascal case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_pascal_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pascal_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let out: String = words_iter(&s)
         .into_iter()
@@ -11362,7 +11362,7 @@ fn builtin_pascal_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     Ok(PerlValue::string(out))
 }
 /// `constant_case` — Constant case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_constant_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_constant_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         words_iter(&s)
@@ -11373,7 +11373,7 @@ fn builtin_constant_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     ))
 }
 /// `dot_case` — Dot case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_dot_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dot_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         words_iter(&s)
@@ -11384,7 +11384,7 @@ fn builtin_dot_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
     ))
 }
 /// `path_case` — Path case. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_path_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         words_iter(&s)
@@ -11395,7 +11395,7 @@ fn builtin_path_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     ))
 }
 /// `is_palindrome` — Test whether the argument is palindrome. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_palindrome(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_palindrome(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let clean: String = s
         .chars()
@@ -11436,7 +11436,7 @@ fn builtin_lcp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(out))
 }
 /// `ord_char` — Ord char. Returns an integer. Defaults to `$_` when called with no args.
-fn builtin_ord_char(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ord_char(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(s.chars()
         .next()
@@ -11444,7 +11444,7 @@ fn builtin_ord_char(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `chr_from` — Chr from. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_chr_from(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_chr_from(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(char::from_u32(n as u32)
         .map(|c| PerlValue::string(c.to_string()))
@@ -12011,7 +12011,7 @@ fn builtin_json_minify(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_to_json(args)
 }
 /// `escape_json` — Escape json. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_escape_json(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_escape_json(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(json_escape(
         &first_arg_or_topic(interp, args).to_string(),
     )))
@@ -12021,7 +12021,7 @@ fn builtin_escape_json(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 // Process / env
 // ─────────────────────────────────────────────────────────────────────────
 /// `cmd_exists` — Cmd exists. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_cmd_exists(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cmd_exists(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let name = first_arg_or_topic(interp, args).to_string();
     let Ok(path) = std::env::var("PATH") else {
         return Ok(bool_iv(false));
@@ -12031,14 +12031,14 @@ fn builtin_cmd_exists(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `env_get` — Env get. Defaults to `$_` when called with no args.
-fn builtin_env_get(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_env_get(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let key = first_arg_or_topic(interp, args).to_string();
     Ok(std::env::var(&key)
         .map(PerlValue::string)
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `env_has` — Env has. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_env_has(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_env_has(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let key = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(std::env::var(&key).is_ok()))
 }
@@ -12051,7 +12051,7 @@ fn builtin_env_keys() -> PerlResult<PerlValue> {
     ))
 }
 /// `argc` — Argc. Returns an integer.
-fn builtin_argc(interp: &Interpreter, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_argc(interp: &VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         interp.scope.get_array("ARGV").len() as i64
     ))
@@ -12111,7 +12111,7 @@ fn builtin_short_id() -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!("{:07x}", n)))
 }
 /// `is_uuid` — Test whether the argument is uuid. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_uuid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_uuid(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 5 {
@@ -12139,7 +12139,7 @@ fn builtin_token(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // URL / email parts
 // ─────────────────────────────────────────────────────────────────────────
 /// `email_domain` — Email domain. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_email_domain(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_email_domain(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(match s.split_once('@') {
         Some((_, d)) => PerlValue::string(d.to_string()),
@@ -12147,7 +12147,7 @@ fn builtin_email_domain(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     })
 }
 /// `email_local` — Email local. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_email_local(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_email_local(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(match s.split_once('@') {
         Some((l, _)) => PerlValue::string(l.to_string()),
@@ -12173,21 +12173,21 @@ fn url_part(s: &str) -> Option<(&str, &str, &str, &str)> {
     ))
 }
 /// `url_host` — Url host. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_url_host(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_host(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(url_part(&s)
         .map(|(_, h, _, _)| PerlValue::string(h.to_string()))
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `url_path` — Url path. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_url_path(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_path(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(url_part(&s)
         .map(|(_, _, p, _)| PerlValue::string(p.to_string()))
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `url_query` — Url query. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_url_query(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_query(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(url_part(&s)
         .map(|(_, _, _, q)| PerlValue::string(q.to_string()))
@@ -12195,7 +12195,7 @@ fn builtin_url_query(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 // ── File stat ────────────────────────────────────────────────────────────
 fn stat_field<F: Fn(&std::fs::Metadata) -> PerlValue>(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     f: F,
 ) -> PerlResult<PerlValue> {
@@ -12205,7 +12205,7 @@ fn stat_field<F: Fn(&std::fs::Metadata) -> PerlValue>(
         .unwrap_or(PerlValue::UNDEF))
 }
 /// `file_size_n` — File size n. Returns an integer.
-fn builtin_file_size_n(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_file_size_n(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     stat_field(interp, args, |m| PerlValue::integer(m.len() as i64))
 }
 fn secs_or_undef(t: std::io::Result<std::time::SystemTime>) -> PerlValue {
@@ -12218,19 +12218,19 @@ fn secs_or_undef(t: std::io::Result<std::time::SystemTime>) -> PerlValue {
     }
 }
 /// `file_mtime` — File mtime.
-fn builtin_file_mtime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_file_mtime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     stat_field(interp, args, |m| secs_or_undef(m.modified()))
 }
 /// `file_atime` — File atime.
-fn builtin_file_atime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_file_atime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     stat_field(interp, args, |m| secs_or_undef(m.accessed()))
 }
 /// `file_ctime` — File ctime.
-fn builtin_file_ctime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_file_ctime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     stat_field(interp, args, |m| secs_or_undef(m.created()))
 }
 /// `is_symlink` — Test whether the argument is symlink. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_symlink(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_symlink(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         std::fs::symlink_metadata(&p)
@@ -12240,7 +12240,7 @@ fn builtin_is_symlink(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 #[cfg(unix)]
 /// `is_readable` — Test whether the argument is readable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_readable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_readable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::os::unix::fs::PermissionsExt;
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
@@ -12251,13 +12251,13 @@ fn builtin_is_readable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 #[cfg(not(unix))]
 /// `is_readable` — Test whether the argument is readable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_readable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_readable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(std::fs::metadata(&p).is_ok()))
 }
 #[cfg(unix)]
 /// `is_writable` — Test whether the argument is writable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_writable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_writable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::os::unix::fs::PermissionsExt;
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
@@ -12268,7 +12268,7 @@ fn builtin_is_writable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 #[cfg(not(unix))]
 /// `is_writable` — Test whether the argument is writable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_writable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_writable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         std::fs::metadata(&p)
@@ -12278,7 +12278,7 @@ fn builtin_is_writable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 #[cfg(unix)]
 /// `is_executable` — Test whether the argument is executable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_executable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_executable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use std::os::unix::fs::PermissionsExt;
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
@@ -12289,17 +12289,17 @@ fn builtin_is_executable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
 }
 #[cfg(not(unix))]
 /// `is_executable` — Test whether the argument is executable. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_executable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_executable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(p.ends_with(".exe") || p.ends_with(".bat")))
 }
 /// `path_is_abs` — Path is abs. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_path_is_abs(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_is_abs(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(std::path::Path::new(&s).is_absolute()))
 }
 /// `path_is_rel` — Path is rel. Returns 1 (true) or 0 (false). Defaults to `$_` when called with no args.
-fn builtin_path_is_rel(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_path_is_rel(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(std::path::Path::new(&s).is_relative()))
 }
@@ -12465,11 +12465,11 @@ fn builtin_pairwise(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ─────────────────────────────────────────────────────────────────────────
 
 fn exec_to_perl_result(
-    result: Result<PerlValue, crate::interpreter::FlowOrError>,
+    result: Result<PerlValue, crate::vm_helper::FlowOrError>,
     name: &str,
     line: usize,
 ) -> PerlResult<PerlValue> {
-    use crate::interpreter::{Flow, FlowOrError};
+    use crate::vm_helper::{Flow, FlowOrError};
     match result {
         Ok(v) => Ok(v),
         Err(FlowOrError::Error(e)) => Err(e),
@@ -12484,7 +12484,7 @@ fn exec_to_perl_result(
 /// `first [CODEREF,] LIST` — if first arg is a code ref, returns first element matching predicate.
 /// Otherwise returns the first element of the list (Clojure's first).
 fn builtin_first_clj(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12604,7 +12604,7 @@ fn builtin_pop_clj(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `some PREDICATE, LIST` — returns the first truthy value for which pred returns true.
 fn builtin_some(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12634,7 +12634,7 @@ fn builtin_some(
 
 /// `every PREDICATE, LIST` — returns true if pred is true for all elements.
 fn builtin_every(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12664,7 +12664,7 @@ fn builtin_every(
 
 /// `not_any PREDICATE, LIST` — returns true if pred is false for all elements.
 fn builtin_not_any(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12694,7 +12694,7 @@ fn builtin_not_any(
 
 /// `not_every PREDICATE, LIST` — returns true if pred is false for at least one element.
 fn builtin_not_every(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12915,7 +12915,7 @@ impl PerlIterator for IterateIterator {
             *first_flag = false;
             return Some(current.clone());
         }
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let result = interp.call_sub(&self.sub, vec![current.clone()], WantarrayCtx::Scalar, 0);
         match result {
             Ok(v) => {
@@ -12971,7 +12971,7 @@ impl PerlIterator for RepeatedlyIterator {
             }
         }
         *count += 1;
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp
             .call_sub(&self.sub, vec![], WantarrayCtx::Scalar, 0)
             .ok()
@@ -13045,7 +13045,7 @@ impl PerlIterator for CycleIterator {
 
 /// `mapcat FN, LIST` — maps f over list and concatenates the results.
 fn builtin_mapcat(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13074,7 +13074,7 @@ fn builtin_mapcat(
 
 /// `keep FN, LIST` — returns non-nil results of mapping f over list.
 fn builtin_keep(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13105,7 +13105,7 @@ fn builtin_keep(
 
 /// `remove_clj FN, LIST` — removes elements for which pred returns true.
 fn builtin_remove_clj(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13136,7 +13136,7 @@ fn builtin_remove_clj(
 
 /// `reductions FN, INIT, LIST` — returns intermediate values of reduce.
 fn builtin_reductions(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13174,7 +13174,7 @@ fn builtin_reductions(
 
 /// `partition_by FN, LIST` — partitions list into sublists when f returns a new value.
 fn builtin_partition_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13250,7 +13250,7 @@ fn builtin_split_at(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `split_with FN, LIST` — splits list at first element where pred is false.
 fn builtin_split_with(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13370,7 +13370,7 @@ fn builtin_assoc_in(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `update_in HASH, [KEY1, KEY2, ...], FN` — updates nested value with function.
 fn builtin_update_in(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13490,7 +13490,7 @@ fn builtin_vec_clj(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `apply FN, ARGS...` — applies function to args, with last arg spread if it's a list.
 fn builtin_apply(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13543,7 +13543,7 @@ fn builtin_divmod(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `accumulate FN, LIST` — returns cumulative results (Python's itertools.accumulate).
 fn builtin_accumulate(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13578,7 +13578,7 @@ fn builtin_accumulate(
 
 /// `starmap FN, LIST_OF_LISTS` — maps fn over list, spreading each element as args (Python's itertools.starmap).
 fn builtin_starmap(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13754,7 +13754,7 @@ fn builtin_compress(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `filterfalse FN, LIST` — returns elements where predicate is false (Python's itertools.filterfalse).
 fn builtin_filterfalse(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13842,7 +13842,7 @@ fn builtin_tee_iter(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `groupby_iter FN, LIST` — groups consecutive elements by key (Python's itertools.groupby).
 fn builtin_groupby_iter(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -13933,7 +13933,7 @@ fn builtin_each_cons(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `one FN, LIST` — returns true if exactly one element matches (Ruby's one?).
-fn builtin_one(interp: &mut Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_one(interp: &mut VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     if args.is_empty() {
         return Ok(bool_iv(false));
     }
@@ -13967,7 +13967,7 @@ fn builtin_one(interp: &mut Interpreter, args: &[PerlValue], line: usize) -> Per
 
 /// `none_match FN, LIST` — returns true if no elements match (Ruby's none?).
 fn builtin_none_match(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14000,7 +14000,7 @@ fn builtin_none_match(
 
 /// `find_index_fn FN, LIST` — returns index of first match (Ruby's find_index with block).
 fn builtin_find_index_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14030,7 +14030,7 @@ fn builtin_find_index_fn(
 
 /// `rindex_fn FN, LIST` — returns index of last match (Ruby's rindex with block).
 fn builtin_rindex_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14079,7 +14079,7 @@ fn builtin_minmax(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `minmax_by FN, LIST` — returns [min, max] by key function (Ruby's minmax_by).
 fn builtin_minmax_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14227,7 +14227,7 @@ fn builtin_slice_arr(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `transform_keys FN, HASH` — transforms hash keys (Ruby's transform_keys).
 fn builtin_transform_keys(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14269,7 +14269,7 @@ fn builtin_transform_keys(
 
 /// `transform_values FN, HASH` — transforms hash values (Ruby's transform_values).
 fn builtin_transform_values(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14310,7 +14310,7 @@ fn builtin_transform_values(
 
 /// `sum_by FN, LIST` — sums values by key function (Ruby's sum with block).
 fn builtin_sum_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14339,7 +14339,7 @@ fn builtin_sum_by(
 
 /// `uniq_by FN, LIST` — returns unique elements by key function (Ruby's uniq with block).
 fn builtin_uniq_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14372,7 +14372,7 @@ fn builtin_uniq_by(
 
 /// `flat_map_fn FN, LIST` — maps and flattens one level (Ruby's flat_map).
 fn builtin_flat_map_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14381,7 +14381,7 @@ fn builtin_flat_map_fn(
 
 /// `then_fn FN, VALUE` — passes value to fn and returns result (Ruby's then/yield_self).
 fn builtin_then_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14405,7 +14405,7 @@ fn builtin_then_fn(
 
 /// `times_fn N, FN` — calls fn N times with index (Ruby's times).
 fn builtin_times_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14483,7 +14483,7 @@ fn builtin_downto(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `find_last FN, LIST` — returns last element matching predicate (JS Array.findLast).
 fn builtin_find_last(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14513,7 +14513,7 @@ fn builtin_find_last(
 
 /// `find_last_index FN, LIST` — returns index of last matching element (JS Array.findLastIndex).
 fn builtin_find_last_index(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14574,7 +14574,7 @@ fn builtin_replace_at(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `to_sorted FN, LIST` — returns new sorted array (JS Array.toSorted).
 fn builtin_to_sorted(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14754,7 +14754,7 @@ fn builtin_object_from_entries(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `span_fn FN, LIST` — splits list at first element where predicate fails (Haskell's span).
 fn builtin_span_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14795,7 +14795,7 @@ fn builtin_span_fn(
 
 /// `break_fn FN, LIST` — splits list at first element where predicate succeeds (Haskell's break).
 fn builtin_break_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14877,7 +14877,7 @@ fn builtin_nub(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `sort_on FN, LIST` — sorts by key function (Haskell's sortOn).
 fn builtin_sort_on(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -14993,7 +14993,7 @@ fn builtin_lookup_assoc(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `scanl FN, INIT, LIST` — like foldl but returns intermediate values (Haskell's scanl).
 fn builtin_scanl(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15024,7 +15024,7 @@ fn builtin_scanl(
 
 /// `scanr FN, INIT, LIST` — like foldr but returns intermediate values (Haskell's scanr).
 fn builtin_scanr(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15056,7 +15056,7 @@ fn builtin_scanr(
 
 /// `unfoldr FN, SEED` — generates list from seed function (Haskell's unfoldr).
 fn builtin_unfoldr(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15101,7 +15101,7 @@ fn builtin_unfoldr(
 
 /// `find_map FN, LIST` — returns first Some result from mapping (Rust's find_map).
 fn builtin_find_map(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15131,7 +15131,7 @@ fn builtin_find_map(
 
 /// `filter_map FN, LIST` — maps and filters out undefs (Rust's filter_map).
 fn builtin_filter_map(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15162,7 +15162,7 @@ fn builtin_filter_map(
 
 /// `fold_right FN, INIT, LIST` — right-associative fold (Rust's rfold).
 fn builtin_fold_right(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15190,7 +15190,7 @@ fn builtin_fold_right(
 
 /// `partition_either FN, LIST` — partitions into (left, right) based on return value (Rust's partition_map).
 fn builtin_partition_either(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15235,7 +15235,7 @@ fn builtin_partition_either(
 
 /// `try_fold FN, INIT, LIST` — fold that short-circuits on undef (Rust's try_fold).
 fn builtin_try_fold(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15266,7 +15266,7 @@ fn builtin_try_fold(
 
 /// `map_while FN, LIST` — maps while predicate returns defined values (Rust's map_while).
 fn builtin_map_while(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15298,7 +15298,7 @@ fn builtin_map_while(
 
 /// `inspect FN, LIST` — calls fn on each element but returns original list (Rust's inspect).
 fn builtin_inspect(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15325,7 +15325,7 @@ fn builtin_inspect(
 
 /// `tally_by FN, LIST` — counts elements by key function (Ruby's tally with block).
 fn builtin_tally_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15373,7 +15373,7 @@ fn builtin_sole(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// `chunk_while FN, LIST` — chunks consecutive elements while predicate is true (Ruby's chunk_while).
 fn builtin_chunk_while(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15424,7 +15424,7 @@ fn builtin_chunk_while(
 
 /// `count_while FN, LIST` — counts elements while predicate is true.
 fn builtin_count_while(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15490,7 +15490,7 @@ fn builtin_delete_at(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `update_at FN, LIST, INDEX` — returns new list with element at index updated by function.
 fn builtin_update_at(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15545,7 +15545,7 @@ fn builtin_split_on(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `words_from STR` — splits string into words.
-fn builtin_words_from(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_words_from(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let words: Vec<PerlValue> = s
         .split_whitespace()
@@ -15566,7 +15566,7 @@ fn builtin_unwords(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `lines_from STR` — splits string into lines.
-fn builtin_lines_from(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lines_from(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let lines: Vec<PerlValue> = s
         .lines()
@@ -15669,7 +15669,7 @@ fn builtin_partition_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `map_indexed LIST..., FN` — each call receives `(item, index)` in `@_` / `_0` / `_1`.
 /// `map_indexed FN, LIST` is still accepted for `->>` thread-last desugar (`[FN, LIST]`).
 fn builtin_map_indexed(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15717,7 +15717,7 @@ fn builtin_map_indexed(
 
 /// `reduce_indexed FN, INIT, LIST` — reduce with index as third argument.
 fn builtin_reduce_indexed(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15750,7 +15750,7 @@ fn builtin_reduce_indexed(
 
 /// `filter_indexed FN, LIST` — filter with index as second argument.
 fn builtin_filter_indexed(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15787,7 +15787,7 @@ fn builtin_filter_indexed(
 
 /// `group_by_fn FN, LIST` — groups elements by key function result.
 fn builtin_group_by_fn(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15823,7 +15823,7 @@ fn builtin_group_by_fn(
 
 /// `index_by FN, LIST` — creates hash indexed by key function result.
 fn builtin_index_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15855,7 +15855,7 @@ fn builtin_index_by(
 
 /// `associate FN, LIST` — creates hash with elements as keys and fn results as values.
 fn builtin_associate(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -15970,7 +15970,7 @@ fn builtin_subsequences(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `nub_by FN, LIST` — remove duplicates using custom equality (Haskell nubBy).
 fn builtin_nub_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16010,7 +16010,7 @@ fn builtin_nub_by(
 
 /// `slice_when FN, LIST` — split when predicate true between adjacent elements (Ruby slice_when).
 fn builtin_slice_when(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16059,7 +16059,7 @@ fn builtin_slice_when(
 
 /// `slice_before FN, LIST` — split before elements where predicate is true (Ruby slice_before).
 fn builtin_slice_before(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16101,7 +16101,7 @@ fn builtin_slice_before(
 
 /// `slice_after FN, LIST` — split after elements where predicate is true (Ruby slice_after).
 fn builtin_slice_after(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16143,7 +16143,7 @@ fn builtin_slice_after(
 
 /// `each_with_object OBJ, FN, LIST` — reduce with mutable object (Ruby each_with_object).
 fn builtin_each_with_object(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16171,7 +16171,7 @@ fn builtin_each_with_object(
 
 /// `reduce_right FN, INIT, LIST` — alias for fold_right (JS reduceRight).
 fn builtin_reduce_right(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16180,7 +16180,7 @@ fn builtin_reduce_right(
 
 /// `is_sorted_by FN, LIST` — check if sorted by comparator (Rust is_sorted_by).
 fn builtin_is_sorted_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16219,7 +16219,7 @@ fn builtin_is_sorted_by(
 
 /// `intersperse_with FN, LIST` — intersperse with function results (Rust intersperse_with).
 fn builtin_intersperse_with(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16254,7 +16254,7 @@ fn builtin_intersperse_with(
 
 /// `running_reduce FN, LIST` — like scanl but without init, starts with first element (Kotlin runningReduce).
 fn builtin_running_reduce(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16308,7 +16308,7 @@ fn builtin_windowed_circular(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `distinct_by FN, LIST` — alias for uniq_by (Kotlin distinctBy).
 fn builtin_distinct_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16379,7 +16379,7 @@ fn builtin_or_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `concat_map FN, LIST` — map then flatten one level (Haskell concatMap).
 fn builtin_concat_map(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16413,7 +16413,7 @@ fn builtin_elem_indices(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `find_indices FN, LIST` — indices where predicate is true (Haskell findIndices).
 fn builtin_find_indices(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16461,7 +16461,7 @@ fn builtin_delete_first(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `delete_by FN, VALUE, LIST` — remove first element equal by predicate (Haskell deleteBy).
 fn builtin_delete_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16557,7 +16557,7 @@ fn builtin_intersect_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `maximum_by FN, LIST` — max by comparator (Haskell maximumBy).
 fn builtin_maximum_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16597,7 +16597,7 @@ fn builtin_maximum_by(
 
 /// `minimum_by FN, LIST` — min by comparator (Haskell minimumBy).
 fn builtin_minimum_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -16730,13 +16730,13 @@ fn builtin_replace_regex(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `is_ascii STR` — returns true if string is all ASCII.
-fn builtin_is_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_ascii(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(s.is_ascii()))
 }
 
 /// `to_ascii STR` — converts to ASCII, replacing non-ASCII with '?'.
-fn builtin_to_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_ascii(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let ascii: String = s
         .chars()
@@ -16790,14 +16790,14 @@ fn builtin_from_code_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `normalize_spaces STR` — collapses whitespace to single spaces.
-fn builtin_normalize_spaces(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_normalize_spaces(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let normalized: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
     Ok(PerlValue::string(normalized))
 }
 
 /// `remove_whitespace STR` — removes all whitespace.
-fn builtin_remove_whitespace(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_remove_whitespace(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let result: String = s.chars().filter(|c| !c.is_whitespace()).collect();
     Ok(PerlValue::string(result))
@@ -17584,7 +17584,7 @@ fn builtin_dateseq(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 /// `dategrep PATTERN, LIST` — filter strings containing dates matching pattern.
 /// PATTERN is a date string or glob-like: "2024-03-*", "2024-*", "2024-03-15".
 /// Scans each line for ISO-ish dates and checks if they match the pattern.
-fn builtin_dategrep(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dategrep(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let pattern = args.first().map(|v| v.to_string()).unwrap_or_default();
     let list = if args.len() > 1 {
         args[1..]
@@ -17754,7 +17754,7 @@ fn builtin_datesort(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ─────────────────────────────────────────────────────────────────────────
 
 /// `url_encode STR` — URL encode string.
-fn builtin_url_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_encode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let encoded: String = s
         .bytes()
@@ -17770,7 +17770,7 @@ fn builtin_url_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `url_decode STR` — URL decode string.
-fn builtin_url_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_decode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut result = Vec::new();
     let bytes = s.as_bytes();
@@ -17796,7 +17796,7 @@ fn builtin_url_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `html_encode STR` — HTML encode string.
-fn builtin_html_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_html_encode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let encoded: String = s
         .chars()
@@ -17813,7 +17813,7 @@ fn builtin_html_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 
 /// `html_decode STR` — HTML decode string.
-fn builtin_html_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_html_decode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let decoded = s
         .replace("&amp;", "&")
@@ -17827,7 +17827,7 @@ fn builtin_html_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 
 /// `adler32 STR` — Adler32 checksum.
-fn builtin_adler32(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_adler32(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut a: u32 = 1;
     let mut b: u32 = 0;
@@ -17839,7 +17839,7 @@ fn builtin_adler32(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `fnv1a STR` — FNV-1a hash.
-fn builtin_fnv1a(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_fnv1a(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut hash: u64 = 0xcbf29ce484222325;
     for byte in s.bytes() {
@@ -17850,7 +17850,7 @@ fn builtin_fnv1a(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
 }
 
 /// `djb2 STR` — DJB2 hash.
-fn builtin_djb2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_djb2(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut hash: u64 = 5381;
     for byte in s.bytes() {
@@ -17864,7 +17864,7 @@ fn builtin_djb2(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
 // ─────────────────────────────────────────────────────────────────────────
 
 /// `is_credit_card STR` — validates credit card number (Luhn).
-fn builtin_is_credit_card(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_credit_card(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let digits: Vec<u32> = s
         .chars()
@@ -17891,7 +17891,7 @@ fn builtin_is_credit_card(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
 }
 
 /// `is_isbn10 STR` — validates ISBN-10.
-fn builtin_is_isbn10(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_isbn10(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let chars: Vec<char> = s
         .chars()
@@ -17913,7 +17913,7 @@ fn builtin_is_isbn10(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `is_isbn13 STR` — validates ISBN-13.
-fn builtin_is_isbn13(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_isbn13(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let digits: Vec<u32> = s
         .chars()
@@ -17932,7 +17932,7 @@ fn builtin_is_isbn13(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `is_iban STR` — validates IBAN (basic check).
-fn builtin_is_iban(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_iban(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args)
         .to_string()
         .replace(|c: char| c.is_whitespace(), "")
@@ -17967,7 +17967,7 @@ fn builtin_is_iban(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `is_hex STR` — validates hexadecimal string.
-fn builtin_is_hex_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_hex_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit()),
@@ -17975,7 +17975,7 @@ fn builtin_is_hex_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `is_binary STR` — validates binary string.
-fn builtin_is_binary_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_binary_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         !s.is_empty() && s.chars().all(|c| c == '0' || c == '1'),
@@ -17983,7 +17983,7 @@ fn builtin_is_binary_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
 }
 
 /// `is_octal STR` — validates octal string.
-fn builtin_is_octal_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_octal_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         !s.is_empty() && s.chars().all(|c| ('0'..='7').contains(&c)),
@@ -17991,7 +17991,7 @@ fn builtin_is_octal_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
 }
 
 /// `is_json STR` — validates JSON syntax (basic).
-fn builtin_is_json(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_json(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         serde_json::from_str::<serde_json::Value>(&s).is_ok(),
@@ -17999,7 +17999,7 @@ fn builtin_is_json(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
 }
 
 /// `is_base64 STR` — validates base64 string.
-fn builtin_is_base64(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_base64(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let s = s.trim();
     if s.is_empty() {
@@ -18012,21 +18012,21 @@ fn builtin_is_base64(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `is_semver STR` — validates semantic version.
-fn builtin_is_semver(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_semver(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?(?:\+([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?$").unwrap();
     Ok(bool_iv(re.is_match(&s)))
 }
 
 /// `is_slug STR` — validates URL slug.
-fn builtin_is_slug(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_slug(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap();
     Ok(bool_iv(re.is_match(&s)))
 }
 
 /// `slugify STR` — converts string to URL slug.
-fn builtin_slugify(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_slugify(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string().to_lowercase();
     let slug: String = s
         .chars()
@@ -18220,7 +18220,7 @@ fn builtin_dense_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `partition_point FN, LIST` — index where predicate becomes false (binary search).
 fn builtin_partition_point(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -18847,19 +18847,19 @@ fn builtin_is_bipartite_graph(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ─────────────────────────────────────────────────────────────────────────
 
 /// `is_ipv4_addr STR` — validate IPv4 address.
-fn builtin_is_ipv4_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_ipv4_addr(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(s.parse::<std::net::Ipv4Addr>().is_ok()))
 }
 
 /// `is_ipv6_addr STR` — validate IPv6 address.
-fn builtin_is_ipv6_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_ipv6_addr(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(s.parse::<std::net::Ipv6Addr>().is_ok()))
 }
 
 /// `is_mac_addr STR` — validate MAC address.
-fn builtin_is_mac_addr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_mac_addr(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<&str> = s.split([':', '-']).collect();
     if parts.len() != 6 {
@@ -18883,7 +18883,7 @@ fn builtin_is_port_num(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `is_hostname_valid STR` — validate hostname.
-fn builtin_is_hostname_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_hostname_valid(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     if s.is_empty() || s.len() > 253 {
         return Ok(bool_iv(false));
@@ -18904,21 +18904,21 @@ fn builtin_is_hostname_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlRe
 }
 
 /// `is_iso_date STR` — validate ISO date (YYYY-MM-DD).
-fn builtin_is_iso_date(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_iso_date(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$").unwrap();
     Ok(bool_iv(re.is_match(&s)))
 }
 
 /// `is_iso_time STR` — validate ISO time (HH:MM:SS).
-fn builtin_is_iso_time(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_iso_time(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(r"^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$").unwrap();
     Ok(bool_iv(re.is_match(&s)))
 }
 
 /// `is_iso_datetime STR` — validate ISO datetime.
-fn builtin_is_iso_datetime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_iso_datetime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(
         r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d",
@@ -18928,14 +18928,14 @@ fn builtin_is_iso_datetime(interp: &Interpreter, args: &[PerlValue]) -> PerlResu
 }
 
 /// `is_phone_num STR` — validate phone number (basic).
-fn builtin_is_phone_num(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_phone_num(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
     Ok(bool_iv(digits.len() >= 7 && digits.len() <= 15))
 }
 
 /// `is_us_zip STR` — validate US ZIP code.
-fn builtin_is_us_zip(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_us_zip(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let re = regex::Regex::new(r"^\d{5}(?:-\d{4})?$").unwrap();
     Ok(bool_iv(re.is_match(&s)))
@@ -19564,7 +19564,7 @@ fn builtin_cartesian_power(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ── Advanced String ─────────────────────────────────────────────────────
 
 /// `is_isogram STR` — check if no repeated letters.
-fn builtin_is_isogram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_isogram(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string().to_lowercase();
     let letters: Vec<char> = s.chars().filter(|c| c.is_alphabetic()).collect();
     let unique: std::collections::HashSet<char> = letters.iter().cloned().collect();
@@ -19572,7 +19572,7 @@ fn builtin_is_isogram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `is_heterogram STR` — alias for isogram.
-fn builtin_is_heterogram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_heterogram(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_is_isogram(interp, args)
 }
 
@@ -20026,7 +20026,7 @@ fn builtin_zipmap(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
 }
 /// `format_bytes` — Format the input as a human-readable bytes string. Defaults to `$_`.
-fn builtin_format_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_format_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_number();
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB", "PB"];
     let mut i = 0;
@@ -20037,7 +20037,7 @@ fn builtin_format_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::string(format!("{:.2} {}", n, UNITS[i])))
 }
 /// `format_duration` — Format the input as a human-readable duration string. Defaults to `$_`.
-fn builtin_format_duration(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_format_duration(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut secs = first_arg_or_topic(interp, args).to_int();
     let sign = if secs < 0 {
         secs = -secs;
@@ -20057,7 +20057,7 @@ fn builtin_format_duration(interp: &Interpreter, args: &[PerlValue]) -> PerlResu
     }))
 }
 /// `format_number` — Format the input as a human-readable number string. Defaults to `$_`.
-fn builtin_format_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_format_number(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     let sign = if n < 0 { "-" } else { "" };
     let digits = n.abs().to_string();
@@ -20203,7 +20203,7 @@ fn builtin_regex_replace(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `shuffle_chars` — Shuffle chars. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_shuffle_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_shuffle_chars(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut cs: Vec<char> = s.chars().collect();
     for i in (1..cs.len()).rev() {
@@ -20213,7 +20213,7 @@ fn builtin_shuffle_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     Ok(PerlValue::string(cs.into_iter().collect()))
 }
 /// `random_char` — Generate a random char.
-fn builtin_random_char(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_random_char(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let cs: Vec<char> = s.chars().collect();
     if cs.is_empty() {
@@ -20264,7 +20264,7 @@ fn builtin_count_substring(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(s.matches(&sub as &str).count() as i64))
 }
 /// `is_valid_hex` — Test whether the argument is valid hex. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_valid_hex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_hex(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let s = s.trim_start_matches('#');
     Ok(bool_iv(
@@ -20272,103 +20272,103 @@ fn builtin_is_valid_hex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 /// `hex_upper` — Hex upper. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_hex_upper(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hex_upper(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string().to_uppercase(),
     ))
 }
 /// `hex_lower` — Hex lower. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_hex_lower(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hex_lower(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string().to_lowercase(),
     ))
 }
 /// `ms_to_s` — Unit conversion: `ms to s`. Computes `m / 1000.0` from the input.
-fn builtin_ms_to_s(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ms_to_s(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 1000.0)
 }
 /// `s_to_ms` — Unit conversion: `s to ms`. Computes `s * 1000.0` from the input.
-fn builtin_s_to_ms(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_s_to_ms(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |s| s * 1000.0)
 }
 /// `ms_to_ns` — Unit conversion: `ms to ns`. Computes `m * 1_000_000.0` from the input.
-fn builtin_ms_to_ns(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ms_to_ns(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m * 1_000_000.0)
 }
 /// `ns_to_ms` — Unit conversion: `ns to ms`. Computes `n / 1_000_000.0` from the input.
-fn builtin_ns_to_ms(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ns_to_ms(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |n| n / 1_000_000.0)
 }
 /// `us_to_ns` — Unit conversion: `us to ns`. Computes `u * 1_000.0` from the input.
-fn builtin_us_to_ns(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_us_to_ns(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |u| u * 1_000.0)
 }
 /// `ns_to_us` — Unit conversion: `ns to us`. Computes `n / 1_000.0` from the input.
-fn builtin_ns_to_us(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ns_to_us(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |n| n / 1_000.0)
 }
 /// `l_to_gal` — Unit conversion: `l to gal`. Computes `l / 3.785411784` from the input.
-fn builtin_l_to_gal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_l_to_gal(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |l| l / 3.785411784)
 }
 /// `gal_to_l` — Unit conversion: `gal to l`. Computes `g * 3.785411784` from the input.
-fn builtin_gal_to_l(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gal_to_l(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |g| g * 3.785411784)
 }
 /// `l_to_ml` — Unit conversion: `l to ml`. Computes `l * 1000.0` from the input.
-fn builtin_l_to_ml(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_l_to_ml(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |l| l * 1000.0)
 }
 /// `ml_to_l` — Unit conversion: `ml to l`. Computes `m / 1000.0` from the input.
-fn builtin_ml_to_l(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ml_to_l(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 1000.0)
 }
 /// `cups_to_ml` — Unit conversion: `cups to ml`. Computes `c * 240.0` from the input.
-fn builtin_cups_to_ml(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cups_to_ml(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |c| c * 240.0)
 }
 /// `ml_to_cups` — Unit conversion: `ml to cups`. Computes `m / 240.0` from the input.
-fn builtin_ml_to_cups(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_ml_to_cups(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |m| m / 240.0)
 }
 /// `n_to_lbf` — Unit conversion: `n to lbf`. Computes `n * 0.22480894244319` from the input.
-fn builtin_n_to_lbf(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_n_to_lbf(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |n| n * 0.22480894244319)
 }
 /// `lbf_to_n` — Unit conversion: `lbf to n`. Computes `l / 0.22480894244319` from the input.
-fn builtin_lbf_to_n(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lbf_to_n(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |l| l / 0.22480894244319)
 }
 /// `j_to_cal` — Unit conversion: `j to cal`. Computes `j / 4.184` from the input.
-fn builtin_j_to_cal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_j_to_cal(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |j| j / 4.184)
 }
 /// `cal_to_j` — Unit conversion: `cal to j`. Computes `c * 4.184` from the input.
-fn builtin_cal_to_j(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cal_to_j(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |c| c * 4.184)
 }
 /// `w_to_hp` — Unit conversion: `w to hp`. Computes `w / 745.6998715822702` from the input.
-fn builtin_w_to_hp(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_w_to_hp(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |w| w / 745.6998715822702)
 }
 /// `hp_to_w` — Unit conversion: `hp to w`. Computes `h * 745.6998715822702` from the input.
-fn builtin_hp_to_w(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hp_to_w(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |h| h * 745.6998715822702)
 }
 /// `pa_to_psi` — Unit conversion: `pa to psi`. Computes `p * 0.000145037737797` from the input.
-fn builtin_pa_to_psi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pa_to_psi(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |p| p * 0.000145037737797)
 }
 /// `psi_to_pa` — Unit conversion: `psi to pa`. Computes `p / 0.000145037737797` from the input.
-fn builtin_psi_to_pa(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_psi_to_pa(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |p| p / 0.000145037737797)
 }
 /// `bar_to_pa` — Unit conversion: `bar to pa`. Computes `b * 100000.0` from the input.
-fn builtin_bar_to_pa(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bar_to_pa(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |b| b * 100000.0)
 }
 /// `pa_to_bar` — Unit conversion: `pa to bar`. Computes `p / 100000.0` from the input.
-fn builtin_pa_to_bar(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pa_to_bar(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     unit_scale(interp, args, |p| p / 100000.0)
 }
 
@@ -20462,7 +20462,7 @@ fn builtin_clamp_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(v.clamp(lo, hi)))
 }
 /// `attempt` — Attempt. Defaults to `$_` when called with no args.
-fn builtin_attempt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_attempt(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(first_arg_or_topic(interp, args))
 }
 /// `safe_div` — Safe div. Returns a float.
@@ -20486,7 +20486,7 @@ fn builtin_safe_mod(args: &[PerlValue]) -> PerlResult<PerlValue> {
     })
 }
 /// `safe_sqrt` — Safe sqrt. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_safe_sqrt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_safe_sqrt(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(if n < 0.0 {
         PerlValue::UNDEF
@@ -20495,7 +20495,7 @@ fn builtin_safe_sqrt(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     })
 }
 /// `safe_log` — Safe log. Returns a float. Defaults to `$_` when called with no args.
-fn builtin_safe_log(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_safe_log(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(if n <= 0.0 {
         PerlValue::UNDEF
@@ -20508,7 +20508,7 @@ fn builtin_tap_val(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
 }
 /// `debug_val` — Debug val. Defaults to `$_` when called with no args.
-fn builtin_debug_val(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_debug_val(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     eprintln!("[debug] {}", v);
     Ok(v)
@@ -20857,7 +20857,7 @@ fn builtin_re_groups(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `re_escape` — Re escape. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_re_escape(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_re_escape(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(regex::escape(
         &first_arg_or_topic(interp, args).to_string(),
     )))
@@ -20877,7 +20877,7 @@ fn builtin_re_split_limit(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `glob_to_regex` — Glob to regex. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_glob_to_regex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_glob_to_regex(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g = first_arg_or_topic(interp, args).to_string();
     let mut re = String::from("^");
     for c in g.chars() {
@@ -20895,7 +20895,7 @@ fn builtin_glob_to_regex(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     Ok(PerlValue::string(re))
 }
 /// `is_regex_valid` — Test whether the argument is regex valid. Returns 1 (true) or 0 (false). Defaults to `$_`.
-fn builtin_is_regex_valid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_regex_valid(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         compile_re(&first_arg_or_topic(interp, args).to_string()).is_some(),
     ))
@@ -20943,7 +20943,7 @@ fn builtin_env_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(val))
 }
 /// `env_remove` — Env remove. Defaults to `$_` when called with no args.
-fn builtin_env_remove(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_env_remove(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let key = first_arg_or_topic(interp, args).to_string();
     if !key.is_empty() {
         std::env::remove_var(&key);
@@ -21099,12 +21099,12 @@ fn builtin_bitset_clear(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 /// `url_scheme` — Url scheme. Returns a string. Defaults to `$_` when called with no args.
 /// `chomp_str` — Chomp str.
-fn builtin_chomp_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_chomp_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(s.trim_end_matches("\n").to_string()))
 }
 /// `chop_str` — Chop str.
-fn builtin_chop_str(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_chop_str(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut s = first_arg_or_topic(interp, args).to_string();
     s.pop();
     Ok(PerlValue::string(s))
@@ -21129,20 +21129,20 @@ fn builtin_zfill(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(format!("{}{}", "0".repeat(pad), s)))
 }
 /// `normalize_whitespace` — Normalize whitespace.
-fn builtin_normalize_whitespace(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_normalize_whitespace(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace().collect::<Vec<_>>().join(" "),
     ))
 }
 /// `byte_length` — Byte length.
-fn builtin_byte_length(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_byte_length(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_string().len() as i64,
     ))
 }
 /// `char_length` — Char length.
-fn builtin_char_length(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_char_length(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_string().chars().count() as i64,
     ))
@@ -21195,7 +21195,7 @@ fn builtin_between(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(n >= lo && n <= hi))
 }
 /// `succ` — Successor (n + 1).
-fn builtin_succ(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_succ(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(if let Some(n) = v.as_integer() {
         PerlValue::integer(n.wrapping_add(1))
@@ -21204,7 +21204,7 @@ fn builtin_succ(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
     })
 }
 /// `pred` — Predecessor (n - 1).
-fn builtin_pred(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pred(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(if let Some(n) = v.as_integer() {
         PerlValue::integer(n.wrapping_sub(1))
@@ -21213,7 +21213,7 @@ fn builtin_pred(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValu
     })
 }
 /// `reciprocal` — Reciprocal.
-fn builtin_reciprocal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_reciprocal(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(if n == 0.0 {
         PerlValue::UNDEF
@@ -21222,39 +21222,39 @@ fn builtin_reciprocal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     })
 }
 /// `square_root` — Alias for sqrt.
-fn builtin_square_root(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_square_root(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().sqrt(),
     ))
 }
 /// `cube_root` — Alias for cbrt.
-fn builtin_cube_root(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_cube_root(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number().cbrt(),
     ))
 }
 /// `is_even` — Alias for even.
-fn builtin_is_even(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_even(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_int() % 2 == 0))
 }
 /// `is_odd` — Alias for odd.
-fn builtin_is_odd(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_odd(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_int() % 2 != 0))
 }
 /// `is_zero` — Alias for zero.
-fn builtin_is_zero(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_zero(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() == 0.0))
 }
 /// `is_positive` — Alias for positive.
-fn builtin_is_positive(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_positive(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() > 0.0))
 }
 /// `is_negative` — Alias for negative.
-fn builtin_is_negative(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_negative(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() < 0.0))
 }
 /// `is_nonzero` — Alias for nonzero.
-fn builtin_is_nonzero(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_nonzero(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).to_number() != 0.0))
 }
 /// `approx_eq` — Test approximate equality within epsilon.
@@ -21265,12 +21265,12 @@ fn builtin_approx_eq(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv((a - b).abs() < eps))
 }
 /// `sigmoid` — Sigmoid.
-fn builtin_sigmoid(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sigmoid(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(1.0 / (1.0 + (-x).exp())))
 }
 /// `relu` — Relu.
-fn builtin_relu(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_relu(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(x.max(0.0)))
 }
@@ -21541,7 +21541,7 @@ fn builtin_is_power_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(true))
 }
 /// `is_perfect_square` — Is perfect square.
-fn builtin_is_perfect_square(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_perfect_square(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(bool_iv(false));
@@ -21550,7 +21550,7 @@ fn builtin_is_perfect_square(interp: &Interpreter, args: &[PerlValue]) -> PerlRe
     Ok(bool_iv(r * r == n))
 }
 /// `is_triangular` — Test if number is triangular.
-fn builtin_is_triangular(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_triangular(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(bool_iv(false));
@@ -21560,7 +21560,7 @@ fn builtin_is_triangular(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     Ok(bool_iv(s * s == d && (s - 1) % 2 == 0))
 }
 /// `is_fibonacci` — Is fibonacci.
-fn builtin_is_fibonacci(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_fibonacci(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 0 {
         return Ok(bool_iv(false));
@@ -21672,7 +21672,7 @@ fn builtin_primes_seq(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `digits_of` — Split integer into digits.
-fn builtin_digits_of(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_digits_of(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().abs();
     if n == 0 {
         return Ok(PerlValue::array(vec![PerlValue::integer(0)]));
@@ -21710,7 +21710,7 @@ fn builtin_range_exclusive(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array((lo..hi).map(PerlValue::integer).collect()))
 }
 /// `hex_to_bytes` — Convert hex to bytes.
-fn builtin_hex_to_bytes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_hex_to_bytes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let bytes: Vec<PerlValue> = (0..s.len() / 2)
         .filter_map(|i| {
@@ -21881,13 +21881,13 @@ fn builtin_assert_type(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(v)
 }
 /// `tap_debug` — Print value to stderr and pass through.
-fn builtin_tap_debug(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tap_debug(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     eprintln!("[tap] {}", v);
     Ok(v)
 }
 /// `measure` — Measure and print elapsed time.
-fn builtin_measure(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_measure(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let start = std::time::Instant::now();
     let v = first_arg_or_topic(interp, args);
     let elapsed = start.elapsed().as_secs_f64();
@@ -21901,23 +21901,23 @@ fn builtin_wrap_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(((i % len) + len) % len))
 }
 /// `to_bool` — Convert to boolean 0/1.
-fn builtin_to_bool(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_bool(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_true()))
 }
 /// `to_int` — Convert to integer.
-fn builtin_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_int(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_int(),
     ))
 }
 /// `to_float` — Convert to float.
-fn builtin_to_float(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_float(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         first_arg_or_topic(interp, args).to_number(),
     ))
 }
 /// `to_string` — Convert to string.
-fn builtin_to_string(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_string(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string(),
     ))
@@ -21928,13 +21928,13 @@ fn builtin_to_array(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `abs_ceil` — Absolute value then ceil.
-fn builtin_abs_ceil(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_abs_ceil(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_number().abs().ceil() as i64,
     ))
 }
 /// `abs_floor` — Absolute value then floor.
-fn builtin_abs_floor(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_abs_floor(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args).to_number().abs().floor() as i64,
     ))
@@ -21957,7 +21957,7 @@ fn builtin_all_match(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `alternate_case` — Alternate case.
-fn builtin_alternate_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_alternate_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.chars()
@@ -21973,7 +21973,7 @@ fn builtin_alternate_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
     ))
 }
 /// `angle_bracket` — Wrap in angle brackets.
-fn builtin_angle_bracket(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_angle_bracket(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!("<{}>", s)))
 }
@@ -21994,7 +21994,7 @@ fn builtin_bmi_calc(args: &[PerlValue]) -> PerlResult<PerlValue> {
     })
 }
 /// `bracket` — Wrap in square brackets.
-fn builtin_bracket(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bracket(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!("[{}]", s)))
 }
@@ -22035,7 +22035,7 @@ fn builtin_cosine_similarity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     })
 }
 /// `count_digits` — Count digits.
-fn builtin_count_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_digits(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22045,7 +22045,7 @@ fn builtin_count_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 /// `count_letters` — Count letters.
-fn builtin_count_letters(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_letters(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22055,7 +22055,7 @@ fn builtin_count_letters(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     ))
 }
 /// `count_lower` — Count lower.
-fn builtin_count_lower(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_lower(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22065,7 +22065,7 @@ fn builtin_count_lower(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     ))
 }
 /// `count_punctuation` — Count punctuation.
-fn builtin_count_punctuation(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_punctuation(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22075,7 +22075,7 @@ fn builtin_count_punctuation(interp: &Interpreter, args: &[PerlValue]) -> PerlRe
     ))
 }
 /// `count_spaces` — Count spaces.
-fn builtin_count_spaces(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_spaces(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22085,7 +22085,7 @@ fn builtin_count_spaces(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 /// `count_upper` — Count upper.
-fn builtin_count_upper(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_count_upper(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22137,7 +22137,7 @@ fn builtin_fma(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a.mul_add(b, c)))
 }
 /// `freq_wavelength` — Frequency = c / wavelength.
-fn builtin_freq_wavelength(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_freq_wavelength(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let w = first_arg_or_topic(interp, args).to_number();
     Ok(if w == 0.0 {
         PerlValue::UNDEF
@@ -22167,7 +22167,7 @@ fn builtin_heat_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((hi - 32.0) * 5.0 / 9.0))
 }
 /// `is_whole` — Test if float has no fractional part.
-fn builtin_is_whole(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_whole(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(bool_iv(n == n.floor() && n.is_finite()))
 }
@@ -22212,7 +22212,7 @@ fn builtin_mae(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `mirror_string` — Mirror string.
-fn builtin_mirror_string(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_mirror_string(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let rev: String = s.chars().rev().collect();
     Ok(PerlValue::string(format!("{}{}", s, rev)))
@@ -22267,7 +22267,7 @@ fn builtin_ohms_law_v(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(i * r))
 }
 /// `only_alnum` — Only alnum.
-fn builtin_only_alnum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_only_alnum(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22277,7 +22277,7 @@ fn builtin_only_alnum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `only_alpha` — Only alpha.
-fn builtin_only_alpha(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_only_alpha(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22287,7 +22287,7 @@ fn builtin_only_alpha(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `only_ascii` — Only ascii.
-fn builtin_only_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_only_ascii(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22297,7 +22297,7 @@ fn builtin_only_ascii(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `only_digits` — Only digits.
-fn builtin_only_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_only_digits(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22307,7 +22307,7 @@ fn builtin_only_digits(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     ))
 }
 /// `parenthesize` — Wrap in parentheses.
-fn builtin_parenthesize(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_parenthesize(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(format!("({})", s)))
 }
@@ -22389,7 +22389,7 @@ fn builtin_running_min(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `signum` — Sign: -1, 0, or 1.
-fn builtin_signum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_signum(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::integer(if n > 0.0 {
         1
@@ -22407,7 +22407,7 @@ fn builtin_simple_interest(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(p * r * t))
 }
 /// `string_sort` — Sort characters in string.
-fn builtin_string_sort(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_string_sort(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut cs: Vec<char> = first_arg_or_topic(interp, args)
         .to_string()
         .chars()
@@ -22416,7 +22416,7 @@ fn builtin_string_sort(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
     Ok(PerlValue::string(cs.into_iter().collect()))
 }
 /// `string_unique_chars` — String unique chars.
-fn builtin_string_unique_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_string_unique_chars(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut seen = std::collections::HashSet::new();
     Ok(PerlValue::string(
@@ -22430,7 +22430,7 @@ fn builtin_tip_amount(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(bill * pct / 100.0))
 }
 /// `trim_left` — Trim left.
-fn builtin_trim_left(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_trim_left(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22439,7 +22439,7 @@ fn builtin_trim_left(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     ))
 }
 /// `trim_right` — Trim right.
-fn builtin_trim_right(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_trim_right(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -22448,7 +22448,7 @@ fn builtin_trim_right(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     ))
 }
 /// `wavelength_freq` — Wavelength = c / frequency.
-fn builtin_wavelength_freq(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_wavelength_freq(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f = first_arg_or_topic(interp, args).to_number();
     Ok(if f == 0.0 {
         PerlValue::UNDEF
@@ -22466,7 +22466,7 @@ fn builtin_wind_chill(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `camel_words` — Split camelCase into words.
-fn builtin_camel_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_camel_words(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = Vec::new();
     let mut cur = String::new();
@@ -22521,7 +22521,7 @@ fn builtin_drop_every(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `filter_chars` — Filter chars.
-fn builtin_filter_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_filter_chars(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let keep = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let set: std::collections::HashSet<char> = keep.chars().collect();
@@ -22544,7 +22544,7 @@ fn builtin_force_mass_acc(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m * a))
 }
 /// `from_csv_line` — From csv line.
-fn builtin_from_csv_line(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_from_csv_line(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = Vec::new();
     let mut field = String::new();
@@ -22610,7 +22610,7 @@ fn builtin_int_bits(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(64))
 }
 /// `intersperse_char` — Intersperse char.
-fn builtin_intersperse_char(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_intersperse_char(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let sep = args
         .get(1)
@@ -22624,21 +22624,21 @@ fn builtin_intersperse_char(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
     Ok(PerlValue::string(out))
 }
 /// `is_blank_or_nil` — Is blank or nil.
-fn builtin_is_blank_or_nil(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_blank_or_nil(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(bool_iv(v.is_undef() || v.to_string().trim().is_empty()))
 }
 /// `is_email` — Is email.
-fn builtin_is_email(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_email(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(s.contains('@') && s.contains('.')))
 }
 /// `is_falsy` — Is falsy.
-fn builtin_is_falsy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_falsy(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(!first_arg_or_topic(interp, args).is_true()))
 }
 /// `is_hex_color` — Is hex color.
-fn builtin_is_hex_color(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_hex_color(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let t = s.trim_start_matches('#');
     Ok(bool_iv(
@@ -22646,7 +22646,7 @@ fn builtin_is_hex_color(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 /// `is_ipv4` — Is ipv4.
-fn builtin_is_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_ipv4(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<_> = s.split('.').collect();
     Ok(bool_iv(
@@ -22657,11 +22657,11 @@ fn builtin_is_ipv4(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
     ))
 }
 /// `is_nil` — Alias for is_undef.
-fn builtin_is_nil(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_nil(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_undef()))
 }
 /// `is_present` — Is present.
-fn builtin_is_present(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_present(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args);
     Ok(bool_iv(!v.is_undef() && !v.to_string().is_empty()))
 }
@@ -22676,11 +22676,11 @@ fn builtin_is_strictly_increasing(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(xs.windows(2).all(|w| w[0] < w[1])))
 }
 /// `is_truthy` — Is truthy.
-fn builtin_is_truthy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_truthy(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(first_arg_or_topic(interp, args).is_true()))
 }
 /// `is_url` — Is url.
-fn builtin_is_url(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_url(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         s.starts_with("http://") || s.starts_with("https://"),
@@ -22705,7 +22705,7 @@ fn builtin_jaccard_similarity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     })
 }
 /// `map_chars` — Map chars.
-fn builtin_map_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_map_chars(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::array(
         s.chars()
@@ -22800,7 +22800,7 @@ fn builtin_scan_left(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 /// `sentence_case` — Sentence case.
-fn builtin_sentence_case(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sentence_case(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut out = String::new();
     let mut cap_next = true;
@@ -22828,7 +22828,7 @@ fn builtin_speed_distance_time(args: &[PerlValue]) -> PerlResult<PerlValue> {
     })
 }
 /// `string_to_chars` — String to chars.
-fn builtin_string_to_chars(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_string_to_chars(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::array(
         s.chars()
@@ -23418,7 +23418,7 @@ fn builtin_void(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `url_scheme` — Url scheme. Returns a string. Defaults to `$_` when called with no args.
-fn builtin_url_scheme(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_url_scheme(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(url_part(&s)
         .map(|(sc, _, _, _)| PerlValue::string(sc.to_string()))
@@ -24737,7 +24737,7 @@ fn md_escape_into(buf: &mut String, s: &str) {
 ///   - Array of strings → one line per element
 ///   - Hashref → key-value table
 ///   - Array of hashrefs → tabular data
-fn builtin_to_pdf(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_to_pdf(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let content = first_arg_or_topic(interp, args);
     let path = args.get(1).map(|v| v.to_string());
 
@@ -24770,7 +24770,7 @@ fn builtin_to_pdf(interp: &Interpreter, args: &[PerlValue], line: usize) -> Perl
 /// `html_parse HTML_STRING` — parse HTML and return a document value that can be queried with css_select.
 /// If called with one arg, returns the parsed document as a nested hashref tree.
 fn builtin_html_parse(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -24811,7 +24811,7 @@ fn builtin_html_parse(
 /// `css_select SELECTOR, HTML_STRING` — query HTML with CSS selector, return matching elements.
 /// Each element is a hashref {tag, text, attrs, html}.
 fn builtin_css_select(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -24915,7 +24915,7 @@ fn builtin_xml_parse(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 
 /// `xpath EXPR, XML_STRING` — query XML with simple XPath-like expressions.
 /// Supports: `//tag`, `//tag[@attr]`, `//tag[@attr='val']`, `/root/child`.
-fn builtin_xpath(interp: &Interpreter, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
+fn builtin_xpath(interp: &VMHelper, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
     let xpath_str = args.first().map(|v| v.to_string()).unwrap_or_default();
     let xml_str = if args.len() > 1 {
         args[1].to_string()
@@ -25778,7 +25778,7 @@ fn ddump_value(buf: &mut String, val: &PerlValue, depth: usize) {
 
 /// `read_lines PATH` — slurp file into array of chomped lines.
 fn builtin_read_lines(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -26571,7 +26571,7 @@ fn builtin_times() -> PerlResult<PerlValue> {
 /// Mirrors zshrs `intercept_proceed` (exec.rs:14926-14952): reads the top frame of
 /// `Interpreter::intercept_ctx_stack`, runs the original synchronously with the
 /// saved args, marks the ctx `proceeded=true`, and returns the retval.
-fn builtin_proceed(interp: &mut Interpreter, line: usize) -> PerlResult<PerlValue> {
+fn builtin_proceed(interp: &mut VMHelper, line: usize) -> PerlResult<PerlValue> {
     let ctx_idx = interp
         .intercept_ctx_stack
         .len()
@@ -26590,11 +26590,11 @@ fn builtin_proceed(interp: &mut Interpreter, line: usize) -> PerlResult<PerlValu
         let want = interp.wantarray_kind;
         match interp.call_sub(&sub, args, want, line) {
             Ok(v) => Ok(v),
-            Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
+            Err(crate::vm_helper::FlowOrError::Flow(crate::vm_helper::Flow::Return(v))) => {
                 Ok(v)
             }
-            Err(crate::interpreter::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
-            Err(crate::interpreter::FlowOrError::Error(e)) => Err(e.at_line(line)),
+            Err(crate::vm_helper::FlowOrError::Flow(_)) => Ok(PerlValue::UNDEF),
+            Err(crate::vm_helper::FlowOrError::Error(e)) => Err(e.at_line(line)),
         }
     } else {
         match crate::builtins::try_builtin(interp, &name, &args, line) {
@@ -26616,7 +26616,7 @@ fn builtin_proceed(interp: &mut Interpreter, line: usize) -> PerlResult<PerlValu
 }
 
 /// `intercept_list()` — return registered AOP advice as an array of `[id, kind, pattern]` triples.
-fn builtin_intercept_list(interp: &Interpreter) -> PerlResult<PerlValue> {
+fn builtin_intercept_list(interp: &VMHelper) -> PerlResult<PerlValue> {
     let items: Vec<PerlValue> = interp
         .intercepts
         .iter()
@@ -26637,7 +26637,7 @@ fn builtin_intercept_list(interp: &Interpreter) -> PerlResult<PerlValue> {
 }
 
 /// `intercept_remove(id)` — remove advice by id; returns count removed (0 or 1).
-fn builtin_intercept_remove(interp: &mut Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_intercept_remove(interp: &mut VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let id = args.first().map(|v| v.to_int()).unwrap_or(0).max(0) as u32;
     let before = interp.intercepts.len();
     interp.intercepts.retain(|i| i.id != id);
@@ -26647,7 +26647,7 @@ fn builtin_intercept_remove(interp: &mut Interpreter, args: &[PerlValue]) -> Per
 }
 
 /// `intercept_clear()` — drop all registered advice; returns count cleared.
-fn builtin_intercept_clear(interp: &mut Interpreter) -> PerlResult<PerlValue> {
+fn builtin_intercept_clear(interp: &mut VMHelper) -> PerlResult<PerlValue> {
     let n = interp.intercepts.len();
     interp.intercepts.clear();
     Ok(PerlValue::integer(n as i64))
@@ -27062,7 +27062,7 @@ fn sockopt_payload(v: &PerlValue) -> Vec<u8> {
     n.to_ne_bytes().to_vec()
 }
 
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn builtin_localtime(
         &mut self,
         args: &[PerlValue],
@@ -27611,9 +27611,9 @@ impl Interpreter {
         }
     }
 
-    /// `tell FILEHANDLE` / `tell` — byte offset for handles in [`Interpreter::io_file_slots`]
+    /// `tell FILEHANDLE` / `tell` — byte offset for handles in [`VMHelper::io_file_slots`]
     /// (same underlying `File` as `sysseek`). Unseekable or unopened handles return `-1`.
-    /// No-arg form uses [`Interpreter::last_readline_handle`] after `readline` / `<>` (Perl semantics).
+    /// No-arg form uses [`VMHelper::last_readline_handle`] after `readline` / `<>` (Perl semantics).
     fn builtin_tell(&mut self, args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
         let name = match args.len() {
             0 => {
@@ -28099,12 +28099,12 @@ impl Interpreter {
                 let is_writable = access == 1 || access == 2;
                 let is_readable = access == 0 || access == 2;
                 if is_writable {
-                    use crate::interpreter::IoSharedFileWrite;
+                    use crate::vm_helper::IoSharedFileWrite;
                     self.output_handles
                         .insert(fh.clone(), Box::new(IoSharedFileWrite(Arc::clone(&shared))));
                 }
                 if is_readable {
-                    use crate::interpreter::IoSharedFile;
+                    use crate::vm_helper::IoSharedFile;
                     use std::io::BufReader;
                     self.input_handles.insert(
                         fh.clone(),
@@ -28457,7 +28457,7 @@ fn serve_handle_connection(
     ]);
 
     // Call handler
-    let mut interp = crate::interpreter::Interpreter::new();
+    let mut interp = crate::vm_helper::VMHelper::new();
     interp.subs = subs.clone();
     interp.scope.restore_capture(scope_capture);
     interp.scope.restore_atomics(atomic_arrays, atomic_hashes);
@@ -28465,13 +28465,13 @@ fn serve_handle_connection(
     let result = interp.dispatch_indirect_call(
         handler.clone(),
         vec![req],
-        crate::interpreter::WantarrayCtx::Scalar,
+        crate::vm_helper::WantarrayCtx::Scalar,
         0,
     );
 
     let (status, resp_headers, resp_body) = match result {
         Ok(val) => serve_format_response(val),
-        Err(crate::interpreter::FlowOrError::Error(e)) => (
+        Err(crate::vm_helper::FlowOrError::Error(e)) => (
             500,
             vec![("content-type".into(), "text/plain".into())],
             format!("Internal Server Error: {}", e),

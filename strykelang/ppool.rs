@@ -1,5 +1,5 @@
 //! Persistent thread pool (`ppool`) — workers pull jobs from a shared queue and run
-//! each task on a **fresh** [`Interpreter`] on an **existing** OS thread (no rayon task
+//! each task on a **fresh** [`VMHelper`] on an **existing** OS thread (no rayon task
 //! spawn per item; threads stay alive between jobs).
 
 use std::collections::{HashMap, VecDeque};
@@ -10,7 +10,7 @@ use std::thread::{self, JoinHandle};
 use crossbeam::channel::{unbounded, Receiver, Sender};
 
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::{Flow, FlowOrError, Interpreter};
+use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlPpool, PerlSub, PerlValue};
 
@@ -38,7 +38,7 @@ pub(crate) struct PoolJob {
 impl PerlPpool {
     pub(crate) fn submit(
         &self,
-        interp: &mut Interpreter,
+        interp: &mut VMHelper,
         args: &[PerlValue],
         line: usize,
     ) -> PerlResult<PerlValue> {
@@ -173,7 +173,7 @@ impl Drop for PpoolInner {
 
 fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
     while let Ok(job) = job_rx.recv() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = job.subs;
         interp.scope.restore_capture(&job.capture);
         interp
@@ -196,7 +196,7 @@ fn worker_loop(job_rx: Receiver<PoolJob>, result_tx: Sender<(u64, PerlValue)>) {
 }
 
 /// Create a pool with `workers` OS threads (clamped to 1..=256). Each thread runs jobs
-/// sequentially; new [`Interpreter`] values are constructed per job (cheap vs thread spawn).
+/// sequentially; new [`VMHelper`] values are constructed per job (cheap vs thread spawn).
 pub fn create_pool(workers: usize) -> PerlResult<PerlValue> {
     let workers = workers.clamp(1, 256);
     let (job_tx, job_rx): (Sender<PoolJob>, Receiver<PoolJob>) = unbounded();
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_ppool_basic() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let pool_val = create_pool(2).expect("create_pool");
         let pool = pool_val.as_ppool().expect("as_ppool");
 

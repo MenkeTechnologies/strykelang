@@ -40,7 +40,7 @@ use percent_encoding::percent_decode_str;
 use crate::ast::MatchArrayElem;
 use crate::ast::{Block, Sigil, Statement, StmtKind, SubSigParam, VarDecl};
 use crate::error::{ErrorKind, PerlError};
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 
 pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (conn, io_threads) = Connection::stdio();
@@ -422,7 +422,7 @@ fn compute_diagnostics(text: &str, path: &str) -> Vec<Diagnostic> {
     match crate::parse_with_file(text, path) {
         Err(e) => out.push(perror_to_diagnostic(&e, text)),
         Ok(program) => {
-            let mut interp = Interpreter::new();
+            let mut interp = VMHelper::new();
             interp.file = path.to_string();
             if let Err(e) = crate::lint_program(&program, &mut interp) {
                 out.push(perror_to_diagnostic(&e, text));

@@ -1,6 +1,6 @@
 //! `@INC`, `%INC`, `require`, and `use` loading (pure stryke `.pm` files).
 
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
 use stryke::{parse, parse_and_run_string};
 
@@ -10,7 +10,7 @@ fn fixture_inc() -> String {
 
 #[test]
 fn require_loads_pm_and_sets_inc() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let d = fixture_inc();
     interp.scope.declare_array(
         "INC",
@@ -24,7 +24,7 @@ fn require_loads_pm_and_sets_inc() {
 
 #[test]
 fn use_loads_module_and_second_require_is_noop() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let d = fixture_inc();
     interp.scope.declare_array(
         "INC",
@@ -39,7 +39,7 @@ fn use_loads_module_and_second_require_is_noop() {
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 43);
 
-    let mut interp2 = Interpreter::new();
+    let mut interp2 = VMHelper::new();
     interp2.scope.declare_array(
         "INC",
         vec![
@@ -54,7 +54,7 @@ fn use_loads_module_and_second_require_is_noop() {
 
 #[test]
 fn use_trivial_qw_imports_symbol() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.scope.declare_array(
         "INC",
         vec![
@@ -69,7 +69,7 @@ fn use_trivial_qw_imports_symbol() {
 
 #[test]
 fn use_trivial_empty_list_does_not_import() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.scope.declare_array(
         "INC",
         vec![
@@ -83,7 +83,7 @@ fn use_trivial_empty_list_does_not_import() {
 
 #[test]
 fn use_trivial_rejects_symbol_not_in_export_ok() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.scope.declare_array(
         "INC",
         vec![
@@ -97,7 +97,7 @@ fn use_trivial_rejects_symbol_not_in_export_ok() {
 
 #[test]
 fn use_exporter_default_imports_only_export() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.scope.declare_array(
         "INC",
         vec![
@@ -113,7 +113,7 @@ fn use_exporter_default_imports_only_export() {
 
 #[test]
 fn parse_and_run_string_nested_require_shares_inc() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.scope.declare_array(
         "INC",
         vec![

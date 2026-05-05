@@ -16,7 +16,7 @@
 //! PASS 4 (next):         Migrations (create_table/add_column/Migrator).
 
 use crate::error::PerlError;
-use crate::interpreter::{FlowOrError, Interpreter};
+use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::value::PerlValue;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -329,7 +329,7 @@ fn parse_render_opts(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
 }
 
 pub(crate) fn web_render_dispatch(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> Result<PerlValue> {
@@ -1541,7 +1541,7 @@ pub(crate) fn web_yield_content(args: &[PerlValue], _line: usize) -> Result<Perl
 // embedding inside another template. The leading underscore matches the
 // Rails partial convention.
 
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn web_render_partial(
         &mut self,
         args: &[PerlValue],
@@ -2384,7 +2384,7 @@ fn collect_kv_pairs(args: &[PerlValue]) -> IndexMap<String, PerlValue> {
 
 // ── Boot + dispatch ────────────────────────────────────────────────────
 
-impl Interpreter {
+impl VMHelper {
     /// Builtin entry: `web_render(...)`. Dispatches to one of: `text`,
     /// `html`, `body`, `json`, `template`. The template branch reads the
     /// matching `.erb` file and runs it through the ERB engine below,

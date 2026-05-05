@@ -3,7 +3,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use stryke::bytecode::{Chunk, Op};
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::vm::VM;
 
 /// `for ($i=0; $i<limit; $i++) { $sum += $i }` — returns sum of `0..limit-1`.
@@ -39,7 +39,7 @@ fn jit_block_loop(c: &mut Criterion) {
     let mut g = c.benchmark_group("block_loop_sum_slots");
     g.bench_function("jit_on", |b| {
         b.iter(|| {
-            let mut interp = Interpreter::new();
+            let mut interp = VMHelper::new();
             let mut vm = VM::new(&chunk, &mut interp);
             vm.set_jit_enabled(true);
             black_box(vm.execute().expect("vm").to_int())
@@ -47,7 +47,7 @@ fn jit_block_loop(c: &mut Criterion) {
     });
     g.bench_function("jit_off", |b| {
         b.iter(|| {
-            let mut interp = Interpreter::new();
+            let mut interp = VMHelper::new();
             let mut vm = VM::new(&chunk, &mut interp);
             vm.set_jit_enabled(false);
             black_box(vm.execute().expect("vm").to_int())

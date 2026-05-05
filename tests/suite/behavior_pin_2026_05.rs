@@ -235,14 +235,14 @@ fn clamp_direct_multi_value_list() {
 #[test]
 fn redefining_builtin_id_is_rejected() {
     let res = stryke::parse(r#"sub id { $_[0] }"#)
-        .and_then(|p| stryke::interpreter::Interpreter::new().execute(&p));
+        .and_then(|p| stryke::vm_helper::VMHelper::new().execute(&p));
     assert!(res.is_err(), "redefining `id` (a stryke builtin) must error");
 }
 
 #[test]
 fn redefining_builtin_squared_is_rejected() {
     let res = stryke::parse(r#"fn squared($x) = $x * $x"#)
-        .and_then(|p| stryke::interpreter::Interpreter::new().execute(&p));
+        .and_then(|p| stryke::vm_helper::VMHelper::new().execute(&p));
     assert!(
         res.is_err(),
         "redefining `squared` (a stryke builtin) must error"

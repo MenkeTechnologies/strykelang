@@ -2,7 +2,7 @@
 //! `parse_and_run_string`, `parse_and_run_string_in_file`, and `parse_with_file` diagnostics.
 
 use stryke::error::ErrorKind;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::{
     format_program, lint_program, parse, parse_and_run_string, parse_and_run_string_in_file,
     parse_with_file, run, try_vm_execute, vendor_perl_inc_path,
@@ -25,7 +25,7 @@ fn run_returns_err_on_invalid_syntax() {
 
 #[test]
 fn parse_and_run_string_returns_err_on_invalid_syntax() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     assert!(parse_and_run_string("}", &mut interp).is_err());
 }
 
@@ -48,14 +48,14 @@ fn run_returns_err_on_die() {
 
 #[test]
 fn parse_and_run_string_returns_err_on_runtime_failure() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let r = parse_and_run_string("1/0", &mut interp);
     assert!(r.is_err());
 }
 
 #[test]
 fn parse_and_run_string_accumulates_state_across_calls() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     parse_and_run_string("my $x = 10;", &mut interp).expect("first");
     let v = parse_and_run_string("$x + 5", &mut interp).expect("second");
     assert_eq!(v.to_int(), 15);
@@ -63,14 +63,14 @@ fn parse_and_run_string_accumulates_state_across_calls() {
 
 #[test]
 fn parse_and_run_string_returns_last_statement_value() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = parse_and_run_string("1; 2; 7", &mut interp).expect("run");
     assert_eq!(v.to_int(), 7);
 }
 
 #[test]
 fn parse_and_run_string_preserves_subroutine_definitions() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     parse_and_run_string("fn api_t { 40 + 2 }", &mut interp).expect("define");
     let v = parse_and_run_string("api_t()", &mut interp).expect("call");
     assert_eq!(v.to_int(), 42);
@@ -78,7 +78,7 @@ fn parse_and_run_string_preserves_subroutine_definitions() {
 
 #[test]
 fn parse_and_run_string_in_file_magic_file_matches_argument() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file("caller.pm");
     let v =
         parse_and_run_string_in_file("__FILE__", &mut interp, "/tmp/module/Foo.pm").expect("run");
@@ -89,7 +89,7 @@ fn parse_and_run_string_in_file_magic_file_matches_argument() {
 
 #[test]
 fn parse_and_run_string_in_file_restores_interp_file_after_success() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     parse_and_run_string_in_file("1 + 1", &mut interp, "other.pl").expect("run");
     let v = parse_and_run_string("__FILE__", &mut interp).expect("file");
     assert_eq!(v.to_string(), "-e");
@@ -97,7 +97,7 @@ fn parse_and_run_string_in_file_restores_interp_file_after_success() {
 
 #[test]
 fn parse_and_run_string_in_file_restores_interp_file_after_runtime_error() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file("caller.pl");
     let r = parse_and_run_string_in_file(r#"die "stop""#, &mut interp, "evalunit.pl");
     assert!(r.is_err());
@@ -107,7 +107,7 @@ fn parse_and_run_string_in_file_restores_interp_file_after_runtime_error() {
 
 #[test]
 fn parse_and_run_string_in_file_parse_error_leaves_interp_file_unchanged() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file("caller.pl");
     assert!(parse_and_run_string_in_file("fn x {", &mut interp, "broken.pl").is_err());
     let after = parse_and_run_string("__FILE__", &mut interp).expect("file after parse err");
@@ -132,7 +132,7 @@ fn format_program_output_reparses() {
 #[test]
 fn lint_program_ok_for_simple_vm_compilable_program() {
     let p = parse("my $lint_x = 1; $lint_x + 1").expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     lint_program(&p, &mut interp).expect("lint");
 }
 
@@ -140,7 +140,7 @@ fn lint_program_ok_for_simple_vm_compilable_program() {
 fn try_vm_execute_matches_run_for_simple_expression() {
     let code = "11 * 3;";
     let program = parse(code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let vm_val = try_vm_execute(&program, &mut interp)
         .expect("expected VM to compile simple expression")
         .expect("vm execution");
@@ -159,7 +159,7 @@ fn vendor_perl_inc_path_suffix_is_vendor_perl() {
 
 #[test]
 fn try_vm_execute_sub_def_visible_to_parse_and_run_string() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let def = parse("fn lib_api_vm_fn { 41 }").expect("parse fn");
     try_vm_execute(&def, &mut interp)
         .expect("vm compiles fn")

@@ -1,12 +1,12 @@
 //! Tests for stryke list builtins (sum, min, max, uniq, reduce, zip, pairs, ...)
 //! for `%INC` / `require`. Use `Interpreter::new()` so subs are registered (tests may add `vendor/perl` to `@INC`).
 
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::value::PerlValue;
 use stryke::{parse, vendor_perl_inc_path};
 
-fn with_vendor_inc() -> Interpreter {
-    let mut interp = Interpreter::new();
+fn with_vendor_inc() -> VMHelper {
+    let mut interp = VMHelper::new();
     let dirs = vec![
         PerlValue::string(vendor_perl_inc_path().to_string_lossy().into_owned()),
         PerlValue::string(".".to_string()),
@@ -60,7 +60,7 @@ fn bare_builtin_reduce_block_form() {
 
 #[test]
 fn bare_builtin_any_coderef() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("any(fn { $_ > 2 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
@@ -68,7 +68,7 @@ fn bare_builtin_any_coderef() {
 
 #[test]
 fn bare_builtin_all_coderef() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("all(fn { $_ > 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
@@ -76,7 +76,7 @@ fn bare_builtin_all_coderef() {
 
 #[test]
 fn bare_builtin_none_coderef() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("none(fn { $_ < 0 }, 1, 2, 3)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
@@ -84,7 +84,7 @@ fn bare_builtin_none_coderef() {
 
 #[test]
 fn bare_builtin_notall_coderef() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("notall(fn { $_ > 0 }, 1, -1, 2)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
@@ -92,7 +92,7 @@ fn bare_builtin_notall_coderef() {
 
 #[test]
 fn bare_builtin_product_scalar() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("product(2, 3, 4)").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 24);
@@ -100,7 +100,7 @@ fn bare_builtin_product_scalar() {
 
 #[test]
 fn bare_builtin_sum_in_list_context_joins_like_scalar() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(r#"sum(10, 3) |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_string(), "13");
@@ -108,7 +108,7 @@ fn bare_builtin_sum_in_list_context_joins_like_scalar() {
 
 #[test]
 fn bare_sum_min_max_product_without_import() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(r#"min(9, 2) + max(1, 4) + sum(1, 2) + product(2, 3)"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_int(), 15);
@@ -116,7 +116,7 @@ fn bare_sum_min_max_product_without_import() {
 
 #[test]
 fn bare_mean_and_mode_stats() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(r#"mean(2, 4, 10) == mean(2, 4, 10)"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert!(v.is_true());
@@ -127,7 +127,7 @@ fn bare_mean_and_mode_stats() {
 
 #[test]
 fn bare_builtin_uniqstr_case_sensitive() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(r#"uniqstr("a", "A", "a") |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_string(), "a,A,a");
@@ -135,7 +135,7 @@ fn bare_builtin_uniqstr_case_sensitive() {
 
 #[test]
 fn bare_builtin_mesh_interleaves_array_refs() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(r#"my @m = mesh([1, 2], [10, 20]); @m |> join ','"#).expect("parse");
     let v = interp.execute(&p).expect("run");
     assert_eq!(v.to_string(), "1,10,2,20");
@@ -143,7 +143,7 @@ fn bare_builtin_mesh_interleaves_array_refs() {
 
 #[test]
 fn bare_builtin_zip_shortest_pairs_rows_by_min_length() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(
         "my @z = zip_shortest([1, 2, 3], [10, 20]); len(@z) + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + $z[1]->[1]",
     )
@@ -154,7 +154,7 @@ fn bare_builtin_zip_shortest_pairs_rows_by_min_length() {
 
 #[test]
 fn bare_builtin_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse(
         "my @z = zip_longest([1, 2], [10]); len(@z) + $z[0]->[0] + $z[0]->[1] + $z[1]->[0] + ($z[1]->[1] + 0)",
     )
@@ -165,7 +165,7 @@ fn bare_builtin_zip_longest_pairs_all_rows_shorter_list_pads_second_column() {
 
 #[test]
 fn bare_builtin_pairs_returns_blessed_arrays() {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let p = parse("pairs(\"a\", 1, \"b\", 2) |> join \",\"").expect("parse");
     let v = interp.execute(&p).expect("run");
     assert!(v.to_string().len() >= 4);

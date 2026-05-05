@@ -1,6 +1,6 @@
 //! Perl 5 `${^NAME}` scalars: see [perlvar](https://perldoc.perl.org/perlvar).
 //!
-//! Names not implemented with dedicated [`crate::interpreter::Interpreter`] fields are stored in
+//! Names not implemented with dedicated [`crate::vm_helper::VMHelper`] fields are stored in
 //! `Interpreter::special_caret_scalars` (default `undef`). Reads use that map; unknown names still
 //! return `undef` without a pre-inserted key.
 

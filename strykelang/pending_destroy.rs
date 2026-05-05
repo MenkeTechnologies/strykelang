@@ -1,7 +1,7 @@
 //! Queue for Perl-style `DESTROY` callbacks when the last reference to a blessed object is dropped.
 //!
 //! [`crate::value::BlessedRef`]'s [`Drop`] enqueues `(class, inner payload)`; the
-//! [`Interpreter`](crate::interpreter::Interpreter) drains the queue while running user code.
+//! [`Interpreter`](crate::vm_helper::VMHelper) drains the queue while running user code.
 //!
 //! **`NEEDS_VM_SYNC`:** `BlessedRef::drop` cannot call into the interpreter. The bytecode VM
 //! therefore checks this flag **after each opcode** and runs [`Interpreter::drain_pending_destroys`]

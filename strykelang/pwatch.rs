@@ -7,7 +7,7 @@ use std::sync::Arc;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::{Interpreter, WantarrayCtx};
+use crate::vm_helper::{VMHelper, WantarrayCtx};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, PerlValue};
 
@@ -132,7 +132,7 @@ pub fn run_pwatch(
                     let aa = atomic_arrays.clone();
                     let ah = atomic_hashes.clone();
                     rayon::spawn(move || {
-                        let mut local_interp = Interpreter::new();
+                        let mut local_interp = VMHelper::new();
                         local_interp.subs = subs;
                         local_interp.scope.restore_capture(&scalars);
                         local_interp.scope.restore_atomics(&aa, &ah);

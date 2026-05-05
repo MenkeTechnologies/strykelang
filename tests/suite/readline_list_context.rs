@@ -5,7 +5,7 @@
 
 use std::io::Write;
 use std::process::{Command, Stdio};
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 
 fn stryke_exe() -> &'static str {
     env!("CARGO_BIN_EXE_stryke")
@@ -191,7 +191,7 @@ fn open_file_readline_list_slurps_all_lines() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(v.to_int(), 3);
     std::fs::remove_file(&path).ok();
@@ -212,7 +212,7 @@ fn open_file_global_array_assign_readline_list_slurps() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(v.to_int(), 3);
     std::fs::remove_file(&path).ok();
@@ -234,7 +234,7 @@ fn open_file_reverse_readline_list_reverses() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(v.to_string(), "cc\n");
     std::fs::remove_file(&path).ok();
@@ -404,7 +404,7 @@ fn open_file_join_readline_list_slurps() {
     "#
     );
     let program = stryke::parse(&code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(v.to_string(), "part1\npart2\n");
     std::fs::remove_file(&path).ok();

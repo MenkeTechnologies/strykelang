@@ -1,13 +1,13 @@
 //! Unit tests for `Interpreter`: defaults, `set_file`, and `execute` behavior.
 
 use crate::ast::StmtKind;
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 use crate::parse;
 use crate::value::PerlValue;
 
 #[test]
 fn destroy_runs_when_lexical_overwritten_with_undef() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(
         r#"$main::d = 0
         fn Dtor::DESTROY { $main::d = $main::d + 1 }
@@ -35,7 +35,7 @@ fn destroy_runs_when_lexical_overwritten_with_undef() {
 
 #[test]
 fn our_isa_stores_c_isa_for_parents_of_class() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse("package C; our @ISA = qw(P); 1").unwrap();
     i.execute(&prog).unwrap();
     assert_eq!(i.parents_of_class("C"), vec!["P".to_string()]);
@@ -43,7 +43,7 @@ fn our_isa_stores_c_isa_for_parents_of_class() {
 
 #[test]
 fn super_fixture_succeeds_on_tree_execute_path() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(
         r#"
         package P
@@ -63,7 +63,7 @@ fn super_fixture_succeeds_on_tree_execute_path() {
 
 #[test]
 fn execute_sets_global_phase_start_run_end() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(
         r#"
         BEGIN { $main::g = ${^GLOBAL_PHASE} }
@@ -80,7 +80,7 @@ fn execute_sets_global_phase_start_run_end() {
 
 #[test]
 fn qualify_sub_key_preserves_package_qualified_sub_name() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse("package My::Module; 1").unwrap();
     i.execute(&prog).unwrap();
     // A name that is already qualified is preserved verbatim.
@@ -94,27 +94,27 @@ fn qualify_sub_key_preserves_package_qualified_sub_name() {
 
 #[test]
 fn new_default_file_is_dash_e() {
-    assert_eq!(Interpreter::new().file, "-e");
+    assert_eq!(VMHelper::new().file, "-e");
 }
 
 #[test]
 fn new_default_program_name() {
-    assert_eq!(Interpreter::new().program_name, "stryke");
+    assert_eq!(VMHelper::new().program_name, "stryke");
 }
 
 #[test]
 fn new_default_irs_newline() {
-    assert_eq!(Interpreter::new().irs.as_deref(), Some("\n"));
+    assert_eq!(VMHelper::new().irs.as_deref(), Some("\n"));
 }
 
 #[test]
 fn new_line_number_starts_zero() {
-    assert_eq!(Interpreter::new().line_number, 0);
+    assert_eq!(VMHelper::new().line_number, 0);
 }
 
 #[test]
 fn new_env_populated_from_process() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.materialize_env_if_needed();
     assert!(
         i.env.contains_key("PATH") || i.env.contains_key("HOME") || !i.env.is_empty(),
@@ -124,7 +124,7 @@ fn new_env_populated_from_process() {
 
 #[test]
 fn set_file_updates_file_field() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_file("t/foo.pl");
     assert_eq!(i.file, "t/foo.pl");
 }
@@ -132,7 +132,7 @@ fn set_file_updates_file_field() {
 #[test]
 fn execute_computed_expression() {
     let p = parse("7 * 6").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
@@ -140,7 +140,7 @@ fn execute_computed_expression() {
 #[test]
 fn execute_my_scalar_sequence() {
     let p = parse("my $a = 10; my $b = 32; $a + $b").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
@@ -148,7 +148,7 @@ fn execute_my_scalar_sequence() {
 #[test]
 fn execute_registers_sub_for_later_call() {
     let p = parse("fn times6 { return $_0 * 6; } times6(7)").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let v = i.execute(&p).expect("execute");
     assert_eq!(v.to_int(), 42);
 }
@@ -157,7 +157,7 @@ fn execute_registers_sub_for_later_call() {
 fn execute_preserves_scope_scalar_across_two_parses() {
     let p1 = parse("my $interp_unit_x = 41").expect("parse");
     let p2 = parse("$interp_unit_x + 1").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.execute(&p1).expect("first");
     let v = i.execute(&p2).expect("second");
     assert_eq!(v.to_int(), 42);
@@ -166,14 +166,14 @@ fn execute_preserves_scope_scalar_across_two_parses() {
 #[test]
 fn subs_map_holds_declared_sub() {
     let p = parse("fn interp_named { 1 }").expect("parse");
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.execute(&p).expect("execute");
     assert!(i.subs.contains_key("interp_named"));
 }
 
 #[test]
 fn format_decl_registers_template_and_render_matches_picture() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(
         r#"
 format STDOUT =
@@ -210,7 +210,7 @@ format STDOUT =
 
 #[test]
 fn list_separator_dollar_quote_roundtrips() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     assert_eq!(i.list_separator, " ");
     i.set_special_var("\"", &PerlValue::string(",".into()))
         .expect("set $\"");
@@ -220,19 +220,19 @@ fn list_separator_dollar_quote_roundtrips() {
 
 #[test]
 fn caret_unicode_reflects_utf8_pragma() {
-    let i = Interpreter::new();
+    let i = VMHelper::new();
     assert_eq!(i.get_special_var("^UNICODE").to_int(), 0);
 }
 
 #[test]
 fn caret_regerror_preseeded_undef() {
-    let i = Interpreter::new();
+    let i = VMHelper::new();
     assert!(i.get_special_var("^REGERROR").is_undef());
 }
 
 #[test]
 fn star_multiline_prepends_dotall_in_compile_regex() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_special_var("*", &PerlValue::integer(1))
         .expect("set $*");
     let re = i.compile_regex("a.b", "", 1).expect("compile");
@@ -245,7 +245,7 @@ fn star_multiline_prepends_dotall_in_compile_regex() {
 
 #[test]
 fn compile_regex_dollar_end_matches_before_trailing_newline() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let re = i.compile_regex("foo$", "", 1).expect("compile");
     assert!(re.is_match("foo\n"));
     assert!(re.is_match("foo"));
@@ -254,7 +254,7 @@ fn compile_regex_dollar_end_matches_before_trailing_newline() {
 
 #[test]
 fn compile_regex_dollar_in_class_is_literal() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let re = i.compile_regex("[$]", "", 1).expect("compile");
     assert!(re.is_match("$"));
     assert!(!re.is_match("a"));
@@ -262,7 +262,7 @@ fn compile_regex_dollar_in_class_is_literal() {
 
 #[test]
 fn end_foreach_iterates_list_context() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(
         r#"$main::end_out = ""
 END { foreach $k (1..3) { $main::end_out .= "k=$k " } }"#,
@@ -277,7 +277,7 @@ END { foreach $k (1..3) { $main::end_out .= "k=$k " } }"#,
 
 #[test]
 fn stash_array_caret_prefixed_stays_global() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let _ = i
         .scope
         .set_scalar("__PACKAGE__", PerlValue::string("Foo".into()));
@@ -286,7 +286,7 @@ fn stash_array_caret_prefixed_stays_global() {
 
 #[test]
 fn at_is_dualvar_after_eval_failure() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(r#"eval("1/0"); 0+$@"#).expect("parse");
     let v = i.execute(&prog).expect("execute");
     assert_eq!(v.to_int(), 1);
@@ -294,7 +294,7 @@ fn at_is_dualvar_after_eval_failure() {
 
 #[test]
 fn at_dualvar_roundtrip_assignment() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let dv = PerlValue::errno_dual(7, "x".into());
     i.set_special_var("@", &dv).expect("set $@");
     assert_eq!(i.eval_error_code, 7);
@@ -306,7 +306,7 @@ fn at_dualvar_roundtrip_assignment() {
 
 #[test]
 fn at_clear_eval_error_zeroes_dualvar_read() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_eval_error("err".into());
     i.clear_eval_error();
     let g = i.get_special_var("@");
@@ -316,7 +316,7 @@ fn at_clear_eval_error_zeroes_dualvar_read() {
 
 #[test]
 fn set_eval_error_empty_string_clears_code() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_eval_error("x".into());
     assert_eq!(i.eval_error_code, 1);
     i.set_eval_error(String::new());
@@ -326,7 +326,7 @@ fn set_eval_error_empty_string_clears_code() {
 
 #[test]
 fn at_set_special_plain_string_uses_code_one_when_nonnumeric() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_special_var("@", &PerlValue::string("boom".into()))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 1);
@@ -335,7 +335,7 @@ fn at_set_special_plain_string_uses_code_one_when_nonnumeric() {
 
 #[test]
 fn at_set_special_integer_keeps_numeric_code_and_display_string() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_special_var("@", &PerlValue::integer(99))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 99);
@@ -345,7 +345,7 @@ fn at_set_special_integer_keeps_numeric_code_and_display_string() {
 #[test]
 fn at_set_special_string_zero_still_gets_code_one() {
     // Non-empty message with numeric parse 0 → `set_special_var` bumps code to 1.
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     i.set_special_var("@", &PerlValue::string("0".into()))
         .expect("set $@");
     assert_eq!(i.eval_error_code, 1);
@@ -354,7 +354,7 @@ fn at_set_special_string_zero_still_gets_code_one() {
 
 #[test]
 fn capture_array_after_bind_match() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let prog = parse(r#""foo=bar" =~ /=(.*)/; 1"#).expect("parse");
     i.execute(&prog).expect("execute");
     let cap = i.scope.get_array("^CAPTURE");

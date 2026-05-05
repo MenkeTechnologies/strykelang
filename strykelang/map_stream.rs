@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 
 use crate::ast::Expr;
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::{FlowOrError, Interpreter, WantarrayCtx};
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlIterator, PerlSub, PerlValue, PipelineOp};
 
@@ -55,7 +55,7 @@ pub(crate) struct MapStreamIterator {
     source: Arc<dyn PerlIterator>,
     pending: Mutex<VecDeque<PerlValue>>,
     mode: MapStreamMode,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     _capture: Vec<(String, PerlValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
@@ -72,7 +72,7 @@ impl MapStreamIterator {
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -97,7 +97,7 @@ impl MapStreamIterator {
         atomic_hashes: Vec<(String, AtomicHash)>,
         peel: bool,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -190,7 +190,7 @@ enum FilterStreamMode {
 pub(crate) struct FilterStreamIterator {
     source: Arc<dyn PerlIterator>,
     mode: FilterStreamMode,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     _capture: Vec<(String, PerlValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
@@ -205,7 +205,7 @@ impl FilterStreamIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -227,7 +227,7 @@ impl FilterStreamIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -266,7 +266,7 @@ impl PerlIterator for FilterStreamIterator {
     }
 }
 
-impl Interpreter {
+impl VMHelper {
     /// Lazy `filter { }` / `filter EXPR` iterator (or push `->filter` onto a lone pipeline).
     pub(crate) fn filter_stream_block_output(
         &mut self,
@@ -613,7 +613,7 @@ impl PerlIterator for RangeIterator {
 pub(crate) struct TakeWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -630,7 +630,7 @@ impl TakeWhileIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -672,7 +672,7 @@ impl PerlIterator for TakeWhileIterator {
 pub(crate) struct SkipWhileIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -689,7 +689,7 @@ impl SkipWhileIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -730,7 +730,7 @@ impl PerlIterator for SkipWhileIterator {
 pub(crate) struct TapIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     _capture: Vec<(String, PerlValue)>,
     _atomic_arrays: Vec<(String, AtomicArray)>,
     _atomic_hashes: Vec<(String, AtomicHash)>,
@@ -745,7 +745,7 @@ impl TapIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -990,7 +990,7 @@ impl PerlIterator for CompactIterator {
 pub(crate) struct RejectIterator {
     source: Arc<dyn PerlIterator>,
     sub: Arc<PerlSub>,
-    interp: Mutex<Interpreter>,
+    interp: Mutex<VMHelper>,
     capture: Vec<(String, PerlValue)>,
     atomic_arrays: Vec<(String, AtomicArray)>,
     atomic_hashes: Vec<(String, AtomicHash)>,
@@ -1006,7 +1006,7 @@ impl RejectIterator {
         atomic_arrays: Vec<(String, AtomicArray)>,
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs;
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -1291,8 +1291,8 @@ pub(crate) struct TransliterateStreamIterator {
 
 impl TransliterateStreamIterator {
     pub(crate) fn new(source: Arc<dyn PerlIterator>, from: &str, to: &str, flags: &str) -> Self {
-        let from_chars = Interpreter::tr_expand_ranges(from);
-        let to_chars = Interpreter::tr_expand_ranges(to);
+        let from_chars = VMHelper::tr_expand_ranges(from);
+        let to_chars = VMHelper::tr_expand_ranges(to);
         Self {
             source,
             from_chars,
@@ -1500,7 +1500,7 @@ impl PMapStreamIterator {
                 let atomic_hashes = atomic_hashes.clone();
                 let sub = Arc::clone(&sub);
                 workers.push(std::thread::spawn(move || {
-                    let mut interp = Interpreter::new();
+                    let mut interp = VMHelper::new();
                     interp.subs = subs.clone();
                     interp.scope.restore_capture(&capture);
                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -1578,7 +1578,7 @@ impl PGrepStreamIterator {
                 let atomic_hashes = atomic_hashes.clone();
                 let sub = Arc::clone(&sub);
                 workers.push(std::thread::spawn(move || {
-                    let mut interp = Interpreter::new();
+                    let mut interp = VMHelper::new();
                     interp.subs = subs.clone();
                     interp.scope.restore_capture(&capture);
                     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);

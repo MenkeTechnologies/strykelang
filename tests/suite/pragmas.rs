@@ -3,12 +3,12 @@
 use crate::common::eval_err_kind;
 
 use stryke::error::ErrorKind;
-use stryke::interpreter::{Interpreter, FEAT_SAY};
+use stryke::vm_helper::{VMHelper, FEAT_SAY};
 use stryke::parse;
 
 #[test]
 fn use_strict_refs_only() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use strict 'refs'; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(i.strict_refs);
@@ -18,7 +18,7 @@ fn use_strict_refs_only() {
 
 #[test]
 fn use_strict_default_enables_all_three() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use strict; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(i.strict_refs && i.strict_subs && i.strict_vars);
@@ -26,7 +26,7 @@ fn use_strict_default_enables_all_three() {
 
 #[test]
 fn no_strict_refs_clears_only_refs() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use strict; no strict 'refs'; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(!i.strict_refs);
@@ -35,7 +35,7 @@ fn no_strict_refs_clears_only_refs() {
 
 #[test]
 fn no_strict_empty_clears_all() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use strict; no strict; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(!i.strict_refs && !i.strict_subs && !i.strict_vars);
@@ -43,7 +43,7 @@ fn no_strict_empty_clears_all() {
 
 #[test]
 fn use_feature_qw_say() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use feature qw(say); 1").expect("parse");
     i.execute(&p).expect("run");
     assert_ne!(i.feature_bits & FEAT_SAY, 0);
@@ -51,7 +51,7 @@ fn use_feature_qw_say() {
 
 #[test]
 fn use_feature_bundle_510() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use feature ':5.10'; 1").expect("parse");
     i.execute(&p).expect("run");
     assert_ne!(i.feature_bits & FEAT_SAY, 0);
@@ -59,7 +59,7 @@ fn use_feature_bundle_510() {
 
 #[test]
 fn require_strict_enables_strict_like_use() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("require strict; 1").expect("parse");
     i.execute(&p).expect("run");
     assert!(i.strict_refs && i.strict_subs && i.strict_vars);
@@ -75,7 +75,7 @@ fn strict_refs_rejects_symbolic_scalar_deref() {
 
 #[test]
 fn strict_refs_allows_symbolic_deref_when_refs_off() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse(r#"my $foo = "x"; my $x = 1; $$foo"#).expect("parse");
     let v = i.execute(&p).expect("run");
     assert_eq!(v.to_int(), 1);
@@ -91,7 +91,7 @@ fn strict_vars_rejects_unqualified_global_read() {
 
 #[test]
 fn strict_subs_hint_on_undefined_sub() {
-    let mut i = Interpreter::new();
+    let mut i = VMHelper::new();
     let p = parse("use strict; use strict 'subs'; no_such_sub_zzzzzz()").expect("parse");
     let e = i.execute(&p).expect_err("undefined sub");
     assert!(
