@@ -24,6 +24,12 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-005** — `%` now uses Perl-style floored division so the
+  result has the sign of the divisor (or is zero). New helper
+  `value::perl_mod_i64` wraps the snap. Float operands are truncated
+  to int first, matching Perl. The compound `$x %= rhs` form picks up
+  the same fix; the previously-buggy `rem_euclid` site (always-non-
+  negative, neither Rust's nor Perl's) is gone.
 - **PARITY-004** — division-by-zero (and modulus-by-zero) now raise
   `ErrorKind::DivisionByZero` instead of `ErrorKind::Runtime`. The
   user-visible message ("Illegal division by zero" / "Illegal modulus
@@ -216,7 +222,7 @@ accurate message would be "Can't modify constant string in postfix ++"
 Severity: **polish**.
 
 
-## PARITY-005 — Modulo follows sign-of-dividend, not sign-of-divisor
+## PARITY-005 — Modulo follows sign-of-dividend, not sign-of-divisor — **FIXED**
 
 Stryke uses Rust/C semantics for `%`:
 
