@@ -17,6 +17,11 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-011** — `CORE::keyword(...)` now parses identically to bare
+  `keyword(...)`. Parser strips a leading `CORE::` prefix before the
+  keyword-dispatch match, so `CORE::length` produces `ExprKind::Length`,
+  `CORE::print` produces `ExprKind::Print`, etc. — same AST as the
+  unprefixed forms. Matches Perl 5's documented `CORE::` namespace.
 - **PARITY-010** — `vec($s, $offset, $bits) = N` lvalue now works in
   both the VM and tree-walking interpreter. Compiler rewrites the
   assignment to `$s = vec_set_value(...)`; interpreter handles the
@@ -363,15 +368,20 @@ the same string-vs-bytes interaction that affects `pack` output.
 Severity: **parity** (FIXED for the documented lvalue case).
 
 
-## PARITY-011 — `CORE::*` namespace not available
+## PARITY-011 — `CORE::*` namespace not available — **FIXED**
 
-```sh
-$ stryke -e 'CORE::print "hi"'
-Undefined subroutine &CORE::print at -e line 1.
-```
+The parser now strips a leading `CORE::` prefix from any qualified
+identifier just before the keyword-dispatch match, so `CORE::length`,
+`CORE::print`, `CORE::abs`, `CORE::ord`, `CORE::chr`, `CORE::int`,
+`CORE::uc`, `CORE::lc`, `CORE::scalar`, `CORE::sort`, `CORE::printf`,
+etc. all parse identically to the bare keyword. Matches Perl 5's
+documented `CORE::` namespace, which routes through to the built-in
+implementation.
 
-Severity: **parity**. Affects code that explicitly disambiguates between
-overridden and built-in operations.
+Tests: `core_prefix_routes_to_builtin_keyword` (8 builtins),
+`core_prefix_works_inside_print_arg`.
+
+Severity: **parity** (FIXED).
 
 
 ## PARITY-012 — `use overload "+" => sub { ... }` rejects anonymous-sub handlers
