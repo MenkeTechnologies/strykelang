@@ -73,14 +73,45 @@ fn substr_four_arg_replaces_in_place_and_returns_old() {
 }
 
 #[test]
-fn substr_lvalue_assignment_not_supported_today() {
-    // PARITY-014: substr-as-lvalue raises VM-level "Assign to complex lvalue".
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"my $s = "Hello"; substr($s, 0, 1) = "J"; $s"#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime/type error for substr lvalue, got {:?}",
-        kind
+fn substr_lvalue_assignment_replaces_in_place() {
+    // PARITY-014 FIXED: `substr($s, $o, $l) = $rhs` is equivalent to the
+    // 4-arg form `substr($s, $o, $l, $rhs)` — both compiler and tree-
+    // walker now rewrite the assignment that way.
+    assert_eq!(
+        eval_string(r#"my $s = "Hello"; substr($s, 0, 1) = "J"; $s"#),
+        "Jello"
+    );
+}
+
+#[test]
+fn substr_lvalue_with_two_args_replaces_to_end() {
+    assert_eq!(
+        eval_string(r#"my $s = "abcdef"; substr($s, 2) = "Z"; $s"#),
+        "abZ"
+    );
+}
+
+#[test]
+fn substr_lvalue_with_negative_offset() {
+    assert_eq!(
+        eval_string(r#"my $s = "Hello"; substr($s, -3, 2) = "ZZZ"; $s"#),
+        "HeZZZo"
+    );
+}
+
+#[test]
+fn substr_lvalue_zero_length_at_start_inserts() {
+    assert_eq!(
+        eval_string(r#"my $s = "abcdef"; substr($s, 0, 0) = "PRE"; $s"#),
+        "PREabcdef"
+    );
+}
+
+#[test]
+fn substr_lvalue_zero_length_at_end_appends() {
+    assert_eq!(
+        eval_string(r#"my $s = "abcdef"; substr($s, 6, 0) = "POST"; $s"#),
+        "abcdefPOST"
     );
 }
 
