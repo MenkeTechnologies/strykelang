@@ -13696,6 +13696,44 @@ impl Interpreter {
 
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
+            // `(my $copy = $orig) =~ s/.../.../` — at this point the
+            // MyExpr has already been evaluated as a side-effect of
+            // `eval_expr(target)` upstream (so `$copy` has been declared
+            // and initialized). The substitution / transliteration helpers
+            // call back here to write the *new* string. Bind through the
+            // declared name without re-running the initializer.
+            ExprKind::MyExpr { decls, .. } => {
+                let first = decls.first().ok_or_else(|| {
+                    FlowOrError::Error(PerlError::runtime(
+                        "assign_value: empty MyExpr decl list",
+                        target.line,
+                    ))
+                })?;
+                match first.sigil {
+                    Sigil::Scalar => {
+                        let stor = self.tree_scalar_storage_name(&first.name);
+                        self.set_special_var(&stor, &val)
+                            .map_err(|e| FlowOrError::Error(e.at_line(target.line)))?;
+                        Ok(PerlValue::UNDEF)
+                    }
+                    Sigil::Array => {
+                        self.scope.set_array(&first.name, val.to_list())?;
+                        Ok(PerlValue::UNDEF)
+                    }
+                    Sigil::Hash => {
+                        let items = val.to_list();
+                        let mut map = IndexMap::new();
+                        let mut i = 0;
+                        while i + 1 < items.len() {
+                            map.insert(items[i].to_string(), items[i + 1].clone());
+                            i += 2;
+                        }
+                        self.scope.set_hash(&first.name, map)?;
+                        Ok(PerlValue::UNDEF)
+                    }
+                    Sigil::Typeglob => Ok(PerlValue::UNDEF),
+                }
+            }
             ExprKind::ScalarVar(name) => {
                 let stor = self.tree_scalar_storage_name(name);
                 if self.scope.is_scalar_frozen(&stor) {

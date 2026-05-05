@@ -149,32 +149,46 @@ fn inc_on_int_value_stays_numeric() {
     assert_eq!(eval_int(r#"my $x = 5; $x++; $x"#), 6);
 }
 
-// ── `(my $copy = $orig) =~ s///` idiom ────────────────────────────────────────
+// ── `(my $copy = $orig) =~ s///` idiom (PARITY-002 FIXED) ─────────────────────
 //
-// Perl 5: the bind binds to `$copy`, leaves `$orig` alone, mutates `$copy`.
-// Stryke today: bind appears to no-op; both vars still equal the original.
-// Tracked in `docs/BUGS.md` (PARITY-002).
+// The Perl idiom: declare `$copy`, initialize from `$orig`, then run the
+// substitution / transliteration on `$copy` only — `$orig` stays untouched.
 
 #[test]
-fn copy_on_bind_substitute_does_not_mutate() {
-    // With current behavior, $t stays equal to $s.
+fn copy_on_bind_substitute_mutates_copy_only() {
     assert_eq!(
         eval_string(r#"my $s = "abc"; (my $t = $s) =~ s/a/X/; "$s/$t""#),
-        "abc/abc"
+        "abc/Xbc"
     );
 }
 
 #[test]
-fn copy_on_bind_tr_does_not_mutate() {
+fn copy_on_bind_tr_mutates_copy_only() {
     assert_eq!(
         eval_string(r#"my $s = "abc"; (my $t = $s) =~ tr/a-z/A-Z/; "$s/$t""#),
-        "abc/abc"
+        "abc/ABC"
+    );
+}
+
+#[test]
+fn copy_on_bind_global_substitute_replaces_all_in_copy() {
+    assert_eq!(
+        eval_string(r#"my $s = "abcabc"; (my $t = $s) =~ s/a/X/g; "$s/$t""#),
+        "abcabc/XbcXbc"
+    );
+}
+
+#[test]
+fn copy_on_bind_substitute_with_capture_backref() {
+    assert_eq!(
+        eval_string(r#"my $s = "x"; (my $t = $s) =~ s/(.+)/[$1]/; "$s/$t""#),
+        "x/[x]"
     );
 }
 
 #[test]
 fn explicit_copy_then_substitute_works() {
-    // Sanity check: the explicit form behaves correctly.
+    // Sanity check: the explicit form behaves correctly (and continues to).
     assert_eq!(
         eval_string(r#"my $s = "abc"; my $t = $s; $t =~ s/a/X/; "$s/$t""#),
         "abc/Xbc"
