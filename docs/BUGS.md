@@ -17,6 +17,13 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-019** — `for (@arr) { $_ *= 10 }` now mutates `@arr` in place.
+  Bytecode compiler detects a bare-`@arr` source and emits an
+  `Op::SetArrayElem` write-back at the merged step target so both
+  normal-completion and `next` paths flush the loop variable's current
+  value back to the source array. Named loop vars (`for my $x (@a)`)
+  alias too. Non-lvalue sources (ranges, list literals, `keys`) keep
+  copy semantics — matching Perl 5 exactly.
 - **PARITY-012** — `use overload "+" => sub { ... }` now accepts
   anonymous-sub handlers. Parser promotes the anon body to a synthetic
   top-level `__overload_anon_N` SubDecl; install_use_overload_pairs
@@ -812,23 +819,29 @@ Tests: `open_then_slurp_with_undef_separator_reads_only_first_line_today`.
 Severity: **bug**. Slurping a file is one of Perl's most common idioms.
 
 
-## BUG-019 — `for (@arr) { $_ ... }` does not alias array elements
+## BUG-019 — `for (@arr) { $_ ... }` does not alias array elements — **FIXED**
 
-```sh
-$ stryke -e 'my @a = (1..3); for (@a) { $_ *= 10 } print "@a"'
-1 2 3
-$ perl   -e 'my @a = (1..3); for (@a) { $_ *= 10 } print "@a"'
-10 20 30
-```
+The bytecode compiler (`StmtKind::Foreach` in compiler.rs) now detects a
+bare-`@arr` source list and emits an `Op::SetArrayElem` write-back step
+at the end of each iteration. Mutations to `$_` (or a named loop var)
+through the body propagate back to the source array. Approach: at the
+merged `step_ip` target (where both normal-completion and `next` paths
+converge), push the loop var, push the counter, then emit
+`SetArrayElem(arr_name)` — using the cached counter and var slots so
+nested foreach loops don't poison the slot resolution. Aliasing only
+fires when the source is `ExprKind::ArrayVar(name)`; ranges, list
+literals, and `keys`/`values` keep copy semantics, matching Perl 5.
 
-The named-loop-var form (`for my $x (@a)`) has the same bug. The
-explicit-index form (`for my $i (0..$#a) { $a[$i] *= 10 }`) works.
+The interpreter's tree-walking handler (`StmtKind::Foreach` in
+interpreter.rs) got the same fix for `Interpreter::execute` paths that
+ever bypass the VM (line-mode-skip, etc.).
 
-Tests: `for_dollar_underscore_does_not_alias_array_element_today`,
-`for_named_loop_var_does_not_alias_array_element_today`,
-`for_index_assignment_works`.
+Tests: `for_dollar_underscore_aliases_array_element` (was
+`_does_not_alias_..._today`), `for_named_loop_var_aliases_array_element`,
+`for_alias_respects_last_and_next`,
+`for_alias_only_for_simple_array_source`, `for_index_assignment_works`.
 
-Severity: **bug**. Affects every in-place mutation idiom.
+Severity: **bug** (FIXED — affects every in-place mutation idiom).
 
 
 ## BUG-020 — `$\`` (pre-match) does not parse outside string interpolation
