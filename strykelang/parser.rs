@@ -143,6 +143,13 @@ pub struct Parser {
     /// past this checkpoint, so list-repeat fires only when `x` is the very
     /// next token after the closing paren.
     list_construct_close_pos: Option<usize>,
+    /// Synthetic SubDecl statements queued by anonymous-sub overload handlers
+    /// (`use overload "+" => sub { ... }`) — drained at the end of
+    /// [`Self::parse_program`] and prepended to the top-level statements so
+    /// the package-qualified synthetic name resolves at runtime. (PARITY-012)
+    pending_synthetic_subs: Vec<Statement>,
+    /// Counter for unique anonymous-overload-handler names.
+    next_overload_anon_id: u32,
 }
 
 impl Parser {
@@ -168,6 +175,8 @@ impl Parser {
             suppress_colon_range: 0,
             suppress_tilde_range: 0,
             thread_last_mode: false,
+            pending_synthetic_subs: Vec::new(),
+            next_overload_anon_id: 0,
             parsing_module: false,
             list_construct_close_pos: None,
         }
@@ -464,7 +473,17 @@ impl Parser {
     // ── Top level ──
 
     pub fn parse_program(&mut self) -> PerlResult<Program> {
-        let statements = self.parse_statements()?;
+        let mut statements = self.parse_statements()?;
+        // Prepend any synthetic SubDecl stubs queued by anonymous overload
+        // handlers so the package-qualified synthetic names resolve when the
+        // overload table is consulted at runtime. (PARITY-012)
+        if !self.pending_synthetic_subs.is_empty() {
+            let synthetics = std::mem::take(&mut self.pending_synthetic_subs);
+            let mut combined = Vec::with_capacity(synthetics.len() + statements.len());
+            combined.extend(synthetics);
+            combined.extend(statements.drain(..));
+            statements = combined;
+        }
         Ok(Program { statements })
     }
 
@@ -15658,11 +15677,30 @@ impl Parser {
         }
     }
 
-    fn expr_to_overload_sub(&self, e: &Expr) -> PerlResult<String> {
+    fn expr_to_overload_sub(&mut self, e: &Expr) -> PerlResult<String> {
         match &e.kind {
             ExprKind::String(s) => Ok(s.clone()),
             ExprKind::Integer(n) => Ok(n.to_string()),
             ExprKind::SubroutineRef(s) | ExprKind::SubroutineCodeRef(s) => Ok(s.clone()),
+            // Anonymous sub: `use overload "+" => sub { ... };` — promote the
+            // anon body into a synthetic top-level SubDecl so the overload
+            // table can hold the name like the named-sub case. (PARITY-012)
+            ExprKind::CodeRef { params, body } => {
+                let id = self.next_overload_anon_id;
+                self.next_overload_anon_id = self.next_overload_anon_id.saturating_add(1);
+                let name = format!("__overload_anon_{}", id);
+                self.pending_synthetic_subs.push(Statement {
+                    label: None,
+                    kind: StmtKind::SubDecl {
+                        name: name.clone(),
+                        params: params.clone(),
+                        body: body.clone(),
+                        prototype: None,
+                    },
+                    line: e.line,
+                });
+                Ok(name)
+            }
             _ => Err(self.syntax_err(
                 "overload handler must be a string literal, number (e.g. fallback => 1), or \\&subname (method in current package)",
                 e.line,

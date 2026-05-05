@@ -2373,8 +2373,35 @@ impl Interpreter {
     }
 
     /// `use overload` — merge pairs into [`Self::overload_table`] for [`Self::current_package`].
+    /// Anonymous overload handlers are emitted by the parser as a synthetic
+    /// `__overload_anon_N` SubDecl at the top of the program (registered under
+    /// `main::`); re-bind a clone under the current package so the dispatch
+    /// `Pkg::__overload_anon_N` lookup at runtime resolves. (PARITY-012)
     pub(crate) fn install_use_overload_pairs(&mut self, pairs: &[(String, String)]) {
         let pkg = self.current_package();
+        for (_, v) in pairs {
+            if v.starts_with("__overload_anon_") {
+                // Synthetic anon-overload subs are emitted at the top of the
+                // program, before any user `package N` statement, so they're
+                // registered under the bare name (qualify_sub_key returns the
+                // unqualified form for the `main` package). Re-bind a clone
+                // under `Pkg::name` so the dispatch lookup `Pkg::sub_short`
+                // resolves.
+                let pkg_key = format!("{}::{}", pkg, v);
+                if !self.subs.contains_key(&pkg_key) {
+                    let src = if let Some(s) = self.subs.get(v) {
+                        Some(s.clone())
+                    } else if let Some(s) = self.subs.get(&format!("main::{}", v)) {
+                        Some(s.clone())
+                    } else {
+                        None
+                    };
+                    if let Some(sub) = src {
+                        self.subs.insert(pkg_key, sub);
+                    }
+                }
+            }
+        }
         let ent = self.overload_table.entry(pkg).or_default();
         for (k, v) in pairs {
             ent.insert(k.clone(), v.clone());
