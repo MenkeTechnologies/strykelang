@@ -19610,6 +19610,80 @@ fn par_walk_recursive(
 }
 
 /// `sprintf` with pluggable `%s` formatting (stringify for overload-aware `Interpreter`).
+/// Reformat Rust's `{:e}` / `{:E}` exponent style (`1.234568e4`) to the
+/// Perl/C convention (`1.234568e+04`). Adds a sign character to the
+/// exponent and zero-pads it to at least two digits.
+fn perl_exponent_form(rust_repr: &str, upper: bool) -> String {
+    let marker = if upper { 'E' } else { 'e' };
+    if let Some(pos) = rust_repr.find(marker) {
+        let (mantissa, after) = rust_repr.split_at(pos);
+        let exp_part = &after[1..]; // skip the 'e' / 'E'
+        let (sign, digits) = match exp_part.chars().next() {
+            Some('+') => ("+", &exp_part[1..]),
+            Some('-') => ("-", &exp_part[1..]),
+            _ => ("+", exp_part),
+        };
+        let padded = if digits.len() < 2 {
+            format!("0{}", digits)
+        } else {
+            digits.to_string()
+        };
+        return format!("{}{}{}{}", mantissa, marker, sign, padded);
+    }
+    rust_repr.to_string()
+}
+
+/// Format a value with `%g`-style "shortest of %e or %f, strip trailing
+/// zeros". Precision is the number of *significant* digits (default 6).
+fn perl_g_form(n: f64, prec: usize, upper: bool) -> String {
+    let prec = prec.max(1);
+    if !n.is_finite() {
+        return if upper {
+            format!("{}", n).to_uppercase()
+        } else {
+            format!("{}", n)
+        };
+    }
+    // Compute base-10 exponent.
+    let abs = n.abs();
+    let x = if abs == 0.0 {
+        0i32
+    } else {
+        abs.log10().floor() as i32
+    };
+    // %g rule: use exponential form if x < -4 OR x >= prec.
+    let use_e = x < -4 || x >= prec as i32;
+    // Always work in lowercase-`e` form internally so the trim logic has a
+    // single shape; upcase the marker letter at the end for `%G`.
+    let formatted = if use_e {
+        let raw = format!("{:.*e}", prec - 1, n);
+        perl_exponent_form(&raw, false)
+    } else {
+        let f_prec = (prec as i32 - 1 - x).max(0) as usize;
+        format!("{:.*}", f_prec, n)
+    };
+    // Strip trailing zeros from the fractional part (and a trailing '.'),
+    // but only on the mantissa side — leave the exponent untouched.
+    let (mant, exp) = if let Some(pos) = formatted.find('e') {
+        (formatted[..pos].to_string(), formatted[pos..].to_string())
+    } else {
+        (formatted.clone(), String::new())
+    };
+    let trimmed = if mant.contains('.') {
+        let t = mant.trim_end_matches('0');
+        let t = t.trim_end_matches('.');
+        t.to_string()
+    } else {
+        mant
+    };
+    let combined = format!("{}{}", trimmed, exp);
+    if upper {
+        combined.replace('e', "E")
+    } else {
+        combined
+    }
+}
+
 pub(crate) fn perl_sprintf_format_with<F>(
     fmt: &str,
     args: &[PerlValue],
@@ -19622,6 +19696,14 @@ where
     let mut arg_idx = 0;
     let chars: Vec<char> = fmt.chars().collect();
     let mut i = 0;
+
+    // Helper to consume the next arg as an i64 (used for `*` width / precision).
+    let take_arg_int =
+        |args: &[PerlValue], idx: &mut usize| -> i64 {
+            let v = args.get(*idx).cloned().unwrap_or(PerlValue::UNDEF);
+            *idx += 1;
+            v.to_int()
+        };
 
     while i < chars.len() {
         if chars[i] == '%' {
@@ -19641,17 +19723,42 @@ where
                 flags.push(chars[i]);
                 i += 1;
             }
+            // Width: either `*` (consume an arg) or run of digits.
             let mut width = String::new();
-            while i < chars.len() && chars[i].is_ascii_digit() {
-                width.push(chars[i]);
+            let mut left_align = flags.contains('-');
+            if i < chars.len() && chars[i] == '*' {
+                let n = take_arg_int(args, &mut arg_idx);
+                if n < 0 {
+                    // Negative width means left-align with |n|.
+                    left_align = true;
+                    width = (-n).to_string();
+                } else {
+                    width = n.to_string();
+                }
                 i += 1;
+            } else {
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    width.push(chars[i]);
+                    i += 1;
+                }
             }
+            // Precision: `.*` or `.<digits>` (or nothing).
             let mut precision = String::new();
             if i < chars.len() && chars[i] == '.' {
                 i += 1;
-                while i < chars.len() && chars[i].is_ascii_digit() {
-                    precision.push(chars[i]);
+                if i < chars.len() && chars[i] == '*' {
+                    let n = take_arg_int(args, &mut arg_idx);
+                    precision = n.max(0).to_string();
                     i += 1;
+                } else {
+                    while i < chars.len() && chars[i].is_ascii_digit() {
+                        precision.push(chars[i]);
+                        i += 1;
+                    }
+                    // ".<no digits>" means precision 0 (Perl/C convention).
+                    if precision.is_empty() {
+                        precision = "0".to_string();
+                    }
                 }
             }
             if i >= chars.len() {
@@ -19666,97 +19773,162 @@ where
             let w: usize = width.parse().unwrap_or(0);
             let p: usize = precision.parse().unwrap_or(6);
 
-            let zero_pad = flags.contains('0') && !flags.contains('-');
-            let left_align = flags.contains('-');
+            let zero_pad = flags.contains('0') && !left_align;
+            let plus = flags.contains('+');
+            let space = flags.contains(' ');
+            let hash = flags.contains('#');
+
+            // Apply width + alignment to a body string. Honors zero-pad for
+            // numerics (caller passes the raw signed body so we can splice
+            // zeros after the sign).
+            let pad_align = |body: &str, width: usize, left: bool, zero: bool| -> String {
+                if width == 0 || body.len() >= width {
+                    return body.to_string();
+                }
+                if zero && !left {
+                    if let Some(rest) = body.strip_prefix('-') {
+                        return format!("-{:0>width$}", rest, width = width - 1);
+                    }
+                    if let Some(rest) = body.strip_prefix('+') {
+                        return format!("+{:0>width$}", rest, width = width - 1);
+                    }
+                    return format!("{:0>width$}", body, width = width);
+                }
+                if left {
+                    format!("{:<width$}", body, width = width)
+                } else {
+                    format!("{:>width$}", body, width = width)
+                }
+            };
+
             let formatted = match spec {
                 'd' | 'i' => {
-                    if zero_pad {
-                        format!("{:0width$}", arg.to_int(), width = w)
-                    } else if left_align {
-                        format!("{:<width$}", arg.to_int(), width = w)
+                    let v = arg.to_int();
+                    let body = if plus && v >= 0 {
+                        format!("+{}", v)
+                    } else if space && v >= 0 {
+                        format!(" {}", v)
                     } else {
-                        format!("{:width$}", arg.to_int(), width = w)
-                    }
+                        format!("{}", v)
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 'u' => {
-                    if zero_pad {
-                        format!("{:0width$}", arg.to_int() as u64, width = w)
-                    } else {
-                        format!("{:width$}", arg.to_int() as u64, width = w)
-                    }
+                    let v = arg.to_int() as u64;
+                    pad_align(&format!("{}", v), w, left_align, zero_pad)
                 }
-                'f' => format!("{:width$.prec$}", arg.to_number(), width = w, prec = p),
-                'e' => format!("{:width$.prec$e}", arg.to_number(), width = w, prec = p),
+                'f' => {
+                    let n = arg.to_number();
+                    let body = if plus && n.is_sign_positive() {
+                        format!("+{:.*}", p, n)
+                    } else if space && n.is_sign_positive() {
+                        format!(" {:.*}", p, n)
+                    } else {
+                        format!("{:.*}", p, n)
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
+                }
+                'e' => {
+                    let n = arg.to_number();
+                    let raw = format!("{:.*e}", p, n);
+                    let body0 = perl_exponent_form(&raw, false);
+                    let body = if plus && n.is_sign_positive() {
+                        format!("+{}", body0)
+                    } else if space && n.is_sign_positive() {
+                        format!(" {}", body0)
+                    } else {
+                        body0
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
+                }
+                'E' => {
+                    let n = arg.to_number();
+                    let raw = format!("{:.*E}", p, n);
+                    let body0 = perl_exponent_form(&raw, true);
+                    let body = if plus && n.is_sign_positive() {
+                        format!("+{}", body0)
+                    } else if space && n.is_sign_positive() {
+                        format!(" {}", body0)
+                    } else {
+                        body0
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
+                }
                 'g' => {
                     let n = arg.to_number();
-                    if n.abs() >= 1e-4 && n.abs() < 1e15 {
-                        format!("{:width$.prec$}", n, width = w, prec = p)
+                    // For %g, precision means "significant digits" (default 6).
+                    let prec_g = if precision.is_empty() { 6 } else { p };
+                    let body0 = perl_g_form(n, prec_g, false);
+                    let body = if plus && n.is_sign_positive() {
+                        format!("+{}", body0)
+                    } else if space && n.is_sign_positive() {
+                        format!(" {}", body0)
                     } else {
-                        format!("{:width$.prec$e}", n, width = w, prec = p)
-                    }
+                        body0
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
+                }
+                'G' => {
+                    let n = arg.to_number();
+                    let prec_g = if precision.is_empty() { 6 } else { p };
+                    let body0 = perl_g_form(n, prec_g, true);
+                    let body = if plus && n.is_sign_positive() {
+                        format!("+{}", body0)
+                    } else if space && n.is_sign_positive() {
+                        format!(" {}", body0)
+                    } else {
+                        body0
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 's' => {
                     let s = string_for_s(&arg)?;
-                    if !precision.is_empty() {
-                        let truncated: String = s.chars().take(p).collect();
-                        if flags.contains('-') {
-                            format!("{:<width$}", truncated, width = w)
-                        } else {
-                            format!("{:>width$}", truncated, width = w)
-                        }
-                    } else if flags.contains('-') {
-                        format!("{:<width$}", s, width = w)
+                    let body = if !precision.is_empty() {
+                        s.chars().take(p).collect::<String>()
                     } else {
-                        format!("{:>width$}", s, width = w)
+                        s
+                    };
+                    if left_align {
+                        format!("{:<width$}", body, width = w)
+                    } else {
+                        format!("{:>width$}", body, width = w)
                     }
                 }
                 'x' => {
                     let v = arg.to_int();
-                    if zero_pad && w > 0 {
-                        format!("{:0width$x}", v, width = w)
-                    } else if left_align {
-                        format!("{:<width$x}", v, width = w)
-                    } else if w > 0 {
-                        format!("{:width$x}", v, width = w)
+                    let body = if hash && v != 0 {
+                        format!("0x{:x}", v)
                     } else {
                         format!("{:x}", v)
-                    }
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 'X' => {
                     let v = arg.to_int();
-                    if zero_pad && w > 0 {
-                        format!("{:0width$X}", v, width = w)
-                    } else if left_align {
-                        format!("{:<width$X}", v, width = w)
-                    } else if w > 0 {
-                        format!("{:width$X}", v, width = w)
+                    let body = if hash && v != 0 {
+                        format!("0X{:X}", v)
                     } else {
                         format!("{:X}", v)
-                    }
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 'o' => {
                     let v = arg.to_int();
-                    if zero_pad && w > 0 {
-                        format!("{:0width$o}", v, width = w)
-                    } else if left_align {
-                        format!("{:<width$o}", v, width = w)
-                    } else if w > 0 {
-                        format!("{:width$o}", v, width = w)
+                    let body = if hash && v != 0 {
+                        format!("0{:o}", v)
                     } else {
                         format!("{:o}", v)
-                    }
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 'b' => {
                     let v = arg.to_int();
-                    if zero_pad && w > 0 {
-                        format!("{:0width$b}", v, width = w)
-                    } else if left_align {
-                        format!("{:<width$b}", v, width = w)
-                    } else if w > 0 {
-                        format!("{:width$b}", v, width = w)
+                    let body = if hash && v != 0 {
+                        format!("0b{:b}", v)
                     } else {
                         format!("{:b}", v)
-                    }
+                    };
+                    pad_align(&body, w, left_align, zero_pad)
                 }
                 'c' => char::from_u32(arg.to_int() as u32)
                     .map(|c| c.to_string())

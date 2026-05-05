@@ -613,9 +613,11 @@ fn printf_negative_width_left_justifies() {
 }
 
 #[test]
-fn printf_plus_flag_ignored_today() {
-    // BUG-017: stryke ignores the `+` flag in sprintf — Perl prints `   +3`.
-    assert_eq!(eval_string(r#"sprintf("%+5d", 3)"#), "    3");
+fn printf_plus_flag_adds_sign() {
+    // BUG-017 FIXED: `%+d` shows leading `+` for positive numbers.
+    assert_eq!(eval_string(r#"sprintf("%+5d", 3)"#), "   +3");
+    assert_eq!(eval_string(r#"sprintf("%+05d", 3)"#), "+0003");
+    assert_eq!(eval_string(r#"sprintf("%+5d", -3)"#), "   -3");
 }
 
 #[test]
