@@ -34,11 +34,13 @@ fn for_loop_closure_captures_each_iteration_var() {
 
 #[test]
 fn factory_with_internal_state_is_a_working_counter() {
-    // Counters built via a factory work — internal mutation of `$n` is
-    // observed correctly by repeated calls of the same closure.
+    // Counters built via a factory require `mysync` for the shared cell.
+    // The closure-write check (DESIGN-001) flags `++$n` as a write to an
+    // outer-scope `my` from inside a closure; declaring `mysync $n`
+    // explicitly opts into atomic shared storage.
     assert_eq!(
         eval_string(
-            r#"sub make_counter { my $n = 0; sub { ++$n } }
+            r#"sub make_counter { mysync $n = 0; sub { ++$n } }
                my $c = make_counter();
                join(",", $c->(), $c->(), $c->())"#
         ),
@@ -81,18 +83,34 @@ fn closure_captures_outer_var_by_value() {
 }
 
 #[test]
-fn closure_modifying_outer_scalar_stays_local() {
-    // Incrementing `$count` from inside the closure mutates the closure's
-    // captured copy, not the outer binding. Use a factory or explicit
-    // ref-through (\$n; ${$ref}++) for the Perl outer-counter idiom.
+fn closure_modifying_outer_scalar_is_compile_error() {
+    // DESIGN-001: writing to an outer-scope `my` from inside a closure is
+    // rejected at compile time. The user must opt into shared mutable
+    // state with `mysync`, or use `--compat` for Perl 5 semantics.
+    use stryke::error::ErrorKind;
+    let kind = eval_err_kind(
+        r#"my $count = 0;
+           my $inc = sub { $count++ };
+           $inc->()"#,
+    );
+    assert!(
+        matches!(kind, ErrorKind::Runtime | ErrorKind::Syntax | ErrorKind::Type),
+        "expected closure-write error, got {:?}",
+        kind
+    );
+}
+
+#[test]
+fn closure_modifying_mysync_scalar_works() {
+    // The fix: declare `mysync $count` for atomic shared storage.
     assert_eq!(
         eval_int(
-            r#"my $count = 0;
+            r#"mysync $count = 0;
                my $inc = sub { $count++ };
                $inc->(); $inc->(); $inc->();
                $count"#
         ),
-        0
+        3
     );
 }
 
