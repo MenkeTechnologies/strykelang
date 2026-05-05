@@ -261,17 +261,24 @@ fn regex_atomic_group_prevents_backtrack() {
 // ── sprintf star-width and dynamic precision ────────────────────────────────
 
 #[test]
-fn sprintf_star_width_emits_literal_today() {
-    // BUG-049: `%*d` should consume an arg as the width. Stryke leaves the
-    // `*d` in literally and uses the rest of the args for `%d` (so output
-    // becomes the second arg with extras lost).
-    assert_eq!(eval_string(r#"sprintf("%*d", 5, 42)"#), "5d");
+fn sprintf_star_width_consumes_an_arg() {
+    // BUG-049 FIXED: `%*d` consumes the width as an arg.
+    assert_eq!(eval_string(r#"sprintf("%*d", 5, 42)"#), "   42");
+    // Negative width turns into left-alignment.
+    assert_eq!(eval_string(r#"sprintf("%*d|", -5, 42)"#), "42   |");
 }
 
 #[test]
-fn sprintf_star_precision_emits_literal_today() {
-    // BUG-049b: `%.*f` similarly broken.
-    assert_eq!(eval_string(r#"sprintf("%.*f", 3, 3.14159)"#), "3f");
+fn sprintf_star_precision_consumes_an_arg() {
+    assert_eq!(eval_string(r#"sprintf("%.*f", 3, 3.14159)"#), "3.142");
+}
+
+#[test]
+fn sprintf_star_width_and_precision_combined() {
+    assert_eq!(
+        eval_string(r#"sprintf("%*.*f", 8, 3, 3.14159)"#),
+        "   3.142"
+    );
 }
 
 // ── %s with width and truncation ────────────────────────────────────────────

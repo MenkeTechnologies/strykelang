@@ -190,13 +190,16 @@ fn substr_insert_with_zero_length() {
 }
 
 #[test]
-fn sprintf_percent_d_no_space_flag_yet() {
-    assert_eq!(eval_string(r#"sprintf("% d", 5)"#), "5");
+fn sprintf_percent_d_space_flag_pads_with_space() {
+    // The `% d` flag now adds a leading space for non-negative numbers.
+    assert_eq!(eval_string(r#"sprintf("% d", 5)"#), " 5");
+    assert_eq!(eval_string(r#"sprintf("% d", -5)"#), "-5");
 }
 
 #[test]
-fn sprintf_percent_d_ignores_plus_flag_for_now() {
-    assert_eq!(eval_string(r#"sprintf("%+d", 9)"#), "9");
+fn sprintf_percent_d_plus_flag_adds_sign() {
+    assert_eq!(eval_string(r#"sprintf("%+d", 9)"#), "+9");
+    assert_eq!(eval_string(r#"sprintf("%+d", -9)"#), "-9");
 }
 
 #[test]

@@ -2305,7 +2305,7 @@ fn delete_array_element_leaves_undef_slot() {
 
 #[test]
 fn sprintf_scientific_and_bankers_round_snapshot() {
-    assert_eq!(eval_string(r#"sprintf "%e", 1.23"#), "1.230000e0");
+    assert_eq!(eval_string(r#"sprintf "%e", 1.23"#), "1.230000e+00");
     assert_eq!(eval_string(r#"sprintf "%.2f", 1.005"#), "1.00");
 }
 
@@ -2585,7 +2585,7 @@ fn modulo_negative_dividend_snapshot() {
 
 #[test]
 fn sprintf_g_style_compact_float_snapshot() {
-    assert_eq!(eval_string(r#"sprintf "%g", 1234.56"#), "1234.560000");
+    assert_eq!(eval_string(r#"sprintf "%g", 1234.56"#), "1234.56");
 }
 
 #[test]
@@ -2917,7 +2917,7 @@ fn minus_eq_and_xor_eq_compound_assignments() {
 
 #[test]
 fn sprintf_plus_f_positive_float_snapshot() {
-    assert_eq!(eval_string(r#"sprintf "%+f", 3.14"#), "3.140000");
+    assert_eq!(eval_string(r#"sprintf "%+f", 3.14"#), "+3.140000");
 }
 
 #[test]
@@ -2967,7 +2967,8 @@ fn exponentiation_negative_integer_exponent_is_reciprocal() {
 
 #[test]
 fn exponentiation_half_is_square_root() {
-    assert_eq!(eval_string(r#"sprintf "%.5g", 4 ** 0.5"#), "2.00000");
+    // %g strips trailing zeros, so "2.00000" → "2".
+    assert_eq!(eval_string(r#"sprintf "%.5g", 4 ** 0.5"#), "2");
 }
 
 #[test]
@@ -3081,8 +3082,8 @@ fn substr_four_arg_empty_replacement_removes_span() {
 
 #[test]
 fn sprintf_alternate_form_octal_and_hex_snapshot() {
-    assert_eq!(eval_string(r#"sprintf "%#.3o", 8"#), "10");
-    assert_eq!(eval_string(r#"sprintf "%#x", 255"#), "ff");
+    assert_eq!(eval_string(r#"sprintf "%#.3o", 8"#), "010");
+    assert_eq!(eval_string(r#"sprintf "%#x", 255"#), "0xff");
 }
 
 #[test]
@@ -3890,7 +3891,7 @@ fn sort_default_uses_lexical_string_order_for_digit_prefixes() {
 
 #[test]
 fn sprintf_compact_scientific_rounds_to_single_digit_mantissa() {
-    assert_eq!(eval_string(r#"sprintf "%.0e", 1234"#), "1e3");
+    assert_eq!(eval_string(r#"sprintf "%.0e", 1234"#), "1e+03");
 }
 
 #[test]

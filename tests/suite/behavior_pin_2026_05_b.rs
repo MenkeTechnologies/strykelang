@@ -291,19 +291,25 @@ fn mod_positive_positive_matches_perl() {
 // ── sprintf format-specifier coverage ────────────────────────────────────────
 
 #[test]
-fn sprintf_g_format_uses_fixed_decimal_today() {
-    // PARITY-006: stryke %g currently formats like %f (no shortest-form heuristic).
-    assert_eq!(eval_string(r#"sprintf("%g", 0.0001)"#), "0.000100");
-    assert_eq!(eval_string(r#"sprintf("%g", 1234567)"#), "1234567.000000");
+fn sprintf_g_format_picks_shortest_representation() {
+    // PARITY-006 FIXED: %g picks the shorter of %f / %e and strips trailing
+    // zeros, matching Perl's libc-style format.
+    assert_eq!(eval_string(r#"sprintf("%g", 0.0001)"#), "0.0001");
+    assert_eq!(eval_string(r#"sprintf("%g", 1234567)"#), "1.23457e+06");
+    assert_eq!(eval_string(r#"sprintf("%g", 1.234567890123456)"#), "1.23457");
+    assert_eq!(eval_string(r#"sprintf("%g", 0.00001)"#), "1e-05");
+    assert_eq!(eval_string(r#"sprintf("%G", 1.234e-5)"#), "1.234E-05");
 }
 
 #[test]
-fn sprintf_e_format_omits_plus_and_zero_pad_today() {
-    // PARITY-007: Perl produces `1.234568e+04`; stryke produces `1.234568e4`.
+fn sprintf_e_format_uses_perl_exponent_form() {
+    // PARITY-007 FIXED: exponent has explicit sign and is zero-padded to 2.
     assert_eq!(
         eval_string(r#"sprintf("%e", 12345.6789)"#),
-        "1.234568e4"
+        "1.234568e+04"
     );
+    assert_eq!(eval_string(r#"sprintf("%.0e", 12345)"#), "1e+04");
+    assert_eq!(eval_string(r#"sprintf("%E", 12345.6789)"#), "1.234568E+04");
 }
 
 #[test]

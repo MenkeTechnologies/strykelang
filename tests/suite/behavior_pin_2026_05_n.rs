@@ -33,8 +33,10 @@ fn sprintf_capital_a_does_not_emit_hex_float_today() {
 // ── %g and %G work, but %G uppercases the exponent letter only ──────────────
 
 #[test]
-fn sprintf_capital_g_works_for_integer_inputs() {
-    assert_eq!(eval_string(r#"sprintf("%G", 1234567)"#), "1234567");
+fn sprintf_capital_g_uses_exponential_above_six_significant_digits() {
+    // %G with default precision 6 puts 1234567 (7 sig digits) in exponential
+    // form. Same as Perl/libc.
+    assert_eq!(eval_string(r#"sprintf("%G", 1234567)"#), "1.23457E+06");
 }
 
 // ── Hash insertion order is preserved (IndexMap-backed) ────────────────────

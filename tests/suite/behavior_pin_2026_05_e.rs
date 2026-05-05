@@ -199,11 +199,13 @@ fn sprintf_capital_x_uppercase_hex() {
 }
 
 #[test]
-fn sprintf_hash_flag_does_not_add_prefix_today() {
-    // BUG-035: `%#x` should produce `0xff`; stryke produces `ff`. Same for
-    // `%#o` (Perl: `010`, stryke: `10`).
-    assert_eq!(eval_string(r#"sprintf("%#x", 255)"#), "ff");
-    assert_eq!(eval_string(r#"sprintf("%#o", 8)"#), "10");
+fn sprintf_hash_flag_adds_prefix() {
+    // BUG-034 FIXED: `%#x` / `%#X` / `%#o` / `%#b` add the conventional
+    // prefix.
+    assert_eq!(eval_string(r#"sprintf("%#x", 255)"#), "0xff");
+    assert_eq!(eval_string(r#"sprintf("%#X", 255)"#), "0XFF");
+    assert_eq!(eval_string(r#"sprintf("%#o", 8)"#), "010");
+    assert_eq!(eval_string(r#"sprintf("%#b", 5)"#), "0b101");
 }
 
 #[test]
