@@ -62,13 +62,18 @@ fn map_inside_closure_captures_unique_per_iteration() {
     );
 }
 
-// ── Closure capture: broken forms (capture-by-value of outer-scope vars) ────
+// ── Closure capture: capture-by-value of outer-scope vars (DESIGN-001) ──────
+//
+// Stryke closures snapshot outer-scope `my` variables at capture time
+// rather than holding a live reference to their storage — matching Rust's
+// `move ||` semantics and trading shared-mutable state for race-free
+// dispatch into the parallel runtime (pmap, pfor, async/spawn). This is
+// **intentional**, not a bug. See BUGS.md DESIGN-001.
 
 #[test]
-fn closure_does_not_see_outer_var_mutation_today() {
-    // BUG-089: in Perl this round-trips `5 -> 10` because the closure shares
-    // storage with the outer `$x`. Stryke captures the value at closure
-    // definition (or some equivalent snapshot) and never updates.
+fn closure_captures_outer_var_by_value() {
+    // Perl shares storage; stryke snapshots. The closure observes the
+    // value at definition time (5), not the post-`=` value (10).
     assert_eq!(
         eval_int(r#"my $x = 5; my $f = sub { $x }; $x = 10; $f->()"#),
         5
@@ -76,10 +81,10 @@ fn closure_does_not_see_outer_var_mutation_today() {
 }
 
 #[test]
-fn closure_modifying_outer_scalar_does_not_propagate_today() {
-    // BUG-089b: incrementing `$count` from inside the closure does not
-    // update the outer `$count`. The classic "outer counter" idiom is
-    // broken.
+fn closure_modifying_outer_scalar_stays_local() {
+    // Incrementing `$count` from inside the closure mutates the closure's
+    // captured copy, not the outer binding. Use a factory or explicit
+    // ref-through (\$n; ${$ref}++) for the Perl outer-counter idiom.
     assert_eq!(
         eval_int(
             r#"my $count = 0;
@@ -92,9 +97,9 @@ fn closure_modifying_outer_scalar_does_not_propagate_today() {
 }
 
 #[test]
-fn closure_does_not_observe_outer_array_push_today() {
-    // BUG-089c: arrays mutated outside the closure stay frozen at the
-    // closure's snapshot.
+fn closure_does_not_observe_outer_array_push() {
+    // Arrays mutated outside the closure stay frozen at the closure's
+    // snapshot. Pass a ref (\@a) for shared aliasing.
     assert_eq!(
         eval_string(
             r#"my @a = (1, 2);
@@ -107,7 +112,7 @@ fn closure_does_not_observe_outer_array_push_today() {
 }
 
 #[test]
-fn closure_does_not_observe_outer_hash_extension_today() {
+fn closure_does_not_observe_outer_hash_extension() {
     assert_eq!(
         eval_string(
             r#"my %h = (a => 1);

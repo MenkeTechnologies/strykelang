@@ -5750,8 +5750,31 @@ impl Parser {
         {
             None
         } else {
-            // Only parse up to the assign level to avoid consuming postfix if/unless
-            Some(self.parse_assign_expr()?)
+            // Parse the operand as a comma-list — Perl's `return` is a
+            // list-operator, so `return 1, 2, 3` returns the list (1, 2, 3).
+            // (BUG-010) Stay below pipe-forward and stop at postfix
+            // statement-modifier keywords like `if` / `unless`.
+            let first = self.parse_assign_expr()?;
+            if matches!(self.peek(), Token::Comma | Token::FatArrow) {
+                let mut items = vec![first];
+                while self.eat(&Token::Comma) || self.eat(&Token::FatArrow) {
+                    if matches!(
+                        self.peek(),
+                        Token::Semicolon | Token::RBrace | Token::Eof
+                    ) || self.peek_is_postfix_stmt_modifier_keyword()
+                    {
+                        break;
+                    }
+                    items.push(self.parse_assign_expr()?);
+                }
+                let line = items.first().map(|e| e.line).unwrap_or(line);
+                Some(Expr {
+                    kind: ExprKind::List(items),
+                    line,
+                })
+            } else {
+                Some(first)
+            }
         };
         // Check for postfix modifiers on return
         let stmt = Statement {

@@ -405,23 +405,22 @@ fn implicit_list_return_yields_full_list() {
 }
 
 #[test]
-fn explicit_return_paren_list_collapses_to_last_today() {
-    // BUG-010: `return (1, 2, 3)` returns the last comma operand instead of
-    // the full list. Pinned at current behavior.
+fn explicit_return_paren_list_returns_full_list() {
+    // BUG-010 FIXED: `return (1, 2, 3)` propagates the caller's wantarray
+    // context, so a list-context call gets the full list (1, 2, 3).
     assert_eq!(
         eval_string(r#"fn xs { return (1, 2, 3) } my @a = xs(); "@a""#),
-        "3"
+        "1 2 3"
     );
 }
 
 #[test]
-fn explicit_return_with_bare_commas_is_syntax_error() {
-    let kind = parse_err_kind(r#"fn xs { return 1, 2, 3 } xs()"#);
-    use stryke::error::ErrorKind;
-    assert!(
-        matches!(kind, ErrorKind::Syntax),
-        "expected syntax error, got {:?}",
-        kind
+fn explicit_return_with_bare_commas_returns_full_list() {
+    // BUG-010b FIXED: `return 1, 2, 3` (no parens) is a list-operator form
+    // — Perl accepts it. Stryke now parses it as a comma-list operand.
+    assert_eq!(
+        eval_string(r#"fn xs { return 1, 2, 3 } my @a = xs(); "@a""#),
+        "1 2 3"
     );
 }
 
@@ -434,12 +433,14 @@ fn return_array_var_passes_through_full_list() {
 }
 
 #[test]
-fn list_returning_sub_in_scalar_context_concatenates_today() {
-    // BUG-011: assigning a list-returning sub to a scalar should produce the
-    // last element ("3"). Stryke today concatenates ("123").
+fn list_returning_sub_in_scalar_context_yields_last() {
+    // BUG-011 FIXED (alongside BUG-010): assigning a list-returning sub to
+    // a scalar yields the last element of the list (Perl wantarray
+    // semantics). Coercion happens at Op::ReturnValue when the caller's
+    // wantarray context is Scalar.
     assert_eq!(
         eval_string(r#"sub xs { (1, 2, 3) } my $s = xs(); $s"#),
-        "123"
+        "3"
     );
 }
 

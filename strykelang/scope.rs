@@ -2356,35 +2356,57 @@ impl Scope {
     }
 
     pub fn capture(&mut self) -> Vec<(String, PerlValue)> {
+        // Capture wraps simple scalars in CaptureCell so repeat calls of the
+        // SAME closure share state internally (factory pattern: `sub { ++$n }`
+        // counts up). Whether the OUTER scope's storage is updated to share
+        // the same cell — i.e. whether outer mutations are observable to the
+        // closure (and vice versa) — depends on the mode:
+        //
+        //   - default stryke: cell is closure-local. Outer scope keeps its
+        //     own storage. Outer mutations are NOT observable (DESIGN-001;
+        //     race-free dispatch into pmap/pfor/async/spawn). Use `mysync`
+        //     for explicitly-shared variables.
+        //   - --compat: cell is shared by mutating outer storage to point at
+        //     the same Arc. Perl 5 shared-storage closure semantics.
+        let by_ref = crate::compat_mode();
         let mut captured = Vec::new();
         for frame in &mut self.frames {
+            // Hash-stored scalars cover package globals (`our $x` /
+            // `$main::caught`) and other named-storage cases. These are
+            // **always shared** across closures regardless of compat mode —
+            // package globals are explicitly mutable cross-scope state, and
+            // pretending otherwise would break `$SIG{__WARN__} = sub { … }`,
+            // observer registration, accumulator patterns, etc.
             for (k, v) in &mut frame.scalars {
-                // Wrap scalar in CaptureCell so the closure shares the same memory cell.
-                // If it's already a CaptureCell or ScalarRef, clone as-is (shares the same Arc).
-                // Only wrap simple scalars (integers, floats, strings, undef); complex values
-                // like refs, blessed objects, atomics, etc. already share via Arc and wrapping
-                // them in CaptureCell breaks type detection (as_ppool, as_blessed_ref, etc.).
                 if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                     captured.push((format!("${}", k), v.clone()));
                 } else if v.is_simple_scalar() {
                     let wrapped = PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())));
-                    // Update the original scope variable to point to the same CaptureCell
-                    // so that subsequent closures share the same reference.
                     *v = wrapped.clone();
                     captured.push((format!("${}", k), wrapped));
                 } else {
                     captured.push((format!("${}", k), v.clone()));
                 }
             }
-            for (i, v) in frame.scalar_slots.iter().enumerate() {
+            // Slot-stored scalars are lexical `my` declarations. Closure
+            // capture rule (DESIGN-001):
+            //   - default stryke: cell is closure-local. Repeat calls of the
+            //     same closure share state (factory pattern), but outer
+            //     mutations are NOT observable. Use `mysync` for shared
+            //     state.
+            //   - --compat: cell is shared with outer scope (Perl 5).
+            for (i, v) in frame.scalar_slots.iter_mut().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
-                    // Wrap slot value in CaptureCell for closure sharing.
-                    let wrapped = if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
+                    let cap_val = if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {
-                        PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())))
+                        let wrapped = PerlValue::capture_cell(Arc::new(RwLock::new(v.clone())));
+                        if by_ref {
+                            *v = wrapped.clone();
+                        }
+                        wrapped
                     };
-                    captured.push((format!("$slot:{}:{}", i, name), wrapped));
+                    captured.push((format!("$slot:{}:{}", i, name), cap_val));
                 }
             }
             for (k, v) in &frame.arrays {

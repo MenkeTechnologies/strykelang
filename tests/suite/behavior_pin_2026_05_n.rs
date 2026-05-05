@@ -118,14 +118,16 @@ fn use_integer_pragma_lib_path_tries_to_load_integer_pm_today() {
     );
 }
 
-// ── Octal `0o` prefix not recognized today ─────────────────────────────────
+// ── Octal `0o` prefix recognized (BUG-082 FIXED) ────────────────────────────
 
 #[test]
-fn octal_o_prefix_returns_zero_today() {
-    // BUG-082: Perl 5.34+ accepts `0o777` for octal 511. Stryke parses `0o`
-    // as "0" followed by an unrelated identifier `o777` and emits `0`.
-    assert_eq!(eval_int("0o777"), 0);
-    assert_eq!(eval_int("0o17"), 0);
+fn octal_o_prefix_returns_511() {
+    // BUG-082 FIXED: Lexer recognises Perl 5.34+'s `0o` / `0O` prefix
+    // alongside `0x`, `0b`, and bare-`0` octal. Underscore separators work.
+    assert_eq!(eval_int("0o777"), 511);
+    assert_eq!(eval_int("0O777"), 511);
+    assert_eq!(eval_int("0o17"), 15);
+    assert_eq!(eval_int("0o7_7_7"), 511);
 }
 
 #[test]

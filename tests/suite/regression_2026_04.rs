@@ -170,9 +170,9 @@ fn return_range_returns_contents() {
 }
 
 #[test]
-fn return_list_in_scalar_context_stringifies() {
-    // When a sub returns a list literal, it stringifies in scalar context
-    // Note: This differs from Perl 5 which returns last element
+fn return_list_in_scalar_context_yields_last_element() {
+    // BUG-010 / BUG-011 FIXED: a sub returning a list literal called in
+    // scalar context yields the last element (Perl wantarray semantics).
     assert_eq!(
         eval_string(
             r#"
@@ -181,7 +181,7 @@ fn return_list_in_scalar_context_stringifies() {
             $x
             "#
         ),
-        "102030"
+        "30"
     );
 }
 

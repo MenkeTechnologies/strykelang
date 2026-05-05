@@ -441,6 +441,18 @@ impl Lexer {
                     self.advance();
                     self.advance();
                 }
+                // `0o777` — Perl 5.34+ octal prefix (alongside the bare-`0`
+                // form). (BUG-082) Read the same digit pool as bare `0...`
+                // octals, but skip the `0o` prefix in the conversion.
+                Some('o') | Some('O') => {
+                    self.advance();
+                    self.advance();
+                    let digits = self.read_while(|c| c.is_ascii_digit() || c == '_');
+                    let clean: String = digits.chars().filter(|&c| c != '_').collect();
+                    let val = i64::from_str_radix(&clean, 8)
+                        .map_err(|_| self.syntax_err("Invalid octal literal", self.line))?;
+                    return Ok(Token::Integer(val));
+                }
                 Some(c) if c.is_ascii_digit() => {
                     is_oct = true;
                 }
