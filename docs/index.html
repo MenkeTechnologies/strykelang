@@ -802,6 +802,28 @@ fn deep($_0, $_1, $_2) {
       </section>
 
       <section class="tutorial-section">
+        <h2>Coderef-in-block-position</h2>
+        <p>Wherever a <code>{ BLOCK }</code> is accepted in a per-element list operator (<code>grep</code>, <code>map</code>, <code>sort</code>, <code>first</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>take_while</code>, <code>drop_while</code>, <code>reject</code>, <code>partition</code>, <code>min_by</code>, <code>max_by</code>, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the <code>{ $f($_) }</code> / <code>{ $f-&gt;($_) }</code> boilerplate.</p>
+<pre><span class="comment"># grep / map — single coderef, no block:</span>
+my $is_big = fn ($x) { $x &gt; 3 }
+my @r = grep $is_big, @l                  <span class="comment"># was: grep { $is_big-&gt;($_) } @l</span>
+my @r = @l |&gt; grep $is_big                <span class="comment"># pipe-forward variant</span>
+my @doubled = map fn { _ * 2 }, @l        <span class="comment"># inline coderef</span>
+
+<span class="comment"># Sort comparators receive ($a, $b) positionally — no $a/$b global magic:</span>
+my $cmp = fn ($a, $b) { $b &lt;=&gt; $a }       <span class="comment"># or fn { _0 &lt;=&gt; _1 } using positional aliases</span>
+my @s = sort $cmp @l
+
+<span class="comment"># Tier-2 builtins — no parens, no block:</span>
+my $r = first $is_big, @l
+my $a = any $is_big, @l
+my @t = take_while $is_big, @l
+my @r = reject $is_big, @l                <span class="comment"># inverse of grep</span></pre>
+        <p><strong>Threading <code>~&gt;</code> excluded</strong> — whitespace-delimited stages can't disambiguate <code>~&gt; @l grep $f</code> from "two stages", so threading still requires <code>{ $f(_) }</code>. Use <code>|&gt;</code> for the bare-coderef form, or stay with <code>{ }</code> blocks under <code>~&gt;</code>.</p>
+        <p><strong>Under <code>--compat</code></strong>: dispatch is skipped, restoring Perl's "evaluate EXPR per element, filter by truthiness" semantics. A coderef value is always truthy, so <code>grep $f, @l</code> keeps every element under <code>--compat</code>.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Hash-key power forms</h2>
         <p>Stryke extends Perl's bareword autoquoting in three ways:</p>
         <ul>

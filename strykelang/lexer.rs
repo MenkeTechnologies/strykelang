@@ -2050,6 +2050,29 @@ impl Lexer {
                             }
                         }
                     }
+                    // `_N` (underscore + digits, ≥ 1 digit) is a reserved
+                    // positional-alias name — never a function name. Emit
+                    // ScalarVar directly so bareword `_1`, `_2`, ... in
+                    // expression position resolves to the scalar slot
+                    // instead of being looked up as a sub call. Bare `_`
+                    // alone (without digits) keeps Ident shape so the
+                    // existing topic/bareword machinery still runs.
+                    if ident.len() > 1
+                        && ident.starts_with('_')
+                        && ident
+                            .chars()
+                            .nth(1)
+                            .is_some_and(|c| c.is_ascii_digit())
+                    {
+                        self.last_was_term = true;
+                        return Ok(Token::ScalarVar(ident));
+                    }
+                    // Also reserve bare `_<+` (chevron-only topic ascent on
+                    // slot 0) — these are never sub names.
+                    if ident.starts_with('_') && ident.contains('<') {
+                        self.last_was_term = true;
+                        return Ok(Token::ScalarVar(ident));
+                    }
                 }
 
                 // Special multi-char constructs

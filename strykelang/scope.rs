@@ -1232,6 +1232,16 @@ impl Scope {
         // visible. `set_closure_args` does NOT set this flag, so a sub call
         // followed by `map { ... }` still gets a real shift on the FIRST
         // map iter (the chain becomes "the sub's args at level 1").
+        //
+        // Slots 1+ (`$_1`, `$_2`, …, `$_N`) are NOT touched here. They are
+        // caller-frame positional aliases set by [`Self::set_closure_args`]
+        // at fn boundaries; map/grep iteration is not a fn boundary, so
+        // those values stay visible from the surrounding fn. This makes
+        // EXPR-form HOF patterns like `grep _1, @$_` work — `_1` reads
+        // the surrounding fn's second arg per iter rather than getting
+        // nuked to undef. Block-form `grep { ... }` invokes a CodeRef via
+        // `set_closure_args` which has its own frame, so block bodies
+        // still see fresh positionals.
         let already_shifted = self
             .frames
             .last()
@@ -1239,18 +1249,12 @@ impl Scope {
             .unwrap_or(false);
         if already_shifted {
             self.declare_topic_slot(0, 0, val);
-            for slot in 1..=self.max_active_slot {
-                self.declare_topic_slot(slot, 0, PerlValue::UNDEF);
-            }
             return;
         }
         if let Some(frame) = self.frames.last_mut() {
             frame.set_topic_called = true;
         }
         self.shift_slot_chain(0, val);
-        for slot in 1..=self.max_active_slot {
-            self.shift_slot_chain(slot, PerlValue::UNDEF);
-        }
     }
 
     /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all
