@@ -105,12 +105,12 @@ fn no_warnings_pragma_runs_without_error() {
 
 #[test]
 fn log_zero_is_negative_infinity() {
-    assert_eq!(eval_string("log(0)"), "-inf");
+    assert_eq!(eval_string("log(0)"), "-Inf");
 }
 
 #[test]
 fn log_negative_one_is_nan() {
-    assert_eq!(eval_string("log(-1)"), "nan");
+    assert_eq!(eval_string("log(-1)"), "NaN");
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn zero_to_zero_is_one() {
 
 #[test]
 fn zero_to_negative_one_is_inf() {
-    assert_eq!(eval_string("0 ** -1"), "inf");
+    assert_eq!(eval_string("0 ** -1"), "Inf");
 }
 
 #[test]
