@@ -18,7 +18,7 @@
 //!     `up` (or `down`) method in order.
 
 use crate::error::PerlError;
-use crate::interpreter::{FlowOrError, Interpreter};
+use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::native_data::{exec_sql, perl_to_sql_value, query_sql};
 use crate::value::PerlValue;
 use indexmap::IndexMap;
@@ -828,7 +828,7 @@ pub(crate) fn web_remove_column(args: &[PerlValue], line: usize) -> Result<PerlV
 // `require`d. The migrator picks them up by name pattern and invokes
 // their `up` / `down` blocks in deterministic order.
 
-impl Interpreter {
+impl VMHelper {
     pub(crate) fn web_migrate(&mut self, _args: &[PerlValue], line: usize) -> Result<PerlValue> {
         with_db(
             |c| {

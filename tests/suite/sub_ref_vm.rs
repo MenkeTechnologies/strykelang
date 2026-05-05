@@ -1,7 +1,7 @@
 //! `&sub` / `\&sub` / `\&{ EXPR }` lowered to VM (`Op::Call` / `Op::LoadNamedSubRef` / `Op::LoadDynamicSubRef`).
 
 use crate::common::*;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 
 #[test]
 fn ampersand_sub_invokes_named_sub() {
@@ -34,7 +34,7 @@ fn vm_program_compiles_subroutine_code_ref() {
         fn foo { 1 }
         \&foo"#;
     let program = stryke::parse(code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     assert!(
         stryke::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for \\\\&foo expression"
@@ -47,7 +47,7 @@ fn vm_program_compiles_dynamic_subroutine_coderef() {
         fn g { 7 }
         \&{"g"}"#;
     let program = stryke::parse(code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     assert!(
         stryke::try_vm_execute(&program, &mut interp).is_some(),
         "expected bytecode VM for Op::LoadDynamicSubRef (dynamic coderef)"

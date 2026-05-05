@@ -2,7 +2,7 @@
 
 use crate::common::*;
 use std::path::PathBuf;
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 
 #[test]
 fn mkdir_creates_directory_and_file_test_sees_it() {
@@ -109,7 +109,7 @@ fn piped_open_readline_works() {
         $x;
     "#;
     let program = stryke::parse(code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert!(v.to_string().contains("hi"));
 }
@@ -201,7 +201,7 @@ fn pipe_builtin_rw_roundtrip() {
         $x eq "ping\n" ? 1 : 0;
     "#;
     let program = stryke::parse(code).expect("parse");
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program).expect("execute");
     assert_eq!(v.to_int(), 1);
 }

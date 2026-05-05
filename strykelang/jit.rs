@@ -116,7 +116,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{default_libcall_names, Linkage, Module};
 
 use crate::bytecode::Op;
-use crate::interpreter::WantarrayCtx;
+use crate::vm_helper::WantarrayCtx;
 use crate::nanbox;
 use crate::value::PerlValue;
 
@@ -4323,7 +4323,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_uses_jit_path_for_pure_int() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4331,7 +4331,7 @@ mod tests {
         c.emit(Op::LoadInt(2), 1);
         c.emit(Op::Add, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 42);
@@ -4339,7 +4339,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_uses_jit_with_integer_load_const() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4348,7 +4348,7 @@ mod tests {
         c.emit(Op::LoadInt(2), 1);
         c.emit(Op::Add, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 42);
@@ -4356,7 +4356,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_get_scalar_plain_add() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4365,7 +4365,7 @@ mod tests {
         c.emit(Op::LoadInt(2), 1);
         c.emit(Op::Add, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.scope.declare_scalar("v", PerlValue::integer(40));
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
@@ -4374,14 +4374,14 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_lognot() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
         c.emit(Op::LoadInt(0), 1);
         c.emit(Op::LogNot, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 1);
@@ -4389,7 +4389,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_num_cmp() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4397,7 +4397,7 @@ mod tests {
         c.emit(Op::LoadInt(3), 1);
         c.emit(Op::NumLt, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 1);
@@ -4455,7 +4455,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_declare_slot_post_inc() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4465,7 +4465,7 @@ mod tests {
         c.emit(Op::Pop, 1);
         c.emit(Op::GetScalarSlot(0), 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 11);
@@ -4487,7 +4487,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_pow_slot_to_const_exp() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -4497,7 +4497,7 @@ mod tests {
         c.emit(Op::LoadInt(3), 1);
         c.emit(Op::Pow, 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 8);
@@ -5005,7 +5005,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_block_jit_for_loop() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         // for ($i=0; $i<10; $i++) { $sum += $i } → 45
@@ -5031,7 +5031,7 @@ mod tests {
         c.emit(Op::GetScalarSlot(1), 1);
         c.emit(Op::Halt, 1);
 
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 45);
@@ -5039,7 +5039,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_block_jit_conditional() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         // if (1) { 42 } else { 0 }
@@ -5051,7 +5051,7 @@ mod tests {
         c.emit(Op::LoadInt(0), 1);
         c.emit(Op::Halt, 1);
 
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");
         assert_eq!(v.to_int(), 42);
@@ -5153,7 +5153,7 @@ mod tests {
 
     #[test]
     fn vm_chunk_jit_set_scalar_plain() {
-        use crate::interpreter::Interpreter;
+        use crate::vm_helper::VMHelper;
         use crate::vm::VM;
 
         let mut c = Chunk::new();
@@ -5161,7 +5161,7 @@ mod tests {
         c.emit(Op::LoadInt(42), 1);
         c.emit(Op::SetScalarKeepPlain(idx), 1);
         c.emit(Op::Halt, 1);
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.scope.declare_scalar("x", PerlValue::integer(0));
         let mut vm = VM::new(&c, &mut interp);
         let v = vm.execute().expect("vm");

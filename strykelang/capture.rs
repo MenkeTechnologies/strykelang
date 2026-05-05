@@ -4,13 +4,13 @@ use std::process::Command;
 use std::sync::Arc;
 
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::Interpreter;
+use crate::vm_helper::VMHelper;
 use crate::perl_decode::decode_utf8_or_latin1;
 use crate::value::{CaptureResult, PerlValue};
 
 /// Run `cmd` through `sh -c` and return stdout as a string (Perl `` `...` `` / `qx`).
-/// Updates [`Interpreter::child_exit_status`] (`$?`) like [`run_capture`] and `system`.
-pub fn run_readpipe(interp: &mut Interpreter, cmd: &str, line: usize) -> PerlResult<PerlValue> {
+/// Updates [`VMHelper::child_exit_status`] (`$?`) like [`run_capture`] and `system`.
+pub fn run_readpipe(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult<PerlValue> {
     let output = match Command::new("sh").arg("-c").arg(cmd).output() {
         Ok(o) => o,
         Err(e) => {
@@ -24,8 +24,8 @@ pub fn run_readpipe(interp: &mut Interpreter, cmd: &str, line: usize) -> PerlRes
 }
 
 /// Run `cmd` through `sh -c` and return stdout, stderr, and exit code.
-/// Updates [`Interpreter::child_exit_status`] (`$?`) like `system` and backticks.
-pub fn run_capture(interp: &mut Interpreter, cmd: &str, line: usize) -> PerlResult<PerlValue> {
+/// Updates [`VMHelper::child_exit_status`] (`$?`) like `system` and backticks.
+pub fn run_capture(interp: &mut VMHelper, cmd: &str, line: usize) -> PerlResult<PerlValue> {
     let output = match Command::new("sh").arg("-c").arg(cmd).output() {
         Ok(o) => o,
         Err(e) => {
@@ -51,14 +51,14 @@ mod tests {
 
     #[test]
     fn run_readpipe_echo_stdout_string() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let v = run_readpipe(&mut interp, "echo stryke_readpipe_ok", 1).expect("readpipe");
         assert_eq!(v.to_string(), "stryke_readpipe_ok\n");
     }
 
     #[test]
     fn run_capture_echo_stdout_exit_zero() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let v = run_capture(&mut interp, "echo stryke_capture_ok", 1).expect("capture");
         let c = v.as_capture().expect("capture PerlValue");
         assert_eq!(c.exitcode, 0, "stderr={:?}", c.stderr);
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn run_capture_false_nonzero_exit() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let v = run_capture(&mut interp, "false", 1).expect("capture");
         let c = v.as_capture().expect("capture PerlValue");
         assert_ne!(c.exitcode, 0);

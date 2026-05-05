@@ -40,7 +40,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::Block;
-use crate::interpreter::{FlowOrError, Interpreter};
+use crate::vm_helper::{FlowOrError, VMHelper};
 use crate::value::{PerlSub, PerlValue};
 
 /// Frame-kind discriminator. Stored as the first byte of every wire payload after the
@@ -370,7 +370,7 @@ pub fn build_subs_prelude(subs: &HashMap<String, Arc<PerlSub>>) -> String {
 
 /// Run one job in-process (for tests / local debugging).
 pub fn run_job_local(job: &RemoteJobV1) -> RemoteRespV1 {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let cap: Vec<(String, PerlValue)> = match job
         .capture
         .iter()
@@ -502,7 +502,7 @@ pub fn run_remote_worker_session() -> i32 {
 
     // Parse subs prelude ONCE so they're registered for every JOB; parse block ONCE so we
     // can hand the same `Block` to `exec_block_smart` per item without re-parsing.
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let prelude_program = match crate::parse(&init.subs_prelude) {
         Ok(p) => p,
         Err(e) => {
@@ -617,7 +617,7 @@ pub fn run_remote_worker_session() -> i32 {
 /// Run one JOB inside an active session. Sets `$_` to the item, evaluates the cached block,
 /// returns the JSON-marshalled result. Preserves Interpreter state across jobs so anything
 /// the prelude installed (named subs, package vars) stays live.
-fn run_one_session_job(interp: &mut Interpreter, block: &Block, job: &JobMsg) -> JobRespMsg {
+fn run_one_session_job(interp: &mut VMHelper, block: &Block, job: &JobMsg) -> JobRespMsg {
     let item_pv = match json_to_perl(&job.item) {
         Ok(v) => v,
         Err(e) => {

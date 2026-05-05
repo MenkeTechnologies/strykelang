@@ -789,7 +789,7 @@ fn perl_to_json(v: &PerlValue) -> serde_json::Value {
 // binary's interactive state — only call it from a dedicated MCP
 // server entry point.
 
-use crate::interpreter::{FlowOrError, Interpreter, WantarrayCtx};
+use crate::vm_helper::{FlowOrError, VMHelper, WantarrayCtx};
 use crate::value::{PerlSub, PerlValue as PV};
 
 struct ServerTool {
@@ -799,7 +799,7 @@ struct ServerTool {
     run_sub: Arc<PerlSub>,
 }
 
-impl crate::interpreter::Interpreter {
+impl crate::vm_helper::VMHelper {
     pub(crate) fn mcp_server_start(
         &mut self,
         args: &[PerlValue],
@@ -832,7 +832,7 @@ impl crate::interpreter::Interpreter {
 }
 
 pub(crate) fn mcp_server_start_dispatch(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> Result<PerlValue> {
@@ -846,7 +846,7 @@ pub(crate) fn mcp_server_start_dispatch(
 /// both flags eventually call this after the user's script has had a
 /// chance to register its tools.
 pub(crate) fn mcp_serve_registered_tools(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> Result<PerlValue> {
@@ -874,7 +874,7 @@ pub(crate) fn mcp_serve_registered_tools(
 }
 
 pub(crate) fn mcp_serve_registered_tools_dispatch(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> Result<PerlValue> {
@@ -960,7 +960,7 @@ fn server_params_to_schema(v: &PerlValue) -> serde_json::Value {
 }
 
 fn run_stdio_server(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     name: &str,
     tools: &[ServerTool],
     line: usize,

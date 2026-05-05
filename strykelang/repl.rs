@@ -35,7 +35,7 @@ use reedline::{
 
 use crate::Cli;
 use stryke::error::ErrorKind;
-use stryke::interpreter::{repl_arrow_method_completions, Interpreter, ReplCompletionSnapshot};
+use stryke::vm_helper::{repl_arrow_method_completions, VMHelper, ReplCompletionSnapshot};
 use stryke::lsp::builtin_completion_words;
 use stryke::token::KEYWORDS;
 
@@ -296,7 +296,7 @@ impl Prompt for StrykePrompt {
 }
 
 pub fn run(cli: &Cli) {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     crate::configure_interpreter(cli, &mut interp, "repl");
 
     let prelude = crate::module_prelude(cli);

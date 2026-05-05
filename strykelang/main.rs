@@ -10,7 +10,7 @@ use rayon::prelude::*;
 
 use stryke::ast::Program;
 use stryke::error::{ErrorKind, PerlError};
-use stryke::interpreter::Interpreter;
+use stryke::vm_helper::VMHelper;
 use stryke::perl_fs::{
     decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
     read_logical_line_perl_compat,
@@ -679,7 +679,7 @@ fn line_content_from_stdin_read_line(buf: &str) -> String {
 /// `-n` / `-p` input loop: `@ARGV` files when non-empty, else stdin; `-i` rewrites named files.
 fn run_line_mode_loop(
     cli: &Cli,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     program: &Program,
     slurp: bool,
 ) -> Result<(), PerlError> {
@@ -934,7 +934,7 @@ fn run_line_mode_loop(
     Ok(())
 }
 
-pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut Interpreter, filename: &str) {
+pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: &str) {
     interp.set_file(filename);
     interp.warnings = (cli.warnings || cli.all_warnings) && !cli.no_warnings;
     interp.auto_split = cli.auto_split;
@@ -1941,7 +1941,7 @@ fn main() {
     }
 
     if cli.lint {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         if cli.no_jit {
             interp.vm_jit_enabled = false;
         }
@@ -1971,7 +1971,7 @@ fn main() {
         return;
     }
 
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     if cli.no_jit {
         interp.vm_jit_enabled = false;
     }
@@ -2109,7 +2109,7 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
             return 255;
         }
     };
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file(&embedded.name);
     interp.program_name = embedded.name.clone();
     interp.argv = argv.clone();
@@ -2162,7 +2162,7 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
         }
     };
 
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file(&bundle.entry);
     interp.program_name = bundle.entry.clone();
     interp.argv = argv.clone();
@@ -2204,10 +2204,10 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
 /// `stryke BUILTIN [ARGS...]` — invoke a builtin function directly from CLI.
 /// Hierarchy: subcommand → builtin → script. Use `--script` to force script lookup.
 fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
-    use stryke::interpreter::Interpreter;
+    use stryke::vm_helper::VMHelper;
     use stryke::value::PerlValue;
 
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let argv_values: Vec<PerlValue> = argv.iter().map(|s| PerlValue::string(s.clone())).collect();
     let _ = interp.scope.set_array("ARGV", argv_values);
 
@@ -2325,7 +2325,7 @@ fn run_check_subcommand(args: &[String]) -> i32 {
             }
         };
 
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.set_file(file);
         match stryke::lint_program(&program, &mut interp) {
             Ok(()) => {
@@ -2417,7 +2417,7 @@ fn run_disasm_subcommand(args: &[String]) -> i32 {
         }
     };
 
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.set_file(&file);
     if let Err(e) = stryke::lint_program(&program, &mut interp) {
         eprintln!("{}", e);
@@ -2848,7 +2848,7 @@ fn run_ai_subcommand(args: &[String]) -> i32 {
         &prompt.replace('\\', "\\\\").replace('}', "\\}"),
     );
 
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     match stryke::parse_and_run_string(&final_script, &mut interp) {
         Ok(_) => 0,
         Err(e) => {
@@ -2970,7 +2970,7 @@ fn run_ai_speak_cli(
 
 /// Shared script-driver for the three modal `stryke ai` CLI helpers.
 fn run_ai_cli_script(script: &str) -> i32 {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     match stryke::parse_and_run_string(script, &mut interp) {
         Ok(_) => 0,
         Err(e) => {
@@ -3419,7 +3419,7 @@ serve {port}, fn ($req) {{
         }
     };
 
-    let mut interp = stryke::interpreter::Interpreter::new();
+    let mut interp = stryke::vm_helper::VMHelper::new();
     match stryke::parse_and_run_string(&code, &mut interp) {
         Ok(_) => 0,
         Err(e) => {

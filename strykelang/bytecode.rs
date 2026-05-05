@@ -9,7 +9,7 @@ use crate::value::PerlValue;
 pub(crate) type SpliceExprEntry = (Expr, Option<Expr>, Option<Expr>, Vec<Expr>);
 
 /// `sub` body registered at run time (e.g. `BEGIN { sub f { ... } }`), mirrored from
-/// [`crate::interpreter::Interpreter::exec_statement`] `StmtKind::SubDecl`.
+/// [`crate::vm_helper::VMHelper::exec_statement`] `StmtKind::SubDecl`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeSubDecl {
     pub name: String,
@@ -253,7 +253,7 @@ pub enum Op {
     ReturnValue,
     /// End of a compiled `map` / `grep` / `sort` block body (empty block or last statement an expression).
     /// Pops the synthetic call frame from [`crate::vm::VM::run_block_region`] and unwinds the
-    /// block-local scope (`scope_push_hook` per iteration, like [`crate::interpreter::Interpreter::exec_block`]);
+    /// block-local scope (`scope_push_hook` per iteration, like [`crate::vm_helper::VMHelper::exec_block`]);
     /// not subroutine `return` and not a closure capture.
     BlockReturnValue,
     /// At runtime statement position: capture current lexicals into [`crate::value::PerlSub::closure_env`]
@@ -265,15 +265,15 @@ pub enum Op {
     PopFrame,
 
     // ── I/O ──
-    /// `print [HANDLE] LIST` — `None` uses [`crate::interpreter::Interpreter::default_print_handle`].
+    /// `print [HANDLE] LIST` — `None` uses [`crate::vm_helper::VMHelper::default_print_handle`].
     Print(Option<u16>, u8),
     Say(Option<u16>, u8),
 
     // ── Built-in function calls ──
     /// Calls a registered built-in: (builtin_id, arg_count)
     CallBuiltin(u16, u8),
-    /// Save [`crate::interpreter::Interpreter::wantarray_kind`] and set from `u8`
-    /// ([`crate::interpreter::WantarrayCtx::as_byte`]). Used for `splice` / similar where the
+    /// Save [`crate::vm_helper::VMHelper::wantarray_kind`] and set from `u8`
+    /// ([`crate::vm_helper::WantarrayCtx::as_byte`]). Used for `splice` / similar where the
     /// dynamic context must match the expression's compile-time [`WantarrayCtx`] (e.g. `print splice…`).
     WantarrayPush(u8),
     /// Restore after [`Op::WantarrayPush`].
@@ -325,16 +325,16 @@ pub enum Op {
     /// Stack `[container, key1, …, keyN, cur]` — drop container and keys; keep `cur`.
     HashSliceDerefDropKeysKeepCur(u16),
     /// `@$aref[i1,i2,...] = LIST` — stack: `[value, aref, spec1, …, specN]` (TOS = last spec);
-    /// pops `N+2`. Delegates to [`crate::interpreter::Interpreter::assign_arrow_array_slice`].
+    /// pops `N+2`. Delegates to [`crate::vm_helper::VMHelper::assign_arrow_array_slice`].
     SetArrowArraySlice(u16),
     /// `@$aref[i1,i2,...] OP= rhs` — stack: `[rhs, aref, spec1, …, specN]`; pops `N+2`, pushes new value.
     /// `u8` = [`crate::compiler::scalar_compound_op_to_byte`] encoding of the binop.
-    /// Perl 5 applies the op only to the **last** index. Delegates to [`crate::interpreter::Interpreter::compound_assign_arrow_array_slice`].
+    /// Perl 5 applies the op only to the **last** index. Delegates to [`crate::vm_helper::VMHelper::compound_assign_arrow_array_slice`].
     ArrowArraySliceCompound(u8, u16),
     /// `++@$aref[i1,i2,...]` / `--...` / `...++` / `...--` — stack: `[aref, spec1, …, specN]`;
     /// pops `N+1`. Pre-forms push the new last-element value; post-forms push the old last value.
     /// `u8` kind matches [`Op::HashSliceDerefIncDec`]. Only the last index is updated. Delegates to
-    /// [`crate::interpreter::Interpreter::arrow_array_slice_inc_dec`].
+    /// [`crate::vm_helper::VMHelper::arrow_array_slice_inc_dec`].
     ArrowArraySliceIncDec(u8, u16),
     /// Read the element at the **last** flattened index of `@$aref[spec1,…]` without popping `aref`
     /// or specs. Stack: `[aref, spec1, …, specN]` (TOS = last spec) → same plus pushed scalar.
@@ -351,7 +351,7 @@ pub enum Op {
     SetArrowArraySliceLastKeep(u16),
     /// Like [`Op::ArrowArraySliceIncDec`] but for a **named** stash array (`@a[i1,i2,...]`).
     /// Stack: `[spec1, …, specN]` (TOS = last spec). `u16` = name pool index (stash-qualified).
-    /// Delegates to [`crate::interpreter::Interpreter::named_array_slice_inc_dec`].
+    /// Delegates to [`crate::vm_helper::VMHelper::named_array_slice_inc_dec`].
     NamedArraySliceIncDec(u8, u16, u16),
     /// `@name[spec1,…] OP= rhs` — stack `[rhs, spec1, …, specN]` (TOS = last spec); pops `N+1`.
     /// Only the **last** flattened index is updated (same as [`Op::ArrowArraySliceCompound`]).
@@ -371,7 +371,7 @@ pub enum Op {
     /// `BAREWORD` as an rvalue — at run time, look up a subroutine with this name; if found,
     /// call it with no args (nullary), otherwise push the name as a string (Perl's bareword-as-
     /// stringifies behavior). `u16` is a name-pool index. Delegates to
-    /// [`crate::interpreter::Interpreter::resolve_bareword_rvalue`].
+    /// [`crate::vm_helper::VMHelper::resolve_bareword_rvalue`].
     BarewordRvalue(u16),
     /// Throw `PerlError::runtime` with the message at constant pool index `u16`. Used by the compiler
     /// to hard-reject constructs whose only valid response is a runtime error
@@ -673,7 +673,7 @@ pub enum Op {
     FanCapWithBlock(u16),
     /// fan_cap { BLOCK } — like fan; stack: \[progress_flag\] → array
     FanCapWithBlockAuto(u16),
-    /// `do { BLOCK }` — block_idx + wantarray byte ([`crate::interpreter::WantarrayCtx::as_byte`]);
+    /// `do { BLOCK }` — block_idx + wantarray byte ([`crate::vm_helper::WantarrayCtx::as_byte`]);
     /// stack: \[\] → result
     EvalBlock(u16, u8),
     /// `trace { BLOCK }` — block_idx; stack: \[\] → block value (stderr tracing for mysync mutations)
@@ -759,7 +759,7 @@ pub enum Op {
     /// Like [`Op::SetSymbolicScalarRef`] but leaves the assigned value on the stack.
     SetSymbolicScalarRefKeep,
     /// `@{ EXPR } = LIST` — stack: \[list value, ref-or-name\] (top = ref / package name); delegates to
-    /// [`Interpreter::assign_symbolic_array_ref_deref`](crate::interpreter::Interpreter::assign_symbolic_array_ref_deref).
+    /// [`Interpreter::assign_symbolic_array_ref_deref`](crate::vm_helper::VMHelper::assign_symbolic_array_ref_deref).
     SetSymbolicArrayRef,
     /// `%{ EXPR } = LIST` — stack: \[list value, ref-or-name\]; pairs from list like `%h = (k => v, …)`.
     SetSymbolicHashRef,

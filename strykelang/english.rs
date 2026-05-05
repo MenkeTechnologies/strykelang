@@ -6,8 +6,8 @@
 //! Supports `use English qw(-no_match_vars)` to suppress the `$MATCH`, `$PREMATCH`,
 //! and `$POSTMATCH` aliases (the recommended usage in Perl for performance reasons).
 //!
-//! Wired through [`Interpreter::english_scalar_name`](crate::interpreter::Interpreter::english_scalar_name)
-//! when `use English` sets [`Interpreter::english_enabled`](crate::interpreter::Interpreter::english_enabled).
+//! Wired through [`Interpreter::english_scalar_name`](crate::vm_helper::VMHelper::english_scalar_name)
+//! when `use English` sets [`Interpreter::english_enabled`](crate::vm_helper::VMHelper::english_enabled).
 
 use std::collections::HashMap;
 use std::sync::LazyLock;

@@ -29,7 +29,7 @@ pub mod error;
 mod fib_like_tail;
 pub mod fmt;
 pub mod format;
-pub mod interpreter;
+pub mod vm_helper;
 mod jit;
 mod jwt;
 pub mod lexer;
@@ -93,12 +93,12 @@ pub use zsh::tokens as zsh_tokens;
 pub use zsh::zle as shell_zle;
 pub use zsh::zwc as shell_zwc;
 
-pub use interpreter::{
+pub use vm_helper::{
     perl_bracket_version, FEAT_SAY, FEAT_STATE, FEAT_SWITCH, FEAT_UNICODE_STRINGS,
 };
 
 use error::{PerlError, PerlResult};
-use interpreter::Interpreter;
+use vm_helper::VMHelper;
 
 // ── Perl 5 strict-compat mode (`--compat`) ──────────────────────────────────
 
@@ -221,17 +221,17 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<
 
 /// Parse and execute a string of Perl code within an existing interpreter.
 /// Compile and execute via the bytecode VM.
-/// Uses [`Interpreter::file`] for both parse diagnostics and `__FILE__` during this execution.
-pub fn parse_and_run_string(code: &str, interp: &mut Interpreter) -> PerlResult<PerlValue> {
+/// Uses [`VMHelper::file`] for both parse diagnostics and `__FILE__` during this execution.
+pub fn parse_and_run_string(code: &str, interp: &mut VMHelper) -> PerlResult<PerlValue> {
     let file = interp.file.clone();
     parse_and_run_string_in_file(code, interp, &file)
 }
 
 /// Like [`parse_and_run_string`], but parse errors and `__FILE__` for this run use `file` (e.g. a
-/// required module path). Restores [`Interpreter::file`] after execution.
+/// required module path). Restores [`VMHelper::file`] after execution.
 pub fn parse_and_run_string_in_file(
     code: &str,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     file: &str,
 ) -> PerlResult<PerlValue> {
     parse_and_run_string_in_file_inner(code, interp, file, false)
@@ -241,7 +241,7 @@ pub fn parse_and_run_string_in_file(
 /// stryke builtins (e.g. `sub blessed { ... }`) unless `--no-interop` is active.
 pub fn parse_and_run_module_in_file(
     code: &str,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     file: &str,
 ) -> PerlResult<PerlValue> {
     parse_and_run_string_in_file_inner(code, interp, file, true)
@@ -249,7 +249,7 @@ pub fn parse_and_run_module_in_file(
 
 fn parse_and_run_string_in_file_inner(
     code: &str,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     file: &str,
     is_module: bool,
 ) -> PerlResult<PerlValue> {
@@ -287,7 +287,7 @@ pub fn run_lsp_stdio() -> i32 {
 /// Parse and execute a string of Perl code with a fresh interpreter.
 pub fn run(code: &str) -> PerlResult<PerlValue> {
     let program = parse(code)?;
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     let v = interp.execute(&program)?;
     interp.run_global_teardown()?;
     Ok(v)
@@ -302,7 +302,7 @@ pub fn run(code: &str) -> PerlResult<PerlValue> {
 /// run skips lex/parse/compile entirely.
 pub fn try_vm_execute(
     program: &ast::Program,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
 ) -> Option<PerlResult<PerlValue>> {
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
@@ -344,7 +344,7 @@ pub fn try_vm_execute(
 /// Shared execution tail used by both the cache-hit and compile paths in
 /// [`try_vm_execute`]. Pulled out so the rkyv-cache fast path does not duplicate
 /// the flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
-fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlResult<PerlValue> {
+fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> PerlResult<PerlValue> {
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
     if interp.disasm_bytecode {
@@ -442,7 +442,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
             let val = if let Some(ref expr) = sf.default {
                 match interp.eval_expr(expr) {
                     Ok(v) => v,
-                    Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                    Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                     Err(_) => crate::value::PerlValue::UNDEF,
                 }
             } else {
@@ -504,7 +504,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut Interpreter) -> PerlR
 
 /// Compile program and run only the prelude (BEGIN/CHECK/INIT phase blocks) via the VM.
 /// Stores the compiled chunk on `interp.line_mode_chunk` for per-line re-execution.
-pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
+pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) -> PerlResult<()> {
     interp.prepare_program_top_level(program)?;
     let comp = compiler::Compiler::new()
         .with_source_file(interp.file.clone())
@@ -586,7 +586,7 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut Interpreter)
 /// Sets `$_` to `line_str`, runs from `body_start_ip` to Halt, returns `$_` for `-p` output.
 pub fn run_line_body(
     chunk: &bytecode::Chunk,
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     line_str: &str,
     is_last_input_line: bool,
 ) -> PerlResult<Option<String>> {
@@ -623,7 +623,7 @@ pub fn run_line_body(
 
 /// Parse + register top-level subs / `use` (same as the VM path), then compile to bytecode without running.
 /// Also runs static analysis to detect undefined variables and subroutines.
-pub fn lint_program(program: &ast::Program, interp: &mut Interpreter) -> PerlResult<()> {
+pub fn lint_program(program: &ast::Program, interp: &mut VMHelper) -> PerlResult<()> {
     interp.prepare_program_top_level(program)?;
     static_analysis::analyze_program(program, &interp.file)?;
     if interp.strict_refs || interp.strict_subs || interp.strict_vars {
@@ -664,7 +664,7 @@ mod tests {
 
     #[test]
     fn interpreter_scope_persists_global_scalar_across_execute_calls() {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let assign = parse("$persist_test = 100").expect("parse assign");
         interp.execute(&assign).expect("assign");
         let read = parse("$persist_test").expect("parse read");

@@ -5,7 +5,7 @@ use crate::bytecode::{
     BuiltinId, Chunk, Op, RuntimeAdviceDecl, RuntimeSubDecl, GP_CHECK, GP_END, GP_INIT, GP_RUN,
     GP_START,
 };
-use crate::interpreter::{assign_rhs_wantarray, Interpreter, WantarrayCtx};
+use crate::vm_helper::{assign_rhs_wantarray, VMHelper, WantarrayCtx};
 use crate::sort_fast::detect_sort_block_fast;
 use crate::value::PerlValue;
 
@@ -14,7 +14,7 @@ use crate::value::PerlValue;
 /// `sort` / `map` / `grep` calls, array/hash variables and derefs, `@{...}`, etc. Shared
 /// block-bytecode regions compile the tail in scalar context for grep/sort, so map VM paths
 /// consult this predicate to decide whether to reuse the shared region or emit a
-/// list-tail [`Interpreter::exec_block_with_tail`](crate::interpreter::Interpreter::exec_block_with_tail) call.
+/// list-tail [`Interpreter::exec_block_with_tail`](crate::vm_helper::VMHelper::exec_block_with_tail) call.
 pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     match &expr.kind {
         // Range `..` in scalar context is flip-flop, in list context is expansion.
@@ -172,7 +172,7 @@ pub struct Compiler {
     pub end_blocks: Vec<Block>,
     /// Lexical `my` declarations per scope frame (mirrors `PushFrame` / sub bodies).
     scope_stack: Vec<ScopeLayer>,
-    /// Current `package` for stash qualification (`@ISA`, `@EXPORT`, …), matching [`Interpreter::stash_array_name_for_package`].
+    /// Current `package` for stash qualification (`@ISA`, `@EXPORT`, …), matching [`VMHelper::stash_array_name_for_package`].
     current_package: String,
     /// Set while compiling the main program body when the last statement must leave its value on the
     /// stack (implicit return). Enables `try`/`catch` blocks to match `emit_block_value` semantics.
@@ -433,7 +433,7 @@ impl Compiler {
         name.to_string()
     }
 
-    /// Package stash key for `our $name` (matches [`Interpreter::stash_scalar_name_for_package`]).
+    /// Package stash key for `our $name` (matches [`VMHelper::stash_scalar_name_for_package`]).
     fn qualify_stash_scalar_name(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
@@ -471,7 +471,7 @@ impl Compiler {
     /// For `local $x`, qualify to package stash since local only works on package variables.
     /// Special vars (like `$/`, `$\`, `$,`, `$"`, or `^X` caret vars) are not qualified.
     fn intern_scalar_for_local(&mut self, bare: &str) -> u16 {
-        if Interpreter::is_special_scalar_name_for_set(bare) || bare.starts_with('^') {
+        if VMHelper::is_special_scalar_name_for_set(bare) || bare.starts_with('^') {
             self.chunk.intern_name(bare)
         } else {
             let s = self.qualify_stash_scalar_name(bare);
@@ -497,7 +497,7 @@ impl Compiler {
         }
     }
 
-    /// Stash key for a subroutine name in the current package (matches [`Interpreter::qualify_sub_key`]).
+    /// Stash key for a subroutine name in the current package (matches [`VMHelper::qualify_sub_key`]).
     fn qualify_sub_key(&self, name: &str) -> String {
         if name.contains("::") {
             return name.to_string();
@@ -628,7 +628,7 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.emit_op(Op::GetScalarSlot(slot), line, ast);
-        } else if Interpreter::is_special_scalar_name_for_get(name) {
+        } else if VMHelper::is_special_scalar_name_for_get(name) {
             self.emit_op(Op::GetScalar(name_idx), line, ast);
         } else {
             self.emit_op(Op::GetScalarPlain(name_idx), line, ast);
@@ -668,7 +668,7 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.emit_op(Op::SetScalarSlot(slot), line, ast);
-        } else if Interpreter::is_special_scalar_name_for_set(name) {
+        } else if VMHelper::is_special_scalar_name_for_set(name) {
             self.emit_op(Op::SetScalar(name_idx), line, ast);
         } else {
             self.emit_op(Op::SetScalarPlain(name_idx), line, ast);
@@ -680,7 +680,7 @@ impl Compiler {
         let name = &self.chunk.names[name_idx as usize];
         if let Some(slot) = self.scalar_slot(name) {
             self.emit_op(Op::SetScalarSlotKeep(slot), line, ast);
-        } else if Interpreter::is_special_scalar_name_for_set(name) {
+        } else if VMHelper::is_special_scalar_name_for_set(name) {
             self.emit_op(Op::SetScalarKeep(name_idx), line, ast);
         } else {
             self.emit_op(Op::SetScalarKeepPlain(name_idx), line, ast);
@@ -764,7 +764,7 @@ impl Compiler {
         }
     }
 
-    /// `use strict 'vars'` check for a scalar `$name`. Mirrors [`Interpreter::check_strict_scalar_var`]:
+    /// `use strict 'vars'` check for a scalar `$name`. Mirrors [`VMHelper::check_strict_scalar_var`]:
     /// ok if strict is off, the name contains `::` (package-qualified), the name is a Perl special
     /// scalar, or the name is declared via `my`/`our` in any enclosing compiler scope layer.
     /// Otherwise errors with the exact diagnostic message so the user sees a consistent
@@ -772,8 +772,8 @@ impl Compiler {
     fn check_strict_scalar_access(&self, name: &str, line: usize) -> Result<(), CompileError> {
         if !self.strict_vars
             || name.contains("::")
-            || Interpreter::strict_scalar_exempt(name)
-            || Interpreter::is_special_scalar_name_for_get(name)
+            || VMHelper::strict_scalar_exempt(name)
+            || VMHelper::is_special_scalar_name_for_get(name)
             || self
                 .scope_stack
                 .iter()
@@ -1376,7 +1376,7 @@ impl Compiler {
     ///
     /// Used for `grep EXPR, LIST` (with `$_` set by the VM per item), `eval_timeout EXPR { ... }`,
     /// `keys EXPR` / `values EXPR` operands, `given (TOPIC) { ... }` topic, algebraic `match (SUBJECT)`
-    /// subject, and similar one-shot regions matching [`Interpreter::eval_expr`].
+    /// subject, and similar one-shot regions matching [`VMHelper::eval_expr`].
     fn try_compile_grep_expr_region(
         &mut self,
         expr: &Expr,
@@ -2946,7 +2946,7 @@ impl Compiler {
                 self.emit_op(Op::LoadFloat(*f), line, Some(root));
             }
             ExprKind::String(s) => {
-                let processed = Interpreter::process_case_escapes(s);
+                let processed = VMHelper::process_case_escapes(s);
                 let idx = self.chunk.add_constant(PerlValue::string(processed));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }

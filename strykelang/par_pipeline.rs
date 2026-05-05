@@ -12,7 +12,7 @@ use crossbeam::channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
 
 use crate::error::{PerlError, PerlResult};
-use crate::interpreter::{Flow, FlowOrError, Interpreter};
+use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 use crate::scope::{AtomicArray, AtomicHash};
 use crate::value::{PerlSub, PerlValue};
 
@@ -135,7 +135,7 @@ fn run_worker(
         if err.lock().is_some() {
             break;
         }
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         interp.subs = subs.clone();
         interp.scope.restore_capture(&capture);
         interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -182,7 +182,7 @@ fn run_source(
     tx: Sender<PerlValue>,
     err: Arc<Mutex<Option<String>>>,
 ) {
-    let mut interp = Interpreter::new();
+    let mut interp = VMHelper::new();
     interp.subs = subs.clone();
     interp.scope.restore_capture(&capture);
     interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -224,7 +224,7 @@ fn run_source(
 /// processes the full batch via rayon before the next stage starts.
 /// Returns the number of items processed by the **last** stage (scalar).
 pub(crate) fn run_par_pipeline(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -237,7 +237,7 @@ pub(crate) fn run_par_pipeline(
     // Phase 1: drain all items from source.
     let mut items = Vec::new();
     {
-        let mut src_interp = Interpreter::new();
+        let mut src_interp = VMHelper::new();
         src_interp.subs = subs.clone();
         src_interp.scope.restore_capture(&capture);
         src_interp
@@ -280,7 +280,7 @@ pub(crate) fn run_par_pipeline(
                 if err_w.lock().is_some() {
                     return PerlValue::UNDEF;
                 }
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs_w.clone();
                 local_interp.scope.restore_capture(&cap_w);
                 local_interp.scope.restore_atomics(&aa_w, &ah_w);
@@ -321,7 +321,7 @@ pub(crate) fn run_par_pipeline(
 /// between stages concurrently (order not preserved when a stage has multiple workers).
 /// Returns the number of items processed by the **last** stage (scalar).
 pub(crate) fn run_par_pipeline_streaming(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {

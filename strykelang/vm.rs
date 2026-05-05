@@ -12,9 +12,9 @@ use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam}
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, PerlError, PerlResult};
-use crate::interpreter::{
+use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
-    FlowOrError, Interpreter, WantarrayCtx,
+    FlowOrError, VMHelper, WantarrayCtx,
 };
 use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
@@ -136,7 +136,7 @@ impl ParallelBlockVmShared {
         }
     }
 
-    fn worker_vm<'a>(&self, interp: &'a mut Interpreter) -> VM<'a> {
+    fn worker_vm<'a>(&self, interp: &'a mut VMHelper) -> VM<'a> {
         let n = self.op_len_plus_one;
         VM {
             names: Arc::clone(&self.names),
@@ -312,7 +312,7 @@ pub struct VM<'a> {
     call_stack: Vec<CallFrame>,
     /// Paired with [`Op::WantarrayPush`] / [`Op::WantarrayPop`] (e.g. `splice` list vs scalar return).
     wantarray_stack: Vec<WantarrayCtx>,
-    interp: &'a mut Interpreter,
+    interp: &'a mut VMHelper,
     /// When `false`, [`VM::execute`] skips Cranelift JIT (linear, block, and subroutine linear) and
     /// uses only the opcode interpreter. Default `true`.
     jit_enabled: bool,
@@ -356,7 +356,7 @@ pub struct VM<'a> {
 }
 
 impl<'a> VM<'a> {
-    pub fn new(chunk: &Chunk, interp: &'a mut Interpreter) -> Self {
+    pub fn new(chunk: &Chunk, interp: &'a mut VMHelper) -> Self {
         let static_sub_closure_subs: Vec<Option<Arc<PerlSub>>> = chunk
             .static_sub_calls
             .iter()
@@ -472,7 +472,7 @@ impl<'a> VM<'a> {
 
     /// Run `ops[start..end]` (exclusive) for a compiled `map`/`grep`/`sort` block body.
     ///
-    /// Matches [`Interpreter::exec_block`]: `$_` / `$a` / `$b` are set in the caller before each
+    /// Matches [`VMHelper::exec_block`]: `$_` / `$a` / `$b` are set in the caller before each
     /// iteration; then one block-local scope frame is pushed (no closure capture) and the body runs
     /// inline. [`Op::BlockReturnValue`] unwinds that frame via [`Self::unwind_stale_block_region_frame`]
     /// on error paths here.
@@ -1379,10 +1379,10 @@ impl<'a> VM<'a> {
             self.interp.scope_pop_hook();
             match result {
                 Ok(v) => self.push(v),
-                Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
+                Err(crate::vm_helper::FlowOrError::Flow(crate::vm_helper::Flow::Return(v))) => {
                     self.push(v)
                 }
-                Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                 Err(_) => self.push(PerlValue::UNDEF),
             }
         } else if method == "new" && !super_call {
@@ -1404,7 +1404,7 @@ impl<'a> VM<'a> {
                 for field in &def.fields {
                     if let Some(ref expr) = field.default {
                         let val = self.interp.eval_expr(expr).map_err(|e| match e {
-                            crate::interpreter::FlowOrError::Error(stryke) => stryke,
+                            crate::vm_helper::FlowOrError::Error(stryke) => stryke,
                             _ => PerlError::runtime("default evaluation flow", line),
                         })?;
                         defaults.push(Some(val));
@@ -1432,10 +1432,10 @@ impl<'a> VM<'a> {
         {
             match result {
                 Ok(v) => self.push(v),
-                Err(crate::interpreter::FlowOrError::Flow(crate::interpreter::Flow::Return(v))) => {
+                Err(crate::vm_helper::FlowOrError::Flow(crate::vm_helper::Flow::Return(v))) => {
                     self.push(v)
                 }
-                Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                 Err(_) => self.push(PerlValue::UNDEF),
             }
         } else {
@@ -1468,7 +1468,7 @@ impl<'a> VM<'a> {
                 return;
             }
             fan_progress.start_worker(i);
-            let mut local_interp = Interpreter::new();
+            let mut local_interp = VMHelper::new();
             local_interp.subs = subs.clone();
             local_interp.suppress_stdout = progress;
             local_interp.scope.restore_capture(&scope_capture);
@@ -1523,7 +1523,7 @@ impl<'a> VM<'a> {
             .into_par_iter()
             .map(|i| {
                 fan_progress.start_worker(i);
-                let mut local_interp = Interpreter::new();
+                let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.suppress_stdout = progress;
                 local_interp.scope.restore_capture(&scope_capture);
@@ -2259,10 +2259,10 @@ impl<'a> VM<'a> {
                     self.interp.scope_pop_hook();
                     match result {
                         Ok(v) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Flow(
-                            crate::interpreter::Flow::Return(v),
+                        Err(crate::vm_helper::FlowOrError::Flow(
+                                crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
@@ -2341,10 +2341,10 @@ impl<'a> VM<'a> {
                     self.interp.wantarray_kind = saved_wa;
                     match out {
                         Ok(v) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Flow(
-                            crate::interpreter::Flow::Return(v),
+                        Err(crate::vm_helper::FlowOrError::Flow(
+                                crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
@@ -2372,10 +2372,10 @@ impl<'a> VM<'a> {
                     }
                     match result {
                         Ok(v) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Flow(
-                            crate::interpreter::Flow::Return(v),
+                        Err(crate::vm_helper::FlowOrError::Flow(
+                                crate::vm_helper::Flow::Return(v),
                         )) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
@@ -2391,7 +2391,7 @@ impl<'a> VM<'a> {
                     let result = self.interp.struct_construct(&def, args, self.line());
                     match result {
                         Ok(v) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                         _ => self.push(PerlValue::UNDEF),
                     }
                 } else if let Some(def) = self.interp.class_defs.get(name).cloned() {
@@ -2399,7 +2399,7 @@ impl<'a> VM<'a> {
                     let result = self.interp.class_construct(&def, args, self.line());
                     match result {
                         Ok(v) => self.push(v),
-                        Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                         _ => self.push(PerlValue::UNDEF),
                     }
                 } else if let Some((prefix, suffix)) = name.rsplit_once("::") {
@@ -2408,7 +2408,7 @@ impl<'a> VM<'a> {
                         let result = self.interp.enum_construct(&def, suffix, args, self.line());
                         match result {
                             Ok(v) => self.push(v),
-                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                            Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                             _ => self.push(PerlValue::UNDEF),
                         }
                     // Static class method: Math::add(...)
@@ -2424,11 +2424,11 @@ impl<'a> VM<'a> {
                                         self.line(),
                                     ) {
                                         Ok(v) => self.push(v),
-                                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                                             return Err(e)
                                         }
-                                        Err(crate::interpreter::FlowOrError::Flow(
-                                            crate::interpreter::Flow::Return(v),
+                                        Err(crate::vm_helper::FlowOrError::Flow(
+                                                crate::vm_helper::Flow::Return(v),
                                         )) => self.push(v),
                                         _ => self.push(PerlValue::UNDEF),
                                     }
@@ -2666,7 +2666,7 @@ impl<'a> VM<'a> {
                         let out = vm_interp_result(
                             self.interp.resolve_bareword_rvalue(
                                 &name,
-                                crate::interpreter::WantarrayCtx::Scalar,
+                                crate::vm_helper::WantarrayCtx::Scalar,
                                 line,
                             ),
                             line,
@@ -3230,7 +3230,7 @@ impl<'a> VM<'a> {
                         // Perl's `local` handler. Save prior value to
                         // the interpreter's `special_var_restore_frames` so `scope_pop_hook`
                         // restores the backing field on block exit.
-                        if Interpreter::is_special_scalar_name_for_set(n) {
+                        if VMHelper::is_special_scalar_name_for_set(n) {
                             let old = self.interp.get_special_var(n);
                             if let Some(frame) = self.interp.special_var_restore_frames.last_mut() {
                                 frame.push((n.to_string(), old));
@@ -3503,14 +3503,14 @@ impl<'a> VM<'a> {
                     Op::KeysFromValue => {
                         let val = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(Interpreter::keys_from_value(val, line), line)?;
+                        let v = vm_interp_result(VMHelper::keys_from_value(val, line), line)?;
                         self.push(v);
                         Ok(())
                     }
                     Op::KeysFromValueScalar => {
                         let val = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(Interpreter::keys_from_value(val, line), line)?;
+                        let v = vm_interp_result(VMHelper::keys_from_value(val, line), line)?;
                         let n = v.as_array_vec().map(|a| a.len()).unwrap_or(0) as i64;
                         self.push(PerlValue::integer(n));
                         Ok(())
@@ -3518,14 +3518,14 @@ impl<'a> VM<'a> {
                     Op::ValuesFromValue => {
                         let val = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(Interpreter::values_from_value(val, line), line)?;
+                        let v = vm_interp_result(VMHelper::values_from_value(val, line), line)?;
                         self.push(v);
                         Ok(())
                     }
                     Op::ValuesFromValueScalar => {
                         let val = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(Interpreter::values_from_value(val, line), line)?;
+                        let v = vm_interp_result(VMHelper::values_from_value(val, line), line)?;
                         let n = v.as_array_vec().map(|a| a.len()).unwrap_or(0) as i64;
                         self.push(PerlValue::integer(n));
                         Ok(())
@@ -3684,7 +3684,7 @@ impl<'a> VM<'a> {
                     Op::ProcessCaseEscapes => {
                         let val = self.pop();
                         let s = val.to_string();
-                        let processed = Interpreter::process_case_escapes(&s);
+                        let processed = VMHelper::process_case_escapes(&s);
                         self.push(PerlValue::string(processed));
                         Ok(())
                     }
@@ -4006,13 +4006,13 @@ impl<'a> VM<'a> {
                             let _ = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| crate::interpreter::perl_inc(v));
+                                .atomic_mutate_post(en, |v| crate::vm_helper::perl_inc(v));
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| crate::interpreter::perl_inc(v));
+                                .atomic_mutate_post(en, |v| crate::vm_helper::perl_inc(v));
                             self.push(old);
                         }
                         Ok(())
@@ -4038,14 +4038,14 @@ impl<'a> VM<'a> {
                     }
                     Op::PreIncSlot(slot) => {
                         let cur = self.interp.scope.get_scalar_slot(*slot);
-                        let new_val = crate::interpreter::perl_inc(&cur);
+                        let new_val = crate::vm_helper::perl_inc(&cur);
                         self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                         self.push(new_val);
                         Ok(())
                     }
                     Op::PreIncSlotVoid(slot) => {
                         let cur = self.interp.scope.get_scalar_slot(*slot);
-                        let new_val = crate::interpreter::perl_inc(&cur);
+                        let new_val = crate::vm_helper::perl_inc(&cur);
                         self.interp.scope.set_scalar_slot(*slot, new_val);
                         Ok(())
                     }
@@ -4060,12 +4060,12 @@ impl<'a> VM<'a> {
                         // Fuse PostIncSlot+Pop: if next op discards the old value, skip stack work.
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
                             let cur = self.interp.scope.get_scalar_slot(*slot);
-                            let new_val = crate::interpreter::perl_inc(&cur);
+                            let new_val = crate::vm_helper::perl_inc(&cur);
                             self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.ip += 1; // skip Pop
                         } else {
                             let old = self.interp.scope.get_scalar_slot(*slot);
-                            let new_val = crate::interpreter::perl_inc(&old);
+                            let new_val = crate::vm_helper::perl_inc(&old);
                             self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.push(old);
                         }
@@ -4274,7 +4274,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::Say(handle_idx, argc) => {
-                        if (self.interp.feature_bits & crate::interpreter::FEAT_SAY) == 0 {
+                        if (self.interp.feature_bits & crate::vm_helper::FEAT_SAY) == 0 {
                             return Err(PerlError::runtime(
                             "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
                             self.line(),
@@ -5302,7 +5302,7 @@ impl<'a> VM<'a> {
                                 crate::map_stream::SubstStreamIterator::new(
                                     source,
                                     re,
-                                    crate::interpreter::normalize_replacement_backrefs(
+                                    crate::vm_helper::normalize_replacement_backrefs(
                                         &replacement,
                                     ),
                                     global,
@@ -5783,7 +5783,7 @@ impl<'a> VM<'a> {
                             .and_then(|r| r.as_ref())
                         {
                             let val = self.run_block_region(start, end, op_count)?;
-                            vm_interp_result(Interpreter::keys_from_value(val, line), line)?
+                            vm_interp_result(VMHelper::keys_from_value(val, line), line)?
                         } else {
                             let e = &self.keys_expr_entries[i];
                             vm_interp_result(self.interp.eval_keys_expr(e, line), line)?
@@ -5800,7 +5800,7 @@ impl<'a> VM<'a> {
                             .and_then(|r| r.as_ref())
                         {
                             let val = self.run_block_region(start, end, op_count)?;
-                            vm_interp_result(Interpreter::keys_from_value(val, line), line)?
+                            vm_interp_result(VMHelper::keys_from_value(val, line), line)?
                         } else {
                             let e = &self.keys_expr_entries[i];
                             vm_interp_result(self.interp.eval_keys_expr(e, line), line)?
@@ -5818,7 +5818,7 @@ impl<'a> VM<'a> {
                             .and_then(|r| r.as_ref())
                         {
                             let val = self.run_block_region(start, end, op_count)?;
-                            vm_interp_result(Interpreter::values_from_value(val, line), line)?
+                            vm_interp_result(VMHelper::values_from_value(val, line), line)?
                         } else {
                             let e = &self.values_expr_entries[i];
                             vm_interp_result(self.interp.eval_values_expr(e, line), line)?
@@ -5835,7 +5835,7 @@ impl<'a> VM<'a> {
                             .and_then(|r| r.as_ref())
                         {
                             let val = self.run_block_region(start, end, op_count)?;
-                            vm_interp_result(Interpreter::values_from_value(val, line), line)?
+                            vm_interp_result(VMHelper::values_from_value(val, line), line)?
                         } else {
                             let e = &self.values_expr_entries[i];
                             vm_interp_result(self.interp.eval_values_expr(e, line), line)?
@@ -6291,10 +6291,10 @@ impl<'a> VM<'a> {
                             self.interp.current_sub_stack.pop();
                             match result {
                                 Ok(v) => self.push(v),
-                                Err(crate::interpreter::FlowOrError::Flow(
-                                    crate::interpreter::Flow::Return(v),
+                                Err(crate::vm_helper::FlowOrError::Flow(
+                                        crate::vm_helper::Flow::Return(v),
                                 )) => self.push(v),
-                                Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
+                                Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
                                 Err(_) => self.push(PerlValue::UNDEF),
                             }
                         } else {
@@ -6458,7 +6458,7 @@ impl<'a> VM<'a> {
                         if list.len() == 1 {
                             if let Some(p) = list[0].as_pipeline() {
                                 let line = self.line();
-                                let sub = Interpreter::pipeline_int_mul_sub(*k);
+                                let sub = VMHelper::pipeline_int_mul_sub(*k);
                                 self.interp.pipeline_push(&p, PipelineOp::Map(sub), line)?;
                                 self.push(PerlValue::pipeline(Arc::clone(&p)));
                                 return Ok(());
@@ -6614,7 +6614,7 @@ impl<'a> VM<'a> {
                                             result.push(item);
                                         }
                                     }
-                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
                                         return Err(e)
                                     }
                                     Err(_) => {}
@@ -6646,7 +6646,7 @@ impl<'a> VM<'a> {
                                     self.interp.scope.set_topic(item);
                                     match self.interp.exec_block(&block) {
                                         Ok(_) => {}
-                                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                                             return Err(e)
                                         }
                                         Err(_) => {}
@@ -6671,7 +6671,7 @@ impl<'a> VM<'a> {
                                 self.interp.scope.set_topic(item);
                                 match self.interp.exec_block(&block) {
                                     Ok(_) => {}
-                                    Err(crate::interpreter::FlowOrError::Error(e)) => {
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
                                         return Err(e)
                                     }
                                     Err(_) => {}
@@ -6938,7 +6938,7 @@ impl<'a> VM<'a> {
                     // ── Eval block ──
                     Op::EvalBlock(block_idx, want) => {
                         let block = self.blocks[*block_idx as usize].clone();
-                        let tail = crate::interpreter::WantarrayCtx::from_byte(*want);
+                        let tail = crate::vm_helper::WantarrayCtx::from_byte(*want);
                         self.interp.eval_nesting += 1;
                         // Use exec_block (with scope frame) so local/my declarations
                         // inside the block are properly scoped.
@@ -6947,7 +6947,7 @@ impl<'a> VM<'a> {
                                 self.interp.clear_eval_error();
                                 self.push(v);
                             }
-                            Err(crate::interpreter::FlowOrError::Error(e)) => {
+                            Err(crate::vm_helper::FlowOrError::Error(e)) => {
                                 self.interp.set_eval_error_from_perl_error(&e);
                                 self.push(PerlValue::UNDEF);
                             }
@@ -7130,9 +7130,9 @@ impl<'a> VM<'a> {
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         let n_workers = rayon::current_num_threads();
-                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                        let pool: Vec<Mutex<VMHelper>> = (0..n_workers)
                             .map(|_| {
-                                let mut interp = Interpreter::new();
+                                let mut interp = VMHelper::new();
                                 interp.subs = subs.clone();
                                 interp.scope.restore_capture(&scope_capture);
                                 interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -7197,9 +7197,9 @@ impl<'a> VM<'a> {
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         let n_workers = rayon::current_num_threads();
-                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                        let pool: Vec<Mutex<VMHelper>> = (0..n_workers)
                             .map(|_| {
-                                let mut interp = Interpreter::new();
+                                let mut interp = VMHelper::new();
                                 interp.subs = subs.clone();
                                 interp.scope.restore_capture(&scope_capture);
                                 interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -7309,7 +7309,7 @@ impl<'a> VM<'a> {
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
                             crate::par_list::pfirst_run(list, &pmap_progress, |item| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -7327,7 +7327,7 @@ impl<'a> VM<'a> {
                         } else {
                             let block = self.blocks[idx].clone();
                             crate::par_list::pfirst_run(list, &pmap_progress, |item| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -7361,7 +7361,7 @@ impl<'a> VM<'a> {
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
                             crate::par_list::pany_run(list, &pmap_progress, |item| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -7379,7 +7379,7 @@ impl<'a> VM<'a> {
                         } else {
                             let block = self.blocks[idx].clone();
                             crate::par_list::pany_run(list, &pmap_progress, |item| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -7422,7 +7422,7 @@ impl<'a> VM<'a> {
                             let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
                                 .into_par_iter()
                                 .map(|(chunk_idx, chunk)| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp
@@ -7456,7 +7456,7 @@ impl<'a> VM<'a> {
                             let mut chunk_results: Vec<(usize, Vec<PerlValue>)> = indexed_chunks
                                 .into_par_iter()
                                 .map(|(chunk_idx, chunk)| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp
@@ -7507,7 +7507,7 @@ impl<'a> VM<'a> {
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
                             for b in rest {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp.scope.set_sort_pair(acc.clone(), b.clone());
@@ -7521,7 +7521,7 @@ impl<'a> VM<'a> {
                         } else {
                             let block = self.blocks[idx].clone();
                             for b in rest {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp.scope.set_sort_pair(acc.clone(), b.clone());
@@ -7560,7 +7560,7 @@ impl<'a> VM<'a> {
                                     x
                                 })
                                 .reduce_with(|a, b| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_sort_pair(a.clone(), b.clone());
@@ -7583,7 +7583,7 @@ impl<'a> VM<'a> {
                                     x
                                 })
                                 .reduce_with(|a, b| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_sort_pair(a.clone(), b.clone());
@@ -7651,7 +7651,7 @@ impl<'a> VM<'a> {
                             return Ok(());
                         }
                         if list.len() == 1 {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -7683,7 +7683,7 @@ impl<'a> VM<'a> {
                             let result = list
                                 .into_par_iter()
                                 .map(|item| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_topic(item);
@@ -7701,7 +7701,7 @@ impl<'a> VM<'a> {
                                     val
                                 })
                                 .reduce_with(|a, b| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_sort_pair(a.clone(), b.clone());
@@ -7725,7 +7725,7 @@ impl<'a> VM<'a> {
                             let result = list
                                 .into_par_iter()
                                 .map(|item| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_topic(item);
@@ -7737,7 +7737,7 @@ impl<'a> VM<'a> {
                                     val
                                 })
                                 .reduce_with(|a, b| {
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_sort_pair(a.clone(), b.clone());
@@ -7772,7 +7772,7 @@ impl<'a> VM<'a> {
                                         pmap_progress.tick();
                                         return v.clone();
                                     }
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_topic(item.clone());
@@ -7799,7 +7799,7 @@ impl<'a> VM<'a> {
                                         pmap_progress.tick();
                                         return v.clone();
                                     }
-                                    let mut local_interp = Interpreter::new();
+                                    let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
                                     local_interp.scope.set_topic(item.clone());
@@ -7845,9 +7845,9 @@ impl<'a> VM<'a> {
                             self.interp.scope.capture_with_atomics();
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
                         let n_workers = rayon::current_num_threads();
-                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                        let pool: Vec<Mutex<VMHelper>> = (0..n_workers)
                             .map(|_| {
-                                let mut interp = Interpreter::new();
+                                let mut interp = VMHelper::new();
                                 interp.subs = subs.clone();
                                 interp.scope.restore_capture(&scope_capture);
                                 interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -7985,9 +7985,9 @@ impl<'a> VM<'a> {
                             self.interp.scope.capture_with_atomics();
                         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
                         let n_workers = rayon::current_num_threads();
-                        let pool: Vec<Mutex<Interpreter>> = (0..n_workers)
+                        let pool: Vec<Mutex<VMHelper>> = (0..n_workers)
                             .map(|_| {
-                                let mut interp = Interpreter::new();
+                                let mut interp = VMHelper::new();
                                 interp.subs = subs.clone();
                                 interp.scope.restore_capture(&scope_capture);
                                 interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
@@ -8070,7 +8070,7 @@ impl<'a> VM<'a> {
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
                             items.par_sort_by(|a, b| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -8097,7 +8097,7 @@ impl<'a> VM<'a> {
                         } else {
                             let block = self.blocks[idx].clone();
                             items.par_sort_by(|a, b| {
-                                let mut local_interp = Interpreter::new();
+                                let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
                                 local_interp
@@ -8197,7 +8197,7 @@ impl<'a> VM<'a> {
                             Arc::new(Mutex::new(None));
                         let rs = Arc::clone(&result_slot);
                         let h = std::thread::spawn(move || {
-                            let mut local_interp = Interpreter::new();
+                            let mut local_interp = VMHelper::new();
                             local_interp.subs = subs;
                             local_interp.scope.restore_capture(&scope_capture);
                             local_interp
@@ -8445,8 +8445,8 @@ impl<'a> VM<'a> {
                         let val = match self.interp.eval_expr_ctx(expr, self.interp.wantarray_kind)
                         {
                             Ok(v) => v,
-                            Err(crate::interpreter::FlowOrError::Error(e)) => return Err(e),
-                            Err(crate::interpreter::FlowOrError::Flow(f)) => {
+                            Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+                            Err(crate::vm_helper::FlowOrError::Flow(f)) => {
                                 return Err(PerlError::runtime(
                                     format!("unexpected flow control in EvalAstExpr: {:?}", f),
                                     self.line(),
@@ -8665,7 +8665,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Study) => {
                 let s = args.into_iter().next().unwrap_or(PerlValue::UNDEF);
-                Ok(Interpreter::study_return_value(&s.to_string()))
+                Ok(VMHelper::study_return_value(&s.to_string()))
             }
             Some(BuiltinId::Chr) => {
                 let n = args.into_iter().next().unwrap_or(PerlValue::UNDEF).to_int() as u32;
@@ -9370,9 +9370,9 @@ impl<'a> VM<'a> {
                 crate::ppool::create_pool(n)
             }
             Some(BuiltinId::Wantarray) => Ok(match self.interp.wantarray_kind {
-                crate::interpreter::WantarrayCtx::Void => PerlValue::UNDEF,
-                crate::interpreter::WantarrayCtx::Scalar => PerlValue::integer(0),
-                crate::interpreter::WantarrayCtx::List => PerlValue::integer(1),
+                crate::vm_helper::WantarrayCtx::Void => PerlValue::UNDEF,
+                crate::vm_helper::WantarrayCtx::Scalar => PerlValue::integer(0),
+                crate::vm_helper::WantarrayCtx::List => PerlValue::integer(1),
             }),
             Some(BuiltinId::FetchUrl) => {
                 let url = args
@@ -9505,11 +9505,11 @@ impl<'a> VM<'a> {
                             self.interp.clear_eval_error();
                             Ok(v)
                         }
-                        Err(crate::interpreter::FlowOrError::Error(e)) => {
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
                             self.interp.set_eval_error_from_perl_error(&e);
                             Ok(PerlValue::UNDEF)
                         }
-                        Err(crate::interpreter::FlowOrError::Flow(_)) => {
+                        Err(crate::vm_helper::FlowOrError::Flow(_)) => {
                             self.interp.clear_eval_error();
                             Ok(PerlValue::UNDEF)
                         }
@@ -9693,7 +9693,7 @@ mod tests {
     use crate::value::PerlValue;
 
     fn run_chunk(chunk: &Chunk) -> PerlResult<PerlValue> {
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(chunk, &mut interp);
         vm.execute()
     }
@@ -9729,11 +9729,11 @@ mod tests {
         let chunk = block_jit_sum_chunk(limit);
         let expect = limit * (limit - 1) / 2;
 
-        let mut interp_on = Interpreter::new();
+        let mut interp_on = VMHelper::new();
         let mut vm_on = VM::new(&chunk, &mut interp_on);
         assert_eq!(vm_on.execute().expect("vm").to_int(), expect);
 
-        let mut interp_off = Interpreter::new();
+        let mut interp_off = VMHelper::new();
         let mut vm_off = VM::new(&chunk, &mut interp_off);
         vm_off.set_jit_enabled(false);
         assert_eq!(vm_off.execute().expect("vm").to_int(), expect);
@@ -10140,7 +10140,7 @@ mod tests {
             }
             _ => unreachable!(),
         }
-        let mut interp = Interpreter::new();
+        let mut interp = VMHelper::new();
         let mut vm = VM::new(&chunk, &mut interp);
         vm.set_jit_enabled(false);
         let v = vm.execute().expect("vm should catch die");

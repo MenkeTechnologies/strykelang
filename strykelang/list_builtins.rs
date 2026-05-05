@@ -71,13 +71,13 @@ use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::interpreter::{ExecResult, Interpreter, WantarrayCtx};
+use crate::vm_helper::{ExecResult, VMHelper, WantarrayCtx};
 use crate::value::{BlessedRef, HeapObject, PerlValue};
 
 /// Dispatch a list builtin by bare name. Stryke exposes every list builtin as a
 /// bare-name builtin; callers pass the unqualified name (e.g. `"sum"`, `"reduce"`).
 pub(crate) fn dispatch_by_name(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     name: &str,
     args: &[PerlValue],
     want: WantarrayCtx,
@@ -579,7 +579,7 @@ fn stddev(args: &[PerlValue]) -> crate::error::PerlResult<PerlValue> {
 }
 
 fn shuffle_native(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
 ) -> crate::error::PerlResult<PerlValue> {
     let mut v: Vec<PerlValue> = args.to_vec();
@@ -668,7 +668,7 @@ fn windowed_with_want(
 }
 
 fn sample_native(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
 ) -> crate::error::PerlResult<PerlValue> {
     if args.is_empty() {
@@ -851,7 +851,7 @@ pub(crate) fn extension_drop_impl(
 }
 
 fn reduce_like(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     want: WantarrayCtx,
     reductions: bool,
@@ -909,7 +909,7 @@ enum AnyMode {
 }
 
 fn any_all_none(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     _want: WantarrayCtx,
     mode: AnyMode,
@@ -949,7 +949,7 @@ fn any_all_none(
     }))
 }
 
-fn first_native(interp: &mut Interpreter, args: &[PerlValue], _want: WantarrayCtx) -> ExecResult {
+fn first_native(interp: &mut VMHelper, args: &[PerlValue], _want: WantarrayCtx) -> ExecResult {
     let code = match args.first().and_then(|x| x.as_code_ref()) {
         Some(s) => s,
         _ => {
@@ -1032,7 +1032,7 @@ enum PairMode {
 }
 
 fn pairgrep_map(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     want: WantarrayCtx,
     mode: PairMode,
@@ -1203,11 +1203,11 @@ fn arg_to_list(v: &PerlValue) -> Vec<PerlValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::interpreter::{Interpreter, WantarrayCtx};
+    use crate::vm_helper::{VMHelper, WantarrayCtx};
     use crate::value::PerlValue;
 
     fn call_native(
-        interp: &mut Interpreter,
+        interp: &mut VMHelper,
         name: &str,
         args: &[PerlValue],
         want: WantarrayCtx,
@@ -1221,7 +1221,7 @@ mod tests {
 
     #[test]
     fn sum_and_product() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let s = call_native(
             &mut i,
             "sum",
@@ -1244,7 +1244,7 @@ mod tests {
 
     #[test]
     fn sum_empty_is_undef_sum0_empty_is_zero() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let s = call_native(&mut i, "sum", &[], WantarrayCtx::Scalar);
         assert!(s.is_undef());
         let z = call_native(&mut i, "sum0", &[], WantarrayCtx::Scalar);
@@ -1253,14 +1253,14 @@ mod tests {
 
     #[test]
     fn product_empty_is_one() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let p = call_native(&mut i, "product", &[], WantarrayCtx::Scalar);
         assert_eq!(p.to_int(), 1);
     }
 
     #[test]
     fn min_max_minstr_maxstr() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let mn = call_native(
             &mut i,
             "min",
@@ -1286,7 +1286,7 @@ mod tests {
 
     #[test]
     fn mean_median_mode_variance_stddev() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         assert!(call_native(&mut i, "mean", &[], WantarrayCtx::Scalar).is_undef());
         let m = call_native(
             &mut i,
@@ -1390,7 +1390,7 @@ mod tests {
         // independent of caller context. Wrapping in a 1-element array (the
         // previous behavior) broke arithmetic on the result; see
         // `aggregate_wantarray` for the rationale.
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let args_sum = [
             PerlValue::integer(1),
             PerlValue::integer(2),
@@ -1430,14 +1430,14 @@ mod tests {
 
     #[test]
     fn min_max_empty_undef() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let mn = call_native(&mut i, "min", &[], WantarrayCtx::Scalar);
         assert!(mn.is_undef());
     }
 
     #[test]
     fn uniq_adjacent_strings() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let u = call_native(
             &mut i,
             "uniq",
@@ -1456,7 +1456,7 @@ mod tests {
 
     #[test]
     fn uniqstr_compares_strings_not_dwim() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let u = call_native(
             &mut i,
             "uniqstr",
@@ -1469,7 +1469,7 @@ mod tests {
 
     #[test]
     fn uniqint_coerces_to_int() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let u = call_native(
             &mut i,
             "uniqint",
@@ -1488,7 +1488,7 @@ mod tests {
 
     #[test]
     fn chunked_splits_list_last_arg_is_size() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let c = call_native(
             &mut i,
             "chunked",
@@ -1530,7 +1530,7 @@ mod tests {
 
     #[test]
     fn chunked_native_n_zero_and_empty_list() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let z = call_native(
             &mut i,
             "chunked",
@@ -1565,7 +1565,7 @@ mod tests {
 
     #[test]
     fn chunked_native_chunk_size_exceeds_length() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let c = call_native(
             &mut i,
             "chunked",
@@ -1587,7 +1587,7 @@ mod tests {
 
     #[test]
     fn windowed_overlapping_windows() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let w = call_native(
             &mut i,
             "windowed",
@@ -1614,7 +1614,7 @@ mod tests {
 
     #[test]
     fn windowed_zero_n_empty() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let w = call_native(
             &mut i,
             "windowed",
@@ -1630,7 +1630,7 @@ mod tests {
 
     #[test]
     fn windowed_n_larger_than_list_empty() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let w = call_native(
             &mut i,
             "windowed",
@@ -1646,7 +1646,7 @@ mod tests {
 
     #[test]
     fn windowed_single_full_width_window() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let w = call_native(
             &mut i,
             "windowed",
@@ -1669,7 +1669,7 @@ mod tests {
 
     #[test]
     fn head_and_tail() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let h = call_native(
             &mut i,
             "head",
@@ -1741,7 +1741,7 @@ mod tests {
 
     #[test]
     fn pairkeys_and_pairvalues() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let k = call_native(
             &mut i,
             "pairkeys",
@@ -1775,7 +1775,7 @@ mod tests {
 
     #[test]
     fn zip_shortest_two_lists() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let z = call_native(
             &mut i,
             "zip_shortest",
@@ -1796,7 +1796,7 @@ mod tests {
 
     #[test]
     fn mesh_interleaves_rows() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let m = call_native(
             &mut i,
             "mesh_shortest",
@@ -1816,7 +1816,7 @@ mod tests {
 
     #[test]
     fn sample_without_pool_returns_empty() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let s = call_native(
             &mut i,
             "sample",
@@ -1829,7 +1829,7 @@ mod tests {
 
     #[test]
     fn sub_util_set_subname_returns_coderef_arg() {
-        let mut i = Interpreter::new();
+        let mut i = VMHelper::new();
         let cr = PerlValue::integer(42);
         let out = call_native(
             &mut i,

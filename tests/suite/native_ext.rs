@@ -459,7 +459,7 @@ fn par_pipeline_stream_rejects_psort() {
     let program =
         stryke::parse(r#"par_pipeline_stream((1..5))->psort(fn { $a <=> $b })->collect()"#)
             .expect("parse");
-    let mut interp = stryke::interpreter::Interpreter::new();
+    let mut interp = stryke::vm_helper::VMHelper::new();
     let err = interp.execute(&program).unwrap_err();
     assert!(
         err.to_string().contains("cannot stream"),

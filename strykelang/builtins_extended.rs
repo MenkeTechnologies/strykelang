@@ -87,7 +87,7 @@ fn euler_phi(n: i64) -> i64 {
 }
 
 /// `prime_factors N` — prime factorization.
-fn builtin_prime_factors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_prime_factors(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(PerlValue::array(
         prime_factorize(n)
@@ -98,7 +98,7 @@ fn builtin_prime_factors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
 }
 
 /// `divisors N` — all divisors of N, sorted.
-fn builtin_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_divisors(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().unsigned_abs();
     if n == 0 {
         return Ok(PerlValue::array(vec![]));
@@ -121,7 +121,7 @@ fn builtin_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `num_divisors N` — count of divisors.
-fn builtin_num_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_num_divisors(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().unsigned_abs();
     if n == 0 {
         return Ok(PerlValue::integer(0));
@@ -138,32 +138,32 @@ fn builtin_num_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
 }
 
 /// `sum_divisors N` — sum of proper divisors.
-fn builtin_sum_divisors(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sum_divisors(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(aliquot(
         first_arg_or_topic(interp, args).to_int(),
     )))
 }
 
 /// `is_perfect N`.
-fn builtin_is_perfect(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_perfect(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(bool_iv(n > 1 && aliquot(n) == n))
 }
 
 /// `is_abundant N`.
-fn builtin_is_abundant(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_abundant(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(bool_iv(n > 0 && aliquot(n) > n))
 }
 
 /// `is_deficient N`.
-fn builtin_is_deficient(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_deficient(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(bool_iv(n > 0 && aliquot(n) < n))
 }
 
 /// `collatz_length N` — steps to reach 1.
-fn builtin_collatz_length(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_collatz_length(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int();
     if n <= 0 {
         return Ok(PerlValue::integer(0));
@@ -177,7 +177,7 @@ fn builtin_collatz_length(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
 }
 
 /// `collatz_sequence N` — full sequence from N to 1.
-fn builtin_collatz_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_collatz_sequence(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int();
     if n <= 0 {
         return Ok(PerlValue::array(vec![]));
@@ -191,7 +191,7 @@ fn builtin_collatz_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
 }
 
 /// `lucas N` — Nth Lucas number.
-fn builtin_lucas(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lucas(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n == 0 {
         return Ok(PerlValue::integer(2));
@@ -209,7 +209,7 @@ fn builtin_lucas(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
 }
 
 /// `tribonacci N` — Nth Tribonacci number.
-fn builtin_tribonacci(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tribonacci(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n == 0 {
         return Ok(PerlValue::integer(0));
@@ -228,7 +228,7 @@ fn builtin_tribonacci(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `nth_prime N` — the Nth prime (1-indexed).
-fn builtin_nth_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_nth_prime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(1) as usize;
     let mut count = 0usize;
     let mut candidate = 2i64;
@@ -244,7 +244,7 @@ fn builtin_nth_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
 }
 
 /// `primes_up_to N` — sieve of Eratosthenes.
-fn builtin_primes_up_to(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_primes_up_to(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n < 2 {
         return Ok(PerlValue::array(vec![]));
@@ -274,7 +274,7 @@ fn builtin_primes_up_to(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
 }
 
 /// `next_prime N`.
-fn builtin_next_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_next_prime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int() + 1;
     if n < 2 {
         n = 2;
@@ -286,7 +286,7 @@ fn builtin_next_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `prev_prime N`.
-fn builtin_prev_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_prev_prime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int() - 1;
     while n >= 2 && !is_prime_check(n) {
         n -= 1;
@@ -299,13 +299,13 @@ fn builtin_prev_prime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
 }
 
 /// `triangular_number N` — N*(N+1)/2.
-fn builtin_triangular_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_triangular_number(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(PerlValue::integer(n * (n + 1) / 2))
 }
 
 /// `is_pentagonal N`.
-fn builtin_is_pentagonal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_pentagonal(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 1 {
         return Ok(bool_iv(false));
@@ -316,13 +316,13 @@ fn builtin_is_pentagonal(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
 }
 
 /// `pentagonal_number N` — N*(3N-1)/2.
-fn builtin_pentagonal_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pentagonal_number(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(PerlValue::integer(n * (3 * n - 1) / 2))
 }
 
 /// `perfect_numbers N` — first N perfect numbers.
-fn builtin_perfect_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_perfect_numbers(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let count = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     let exponents = [2, 3, 5, 7, 13, 17, 19, 31];
     let mut result = Vec::with_capacity(count.min(exponents.len()));
@@ -334,7 +334,7 @@ fn builtin_perfect_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResu
 }
 
 /// `twin_primes N` — twin prime pairs up to N.
-fn builtin_twin_primes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_twin_primes(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     let mut result = Vec::new();
     let mut p = 2i64;
@@ -351,7 +351,7 @@ fn builtin_twin_primes(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 
 /// `goldbach N` — decomposition of even N into two primes.
-fn builtin_goldbach(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_goldbach(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 4 || n % 2 != 0 {
         return Ok(PerlValue::UNDEF);
@@ -368,7 +368,7 @@ fn builtin_goldbach(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `prime_pi N` — count of primes ≤ N.
-fn builtin_prime_pi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_prime_pi(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n < 2 {
         return Ok(PerlValue::integer(0));
@@ -393,7 +393,7 @@ fn builtin_prime_pi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `totient_sum N` — sum of Euler's totient for 1..N.
-fn builtin_totient_sum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_totient_sum(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     let mut sum = 0i64;
     for i in 1..=n {
@@ -403,7 +403,7 @@ fn builtin_totient_sum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 
 /// `subfactorial N` — number of derangements.
-fn builtin_subfactorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_subfactorial(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n == 0 {
         return Ok(PerlValue::integer(1));
@@ -421,7 +421,7 @@ fn builtin_subfactorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
 }
 
 /// `bell_number N`.
-fn builtin_bell_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bell_number(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     if n == 0 {
         return Ok(PerlValue::integer(1));
@@ -438,7 +438,7 @@ fn builtin_bell_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
 }
 
 /// `partition_number N` — integer partitions of N.
-fn builtin_partition_number(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_partition_number(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     let mut dp = vec![0i64; n + 1];
     dp[0] = 1;
@@ -470,7 +470,7 @@ fn builtin_multinomial(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `is_smith N`.
-fn builtin_is_smith(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_smith(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     if n < 4 || is_prime_check(n) {
         return Ok(bool_iv(false));
@@ -490,14 +490,14 @@ fn builtin_is_smith(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
 }
 
 /// `aliquot_sum N`.
-fn builtin_aliquot_sum(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_aliquot_sum(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(aliquot(
         first_arg_or_topic(interp, args).to_int(),
     )))
 }
 
 /// `abundant_numbers N`.
-fn builtin_abundant_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_abundant_numbers(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0);
     Ok(PerlValue::array(
         (1..=n)
@@ -508,7 +508,7 @@ fn builtin_abundant_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
 }
 
 /// `deficient_numbers N`.
-fn builtin_deficient_numbers(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_deficient_numbers(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0);
     Ok(PerlValue::array(
         (1..=n)
@@ -1147,7 +1147,7 @@ fn builtin_describe(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Geometry
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn builtin_area_circle(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_area_circle(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(std::f64::consts::PI * r * r))
 }
@@ -1172,7 +1172,7 @@ fn builtin_area_ellipse(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(std::f64::consts::PI * a * b))
 }
-fn builtin_circumference(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_circumference(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(2.0 * std::f64::consts::PI * r))
 }
@@ -1209,13 +1209,13 @@ fn builtin_polygon_area(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::float((area / 2.0).abs()))
 }
-fn builtin_sphere_volume(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sphere_volume(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(
         4.0 / 3.0 * std::f64::consts::PI * r * r * r,
     ))
 }
-fn builtin_sphere_surface(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sphere_surface(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(4.0 * std::f64::consts::PI * r * r))
 }
@@ -1274,7 +1274,7 @@ fn builtin_triangle_hypotenuse(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(a.hypot(b)))
 }
-fn builtin_degrees_to_compass(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_degrees_to_compass(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let deg = first_arg_or_topic(interp, args).to_number() % 360.0;
     let d = if deg < 0.0 { deg + 360.0 } else { deg };
     let dirs = [
@@ -2260,7 +2260,7 @@ fn builtin_black_scholes_put(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Encoding / Decoding
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn builtin_morse_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_morse_encode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let morse: Vec<&str> = s
         .to_uppercase()
@@ -2313,7 +2313,7 @@ fn builtin_morse_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::string(morse.join(" ")))
 }
 
-fn builtin_morse_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_morse_decode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let decoded: String = s
         .split(' ')
@@ -2365,7 +2365,7 @@ fn builtin_morse_decode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::string(decoded))
 }
 
-fn builtin_nato_phonetic(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_nato_phonetic(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let words: Vec<&str> = s
         .to_uppercase()
@@ -2413,7 +2413,7 @@ fn builtin_nato_phonetic(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     Ok(PerlValue::string(words.join(" ")))
 }
 
-fn builtin_int_to_roman(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_int_to_roman(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int();
     if n <= 0 || n > 3999 {
         return Ok(PerlValue::string(String::new()));
@@ -2443,7 +2443,7 @@ fn builtin_int_to_roman(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::string(result))
 }
 
-fn builtin_roman_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_roman_to_int(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string().to_uppercase();
     let val_of = |c| match c {
         'I' => 1,
@@ -2473,11 +2473,11 @@ fn builtin_roman_to_int(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::integer(total))
 }
 
-fn builtin_binary_to_gray(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_binary_to_gray(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int();
     Ok(PerlValue::integer(n ^ (n >> 1)))
 }
-fn builtin_gray_to_binary(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gray_to_binary(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut n = first_arg_or_topic(interp, args).to_int();
     let mut mask = n >> 1;
     while mask != 0 {
@@ -2487,7 +2487,7 @@ fn builtin_gray_to_binary(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
     Ok(PerlValue::integer(n))
 }
 
-fn builtin_pig_latin(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pig_latin(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let result: Vec<String> = s
         .split_whitespace()
@@ -2504,7 +2504,7 @@ fn builtin_pig_latin(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     Ok(PerlValue::string(result.join(" ")))
 }
 
-fn builtin_atbash(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_atbash(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.chars()
@@ -2521,7 +2521,7 @@ fn builtin_atbash(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVa
     ))
 }
 
-fn builtin_to_emoji_num(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_emoji_num(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.chars()
@@ -2536,7 +2536,7 @@ fn builtin_to_emoji_num(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     ))
 }
 
-fn builtin_braille_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_braille_encode(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.to_lowercase()
@@ -2575,7 +2575,7 @@ fn builtin_braille_encode(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
     ))
 }
 
-fn builtin_phonetic_digit(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_phonetic_digit(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let words: Vec<&str> = s
         .chars()
@@ -2957,7 +2957,7 @@ fn builtin_matrix_from_rows(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array(result))
 }
 fn builtin_matrix_map(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -3039,19 +3039,19 @@ fn builtin_ngrams(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .collect(),
     ))
 }
-fn builtin_bigrams(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_bigrams(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_ngrams(&[
         PerlValue::integer(2),
         PerlValue::string(first_arg_or_topic(interp, args).to_string()),
     ])
 }
-fn builtin_trigrams(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_trigrams(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_ngrams(&[
         PerlValue::integer(3),
         PerlValue::string(first_arg_or_topic(interp, args).to_string()),
     ])
 }
-fn builtin_char_frequencies(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_char_frequencies(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut map = indexmap::IndexMap::new();
     for c in s.chars() {
@@ -3078,11 +3078,11 @@ fn builtin_is_anagram(args: &[PerlValue]) -> PerlResult<PerlValue> {
     bc.sort_unstable();
     Ok(bool_iv(ac == bc))
 }
-fn builtin_is_pangram(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_pangram(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string().to_lowercase();
     Ok(bool_iv(('a'..='z').all(|c| s.contains(c))))
 }
-fn builtin_is_printable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_printable(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3090,7 +3090,7 @@ fn builtin_is_printable(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
             .all(|c| !c.is_control() || c == '\n' || c == '\t'),
     ))
 }
-fn builtin_is_control(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_control(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(!s.is_empty() && s.chars().all(|c| c.is_control())))
 }
@@ -3129,7 +3129,7 @@ fn builtin_indent_text(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .join("\n"),
     ))
 }
-fn builtin_dedent_text(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_dedent_text(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let lines: Vec<&str> = s.lines().collect();
     let min_indent = lines
@@ -3152,7 +3152,7 @@ fn builtin_dedent_text(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
             .join("\n"),
     ))
 }
-fn builtin_strip_html(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_strip_html(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut result = String::new();
     let mut in_tag = false;
@@ -3184,7 +3184,7 @@ fn builtin_chunk_string(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .collect(),
     ))
 }
-fn builtin_camel_to_snake(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_camel_to_snake(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
@@ -3195,7 +3195,7 @@ fn builtin_camel_to_snake(interp: &Interpreter, args: &[PerlValue]) -> PerlResul
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_snake_to_camel(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_snake_to_camel(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split('_')
@@ -3219,7 +3219,7 @@ fn builtin_string_multiply(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(1);
     Ok(PerlValue::string(s.repeat(n)))
 }
-fn builtin_collapse_whitespace(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_collapse_whitespace(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut result = String::new();
     let mut prev_space = false;
@@ -3236,7 +3236,7 @@ fn builtin_collapse_whitespace(interp: &Interpreter, args: &[PerlValue]) -> Perl
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_remove_vowels(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_remove_vowels(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3245,7 +3245,7 @@ fn builtin_remove_vowels(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
             .collect(),
     ))
 }
-fn builtin_remove_consonants(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_remove_consonants(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3254,7 +3254,7 @@ fn builtin_remove_consonants(interp: &Interpreter, args: &[PerlValue]) -> PerlRe
             .collect(),
     ))
 }
-fn builtin_is_numeric_string(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_numeric_string(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3285,7 +3285,7 @@ fn builtin_string_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::integer(dp[m][n] as i64))
 }
-fn builtin_metaphone(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_metaphone(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string().to_uppercase();
     let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
     if chars.is_empty() {
@@ -3345,11 +3345,11 @@ fn builtin_metaphone(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_double_metaphone(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_double_metaphone(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let code = builtin_metaphone(interp, args)?;
     Ok(PerlValue::array(vec![code.clone(), code]))
 }
-fn builtin_initials(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_initials(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace()
@@ -3358,7 +3358,7 @@ fn builtin_initials(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Perl
             .collect(),
     ))
 }
-fn builtin_acronym(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_acronym(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(PerlValue::string(
         s.split_whitespace()
@@ -3367,7 +3367,7 @@ fn builtin_acronym(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlV
             .collect(),
     ))
 }
-fn builtin_superscript(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_superscript(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3394,7 +3394,7 @@ fn builtin_superscript(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<P
             .collect(),
     ))
 }
-fn builtin_subscript(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_subscript(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3420,7 +3420,7 @@ fn builtin_subscript(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
             .collect(),
     ))
 }
-fn builtin_leetspeak(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_leetspeak(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3438,7 +3438,7 @@ fn builtin_leetspeak(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Per
             .collect(),
     ))
 }
-fn builtin_zalgo(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_zalgo(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     use rand::Rng;
     let s = first_arg_or_topic(interp, args).to_string();
     let mut rng = rand::thread_rng();
@@ -3464,7 +3464,7 @@ fn builtin_zalgo(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlVal
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_reverse_each_word(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_reverse_each_word(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3474,13 +3474,13 @@ fn builtin_reverse_each_word(interp: &Interpreter, args: &[PerlValue]) -> PerlRe
             .join(" "),
     ))
 }
-fn builtin_sort_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sort_words(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut words: Vec<&str> = s.split_whitespace().collect();
     words.sort_unstable();
     Ok(PerlValue::string(words.join(" ")))
 }
-fn builtin_unique_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_unique_words(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut seen = indexmap::IndexMap::new();
     for w in s.split_whitespace() {
@@ -3490,7 +3490,7 @@ fn builtin_unique_words(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
         seen.keys().cloned().collect::<Vec<_>>().join(" "),
     ))
 }
-fn builtin_word_frequencies(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_word_frequencies(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut map = indexmap::IndexMap::new();
     for w in s.split_whitespace() {
@@ -3505,7 +3505,7 @@ fn builtin_word_frequencies(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
 // Validation (extended)
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn builtin_luhn_check(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_luhn_check(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let digits: Vec<u32> = first_arg_or_topic(interp, args)
         .to_string()
         .chars()
@@ -3525,7 +3525,7 @@ fn builtin_luhn_check(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<Pe
     }
     Ok(bool_iv(sum.is_multiple_of(10)))
 }
-fn builtin_is_valid_hex_color(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_hex_color(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     Ok(bool_iv(
         s.starts_with('#')
@@ -3533,7 +3533,7 @@ fn builtin_is_valid_hex_color(interp: &Interpreter, args: &[PerlValue]) -> PerlR
             && s[1..].chars().all(|c| c.is_ascii_hexdigit()),
     ))
 }
-fn builtin_is_valid_cidr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_cidr(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<&str> = s.split('/').collect();
     if parts.len() != 2 {
@@ -3548,7 +3548,7 @@ fn builtin_is_valid_cidr(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
     let prefix_ok = parts[1].parse::<u32>().map(|n| n <= 32).unwrap_or(false);
     Ok(bool_iv(ip_ok && prefix_ok))
 }
-fn builtin_is_valid_mime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_mime(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let parts: Vec<&str> = s.split('/').collect();
     Ok(bool_iv(
@@ -3560,7 +3560,7 @@ fn builtin_is_valid_mime(interp: &Interpreter, args: &[PerlValue]) -> PerlResult
                 .all(|c| c.is_ascii_alphanumeric() || c == '-'),
     ))
 }
-fn builtin_is_valid_cron(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_valid_cron(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(bool_iv(
         first_arg_or_topic(interp, args)
             .to_string()
@@ -3612,7 +3612,7 @@ fn builtin_next_permutation(args: &[PerlValue]) -> PerlResult<PerlValue> {
         xs.into_iter().map(PerlValue::integer).collect(),
     ))
 }
-fn builtin_is_balanced_parens(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_is_balanced_parens(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut stack = Vec::new();
     for c in s.chars() {
@@ -3717,7 +3717,7 @@ fn builtin_reservoir_sample(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array(reservoir))
 }
 fn builtin_run_length_encode_str(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
 ) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
@@ -3739,7 +3739,7 @@ fn builtin_run_length_encode_str(
     Ok(PerlValue::string(result))
 }
 fn builtin_run_length_decode_str(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
 ) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
@@ -3758,7 +3758,7 @@ fn builtin_run_length_decode_str(
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_range_expand(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_range_expand(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     let mut result = Vec::new();
     for part in s.split(',') {
@@ -3808,7 +3808,7 @@ fn builtin_range_compress(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(ranges.join(",")))
 }
 fn builtin_group_consecutive_by(
-    interp: &mut Interpreter,
+    interp: &mut VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -3936,7 +3936,7 @@ fn builtin_normalize_range(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Conversion utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn builtin_to_string_val(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_to_string_val(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::string(
         first_arg_or_topic(interp, args).to_string(),
     ))
@@ -4577,7 +4577,7 @@ fn builtin_upsample(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Miscellaneous
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn builtin_fizzbuzz(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_fizzbuzz(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0);
     Ok(PerlValue::array(
         (1..=n)
@@ -4625,7 +4625,7 @@ fn builtin_roman_numeral_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .collect(),
     ))
 }
-fn builtin_look_and_say(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_look_and_say(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = first_arg_or_topic(interp, args).to_string();
     if s.is_empty() {
         return Ok(PerlValue::string("1".to_string()));
@@ -4644,7 +4644,7 @@ fn builtin_look_and_say(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     }
     Ok(PerlValue::string(result))
 }
-fn builtin_gray_code_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gray_code_sequence(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().clamp(0, 20) as u32;
     Ok(PerlValue::array(
         (0..1u64 << n)
@@ -4652,7 +4652,7 @@ fn builtin_gray_code_sequence(interp: &Interpreter, args: &[PerlValue]) -> PerlR
             .collect(),
     ))
 }
-fn builtin_sierpinski(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_sierpinski(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().clamp(0, 8) as u32;
     let size = 1usize << n;
     let mut lines = Vec::with_capacity(size);
@@ -4730,12 +4730,12 @@ fn builtin_game_of_life_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::array(result))
 }
-fn builtin_tower_of_hanoi(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_tower_of_hanoi(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(
         (1i64 << first_arg_or_topic(interp, args).to_int().max(0)) - 1,
     ))
 }
-fn builtin_pascals_triangle(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pascals_triangle(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0) as usize;
     let mut rows: Vec<Vec<i64>> = Vec::with_capacity(n);
     for i in 0..n {
@@ -4755,7 +4755,7 @@ fn builtin_pascals_triangle(interp: &Interpreter, args: &[PerlValue]) -> PerlRes
             .collect(),
     ))
 }
-fn builtin_truth_table(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_truth_table(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().clamp(0, 20) as u32;
     Ok(PerlValue::array(
         (0..1u64 << n)
@@ -4785,7 +4785,7 @@ fn builtin_base_convert(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_to_base(&[PerlValue::integer(n), PerlValue::integer(to as i64)])
 }
 fn builtin_roman_add(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let interp = crate::interpreter::Interpreter::new();
+    let interp = crate::vm_helper::VMHelper::new();
     let a = builtin_roman_to_int(&interp, &args[..1.min(args.len())])?.to_int();
     let b = if args.len() > 1 {
         builtin_roman_to_int(&interp, &args[1..2])?.to_int()
@@ -4899,7 +4899,7 @@ fn builtin_geometric_series(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }))
 }
 
-fn builtin_stirling_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_stirling_approx(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_number().max(0.0);
     if n < 1.0 {
         return Ok(PerlValue::float(1.0));
@@ -4909,7 +4909,7 @@ fn builtin_stirling_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResu
     Ok(PerlValue::float((2.0 * pi * n).sqrt() * (n / e).powf(n)))
 }
 
-fn builtin_double_factorial(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_double_factorial(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = first_arg_or_topic(interp, args).to_int().max(0);
     let mut result: i64 = 1;
     let mut i = n;
@@ -4940,7 +4940,7 @@ fn builtin_falling_factorial(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(result))
 }
 
-fn builtin_gamma_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_gamma_approx(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = first_arg_or_topic(interp, args).to_number();
     fn gamma_internal(z: f64) -> f64 {
         let g = 7;
@@ -4970,7 +4970,7 @@ fn builtin_gamma_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<
     Ok(PerlValue::float(gamma_internal(z)))
 }
 
-fn builtin_erf_approx(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_erf_approx(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = first_arg_or_topic(interp, args).to_number();
     let a1 = 0.254829592;
     let a2 = -0.284496736;
@@ -5253,7 +5253,7 @@ fn builtin_relativistic_mass(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }))
 }
 
-fn builtin_lorentz_factor(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lorentz_factor(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = first_arg_or_topic(interp, args).to_number();
     const C: f64 = 299792458.0;
     let v2_c2 = (v / C).powi(2);
@@ -5301,7 +5301,7 @@ fn builtin_relativistic_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(gamma * m0 * C * C))
 }
 
-fn builtin_rest_energy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_rest_energy(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = first_arg_or_topic(interp, args).to_number();
     const C: f64 = 299792458.0;
     Ok(PerlValue::float(m * C * C))
@@ -5319,14 +5319,14 @@ fn builtin_de_broglie_wavelength(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }))
 }
 
-fn builtin_photon_energy(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_photon_energy(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f = first_arg_or_topic(interp, args).to_number();
     const H: f64 = 6.62607015e-34;
     Ok(PerlValue::float(H * f))
 }
 
 fn builtin_photon_energy_wavelength(
-    interp: &Interpreter,
+    interp: &VMHelper,
     args: &[PerlValue],
 ) -> PerlResult<PerlValue> {
     let lambda = first_arg_or_topic(interp, args).to_number();
@@ -5339,7 +5339,7 @@ fn builtin_photon_energy_wavelength(
     }))
 }
 
-fn builtin_schwarzschild_radius(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_schwarzschild_radius(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = first_arg_or_topic(interp, args).to_number();
     const G: f64 = 6.67430e-11;
     const C: f64 = 299792458.0;
@@ -5353,7 +5353,7 @@ fn builtin_stefan_boltzmann(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(SIGMA * area * temp.powi(4)))
 }
 
-fn builtin_wien_displacement(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_wien_displacement(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let temp = first_arg_or_topic(interp, args).to_number();
     const B: f64 = 2.897771955e-3;
     Ok(PerlValue::float(if temp == 0.0 {
@@ -5432,7 +5432,7 @@ fn builtin_spring_energy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(0.5 * k * x * x))
 }
 
-fn builtin_pendulum_period(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_pendulum_period(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l = first_arg_or_topic(interp, args).to_number();
     const G: f64 = 9.80665;
     let pi = std::f64::consts::PI;
@@ -5493,7 +5493,7 @@ fn builtin_critical_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(ratio.asin().to_degrees()))
 }
 
-fn builtin_lens_power(interp: &Interpreter, args: &[PerlValue]) -> PerlResult<PerlValue> {
+fn builtin_lens_power(interp: &VMHelper, args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f = first_arg_or_topic(interp, args).to_number();
     Ok(PerlValue::float(if f == 0.0 {
         f64::INFINITY
@@ -6688,7 +6688,7 @@ fn builtin_cumtrapz(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn call_f(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     f: &PerlValue,
     x: f64,
     line: usize,
@@ -6705,7 +6705,7 @@ fn call_f(
 }
 
 fn call_f2(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     f: &PerlValue,
     a: f64,
     b: f64,
@@ -6729,7 +6729,7 @@ fn call_f2(
 
 /// `bisection F, a, b [, tol]` — find root of f(x)=0 in [a,b] via bisection.
 fn builtin_bisection(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -6755,7 +6755,7 @@ fn builtin_bisection(
 
 /// `newton_method F, F', x0 [, tol]` — Newton-Raphson root finding.
 fn builtin_newton_method(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -6780,7 +6780,7 @@ fn builtin_newton_method(
 
 /// `golden_section F, a, b [, tol]` — golden-section search for minimum of f on [a,b].
 fn builtin_golden_section(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -6814,7 +6814,7 @@ fn builtin_golden_section(
 
 /// `rk4 F, t0, y0, dt, steps` — 4th-order Runge-Kutta. F(t,y)->dy/dt. Returns [[t,y],...].
 fn builtin_rk4(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -6845,7 +6845,7 @@ fn builtin_rk4(
 
 /// `euler_ode F, t0, y0, dt, steps` — Euler method ODE solver.
 fn builtin_euler_ode(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -8028,7 +8028,7 @@ fn builtin_scale(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `which_val VEC, pred` — indices where predicate is true (R's which()).
 fn builtin_which_val(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -8365,7 +8365,7 @@ fn builtin_binom_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `sapply VEC, FN` — apply function to each element, return vector (R's sapply).
 fn builtin_sapply(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -8388,7 +8388,7 @@ fn builtin_sapply(
 
 /// `tapply VEC, GROUPS, FN` — apply function by group (R's tapply). Returns hash.
 fn builtin_tapply(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -8426,7 +8426,7 @@ fn builtin_tapply(
 
 /// `do_call FN, ARGS` — call function with args from a list (R's do.call).
 fn builtin_do_call(
-    interp: &mut crate::interpreter::Interpreter,
+    interp: &mut crate::vm_helper::VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -12083,7 +12083,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_divisors_returns_sorted() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_divisors(&interp, &[PerlValue::integer(12)]).unwrap();
         let arr = result.to_list();
         let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
@@ -12092,7 +12092,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_divisors_zero() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_divisors(&interp, &[PerlValue::integer(0)]).unwrap();
         let arr = result.to_list();
         assert!(arr.is_empty());
@@ -12100,14 +12100,14 @@ mod extended_tests {
 
     #[test]
     fn builtin_num_divisors_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_num_divisors(&interp, &[PerlValue::integer(12)]).unwrap();
         assert_eq!(result.to_int(), 6);
     }
 
     #[test]
     fn builtin_is_perfect_detects_perfect_numbers() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_is_perfect(&interp, &[PerlValue::integer(6)])
                 .unwrap()
@@ -12130,7 +12130,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_is_abundant_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_is_abundant(&interp, &[PerlValue::integer(12)])
                 .unwrap()
@@ -12147,7 +12147,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_is_deficient_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_is_deficient(&interp, &[PerlValue::integer(8)])
                 .unwrap()
@@ -12164,7 +12164,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_collatz_length_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_collatz_length(&interp, &[PerlValue::integer(1)])
                 .unwrap()
@@ -12181,7 +12181,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_collatz_sequence_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_collatz_sequence(&interp, &[PerlValue::integer(6)]).unwrap();
         let arr = result.to_list();
         let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
@@ -12190,7 +12190,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_lucas_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_lucas(&interp, &[PerlValue::integer(0)])
                 .unwrap()
@@ -12213,7 +12213,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_tribonacci_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_tribonacci(&interp, &[PerlValue::integer(0)])
                 .unwrap()
@@ -12236,7 +12236,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_nth_prime_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_nth_prime(&interp, &[PerlValue::integer(1)])
                 .unwrap()
@@ -12253,7 +12253,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_primes_up_to_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_primes_up_to(&interp, &[PerlValue::integer(20)]).unwrap();
         let arr = result.to_list();
         let vals: Vec<i64> = arr.iter().map(|v| v.to_int()).collect();
@@ -12262,7 +12262,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_next_prime_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_next_prime(&interp, &[PerlValue::integer(10)])
                 .unwrap()
@@ -12279,7 +12279,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_prev_prime_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_prev_prime(&interp, &[PerlValue::integer(10)])
                 .unwrap()
@@ -12296,7 +12296,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_triangular_number_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_triangular_number(&interp, &[PerlValue::integer(5)])
                 .unwrap()
@@ -12307,7 +12307,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_is_pentagonal_runs() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_is_pentagonal(&interp, &[PerlValue::integer(5)]);
         assert!(result.is_ok());
         let result2 = builtin_is_pentagonal(&interp, &[PerlValue::integer(0)]);
@@ -12316,7 +12316,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_pentagonal_number_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         assert_eq!(
             builtin_pentagonal_number(&interp, &[PerlValue::integer(3)])
                 .unwrap()
@@ -12327,7 +12327,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_area_circle_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_area_circle(&interp, &[PerlValue::integer(1)]).unwrap();
         let area = result.as_float().unwrap_or(0.0);
         assert!((area - std::f64::consts::PI).abs() < 1e-10);
@@ -12349,7 +12349,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_circumference_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_circumference(&interp, &[PerlValue::integer(1)]).unwrap();
         let circ = result.as_float().unwrap_or(0.0);
         assert!((circ - 2.0 * std::f64::consts::PI).abs() < 1e-10);
@@ -12403,7 +12403,7 @@ mod extended_tests {
 
     #[test]
     fn builtin_sphere_volume_basic() {
-        let interp = Interpreter::new();
+        let interp = VMHelper::new();
         let result = builtin_sphere_volume(&interp, &[PerlValue::integer(1)]).unwrap();
         let vol = result.as_float().unwrap_or(0.0);
         let expected = 4.0 / 3.0 * std::f64::consts::PI;
