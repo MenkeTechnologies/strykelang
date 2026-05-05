@@ -41,18 +41,18 @@ Severity legend:
   keyword-dispatch match, so `CORE::length` produces `ExprKind::Length`,
   `CORE::print` produces `ExprKind::Print`, etc. — same AST as the
   unprefixed forms. Matches Perl 5's documented `CORE::` namespace.
-- **PARITY-010** — `vec($s, $offset, $bits) = N` lvalue now works in
-  both the VM and tree-walking interpreter. Compiler rewrites the
-  assignment to `$s = vec_set_value(...)`; interpreter handles the
-  `FuncCall { name == "vec" }` target inline. While fixing the lvalue,
-  the existing 16/32-bit `vec` *read* path was also corrected — Perl
-  uses big-endian byte order for multi-byte BITS, and zero-pads
-  past-the-end reads (stryke previously did neither).
+- **PARITY-010** — `vec($s, $offset, $bits) = N` lvalue now works.
+  Compiler rewrites the assignment to `$s = vec_set_value(...)`, where
+  `vec_set_value` is a new internal 4-arg builtin that returns the
+  modified bit-buffer. While fixing the lvalue, the existing 16/32-bit
+  `vec` *read* path was also corrected — Perl uses big-endian byte
+  order for multi-byte BITS, and zero-pads past-the-end reads (stryke
+  previously did neither).
 - **PARITY-013** — `length` now respects `use utf8;`. With the pragma
   active, scalar args count Unicode codepoints; without it, UTF-8
-  bytes. Raw byte buffers always return byte count. Honored by both
-  tree-walking interpreter and bytecode VM. Per-interpreter flag (not
-  a process global) so concurrent test workers don't bleed.
+  bytes. Raw byte buffers always return byte count. Per-interpreter
+  flag (not a process-global static) so concurrent test workers don't
+  bleed pragma state.
 - **PARITY-016** — Named-unary precedence: `ref $@ eq "E"`,
   `length $s == 3 ? "Y" : "N"`, and similar idioms now parse as
   `(ref $@) eq "E"` / `(length $s) == 3 ? "Y" : "N"` — matching Perl.
@@ -76,11 +76,11 @@ Severity legend:
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
 - **PARITY-014** — `substr($s, $o, $l) = $rhs` lvalue assignment now
-  works. Both the bytecode compiler and tree-walking interpreter
-  recognize an `Assign { target: Substr { replacement: None }, value }`
-  shape and rewrite it to the 4-arg form `substr($s, $o, $l, $rhs)`.
-  Two-arg, three-arg, negative-offset, zero-length insert/append, and
-  the explicit 4-arg form all match Perl across 8 differential cases.
+  works. The bytecode compiler recognises an `Assign { target: Substr
+  { replacement: None }, value }` shape and rewrites it to the 4-arg
+  form `substr($s, $o, $l, $rhs)`. Two-arg, three-arg, negative-offset,
+  zero-length insert/append, and the explicit 4-arg form all match
+  Perl across 8 differential cases.
 - **PARITY-005** — `%` now uses Perl-style floored division so the
   result has the sign of the divisor (or is zero). New helper
   `value::perl_mod_i64` wraps the snap. Float operands are truncated
@@ -110,9 +110,9 @@ Severity legend:
   "Ba"`, `"zz"++ → "aaa"`, `""++ → "1"`, `"a9"++ → "b0"`). Decrement
   has no magic counterpart in Perl 5 and stays numeric. Pure-digit
   and mixed (e.g. `"9a"`) strings continue to fall back to numeric
-  increment. Wired through both the tree-walking interpreter
-  (`PreIncrement` / `PostfixOp::Increment`) and the bytecode VM
-  (`PostInc`, `PostIncSlot`, `PreIncSlot`, `PreIncSlotVoid`).
+  increment. Wired through every VM increment op (`PostInc`,
+  `PostIncSlot`, `PreIncSlot`, `PreIncSlotVoid`) via a shared
+  `perl_inc` helper.
 - **BUG-057, BUG-079, BUG-080, PARITY-008, PARITY-009** — sprintf `%a` /
   `%A` (C99 hex-float), `%n` (write byte-count through scalar ref),
   `%p` (deterministic placeholder), `%v...` (vectorize per-byte through
@@ -362,14 +362,13 @@ Severity: **parity** (i18n-relevant).
 
 ## PARITY-010 — `vec($s, $offset, $bits) = N` rejected as complex lvalue — **FIXED**
 
-`vec(...) = $rhs` is now supported in both the bytecode VM and the tree-
-walking interpreter. The compiler rewrites `vec($s, $o, $b) = $rhs` into
-`$s = vec_set_value($s, $o, $b, $rhs)` (a new internal helper builtin
-that returns the modified bit-buffer). The interpreter's `assign_value`
-recognises the `FuncCall { name == "vec", args }` lvalue shape and does
-the in-place bit set inline.
+The bytecode compiler now rewrites `vec($s, $o, $b) = $rhs` into
+`$s = vec_set_value($s, $o, $b, $rhs)`, where `vec_set_value` is a new
+internal 4-arg builtin that returns the modified bit-buffer. The
+existing supported-lvalue paths (`$s` plain scalar, `$arr[i]`, `$h{k}`,
+etc.) handle the assignment from there.
 
-While fixing the lvalue path, the existing `vec` *read* impl was also
+While fixing the lvalue, the existing `vec` *read* impl was also
 corrected: Perl uses **big-endian** byte order for multi-byte BITS (16 /
 32) and zero-pads past the end of the string. Stryke previously read
 little-endian and returned 0 on out-of-range reads.
@@ -541,18 +540,23 @@ Tests: `arrow_invoke_of_static_method_passes_class_as_first_arg_today`.
 Severity: **bug**.
 
 
-## BUG-008 — `%h{KEYS}` kv-slice returns the full hash
+## BUG-008 — `%h{KEYS}` kv-slice returns the full hash — **FIXED**
 
-```sh
-$ stryke -e 'my %h = (a=>1, b=>2, c=>3); my %sub = %h{qw(a c)}; say sort keys %sub'
-a b c                       # stryke (wrong)
-$ perl   -e 'my %h = (a=>1, b=>2, c=>3); my %sub = %h{qw(a c)}; say sort keys %sub'
-a c                         # perl
-```
+`%h{KEYS}` is Perl 5.20+'s key-value hash slice — returns a flat list
+of (key, value, key, value, …) pairs for just the requested keys, NOT
+the whole hash. New AST variant `ExprKind::HashKvSlice { hash, keys }`
+parses `%h{...}` (lexer feeds `Token::HashVar(h)` followed by
+`Token::LBrace`). The bytecode compiler emits `LoadConst(key) ;
+LoadConst(key) ; GetHashElem(h)` per key (or `compile_expr ; Dup ;
+GetHashElem` for non-literal keys), then `MakeArray(2 * total_pairs)`
+to build the flat key-value list.
 
-Tests: `kv_slice_returns_full_hash_today`.
+Tests: `kv_slice_returns_subset_with_key_value_pairs` (was
+`kv_slice_returns_full_hash_today`),
+`kv_slice_into_array_yields_alternating_key_value_pairs`.
 
-Severity: **bug**. Was added to Perl in 5.20; widely used.
+Severity: **bug** (FIXED — Perl 5.20+ syntax, common destructuring).
+
 
 
 ## BUG-009 — `exists $h{x}{y}` errors when `$h{x}` is missing — **FIXED**
@@ -616,10 +620,10 @@ Severity: **polish**.
 `use utf8;` / `no utf8;`. With the pragma on, scalar args count Unicode
 codepoints (`s.chars().count()`); without it, they count UTF-8 bytes
 (`s.len()`). Raw byte buffers (`as_bytes_arc`) always return byte count,
-matching Perl's `bytes::length` semantics. Both the tree-walking
-interpreter and the bytecode VM (`BuiltinId::Length` reading
-`self.interp.utf8_pragma`) honor the flag. The flag is per-interpreter,
-not global, so concurrent test workers don't bleed pragma state.
+matching Perl's `bytes::length` semantics. The VM `BuiltinId::Length`
+reads `self.interp.utf8_pragma`. The flag is per-interpreter (not a
+process-global static), so concurrent test workers don't bleed pragma
+state.
 
 Tests: `length_returns_byte_count_for_unicode_string`,
 `length_with_use_utf8_returns_char_count` (covers `héllo` → 5,
@@ -844,10 +848,6 @@ nested foreach loops don't poison the slot resolution. Aliasing only
 fires when the source is `ExprKind::ArrayVar(name)`; ranges, list
 literals, and `keys`/`values` keep copy semantics, matching Perl 5.
 
-The interpreter's tree-walking handler (`StmtKind::Foreach` in
-interpreter.rs) got the same fix for `Interpreter::execute` paths that
-ever bypass the VM (line-mode-skip, etc.).
-
 Tests: `for_dollar_underscore_aliases_array_element` (was
 `_does_not_alias_..._today`), `for_named_loop_var_aliases_array_element`,
 `for_alias_respects_last_and_next`,
@@ -949,10 +949,10 @@ given/when.
 
 ## BUG-025 — `$SIG{__WARN__}` handler is not invoked — **FIXED**
 
-**FIXED** in commit (pending) — interpreter and bytecode VM now route the
-`warn` builtin through `$SIG{__WARN__}` when a coderef is installed.
-Recursion guard: the slot is temporarily cleared during dispatch so a
-handler that itself calls `warn` falls back to stderr instead of looping.
+**FIXED** in commit (pending) — the bytecode VM `warn` op now routes
+through `$SIG{__WARN__}` when a coderef is installed. Recursion guard:
+the slot is temporarily cleared during dispatch so a handler that itself
+calls `warn` falls back to stderr instead of looping.
 
 Original report: variable is assignable and reads back as a CODE ref,
 but `warn` did not route through it.
