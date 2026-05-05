@@ -114,6 +114,12 @@ static COMPAT_MODE: AtomicBool = AtomicBool::new(false);
 /// bots or enforce style.
 static NO_INTEROP_MODE: AtomicBool = AtomicBool::new(false);
 
+/// When `true`, integer arithmetic that overflows i64 promotes to `BigInt`
+/// instead of falling back to `f64`. Activated by `use bigint;` and
+/// deactivated by `no bigint;`. Independent of `COMPAT_MODE` so a script
+/// can opt into bigint semantics without dragging in the rest of compat.
+static BIGINT_PRAGMA: AtomicBool = AtomicBool::new(false);
+
 /// Enable Perl 5 strict-compatibility mode (disables all stryke extensions).
 pub fn set_compat_mode(on: bool) {
     COMPAT_MODE.store(on, Ordering::Relaxed);
@@ -123,6 +129,18 @@ pub fn set_compat_mode(on: bool) {
 #[inline]
 pub fn compat_mode() -> bool {
     COMPAT_MODE.load(Ordering::Relaxed)
+}
+
+/// Enable bigint pragma (`use bigint;`) — integer overflow promotes to
+/// `BigInt` instead of demoting to `f64`.
+pub fn set_bigint_pragma(on: bool) {
+    BIGINT_PRAGMA.store(on, Ordering::Relaxed);
+}
+
+/// Returns `true` when `use bigint;` is active in this script.
+#[inline]
+pub fn bigint_pragma() -> bool {
+    BIGINT_PRAGMA.load(Ordering::Relaxed)
 }
 
 /// Enable no-interop mode (rejects Perl-isms, forces idiomatic stryke).

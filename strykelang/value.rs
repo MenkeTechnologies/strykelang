@@ -2554,7 +2554,7 @@ pub fn compat_mul(a: &PerlValue, b: &PerlValue) -> PerlValue {
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
         return PerlValue::float(a.to_number() * b.to_number());
     };
-    if crate::compat_mode() {
+    if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_mul(y) {
             Some(r) => PerlValue::integer(r),
             None => PerlValue::bigint(BigInt::from(x) * BigInt::from(y)),
@@ -2572,7 +2572,7 @@ pub fn compat_add(a: &PerlValue, b: &PerlValue) -> PerlValue {
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
         return PerlValue::float(a.to_number() + b.to_number());
     };
-    if crate::compat_mode() {
+    if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_add(y) {
             Some(r) => PerlValue::integer(r),
             None => PerlValue::bigint(BigInt::from(x) + BigInt::from(y)),
@@ -2590,7 +2590,7 @@ pub fn compat_sub(a: &PerlValue, b: &PerlValue) -> PerlValue {
     let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
         return PerlValue::float(a.to_number() - b.to_number());
     };
-    if crate::compat_mode() {
+    if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_sub(y) {
             Some(r) => PerlValue::integer(r),
             None => PerlValue::bigint(BigInt::from(x) - BigInt::from(y)),
@@ -2600,15 +2600,17 @@ pub fn compat_sub(a: &PerlValue, b: &PerlValue) -> PerlValue {
     }
 }
 
-/// `**` (exponentiation) — under `--compat`, uses `BigInt` directly when the
-/// exponent is non-negative so `2 ** 100` works. Falls through to `f64::powf`
-/// for negative or non-integer exponents (matches Perl's behavior).
+/// `**` (exponentiation) — under `--compat` or `use bigint;`, uses `BigInt`
+/// directly when the exponent is a non-negative integer so `2 ** 100`
+/// works. Falls through to `f64::powf` for negative or non-integer
+/// exponents (matches Perl's behavior).
 #[inline]
 pub fn compat_pow(a: &PerlValue, b: &PerlValue) -> PerlValue {
     let (Some(base), Some(exp)) = (a.as_integer(), b.as_integer()) else {
         return PerlValue::float(a.to_number().powf(b.to_number()));
     };
-    if !crate::compat_mode() {
+    let bigint_active = crate::compat_mode() || crate::bigint_pragma();
+    if !bigint_active {
         // Native: do whatever the existing path does — fall back to float
         // (matches Perl's default i64-overflow-to-NV behavior).
         return PerlValue::float((base as f64).powf(exp as f64));
