@@ -8875,6 +8875,9 @@ impl<'a> VM<'a> {
                     msg.push_str(&self.interp.die_warn_at_suffix(line));
                     msg.push('\n');
                 }
+                if let Err(e) = self.interp.fire_pseudosig_die(&msg, line) {
+                    return Err(e);
+                }
                 Err(PerlError::die(msg, line))
             }
             Some(BuiltinId::Warn) => {
@@ -8889,7 +8892,7 @@ impl<'a> VM<'a> {
                     msg.push_str(&self.interp.die_warn_at_suffix(line));
                     msg.push('\n');
                 }
-                eprint!("{}", msg);
+                self.interp.fire_pseudosig_warn(&msg, line)?;
                 Ok(PerlValue::integer(1))
             }
             Some(BuiltinId::Exit) => {
