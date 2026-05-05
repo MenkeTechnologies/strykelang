@@ -617,6 +617,42 @@ fn from_json_true_returns_truthy_one() {
     );
 }
 
+// ── `"$Pkg::Var"` interpolation drops the package prefix (BUG-107) ─────────
+
+#[test]
+fn package_qualified_scalar_interpolates_with_dropped_prefix_today() {
+    // BUG-107: `"$Foo::bar"` in a double-quoted string should expand to the
+    // value of `$Foo::bar`. Stryke parses `$Foo` as the variable and leaves
+    // `::bar` as a literal.
+    assert_eq!(
+        eval_string(r#"package Foo; our $bar = "hello"; package main; "[$Foo::bar]""#),
+        "[::bar]"
+    );
+}
+
+#[test]
+fn package_qualified_scalar_in_bare_code_works() {
+    assert_eq!(
+        eval_string(r#"package Foo; our $bar = "hello"; package main; $Foo::bar"#),
+        "hello"
+    );
+}
+
+#[test]
+fn package_qualified_scalar_via_code_deref_in_lib_eval_returns_empty_today() {
+    // BUG-107b: even the `${\ EXPR }` workaround doesn't reliably
+    // interpolate `$Foo::bar` from inside a string literal in the library
+    // `eval` API — the interpolated portion comes back empty. (CLI direct
+    // form `print "${\$Foo::bar}"` does work; only the
+    // assigned-into-string form is broken.)
+    assert_eq!(
+        eval_string(
+            r#"package Foo; our $bar = "hello"; package main; "value:${\$Foo::bar}""#
+        ),
+        "value:"
+    );
+}
+
 #[test]
 fn to_json_two_arg_pretty_form_serializes_as_array_today() {
     // BUG-106: `to_json($data, { pretty => 1 })` should produce pretty-
