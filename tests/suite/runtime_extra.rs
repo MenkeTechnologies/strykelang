@@ -227,7 +227,8 @@ fn bitwise_shift_negative_is_arithmetic_right() {
 
 #[test]
 fn modulo_negative_divisor() {
-    assert_eq!(eval_int("7 % -3"), 1);
+    // Perl-style floored mod: 7 mod -3 = -2 (result has sign of divisor).
+    assert_eq!(eval_int("7 % -3"), -2);
 }
 
 #[test]

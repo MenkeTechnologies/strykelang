@@ -8157,7 +8157,18 @@ impl Interpreter {
             BinOp::ShiftLeft => PerlValue::integer(old.to_int() << rhs.to_int()),
             BinOp::ShiftRight => PerlValue::integer(old.to_int() >> rhs.to_int()),
             BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
-            BinOp::Mod => PerlValue::float(old.to_number() % rhs.to_number()),
+            BinOp::Mod => {
+                // Return 0 on b==0 silently — this helper is the
+                // `$x OP= rhs` atomic-mutate path which can't propagate
+                // errors. The non-compound `%` path (eval_binop) raises
+                // `ErrorKind::DivisionByZero`.
+                let b = rhs.to_int();
+                if b == 0 {
+                    PerlValue::integer(0)
+                } else {
+                    PerlValue::integer(crate::value::perl_mod_i64(old.to_int(), b))
+                }
+            }
             BinOp::Pow => PerlValue::float(old.to_number().powf(rhs.to_number())),
             BinOp::LogOr => {
                 if old.is_true() {
@@ -9411,15 +9422,16 @@ impl Interpreter {
                         }
                         BinOp::Div => PerlValue::float(old.to_number() / rhs.to_number()),
                         BinOp::Mod => {
-                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                if b == 0 {
-                                    PerlValue::integer(0)
-                                } else {
-                                    PerlValue::integer(a.rem_euclid(b))
-                                }
+                            // Perl `%` is floored-division (sign-of-divisor),
+                            // not Rust's `%` (sign-of-dividend) nor
+                            // `rem_euclid` (always non-negative). Truncate
+                            // float operands to int first, matching Perl 5.
+                            let a = old.to_int();
+                            let b = rhs.to_int();
+                            if b == 0 {
+                                PerlValue::integer(0)
                             } else {
-                                let b = rhs.to_number();
-                                PerlValue::float(if b == 0.0 { 0.0 } else { old.to_number() % b })
+                                PerlValue::integer(crate::value::perl_mod_i64(a, b))
                             }
                         }
                         BinOp::Concat => {
@@ -12879,7 +12891,7 @@ impl Interpreter {
                 if d == 0 {
                     return Err(PerlError::division_by_zero("Illegal modulus zero", _line).into());
                 }
-                PerlValue::integer(lv.to_int() % d)
+                PerlValue::integer(crate::value::perl_mod_i64(lv.to_int(), d))
             }
             BinOp::Pow => {
                 // Under `--compat` or `use bigint;`, `compat_pow` promotes

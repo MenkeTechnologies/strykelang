@@ -2543,6 +2543,29 @@ pub fn set_member_key(v: &PerlValue) -> String {
     }
 }
 
+/// Perl-style integer modulo: floored division, so the result has the
+/// sign of the divisor (or is zero). Defined for all `b != 0`. Rust's
+/// `%` operator returns the sign of the dividend, which differs whenever
+/// the operands have opposite signs.
+///
+/// Examples (matching Perl 5.42):
+///   `perl_mod_i64(-7, 3) =  2`
+///   `perl_mod_i64( 7,-3) = -2`
+///   `perl_mod_i64(-7,-3) = -1`
+///   `perl_mod_i64( 7, 3) =  1`
+#[inline]
+pub fn perl_mod_i64(a: i64, b: i64) -> i64 {
+    debug_assert_ne!(b, 0);
+    let r = a.wrapping_rem(b);
+    // Sign mismatch between r and b, and r is non-zero → snap toward
+    // the divisor's sign by adding b (won't overflow since |r| < |b|).
+    if r != 0 && (r ^ b) < 0 {
+        r + b
+    } else {
+        r
+    }
+}
+
 /// `--compat`-aware integer multiply. In compat mode, promotes to `BigInt` on
 /// overflow. In native mode, wraps (preserves current behavior). Either side
 /// already being a `BigInt` forces the BigInt path.
