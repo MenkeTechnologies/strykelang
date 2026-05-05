@@ -3888,6 +3888,29 @@ impl Compiler {
             }
 
             ExprKind::Assign { target, value } => {
+                // `substr($s, $o, $l) = $rhs` is equivalent to the 4-arg
+                // form `substr($s, $o, $l, $rhs)`. Rewrite + compile as
+                // a function call so the dedicated lvalue path isn't
+                // needed.
+                if let ExprKind::Substr {
+                    string,
+                    offset,
+                    length,
+                    replacement: None,
+                } = &target.kind
+                {
+                    let rewritten = Expr {
+                        kind: ExprKind::Substr {
+                            string: string.clone(),
+                            offset: offset.clone(),
+                            length: length.clone(),
+                            replacement: Some(value.clone()),
+                        },
+                        line: target.line,
+                    };
+                    self.compile_expr(&rewritten)?;
+                    return Ok(());
+                }
                 if let (ExprKind::Typeglob(lhs), ExprKind::Typeglob(rhs)) =
                     (&target.kind, &value.kind)
                 {

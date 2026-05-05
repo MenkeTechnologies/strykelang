@@ -13731,6 +13731,43 @@ impl Interpreter {
 
     fn assign_value(&mut self, target: &Expr, val: PerlValue) -> ExecResult {
         match &target.kind {
+            // `substr($s, $o, $l) = $rhs` — equivalent to the 4-arg form
+            // `substr($s, $o, $l, $rhs)`. Evaluate the offset/length
+            // sub-exprs, splice the new substring into the target, then
+            // recursively call assign_value to write the modified string
+            // through the original `string` lvalue.
+            ExprKind::Substr {
+                string,
+                offset,
+                length,
+                replacement: None,
+            } => {
+                let s = self.eval_expr(string)?.to_string();
+                let off = self.eval_expr(offset)?.to_int();
+                let start = if off < 0 {
+                    (s.len() as i64 + off).max(0) as usize
+                } else {
+                    (off as usize).min(s.len())
+                };
+                let len = if let Some(l) = length {
+                    let lv = self.eval_expr(l)?.to_int();
+                    if lv < 0 {
+                        let remaining = s.len().saturating_sub(start) as i64;
+                        (remaining + lv).max(0) as usize
+                    } else {
+                        lv as usize
+                    }
+                } else {
+                    s.len().saturating_sub(start)
+                };
+                let end = start.saturating_add(len).min(s.len());
+                let mut new_s = String::with_capacity(s.len());
+                new_s.push_str(&s[..start]);
+                new_s.push_str(&val.to_string());
+                new_s.push_str(&s[end..]);
+                self.assign_value(string, PerlValue::string(new_s))?;
+                Ok(PerlValue::UNDEF)
+            }
             // `(my $copy = $orig) =~ s/.../.../` — at this point the
             // MyExpr has already been evaluated as a side-effect of
             // `eval_expr(target)` upstream (so `$copy` has been declared
