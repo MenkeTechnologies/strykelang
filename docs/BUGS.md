@@ -17,6 +17,15 @@ Severity legend:
 
 ## Recently fixed
 
+- **PARITY-016** — Named-unary precedence: `ref $@ eq "E"`,
+  `length $s == 3 ? "Y" : "N"`, and similar idioms now parse as
+  `(ref $@) eq "E"` / `(length $s) == 3 ? "Y" : "N"` — matching Perl.
+  `parse_one_arg_or_default` (every Perl named-unary builtin: `ref`,
+  `length`, `lc`, `uc`, `chr`, `ord`, `hex`, `oct`, `int`, `abs`,
+  `sqrt`, `sin`, `cos`, `exp`, `log`, etc.) parses the bare argument
+  at named-unary precedence (shift-level) instead of full assignment-
+  expression precedence. List-op `rev` got its own arg path so
+  `rev 1..3` still parses as `rev(1..3)`.
 - **PARITY-015** — `"Inf"` / `"Infinity"` / `"NaN"` strings (case-
   insensitive, optional leading sign) now numify to actual float
   specials. `format_float` also prints `Inf` / `-Inf` / `NaN` (Perl's
@@ -951,25 +960,25 @@ Tests: `match_dollar_amp_captures_whole_match` (the form that works),
 Severity: **bug** (interpolation parser).
 
 
-## PARITY-016 — `ref $@ eq "Class"` parses with the wrong precedence
+## PARITY-016 — `ref $@ eq "Class"` parses with the wrong precedence — **FIXED**
 
-```sh
-$ stryke -e 'package E; sub new { bless {}, shift } package main;
-             eval { die E->new }; print ref $@ eq "E" ? "Y" : "N"'
-N
-$ stryke -e 'package E; sub new { bless {}, shift } package main;
-             eval { die E->new }; print((ref $@) eq "E" ? "Y" : "N")'
-Y
-```
+`parse_one_arg_or_default` (the helper used by every Perl named unary —
+`ref`, `length`, `lc`/`uc`, `chr`/`ord`, `hex`/`oct`, `int`/`abs`/`sqrt`,
+`sin`/`cos`/`exp`/`log`, etc.) now parses the bare argument at named-unary
+precedence (`parse_named_unary_arg`, which stops at shift level) instead
+of `parse_one_arg`'s wider assignment-expression precedence. `ref $@ eq
+"E"` now parses as `(ref $@) eq "E"`, matching Perl. Same fix lifts
+`length $s == 3 ? "Y" : "N"` and similar idioms.
 
-Stryke parses `ref $@ eq "E"` as `ref ($@ eq "E")` — the named-unary
-operator's argument absorbs the `eq` expression — instead of `(ref $@) eq
-"E"` per Perl precedence.
+`rev` (a stryke list-operator alias) was migrated off
+`parse_one_arg_or_default` to its own list-op-precedence path with an
+inline implicit-`$_` default, so `rev 1..3` keeps parsing as
+`rev(1..3)`.
 
-Tests: `ref_dollar_at_eq_string_precedence_today`,
-`die_with_blessed_object_preserves_class` (the form that works).
+Tests: `ref_dollar_at_eq_string_precedence` (was
+`_today`).
 
-Severity: **parity**. Common idiom for typed-exception dispatch.
+Severity: **parity** (FIXED).
 
 
 ## BUG-030 — `system()` return value is exit code, not Perl's status word
