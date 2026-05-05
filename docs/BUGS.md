@@ -24,6 +24,14 @@ Severity legend:
   and `%e`/`%E` Perl-style exponent (`1.234568e+04` instead of
   `1.234568e4`) are now all matching Perl exactly across 38 tested
   format specifiers.
+- **PARITY-003** — `use bigint;` (and `use bignum;` / `use bigrat;`)
+  now activates BigInt promotion for `**`, `+`, `-`, `*`, and `*=`.
+  Same numeric-promotion path as `--compat` but gated by the source-
+  level pragma. Bare `2 ** 64` (without `use bigint;` and without
+  `--compat`) continues to fall back to `f64`, matching Perl's
+  default. Note: `use bigint; ... no bigint;` still cancels because
+  pragmas are processed at compile time globally; full lexical scoping
+  would require a separate effort.
 - **PARITY-002** — `(my $copy = $orig) =~ s///` and the matching
   `tr///` form now bind the substitution to `$copy` (the freshly
   declared variable inside the parens), leaving `$orig` untouched.
@@ -117,7 +125,7 @@ parsing/lvalue-shaping in `parser.rs` for the parenthesized-decl-as-lvalue
 case feeding `=~`.
 
 
-## PARITY-003 — `2 ** 64` falls back to float instead of bigint
+## PARITY-003 — `2 ** 64` falls back to float instead of bigint — **FIXED** (`use bigint;`)
 
 ```sh
 $ stryke -e 'print 2 ** 64'
