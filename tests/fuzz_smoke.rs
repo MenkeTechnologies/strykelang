@@ -43,7 +43,10 @@ fn read_corpus(target: &str) -> Vec<(PathBuf, Vec<u8>)> {
 #[test]
 fn parse_corpus_does_not_panic() {
     let entries = read_corpus("parse");
-    assert!(!entries.is_empty(), "fuzz/corpus/parse must have seed files");
+    assert!(
+        !entries.is_empty(),
+        "fuzz/corpus/parse must have seed files"
+    );
     for (path, bytes) in entries {
         if let Ok(s) = std::str::from_utf8(&bytes) {
             // Mirror parse.rs harness exactly — `parse` returns Result, we only

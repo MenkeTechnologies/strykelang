@@ -8,16 +8,19 @@ use crate::common::*;
 fn system_env_ae() {
     assert_eq!(eval_int("cmd_exists('ls')"), 1);
     assert_eq!(eval_int("cmd_exists('non-existent-cmd-xyz')"), 0);
-    
+
     // argc() depends on how integration tests are invoked, usually 0 or small
     let _ = eval_int("argc()");
-    
+
     // script_name() returns binary name
-    assert!(eval_string("script_name()").contains("stryke") || eval_string("script_name()").contains("integration"));
-    
+    assert!(
+        eval_string("script_name()").contains("stryke")
+            || eval_string("script_name()").contains("integration")
+    );
+
     // has_stdout_tty()
     let _ = eval_int("has_stdout_tty()");
-    
+
     // env_keys()
     let code = r#"
         my @keys = env_keys();
@@ -35,7 +38,7 @@ fn random_sampling_ae() {
         len(@sample)
     "#;
     assert_eq!(eval_int(code), 3);
-    
+
     // sample members should be in original list
     let code2 = r#"
         my @l = (1, 2, 3, 4, 5);

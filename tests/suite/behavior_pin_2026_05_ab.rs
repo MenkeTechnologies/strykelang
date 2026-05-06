@@ -17,7 +17,7 @@ fn network_interfaces_smoke() {
         }
     "#;
     assert_eq!(eval_int(code), 1);
-    
+
     // net_ipv4() returns current primary IP
     assert!(!eval_string("net_ipv4()").is_empty());
 }
@@ -30,9 +30,9 @@ fn ansi_styling_smoke() {
     let s = eval_string(r#"ansi_red("hello")"#);
     assert!(s.contains("\x1b[31m"));
     assert!(s.contains("hello"));
-    
+
     assert_eq!(eval_string(&format!(r##"strip_ansi("{}")"##, s)), "hello");
-    
+
     // Bold wrap
     let bold = eval_string(r#"ansi_bold("bold")"#);
     assert!(bold.contains("\x1b[1m"));
@@ -44,8 +44,11 @@ fn ansi_styling_smoke() {
 fn stats_ab_smoke() {
     // geometric_mean(1, 8, 64) = 8
     // Use format to avoid int truncation issues
-    assert_eq!(eval_string("sprintf('%.0f', geometric_mean(1, 8, 64))"), "8");
-    
+    assert_eq!(
+        eval_string("sprintf('%.0f', geometric_mean(1, 8, 64))"),
+        "8"
+    );
+
     // zscore(x, list)
     // For x=15 and list=[10, 5]: mean=7.5, sd=2.5, z=(15-7.5)/2.5 = 3
     assert_eq!(eval_int("zscore(15, 10, 5)"), 3);
@@ -61,7 +64,7 @@ fn sorting_ab_smoke() {
         join(",", @s)
     "#;
     assert_eq!(eval_string(code), "a,pear,apple,banana");
-    
+
     let code2 = r#"
         my @l = (1, 2, 3);
         my @r = reverse_list(@l);
@@ -79,7 +82,7 @@ fn array_ab_helpers() {
         join(",", @w)
     "#;
     assert_eq!(eval_string(code), "1,3,4");
-    
+
     let code2 = r#"
         my @l = (1, 2, 3, 4, 5);
         my @tl = take_last(2, @l);
@@ -97,7 +100,7 @@ fn string_ab_smoke() {
     let s = eval_string(r#"shuffle_chars("abc")"#);
     assert_eq!(s.len(), 3);
     assert!(s.contains("a") && s.contains("b") && s.contains("c"));
-    
+
     assert_eq!(eval_int(r#"matches_regex("hello", "^h.*o$")"#), 1);
     assert_eq!(eval_int(r#"count_regex_matches("ababa", "a")"#), 3);
 }

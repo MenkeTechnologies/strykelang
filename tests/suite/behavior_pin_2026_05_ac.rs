@@ -25,11 +25,14 @@ fn string_analysis_ac() {
     assert_eq!(eval_int("is_vowel('b')"), 0);
     assert_eq!(eval_int("is_consonant('b')"), 1);
     assert_eq!(eval_int("is_consonant('a')"), 0);
-    
+
     assert_eq!(eval_int("count_vowels('hello')"), 2);
     assert_eq!(eval_int("count_consonants('hello')"), 3);
-    
-    assert_eq!(eval_string(r#"reverse_words("hello world")"#), "world hello");
+
+    assert_eq!(
+        eval_string(r#"reverse_words("hello world")"#),
+        "world hello"
+    );
     assert_eq!(eval_string(r#"rot47("abc")"#), "234");
 }
 
@@ -53,11 +56,11 @@ fn predicates_ac() {
     assert_eq!(eval_int("is_pair([1, 2])"), 1);
     assert_eq!(eval_int("is_pair([1])"), 0);
     assert_eq!(eval_int("is_triple([1, 2, 3])"), 1);
-    
+
     assert_eq!(eval_int("is_empty_arr([])"), 1);
     assert_eq!(eval_int("is_empty_arr([1])"), 0);
     assert_eq!(eval_int("is_empty_hash({})"), 1);
-    
+
     assert_eq!(eval_int("is_subset([1, 2], [1, 2, 3])"), 1);
     assert_eq!(eval_int("is_permutation([1, 2, 3], [3, 2, 1])"), 1);
 }
@@ -69,7 +72,7 @@ fn search_ac() {
     // binary_search(target, sorted_list)
     assert_eq!(eval_int("binary_search(3, 1, 2, 3, 4, 5)"), 2);
     assert_eq!(eval_int("binary_search(6, 1, 2, 3, 4, 5)"), -1);
-    
+
     // linear_search(target, list)
     assert_eq!(eval_int("linear_search(3, 5, 4, 3, 2, 1)"), 2);
 }
