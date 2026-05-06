@@ -14,13 +14,12 @@ fn Rosetta::ImageConvolution::convolve($image, $kernel) {
     
     # We use map to build the result array
     ~> 0..($img_h - 1) map {
-        my $r = _
         my @row
         for my $c (0..($img_w - 1)) {
             my $sum = 0.0
             for my $kr (0..($ker_h - 1)) {
                 for my $kc (0..($ker_w - 1)) {
-                    my $img_r = $r + $kr - $kh_half
+                    my $img_r = _ + $kr - $kh_half
                     my $img_c = $c + $kc - $kw_half
                     
                     # Zero-padding for edges
