@@ -15,6 +15,8 @@ mod behavior_pin_2026_05_ag;
 mod behavior_pin_2026_05_ah;
 mod behavior_pin_2026_05_ai;
 mod behavior_pin_2026_05_aj;
+mod behavior_pin_2026_05_ak;
+mod behavior_pin_2026_05_al;
 mod behavior_pin_2026_05_b;
 mod behavior_pin_2026_05_c;
 mod behavior_pin_2026_05_d;
