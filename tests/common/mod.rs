@@ -47,6 +47,13 @@ pub fn eval_int_locked(code: &str) -> i64 {
     eval_locked(code).to_int()
 }
 
+/// `ErrorKind` variant of [`eval_locked`] for use inside [`with_global_flags`].
+pub fn eval_err_kind_locked(code: &str) -> ErrorKind {
+    let program = stryke::parse(code).expect("parse failed");
+    let mut interp = VMHelper::new();
+    interp.execute(&program).unwrap_err().kind
+}
+
 /// Parse and execute Perl code; panics on parse or runtime error.
 pub fn eval(code: &str) -> PerlValue {
     let _guard = GLOBAL_FLAGS_LOCK.read();
