@@ -8,7 +8,7 @@ use crate::common::*;
 fn json_helpers_ag() {
     // escape_json(s)
     assert_eq!(eval_string(r#"escape_json('a"b')"#), r#"a\"b"#);
-    
+
     // json_minify(hash) returns minified string
     let code = r#"
         my $h = { a => 1, b => 2 };
@@ -23,7 +23,7 @@ fn json_helpers_ag() {
 fn env_ids_ag() {
     assert_eq!(eval_int("env_has('PATH')"), 1);
     assert!(!eval_string("env_get('PATH')").is_empty());
-    
+
     // token(n)
     assert_eq!(eval_int("len(token(16))"), 16);
     assert_eq!(eval_int("len(token(32))"), 32);
@@ -36,7 +36,7 @@ fn system_ae_extras() {
     // script_name() returns binary name or integration test name
     let s = eval_string("script_name()");
     assert!(s.contains("stryke") || s.contains("integration"));
-    
+
     // argc() should be >= 0
     assert!(eval_int("argc()") >= 0);
 }

@@ -79,7 +79,10 @@ fn unit_conversions_digital() {
 fn string_ngrams_and_cases() {
     assert_eq!(eval_string(r#"join(",", ngrams(2, "abc"))"#), "ab,bc");
     assert_eq!(eval_string(r#"pascal_case("hello_world")"#), "HelloWorld");
-    assert_eq!(eval_string(r#"constant_case("hello_world")"#), "HELLO_WORLD");
+    assert_eq!(
+        eval_string(r#"constant_case("hello_world")"#),
+        "HELLO_WORLD"
+    );
 }
 
 #[test]

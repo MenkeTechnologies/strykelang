@@ -75,7 +75,7 @@ fn number_theory_partition_and_bell() {
 #[test]
 fn number_theory_prime_pi_and_totient_sum() {
     assert_eq!(eval_int("prime_pi(10)"), 4); // 2, 3, 5, 7
-    // totient_sum(3) = phi(1) + phi(2) + phi(3) = 1 + 1 + 2 = 4
+                                             // totient_sum(3) = phi(1) + phi(2) + phi(3) = 1 + 1 + 2 = 4
     assert_eq!(eval_int("totient_sum(3)"), 4);
 }
 

@@ -131,7 +131,13 @@ fn cyber_rain_generates_matrix_effect() {
     let s = eval_string("cyber_rain(40, 10)");
     assert!(s.contains("\x1b[38;2;"));
     // Rain characters (Japanese katakana or symbols used in the source)
-    assert!(s.contains("ァ") || s.contains("ィ") || s.contains("ゥ") || s.contains("カ") || s.contains(":"));
+    assert!(
+        s.contains("ァ")
+            || s.contains("ィ")
+            || s.contains("ゥ")
+            || s.contains("カ")
+            || s.contains(":")
+    );
 }
 
 // ── AI Syntax Desugaring (`tool fn` and `mcp_server`) ────────────────────────

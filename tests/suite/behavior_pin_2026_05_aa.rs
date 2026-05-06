@@ -9,7 +9,7 @@ fn color_conversions_aa() {
     assert_eq!(eval_string("rgb_to_hex(255, 0, 0)"), "#ff0000");
     assert_eq!(eval_string("rgb_to_hex(0, 255, 0)"), "#00ff00");
     assert_eq!(eval_string("rgb_to_hex(0, 0, 255)"), "#0000ff");
-    
+
     let code = r##"
         my $rgb = hex_to_rgb("#ff0000");
         join(",", @$rgb)
@@ -26,7 +26,7 @@ fn hash_ops_aa() {
         hash_size($h)
     "#;
     assert_eq!(eval_int(code), 2);
-    
+
     let code2 = r#"
         my $h = { a => 1, b => 2 };
         my @p = pairs_from_hash($h);
@@ -42,10 +42,10 @@ fn hash_ops_aa() {
 fn predicates_aa() {
     assert_eq!(eval_int("is_sorted(1, 2, 3)"), 1);
     assert_eq!(eval_int("is_sorted(1, 3, 2)"), 0);
-    
+
     assert_eq!(eval_int("is_subset([1, 2], [1, 2, 3])"), 1);
     assert_eq!(eval_int("is_subset([1, 4], [1, 2, 3])"), 0);
-    
+
     assert_eq!(eval_int("is_permutation([1, 2, 3], [3, 2, 1])"), 1);
     assert_eq!(eval_int("is_permutation([1, 2, 3], [1, 2, 4])"), 0);
 }
@@ -68,7 +68,7 @@ fn random_smoke_aa() {
         let n = eval_int("coin_flip()");
         assert!(n == 0 || n == 1);
     }
-    
+
     // random_int(lo, hi)
     let n = eval_int("random_int(10, 20)");
     assert!((10..=20).contains(&n));
@@ -83,7 +83,7 @@ fn stats_aa_smoke() {
         join(",", @$res)
     "#;
     assert_eq!(eval_string(code), "5,20");
-    
+
     // harmonic_mean(1, 2, 4) = 3 / (1/1 + 1/2 + 1/4) = 3 / 1.75 = 1.714
     let mean = eval("harmonic_mean(1, 2, 4)").to_number();
     assert!((mean - 1.714).abs() < 0.01);
