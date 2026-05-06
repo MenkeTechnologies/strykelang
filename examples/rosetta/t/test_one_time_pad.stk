@@ -8,20 +8,12 @@ fn Rosetta::OTP::generate_pad($len) {
 }
 
 fn Rosetta::OTP::encrypt($text, $pad) {
-    my @chars = $text |> chars() |> map { ord(_) }
-    my @res
-    for (my $i = 0; $i < len(@chars); $i++) {
-        push @res, $chars[$i] ^ $pad->[$i]
-    }
-    \@res
+    my @chars = $text |> chars |> map { ord(_) }
+    [~> 0:len(@chars)-1 map { $chars[_] ^ $pad->[_] }]
 }
 
 fn Rosetta::OTP::decrypt($cipher, $pad) {
-    my @res
-    for (my $i = 0; $i < len(@$cipher); $i++) {
-        push @res, chr($cipher->[$i] ^ $pad->[$i])
-    }
-    join("", @res)
+    0:len(@$cipher)-1 |> map { chr($cipher->[_] ^ $pad->[_]) } |> join("")
 }
 
 my $t = "Rosetta Code"

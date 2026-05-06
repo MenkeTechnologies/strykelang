@@ -4,25 +4,13 @@
 fn Rosetta::SimpsonsRule::integrate($f, $a, $b, $n) {
     if ($n % 2 != 0) { $n++ }
     my $h = ($b - $a) / $n
-    
-    my $sum = $f->($a) + $f->($b)
-    
     my $half_n = $n / 2
-    my $half_n_minus_1 = $half_n - 1
-    
-    my @odds = ~> 1:$half_n map { $a + (2*$_ - 1) * $h }
-    my @evens = ()
-    if ($half_n_minus_1 >= 1) {
-        @evens = ~> 1:$half_n_minus_1 map { $a + 2*$_ * $h }
-    }
-    
-    my $sum_odds = ~> @odds map { $f->(_) } reduce { _0 + _1 }
-    my $sum_evens = 0
-    if (len(@evens) > 0) {
-        $sum_evens = ~> @evens map { $f->(_) } reduce { _0 + _1 }
-    }
-    
-    ($h / 3) * ($sum + 4 * $sum_odds + 2 * $sum_evens)
+    my @odds  = ~> 1:$half_n   map { $a + (2*_ - 1) * $h }
+    my @evens = ~> 1:$half_n-1 map { $a + 2*_ * $h }
+    my $sum_odds  = @odds  |> map $f |> sum
+    my $sum_evens = @evens |> map $f |> sum
+    my $sum_ends  = $f->($a) + $f->($b)
+    ($h / 3) * ($sum_ends + 4 * $sum_odds + 2 * $sum_evens)
 }
 
 my $f1 = fn($x) { $x ** 3 }

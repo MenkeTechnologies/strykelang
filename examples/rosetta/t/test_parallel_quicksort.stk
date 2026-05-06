@@ -6,12 +6,8 @@
 my @data = ~> 1..100 map { int(rand(1000)) }
 my @sorted = sort { _0 <=> _1 } @data
 
-# Verify order
-my $ok = 1
-for (my $i = 0; $i < len(@sorted) - 1; $i++) {
-    if ($sorted[$i] > $sorted[$i+1]) { $ok = 0 }
-}
-
+# Verify order: every adjacent pair must be non-decreasing
+my $ok = ~> 0:len(@sorted)-2 all { $sorted[_] <= $sorted[_+1] }
 assert_ok $ok, "Parallel QuickSort result is sorted"
 assert_eq len(@sorted), 100, "Parallel QuickSort preserved all elements"
 
