@@ -17,5 +17,5 @@ fn Exercism::AffineCipher::decode($phrase, $a, $b) {
     my $inv = Exercism::AffineCipher::_modinv($a, 26)
     ~> ($phrase =~ s/\s+//gr) chars map {
         _ =~ /[a-z]/ ? chr((($inv * (ord(_) - ord("a") - $b)) % 26 + 26) % 26 + ord("a")) : _
-    } |> join("")
+    } join("")
 }

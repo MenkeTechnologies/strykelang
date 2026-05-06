@@ -11,8 +11,8 @@ fn Exercism::BeerSong::verse {
     }
 }
 
-fn Exercism::BeerSong::sing($args) {
-    my $top    = $args->{bottles}
-    my $bottom = $top - $args->{verses} + 1
+fn Exercism::BeerSong::sing {
+    my $top    = _->{bottles}
+    my $bottom = $top - _->{verses} + 1
     ~> $bottom:$top rev map { Exercism::BeerSong::verse } join("\n\n")
 }

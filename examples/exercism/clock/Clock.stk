@@ -6,7 +6,7 @@ fn Exercism::Clock::new($h, $m) {
     { hour => int($total / 60), minute => $total % 60 }
 }
 
-fn Exercism::Clock::time($c)        { sprintf("%02d:%02d", $c->{hour}, $c->{minute}) }
+fn Exercism::Clock::time = sprintf("%02d:%02d", _->{hour}, _->{minute})
 fn Exercism::Clock::add_minutes($c, $n)      { Exercism::Clock::new($c->{hour}, $c->{minute} + $n) }
 fn Exercism::Clock::subtract_minutes($c, $n) { Exercism::Clock::add_minutes($c, -$n) }
 fn Exercism::Clock::equals($a, $b) { $a->{hour} == $b->{hour} && $a->{minute} == $b->{minute} ? 1 : 0 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-fn Exercism::PalindromeProducts::_pal { "$_[0]" eq join("", rev chars("$_[0]")) }
+fn Exercism::PalindromeProducts::_pal = _ == ~> _ chars rev join("")
 
 fn Exercism::PalindromeProducts::_search($min, $max, $want_largest) {
     die "min must be <= max" if $min > $max

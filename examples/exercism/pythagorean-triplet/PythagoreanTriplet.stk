@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-fn Exercism::PythagoreanTriplet::is_pythagorean($a, $b, $c) { $a * $a + $b * $b == $c * $c }
+fn Exercism::PythagoreanTriplet::is_pythagorean = _ * _ + _1 * _1 == _2 * _2
 
 fn Exercism::PythagoreanTriplet::triplets_in_range($min, $max) {
     my @out

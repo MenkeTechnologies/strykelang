@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
-fn Exercism::SimpleLinkedList::new        { { data => _0, next => _1 } }
-fn Exercism::SimpleLinkedList::data       { _0->{data} }
-fn Exercism::SimpleLinkedList::next       { _0->{next} }
+fn Exercism::SimpleLinkedList::new        { { data => _, next => _1 } }
+fn Exercism::SimpleLinkedList::data       { _->{data} }
+fn Exercism::SimpleLinkedList::next       { _->{next} }
 
 fn Exercism::SimpleLinkedList::from_array($vs) {
     my $h

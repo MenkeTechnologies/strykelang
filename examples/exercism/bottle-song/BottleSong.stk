@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 my @_NUM = ("No","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten")
 
-fn Exercism::BottleSong::_word($n) { $_NUM[$n] // "$n" }
+fn Exercism::BottleSong::_word = $_NUM[_] // "$_"
 
 fn Exercism::BottleSong::recite($args) {
     my $start  = $args->{start_bottles}
     my $verses = $args->{take_down} // 1
     my @out
-    for my $i (0..$verses - 1) {
+    for my $i (0:$verses - 1) {
         my $n  = $start - $i
         my $b  = $n == 1 ? "bottle"  : "bottles"
         my $nn = $n - 1

@@ -6,7 +6,7 @@ fn Exercism::Sublist::_contains($a, $b) {
     return 0 if $na > $nb
     for my $i (0..$nb - $na) {
         my $ok = 1
-        for my $j (0..$na - 1) { if ($a->[$j] ne $b->[$i + $j]) { $ok = 0; last } }
+        for my $j (0:$na - 1) { if ($a->[$j] ne $b->[$i + $j]) { $ok = 0; last } }
         return 1 if $ok
     }
     0

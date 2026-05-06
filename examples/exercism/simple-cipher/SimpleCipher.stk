@@ -16,7 +16,7 @@ fn Exercism::SimpleCipher::_process($self, $in, $decode) {
         my $tr = ord($c[_]) - 97
         my $kk = ord($k[_ % $kn]) - 97
         chr(97 + (($tr + ($decode ? -$kk : $kk)) % 26 + 26) % 26)
-    } |> join("")
+    } join("")
 }
 
 fn Exercism::SimpleCipher::encode($self, $plain) = Exercism::SimpleCipher::_process($self, $plain, 0)
