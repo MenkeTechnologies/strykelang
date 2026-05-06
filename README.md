@@ -1616,6 +1616,13 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   my $f = fn { _ * 2 }
   p $f->(21)                      # 42
+
+  # implicit zero-arg coderef — at top-level, RHS starting with bare `_` / `_N`
+  # auto-wraps as `fn { ... }`. Inside any block, `_` is still the topic.
+  my $g = _ * 2
+  p $g->(21)                      # 42
+  my $h = _ + _1
+  p $h->(3, 4)                    # 7
   ```
 
 - **Closure arguments `$_0`, `$_1`, ... `$_N`** — numeric closure arguments inspired by Swift. All arguments passed to any fn (named or anonymous) are available as `$_0` (first), `$_1` (second), `$_2` (third), up to `$_N` for any number of arguments. These work alongside or instead of Perl's `@_`, `$_`, `$a`, `$b`. Both `$_`, bare `_`, and `$_0` refer to the first argument — `_ * 2`, `$_ * 2`, and `$_0 * 2` are all equivalent. Use bare `_` for maximum conciseness in blocks.

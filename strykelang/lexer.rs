@@ -44,6 +44,17 @@ pub struct Lexer {
     /// instead of `m//` regex syntax. Used in thread/pipeline stages where
     /// `/m/` should be a regex grep filter, not `m//`.
     pub suppress_m_regex: u32,
+    /// Set true by [`Self::next_token`] right before returning a token that
+    /// originated from a *bare* positional alias (`_`, `_0`, `_1`, …) — i.e.
+    /// without a leading `$` sigil. Read by [`Self::tokenize`] to record the
+    /// emitted token's index in [`Self::bare_positional_indices`]. Reset to
+    /// `false` at the top of every `next_token` call.
+    pub last_was_bare_positional: bool,
+    /// Indices into the token vector returned by [`Self::tokenize`] for every
+    /// bare-positional token. Used by the parser's `my $X = EXPR` rule to
+    /// auto-wrap an RHS that contains free positional aliases into an
+    /// implicit zero-arg coderef (so `my $f = _ * 2` ≡ `my $f = fn { _ * 2 }`).
+    pub bare_positional_indices: std::collections::HashSet<usize>,
 }
 
 impl Lexer {
@@ -61,6 +72,8 @@ impl Lexer {
             prev_arrow: false,
             error_file: file.into(),
             suppress_m_regex: 0,
+            last_was_bare_positional: false,
+            bare_positional_indices: std::collections::HashSet::new(),
         }
     }
 
@@ -1394,6 +1407,7 @@ impl Lexer {
         // via `self.prev_arrow` (set up via a one-shot field swap).
         self.prev_arrow = self.last_was_arrow;
         self.last_was_arrow = false;
+        self.last_was_bare_positional = false;
 
         let ch = self.input[self.pos];
         match ch {
@@ -2082,12 +2096,14 @@ impl Lexer {
                         && ident.chars().nth(1).is_some_and(|c| c.is_ascii_digit())
                     {
                         self.last_was_term = true;
+                        self.last_was_bare_positional = true;
                         return Ok(Token::ScalarVar(ident));
                     }
                     // Also reserve bare `_<+` (chevron-only topic ascent on
                     // slot 0) — these are never sub names.
                     if ident.starts_with('_') && ident.contains('<') {
                         self.last_was_term = true;
+                        self.last_was_bare_positional = true;
                         return Ok(Token::ScalarVar(ident));
                     }
                 }
@@ -2578,6 +2594,9 @@ impl Lexer {
                 } else {
                     keyword_or_ident(&ident)
                 };
+                if matches!(tok, Token::Ident(ref s) if s == "_") {
+                    self.last_was_bare_positional = true;
+                }
                 // Keywords that expect a variable next should not set last_was_term
                 // so that % is parsed as hash sigil, not modulo
                 self.last_was_term = match ident.as_str() {
@@ -2807,6 +2826,9 @@ impl Lexer {
             self.skip_whitespace_and_comments();
             let line = self.line;
             let tok = self.next_token()?;
+            if self.last_was_bare_positional {
+                self.bare_positional_indices.insert(tokens.len());
+            }
             if tok == Token::Eof {
                 tokens.push((Token::Eof, line));
                 break;

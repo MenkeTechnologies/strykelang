@@ -93,6 +93,13 @@ pub struct Parser {
     /// placeholder when this flag is set, because [`Self::pipe_forward_apply`]
     /// will substitute the piped value in afterwards.
     pipe_rhs_depth: u32,
+    /// When > 0 we are parsing inside a `{ … }` block (function body, `map`/`grep`,
+    /// `for`, `if`, anonymous coderef, etc.). Inside any block, bare `_` is a topic
+    /// reference (`$_[0]`/`$_`), so `my $i = _` means "capture the topic" and must
+    /// NOT be auto-wrapped as an implicit zero-arg coderef. Only at the true top
+    /// level (depth 0 — module scope) is `_` unbound, allowing `my $f = _ * 2` to
+    /// parse as `my $f = fn { _ * 2 }`. Bumped in [`Self::parse_block`].
+    block_depth: u32,
     /// When > 0, [`Self::parse_pipe_forward`] will **not** consume a trailing `|>`
     /// and leaves it for an outer parser instead. Bumped while parsing paren-less
     /// arg lists (`parse_list_until_terminator`, paren-less method args, `map`/`grep`
@@ -151,6 +158,13 @@ pub struct Parser {
     pending_synthetic_subs: Vec<Statement>,
     /// Counter for unique anonymous-overload-handler names.
     next_overload_anon_id: u32,
+    /// Token-vector indices where the lexer emitted a *bare* positional alias
+    /// (`_`, `_0`, `_1`, …) — i.e. without a leading `$` sigil. Populated by
+    /// [`crate::lexer::Lexer::tokenize`]. Consulted by [`Self::parse_my_our_local`]
+    /// to auto-wrap an RHS expression that contains free positional aliases
+    /// into an implicit zero-arg coderef, so `my $f = _ * 2` ≡
+    /// `my $f = fn { _ * 2 }`.
+    pub bare_positional_indices: std::collections::HashSet<usize>,
 }
 
 impl Parser {
@@ -180,6 +194,8 @@ impl Parser {
             next_overload_anon_id: 0,
             parsing_module: false,
             list_construct_close_pos: None,
+            bare_positional_indices: std::collections::HashSet::new(),
+            block_depth: 0,
         }
     }
 
@@ -1767,6 +1783,7 @@ impl Parser {
         // parses its own input instead of using `$_[0]` placeholder.
         let saved_pipe_rhs_depth = self.pipe_rhs_depth;
         self.pipe_rhs_depth = 0;
+        self.block_depth += 1;
         let mut stmts = Vec::new();
         // `{ |$a, $b| body }` — Ruby-style block params.
         // Desugars to `my $a = $_` (1 param), `my $a = $a; my $b = $b` (2 — sort/reduce),
@@ -1782,6 +1799,7 @@ impl Parser {
         }
         self.expect(&Token::RBrace)?;
         self.pipe_rhs_depth = saved_pipe_rhs_depth;
+        self.block_depth -= 1;
         Self::default_topic_for_sole_bareword(&mut stmts);
         Ok(stmts)
     }
@@ -5537,7 +5555,54 @@ impl Parser {
                     }
                 }
             }
-            let val = self.parse_expression()?;
+            let rhs_start_pos = self.pos;
+            let mut val = self.parse_expression()?;
+            // Stryke implicit-coderef sugar: `my $f = _ * 2;` ≡
+            // `my $f = fn { _ * 2 };`. Triggers only when (a) the LHS is a
+            // single scalar declaration, (b) the RHS contains at least one
+            // *bare* positional alias (`_`, `_0`, `_1`, …; no `$` sigil), and
+            // (c) the RHS isn't already a coderef-shaped value. Bare-positional
+            // tracking comes from the lexer (see `Lexer::bare_positional_indices`)
+            // so legitimate uses of `$_` inside e.g. `fn { my $x = $_; … }`
+            // closures keep their Perl semantics.
+            if !crate::compat_mode()
+                && self.block_depth == 0
+                && decls.len() == 1
+                && matches!(decls[0].sigil, Sigil::Scalar)
+                && !matches!(
+                    val.kind,
+                    ExprKind::CodeRef { .. }
+                        | ExprKind::SubroutineRef(_)
+                        | ExprKind::SubroutineCodeRef(_)
+                        | ExprKind::DynamicSubCodeRef(_)
+                )
+            {
+                let rhs_end_pos = self.pos;
+                // Trigger only when the RHS *begins* with a bare positional
+                // alias (e.g. `_ * 2`, `_1 + _2`). Restricting to the leading
+                // token avoids false positives when bare `_` appears deeper in
+                // unrelated grammar (most notably `match { _ => ... }` arm
+                // patterns, which are wildcard patterns rather than topic
+                // references).
+                let rhs_has_bare_positional = self
+                    .bare_positional_indices
+                    .contains(&rhs_start_pos)
+                    && rhs_start_pos < rhs_end_pos;
+                if rhs_has_bare_positional {
+                    let val_line = val.line;
+                    val = Expr {
+                        kind: ExprKind::CodeRef {
+                            params: Vec::new(),
+                            body: vec![Statement {
+                                label: None,
+                                kind: StmtKind::Expression(val),
+                                line: val_line,
+                            }],
+                        },
+                        line: val_line,
+                    };
+                }
+            }
             // Validate assignment for single variable declarations (not destructuring)
             // `my ($a, $b) = (1, 2)` is destructuring, not scalar-from-list
             if !crate::compat_mode() && decls.len() == 1 {

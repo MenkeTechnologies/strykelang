@@ -1385,6 +1385,7 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
         <p>Define a named or anonymous function with optional typed parameters and default values. Named functions are installed into the current package; anonymous functions (closures) capture their enclosing lexical scope. Functions are first-class values — assign them to scalars, store in arrays, pass as callbacks. The last expression evaluated is the implicit return value unless an explicit <code>return</code> is used.</p>
         <pre><code class="lang-perl">fn double($x) { $x * 2 }
 my $f = fn { _ * 2 }
+my $g = _ * 2          <span class="comment"># implicit zero-arg coderef (top-level my): same as fn { _ * 2 }</span>
 my $add = fn ($a: Int, $b: Int) { $a + $b }
 
 # Default parameter values:
