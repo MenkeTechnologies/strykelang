@@ -243,6 +243,41 @@ fn Rb::tokenize($src) {
             next
         }
 
+        # %w[...] / %i[...] / %w(...) / %w{...} word arrays.
+        # Splits on whitespace, emits LBRACK <STR|SYM> COMMA ... RBRACK so the
+        # array-literal parser builds an Array AST node.
+        if ($c eq "%" && $i + 1 < $n && substr($src, $i + 1, 1) =~ /[wi]/) {
+            my $kind = substr($src, $i + 1, 1)
+            my $opener = $i + 2 < $n ? substr($src, $i + 2, 1) : ""
+            my %close = ("[" => "]", "(" => ")", "{" => "}", "<" => ">")
+            if (exists $close{$opener}) {
+                $i += 3
+                my $closer = $close{$opener}
+                push @toks, +{ kind => "LBRACK", val => "[", line => $line }
+                my $first = 1
+                while ($i < $n && substr($src, $i, 1) ne $closer) {
+                    while ($i < $n && substr($src, $i, 1) =~ /\s/) {
+                        $line++ if substr($src, $i, 1) eq "\n"
+                        $i++
+                    }
+                    last if $i >= $n || substr($src, $i, 1) eq $closer
+                    my $start = $i
+                    while ($i < $n && substr($src, $i, 1) ne $closer && substr($src, $i, 1) !~ /\s/) { $i++ }
+                    my $word = substr($src, $start, $i - $start)
+                    push @toks, +{ kind => "COMMA", val => ",", line => $line } unless $first
+                    $first = 0
+                    if ($kind eq "w") {
+                        push @toks, +{ kind => "STR", val => $word, line => $line }
+                    } else {
+                        push @toks, +{ kind => "SYM", val => $word, line => $line }
+                    }
+                }
+                $i++ if $i < $n
+                push @toks, +{ kind => "RBRACK", val => "]", line => $line }
+                next
+            }
+        }
+
         # Single-quoted string
         if ($c eq "'") {
             $i++
@@ -1668,6 +1703,12 @@ fn Rb::apply_op($op, $l, $r) {
             $m += $r->{val} if $m != 0 && (($m < 0) != ($r->{val} < 0))
             return Rb::v_int($m)
         }
+        # `"fmt" % args` — sprintf-style formatting with %d, %s, %f, %x, etc.
+        if (Rb::is_str($l)) {
+            my @argv = Rb::is_array($r) ? @{$r->{items}} : ($r)
+            my @raw = map { Rb::is_str($_) || Rb::is_sym($_) ? $_->{val} : Rb::is_num($_) ? $_->{val} : Rb::to_s($_) } @argv
+            return Rb::v_str(sprintf($l->{val}, @raw))
+        }
     }
     if ($op eq "**") {
         if (Rb::is_int($l) && Rb::is_int($r) && $r->{val} >= 0) {
@@ -2055,9 +2096,31 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "[]") {
         my $idx = $args->[0]
         if (Rb::is_int($idx)) {
+            # [start, length] form: arr[1, 2]
+            if (scalar(@$args) >= 2 && Rb::is_int($args->[1])) {
+                my $s = $idx->{val}
+                $s += scalar(@$items) if $s < 0
+                my $len = $args->[1]{val}
+                return Rb::v_nil() if $s < 0 || $s > scalar(@$items) || $len < 0
+                my $e = $s + $len - 1
+                $e = scalar(@$items) - 1 if $e >= scalar(@$items)
+                return Rb::v_array([]) if $e < $s
+                return Rb::v_array([@$items[$s..$e]])
+            }
             my $i = $idx->{val}
             $i += scalar(@$items) if $i < 0
             return ($i < 0 || $i >= scalar(@$items)) ? Rb::v_nil() : $items->[$i]
+        }
+        if (Rb::is_range($idx)) {
+            my $lo = Rb::nv($idx->{lo})
+            my $hi = Rb::nv($idx->{hi})
+            $lo += scalar(@$items) if $lo < 0
+            $hi += scalar(@$items) if $hi < 0
+            $hi-- if $idx->{exclusive}
+            return Rb::v_nil() if $lo < 0 || $lo > scalar(@$items)
+            $hi = scalar(@$items) - 1 if $hi >= scalar(@$items)
+            return Rb::v_array([]) if $hi < $lo
+            return Rb::v_array([@$items[$lo..$hi]])
         }
         return Rb::v_nil()
     }
@@ -2073,8 +2136,25 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_int(scalar(@$items))
     }
     if ($name eq "empty?") { return Rb::v_bool(scalar(@$items) == 0 ? 1 : 0) }
-    if ($name eq "first")  { return $items->[0]  // Rb::v_nil() }
-    if ($name eq "last")   { return $items->[-1] // Rb::v_nil() }
+    if ($name eq "first") {
+        if (scalar(@$args) && Rb::is_int($args->[0])) {
+            my $n = $args->[0]{val}
+            $n = scalar(@$items) if $n > scalar(@$items)
+            return Rb::v_array([]) if $n <= 0
+            return Rb::v_array([@$items[0..$n - 1]])
+        }
+        return $items->[0]  // Rb::v_nil()
+    }
+    if ($name eq "last") {
+        if (scalar(@$args) && Rb::is_int($args->[0])) {
+            my $n = $args->[0]{val}
+            $n = scalar(@$items) if $n > scalar(@$items)
+            return Rb::v_array([]) if $n <= 0
+            my $start = scalar(@$items) - $n
+            return Rb::v_array([@$items[$start..scalar(@$items) - 1]])
+        }
+        return $items->[-1] // Rb::v_nil()
+    }
     if ($name eq "push" || $name eq "append") { push @$items, @$args; return $a }
     if ($name eq "pop")    { return scalar(@$items) ? pop(@$items)   : Rb::v_nil() }
     if ($name eq "shift")  { return scalar(@$items) ? shift(@$items) : Rb::v_nil() }
@@ -2089,6 +2169,13 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_str(join($sep, map { Rb::to_s($_) } @$items))
     }
     if ($name eq "sort") {
+        if (defined $block) {
+            my @s = sort {
+                my $r = Rb::call_block($block, [$a, $b], $ctx)
+                Rb::is_int($r) ? $r->{val} : 0
+            } @$items
+            return Rb::v_array(\@s)
+        }
         my @s = sort { Rb::v_cmp($a, $b) } @$items
         return Rb::v_array(\@s)
     }
@@ -2173,8 +2260,34 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         }
         return $acc
     }
-    if ($name eq "min") { return Rb::v_nil() unless scalar(@$items); my $m = $items->[0]; for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) < 0 } return $m }
-    if ($name eq "max") { return Rb::v_nil() unless scalar(@$items); my $m = $items->[0]; for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) > 0 } return $m }
+    if ($name eq "min") {
+        return Rb::v_nil() unless scalar(@$items)
+        my $m = $items->[0]
+        if (defined $block) {
+            for my $e (@$items) {
+                my $r = Rb::call_block($block, [$e, $m], $ctx)
+                my $cmp = Rb::is_int($r) ? $r->{val} : 0
+                $m = $e if $cmp < 0
+            }
+            return $m
+        }
+        for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) < 0 }
+        return $m
+    }
+    if ($name eq "max") {
+        return Rb::v_nil() unless scalar(@$items)
+        my $m = $items->[0]
+        if (defined $block) {
+            for my $e (@$items) {
+                my $r = Rb::call_block($block, [$e, $m], $ctx)
+                my $cmp = Rb::is_int($r) ? $r->{val} : 0
+                $m = $e if $cmp > 0
+            }
+            return $m
+        }
+        for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) > 0 }
+        return $m
+    }
     if ($name eq "sum") {
         my $s = 0
         for my $e (@$items) { $s += Rb::nv($e) }
@@ -3473,6 +3586,44 @@ rb_test "ancestors includes module",
      end
      Pet.new.walk',
     "\"walking\""
+
+# ── ARRAY SLICING / AT / FETCH / RANGE INDEXING ────────────────────────────
+rb_test "array slice range",  "[10, 20, 30, 40, 50][1..3]",      "[20, 30, 40]"
+rb_test "array slice excl",   "[10, 20, 30, 40, 50][1...3]",     "[20, 30]"
+rb_test "array first(n)",     "[1, 2, 3, 4].first(2)",           "[1, 2]"
+rb_test "array last(n)",      "[1, 2, 3, 4].last(2)",            "[3, 4]"
+rb_test "array min with block",
+    "[\"aa\", \"b\", \"ccc\"].min { |a, b| a.length <=> b.length }",
+    "\"b\""
+rb_test "array max with block",
+    "[\"aa\", \"b\", \"ccc\"].max { |a, b| a.length <=> b.length }",
+    "\"ccc\""
+rb_test "array compact",      "[1, nil, 2, nil, 3].compact",     "[1, 2, 3]"
+rb_test "array sort with block",
+    "[3, 1, 2].sort { |a, b| b <=> a }",                          "[3, 2, 1]"
+
+# ── HASH MERGE / EACH_WITH_INDEX / EACH_PAIR ───────────────────────────────
+rb_test "hash merge",          '{a: 1}.merge({b: 2})',           "{a: 1, b: 2}"
+rb_test "hash merge override",  '{a: 1, b: 2}.merge({b: 99})',   "{a: 1, b: 99}"
+rb_test "array each_with_index",
+    "out = []; [10, 20, 30].each_with_index { |v, i| out.push([i, v]) }; out",
+    "[[0, 10], [1, 20], [2, 30]]"
+
+# ── STRING SPLIT / FORMAT ──────────────────────────────────────────────────
+rb_test "string format %",    '"x = %d, y = %s" % [42, "hi"]',  "\"x = 42, y = hi\""
+rb_test "string * repeat",    '"ab" * 3',                       "\"ababab\""
+rb_test "string * 0",         '"x" * 0',                        "\"\""
+
+# ── %w / %i WORD ARRAYS ────────────────────────────────────────────────────
+rb_test "%w bracket",       "%w[apple pear plum]",            "[\"apple\", \"pear\", \"plum\"]"
+rb_test "%w paren",         "%w(red green blue)",             "[\"red\", \"green\", \"blue\"]"
+rb_test "%w brace",         "%w{a b c}",                      "[\"a\", \"b\", \"c\"]"
+rb_test "%i bracket",       "%i[foo bar baz]",                "[:foo, :bar, :baz]"
+rb_test "%w with newlines", "%w[
+  one
+  two
+  three
+]",                                                            "[\"one\", \"two\", \"three\"]"
 
 # ── EXCEPTION CLASSES ──────────────────────────────────────────────────────
 rb_test "rescue named class",
