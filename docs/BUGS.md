@@ -1,13 +1,16 @@
 # BUGS.md — Known parity gaps and surprising behaviors
 
 Captured 2026-05-04 from a behavior-pinning sweep against `stryke v0.11.12` on
-macOS aarch64. The sweep produced 17 batches of pin tests
-(`tests/suite/behavior_pin_2026_05_a..q.rs`, ~750 cases total) and the entries
-below.
+macOS aarch64; continuously updated since. The pin-test corpus now lives in
+`tests/suite/behavior_pin_2026_05*.rs` (43 batches as of 2026-05-06,
+the unsuffixed file plus `_b..z` and `_aa..ap`), and contains ~3000+ cases.
+Entries below pair each documented bug with the pinning tests that lock the
+*current* output.
 
-Each entry is paired with one or more pin tests that lock the *current*
-output. When a bug is fixed, update the corresponding test rather than
-deleting it — the test then becomes the regression guard.
+When a bug is fixed, update the corresponding test rather than deleting
+it — the test then becomes the regression guard. Bugs marked **FIXED**
+in the title kept their numeric ID so historical references in commits
+and other docs still resolve.
 
 Severity legend:
 
@@ -17,6 +20,72 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-027** — `$#a = N` now resizes `@a` to length `N + 1` (truncates
+  if shrinking, pads with `undef` if growing). Routed `#name` writes
+  through `VMHelper::set_special_var`, which calls
+  `scope.set_array(name, vec_resized)`. Negative values empty the array.
+- **BUG-029** — `"$&"` inside double-quoted strings now interpolates the
+  match result instead of staying literal. The interpolation parser
+  (`parse_interpolated_string`) had explicit branches for the `'`
+  (postmatch) and `` ` `` (prematch) regex special vars but missed
+  `&` — added it. The `s///` replacement form (BUG-032) is a separate
+  interpolation path and remains broken.
+- **BUG-107** — `"$Pkg::Var"` interpolation now greedy-matches `::`
+  continuations, matching the bare-code path. Multi-segment chains
+  (`$A::B::C::x`) work too. Plus a separate fix in the lexer for the
+  IPv6-zero-compression trap that was misfiring on 3-or-more-segment
+  package paths like `package A::B::C` (the hex-digit-only ident `B`
+  followed by `::` looked like an IPv6 address). The trap now skips
+  when `ident_start` is preceded by `::`.
+- **`smartmatch` array / hash RHS** — `given (X) { when ([list]) }`,
+  `when (\@arr)`, and `when (\%hash)` now match Perl's smartmatch
+  semantics. `smartmatch_when` previously fell back to string equality;
+  extended to recurse over array elements and check hash-key existence.
+- **`tie my $x, Class`** — common Perl idiom now parses (was rejected
+  with "tie expects $scalar, @array, or %hash, got Ident(\"my\")").
+  Parser desugars to `my $x; tie $x, Class` via implicit `StmtGroup`.
+  Tied-hash `tie my %h, Class` works end-to-end. Tied-scalar runtime
+  FETCH is a separate pre-existing limitation.
+- **`or`/`and`/`not` precedence vs `=`** — `EXPR or $err = $@` now parses
+  as `EXPR or ($err = $@)` (Perl's documented lowest-precedence
+  operators). Stryke previously parsed this as
+  `(EXPR or $err) = $@`, surfacing as "Assign to complex lvalue".
+  Restructured the precedence chain to put word-ops at the top, with
+  `parse_assign_expr` between `parse_not_word` and `parse_ternary`,
+  and `parse_pipe_forward` descending into `parse_range` so `..`
+  remains reachable.
+- **Test framework isolation** — `test_run` no longer calls
+  `std::process::exit(1)` from inside the VM (was hostile to
+  embedding); it now sets a sticky flag (`interp.test_run_failed`) that
+  the CLI driver translates to exit code 1. Test counters
+  (`test_pass_count`, `test_fail_count`, `test_skip_count`) moved from
+  process-global `static AtomicUsize` to per-`VMHelper` fields so
+  runs in the same process don't contaminate each other. The
+  `test_pass`/`test_fail`/`test_skip` progress lines now respect
+  `interp.suppress_stdout`.
+- **`oursync`** — package-global counterpart of `mysync`. Same
+  `Arc<Mutex>` backing, but keyed by `Pkg::x` so all packages and
+  parallel workers share one cell. The classic Counter pattern
+  (`package C; oursync $total = 0; fn bump { $total++ }; fan_cap N
+  { C::bump() }`) lands at exactly N. Plain `our` mutated inside a
+  parallel block now errors strictly (DESIGN-001 parity with `my`).
+- **CaptureCell nesting leak** — closures used to surface
+  `SCALAR(0x...)` for outer-scope `$_` after a sequence of
+  `fn outer { my $cb = sub { ... }; $cb->(...) } outer()`. Root cause:
+  `Scope::capture()` walked all frames and pushed one entry per frame
+  for each scalar name, so a name that shadowed itself across frames
+  got declared twice during `restore_capture`, nesting a CaptureCell
+  inside another. Fix: dedup hash-stored scalars at capture time,
+  innermost-first; slot-stored scalars keep outer-first iteration so
+  the factory-closure pattern still wins via last-write-wins on slot
+  collisions.
+- **Topic-variant frame-locality** — user writes to `$_`/`$_<`/`$_N`
+  inside a closure used to leak through CaptureCells and clobber outer
+  topic state. New `Frame::set_scalar_raw` bypasses the cell write-
+  through; `Scope::set_scalar` recognises topic-variant names
+  (`is_topic_variant_name`, regex `^_[0-9]*<*$`) and routes them through
+  the raw path. Topic variants now follow the same frame-local rule as
+  `|param|` block params and `my $x` inside a block.
 - **BUG-082** — Lexer now recognises Perl 5.34+'s `0o777` / `0O777`
   octal prefix alongside `0x`, `0b`, and bare-`0`. Underscore
   separators (`0o7_7_7`) supported.
@@ -999,21 +1068,26 @@ Tests: `x_compound_assign_is_parse_error_today`,
 Severity: **bug** (parse-time; small surface).
 
 
-## BUG-027 — `$#arr = N` does not change array length
+## BUG-027 — `$#arr = N` does not change array length — **FIXED**
 
 ```sh
 $ stryke -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
-5 / 1 2 3 4 5
+3 / 1 2 3
 $ perl   -e 'my @a = (1..5); $#a = 2; print scalar @a, " / @a"'
 3 / 1 2 3
 ```
 
 Both truncation (`$#a = $smaller`) and extension (`$#a = $bigger`, fills
-with undef) are no-ops.
+with undef) now work. Routed `#name` writes through
+`VMHelper::set_special_var` which calls `scope.set_array(name, vec_resized)`.
+Negative values (`$#a = -1`) empty the array.
 
-Tests: `dollar_hash_array_lvalue_does_not_truncate_today`.
+Tests: `dollar_hash_array_truncates_when_assigned`,
+`dollar_hash_array_extends_with_undef_when_assigned`,
+`dollar_hash_array_negative_one_empties` in
+`tests/suite/behavior_pin_2026_05_aq.rs`.
 
-Severity: **bug**.
+Severity: **parity** (FIXED).
 
 
 ## BUG-028 — `@hash{@array_var}` slice returns empty list
@@ -1035,21 +1109,27 @@ Tests: `hash_slice_with_literal_keys_returns_correct_values`,
 Severity: **bug**.
 
 
-## BUG-029 — `$&` does not interpolate inside double-quoted strings
+## BUG-029 — `$&` does not interpolate inside double-quoted strings — **FIXED**
 
 ```sh
 $ stryke -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
-[$&]                    # stryke (literal)
+[XYZ]
 $ perl   -e '"abXYZcd" =~ /XYZ/; print "[$&]"'
 [XYZ]
 ```
 
-`my $m = $&` works correctly; only the interpolation form is broken.
+The double-quoted `$&` interpolation now matches the bare-expression read.
+`parse_interpolated_string` had explicit branches for `'` (postmatch) and
+`` ` `` (prematch) but missed `&` — added it to the same `matches!` arm.
 
-Tests: `match_dollar_amp_captures_whole_match` (the form that works),
-`match_dollar_amp_does_not_interpolate_today`.
+Tests: `match_dollar_amp_captures_whole_match`,
+`match_dollar_amp_interpolates_correctly` (formerly
+`..._does_not_interpolate_today`), plus
+`dollar_amp_interpolates_after_match` and
+`dollar_apostrophe_interpolates_postmatch` in
+`tests/suite/behavior_pin_2026_05_aq.rs`.
 
-Severity: **bug** (interpolation parser).
+Severity: **parity** (FIXED).
 
 
 ## PARITY-016 — `ref $@ eq "Class"` parses with the wrong precedence — **FIXED**
@@ -2736,32 +2816,34 @@ Tests: `to_json_two_arg_pretty_form_serializes_as_array_today`.
 Severity: **bug** (low impact; rarely needed for machine-read JSON).
 
 
-## BUG-107 — `"$Pkg::Var"` interpolation drops the package prefix
+## BUG-107 — `"$Pkg::Var"` interpolation drops the package prefix — **FIXED**
 
 ```sh
 $ stryke -e 'package Foo; our $bar = "hello"; package main; print "[$Foo::bar]"'
-[::bar]                              # `Foo` part lost
-$ stryke -e 'package Foo; our $bar = "hello"; package main; print $Foo::bar'
-hello                                # bare-code path works
-$ perl   -e '...'
-[hello]                              # Perl interpolates correctly
+[hello]
+$ perl   -e 'package Foo; our $bar = "hello"; package main; print "[$Foo::bar]"'
+[hello]
 ```
 
-The interpolation parser stops at the first non-identifier character of
-`$Foo` and treats `::bar` as a literal suffix. Workarounds:
+`parse_interpolated_string` in parser.rs now greedy-matches `::` continuations
+after the bare ident is read, mirroring the `$#Foo::a` and bare-code paths.
+Multi-segment chains (`$A::B::C::x`) are also supported.
 
-- Bare-code form: `print $Foo::bar` (no string interpolation)
-- `${\ EXPR }` escape: works in CLI direct print
-  (`print "${\\\$Foo::bar}"`) but is empty when assigned into a string
-  via the library `eval` API. The most reliable workaround is to copy
-  to a same-package lexical first: `my $copy = $Foo::bar; "$copy"`.
+A separate lexer issue (the IPv6-zero-compression trap) was misfiring for
+3-or-more-segment package paths like `package A::B::C` because the
+hex-digit-only ident `B` (1 char, ≤ 4) followed by `::` looked like an
+IPv6 address. Fixed by skipping the IPv6 trap when `ident_start` is
+preceded by `::`.
 
-Tests: `package_qualified_scalar_interpolates_with_dropped_prefix_today`,
-`package_qualified_scalar_in_bare_code_works`,
-`package_qualified_scalar_via_code_deref_in_lib_eval_returns_empty_today`.
+Tests: `package_qualified_scalar_interpolates_correctly` (formerly
+`..._with_dropped_prefix_today`), `package_qualified_scalar_in_bare_code_works`,
+plus `package_decl_parses_three_segments`,
+`package_decl_parses_four_segments`,
+`package_qualified_scalar_interpolates_with_deeper_namespace`,
+`ipv6_literal_fe80_still_lexes_as_address` in
+`tests/suite/behavior_pin_2026_05_ap.rs`.
 
-Severity: **bug** (parser; common idiom for accessing module-level vars
-in error messages and logs).
+Severity: **parity** (FIXED).
 
 
 ## NOT-A-BUG observations (pinned, but documented as deliberate)
