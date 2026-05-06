@@ -14519,7 +14519,12 @@ impl VMHelper {
 
     /// True when [`set_special_var`] must run instead of [`Scope::set_scalar`].
     pub(crate) fn is_special_scalar_name_for_set(name: &str) -> bool {
-        name.starts_with('^')
+        // `$#name = N` resizes `@name` (Perl: setting the last index). The
+        // bare-set path stores under literal `#name` as a separate scalar
+        // and silently does nothing useful — match the read-side handling
+        // by routing through `set_special_var`.
+        (name.starts_with('#') && name.len() > 1)
+            || name.starts_with('^')
             || matches!(
                 name,
                 "0" | "/"
@@ -14771,6 +14776,17 @@ impl VMHelper {
             _ if name.starts_with('^') && name.len() > 1 => {
                 self.special_caret_scalars
                     .insert(name.to_string(), val.clone());
+            }
+            _ if name.starts_with('#') && name.len() > 1 => {
+                // `$#name = N` resizes `@name` to length `N + 1`. Truncates
+                // when N < current_last_idx, extends with `undef` otherwise.
+                let arr = &name[1..];
+                let aname = self.stash_array_name_for_package(arr);
+                let new_last = val.to_int();
+                let new_len = if new_last < 0 { 0 } else { (new_last as usize) + 1 };
+                let mut current = self.scope.get_array(&aname);
+                current.resize(new_len, PerlValue::UNDEF);
+                self.scope.set_array(&aname, current)?;
             }
             _ => self.scope.set_scalar(name, val.clone())?,
         }
