@@ -3,6 +3,14 @@
 # CPAN local-lib from parity/cpan_topn/install_deps.sh (reproducible via MODULES.txt + cpanm).
 /parity/cpan_topn/local/
 
+# cargo-fuzz build + run artifacts. Seed corpus under `fuzz/corpus/` stays tracked
+# (it's the regression suite for `tests/fuzz_smoke.rs`); generated mutations and
+# crash reproducers do not.
+/fuzz/target/
+/fuzz/artifacts/
+/fuzz/coverage/
+/fuzz/Cargo.lock
+
 # Per-run parity failure log — truncated on each `bash parity/run_parity.sh`.
 # Noisy diff content; upload as CI artifact instead of committing.
 # `parity_summary.json` stays tracked — it feeds the docs badge.

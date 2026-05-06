@@ -1,0 +1,2 @@
+my @r = map { my @inner = (1, 2); map { _< + _ } @inner } (10, 20)
+print join(",", @r), "\n"

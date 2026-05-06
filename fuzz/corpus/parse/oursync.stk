@@ -1,0 +1,6 @@
+package C
+oursync $total = 0
+fn bump { $total++ }
+package main
+fan_cap 100 { C::bump() }
+print $C::total, "\n"

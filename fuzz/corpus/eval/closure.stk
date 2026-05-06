@@ -1,0 +1,3 @@
+sub mkadder { my $base = shift; sub { $base + shift } }
+my $a5 = mkadder(5);
+print $a5->(3), "\n"

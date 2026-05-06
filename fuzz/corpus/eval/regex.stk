@@ -1,0 +1,5 @@
+my $s = "hello world"
+$s =~ s/world/stryke/g
+print $s, "\n"
+my @m = ($s =~ /(\w+)/g)
+print join("|", @m), "\n"
