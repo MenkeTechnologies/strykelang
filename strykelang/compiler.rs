@@ -1939,6 +1939,76 @@ impl Compiler {
         Ok(())
     }
 
+    /// `oursync $x` — package-global counterpart of `mysync`. Wraps the value in
+    /// `Arc<Mutex<PerlValue>>` (or `AtomicArray` / `AtomicHash`) like `mysync`, but
+    /// keys the binding by the package-qualified stash name (`Pkg::x`) so all
+    /// packages and parallel workers share one cell. Mirrors [`Self::emit_declare_our_scalar`]
+    /// for name qualification + `register_declare_our_scalar` so later `$x` references
+    /// rewrite to `Pkg::x` via [`Self::scalar_storage_name_for_ops`].
+    fn compile_oursync_declarations(
+        &mut self,
+        decls: &[VarDecl],
+        line: usize,
+    ) -> Result<(), CompileError> {
+        for decl in decls {
+            if decl.type_annotation.is_some() {
+                return Err(CompileError::Unsupported("typed oursync".into()));
+            }
+            match decl.sigil {
+                Sigil::Typeglob => {
+                    return Err(CompileError::Unsupported(
+                        "`oursync` does not support typeglob variables".into(),
+                    ));
+                }
+                Sigil::Scalar => {
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr(init)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    let stash = self.qualify_stash_scalar_name(&decl.name);
+                    let name_idx = self.chunk.intern_name(&stash);
+                    self.register_declare_our_scalar(&decl.name);
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.mysync_scalars.insert(stash);
+                    }
+                    self.chunk.emit(Op::DeclareOurSyncScalar(name_idx), line);
+                }
+                Sigil::Array => {
+                    let stash = self.qualify_stash_array_name(&decl.name);
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    let name_idx = self.chunk.intern_name(&stash);
+                    self.register_declare(Sigil::Array, &stash, false);
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.mysync_arrays.insert(stash);
+                    }
+                    self.chunk.emit(Op::DeclareOurSyncArray(name_idx), line);
+                }
+                Sigil::Hash => {
+                    if let Some(init) = &decl.initializer {
+                        self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                    } else {
+                        self.chunk.emit(Op::LoadUndef, line);
+                    }
+                    // Hashes follow the existing `our %h` convention and use the
+                    // bare name in bytecode (compiler.rs:1722). Cross-package
+                    // hash access has separate quirks tracked elsewhere.
+                    let name_idx = self.chunk.intern_name(&decl.name);
+                    self.register_declare(Sigil::Hash, &decl.name, false);
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.mysync_hashes.insert(decl.name.clone());
+                    }
+                    self.chunk.emit(Op::DeclareOurSyncHash(name_idx), line);
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn compile_mysync_declarations(
         &mut self,
         decls: &[VarDecl],
@@ -2148,6 +2218,7 @@ impl Compiler {
                 self.compile_local_expr(target, initializer.as_ref(), line)?;
             }
             StmtKind::MySync(decls) => self.compile_mysync_declarations(decls, line)?,
+            StmtKind::OurSync(decls) => self.compile_oursync_declarations(decls, line)?,
             StmtKind::My(decls) => self.compile_var_declarations(decls, line, true)?,
             StmtKind::Our(decls) => self.compile_var_declarations(decls, line, false)?,
             StmtKind::State(decls) => self.compile_state_declarations(decls, line)?,

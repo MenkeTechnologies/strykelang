@@ -399,6 +399,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             s
         }
         StmtKind::MySync(decls) => format!("mysync {}", convert_var_decls(decls)),
+        StmtKind::OurSync(decls) => format!("oursync {}", convert_var_decls(decls)),
         StmtKind::StmtGroup(b) => convert_block(b, depth),
         StmtKind::Block(b) => format!("{{\n{}\n{}}}", convert_block(b, depth + 1), pfx),
         StmtKind::Begin(b) => format!("BEGIN {{\n{}\n{}}}", convert_block(b, depth + 1), pfx),

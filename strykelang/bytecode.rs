@@ -808,6 +808,17 @@ pub enum Op {
     DeclareMySyncArray(u16),
     /// Stack: `[init_list]` → `[]`. Declares `%name` as atomic hash.
     DeclareMySyncHash(u16),
+    // ── `oursync` (package-global thread-safe shared bindings; see [`StmtKind::OurSync`]) ──
+    /// Stack: `[init]` → `[]`. `name_idx` is the package-qualified key (`Pkg::name`).
+    /// Declares the binding in the **global frame** as `PerlValue::atomic` (or deque/heap unwrapped),
+    /// so all packages and parallel workers share one cell.
+    DeclareOurSyncScalar(u16),
+    /// Stack: `[init_list]` → `[]`. `name_idx` is the package-qualified array key (`Pkg::name`).
+    /// Declares an atomic array in the global frame.
+    DeclareOurSyncArray(u16),
+    /// Stack: `[init_list]` → `[]`. `name_idx` is the package-qualified hash key (`Pkg::name`).
+    /// Declares an atomic hash in the global frame.
+    DeclareOurSyncHash(u16),
     /// Register [`RuntimeSubDecl`] at index (nested `sub`, including inside `BEGIN`).
     RuntimeSubDecl(u16),
     /// Register [`RuntimeAdviceDecl`] at index — install AOP advice into VM `intercepts` registry.
