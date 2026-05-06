@@ -3219,6 +3219,56 @@ impl Parser {
     fn parse_tie_stmt(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // tie
+        // `tie my $x, Class` and `tie our $x, Class` — common Perl idiom.
+        // Desugar by emitting an implicit `my $x` (or `our $x`) declaration
+        // before the tie. The tie target then references the just-declared
+        // variable. Without this, `tie my $x, Class, ARGS` errors with
+        // "tie expects $scalar, @array, or %hash, got Ident(\"my\")".
+        let mut implicit_decl: Option<Statement> = None;
+        if let Token::Ident(kw) = self.peek().clone() {
+            if matches!(kw.as_str(), "my" | "our") {
+                let kw_line = self.peek_line();
+                self.advance(); // my / our
+                // Read the variable being declared (must be Scalar/Array/Hash).
+                let (decl_sigil, decl_name) = match self.peek().clone() {
+                    Token::ScalarVar(s) => {
+                        (Sigil::Scalar, s)
+                    }
+                    Token::ArrayVar(a) => {
+                        (Sigil::Array, a)
+                    }
+                    Token::HashVar(h) => {
+                        (Sigil::Hash, h)
+                    }
+                    tok => {
+                        return Err(self.syntax_err(
+                            format!("expected variable after `tie {}`, got {:?}", kw, tok),
+                            self.peek_line(),
+                        ));
+                    }
+                };
+                let decls = vec![VarDecl {
+                    sigil: decl_sigil,
+                    name: decl_name.clone(),
+                    initializer: None,
+                    frozen: false,
+                    type_annotation: None,
+                }];
+                implicit_decl = Some(Statement {
+                    label: None,
+                    kind: if kw == "my" {
+                        StmtKind::My(decls)
+                    } else {
+                        StmtKind::Our(decls)
+                    },
+                    line: kw_line,
+                });
+                // Don't advance past the variable token here — fall through
+                // to the existing match below so `target` is built from the
+                // same token (the ScalarVar/ArrayVar/HashVar path will
+                // advance and capture the name).
+            }
+        }
         let target = match self.peek().clone() {
             Token::HashVar(h) => {
                 self.advance();
@@ -3249,7 +3299,7 @@ impl Parser {
             args.push(self.parse_assign_expr()?);
         }
         self.eat(&Token::Semicolon);
-        Ok(Statement {
+        let tie_stmt = Statement {
             label: None,
             kind: StmtKind::Tie {
                 target,
@@ -3257,7 +3307,20 @@ impl Parser {
                 args,
             },
             line,
-        })
+        };
+        if let Some(decl) = implicit_decl {
+            // Wrap the implicit `my $x` + tie in a `StmtGroup` so they live
+            // in the same lexical block (the parser desugar is invisible to
+            // callers; `StmtGroup` runs statements in order without a frame
+            // push).
+            Ok(Statement {
+                label: None,
+                kind: StmtKind::StmtGroup(vec![decl, tie_stmt]),
+                line,
+            })
+        } else {
+            Ok(tie_stmt)
+        }
     }
 
     /// `given (EXPR) { ... }`

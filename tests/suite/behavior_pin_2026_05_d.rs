@@ -132,11 +132,11 @@ fn match_dollar_amp_captures_whole_match() {
 }
 
 #[test]
-fn match_dollar_amp_does_not_interpolate_today() {
-    // BUG-029: stryke does NOT interpolate `$&` inside double-quoted strings;
-    // it leaves the literal `$&` in place. The variable IS readable as a
-    // standalone expression (see the previous test).
-    assert_eq!(eval_string(r#""abXYZcd" =~ /XYZ/; "[$&]""#), "[$&]");
+fn match_dollar_amp_interpolates_correctly() {
+    // BUG-029 (FIXED): `$&` now interpolates inside double-quoted strings.
+    // Fix: added `&` to the special-char branch of `parse_interpolated_string`
+    // (parser.rs) alongside the existing `'`/`` ` `` handlers.
+    assert_eq!(eval_string(r#""abXYZcd" =~ /XYZ/; "[$&]""#), "[XYZ]");
 }
 
 #[test]
@@ -393,9 +393,11 @@ fn x_compound_workaround_works() {
 // ── `$#a = N` lvalue not honored today ───────────────────────────────────────
 
 #[test]
-fn dollar_hash_array_lvalue_does_not_truncate_today() {
-    // BUG-027: setting `$#a` should change the array length. Stryke ignores it.
-    assert_eq!(eval_int(r#"my @a = (1..5); $#a = 2; scalar @a"#), 5);
+fn dollar_hash_array_lvalue_truncates() {
+    // BUG-027 (FIXED): `$#a = N` now resizes `@a` to length `N + 1`.
+    // Fix: routed `#name` writes through `set_special_var`, which resizes
+    // the array via `scope.set_array(name, vec_resized_to_N+1)`.
+    assert_eq!(eval_int(r#"my @a = (1..5); $#a = 2; scalar @a"#), 3);
 }
 
 // ── Hash slice with arrayref-deref keys returns empty today ──────────────────
