@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
-fn Exercism::PrimeFactors::factors($n) {
+fn Exercism::PrimeFactors::factors {
     my @f
     my $d = 2
-    while ($n > 1) {
-        while ($n % $d == 0) { push @f, $d; $n /= $d }
+    while (_ > 1) {
+        while (_ % $d == 0) { push @f, $d; _ /= $d }
         $d++
     }
     \@f

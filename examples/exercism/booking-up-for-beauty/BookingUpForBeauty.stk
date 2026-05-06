@@ -16,7 +16,7 @@ fn Exercism::BookingUpForBeauty::is_afternoon_appointment($iso) {
 }
 
 fn Exercism::BookingUpForBeauty::description($iso) {
-    "You have an appointment on " . Exercism::BookingUpForBeauty::schedule($iso) . "."
+    "You have an appointment on #{Exercism::BookingUpForBeauty::schedule($iso)}."
 }
 
 fn Exercism::BookingUpForBeauty::anniversary_date() {

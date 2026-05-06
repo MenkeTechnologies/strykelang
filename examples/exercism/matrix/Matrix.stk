@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-fn Exercism::Matrix::new($s) { { string => $s } }
+fn Exercism::Matrix::new = { string => _ }
 
 fn Exercism::Matrix::row($self, $idx) {
     my @rows = split /\n/, $self->{string}

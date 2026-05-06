@@ -16,7 +16,7 @@ fn Exercism::OcrNumbers::convert($rows) {
         my $cols = int(length($block[0]) / 3)
         ~> 0:$cols-1 map {
             my $col = _
-            $_DIG{~> @block map { substr(_, $col * 3, 3) } |> join("")} // "?"
-        } |> join("")
-    } |> join(",")
+            $_DIG{~> @block map { substr(_, $col * 3, 3) } join("")} // "?"
+        } join("")
+    } join(",")
 }

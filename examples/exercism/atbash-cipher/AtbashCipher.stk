@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-my %h = map { (chr(97 + _), chr(122 - _)) } 0..25
+my %h = map { (chr(97 + _), chr(122 - _)) } 0:25
 
 fn Exercism::AtbashCipher::decode_atbash = ~> _ lc chars map { /\d/ ? _ : $h{_} // "" } join("")
 

@@ -23,6 +23,6 @@ fn Exercism::TwelveDays::verse($n) {
     $head . join(" ", @gifts)
 }
 
-fn Exercism::TwelveDays::verses($from, $to) { ~> $from:$to map { Exercism::TwelveDays::verse } |> join("\n") }
+fn Exercism::TwelveDays::verses = ~> _:_1 map { Exercism::TwelveDays::verse } join("\n")
 
-fn Exercism::TwelveDays::sing { Exercism::TwelveDays::verses(1, 12) }
+fn Exercism::TwelveDays::sing = Exercism::TwelveDays::verses(1, 12)

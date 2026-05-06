@@ -15,9 +15,9 @@ my @_PARTS = (
 )
 
 fn Exercism::House::_phrase($idx) {
-    ~> 0:$idx map { $_PARTS[_] } rev map { join(" that ", @$_) } |> join(" the ")
+    ~> 0:$idx map { $_PARTS[_] } rev map { join(" that ", @$_) } join(" the ")
 }
 
 fn Exercism::House::recite($from, $to) {
-    ~> $from:$to map { "This is the " . Exercism::House::_phrase(_ - 1) . "." } |> join("\n")
+    ~> $from:$to map { "This is the #{Exercism::House::_phrase(_ - 1)}." } join("\n")
 }

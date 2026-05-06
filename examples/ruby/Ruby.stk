@@ -604,8 +604,18 @@ fn Rb::parse_cmp($p) {
 }
 
 fn Rb::parse_add($p) {
-    my $left = Rb::parse_mul($p)
+    my $left = Rb::parse_shift($p)
     while (Rb::p_op($p, "+") || Rb::p_op($p, "-")) {
+        my $op = Rb::p_adv($p)->{val}
+        my $right = Rb::parse_shift($p)
+        $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
+    }
+    $left
+}
+
+fn Rb::parse_shift($p) {
+    my $left = Rb::parse_mul($p)
+    while (Rb::p_op($p, "<<") || Rb::p_op($p, ">>")) {
         my $op = Rb::p_adv($p)->{val}
         my $right = Rb::parse_mul($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
@@ -1728,6 +1738,15 @@ fn Rb::apply_op($op, $l, $r) {
     if ($op eq "===") {
         return Rb::v_bool(Rb::case_match($l, $r) ? 1 : 0)
     }
+    if ($op eq "<<") {
+        # Array#<< appends in-place and returns the array; String#<< concats; Int#<< is left-shift.
+        if (Rb::is_array($l)) { push @{$l->{items}}, $r; return $l }
+        if (Rb::is_str($l))   { $l->{val} .= Rb::to_s($r); return $l }
+        if (Rb::is_int($l) && Rb::is_int($r)) { return Rb::v_int($l->{val} << $r->{val}) }
+    }
+    if ($op eq ">>") {
+        if (Rb::is_int($l) && Rb::is_int($r)) { return Rb::v_int($l->{val} >> $r->{val}) }
+    }
     die "Rb::eval: unhandled op `" . $op . "`"
 }
 
@@ -2289,9 +2308,35 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $m
     }
     if ($name eq "sum") {
-        my $s = 0
-        for my $e (@$items) { $s += Rb::nv($e) }
-        return Rb::v_int($s)
+        my $init = scalar(@$args) ? Rb::nv($args->[0]) : 0
+        my $s = $init
+        my $is_float = (defined($args->[0]) && Rb::is_float($args->[0])) ? 1 : 0
+        for my $e (@$items) {
+            my $v = defined($block) ? Rb::call_block($block, [$e], $ctx) : $e
+            $is_float = 1 if Rb::is_float($v)
+            $s += Rb::nv($v)
+        }
+        return $is_float ? Rb::v_float($s) : Rb::v_int($s)
+    }
+    if ($name eq "filter_map") {
+        my @out
+        for my $e (@$items) {
+            my $r = Rb::call_block($block, [$e], $ctx)
+            push @out, $r if Rb::is_truthy($r)
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "find_index") {
+        if (defined $block) {
+            for (my $i = 0; $i < scalar(@$items); $i++) {
+                return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
+            }
+            return Rb::v_nil()
+        }
+        for (my $i = 0; $i < scalar(@$items); $i++) {
+            return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
+        }
+        return Rb::v_nil()
     }
     if ($name eq "to_a")    { return $a }
     if ($name eq "compact") { return Rb::v_array([grep { !Rb::is_nil($_) } @$items]) }
@@ -2585,8 +2630,19 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "reverse")   { return Rb::v_str(scalar reverse $v) }
     if ($name eq "chars")     { return Rb::v_array([map { Rb::v_str($_) } split //, $v]) }
     if ($name eq "split") {
-        my $sep = scalar(@$args) ? $args->[0]{val} : " "
+        # Bare split / split(" ") — split on runs of whitespace, drop leading empties.
+        if (!scalar(@$args) || (Rb::is_str($args->[0]) && $args->[0]{val} eq " ")) {
+            my $r = $v
+            $r =~ s/^\s+//
+            return Rb::v_array([map { Rb::v_str($_) } split /\s+/, $r])
+        }
+        my $sep = $args->[0]{val}
         return Rb::v_array([map { Rb::v_str($_) } split /\Q$sep\E/, $v])
+    }
+    if ($name eq "index") {
+        my $needle = $args->[0]{val}
+        my $i = index($v, $needle)
+        return $i < 0 ? Rb::v_nil() : Rb::v_int($i)
     }
     if ($name eq "include?") { return Rb::v_bool(index($v, $args->[0]{val}) >= 0 ? 1 : 0) }
     if ($name eq "start_with?") { return Rb::v_bool(substr($v, 0, length($args->[0]{val})) eq $args->[0]{val} ? 1 : 0) }
@@ -2595,10 +2651,35 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "to_f")  { return Rb::v_float($v + 0.0) }
     if ($name eq "to_sym"){ return Rb::v_sym($v) }
     if ($name eq "[]") {
-        my $i = $args->[0]{val}
-        $i += length($v) if $i < 0
-        return Rb::v_nil() if $i < 0 || $i >= length($v)
-        return Rb::v_str(substr($v, $i, 1))
+        my $idx = $args->[0]
+        if (Rb::is_int($idx)) {
+            if (scalar(@$args) >= 2 && Rb::is_int($args->[1])) {
+                my $s = $idx->{val}
+                $s += length($v) if $s < 0
+                my $len = $args->[1]{val}
+                return Rb::v_nil() if $s < 0 || $s > length($v) || $len < 0
+                return Rb::v_str(substr($v, $s, $len))
+            }
+            my $i = $idx->{val}
+            $i += length($v) if $i < 0
+            return Rb::v_nil() if $i < 0 || $i >= length($v)
+            return Rb::v_str(substr($v, $i, 1))
+        }
+        if (Rb::is_range($idx)) {
+            my $lo = Rb::nv($idx->{lo})
+            my $hi = Rb::nv($idx->{hi})
+            $lo += length($v) if $lo < 0
+            $hi += length($v) if $hi < 0
+            $hi-- if $idx->{exclusive}
+            return Rb::v_nil() if $lo < 0 || $lo > length($v)
+            $hi = length($v) - 1 if $hi >= length($v)
+            return Rb::v_str("") if $hi < $lo
+            return Rb::v_str(substr($v, $lo, $hi - $lo + 1))
+        }
+        if (Rb::is_str($idx)) {
+            return index($v, $idx->{val}) >= 0 ? Rb::v_str($idx->{val}) : Rb::v_nil()
+        }
+        return Rb::v_nil()
     }
     if ($name eq "+")     { return Rb::v_str($v . $args->[0]{val}) }
     if ($name eq "*")     { return Rb::v_str($v x $args->[0]{val}) }
@@ -3036,6 +3117,18 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
     if ($name eq "chr")       { return Rb::v_str(chr($v)) }
     if ($name eq "**")        { return Rb::v_int($v ** $args->[0]{val}) }
     if ($name eq "coerce")    { return Rb::v_array([$args->[0], $n]) }
+    if ($name eq "between?") {
+        my $lo = Rb::nv($args->[0])
+        my $hi = Rb::nv($args->[1])
+        return Rb::v_bool(($v >= $lo && $v <= $hi) ? 1 : 0)
+    }
+    if ($name eq "clamp") {
+        my $lo = Rb::nv($args->[0])
+        my $hi = Rb::nv($args->[1])
+        return Rb::v_int($lo) if $v < $lo
+        return Rb::v_int($hi) if $v > $hi
+        return $n
+    }
     undef
 }
 
@@ -3091,6 +3184,22 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
     if ($name eq "each") {
         for my $e (@$items) { Rb::call_block($block, [$e], $ctx) }
         return $r
+    }
+    if ($name eq "step") {
+        my $stride = scalar(@$args) ? Rb::nv($args->[0]) : 1
+        my $lo = Rb::nv($r->{lo})
+        my $hi = Rb::nv($r->{hi})
+        $hi-- if $r->{exclusive}
+        my @out
+        for (my $i = $lo; $i <= $hi; $i += $stride) {
+            if (defined $block) {
+                Rb::call_block($block, [Rb::v_int($i)], $ctx)
+            } else {
+                push @out, Rb::v_int($i)
+            }
+        }
+        return $r if defined $block
+        return Rb::v_array(\@out)
     }
     if ($name eq "map") {
         my @out
@@ -3613,6 +3722,48 @@ rb_test "array each_with_index",
 rb_test "string format %",    '"x = %d, y = %s" % [42, "hi"]',  "\"x = 42, y = hi\""
 rb_test "string * repeat",    '"ab" * 3',                       "\"ababab\""
 rb_test "string * 0",         '"x" * 0',                        "\"\""
+
+# ── STRING TESTS / PREDICATES ──────────────────────────────────────────────
+rb_test "str start_with?",     '"hello".start_with?("hel")',     "true"
+rb_test "str end_with?",       '"hello".end_with?("llo")',       "true"
+rb_test "str start_with? false",'"hello".start_with?("foo")',     "false"
+rb_test "str empty?",          '"".empty?',                      "true"
+rb_test "str empty? false",    '"x".empty?',                     "false"
+rb_test "str index",           '"hello".index("l")',             "2"
+rb_test "str []",              '"hello"[1]',                     "\"e\""
+rb_test "str slice range",     '"hello"[1..3]',                  "\"ell\""
+rb_test "str * literal",       '"a" * 5',                        "\"aaaaa\""
+rb_test "str to_i",            '"42abc".to_i',                   "42"
+rb_test "str to_f",            '"3.14".to_f',                    "3.14"
+rb_test "str to_sym",          '"foo".to_sym',                   ":foo"
+rb_test "str split default",   '"a b  c\td".split',              "[\"a\", \"b\", \"c\", \"d\"]"
+rb_test "str length unicode",  '"hi".length',                    "2"
+
+# ── ARRAY << OPERATOR / FLATTEN! / DUP ─────────────────────────────────────
+rb_test "array push <<",       'a = [1, 2]; a << 3; a',          "[1, 2, 3]"
+rb_test "array dup independent",
+    'a = [1, 2]; b = a.dup; b.push(3); a',                         "[1, 2]"
+rb_test "array sum with block",
+    "[1, 2, 3].sum(0) { |x| x * x }",                               "14"
+
+# ── RANGE STEP / LAZY-ish ──────────────────────────────────────────────────
+rb_test "range step block",
+    "out = []; (1..10).step(3) { |i| out.push(i) }; out",         "[1, 4, 7, 10]"
+rb_test "range step to_a",     "(1..10).step(2).to_a",           "[1, 3, 5, 7, 9]"
+
+# ── FILTER_MAP / FIND_INDEX / EACH_WITH_OBJECT ─────────────────────────────
+rb_test "array filter_map",
+    "[1, 2, 3, 4].filter_map { |x| x * 2 if x.even? }",            "[4, 8]"
+rb_test "array find_index pred",
+    "[1, 2, 3, 4].find_index { |x| x > 2 }",                       "2"
+rb_test "array each_with_object",
+    "[1, 2, 3].each_with_object([]) { |x, acc| acc.push(x * 10) }", "[10, 20, 30]"
+
+# ── COMPARABLE-LIKE: BETWEEN / CLAMP ───────────────────────────────────────
+rb_test "int between?",        "5.between?(1, 10)",              "true"
+rb_test "int between? false",  "15.between?(1, 10)",             "false"
+rb_test "int clamp",           "15.clamp(1, 10)",                "10"
+rb_test "int clamp low",       "(-5).clamp(0, 10)",              "0"
 
 # ── %w / %i WORD ARRAYS ────────────────────────────────────────────────────
 rb_test "%w bracket",       "%w[apple pear plum]",            "[\"apple\", \"pear\", \"plum\"]"
