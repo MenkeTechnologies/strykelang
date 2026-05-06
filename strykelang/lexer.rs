@@ -1275,10 +1275,7 @@ impl Lexer {
                     // string slice like `$_<1:5>`), expand `<N` to N chevrons.
                     if lts.len() == 1 && self.peek().is_some_and(|c| c.is_ascii_digit()) {
                         let mut peek_off = 0usize;
-                        while self
-                            .peek_at(peek_off)
-                            .is_some_and(|c| c.is_ascii_digit())
-                        {
+                        while self.peek_at(peek_off).is_some_and(|c| c.is_ascii_digit()) {
                             peek_off += 1;
                         }
                         let trailing = self.peek_at(peek_off);
@@ -2006,16 +2003,13 @@ impl Lexer {
                     // mean "depth 2 of position 3" (which is not how the
                     // grammar works) — we only allow `_<digits` at depth 1.
                     let mut indexed_ascent: Option<usize> = None;
-                    if peek_off == 1
-                        && trailing.is_some_and(|c: char| c.is_ascii_digit())
-                    {
+                    if peek_off == 1 && trailing.is_some_and(|c: char| c.is_ascii_digit()) {
                         let mut off = 1usize;
                         while self.peek_at(off).is_some_and(|c| c.is_ascii_digit()) {
                             off += 1;
                         }
                         let after_digits = self.peek_at(off);
-                        let still_a_slice =
-                            matches!(after_digits, Some(':') | Some('>'));
+                        let still_a_slice = matches!(after_digits, Some(':') | Some('>'));
                         if !still_a_slice {
                             // Parse the digit run.
                             let mut digits = String::new();
@@ -2059,10 +2053,7 @@ impl Lexer {
                     // existing topic/bareword machinery still runs.
                     if ident.len() > 1
                         && ident.starts_with('_')
-                        && ident
-                            .chars()
-                            .nth(1)
-                            .is_some_and(|c| c.is_ascii_digit())
+                        && ident.chars().nth(1).is_some_and(|c| c.is_ascii_digit())
                     {
                         self.last_was_term = true;
                         return Ok(Token::ScalarVar(ident));
@@ -2747,6 +2738,7 @@ impl Lexer {
                     | "filter"
                     | "f"
                     | "reject"
+                    | "grepv"
                     | "collect"
                     | "compact"
                     | "concat"

@@ -395,8 +395,8 @@ pub(crate) fn try_builtin(
             }
             Some(builtin_drop(interp, args))
         }
-        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek" | "partition"
-        | "min_by" | "max_by" | "zip_with" | "count_by" => {
+        "take_while" | "drop_while" | "skip_while" | "reject" | "grepv" | "tap" | "peek"
+        | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
             Some(interp.list_higher_order_block_builtin(name, args, line))
         }
         "with_index" | "wi" => Some(builtin_with_index(interp, args)),

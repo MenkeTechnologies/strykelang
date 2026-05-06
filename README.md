@@ -373,7 +373,20 @@ my @r = @huge |> pmap_on $cluster heavy
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
-**Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every closure iter shifts an outer-topic chain across all positional slots, up to 5 frames back. Read the previous topic with `_<`, two back with `_<<`, up to five back with `_<<<<<`. Same for every positional slot: `_1<<`, `_2<<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
+**Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every **block-form** closure iter (`grep { ... }`, `map { ... }`, `sort { ... }`, `~> @arr map { ... }`, `fi { ... }`, etc.) shifts an outer-topic chain across all positional slots, up to 5 frames back. Read the previous topic with `_<`, two back with `_<<`, up to five back with `_<<<<<`. Same for every positional slot: `_1<<`, `_2<<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
+
+**`{}` is the shift trigger.** EXPR-form HOFs (`grep EXPR, LIST`, `map EXPR, LIST`, `reject EXPR, LIST`, `grepv EXPR, LIST`, `|> grep EXPR`, etc. — anything with no braces) **do not shift the chain**. The expression is evaluated in the surrounding lexical scope with `$_`/`$_0` rebound per iter; everything else (including all positional aliases `$_1`, `$_2`, …) stays put. This makes higher-order combinator patterns work without chain-ascent boilerplate:
+
+```perl
+# Strain (Exercism): keep elements matching the predicate. The fn's args
+# are `$_` (arrayref) and `$_1` (predicate coderef). EXPR-form `grep _1, …`
+# evaluates `_1` per iter — and since there's no `{}` block, slot 1 stays
+# bound to the caller's $_1 (the coderef), which the runtime then dispatches.
+fn Exercism::Strain::keep    = [grep  _1, @$_]
+fn Exercism::Strain::discard = [grepv _1, @$_]   # grepv ≡ reject (inverse)
+```
+
+The rule reads the same in both directions: **`{}` → shift, no `{}` → no shift**. Block boundaries are scope boundaries; expression positions are not.
 
 **Indexed-ascent shortcut `_<N`** — past depth 2, counting chevrons gets error-prone. The lexer accepts `_<N` (where N is a positive integer) as syntactic sugar for `_<<<...<` (N chevrons). So `_<3` ≡ `_<<<` (more readable past depth 2), `_<5` ≡ `_<<<<<`, etc. Mixed forms work too: `$_2<3` reaches positional 2 from 3 frames up. Disambiguator: `_<3>` and `_<3:5>` remain string-slice syntax; `_<3` (without trailing `>` or `:`) is indexed-ascent.
 

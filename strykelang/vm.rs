@@ -616,6 +616,10 @@ impl<'a> VM<'a> {
     ) -> PerlResult<()> {
         let idx = expr_idx as usize;
         let dispatch_coderef = !crate::compat_mode();
+        // EXPR-form `map EXPR, LIST`: no block boundary, so use
+        // `set_topic_local` (rebinds `_`/`_0` only, no chain shift, no
+        // slot 1+ zero). Block-form `map { ... }` goes through a
+        // separate dispatch path that uses full `set_topic`.
         if let Some(&(start, end)) = self
             .map_expr_bytecode_ranges
             .get(idx)
@@ -623,7 +627,7 @@ impl<'a> VM<'a> {
         {
             let mut result = Vec::new();
             for item in list {
-                self.interp.scope.set_topic(item.clone());
+                self.interp.scope.set_topic_local(item.clone());
                 let val = self.run_block_region(start, end, op_count)?;
                 let val = self.maybe_call_coderef_with_item(val, &item, dispatch_coderef)?;
                 Self::extend_map_outputs(&mut result, val, peel_array_ref);
@@ -633,7 +637,7 @@ impl<'a> VM<'a> {
             let e = self.map_expr_entries[idx].clone();
             let mut result = Vec::new();
             for item in list {
-                self.interp.scope.set_topic(item.clone());
+                self.interp.scope.set_topic_local(item.clone());
                 let val = vm_interp_result(
                     self.interp.eval_expr_ctx(&e, WantarrayCtx::List),
                     self.line(),
@@ -6735,6 +6739,9 @@ impl<'a> VM<'a> {
                         let list = self.pop().to_list();
                         let idx = *expr_idx as usize;
                         let dispatch_coderef = !crate::compat_mode();
+                        // EXPR-form: see `map_with_expr_common` — no `{}` block
+                        // boundary, so use `set_topic_local` (no chain shift,
+                        // no slot 1+ zero).
                         if let Some(&(start, end)) = self
                             .grep_expr_bytecode_ranges
                             .get(idx)
@@ -6742,7 +6749,7 @@ impl<'a> VM<'a> {
                         {
                             let mut result = Vec::new();
                             for item in list {
-                                self.interp.scope.set_topic(item.clone());
+                                self.interp.scope.set_topic_local(item.clone());
                                 let val = self.run_block_region(start, end, op_count)?;
                                 let val = self.maybe_call_coderef_with_item(
                                     val,
@@ -6764,7 +6771,7 @@ impl<'a> VM<'a> {
                             let e = self.grep_expr_entries[idx].clone();
                             let mut result = Vec::new();
                             for item in list {
-                                self.interp.scope.set_topic(item.clone());
+                                self.interp.scope.set_topic_local(item.clone());
                                 let val = vm_interp_result(self.interp.eval_expr(&e), self.line())?;
                                 let val = self.maybe_call_coderef_with_item(
                                     val,

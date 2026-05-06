@@ -603,7 +603,7 @@ fn regex_two_named_captures() {
 // ── Pack / unpack roundtrip ──────────────────────────────────────────────────
 
 #[test]
-fn pack_n_and_N_roundtrip_through_hex() {
+fn pack_n_and_capital_n_roundtrip_through_hex() {
     assert_eq!(
         eval_string(r#"my $b = pack("nN", 1, 2); unpack("H*", $b)"#),
         "000100000002"

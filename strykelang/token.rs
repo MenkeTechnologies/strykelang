@@ -301,6 +301,7 @@ pub const KEYWORDS: &[&str] = &[
     "flatten",
     "compact",
     "reject",
+    "grepv",
     "concat",
     "chain",
     "set",

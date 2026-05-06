@@ -4266,7 +4266,7 @@ impl VMHelper {
                     WantarrayCtx::Void => PerlValue::UNDEF,
                 })
             }
-            "reject" => {
+            "reject" | "grepv" => {
                 let mut out = Vec::new();
                 for item in items {
                     self.scope.set_topic(item.clone());
@@ -9931,7 +9931,13 @@ impl VMHelper {
                 let arg_vals = if matches!(dispatch_name, "any" | "all" | "none" | "first")
                     || matches!(
                         dispatch_name,
-                        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+                        "take_while"
+                            | "drop_while"
+                            | "skip_while"
+                            | "reject"
+                            | "grepv"
+                            | "tap"
+                            | "peek"
                     )
                     || matches!(
                         dispatch_name,
@@ -10080,7 +10086,13 @@ impl VMHelper {
                 if !crate::compat_mode() {
                     if matches!(
                         dispatch_name,
-                        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+                        "take_while"
+                            | "drop_while"
+                            | "skip_while"
+                            | "reject"
+                            | "grepv"
+                            | "tap"
+                            | "peek"
                     ) {
                         let r =
                             self.list_higher_order_block_builtin(dispatch_name, &arg_vals, line);
@@ -10103,7 +10115,13 @@ impl VMHelper {
                 if crate::compat_mode() {
                     if matches!(
                         dispatch_name,
-                        "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+                        "take_while"
+                            | "drop_while"
+                            | "skip_while"
+                            | "reject"
+                            | "grepv"
+                            | "tap"
+                            | "peek"
                     ) {
                         let r =
                             self.list_higher_order_block_builtin(dispatch_name, &arg_vals, line);
@@ -10480,7 +10498,12 @@ impl VMHelper {
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
-                    self.scope.set_topic(item.clone());
+                    // EXPR-form: no `{}` block boundary, so don't shift the
+                    // topic chain or zero slot 1+. Just rebind `$_` / `$_0`.
+                    // This makes `map _1, @$_` read the surrounding fn's
+                    // second arg per iter; block-form `map { ... }` still
+                    // gets a full `set_topic` via its CodeRef call.
+                    self.scope.set_topic_local(item.clone());
                     let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
                     // Coderef-in-block-position: `map $f, @l` calls `$f($_)`
                     // when `$f` is a code reference. Skipped under `--compat`
@@ -10561,7 +10584,10 @@ impl VMHelper {
                 let items = list_val.to_list();
                 let mut result = Vec::new();
                 for item in items {
-                    self.scope.set_topic(item.clone());
+                    // EXPR-form: see comment in MapExprComma above. No block
+                    // boundary, so no chain shift; `_1` reads the surrounding
+                    // fn's second arg per iter rather than getting nuked.
+                    self.scope.set_topic_local(item.clone());
                     let val = self.eval_expr(expr)?;
                     // Coderef-in-block-position: `grep $f, @l` calls `$f($_)`
                     // when `$f` is a code reference, then filters by truthiness

@@ -1210,8 +1210,18 @@ impl Scope {
     }
 
     /// Set the topic variable `$_` and its numeric alias `$_0` together.
-    /// Use this for single-arg closures (map, grep, etc.) so both `$_` and `$_0` work.
-    /// This declares them in the current scope (not global), suitable for sub calls.
+    /// Use this for **block-form** closures (`map { ... }`, `grep { ... }`,
+    /// `sort { ... }`, threaded `~> @arr map { ... }`, `fi { ... }`,
+    /// etc.) so `$_`, `$_0`, and the outer-topic chain (`$_<`, `$_<<`, …)
+    /// all behave correctly. EXPR-form HOFs (`grep EXPR, LIST`,
+    /// `map EXPR, LIST`, `reject EXPR, LIST`, `grepv EXPR, LIST`, etc. —
+    /// anything with no `{}`) MUST use [`Self::set_topic_local`] instead;
+    /// EXPR position is in the same lexical scope as the surrounding code,
+    /// so there is no scope/frame boundary and the chain MUST NOT shift.
+    /// User-facing rule: **`{}` triggers the shift; no `{}` means no shift**.
+    ///
+    /// This declares `$_`/`$_0` in the current scope (not global), suitable
+    /// for sub calls.
     ///
     /// Shifts the outer-topic chain (`$_<`, `$_<<`, `$_<<<`, `$_<<<<`,
     /// `$_<<<<<`) on the FIRST call in a given frame so nested blocks can
@@ -1232,16 +1242,6 @@ impl Scope {
         // visible. `set_closure_args` does NOT set this flag, so a sub call
         // followed by `map { ... }` still gets a real shift on the FIRST
         // map iter (the chain becomes "the sub's args at level 1").
-        //
-        // Slots 1+ (`$_1`, `$_2`, …, `$_N`) are NOT touched here. They are
-        // caller-frame positional aliases set by [`Self::set_closure_args`]
-        // at fn boundaries; map/grep iteration is not a fn boundary, so
-        // those values stay visible from the surrounding fn. This makes
-        // EXPR-form HOF patterns like `grep _1, @$_` work — `_1` reads
-        // the surrounding fn's second arg per iter rather than getting
-        // nuked to undef. Block-form `grep { ... }` invokes a CodeRef via
-        // `set_closure_args` which has its own frame, so block bodies
-        // still see fresh positionals.
         let already_shifted = self
             .frames
             .last()
@@ -1249,12 +1249,31 @@ impl Scope {
             .unwrap_or(false);
         if already_shifted {
             self.declare_topic_slot(0, 0, val);
+            for slot in 1..=self.max_active_slot {
+                self.declare_topic_slot(slot, 0, PerlValue::UNDEF);
+            }
             return;
         }
         if let Some(frame) = self.frames.last_mut() {
             frame.set_topic_called = true;
         }
         self.shift_slot_chain(0, val);
+        for slot in 1..=self.max_active_slot {
+            self.shift_slot_chain(slot, PerlValue::UNDEF);
+        }
+    }
+
+    /// EXPR-form variant: rebinds `$_` / `$_0` to `val` for the current
+    /// iteration WITHOUT shifting any chain or zeroing slot 1+ aliases.
+    /// Used by `grep EXPR, LIST` / `map EXPR, LIST` and the streaming
+    /// equivalents — the EXPR is evaluated in the lexical scope of the
+    /// surrounding code, with no block boundary, so the topic chain
+    /// shouldn't roll. Crucially this preserves `_1`, `_2`, ..., `_N`
+    /// from the caller fn so patterns like `grep _1, @$_` work without
+    /// chain-ascent.
+    #[inline]
+    pub fn set_topic_local(&mut self, val: PerlValue) {
+        self.declare_topic_slot(0, 0, val);
     }
 
     /// Set numeric closure argument aliases `$_0`, `$_1`, `$_2`, ... for all
