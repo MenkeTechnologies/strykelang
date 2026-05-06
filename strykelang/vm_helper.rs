@@ -9337,7 +9337,10 @@ impl VMHelper {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_strict_scalar_var(name, line)?;
                         let n = self.resolved_scalar_storage_name(name);
-                        return Ok(self.scope.atomic_mutate(&n, perl_inc).map_err(|e| e.at_line(line))?);
+                        return Ok(self
+                            .scope
+                            .atomic_mutate(&n, perl_inc)
+                            .map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
                         if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -14788,7 +14791,11 @@ impl VMHelper {
                 let arr = &name[1..];
                 let aname = self.stash_array_name_for_package(arr);
                 let new_last = val.to_int();
-                let new_len = if new_last < 0 { 0 } else { (new_last as usize) + 1 };
+                let new_len = if new_last < 0 {
+                    0
+                } else {
+                    (new_last as usize) + 1
+                };
                 let mut current = self.scope.get_array(&aname);
                 current.resize(new_len, PerlValue::UNDEF);
                 self.scope.set_array(&aname, current)?;

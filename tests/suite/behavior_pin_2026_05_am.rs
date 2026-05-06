@@ -6,8 +6,14 @@ use crate::common::*;
 
 #[test]
 fn string_words_am() {
-    assert_eq!(eval_string(r#"first_word("  hello world from rust  ")"#), "hello");
-    assert_eq!(eval_string(r#"last_word("  hello world from rust  ")"#), "rust");
+    assert_eq!(
+        eval_string(r#"first_word("  hello world from rust  ")"#),
+        "hello"
+    );
+    assert_eq!(
+        eval_string(r#"last_word("  hello world from rust  ")"#),
+        "rust"
+    );
 }
 
 // ── Substring Helpers ────────────────────────────────────────────────────────
@@ -29,7 +35,10 @@ fn string_substrings_am() {
 
 #[test]
 fn string_cases_am() {
-    assert_eq!(eval_string(r#"pascal_case("foo_bar_baz_qux")"#), "FooBarBazQux");
+    assert_eq!(
+        eval_string(r#"pascal_case("foo_bar_baz_qux")"#),
+        "FooBarBazQux"
+    );
     assert_eq!(
         eval_string(r#"constant_case("foo_bar_baz_qux")"#),
         "FOO_BAR_BAZ_QUX"
@@ -69,6 +78,12 @@ fn string_predicates_am() {
     assert_eq!(eval_int(r#"contains_all("hello world", "e", "l", "w")"#), 1);
     assert_eq!(eval_int(r#"contains_all("hello world", "e", "x", "w")"#), 0);
 
-    assert_eq!(eval_int(r#"starts_with_any("hello world", "h", "x", "w")"#), 1);
-    assert_eq!(eval_int(r#"ends_with_any("hello world", "d", "x", "w")"#), 1);
+    assert_eq!(
+        eval_int(r#"starts_with_any("hello world", "h", "x", "w")"#),
+        1
+    );
+    assert_eq!(
+        eval_int(r#"ends_with_any("hello world", "d", "x", "w")"#),
+        1
+    );
 }

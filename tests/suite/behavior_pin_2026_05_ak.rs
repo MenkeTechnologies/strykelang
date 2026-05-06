@@ -43,10 +43,7 @@ fn ansi_styling_ak() {
 #[test]
 fn stats_ak() {
     // geometric_mean of a single number is the number itself
-    assert_eq!(
-        eval_string("sprintf('%.0f', geometric_mean(10))"),
-        "10"
-    );
+    assert_eq!(eval_string("sprintf('%.0f', geometric_mean(10))"), "10");
 
     // zscore with same values should be 0
     assert_eq!(eval_int("zscore(10, 10, 10)"), 0);
@@ -97,7 +94,9 @@ fn string_ak() {
     // shuffle_chars should keep same chars
     let s = eval_string(r#"shuffle_chars("abcde")"#);
     assert_eq!(s.len(), 5);
-    assert!(s.contains("a") && s.contains("b") && s.contains("c") && s.contains("d") && s.contains("e"));
+    assert!(
+        s.contains("a") && s.contains("b") && s.contains("c") && s.contains("d") && s.contains("e")
+    );
 
     assert_eq!(eval_int(r#"matches_regex("hello world", "^h.*d$")"#), 1);
     assert_eq!(eval_int(r#"count_regex_matches("abababa", "a")"#), 4);

@@ -10282,22 +10282,18 @@ fn builtin_assert_dies(
                 Ok(PerlValue::integer(1))
             }
             Ok(_) => {
-                test_fail(interp, &msg,"expected die but block succeeded");
+                test_fail(interp, &msg, "expected die but block succeeded");
                 Ok(PerlValue::integer(0))
             }
         }
     } else {
-        test_fail(interp, &msg,"first arg must be a code ref");
+        test_fail(interp, &msg, "first arg must be a code ref");
         Ok(PerlValue::integer(0))
     }
 }
 
 /// `test_run` / `run_tests` — print test summary and exit with appropriate code.
-fn builtin_test_run(
-    interp: &VMHelper,
-    _args: &[PerlValue],
-    _line: usize,
-) -> PerlResult<PerlValue> {
+fn builtin_test_run(interp: &VMHelper, _args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let pass = interp.test_pass_count.load(AtomicOrdering::Relaxed);
     let fail = interp.test_fail_count.load(AtomicOrdering::Relaxed);
     let skip = interp.test_skip_count.load(AtomicOrdering::Relaxed);
@@ -10335,9 +10331,7 @@ fn builtin_test_run(
     // is sticky — once any `test_run` reports failures, it stays set even if a
     // subsequent reset clears the counters.
     if fail > 0 {
-        interp
-            .test_run_failed
-            .store(true, AtomicOrdering::Relaxed);
+        interp.test_run_failed.store(true, AtomicOrdering::Relaxed);
     }
     Ok(PerlValue::integer(if fail == 0 { 1 } else { 0 }))
 }
@@ -10345,11 +10339,7 @@ fn builtin_test_run(
 /// `test_skip MSG` — mark the surrounding assertion as skipped (yellow `↷`).
 /// Pair with postfix `if`/`unless` to gate on a condition:
 /// `test_skip "needs --compat" unless compat_mode`.
-fn builtin_test_skip(
-    interp: &VMHelper,
-    args: &[PerlValue],
-    _line: usize,
-) -> PerlResult<PerlValue> {
+fn builtin_test_skip(interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let msg = args
         .first()
         .map(|v| v.to_string())

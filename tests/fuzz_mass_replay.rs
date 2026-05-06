@@ -116,4 +116,3 @@ fn compile_mass_replay() {
     });
     report("compile", panics);
 }
-

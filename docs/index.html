@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.2 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3500+ builtins</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.5 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 3500+ builtins</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -477,7 +477,7 @@ kubectl apply -f stryke-daemonset.yaml
 
 <span class="comment"># AOT compile your test suite into one binary</span>
 stryke build load_test.stk -o load_test
-scp load_test node{1..100}:/tmp/</pre>
+scp load_test node{1:100}:/tmp/</pre>
 
         <h3>Compliance Use Cases</h3>
         <table class="reflection-table" style="font-size:11px;">
@@ -616,9 +616,9 @@ pty_close($h)
 
 <span class="comment"># Table form (Tcl `expect { ... }` block)</span>
 my $tag = pty_expect_table($h, [
-    +{ re =&gt; qr/password:/, do =&gt; sub { pty_send($h, "$pw\n"); "ok" } },
-    +{ re =&gt; qr/yes\/no/,   do =&gt; sub { pty_send($h, "yes\n"); "confirmed" } },
-    +{ re =&gt; qr/denied/,    do =&gt; sub { die "auth failed" } },
+    +{ re =&gt; qr/password:/, do =&gt; fn { pty_send($h, "$pw\n"); "ok" } },
+    +{ re =&gt; qr/yes\/no/,   do =&gt; fn { pty_send($h, "yes\n"); "confirmed" } },
+    +{ re =&gt; qr/denied/,    do =&gt; fn { die "auth failed" } },
 ], 30)
 
 <span class="comment"># Method-form sugar</span>
@@ -689,17 +689,17 @@ shared = { workspace = true }       <span class="comment"># inherit version + fe
       <section class="tutorial-section">
         <h2>Parallel primitives (highlights)</h2>
         <p>Every <code>p*</code> primitive uses rayon work-stealing, saturates all cores by default, and takes three surface forms:</p>
-<pre># block form   (_ = element, bare _ is shorthand for _)
+<pre># block form   ($_ = element, bare _ is shorthand for $_)
 pmap { _ * 2 } 1:1_000_000
 
 # expression form
 pmap _ * 2, 1:1_000_000
 
-# bare-fn form   (fn double { $_0 * 2 })
+# bare-fn form   (fn double { _ * 2 })
 pmap double, 1:1_000_000</pre>
 
         <h3>fan / pchannel / ppool</h3>
-<pre># fan — run a block N times in parallel (_/$_0 = index 0..N-1)
+<pre># fan — run a block N times in parallel (_/_0 = index 0:N-1)
 fan 16 { heavy_work(_) }
 
 # pchannel — bounded MPMC queue
@@ -791,7 +791,7 @@ fe80::ff~fe80::fc~-1          <span class="comment"># IPv6 reverse step</span>
 map { my @inner = (1, 2); map { _&lt; + _ } @inner } (10, 20)
 <span class="comment"># 11, 12, 21, 22</span>
 
-<span class="comment"># Inside a 3-arg sub, _0&lt;5 (≡ _0&lt;&lt;&lt;&lt;&lt;) reaches arg 0 five frames up:</span>
+<span class="comment"># Inside a 3-arg fn, _0&lt;5 (≡ _0&lt;&lt;&lt;&lt;&lt;) reaches arg 0 five frames up:</span>
 fn deep($_0, $_1, $_2) {
   ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map { ~&gt; 1:1 map {
     p _0&lt;5, _1&lt;5, _2&lt;5      <span class="comment"># preferred: indexed form</span>
@@ -830,7 +830,7 @@ fn deep($_0, $_1, $_2) {
         <p>Wherever a <code>{ BLOCK }</code> is accepted in a per-element list operator (<code>grep</code>, <code>map</code>, <code>sort</code>, <code>first</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>take_while</code>, <code>drop_while</code>, <code>reject</code>, <code>partition</code>, <code>min_by</code>, <code>max_by</code>, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the <code>{ $f($_) }</code> / <code>{ $f-&gt;($_) }</code> boilerplate.</p>
 <pre><span class="comment"># grep / map — single coderef, no block:</span>
 my $is_big = fn ($x) { $x &gt; 3 }
-my @r = grep $is_big, @l                  <span class="comment"># was: grep { $is_big-&gt;($_) } @l</span>
+my @r = grep $is_big, @l                  <span class="comment"># was: grep { $is_big-&gt;(_) } @l</span>
 my @r = @l |&gt; grep $is_big                <span class="comment"># pipe-forward variant</span>
 my @doubled = map fn { _ * 2 }, @l        <span class="comment"># inline coderef</span>
 
