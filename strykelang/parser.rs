@@ -5936,7 +5936,14 @@ impl Parser {
     }
 
     fn parse_comma_expr(&mut self) -> PerlResult<Expr> {
-        let expr = self.parse_assign_expr()?;
+        // Word-op precedence (or/and/not) sits ABOVE assignment in Perl —
+        // `EXPR or $err = $@` parses as `EXPR or ($err = $@)`, NOT
+        // `(EXPR or $err) = $@`. Entering through `parse_or_word` here
+        // (instead of `parse_assign_expr` directly) gives `or`/`and`/`not`
+        // looser binding than `=`, matching `perlop`. The deeper chain
+        // (`parse_not_word → parse_assign_expr → parse_ternary → … →
+        // parse_log_or → …`) handles tighter operators normally.
+        let expr = self.parse_or_word()?;
         let mut exprs = vec![expr];
         while self.eat(&Token::Comma) || self.eat(&Token::FatArrow) {
             if matches!(
@@ -5945,7 +5952,7 @@ impl Parser {
             ) {
                 break; // trailing comma
             }
-            exprs.push(self.parse_assign_expr()?);
+            exprs.push(self.parse_or_word()?);
         }
         if exprs.len() == 1 {
             return Ok(exprs.pop().unwrap());
@@ -6210,7 +6217,13 @@ impl Parser {
     /// `x |> f |> g(2)` → `g(f(x), 2)`. Precedence sits between `?:` and `||`, so
     /// `x + 1 |> f || y` parses as `f(x + 1) || y`.
     fn parse_pipe_forward(&mut self) -> PerlResult<Expr> {
-        let mut left = self.parse_or_word()?;
+        // After moving word-ops (or/and/not) above the assignment level,
+        // pipe_forward must descend into `parse_range` (which itself
+        // descends into `parse_log_or`) — calling `parse_or_word` here
+        // would re-introduce `or` at a wrong place in the precedence chain
+        // (it now sits above `parse_comma_expr`). We skip past `parse_range`
+        // rather than `parse_log_or` so `..` stays reachable.
+        let mut left = self.parse_range()?;
         // Inside a paren-less arg list, `|>` is a hard terminator for the
         // enclosing call — leave it for the outer `parse_pipe_forward` loop
         // so `qw(…) |> head 2 |> join "-"` chains left-to-right as
@@ -6231,7 +6244,10 @@ impl Parser {
             // Set pipe-RHS context so list-taking builtins (`map`, `grep`,
             // `join`, …) accept a placeholder in place of their list operand.
             self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_add(1);
-            let right_result = self.parse_or_word();
+            // RHS of `|>` parses at the same precedence as the LHS — see
+            // the comment at the top of `parse_pipe_forward` for why this
+            // descends into `parse_range` instead of `parse_or_word`.
+            let right_result = self.parse_range();
             self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_sub(1);
             let right = right_result?;
             left = self.pipe_forward_apply(left, right, line)?;
@@ -7014,7 +7030,9 @@ impl Parser {
                 line,
             });
         }
-        self.parse_range()
+        // Descend into assignment level — `not` sits ABOVE `=` in Perl
+        // precedence, so `not $x = 5` parses as `not ($x = 5)`.
+        self.parse_assign_expr()
     }
 
     fn parse_log_or(&mut self) -> PerlResult<Expr> {
