@@ -1,0 +1,47 @@
+[package]
+name = "strykelang-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.strykelang]
+path = ".."
+
+# Each fuzz target must be a separate `[[bin]]` for cargo-fuzz to discover it.
+# `path.unstable-options` lets the binaries live under `fuzz_targets/`.
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "compile"
+path = "fuzz_targets/compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "eval"
+path = "fuzz_targets/eval.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pack"
+path = "fuzz_targets/pack.rs"
+test = false
+doc = false
+bench = false
+
+# Standalone — not part of the main workspace (keeps fuzz deps off the main build path).
+[workspace]
