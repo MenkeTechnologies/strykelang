@@ -240,6 +240,7 @@ impl Parser {
                 | "drop_while"
                 | "skip_while"
                 | "reject"
+                | "grepv"
                 | "tap"
                 | "peek"
                 | "group_by"
@@ -11321,7 +11322,7 @@ impl Parser {
                     line,
                 })
             }
-            "take_while" | "drop_while" | "skip_while" | "reject" | "tap" | "peek"
+            "take_while" | "drop_while" | "skip_while" | "reject" | "grepv" | "tap" | "peek"
             | "partition" | "min_by" | "max_by" | "zip_with" | "count_by" => {
                 // Coderef-in-block-position: `take_while $f LIST` etc.
                 if let Some(args) = self.try_parse_coderef_listop_args(line)? {
@@ -12811,7 +12812,7 @@ impl Parser {
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
-            | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "flatten" | "set"
+            | "first" | "detect" | "find" | "compact" | "concat" | "chain" | "reject" | "grepv" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally" | "find_index"
             | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
             | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"

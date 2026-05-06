@@ -122,9 +122,12 @@ impl MapStreamIterator {
         }
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
-            interp.scope.set_topic(item);
+            // Block-form goes through `set_topic` (full chain shift). Expr-
+            // form uses `set_topic_local` (no shift, no slot-1+ zero) so
+            // patterns like `maps _1, @$_` see the surrounding fn's `_1`.
             match &self.mode {
                 MapStreamMode::Block(sub) => {
+                    interp.scope.set_topic(item);
                     match interp.exec_block_with_tail(&sub.body, WantarrayCtx::List) {
                         Ok(val) => {
                             let extended = val.map_flatten_outputs(self.peel);
@@ -142,6 +145,7 @@ impl MapStreamIterator {
                     }
                 }
                 MapStreamMode::Expr(expr) => {
+                    interp.scope.set_topic_local(item);
                     match interp.eval_expr_ctx(expr.as_ref(), WantarrayCtx::List) {
                         Ok(val) => {
                             // Coderef-in-block-position: when the streaming
@@ -266,48 +270,56 @@ impl PerlIterator for FilterStreamIterator {
     fn next_item(&self) -> Option<PerlValue> {
         while let Some(item) = self.source.next_item() {
             let mut interp = self.interp.lock();
-            interp.scope.set_topic(item.clone());
+            // Block-form: full `set_topic` (chain shift); EXPR-form: just
+            // `set_topic_local` so the surrounding fn's `_1`/`_2`/... stay
+            // visible inside the per-iter expr.
             match &self.mode {
-                FilterStreamMode::Block(sub) => match interp.exec_block(&sub.body) {
-                    Ok(v) if v.is_true() => return Some(item),
-                    Ok(_) => continue,
-                    Err(FlowOrError::Error(e)) => panic!("filter iterator: {e}"),
-                    Err(_) => continue,
-                },
-                FilterStreamMode::Expr(expr) => match interp.eval_expr(expr.as_ref()) {
-                    Ok(val) => {
-                        // Coderef-in-block-position: call the coderef with
-                        // the current item and use the call result for
-                        // truthiness. Skipped under `--compat`.
-                        let v = if !crate::compat_mode() {
-                            if let Some(sub) = val.as_code_ref() {
-                                let sub = sub.clone();
-                                match interp.call_sub(
-                                    &sub,
-                                    vec![item.clone()],
-                                    WantarrayCtx::Scalar,
-                                    0,
-                                ) {
-                                    Ok(v) => v,
-                                    Err(FlowOrError::Error(e)) => {
-                                        panic!("filter iterator: {e}")
+                FilterStreamMode::Block(sub) => {
+                    interp.scope.set_topic(item.clone());
+                    match interp.exec_block(&sub.body) {
+                        Ok(v) if v.is_true() => return Some(item),
+                        Ok(_) => continue,
+                        Err(FlowOrError::Error(e)) => panic!("filter iterator: {e}"),
+                        Err(_) => continue,
+                    }
+                }
+                FilterStreamMode::Expr(expr) => {
+                    interp.scope.set_topic_local(item.clone());
+                    match interp.eval_expr(expr.as_ref()) {
+                        Ok(val) => {
+                            // Coderef-in-block-position: call the coderef with
+                            // the current item and use the call result for
+                            // truthiness. Skipped under `--compat`.
+                            let v = if !crate::compat_mode() {
+                                if let Some(sub) = val.as_code_ref() {
+                                    let sub = sub.clone();
+                                    match interp.call_sub(
+                                        &sub,
+                                        vec![item.clone()],
+                                        WantarrayCtx::Scalar,
+                                        0,
+                                    ) {
+                                        Ok(v) => v,
+                                        Err(FlowOrError::Error(e)) => {
+                                            panic!("filter iterator: {e}")
+                                        }
+                                        Err(_) => continue,
                                     }
-                                    Err(_) => continue,
+                                } else {
+                                    val
                                 }
                             } else {
                                 val
+                            };
+                            if v.is_true() {
+                                return Some(item);
                             }
-                        } else {
-                            val
-                        };
-                        if v.is_true() {
-                            return Some(item);
+                            continue;
                         }
-                        continue;
+                        Err(FlowOrError::Error(e)) => panic!("filter iterator: {e}"),
+                        Err(_) => continue,
                     }
-                    Err(FlowOrError::Error(e)) => panic!("filter iterator: {e}"),
-                    Err(_) => continue,
-                },
+                }
             }
         }
         None
