@@ -46,10 +46,23 @@ fn Rb::v_proc($params, $body, $env) {
     +{ type => "proc", params => $params, body => $body, env => $env }
 }
 fn Rb::v_class($name, $parent) {
-    +{ type => "class", name => $name, parent => $parent, methods => +{} }
+    +{
+        type     => "class",
+        name     => $name,
+        parent   => $parent,
+        methods  => +{},
+        cmethods => +{},      # class-side (singleton) methods — `def self.foo`
+        includes => [],       # mixed-in modules
+    }
+}
+fn Rb::v_module($name) {
+    +{ type => "module", name => $name, methods => +{} }
 }
 fn Rb::v_instance($klass) {
     +{ type => "instance", klass => $klass, ivars => +{} }
+}
+fn Rb::v_exception($klass, $msg) {
+    +{ type => "exception", klass => $klass, message => $msg }
 }
 
 fn Rb::is_int($v)      { ref($v) eq "HASH" && $v->{type} eq "int" }
@@ -64,7 +77,9 @@ fn Rb::is_hash($v)     { ref($v) eq "HASH" && $v->{type} eq "hash" }
 fn Rb::is_range($v)    { ref($v) eq "HASH" && $v->{type} eq "range" }
 fn Rb::is_proc($v)     { ref($v) eq "HASH" && $v->{type} eq "proc" }
 fn Rb::is_class($v)    { ref($v) eq "HASH" && $v->{type} eq "class" }
+fn Rb::is_module($v)   { ref($v) eq "HASH" && $v->{type} eq "module" }
 fn Rb::is_instance($v) { ref($v) eq "HASH" && $v->{type} eq "instance" }
+fn Rb::is_exception($v){ ref($v) eq "HASH" && $v->{type} eq "exception" }
 
 # Ruby truthiness: only nil and false are falsy; 0, "", [] are TRUTHY.
 fn Rb::is_truthy($v) {
@@ -103,6 +118,9 @@ fn Rb::v_cmp($a, $b) {
         return $av < $bv ? -1 : ($av > $bv ? 1 : 0)
     }
     if (Rb::is_str($a) && Rb::is_str($b)) {
+        return $a->{val} lt $b->{val} ? -1 : ($a->{val} gt $b->{val} ? 1 : 0)
+    }
+    if ($a->{type} eq "sym" && $b->{type} eq "sym") {
         return $a->{val} lt $b->{val} ? -1 : ($a->{val} gt $b->{val} ? 1 : 0)
     }
     0
@@ -159,12 +177,19 @@ fn Rb::inspect($v) {
         my $body = scalar(@parts) ? " " . join(", ", @parts) : ""
         return "#<" . $v->{klass}{name} . $body . ">"
     }
+    if (Rb::is_exception($v)) {
+        # Ruby's `e.inspect` formats as `#<Class: message>`; Stryke tests for
+        # bare `e` without `.inspect` so we keep the message-only short form.
+        my $m = $v->{message} // $v->{klass}{name}
+        return "\"" . $m . "\""
+    }
     "#<unknown>"
 }
 
 fn Rb::to_s($v) {
     return $v->{val} if Rb::is_str($v) || Rb::is_sym($v)
     return ""        if Rb::is_nil($v)
+    return $v->{message} // $v->{klass}{name} if Rb::is_exception($v)
     Rb::inspect($v)
 }
 
@@ -365,8 +390,9 @@ fn Rb::tokenize($src) {
 fn Rb::is_keyword($w) {
     my %kw = map { $_ => 1 } qw(
         def end if elsif else unless while until for in do return yield
-        nil true false class self begin rescue raise ensure case when
-        then and or not puts print p break next lambda proc new
+        nil true false class module self begin rescue raise ensure case when
+        then and or not puts print p pp break next lambda proc new super
+        attr_accessor attr_reader attr_writer include extend
     )
     exists $kw{$w} ? 1 : 0
 }
@@ -763,6 +789,7 @@ fn Rb::parse_primary($p) {
         if ($w eq "for")    { return Rb::parse_for($p) }
         if ($w eq "def")    { return Rb::parse_def($p) }
         if ($w eq "class")  { return Rb::parse_class($p) }
+        if ($w eq "module") { return Rb::parse_module($p) }
         if ($w eq "begin")  { return Rb::parse_begin($p) }
         if ($w eq "return") { return Rb::parse_return($p) }
         if ($w eq "yield")  { return Rb::parse_yield($p) }
@@ -772,8 +799,30 @@ fn Rb::parse_primary($p) {
         if ($w eq "puts")   { return Rb::parse_implicit_call($p, "puts") }
         if ($w eq "print")  { return Rb::parse_implicit_call($p, "print") }
         if ($w eq "p")      { return Rb::parse_implicit_call($p, "p") }
+        if ($w eq "pp")     { return Rb::parse_implicit_call($p, "pp") }
         if ($w eq "lambda") { return Rb::parse_lambda_or_proc($p, 1) }
         if ($w eq "proc")   { return Rb::parse_lambda_or_proc($p, 0) }
+        if ($w eq "super") {
+            Rb::p_adv($p)
+            my @args
+            my $explicit = 0
+            if (Rb::p_kind($p, "LPAREN")) {
+                Rb::p_adv($p)
+                $explicit = 1
+                while (!Rb::p_kind($p, "RPAREN")) {
+                    push @args, Rb::parse_expr($p)
+                    last unless Rb::p_eat_kind($p, "COMMA")
+                }
+                Rb::p_expect_kind($p, "RPAREN")
+            }
+            return +{ kind => "Super", args => \@args, explicit => $explicit, line => $line }
+        }
+        if ($w eq "attr_accessor" || $w eq "attr_reader" || $w eq "attr_writer") {
+            return Rb::parse_implicit_call($p, $w)
+        }
+        if ($w eq "include" || $w eq "extend") {
+            return Rb::parse_implicit_call($p, $w)
+        }
     }
     if ($k eq "IDENT") {
         Rb::p_adv($p)
@@ -976,21 +1025,48 @@ fn Rb::parse_for($p) {
 
 fn Rb::parse_def($p) {
     my $line = Rb::p_adv($p)->{line}
+    # `def self.foo` → class method (singleton on the class).
+    my $is_self = 0
+    if (Rb::p_kw($p, "self")) {
+        Rb::p_adv($p)
+        Rb::p_expect_op($p, ".")
+        $is_self = 1
+    }
     my $name_t = Rb::p_adv($p)
     my $name = $name_t->{val}
+    # `def foo=` setter — accept the trailing `=`.
+    if (Rb::p_op($p, "=")) {
+        Rb::p_adv($p)
+        $name = $name . "="
+    }
     my @params
+    my $rest = undef                # `*args` slurp
+    my $block_param = undef         # `&block`
     if (Rb::p_kind($p, "LPAREN")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
         while (!Rb::p_kind($p, "RPAREN")) {
-            push @params, Rb::p_adv($p)->{val}
+            if (Rb::p_op($p, "*")) {
+                Rb::p_adv($p)
+                $rest = Rb::p_adv($p)->{val}
+            } elsif (Rb::p_op($p, "&")) {
+                Rb::p_adv($p)
+                $block_param = Rb::p_adv($p)->{val}
+            } else {
+                push @params, Rb::p_adv($p)->{val}
+            }
             last unless Rb::p_eat_kind($p, "COMMA")
             Rb::p_skip_nl($p)
         }
         Rb::p_expect_kind($p, "RPAREN")
-    } elsif (Rb::p_kind($p, "IDENT")) {
+    } elsif (Rb::p_kind($p, "IDENT") || Rb::p_op($p, "*")) {
         while (!Rb::p_kind($p, "NL") && !Rb::p_kind($p, "EOF")) {
-            push @params, Rb::p_adv($p)->{val}
+            if (Rb::p_op($p, "*")) {
+                Rb::p_adv($p)
+                $rest = Rb::p_adv($p)->{val}
+            } else {
+                push @params, Rb::p_adv($p)->{val}
+            }
             last unless Rb::p_eat_kind($p, "COMMA")
         }
     }
@@ -1001,7 +1077,16 @@ fn Rb::parse_def($p) {
         Rb::p_skip_nl($p)
     }
     Rb::p_expect_kw($p, "end")
-    +{ kind => "Def", name => $name, params => \@params, body => \@body, line => $line }
+    +{
+        kind        => "Def",
+        name        => $name,
+        params      => \@params,
+        rest        => $rest,
+        block_param => $block_param,
+        is_self     => $is_self,
+        body        => \@body,
+        line        => $line,
+    }
 }
 
 fn Rb::parse_class($p) {
@@ -1020,6 +1105,19 @@ fn Rb::parse_class($p) {
     }
     Rb::p_expect_kw($p, "end")
     +{ kind => "Class", name => $name, parent => $parent, body => \@body, line => $line }
+}
+
+fn Rb::parse_module($p) {
+    my $line = Rb::p_adv($p)->{line}
+    my $name = Rb::p_adv($p)->{val}
+    Rb::p_skip_nl($p)
+    my @body
+    while (!Rb::p_kw($p, "end")) {
+        push @body, Rb::parse_stmt($p)
+        Rb::p_skip_nl($p)
+    }
+    Rb::p_expect_kw($p, "end")
+    +{ kind => "Module", name => $name, body => \@body, line => $line }
 }
 
 fn Rb::parse_begin($p) {
@@ -1364,11 +1462,33 @@ fn Rb::eval_node($n, $ctx) {
     if ($k eq "Begin") {
         my $r = eval { Rb::eval_body($n->{body}, $ctx) }
         my $err = $@
+        # Skip control-flow unwinds (return/break/next) — they propagate.
+        if ($err && ref($err) eq "HASH" && exists($err->{flow})) {
+            Rb::eval_body($n->{ensure}, $ctx) if defined $n->{ensure}
+            die $err
+        }
         if ($err) {
+            # Coerce non-exception err (string die from internals, plain hashref) into an exception.
+            my $exc
+            if (Rb::is_exception($err)) {
+                $exc = $err
+            } else {
+                my $msg = ref($err) eq "HASH" && exists($err->{message}) ? $err->{message} : "" . $err
+                $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, $msg)
+            }
             for my $rs (@{$n->{rescues}}) {
+                # Class filter: bare rescue matches StandardError + RuntimeError-like errors.
+                my $matches = 1
+                if (defined $rs->{klass}) {
+                    my $cls = $ctx->{classes}{$rs->{klass}}
+                    $matches = (defined($cls) && Rb::value_is_a($exc, $cls, $ctx)) ? 1 : 0
+                } else {
+                    my $std = $ctx->{classes}{StandardError}
+                    $matches = (defined($std) && Rb::value_is_a($exc, $std, $ctx)) ? 1 : 0
+                }
+                next unless $matches
                 if (defined $rs->{var}) {
-                    my $msg = ref($err) eq "HASH" && exists($err->{message}) ? $err->{message} : "" . $err
-                    Rb::env_define($ctx->{env}, $rs->{var}, Rb::v_str($msg))
+                    Rb::env_define($ctx->{env}, $rs->{var}, $exc)
                 }
                 $r = Rb::eval_body($rs->{body}, $ctx)
                 $err = undef
@@ -1397,11 +1517,19 @@ fn Rb::eval_node($n, $ctx) {
     }
     if ($k eq "Def") {
         my $proc = Rb::v_proc($n->{params}, $n->{body}, [@{$ctx->{env}}])
+        # Carry through optional rest / block-param markers for richer dispatch.
+        $proc->{rest}        = $n->{rest}        if defined $n->{rest}
+        $proc->{block_param} = $n->{block_param} if defined $n->{block_param}
+        $proc->{name}        = $n->{name}
         my $owner = $ctx->{cur_klass}
         if (defined $owner) {
-            $owner->{methods}{$n->{name}} = $proc
+            if ($n->{is_self} && Rb::is_class($owner)) {
+                # `def self.foo` — class-side method.
+                $owner->{cmethods}{$n->{name}} = $proc
+            } else {
+                $owner->{methods}{$n->{name}} = $proc
+            }
         } else {
-            # Top-level def → make it callable as a bare ident.
             Rb::env_define($ctx->{env}, $n->{name}, $proc)
         }
         return Rb::v_sym($n->{name})
@@ -1412,7 +1540,7 @@ fn Rb::eval_node($n, $ctx) {
         if (exists $ctx->{classes}{$name}) {
             $klass = $ctx->{classes}{$name}
         } else {
-            my $parent = defined($n->{parent}) ? $ctx->{classes}{$n->{parent}} : undef
+            my $parent = defined($n->{parent}) ? $ctx->{classes}{$n->{parent}} : $ctx->{classes}{Object}
             $klass = Rb::v_class($name, $parent)
             $ctx->{classes}{$name} = $klass
         }
@@ -1423,6 +1551,45 @@ fn Rb::eval_node($n, $ctx) {
         $ctx->{cur_klass} = $saved
         die $err if $err
         return $klass
+    }
+    if ($k eq "Module") {
+        my $name = $n->{name}
+        my $mod
+        if (exists $ctx->{classes}{$name}) {
+            $mod = $ctx->{classes}{$name}
+        } else {
+            $mod = Rb::v_module($name)
+            $ctx->{classes}{$name} = $mod
+        }
+        my $saved = $ctx->{cur_klass}
+        $ctx->{cur_klass} = $mod
+        eval { Rb::eval_body($n->{body}, $ctx) }
+        my $err = $@
+        $ctx->{cur_klass} = $saved
+        die $err if $err
+        return $mod
+    }
+    if ($k eq "Super") {
+        # `super` calls the same-named method on the parent class.
+        my $klass = Rb::is_instance($ctx->{self}) ? $ctx->{self}{klass} : undef
+        die "super outside method" unless defined $klass
+        my $parent = $klass->{parent}
+        die "super: no parent" unless defined $parent
+        # Find the current method's name from `__method__` env binding (best-effort).
+        my $mname = Rb::env_lookup($ctx->{env}, "__method__")
+        my $mn = Rb::is_str($mname) ? $mname->{val} : (Rb::is_sym($mname) ? $mname->{val} : "?")
+        my $proc = Rb::class_method($parent, $mn)
+        die "super: method `" . $mn . "` not in parent" unless defined $proc
+        my @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
+        # `super` (no parens) forwards the current method's args.
+        unless ($n->{explicit}) {
+            @args = ()
+            for my $p (@{$ctx->{cur_method_params} // []}) {
+                my $v = Rb::env_lookup($ctx->{env}, $p)
+                push @args, defined($v) ? $v : Rb::v_nil()
+            }
+        }
+        return Rb::call_method($proc, $ctx->{self}, \@args, $ctx->{block}, $ctx, $mn)
     }
 
     if ($k eq "Call") {
@@ -1453,6 +1620,11 @@ fn Rb::do_assign($target, $val, $ctx) {
     if ($k eq "Const") {
         $ctx->{classes}{$target->{name}} = $val
         return $val
+    }
+    # `obj.foo = val` desugars to `obj.foo=(val)` setter dispatch.
+    if ($k eq "Call" && defined($target->{recv}) && !scalar(@{$target->{args}})) {
+        my $recv = Rb::eval_node($target->{recv}, $ctx)
+        return Rb::dispatch($recv, $target->{name} . "=", [$val], undef, $ctx, 0)
     }
     die "cannot assign to " . $k
 }
@@ -1584,11 +1756,77 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         return scalar(@$args) == 1 ? $args->[0] : Rb::v_array($args)
     }
     if ($name eq "raise") {
-        die +{ message => scalar(@$args) ? Rb::to_s($args->[0]) : "RuntimeError" }
+        # raise                       — bare re-raise / RuntimeError
+        # raise "msg"                 — RuntimeError with message
+        # raise Class                 — instance of Class
+        # raise Class, "msg"          — instance of Class with message
+        # raise instance              — re-raise instance
+        my $exc
+        if (!scalar(@$args)) {
+            $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, "RuntimeError")
+        } elsif (Rb::is_exception($args->[0])) {
+            $exc = $args->[0]
+        } elsif (Rb::is_class($args->[0])) {
+            my $msg = scalar(@$args) > 1 ? Rb::to_s($args->[1]) : $args->[0]{name}
+            $exc = Rb::v_exception($args->[0], $msg)
+        } else {
+            $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, Rb::to_s($args->[0]))
+        }
+        die $exc
+    }
+    if ($name eq "pp") {
+        print Rb::inspect($_), "\n" for @$args
+        return scalar(@$args) == 1 ? $args->[0] : Rb::v_array($args)
     }
     if ($name eq "Integer") { return Rb::v_int(int(Rb::nv($args->[0]))) }
     if ($name eq "Float")   { return Rb::v_float(Rb::nv($args->[0]) + 0.0) }
     if ($name eq "String")  { return Rb::v_str(Rb::to_s($args->[0])) }
+    if ($name eq "Array") {
+        return Rb::v_array([])    if scalar(@$args) == 0 || Rb::is_nil($args->[0])
+        return $args->[0]         if Rb::is_array($args->[0])
+        return Rb::v_array([$args->[0]])
+    }
+    if ($name eq "attr_accessor" || $name eq "attr_reader" || $name eq "attr_writer") {
+        my $klass = $ctx->{cur_klass}
+        die $name . " outside class" unless defined $klass
+        my $reader = ($name eq "attr_writer") ? 0 : 1
+        my $writer = ($name eq "attr_reader") ? 0 : 1
+        for my $sym (@$args) {
+            my $attr = Rb::is_sym($sym) ? $sym->{val} : Rb::to_s($sym)
+            if ($reader) {
+                my $body = [+{ kind => "IVar", name => $attr, line => 0 }]
+                $klass->{methods}{$attr} = Rb::v_proc([], $body, [+{}])
+            }
+            if ($writer) {
+                my $body = [+{
+                    kind   => "Assign",
+                    target => +{ kind => "IVar", name => $attr, line => 0 },
+                    value  => +{ kind => "Ident", name => "v", line => 0 },
+                    line   => 0,
+                }]
+                $klass->{methods}{$attr . "="} = Rb::v_proc(["v"], $body, [+{}])
+            }
+        }
+        return Rb::v_nil()
+    }
+    if ($name eq "include") {
+        my $klass = $ctx->{cur_klass}
+        die "include outside class/module" unless defined $klass
+        for my $mod (@$args) {
+            push @{$klass->{includes}}, $mod
+        }
+        return Rb::v_nil()
+    }
+    if ($name eq "extend") {
+        my $klass = $ctx->{cur_klass}
+        die "extend outside class/module" unless defined $klass
+        for my $mod (@$args) {
+            for my $mname (keys %{$mod->{methods}}) {
+                $klass->{cmethods}{$mname} = $mod->{methods}{$mname}
+            }
+        }
+        return Rb::v_nil()
+    }
     if ($name eq "lambda" || $name eq "proc") {
         die "lambda/proc requires a block" unless defined $block
         return $block
@@ -1599,7 +1837,7 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         if (Rb::is_proc($v)) {
             # Top-level def: install caller's block so `yield` inside the body
             # finds it. Use call_method so `return` flow unwinds correctly.
-            return Rb::call_method($v, $ctx->{self}, $args, $block, $ctx)
+            return Rb::call_method($v, $ctx->{self}, $args, $block, $ctx, $name)
         }
         return $v
     }
@@ -1626,14 +1864,49 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
     if ($name eq "==")      { return Rb::v_bool(Rb::v_eq($recv, $args->[0]) ? 1 : 0) }
     if ($name eq "!=")      { return Rb::v_bool(Rb::v_eq($recv, $args->[0]) ? 0 : 1) }
 
+    # Exception accessors.
+    if (Rb::is_exception($recv)) {
+        return Rb::v_str($recv->{message} // "") if $name eq "message";
+        return $recv->{klass}                    if $name eq "class";
+        return Rb::v_str($recv->{message} // "") if $name eq "to_s";
+    }
+
     # Class method `Klass.new` builds an instance and runs `initialize`.
-    if (Rb::is_class($recv) && $name eq "new") {
-        my $inst = Rb::v_instance($recv)
-        my $init = Rb::class_method($recv, "initialize")
-        if (defined $init) {
-            Rb::call_method($init, $inst, $args, $block, $ctx)
+    if (Rb::is_class($recv)) {
+        if ($name eq "new") {
+            my $inst = Rb::v_instance($recv)
+            my $init = Rb::class_method($recv, "initialize")
+            if (defined $init) {
+                Rb::call_method($init, $inst, $args, $block, $ctx, "initialize")
+            }
+            return $inst
         }
-        return $inst
+        if ($name eq "name" || $name eq "to_s" || $name eq "inspect") {
+            return Rb::v_str($recv->{name})
+        }
+        if ($name eq "ancestors") {
+            my @a; my $c = $recv
+            while (defined $c) {
+                push @a, $c
+                push @a, $_ for @{$c->{includes} // []}
+                $c = $c->{parent}
+            }
+            return Rb::v_array(\@a)
+        }
+        # `def self.foo` is a class-side method; lookup via cmethods.
+        my $cm = $recv->{cmethods}{$name}
+        if (defined $cm) {
+            return Rb::call_method($cm, $recv, $args, $block, $ctx, $name)
+        }
+    }
+    if (Rb::is_module($recv)) {
+        if ($name eq "name" || $name eq "to_s" || $name eq "inspect") {
+            return Rb::v_str($recv->{name})
+        }
+        my $m = $recv->{methods}{$name}
+        if (defined $m) {
+            return Rb::call_method($m, $recv, $args, $block, $ctx, $name)
+        }
     }
 
     # Type-specific built-ins.
@@ -1644,18 +1917,87 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
     if (Rb::is_instance($recv)) {
         my $m = Rb::class_method($recv->{klass}, $name)
         if (defined $m) {
-            return Rb::call_method($m, $recv, $args, $block, $ctx)
+            return Rb::call_method($m, $recv, $args, $block, $ctx, $name)
         }
+    }
+
+    # Universal `is_a?` / `kind_of?` / `instance_of?` against a class arg.
+    if (($name eq "is_a?" || $name eq "kind_of?") && scalar(@$args) > 0 && Rb::is_class($args->[0])) {
+        return Rb::v_bool(Rb::value_is_a($recv, $args->[0], $ctx) ? 1 : 0)
+    }
+    if ($name eq "instance_of?" && scalar(@$args) > 0 && Rb::is_class($args->[0])) {
+        my $cls = Rb::value_class($recv, $ctx)
+        return Rb::v_bool(defined($cls) && $cls->{name} eq $args->[0]{name} ? 1 : 0)
+    }
+    if ($name eq "respond_to?" && scalar(@$args) > 0) {
+        my $sym = Rb::is_sym($args->[0]) ? $args->[0]{val} : Rb::to_s($args->[0])
+        # Check built-in dispatch first.
+        my $tries = Rb::call_builtin_method($recv, $sym, [], undef, $ctx)
+        return Rb::v_bool(1) if defined $tries
+        if (Rb::is_instance($recv)) {
+            return Rb::v_bool(defined(Rb::class_method($recv->{klass}, $sym)) ? 1 : 0)
+        }
+        return Rb::v_bool(0)
+    }
+    if ($name eq "tap") {
+        Rb::call_block($block, [$recv], $ctx) if defined $block
+        return $recv
+    }
+    if ($name eq "then" || $name eq "yield_self") {
+        return defined($block) ? Rb::call_block($block, [$recv], $ctx) : $recv
+    }
+    if ($name eq "freeze")  { return $recv }
+    if ($name eq "frozen?") { return Rb::v_bool(1) }   # simplified
+    if ($name eq "object_id" || $name eq "__id__") { return Rb::v_int(0) }
+    if ($name eq "send" || $name eq "__send__" || $name eq "public_send") {
+        my $msg = shift @$args
+        my $mname = Rb::is_sym($msg) ? $msg->{val} : Rb::to_s($msg)
+        return Rb::dispatch($recv, $mname, $args, $block, $ctx, 0)
     }
 
     return Rb::v_nil() if $is_implicit
     die "undefined method `" . $name . "' for " . Rb::inspect($recv)
 }
 
+# Lookup a value's class without going through Universal dispatch.
+fn Rb::value_class($v, $ctx) {
+    return $ctx->{classes}{Integer}    if Rb::is_int($v)
+    return $ctx->{classes}{Float}      if Rb::is_float($v)
+    return $ctx->{classes}{String}     if Rb::is_str($v)
+    return $ctx->{classes}{Symbol}     if Rb::is_sym($v)
+    return $ctx->{classes}{Array}      if Rb::is_array($v)
+    return $ctx->{classes}{Hash}       if Rb::is_hash($v)
+    return $ctx->{classes}{Range}      if Rb::is_range($v)
+    return $ctx->{classes}{Proc}       if Rb::is_proc($v)
+    return $ctx->{classes}{NilClass}   if Rb::is_nil($v)
+    return Rb::is_truthy($v) ? $ctx->{classes}{TrueClass} : $ctx->{classes}{FalseClass} if Rb::is_bool($v)
+    return $v->{klass}                 if Rb::is_instance($v)
+    return $v->{klass}                 if Rb::is_exception($v)
+    return $v                          if Rb::is_class($v)
+    undef
+}
+
+# Walk class chain (including mixins) checking for a target class.
+fn Rb::value_is_a($v, $target, $ctx) {
+    my $c = Rb::value_class($v, $ctx)
+    while (defined $c) {
+        return 1 if $c->{name} eq $target->{name}
+        for my $mod (@{$c->{includes} // []}) {
+            return 1 if $mod->{name} eq $target->{name}
+        }
+        $c = $c->{parent}
+    }
+    0
+}
+
 fn Rb::class_method($klass, $name) {
     my $c = $klass
     while (defined $c) {
         return $c->{methods}{$name} if exists $c->{methods}{$name}
+        # Mixed-in modules: most-recently-included takes precedence (matches MRI's MRO).
+        for my $mod (reverse @{$c->{includes} // []}) {
+            return $mod->{methods}{$name} if exists $mod->{methods}{$name}
+        }
         $c = $c->{parent}
     }
     undef
@@ -1664,23 +2006,27 @@ fn Rb::class_method($klass, $name) {
 # Bind a proc as a method on `recv`. Sets `self` and `block`, runs body,
 # unwinds on `Return`. The proc's body runs in its captured env + a fresh
 # frame — local vars don't leak out.
-fn Rb::call_method($proc, $recv, $args, $block, $ctx) {
-    my $saved_env   = $ctx->{env}
-    my $saved_self  = $ctx->{self}
-    my $saved_block = $ctx->{block}
+fn Rb::call_method($proc, $recv, $args, $block, $ctx, $mname) {
+    my $saved_env    = $ctx->{env}
+    my $saved_self   = $ctx->{self}
+    my $saved_block  = $ctx->{block}
+    my $saved_params = $ctx->{cur_method_params}
     my @new_frames = (@{$proc->{env}}, +{})
     $ctx->{env}   = \@new_frames
     $ctx->{self}  = $recv
     $ctx->{block} = $block
     my $params = $proc->{params}
+    $ctx->{cur_method_params} = $params
+    Rb::env_define($ctx->{env}, "__method__", Rb::v_sym($mname)) if defined $mname
     for (my $i = 0; $i < scalar(@$params); $i++) {
         Rb::env_define($ctx->{env}, $params->[$i], $args->[$i] // Rb::v_nil())
     }
     my $r = eval { Rb::eval_body($proc->{body}, $ctx) }
     my $err = $@
-    $ctx->{env}   = $saved_env
-    $ctx->{self}  = $saved_self
-    $ctx->{block} = $saved_block
+    $ctx->{env}              = $saved_env
+    $ctx->{self}             = $saved_self
+    $ctx->{block}            = $saved_block
+    $ctx->{cur_method_params} = $saved_params
     if ($err) {
         if (ref($err) eq "HASH" && $err->{flow} eq "return") { return $err->{value} }
         die $err
@@ -1695,8 +2041,12 @@ fn Rb::call_builtin_method($recv, $name, $args, $block, $ctx) {
     return Rb::str_m($recv, $name, $args, $block, $ctx)    if Rb::is_str($recv)
     return Rb::hash_m($recv, $name, $args, $block, $ctx)   if Rb::is_hash($recv)
     return Rb::int_m($recv, $name, $args, $block, $ctx)    if Rb::is_int($recv)
+    return Rb::float_m($recv, $name, $args, $block, $ctx)  if Rb::is_float($recv)
     return Rb::range_m($recv, $name, $args, $block, $ctx)  if Rb::is_range($recv)
     return Rb::proc_m($recv, $name, $args, $block, $ctx)   if Rb::is_proc($recv)
+    return Rb::sym_m($recv, $name, $args, $block, $ctx)    if Rb::is_sym($recv)
+    return Rb::nil_m($recv, $name, $args, $block, $ctx)    if Rb::is_nil($recv)
+    return Rb::bool_m($recv, $name, $args, $block, $ctx)   if Rb::is_bool($recv)
     undef
 }
 
@@ -1716,7 +2066,10 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         $items->[$i] = $args->[1]
         return $args->[1]
     }
-    if ($name eq "length" || $name eq "size" || $name eq "count") {
+    if ($name eq "length" || $name eq "size") {
+        return Rb::v_int(scalar(@$items))
+    }
+    if ($name eq "count" && !defined($block) && !scalar(@$args)) {
         return Rb::v_int(scalar(@$items))
     }
     if ($name eq "empty?") { return Rb::v_bool(scalar(@$items) == 0 ? 1 : 0) }
@@ -1829,7 +2182,284 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "to_a")    { return $a }
     if ($name eq "compact") { return Rb::v_array([grep { !Rb::is_nil($_) } @$items]) }
+    if ($name eq "none?") {
+        for my $e (@$items) {
+            if (defined $block) {
+                return Rb::v_bool(0) if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
+            } else {
+                return Rb::v_bool(0) if Rb::is_truthy($e)
+            }
+        }
+        return Rb::v_bool(1)
+    }
+    # `count` with a predicate or value argument (no-arg case handled at top).
+    if ($name eq "count") {
+        if (defined $block) {
+            my $n = 0
+            for my $e (@$items) {
+                $n++ if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
+            }
+            return Rb::v_int($n)
+        }
+        my $n = 0
+        for my $e (@$items) {
+            $n++ if Rb::v_eq($e, $args->[0])
+        }
+        return Rb::v_int($n)
+    }
+    if ($name eq "index") {
+        if (defined $block) {
+            for (my $i = 0; $i < scalar(@$items); $i++) {
+                return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
+            }
+            return Rb::v_nil()
+        }
+        for (my $i = 0; $i < scalar(@$items); $i++) {
+            return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
+        }
+        return Rb::v_nil()
+    }
+    if ($name eq "take") {
+        my $n = $args->[0]{val}
+        $n = scalar(@$items) if $n > scalar(@$items)
+        return Rb::v_array([@$items[0..$n - 1]]) if $n > 0
+        return Rb::v_array([])
+    }
+    if ($name eq "drop") {
+        my $n = $args->[0]{val}
+        return Rb::v_array([]) if $n >= scalar(@$items)
+        return Rb::v_array([@$items[$n..scalar(@$items) - 1]])
+    }
+    if ($name eq "take_while") {
+        my @out
+        for my $e (@$items) {
+            last unless Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
+            push @out, $e
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "drop_while") {
+        my @out
+        my $dropping = 1
+        for my $e (@$items) {
+            $dropping = 0 unless $dropping && Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
+            push @out, $e unless $dropping
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "partition") {
+        my @yes; my @no
+        for my $e (@$items) {
+            if (Rb::is_truthy(Rb::call_block($block, [$e], $ctx))) {
+                push @yes, $e
+            } else {
+                push @no, $e
+            }
+        }
+        return Rb::v_array([Rb::v_array(\@yes), Rb::v_array(\@no)])
+    }
+    if ($name eq "group_by") {
+        my @keys; my @groups
+        for my $e (@$items) {
+            my $k = Rb::call_block($block, [$e], $ctx)
+            my $found = 0
+            for (my $i = 0; $i < scalar(@keys); $i++) {
+                if (Rb::v_eq($keys[$i], $k)) {
+                    push @{$groups[$i]}, $e
+                    $found = 1
+                    last
+                }
+            }
+            unless ($found) {
+                push @keys, $k
+                push @groups, [$e]
+            }
+        }
+        my @pairs
+        for (my $i = 0; $i < scalar(@keys); $i++) {
+            push @pairs, [$keys[$i], Rb::v_array($groups[$i])]
+        }
+        return Rb::v_hash(\@pairs)
+    }
+    if ($name eq "tally") {
+        my @keys; my @counts
+        for my $e (@$items) {
+            my $found = 0
+            for (my $i = 0; $i < scalar(@keys); $i++) {
+                if (Rb::v_eq($keys[$i], $e)) {
+                    $counts[$i]++
+                    $found = 1
+                    last
+                }
+            }
+            unless ($found) {
+                push @keys, $e
+                push @counts, 1
+            }
+        }
+        my @pairs
+        for (my $i = 0; $i < scalar(@keys); $i++) {
+            push @pairs, [$keys[$i], Rb::v_int($counts[$i])]
+        }
+        return Rb::v_hash(\@pairs)
+    }
+    if ($name eq "to_h") {
+        my @pairs
+        for my $e (@$items) {
+            die "to_h requires pair" unless Rb::is_array($e) && scalar(@{$e->{items}}) == 2
+            push @pairs, [$e->{items}[0], $e->{items}[1]]
+        }
+        return Rb::v_hash(\@pairs)
+    }
+    if ($name eq "zip") {
+        my @result
+        for (my $i = 0; $i < scalar(@$items); $i++) {
+            my @row = ($items->[$i])
+            for my $other (@$args) {
+                push @row, ($other->{items}[$i] // Rb::v_nil())
+            }
+            push @result, Rb::v_array(\@row)
+        }
+        return Rb::v_array(\@result)
+    }
+    if ($name eq "min_by") {
+        return Rb::v_nil() unless scalar(@$items)
+        my $best = $items->[0]
+        my $bk = Rb::call_block($block, [$best], $ctx)
+        for (my $i = 1; $i < scalar(@$items); $i++) {
+            my $e = $items->[$i]
+            my $k = Rb::call_block($block, [$e], $ctx)
+            if (Rb::v_cmp($k, $bk) < 0) { $best = $e; $bk = $k }
+        }
+        return $best
+    }
+    if ($name eq "max_by") {
+        return Rb::v_nil() unless scalar(@$items)
+        my $best = $items->[0]
+        my $bk = Rb::call_block($block, [$best], $ctx)
+        for (my $i = 1; $i < scalar(@$items); $i++) {
+            my $e = $items->[$i]
+            my $k = Rb::call_block($block, [$e], $ctx)
+            if (Rb::v_cmp($k, $bk) > 0) { $best = $e; $bk = $k }
+        }
+        return $best
+    }
+    if ($name eq "sort_by") {
+        my @decorated = map { [Rb::call_block($block, [$_], $ctx), $_] } @$items
+        my @sorted = sort { Rb::v_cmp($a->[0], $b->[0]) } @decorated
+        return Rb::v_array([map { $_->[1] } @sorted])
+    }
+    if ($name eq "flat_map" || $name eq "collect_concat") {
+        my @out
+        for my $e (@$items) {
+            my $r = Rb::call_block($block, [$e], $ctx)
+            if (Rb::is_array($r)) { push @out, @{$r->{items}} } else { push @out, $r }
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "flatten") {
+        my $depth = scalar(@$args) ? $args->[0]{val} : -1
+        return Rb::v_array(Rb::array_flatten($items, $depth))
+    }
+    if ($name eq "concat") {
+        for my $arg (@$args) {
+            push @$items, @{$arg->{items}} if Rb::is_array($arg)
+        }
+        return $a
+    }
+    if ($name eq "dup" || $name eq "clone") {
+        return Rb::v_array([@$items])
+    }
+    if ($name eq "rotate") {
+        my $by = scalar(@$args) ? $args->[0]{val} : 1
+        my $n = scalar(@$items)
+        return $a if $n == 0
+        $by = (($by % $n) + $n) % $n
+        return Rb::v_array([@$items[$by..$n - 1], @$items[0..$by - 1]])
+    }
+    if ($name eq "sample") {
+        return Rb::v_nil() unless scalar(@$items)
+        return $items->[int(rand(scalar(@$items)))]
+    }
+    if ($name eq "shuffle") {
+        my @out = @$items
+        for (my $i = scalar(@out) - 1; $i > 0; $i--) {
+            my $j = int(rand($i + 1))
+            ($out[$i], $out[$j]) = ($out[$j], $out[$i])
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "minmax") {
+        return Rb::v_array([Rb::v_nil(), Rb::v_nil()]) unless scalar(@$items)
+        my $min = $items->[0]; my $max = $items->[0]
+        for my $e (@$items) {
+            $min = $e if Rb::v_cmp($e, $min) < 0
+            $max = $e if Rb::v_cmp($e, $max) > 0
+        }
+        return Rb::v_array([$min, $max])
+    }
+    if ($name eq "each_with_object") {
+        my $memo = $args->[0]
+        for my $e (@$items) {
+            Rb::call_block($block, [$e, $memo], $ctx)
+        }
+        return $memo
+    }
+    if ($name eq "chunk_while") {
+        my @groups
+        return Rb::v_array(\@groups) unless scalar(@$items)
+        my @cur = ($items->[0])
+        for (my $i = 1; $i < scalar(@$items); $i++) {
+            if (Rb::is_truthy(Rb::call_block($block, [$items->[$i - 1], $items->[$i]], $ctx))) {
+                push @cur, $items->[$i]
+            } else {
+                push @groups, Rb::v_array([@cur])
+                @cur = ($items->[$i])
+            }
+        }
+        push @groups, Rb::v_array([@cur])
+        return Rb::v_array(\@groups)
+    }
+    if ($name eq "each_slice") {
+        my $n = $args->[0]{val}
+        my @out
+        for (my $i = 0; $i < scalar(@$items); $i += $n) {
+            my $end = $i + $n - 1
+            $end = scalar(@$items) - 1 if $end >= scalar(@$items)
+            push @out, Rb::v_array([@$items[$i..$end]])
+        }
+        if (defined $block) {
+            for my $g (@out) { Rb::call_block($block, [$g], $ctx) }
+            return $a
+        }
+        return Rb::v_array(\@out)
+    }
+    if ($name eq "each_cons") {
+        my $n = $args->[0]{val}
+        my @out
+        for (my $i = 0; $i + $n <= scalar(@$items); $i++) {
+            push @out, Rb::v_array([@$items[$i..$i + $n - 1]])
+        }
+        if (defined $block) {
+            for my $g (@out) { Rb::call_block($block, [$g], $ctx) }
+            return $a
+        }
+        return Rb::v_array(\@out)
+    }
     undef
+}
+
+# Recursive helper for `flatten` — `$depth = -1` means infinite.
+fn Rb::array_flatten($items, $depth) {
+    my @out
+    for my $e (@$items) {
+        if (Rb::is_array($e) && $depth != 0) {
+            push @out, @{Rb::array_flatten($e->{items}, $depth - 1)}
+        } else {
+            push @out, $e
+        }
+    }
+    \@out
 }
 
 fn Rb::str_m($s, $name, $args, $block, $ctx) {
@@ -1859,6 +2489,164 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     }
     if ($name eq "+")     { return Rb::v_str($v . $args->[0]{val}) }
     if ($name eq "*")     { return Rb::v_str($v x $args->[0]{val}) }
+    if ($name eq "swapcase") {
+        my $r = ""
+        for my $c (split //, $v) {
+            if ($c =~ /[A-Z]/) { $r .= lc($c) }
+            elsif ($c =~ /[a-z]/) { $r .= uc($c) }
+            else { $r .= $c }
+        }
+        return Rb::v_str($r)
+    }
+    if ($name eq "bytes") {
+        my @b
+        for my $c (split //, $v) { push @b, Rb::v_int(ord($c)) }
+        return Rb::v_array(\@b)
+    }
+    if ($name eq "lines") {
+        return Rb::v_array([map { Rb::v_str($_) } split /(?<=\n)/, $v])
+    }
+    if ($name eq "strip" || $name eq "trim") {
+        my $r = $v
+        $r =~ s/^\s+//
+        $r =~ s/\s+$//
+        return Rb::v_str($r)
+    }
+    if ($name eq "lstrip") {
+        my $r = $v; $r =~ s/^\s+//
+        return Rb::v_str($r)
+    }
+    if ($name eq "rstrip") {
+        my $r = $v; $r =~ s/\s+$//
+        return Rb::v_str($r)
+    }
+    if ($name eq "chomp") {
+        my $r = $v; $r =~ s/\r?\n$//
+        return Rb::v_str($r)
+    }
+    if ($name eq "chop") {
+        return Rb::v_str(length($v) > 0 ? substr($v, 0, -1) : "")
+    }
+    if ($name eq "sub") {
+        my $pat = $args->[0]{val}
+        my $rep = $args->[1]{val}
+        my $r = $v
+        $r =~ s/\Q$pat\E/$rep/
+        return Rb::v_str($r)
+    }
+    if ($name eq "gsub") {
+        my $pat = $args->[0]{val}
+        my $rep = $args->[1]{val}
+        my $r = $v
+        $r =~ s/\Q$pat\E/$rep/g
+        return Rb::v_str($r)
+    }
+    if ($name eq "replace") {
+        $s->{val} = $args->[0]{val}
+        return $s
+    }
+    if ($name eq "concat" || $name eq "<<") {
+        $s->{val} = $v . Rb::to_s($args->[0])
+        return $s
+    }
+    if ($name eq "tr") {
+        my $from = $args->[0]{val}
+        my $to = $args->[1]{val}
+        my $r = ""
+        for my $c (split //, $v) {
+            my $idx = index($from, $c)
+            if ($idx >= 0 && $idx < length($to)) {
+                $r .= substr($to, $idx, 1)
+            } elsif ($idx >= 0) {
+                # Pad with last char of $to (Ruby semantics).
+                $r .= length($to) > 0 ? substr($to, -1, 1) : ""
+            } else {
+                $r .= $c
+            }
+        }
+        return Rb::v_str($r)
+    }
+    if ($name eq "delete") {
+        my $del = $args->[0]{val}
+        my $r = ""
+        for my $c (split //, $v) {
+            $r .= $c unless index($del, $c) >= 0
+        }
+        return Rb::v_str($r)
+    }
+    if ($name eq "squeeze") {
+        my $r = ""; my $prev = ""
+        for my $c (split //, $v) {
+            $r .= $c unless $c eq $prev
+            $prev = $c
+        }
+        return Rb::v_str($r)
+    }
+    if ($name eq "center") {
+        my $w = $args->[0]{val}
+        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        my $deficit = $w - length($v)
+        return $s if $deficit <= 0
+        my $left = int($deficit / 2)
+        my $right = $deficit - $left
+        return Rb::v_str(($pad x $left) . $v . ($pad x $right))
+    }
+    if ($name eq "ljust") {
+        my $w = $args->[0]{val}
+        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        return Rb::v_str(length($v) >= $w ? $v : $v . ($pad x ($w - length($v))))
+    }
+    if ($name eq "rjust") {
+        my $w = $args->[0]{val}
+        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        return Rb::v_str(length($v) >= $w ? $v : ($pad x ($w - length($v))) . $v)
+    }
+    if ($name eq "match?") {
+        my $pat = $args->[0]{val}
+        return Rb::v_bool($v =~ /$pat/ ? 1 : 0)
+    }
+    if ($name eq "match") {
+        my $pat = $args->[0]{val}
+        return $v =~ /$pat/ ? Rb::v_str($&) : Rb::v_nil()
+    }
+    if ($name eq "scan") {
+        my $pat = $args->[0]{val}
+        my @hits = ($v =~ /$pat/g)
+        return Rb::v_array([map { Rb::v_str($_) } @hits])
+    }
+    if ($name eq "count") {
+        my $n = 0
+        my $needle = $args->[0]{val}
+        $n++ for $v =~ /\Q$needle\E/g
+        return Rb::v_int($n)
+    }
+    if ($name eq "each_char") {
+        for my $c (split //, $v) {
+            Rb::call_block($block, [Rb::v_str($c)], $ctx)
+        }
+        return $s
+    }
+    if ($name eq "each_line") {
+        for my $line (split /(?<=\n)/, $v) {
+            Rb::call_block($block, [Rb::v_str($line)], $ctx)
+        }
+        return $s
+    }
+    if ($name eq "intern")  { return Rb::v_sym($v) }
+    if ($name eq "to_str")  { return $s }
+    if ($name eq "freeze" || $name eq "dup" || $name eq "clone") {
+        return Rb::v_str($v)
+    }
+    if ($name eq "succ" || $name eq "next") {
+        # Just bump last char (simplified).
+        return Rb::v_str("") if length($v) == 0
+        my $last = substr($v, -1, 1)
+        my $rest = substr($v, 0, length($v) - 1)
+        return Rb::v_str($rest . chr(ord($last) + 1))
+    }
+    if ($name eq "ord")     { return Rb::v_int(ord(substr($v, 0, 1))) }
+    if ($name eq "hex")     { return Rb::v_int(hex($v)) }
+    if ($name eq "oct")     { return Rb::v_int(oct($v)) }
     undef
 }
 
@@ -1909,6 +2697,142 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         }
         return Rb::v_hash(\@m)
     }
+    if ($name eq "delete") {
+        for (my $i = 0; $i < scalar(@$pairs); $i++) {
+            if (Rb::v_eq($pairs->[$i][0], $args->[0])) {
+                my $val = $pairs->[$i][1]
+                splice @$pairs, $i, 1
+                return $val
+            }
+        }
+        return Rb::v_nil()
+    }
+    if ($name eq "fetch") {
+        for my $p (@$pairs) {
+            return $p->[1] if Rb::v_eq($p->[0], $args->[0])
+        }
+        return $args->[1] if scalar(@$args) > 1
+        return Rb::call_block($block, [$args->[0]], $ctx) if defined $block
+        die "key not found"
+    }
+    if ($name eq "invert") {
+        return Rb::v_hash([map { [$_->[1], $_->[0]] } @$pairs])
+    }
+    if ($name eq "has_value?" || $name eq "value?") {
+        for my $p (@$pairs) {
+            return Rb::v_bool(1) if Rb::v_eq($p->[1], $args->[0])
+        }
+        return Rb::v_bool(0)
+    }
+    if ($name eq "to_a") {
+        return Rb::v_array([map { Rb::v_array([$_->[0], $_->[1]]) } @$pairs])
+    }
+    if ($name eq "to_h" || $name eq "dup" || $name eq "clone") {
+        return Rb::v_hash([map { [$_->[0], $_->[1]] } @$pairs])
+    }
+    if ($name eq "each_key") {
+        for my $p (@$pairs) { Rb::call_block($block, [$p->[0]], $ctx) }
+        return $h
+    }
+    if ($name eq "each_value") {
+        for my $p (@$pairs) { Rb::call_block($block, [$p->[1]], $ctx) }
+        return $h
+    }
+    if ($name eq "select" || $name eq "filter") {
+        my @kept
+        for my $p (@$pairs) {
+            if (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
+                push @kept, [$p->[0], $p->[1]]
+            }
+        }
+        return Rb::v_hash(\@kept)
+    }
+    if ($name eq "reject") {
+        my @kept
+        for my $p (@$pairs) {
+            unless (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
+                push @kept, [$p->[0], $p->[1]]
+            }
+        }
+        return Rb::v_hash(\@kept)
+    }
+    if ($name eq "any?") {
+        for my $p (@$pairs) {
+            if (defined $block) {
+                return Rb::v_bool(1)
+                    if Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))
+            } else {
+                return Rb::v_bool(scalar(@$pairs) > 0 ? 1 : 0)
+            }
+        }
+        return Rb::v_bool(0)
+    }
+    if ($name eq "all?") {
+        for my $p (@$pairs) {
+            unless (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
+                return Rb::v_bool(0)
+            }
+        }
+        return Rb::v_bool(1)
+    }
+    if ($name eq "min_by") {
+        return Rb::v_nil() unless scalar(@$pairs)
+        my $best = $pairs->[0]
+        my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
+        for (my $i = 1; $i < scalar(@$pairs); $i++) {
+            my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
+            if (Rb::v_cmp($k, $bk) < 0) { $best = $pairs->[$i]; $bk = $k }
+        }
+        return Rb::v_array([$best->[0], $best->[1]])
+    }
+    if ($name eq "max_by") {
+        return Rb::v_nil() unless scalar(@$pairs)
+        my $best = $pairs->[0]
+        my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
+        for (my $i = 1; $i < scalar(@$pairs); $i++) {
+            my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
+            if (Rb::v_cmp($k, $bk) > 0) { $best = $pairs->[$i]; $bk = $k }
+        }
+        return Rb::v_array([$best->[0], $best->[1]])
+    }
+    if ($name eq "transform_values") {
+        my @out
+        for my $p (@$pairs) {
+            push @out, [$p->[0], Rb::call_block($block, [$p->[1]], $ctx)]
+        }
+        return Rb::v_hash(\@out)
+    }
+    if ($name eq "transform_keys") {
+        my @out
+        for my $p (@$pairs) {
+            push @out, [Rb::call_block($block, [$p->[0]], $ctx), $p->[1]]
+        }
+        return Rb::v_hash(\@out)
+    }
+    if ($name eq "count") {
+        return Rb::v_int(scalar(@$pairs))
+    }
+    if ($name eq "min") {
+        return Rb::v_nil() unless scalar(@$pairs)
+        my $best = $pairs->[0]
+        for my $p (@$pairs) {
+            $best = $p if Rb::v_cmp($p->[0], $best->[0]) < 0
+        }
+        return Rb::v_array([$best->[0], $best->[1]])
+    }
+    if ($name eq "max") {
+        return Rb::v_nil() unless scalar(@$pairs)
+        my $best = $pairs->[0]
+        for my $p (@$pairs) {
+            $best = $p if Rb::v_cmp($p->[0], $best->[0]) > 0
+        }
+        return Rb::v_array([$best->[0], $best->[1]])
+    }
+    if ($name eq "store") {
+        return Rb::hash_m($h, "[]=", $args, $block, $ctx)
+    }
+    if ($name eq "default") { return Rb::v_nil() }
+    if ($name eq "freeze")  { return $h }
     undef
 }
 
@@ -1943,6 +2867,100 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
         }
         return $n
     }
+    if ($name eq "step") {
+        my $hi = $args->[0]{val}
+        my $step = scalar(@$args) > 1 ? $args->[1]{val} : 1
+        if ($step > 0) {
+            for (my $i = $v; $i <= $hi; $i += $step) {
+                Rb::call_block($block, [Rb::v_int($i)], $ctx)
+            }
+        } elsif ($step < 0) {
+            for (my $i = $v; $i >= $hi; $i += $step) {
+                Rb::call_block($block, [Rb::v_int($i)], $ctx)
+            }
+        }
+        return $n
+    }
+    if ($name eq "gcd") {
+        my $a = abs($v); my $b = abs($args->[0]{val})
+        while ($b) { ($a, $b) = ($b, $a % $b) }
+        return Rb::v_int($a)
+    }
+    if ($name eq "lcm") {
+        my $a = abs($v); my $b = abs($args->[0]{val})
+        return Rb::v_int(0) if $a == 0 || $b == 0
+        my $x = $a; my $y = $b
+        while ($y) { ($x, $y) = ($y, $x % $y) }
+        return Rb::v_int(int($a * $b / $x))
+    }
+    if ($name eq "divmod") {
+        my $b = $args->[0]{val}
+        my $q = int($v / $b)
+        $q-- if ($v % $b != 0) && (($v < 0) != ($b < 0))
+        my $r = $v - $q * $b
+        return Rb::v_array([Rb::v_int($q), Rb::v_int($r)])
+    }
+    if ($name eq "digits") {
+        my $base = scalar(@$args) ? $args->[0]{val} : 10
+        my @d
+        my $x = abs($v)
+        if ($x == 0) { @d = (0) }
+        while ($x > 0) { push @d, $x % $base; $x = int($x / $base) }
+        return Rb::v_array([map { Rb::v_int($_) } @d])
+    }
+    if ($name eq "bit_length") {
+        my $x = $v < 0 ? ~$v : $v
+        my $bits = 0
+        while ($x > 0) { $bits++; $x = $x >> 1 }
+        return Rb::v_int($bits)
+    }
+    if ($name eq "to_r")    { return $n }   # Rational not implemented; identity for ints.
+    if ($name eq "ceil" || $name eq "floor" || $name eq "round" || $name eq "truncate") {
+        return $n
+    }
+    if ($name eq "positive?") { return Rb::v_bool($v > 0 ? 1 : 0) }
+    if ($name eq "negative?") { return Rb::v_bool($v < 0 ? 1 : 0) }
+    if ($name eq "chr")       { return Rb::v_str(chr($v)) }
+    if ($name eq "**")        { return Rb::v_int($v ** $args->[0]{val}) }
+    if ($name eq "coerce")    { return Rb::v_array([$args->[0], $n]) }
+    undef
+}
+
+fn Rb::float_m($f, $name, $args, $block, $ctx) {
+    my $v = $f->{val}
+    if ($name eq "to_s") {
+        my $s = $v . ""
+        return Rb::v_str($s . ".0") unless $s =~ /[.eE]/
+        return Rb::v_str($s)
+    }
+    if ($name eq "to_i" || $name eq "to_int" || $name eq "truncate") {
+        return Rb::v_int(int($v))
+    }
+    if ($name eq "to_f")    { return $f }
+    if ($name eq "abs")     { return Rb::v_float(abs($v)) }
+    if ($name eq "zero?")     { return Rb::v_bool($v == 0 ? 1 : 0) }
+    if ($name eq "positive?") { return Rb::v_bool($v > 0  ? 1 : 0) }
+    if ($name eq "negative?") { return Rb::v_bool($v < 0  ? 1 : 0) }
+    if ($name eq "round") {
+        my $digits = scalar(@$args) ? $args->[0]{val} : 0
+        if ($digits > 0) {
+            my $f10 = 10 ** $digits
+            return Rb::v_float(int($v * $f10 + ($v >= 0 ? 0.5 : -0.5)) / $f10)
+        }
+        return Rb::v_int(int($v + ($v >= 0 ? 0.5 : -0.5)))
+    }
+    if ($name eq "floor") {
+        return Rb::v_int(int($v) - ($v < 0 && $v != int($v) ? 1 : 0))
+    }
+    if ($name eq "ceil") {
+        return Rb::v_int(int($v) + ($v > 0 && $v != int($v) ? 1 : 0))
+    }
+    if ($name eq "nan?")      { return Rb::v_bool($v != $v ? 1 : 0) }
+    if ($name eq "infinite?") {
+        return Rb::v_int($v > 0 ? 1 : -1) if ($v - $v) != 0 && $v == $v
+        return Rb::v_nil()
+    }
+    if ($name eq "finite?") { return Rb::v_bool(($v == $v && ($v - $v) == 0) ? 1 : 0) }
     undef
 }
 
@@ -1975,17 +2993,92 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
 }
 
 fn Rb::proc_m($p, $name, $args, $block, $ctx) {
-    if ($name eq "call" || $name eq "[]") { return Rb::call_block($p, $args, $ctx) }
-    if ($name eq "arity") { return Rb::v_int(scalar(@{$p->{params}})) }
+    if ($name eq "call" || $name eq "[]" || $name eq "()") {
+        return Rb::call_block($p, $args, $ctx)
+    }
+    if ($name eq "arity")    { return Rb::v_int(scalar(@{$p->{params}})) }
+    if ($name eq "lambda?")  { return Rb::v_bool(0) }   # all are non-lambda for now
+    if ($name eq "curry")    { return $p }              # simplified
+    if ($name eq "to_proc")  { return $p }
     undef
 }
 
-# Bootstrap the class registry with the named built-ins.
+fn Rb::sym_m($s, $name, $args, $block, $ctx) {
+    my $v = $s->{val}
+    if ($name eq "to_s")     { return Rb::v_str($v) }
+    if ($name eq "to_sym")   { return $s }
+    if ($name eq "length" || $name eq "size") { return Rb::v_int(length($v)) }
+    if ($name eq "upcase")   { return Rb::v_sym(uc($v)) }
+    if ($name eq "downcase") { return Rb::v_sym(lc($v)) }
+    if ($name eq "capitalize"){ return Rb::v_sym(uc(substr($v, 0, 1)) . lc(substr($v, 1))) }
+    if ($name eq "empty?")   { return Rb::v_bool(length($v) == 0 ? 1 : 0) }
+    if ($name eq "to_proc") {
+        # `&:method` — turns a symbol into a one-arg block calling that method.
+        my $body = [+{
+            kind  => "Call",
+            recv  => +{ kind => "Ident", name => "x", line => 0 },
+            name  => $v,
+            args  => [],
+            block => undef,
+            line  => 0,
+        }]
+        return Rb::v_proc(["x"], $body, [+{}])
+    }
+    undef
+}
+
+fn Rb::nil_m($v, $name, $args, $block, $ctx) {
+    if ($name eq "to_a")    { return Rb::v_array([]) }
+    if ($name eq "to_s")    { return Rb::v_str("") }
+    if ($name eq "to_i")    { return Rb::v_int(0) }
+    if ($name eq "to_f")    { return Rb::v_float(0.0) }
+    if ($name eq "to_h")    { return Rb::v_hash([]) }
+    if ($name eq "inspect") { return Rb::v_str("nil") }
+    if ($name eq "nil?")    { return Rb::v_bool(1) }
+    if ($name eq "!")       { return Rb::v_bool(1) }
+    if ($name eq "&")       { return Rb::v_bool(0) }
+    if ($name eq "|")       { return Rb::v_bool(Rb::is_truthy($args->[0]) ? 1 : 0) }
+    if ($name eq "^")       { return Rb::v_bool(Rb::is_truthy($args->[0]) ? 1 : 0) }
+    if ($name eq "==")      { return Rb::v_bool(Rb::is_nil($args->[0]) ? 1 : 0) }
+    undef
+}
+
+fn Rb::bool_m($v, $name, $args, $block, $ctx) {
+    my $b = $v->{val}
+    if ($name eq "to_s")    { return Rb::v_str($b ? "true" : "false") }
+    if ($name eq "inspect") { return Rb::v_str($b ? "true" : "false") }
+    if ($name eq "!")       { return Rb::v_bool($b ? 0 : 1) }
+    if ($name eq "&")       { return Rb::v_bool($b && Rb::is_truthy($args->[0]) ? 1 : 0) }
+    if ($name eq "|")       { return Rb::v_bool($b || Rb::is_truthy($args->[0]) ? 1 : 0) }
+    if ($name eq "^")       { return Rb::v_bool(($b ? 1 : 0) != (Rb::is_truthy($args->[0]) ? 1 : 0) ? 1 : 0) }
+    undef
+}
+
+# Bootstrap the class registry with the named built-ins. Includes a small
+# exception hierarchy so `rescue`-by-class works.
 fn Rb::bootstrap_classes($ctx) {
-    for my $name (qw(Object Integer Float String Symbol Array Hash Range
+    my $obj = Rb::v_class("Object", undef)
+    $ctx->{classes}{Object} = $obj
+    my $num = Rb::v_class("Numeric", $obj)
+    $ctx->{classes}{Numeric} = $num
+    $ctx->{classes}{Integer} = Rb::v_class("Integer", $num)
+    $ctx->{classes}{Float}   = Rb::v_class("Float",   $num)
+    for my $name (qw(String Symbol Array Hash Range
                       TrueClass FalseClass NilClass Proc Class Module
-                      Numeric Exception)) {
-        $ctx->{classes}{$name} = Rb::v_class($name, undef)
+                      Comparable Enumerable)) {
+        $ctx->{classes}{$name} = Rb::v_class($name, $obj)
+    }
+    my $exc = Rb::v_class("Exception", $obj)
+    $ctx->{classes}{Exception} = $exc
+    my $std = Rb::v_class("StandardError", $exc)
+    $ctx->{classes}{StandardError} = $std
+    my $rt = Rb::v_class("RuntimeError", $std)
+    $ctx->{classes}{RuntimeError} = $rt
+    for my $sub (qw(ArgumentError TypeError NameError NoMethodError
+                     ZeroDivisionError IndexError KeyError IOError
+                     StopIteration FrozenError NotImplementedError
+                     RangeError FloatDomainError)) {
+        $ctx->{classes}{$sub} = Rb::v_class($sub, $std)
     }
 }
 
@@ -2209,6 +3302,194 @@ rb_test "begin/rescue catches",
        e
      end',
     "\"boom\""
+
+# ── ARRAY METHODS (extended) ───────────────────────────────────────────────
+rb_test "array none? true",   "[1, 2, 3].none? { |x| x > 5 }",  "true"
+rb_test "array none? false",  "[1, 2, 3].none? { |x| x > 2 }",  "false"
+rb_test "array count pred",   "[1, 2, 3, 4].count { |x| x.even? }", "2"
+rb_test "array count val",    "[1, 2, 1, 3, 1].count(1)",       "3"
+rb_test "array count noargs", "[1, 2, 3].count",                "3"
+rb_test "array index of",     "[10, 20, 30].index(20)",         "1"
+rb_test "array index pred",   "[1, 2, 3, 4].index { |x| x > 2 }", "2"
+rb_test "array take",         "[1, 2, 3, 4].take(2)",           "[1, 2]"
+rb_test "array drop",         "[1, 2, 3, 4].drop(2)",           "[3, 4]"
+rb_test "array take_while",   "[1, 2, 3, 1].take_while { |x| x < 3 }", "[1, 2]"
+rb_test "array drop_while",   "[1, 2, 3, 1].drop_while { |x| x < 3 }", "[3, 1]"
+rb_test "array partition",
+    "[1, 2, 3, 4].partition { |x| x.even? }",                   "[[2, 4], [1, 3]]"
+rb_test "array group_by",
+    "[1, 2, 3, 4].group_by { |x| x % 2 }",                       "{1 => [1, 3], 0 => [2, 4]}"
+rb_test "array tally",        '["a","b","a","c","a"].tally',    "{\"a\" => 3, \"b\" => 1, \"c\" => 1}"
+rb_test "array zip",          "[1, 2, 3].zip([4, 5, 6])",        "[[1, 4], [2, 5], [3, 6]]"
+rb_test "array min_by",       "[\"aa\", \"b\", \"ccc\"].min_by { |s| s.length }", "\"b\""
+rb_test "array max_by",       "[\"aa\", \"b\", \"ccc\"].max_by { |s| s.length }", "\"ccc\""
+rb_test "array sort_by",      "[\"ccc\", \"a\", \"bb\"].sort_by { |s| s.length }", "[\"a\", \"bb\", \"ccc\"]"
+rb_test "array flat_map",     "[1, 2, 3].flat_map { |x| [x, x*10] }", "[1, 10, 2, 20, 3, 30]"
+rb_test "array flatten",      "[[1, 2], [3, [4, 5]]].flatten",    "[1, 2, 3, 4, 5]"
+rb_test "array flatten 1",    "[[1, 2], [3, [4, 5]]].flatten(1)", "[1, 2, 3, [4, 5]]"
+rb_test "array concat",       "[1, 2].concat([3, 4])",           "[1, 2, 3, 4]"
+rb_test "array rotate",       "[1, 2, 3, 4].rotate(1)",          "[2, 3, 4, 1]"
+rb_test "array minmax",       "[3, 1, 4, 1, 5].minmax",          "[1, 5]"
+rb_test "array each_slice",   "[1, 2, 3, 4, 5].each_slice(2).to_a", "[[1, 2], [3, 4], [5]]"
+rb_test "array each_cons",    "[1, 2, 3, 4].each_cons(2).to_a", "[[1, 2], [2, 3], [3, 4]]"
+
+# ── STRING METHODS (extended) ──────────────────────────────────────────────
+rb_test "str swapcase",       '"Hello".swapcase',               "\"hELLO\""
+rb_test "str strip",          '"  hi  ".strip',                 "\"hi\""
+rb_test "str lstrip",         '"  hi  ".lstrip',                "\"hi  \""
+rb_test "str rstrip",         '"  hi  ".rstrip',                "\"  hi\""
+rb_test "str chomp",          "\"abc\\n\".chomp",                "\"abc\""
+rb_test "str sub",            '"hello".sub("l", "L")',          "\"heLlo\""
+rb_test "str gsub",           '"hello".gsub("l", "L")',         "\"heLLo\""
+rb_test "str ljust",          '"hi".ljust(5)',                  "\"hi   \""
+rb_test "str rjust",          '"hi".rjust(5)',                  "\"   hi\""
+rb_test "str center",         '"hi".center(6)',                 "\"  hi  \""
+rb_test "str count chars",    '"hello".count("l")',             "2"
+rb_test "str succ",           '"a".succ',                       "\"b\""
+rb_test "str ord",            '"A".ord',                        "65"
+
+# ── HASH METHODS (extended) ────────────────────────────────────────────────
+rb_test "hash delete",        '{a: 1, b: 2}.delete(:a)',        "1"
+rb_test "hash fetch",         '{a: 1}.fetch(:a)',               "1"
+rb_test "hash fetch default", '{a: 1}.fetch(:z, 99)',           "99"
+rb_test "hash invert",        '{a: 1, b: 2}.invert',            "{1 => :a, 2 => :b}"
+rb_test "hash has_value?",    '{a: 1}.has_value?(1)',           "true"
+rb_test "hash to_a",          '{a: 1, b: 2}.to_a',              "[[:a, 1], [:b, 2]]"
+rb_test "hash select",        '{a: 1, b: 2, c: 3}.select { |k, v| v > 1 }', "{b: 2, c: 3}"
+rb_test "hash reject",        '{a: 1, b: 2, c: 3}.reject { |k, v| v > 1 }', "{a: 1}"
+rb_test "hash any?",          '{a: 1, b: 2}.any? { |k, v| v > 1 }',  "true"
+rb_test "hash all?",          '{a: 1, b: 2}.all? { |k, v| v > 0 }',  "true"
+rb_test "hash transform_values",
+    '{a: 1, b: 2}.transform_values { |v| v * 10 }',                 "{a: 10, b: 20}"
+rb_test "hash transform_keys",
+    '{a: 1, b: 2}.transform_keys { |k| k.to_s }',                   "{\"a\" => 1, \"b\" => 2}"
+rb_test "hash count",         '{a: 1, b: 2}.count',             "2"
+rb_test "hash min",           '{b: 2, a: 1}.min',               "[:a, 1]"
+
+# ── INTEGER METHODS (extended) ─────────────────────────────────────────────
+rb_test "int gcd",            "12.gcd(8)",                      "4"
+rb_test "int lcm",            "4.lcm(6)",                       "12"
+rb_test "int divmod",         "13.divmod(4)",                   "[3, 1]"
+rb_test "int digits",         "1234.digits",                    "[4, 3, 2, 1]"
+rb_test "int positive?",      "5.positive?",                    "true"
+rb_test "int negative?",      "(-5).negative?",                 "true"
+rb_test "int chr",            "65.chr",                         "\"A\""
+rb_test "int step",
+    "out = []; 1.step(10, 3) { |i| out.push(i) }; out",          "[1, 4, 7, 10]"
+
+# ── FLOAT METHODS ──────────────────────────────────────────────────────────
+rb_test "float to_i",         "3.7.to_i",                       "3"
+rb_test "float floor",        "3.7.floor",                      "3"
+rb_test "float ceil",         "3.2.ceil",                       "4"
+rb_test "float round",        "3.5.round",                      "4"
+rb_test "float abs",          "(-3.5).abs",                     "3.5"
+rb_test "float zero?",        "0.0.zero?",                      "true"
+rb_test "float positive?",    "1.5.positive?",                  "true"
+
+# ── SYMBOL METHODS ─────────────────────────────────────────────────────────
+rb_test "sym to_s",           ":foo.to_s",                      "\"foo\""
+rb_test "sym length",         ":hello.length",                  "5"
+rb_test "sym upcase",         ":hello.upcase",                  ":HELLO"
+rb_test "sym empty? false",   ":hello.empty?",                  "false"
+
+# ── NIL / BOOL METHODS ─────────────────────────────────────────────────────
+rb_test "nil to_a",           "nil.to_a",                       "[]"
+rb_test "nil to_s",           "nil.to_s",                       "\"\""
+rb_test "nil to_i",           "nil.to_i",                       "0"
+rb_test "nil nil?",           "nil.nil?",                       "true"
+rb_test "nil inspect",        "nil.inspect",                    "\"nil\""
+rb_test "true to_s",          "true.to_s",                      "\"true\""
+rb_test "false to_s",         "false.to_s",                     "\"false\""
+
+# ── CLASS / OBJECT INTROSPECTION ───────────────────────────────────────────
+rb_test "is_a? Integer",      "5.is_a?(Integer)",               "true"
+rb_test "is_a? String",       '"hi".is_a?(String)',             "true"
+rb_test "is_a? Numeric",      "5.is_a?(Numeric)",               "true"
+rb_test "kind_of?",           "5.kind_of?(Integer)",            "true"
+rb_test "instance_of?",       "5.instance_of?(Integer)",        "true"
+rb_test "respond_to? true",   '"hi".respond_to?(:length)',      "true"
+rb_test "tap",                "[1, 2, 3].tap { |a| a.push(4) }", "[1, 2, 3, 4]"
+rb_test "then",               "5.then { |x| x * 2 }",           "10"
+
+# ── ATTR_* / CLASS-SIDE / SUPER ────────────────────────────────────────────
+rb_test "attr_accessor get/set",
+    'class Box
+       attr_accessor :v
+     end
+     b = Box.new
+     b.v = 42
+     b.v',
+    "42"
+
+rb_test "attr_reader get",
+    'class Box
+       def initialize(v); @v = v; end
+       attr_reader :v
+     end
+     Box.new(7).v',
+    "7"
+
+rb_test "def self.classmethod",
+    'class Counter
+       def self.zero
+         0
+       end
+     end
+     Counter.zero',
+    "0"
+
+rb_test "super calls parent",
+    'class A
+       def hi
+         "A"
+       end
+     end
+     class B < A
+       def hi
+         super + "B"
+       end
+     end
+     B.new.hi',
+    "\"AB\""
+
+rb_test "module include",
+    'module Greet
+       def hello
+         "hi"
+       end
+     end
+     class Person
+       include Greet
+     end
+     Person.new.hello',
+    "\"hi\""
+
+rb_test "ancestors includes module",
+    'module Walkable
+       def walk; "walking"; end
+     end
+     class Pet
+       include Walkable
+     end
+     Pet.new.walk',
+    "\"walking\""
+
+# ── EXCEPTION CLASSES ──────────────────────────────────────────────────────
+rb_test "rescue named class",
+    'begin
+       raise ArgumentError, "bad arg"
+     rescue ArgumentError => e
+       e.message
+     end',
+    "\"bad arg\""
+
+rb_test "rescue base catches subclass",
+    'begin
+       raise ArgumentError, "x"
+     rescue StandardError => e
+       "caught"
+     end',
+    "\"caught\""
 
 # ── FINAL SUMMARY ──────────────────────────────────────────────────────────
 

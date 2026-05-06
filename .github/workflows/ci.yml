@@ -107,6 +107,8 @@ jobs:
         env:
           ST: ${{ github.workspace }}/target/release/s
         run: bash examples/exercism_run_all.sh --summary
+      - name: Run ruby interp
+        run: ./target/release/stryke examples/ruby/Ruby.stk
       - name: Run Scheme R5RS-subset interpreter (~5k lines, 356 tests)
         # `examples/scheme/Scheme.stk` is a single-file Scheme interpreter
         # implemented in stryke — tokenizer, parser, evaluator, ~150 built-ins,
