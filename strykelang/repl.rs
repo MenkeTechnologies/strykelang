@@ -13,7 +13,8 @@
 //! * Tab pops a `ColumnarMenu` of suggestions sourced from
 //!   `stryke::lsp::builtin_completion_words` plus the live interpreter
 //!   binding/sub names — the same wordlist the LSP serves.
-//! * History is `~/.stryke_history` via `FileBackedHistory`.
+//! * History is `~/.stryke/history` via `FileBackedHistory` (the parent
+//!   `~/.stryke/` dir is created on first run if missing).
 //! * `$obj->method` completion uses the running interpreter's blessed-scalar
 //!   snapshot (same code path the old rustyline driver used).
 //!
@@ -45,9 +46,24 @@ const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", 
 const STRYKE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn history_path() -> std::path::PathBuf {
-    std::env::var_os("HOME")
-        .map(|h| std::path::PathBuf::from(h).join(".stryke_history"))
-        .unwrap_or_else(|| std::path::PathBuf::from(".stryke_history"))
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    let dir = home
+        .as_ref()
+        .map(|h| h.join(".stryke"))
+        .unwrap_or_else(|| std::path::PathBuf::from(".stryke"));
+    let _ = std::fs::create_dir_all(&dir);
+    let new_path = dir.join("history");
+    // One-time migration from the old `~/.stryke_history` location so
+    // existing users keep their history. Only runs when the new file
+    // doesn't yet exist and the old one does.
+    if !new_path.exists() {
+        if let Some(old) = home.map(|h| h.join(".stryke_history")) {
+            if old.exists() {
+                let _ = std::fs::rename(&old, &new_path);
+            }
+        }
+    }
+    new_path
 }
 
 fn build_static_completions() -> Vec<String> {

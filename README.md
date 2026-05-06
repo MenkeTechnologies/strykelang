@@ -242,7 +242,7 @@ stryke prun *.stk                            # run multiple files in parallel
 stryke -j 4 *.stk                             # run multiple files in parallel (4 threads)
 stryke convert app.pl                        # convert Perl to stryke syntax with |> pipes
 stryke deconvert app.stk                     # convert stryke back to Perl syntax
-stryke app.stk                                # warm starts skip parse + compile via ~/.cache/stryke/scripts.rkyv ([0x0F])
+stryke app.stk                                # warm starts skip parse + compile via ~/.stryke/scripts.rkyv ([0x0F])
 ```
 
 > **`-e` is optional.** If the first argument isn't a file on disk and looks like code, `stryke` runs it directly. `stryke 'p 42'` and `stryke -e 'p 42'` are equivalent. Use `-e` when combining with `-n`/`-p`/`-l`/`-a` (e.g. `stryke -lane 'p $F[0]'`).
@@ -260,7 +260,7 @@ my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
 
 #### Interactive REPL
 
-Run `stryke` with no arguments to enter a readline session: line editing, history (`~/.stryke_history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
+Run `stryke` with no arguments to enter a readline session: line editing, history (`~/.stryke/history`), tab completion for keywords, lexicals in scope, sub names, methods after `->` on blessed objects, and file paths. `exit`/`quit`/Ctrl-D leaves. Non-TTY stdin is read as a complete program.
 
 #### `__DATA__`
 
@@ -1032,7 +1032,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
 - **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)): `stryke build SCRIPT -o OUT` bakes a script into a self-contained executable.
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
-- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-rkyv)): single rkyv shard at `~/.cache/stryke/scripts.rkyv` — `mmap` + zero-copy `ArchivedHashMap` lookup skips lex/parse/compile on warm starts. Disable with `STRYKE_CACHE=0`.
+- **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-rkyv)): single rkyv shard at `~/.stryke/scripts.rkyv` — `mmap` + zero-copy `ArchivedHashMap` lookup skips lex/parse/compile on warm starts. Disable with `STRYKE_CACHE=0`.
 - **Language server** ([\[0x11\]](#0x11-language-server-stryke-lsp)): `stryke lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
@@ -1962,7 +1962,7 @@ p fib 50             # 12586269025
 
 ## [0x0F] BYTECODE CACHE (rkyv)
 
-stryke stores compiled bytecode in a single rkyv shard at `~/.cache/stryke/scripts.rkyv`. The first run of a script parses + compiles + persists into the shard. Every subsequent run `mmap`s the shard, validates the archived root once, looks up the entry by canonical path in the zero-copy `ArchivedHashMap`, and skips **lex, parse, and compile** entirely.
+stryke stores compiled bytecode in a single rkyv shard at `~/.stryke/scripts.rkyv`. The first run of a script parses + compiles + persists into the shard. Every subsequent run `mmap`s the shard, validates the archived root once, looks up the entry by canonical path in the zero-copy `ArchivedHashMap`, and skips **lex, parse, and compile** entirely.
 
 ```sh
 stryke my_app.stk              # cold: parse + compile + write into the shard
@@ -1995,7 +1995,7 @@ cache_clear()                  # wipe the cache
 ```
 $ stryke -e 'cacheview()'
 stryke bytecode cache
-  path: ~/.cache/stryke/scripts.rkyv
+  path: ~/.stryke/scripts.rkyv
   scripts: 103 (612.45 KB)
 
 PATH                                                      PROG KB    BC KB

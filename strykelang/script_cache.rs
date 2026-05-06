@@ -1,6 +1,7 @@
 //! rkyv-backed bytecode cache for scripts.
 //!
-//! Single-file shard at `~/.cache/stryke/scripts.rkyv`. On 2+ runs of a given
+//! Single-file shard at `~/.stryke/scripts.rkyv` (legacy `~/.cache/stryke/scripts.rkyv`
+//! is migrated into the new location on first run). On 2+ runs of a given
 //! script, lex/parse/compile is skipped — the cache hit is `mmap` + zero-copy
 //! `ArchivedHashMap` lookup + bincode-decode of the inner Program/Chunk blobs.
 //!
@@ -521,11 +522,32 @@ fn current_binary_mtime_secs() -> Option<i64> {
     })
 }
 
-/// Default shard path: `~/.cache/stryke/scripts.rkyv`.
+/// Default shard path: `~/.stryke/scripts.rkyv`.
+///
+/// Migrates a legacy `~/.cache/stryke/scripts.rkyv` (and its `.lock` sibling)
+/// into the new location on first call so existing warm caches survive the
+/// move. The migration runs once per process and is best-effort: any failure
+/// silently falls back to the new path (the cache will simply rebuild).
 pub fn default_cache_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".cache/stryke/scripts.rkyv")
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let new_path = home.join(".stryke/scripts.rkyv");
+    static MIGRATED: OnceLock<()> = OnceLock::new();
+    MIGRATED.get_or_init(|| {
+        if let Some(parent) = new_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if !new_path.exists() {
+            let old = home.join(".cache/stryke/scripts.rkyv");
+            if old.exists() {
+                let _ = std::fs::rename(&old, &new_path);
+                let old_lock = home.join(".cache/stryke/scripts.rkyv.lock");
+                if old_lock.exists() {
+                    let _ = std::fs::rename(&old_lock, new_path.with_extension("rkyv.lock"));
+                }
+            }
+        }
+    });
+    new_path
 }
 
 /// `STRYKE_CACHE=0|false|no` disables the cache entirely.

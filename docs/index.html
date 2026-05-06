@@ -1109,7 +1109,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Crypto / compression</strong> — <code>sha256</code>, <code>hmac_sha256</code>, <code>jwt_encode</code>/<code>decode</code>, <code>gzip</code> / <code>gunzip</code> / <code>zstd</code>.</li>
           <li><strong>Standalone binaries</strong> — <code>s build SCRIPT -o OUT</code> bakes a script into a self-contained executable.</li>
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
-          <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.cache/stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
+          <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
           <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
@@ -1181,7 +1181,7 @@ s --script basename         <span class="comment"># run ./basename script, not b
 
       <section class="tutorial-section" id="bytecode-cache">
         <h2>Bytecode Cache (rkyv)</h2>
-        <p>stryke caches compiled bytecode in a single rkyv-archived shard at <code>~/.cache/stryke/scripts.rkyv</code>. First run of a script parses + compiles + persists into the shard. Every subsequent run <code>mmap</code>s the shard, validates the archived root once, looks up the entry by canonical path in a zero-copy <code>ArchivedHashMap</code>, and skips lex/parse/compile entirely.</p>
+        <p>stryke caches compiled bytecode in a single rkyv-archived shard at <code>~/.stryke/scripts.rkyv</code>. First run of a script parses + compiles + persists into the shard. Every subsequent run <code>mmap</code>s the shard, validates the archived root once, looks up the entry by canonical path in a zero-copy <code>ArchivedHashMap</code>, and skips lex/parse/compile entirely.</p>
 <pre>stryke my_app.stk    <span class="comment"># cold: parse + compile + write to shard</span>
 stryke my_app.stk    <span class="comment"># warm: mmap shard + lookup + dispatch</span></pre>
 

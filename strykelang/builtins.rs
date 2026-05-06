@@ -3913,7 +3913,7 @@ fn builtin_sqlite(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Bytecode cache builtins — inspect/manage ~/.cache/stryke/scripts.rkyv
+// Bytecode cache builtins — inspect/manage ~/.stryke/scripts.rkyv
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// `cacheview` / `cv` — View cached scripts in the rkyv bytecode cache.
