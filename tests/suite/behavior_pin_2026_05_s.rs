@@ -67,7 +67,10 @@ fn is_perfect_numbers() {
 
 #[test]
 fn divisors_list() {
-    assert_eq!(eval_string(r#"join ",", sort { $a <=> $b } divisors(12)"#), "1,2,3,4,6,12");
+    assert_eq!(
+        eval_string(r#"join ",", sort { $a <=> $b } divisors(12)"#),
+        "1,2,3,4,6,12"
+    );
 }
 
 #[test]
@@ -85,7 +88,10 @@ fn nth_prime_lookup() {
 
 #[test]
 fn primes_up_to_sieve() {
-    assert_eq!(eval_string(r#"join ",", primes_up_to(20)"#), "2,3,5,7,11,13,17,19");
+    assert_eq!(
+        eval_string(r#"join ",", primes_up_to(20)"#),
+        "2,3,5,7,11,13,17,19"
+    );
 }
 
 #[test]
@@ -139,7 +145,10 @@ fn median_odd_even() {
 #[test]
 fn mode_single_and_multi() {
     assert_eq!(eval_int("mode(1, 2, 2, 3)"), 2);
-    assert_eq!(eval_string(r#"join ",", sort { $a <=> $b } mode(1, 1, 2, 2, 3)"#), "1,2");
+    assert_eq!(
+        eval_string(r#"join ",", sort { $a <=> $b } mode(1, 1, 2, 2, 3)"#),
+        "1,2"
+    );
 }
 
 #[test]
@@ -225,7 +234,10 @@ fn base64_roundtrip() {
 fn sha256_hex_output() {
     // sha256 of empty string
     let s = eval_string(r#"sha256("")"#);
-    assert_eq!(s, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    assert_eq!(
+        s,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
 }
 
 #[test]
@@ -258,7 +270,10 @@ fn financial_future_value_calculation() {
 
 #[test]
 fn system_env_access() {
-    assert_eq!(eval_string(r#"$ENV{STRYKE_NONEXISTENT} // "missing""#), "missing");
+    assert_eq!(
+        eval_string(r#"$ENV{STRYKE_NONEXISTENT} // "missing""#),
+        "missing"
+    );
 }
 
 #[test]

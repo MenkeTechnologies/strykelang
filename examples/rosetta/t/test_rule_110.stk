@@ -7,9 +7,7 @@ fn Rosetta::Rule110::next_gen($state) {
     my @chars = chars($padded)
     
     my $next_state = ~> 1..$len map {
-        my $i = _
-        my $pattern = $chars[$i-1] . $chars[$i] . $chars[$i+1]
-        
+        my $pattern = $chars[_-1] . $chars[_] . $chars[_+1]
         # Rule 110:
         # 111 -> 0, 110 -> 1, 101 -> 1, 100 -> 0
         # 011 -> 1, 010 -> 1, 001 -> 1, 000 -> 0

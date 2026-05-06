@@ -4,10 +4,7 @@
 fn Rosetta::GaussJordan::solve($matrix, $vector) {
     my $n = len(@$matrix)
     # Augmented matrix
-    my @m = ~> 0:$n-1 map {
-        my $i = _
-        [ @{$matrix->[$i]}, $vector->[$i] ]
-    }
+    my @m = ~> 0:$n-1 map { [ @{$matrix->[_]}, $vector->[_] ] }
     
     for my $i (0:$n-1) {
         # Pivot

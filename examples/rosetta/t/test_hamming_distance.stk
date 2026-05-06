@@ -4,11 +4,7 @@
 fn Rosetta::HammingDistance::compute($s1, $s2) {
     my @c1 = ~> $s1 chars
     my @c2 = ~> $s2 chars
-    
-    0..len(@c1)-1 |> grep {
-        my $i = _
-        $c1[$i] ne $c2[$i]
-    } |> len
+    0..len(@c1)-1 |> grep { $c1[_] ne $c2[_] } |> len
 }
 
 assert_eq Rosetta::HammingDistance::compute("karolin", "kathrin"), 3, "karolin vs kathrin"
