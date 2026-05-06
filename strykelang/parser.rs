@@ -1428,13 +1428,43 @@ impl Parser {
         while i < bytes.len() && bytes[i].is_ascii_digit() {
             i += 1;
         }
-        // Then any number of `<` chevrons (1..4 in practice, lexer caps at 4).
+        // Then any number of `<` chevrons (runtime cap at 5; lexer accepts more).
         let chevrons_start = i;
         while i < bytes.len() && bytes[i] == b'<' {
             i += 1;
         }
         // Must be one of: `_`, `_N`, `_<+`, `_N<+`. No other trailing chars.
         i == bytes.len() && (i > 1 || chevrons_start > 1)
+    }
+
+    /// Bareword names that map to Perl special variables / filehandles /
+    /// compile-time tokens. A user-defined sub with any of these names
+    /// would shadow the special variable's expression-position usage and
+    /// produce silently-broken code. Reject at parse time with a
+    /// foot-gun error message.
+    ///
+    /// Sigil-form spellings (`$@`, `$!`, `@ARGV`, `%ENV`, etc.) are caught
+    /// separately via the `parse_sub_decl` catch-all branch — those don't
+    /// even lex as `Token::Ident` so they hit a different code path.
+    pub(crate) fn is_reserved_special_var_name(name: &str) -> bool {
+        matches!(
+            name,
+            // Standard filehandles (Perl: STDIN, STDOUT, STDERR, ARGV, …)
+            "STDIN" | "STDOUT" | "STDERR" | "ARGV" | "ARGVOUT" | "DATA"
+            // Package globals, normally accessed via sigils (@ARGV, %ENV,
+            // @INC, %SIG, @ISA, %ENV, etc.) — bareword shadow is a foot-gun.
+            // NOTE: `AUTOLOAD` is intentionally NOT in this list — `fn
+            // AUTOLOAD { ... }` is the legitimate Perl idiom for handling
+            // missing-method dispatch. The runtime sets `$AUTOLOAD` to the
+            // missing sub's qualified name before invoking the user's
+            // AUTOLOAD sub. Adding it here would break that mechanism.
+            | "ENV" | "INC" | "SIG" | "ISA"
+            | "EXPORT" | "EXPORT_OK" | "EXPORT_TAGS"
+            | "VERSION"
+            // Compile-time tokens (resolve to constants at parse time).
+            | "__FILE__" | "__LINE__" | "__PACKAGE__" | "__SUB__"
+            | "__DATA__" | "__END__"
+        )
     }
 
     /// Identifiers that start a [`parse_named_expr`] arm (builtins / special forms), not a bare sub call.
@@ -4391,6 +4421,15 @@ impl Parser {
                         line,
                     ));
                 }
+                if Self::is_reserved_special_var_name(bare) {
+                    return Err(self.syntax_err(
+                        format!(
+                            "`fn {}` would shadow a Perl special variable / filehandle / compile-time token; pick a different name",
+                            name
+                        ),
+                        line,
+                    ));
+                }
                 // Allow shadowing builtins:
                 // - In compat mode (full Perl 5)
                 // - When parsing a module (imports should work)
@@ -4465,6 +4504,41 @@ impl Parser {
                             "`fn {}{}` would shadow the topic-slot scalar; pick a different name",
                             sigil, n
                         ),
+                        self.peek_line(),
+                    ));
+                }
+                // Sigil-form Perl special variables / globals — same foot-gun.
+                // Catches `fn $@`, `fn $!`, `fn $/`, `fn $\\`, `fn $,`, `fn $;`,
+                // `fn $"`, `fn $.`, `fn $0`, `fn $$`, `fn $?`, `fn $1`-`$9`,
+                // `fn $^I`, `fn @ARGV`, `fn @INC`, `fn %ENV`, `fn %SIG`, etc.
+                let special_var = match &tok {
+                    Token::ScalarVar(n) | Token::ArrayVar(n) | Token::HashVar(n) => Some((
+                        match &tok {
+                            Token::ScalarVar(_) => '$',
+                            Token::ArrayVar(_) => '@',
+                            Token::HashVar(_) => '%',
+                            _ => unreachable!(),
+                        },
+                        n.clone(),
+                    )),
+                    _ => None,
+                };
+                if let Some((sigil, n)) = special_var {
+                    return Err(self.syntax_err(
+                        format!(
+                            "`fn {}{}` would shadow a Perl special variable / global; pick a different name",
+                            sigil, n
+                        ),
+                        self.peek_line(),
+                    ));
+                }
+                // After `fn`, `%` lexes as `Token::Percent` (modulo) rather
+                // than a hash sigil — but `fn %ENV { }`, `fn %SIG { }`,
+                // `fn %_ { }`, etc. all reach here. Emit the same foot-gun
+                // message as the sigil-form catch above.
+                if matches!(tok, Token::Percent) {
+                    return Err(self.syntax_err(
+                        "`fn %NAME` is not a valid sub declaration — `%name` would refer to a hash variable, not a sub name. To define a sub, use `fn NAME { ... }`",
                         self.peek_line(),
                     ));
                 }
@@ -7464,6 +7538,17 @@ impl Parser {
         while self.eat(&Token::PackageSep) {
             match self.advance() {
                 (Token::Ident(part), _) => {
+                    name.push_str("::");
+                    name.push_str(&part);
+                }
+                // Topic-slot scalars (`_`, `_<<<<`, `_3`, etc.) lex as
+                // `Token::ScalarVar` per the lexer's reservation. Accept
+                // them as the trailing segment of a package-qualified
+                // name so callers (e.g. `parse_sub_decl`) can reject the
+                // full name with a friendly "would shadow topic-slot"
+                // message rather than a generic "Expected identifier
+                // after `::`" lexer-level error.
+                (Token::ScalarVar(part), _) if Self::is_underscore_topic_slot(&part) => {
                     name.push_str("::");
                     name.push_str(&part);
                 }
