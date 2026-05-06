@@ -5266,14 +5266,22 @@ fn unary_plus_is_numeric_noop() {
 fn scalar_assign_from_paren_list_keeps_last_element() {
     // In stryke mode, `$z = (1,2,3)` is a syntax error — use `$z = (list)[-1]` explicitly.
     // Test that the compat mode (Perl 5) preserves the "last element" behavior.
-    stryke::set_compat_mode(true);
-    let result = eval_int(
-        r#"no strict 'vars';
-            my $z;
-            $z = (1, 2, 3);
-            $z"#,
-    );
-    stryke::set_compat_mode(false);
+    //
+    // `with_global_flags` holds the RwLock write guard so concurrent tests
+    // that read `compat_mode()` block while we mutate it. Without the
+    // guard, the brief `set_compat_mode(true) → set_compat_mode(false)`
+    // window flakes any parallel test sensitive to the flag.
+    let result = crate::common::with_global_flags(|| {
+        stryke::set_compat_mode(true);
+        let r = crate::common::eval_int_locked(
+            r#"no strict 'vars';
+                my $z;
+                $z = (1, 2, 3);
+                $z"#,
+        );
+        stryke::set_compat_mode(false);
+        r
+    });
     assert_eq!(result, 3);
 }
 
