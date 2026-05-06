@@ -6249,6 +6249,37 @@ impl VMHelper {
         if let Some(re) = c.as_regex() {
             return re.is_match(&topic.to_string());
         }
+        // ARRAY / array-ref RHS: smartmatch is "any element matches the topic"
+        // (`$x ~~ @list` → `grep { $x ~~ $_ } @list` per `perlop`).
+        // Without this branch, `when ([2, 3, 5, 7])` always falls through to
+        // `default` because the array stringified ("23 5 7"-ish) won't equal
+        // the scalar. Recurse so nested arrays / regexes inside the array
+        // still work.
+        if let Some(arr) = c.as_array_ref() {
+            let arr = arr.read();
+            return arr.iter().any(|elem| self.smartmatch_when(topic, elem));
+        }
+        if let Some(arr) = c.as_array_vec() {
+            return arr.iter().any(|elem| self.smartmatch_when(topic, elem));
+        }
+        // HASH / hash-ref RHS: "topic is a key" (`$x ~~ %h` → `exists $h{$x}`).
+        if let Some(href) = c.as_hash_ref() {
+            return href.read().contains_key(&topic.to_string());
+        }
+        if let Some(h) = c.as_hash_map() {
+            return h.contains_key(&topic.to_string());
+        }
+        // Coderef RHS: call it with the topic, treat truthy result as match.
+        if let Some(sub) = c.as_code_ref() {
+            // smartmatch_when is `&self`; we can't `call_sub` (needs `&mut`).
+            // For now, fall through to string equality. Future: hoist
+            // when_matches to use `&mut self` so coderef RHS can fire.
+            let _ = sub;
+        }
+        // Numeric equality if both sides parse as numbers.
+        if let (Some(a), Some(b)) = (topic.as_integer(), c.as_integer()) {
+            return a == b;
+        }
         topic.to_string() == c.to_string()
     }
 

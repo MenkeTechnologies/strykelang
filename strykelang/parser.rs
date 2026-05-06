@@ -15616,7 +15616,14 @@ impl Parser {
                 } else {
                     let c = chars[i];
                     let probe = c.to_string();
-                    if VMHelper::is_special_scalar_name_for_get(&probe) || matches!(c, '\'' | '`') {
+                    // `&` is the regex-match special var — semantically symmetric with
+                    // backtick (`$``) prematch and apostrophe (`$'`) postmatch which
+                    // are already handled here. `is_special_scalar_name_for_get` doesn't
+                    // currently list `&`/`'`/`` ` `` (those have separate runtime paths
+                    // for set/clear under regex updates), so we add them inline.
+                    if VMHelper::is_special_scalar_name_for_get(&probe)
+                        || matches!(c, '\'' | '`' | '&')
+                    {
                         i += 1;
                         // Check for hash element access: `$+{key}`, `$-{key}`, etc.
                         if i < chars.len() && chars[i] == '{' {
