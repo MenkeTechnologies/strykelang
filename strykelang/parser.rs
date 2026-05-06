@@ -3219,27 +3219,21 @@ impl Parser {
     fn parse_tie_stmt(&mut self) -> PerlResult<Statement> {
         let line = self.peek_line();
         self.advance(); // tie
-        // `tie my $x, Class` and `tie our $x, Class` — common Perl idiom.
-        // Desugar by emitting an implicit `my $x` (or `our $x`) declaration
-        // before the tie. The tie target then references the just-declared
-        // variable. Without this, `tie my $x, Class, ARGS` errors with
-        // "tie expects $scalar, @array, or %hash, got Ident(\"my\")".
+                        // `tie my $x, Class` and `tie our $x, Class` — common Perl idiom.
+                        // Desugar by emitting an implicit `my $x` (or `our $x`) declaration
+                        // before the tie. The tie target then references the just-declared
+                        // variable. Without this, `tie my $x, Class, ARGS` errors with
+                        // "tie expects $scalar, @array, or %hash, got Ident(\"my\")".
         let mut implicit_decl: Option<Statement> = None;
         if let Token::Ident(kw) = self.peek().clone() {
             if matches!(kw.as_str(), "my" | "our") {
                 let kw_line = self.peek_line();
                 self.advance(); // my / our
-                // Read the variable being declared (must be Scalar/Array/Hash).
+                                // Read the variable being declared (must be Scalar/Array/Hash).
                 let (decl_sigil, decl_name) = match self.peek().clone() {
-                    Token::ScalarVar(s) => {
-                        (Sigil::Scalar, s)
-                    }
-                    Token::ArrayVar(a) => {
-                        (Sigil::Array, a)
-                    }
-                    Token::HashVar(h) => {
-                        (Sigil::Hash, h)
-                    }
+                    Token::ScalarVar(s) => (Sigil::Scalar, s),
+                    Token::ArrayVar(a) => (Sigil::Array, a),
+                    Token::HashVar(h) => (Sigil::Hash, h),
                     tok => {
                         return Err(self.syntax_err(
                             format!("expected variable after `tie {}`, got {:?}", kw, tok),
@@ -15521,9 +15515,7 @@ impl Parser {
                     while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
                         name.push_str("::");
                         i += 2;
-                        while i < chars.len()
-                            && (chars[i].is_alphanumeric() || chars[i] == '_')
-                        {
+                        while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
                             name.push(chars[i]);
                             i += 1;
                         }

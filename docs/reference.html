@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.2 · 3567 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.5 · 3567 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -222,7 +222,7 @@ my @hashes = pmap sha256 @blobs, progress =&gt; 1
 
 # Bare-fn form (works for builtins and user-defined subs)
 my @hashes = pmap sha256, @blobs, progress =&gt; 1
-sub double { $_0 * 2 }
+fn double { _ * 2 }
 my @r = pmap double, (1:1_000_000)
 </code></pre>
       </article>
@@ -252,7 +252,7 @@ my @primes = pgrep { is_prime } 2:1_000_000
 @files |&gt; pgrep { -s _ &gt; 1024 } |&gt; e p
 
 # Bare-fn form
-sub even { $_0 % 2 == 0 }
+fn even { _ % 2 == 0 }
 my @e = pgrep even, 1:10        # (2,4,6,8,10)
 </code></pre>
       </article>
@@ -274,15 +274,15 @@ pfor { compress_file } glob(&quot;*.log&quot;)
     p &quot;done: $_&quot; }
 
 # Bare-fn form
-sub work { print &quot;did $_0\n&quot; }
+fn work { print &quot;did $_\n&quot; }
 pfor work, (1, 2, 3)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-psort">
         <h3><a class="doc-anchor" href="#doc-psort">#</a> <code>psort</code></h3>
-        <p>Parallel sort that uses rayon&#39;s parallel merge-sort algorithm. Accepts an optional comparator block using <code>$_0</code>/<code>$_1</code> (or <code>$a</code>/<code>$b</code>). For large lists (10k+ elements), this significantly outperforms the sequential <code>sort</code> by splitting the array, sorting partitions in parallel, and merging. The sort is stable — equal elements retain their relative order.</p>
-        <pre><code class="lang-perl">my @sorted = psort { $_0 &lt;=&gt; $_1 } @big_list
-my @by_name = psort { $_0-&gt;{name} cmp $_1-&gt;{name} } @records
+        <p>Parallel sort that uses rayon&#39;s parallel merge-sort algorithm. Accepts an optional comparator block using <code>_</code>/<code>_1</code> (or <code>$a</code>/<code>$b</code>). For large lists (10k+ elements), this significantly outperforms the sequential <code>sort</code> by splitting the array, sorting partitions in parallel, and merging. The sort is stable — equal elements retain their relative order.</p>
+        <pre><code class="lang-perl">my @sorted = psort { _ &lt;=&gt; _1 } @big_list
+my @by_name = psort { _-&gt;{name} cmp _1-&gt;{name} } @records
 @nums |&gt; psort { $a &lt;=&gt; $b } |&gt; e p
 </code></pre>
       </article>
@@ -301,21 +301,21 @@ my @resolved = pcache dns_resolve, @hostnames
       <article class="doc-entry" id="doc-preduce">
         <h3><a class="doc-anchor" href="#doc-preduce">#</a> <code>preduce</code></h3>
         <p>Parallel tree-fold using rayon&#39;s <code>reduce</code> — splits the list into chunks, reduces each chunk independently, then merges partial results. The combining operation <strong>must be associative</strong> (e.g. <code>+</code>, <code>*</code>, <code>max</code>); non-associative ops will produce incorrect results. Much faster than sequential <code>reduce</code> on large numeric lists because the tree structure allows O(log n) merge depth across cores.</p>
-        <pre><code class="lang-perl">my $total = preduce { $_0 + $_1 } @nums
-my $biggest = preduce { $_0 &gt; $_1 ? $_0 : $_1 } @vals
+        <pre><code class="lang-perl">my $total = preduce { _ + _1 } @nums
+my $biggest = preduce { _ &gt; _1 ? _ : _1 } @vals
 my $product = preduce { $a * $b } 1:100
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-preduce-init">
         <h3><a class="doc-anchor" href="#doc-preduce-init">#</a> <code>preduce_init</code></h3>
         <p>Parallel fold with identity value.</p>
-        <pre><code class="lang-perl">my $total = preduce_init 0, { $_0 + $_1 } @list
+        <pre><code class="lang-perl">my $total = preduce_init 0, { _ + _1 } @list
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pmap-reduce">
         <h3><a class="doc-anchor" href="#doc-pmap-reduce">#</a> <code>pmap_reduce</code></h3>
         <p>Fused parallel map + tree reduce.</p>
-        <pre><code class="lang-perl">my $sum = pmap_reduce { _*2 } { $_0 + $_1 } @list
+        <pre><code class="lang-perl">my $sum = pmap_reduce { _*2 } { _ + _1 } @list
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pany">
@@ -338,7 +338,7 @@ my $product = preduce { $a * $b } 1:100
 my @out = pflat_map expand @list
 
 # Bare-fn form
-sub expand { ($_0, $_0 * 10) }
+fn expand { (_, _ * 10) }
 my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
 </code></pre>
       </article>
@@ -350,14 +350,14 @@ my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
       </article>
       <article class="doc-entry" id="doc-fan">
         <h3><a class="doc-anchor" href="#doc-fan">#</a> <code>fan</code></h3>
-        <p>Execute BLOCK or FUNC N times in parallel (<code>_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
+        <p>Execute BLOCK or FUNC N times in parallel (<code>_</code>/<code>_</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
         <p>Two equivalent surface syntaxes: • Block form — <code>fan N { BLOCK }</code> or <code>fan { BLOCK }</code> • Bare-fn form — <code>fan N, FUNC</code> or <code>fan FUNC</code></p>
         <pre><code class="lang-perl"># Block form
 fan 8 { work(_) }
 fan { work(_) } progress =&gt; 1
 
 # Bare-fn form
-sub work { print &quot;tick $_0\n&quot; }
+fn work { print &quot;tick $_\n&quot; }
 fan 8, work
 fan work, progress =&gt; 1   # uses pool size
 </code></pre>
@@ -369,7 +369,7 @@ fan work, progress =&gt; 1   # uses pool size
 my @results = fan_cap 8 { compute(_) }
 
 # Bare-fn form
-sub compute { $_0 * $_0 }
+fn compute { _ * _ }
 my @squares = fan_cap 8, compute
 </code></pre>
       </article>
@@ -379,30 +379,14 @@ my @squares = fan_cap 8, compute
       <p class="chapter-meta">11 topics</p>
       <article class="doc-entry" id="doc-mysync">
         <h3><a class="doc-anchor" href="#doc-mysync">#</a> <code>mysync</code></h3>
-        <p>Declare lexically scoped shared variables for parallel blocks (<code>Arc&lt;Mutex&gt;</code>).</p>
+        <p>Declare shared variables for parallel blocks (<code>Arc&lt;Mutex&gt;</code>).</p>
         <pre><code class="lang-perl">mysync $counter = 0
 fan 10000 { $counter++ }   # always exactly 10000
 mysync @results
-mysync %histogram
+mysync %histogram$1
 
-# Compound ops (++, +=, .=, |=, &amp;=) are fully atomic.</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-oursync">
-        <h3><a class="doc-anchor" href="#doc-oursync">#</a> <code>oursync</code></h3>
-        <p>Package-global counterpart of <code>mysync</code>. Same <code>Arc&lt;Mutex&gt;</code> backing, but the binding is keyed by the package-qualified stash name (<code>Pkg::x</code>) so all packages and parallel workers share one cell.</p>
-        <pre><code class="lang-perl">package Counter
-oursync $total = 0
-fn bump { $total++ }
-package main
-fan 10000 { Counter::bump() }
-p $Counter::total          # always exactly 10000
-
-oursync @results
-pfor { push @results, _ * _ } 1:50
-
-oursync %hits
-pfor { $hits{_ % 10} += 1 } 0:999</code></pre>
-        <p>Plain <code>our $x</code> mutated inside a parallel block is rejected at runtime with a directive to declare <code>oursync</code> — DESIGN-001 strict-error parity with the way plain <code>my</code> closure-writes are rejected, pointing at <code>mysync</code>. Use <code>oursync</code> for cross-package shared state; use <code>mysync</code> for lexically scoped shared state.</p>
+Compound ops (`++`, `+=`, `.=`, `|=`, `&amp;=`) are fully atomic.
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-async">
         <h3><a class="doc-anchor" href="#doc-async">#</a> <code>async</code></h3>
@@ -455,7 +439,7 @@ while (defined(my $val = $rx-&gt;recv)) {
 my ($tx, $rx) = pchannel(50)
 for my $i (1:4) {
     my $t = $tx-&gt;clone
-    spawn { $t-&gt;send(&quot;from worker $i: _&quot;) for 1:100 }
+    spawn { $t-&gt;send(&quot;from worker $i: $_&quot;) for 1:100 }
 }
 undef $tx  # drop original so channel closes when workers finish
 </code></pre>
@@ -540,9 +524,9 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
       <article class="doc-entry" id="doc-thread">
         <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
         <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure&#39;s <code>-&gt;</code>).</p>
-        <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { _0 &lt;=&gt; _1 } |&gt; join &quot;,&quot; |&gt; p
+        <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { _ &lt;=&gt; _1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-fn div { _0 / _1 }
+fn div { _ / _1 }
 ~&gt; 10 div(2) p                               # div(10, 2) = 5
 ~&gt; 10 div(_, 2) p                           # explicit _ position: div(10, 2) = 5
 </code></pre>
@@ -551,7 +535,7 @@ fn div { _0 / _1 }
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;&gt;</code></h3>
         <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
-        <pre><code class="lang-perl">fn div { _0 / _1 }
+        <pre><code class="lang-perl">fn div { _ / _1 }
 ~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
 -&gt;&gt; 10 div(_, 2) p                          # explicit _ overrides: div(10, 2) = 5
 
@@ -747,8 +731,8 @@ concat(\@a, \@b, \@c) |&gt; maps { uc } |&gt; e p
         <h3><a class="doc-anchor" href="#doc-enumerate">#</a> <code>enumerate</code></h3>
         <p><code>enumerate ITERATOR</code> / <code>en ITERATOR</code> — yield <code>[$index, $item]</code> pairs from a streaming iterator.</p>
         <p>Each element is wrapped as <code>[$index, $item]</code> where the index starts at 0 and increments for each element. Unlike <code>with_index</code> which returns <code>[item, index]</code>, <code>enumerate</code> uses the Rust/Python convention of <code>[index, item]</code>. This is a streaming operation: the index counter is maintained lazily as elements flow through the pipeline.</p>
-        <pre><code class="lang-perl">stdin |&gt; en |&gt; e { p &quot;_-&gt;[0]: _-&gt;[1]&quot; }
-1:5 |&gt; en |&gt; e { p &quot;_-&gt;[0]: _-&gt;[1]&quot; }
+        <pre><code class="lang-perl">stdin |&gt; en |&gt; e { p &quot;$_-&gt;[0]: $_-&gt;[1]&quot; }
+1:5 |&gt; en |&gt; e { p &quot;$_-&gt;[0]: $_-&gt;[1]&quot; }
 @lines |&gt; en |&gt; grep { _-&gt;[0] &lt; 10 } |&gt; e { p _-&gt;[1] }
 </code></pre>
       </article>
@@ -792,7 +776,7 @@ stdin |&gt; distinct |&gt; e p              # unique lines
         <h3><a class="doc-anchor" href="#doc-with-index">#</a> <code>with_index</code></h3>
         <p><code>with_index LIST</code> / <code>wi LIST</code> — pair each element with its 0-based index as <code>[$item, $index]</code>.</p>
         <p>Each element is wrapped in a two-element arrayref where <code>_-&gt;[0]</code> is the original value and <code>_-&gt;[1]</code> is its position. This is useful when you need positional information during a map or grep without maintaining a manual counter. Note the order is <code>[item, index]</code>, which differs from <code>enumerate</code> which yields <code>[index, item]</code>.</p>
-        <pre><code class="lang-perl">qw(a b c) |&gt; wi |&gt; e { p &quot;_-&gt;[1]: _-&gt;[0]&quot; }
+        <pre><code class="lang-perl">qw(a b c) |&gt; wi |&gt; e { p &quot;$_-&gt;[1]: $_-&gt;[0]&quot; }
 # 0: a  1: b  2: c
 @data |&gt; wi |&gt; grep { _-&gt;[1] % 2 == 0 } |&gt; e { p _-&gt;[0] }
 </code></pre>
@@ -822,7 +806,7 @@ range(10, 0, -2) |&gt; e p               # 10 8 6 4 2 0
         <p>Each call to the iterator reads one line from STDIN, strips the trailing newline, and yields it. The iterator terminates at EOF. Because it is lazy, combining <code>stdin</code> with <code>take</code>, <code>grep</code>, or <code>first_or</code> processes only as many lines as needed — the rest of STDIN is left unconsumed. This is the idiomatic stryke way to build Unix-style filters.</p>
         <pre><code class="lang-perl">stdin |&gt; grep /error/i |&gt; e p
 stdin |&gt; take 5 |&gt; e p
-stdin |&gt; en |&gt; e { p &quot;_-&gt;[0]: _-&gt;[1]&quot; }
+stdin |&gt; en |&gt; e { p &quot;$_-&gt;[0]: $_-&gt;[1]&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-nth">
@@ -859,12 +843,12 @@ my @long = grep { length(_) &gt; 3 } @words
       </article>
       <article class="doc-entry" id="doc-sort">
         <h3><a class="doc-anchor" href="#doc-sort">#</a> <code>sort</code></h3>
-        <p><code>sort [BLOCK] LIST</code> — returns a new list sorted in ascending order. Without a block, <code>sort</code> compares elements as strings (lexicographic). Pass a comparator block using <code>$_0</code> and <code>$_1</code> (stryke style) or <code>$a</code> and <code>$b</code> (classic Perl) to control ordering: use <code>&lt;=&gt;</code> for numeric and <code>cmp</code> for string comparison. The sort is stable in stryke, meaning equal elements preserve their original relative order. For descending order, reverse the operands in the comparator. Use <code>{ |$x, $y| body }</code> to name the two comparator params. Works naturally in <code>|&gt;</code> pipelines.</p>
+        <p><code>sort [BLOCK] LIST</code> — returns a new list sorted in ascending order. Without a block, <code>sort</code> compares elements as strings (lexicographic). Pass a comparator block using <code>_</code> and <code>_1</code> (stryke style) or <code>$a</code> and <code>$b</code> (classic Perl) to control ordering: use <code>&lt;=&gt;</code> for numeric and <code>cmp</code> for string comparison. The sort is stable in stryke, meaning equal elements preserve their original relative order. For descending order, reverse the operands in the comparator. Use <code>{ |$x, $y| body }</code> to name the two comparator params. Works naturally in <code>|&gt;</code> pipelines.</p>
         <pre><code class="lang-perl">my @nums = (3, 1, 4, 1, 5)
-my @asc = sort { $_0 &lt;=&gt; $_1 } @nums
+my @asc = sort { _ &lt;=&gt; _1 } @nums
 @asc |&gt; e p   # 1 1 3 4 5
 sort { |$x, $y| $y &lt;=&gt; $x }, @nums   # named params
-my @desc = sort { $_1 &lt;=&gt; $_0 } @nums
+my @desc = sort { _1 &lt;=&gt; _ } @nums
 @desc |&gt; e p  # 5 4 3 1 1
 @nums |&gt; sort |&gt; e p   # string sort in pipeline
 </code></pre>
@@ -881,7 +865,7 @@ my @r = reverse 1:5   # (5,4,3,2,1)
       </article>
       <article class="doc-entry" id="doc-reduce">
         <h3><a class="doc-anchor" href="#doc-reduce">#</a> <code>reduce</code></h3>
-        <p><code>reduce { $_0 OP $_1 } @list</code> — performs a sequential left fold over the list. The first two elements are passed as <code>$_0</code> and <code>$_1</code> to the block; the result becomes <code>$_0</code> for the next iteration. The traditional <code>$a</code>/<code>$b</code> names are also supported for Perl compatibility. Use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
+        <p><code>reduce { _ OP _1 } @list</code> — performs a sequential left fold over the list. The first two elements are passed as <code>_</code> and <code>_1</code> to the block; the result becomes <code>_</code> for the next iteration. The traditional <code>$a</code>/<code>$b</code> names are also supported for Perl compatibility. Use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
         <pre><code class="lang-perl">my $fac = reduce { _ * _1 } 1:6
 p $fac   # 720
 reduce { |$acc, $val| $acc + $val }, 1:10   # 55 (named params)
@@ -890,10 +874,10 @@ my $longest = reduce { length(_) &gt; length(_1) ? _ : _1 } @words
       </article>
       <article class="doc-entry" id="doc-fold">
         <h3><a class="doc-anchor" href="#doc-fold">#</a> <code>fold</code></h3>
-        <p><code>fold { _ OP _1 } INIT, @list</code> — left fold with an explicit initial accumulator value. The initial value is passed as the first <code>$_0</code>, and each list element arrives as <code>$_1</code>. Unlike <code>reduce</code>, <code>fold</code> never returns <code>undef</code> for an empty list — it returns the initial value instead. Both <code>$a</code>/<code>$b</code> and <code>$_0</code>/<code>$_1</code> are supported in the block. Use <code>fold</code> when you need a guaranteed starting point for the accumulation.</p>
+        <p><code>fold { _ OP _1 } INIT, @list</code> — left fold with an explicit initial accumulator value. The initial value is passed as the first <code>_</code>, and each list element arrives as <code>_1</code>. Unlike <code>reduce</code>, <code>fold</code> never returns <code>undef</code> for an empty list — it returns the initial value instead. Both <code>$a</code>/<code>$b</code> and <code>_</code>/<code>_1</code> are supported in the block. Use <code>fold</code> when you need a guaranteed starting point for the accumulation.</p>
         <pre><code class="lang-perl">my $total = fold { _ + _1 } 100, 1:5
 p $total   # 115
-my $csv = fold { &quot;_,_1&quot; } &quot;&quot;, @fields
+my $csv = fold { &quot;$_,$_1&quot; } &quot;&quot;, @fields
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-reductions">
@@ -909,7 +893,7 @@ my $csv = fold { &quot;_,_1&quot; } &quot;&quot;, @fields
         <p><code>all { COND } @list</code> — returns true (1) if every element in the list satisfies the predicate, false (&quot;&quot;) otherwise. The block receives each element as <code>_</code> and should return a boolean. Short-circuits on the first failing element, so it never evaluates more than necessary. Works with <code>|&gt;</code> pipelines and accepts bare lists or array variables.</p>
         <pre><code class="lang-perl">my @nums = 2, 4, 6, 8
 p all { _ % 2 == 0 } @nums   # 1
-1:100 |&gt; all { _ &gt; 0 } |&gt; p  # 1
+~&gt; 1:100 all { _ &gt; 0 } p  # 1
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-any">
@@ -917,7 +901,7 @@ p all { _ % 2 == 0 } @nums   # 1
         <p><code>any { COND } @list</code> — returns true (1) if at least one element satisfies the predicate, false (&quot;&quot;) if none do. The block receives each element as <code>_</code>. Short-circuits on the first match, making it efficient even on large lists. <code>any</code> is a stryke global builtin and can be used in <code>|&gt;</code> pipelines.</p>
         <pre><code class="lang-perl">my @vals = 1, 3, 5, 8
 p any { _ &gt; 7 } @vals   # 1
-1:1000 |&gt; any { _ == 42 } |&gt; p  # 1
+~&gt; 1:1000 any { _ == 42 } p  # 1
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-none">
@@ -933,7 +917,7 @@ p &quot;all non-negative&quot; if none { _ &lt; 0 } @vals
         <p><code>first { COND } @list</code> — returns the first element for which the block returns true, or <code>undef</code> if no element matches. The alias <code>fst</code> is also available. Short-circuits immediately upon finding a match, so only the minimum number of elements are tested. Ideal for searching sorted or unsorted lists when you need a single result.</p>
         <pre><code class="lang-perl">my $f = first { _ &gt; 10 } 3, 7, 12, 20
 p $f   # 12
-1:1_000_000 |&gt; first { _ % 9999 == 0 } |&gt; p  # 9999
+~&gt; 1:1_000_000 first { _ % 9999 == 0 } p  # 9999
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-min">
@@ -1098,7 +1082,7 @@ my @deltas = windowed(2, @vals) |&gt; map { _-&gt;[1] - _-&gt;[0] }
         <h3><a class="doc-anchor" href="#doc-pairs">#</a> <code>pairs</code></h3>
         <p><code>pairs @list</code> — takes a flat list and groups consecutive elements into pairs, returning a list of two-element arrayrefs <code>([$k, $v], ...)</code>. The input list must have an even number of elements. Each pair can be accessed via array indexing (<code>_-&gt;[0]</code>, <code>_-&gt;[1]</code>). This is the inverse of <code>unpairs</code> and is commonly used to iterate over hash-like flat lists in a structured way.</p>
         <pre><code class="lang-perl">my @p = pairs &quot;a&quot;, 1, &quot;b&quot;, 2
-@p |&gt; e { p &quot;_-&gt;[0]=_-&gt;[1]&quot; }   # a=1 b=2
+@p |&gt; e { p &quot;$_-&gt;[0]=$_-&gt;[1]&quot; }   # a=1 b=2
 my @entries = pairs %hash
 </code></pre>
       </article>
@@ -1130,29 +1114,29 @@ my @settings = pairvalues @defaults
       </article>
       <article class="doc-entry" id="doc-pairmap">
         <h3><a class="doc-anchor" href="#doc-pairmap">#</a> <code>pairmap</code></h3>
-        <p><code>pairmap BLOCK @list</code> — maps over consecutive pairs in a flat list, passing the key as <code>$_0</code> (or <code>$a</code>) and the value as <code>$_1</code> (or <code>$b</code>). The block can return any number of elements. This is the pair-aware equivalent of <code>map</code> and is ideal for transforming hash-like flat lists. The result is a flat list of whatever the block returns.</p>
-        <pre><code class="lang-perl">my @out = pairmap { &quot;$_0=$_1&quot; } &quot;a&quot;, 1, &quot;b&quot;, 2
+        <p><code>pairmap BLOCK @list</code> — maps over consecutive pairs in a flat list, passing the key as <code>_</code> (or <code>$a</code>) and the value as <code>_1</code> (or <code>$b</code>). The block can return any number of elements. This is the pair-aware equivalent of <code>map</code> and is ideal for transforming hash-like flat lists. The result is a flat list of whatever the block returns.</p>
+        <pre><code class="lang-perl">my @out = pairmap { &quot;$_=$_1&quot; } &quot;a&quot;, 1, &quot;b&quot;, 2
 @out |&gt; e p   # a=1 b=2
 my @cfg_pairs = (host =&gt; &quot;x&quot;, port =&gt; 80)
-my @upper = pairmap { uc($_0), $_1 } @cfg_pairs
+my @upper = pairmap { uc(_), _1 } @cfg_pairs
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pairgrep">
         <h3><a class="doc-anchor" href="#doc-pairgrep">#</a> <code>pairgrep</code></h3>
-        <p><code>pairgrep { BLOCK } @list</code> — filters consecutive pairs from a flat list, keeping only those where the block returns true. The key is available as <code>$_0</code> (or <code>$a</code>) and the value as <code>$_1</code> (or <code>$b</code>). Returns a flat list of the matching key-value pairs. This is the pair-aware equivalent of <code>grep</code> and is useful for filtering hash-like data by both key and value simultaneously.</p>
-        <pre><code class="lang-perl">my @big = pairgrep { $_1 &gt; 5 } &quot;a&quot;, 3, &quot;b&quot;, 9, &quot;c&quot;, 1
+        <p><code>pairgrep { BLOCK } @list</code> — filters consecutive pairs from a flat list, keeping only those where the block returns true. The key is available as <code>_</code> (or <code>$a</code>) and the value as <code>_1</code> (or <code>$b</code>). Returns a flat list of the matching key-value pairs. This is the pair-aware equivalent of <code>grep</code> and is useful for filtering hash-like data by both key and value simultaneously.</p>
+        <pre><code class="lang-perl">my @big = pairgrep { _1 &gt; 5 } &quot;a&quot;, 3, &quot;b&quot;, 9, &quot;c&quot;, 1
 @big |&gt; e p   # b 9
 my @alert_pairs = (info =&gt; 1, critical_a =&gt; 9, critical_b =&gt; 7)
-my @important = pairgrep { $_0 =~ /^critical/ } @alert_pairs
+my @important = pairgrep { _ =~ /^critical/ } @alert_pairs
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pairfirst">
         <h3><a class="doc-anchor" href="#doc-pairfirst">#</a> <code>pairfirst</code></h3>
-        <p><code>pairfirst { BLOCK } @list</code> — returns the first pair from a flat list where the block returns true, as a two-element list <code>($key, $value)</code>. The key is <code>$_0</code> (or <code>$a</code>) and the value is <code>$_1</code> (or <code>$b</code>). Short-circuits on the first match. Returns an empty list if no pair matches. This is the pair-aware equivalent of <code>first</code>.</p>
-        <pre><code class="lang-perl">my @hit = pairfirst { $_1 &gt; 5 } &quot;x&quot;, 2, &quot;y&quot;, 8
+        <p><code>pairfirst { BLOCK } @list</code> — returns the first pair from a flat list where the block returns true, as a two-element list <code>($key, $value)</code>. The key is <code>_</code> (or <code>$a</code>) and the value is <code>_1</code> (or <code>$b</code>). Short-circuits on the first match. Returns an empty list if no pair matches. This is the pair-aware equivalent of <code>first</code>.</p>
+        <pre><code class="lang-perl">my @hit = pairfirst { _1 &gt; 5 } &quot;x&quot;, 2, &quot;y&quot;, 8
 p &quot;@hit&quot;   # y 8
 my @flags = (info =&gt; 1, debug =&gt; 7, trace =&gt; 0)
-my ($k, $v) = pairfirst { $_0 eq &quot;debug&quot; } @flags
+my ($k, $v) = pairfirst { _ eq &quot;debug&quot; } @flags
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mesh">
@@ -1275,12 +1259,12 @@ my @pixels = nrm @raw_intensities
         <pre><code class="lang-perl">my $double = fn { _ * 2 }
 my $inc    = fn { _ + 1 }
 my $f = compose($inc, $double)
-p $f(5)   # 11  (double 5 → 10, inc 10 → 11)
+p $f-&gt;(5)   # 11  (double 5 → 10, inc 10 → 11)
 
 my $pipeline = compose(
-    fn { join &quot;,&quot;, @{$_[0]} },
-    fn { [sort @{$_[0]}] },
-    fn { [grep { _ &gt; 2 } @{$_[0]}] },
+    fn { join &quot;,&quot;, @{_} },
+    fn { [sort @{_}] },
+    fn { [grep { _ &gt; 2 } @{_}] },
 )
 p $pipeline-&gt;([3,1,4,1,5])  # 3,4,5
 </code></pre>
@@ -1288,11 +1272,11 @@ p $pipeline-&gt;([3,1,4,1,5])  # 3,4,5
       <article class="doc-entry" id="doc-partial">
         <h3><a class="doc-anchor" href="#doc-partial">#</a> <code>partial</code></h3>
         <p><code>partial</code> returns a partially applied function — the bound arguments are prepended to any arguments supplied at call time. <code>partial(\&amp;f, @bound)-&gt;(x)</code> is equivalent to <code>f(@bound, x)</code>. This is the standard partial application from functional programming, useful for creating specialized versions of general functions without closures.</p>
-        <pre><code class="lang-perl">my $add = fn { $_[0] + $_[1] }
+        <pre><code class="lang-perl">my $add = fn { _ + _1 }
 my $add5 = partial($add, 5)
 p $add5-&gt;(3)   # 8
 
-my $log = fn { p &quot;[$_[0]] $_[1]&quot; }
+my $log = fn { p &quot;[$_] $_1&quot; }
 my $warn_log = partial($log, &quot;WARN&quot;)
 $warn_log-&gt;(&quot;disk full&quot;)   # [WARN] disk full
 </code></pre>
@@ -1300,7 +1284,7 @@ $warn_log-&gt;(&quot;disk full&quot;)   # [WARN] disk full
       <article class="doc-entry" id="doc-curry">
         <h3><a class="doc-anchor" href="#doc-curry">#</a> <code>curry</code></h3>
         <p><code>curry</code> auto-curries a function with a given arity. The curried function accumulates arguments across calls and invokes the original only when enough have been collected. <code>curry(\&amp;f, N)-&gt;(a)-&gt;(b)</code> calls <code>f(a, b)</code> when N=2. If all arguments are supplied at once, it calls immediately.</p>
-        <pre><code class="lang-perl">my $add = curry(fn { $_[0] + $_[1] }, 2)
+        <pre><code class="lang-perl">my $add = curry(fn { _ + _1 }, 2)
 my $add5 = $add-&gt;(5)
 p $add5-&gt;(3)       # 8
 p $add-&gt;(10, 20)   # 30  (enough args — calls immediately)
@@ -1310,12 +1294,12 @@ p $add-&gt;(10, 20)   # 30  (enough args — calls immediately)
         <h3><a class="doc-anchor" href="#doc-memoize">#</a> <code>memoize</code></h3>
         <p><code>memoize</code> (alias <code>memo</code>) wraps a function so that repeated calls with the same arguments return a cached result instead of re-executing the function. Arguments are stringified and joined as the cache key. This is essential for expensive pure functions like recursive algorithms, API lookups with stable results, or any computation where the same inputs always produce the same output.</p>
         <pre><code class="lang-perl">my $fib = memoize(fn {
-    my $n = $_[0]
+    my $n = _
     $n &lt; 2 ? $n : $fib-&gt;($n-1) + $fib-&gt;($n-2)
 })
 p $fib-&gt;(30)   # instant (without memoize: ~1B calls)
 
-my $fetch_user = memo(fn { fetch_json(&quot;https://api/users/$_[0]&quot;) })
+my $fetch_user = memo(fn { fetch_json(&quot;https://api/users/$_&quot;) })
 $fetch_user-&gt;(42)   # hits API
 $fetch_user-&gt;(42)   # returns cached
 </code></pre>
@@ -1341,7 +1325,7 @@ my @defaults = map { constantly(0)-&gt;() } 1:5   # [0,0,0,0,0]
       <article class="doc-entry" id="doc-complement">
         <h3><a class="doc-anchor" href="#doc-complement">#</a> <code>complement</code></h3>
         <p><code>complement</code> (alias <code>compl</code>) wraps a predicate function and returns a new function that negates its boolean result. <code>complement(\&amp;even?)-&gt;(3)</code> returns true. This is the functional equivalent of <code>!f(x)</code> without creating a closure.</p>
-        <pre><code class="lang-perl">my $even = fn { $_[0] % 2 == 0 }
+        <pre><code class="lang-perl">my $even = fn { _ % 2 == 0 }
 my $odd = complement($even)
 p $odd-&gt;(3)   # 1
 p $odd-&gt;(4)   # 0
@@ -1359,7 +1343,7 @@ p &quot;@r&quot;   # 1 5 2.8
       <article class="doc-entry" id="doc-fnil">
         <h3><a class="doc-anchor" href="#doc-fnil">#</a> <code>fnil</code></h3>
         <p><code>fnil</code> wraps a function so that any <code>undef</code> arguments are replaced with the given defaults before the function is called. This eliminates repetitive <code>// $default</code> patterns inside function bodies.</p>
-        <pre><code class="lang-perl">my $greet = fnil(fn { &quot;Hello, $_[0]!&quot; }, &quot;World&quot;)
+        <pre><code class="lang-perl">my $greet = fnil(fn { &quot;Hello, $_!&quot; }, &quot;World&quot;)
 p $greet-&gt;(undef)    # Hello, World!
 p $greet-&gt;(&quot;Alice&quot;)  # Hello, Alice!
 </code></pre>
@@ -1725,7 +1709,7 @@ slurp(&quot;config.json&quot;) |&gt; fj
         <pre><code class="lang-perl">my $yaml = &quot;name: Alice\nage: 30&quot;
 my $data = from_yaml($yaml)
 p $data-&gt;{name}   # Alice
-slurp(&quot;config.yaml&quot;) |&gt; fy |&gt; say _-&gt;{database}{host}
+slurp(&quot;config.yaml&quot;) |&gt; fy |&gt; p _-&gt;{database}{host}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-from-toml">
@@ -1734,7 +1718,7 @@ slurp(&quot;config.yaml&quot;) |&gt; fy |&gt; say _-&gt;{database}{host}
         <pre><code class="lang-perl">my $toml = &quot;[package]\nname = \&quot;myapp\&quot;\nversion = \&quot;1.0\&quot;&quot;
 my $data = from_toml($toml)
 p $data-&gt;{package}{name}   # myapp
-slurp(&quot;Cargo.toml&quot;) |&gt; ftoml |&gt; say _-&gt;{package}{version}
+slurp(&quot;Cargo.toml&quot;) |&gt; ftoml |&gt; p _-&gt;{package}{version}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-from-xml">
@@ -1743,7 +1727,7 @@ slurp(&quot;Cargo.toml&quot;) |&gt; ftoml |&gt; say _-&gt;{package}{version}
         <pre><code class="lang-perl">my $xml = &#39;&lt;root&gt;&lt;name&gt;Alice&lt;/name&gt;&lt;age&gt;30&lt;/age&gt;&lt;/root&gt;&#39;
 my $data = from_xml($xml)
 p $data-&gt;{root}{name}   # Alice
-slurp(&quot;config.xml&quot;) |&gt; fx |&gt; say _-&gt;{config}{database}{host}
+slurp(&quot;config.xml&quot;) |&gt; fx |&gt; p _-&gt;{config}{database}{host}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-from-csv">
@@ -2228,7 +2212,7 @@ p &quot;peer: &quot; . inet_ntoa($ip) . &quot;:$port&quot;
         <h3><a class="doc-anchor" href="#doc-gethostbyname">#</a> <code>gethostbyname</code></h3>
         <p>Resolve a hostname to its network addresses using the system resolver. Returns <code>($name, $aliases, $addrtype, $length, @addrs)</code>. The addresses are packed binary — pass them through <code>inet_ntoa</code> to get dotted-quad strings. This is the classic DNS forward-lookup function.</p>
         <pre><code class="lang-perl">my @info = gethostbyname(&quot;example.com&quot;)
-my @addrs = @info[4..$ #info]
+my @addrs = @info[4:$ #info]
 @addrs |&gt; map inet_ntoa |&gt; e p
 my $ip = inet_ntoa((gethostbyname(&quot;localhost&quot;))[4])
 p $ip   # 127.0.0.1
@@ -3593,7 +3577,7 @@ printf &quot;%s has %d item%s\n&quot;, $user, $n, $n == 1 ? &quot;&quot; : &quot
         <pre><code class="lang-perl">my $hex = sprintf &quot;0x%04x&quot;, 255
 my $padded = sprintf &quot;%08d&quot;, $id
 my $msg = sprintf &quot;%-20s: %s&quot;, $key, $value
-my @rows = map { sprintf &quot;%3d. %s&quot;, _, $names[_] } 0..$ #names
+my @rows = map { sprintf &quot;%3d. %s&quot;, _, $names[_] } 0:$ #names
 @rows |&gt; e p
 </code></pre>
       </article>
@@ -4222,7 +4206,7 @@ keys(@a) |&gt; e p              # 0 1 2
         <p><code>values %hash</code> — returns the list of all values in a hash in no particular order (matching the order of <code>keys</code> for the same hash state). When called on an array, it returns the array elements themselves. In scalar context, returns the count of values. Like <code>keys</code>, calling <code>values</code> resets the <code>each</code> iterator. In stryke this maps to Rust&#39;s <code>HashMap::values()</code>. Combine with <code>sum</code>, <code>sort</code>, or pipeline operators for common aggregation patterns.</p>
         <pre><code class="lang-perl">my %scores = (alice =&gt; 90, bob =&gt; 85)
 p sum(values %scores)   # 175
-values(%scores) |&gt; sort { $_1 &lt;=&gt; $_0 } |&gt; e p   # 90 85
+values(%scores) |&gt; sort { _1 &lt;=&gt; _ } |&gt; e p   # 90 85
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-each">
@@ -4281,7 +4265,7 @@ p $val if defined $val
 undef $x
 p defined($x) ? &quot;def&quot; : &quot;undef&quot;   # undef
 fn maybe { return undef if !@_
-    return $_[0] }
+    return _ }
 p defined(maybe()) ? &quot;got&quot; : &quot;nothing&quot;   # nothing
 </code></pre>
       </article>
@@ -4769,7 +4753,7 @@ Use `my` everywhere unless you specifically need `our` (package global), `local`
       <article class="doc-entry" id="doc-our">
         <h3><a class="doc-anchor" href="#doc-our">#</a> <code>our</code></h3>
         <p>Declare a package-global variable accessible as a lexical alias in the current scope. Unlike <code>my</code>, <code>our</code> variables are visible across the entire package and can be accessed from other packages via their fully qualified name (e.g. <code>$Counter::total</code>). Useful for package-level configuration, shared counters, or variables that need to survive across file boundaries.</p>
-        <p>In stryke, <code>our</code> variables are NOT mutex-protected. <strong>Mutating an <code>our</code> variable from inside <code>fan</code>/<code>pmap</code>/<code>pfor</code> is rejected at runtime</strong> with a directive to use <a href="#doc-oursync"><code>oursync</code></a> (the package-global counterpart of <code>mysync</code> — same <code>Arc&lt;Mutex&gt;</code> backing, keyed by <code>Pkg::x</code>).</p>
+        <p>In stryke, <code>our</code> variables are NOT mutex-protected. <strong>Mutating an <code>our</code> variable from inside <code>fan</code>/<code>pmap</code>/<code>pfor</code> is rejected at runtime</strong> with a directive to use <code>oursync</code> (the package-global counterpart of <code>mysync</code> — same <code>Arc&lt;Mutex&gt;</code> backing, keyed by <code>Pkg::x</code>).</p>
         <pre><code class="lang-perl">package Counter
 our $total = 0           # serial use only
 fn bump { $total++ }
@@ -4782,7 +4766,8 @@ package C
 oursync $shared = 0
 fn inc { $shared++ }
 package main
-fan 10000 { C::inc() }   # always exactly 10000</code></pre>
+fan 10000 { C::inc() }   # always exactly 10000
+</code></pre>
         <p>Prefer <code>my</code> for local state; <code>our</code> for cross-package read-mostly globals; <code>oursync</code> for cross-package mutation under parallelism.</p>
       </article>
       <article class="doc-entry" id="doc-local">
@@ -5550,7 +5535,7 @@ p &quot;$bytes bytes&quot;
         <h3><a class="doc-anchor" href="#doc-du-tree">#</a> <code>du_tree</code></h3>
         <p><code>du_tree</code> (alias <code>dir_sizes</code>) — return directory sizes as an array of hashrefs <code>{path, size}</code>, sorted descending by size. Each entry is an immediate child directory.</p>
         <pre><code class="lang-perl">my @dirs = du_tree(&quot;/usr/local&quot;)
-for (@dirs) { p &quot;_-&gt;{path}: _-&gt;{size}&quot; }
+for (@dirs) { p &quot;$_-&gt;{path}: $_-&gt;{size}&quot; }
 </code></pre>
       </article>
     </section>
@@ -5767,7 +5752,7 @@ syscall(162)               # flush filesystem caches
         <h3><a class="doc-anchor" href="#doc-process-list">#</a> <code>process_list</code></h3>
         <p><code>process_list</code> (aliases <code>ps</code>, <code>procs</code>) — list running processes as an array of hashrefs with <code>{pid, name, uid}</code> keys.</p>
         <pre><code class="lang-perl">my @procs = ps()
-for (@procs) { p &quot;_-&gt;{pid} _-&gt;{name}&quot; }
+for (@procs) { p &quot;$_-&gt;{pid} $_-&gt;{name}&quot; }
 </code></pre>
       </article>
     </section>
@@ -6051,7 +6036,7 @@ p &quot;$tags-&gt;{artist} - $tags-&gt;{title}&quot;
         <h3><a class="doc-anchor" href="#doc-net-interfaces">#</a> <code>net_interfaces</code></h3>
         <p><code>net_interfaces</code> (aliases <code>net_ifs</code>, <code>ifconfig</code>) — list all network interfaces with name, IPs, MAC, and status.</p>
         <pre><code class="lang-perl">my @ifs = net_ifs()
-for (@ifs) { p &quot;_-&gt;{name}: _-&gt;{ipv4}&quot; }
+for (@ifs) { p &quot;$_-&gt;{name}: $_-&gt;{ipv4}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-net-ipv4">
@@ -6171,14 +6156,14 @@ p @dns   # e.g. 8.8.8.8, 8.8.4.4
         <h3><a class="doc-anchor" href="#doc-html-parse">#</a> <code>html_parse</code></h3>
         <p><code>html_parse</code> (alias <code>parse_html</code>) — parse an HTML string into an array of element hashrefs with tag, text, and attrs.</p>
         <pre><code class="lang-perl">my @els = html_parse(slurp(&quot;page.html&quot;))
-for (@els) { p &quot;_-&gt;{tag}: _-&gt;{text}&quot; }
+for (@els) { p &quot;$_-&gt;{tag}: $_-&gt;{text}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-css-select">
         <h3><a class="doc-anchor" href="#doc-css-select">#</a> <code>css_select</code></h3>
         <p><code>css_select</code> (aliases <code>css</code>, <code>qs</code>, <code>query_selector</code>) — query parsed HTML with a CSS selector. Returns matching elements as hashrefs with tag, text, attrs, and html.</p>
         <pre><code class="lang-perl">my @links = css_select(slurp(&quot;page.html&quot;), &quot;a.nav&quot;)
-for (@links) { p &quot;_-&gt;{tag} _-&gt;{attrs}{href}&quot; }
+for (@links) { p &quot;$_-&gt;{tag} $_-&gt;{attrs}{href}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-xml-parse">
@@ -6234,14 +6219,14 @@ p @sorted
         <h3><a class="doc-anchor" href="#doc-git-log">#</a> <code>git_log</code></h3>
         <p><code>git_log</code> (alias <code>glog</code>) — get the last N commits as an array of hashrefs (hash, author, date, message).</p>
         <pre><code class="lang-perl">my @commits = glog(10)
-for (@commits) { p &quot;_-&gt;{hash} _-&gt;{message}&quot; }
+for (@commits) { p &quot;$_-&gt;{hash} $_-&gt;{message}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-git-status">
         <h3><a class="doc-anchor" href="#doc-git-status">#</a> <code>git_status</code></h3>
         <p><code>git_status</code> (alias <code>gst</code>) — get working tree status as an array of hashrefs (path, status).</p>
         <pre><code class="lang-perl">my @st = gst()
-for (@st) { p &quot;_-&gt;{status} _-&gt;{path}&quot; }
+for (@st) { p &quot;$_-&gt;{status} $_-&gt;{path}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-git-diff">
@@ -6275,7 +6260,7 @@ p @tags
         <h3><a class="doc-anchor" href="#doc-git-authors">#</a> <code>git_authors</code></h3>
         <p><code>git_authors</code> (alias <code>gauthors</code>) — list unique authors sorted by commit count as hashrefs.</p>
         <pre><code class="lang-perl">my @authors = gauthors()
-for (@authors) { p &quot;_-&gt;{name}: _-&gt;{count}&quot; }
+for (@authors) { p &quot;$_-&gt;{name}: $_-&gt;{count}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-git-files">
@@ -6306,7 +6291,7 @@ p gshow(&quot;abc1234&quot;)
         <h3><a class="doc-anchor" href="#doc-mounts">#</a> <code>mounts</code></h3>
         <p><code>mounts</code> (aliases <code>disk_mounts</code>, <code>filesystems</code>) — list mounted filesystems with usage (total, used, available).</p>
         <pre><code class="lang-perl">my @m = mounts()
-for (@m) { p &quot;_-&gt;{mount}: _-&gt;{used}/_-&gt;{total}&quot; }
+for (@m) { p &quot;$_-&gt;{mount}: $_-&gt;{used}/$_-&gt;{total}&quot; }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-thread-count">
@@ -6539,7 +6524,7 @@ my $r = ai &quot;extract user&quot;, schema =&gt; +{ name =&gt; &quot;string&quo
         <p><code>stream_prompt $prompt, on_chunk =&gt; sub { ... }</code> — Anthropic SSE streaming. With <code>on_chunk</code>, fires once per text-delta. Without, returns a <code>PerlIterator</code>-backed handle: <code>for my $chunk in stream_prompt(&quot;...&quot;) { print $chunk }</code>.</p>
         <pre><code class="lang-perl">my $state = +{ buf =&gt; &quot;&quot; };
 stream_prompt(&quot;write a haiku&quot;,
-    on_chunk =&gt; sub { $state-&gt;{buf} .= $_[0]; print $_[0] });
+    on_chunk =&gt; sub { $state-&gt;{buf} .= _; print _ });
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-chat">
@@ -6664,7 +6649,7 @@ my @vecs = @{ embed([&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]) }
         <p><code>ai_register_tool($name, $description, +{params}, sub { ... })</code> — register a tool that the bare <code>ai($prompt)</code> call auto-attaches to its agent loop. Idempotent re-register on same name.</p>
         <pre><code class="lang-perl">ai_register_tool(&quot;weather&quot;, &quot;Get weather&quot;,
     +{ city =&gt; &quot;string&quot; },
-    sub { fetch &quot;https://api.weather.com/&quot; . uri_encode($_[0]-&gt;{city}) });
+    sub { fetch &quot;https://api.weather.com/&quot; . uri_encode(_-&gt;{city}) });
 ai_clear_tools();
 </code></pre>
         <p>For parser-level sugar, use <code>tool fn</code> instead.</p>
@@ -9719,7 +9704,7 @@ p j1(1.84) # ≈ 0.582 (first max)
       <article class="doc-entry" id="doc-bisect">
         <h3><a class="doc-anchor" href="#doc-bisect">#</a> <code>bisect</code></h3>
         <p><code>bisection</code> (alias <code>bisect</code>) finds a root of f(x)=0 in [a,b] via the bisection method. Takes a code ref, a, b, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = bisect(fn { $_[0]**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
+        <pre><code class="lang-perl">my $root = bisect(fn { _**2 - 2 }, 1, 2)  # √2 ≈ 1.4142
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-bit-and">
@@ -12872,7 +12857,7 @@ my $D2 = dist_mat([[0,0],[1,1]], &quot;manhattan&quot;)  # Manhattan
       <article class="doc-entry" id="doc-do-call">
         <h3><a class="doc-anchor" href="#doc-do-call">#</a> <code>do_call</code></h3>
         <p><code>do_call</code> — call a function with args from a list. Like R&#39;s do.call().</p>
-        <pre><code class="lang-perl">my $result = docall(fn { $_[0] + $_[1] }, [3, 4])  # 7
+        <pre><code class="lang-perl">my $result = docall(fn { _ + _1 }, [3, 4])  # 7
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-doppler">
@@ -13664,7 +13649,7 @@ p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
       <article class="doc-entry" id="doc-euler-method">
         <h3><a class="doc-anchor" href="#doc-euler-method">#</a> <code>euler_method</code></h3>
         <p><code>euler_ode</code> (alias <code>euler_method</code>) solves an ODE dy/dt = f(t,y) using the Euler method. Returns [[t,y], ...].</p>
-        <pre><code class="lang-perl">my $sol = euler_ode(fn { $_[1] }, 0, 1, 0.01, 100)  # exponential growth
+        <pre><code class="lang-perl">my $sol = euler_ode(fn { _1 }, 0, 1, 0.01, 100)  # exponential growth
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-euler-number">
@@ -14998,7 +14983,7 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
       <article class="doc-entry" id="doc-golden">
         <h3><a class="doc-anchor" href="#doc-golden">#</a> <code>golden</code></h3>
         <p><code>golden_section</code> (aliases <code>golden</code>, <code>gss</code>) finds the minimum of f on [a,b] via golden-section search.</p>
-        <pre><code class="lang-perl">my $xmin = golden(fn { ($_[0]-3)**2 }, 0, 10)  # 3.0
+        <pre><code class="lang-perl">my $xmin = golden(fn { (_-3)**2 }, 0, 10)  # 3.0
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-golden-ratio">
@@ -20741,7 +20726,7 @@ p powmod(3, 13, 50)    # 7
       <article class="doc-entry" id="doc-newton">
         <h3><a class="doc-anchor" href="#doc-newton">#</a> <code>newton</code></h3>
         <p><code>newton_method</code> (aliases <code>newton</code>, <code>newton_raphson</code>) finds a root via Newton-Raphson. Takes f, f&#39;, x0, and optional tolerance.</p>
-        <pre><code class="lang-perl">my $root = newton(fn { $_[0]**2 - 2 }, fn { 2*$_[0] }, 1.5)  # √2
+        <pre><code class="lang-perl">my $root = newton(fn { _**2 - 2 }, fn { 2*_ }, 1.5)  # √2
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-newtons-to-lbf">
@@ -24029,7 +24014,7 @@ my $down = resample(\@signal, 0.5) # halve sample rate
         <h3><a class="doc-anchor" href="#doc-rk4">#</a> <code>rk4</code></h3>
         <p><code>rk4</code> (aliases <code>runge_kutta</code>, <code>rk4_ode</code>) solves an ODE dy/dt = f(t,y) using 4th-order Runge-Kutta. Returns [[t,y], ...].</p>
         <pre><code class="lang-perl"># dy/dt = -y, y(0) = 1 → y = e^(-t)
-my $sol = rk4(fn { -$_[1] }, 0, 1, 0.1, 100)
+my $sol = rk4(fn { -_1 }, 0, 1, 0.1, 100)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-rl-time-constant">
@@ -24586,7 +24571,7 @@ my @y = @{rnorm(100, 50, 10)}   # mean=50, sd=10
       <article class="doc-entry" id="doc-sapply">
         <h3><a class="doc-anchor" href="#doc-sapply">#</a> <code>sapply</code></h3>
         <p><code>sapply</code> — apply a function to each element, return a vector. Like R&#39;s sapply().</p>
-        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], fn { $_[0] ** 2 })}  # [1,4,9,16]
+        <pre><code class="lang-perl">my @sq = @{sapply([1,2,3,4], fn { _ ** 2 })}  # [1,4,9,16]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sat01">
@@ -26516,7 +26501,7 @@ p $t{a}  # 3
       <article class="doc-entry" id="doc-tapply">
         <h3><a class="doc-anchor" href="#doc-tapply">#</a> <code>tapply</code></h3>
         <p><code>tapply</code> — apply a function by group. Takes data, group labels, and function. Returns hash. Like R&#39;s tapply().</p>
-        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], fn { avg(@{$_[0]}) })}
+        <pre><code class="lang-perl">my %means = %{tapply([1,2,3,4], [&quot;a&quot;,&quot;a&quot;,&quot;b&quot;,&quot;b&quot;], fn { avg(@{_}) })}
 p $means{a}  # 1.5
 p $means{b}  # 3.5
 </code></pre>
@@ -28107,7 +28092,7 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
       <article class="doc-entry" id="doc-which-fn">
         <h3><a class="doc-anchor" href="#doc-which-fn">#</a> <code>which_fn</code></h3>
         <p><code>which_fn</code> — return indices where a predicate is true. Like R&#39;s which().</p>
-        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], fn { $_[0] &gt; 3 })}  # [1, 3]
+        <pre><code class="lang-perl">my @idx = @{which_fn([1,5,3,8,2], fn { _ &gt; 3 })}  # [1, 3]
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-white">
