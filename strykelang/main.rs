@@ -2069,6 +2069,15 @@ fn main() {
                 if let Some(mut p) = interp.profiler.take() {
                     emit_profiler_report(&mut p, &flame_stdout, flame_is_tty);
                 }
+                // `test_run` no longer calls `std::process::exit(1)` from inside the
+                // VM (used to make embedding impossible). It sets a flag instead;
+                // the CLI driver translates that into the process exit code.
+                if interp
+                    .test_run_failed
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                {
+                    process::exit(1);
+                }
             }
             Err(e) => match e.kind {
                 ErrorKind::Exit(code) => {
@@ -2127,7 +2136,16 @@ fn run_embedded_script(embedded: stryke::aot::EmbeddedScript, argv: Vec<String>)
         Ok(_) => {
             let _ = interp.run_global_teardown();
             let _ = io::stdout().flush();
-            0
+            // `test_run` sets this flag on assertion failure (replaces the previous
+            // in-VM `std::process::exit(1)`).
+            if interp
+                .test_run_failed
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                1
+            } else {
+                0
+            }
         }
         Err(e) => match e.kind {
             ErrorKind::Exit(code) => code,
@@ -2185,7 +2203,16 @@ fn run_embedded_bundle(bundle: stryke::aot::EmbeddedBundle, argv: Vec<String>) -
         Ok(_) => {
             let _ = interp.run_global_teardown();
             let _ = io::stdout().flush();
-            0
+            // `test_run` sets this flag on assertion failure (replaces the previous
+            // in-VM `std::process::exit(1)`).
+            if interp
+                .test_run_failed
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                1
+            } else {
+                0
+            }
         }
         Err(e) => match e.kind {
             ErrorKind::Exit(code) => code,
@@ -2231,7 +2258,16 @@ fn run_builtin_subcommand(name: &str, argv: &[String]) -> i32 {
         Ok(_) => {
             let _ = interp.run_global_teardown();
             let _ = io::stdout().flush();
-            0
+            // `test_run` sets this flag on assertion failure (replaces the previous
+            // in-VM `std::process::exit(1)`).
+            if interp
+                .test_run_failed
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                1
+            } else {
+                0
+            }
         }
         Err(e) => match e.kind {
             ErrorKind::Exit(code) => code,

@@ -658,6 +658,21 @@ pub struct VMHelper {
     pub default_print_handle: String,
     /// Suppress stdout output (fan workers with progress bars).
     pub suppress_stdout: bool,
+    /// Per-instance test counters for `assert_*` / `test_run` / `test_skip` (stryke
+    /// `.stk` test framework). Atomics so the immutable-ref builtin signature
+    /// (`fn(&VMHelper, ...)`) can mutate without changing every call site. Replaces
+    /// the previous `AtomicUsize` process-globals which leaked counts across runs
+    /// in a single process — embedders running multiple `.stk` programs in one
+    /// `VMHelper` would see the previous run's counts contaminate the next.
+    pub test_pass_count: std::sync::atomic::AtomicUsize,
+    pub test_fail_count: std::sync::atomic::AtomicUsize,
+    pub test_skip_count: std::sync::atomic::AtomicUsize,
+    /// Set to `true` by `test_run` when any assertion failed during the run.
+    /// CLI driver (`main.rs`) reads this after `execute` returns and exits with
+    /// code 1. Replaces the previous in-VM `std::process::exit(1)` which made
+    /// embedding (running a `.stk` program from a Rust harness) impossible —
+    /// any failing test would kill the host process.
+    pub test_run_failed: std::sync::atomic::AtomicBool,
     /// Child wait status (`$?`) — POSIX-style (exit code in high byte, etc.).
     pub child_exit_status: i64,
     /// Last successful match (`$&`, `${^MATCH}`).
@@ -1508,6 +1523,10 @@ impl VMHelper {
             output_autoflush: false,
             default_print_handle: "STDOUT".to_string(),
             suppress_stdout: false,
+            test_pass_count: std::sync::atomic::AtomicUsize::new(0),
+            test_fail_count: std::sync::atomic::AtomicUsize::new(0),
+            test_skip_count: std::sync::atomic::AtomicUsize::new(0),
+            test_run_failed: std::sync::atomic::AtomicBool::new(false),
             child_exit_status: 0,
             last_match: String::new(),
             prematch: String::new(),
@@ -1840,6 +1859,13 @@ impl VMHelper {
             output_autoflush: self.output_autoflush,
             default_print_handle: self.default_print_handle.clone(),
             suppress_stdout: self.suppress_stdout,
+            // Workers start with fresh test counters — they don't share with the
+            // parent. The parent is responsible for aggregating across workers if
+            // it cares (none of the current parallel callers do).
+            test_pass_count: std::sync::atomic::AtomicUsize::new(0),
+            test_fail_count: std::sync::atomic::AtomicUsize::new(0),
+            test_skip_count: std::sync::atomic::AtomicUsize::new(0),
+            test_run_failed: std::sync::atomic::AtomicBool::new(false),
             child_exit_status: self.child_exit_status,
             last_match: self.last_match.clone(),
             prematch: self.prematch.clone(),
