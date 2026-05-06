@@ -2931,6 +2931,11 @@ impl VMHelper {
                 | ":"
                 | "*"
                 | "INC"
+                // sort/reduce comparator slots — predefined package globals
+                // ($main::a, $main::b). Perl exempts them globally, not just
+                // inside sort blocks, so any reference compiles cleanly.
+                | "a"
+                | "b"
         ) || name.chars().all(|c| c.is_ascii_digit())
             || name.starts_with('^')
             || (name.starts_with('#') && name.len() > 1)

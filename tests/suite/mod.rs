@@ -23,6 +23,7 @@ mod behavior_pin_2026_05_ao;
 mod behavior_pin_2026_05_ap;
 mod behavior_pin_2026_05_aq;
 mod behavior_pin_2026_05_ar;
+mod behavior_pin_2026_05_as;
 mod behavior_pin_2026_05_b;
 mod behavior_pin_2026_05_c;
 mod behavior_pin_2026_05_d;
