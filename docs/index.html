@@ -848,6 +848,24 @@ my @r = reject $is_big, @l                <span class="comment"># inverse of gre
       </section>
 
       <section class="tutorial-section">
+        <h2>Implicit zero-arg coderef from bare positional</h2>
+        <p>At <strong>module top level</strong>, a <code>my $f = …</code> declaration whose RHS <em>begins</em> with a bare positional alias (<code>_</code>, <code>_0</code>, <code>_1</code>, …; no <code>$</code> sigil) is auto-wrapped as a zero-arg coderef. Inside any block (<code>fn</code>, <code>map</code>, <code>grep</code>, <code>for</code>, …) bare <code>_</code> is the bound topic, so this sugar only fires where <code>_</code> would otherwise be unbound.</p>
+<pre><span class="comment"># at top level — these two forms are equivalent:</span>
+my $f = _ * 2
+my $f = fn { _ * 2 }
+$f-&gt;(5)                <span class="comment"># 10</span>
+
+<span class="comment"># multi-arg coderefs via _1, _2, …:</span>
+my $g = _ + _1
+$g-&gt;(3, 4)             <span class="comment"># 7</span>
+
+<span class="comment"># inside a block, _ is the topic — NOT auto-wrapped:</span>
+fn dbl { my $x = _; $x * 2 }      <span class="comment"># $x captures the first arg</span>
+map { my $i = _; $i * 2 } 1:3     <span class="comment"># $i captures each element</span></pre>
+        <p><strong>Heuristic</strong>: the wrap fires only when (a) we're at <code>block_depth == 0</code>, (b) the LHS is a single scalar, (c) the first RHS token is a bare positional alias (so <code>match (5) { _ =&gt; … }</code> stays a match expression), and (d) the RHS isn't already a coderef-shaped value. <strong>Disabled under <code>--compat</code></strong>.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Hash-key power forms</h2>
         <p>Stryke extends Perl's bareword autoquoting in three ways:</p>
         <ul>

@@ -12,4 +12,4 @@ fn Exercism::RobotName::_unique {
 
 fn Exercism::RobotName::new = { name => Exercism::RobotName::_unique() }
 fn Exercism::RobotName::name = _->{name}
-fn Exercism::RobotName::reset_name = do { my $r = _; delete $_USED{$r->{name}}; $r->{name} = Exercism::RobotName::_unique(); $r }
+fn Exercism::RobotName::reset_name ($r)= do { delete $_USED{$r->{name}}; $r->{name} = Exercism::RobotName::_unique(); $r }

@@ -212,7 +212,9 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> PerlResult<
     };
     let mut lexer = lexer::Lexer::new_with_file(&desugared, file);
     let tokens = lexer.tokenize()?;
+    let bare_positional_indices = std::mem::take(&mut lexer.bare_positional_indices);
     let mut parser = parser::Parser::new_with_file(tokens, file);
+    parser.bare_positional_indices = bare_positional_indices;
     parser.parsing_module = is_module;
     parser.parse_program()
 }
