@@ -24,6 +24,7 @@ fn destructure_stmt_from_var_decls(keyword: &str, decls: Vec<VarDecl>, line: usi
         "my" => StmtKind::My(decls),
         "mysync" => StmtKind::MySync(decls),
         "our" => StmtKind::Our(decls),
+        "oursync" => StmtKind::OurSync(decls),
         "local" => StmtKind::Local(decls),
         "state" => StmtKind::State(decls),
         _ => unreachable!("parse_my_our_local keyword"),
@@ -691,6 +692,15 @@ impl Parser {
                         ));
                     }
                     self.parse_my_our_local("mysync", false)?
+                }
+                "oursync" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`oursync` is a stryke extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_my_our_local("oursync", false)?
                 }
                 "frozen" | "const" => {
                     let leading = kw.as_str().to_string();
@@ -5494,6 +5504,7 @@ impl Parser {
                                 "my" => StmtKind::My(decls),
                                 "mysync" => StmtKind::MySync(decls),
                                 "our" => StmtKind::Our(decls),
+                                "oursync" => StmtKind::OurSync(decls),
                                 "local" => StmtKind::Local(decls),
                                 "state" => StmtKind::State(decls),
                                 _ => unreachable!(),
@@ -5557,6 +5568,7 @@ impl Parser {
             "my" => StmtKind::My(decls),
             "mysync" => StmtKind::MySync(decls),
             "our" => StmtKind::Our(decls),
+            "oursync" => StmtKind::OurSync(decls),
             "local" => StmtKind::Local(decls),
             "state" => StmtKind::State(decls),
             _ => unreachable!(),
@@ -15420,6 +15432,20 @@ impl Parser {
                     while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
                         name.push(chars[i]);
                         i += 1;
+                    }
+                    // Package-qualified names: `$Foo::x`, `$Foo::Bar::baz`. Mirror
+                    // the `$#Foo::a` continuation logic. Without this, `"$Foo::x"`
+                    // captures only `Foo` and leaves `::x` as literal text — the
+                    // interpolation reads bare `$Foo`, which is undef.
+                    while i + 1 < chars.len() && chars[i] == ':' && chars[i + 1] == ':' {
+                        name.push_str("::");
+                        i += 2;
+                        while i < chars.len()
+                            && (chars[i].is_alphanumeric() || chars[i] == '_')
+                        {
+                            name.push(chars[i]);
+                            i += 1;
+                        }
                     }
                     // `$_<`, `$_<<`, … — outer topic (stryke extension). Also
                     // `$_N<`, `$_N<<` for positional aliases. And the indexed

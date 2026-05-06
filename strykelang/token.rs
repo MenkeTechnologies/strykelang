@@ -206,6 +206,7 @@ pub const KEYWORDS: &[&str] = &[
     "my",
     "mysync",
     "our",
+    "oursync",
     "local",
     "sub",
     "fn",
