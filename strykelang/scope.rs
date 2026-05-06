@@ -2527,6 +2527,18 @@ impl Scope {
             //   - --compat: cell is shared with outer scope (Perl 5).
             for (i, v) in frame.scalar_slots.iter_mut().enumerate() {
                 if let Some(Some(name)) = frame.scalar_slot_names.get(i) {
+                    // Cross-storage shadow check: a hash-stored scalar with this
+                    // name was already captured from an inner frame (e.g. a
+                    // sub-parameter declared via `apply_sub_signature` in the
+                    // callee's frame). Capturing the outer slot-stored entry too
+                    // would put BOTH into the closure's call frame on restore,
+                    // and `Frame::get_scalar` checks slots before scalars — so
+                    // the slot-stored OUTER value would shadow the parameter on
+                    // every closure body lookup. Skip the slot-stored entry to
+                    // let the hash-stored param win at runtime.
+                    if !name.is_empty() && seen_hash_scalars.contains(name) {
+                        continue;
+                    }
                     let cap_val = if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                         v.clone()
                     } else {
