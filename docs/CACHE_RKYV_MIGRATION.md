@@ -52,7 +52,7 @@ Per the project framing: stryke is the second-priority project after zshrs, and 
 | Aspect | Before | After |
 |---|---|---|
 | Crate | `rusqlite` + bundled SQLite C | `rkyv = "0.7"` with `validation`, `archive_le`, `size_32` features |
-| Path | `~/.cache/stryke/scripts.db` (+ WAL, SHM files) | `~/.cache/stryke/scripts.rkyv` (+ `.rkyv.lock`) |
+| Path | `~/.cache/stryke/scripts.db` (+ WAL, SHM files) | `~/.stryke/scripts.rkyv` (+ `.rkyv.lock`) — legacy `~/.cache/stryke/scripts.rkyv` is auto-migrated on first run |
 | Storage | SQL table with BLOB columns | rkyv-archived `ScriptShard { header, entries: HashMap<path, ScriptEntry> }` |
 | Lookup | SQL B-tree probe via path index | `ArchivedHashMap::get` (zero-copy hashbrown) |
 | Compression | zstd L3 on each blob | None on inner blobs (mmap-friendly) |
