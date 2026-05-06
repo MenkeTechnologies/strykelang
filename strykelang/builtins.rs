@@ -777,13 +777,13 @@ pub(crate) fn try_builtin(
         "assert_err" => Some(builtin_assert_err(interp, args, line)),
         "assert_true" | "atrue" => Some(builtin_assert_true(interp, args, line)),
         "assert_false" | "afalse" => Some(builtin_assert_false(interp, args, line)),
-        "assert_gt" => Some(builtin_assert_gt(args, line)),
-        "assert_lt" => Some(builtin_assert_lt(args, line)),
-        "assert_ge" => Some(builtin_assert_ge(args, line)),
-        "assert_le" => Some(builtin_assert_le(args, line)),
+        "assert_gt" => Some(builtin_assert_gt(interp, args, line)),
+        "assert_lt" => Some(builtin_assert_lt(interp, args, line)),
+        "assert_ge" => Some(builtin_assert_ge(interp, args, line)),
+        "assert_le" => Some(builtin_assert_le(interp, args, line)),
         "assert_match" | "amatch" => Some(builtin_assert_match(interp, args, line)),
-        "assert_contains" | "acontains" => Some(builtin_assert_contains(args, line)),
-        "assert_near" | "anear" => Some(builtin_assert_near(args, line)),
+        "assert_contains" | "acontains" => Some(builtin_assert_contains(interp, args, line)),
+        "assert_near" | "anear" => Some(builtin_assert_near(interp, args, line)),
         "assert_dies" | "adies" => Some(builtin_assert_dies(interp, args, line)),
         "test_run" | "run_tests" => Some(builtin_test_run(interp, args, line)),
         "test_skip" | "skip_test" | "skip_assert" => Some(builtin_test_skip(interp, args, line)),
@@ -10015,25 +10015,27 @@ fn builtin_process_list(_line: usize) -> PerlResult<PerlValue> {
 
 // ── Testing framework ──────────────────────────────────────────────────
 
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+use std::sync::atomic::Ordering as AtomicOrdering;
 
-static TEST_PASS: AtomicUsize = AtomicUsize::new(0);
-static TEST_FAIL: AtomicUsize = AtomicUsize::new(0);
-static TEST_SKIP: AtomicUsize = AtomicUsize::new(0);
-
-fn test_pass(msg: &str) {
-    TEST_PASS.fetch_add(1, AtomicOrdering::Relaxed);
-    eprintln!("  \x1b[32m✓\x1b[0m {}", msg);
+fn test_pass(interp: &VMHelper, msg: &str) {
+    interp.test_pass_count.fetch_add(1, AtomicOrdering::Relaxed);
+    if !interp.suppress_stdout {
+        eprintln!("  \x1b[32m✓\x1b[0m {}", msg);
+    }
 }
 
-fn test_fail(msg: &str, detail: &str) {
-    TEST_FAIL.fetch_add(1, AtomicOrdering::Relaxed);
-    eprintln!("  \x1b[31m✗\x1b[0m {} — {}", msg, detail);
+fn test_fail(interp: &VMHelper, msg: &str, detail: &str) {
+    interp.test_fail_count.fetch_add(1, AtomicOrdering::Relaxed);
+    if !interp.suppress_stdout {
+        eprintln!("  \x1b[31m✗\x1b[0m {} — {}", msg, detail);
+    }
 }
 
-fn test_skip(msg: &str) {
-    TEST_SKIP.fetch_add(1, AtomicOrdering::Relaxed);
-    eprintln!("  \x1b[33m↷\x1b[0m skipped: {}", msg);
+fn test_skip(interp: &VMHelper, msg: &str) {
+    interp.test_skip_count.fetch_add(1, AtomicOrdering::Relaxed);
+    if !interp.suppress_stdout {
+        eprintln!("  \x1b[33m↷\x1b[0m skipped: {}", msg);
+    }
 }
 
 fn assert_label(_interp: &VMHelper, args: &[PerlValue], default: &str) -> String {
@@ -10056,10 +10058,10 @@ fn builtin_assert_eq(interp: &VMHelper, args: &[PerlValue], _line: usize) -> Per
     let b = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
     let msg = assert_label(interp, args, "assert_eq");
     if a.to_string() == b.to_string() {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("got '{}', expected '{}'", a, b));
+        test_fail(interp, &msg, &format!("got '{}', expected '{}'", a, b));
         Ok(PerlValue::integer(0))
     }
 }
@@ -10070,10 +10072,10 @@ fn builtin_assert_ne(interp: &VMHelper, args: &[PerlValue], _line: usize) -> Per
     let b = args.get(1).cloned().unwrap_or(PerlValue::UNDEF);
     let msg = assert_label(interp, args, "assert_ne");
     if a.to_string() != b.to_string() {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("both equal '{}'", a));
+        test_fail(interp, &msg, &format!("both equal '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -10083,10 +10085,10 @@ fn builtin_assert_ok(interp: &VMHelper, args: &[PerlValue], _line: usize) -> Per
     let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
     let msg = assert_label(interp, args, "assert_ok");
     if a.is_true() {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("got falsy: '{}'", a));
+        test_fail(interp, &msg, &format!("got falsy: '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -10100,10 +10102,10 @@ fn builtin_assert_err(
     let a = args.first().cloned().unwrap_or(PerlValue::UNDEF);
     let msg = assert_label(interp, args, "assert_err");
     if !a.is_true() {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("expected falsy, got '{}'", a));
+        test_fail(interp, &msg, &format!("expected falsy, got '{}'", a));
         Ok(PerlValue::integer(0))
     }
 }
@@ -10127,7 +10129,7 @@ fn builtin_assert_false(
 }
 
 /// `assert_gt A, B [, MSG]`
-fn builtin_assert_gt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_gt(interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -10135,15 +10137,15 @@ fn builtin_assert_gt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_gt".into());
     if a > b {
-        test_pass(&msg);
+        test_pass(interp, &msg);
     } else {
-        test_fail(&msg, &format!("{} not > {}", a, b));
+        test_fail(interp, &msg, &format!("{} not > {}", a, b));
     }
     Ok(PerlValue::integer(if a > b { 1 } else { 0 }))
 }
 
 /// `assert_lt A, B [, MSG]`
-fn builtin_assert_lt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_lt(interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -10151,15 +10153,15 @@ fn builtin_assert_lt(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_lt".into());
     if a < b {
-        test_pass(&msg);
+        test_pass(interp, &msg);
     } else {
-        test_fail(&msg, &format!("{} not < {}", a, b));
+        test_fail(interp, &msg, &format!("{} not < {}", a, b));
     }
     Ok(PerlValue::integer(if a < b { 1 } else { 0 }))
 }
 
 /// `assert_ge A, B [, MSG]`
-fn builtin_assert_ge(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_ge(interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -10167,15 +10169,15 @@ fn builtin_assert_ge(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_ge".into());
     if a >= b {
-        test_pass(&msg);
+        test_pass(interp, &msg);
     } else {
-        test_fail(&msg, &format!("{} not >= {}", a, b));
+        test_fail(interp, &msg, &format!("{} not >= {}", a, b));
     }
     Ok(PerlValue::integer(if a >= b { 1 } else { 0 }))
 }
 
 /// `assert_le A, B [, MSG]`
-fn builtin_assert_le(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_le(interp: &VMHelper, args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let msg = args
@@ -10183,16 +10185,16 @@ fn builtin_assert_le(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> 
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_le".into());
     if a <= b {
-        test_pass(&msg);
+        test_pass(interp, &msg);
     } else {
-        test_fail(&msg, &format!("{} not <= {}", a, b));
+        test_fail(interp, &msg, &format!("{} not <= {}", a, b));
     }
     Ok(PerlValue::integer(if a <= b { 1 } else { 0 }))
 }
 
 /// `assert_match PATTERN, STRING [, MSG]` — passes if regex matches.
 fn builtin_assert_match(
-    _interp: &VMHelper,
+    interp: &VMHelper,
     args: &[PerlValue],
     line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10205,16 +10207,20 @@ fn builtin_assert_match(
     let re = regex::Regex::new(&pattern)
         .map_err(|e| PerlError::runtime(format!("assert_match: {}", e), line))?;
     if re.is_match(&string) {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("'{}' !~ /{}/", string, pattern));
+        test_fail(interp, &msg, &format!("'{}' !~ /{}/", string, pattern));
         Ok(PerlValue::integer(0))
     }
 }
 
 /// `assert_contains HAYSTACK, NEEDLE [, MSG]`
-fn builtin_assert_contains(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_contains(
+    interp: &VMHelper,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
     let haystack = args.first().map(|v| v.to_string()).unwrap_or_default();
     let needle = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let msg = args
@@ -10222,10 +10228,11 @@ fn builtin_assert_contains(args: &[PerlValue], _line: usize) -> PerlResult<PerlV
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_contains".into());
     if haystack.contains(&needle) {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
         test_fail(
+            interp,
             &msg,
             &format!("'{}' does not contain '{}'", haystack, needle),
         );
@@ -10234,7 +10241,11 @@ fn builtin_assert_contains(args: &[PerlValue], _line: usize) -> PerlResult<PerlV
 }
 
 /// `assert_near A, B [, EPSILON [, MSG]]` — float approximate equality.
-fn builtin_assert_near(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue> {
+fn builtin_assert_near(
+    interp: &VMHelper,
+    args: &[PerlValue],
+    _line: usize,
+) -> PerlResult<PerlValue> {
     let a = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     let eps = args.get(2).map(|v| v.to_number()).unwrap_or(1e-9);
@@ -10243,10 +10254,10 @@ fn builtin_assert_near(args: &[PerlValue], _line: usize) -> PerlResult<PerlValue
         .map(|v| v.to_string())
         .unwrap_or_else(|| "assert_near".into());
     if (a - b).abs() <= eps {
-        test_pass(&msg);
+        test_pass(interp, &msg);
         Ok(PerlValue::integer(1))
     } else {
-        test_fail(&msg, &format!("{} not near {} (eps={})", a, b, eps));
+        test_fail(interp, &msg, &format!("{} not near {} (eps={})", a, b, eps));
         Ok(PerlValue::integer(0))
     }
 }
@@ -10267,58 +10278,66 @@ fn builtin_assert_dies(
         test_interp.subs = interp.subs.clone();
         match test_interp.exec_block(&code.body) {
             Err(_) => {
-                test_pass(&msg);
+                test_pass(interp, &msg);
                 Ok(PerlValue::integer(1))
             }
             Ok(_) => {
-                test_fail(&msg, "expected die but block succeeded");
+                test_fail(interp, &msg,"expected die but block succeeded");
                 Ok(PerlValue::integer(0))
             }
         }
     } else {
-        test_fail(&msg, "first arg must be a code ref");
+        test_fail(interp, &msg,"first arg must be a code ref");
         Ok(PerlValue::integer(0))
     }
 }
 
 /// `test_run` / `run_tests` — print test summary and exit with appropriate code.
 fn builtin_test_run(
-    _interp: &VMHelper,
+    interp: &VMHelper,
     _args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
-    let pass = TEST_PASS.load(AtomicOrdering::Relaxed);
-    let fail = TEST_FAIL.load(AtomicOrdering::Relaxed);
-    let skip = TEST_SKIP.load(AtomicOrdering::Relaxed);
+    let pass = interp.test_pass_count.load(AtomicOrdering::Relaxed);
+    let fail = interp.test_fail_count.load(AtomicOrdering::Relaxed);
+    let skip = interp.test_skip_count.load(AtomicOrdering::Relaxed);
     let total = pass + fail + skip;
-    eprintln!();
-    if fail == 0 {
-        if skip == 0 {
-            eprintln!("\x1b[32m  ✓ All {} tests passed\x1b[0m", total);
+    if !interp.suppress_stdout {
+        eprintln!();
+        if fail == 0 {
+            if skip == 0 {
+                eprintln!("\x1b[32m  ✓ All {} tests passed\x1b[0m", total);
+            } else {
+                eprintln!(
+                    "\x1b[32m  ✓ {} passed\x1b[0m, \x1b[33m{} skipped\x1b[0m (of {})",
+                    pass, skip, total
+                );
+            }
         } else {
             eprintln!(
-                "\x1b[32m  ✓ {} passed\x1b[0m, \x1b[33m{} skipped\x1b[0m (of {})",
-                pass, skip, total
+                "\x1b[31m  ✗ {} of {} tests failed\x1b[0m{}",
+                fail,
+                total,
+                if skip > 0 {
+                    format!(" (\x1b[33m{} skipped\x1b[0m)", skip)
+                } else {
+                    String::new()
+                },
             );
         }
-    } else {
-        eprintln!(
-            "\x1b[31m  ✗ {} of {} tests failed\x1b[0m{}",
-            fail,
-            total,
-            if skip > 0 {
-                format!(" (\x1b[33m{} skipped\x1b[0m)", skip)
-            } else {
-                String::new()
-            },
-        );
     }
-    // Reset for next run
-    TEST_PASS.store(0, AtomicOrdering::Relaxed);
-    TEST_FAIL.store(0, AtomicOrdering::Relaxed);
-    TEST_SKIP.store(0, AtomicOrdering::Relaxed);
+    // Reset counters so a follow-up `test_run` (rare but supported) starts fresh.
+    interp.test_pass_count.store(0, AtomicOrdering::Relaxed);
+    interp.test_fail_count.store(0, AtomicOrdering::Relaxed);
+    interp.test_skip_count.store(0, AtomicOrdering::Relaxed);
+    // Set the failure flag for the CLI driver to read (replaces the previous
+    // in-VM `std::process::exit(1)` which made embedding impossible). The flag
+    // is sticky — once any `test_run` reports failures, it stays set even if a
+    // subsequent reset clears the counters.
     if fail > 0 {
-        std::process::exit(1);
+        interp
+            .test_run_failed
+            .store(true, AtomicOrdering::Relaxed);
     }
     Ok(PerlValue::integer(if fail == 0 { 1 } else { 0 }))
 }
@@ -10327,7 +10346,7 @@ fn builtin_test_run(
 /// Pair with postfix `if`/`unless` to gate on a condition:
 /// `test_skip "needs --compat" unless compat_mode`.
 fn builtin_test_skip(
-    _interp: &VMHelper,
+    interp: &VMHelper,
     args: &[PerlValue],
     _line: usize,
 ) -> PerlResult<PerlValue> {
@@ -10335,7 +10354,7 @@ fn builtin_test_skip(
         .first()
         .map(|v| v.to_string())
         .unwrap_or_else(|| "skipped".to_string());
-    test_skip(&msg);
+    test_skip(interp, &msg);
     Ok(PerlValue::UNDEF)
 }
 
