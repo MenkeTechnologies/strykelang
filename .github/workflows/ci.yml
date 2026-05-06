@@ -107,6 +107,17 @@ jobs:
         env:
           ST: ${{ github.workspace }}/target/release/s
         run: bash examples/exercism_run_all.sh --summary
+      - name: Run Scheme R5RS-subset interpreter (~5k lines, 356 tests)
+        # `examples/scheme/Scheme.stk` is a single-file Scheme interpreter
+        # implemented in stryke — tokenizer, parser, evaluator, ~150 built-ins,
+        # and an embedded test suite of 356 assertions covering arithmetic,
+        # list/string/vector ops, special forms (let/let*/letrec, cond, case,
+        # quasiquote, do), closures, recursion, plus end-to-end programs
+        # (mergesort, quicksort, sieve, BST, N-queens, Dijkstra, BFS, λ-calc
+        # β-reduction, Y combinator factorial, ...). It exercises the stryke
+        # parser + bytecode VM at scale on a single 5k-line program; any
+        # regression in the language surfaces here.
+        run: ./target/release/stryke examples/scheme/Scheme.stk
 
   release-build:
     name: Release Build
