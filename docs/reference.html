@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.11.14 · 3566 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.1 · 3567 topics · 39 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -205,7 +205,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">2637</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">2638</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -8187,7 +8187,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">2637 topics</p>
+      <p class="chapter-meta">2638 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -15069,6 +15069,14 @@ p gini(0, 0, 0, 100)   # ~0.75 (high inequality)
         <pre><code class="lang-perl">my $result = green_bold $x 
 # or in a pipeline:
 @list |&gt; map green_bold |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-grepv">
+        <h3><a class="doc-anchor" href="#doc-grepv">#</a> <code>grepv</code></h3>
+        <p><code>grepv</code> — pipeline / string helpers builtin. Alias for <code>drop</code>.</p>
+        <pre><code class="lang-perl">my $result = grepv $x 
+# or in a pipeline:
+@list |&gt; map grepv |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-grey">
