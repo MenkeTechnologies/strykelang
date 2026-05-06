@@ -2563,7 +2563,6 @@ impl Lexer {
                     | "const"
                     | "typed"
                     | "our"
-                    | "oursync"
                     | "local"
                     | "state"
                     | "return"

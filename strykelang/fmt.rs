@@ -354,7 +354,6 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
             s
         }
         StmtKind::MySync(decls) => format!("mysync {}", format_var_decls(decls)),
-        StmtKind::OurSync(decls) => format!("oursync {}", format_var_decls(decls)),
         StmtKind::StmtGroup(b) => format_block_indent(b, depth),
         StmtKind::Block(b) => format!("{{\n{}\n{}}}", format_block_indent(b, depth + 1), prefix),
         StmtKind::Begin(b) => format!(

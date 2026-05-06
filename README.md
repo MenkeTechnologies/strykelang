@@ -450,9 +450,7 @@ A user writing `$_ = ...` or `$_< = ...` inside a block mutates **only the curre
 | `my $x` inside a block | NO — frame-local | new lexical binding in current frame |
 | `my $x` outer + inner closure writes `$x` | rejected at compile time | DESIGN-001 (closures capture by value) |
 | `mysync $x` outer + inner closure writes `$x` | YES — explicit `Arc<Mutex>` opt-in | shared cell, atomic compound ops |
-| `our $x` (single-thread) | YES — package-global by design | symbol table, not lexical |
-| `our $x` outer + parallel block writes `$x` | rejected at runtime | parallel guard directs to `oursync` |
-| `oursync $x` outer + parallel block writes `$x` | YES — explicit `Arc<Mutex>` opt-in, package-global | same atomic-RMW path as `mysync` keyed by `Pkg::x` |
+| `our $x` | YES — package-global by design | symbol table, not lexical |
 | `$_`, `$_<`, `$_<<`, `$_<<<`, `$_<<<<`, `$_<<<<<` | NO — frame-local | `Frame::set_scalar_raw` bypasses CaptureCell write-through |
 | `$_0`, `$_1`, … `$_N` and `$_N<+` chain forms | NO — frame-local | same path as topic-chain writes |
 
@@ -460,22 +458,14 @@ Implementation: `strykelang/scope.rs::Scope::set_scalar` recognizes topic-varian
 
 ---
 
-## [0x04] SHARED STATE (`mysync` / `oursync`)
+## [0x04] SHARED STATE (`mysync`)
 
-`mysync` declares **lexically scoped** variables backed by `Arc<Mutex>` shared across parallel blocks. `oursync` is the **package-global** counterpart: the binding is keyed by the package-qualified stash name (`Pkg::x`) so all packages and parallel workers share one cell, and `$Pkg::x` reads from any other package see the live value. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle on both.
+`mysync` declares variables backed by `Arc<Mutex>` shared across parallel blocks. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle — fully atomic.
 
 ```perl
 mysync $counter = 0
 fan 10000 { $counter++ }  # always exactly 10000
 print $counter
-
-# `oursync` — same Arc<Mutex>, but package-global
-package Counter
-oursync $total = 0
-fn bump { $total++ }
-package main
-fan 10000 { Counter::bump() }
-print $Counter::total       # exactly 10000
 
 mysync @results
 (1..100) |> pfor { push @results, $_ * $_ }
@@ -488,7 +478,7 @@ mysync $q  = deque()
 mysync $pq = heap { $a <=> $b }
 ```
 
-For `mysync` / `oursync` scalars holding a `Set`, `|`/`&` are union/intersection. Plain `my $x` and `our $x` writes from inside `fan`/`pmap`/`pfor` workers are **rejected at runtime** with a directive pointing at `mysync` (lexical) or `oursync` (package-global) — the same DESIGN-001 strict-error stance that catches closure-captured `my` writes at compile time. Silent per-worker copies are not a supported mode in stryke.
+For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `mysync`, each thread gets an independent copy.
 
 ---
 
