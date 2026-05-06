@@ -248,6 +248,33 @@ impl Frame {
         }
     }
 
+    /// Topic-slot variant: REPLACE the slot's value without writing
+    /// through any existing CaptureCell. Used by `shift_slot_chain` /
+    /// `declare_topic_slot` so binding the per-call arg to `$_`/`$_0`
+    /// doesn't mutate a closure-captured cell shared with the outer
+    /// scope. Without this, every call of a closure would clobber the
+    /// caller's `$_` with the call's first arg, and `$_<` inside HOF
+    /// blocks would alias the iter value rather than the surrounding
+    /// scope's topic.
+    #[inline]
+    fn set_scalar_raw(&mut self, name: &str, val: PerlValue) {
+        for (i, sn) in self.scalar_slot_names.iter().enumerate() {
+            if let Some(ref n) = sn {
+                if n == name {
+                    if i < self.scalar_slots.len() {
+                        self.scalar_slots[i] = val;
+                    }
+                    return;
+                }
+            }
+        }
+        if let Some(entry) = self.scalars.iter_mut().find(|(k, _)| k == name) {
+            entry.1 = val;
+        } else {
+            self.scalars.push((name.to_string(), val));
+        }
+    }
+
     #[inline]
     fn get_array(&self, name: &str) -> Option<&Vec<PerlValue>> {
         if name == "_" {
@@ -966,6 +993,30 @@ impl Scope {
         i == bytes.len()
     }
 
+    /// True for ANY topic-variant name: `_`, `_<+`, `_N`, `_N<+`. Matches
+    /// the regex `^_[0-9]*<*$`. User assignments to these names are
+    /// routed through the raw-write path so they stay frame-local rather
+    /// than propagating up via closure-shared CaptureCells. Topic
+    /// variants are framework-managed positional aliases — mutating them
+    /// inside a block must NOT leak to the surrounding scope, otherwise
+    /// per-iter HOF body mutations would chaotically mutate the caller's
+    /// `$_`/`$_N` and break the lexical-outer chain invariant.
+    #[inline]
+    pub(crate) fn is_topic_variant_name(name: &str) -> bool {
+        let bytes = name.as_bytes();
+        if bytes.is_empty() || bytes[0] != b'_' {
+            return false;
+        }
+        let mut i = 1;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        while i < bytes.len() && bytes[i] == b'<' {
+            i += 1;
+        }
+        i == bytes.len()
+    }
+
     /// True if any frame has a lexical scalar binding for `name` (`my` / `our` / assignment).
     #[inline]
     pub fn scalar_binding_exists(&self, name: &str) -> bool {
@@ -1132,6 +1183,18 @@ impl Scope {
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
         self.check_parallel_scalar_write(name)?;
+        // Topic variants (`_`, `_<+`, `_N`, `_N<+`) are framework-managed
+        // positional aliases. User assignments to them stay LOCAL to the
+        // current frame — never propagate up through closure-shared
+        // CaptureCells. Without this guard, a per-iter mutation inside a
+        // HOF block would clobber the surrounding scope's `$_`/`$_N` and
+        // break the "topic chain is lexical, not iterative" invariant.
+        if Self::is_topic_variant_name(name) {
+            if let Some(frame) = self.frames.last_mut() {
+                frame.set_scalar_raw(name, val);
+            }
+            return Ok(());
+        }
         for frame in self.frames.iter_mut().rev() {
             // If the existing value is Atomic, write through the lock
             if let Some(v) = frame.get_scalar(name) {
@@ -1203,9 +1266,18 @@ impl Scope {
     /// rule "_< ≡ $_< ≡ _0< ≡ $_0<".
     #[inline]
     fn declare_topic_slot(&mut self, slot: usize, level: usize, val: PerlValue) {
-        self.declare_scalar(&Self::topic_slot_key(slot, level), val.clone());
-        if let Some(alias) = Self::topic_slot_alias_key(slot, level) {
-            self.declare_scalar(&alias, val);
+        // Use `set_scalar_raw` (frame method) so binding the topic does
+        // NOT write through a closure-captured CaptureCell. Without this,
+        // every per-iter HOF block call would clobber the surrounding
+        // scope's `$_` with the iter value via the shared cell — making
+        // `$_<` alias the iter value rather than the lexical outer's
+        // topic. The chain semantics require frame-isolated writes.
+        if let Some(frame) = self.frames.last_mut() {
+            let key = Self::topic_slot_key(slot, level);
+            frame.set_scalar_raw(&key, val.clone());
+            if let Some(alias) = Self::topic_slot_alias_key(slot, level) {
+                frame.set_scalar_raw(&alias, val);
+            }
         }
     }
 
