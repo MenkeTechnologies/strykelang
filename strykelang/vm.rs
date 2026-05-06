@@ -1494,6 +1494,12 @@ impl<'a> VM<'a> {
         let subs = self.interp.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) =
             self.interp.scope.capture_with_atomics();
+        // Worker bodies execute via the tree walker (`exec_block_no_scope`) which uses
+        // `tree_scalar_storage_name` to rewrite `$x` → `Pkg::x`. That helper consults
+        // `english_lexical_scalars` + `our_lexical_scalars` — empty in a fresh worker —
+        // so without copying the parent's sets, `our` / `oursync` reads see UNDEF.
+        let lex_scalars = self.interp.english_lexical_scalars_clone();
+        let our_scalars = self.interp.our_lexical_scalars_clone();
         let fan_progress = FanProgress::new(progress, n);
         let first_err: Arc<Mutex<Option<PerlError>>> = Arc::new(Mutex::new(None));
         (0..n).into_par_iter().for_each(|i| {
@@ -1508,6 +1514,8 @@ impl<'a> VM<'a> {
             local_interp
                 .scope
                 .restore_atomics(&atomic_arrays, &atomic_hashes);
+            local_interp.set_english_lexical_scalars(lex_scalars.clone());
+            local_interp.set_our_lexical_scalars(our_scalars.clone());
             local_interp.enable_parallel_guard();
             local_interp.scope.set_topic(PerlValue::integer(i as i64));
             crate::parallel_trace::fan_worker_set_index(Some(i as i64));
@@ -1551,6 +1559,9 @@ impl<'a> VM<'a> {
         let subs = self.interp.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) =
             self.interp.scope.capture_with_atomics();
+        // See run_fan_block for why we copy lexical-scalar tracking sets.
+        let lex_scalars = self.interp.english_lexical_scalars_clone();
+        let our_scalars = self.interp.our_lexical_scalars_clone();
         let fan_progress = FanProgress::new(progress, n);
         let pairs: Vec<(usize, Result<PerlValue, FlowOrError>)> = (0..n)
             .into_par_iter()
@@ -1563,6 +1574,8 @@ impl<'a> VM<'a> {
                 local_interp
                     .scope
                     .restore_atomics(&atomic_arrays, &atomic_hashes);
+                local_interp.set_english_lexical_scalars(lex_scalars.clone());
+                local_interp.set_our_lexical_scalars(our_scalars.clone());
                 local_interp.enable_parallel_guard();
                 local_interp.scope.set_topic(PerlValue::integer(i as i64));
                 crate::parallel_trace::fan_worker_set_index(Some(i as i64));
@@ -2816,6 +2829,15 @@ impl<'a> VM<'a> {
                             .scope
                             .declare_scalar_frozen(n, val, false, None)
                             .map_err(|e| e.at_line(self.line()))?;
+                        // `our $x` emits `Op::DeclareScalar` with a qualified name
+                        // (`main::x` / `Pkg::x`). Register the bare in the tree-walker
+                        // tracking sets so parallel workers' `tree_scalar_storage_name`
+                        // produces the same `Pkg::x` rewrite. Plain `my` always uses
+                        // bare names so this branch never fires for it.
+                        if let Some((_, bare)) = n.rsplit_once("::") {
+                            self.interp.english_note_lexical_scalar_pub(bare);
+                            self.interp.note_our_scalar_pub(bare);
+                        }
                         Ok(())
                     }
                     Op::DeclareScalarFrozen(idx) => {
@@ -2825,6 +2847,10 @@ impl<'a> VM<'a> {
                             .scope
                             .declare_scalar_frozen(n, val, true, None)
                             .map_err(|e| e.at_line(self.line()))?;
+                        if let Some((_, bare)) = n.rsplit_once("::") {
+                            self.interp.english_note_lexical_scalar_pub(bare);
+                            self.interp.note_our_scalar_pub(bare);
+                        }
                         Ok(())
                     }
                     Op::DeclareScalarTyped(idx, tyb) => {
@@ -4028,7 +4054,8 @@ impl<'a> VM<'a> {
                         let new_val = self
                             .interp
                             .scope
-                            .atomic_mutate(en, |v| PerlValue::integer(v.to_int() + 1));
+                            .atomic_mutate(en, |v| PerlValue::integer(v.to_int() + 1))
+                            .map_err(|e| e.at_line(self.line()))?;
                         self.push(new_val);
                         Ok(())
                     }
@@ -4039,7 +4066,8 @@ impl<'a> VM<'a> {
                         let new_val = self
                             .interp
                             .scope
-                            .atomic_mutate(en, |v| PerlValue::integer(v.to_int() - 1));
+                            .atomic_mutate(en, |v| PerlValue::integer(v.to_int() - 1))
+                            .map_err(|e| e.at_line(self.line()))?;
                         self.push(new_val);
                         Ok(())
                     }
@@ -4048,16 +4076,17 @@ impl<'a> VM<'a> {
                         self.require_scalar_mutable(n)?;
                         let en = self.interp.english_scalar_name(n);
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
-                            let _ = self
-                                .interp
+                            self.interp
                                 .scope
-                                .atomic_mutate_post(en, crate::vm_helper::perl_inc);
+                                .atomic_mutate_post(en, crate::vm_helper::perl_inc)
+                                .map_err(|e| e.at_line(self.line()))?;
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, crate::vm_helper::perl_inc);
+                                .atomic_mutate_post(en, crate::vm_helper::perl_inc)
+                                .map_err(|e| e.at_line(self.line()))?;
                             self.push(old);
                         }
                         Ok(())
@@ -4067,16 +4096,17 @@ impl<'a> VM<'a> {
                         self.require_scalar_mutable(n)?;
                         let en = self.interp.english_scalar_name(n);
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
-                            let _ = self
-                                .interp
+                            self.interp
                                 .scope
-                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() - 1));
+                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() - 1))
+                                .map_err(|e| e.at_line(self.line()))?;
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() - 1));
+                                .atomic_mutate_post(en, |v| PerlValue::integer(v.to_int() - 1))
+                                .map_err(|e| e.at_line(self.line()))?;
                             self.push(old);
                         }
                         Ok(())
@@ -8409,6 +8439,49 @@ impl<'a> VM<'a> {
                             i += 2;
                         }
                         self.interp.scope.declare_atomic_hash(n, map);
+                        Ok(())
+                    }
+                    Op::DeclareOurSyncScalar(name_idx) => {
+                        let val = self.pop();
+                        let n = names[*name_idx as usize].as_str();
+                        let stored = if val.is_mysync_deque_or_heap() {
+                            val
+                        } else {
+                            PerlValue::atomic(Arc::new(Mutex::new(val)))
+                        };
+                        self.interp.scope.declare_scalar(n, stored);
+                        // Register the bare name (everything after `Pkg::`) in the
+                        // tree-walker tracking sets so worker `$x` reads inside fan/pmap
+                        // bodies (which run via `exec_block_no_scope`, not bytecode)
+                        // rewrite to `Pkg::x` and find the shared cell.
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.english_note_lexical_scalar_pub(&bare);
+                        self.interp.note_our_scalar_pub(&bare);
+                        Ok(())
+                    }
+                    Op::DeclareOurSyncArray(name_idx) => {
+                        let val = self.pop();
+                        let n = names[*name_idx as usize].as_str();
+                        self.interp.scope.declare_atomic_array(n, val.to_list());
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.english_note_lexical_scalar_pub(&bare);
+                        self.interp.note_our_scalar_pub(&bare);
+                        Ok(())
+                    }
+                    Op::DeclareOurSyncHash(name_idx) => {
+                        let val = self.pop();
+                        let n = names[*name_idx as usize].as_str();
+                        let items = val.to_list();
+                        let mut map = IndexMap::new();
+                        let mut i = 0usize;
+                        while i + 1 < items.len() {
+                            map.insert(items[i].to_string(), items[i + 1].clone());
+                            i += 2;
+                        }
+                        self.interp.scope.declare_atomic_hash(n, map);
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.english_note_lexical_scalar_pub(&bare);
+                        self.interp.note_our_scalar_pub(&bare);
                         Ok(())
                     }
                     Op::RuntimeSubDecl(idx) => {

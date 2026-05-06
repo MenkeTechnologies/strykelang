@@ -316,6 +316,11 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             deparse_var_decls(buf, decls);
             buf.push(';');
         }
+        StmtKind::OurSync(decls) => {
+            buf.push_str("oursync ");
+            deparse_var_decls(buf, decls);
+            buf.push(';');
+        }
         StmtKind::LocalExpr {
             target,
             initializer,

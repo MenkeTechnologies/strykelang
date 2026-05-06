@@ -24,6 +24,7 @@ fn destructure_stmt_from_var_decls(keyword: &str, decls: Vec<VarDecl>, line: usi
         "my" => StmtKind::My(decls),
         "mysync" => StmtKind::MySync(decls),
         "our" => StmtKind::Our(decls),
+        "oursync" => StmtKind::OurSync(decls),
         "local" => StmtKind::Local(decls),
         "state" => StmtKind::State(decls),
         _ => unreachable!("parse_my_our_local keyword"),
@@ -691,6 +692,15 @@ impl Parser {
                         ));
                     }
                     self.parse_my_our_local("mysync", false)?
+                }
+                "oursync" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`oursync` is a stryke extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_my_our_local("oursync", false)?
                 }
                 "frozen" | "const" => {
                     let leading = kw.as_str().to_string();
@@ -5494,6 +5504,7 @@ impl Parser {
                                 "my" => StmtKind::My(decls),
                                 "mysync" => StmtKind::MySync(decls),
                                 "our" => StmtKind::Our(decls),
+                                "oursync" => StmtKind::OurSync(decls),
                                 "local" => StmtKind::Local(decls),
                                 "state" => StmtKind::State(decls),
                                 _ => unreachable!(),
@@ -5557,6 +5568,7 @@ impl Parser {
             "my" => StmtKind::My(decls),
             "mysync" => StmtKind::MySync(decls),
             "our" => StmtKind::Our(decls),
+            "oursync" => StmtKind::OurSync(decls),
             "local" => StmtKind::Local(decls),
             "state" => StmtKind::State(decls),
             _ => unreachable!(),
