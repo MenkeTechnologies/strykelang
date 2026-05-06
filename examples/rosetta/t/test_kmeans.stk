@@ -2,12 +2,7 @@
 # Rosetta Code: K-means clustering
 
 fn Rosetta::KMeans::distance($p1, $p2) {
-    my $sum = 0
-    for (my $i = 0; $i < len(@$p1); $i++) {
-        my $diff = $p1->[$i] - $p2->[$i]
-        $sum += $diff * $diff
-    }
-    sqrt($sum)
+    ~> 0:len(@$p1)-1 map { ($p1->[_] - $p2->[_]) ** 2 } sum sqrt
 }
 
 fn Rosetta::KMeans::solve($points, $k, $max_iters) {
@@ -17,29 +12,13 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
     my @assignments = ~> 0..$n-1 map { -1 }
     
     for (1..$max_iters) {
-        my $changed = 0
-        
-        # Assignment step
+        # Assignment step: each point picks the nearest centroid by index.
         my @new_assignments = map {
             my $p_idx = _
-            my $min_dist = 1e18
-            my $best_c = -1
-            for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
-                my $d = Rosetta::KMeans::distance($points->[$p_idx], $centroids[$c_idx])
-                if ($d < $min_dist) {
-                    $min_dist = $d
-                    $best_c = $c_idx
-                }
-            }
-            $best_c
+            min_by { Rosetta::KMeans::distance($points->[$p_idx], $centroids[_]) } 0:$k-1
         } 0..$n-1
-        
-        for (my $i = 0; $i < $n; $i++) {
-            if ($new_assignments[$i] != $assignments[$i]) {
-                $changed = 1
-                $assignments[$i] = $new_assignments[$i]
-            }
-        }
+        my $changed = ~> 0:$n-1 any { $new_assignments[_] != $assignments[_] }
+        @assignments = @new_assignments
         last if !$changed
         
         # Update step

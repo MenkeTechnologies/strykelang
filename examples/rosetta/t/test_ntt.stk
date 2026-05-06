@@ -13,17 +13,12 @@ fn Rosetta::NTT::mod_pow($base, $exp, $mod) {
 }
 
 fn Rosetta::NTT::transform($a, $n, $g, $p) {
-    my @res
-    for (my $i = 0; $i < $n; $i++) {
-        my $sum = 0
-        for (my $j = 0; $j < $n; $j++) {
-            my $exp = ($i * $j) % ($p - 1)
-            my $w = Rosetta::NTT::mod_pow($g, $exp, $p)
-            $sum = ($sum + $a->[$j] * $w) % $p
-        }
-        push @res, $sum
-    }
-    \@res
+    [~> 0:$n-1 map {
+        my $sum = ~> 0:$n-1 map {
+            $a->[_] * Rosetta::NTT::mod_pow($g, (_< * _) % ($p - 1), $p)
+        } sum
+        $sum % $p
+    }]
 }
 
 # Example from a source: p=7, n=3, g=2? No, n must divide p-1.
