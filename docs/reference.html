@@ -398,10 +398,10 @@ fan 10000 { Counter::bump() }
 p $Counter::total          # always exactly 10000
 
 oursync @results
-pfor { push @results, $_ * $_ } 1..50
+pfor { push @results, _ * _ } 1:50
 
 oursync %hits
-pfor { $hits{$_ % 10} += 1 } 0..999</code></pre>
+pfor { $hits{_ % 10} += 1 } 0:999</code></pre>
         <p>Plain <code>our $x</code> mutated inside a parallel block is rejected at runtime with a directive to declare <code>oursync</code> — DESIGN-001 strict-error parity with the way plain <code>my</code> closure-writes are rejected, pointing at <code>mysync</code>. Use <code>oursync</code> for cross-package shared state; use <code>mysync</code> for lexically scoped shared state.</p>
       </article>
       <article class="doc-entry" id="doc-async">
@@ -540,9 +540,9 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
       <article class="doc-entry" id="doc-thread">
         <h3><a class="doc-anchor" href="#doc-thread">#</a> <code>thread</code></h3>
         <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure&#39;s <code>-&gt;</code>).</p>
-        <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
+        <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { _0 &lt;=&gt; _1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-fn div { $_0 / $_1 }
+fn div { _0 / _1 }
 ~&gt; 10 div(2) p                               # div(10, 2) = 5
 ~&gt; 10 div(_, 2) p                           # explicit _ position: div(10, 2) = 5
 </code></pre>
@@ -551,12 +551,12 @@ fn div { $_0 / $_1 }
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;&gt;</code></h3>
         <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
-        <pre><code class="lang-perl">fn div { $_0 / $_1 }
+        <pre><code class="lang-perl">fn div { _0 / _1 }
 ~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
 -&gt;&gt; 10 div(_, 2) p                          # explicit _ overrides: div(10, 2) = 5
 
 # Thread-last is useful for list-consuming functions:
-fn take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
+fn take_n { @_[0:$_[-1]-1] }               # take_n(list, n)
 ~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
 </code></pre>
         <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>_</code> placeholder always takes precedence.</p>
@@ -579,7 +579,7 @@ pipeline(1:1_000_000)
 
 my $sum = pipeline(@scores)
   -&gt;filter { _ &gt;= 60 }
-  -&gt;reduce { $_0 + $_1 }
+  -&gt;reduce { _ + _1 }
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-par-pipeline">
@@ -882,26 +882,26 @@ my @r = reverse 1:5   # (5,4,3,2,1)
       <article class="doc-entry" id="doc-reduce">
         <h3><a class="doc-anchor" href="#doc-reduce">#</a> <code>reduce</code></h3>
         <p><code>reduce { $_0 OP $_1 } @list</code> — performs a sequential left fold over the list. The first two elements are passed as <code>$_0</code> and <code>$_1</code> to the block; the result becomes <code>$_0</code> for the next iteration. The traditional <code>$a</code>/<code>$b</code> names are also supported for Perl compatibility. Use <code>{ |$acc, $val| body }</code> to name the two params. Returns <code>undef</code> for an empty list and the single element for a one-element list. For a fold with an explicit initial value, see <code>fold</code>.</p>
-        <pre><code class="lang-perl">my $fac = reduce { $_0 * $_1 } 1:6
+        <pre><code class="lang-perl">my $fac = reduce { _ * _1 } 1:6
 p $fac   # 720
 reduce { |$acc, $val| $acc + $val }, 1:10   # 55 (named params)
-my $longest = reduce { length($_0) &gt; length($_1) ? $_0 : $_1 } @words
+my $longest = reduce { length(_) &gt; length(_1) ? _ : _1 } @words
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fold">
         <h3><a class="doc-anchor" href="#doc-fold">#</a> <code>fold</code></h3>
-        <p><code>fold { $_0 OP $_1 } INIT, @list</code> — left fold with an explicit initial accumulator value. The initial value is passed as the first <code>$_0</code>, and each list element arrives as <code>$_1</code>. Unlike <code>reduce</code>, <code>fold</code> never returns <code>undef</code> for an empty list — it returns the initial value instead. Both <code>$a</code>/<code>$b</code> and <code>$_0</code>/<code>$_1</code> are supported in the block. Use <code>fold</code> when you need a guaranteed starting point for the accumulation.</p>
-        <pre><code class="lang-perl">my $total = fold { $_0 + $_1 } 100, 1:5
+        <p><code>fold { _ OP _1 } INIT, @list</code> — left fold with an explicit initial accumulator value. The initial value is passed as the first <code>$_0</code>, and each list element arrives as <code>$_1</code>. Unlike <code>reduce</code>, <code>fold</code> never returns <code>undef</code> for an empty list — it returns the initial value instead. Both <code>$a</code>/<code>$b</code> and <code>$_0</code>/<code>$_1</code> are supported in the block. Use <code>fold</code> when you need a guaranteed starting point for the accumulation.</p>
+        <pre><code class="lang-perl">my $total = fold { _ + _1 } 100, 1:5
 p $total   # 115
-my $csv = fold { &quot;$_0,$_1&quot; } &quot;&quot;, @fields
+my $csv = fold { &quot;_,_1&quot; } &quot;&quot;, @fields
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-reductions">
         <h3><a class="doc-anchor" href="#doc-reductions">#</a> <code>reductions</code></h3>
-        <p><code>reductions { $_0 OP $_1 } @list</code> — returns the running (cumulative) results of a left fold, also known as a scan or prefix-sum. Each element of the output is the accumulator state after processing the corresponding input element. The output list has the same length as the input. Both <code>$_0</code>/<code>$_1</code> and <code>$a</code>/<code>$b</code> naming conventions are supported.</p>
-        <pre><code class="lang-perl">my @pfx = reductions { $_0 + $_1 } 1:4
+        <p><code>reductions { _ OP _1 } @list</code> — returns the running (cumulative) results of a left fold, also known as a scan or prefix-sum. Each element of the output is the accumulator state after processing the corresponding input element. The output list has the same length as the input. Both <code>_</code>/<code>_1</code> and <code>$a</code>/<code>$b</code> naming conventions are supported.</p>
+        <pre><code class="lang-perl">my @pfx = reductions { _ + _1 } 1:4
 @pfx |&gt; e p   # 1 3 6 10
-1:5 |&gt; reductions { $_0 * $_1 } |&gt; e p  # 1 2 6 24 120
+1:5 |&gt; reductions { _ * _1 } |&gt; e p  # 1 2 6 24 120
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-all">
@@ -1272,10 +1272,10 @@ my @pixels = nrm @raw_intensities
       <article class="doc-entry" id="doc-compose">
         <h3><a class="doc-anchor" href="#doc-compose">#</a> <code>compose</code></h3>
         <p><code>compose</code> (alias <code>comp</code>) creates a right-to-left function composition. Given <code>compose(\&amp;f, \&amp;g)</code>, calling the result with <code>x</code> computes <code>f(g(x))</code>. Chain any number of functions — they apply from right to left (last argument first). This is the standard mathematical function composition found in Haskell, Clojure, and Ramda. The returned code ref can be stored, passed around, or used in pipelines.</p>
-        <pre><code class="lang-perl">my $double = fn { $_[0] * 2 }
-my $inc    = fn { $_[0] + 1 }
+        <pre><code class="lang-perl">my $double = fn { _ * 2 }
+my $inc    = fn { _ + 1 }
 my $f = compose($inc, $double)
-p $f-&gt;(5)   # 11  (double 5 → 10, inc 10 → 11)
+p $f(5)   # 11  (double 5 → 10, inc 10 → 11)
 
 my $pipeline = compose(
     fn { join &quot;,&quot;, @{$_[0]} },
