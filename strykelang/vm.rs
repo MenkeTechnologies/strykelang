@@ -2829,15 +2829,6 @@ impl<'a> VM<'a> {
                             .scope
                             .declare_scalar_frozen(n, val, false, None)
                             .map_err(|e| e.at_line(self.line()))?;
-                        // `our $x` emits `Op::DeclareScalar` with a qualified name
-                        // (`main::x` / `Pkg::x`). Register the bare in the tree-walker
-                        // tracking sets so parallel workers' `tree_scalar_storage_name`
-                        // produces the same `Pkg::x` rewrite. Plain `my` always uses
-                        // bare names so this branch never fires for it.
-                        if let Some((_, bare)) = n.rsplit_once("::") {
-                            self.interp.english_note_lexical_scalar_pub(bare);
-                            self.interp.note_our_scalar_pub(bare);
-                        }
                         Ok(())
                     }
                     Op::DeclareScalarFrozen(idx) => {
@@ -2847,10 +2838,6 @@ impl<'a> VM<'a> {
                             .scope
                             .declare_scalar_frozen(n, val, true, None)
                             .map_err(|e| e.at_line(self.line()))?;
-                        if let Some((_, bare)) = n.rsplit_once("::") {
-                            self.interp.english_note_lexical_scalar_pub(bare);
-                            self.interp.note_our_scalar_pub(bare);
-                        }
                         Ok(())
                     }
                     Op::DeclareScalarTyped(idx, tyb) => {

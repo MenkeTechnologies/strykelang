@@ -817,7 +817,9 @@ fn deep($_0, $_1, $_2) {
             <tr><td><code>my $x</code> inside a block</td><td style="color:#0f0;">NO — frame-local</td><td>new lexical binding in current frame</td></tr>
             <tr><td><code>my $x</code> outer + inner closure writes <code>$x</code></td><td style="color:#f55;">rejected at compile time</td><td>DESIGN-001 (closures capture by value)</td></tr>
             <tr><td><code>mysync $x</code> outer + inner closure writes <code>$x</code></td><td style="color:#ff0;">YES — explicit <code>Arc&lt;Mutex&gt;</code> opt-in</td><td>shared cell, atomic compound ops</td></tr>
-            <tr><td><code>our $x</code></td><td style="color:#ff0;">YES — package-global by design</td><td>symbol table, not lexical</td></tr>
+            <tr><td><code>our $x</code> (single-thread)</td><td style="color:#ff0;">YES — package-global by design</td><td>symbol table, not lexical</td></tr>
+            <tr><td><code>our $x</code> outer + parallel block writes <code>$x</code></td><td style="color:#f55;">rejected at runtime</td><td>parallel guard directs to <code>oursync</code></td></tr>
+            <tr><td><code>oursync $x</code> outer + parallel block writes <code>$x</code></td><td style="color:#ff0;">YES — explicit <code>Arc&lt;Mutex&gt;</code> opt-in, package-global</td><td>same atomic-RMW path as <code>mysync</code> keyed by <code>Pkg::x</code></td></tr>
             <tr><td><code>$_</code>, <code>$_&lt;</code>, <code>$_&lt;&lt;</code>, <code>$_&lt;&lt;&lt;</code>, <code>$_&lt;&lt;&lt;&lt;</code>, <code>$_&lt;&lt;&lt;&lt;&lt;</code></td><td style="color:#0f0;">NO — frame-local</td><td><code>Frame::set_scalar_raw</code> bypasses CaptureCell write-through</td></tr>
             <tr><td><code>$_0</code>, <code>$_1</code>, … <code>$_N</code> and <code>$_N&lt;+</code> chain forms</td><td style="color:#0f0;">NO — frame-local</td><td>same path as topic-chain writes</td></tr>
           </tbody>
@@ -1111,7 +1113,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
           <li><strong>Inline Rust FFI</strong> — <code>rust { pub extern "C" fn ... }</code> blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.</li>
           <li><strong>Bytecode cache</strong> — single rkyv shard at <code>~/.cache/stryke/scripts.rkyv</code>, <code>mmap</code> + zero-copy <code>ArchivedHashMap</code> lookup, skips lex/parse/compile on warm starts. <strong>11x faster per-process</strong> than the old SQLite cache. Disable with <code>STRYKE_CACHE=0</code>. <a href="../docs/CACHE_RKYV_MIGRATION.md">Migration story &amp; benchmarks →</a></li>
           <li><strong>Distributed compute</strong> — <code>cluster([...])</code> builds an SSH worker pool; <code>pmap_on $cluster { } @list</code> fans a map across persistent remote workers with fault tolerance.</li>
-          <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers.</li>
+          <li><strong>Shared state</strong> — <code>mysync</code> declares atomic variables safe to mutate from parallel workers (lexical scope). <code>oursync</code> is the package-global counterpart: same <code>Arc&lt;Mutex&gt;</code> backing, but keyed by the qualified stash name (<code>Pkg::x</code>) so all packages and workers share one cell.</li>
           <li><strong>Language server</strong> — <code>s lsp</code> (or <code>s --lsp</code>) runs an LSP server over stdio with diagnostics, hover, completion. The nine reflection hashes above are part of the completion surface.</li>
         </ul>
       </section>
