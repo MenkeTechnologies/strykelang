@@ -78,12 +78,53 @@ fn package_qualified_scalar_interpolates_in_double_quoted() {
     assert_eq!(eval_string(code), "[hello]");
 }
 
-// NOTE: a `package A::B::C` declaration currently fails to parse with
-// "Expected package name, got DoubleString" — separate bug in the package-
-// statement parser, not in string interpolation. Multi-segment `::` chains
-// inside string interpolation work in principle (the loop in
-// `parse_interpolated_string` greedy-matches `::word` repeatedly), but we
-// can't write a positive test for it until the package-decl bug is fixed.
+#[test]
+fn package_qualified_scalar_interpolates_with_deeper_namespace() {
+    // 3-segment package path. The lexer's IPv6 trap used to misfire here:
+    // after lexing `A::`, it would see ident `B` (1 hex digit, len ≤ 4) and
+    // try IPv6 zero-compression on `B::C`, producing
+    // `Ident, Ident, PackageSep, DoubleString("B::C")` and breaking the
+    // package decl. Fixed by `after_package_sep` guard in lexer.rs which
+    // skips the IPv6 trap when ident_start is preceded by `::`.
+    let code = r#"
+        package A::B::C;
+        our $x = 7;
+        package main;
+        "deep:$A::B::C::x:end"
+    "#;
+    assert_eq!(eval_string(code), "deep:7:end");
+}
+
+#[test]
+fn package_decl_parses_three_segments() {
+    let code = r#"
+        package A::B::C;
+        our $x = 7;
+        $A::B::C::x
+    "#;
+    assert_eq!(eval_int(code), 7);
+}
+
+#[test]
+fn package_decl_parses_four_segments() {
+    let code = r#"
+        package A::B::C::D;
+        our $x = 11;
+        $A::B::C::D::x
+    "#;
+    assert_eq!(eval_int(code), 11);
+}
+
+#[test]
+fn ipv6_literal_fe80_still_lexes_as_address() {
+    // Don't let the package-fix break inline IPv6 literals — `fe80::1` should
+    // still tokenize as a single string, not as `fe80` + `::` + `1`.
+    let code = r#"
+        my $ip = fe80::1;
+        $ip
+    "#;
+    assert_eq!(eval_string(code), "fe80::1");
+}
 
 #[test]
 fn interpolation_single_colon_does_not_capture_namespace() {

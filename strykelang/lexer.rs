@@ -359,6 +359,21 @@ impl Lexer {
                 self.pos = saved;
                 return None;
             }
+            // Three-segment package path: `A::B::C` greedy-matched `A::B` as
+            // IPv6 zero-compressed (legal: `0:0:0:0:0:0:A:B`). Detect the
+            // `::IDENT` continuation and bail so the standard PackageSep path
+            // runs. Without this, `package A::B::C` lexes as
+            // `Ident, DoubleString("A::B"), PackageSep, Ident("C")`.
+            if next == ':'
+                && self.input.get(self.pos + 1) == Some(&':')
+                && self
+                    .input
+                    .get(self.pos + 2)
+                    .is_some_and(|c| c.is_ascii_alphabetic() || *c == '_')
+            {
+                self.pos = saved;
+                return None;
+            }
         }
         let candidate: String = self.input[start..self.pos].iter().collect();
         // Require at least one hex digit. The bare `::` form is technically
@@ -1959,7 +1974,18 @@ impl Lexer {
                 // greedily consumes hex / `:` / `::` and asks Rust's
                 // `Ipv6Addr` parser to validate; on failure restores `pos`
                 // so the identifier-as-bareword path runs unchanged.
-                if self.peek() == Some(':')
+                //
+                // Skip when we're already in the middle of a package-qualified
+                // path: `package A::B::C` lexes "A" then "::", and at that
+                // point the next ident "B" must NOT be IPv6-trapped — `B::C`
+                // is the rest of the package name, not the address
+                // `0:0:0:0:0:0:B:C`. Same rule for `Foo::Bar::baz` mid-stream
+                // with hex letters that happen to look like an address.
+                let after_package_sep = ident_start >= 2
+                    && self.input.get(ident_start.saturating_sub(2)) == Some(&':')
+                    && self.input.get(ident_start.saturating_sub(1)) == Some(&':');
+                if !after_package_sep
+                    && self.peek() == Some(':')
                     && ident.len() <= 4
                     && ident.chars().all(|ch| ch.is_ascii_hexdigit())
                 {
