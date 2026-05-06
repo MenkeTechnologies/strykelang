@@ -2474,11 +2474,51 @@ impl VMHelper {
         }
     }
 
+    /// Snapshot the `english_lexical_scalars` stack for parallel worker spawn (rayon
+    /// closures need owned `Vec<HashSet<String>>` they can `clone()` per-worker).
+    #[inline]
+    pub(crate) fn english_lexical_scalars_clone(&self) -> Vec<HashSet<String>> {
+        self.english_lexical_scalars.clone()
+    }
+
+    /// Snapshot the `our_lexical_scalars` stack — companion to
+    /// [`Self::english_lexical_scalars_clone`].
+    #[inline]
+    pub(crate) fn our_lexical_scalars_clone(&self) -> Vec<HashSet<String>> {
+        self.our_lexical_scalars.clone()
+    }
+
+    /// Replace `english_lexical_scalars` wholesale (parallel-worker setup).
+    #[inline]
+    pub(crate) fn set_english_lexical_scalars(&mut self, v: Vec<HashSet<String>>) {
+        self.english_lexical_scalars = v;
+    }
+
+    /// Replace `our_lexical_scalars` wholesale (parallel-worker setup).
+    #[inline]
+    pub(crate) fn set_our_lexical_scalars(&mut self, v: Vec<HashSet<String>>) {
+        self.our_lexical_scalars = v;
+    }
+
     #[inline]
     fn note_our_scalar(&mut self, bare_name: &str) {
         if let Some(s) = self.our_lexical_scalars.last_mut() {
             s.insert(bare_name.to_string());
         }
+    }
+
+    /// Public wrapper for [`Self::english_note_lexical_scalar`] — used by bytecode
+    /// `Op::DeclareOurSync*` to register bare names so worker `tree_scalar_storage_name`
+    /// reads rewrite to `Pkg::x`.
+    #[inline]
+    pub(crate) fn english_note_lexical_scalar_pub(&mut self, name: &str) {
+        self.english_note_lexical_scalar(name);
+    }
+
+    /// Public wrapper for [`Self::note_our_scalar`] — see [`Self::english_note_lexical_scalar_pub`].
+    #[inline]
+    pub(crate) fn note_our_scalar_pub(&mut self, bare_name: &str) {
+        self.note_our_scalar(bare_name);
     }
 
     pub(crate) fn scope_pop_hook(&mut self) {
@@ -8021,6 +8061,62 @@ impl VMHelper {
                 }
                 Ok(PerlValue::UNDEF)
             }
+            StmtKind::OurSync(decls) => {
+                // The fan/pmap/pfor workers execute closure bodies via this tree-walker
+                // (`exec_block_no_scope`), not the bytecode VM — so `oursync` MUST register
+                // each declared name in `english_lexical_scalars` + `our_lexical_scalars`
+                // for `tree_scalar_storage_name` to rewrite later `$x` reads to `Pkg::x`.
+                // Without this, worker `$x` reads see UNDEF (the qualified key isn't
+                // queried) even though capture/restore brought the cell across.
+                for decl in decls {
+                    let val = if let Some(init) = &decl.initializer {
+                        self.eval_expr(init)?
+                    } else {
+                        PerlValue::UNDEF
+                    };
+                    match decl.sigil {
+                        Sigil::Typeglob => {
+                            return Err(PerlError::runtime(
+                                "`oursync` does not support typeglob variables",
+                                stmt.line,
+                            )
+                            .into());
+                        }
+                        Sigil::Scalar => {
+                            let stash = self.stash_scalar_name_for_package(&decl.name);
+                            let stored = if val.is_mysync_deque_or_heap() {
+                                val
+                            } else {
+                                PerlValue::atomic(std::sync::Arc::new(parking_lot::Mutex::new(val)))
+                            };
+                            self.scope.declare_scalar(&stash, stored);
+                            self.english_note_lexical_scalar(&decl.name);
+                            self.note_our_scalar(&decl.name);
+                        }
+                        Sigil::Array => {
+                            let stash = self.stash_array_name_for_package(&decl.name);
+                            self.scope.declare_atomic_array(&stash, val.to_list());
+                            self.english_note_lexical_scalar(&decl.name);
+                            self.note_our_scalar(&decl.name);
+                        }
+                        Sigil::Hash => {
+                            let items = val.to_list();
+                            let mut map = IndexMap::new();
+                            let mut i = 0;
+                            while i + 1 < items.len() {
+                                map.insert(items[i].to_string(), items[i + 1].clone());
+                                i += 2;
+                            }
+                            // Match `our %h` convention: bare hash name (existing
+                            // cross-package quirk).
+                            self.scope.declare_atomic_hash(&decl.name, map);
+                            self.english_note_lexical_scalar(&decl.name);
+                            self.note_our_scalar(&decl.name);
+                        }
+                    }
+                }
+                Ok(PerlValue::UNDEF)
+            }
             StmtKind::Package { name } => {
                 // Minimal package support — just set a variable
                 let _ = self
@@ -8176,9 +8272,8 @@ impl VMHelper {
         if op == BinOp::Concat {
             return self.scope.scalar_concat_inplace(name, &rhs);
         }
-        Ok(self
-            .scope
-            .atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs)))
+        self.scope
+            .atomic_mutate(name, |old| Self::compound_scalar_binop(old, op, &rhs))
     }
 
     fn compound_scalar_binop(old: &PerlValue, op: BinOp, rhs: &PerlValue) -> PerlValue {
@@ -9205,8 +9300,8 @@ impl VMHelper {
                 UnaryOp::PreIncrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_strict_scalar_var(name, line)?;
-                        let n = self.english_scalar_name(name);
-                        return Ok(self.scope.atomic_mutate(n, perl_inc));
+                        let n = self.resolved_scalar_storage_name(name);
+                        return Ok(self.scope.atomic_mutate(&n, perl_inc).map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
                         if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -9246,10 +9341,11 @@ impl VMHelper {
                 UnaryOp::PreDecrement => {
                     if let ExprKind::ScalarVar(name) = &expr.kind {
                         self.check_strict_scalar_var(name, line)?;
-                        let n = self.english_scalar_name(name);
+                        let n = self.resolved_scalar_storage_name(name);
                         return Ok(self
                             .scope
-                            .atomic_mutate(n, |v| PerlValue::integer(v.to_int() - 1)));
+                            .atomic_mutate(&n, |v| PerlValue::integer(v.to_int() - 1))
+                            .map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
                         if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -9343,12 +9439,15 @@ impl VMHelper {
                 // for the entire read-modify-write (critical for mysync).
                 if let ExprKind::ScalarVar(name) = &expr.kind {
                     self.check_strict_scalar_var(name, line)?;
-                    let n = self.english_scalar_name(name);
+                    let n = self.resolved_scalar_storage_name(name);
                     let f: fn(&PerlValue) -> PerlValue = match op {
                         PostfixOp::Increment => |v| perl_inc(v),
                         PostfixOp::Decrement => |v| PerlValue::integer(v.to_int() - 1),
                     };
-                    return Ok(self.scope.atomic_mutate_post(n, f));
+                    return Ok(self
+                        .scope
+                        .atomic_mutate_post(&n, f)
+                        .map_err(|e| e.at_line(line))?);
                 }
                 if let ExprKind::Deref { kind, .. } = &expr.kind {
                     if matches!(kind, Sigil::Array | Sigil::Hash) {
@@ -9416,25 +9515,25 @@ impl VMHelper {
                 // `||=` / `//=` short-circuit: do not evaluate RHS if LHS is already true / defined.
                 if let ExprKind::ScalarVar(name) = &target.kind {
                     self.check_strict_scalar_var(name, line)?;
-                    let n = self.english_scalar_name(name);
+                    let n = self.resolved_scalar_storage_name(name);
                     let op = *op;
                     let rhs = match op {
                         BinOp::LogOr => {
-                            let old = self.scope.get_scalar(n);
+                            let old = self.scope.get_scalar(&n);
                             if old.is_true() {
                                 return Ok(old);
                             }
                             self.eval_expr(value)?
                         }
                         BinOp::DefinedOr => {
-                            let old = self.scope.get_scalar(n);
+                            let old = self.scope.get_scalar(&n);
                             if !old.is_undef() {
                                 return Ok(old);
                             }
                             self.eval_expr(value)?
                         }
                         BinOp::LogAnd => {
-                            let old = self.scope.get_scalar(n);
+                            let old = self.scope.get_scalar(&n);
                             if !old.is_true() {
                                 return Ok(old);
                             }
@@ -9442,7 +9541,7 @@ impl VMHelper {
                         }
                         _ => self.eval_expr(value)?,
                     };
-                    return Ok(self.scalar_compound_assign_scalar_target(n, op, rhs)?);
+                    return Ok(self.scalar_compound_assign_scalar_target(&n, op, rhs)?);
                 }
                 let rhs = self.eval_expr(value)?;
                 // For hash element targets: $h{key} += 1
@@ -10135,7 +10234,8 @@ impl VMHelper {
                 if let Some(sub) = self.resolve_sub_by_name(name) {
                     self.wantarray_kind = saved_wa;
                     let args = self.with_topic_default_args(arg_vals);
-                    return self.call_sub(&sub, args, ctx, line);
+                    let pkg = name.rsplit_once("::").map(|(p, _)| p.to_string());
+                    return self.call_sub_with_package(&sub, args, ctx, line, pkg);
                 }
                 // Compat mode: check builtins after user subs (Perl 5 semantics).
                 if crate::compat_mode() {
@@ -14361,6 +14461,14 @@ impl VMHelper {
     /// Match aliases (`MATCH`/`PREMATCH`/`POSTMATCH`) are suppressed when
     /// [`Self::english_no_match_vars`] is set.
     #[inline]
+    /// English alias resolution + `our`/`oursync` package qualification in one call.
+    /// Returns the storage key the scope expects: `$ARG` → `_`, then `our $x` → `Pkg::x`.
+    /// Use this for compound ops (`++`, `--`, `+=`, `||=`, etc.) so atomic-RMW lookups
+    /// hit the package-qualified cell stored by `oursync`.
+    pub(crate) fn resolved_scalar_storage_name(&self, name: &str) -> String {
+        self.tree_scalar_storage_name(self.english_scalar_name(name))
+    }
+
     pub(crate) fn english_scalar_name<'a>(&self, name: &'a str) -> &'a str {
         if !self.english_enabled {
             return name;
@@ -14858,7 +14966,11 @@ impl VMHelper {
     ) -> ExecResult {
         if let Some(sub) = self.resolve_sub_by_name(name) {
             let args = self.with_topic_default_args(args);
-            return self.call_sub(&sub, args, want, line);
+            // The sub's home package is the qualifier from the resolved registry key.
+            // `PerlSub.name` itself may be bare; pass an explicit override so call_sub can
+            // switch `__PACKAGE__` for cross-package `our`/`oursync` qualification.
+            let pkg = name.rsplit_once("::").map(|(p, _)| p.to_string());
+            return self.call_sub_with_package(&sub, args, want, line, pkg);
         }
         match name {
             "uniq" | "distinct" | "uq" | "uniqstr" | "uniqint" | "uniqnum" | "shuffle" | "shuf"
@@ -18106,7 +18218,24 @@ impl VMHelper {
         sub: &PerlSub,
         args: Vec<PerlValue>,
         want: WantarrayCtx,
+        line: usize,
+    ) -> ExecResult {
+        // Default path: derive the package from `sub.name` if it is qualified. Bare-named
+        // subs (registered without a `Pkg::` prefix) leave `__PACKAGE__` untouched.
+        let pkg = sub.name.rsplit_once("::").map(|(p, _)| p.to_string());
+        self.call_sub_with_package(sub, args, want, line, pkg)
+    }
+
+    /// Internal helper: like [`Self::call_sub`] but takes an explicit home-package override
+    /// (used by [`Self::call_named_sub`], which knows the qualified registry key even when
+    /// the cached `PerlSub.name` is bare).
+    fn call_sub_with_package(
+        &mut self,
+        sub: &PerlSub,
+        args: Vec<PerlValue>,
+        want: WantarrayCtx,
         _line: usize,
+        home_package: Option<String>,
     ) -> ExecResult {
         // Push current sub for __SUB__ access
         self.current_sub_stack.push(Arc::new(sub.clone()));
@@ -18117,6 +18246,15 @@ impl VMHelper {
         self.scope.declare_array("_", args.clone());
         if let Some(ref env) = sub.closure_env {
             self.scope.restore_capture(env);
+        }
+        // Switch `__PACKAGE__` to the sub's home package so cross-package `our`/`oursync`
+        // qualifies correctly inside the body. Bytecode VM rewrites at compile time so it
+        // never needed this; the tree walker (used by parallel workers) does need it.
+        // Goes AFTER restore_capture so the closure's captured `__PACKAGE__` doesn't
+        // overwrite our home-package switch.
+        if let Some(pkg) = home_package {
+            self.scope
+                .declare_scalar("__PACKAGE__", PerlValue::string(pkg));
         }
         // Set $_0, $_1, $_2, ... for all args, and $_ to first arg
         // so `>{ $_ + 1 }` works instead of requiring `>{ $_[0] + 1 }`

@@ -579,13 +579,15 @@ fn from_json_true_returns_truthy_one() {
 // ── `"$Pkg::Var"` interpolation drops the package prefix (BUG-107) ─────────
 
 #[test]
-fn package_qualified_scalar_interpolates_with_dropped_prefix_today() {
-    // BUG-107: `"$Foo::bar"` in a double-quoted string should expand to the
-    // value of `$Foo::bar`. Stryke parses `$Foo` as the variable and leaves
-    // `::bar` as a literal.
+fn package_qualified_scalar_interpolates_correctly() {
+    // BUG-107 (FIXED): `"$Foo::bar"` in a double-quoted string now correctly
+    // expands to the value of `$Foo::bar`, matching Perl 5. The fix landed in
+    // `parse_interpolated_string` — after reading the bare name we now greedy-
+    // match `::` continuations the same way `$#Foo::a` and bare-code variable
+    // references already did.
     assert_eq!(
         eval_string(r#"package Foo; our $bar = "hello"; package main; "[$Foo::bar]""#),
-        "[::bar]"
+        "[hello]"
     );
 }
 

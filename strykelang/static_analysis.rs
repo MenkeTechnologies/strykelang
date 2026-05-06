@@ -246,7 +246,8 @@ impl StaticAnalyzer {
             | StmtKind::Our(decls)
             | StmtKind::Local(decls)
             | StmtKind::State(decls)
-            | StmtKind::MySync(decls) => {
+            | StmtKind::MySync(decls)
+            | StmtKind::OurSync(decls) => {
                 for d in decls {
                     match d.sigil {
                         Sigil::Scalar => self.declare_scalar(&d.name),

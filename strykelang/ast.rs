@@ -164,6 +164,10 @@ pub enum StmtKind {
     },
     /// `mysync $x = 0` — thread-safe atomic variable for parallel blocks
     MySync(Vec<VarDecl>),
+    /// `oursync $x = 0` — package-global thread-safe atomic variable. Same as
+    /// `mysync` but the binding lives in the package stash (e.g. `main::x`)
+    /// so it is visible across packages and parallel workers share one cell.
+    OurSync(Vec<VarDecl>),
     /// Bare block (for scoping or do {})
     Block(Block),
     /// Statements run in order without an extra scope frame (parser desugar).

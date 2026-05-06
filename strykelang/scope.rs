@@ -400,9 +400,15 @@ impl Scope {
         self.parallel_guard
     }
 
+    /// Names allowed to mutate freely inside a parallel block. Excludes plain
+    /// package-qualified names (`Pkg::x`) — those used to be unconditionally skipped,
+    /// but that was the source of plain `our $x` silently accumulating per-worker
+    /// copies under `fan`/`pmap`/`pfor`. The atomicity check in
+    /// [`Self::check_parallel_scalar_write`] now decides: `oursync` (Atomic-backed) is
+    /// allowed, plain `our` (non-atomic) errors with a directive to declare `oursync`.
     #[inline]
-    fn parallel_skip_special_name(name: &str) -> bool {
-        name.contains("::")
+    fn parallel_skip_special_name(_name: &str) -> bool {
+        false
     }
 
     /// Loop/sort topic scalars that parallel ops assign before each iteration.
@@ -442,10 +448,18 @@ impl Scope {
                     }
                 }
                 if i != inner {
+                    // Direct the user to the right shared-state primitive based on
+                    // whether the captured variable is package-global (`our` →
+                    // `oursync`) or lexical (`my` → `mysync`).
+                    let directive = if name.contains("::") {
+                        "declare `oursync` for shared package-global state"
+                    } else {
+                        "declare `mysync` for shared lexical state"
+                    };
                     return Err(PerlError::runtime(
                         format!(
-                            "cannot assign to captured non-mysync variable `${}` in a parallel block",
-                            name
+                            "cannot assign to captured non-atomic variable `${}` in a parallel block — {}",
+                            name, directive
                         ),
                         0,
                     ));
@@ -1088,12 +1102,14 @@ impl Scope {
 
     /// Atomically read-modify-write a scalar. Holds the Mutex lock for
     /// the entire cycle so `mysync` variables are race-free under `fan`/`pfor`.
-    /// Returns the NEW value.
+    /// Returns the NEW value. Returns `Err` when the parallel guard rejects the
+    /// write — `++`/`+=`/`-=` on a captured non-atomic outer-scope variable now
+    /// fails fast just like plain `=` does, instead of silently dropping writes.
     pub fn atomic_mutate(
         &mut self,
         name: &str,
         f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> PerlValue {
+    ) -> Result<PerlValue, PerlError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1102,23 +1118,26 @@ impl Scope {
                     let new_val = f(&guard);
                     *guard = new_val.clone();
                     crate::parallel_trace::emit_scalar_mutation(name, &old, &new_val);
-                    return new_val;
+                    return Ok(new_val);
                 }
             }
         }
-        // Non-atomic fallback
+        // Non-atomic fallback. Route through `set_scalar` so the parallel guard
+        // fires on `our` / `my` writes from inside `fan` / `pmap` / `pfor`.
         let old = self.get_scalar(name);
         let new_val = f(&old);
-        let _ = self.set_scalar(name, new_val.clone());
-        new_val
+        self.set_scalar(name, new_val.clone())?;
+        Ok(new_val)
     }
 
-    /// Like atomic_mutate but returns the OLD value (for postfix `$x++`).
+    /// Like [`Self::atomic_mutate`] but returns the OLD value (for postfix `$x++`).
+    /// Returns `Err` for non-atomic captured-outer writes inside parallel blocks
+    /// (same DESIGN-001 strict-error path as `atomic_mutate`).
     pub fn atomic_mutate_post(
         &mut self,
         name: &str,
         f: impl FnOnce(&PerlValue) -> PerlValue,
-    ) -> PerlValue {
+    ) -> Result<PerlValue, PerlError> {
         for frame in self.frames.iter().rev() {
             if let Some(v) = frame.get_scalar(name) {
                 if let Some(arc) = v.as_atomic_arc() {
@@ -1127,14 +1146,14 @@ impl Scope {
                     let new_val = f(&old);
                     *guard = new_val.clone();
                     crate::parallel_trace::emit_scalar_mutation(name, &old, &new_val);
-                    return old;
+                    return Ok(old);
                 }
             }
         }
-        // Non-atomic fallback
+        // Non-atomic fallback — same parallel-guard semantics as `atomic_mutate`.
         let old = self.get_scalar(name);
-        let _ = self.set_scalar(name, f(&old));
-        old
+        self.set_scalar(name, f(&old))?;
+        Ok(old)
     }
 
     /// Append `rhs` to a scalar string in-place (no clone of the existing string).
@@ -2467,14 +2486,26 @@ impl Scope {
         //     the same Arc. Perl 5 shared-storage closure semantics.
         let by_ref = crate::compat_mode();
         let mut captured = Vec::new();
-        for frame in &mut self.frames {
-            // Hash-stored scalars cover package globals (`our $x` /
-            // `$main::caught`) and other named-storage cases. These are
-            // **always shared** across closures regardless of compat mode —
-            // package globals are explicitly mutable cross-scope state, and
-            // pretending otherwise would break `$SIG{__WARN__} = sub { … }`,
-            // observer registration, accumulator patterns, etc.
+        // Hash-stored scalar dedup: each name in `frame.scalars` has at most ONE binding
+        // visible to the closure (innermost shadows outer). Without dedup, a name that
+        // exists in multiple frames — e.g. `$_` restored into a callee frame by an earlier
+        // `restore_capture`, while the top-level frame still holds the original — would be
+        // pushed twice. `restore_capture` then declares them sequentially, and the second
+        // `declare_scalar` write-throughs the first's CaptureCell with another CaptureCell,
+        // nesting them. One `arc.read()` unwrap then surfaces the inner cell and renders
+        // as `SCALAR(0x…)`. We walk hash-stored scalars innermost-first and skip names
+        // already seen — only the innermost binding is captured.
+        //
+        // Slot-stored scalars, arrays, and hashes don't need dedup: they iterate
+        // outer-first so that during `restore_capture` the innermost frame's value is
+        // declared LAST, winning slot-index / hash-key collisions (factory-closure pattern
+        // depends on this last-write-wins behavior).
+        let mut seen_hash_scalars: HashSet<String> = HashSet::new();
+        for frame in self.frames.iter_mut().rev() {
             for (k, v) in &mut frame.scalars {
+                if !seen_hash_scalars.insert(k.clone()) {
+                    continue;
+                }
                 if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                     captured.push((format!("${}", k), v.clone()));
                 } else if v.is_simple_scalar() {
@@ -2485,6 +2516,8 @@ impl Scope {
                     captured.push((format!("${}", k), v.clone()));
                 }
             }
+        }
+        for frame in &mut self.frames {
             // Slot-stored scalars are lexical `my` declarations. Closure
             // capture rule (DESIGN-001):
             //   - default stryke: cell is closure-local. Repeat calls of the
@@ -2842,7 +2875,9 @@ mod tests {
             "n",
             PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(10)))),
         );
-        let v = s.atomic_mutate("n", |old| PerlValue::integer(old.to_int() + 5));
+        let v = s
+            .atomic_mutate("n", |old| PerlValue::integer(old.to_int() + 5))
+            .expect("atomic_mutate on atomic-backed scalar must not fail");
         assert_eq!(v.to_int(), 15);
         assert_eq!(s.get_scalar("n").to_int(), 15);
     }
@@ -2856,7 +2891,9 @@ mod tests {
             "n",
             PerlValue::atomic(Arc::new(Mutex::new(PerlValue::integer(7)))),
         );
-        let old = s.atomic_mutate_post("n", |v| PerlValue::integer(v.to_int() + 1));
+        let old = s
+            .atomic_mutate_post("n", |v| PerlValue::integer(v.to_int() + 1))
+            .expect("atomic_mutate_post on atomic-backed scalar must not fail");
         assert_eq!(old.to_int(), 7);
         assert_eq!(s.get_scalar("n").to_int(), 8);
     }
