@@ -379,14 +379,30 @@ my @squares = fan_cap 8, compute
       <p class="chapter-meta">11 topics</p>
       <article class="doc-entry" id="doc-mysync">
         <h3><a class="doc-anchor" href="#doc-mysync">#</a> <code>mysync</code></h3>
-        <p>Declare shared variables for parallel blocks (<code>Arc&lt;Mutex&gt;</code>).</p>
+        <p>Declare lexically scoped shared variables for parallel blocks (<code>Arc&lt;Mutex&gt;</code>).</p>
         <pre><code class="lang-perl">mysync $counter = 0
 fan 10000 { $counter++ }   # always exactly 10000
 mysync @results
-mysync %histogram$1
+mysync %histogram
 
-Compound ops (`++`, `+=`, `.=`, `|=`, `&amp;=`) are fully atomic.
-</code></pre>
+# Compound ops (++, +=, .=, |=, &amp;=) are fully atomic.</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-oursync">
+        <h3><a class="doc-anchor" href="#doc-oursync">#</a> <code>oursync</code></h3>
+        <p>Package-global counterpart of <code>mysync</code>. Same <code>Arc&lt;Mutex&gt;</code> backing, but the binding is keyed by the package-qualified stash name (<code>Pkg::x</code>) so all packages and parallel workers share one cell.</p>
+        <pre><code class="lang-perl">package Counter
+oursync $total = 0
+fn bump { $total++ }
+package main
+fan 10000 { Counter::bump() }
+p $Counter::total          # always exactly 10000
+
+oursync @results
+pfor { push @results, $_ * $_ } 1..50
+
+oursync %hits
+pfor { $hits{$_ % 10} += 1 } 0..999</code></pre>
+        <p>Plain <code>our $x</code> mutated inside a parallel block is rejected at runtime with a directive to declare <code>oursync</code> — DESIGN-001 strict-error parity with the way plain <code>my</code> closure-writes are rejected, pointing at <code>mysync</code>. Use <code>oursync</code> for cross-package shared state; use <code>mysync</code> for lexically scoped shared state.</p>
       </article>
       <article class="doc-entry" id="doc-async">
         <h3><a class="doc-anchor" href="#doc-async">#</a> <code>async</code></h3>
@@ -4752,15 +4768,22 @@ Use `my` everywhere unless you specifically need `our` (package global), `local`
       </article>
       <article class="doc-entry" id="doc-our">
         <h3><a class="doc-anchor" href="#doc-our">#</a> <code>our</code></h3>
-        <p>Declare a package-global variable that is accessible as a lexical alias in the current scope. Unlike <code>my</code>, <code>our</code> variables are visible across the entire package and can be accessed from other packages via their fully qualified name (e.g. <code>$Counter::total</code>). This is useful for package-level configuration, shared counters, or variables that need to survive across file boundaries. In stryke, <code>our</code> variables are not mutex-protected — use <code>mysync</code> instead for parallel-safe globals.</p>
+        <p>Declare a package-global variable accessible as a lexical alias in the current scope. Unlike <code>my</code>, <code>our</code> variables are visible across the entire package and can be accessed from other packages via their fully qualified name (e.g. <code>$Counter::total</code>). Useful for package-level configuration, shared counters, or variables that need to survive across file boundaries.</p>
+        <p>In stryke, <code>our</code> variables are NOT mutex-protected. <strong>Mutating an <code>our</code> variable from inside <code>fan</code>/<code>pmap</code>/<code>pfor</code> is rejected at runtime</strong> with a directive to use <a href="#doc-oursync"><code>oursync</code></a> (the package-global counterpart of <code>mysync</code> — same <code>Arc&lt;Mutex&gt;</code> backing, keyed by <code>Pkg::x</code>).</p>
         <pre><code class="lang-perl">package Counter
-our $total = 0
+our $total = 0           # serial use only
 fn bump { $total++ }
 package main
 Counter::bump() for 1:5
-p $Counter::total   # 5
-</code></pre>
-        <p>Prefer <code>my</code> for local state; reach for <code>our</code> only when other packages need access.</p>
+p $Counter::total        # 5
+
+# For parallel mutation, use oursync:
+package C
+oursync $shared = 0
+fn inc { $shared++ }
+package main
+fan 10000 { C::inc() }   # always exactly 10000</code></pre>
+        <p>Prefer <code>my</code> for local state; <code>our</code> for cross-package read-mostly globals; <code>oursync</code> for cross-package mutation under parallelism.</p>
       </article>
       <article class="doc-entry" id="doc-local">
         <h3><a class="doc-anchor" href="#doc-local">#</a> <code>local</code></h3>
