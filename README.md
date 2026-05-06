@@ -440,6 +440,22 @@ $_ = 50; ~> 10 >{ $_ + $_< }                   # 60
 
 Implementation: `strykelang/scope.rs::set_closure_args` shifts every active slot's chain on each frame entry; `strykelang/lexer.rs` lexes `_<+`, `_N<+`, and the indexed-ascent forms `_<N`/`_M<N` (bare and `$`-prefixed) as single tokens. Depth cap is hardcoded at 5 levels (`debug_assert!(level <= 5)` in `scope.rs::topic_slot_key`); past depth 5 the chain falls off and reads return undef. Bumping the cap is a one-line change.
 
+### Mutation semantics — topic variants align with `|param|` block params
+
+A user writing `$_ = ...` or `$_< = ...` inside a block mutates **only the current frame**. Topic variants follow the exact same rule as `|$x|` block params and inner `my $x`: writes do not leak outward. The chain shift on the next frame entry remains purely a function of the *outer* topic value, never the inner mutation.
+
+| form | mutation propagates to outer scope? | mechanism |
+|---|---|---|
+| `\|$x\|` block param | NO — frame-local | param binding lives in callee frame |
+| `my $x` inside a block | NO — frame-local | new lexical binding in current frame |
+| `my $x` outer + inner closure writes `$x` | rejected at compile time | DESIGN-001 (closures capture by value) |
+| `mysync $x` outer + inner closure writes `$x` | YES — explicit `Arc<Mutex>` opt-in | shared cell, atomic compound ops |
+| `our $x` | YES — package-global by design | symbol table, not lexical |
+| `$_`, `$_<`, `$_<<`, `$_<<<`, `$_<<<<`, `$_<<<<<` | NO — frame-local | `Frame::set_scalar_raw` bypasses CaptureCell write-through |
+| `$_0`, `$_1`, … `$_N` and `$_N<+` chain forms | NO — frame-local | same path as topic-chain writes |
+
+Implementation: `strykelang/scope.rs::Scope::set_scalar` recognizes topic-variant names via `is_topic_variant_name` (regex `^_[0-9]*<*$`) and routes the write through `Frame::set_scalar_raw`, which bypasses the CaptureCell write-through that named outer-scope `my` variables use. Result: `$_<` always reads the lexical outer-scope topic of the current closure, never an in-flight mutation from a sibling iteration.
+
 ---
 
 ## [0x04] SHARED STATE (`mysync`)

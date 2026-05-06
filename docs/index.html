@@ -802,6 +802,30 @@ fn deep($_0, $_1, $_2) {
       </section>
 
       <section class="tutorial-section">
+        <h2>Mutation semantics — topic variants align with <code>|param|</code> block params</h2>
+        <p>A user writing <code>$_ = ...</code> or <code>$_&lt; = ...</code> inside a block mutates <strong>only the current frame</strong>. Topic variants follow the exact same rule as <code>|$x|</code> block params and inner <code>my $x</code>: writes do not leak outward, and the chain shift on the next frame entry is purely a function of the <em>outer</em> topic value, never the inner mutation.</p>
+        <table class="comparison-table" style="width:100%; border-collapse:collapse; font-size:0.85em;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:4px 8px; border-bottom:1px solid #444;">form</th>
+              <th style="text-align:left; padding:4px 8px; border-bottom:1px solid #444;">mutation propagates to outer scope?</th>
+              <th style="text-align:left; padding:4px 8px; border-bottom:1px solid #444;">mechanism</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>|$x|</code> block param</td><td style="color:#0f0;">NO — frame-local</td><td>param binding lives in callee frame</td></tr>
+            <tr><td><code>my $x</code> inside a block</td><td style="color:#0f0;">NO — frame-local</td><td>new lexical binding in current frame</td></tr>
+            <tr><td><code>my $x</code> outer + inner closure writes <code>$x</code></td><td style="color:#f55;">rejected at compile time</td><td>DESIGN-001 (closures capture by value)</td></tr>
+            <tr><td><code>mysync $x</code> outer + inner closure writes <code>$x</code></td><td style="color:#ff0;">YES — explicit <code>Arc&lt;Mutex&gt;</code> opt-in</td><td>shared cell, atomic compound ops</td></tr>
+            <tr><td><code>our $x</code></td><td style="color:#ff0;">YES — package-global by design</td><td>symbol table, not lexical</td></tr>
+            <tr><td><code>$_</code>, <code>$_&lt;</code>, <code>$_&lt;&lt;</code>, <code>$_&lt;&lt;&lt;</code>, <code>$_&lt;&lt;&lt;&lt;</code>, <code>$_&lt;&lt;&lt;&lt;&lt;</code></td><td style="color:#0f0;">NO — frame-local</td><td><code>Frame::set_scalar_raw</code> bypasses CaptureCell write-through</td></tr>
+            <tr><td><code>$_0</code>, <code>$_1</code>, … <code>$_N</code> and <code>$_N&lt;+</code> chain forms</td><td style="color:#0f0;">NO — frame-local</td><td>same path as topic-chain writes</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:1em;">Implementation: <code>strykelang/scope.rs::Scope::set_scalar</code> recognizes topic-variant names via <code>is_topic_variant_name</code> (regex <code>^_[0-9]*&lt;*$</code>) and routes the write through <code>Frame::set_scalar_raw</code>, which bypasses the CaptureCell write-through that named outer-scope <code>my</code> variables use. Result: <code>$_&lt;</code> always reads the lexical outer-scope topic of the current closure, never an in-flight mutation from a sibling iteration.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>Coderef-in-block-position</h2>
         <p>Wherever a <code>{ BLOCK }</code> is accepted in a per-element list operator (<code>grep</code>, <code>map</code>, <code>sort</code>, <code>first</code>, <code>any</code>, <code>all</code>, <code>none</code>, <code>take_while</code>, <code>drop_while</code>, <code>reject</code>, <code>partition</code>, <code>min_by</code>, <code>max_by</code>, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the <code>{ $f($_) }</code> / <code>{ $f-&gt;($_) }</code> boilerplate.</p>
 <pre><span class="comment"># grep / map — single coderef, no block:</span>
