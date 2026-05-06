@@ -149,3 +149,69 @@ fn oursync_keyword_rejected_under_compat() {
     let code = r#"oursync $x = 7; $x"#;
     assert_eq!(eval_int(code), 7);
 }
+
+// ── CaptureCell nesting leak (SCALAR(0x...) leak) ─────────────────────────────
+
+#[test]
+fn capture_does_not_leak_nested_capture_cell_into_topic() {
+    // Repro for the SCALAR(0x...) leak. Trigger:
+    //   1. outer `$_` is set to a value
+    //   2. a named fn is defined (its `RuntimeSubDecl` calls `Scope::capture()`,
+    //      wrapping outer `$_` in a CaptureCell)
+    //   3. the named fn is called; on entry `restore_capture` reinstalls the
+    //      same CaptureCell into the callee's frame, so `$_` now exists in BOTH
+    //      the top-level frame AND the callee frame, sharing one Arc
+    //   4. an anonymous closure is created inside the named fn — its own
+    //      `Scope::capture()` walks every frame and (without dedup) pushes ONE
+    //      entry per frame, so the captured Vec has two `$_` entries pointing
+    //      to the same Arc
+    //   5. when that closure is called, `restore_capture` declares each entry;
+    //      the second `declare_scalar` write-throughs the first's CaptureCell
+    //      with another CaptureCell, nesting a CaptureCell inside the Arc
+    //   6. one `arc.read()` then surfaces the inner cell, which `Display`
+    //      formats as "SCALAR(0x...)"
+    // Fix: dedup hash-stored scalars in `Scope::capture()` (innermost-first walk
+    // skips already-seen names), so each name produces one captured entry.
+    let code = r#"
+        $_ = "outer";
+        fn worker { my $cb = sub { 1 }; $cb->(7) }
+        worker();
+        $_
+    "#;
+    assert_eq!(eval_string(code), "outer");
+}
+
+#[test]
+fn capture_dedup_preserves_factory_closure_pattern() {
+    // Counterweight: dedup is for hash-stored scalars only. Slot-stored `my`
+    // variables (like `$base` below) keep the outer-first iteration so that
+    // `restore_capture` declares the innermost frame's value LAST, winning
+    // slot-index collisions. If the dedup spread to slot scalars, the second
+    // factory call would clobber the first via slot 0.
+    let code = r#"
+        sub mkadder { my $base = shift; sub { $base + shift } }
+        my $a5 = mkadder(5);
+        my $a10 = mkadder(10);
+        $a5->(3) . "/" . $a10->(3)
+    "#;
+    assert_eq!(eval_string(code), "8/13");
+}
+
+#[test]
+fn capture_does_not_leak_with_map_block_calling_closure() {
+    // Variant: instead of a single `$cb->(7)` call, the closure is invoked from
+    // inside `map { $cb->($_) } LIST`. Each map iter `set_topic`s, which reads
+    // `$_` via `shift_slot_chain` — that read would surface the nested cell if
+    // the leak were present, propagating `SCALAR(0x...)` into `$_<`.
+    let code = r#"
+        $_ = "preserve_me";
+        fn worker {
+            my $cb = sub { $_[0] };
+            my @r = map { $cb->($_) } 1..3;
+            @r
+        }
+        my @r = worker();
+        join(",", @r) . "|" . $_
+    "#;
+    assert_eq!(eval_string(code), "1,2,3|preserve_me");
+}

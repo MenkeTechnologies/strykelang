@@ -2486,14 +2486,26 @@ impl Scope {
         //     the same Arc. Perl 5 shared-storage closure semantics.
         let by_ref = crate::compat_mode();
         let mut captured = Vec::new();
-        for frame in &mut self.frames {
-            // Hash-stored scalars cover package globals (`our $x` /
-            // `$main::caught`) and other named-storage cases. These are
-            // **always shared** across closures regardless of compat mode —
-            // package globals are explicitly mutable cross-scope state, and
-            // pretending otherwise would break `$SIG{__WARN__} = sub { … }`,
-            // observer registration, accumulator patterns, etc.
+        // Hash-stored scalar dedup: each name in `frame.scalars` has at most ONE binding
+        // visible to the closure (innermost shadows outer). Without dedup, a name that
+        // exists in multiple frames — e.g. `$_` restored into a callee frame by an earlier
+        // `restore_capture`, while the top-level frame still holds the original — would be
+        // pushed twice. `restore_capture` then declares them sequentially, and the second
+        // `declare_scalar` write-throughs the first's CaptureCell with another CaptureCell,
+        // nesting them. One `arc.read()` unwrap then surfaces the inner cell and renders
+        // as `SCALAR(0x…)`. We walk hash-stored scalars innermost-first and skip names
+        // already seen — only the innermost binding is captured.
+        //
+        // Slot-stored scalars, arrays, and hashes don't need dedup: they iterate
+        // outer-first so that during `restore_capture` the innermost frame's value is
+        // declared LAST, winning slot-index / hash-key collisions (factory-closure pattern
+        // depends on this last-write-wins behavior).
+        let mut seen_hash_scalars: HashSet<String> = HashSet::new();
+        for frame in self.frames.iter_mut().rev() {
             for (k, v) in &mut frame.scalars {
+                if !seen_hash_scalars.insert(k.clone()) {
+                    continue;
+                }
                 if v.as_capture_cell().is_some() || v.as_scalar_ref().is_some() {
                     captured.push((format!("${}", k), v.clone()));
                 } else if v.is_simple_scalar() {
@@ -2504,6 +2516,8 @@ impl Scope {
                     captured.push((format!("${}", k), v.clone()));
                 }
             }
+        }
+        for frame in &mut self.frames {
             // Slot-stored scalars are lexical `my` declarations. Closure
             // capture rule (DESIGN-001):
             //   - default stryke: cell is closure-local. Repeat calls of the
