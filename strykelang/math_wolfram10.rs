@@ -526,9 +526,7 @@ fn builtin_lcp_array(args: &[PerlValue]) -> PerlResult<PerlValue> {
                 h += 1;
             }
             lcp[rank[i]] = h as i64;
-            if h > 0 {
-                h -= 1;
-            }
+            h = h.saturating_sub(1);
         }
     }
     Ok(PerlValue::array(lcp.into_iter().map(PerlValue::integer).collect()))

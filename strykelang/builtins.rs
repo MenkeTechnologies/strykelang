@@ -63,15 +63,26 @@ pub fn builtins_hash_map() -> indexmap::IndexMap<String, PerlValue> {
 }
 
 /// `%aliases` — alias name → primary dispatcher name (e.g. `tj` → `to_json`).
-/// Source: 2nd+ names in each `try_builtin` match arm. Unchanged from the
-/// previous reflection surface.
+/// Source: 2nd+ names in each `try_builtin` match arm.
+///
+/// Filters out names that are themselves primaries (i.e. appear as the first
+/// slot in some arm and thus already in `%b`). Without this filter, names like
+/// `take` that appear both as an arm's primary and as another arm's tail-slot
+/// alias would self-loop or collide. The invariant is:
+///   `keys %a == keys %all - keys %b`
+/// so `keys %a` is exactly the count of "extra spellings beyond primaries".
 pub fn aliases_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    let primary_set: std::collections::HashSet<&'static str> =
+        CATEGORY_MAP.iter().map(|(n, _)| *n).collect();
     let mut m = indexmap::IndexMap::new();
     for arm in BUILTIN_ARMS {
         let Some((primary, rest)) = arm.split_first() else {
             continue;
         };
         for alias in rest {
+            if primary_set.contains(*alias) {
+                continue;
+            }
             m.insert((*alias).to_string(), PerlValue::string(primary.to_string()));
         }
     }

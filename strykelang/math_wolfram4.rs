@@ -934,7 +934,7 @@ fn matrix_sqrt_db(a: &[Vec<f64>]) -> Vec<Vec<f64>> {
     // Denman-Beavers iteration: Y_0 = A, Z_0 = I; Y_{k+1} = (Y + Z⁻¹)/2,
     // Z_{k+1} = (Z + Y⁻¹)/2.
     let n = a.len();
-    let mut y = a.iter().cloned().collect::<Vec<_>>();
+    let mut y = a.to_vec();
     let mut z = identity_mat(n);
     for _ in 0..50 {
         let y_inv = invert_mat(&y);
@@ -1656,22 +1656,19 @@ fn builtin_decompose_classical(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut trend = vec![f64::NAN; n];
     for i in half..n - half {
         let mut s = 0.0_f64;
-        let count;
-        if period % 2 == 0 {
+        if period.is_multiple_of(2) {
             // Centred 2×p MA.
             s += 0.5 * xs[i - half];
             s += 0.5 * xs[i + half];
             for k in (i - half + 1)..(i + half) {
                 s += xs[k];
             }
-            count = period;
         } else {
             for k in (i - half)..=(i + half) {
                 s += xs[k];
             }
-            count = period;
         }
-        trend[i] = s / count as f64;
+        trend[i] = s / period as f64;
     }
     let detrended: Vec<f64> = xs
         .iter()
@@ -1729,7 +1726,7 @@ fn builtin_combinations_list(args: &[PerlValue]) -> PerlResult<PerlValue> {
         comb.iter().copied().map(PerlValue::integer).collect(),
     ));
     loop {
-        let mut i = (k - 1) as i64;
+        let mut i = k - 1;
         while i >= 0 && comb[i as usize] == n - k + i {
             i -= 1;
         }
@@ -2388,7 +2385,7 @@ fn builtin_rayleigh_jeans(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// Compton wavelength shift Δλ = (h/mc)(1 − cos θ).
 fn builtin_compton_shift(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = args.first().map(|v| v.to_number()).unwrap_or(0.0);
-    let lambda_c = 2.426_310_2367e-12_f64; // electron Compton wavelength (m)
+    let lambda_c = 2.4263102367e-12_f64; // electron Compton wavelength (m)
     Ok(PerlValue::float(lambda_c * (1.0 - theta.cos())))
 }
 
@@ -2510,7 +2507,7 @@ fn builtin_aks_primality(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     // Step 4 — full polynomial check skipped (too expensive). Fall back to
     // Miller-Rabin with the deterministic 12-witness set, exact for 64-bit n.
-    Ok(builtin_miller_rabin(args)?)
+    builtin_miller_rabin(args)
 }
 
 /// Elliptic-curve point addition over Q on y² = x³ + a x + b. Identity

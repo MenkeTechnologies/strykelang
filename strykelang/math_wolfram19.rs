@@ -35,11 +35,11 @@ fn builtin_gauss_legendre_5(
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
     let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     let nodes = [
-        -0.9061798459386640,
+        -0.906_179_845_938_664,
         -0.5384693101056831,
         0.0,
         0.5384693101056831,
-        0.9061798459386640,
+        0.906_179_845_938_664,
     ];
     let weights = [
         0.2369268850561891,
@@ -191,6 +191,7 @@ fn builtin_adaptive_simpson_b19(
         let fm = call_user_1(interp, f, m, line)?;
         Ok(((b - a) / 6.0) * (fa + 4.0 * fm + fb))
     }
+    #[allow(clippy::too_many_arguments)]
     fn recur(
         interp: &mut VMHelper,
         f: &PerlValue,
@@ -650,7 +651,7 @@ fn builtin_brent_root(
         } else {
             b - fb * (b - a) / (fb - fa)
         };
-        let cond1 = !((s - (3.0 * a + b) / 4.0) * (s - b) < 0.0);
+        let cond1 = (s - (3.0 * a + b) / 4.0) * (s - b) >= 0.0;
         let cond2 = mflag && (s - b).abs() >= (b - c).abs() / 2.0;
         let cond3 = !mflag && (s - b).abs() >= (c - d).abs() / 2.0;
         let s = if cond1 || cond2 || cond3 {
@@ -807,7 +808,7 @@ fn builtin_aberth_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = xs.len();
     let mut out = xs.clone();
     for i in 0..n {
-        if dfs.get(i).map_or(true, |&d| d == 0.0) { continue; }
+        if dfs.get(i).is_none_or(|&d| d == 0.0) { continue; }
         let mut sum = 0.0;
         for j in 0..n {
             if i != j {

@@ -569,7 +569,7 @@ fn builtin_least_squares(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 fn solve_linear(a_in: &[Vec<f64>], b_in: &[f64]) -> Vec<f64> {
     let n = a_in.len();
-    let mut a: Vec<Vec<f64>> = a_in.iter().cloned().collect();
+    let mut a: Vec<Vec<f64>> = a_in.to_vec();
     let mut b = b_in.to_vec();
     for col in 0..n {
         let mut pivot = col;
@@ -728,7 +728,7 @@ fn gauss_legendre_nodes(n: usize) -> (Vec<f64>, Vec<f64>) {
     // Newton iteration on Legendre P_n. Tricomi's initial guess.
     let mut xs = vec![0.0_f64; n];
     let mut ws = vec![0.0_f64; n];
-    let m = (n + 1) / 2;
+    let m = n.div_ceil(2);
     for i in 0..m {
         let mut z = (std::f64::consts::PI * (i as f64 + 0.75) / (n as f64 + 0.5)).cos();
         loop {
@@ -792,6 +792,7 @@ fn builtin_adaptive_simpson(
     fn simpson(fa: f64, fb: f64, fm: f64, h: f64) -> f64 {
         h / 6.0 * (fa + 4.0 * fm + fb)
     }
+    #[allow(clippy::too_many_arguments)]
     fn recurse(
         interp: &mut VMHelper,
         f: &PerlValue,
@@ -2071,9 +2072,7 @@ fn builtin_kalman_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     for i in 0..n {
         let rhs: Vec<f64> = (0..m).map(|j| ph_t[i][j]).collect();
         let sol = solve_linear(&s, &rhs);
-        for j in 0..m {
-            k_mat[i][j] = sol[j];
-        }
+        k_mat[i][..m].copy_from_slice(&sol[..m]);
     }
     // Update x = x_p + K y.
     let mut x_new = vec![0.0_f64; n];

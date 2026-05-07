@@ -255,7 +255,7 @@ fn days_to_ymd(d: i64) -> (i64, i64, i64) {
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let day = (doy - (153 * mp + 2) / 5 + 1) as i64;
-    let month = (mp as i64 + if mp < 10 { 3 } else { -9 }) as i64;
+    let month = mp as i64 + if mp < 10 { 3 } else { -9 };
     let year = if month <= 2 { y + 1 } else { y };
     (year, month, day)
 }
@@ -925,11 +925,11 @@ fn builtin_necklace_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     while d * d <= n {
         if n % d == 0 {
             // Euler's totient of n/d times k^d.
-            let phi = euler_totient_simple((n / d) as i64);
-            sum += phi as i64 * k.pow(d as u32);
+            let phi = euler_totient_simple(n / d);
+            sum += phi * k.pow(d as u32);
             if d != n / d {
                 let phi2 = euler_totient_simple(d);
-                sum += phi2 as i64 * k.pow((n / d) as u32);
+                sum += phi2 * k.pow((n / d) as u32);
             }
         }
         d += 1;

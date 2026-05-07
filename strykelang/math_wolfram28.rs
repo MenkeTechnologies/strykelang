@@ -112,7 +112,7 @@ fn builtin_n_ball_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
     fn gamma_int_half(k: usize) -> f64 {
         let pi_local = std::f64::consts::PI;
         if k == 0 { 1.0 }
-        else if k % 2 == 0 { (1..k/2).map(|i| i as f64).product::<f64>() }
+        else if k.is_multiple_of(2) { (1..k/2).map(|i| i as f64).product::<f64>() }
         else {
             let m = (k - 1) / 2;
             (1..=m).map(|i| (2.0 * i as f64 - 1.0) / 2.0).product::<f64>() * pi_local.sqrt()

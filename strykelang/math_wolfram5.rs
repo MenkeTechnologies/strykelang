@@ -288,7 +288,7 @@ fn builtin_clenshaw_curtis_quad(
         let mut w = 1.0 / (n as f64);
         let mut s = 0.0_f64;
         for j in 1..=n / 2 {
-            let denom = if 2 * j == n { 4.0 * j as f64 * j as f64 - 1.0 } else { 4.0 * j as f64 * j as f64 - 1.0 };
+            let denom = 4.0 * j as f64 * j as f64 - 1.0;
             s += (2.0 * j as f64 * theta).cos() / denom;
         }
         w -= 2.0 / n as f64 * s;
@@ -2319,7 +2319,7 @@ fn builtin_ray_triangle_intersect(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let inv_det = 1.0 / det;
     let s = sub3(origin, a);
     let u = inv_det * dot3(s, h);
-    if u < 0.0 || u > 1.0 {
+    if !(0.0..=1.0).contains(&u) {
         return Ok(PerlValue::float(f64::NAN));
     }
     let q = cross3(s, ab);

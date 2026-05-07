@@ -88,7 +88,7 @@ fn builtin_cyclotomic_polynomial(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut den: Vec<i64> = vec![1];
     let mut d = 1_usize;
     while d <= n {
-        if n % d == 0 {
+        if n.is_multiple_of(d) {
             let mu = mobius_i64((n / d) as i64);
             if mu != 0 {
                 let mut factor = vec![0_i64; d + 1];
@@ -332,7 +332,7 @@ fn builtin_best_rational_approximation(args: &[PerlValue]) -> PerlResult<PerlVal
 /// Motzkin number M_n via OEIS A001006: (n+3) M_{n+1} = (2n+3) M_n + 3n M_{n-1}.
 /// Sequence: 1, 1, 2, 4, 9, 21, 51, 127, 323, 835, …
 fn builtin_motzkin_number(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = i1(args).max(0) as i64;
+    let n = i1(args).max(0);
     if n == 0 || n == 1 {
         return Ok(PerlValue::integer(1));
     }
@@ -1543,6 +1543,7 @@ fn builtin_scc_tarjan(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut indices: Vec<i64> = vec![-1; n];
     let mut lowlinks: Vec<i64> = vec![0; n];
     let mut sccs: Vec<Vec<i64>> = Vec::new();
+    #[allow(clippy::too_many_arguments)]
     fn strong(
         u: usize,
         adj: &[Vec<usize>],
@@ -1749,7 +1750,7 @@ fn builtin_graph_radius(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_stieltjes_constant(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = i1(args).max(0) as usize;
     if k == 0 {
-        return Ok(PerlValue::float(0.577215664901532860606512_f64));
+        return Ok(PerlValue::float(0.577_215_664_901_532_9_f64));
     }
     let n = 50_usize;
     let mut sum = 0.0_f64;

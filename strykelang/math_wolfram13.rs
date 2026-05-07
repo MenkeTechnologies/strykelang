@@ -150,6 +150,7 @@ fn builtin_articulation_points(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut parent = vec![-1_i64; n];
     let mut ap = vec![false; n];
     let mut timer = 0_i64;
+    #[allow(clippy::too_many_arguments)]
     fn dfs(u: usize, adj: &[Vec<usize>], visited: &mut [bool], disc: &mut [i64], low: &mut [i64], parent: &mut [i64], ap: &mut [bool], timer: &mut i64) {
         let n = adj.len();
         visited[u] = true; *timer += 1; disc[u] = *timer; low[u] = *timer;
@@ -185,6 +186,7 @@ fn builtin_bridges_edges(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut parent = vec![-1_i64; n];
     let mut bridges: Vec<(i64, i64)> = Vec::new();
     let mut timer = 0_i64;
+    #[allow(clippy::too_many_arguments)]
     fn dfs(u: usize, adj: &[Vec<usize>], visited: &mut [bool], disc: &mut [i64], low: &mut [i64], parent: &mut [i64], bridges: &mut Vec<(i64, i64)>, timer: &mut i64) {
         let n = adj.len();
         visited[u] = true; *timer += 1; disc[u] = *timer; low[u] = *timer;

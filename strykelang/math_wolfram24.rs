@@ -36,6 +36,7 @@ fn builtin_tarjan_scc(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut low = vec![0_usize; n];
     let mut sccs: Vec<Vec<usize>> = vec![];
 
+    #[allow(clippy::too_many_arguments)]
     fn strong(
         v: usize, adj: &[Vec<usize>], index_counter: &mut usize,
         stack: &mut Vec<usize>, on_stack: &mut [bool],
@@ -136,6 +137,7 @@ fn builtin_articulation_points_b24(args: &[PerlValue]) -> PerlResult<PerlValue> 
     let mut ap = vec![false; n];
     let mut time = 0_usize;
 
+    #[allow(clippy::too_many_arguments)]
     fn dfs(
         u: usize, adj: &[Vec<usize>], visited: &mut [bool], disc: &mut [usize],
         low: &mut [usize], parent: &mut [usize], ap: &mut [bool], time: &mut usize,
@@ -180,6 +182,7 @@ fn builtin_bridges(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut bridges_v: Vec<(usize, usize)> = vec![];
     let mut time = 0_usize;
 
+    #[allow(clippy::too_many_arguments)]
     fn dfs(
         u: usize, parent: usize, adj: &[Vec<usize>], visited: &mut [bool],
         disc: &mut [usize], low: &mut [usize], bridges: &mut Vec<(usize, usize)>, time: &mut usize,
