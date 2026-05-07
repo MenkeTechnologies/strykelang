@@ -3397,6 +3397,42 @@ pub(crate) fn try_builtin(
         }
         "golden_section" | "golden" | "gss" => Some(builtin_golden_section(interp, args, line)),
 
+        // ── Batch 3 callback-taking math builtins ─────────────────────────
+        "numerical_gradient" | "ngrad" => {
+            Some(builtin_numerical_gradient(interp, args, line))
+        }
+        "numerical_jacobian" | "njac" => {
+            Some(builtin_numerical_jacobian(interp, args, line))
+        }
+        "numerical_hessian" | "nhess" => {
+            Some(builtin_numerical_hessian(interp, args, line))
+        }
+        "numerical_divergence" | "ndiv" => {
+            Some(builtin_numerical_divergence(interp, args, line))
+        }
+        "numerical_curl" | "ncurl" => Some(builtin_numerical_curl(interp, args, line)),
+        "numerical_laplacian" | "nlap" => {
+            Some(builtin_numerical_laplacian(interp, args, line))
+        }
+        "nelder_mead" | "simplex_min" => Some(builtin_nelder_mead(interp, args, line)),
+        "gradient_descent" | "gd_min" => {
+            Some(builtin_gradient_descent(interp, args, line))
+        }
+        "bfgs_minimize" | "bfgs" => Some(builtin_bfgs_minimize(interp, args, line)),
+        "levenberg_marquardt" | "lev_marq" => {
+            Some(builtin_levenberg_marquardt(interp, args, line))
+        }
+        "romberg" | "romberg_int" => Some(builtin_romberg(interp, args, line)),
+        "gauss_legendre_quad" | "glquad" | "gl_quad" => {
+            Some(builtin_gauss_legendre_quad(interp, args, line))
+        }
+        "monte_carlo_integrate" | "mc_int" => {
+            Some(builtin_monte_carlo_integrate(interp, args, line))
+        }
+        "adaptive_simpson" | "asimp" => {
+            Some(builtin_adaptive_simpson(interp, args, line))
+        }
+
         // ── ODE Solvers ──────────────────────────────────────────────────
         "rk4" | "runge_kutta" | "rk4_ode" => Some(builtin_rk4(interp, args, line)),
         "euler_ode" | "euler_method" => Some(builtin_euler_ode(interp, args, line)),
@@ -3432,6 +3468,391 @@ pub(crate) fn try_builtin(
         "bessel_j0" | "j0" => Some(builtin_bessel_j0(args)),
         "bessel_j1" | "j1" => Some(builtin_bessel_j1(args)),
         "lambert_w" | "lambertw" | "productlog" => Some(builtin_lambert_w(args)),
+
+        // ── Wolfram-Math parity: Bessel/Airy/Hankel/Struve/Kelvin ───────
+        "bessel_j" => Some(builtin_bessel_j(args)),
+        "bessel_y" => Some(builtin_bessel_y(args)),
+        "bessel_i" => Some(builtin_bessel_i(args)),
+        "bessel_k" => Some(builtin_bessel_k(args)),
+        "hankel_h1" => Some(builtin_hankel_h1(args)),
+        "hankel_h2" => Some(builtin_hankel_h2(args)),
+        "bessel_j_zero" => Some(builtin_bessel_j_zero(args)),
+        "airy_ai" => Some(builtin_airy_ai(args)),
+        "airy_bi" => Some(builtin_airy_bi(args)),
+        "airy_ai_prime" => Some(builtin_airy_ai_prime(args)),
+        "airy_bi_prime" => Some(builtin_airy_bi_prime(args)),
+        "spherical_bessel_j" => Some(builtin_spherical_bessel_j(args)),
+        "spherical_bessel_y" => Some(builtin_spherical_bessel_y(args)),
+        "struve_h" => Some(builtin_struve_h(args)),
+        "struve_l" => Some(builtin_struve_l(args)),
+        "kelvin_ber" => Some(builtin_kelvin_ber(args)),
+        "kelvin_bei" => Some(builtin_kelvin_bei(args)),
+
+        // ── Orthogonal polynomials ──────────────────────────────────────
+        "legendre_p" => Some(builtin_legendre_p(args)),
+        "legendre_q" => Some(builtin_legendre_q(args)),
+        "assoc_legendre_p" => Some(builtin_assoc_legendre_p(args)),
+        "hermite_h" => Some(builtin_hermite_h(args)),
+        "hermite_he" => Some(builtin_hermite_he(args)),
+        "laguerre_l" => Some(builtin_laguerre_l(args)),
+        "assoc_laguerre_l" => Some(builtin_assoc_laguerre_l(args)),
+        "jacobi_p" => Some(builtin_jacobi_p(args)),
+        "gegenbauer_c" => Some(builtin_gegenbauer_c(args)),
+        "chebyshev_t" => Some(builtin_chebyshev_t(args)),
+        "chebyshev_u" => Some(builtin_chebyshev_u(args)),
+        "spherical_harmonic_y" => Some(builtin_spherical_harmonic_y(args)),
+        "zernike_r" => Some(builtin_zernike_r(args)),
+
+        // ── Elliptic integrals + Jacobi/Weierstrass/theta ────────────────
+        "elliptic_k" => Some(builtin_elliptic_k(args)),
+        "elliptic_e" => Some(builtin_elliptic_e(args)),
+        "elliptic_pi" => Some(builtin_elliptic_pi(args)),
+        "elliptic_f" => Some(builtin_elliptic_f(args)),
+        "elliptic_e_inc" => Some(builtin_elliptic_e_inc(args)),
+        "elliptic_pi_inc" => Some(builtin_elliptic_pi_inc(args)),
+        "carlson_rf" => Some(builtin_carlson_rf(args)),
+        "carlson_rd" => Some(builtin_carlson_rd(args)),
+        "carlson_rj" => Some(builtin_carlson_rj(args)),
+        "jacobi_sn" => Some(builtin_jacobi_sn(args)),
+        "jacobi_cn" => Some(builtin_jacobi_cn(args)),
+        "jacobi_dn" => Some(builtin_jacobi_dn(args)),
+        "jacobi_am" => Some(builtin_jacobi_am(args)),
+        "elliptic_theta" => Some(builtin_elliptic_theta(args)),
+        "weierstrass_p" => Some(builtin_weierstrass_p(args)),
+        "weierstrass_zeta" => Some(builtin_weierstrass_zeta(args)),
+        "weierstrass_sigma" => Some(builtin_weierstrass_sigma(args)),
+
+        // ── Zeta / polylog / Lerch ──────────────────────────────────────
+        "zeta" | "riemann_zeta" => Some(builtin_zeta(args)),
+        "hurwitz_zeta" => Some(builtin_hurwitz_zeta(args)),
+        "polylog" => Some(builtin_polylog(args)),
+        "dilog" => Some(builtin_dilog(args)),
+        "lerch_phi" => Some(builtin_lerch_phi(args)),
+        "riemann_siegel_z" => Some(builtin_riemann_siegel_z(args)),
+        "riemann_siegel_theta" => Some(builtin_riemann_siegel_theta(args)),
+        "dirichlet_eta" => Some(builtin_dirichlet_eta(args)),
+        "dirichlet_beta" => Some(builtin_dirichlet_beta(args)),
+
+        // ── Hypergeometric ──────────────────────────────────────────────
+        "hypergeometric_2f1" | "hyper_2f1" => Some(builtin_hypergeometric_2f1(args)),
+        "hypergeometric_1f1" | "hyper_1f1" | "kummer_m" => {
+            Some(builtin_hypergeometric_1f1(args))
+        }
+        "hypergeometric_0f1" | "hyper_0f1" => Some(builtin_hypergeometric_0f1(args)),
+        "hypergeometric_pfq" | "hyper_pfq" => Some(builtin_hypergeometric_pfq(args)),
+        "hypergeometric_u" | "tricomi_u" => Some(builtin_hypergeometric_u(args)),
+
+        // ── Modular forms ───────────────────────────────────────────────
+        "dedekind_eta" => Some(builtin_dedekind_eta(args)),
+        "klein_j" | "klein_invariant_j" => Some(builtin_klein_j(args)),
+        "modular_lambda" => Some(builtin_modular_lambda(args)),
+        "ramanujan_tau" => Some(builtin_ramanujan_tau(args)),
+
+        // ── Integrals: Si / Ci / Ei / Li / Fresnel ──────────────────────
+        "sin_integral" | "si_int" => Some(builtin_sin_integral(args)),
+        "cos_integral" | "ci_int" => Some(builtin_cos_integral(args)),
+        "sinh_integral" | "shi_int" => Some(builtin_sinh_integral(args)),
+        "cosh_integral" | "chi_int" => Some(builtin_cosh_integral(args)),
+        "exp_integral_e" | "ei_n" => Some(builtin_exp_integral_e(args)),
+        "exp_integral_ei" | "ei_int" => Some(builtin_exp_integral_ei(args)),
+        "log_integral" | "li_int" => Some(builtin_log_integral(args)),
+        "fresnel_s" => Some(builtin_fresnel_s(args)),
+        "fresnel_c" => Some(builtin_fresnel_c(args)),
+
+        // ── Number-theory gaps ──────────────────────────────────────────
+        "jacobi_symbol" => Some(builtin_jacobi_symbol(args)),
+        "kronecker_symbol" => Some(builtin_kronecker_symbol(args)),
+        "primitive_root" => Some(builtin_primitive_root(args)),
+        "multiplicative_order" => Some(builtin_multiplicative_order(args)),
+        "mangoldt_lambda" | "von_mangoldt" => Some(builtin_mangoldt_lambda(args)),
+        "carmichael_lambda" => Some(builtin_carmichael_lambda(args)),
+        "squares_r" => Some(builtin_squares_r(args)),
+        "thue_morse" => Some(builtin_thue_morse(args)),
+        "rudin_shapiro" => Some(builtin_rudin_shapiro(args)),
+        "farey_sequence" | "farey" => Some(builtin_farey_sequence(args)),
+        "frobenius_number" => Some(builtin_frobenius_number(args)),
+        "frobenius_solve" => Some(builtin_frobenius_solve(args)),
+        "stern_brocot" => Some(builtin_stern_brocot(args)),
+
+        // ── Combinatorial gaps ──────────────────────────────────────────
+        "stirling_s1" | "stirling_first" => Some(builtin_stirling_s1(args)),
+        "bell_polynomial_b" | "bell_y" => Some(builtin_bell_polynomial_b(args)),
+        "clebsch_gordan" => Some(builtin_clebsch_gordan(args)),
+        "three_j_symbol" | "wigner_3j" => Some(builtin_three_j_symbol(args)),
+        "six_j_symbol" | "wigner_6j" => Some(builtin_six_j_symbol(args)),
+        "nine_j_symbol" | "wigner_9j" => Some(builtin_nine_j_symbol(args)),
+        "debruijn_sequence" | "debruijn" => Some(builtin_debruijn_sequence(args)),
+        "wigner_d" => Some(builtin_wigner_d(args)),
+
+        // ── q-series, Mittag-Leffler, Coulomb wave ──────────────────────
+        "q_pochhammer" => Some(builtin_q_pochhammer(args)),
+        "q_factorial" => Some(builtin_q_factorial(args)),
+        "q_binomial" => Some(builtin_q_binomial(args)),
+        "q_hypergeometric_pfq" => Some(builtin_q_hypergeometric_pfq(args)),
+        "mittag_leffler_e" | "mittag_leffler" => Some(builtin_mittag_leffler_e(args)),
+        "coulomb_wave_f" => Some(builtin_coulomb_wave_f(args)),
+        "coulomb_wave_g" => Some(builtin_coulomb_wave_g(args)),
+
+        // ── Inverse special functions ───────────────────────────────────
+        "inverse_erf" | "erfinv" => Some(builtin_inverse_erf(args)),
+        "inverse_erfc" | "erfcinv" => Some(builtin_inverse_erfc(args)),
+        "inverse_gamma_regularized" | "gamma_lr_inv" => {
+            Some(builtin_inverse_gamma_regularized(args))
+        }
+        "inverse_beta_regularized" | "beta_reg_inv" => {
+            Some(builtin_inverse_beta_regularized(args))
+        }
+        "inverse_jacobi_sn" => Some(builtin_inverse_jacobi_sn(args)),
+
+        // ── Piecewise / symbolic primitives ─────────────────────────────
+        "dirac_delta" => Some(builtin_dirac_delta(args)),
+        "heaviside_theta" | "heaviside" => Some(builtin_heaviside_theta(args)),
+        "unit_box" => Some(builtin_unit_box(args)),
+        "unit_triangle" => Some(builtin_unit_triangle(args)),
+        "square_wave" => Some(builtin_square_wave(args)),
+        "triangle_wave" => Some(builtin_triangle_wave(args)),
+        "sawtooth_wave" => Some(builtin_sawtooth_wave(args)),
+        "dirac_comb" => Some(builtin_dirac_comb(args)),
+
+        // ── Tier A: number theory extensions ────────────────────────────
+        "liouville_lambda" => Some(builtin_liouville_lambda(args)),
+        "jordan_totient" => Some(builtin_jordan_totient(args)),
+        "ramanujan_sum" => Some(builtin_ramanujan_sum(args)),
+        "cyclotomic_polynomial" | "cyclotomic" => Some(builtin_cyclotomic_polynomial(args)),
+        "legendre_symbol" => Some(builtin_legendre_symbol(args)),
+        "pythagorean_triple_q" => Some(builtin_pythagorean_triple_q(args)),
+        "gen_pythagorean_triple" => Some(builtin_gen_pythagorean_triple(args)),
+        "sophie_germain_q" => Some(builtin_sophie_germain_q(args)),
+        "mersenne_q" => Some(builtin_mersenne_q(args)),
+        "lucas_lehmer_test" | "lucas_lehmer" => Some(builtin_lucas_lehmer_test(args)),
+        "continued_fraction" => Some(builtin_continued_fraction(args)),
+        "from_continued_fraction" => Some(builtin_from_continued_fraction(args)),
+        "convergents" => Some(builtin_convergents(args)),
+        "best_rational_approximation" | "best_rational" => {
+            Some(builtin_best_rational_approximation(args))
+        }
+
+        // ── Tier B: combinatorial sequences ─────────────────────────────
+        "motzkin_number" | "motzkin" => Some(builtin_motzkin_number(args)),
+        "narayana_number" | "narayana" => Some(builtin_narayana_number(args)),
+        "delannoy_number" | "delannoy" => Some(builtin_delannoy_number(args)),
+        "schroder_number" | "schroder" | "large_schroder" => {
+            Some(builtin_schroder_number(args))
+        }
+        "small_schroder_number" | "small_schroder" => {
+            Some(builtin_small_schroder_number(args))
+        }
+        "eulerian_number" => Some(builtin_eulerian_number(args)),
+        "bernoulli_polynomial" => Some(builtin_bernoulli_polynomial(args)),
+        "euler_polynomial" => Some(builtin_euler_polynomial(args)),
+        "pell_number" | "pell" => Some(builtin_pell_number(args)),
+        "pell_lucas_number" | "pell_lucas" => Some(builtin_pell_lucas_number(args)),
+        "perrin_number" | "perrin" => Some(builtin_perrin_number(args)),
+        "padovan_number" | "padovan" => Some(builtin_padovan_number(args)),
+
+        // ── Tier C: linear algebra extras ───────────────────────────────
+        "kronecker_product" => Some(builtin_kronecker_product(args)),
+        "tensor_product" => Some(builtin_tensor_product(args)),
+        "tensor_contract" => Some(builtin_tensor_contract(args)),
+        "matrix_rank" | "mrank" => Some(builtin_matrix_rank(args)),
+        "companion_matrix" | "companion" => Some(builtin_companion_matrix(args)),
+        "characteristic_polynomial" | "charpoly" => {
+            Some(builtin_characteristic_polynomial(args))
+        }
+        "singular_values" | "svals" => Some(builtin_singular_values(args)),
+        "nullspace" | "null_space" | "kernel" => Some(builtin_nullspace(args)),
+
+        // ── Tier D: polynomial algebra ──────────────────────────────────
+        "polynomial_gcd" | "polygcd" => Some(builtin_polynomial_gcd(args)),
+        "polynomial_quotient" | "polyquot" => Some(builtin_polynomial_quotient(args)),
+        "polynomial_remainder" | "polyrem" => Some(builtin_polynomial_remainder(args)),
+        "polynomial_resultant" | "resultant" => Some(builtin_polynomial_resultant(args)),
+        "polynomial_discriminant" | "discriminant" => {
+            Some(builtin_polynomial_discriminant(args))
+        }
+        "polynomial_roots" | "polyroots" => Some(builtin_polynomial_roots(args)),
+
+        // ── Tier E: more distributions ──────────────────────────────────
+        "gumbel_pdf" => Some(builtin_gumbel_pdf(args)),
+        "gumbel_cdf" => Some(builtin_gumbel_cdf(args)),
+        "gumbel_quantile" => Some(builtin_gumbel_quantile(args)),
+        "frechet_pdf" => Some(builtin_frechet_pdf(args)),
+        "frechet_cdf" => Some(builtin_frechet_cdf(args)),
+        "frechet_quantile" => Some(builtin_frechet_quantile(args)),
+        "logistic_pdf" => Some(builtin_logistic_pdf(args)),
+        "logistic_cdf" => Some(builtin_logistic_cdf(args)),
+        "logistic_quantile" => Some(builtin_logistic_quantile(args)),
+        "rayleigh_pdf" => Some(builtin_rayleigh_pdf(args)),
+        "rayleigh_cdf" => Some(builtin_rayleigh_cdf(args)),
+        "rayleigh_quantile" => Some(builtin_rayleigh_quantile(args)),
+        "inverse_gamma_pdf" => Some(builtin_inverse_gamma_pdf(args)),
+        "inverse_gamma_cdf" => Some(builtin_inverse_gamma_cdf(args)),
+        "inverse_gamma_quantile" => Some(builtin_inverse_gamma_quantile(args)),
+        "kumaraswamy_pdf" => Some(builtin_kumaraswamy_pdf(args)),
+        "kumaraswamy_cdf" => Some(builtin_kumaraswamy_cdf(args)),
+        "kumaraswamy_quantile" => Some(builtin_kumaraswamy_quantile(args)),
+
+        // ── Tier F: Mathieu ─────────────────────────────────────────────
+        "mathieu_a" | "mathieu_characteristic_a" => Some(builtin_mathieu_a(args)),
+        "mathieu_ce" => Some(builtin_mathieu_ce(args)),
+        "mathieu_se" => Some(builtin_mathieu_se(args)),
+
+        // ── Tier G: Heun general ────────────────────────────────────────
+        "heun_g" => Some(builtin_heun_g(args)),
+
+        // ── Tier H: wavelets ────────────────────────────────────────────
+        "haar_transform" | "haar" => Some(builtin_haar_transform(args)),
+        "haar_inverse" | "ihaar" => Some(builtin_haar_inverse(args)),
+        "daubechies_db4" | "db4" => Some(builtin_daubechies_db4(args)),
+        "daubechies_db4_inverse" | "idb4" => Some(builtin_daubechies_db4_inverse(args)),
+
+        // ── Tier I: graph algorithms ────────────────────────────────────
+        "topo_sort_adj" => Some(builtin_topo_sort_adj(args)),
+        "scc_tarjan" | "tarjan_scc" | "strongly_connected" => {
+            Some(builtin_scc_tarjan(args))
+        }
+        "bipartite_q" | "is_bipartite" => Some(builtin_bipartite_q(args)),
+        "max_flow_edmonds_karp" | "max_flow" | "edmonds_karp" => {
+            Some(builtin_max_flow_edmonds_karp(args))
+        }
+        "min_cut" => Some(builtin_min_cut(args)),
+        "eccentricity" => Some(builtin_eccentricity(args)),
+        "graph_diameter" => Some(builtin_graph_diameter(args)),
+        "graph_radius" => Some(builtin_graph_radius(args)),
+
+        // ── Tier J: misc fillers ────────────────────────────────────────
+        "stieltjes_constant" | "stieltjes" => Some(builtin_stieltjes_constant(args)),
+        "gauss_sum" => Some(builtin_gauss_sum(args)),
+        "kloosterman_sum" => Some(builtin_kloosterman_sum(args)),
+        "eta_quotient" => Some(builtin_eta_quotient(args)),
+        "root_approximant" => Some(builtin_root_approximant(args)),
+
+        // ── Batch 3: optimization (no callback) ──────────────────────────
+        "conjugate_gradient" | "cg_solve" => Some(builtin_conjugate_gradient(args)),
+        "least_squares" | "lstsq" => Some(builtin_least_squares(args)),
+
+        // ── Batch 3: linear algebra extras ────────────────────────────────
+        "lu_decompose" | "ludec" => Some(builtin_lu_decompose(args)),
+        "qr_decompose" | "qrdec" => Some(builtin_qr_decompose(args)),
+        "householder_reflector" | "householder" => Some(builtin_householder_reflector(args)),
+        "givens_rotation" | "givens" => Some(builtin_givens_rotation(args)),
+        "forward_substitute" | "fwdsub" => Some(builtin_forward_substitute(args)),
+        "back_substitute" | "backsub" => Some(builtin_back_substitute(args)),
+        "hessenberg_reduce" | "hessen" => Some(builtin_hessenberg_reduce(args)),
+
+        // ── Batch 3: polynomial helpers ───────────────────────────────────
+        "poly_derivative" | "polyder" => Some(builtin_poly_derivative(args)),
+        "poly_integrate" | "polyint" => Some(builtin_poly_integrate(args)),
+        "poly_compose" => Some(builtin_poly_compose(args)),
+        "poly_eval_horner" | "horner" => Some(builtin_poly_eval_horner(args)),
+        "pade_approximant" | "pade" => Some(builtin_pade_approximant(args)),
+
+        // ── Batch 3: quaternions and 3D rotations ─────────────────────────
+        "quat_mul" => Some(builtin_quat_mul(args)),
+        "quat_conj" => Some(builtin_quat_conj(args)),
+        "quat_norm" => Some(builtin_quat_norm(args)),
+        "quat_inv" => Some(builtin_quat_inv(args)),
+        "quat_from_axis_angle" | "axis_angle_to_quat" => {
+            Some(builtin_quat_from_axis_angle(args))
+        }
+        "quat_to_axis_angle" => Some(builtin_quat_to_axis_angle(args)),
+        "quat_to_matrix" => Some(builtin_quat_to_matrix(args)),
+        "quat_from_matrix" | "matrix_to_quat" => Some(builtin_quat_from_matrix(args)),
+        "quat_slerp" | "slerp" => Some(builtin_quat_slerp(args)),
+        "euler_zyx_to_matrix" => Some(builtin_euler_zyx_to_matrix(args)),
+        "matrix_to_euler_zyx" => Some(builtin_matrix_to_euler_zyx(args)),
+        "rotate_3d_vec" => Some(builtin_rotate_3d_vec(args)),
+
+        // ── Batch 3: information theory ───────────────────────────────────
+        "kl_divergence" | "kl_div" => Some(builtin_kl_divergence(args)),
+        "js_divergence" | "js_div" => Some(builtin_js_divergence(args)),
+        "mutual_information" | "mi" => Some(builtin_mutual_information(args)),
+        "cross_entropy_arr" | "cross_entropy_dist" => {
+            Some(builtin_cross_entropy_arr(args))
+        }
+        "renyi_entropy" => Some(builtin_renyi_entropy(args)),
+        "tsallis_entropy" => Some(builtin_tsallis_entropy(args)),
+
+        // ── Batch 3: quantum primitives ──────────────────────────────────
+        "pauli_x" => Some(builtin_pauli_x(args)),
+        "pauli_y" => Some(builtin_pauli_y(args)),
+        "pauli_z" => Some(builtin_pauli_z(args)),
+        "pauli_id" | "pauli_i" | "pauli_identity" => Some(builtin_pauli_id(args)),
+        "ket_bra" => Some(builtin_ket_bra(args)),
+        "density_matrix" => Some(builtin_density_matrix(args)),
+        "expectation_value" | "expval" => Some(builtin_expectation_value(args)),
+        "commutator" => Some(builtin_commutator(args)),
+        "anticommutator" => Some(builtin_anticommutator(args)),
+        "partial_trace" | "ptrace" => Some(builtin_partial_trace(args)),
+        "von_neumann_entropy" | "vn_entropy" => Some(builtin_von_neumann_entropy(args)),
+
+        // ── Batch 3: stat mech ───────────────────────────────────────────
+        "bose_einstein" => Some(builtin_bose_einstein(args)),
+        "fermi_dirac" => Some(builtin_fermi_dirac(args)),
+        "maxwell_boltzmann_speed" | "mb_speed" => {
+            Some(builtin_maxwell_boltzmann_speed(args))
+        }
+        "partition_function" | "z_partition" => Some(builtin_partition_function(args)),
+        "helmholtz_free_energy" | "free_energy_f" => {
+            Some(builtin_helmholtz_free_energy(args))
+        }
+        "boltzmann_factor" => Some(builtin_boltzmann_factor(args)),
+        "einstein_specific_heat" | "einstein_cv" => {
+            Some(builtin_einstein_specific_heat(args))
+        }
+
+        // ── Batch 3: optics ──────────────────────────────────────────────
+        "fresnel_reflection_te" => Some(builtin_fresnel_reflection_te(args)),
+        "fresnel_reflection_tm" => Some(builtin_fresnel_reflection_tm(args)),
+        "fresnel_transmission_te" => Some(builtin_fresnel_transmission_te(args)),
+        "fresnel_transmission_tm" => Some(builtin_fresnel_transmission_tm(args)),
+        "abcd_thin_lens" => Some(builtin_abcd_thin_lens(args)),
+        "abcd_free_space" => Some(builtin_abcd_free_space(args)),
+        "gaussian_beam_q" => Some(builtin_gaussian_beam_q(args)),
+
+        // ── Batch 3: astrodynamics ───────────────────────────────────────
+        "kepler_solve" => Some(builtin_kepler_solve(args)),
+        "true_to_eccentric" => Some(builtin_true_to_eccentric(args)),
+        "eccentric_to_mean" => Some(builtin_eccentric_to_mean(args)),
+        "julian_date" | "j_date" => Some(builtin_julian_date(args)),
+        "jd_to_gregorian" | "jd_to_date" => Some(builtin_jd_to_gregorian(args)),
+        "sidereal_time_gmst" | "gmst" => Some(builtin_sidereal_time_gmst(args)),
+        "vis_viva" => Some(builtin_vis_viva(args)),
+        "orbital_period_kepler" => Some(builtin_orbital_period_kepler(args)),
+        "orbital_elements_to_state" | "elem_to_state" => {
+            Some(builtin_orbital_elements_to_state(args))
+        }
+
+        // ── Batch 3: time series ─────────────────────────────────────────
+        "kalman_step" | "kalman_filter" => Some(builtin_kalman_step(args)),
+        "exponential_smoothing" | "exp_smooth" => Some(builtin_exponential_smoothing(args)),
+        "holt_winters" => Some(builtin_holt_winters(args)),
+        "arma_yw_fit" | "ar_yw" => Some(builtin_arma_yw_fit(args)),
+
+        // ── Batch 3: graph centrality ────────────────────────────────────
+        "pagerank" => Some(builtin_pagerank(args)),
+        "betweenness_centrality" => Some(builtin_betweenness_centrality(args)),
+        "closeness_centrality" => Some(builtin_closeness_centrality(args)),
+        "eigenvector_centrality" => Some(builtin_eigenvector_centrality(args)),
+        "degree_centrality" => Some(builtin_degree_centrality(args)),
+        "triangle_count" => Some(builtin_triangle_count(args)),
+
+        // ── Batch 3: random samplers ─────────────────────────────────────
+        "rgumbel" => Some(builtin_rgumbel(args)),
+        "rfrechet" => Some(builtin_rfrechet(args)),
+        "rrayleigh" => Some(builtin_rrayleigh(args)),
+        "rlogistic" => Some(builtin_rlogistic(args)),
+        "rkumaraswamy" => Some(builtin_rkumaraswamy(args)),
+        "rinverse_gamma" | "rinvgamma" => Some(builtin_rinverse_gamma(args)),
+
+        // ── Batch 3: 2D geometry ─────────────────────────────────────────
+        "graham_scan" | "convex_hull_2d" => Some(builtin_graham_scan(args)),
+        "line_line_intersect_2d" | "ll_intersect_2d" => {
+            Some(builtin_line_line_intersect_2d(args))
+        }
+        "point_segment_distance" | "p_seg_dist" => {
+            Some(builtin_point_segment_distance(args))
+        }
 
         // ── Number Theory (extended) ─────────────────────────────────────
         "mod_exp" | "modexp" | "powmod" => Some(builtin_mod_exp(args)),
@@ -28692,6 +29113,9 @@ fn builtin_tally(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // Include the extended stdlib implementations
 include!("builtins_extended.rs");
+include!("math_wolfram.rs");
+include!("math_wolfram2.rs");
+include!("math_wolfram3.rs");
 
 #[cfg(test)]
 mod tests {
