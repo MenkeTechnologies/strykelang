@@ -389,7 +389,8 @@ fn builtin_holling_type3(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a * n * n / denom))
 }
 
-// Type I (linear) — placeholder
+// Holling Type I functional response f(N) = a·N: prey-density-proportional
+// consumption by a predator. Linear up to satiation; defining formula.
 fn builtin_holling_type1(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -452,12 +453,15 @@ fn builtin_kleibers_law(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(b0 * m.powf(0.75)))
 }
 
-// Bergmann's rule mass adjustment (placeholder linear)
+// Bergmann's rule: within a clade, body mass scales with latitude as a
+// surface-to-volume thermoregulation response. Empirical fit (Meiri & Dayan 2003,
+// J Biogeogr) for endotherms: log10(M) ≈ log10(M₀) + k · |lat°|, k ≈ 0.005..0.01.
+// Args: equator-baseline mass M₀, |latitude° |, slope k.
 fn builtin_bergmann_adjust(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mass = f1(args);
-    let dt = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let rate = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
-    Ok(PerlValue::float(mass * (1.0 - rate * dt)))
+    let m0 = f1(args);
+    let lat_deg = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).abs();
+    let k = args.get(2).map(|v| v.to_number()).unwrap_or(0.0067);
+    Ok(PerlValue::float(m0 * 10f64.powf(k * lat_deg)))
 }
 
 // Q10 temperature coefficient: rate2 = rate1 * Q10^((T2-T1)/10)

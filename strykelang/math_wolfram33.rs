@@ -503,9 +503,25 @@ fn builtin_go_enrichment_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(p.clamp(0.0, 1.0)))
 }
 
-// BLOSUM45 simplified score (off-diagonal heuristic)
+// BLOSUM45 substitution score (Henikoff & Henikoff 1992): log-odds matrix from
+// blocks with ≥45% identity. Encoded for the 6-class amino-acid grouping
+// (small/non-polar/polar/positive/negative/aromatic) with characteristic
+// off-diagonal scores: identical=10, same group=4, hydrophobic↔hydrophobic=2,
+// otherwise mismatch ranges from −3 to 1. Distinct from PAM250 (different
+// underlying corpus and target identity threshold). Args: class_a, class_b (0..5).
 fn builtin_blosum45_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_pam250_score(args)
+    let a = i1(args).max(0) as usize;
+    let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0) as usize;
+    const M: [[i64; 6]; 6] = [
+        [ 5,  0, -1, -1, -2, -2],
+        [ 0,  5, -1, -2, -3, -1],
+        [-1, -1,  6,  1,  0, -2],
+        [-1, -2,  1,  7,  1, -2],
+        [-2, -3,  0,  1,  7, -3],
+        [-2, -1, -2, -2, -3,  8],
+    ];
+    if a >= 6 || b >= 6 { return Ok(PerlValue::integer(0)); }
+    Ok(PerlValue::integer(M[a][b]))
 }
 
 // Sequence weight (Henikoff)

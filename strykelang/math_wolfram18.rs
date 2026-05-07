@@ -1,22 +1,97 @@
 // Batch 18 — more crypto, more time series, more graph theory.
 
+// Poly1305 one-block step per RFC 8439 §2.5.1: acc = ((acc + block) * r) mod (2^130 - 5).
+// Uses 5×26-bit radix limbs so each schoolbook product fits in u64. r is clamped
+// per RFC (clear bits 24,25,26,27,28,29,30,31 within each 32-bit word).
 fn builtin_poly1305_block_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let acc = i1(args) as u128;
-    let block = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
-    let r = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
-    // 2^130 - 5 fits in u128 (max u128 = 2^128 - 1, but 2^130 - 5 is bigger).
-    // Use modular reduction by approximating with the lower-bit prime fragment.
-    // We model with safe constant well within u128 limits.
-    let p: u128 = (1u128 << 127) - 1; // approximation: large Mersenne-like prime
-    let new_acc = ((acc.wrapping_add(block)).wrapping_mul(r)) % p;
-    Ok(PerlValue::integer(new_acc as i64))
+    let acc_in = i1(args) as u128;
+    let block_in = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
+    let r_in = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
+    let r = r_in & 0x0ffffffc_0ffffffc_0ffffffc_0fffffffu128;
+    fn limbs(x: u128) -> [u64; 5] {
+        [
+            (x & 0x3ffffff) as u64,
+            ((x >> 26) & 0x3ffffff) as u64,
+            ((x >> 52) & 0x3ffffff) as u64,
+            ((x >> 78) & 0x3ffffff) as u64,
+            ((x >> 104) & 0x3ffffff) as u64,
+        ]
+    }
+    let mut h = limbs(acc_in.wrapping_add(block_in));
+    let r_l = limbs(r);
+    let s1 = r_l[1].wrapping_mul(5);
+    let s2 = r_l[2].wrapping_mul(5);
+    let s3 = r_l[3].wrapping_mul(5);
+    let s4 = r_l[4].wrapping_mul(5);
+    let d0 = (h[0] as u128) * (r_l[0] as u128) + (h[1] as u128) * (s4 as u128)
+           + (h[2] as u128) * (s3 as u128) + (h[3] as u128) * (s2 as u128) + (h[4] as u128) * (s1 as u128);
+    let d1 = (h[0] as u128) * (r_l[1] as u128) + (h[1] as u128) * (r_l[0] as u128)
+           + (h[2] as u128) * (s4 as u128) + (h[3] as u128) * (s3 as u128) + (h[4] as u128) * (s2 as u128);
+    let d2 = (h[0] as u128) * (r_l[2] as u128) + (h[1] as u128) * (r_l[1] as u128)
+           + (h[2] as u128) * (r_l[0] as u128) + (h[3] as u128) * (s4 as u128) + (h[4] as u128) * (s3 as u128);
+    let d3 = (h[0] as u128) * (r_l[3] as u128) + (h[1] as u128) * (r_l[2] as u128)
+           + (h[2] as u128) * (r_l[1] as u128) + (h[3] as u128) * (r_l[0] as u128) + (h[4] as u128) * (s4 as u128);
+    let d4 = (h[0] as u128) * (r_l[4] as u128) + (h[1] as u128) * (r_l[3] as u128)
+           + (h[2] as u128) * (r_l[2] as u128) + (h[3] as u128) * (r_l[1] as u128) + (h[4] as u128) * (r_l[0] as u128);
+    let mut c;
+    h[0] = (d0 & 0x3ffffff) as u64; c = (d0 >> 26) as u128;
+    let d1c = d1 + c; h[1] = (d1c & 0x3ffffff) as u64; c = (d1c >> 26) as u128;
+    let d2c = d2 + c; h[2] = (d2c & 0x3ffffff) as u64; c = (d2c >> 26) as u128;
+    let d3c = d3 + c; h[3] = (d3c & 0x3ffffff) as u64; c = (d3c >> 26) as u128;
+    let d4c = d4 + c; h[4] = (d4c & 0x3ffffff) as u64; c = (d4c >> 26) as u128;
+    h[0] = h[0].wrapping_add((c as u64).wrapping_mul(5));
+    let extra = h[0] >> 26; h[0] &= 0x3ffffff;
+    h[1] = h[1].wrapping_add(extra);
+    let acc = (h[0] as u128) | ((h[1] as u128) << 26) | ((h[2] as u128) << 52)
+            | ((h[3] as u128) << 78) | ((h[4] as u128) << 104);
+    Ok(PerlValue::integer(acc as i64))
 }
+// X25519 field multiplication mod 2²⁵⁵-19 using 5×51-bit radix limbs (DJB form).
+// Schoolbook multiply produces 9 limb products, each 102-bit; reduce by replacing
+// limb_i (i ≥ 5) with 19·limb_{i-5} per the Curve25519 prime identity 2²⁵⁵ ≡ 19.
 fn builtin_x25519_field_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = i1(args) as i128;
-    let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as i128;
-    // 2^127 - 1 — i128::MAX is exactly 2^127 - 1, so subtract 1 from MAX.
-    let p: i128 = i128::MAX;
-    Ok(PerlValue::integer(((a.wrapping_mul(b)) % p) as i64))
+    let a_lo = i1(args) as u128;
+    let b_lo = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
+    fn limbs51(x: u128) -> [u64; 5] {
+        let m = (1u128 << 51) - 1;
+        [
+            (x & m) as u64,
+            ((x >> 51) & m) as u64,
+            ((x >> 102) & m) as u64,
+            (((x >> 102) >> 51) & m) as u64,
+            0,
+        ]
+    }
+    let a = limbs51(a_lo);
+    let b = limbs51(b_lo);
+    let m51 = (1u64 << 51) - 1;
+    let mut t = [0u128; 5];
+    let s1 = (b[1] as u128) * 19;
+    let s2 = (b[2] as u128) * 19;
+    let s3 = (b[3] as u128) * 19;
+    let s4 = (b[4] as u128) * 19;
+    t[0] = (a[0] as u128) * (b[0] as u128) + (a[1] as u128) * s4
+         + (a[2] as u128) * s3 + (a[3] as u128) * s2 + (a[4] as u128) * s1;
+    t[1] = (a[0] as u128) * (b[1] as u128) + (a[1] as u128) * (b[0] as u128)
+         + (a[2] as u128) * s4 + (a[3] as u128) * s3 + (a[4] as u128) * s2;
+    t[2] = (a[0] as u128) * (b[2] as u128) + (a[1] as u128) * (b[1] as u128)
+         + (a[2] as u128) * (b[0] as u128) + (a[3] as u128) * s4 + (a[4] as u128) * s3;
+    t[3] = (a[0] as u128) * (b[3] as u128) + (a[1] as u128) * (b[2] as u128)
+         + (a[2] as u128) * (b[1] as u128) + (a[3] as u128) * (b[0] as u128) + (a[4] as u128) * s4;
+    t[4] = (a[0] as u128) * (b[4] as u128) + (a[1] as u128) * (b[3] as u128)
+         + (a[2] as u128) * (b[2] as u128) + (a[3] as u128) * (b[1] as u128) + (a[4] as u128) * (b[0] as u128);
+    let mut h = [0u64; 5];
+    let mut c;
+    h[0] = (t[0] & m51 as u128) as u64; c = t[0] >> 51;
+    let t1 = t[1] + c; h[1] = (t1 & m51 as u128) as u64; c = t1 >> 51;
+    let t2 = t[2] + c; h[2] = (t2 & m51 as u128) as u64; c = t2 >> 51;
+    let t3 = t[3] + c; h[3] = (t3 & m51 as u128) as u64; c = t3 >> 51;
+    let t4 = t[4] + c; h[4] = (t4 & m51 as u128) as u64; c = t4 >> 51;
+    h[0] = h[0].wrapping_add((c as u64).wrapping_mul(19));
+    let cc = h[0] >> 51; h[0] &= m51;
+    h[1] = h[1].wrapping_add(cc);
+    let lower = (h[0] as u128) | ((h[1] as u128) << 51);
+    Ok(PerlValue::integer(lower as i64))
 }
 fn builtin_curve25519_mul_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_x25519_field_mul(args)

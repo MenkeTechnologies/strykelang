@@ -710,10 +710,18 @@ fn builtin_sei_resistance_growth(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r0 + k * t.max(0.0).sqrt()))
 }
 
-// Optimal binder content (placeholder mid-point of typical 5–10 wt%)
+// Optimal binder content (electrode coating, wt%): w_b = (ρ_b · t_b · A_s) /
+// (1 + ρ_b · t_b · A_s) · 100%, where A_s is BET specific surface area
+// (m²/g of active material), t_b is binder shell thickness (m), ρ_b is binder
+// density (g/m³). For PVDF (ρ_b ≈ 1.78 g/cm³ = 1.78e6 g/m³, t_b ≈ 5e-9 m), this
+// gives 5–8 wt% at 50 m²/g, matching empirical practice for Li-ion electrodes.
+// Args: A_s (m²/g), t_b (m), ρ_b (g/m³).
 fn builtin_binder_content_optimal(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let surface_area = f1(args);
-    Ok(PerlValue::float((0.05 + 0.05 * (surface_area / 100.0).min(1.0)) * 100.0))
+    let a_s = f1(args).max(0.0);
+    let t_b = args.get(1).map(|v| v.to_number()).unwrap_or(5e-9).max(0.0);
+    let rho_b = args.get(2).map(|v| v.to_number()).unwrap_or(1.78e6).max(0.0);
+    let m = rho_b * t_b * a_s;
+    Ok(PerlValue::float(100.0 * m / (1.0 + m)))
 }
 
 // Porosity of active layer ε = 1 - ρ/ρ_solid

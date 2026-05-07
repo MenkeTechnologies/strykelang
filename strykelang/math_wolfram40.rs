@@ -510,14 +510,28 @@ fn builtin_q_learning_update(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(q + alpha * (r + gamma * max_q_next - q)))
 }
 
-// Policy iteration step (one Bellman update under current π)
+// Policy iteration (Howard 1960): policy-evaluation step — solve V_π = R + γPV_π
+// for fixed π using one expectation-Bellman update (NO max, follow current policy).
+//   V_new(s) = Σ_{s'} p(s' | s, π(s)) · [r(s, π(s), s') + γ V_old(s')].
+// Args: array of [prob_s', reward, V_old(s')] triples for the current action; γ.
 fn builtin_policy_iteration_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_markov_decision_value(args)
+    let triples = b40_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(0.99);
+    let mut v = 0.0_f64;
+    for ch in triples.chunks(3) {
+        if ch.len() < 3 { continue; }
+        v += ch[0] * (ch[1] + gamma * ch[2]);
+    }
+    Ok(PerlValue::float(v))
 }
 
-// Value iteration step (max over actions)
+// Value iteration (Bellman 1957): one optimality-Bellman update — max over actions.
+//   V_{k+1}(s) = max_a Σ_{s'} p(s'|s,a)[r(s,a,s') + γ V_k(s')].
+// Args: array of action-Q-values [Q_a₁, Q_a₂, ...] (caller computes E[r+γV] per action).
 fn builtin_value_iteration_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_markov_decision_value(args)
+    let qs = b40_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if qs.is_empty() { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(qs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
 }
 
 // SARSA update: Q(s,a) ← Q(s,a) + α(r + γQ(s',a') - Q(s,a))
@@ -752,9 +766,16 @@ fn builtin_chisquare_metric(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(s))
 }
 
-// Hellinger kernel K(p, q) = Σ √(p·q) (alias for Bhattacharyya)
+// Hellinger kernel K_H(p, q) = exp(−H²(p, q)) = exp(2·(BC − 1)), the
+// positive-definite Mercer kernel induced by the Hellinger embedding p ↦ √p.
+// Distinct from the Bhattacharyya coefficient (which is BC = Σ √(pq) directly,
+// without the exp wrap). Args: p, q.
 fn builtin_hellinger_kernel(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_bhattacharyya_coefficient(args)
+    let p = b40_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let q = b40_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let n = p.len().min(q.len());
+    let bc: f64 = (0..n).map(|i| (p[i].max(0.0) * q[i].max(0.0)).sqrt()).sum();
+    Ok(PerlValue::float((2.0 * (bc - 1.0)).exp()))
 }
 
 // Jensen-Shannon divergence (alias of kullback_jensen_div in 1-D form)
@@ -802,9 +823,16 @@ fn builtin_sinkhorn_iteration_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(a / kv))
 }
 
-// Sliced Wasserstein distance (single projection)
+// Sliced p-Wasserstein (Rabin et al. 2011): project both empirical measures
+// onto L random unit directions θ_l, compute 1-D Wasserstein per slice (sort
+// + |F⁻¹(u) − G⁻¹(u)|), average. SW_p(μ, ν) = (1/L · Σ_l W_p(θ_l#μ, θ_l#ν)^p)^(1/p).
+// Args: array of pre-projected slice distances [w₁, w₂, ..., w_L], p (default 1).
 fn builtin_sliced_wasserstein(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_wasserstein_dist_emp(args)
+    let slices = b40_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
+    if slices.is_empty() { return Ok(PerlValue::float(0.0)); }
+    let avg: f64 = slices.iter().map(|w| w.abs().powf(p)).sum::<f64>() / slices.len() as f64;
+    Ok(PerlValue::float(avg.powf(1.0 / p)))
 }
 
 // Gromov-Wasserstein step (linearized): Σ (p_ij - q_ij)²

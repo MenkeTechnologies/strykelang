@@ -667,9 +667,29 @@ fn builtin_ar_model_likelihood(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-0.5 * n * (2.0 * std::f64::consts::PI * sigma2).ln() - sse / (2.0 * sigma2)))
 }
 
-// MA(q) model log-likelihood (same Gaussian form)
+// MA(q) Gaussian conditional log-likelihood. Innovations are computed via the
+// recursive backwards filter: ε_t = y_t − Σ_{i=1..q} θ_i · ε_{t−i} (with ε_t = 0
+// for t < 1). Differs from AR (which uses past y, not past ε): the MA path
+// requires running the inverse recursion. Args: y array, θ array (length q), σ².
 fn builtin_ma_model_likelihood(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ar_model_likelihood(args)
+    let y = args.first().map(b36_to_floats).unwrap_or_default();
+    let theta = b36_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let sigma2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if sigma2 <= 0.0 || y.is_empty() { return Ok(PerlValue::float(f64::NEG_INFINITY)); }
+    let q = theta.len();
+    let n = y.len();
+    let mut eps = vec![0.0_f64; n];
+    for t in 0..n {
+        let mut sum = 0.0_f64;
+        for i in 1..=q {
+            if t >= i { sum += theta[i - 1] * eps[t - i]; }
+        }
+        eps[t] = y[t] - sum;
+    }
+    let sse: f64 = eps.iter().map(|e| e * e).sum();
+    let nf = n as f64;
+    Ok(PerlValue::float(-0.5 * nf * (2.0 * std::f64::consts::PI * sigma2).ln()
+        - sse / (2.0 * sigma2)))
 }
 
 // ARMA innovation step: εₜ = yₜ - φyₜ₋₁ - θεₜ₋₁

@@ -1314,9 +1314,25 @@ fn builtin_batch_norm(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ))
 }
 
-/// `layer_norm` — Layer norm.
+/// `layer_norm xs, group_size [, eps]` — per-row LayerNorm over a flat vector
+/// of N rows × `group_size` features each. Differs from BatchNorm: each row is
+/// normalized using its OWN mean/variance (over the feature axis only), not
+/// pooled across the batch.
 fn builtin_layer_norm(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_batch_norm(args)
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let group_size = args.get(1).map(|v| v.to_number() as usize).unwrap_or(xs.len()).max(1);
+    let eps = args.get(2).map(|v| v.to_number()).unwrap_or(1e-5);
+    if xs.is_empty() { return Ok(PerlValue::array(vec![])); }
+    let mut out: Vec<PerlValue> = Vec::with_capacity(xs.len());
+    for chunk in xs.chunks(group_size) {
+        let n = chunk.len() as f64;
+        let mean = chunk.iter().sum::<f64>() / n;
+        let var = chunk.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
+        let denom = (var + eps).sqrt();
+        for &x in chunk { out.push(PerlValue::float((x - mean) / denom)); }
+    }
+    Ok(PerlValue::array(out))
 }
 
 /// Dropout mask (shape n) with prob p of being zero.

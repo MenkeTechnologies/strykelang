@@ -25,14 +25,32 @@ fn builtin_nlp_tf_idf_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(tf * idf))
 }
 
-// Okapi BM25 alternative formula
+// Okapi BM25+ (Lv & Zhai 2011): BM25 with a lower-bound additive term δ that
+// fixes the long-document under-scoring of plain BM25:
+//   score = IDF · ( (tf · (k₁+1)) / (tf + k₁(1−b+b·dl/avgdl)) + δ ).
+// Distinct numerical behavior: at high tf, BM25+ converges to IDF·(k₁+1+δ)
+// instead of BM25's IDF·(k₁+1). Args: tf, IDF, k₁, b, dl, avgdl, δ (default 1.0).
 fn builtin_nlp_okapi_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nlp_bm25_score(args)
+    let tf = f1(args);
+    let idf = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let k1 = args.get(2).map(|v| v.to_number()).unwrap_or(1.5);
+    let b = args.get(3).map(|v| v.to_number()).unwrap_or(0.75);
+    let dl = args.get(4).map(|v| v.to_number()).unwrap_or(100.0);
+    let avgdl = args.get(5).map(|v| v.to_number()).unwrap_or(100.0);
+    let delta = args.get(6).map(|v| v.to_number()).unwrap_or(1.0);
+    if avgdl == 0.0 { return Ok(PerlValue::float(0.0)); }
+    let denom = tf + k1 * (1.0 - b + b * dl / avgdl);
+    if denom == 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(idf * ((tf * (k1 + 1.0)) / denom + delta)))
 }
 
-// Word frequency value (passthrough)
+// Word frequency value: term count in document divided by total token count
+// (relative TF). Args: term count, doc length.
 fn builtin_nlp_word_freq_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let count = f1(args);
+    let total = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    if total <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(count / total))
 }
 
 // Document frequency step
@@ -122,9 +140,15 @@ fn builtin_nlp_jaro_winkler(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(jaro + l * p * (1.0 - jaro)))
 }
 
-// Hamming distance (precomputed)
+// Hamming distance: count of differing positions in two equal-length sequences.
+// Args: array of code points for s1, array for s2.
 fn builtin_nlp_hamming_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let a = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let b = b46_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let n = a.len().min(b.len());
+    let diff = (0..n).filter(|&i| (a[i] - b[i]).abs() > 1e-12).count();
+    let extra = a.len().abs_diff(b.len());
+    Ok(PerlValue::integer((diff + extra) as i64))
 }
 
 // LCS length
@@ -382,9 +406,17 @@ fn builtin_nlp_lda_alpha_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(alpha_old + log_term))
 }
 
-// LDA β update step
+// LDA β (topic-word) update: in collapsed Gibbs, after sampling a topic z for
+// word w, P(w|z) ∝ n_{w,z} + β / (n_z + W·β). Returns the unnormalized score
+// (n_wz + β) / (n_z + W·β). Args: n_wz, n_z, β, W (vocab size).
 fn builtin_nlp_lda_beta_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nlp_lda_alpha_step(args)
+    let n_wz = f1(args);
+    let n_z = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.01);
+    let w_vocab = args.get(3).map(|v| v.to_number()).unwrap_or(10000.0);
+    let denom = n_z + w_vocab * beta;
+    if denom <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float((n_wz + beta) / denom))
 }
 
 // LDA topic distribution P(z|d) ∝ n_zd + α
@@ -396,9 +428,13 @@ fn builtin_nlp_lda_topic_dist(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((n_zd + alpha) / total))
 }
 
-// pLSA EM step (passthrough placeholder)
+// pLSA E-step: P(z|d, w) ∝ P(z|d) P(w|z). Returns posterior z|d,w.
 fn builtin_nlp_plsa_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let p_z_d = f1(args);
+    let p_w_z = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let denom = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if denom <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(p_z_d * p_w_z / denom))
 }
 
 // Word2Vec skipgram loss = -log σ(v_c · v_w)
@@ -407,9 +443,13 @@ fn builtin_nlp_word2vec_skipgram_loss(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float((1.0 + (-dot).exp()).ln()))
 }
 
-// Word2Vec CBOW loss
+// Word2Vec CBOW: predict center word v_c from average context vector
+// h = (1/2k) Σ_{|j|≤k, j≠0} v_{w+j}.  Loss = −log σ(v_c · h) using the
+// averaged context, NOT a single skip-gram pair. Args: dot of v_c with the
+// AVERAGED context h (caller pre-averages).
 fn builtin_nlp_word2vec_cbow_loss(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nlp_word2vec_skipgram_loss(args)
+    let avg_dot = f1(args);
+    Ok(PerlValue::float((1.0 + (-avg_dot).exp()).ln()))
 }
 
 // GloVe loss: f(x) (w_i · w_j + b_i + b_j - log x)²
@@ -530,14 +570,18 @@ fn builtin_nlp_token_drop_rate(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(dropped / total))
 }
 
-// Byte frequency value (passthrough)
+// Byte frequency: count of target byte in stream / total bytes.
 fn builtin_nlp_byte_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let stream = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let target = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    if stream.is_empty() { return Ok(PerlValue::float(0.0)); }
+    let count = stream.iter().filter(|&&b| (b - target).abs() < 0.5).count();
+    Ok(PerlValue::float(count as f64 / stream.len() as f64))
 }
 
-// Char frequency value (passthrough)
+// Character frequency: same form but interpreted as code points.
 fn builtin_nlp_char_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    builtin_nlp_byte_frequency(args)
 }
 
 // Punctuation ratio
@@ -563,25 +607,65 @@ fn builtin_nlp_emoji_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_nlp_punct_ratio(args)
 }
 
-// URL count (from precomputed regex match count)
+// URL count: occurrences of "://" trigram in text given as code-point array.
 fn builtin_nlp_url_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut n = 0_i64;
+    for w in s.windows(3) {
+        if w[0] as i64 == ':' as i64 && w[1] as i64 == '/' as i64 && w[2] as i64 == '/' as i64 { n += 1; }
+    }
+    Ok(PerlValue::integer(n))
 }
 
+// Email count: occurrences of '@' between alphanumerics (simple heuristic: '@'
+// not at boundary). Code-point array input.
 fn builtin_nlp_email_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut n = 0_i64;
+    for i in 1..s.len().saturating_sub(1) {
+        if s[i] as i64 == '@' as i64 && s[i - 1] as i64 > 32 && s[i + 1] as i64 > 32 { n += 1; }
+    }
+    Ok(PerlValue::integer(n))
 }
 
+// Phone count: digit-runs of length 7+ (E.164-shaped local/intl). Code-point input.
 fn builtin_nlp_phone_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut n = 0_i64;
+    let mut run = 0_usize;
+    for &c in &s {
+        let cp = c as i64;
+        if (b'0' as i64..=b'9' as i64).contains(&cp) { run += 1; }
+        else { if run >= 7 { n += 1; } run = 0; }
+    }
+    if run >= 7 { n += 1; }
+    Ok(PerlValue::integer(n))
 }
 
+// Hashtag count: '#' followed by alnum, preceded by start or whitespace.
 fn builtin_nlp_hashtag_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut n = 0_i64;
+    for i in 0..s.len() {
+        if s[i] as i64 != '#' as i64 { continue; }
+        let prev_ok = i == 0 || (s[i - 1] as i64) <= 32;
+        let next_ok = i + 1 < s.len() && (s[i + 1] as i64) > 47;
+        if prev_ok && next_ok { n += 1; }
+    }
+    Ok(PerlValue::integer(n))
 }
 
+// Mention count: '@' preceded by start or whitespace, followed by alnum.
 fn builtin_nlp_mention_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut n = 0_i64;
+    for i in 0..s.len() {
+        if s[i] as i64 != '@' as i64 { continue; }
+        let prev_ok = i == 0 || (s[i - 1] as i64) <= 32;
+        let next_ok = i + 1 < s.len() && (s[i + 1] as i64) > 47;
+        if prev_ok && next_ok { n += 1; }
+    }
+    Ok(PerlValue::integer(n))
 }
 
 // Token overlap of two sequences
@@ -669,14 +753,27 @@ fn builtin_nlp_block_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if block_i == block_j { score } else { f64::NEG_INFINITY }))
 }
 
-// Sliding window step
+// Sliding-window attention (Mistral 7B / Longformer): a token at position i
+// attends to positions [i − w, i] (causal), but the EFFECTIVE receptive field
+// across L stacked layers is L · w due to layer-by-layer information
+// propagation. Returns the multi-layer reach for given (w, L). Args: window w,
+// layers L. Reach saturates at sequence length.
 fn builtin_nlp_sliding_window_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nlp_window_attn_step(args)
+    let w = f1(args);
+    let layers = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
+    let max_seq = args.get(2).map(|v| v.to_number()).unwrap_or(f64::INFINITY);
+    Ok(PerlValue::float((w * layers).min(max_seq)))
 }
 
-// Local attention step
+// Local attention (Longformer / BigBird): combines a sliding window of radius
+// w with a fixed set of g GLOBAL tokens that attend to/from everyone.
+// Per-token attention cost is O(w + g), TOTAL O(N(w + g)) rather than
+// pure sliding window's O(N·w). Args: window w, global g. Returns per-token
+// keys-attended-to.
 fn builtin_nlp_local_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nlp_window_attn_step(args)
+    let w = f1(args);
+    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(2.0 * w + 1.0 + g))
 }
 
 // Dilated attention step
@@ -688,9 +785,14 @@ fn builtin_nlp_dilated_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if dist % dilation == 0 { score } else { f64::NEG_INFINITY }))
 }
 
-// Global attention step (full attention)
+// Global attention: every token attends to every other (cost N²·d).
+// Args: scores array, returns max-stabilized softmax denominator over full window.
 fn builtin_nlp_global_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let s = b46_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if s.is_empty() { return Ok(PerlValue::float(0.0)); }
+    let m = s.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let denom: f64 = s.iter().map(|x| (x - m).exp()).sum();
+    Ok(PerlValue::float(m + denom.ln()))
 }
 
 // Sparse attention score
@@ -700,32 +802,54 @@ fn builtin_nlp_sparse_attn_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if mask != 0 { score } else { f64::NEG_INFINITY }))
 }
 
-// Linformer projection step (low-rank K, V)
+// Linformer: project K, V to k×d (k << N). FLOPs ≈ 2·N·d·k. Args: N, d, k.
 fn builtin_nlp_linformer_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(64.0);
+    let k = args.get(2).map(|v| v.to_number()).unwrap_or(256.0);
+    Ok(PerlValue::float(2.0 * n * d * k))
 }
 
-// Performer (FAVOR+) step
+// Performer FAVOR+: random feature kernel. softmax(QK')V ≈ (φ(Q) · (φ(K)' V)).
+// Cost = O(N · d · m) for m random features. Args: N, d, m.
 fn builtin_nlp_performer_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(64.0);
+    let m = args.get(2).map(|v| v.to_number()).unwrap_or(64.0);
+    Ok(PerlValue::float(n * d * m))
 }
 
-// Reformer LSH attention step
+// Reformer LSH attention: cost N · log(N) · d. Args: N, d.
 fn builtin_nlp_reformer_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(64.0);
+    if n <= 1.0 { return Ok(PerlValue::float(d)); }
+    Ok(PerlValue::float(n * n.log2() * d))
 }
 
-// Longformer step (sliding + global tokens)
+// Longformer: sliding window w + global g. Cost ≈ N(w + g)·d.
 fn builtin_nlp_longformer_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let w = args.get(1).map(|v| v.to_number()).unwrap_or(512.0);
+    let g = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let d = args.get(3).map(|v| v.to_number()).unwrap_or(64.0);
+    Ok(PerlValue::float(n * (w + g) * d))
 }
 
-// BigBird step (random + window + global)
+// BigBird: window w + r random + g global. Cost ≈ N(w + r + g)·d.
 fn builtin_nlp_bigbird_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let w = args.get(1).map(|v| v.to_number()).unwrap_or(64.0);
+    let r = args.get(2).map(|v| v.to_number()).unwrap_or(64.0);
+    let g = args.get(3).map(|v| v.to_number()).unwrap_or(64.0);
+    let d = args.get(4).map(|v| v.to_number()).unwrap_or(64.0);
+    Ok(PerlValue::float(n * (w + r + g) * d))
 }
 
-// Routing attention step
+// Routing attention: top-k routing of clusters. Cost ≈ N·c·d for c clusters.
 fn builtin_nlp_routing_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let n = f1(args);
+    let c = args.get(1).map(|v| v.to_number()).unwrap_or((n as f64).sqrt());
+    let d = args.get(2).map(|v| v.to_number()).unwrap_or(64.0);
+    Ok(PerlValue::float(n * c * d))
 }

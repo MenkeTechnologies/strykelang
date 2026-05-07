@@ -222,11 +222,43 @@ fn builtin_strong_pseudoprime(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // Lucas-Lehmer test for Mersenne primes (p prime → 2^p-1)
 
-// AKS-like aks-style witness check (simplified poly check stub)
+// AKS primality witness step: tests whether (X + a)^n ≡ X^n + a (mod X^r - 1, n)
+// holds for given (n, r, a). Uses square-and-multiply over the ring R = ℤ_n[X]/(X^r-1).
+// Returns 1 if the congruence holds (n passes the step), 0 if a counter-example.
 fn builtin_aks_witness_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = i1(args);
-    let log_n = if n > 0 { (n as f64).ln() } else { 0.0 };
-    Ok(PerlValue::integer((log_n * log_n) as i64 + 1))
+    let n = i1(args).max(2);
+    let r = args.get(1).map(|v| v.to_number() as i64).unwrap_or(7).max(2);
+    let a = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1).rem_euclid(n);
+    let r_us = r as usize;
+    let mut base = vec![0_i128; r_us];
+    base[1] = 1;
+    base[0] = a as i128;
+    let n_mod = n as i128;
+    fn mul_mod(p: &[i128], q: &[i128], r: usize, m: i128) -> Vec<i128> {
+        let mut out = vec![0_i128; r];
+        for i in 0..r {
+            if p[i] == 0 { continue; }
+            for j in 0..r {
+                if q[j] == 0 { continue; }
+                let dst = (i + j) % r;
+                out[dst] = (out[dst] + p[i] * q[j]).rem_euclid(m);
+            }
+        }
+        out
+    }
+    let mut result = vec![0_i128; r_us];
+    result[0] = 1;
+    let mut b = base.clone();
+    let mut e = n;
+    while e > 0 {
+        if e & 1 == 1 { result = mul_mod(&result, &b, r_us, n_mod); }
+        e >>= 1;
+        if e > 0 { b = mul_mod(&b, &b, r_us, n_mod); }
+    }
+    let mut expected = vec![0_i128; r_us];
+    expected[(n as usize) % r_us] = 1;
+    expected[0] = (expected[0] + a as i128).rem_euclid(n_mod);
+    Ok(PerlValue::integer(if result == expected { 1 } else { 0 }))
 }
 
 // Quadratic sieve smoothness (return 1 if x² mod n is B-smooth)
@@ -278,7 +310,9 @@ fn builtin_lll_2x2_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     ]))
 }
 
-// Coppersmith short root upper bound estimate (simplified)
+// Coppersmith's theorem (1996): for a monic polynomial f(X) ∈ ℤ[X] of degree d
+// reduced mod N, there is a polynomial-time algorithm (LLL-based) that finds
+// every root x₀ ∈ ℤ with |x₀| < N^(1/d) − ε. This returns the exact bound N^(1/d).
 fn builtin_coppersmith_bound(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     let degree = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(1.0);
@@ -402,11 +436,23 @@ fn builtin_sum_two_squares(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(0))
 }
 
-// Class number h(-d) heuristic upper bound (simplified)
+// Minkowski's class-number bound for a number field K of degree n with
+// discriminant d_K and r₂ complex places:
+//   h(K) ≤ M_K = (n!/nⁿ) · (4/π)^{r₂} · √|d_K|.
+// For an imaginary quadratic field K = ℚ(√−d), n = 2 and r₂ = 1, giving
+//   M_K = (2/π) · √d.
+// Args: |d|, degree n, number of complex places r₂.
 fn builtin_class_number_bound(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = f1(args).abs();
+    let n = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(1.0);
+    let r2 = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(0.0);
     if d <= 0.0 { return Ok(PerlValue::integer(1)); }
-    Ok(PerlValue::integer((d.sqrt() / std::f64::consts::PI * (d.ln())) as i64 + 1))
+    let mut fact = 1.0_f64;
+    for k in 2..=(n as i64) { fact *= k as f64; }
+    let factor = fact / n.powf(n);
+    let pi_term = (4.0 / std::f64::consts::PI).powf(r2);
+    let bound = factor * pi_term * d.sqrt();
+    Ok(PerlValue::integer(bound.ceil() as i64))
 }
 
 // Smith normal form reduction (1 step on 2x2 integer matrix)
