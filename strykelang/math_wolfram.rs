@@ -322,8 +322,8 @@ fn airy_ai_real(z: f64) -> f64 {
                 break;
             }
         }
-        let c1 = 0.355028053887817239260; // 1 / (3^(2/3) Γ(2/3))
-        let c2 = 0.258819403792806798405; // 1 / (3^(1/3) Γ(1/3))
+        let c1 = 0.355_028_053_887_817_2; // 1 / (3^(2/3) Γ(2/3))
+        let c2 = 0.258_819_403_792_806_8; // 1 / (3^(1/3) Γ(1/3))
         c1 * s_f - c2 * s_g
     } else if z > 0.0 {
         // Asymptotic for large positive: Ai(z) ~ exp(-ζ)/(2√π z^(1/4)) · Σ ...
@@ -354,8 +354,8 @@ fn airy_bi_real(z: f64) -> f64 {
                 break;
             }
         }
-        let c1 = 0.614926627446000735; // 1 / (3^(1/6) Γ(2/3))
-        let c2 = 0.448288357353826358; // 3^(1/6) / Γ(1/3)
+        let c1 = 0.614_926_627_446_000_7; // 1 / (3^(1/6) Γ(2/3))
+        let c2 = 0.448_288_357_353_826_4; // 3^(1/6) / Γ(1/3)
         c1 * s_f + c2 * s_g
     } else if z > 0.0 {
         let zeta = 2.0 / 3.0 * z.powf(1.5);
@@ -1413,7 +1413,7 @@ fn builtin_polylog(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `dilog` — Dilog. Returns a float.
 fn builtin_dilog(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = f1(args);
-    if z > 1.0 || z < -1.0 {
+    if !(-1.0..=1.0).contains(&z) {
         // Reflection Li_2(z) + Li_2(1-z) = π²/6 - ln(z) ln(1-z) — only for 0<z<1.
         return Err(PerlError::runtime(
             "dilog: argument out of [-1,1] range",
@@ -1799,7 +1799,7 @@ fn cos_integral_real(x: f64) -> f64 {
         return f64::NAN;
     }
     if x <= 4.0 {
-        let gamma = 0.577215664901532860606512_f64;
+        let gamma = 0.577_215_664_901_532_9_f64;
         let mut sum = gamma + x.ln();
         let mut term = -x * x / 2.0; // first body term: -x²/(2·2!)
         sum += term;
@@ -1885,7 +1885,7 @@ fn cosh_integral_real(x: f64) -> f64 {
     if x <= 0.0 {
         return f64::NAN;
     }
-    let gamma = 0.577215664901532860606512_f64;
+    let gamma = 0.577_215_664_901_532_9_f64;
     let mut sum = gamma + x.ln();
     let mut term = x * x / 2.0;
     sum += term;
@@ -1928,7 +1928,7 @@ fn exp_integral_ei_real(x: f64) -> f64 {
         return -exp_integral_e1_real(-x);
     }
     if x < 6.0 {
-        let gamma = 0.577215664901532860606512_f64;
+        let gamma = 0.577_215_664_901_532_9_f64;
         let mut sum = gamma + x.ln();
         let mut term = 1.0_f64;
         for k in 1..200 {
@@ -1959,7 +1959,7 @@ fn exp_integral_e1_real(x: f64) -> f64 {
         return f64::NAN;
     }
     if x < 1.0 {
-        let gamma = 0.577215664901532860606512_f64;
+        let gamma = 0.577_215_664_901_532_9_f64;
         let mut sum = -gamma - x.ln();
         let mut term = 1.0_f64;
         let mut sign = -1.0_f64;
@@ -2693,7 +2693,7 @@ fn builtin_debruijn_sequence(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut sequence: Vec<i64> = Vec::new();
     fn db(t: usize, p: usize, k: usize, n: usize, a: &mut Vec<usize>, seq: &mut Vec<i64>) {
         if t > n {
-            if n % p == 0 {
+            if n.is_multiple_of(p) {
                 for i in 1..=p {
                     seq.push(a[i] as i64);
                 }

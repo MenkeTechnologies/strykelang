@@ -142,7 +142,7 @@ fn builtin_gas_constant_r(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(8.314_462_618))
 }
 fn builtin_faraday_constant_b12(_args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(96485.332_12))
+    Ok(PerlValue::float(96485.33212))
 }
 fn builtin_concentration_dilute(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c1 = f1(args); let v1 = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);

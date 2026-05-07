@@ -133,7 +133,7 @@ fn builtin_period_of_string(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = s.as_bytes(); let n = bytes.len();
     for p in 1..=n {
-        if n % p == 0 && (0..n - p).all(|i| bytes[i] == bytes[i + p]) {
+        if n.is_multiple_of(p) && (0..n - p).all(|i| bytes[i] == bytes[i + p]) {
             return Ok(PerlValue::integer(p as i64));
         }
     }

@@ -88,7 +88,7 @@ fn builtin_hamming_dna(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .chars()
         .zip(b.chars())
         .take(n)
-        .filter(|(x, y)| x.to_ascii_uppercase() != y.to_ascii_uppercase())
+        .filter(|(x, y)| !x.eq_ignore_ascii_case(y))
         .count();
     Ok(PerlValue::integer(d as i64))
 }
@@ -856,11 +856,10 @@ fn builtin_metaphone_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let c = chars[i];
         match c {
             'A' | 'E' | 'I' | 'O' | 'U' if i == 0 => out.push(c),
-            'B' => {
-                if !(i + 1 == chars.len() && i > 0 && chars[i - 1] == 'M') {
+            'B'
+                if !(i + 1 == chars.len() && i > 0 && chars[i - 1] == 'M') => {
                     out.push('B');
                 }
-            }
             'C' => {
                 if i + 1 < chars.len() && matches!(chars[i + 1], 'I' | 'E' | 'Y') {
                     out.push('S');
@@ -949,7 +948,7 @@ fn builtin_dice_sum_pmf(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = args.first().map(|v| v.to_number() as usize).unwrap_or(1);
     let s = args.get(1).map(|v| v.to_number() as usize).unwrap_or(6).max(1);
     let target = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
-    let total = (n * s + 1) as usize;
+    let total = n * s + 1;
     let mut dp = vec![0.0_f64; total];
     dp[0] = 1.0;
     for _ in 0..n {

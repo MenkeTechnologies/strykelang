@@ -619,10 +619,8 @@ fn builtin_lqr_2x2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut p = q.clone();
     for _ in 0..200 {
         // K = R⁻¹ Bᵀ P
-        let bt_p = vec![
-            vec![b[0][0] * p[0][0] + b[1][0] * p[1][0], b[0][0] * p[0][1] + b[1][0] * p[1][1]],
-        ];
-        let k = vec![vec![r_inv * bt_p[0][0], r_inv * bt_p[0][1]]];
+        let bt_p = [vec![b[0][0] * p[0][0] + b[1][0] * p[1][0], b[0][0] * p[0][1] + b[1][0] * p[1][1]]];
+        let k = [vec![r_inv * bt_p[0][0], r_inv * bt_p[0][1]]];
         // Compute Aᵀ P + P A − P B K + Q.
         let mut residual = vec![vec![0.0_f64; 2]; 2];
         for i in 0..2 {
@@ -654,10 +652,8 @@ fn builtin_lqr_2x2(args: &[PerlValue]) -> PerlResult<PerlValue> {
             break;
         }
     }
-    let bt_p = vec![
-        b[0][0] * p[0][0] + b[1][0] * p[1][0],
-        b[0][0] * p[0][1] + b[1][0] * p[1][1],
-    ];
+    let bt_p = [b[0][0] * p[0][0] + b[1][0] * p[1][0],
+        b[0][0] * p[0][1] + b[1][0] * p[1][1]];
     let k = vec![r_inv * bt_p[0], r_inv * bt_p[1]];
     Ok(PerlValue::array(vec![
         PerlValue::array(k.into_iter().map(PerlValue::float).collect()),
@@ -1396,7 +1392,7 @@ fn builtin_barabasi_albert_random(args: &[PerlValue]) -> PerlResult<PerlValue> {
             adj[j].push(i);
         }
     }
-    let mut deg_seq: Vec<usize> = (0..=m).flat_map(|i| std::iter::repeat(i).take(adj[i].len())).collect();
+    let mut deg_seq: Vec<usize> = (0..=m).flat_map(|i| std::iter::repeat_n(i, adj[i].len())).collect();
     let mut rng = rand::thread_rng();
     for new_node in (m + 1)..n {
         let mut chosen: std::collections::HashSet<usize> = std::collections::HashSet::new();

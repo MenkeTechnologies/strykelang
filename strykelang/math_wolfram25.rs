@@ -128,7 +128,7 @@ fn builtin_hilbert_envelope(args: &[PerlValue]) -> PerlResult<PerlValue> {
         }
     }
     for k in 0..n {
-        let mult = if k == 0 || (n % 2 == 0 && k == n / 2) { 1.0 }
+        let mult = if k == 0 || (n.is_multiple_of(2) && k == n / 2) { 1.0 }
                    else if k < n / 2 { 2.0 } else { 0.0 };
         re_f[k] *= mult;
         im_f[k] *= mult;

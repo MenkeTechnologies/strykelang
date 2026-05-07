@@ -192,7 +192,7 @@ fn builtin_scrypt_round(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .iter().map(|v| v.to_number() as u32).collect();
     if xs.len() < 16 { return Ok(PerlValue::array(xs.into_iter().map(|v| PerlValue::integer(v as i64)).collect())); }
     let mut x = [0_u32; 16];
-    for i in 0..16 { x[i] = xs[i]; }
+    x.copy_from_slice(&xs[..16]);
     for _ in 0..4 {
         x[4] ^= x[0].wrapping_add(x[12]).rotate_left(7);
         x[8] ^= x[4].wrapping_add(x[0]).rotate_left(9);
@@ -205,7 +205,7 @@ fn builtin_scrypt_round(args: &[PerlValue]) -> PerlResult<PerlValue> {
 // Bcrypt-style cost (just iterations)
 fn builtin_bcrypt_cost_iters(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cost = i1(args).clamp(4, 31) as u32;
-    Ok(PerlValue::integer((1_i64 << cost) as i64))
+    Ok(PerlValue::integer(1_i64 << cost))
 }
 
 // Argon2 memory mixer (placeholder — single XOR over blocks)
@@ -508,7 +508,7 @@ fn builtin_deterministic_prime(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_u = n as u64;
     let mut d = n_u - 1;
     let mut r = 0_u32;
-    while d % 2 == 0 { d /= 2; r += 1; }
+    while d.is_multiple_of(2) { d /= 2; r += 1; }
     fn mod_pow(mut base: u128, mut exp: u128, modulus: u128) -> u128 {
         let mut result = 1_u128;
         base %= modulus;

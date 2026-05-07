@@ -57,9 +57,7 @@ fn builtin_tukey_hsd(args: &[PerlValue]) -> PerlResult<PerlValue> {
     // Lund-Lund / Harter approximation (rough): q ≈ z(α/2) + 0.5 ln k.
     // For α=0.05, z = 1.96; k=3 → ≈ 2.50, matches table value at large df.
     use statrs::function::erf::erf;
-    let z = (1.0 - alpha)
-        .min(1.0 - 1e-12)
-        .max(1e-12);
+    let z = (1.0 - alpha).clamp(1e-12, 1.0 - 1e-12);
     // Inverse Φ approximation (Beasley-Springer): use rough fit.
     fn invphi(p: f64) -> f64 {
         // Acklam's algorithm, abbreviated for stryke use.
@@ -67,7 +65,7 @@ fn builtin_tukey_hsd(args: &[PerlValue]) -> PerlResult<PerlValue> {
             -3.969683028665376e+01,
             2.209460984245205e+02,
             -2.759285104469687e+02,
-            1.383577518672690e+02,
+            1.383_577_518_672_69e2,
             -3.066479806614716e+01,
             2.506628277459239e+00,
         ];
@@ -499,7 +497,7 @@ fn builtin_hilbert_transform(args: &[PerlValue]) -> PerlResult<PerlValue> {
     // H(k) = -i sgn(k) X(k); zero DC and Nyquist.
     for k in 0..n {
         let (nr, ni);
-        if k == 0 || (n % 2 == 0 && k == n / 2) {
+        if k == 0 || (n.is_multiple_of(2) && k == n / 2) {
             nr = 0.0;
             ni = 0.0;
         } else if k < n / 2 + (n & 1) {
@@ -1222,7 +1220,7 @@ fn builtin_kalman_rts_smoother(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .collect();
     let p_arr: Vec<Vec<Vec<f64>>> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
-        .map(|m| matrix_from_value(m))
+        .map(matrix_from_value)
         .collect();
     let x_pred: Vec<Vec<f64>> = arg_to_vec(&args.get(2).cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
@@ -1230,7 +1228,7 @@ fn builtin_kalman_rts_smoother(args: &[PerlValue]) -> PerlResult<PerlValue> {
         .collect();
     let p_pred_arr: Vec<Vec<Vec<f64>>> = arg_to_vec(&args.get(3).cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
-        .map(|m| matrix_from_value(m))
+        .map(matrix_from_value)
         .collect();
     let f_mat = matrix_from_value(&args.get(4).cloned().unwrap_or(PerlValue::UNDEF));
     let t = x_hat.len();
