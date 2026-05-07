@@ -1259,7 +1259,7 @@ pub(crate) fn try_builtin(
         "future_value" => Some(builtin_future_value(args)),
         "heat_index" => Some(builtin_heat_index(args)),
         "is_whole" => Some(builtin_is_whole(interp, args)),
-        "kinetic_energy" => Some(builtin_kinetic_energy(args)),
+        "kinetic_energy" => Some(builtin_kinetic_energy_b12(args)),
         "list_eq" => Some(builtin_list_eq(args)),
         "log_base" => Some(builtin_log_base(args)),
         "mae" => Some(builtin_mae(args)),
@@ -1276,7 +1276,7 @@ pub(crate) fn try_builtin(
         "parenthesize" => Some(builtin_parenthesize(interp, args)),
         "potential_energy" => Some(builtin_potential_energy(args)),
         "prefix_sums" => Some(builtin_prefix_sums(args)),
-        "present_value" => Some(builtin_present_value(args)),
+        "present_value" => Some(builtin_present_value_b13(args)),
         "rmse" => Some(builtin_rmse(args)),
         "round_to" => Some(builtin_round_to(args)),
         "running_max" => Some(builtin_running_max(args)),
@@ -2731,7 +2731,7 @@ pub(crate) fn try_builtin(
         "inv_lerp" | "ilerp" => Some(builtin_inv_lerp(args)),
         "smoothstep" | "smst" => Some(builtin_smoothstep(args)),
         "remap" => Some(builtin_remap(args)),
-        "dot_product" | "dotp" => Some(builtin_dot_product(args)),
+        "dot_product" | "dotp" => Some(builtin_dot_product_b11(args)),
         "cross_product" | "crossp" => Some(builtin_cross_product(args)),
         "matrix_mul" | "matmul" | "mm" => Some(builtin_matrix_mul(args)),
         "magnitude" | "mag" => Some(builtin_magnitude(args)),
@@ -2740,7 +2740,7 @@ pub(crate) fn try_builtin(
         "manhattan_distance" | "mdist" => Some(builtin_manhattan_distance(args)),
         "covariance" | "cov" => Some(builtin_covariance(args)),
         "correlation" | "corr" => Some(builtin_correlation(args)),
-        "iqr" => Some(builtin_iqr(args)),
+        "iqr" => Some(builtin_iqr_b11(args)),
         "quantile" | "qntl" => Some(builtin_quantile(args)),
         "clamp_int" | "clpi" => Some(builtin_clamp_int(args)),
         "in_range" | "inrng" => Some(builtin_in_range(args)),
@@ -3050,10 +3050,10 @@ pub(crate) fn try_builtin(
         "bond_yield" | "bondyld" => Some(builtin_bond_yield(args)),
         "duration" | "macdur" => Some(builtin_duration(args)),
         "modified_duration" | "moddur" => Some(builtin_modified_duration(args)),
-        "sharpe_ratio" | "sharpe" => Some(builtin_sharpe_ratio(args)),
-        "sortino_ratio" | "sortino" => Some(builtin_sortino_ratio(args)),
+        "sharpe_ratio" | "sharpe" => Some(builtin_sharpe_ratio_b13(args)),
+        "sortino_ratio" | "sortino" => Some(builtin_sortino_ratio_b13(args)),
         "max_drawdown" | "maxdd" => Some(builtin_max_drawdown(args)),
-        "continuous_compound" | "contcomp" => Some(builtin_continuous_compound(args)),
+        "continuous_compound" | "contcomp" => Some(builtin_continuous_compound_b13(args)),
         "rule_of_72" | "r72" => Some(builtin_rule_of_72(args)),
         "wacc" => Some(builtin_wacc(args)),
         "capm" => Some(builtin_capm(args)),
@@ -3302,7 +3302,7 @@ pub(crate) fn try_builtin(
         "critical_angle" | "critang" => Some(builtin_critical_angle(args)),
         "lens_power" | "diopter" => Some(builtin_lens_power(interp, args)),
         "thin_lens" | "thinlens" => Some(builtin_thin_lens(args)),
-        "magnification_lens" | "maglens" => Some(builtin_magnification_lens(args)),
+        "magnification_lens" | "maglens" => Some(builtin_magnification_lens_b12(args)),
 
         // ── Math Constants ─────────────────────────────────────────────────
         "euler_mascheroni" | "gamma_const" => Some(builtin_euler_mascheroni(args)),
@@ -3328,7 +3328,7 @@ pub(crate) fn try_builtin(
         "stefan_boltzmann_constant" | "sigma_sb" => Some(builtin_stefan_boltzmann_constant(args)),
         "wien_constant" | "b_wien" => Some(builtin_wien_constant(args)),
         "gas_constant" | "rgas" => Some(builtin_gas_constant(args)),
-        "faraday_constant" | "faraday" => Some(builtin_faraday_constant(args)),
+        "faraday_constant" | "faraday" => Some(builtin_faraday_constant_b12(args)),
         "neutron_mass" | "nmass" => Some(builtin_neutron_mass(args)),
         "atomic_mass_unit" | "amu" => Some(builtin_atomic_mass_unit(args)),
         "earth_mass" | "mearth" => Some(builtin_earth_mass(args)),
@@ -3433,6 +3433,59 @@ pub(crate) fn try_builtin(
             Some(builtin_adaptive_simpson(interp, args, line))
         }
 
+        // ── Batch 4 callback-taking builtins ─────────────────────────────
+        "forward_diff" | "fdiff" => Some(builtin_forward_diff(interp, args, line)),
+        "forward_diff_grad" | "fdiff_grad" => {
+            Some(builtin_forward_diff_grad(interp, args, line))
+        }
+        "rk45_dormand_prince" | "rk45" | "dopri5" => {
+            Some(builtin_rk45_dormand_prince(interp, args, line))
+        }
+        "midpoint_step" | "ode_midpoint" => Some(builtin_midpoint_step(interp, args, line)),
+        "heun_step" | "ode_heun" => Some(builtin_heun_step(interp, args, line)),
+        "verlet_step" | "ode_verlet" => Some(builtin_verlet_step(interp, args, line)),
+
+        // ── Batch 5 callback-taking builtins ─────────────────────────────
+        "gauss_chebyshev_quad" | "gc_quad" => {
+            Some(builtin_gauss_chebyshev_quad(interp, args, line))
+        }
+        "gauss_hermite_quad" | "gh_quad" => {
+            Some(builtin_gauss_hermite_quad(interp, args, line))
+        }
+        "gauss_laguerre_quad" | "glag_quad" => {
+            Some(builtin_gauss_laguerre_quad(interp, args, line))
+        }
+        "clenshaw_curtis_quad" | "cc_quad" => {
+            Some(builtin_clenshaw_curtis_quad(interp, args, line))
+        }
+        "tanh_sinh_quad" | "ts_quad" => Some(builtin_tanh_sinh_quad(interp, args, line)),
+        "gauss_legendre_2d" | "gl_2d" => {
+            Some(builtin_gauss_legendre_2d(interp, args, line))
+        }
+        "monte_carlo_2d" | "mc_2d" => Some(builtin_monte_carlo_2d(interp, args, line)),
+        "simulated_annealing" | "sa_min" => {
+            Some(builtin_simulated_annealing(interp, args, line))
+        }
+        "particle_swarm" | "pso_min" => Some(builtin_particle_swarm(interp, args, line)),
+        "richardson_extrapolation" | "richardson" => {
+            Some(builtin_richardson_extrapolation(interp, args, line))
+        }
+        "finite_difference_5pt" | "fd5pt" => {
+            Some(builtin_finite_difference_5pt(interp, args, line))
+        }
+
+        // ── Batch 6 callback-taking builtins ─────────────────────────────
+        "metropolis_hastings" | "mh_sampler" => {
+            Some(builtin_metropolis_hastings(interp, args, line))
+        }
+        "gibbs_sampler_step" | "gibbs_step" => {
+            Some(builtin_gibbs_sampler_step(interp, args, line))
+        }
+        "euler_maruyama" | "em_sde" => Some(builtin_euler_maruyama(interp, args, line)),
+        "milstein" | "milstein_sde" => Some(builtin_milstein(interp, args, line)),
+        "heat_eq_1d" => Some(builtin_heat_eq_1d(interp, args, line)),
+        "wave_eq_1d" => Some(builtin_wave_eq_1d(interp, args, line)),
+
         // ── ODE Solvers ──────────────────────────────────────────────────
         "rk4" | "runge_kutta" | "rk4_ode" => Some(builtin_rk4(interp, args, line)),
         "euler_ode" | "euler_method" => Some(builtin_euler_ode(interp, args, line)),
@@ -3460,7 +3513,7 @@ pub(crate) fn try_builtin(
         "gelu" => Some(builtin_gelu(args)),
         "silu" | "swish" => Some(builtin_silu(args)),
         "mish" => Some(builtin_mish(args)),
-        "softplus" => Some(builtin_softplus(args)),
+        "softplus" => Some(builtin_softplus_b11(args)),
         "hard_sigmoid" | "hardsigmoid" => Some(builtin_hard_sigmoid(args)),
         "hard_swish" | "hardswish" => Some(builtin_hard_swish(args)),
 
@@ -3853,6 +3906,973 @@ pub(crate) fn try_builtin(
         "point_segment_distance" | "p_seg_dist" => {
             Some(builtin_point_segment_distance(args))
         }
+
+        // ── Batch 4: statistical tests ───────────────────────────────────
+        "bartlett_test" => Some(builtin_bartlett_test(args)),
+        "levene_test" => Some(builtin_levene_test(args)),
+        "fishers_exact_test_2x2" | "fishers_exact" => {
+            Some(builtin_fishers_exact_test_2x2(args))
+        }
+        "mcnemar_test" => Some(builtin_mcnemar_test(args)),
+        "runs_test" | "wald_wolfowitz" => Some(builtin_runs_test(args)),
+        "friedman_test" => Some(builtin_friedman_test(args)),
+        "kruskal_wallis_test" | "kruskal" => Some(builtin_kruskal_wallis_test(args)),
+        "sign_test" => Some(builtin_sign_test(args)),
+        "anderson_darling_normality" | "ad_normality" => {
+            Some(builtin_anderson_darling_normality(args))
+        }
+        "jarque_bera_test" | "jb_test" => Some(builtin_jarque_bera_test(args)),
+        "ljung_box_test" | "ljung_box" => Some(builtin_ljung_box_test(args)),
+        "durbin_watson_stat" | "durbin_watson" => Some(builtin_durbin_watson_stat(args)),
+
+        // ── Batch 4: distance metrics ────────────────────────────────────
+        "mahalanobis_distance" | "mahalanobis_dist" => {
+            Some(builtin_mahalanobis_distance(args))
+        }
+        "cosine_distance" => Some(builtin_cosine_distance(args)),
+        "canberra_distance" => Some(builtin_canberra_distance(args)),
+        "bray_curtis_distance" | "bray_curtis" => Some(builtin_bray_curtis_distance(args)),
+        "l1_distance" => Some(builtin_manhattan_distance_w4(args)),
+        "chi_squared_distance" => Some(builtin_chi_squared_distance(args)),
+
+        // ── Batch 4: more distributions ──────────────────────────────────
+        "multivariate_normal_pdf" | "mvn_pdf" => {
+            Some(builtin_multivariate_normal_pdf(args))
+        }
+        "multivariate_normal_sample" | "rmvn" => {
+            Some(builtin_multivariate_normal_sample(args))
+        }
+        "dirichlet_pdf" => Some(builtin_dirichlet_pdf(args)),
+        "dirichlet_sample" | "rdirichlet" => Some(builtin_dirichlet_sample(args)),
+        "skellam_pmf" => Some(builtin_skellam_pmf(args)),
+        "inverse_gaussian_pdf" | "wald_pdf" => Some(builtin_inverse_gaussian_pdf(args)),
+        "inverse_gaussian_cdf" | "wald_cdf" => Some(builtin_inverse_gaussian_cdf(args)),
+        "inverse_gaussian_sample" | "rwald" => Some(builtin_inverse_gaussian_sample(args)),
+        "non_central_chi2_pdf" | "ncchi2_pdf" => Some(builtin_non_central_chi2_pdf(args)),
+
+        // ── Batch 4: matrix functions ────────────────────────────────────
+        "matrix_exp" | "expm" => Some(builtin_matrix_exp(args)),
+        "matrix_log" | "logm" => Some(builtin_matrix_log(args)),
+        "matrix_sqrt" | "sqrtm" => Some(builtin_matrix_sqrt(args)),
+        "matrix_sin" | "sinm" => Some(builtin_matrix_sin(args)),
+        "matrix_cos" | "cosm" => Some(builtin_matrix_cos(args)),
+
+        // ── Batch 4: GLM ─────────────────────────────────────────────────
+        "logistic_regression" | "logit_fit" => Some(builtin_logistic_regression(args)),
+        "poisson_regression" => Some(builtin_poisson_regression(args)),
+        "ridge_regression" | "ridge" => Some(builtin_ridge_regression(args)),
+        "lasso_coord" | "lasso" => Some(builtin_lasso_coord(args)),
+
+        // ── Batch 4: bootstrap/resampling ────────────────────────────────
+        "bootstrap_mean_ci" | "boot_mean_ci" => Some(builtin_bootstrap_mean_ci(args)),
+        "jackknife_estimate" | "jackknife" => Some(builtin_jackknife_estimate(args)),
+        "permutation_test_diff" | "perm_test_diff" => {
+            Some(builtin_permutation_test_diff(args))
+        }
+
+        // ── Batch 4: time series extras ──────────────────────────────────
+        "acf_at_lag" => Some(builtin_acf_at_lag(args)),
+        "diff_op" => Some(builtin_diff_op(args)),
+        "lag_op" => Some(builtin_lag_op(args)),
+        "decompose_classical" | "decompose_ts" => Some(builtin_decompose_classical(args)),
+
+        // ── Batch 4: combinatorial generators ────────────────────────────
+        "combinations_list" => Some(builtin_combinations_list(args)),
+        "permutations_list" => Some(builtin_permutations_list(args)),
+        "cyclic_permutations" => Some(builtin_cyclic_permutations(args)),
+        "subsets_of_size" => Some(builtin_subsets_of_size(args)),
+
+        // ── Batch 4: DP utilities ────────────────────────────────────────
+        "longest_increasing_subseq" | "lis" => {
+            Some(builtin_longest_increasing_subseq(args))
+        }
+        "knapsack_01" | "knapsack" => Some(builtin_knapsack_01(args)),
+        "subset_sum_target" | "subset_sum" => Some(builtin_subset_sum_target(args)),
+        "coin_change_min" | "coin_change_minimum" => Some(builtin_coin_change_min(args)),
+        "edit_distance_levenshtein" | "edit_distance" => {
+            Some(builtin_edit_distance_levenshtein(args))
+        }
+
+        // ── Batch 4: ML metrics ──────────────────────────────────────────
+        "one_hot_encode" | "onehot" => Some(builtin_one_hot_encode(args)),
+        "label_encode" => Some(builtin_label_encode(args)),
+        "categorical_cross_entropy" | "cce" => {
+            Some(builtin_categorical_cross_entropy(args))
+        }
+        "classification_metrics" | "binary_metrics" => {
+            Some(builtin_classification_metrics(args))
+        }
+        "roc_auc" | "auroc" => Some(builtin_roc_auc(args)),
+
+        // ── Batch 4: DSP / image filters ─────────────────────────────────
+        "gaussian_blur_kernel" => Some(builtin_gaussian_blur_kernel(args)),
+        "sobel_x" => Some(builtin_sobel_x(args)),
+        "sobel_y" => Some(builtin_sobel_y(args)),
+        "prewitt_x" => Some(builtin_prewitt_x(args)),
+        "prewitt_y" => Some(builtin_prewitt_y(args)),
+        "laplacian_of_gaussian" | "log_kernel" => {
+            Some(builtin_laplacian_of_gaussian(args))
+        }
+
+        // ── Batch 4: stochastic processes ────────────────────────────────
+        "brownian_path" | "wiener_path" => Some(builtin_brownian_path(args)),
+        "geometric_brownian_path" | "gbm_path" => {
+            Some(builtin_geometric_brownian_path(args))
+        }
+        "poisson_process" => Some(builtin_poisson_process(args)),
+        "random_walk_1d" => Some(builtin_random_walk_1d(args)),
+
+        // ── Batch 4: compression / info-theoretic ────────────────────────
+        "lempel_ziv_complexity" | "lz_complexity" => {
+            Some(builtin_lempel_ziv_complexity(args))
+        }
+        "huffman_code_lengths" | "huffman" => Some(builtin_huffman_code_lengths(args)),
+        "shannon_entropy_rate" | "block_entropy_rate" => {
+            Some(builtin_shannon_entropy_rate(args))
+        }
+
+        // ── Batch 4: physics / quantum ───────────────────────────────────
+        "planck_blackbody" | "blackbody" => Some(builtin_planck_blackbody(args)),
+        "rayleigh_jeans" => Some(builtin_rayleigh_jeans(args)),
+        "compton_shift" => Some(builtin_compton_shift(args)),
+        "rydberg_energy" => Some(builtin_rydberg_energy(args)),
+        "hydrogen_radial_wavefunction" | "h_rad_psi" => {
+            Some(builtin_hydrogen_radial_wavefunction(args))
+        }
+
+        // ── Batch 4: number theory / algebra ─────────────────────────────
+        "integer_log" | "ilog" => Some(builtin_integer_log(args)),
+        "aks_primality" | "aks" => Some(builtin_aks_primality(args)),
+        "elliptic_curve_add" | "ec_add" => Some(builtin_elliptic_curve_add(args)),
+        "berlekamp_massey" | "bm_lfsr" => Some(builtin_berlekamp_massey(args)),
+        "bezout_coefficients" | "bezout" | "extended_euclid" => {
+            Some(builtin_bezout_coefficients(args))
+        }
+
+        // ── Batch 5: CAS-lite ───────────────────────────────────────────
+        "factor_quadratic" => Some(builtin_factor_quadratic(args)),
+        "complete_square" => Some(builtin_complete_square(args)),
+        "partial_fraction_simple" | "partial_fraction" => {
+            Some(builtin_partial_fraction_simple(args))
+        }
+
+        // ── Batch 5: optimization (no callback) ──────────────────────────
+        "simplex_lp" | "lp_simplex" => Some(builtin_simplex_lp(args)),
+
+        // ── Batch 5: more distributions ──────────────────────────────────
+        "gev_pdf" => Some(builtin_gev_pdf(args)),
+        "gev_cdf" => Some(builtin_gev_cdf(args)),
+        "gev_sample" | "rgev" => Some(builtin_gev_sample(args)),
+        "gen_pareto_pdf" => Some(builtin_gen_pareto_pdf(args)),
+        "gen_pareto_cdf" => Some(builtin_gen_pareto_cdf(args)),
+        "gen_pareto_sample" | "rgenpareto" => Some(builtin_gen_pareto_sample(args)),
+        "skew_normal_pdf" => Some(builtin_skew_normal_pdf(args)),
+        "skew_normal_cdf" => Some(builtin_skew_normal_cdf(args)),
+        "mixture_normal_pdf" => Some(builtin_mixture_normal_pdf(args)),
+        "categorical_sample" | "rcat" => Some(builtin_categorical_sample(args)),
+        "multinomial_pmf" => Some(builtin_multinomial_pmf(args)),
+        "multinomial_sample" | "rmultinom" => Some(builtin_multinomial_sample(args)),
+        "truncated_normal_pdf" => Some(builtin_truncated_normal_pdf(args)),
+        "truncated_normal_sample" | "rtnorm" => Some(builtin_truncated_normal_sample(args)),
+
+        // ── Batch 5: clustering & dim reduction ──────────────────────────
+        "dbscan" => Some(builtin_dbscan(args)),
+        "gmm_em_1d" | "gmm_1d" => Some(builtin_gmm_em_1d(args)),
+        "silhouette_score" => Some(builtin_silhouette_score(args)),
+        "davies_bouldin_index" | "db_index" => Some(builtin_davies_bouldin_index(args)),
+        "calinski_harabasz_index" | "ch_index" => Some(builtin_calinski_harabasz_index(args)),
+        "mds_2d" | "pcoa_2d" => Some(builtin_mds_2d(args)),
+        "mean_shift" => Some(builtin_mean_shift(args)),
+
+        // ── Batch 5: NN primitives ───────────────────────────────────────
+        "batch_norm" => Some(builtin_batch_norm(args)),
+        "layer_norm" => Some(builtin_layer_norm(args)),
+        "dropout_mask" => Some(builtin_dropout_mask(args)),
+        "max_pool_1d" => Some(builtin_max_pool_1d(args)),
+        "avg_pool_1d" => Some(builtin_avg_pool_1d(args)),
+        "attention_softmax" => Some(builtin_attention_softmax(args)),
+        "positional_encoding" => Some(builtin_positional_encoding(args)),
+        "glorot_init" | "xavier_init" => Some(builtin_glorot_init(args)),
+        "he_init" | "kaiming_init" => Some(builtin_he_init(args)),
+        "adam_step" => Some(builtin_adam_step(args)),
+        "rmsprop_step" => Some(builtin_rmsprop_step(args)),
+
+        // ── Batch 5: time series advanced ────────────────────────────────
+        "ewma" => Some(builtin_ewma(args)),
+        "ccf" => Some(builtin_ccf(args)),
+        "periodogram" => Some(builtin_periodogram(args)),
+        "welch_psd" | "welch" => Some(builtin_welch_psd(args)),
+        "lag_features" => Some(builtin_lag_features(args)),
+
+        // ── Batch 5: image processing ────────────────────────────────────
+        "median_filter_2d" => Some(builtin_median_filter_2d(args)),
+        "threshold_otsu" | "otsu" => Some(builtin_threshold_otsu(args)),
+        "histogram_equalize" | "hist_eq" => Some(builtin_histogram_equalize(args)),
+        "erode_2d" => Some(builtin_erode_2d(args)),
+        "dilate_2d" => Some(builtin_dilate_2d(args)),
+
+        // ── Batch 5: losses ──────────────────────────────────────────────
+        "mse_loss" => Some(builtin_mse_loss(args)),
+        "mae_loss" => Some(builtin_mae_loss(args)),
+        "huber_loss" => Some(builtin_huber_loss(args)),
+
+        // ── Batch 5: spatial / geographic ────────────────────────────────
+        "vincenty_distance" | "vincenty" => Some(builtin_vincenty_distance(args)),
+        "mercator_project" => Some(builtin_mercator_project(args)),
+        "destination_from_bearing" | "dest_bearing" => {
+            Some(builtin_destination_from_bearing(args))
+        }
+
+        // ── Batch 5: integer sequences ───────────────────────────────────
+        "recaman" | "recaman_seq" => Some(builtin_recaman(args)),
+        "sylvester" | "sylvester_seq" => Some(builtin_sylvester(args)),
+        "happy_q" | "is_happy" => Some(builtin_happy_q(args)),
+        "amicable_pair_q" => Some(builtin_amicable_pair_q(args)),
+        "aliquot_sequence" => Some(builtin_aliquot_sequence(args)),
+        "magic_constant" => Some(builtin_magic_constant(args)),
+
+        // ── Batch 5: graph metrics ───────────────────────────────────────
+        "clustering_coefficient_local" | "cc_local" => {
+            Some(builtin_clustering_coefficient_local(args))
+        }
+        "clustering_coefficient_global" | "cc_global" => {
+            Some(builtin_clustering_coefficient_global(args))
+        }
+        "assortativity" => Some(builtin_assortativity(args)),
+        "common_neighbors" => Some(builtin_common_neighbors(args)),
+        "jaccard_neighbors" => Some(builtin_jaccard_neighbors(args)),
+        "adamic_adar" => Some(builtin_adamic_adar(args)),
+        "preferential_attachment_score" | "pa_score" => {
+            Some(builtin_preferential_attachment_score(args))
+        }
+
+        // ── Batch 5: 3-D geometry ────────────────────────────────────────
+        "triangle_3d_normal" => Some(builtin_triangle_3d_normal(args)),
+        "triangle_3d_area" => Some(builtin_triangle_3d_area(args)),
+        "tetrahedron_volume" => Some(builtin_tetrahedron_volume(args)),
+        "plane_from_3_points" | "plane_from_pts" => Some(builtin_plane_from_3_points(args)),
+        "point_to_plane_distance" | "pt_plane_dist" => {
+            Some(builtin_point_to_plane_distance(args))
+        }
+        "ray_triangle_intersect" | "moller_trumbore" => {
+            Some(builtin_ray_triangle_intersect(args))
+        }
+        "ray_sphere_intersect" => Some(builtin_ray_sphere_intersect(args)),
+        "aabb_overlap" => Some(builtin_aabb_overlap(args)),
+
+        // ── Batch 5: classical iterative solvers ─────────────────────────
+        "gauss_seidel" => Some(builtin_gauss_seidel(args)),
+        "jacobi_iteration" | "jacobi_solve" => Some(builtin_jacobi_iteration(args)),
+        "sor_solve" | "sor" => Some(builtin_sor_solve(args)),
+        "thomas_tridiag_solve" | "thomas" => Some(builtin_thomas_tridiag_solve(args)),
+
+        // ── Batch 5: algebraic / crypto ──────────────────────────────────
+        "tonelli_shanks_sqrt" | "tonelli_shanks" => Some(builtin_tonelli_shanks_sqrt(args)),
+        "baby_step_giant_step" | "bsgs" => Some(builtin_baby_step_giant_step(args)),
+        "pollard_rho_factor" | "pollard_rho" => Some(builtin_pollard_rho_factor(args)),
+        "modular_lcm" | "mlcm" => Some(builtin_modular_lcm(args)),
+        "crt_general" | "crt_arbitrary" => Some(builtin_crt_general(args)),
+
+        // ── Batch 5: physics / chemistry ─────────────────────────────────
+        "van_der_waals_p" | "vdw_pressure" => Some(builtin_van_der_waals_p(args)),
+        "nernst_equation" | "nernst" => Some(builtin_nernst_equation(args)),
+        "arrhenius_rate" | "arrhenius" => Some(builtin_arrhenius_rate(args)),
+        "reduced_mass" => Some(builtin_reduced_mass(args)),
+        "ph_to_concentration" | "ph_to_h" => Some(builtin_ph_to_concentration(args)),
+
+        // ── Batch 6: SDE non-callback ────────────────────────────────────
+        "ornstein_uhlenbeck_path" | "ou_path" => {
+            Some(builtin_ornstein_uhlenbeck_path(args))
+        }
+
+        // ── Batch 6: HMM ─────────────────────────────────────────────────
+        "hmm_forward" => Some(builtin_hmm_forward(args)),
+        "hmm_viterbi" => Some(builtin_hmm_viterbi(args)),
+        "hmm_backward" => Some(builtin_hmm_backward(args)),
+
+        // ── Batch 6: survival ────────────────────────────────────────────
+        "kaplan_meier" | "km_estimator" => Some(builtin_kaplan_meier(args)),
+        "log_rank_test" => Some(builtin_log_rank_test(args)),
+
+        // ── Batch 6: alignment ───────────────────────────────────────────
+        "needleman_wunsch" | "nw_align" => Some(builtin_needleman_wunsch(args)),
+        "smith_waterman" | "sw_align" => Some(builtin_smith_waterman(args)),
+
+        // ── Batch 6: chemistry ───────────────────────────────────────────
+        "gibbs_free_energy" | "delta_g" => Some(builtin_gibbs_free_energy(args)),
+        "henderson_hasselbalch" | "hh_eq" => Some(builtin_henderson_hasselbalch(args)),
+        "radioactive_decay" => Some(builtin_radioactive_decay(args)),
+        "half_life_to_constant" | "hl_to_lambda" => {
+            Some(builtin_half_life_to_constant(args))
+        }
+
+        // ── Batch 6: control theory ──────────────────────────────────────
+        "pid_step" => Some(builtin_pid_step(args)),
+        "transfer_function_eval" | "tf_eval" => Some(builtin_transfer_function_eval(args)),
+        "bode_magnitude_db" | "bode_mag_db" => Some(builtin_bode_magnitude_db(args)),
+        "bode_phase_deg" | "bode_phase" => Some(builtin_bode_phase_deg(args)),
+        "lqr_2x2" => Some(builtin_lqr_2x2(args)),
+
+        // ── Batch 6: game theory ─────────────────────────────────────────
+        "nash_eq_2x2" | "nash_2x2" => Some(builtin_nash_eq_2x2(args)),
+        "shapley_value" => Some(builtin_shapley_value(args)),
+        "expected_utility" => Some(builtin_expected_utility(args)),
+
+        // ── Batch 6: operations research ─────────────────────────────────
+        "hungarian_assignment" | "hungarian" => Some(builtin_hungarian_assignment(args)),
+        "tsp_nearest_neighbor" | "tsp_nn" => Some(builtin_tsp_nearest_neighbor(args)),
+        "vertex_cover_2approx" | "vc_2approx" => Some(builtin_vertex_cover_2approx(args)),
+
+        // ── Batch 6: PDE non-callback (laplace 2D Jacobi) ────────────────
+        "laplace_2d_jacobi" | "laplace_jacobi" => Some(builtin_laplace_2d_jacobi(args)),
+
+        // ── Batch 6: Bayesian conjugate ──────────────────────────────────
+        "beta_binomial_update" => Some(builtin_beta_binomial_update(args)),
+        "normal_normal_update" => Some(builtin_normal_normal_update(args)),
+        "gamma_poisson_update" => Some(builtin_gamma_poisson_update(args)),
+        "dirichlet_multinomial_update" => Some(builtin_dirichlet_multinomial_update(args)),
+
+        // ── Batch 6: quantum gates ───────────────────────────────────────
+        "hadamard_gate" | "h_gate" => Some(builtin_hadamard_gate(args)),
+        "cnot_gate" | "cx_gate" => Some(builtin_cnot_gate(args)),
+        "swap_gate" => Some(builtin_swap_gate(args)),
+        "cz_gate" => Some(builtin_cz_gate(args)),
+        "qft_matrix" => Some(builtin_qft_matrix(args)),
+        "phase_gate" => Some(builtin_phase_gate(args)),
+        "s_gate" => Some(builtin_s_gate(args)),
+        "t_gate" => Some(builtin_t_gate(args)),
+
+        // ── Batch 6: splines ─────────────────────────────────────────────
+        "bezier_eval" => Some(builtin_bezier_eval(args)),
+        "catmull_rom_eval" | "cmr_eval" => Some(builtin_catmull_rom_eval(args)),
+        "cubic_hermite_eval" | "ch_eval" => Some(builtin_cubic_hermite_eval(args)),
+        "bspline_basis" | "nik_basis" => Some(builtin_bspline_basis(args)),
+
+        // ── Batch 6: music ───────────────────────────────────────────────
+        "freq_to_midi" => Some(builtin_freq_to_midi(args)),
+        "midi_to_freq" => Some(builtin_midi_to_freq(args)),
+        "equal_temperament_freq" => Some(builtin_equal_temperament_freq(args)),
+        "cents_difference" | "cents_diff" => Some(builtin_cents_difference(args)),
+
+        // ── Batch 6: astronomy ───────────────────────────────────────────
+        "redshift_z" => Some(builtin_redshift_z(args)),
+        "hubble_distance" => Some(builtin_hubble_distance(args)),
+        "luminosity_distance" => Some(builtin_luminosity_distance(args)),
+
+        // ── Batch 6: fluid dynamics ──────────────────────────────────────
+        "reynolds_number" => Some(builtin_reynolds_number(args)),
+        "mach_number" => Some(builtin_mach_number(args)),
+        "prandtl_number" => Some(builtin_prandtl_number(args)),
+        "bernoulli_velocity" => Some(builtin_bernoulli_velocity(args)),
+
+        // ── Batch 6: more distributions ──────────────────────────────────
+        "negative_binomial_pmf" | "nb_pmf" => Some(builtin_negative_binomial_pmf(args)),
+        "hypergeometric_pmf" => Some(builtin_hypergeometric_pmf(args)),
+        "beta_binomial_pmf" | "bb_pmf" => Some(builtin_beta_binomial_pmf(args)),
+        "von_mises_pdf" | "vmf_pdf" => Some(builtin_von_mises_pdf(args)),
+
+        // ── Batch 6: random graphs ───────────────────────────────────────
+        "erdos_renyi_random" | "erdos_renyi" => Some(builtin_erdos_renyi_random(args)),
+        "barabasi_albert_random" | "barabasi_albert" => {
+            Some(builtin_barabasi_albert_random(args))
+        }
+        "watts_strogatz_random" | "watts_strogatz" => {
+            Some(builtin_watts_strogatz_random(args))
+        }
+
+        // ── Batch 6: color science ───────────────────────────────────────
+        "rgb_to_lab" => Some(builtin_rgb_to_lab(args)),
+        "lab_to_rgb" => Some(builtin_lab_to_rgb(args)),
+        "kelvin_to_rgb" | "color_temp_rgb" => Some(builtin_kelvin_to_rgb(args)),
+
+        // ── Batch 6: integer sequences ───────────────────────────────────
+        "bell_triangle" => Some(builtin_bell_triangle(args)),
+        "surjection_count" => Some(builtin_surjection_count(args)),
+        "distinct_partition_count" | "q_partition" => {
+            Some(builtin_distinct_partition_count(args))
+        }
+        "fibonacci_q" | "is_fib_number" => Some(builtin_fibonacci_q(args)),
+
+        // ── Batch 7: stats corrections ───────────────────────────────────
+        "bonferroni_correction" | "bonferroni" => Some(builtin_bonferroni_correction(args)),
+        "benjamini_hochberg" | "bh_fdr" => Some(builtin_benjamini_hochberg(args)),
+        "tukey_hsd" => Some(builtin_tukey_hsd(args)),
+
+        // ── Batch 7: divergences ─────────────────────────────────────────
+        "hellinger_distance" => Some(builtin_hellinger_distance(args)),
+        "wasserstein_1d" | "earth_movers_1d" => Some(builtin_wasserstein_1d(args)),
+        "chi_squared_divergence" => Some(builtin_chi_squared_divergence(args)),
+
+        // ── Batch 7: more distributions ──────────────────────────────────
+        "beta_geometric_pmf" => Some(builtin_beta_geometric_pmf(args)),
+        "generalized_gamma_pdf" | "gengamma_pdf" => Some(builtin_generalized_gamma_pdf(args)),
+        "zip_pmf" | "zero_inflated_poisson_pmf" => Some(builtin_zip_pmf(args)),
+
+        // ── Batch 7: physics ─────────────────────────────────────────────
+        "stefan_boltzmann_luminosity" | "stellar_luminosity" => {
+            Some(builtin_stefan_boltzmann_luminosity(args))
+        }
+        "photon_momentum" => Some(builtin_photon_momentum(args)),
+        "photon_energy_ev" => Some(builtin_photon_energy_ev(args)),
+        "dipole_radiation_power" | "larmor_power" => {
+            Some(builtin_dipole_radiation_power(args))
+        }
+        "parallax_to_distance" => Some(builtin_parallax_to_distance(args)),
+        "hawking_temperature" => Some(builtin_hawking_temperature(args)),
+
+        // ── Batch 7: astronomy ───────────────────────────────────────────
+        "roche_limit" => Some(builtin_roche_limit(args)),
+        "apparent_magnitude" => Some(builtin_apparent_magnitude(args)),
+        "distance_modulus" => Some(builtin_distance_modulus(args)),
+
+        // ── Batch 7: chemistry ───────────────────────────────────────────
+        "beer_lambert" | "absorbance" => Some(builtin_beer_lambert(args)),
+        "rate_law_n" => Some(builtin_rate_law_n(args)),
+        "freezing_point_depression" | "fpd" => Some(builtin_freezing_point_depression(args)),
+
+        // ── Batch 7: game theory ─────────────────────────────────────────
+        "mixed_nash_2x2" => Some(builtin_mixed_nash_2x2(args)),
+        "minimax_2x2" => Some(builtin_minimax_2x2(args)),
+
+        // ── Batch 7: graphics ────────────────────────────────────────────
+        "barycentric_coords_2d" | "barycentric_2d" => {
+            Some(builtin_barycentric_coords_2d(args))
+        }
+        "bresenham_line" => Some(builtin_bresenham_line(args)),
+        "bilinear_interp_2d" => Some(builtin_bilinear_interp_2d(args)),
+        "point_in_polygon_2d" => Some(builtin_point_in_polygon_2d(args)),
+
+        // ── Batch 7: DSP ─────────────────────────────────────────────────
+        "hilbert_transform" => Some(builtin_hilbert_transform(args)),
+        "cepstrum" => Some(builtin_cepstrum(args)),
+        "butterworth_lowpass_coeffs" | "butter_lp" => {
+            Some(builtin_butterworth_lowpass_coeffs(args))
+        }
+        "savitzky_golay_coeffs" | "sg_coeffs" => Some(builtin_savitzky_golay_coeffs(args)),
+        "savitzky_golay_filter" | "sg_filter" => Some(builtin_savitzky_golay_filter(args)),
+
+        // ── Batch 7: image processing ────────────────────────────────────
+        "canny_edge_intensity" | "canny_intensity" => {
+            Some(builtin_canny_edge_intensity(args))
+        }
+        "bilateral_filter_basic" | "bilateral_filter" => {
+            Some(builtin_bilateral_filter_basic(args))
+        }
+
+        // ── Batch 7: clustering ──────────────────────────────────────────
+        "kmeans_pp_init" | "kpp_init" => Some(builtin_kmeans_pp_init(args)),
+        "elbow_score" | "wcss" => Some(builtin_elbow_score(args)),
+
+        // ── Batch 7: combinatorics ───────────────────────────────────────
+        "young_tableaux_count" | "syt_count" => Some(builtin_young_tableaux_count(args)),
+        "euler_alt_permutation" | "euler_zigzag" => {
+            Some(builtin_euler_alt_permutation(args))
+        }
+        "genocchi_number" => Some(builtin_genocchi_number(args)),
+        "lattice_paths_count" => Some(builtin_lattice_paths_count(args)),
+
+        // ── Batch 7: number theory extras ────────────────────────────────
+        "tetration" => Some(builtin_tetration(args)),
+        "ackermann_limited" | "ackermann" => Some(builtin_ackermann_limited(args)),
+        "perfect_power_q" => Some(builtin_perfect_power_q(args)),
+        "b_smooth_q" => Some(builtin_b_smooth_q(args)),
+
+        // ── Batch 7: network metrics ─────────────────────────────────────
+        "k_core" => Some(builtin_k_core(args)),
+        "rich_club_coefficient" | "rich_club" => Some(builtin_rich_club_coefficient(args)),
+
+        // ── Batch 7: crypto helpers ──────────────────────────────────────
+        "rsa_basic_encrypt" | "rsa_enc_int" => Some(builtin_rsa_basic_encrypt(args)),
+        "rsa_basic_decrypt" | "rsa_dec_int" => Some(builtin_rsa_basic_decrypt(args)),
+        "dh_shared_secret" => Some(builtin_dh_shared_secret(args)),
+
+        // ── Batch 7: quantum ─────────────────────────────────────────────
+        "bell_state_phi_plus" | "bell_phi_plus" => Some(builtin_bell_state_phi_plus(args)),
+        "bell_state_psi_minus" | "bell_psi_minus" => {
+            Some(builtin_bell_state_psi_minus(args))
+        }
+        "density_matrix_purity" | "rho_purity" => Some(builtin_density_matrix_purity(args)),
+        "concurrence_2qubit" => Some(builtin_concurrence_2qubit(args)),
+
+        // ── Batch 7: 2D geometry ─────────────────────────────────────────
+        "point_in_circle" => Some(builtin_point_in_circle(args)),
+        "circle_circle_intersect_2d" => Some(builtin_circle_circle_intersect_2d(args)),
+        "polygon_centroid" => Some(builtin_polygon_centroid(args)),
+        "sutherland_hodgman_clip" | "sh_clip" => Some(builtin_sutherland_hodgman_clip(args)),
+
+        // ── Batch 7: time series ─────────────────────────────────────────
+        "kalman_rts_smoother" | "rts_smoother" => Some(builtin_kalman_rts_smoother(args)),
+
+        // ── Batch 8: bioinformatics ──────────────────────────────────────
+        "gc_content" => Some(builtin_gc_content(args)),
+        "codon_to_aa" => Some(builtin_codon_to_aa(args)),
+        "reverse_complement_dna" | "rev_comp_dna" => {
+            Some(builtin_reverse_complement_dna(args))
+        }
+        "hamming_dna" => Some(builtin_hamming_dna(args)),
+        "blosum62_pair_score" | "blosum62" => Some(builtin_blosum62_pair_score(args)),
+        "kmer_count" => Some(builtin_kmer_count(args)),
+
+        // ── Batch 8: geographic ──────────────────────────────────────────
+        "great_circle_bearing" | "gc_bearing" => Some(builtin_great_circle_bearing(args)),
+        "midpoint_lat_lon" | "mid_geo" => Some(builtin_midpoint_lat_lon(args)),
+        "utm_zone_for" => Some(builtin_utm_zone_for(args)),
+        "area_polygon_lat_lon" | "geo_polygon_area" => {
+            Some(builtin_area_polygon_lat_lon(args))
+        }
+
+        // ── Batch 8: finance ─────────────────────────────────────────────
+        "crr_binomial_option" | "crr_option" => Some(builtin_crr_binomial_option(args)),
+        "bond_price_clean" => Some(builtin_bond_price_clean(args)),
+        "bond_yield_to_maturity" | "bond_ytm" => {
+            Some(builtin_bond_yield_to_maturity(args))
+        }
+        "modified_duration_bond" => Some(builtin_modified_duration_bond(args)),
+        "convexity_bond" | "bond_convexity" => Some(builtin_convexity_bond(args)),
+
+        // ── Batch 8: image quality ───────────────────────────────────────
+        "ssim" => Some(builtin_ssim(args)),
+        "psnr" => Some(builtin_psnr(args)),
+        "mssim" => Some(builtin_mssim(args)),
+
+        // ── Batch 8: acoustics ───────────────────────────────────────────
+        "db_spl_from_pa" | "db_spl" => Some(builtin_db_spl_from_pa(args)),
+        "a_weighting_factor" | "a_weight" => Some(builtin_a_weighting_factor(args)),
+        "octave_band_center" | "octave_center" => Some(builtin_octave_band_center(args)),
+        "semitone_ratio" => Some(builtin_semitone_ratio(args)),
+
+        // ── Batch 8: genetics ────────────────────────────────────────────
+        "hardy_weinberg" => Some(builtin_hardy_weinberg(args)),
+        "expected_heterozygosity" | "het_e" => Some(builtin_expected_heterozygosity(args)),
+        "fst_simple" => Some(builtin_fst_simple(args)),
+        "allele_frequencies" => Some(builtin_allele_frequencies(args)),
+
+        // ── Batch 8: epidemiology ────────────────────────────────────────
+        "sir_step" => Some(builtin_sir_step(args)),
+        "sir_r0" => Some(builtin_sir_r0(args)),
+        "doubling_time" => Some(builtin_doubling_time(args)),
+
+        // ── Batch 8: economics ───────────────────────────────────────────
+        "theil_index" => Some(builtin_theil_index(args)),
+        "herfindahl_hirschman" | "hhi" => Some(builtin_herfindahl_hirschman(args)),
+        "atkinson_index" => Some(builtin_atkinson_index(args)),
+        "lorenz_curve_points" => Some(builtin_lorenz_curve_points(args)),
+
+        // ── Batch 8: APL/J primitives ────────────────────────────────────
+        "iota_range" | "iota" => Some(builtin_iota_range(args)),
+        "reshape_array" | "reshape" => Some(builtin_reshape_array(args)),
+        "grade_up" | "grade_asc" => Some(builtin_grade_up(args)),
+        "grade_down" | "grade_desc" => Some(builtin_grade_down(args)),
+
+        // ── Batch 8: plasma physics ──────────────────────────────────────
+        "plasma_frequency" | "omega_p" => Some(builtin_plasma_frequency(args)),
+        "debye_length" | "lambda_d" => Some(builtin_debye_length(args)),
+        "cyclotron_frequency" | "omega_c" => Some(builtin_cyclotron_frequency(args)),
+        "larmor_radius" | "gyroradius" => Some(builtin_larmor_radius(args)),
+
+        // ── Batch 8: string similarity ───────────────────────────────────
+        "jaro_winkler_similarity" | "jaro_winkler" => {
+            Some(builtin_jaro_winkler_similarity(args))
+        }
+        "metaphone_simple" => Some(builtin_metaphone_simple(args)),
+
+        // ── Batch 8: rating systems ──────────────────────────────────────
+        "elo_rating_update" | "elo" => Some(builtin_elo_rating_update(args)),
+        "glicko_rating_update" | "glicko" => Some(builtin_glicko_rating_update(args)),
+        "dice_sum_pmf" => Some(builtin_dice_sum_pmf(args)),
+
+        // ── Batch 8: effect sizes ────────────────────────────────────────
+        "cohens_d" | "effect_size_d" => Some(builtin_cohens_d(args)),
+        "cliff_delta" => Some(builtin_cliff_delta(args)),
+        "vargha_delaney_a12" | "a12" => Some(builtin_vargha_delaney_a12(args)),
+
+        // ── Batch 8: control transient ───────────────────────────────────
+        "step_response_2nd_order" | "step_2nd" => {
+            Some(builtin_step_response_2nd_order(args))
+        }
+        "overshoot_2nd_order" | "overshoot_pct" => {
+            Some(builtin_overshoot_2nd_order(args))
+        }
+
+        // ── Batch 8: matrix norms ────────────────────────────────────────
+        "frobenius_norm" => Some(builtin_frobenius_norm(args)),
+        "spectral_norm" | "operator_norm_2" => Some(builtin_spectral_norm(args)),
+        "trace_matrix" | "tr_mat" => Some(builtin_trace_matrix(args)),
+
+        // ── Batch 8: networks ────────────────────────────────────────────
+        "homophily_index" | "homophily" => Some(builtin_homophily_index(args)),
+        "dyad_census" => Some(builtin_dyad_census(args)),
+        "triad_census" => Some(builtin_triad_census(args)),
+
+        // ── Batch 8: misc ────────────────────────────────────────────────
+        "sigmoid_inverse" | "logit" => Some(builtin_sigmoid_inverse(args)),
+
+        // ── Batch 9: list/array helpers ──────────────────────────────────
+        "partition_at" => Some(builtin_partition_at(args)),
+        "drop_at" => Some(builtin_drop_at(args)),
+        "insert_at_idx" => Some(builtin_insert_at_idx(args)),
+        "replace_at_index" | "set_at" => Some(builtin_replace_at_index(args)),
+        "swap_indices" => Some(builtin_swap_indices(args)),
+        "nth_largest" => Some(builtin_nth_largest(args)),
+        "nth_smallest" => Some(builtin_nth_smallest(args)),
+        "position_of_all_matching" | "positions_of_all" => {
+            Some(builtin_position_of_all_matching(args))
+        }
+
+        // ── Batch 9: string helpers ──────────────────────────────────────
+        "string_take_first" => Some(builtin_string_take_first(args)),
+        "string_take_last" => Some(builtin_string_take_last(args)),
+        "string_drop_first" => Some(builtin_string_drop_first(args)),
+        "string_drop_last" => Some(builtin_string_drop_last(args)),
+        "pluralize_simple" => Some(builtin_pluralize_simple(args)),
+        "singularize_simple" | "singularize" => Some(builtin_singularize_simple(args)),
+        "capitalize_words" | "title_words" => Some(builtin_capitalize_words(args)),
+        "format_table_simple" | "ascii_table" => Some(builtin_format_table_simple(args)),
+
+        // ── Batch 9: date / calendar ─────────────────────────────────────
+        "days_between" => Some(builtin_days_between(args)),
+        "weeks_between" => Some(builtin_weeks_between(args)),
+        "months_between" => Some(builtin_months_between(args)),
+        "years_between" => Some(builtin_years_between(args)),
+        "first_of_month" => Some(builtin_first_of_month(args)),
+        "last_of_month" => Some(builtin_last_of_month(args)),
+        "day_of_week_iso" | "iso_dow" => Some(builtin_day_of_week_iso(args)),
+        "easter_sunday" => Some(builtin_easter_sunday(args)),
+        "chinese_zodiac" => Some(builtin_chinese_zodiac(args)),
+        "iso_week_number" | "iso_week" => Some(builtin_iso_week_number(args)),
+
+        // ── Batch 9: accessibility colour ────────────────────────────────
+        "relative_luminance" | "wcag_luminance" => Some(builtin_relative_luminance(args)),
+        "contrast_ratio_wcag" | "wcag_contrast" => Some(builtin_contrast_ratio_wcag(args)),
+        "delta_e_76" | "delta_e" => Some(builtin_delta_e_76(args)),
+        "color_blend_t" | "lerp_color" => Some(builtin_color_blend_t(args)),
+
+        // ── Batch 9: music theory ────────────────────────────────────────
+        "chord_to_freqs" => Some(builtin_chord_to_freqs(args)),
+        "scale_to_intervals" => Some(builtin_scale_to_intervals(args)),
+        "interval_semitones" => Some(builtin_interval_semitones(args)),
+        "transpose_freq_semitones" | "transpose_semi" => {
+            Some(builtin_transpose_freq_semitones(args))
+        }
+        "bpm_to_period" => Some(builtin_bpm_to_period(args)),
+        "midi_to_pitch_class" => Some(builtin_midi_to_pitch_class(args)),
+        "key_signature_for" => Some(builtin_key_signature_for(args)),
+        "circle_of_fifths_step" => Some(builtin_circle_of_fifths_step(args)),
+
+        // ── Batch 9: astronomy ───────────────────────────────────────────
+        "moon_phase" => Some(builtin_moon_phase(args)),
+        "equation_of_time" => Some(builtin_equation_of_time(args)),
+        "solar_declination" => Some(builtin_solar_declination(args)),
+        "sidereal_day_period" => Some(builtin_sidereal_day_period(args)),
+        "ecliptic_obliquity" => Some(builtin_ecliptic_obliquity(args)),
+
+        // ── Batch 9: permutations ────────────────────────────────────────
+        "permutation_order" => Some(builtin_permutation_order(args)),
+        "permutation_parity" | "perm_sign" => Some(builtin_permutation_parity(args)),
+        "identity_permutation" => Some(builtin_identity_permutation(args)),
+        "permutation_compose" | "perm_mul" => Some(builtin_permutation_compose(args)),
+
+        // ── Batch 9: linguistics ─────────────────────────────────────────
+        "flesch_reading_ease" => Some(builtin_flesch_reading_ease(args)),
+        "flesch_kincaid_grade" => Some(builtin_flesch_kincaid_grade(args)),
+        "gunning_fog" => Some(builtin_gunning_fog(args)),
+        "automated_readability_index" | "ari" => {
+            Some(builtin_automated_readability_index(args))
+        }
+        "lix" => Some(builtin_lix(args)),
+
+        // ── Batch 9: regression diagnostics ──────────────────────────────
+        "adjusted_r_squared" | "adj_r2" => Some(builtin_adjusted_r_squared(args)),
+        "aic" => Some(builtin_aic(args)),
+        "bic" => Some(builtin_bic(args)),
+        "residuals_compute" | "compute_residuals" => Some(builtin_residuals_compute(args)),
+
+        // ── Batch 9: combinatorial counts ────────────────────────────────
+        "composition_count" => Some(builtin_composition_count(args)),
+        "weak_composition_count" => Some(builtin_weak_composition_count(args)),
+        "necklace_count" => Some(builtin_necklace_count(args)),
+        "bracelet_count" => Some(builtin_bracelet_count(args)),
+        "multiset_permutations_count" | "multinomial_count" => {
+            Some(builtin_multiset_permutations_count(args))
+        }
+
+        // ── Batch 9: PRNG / hashing ──────────────────────────────────────
+        "pearson_hash_byte" | "pearson_hash" => Some(builtin_pearson_hash_byte(args)),
+        "xorshift32_step" => Some(builtin_xorshift32_step(args)),
+        "lcg_next_u32" => Some(builtin_lcg_next_u32(args)),
+        "fisher_yates_shuffle" => Some(builtin_fisher_yates_shuffle(args)),
+
+        // ── Batch 10 ─────────────────────────────────────────────────────
+        "tetrahedral_number" => Some(builtin_tetrahedral_number(args)),
+        "square_pyramidal_number" => Some(builtin_square_pyramidal_number(args)),
+        "octahedral_number" => Some(builtin_octahedral_number(args)),
+        "pentagonal_pyramidal_number" => Some(builtin_pentagonal_pyramidal_number(args)),
+        "cake_number" => Some(builtin_cake_number(args)),
+        "cuban_number" => Some(builtin_cuban_number(args)),
+        "centered_hexagonal_number" => Some(builtin_centered_hexagonal_number(args)),
+        "carmichael_q" | "is_carmichael" => Some(builtin_carmichael_q(args)),
+        "sphenic_q" | "is_sphenic" => Some(builtin_sphenic_q(args)),
+        "seven_smooth_q" | "is_7_smooth" => Some(builtin_seven_smooth_q(args)),
+        "cartesian_product_n" | "cart_n" => Some(builtin_cartesian_product_n(args)),
+        "multiset_union" => Some(builtin_multiset_union(args)),
+        "multiset_intersection" => Some(builtin_multiset_intersection(args)),
+        "multiset_difference" => Some(builtin_multiset_difference(args)),
+        "polynomial_roots_dk" | "durand_kerner" => Some(builtin_polynomial_roots_dk(args)),
+        "lin_bairstow_step" | "bairstow" => Some(builtin_lin_bairstow_step(args)),
+        "heap_sift_down" => Some(builtin_heap_sift_down(args)),
+        "fenwick_build" | "bit_build" => Some(builtin_fenwick_build(args)),
+        "fenwick_query" | "bit_query" => Some(builtin_fenwick_query(args)),
+        "segment_tree_sum" | "seg_sum" => Some(builtin_segment_tree_sum(args)),
+        "kmp_failure" | "kmp" => Some(builtin_kmp_failure(args)),
+        "z_array" | "z_func" => Some(builtin_z_array(args)),
+        "suffix_array_naive" => Some(builtin_suffix_array_naive(args)),
+        "manacher_radii" | "manacher" => Some(builtin_manacher_radii(args)),
+        "rabin_karp_hash" => Some(builtin_rabin_karp_hash(args)),
+        "lcp_array" => Some(builtin_lcp_array(args)),
+        "regex_escape_simple" | "re_escape" => Some(builtin_regex_escape_simple(args)),
+        "horspool_search" | "bm_horspool" => Some(builtin_horspool_search(args)),
+        "lpt_schedule" | "lpt" => Some(builtin_lpt_schedule(args)),
+        "johnsons_rule" | "johnson_2m" => Some(builtin_johnsons_rule(args)),
+        "bit_reverse_32" | "bit_reverse" => Some(builtin_bit_reverse_32(args)),
+        "bin_to_gray" => Some(builtin_bin_to_gray(args)),
+        "gray_to_bin" => Some(builtin_gray_to_bin(args)),
+        "swap_bits_pos" | "swap_bits" => Some(builtin_swap_bits_pos(args)),
+        "hamming_weight" | "popcnt" => Some(builtin_hamming_weight(args)),
+        "hamming_distance_int" | "hamdist_int" => Some(builtin_hamming_distance_int(args)),
+        "internal_rate_of_return" | "irr" => Some(builtin_internal_rate_of_return(args)),
+        "modified_irr" | "mirr" => Some(builtin_modified_irr(args)),
+        "payback_period_simple" | "payback_simple" => Some(builtin_payback_period_simple(args)),
+        "rfc3339_format" | "rfc3339" => Some(builtin_rfc3339_format(args)),
+        "rfc3339_parse" => Some(builtin_rfc3339_parse(args)),
+        "iso_ordinal_date" | "ordinal_date" => Some(builtin_iso_ordinal_date(args)),
+
+        // ── Batch 11 ─────────────────────────────────────────────────────
+        "lazy_caterer" => Some(builtin_lazy_caterer(args)),
+        "central_polygonal" => Some(builtin_central_polygonal(args)),
+        "centered_square" => Some(builtin_centered_square(args)),
+        "centered_triangular" => Some(builtin_centered_triangular(args)),
+        "centered_pentagonal" => Some(builtin_centered_pentagonal(args)),
+        "star_number" => Some(builtin_star_number(args)),
+        "dodecahedral_number" => Some(builtin_dodecahedral_number(args)),
+        "icosahedral_number" => Some(builtin_icosahedral_number(args)),
+        "pronic_number" => Some(builtin_pronic_number(args)),
+        "squared_triangular" => Some(builtin_squared_triangular(args)),
+        "woodall_number" => Some(builtin_woodall_number(args)),
+        "cullen_number" => Some(builtin_cullen_number(args)),
+        "repunit" => Some(builtin_repunit(args)),
+        "repdigit" => Some(builtin_repdigit(args)),
+        "kaprekar_routine_step" => Some(builtin_kaprekar_routine_step(args)),
+        "smith_q" | "is_smith" => Some(builtin_smith_q(args)),
+        "keith_q" | "is_keith" => Some(builtin_keith_q(args)),
+        "armstrong_q" | "is_armstrong" => Some(builtin_armstrong_q(args)),
+        "fnv1a_hash" | "fnv1a" => Some(builtin_fnv1a_hash(args)),
+        "djb2_hash" | "djb2" => Some(builtin_djb2_hash(args)),
+        "jenkins_one_at_a_time" | "jenkins_oat" => Some(builtin_jenkins_one_at_a_time(args)),
+        "murmurhash3_x32" | "murmur3" => Some(builtin_murmurhash3_x32(args)),
+        "adler32_hash" | "adler32" => Some(builtin_adler32_hash(args)),
+        "crc16_ccitt" => Some(builtin_crc16_ccitt(args)),
+        "dot_product" | "vec_dot" => Some(builtin_dot_product_b11(args)),
+        "l1_norm" => Some(builtin_l1_norm(args)),
+        "l2_norm" | "vec_l2" => Some(builtin_l2_norm(args)),
+        "linf_norm" | "max_norm" => Some(builtin_linf_norm(args)),
+        "lp_norm" => Some(builtin_lp_norm(args)),
+        "unit_vector" => Some(builtin_unit_vector(args)),
+        "vector_project" | "proj" => Some(builtin_vector_project(args)),
+        "vector_reject" => Some(builtin_vector_reject(args)),
+        "orthogonalize_vectors" | "gram_schmidt" => Some(builtin_orthogonalize_vectors(args)),
+        "outer_product" | "vec_outer" => Some(builtin_outer_product(args)),
+        "matrix_diagonal" | "mdiagvec" => Some(builtin_matrix_diagonal(args)),
+        "matrix_anti_diagonal" => Some(builtin_matrix_anti_diagonal(args)),
+        "matrix_symmetric_q" => Some(builtin_matrix_symmetric_q(args)),
+        "matrix_orthogonal_q" => Some(builtin_matrix_orthogonal_q(args)),
+        "geometric_mean_arr" => Some(builtin_geometric_mean_arr(args)),
+        "harmonic_mean_arr" => Some(builtin_harmonic_mean_arr(args)),
+        "quadratic_mean_arr" => Some(builtin_quadratic_mean_arr(args)),
+        "lehmer_mean" => Some(builtin_lehmer_mean(args)),
+        "running_mean" => Some(builtin_running_mean(args)),
+        "running_variance" => Some(builtin_running_variance(args)),
+        "iqr" => Some(builtin_iqr_b11(args)),
+        "outlier_iqr_q" => Some(builtin_outlier_iqr_q(args)),
+        "z_score_robust" => Some(builtin_z_score_robust(args)),
+        "geometric_sequence" => Some(builtin_geometric_sequence(args)),
+        "arithmetic_sequence" => Some(builtin_arithmetic_sequence(args)),
+        "log_sum_exp" | "lse" => Some(builtin_log_sum_exp(args)),
+        "softplus_b11" => Some(builtin_softplus_b11(args)),
+        "log_sigmoid" => Some(builtin_log_sigmoid(args)),
+        "log1p_exp" => Some(builtin_log1p_exp(args)),
+        "string_chars" => Some(builtin_string_chars(args)),
+        "string_words_count" | "word_count_simple" => Some(builtin_string_words_count(args)),
+        "string_lines_count" | "line_count_simple" => Some(builtin_string_lines_count(args)),
+        "string_intersperse" => Some(builtin_string_intersperse(args)),
+        "string_replicate" => Some(builtin_string_replicate(args)),
+        "string_uniq_chars" => Some(builtin_string_uniq_chars(args)),
+        "string_letter_frequency" => Some(builtin_string_letter_frequency(args)),
+        "anagram_q" | "is_anagram_q" => Some(builtin_anagram_q(args)),
+        "string_take_while" => Some(builtin_string_take_while(args)),
+        "string_drop_while" => Some(builtin_string_drop_while(args)),
+        "string_split_at_first" => Some(builtin_string_split_at_first(args)),
+        "string_partition_at_word" => Some(builtin_string_partition_at_word(args)),
+
+        // ── Batch 12: physics ────────────────────────────────────────────
+        "kinetic_energy_b12" => Some(builtin_kinetic_energy_b12(args)),
+        "relativistic_kinetic" => Some(builtin_relativistic_kinetic(args)),
+        "lorentz_factor_v" => Some(builtin_lorentz_factor_v(args)),
+        "doppler_relativistic" => Some(builtin_doppler_relativistic(args)),
+        "drag_force_quadratic" => Some(builtin_drag_force_quadratic(args)),
+        "terminal_velocity" => Some(builtin_terminal_velocity(args)),
+        "carnot_efficiency" => Some(builtin_carnot_efficiency(args)),
+        "otto_efficiency" => Some(builtin_otto_efficiency(args)),
+        "brayton_efficiency" => Some(builtin_brayton_efficiency(args)),
+        "diesel_efficiency" => Some(builtin_diesel_efficiency(args)),
+        "specific_heat_const_v" => Some(builtin_specific_heat_const_v(args)),
+        "speed_of_sound_ideal" => Some(builtin_speed_of_sound_ideal(args)),
+        "kepler_period_au" => Some(builtin_kepler_period_au(args)),
+        "synodic_period" => Some(builtin_synodic_period(args)),
+        "hill_radius" => Some(builtin_hill_radius(args)),
+        "jeans_length" => Some(builtin_jeans_length(args)),
+        "chandrasekhar_mass" => Some(builtin_chandrasekhar_mass(args)),
+        "eddington_luminosity" => Some(builtin_eddington_luminosity(args)),
+        "schwarzschild_radius_m" => Some(builtin_schwarzschild_radius_m(args)),
+        "gravity_at_radius" => Some(builtin_gravity_at_radius(args)),
+        "gravitational_pe" => Some(builtin_gravitational_pe(args)),
+        "orbital_velocity_circular_b12" => Some(builtin_orbital_velocity_circular_b12(args)),
+        "freefall_time" => Some(builtin_freefall_time(args)),
+        "pendulum_freq" => Some(builtin_pendulum_freq(args)),
+        "spring_period" => Some(builtin_spring_period(args)),
+        "centripetal_accel" => Some(builtin_centripetal_accel(args)),
+        "lens_focal_length" => Some(builtin_lens_focal_length(args)),
+        "magnification_lens_b12" => Some(builtin_magnification_lens_b12(args)),
+
+        // ── Batch 12: chemistry ──────────────────────────────────────────
+        "avogadros_number" => Some(builtin_avogadros_number(args)),
+        "boltzmann_const" => Some(builtin_boltzmann_const(args)),
+        "planck_const_h" => Some(builtin_planck_const_h(args)),
+        "gas_constant_r" => Some(builtin_gas_constant_r(args)),
+        "faraday_constant_b12" => Some(builtin_faraday_constant_b12(args)),
+        "concentration_dilute" => Some(builtin_concentration_dilute(args)),
+        "partial_pressure" => Some(builtin_partial_pressure(args)),
+        "mole_fraction" => Some(builtin_mole_fraction(args)),
+        "molarity" => Some(builtin_molarity(args)),
+        "molality" => Some(builtin_molality(args)),
+        "normality_chem" => Some(builtin_normality(args)),
+        "ionic_strength" => Some(builtin_ionic_strength(args)),
+        "buffer_capacity_b12" => Some(builtin_buffer_capacity(args)),
+        "titration_volume" => Some(builtin_titration_volume(args)),
+        "atomic_radius_pm" => Some(builtin_atomic_radius_pm(args)),
+        "de_broglie_wavelength_kg" => Some(builtin_de_broglie_wavelength_kg(args)),
+
+        // ── Batch 12: biology ────────────────────────────────────────────
+        "logistic_growth_b12" => Some(builtin_logistic_growth(args)),
+        "lotka_volterra_step" => Some(builtin_lotka_volterra_step(args)),
+        "michaelis_menten" => Some(builtin_michaelis_menten(args)),
+        "hill_equation" => Some(builtin_hill_equation(args)),
+        "lineweaver_burk" => Some(builtin_lineweaver_burk(args)),
+        "eadie_hofstee_y" => Some(builtin_eadie_hofstee_y(args)),
+        "arrhenius_temp_q10" => Some(builtin_arrhenius_temp_q10(args)),
+        "body_surface_area_dubois" | "bsa_dubois" => Some(builtin_body_surface_area_dubois(args)),
+        "bmr_harris_benedict_male" => Some(builtin_bmr_harris_benedict_male(args)),
+        "bmr_harris_benedict_female" => Some(builtin_bmr_harris_benedict_female(args)),
+        "max_heart_rate" => Some(builtin_max_heart_rate(args)),
+        "target_heart_rate" => Some(builtin_target_heart_rate(args)),
+        "vo2_max_estimate" => Some(builtin_vo2_max_estimate(args)),
+        "pulse_pressure" => Some(builtin_pulse_pressure(args)),
+        "mean_arterial_pressure" | "map_bp" => Some(builtin_mean_arterial_pressure(args)),
+
+        // ── Batch 12: meteorology ────────────────────────────────────────
+        "dew_point_magnus" => Some(builtin_dew_point_magnus(args)),
+        "heat_index_celsius" => Some(builtin_heat_index_celsius(args)),
+        "wind_chill_celsius" => Some(builtin_wind_chill_celsius(args)),
+        "pressure_altitude_m" => Some(builtin_pressure_altitude_m(args)),
+        "density_altitude_m" => Some(builtin_density_altitude_m(args)),
+        "saturation_vapor_pressure" => Some(builtin_saturation_vapor_pressure(args)),
+        "humidex" => Some(builtin_humidex(args)),
+        "utci_simple" => Some(builtin_universal_thermal_climate_index_simple(args)),
+
+        // ── Batch 12: engineering ────────────────────────────────────────
+        "resistance_parallel" | "r_parallel" => Some(builtin_resistance_parallel(args)),
+        "resistance_series" | "r_series" => Some(builtin_resistance_series(args)),
+        "capacitance_parallel" | "c_parallel" => Some(builtin_capacitance_parallel(args)),
+        "capacitance_series" | "c_series" => Some(builtin_capacitance_series(args)),
+        "inductance_parallel" | "l_parallel" => Some(builtin_inductance_parallel(args)),
+        "inductance_series" | "l_series" => Some(builtin_inductance_series(args)),
+        "voltage_divider" => Some(builtin_voltage_divider(args)),
+        "current_divider" => Some(builtin_current_divider(args)),
+        "lc_resonant" => Some(builtin_lc_resonant(args)),
+        "q_factor_rlc" => Some(builtin_q_factor_rlc(args)),
+        "skin_depth" => Some(builtin_skin_depth(args)),
+        "wire_resistance" => Some(builtin_wire_resistance(args)),
+        "motor_torque" => Some(builtin_motor_torque(args)),
+        "efficiency_ratio" => Some(builtin_efficiency_ratio(args)),
+        "dB_voltage" | "db_voltage" => Some(builtin_dB_voltage(args)),
+        "dB_power" | "db_power" => Some(builtin_dB_power(args)),
+
+        // ── Batch 13 ─────────────────────────────────────────────────────
+        "bfs_distances" => Some(builtin_bfs_distances(args)),
+        "dfs_preorder" => Some(builtin_dfs_preorder(args)),
+        "connected_components" => Some(builtin_connected_components(args)),
+        "graph_is_tree" => Some(builtin_graph_is_tree(args)),
+        "graph_density" => Some(builtin_graph_density(args)),
+        "graph_average_degree" => Some(builtin_graph_average_degree(args)),
+        "graph_max_degree" => Some(builtin_graph_max_degree(args)),
+        "graph_min_degree" => Some(builtin_graph_min_degree(args)),
+        "graph_complement" => Some(builtin_graph_complement(args)),
+        "in_degree_directed" => Some(builtin_in_degree_directed(args)),
+        "out_degree_directed" => Some(builtin_out_degree_directed(args)),
+        "graph_eccentricity_all" => Some(builtin_graph_eccentricity_all(args)),
+        "is_connected" => Some(builtin_is_connected(args)),
+        "articulation_points" => Some(builtin_articulation_points(args)),
+        "bridges_edges" => Some(builtin_bridges_edges(args)),
+        "eulerian_path_q" => Some(builtin_eulerian_path_q(args)),
+        "hamiltonian_brute" => Some(builtin_hamiltonian_brute(args)),
+        "string_to_charcodes" => Some(builtin_string_to_charcodes(args)),
+        "charcodes_to_string" => Some(builtin_charcodes_to_string(args)),
+        "string_xor" => Some(builtin_string_xor(args)),
+        "string_camel_to_snake" => Some(builtin_string_camel_to_snake(args)),
+        "string_snake_to_camel" => Some(builtin_string_snake_to_camel(args)),
+        "string_kebab_to_snake" => Some(builtin_string_kebab_to_snake(args)),
+        "string_snake_to_kebab" => Some(builtin_string_snake_to_kebab(args)),
+        "palindromic_q" => Some(builtin_palindromic_q(args)),
+        "substring_count" => Some(builtin_substring_count(args)),
+        "string_truncate_ellipsis" => Some(builtin_string_truncate_ellipsis(args)),
+        "string_expand_tabs" => Some(builtin_string_expand_tabs(args)),
+        "string_normalize_spaces" => Some(builtin_string_normalize_spaces(args)),
+        "is_leap_year_b13" => Some(builtin_is_leap_year_b13(args)),
+        "days_in_year" => Some(builtin_days_in_year(args)),
+        "quarter_of_year" => Some(builtin_quarter_of_year(args)),
+        "zeller_day_of_week" => Some(builtin_zeller_day_of_week(args)),
+        "age_from_birthdate" => Some(builtin_age_from_birthdate(args)),
+        "business_days_between" => Some(builtin_business_days_between(args)),
+        "unix_epoch_to_iso" => Some(builtin_unix_epoch_to_iso(args)),
+        "loan_payment_pmt" => Some(builtin_loan_payment_pmt(args)),
+        "loan_balance" => Some(builtin_loan_balance(args)),
+        "amortization_total_interest" => Some(builtin_amortization_total_interest(args)),
+        "apr_to_apy" => Some(builtin_apr_to_apy(args)),
+        "apy_to_apr" => Some(builtin_apy_to_apr(args)),
+        "compound_interest_periods" => Some(builtin_compound_interest_periods(args)),
+        "simple_interest_compute" => Some(builtin_simple_interest_compute(args)),
+        "continuous_compound_b13" => Some(builtin_continuous_compound_b13(args)),
+        "present_value_b13" => Some(builtin_present_value_b13(args)),
+        "future_value_b13" => Some(builtin_future_value_b13(args)),
+        "perpetuity_value" => Some(builtin_perpetuity_value(args)),
+        "growing_perpetuity" => Some(builtin_growing_perpetuity(args)),
+        "annuity_present_value" => Some(builtin_annuity_present_value(args)),
+        "annuity_future_value" => Some(builtin_annuity_future_value(args)),
+        "capm_expected_return" => Some(builtin_capm_expected_return(args)),
+        "sharpe_ratio" => Some(builtin_sharpe_ratio_b13(args)),
+        "treynor_ratio" => Some(builtin_treynor_ratio(args)),
+        "jensens_alpha" => Some(builtin_jensens_alpha(args)),
+        "information_ratio" => Some(builtin_information_ratio(args)),
+        "sortino_ratio" => Some(builtin_sortino_ratio_b13(args)),
+        "friction_factor_laminar" => Some(builtin_friction_factor_laminar(args)),
+        "swamee_jain_factor" => Some(builtin_swamee_jain_factor(args)),
+        "pipe_pressure_drop" => Some(builtin_pipe_pressure_drop(args)),
+        "orifice_velocity" => Some(builtin_orifice_velocity(args)),
+        "chezy_velocity" => Some(builtin_chezy_velocity(args)),
+        "manning_velocity" => Some(builtin_manning_velocity(args)),
+        "froude_number" => Some(builtin_froude_number(args)),
+        "weber_number" => Some(builtin_weber_number(args)),
+        "grashof_number" => Some(builtin_grashof_number(args)),
+        "nusselt_dittus_boelter" => Some(builtin_nusselt_dittus_boelter(args)),
 
         // ── Number Theory (extended) ─────────────────────────────────────
         "mod_exp" | "modexp" | "powmod" => Some(builtin_mod_exp(args)),
@@ -29116,6 +30136,16 @@ include!("builtins_extended.rs");
 include!("math_wolfram.rs");
 include!("math_wolfram2.rs");
 include!("math_wolfram3.rs");
+include!("math_wolfram4.rs");
+include!("math_wolfram5.rs");
+include!("math_wolfram6.rs");
+include!("math_wolfram7.rs");
+include!("math_wolfram8.rs");
+include!("math_wolfram9.rs");
+include!("math_wolfram10.rs");
+include!("math_wolfram11.rs");
+include!("math_wolfram12.rs");
+include!("math_wolfram13.rs");
 
 #[cfg(test)]
 mod tests {
