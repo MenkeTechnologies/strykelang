@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: 236k Rust lines + 110k stryke lines, 5.1k tests, 4k builtins, 436 VM opcodes, 20k parity cases.">
+  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: 273k Rust lines + 110k stryke lines, 5.1k tests, 6.2k builtins, 436 VM opcodes, 20k parity cases.">
   <title>strykelang &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,12 +92,12 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 436-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. <strong>196k production Rust lines + 110k stryke-program lines + 4,500 callable builtins + 1,349/1,349 Rosetta tasks</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 436-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. <strong>216k production Rust lines + 110k stryke-program lines + 6,182 callable builtins + 1,349/1,349 Rosetta tasks</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-val">236,310</div><div class="stat-label">Rust Lines</div></div>
+        <div class="stat-card"><div class="stat-val">272,551</div><div class="stat-label">Rust Lines</div></div>
         <div class="stat-card"><div class="stat-val">109,527</div><div class="stat-label">Stryke Lines (.stk)</div></div>
-        <div class="stat-card"><div class="stat-val accent">4,043</div><div class="stat-label">Builtins (Callable)</div></div>
+        <div class="stat-card"><div class="stat-val accent">6,182</div><div class="stat-label">Builtins (Callable)</div></div>
         <div class="stat-card"><div class="stat-val green">5,086</div><div class="stat-label">Test Functions</div></div>
         <div class="stat-card"><div class="stat-val">436</div><div class="stat-label">VM Opcodes</div></div>
         <div class="stat-card"><div class="stat-val">334</div><div class="stat-label">AST Variants</div></div>
@@ -108,10 +108,10 @@
       </div>
 
       <div style="margin:1.2rem 0;">
-        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 236,310 lines</p>
+        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 272,551 lines</p>
         <div class="bar-wrap" style="height:26px;">
-          <div class="bar-fill cyan" style="width:80.4%;"></div>
-          <span class="bar-pct" style="font-size:12px;">195,564 production / 40,590 tests / 156 tooling &middot; 82.7% production</span>
+          <div class="bar-fill cyan" style="width:79.4%;"></div>
+          <span class="bar-pct" style="font-size:12px;">216,323 production / 55,559 tests / 669 tooling &middot; 79.4% production</span>
         </div>
         <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Production: 89 files across <code>strykelang/</code> + <code>strykelang/pkg/</code> + <code>strykelang/bins/</code> excluding <code>*_tests.rs</code>. Tests: 17 inline test files in <code>strykelang/</code> + 85 integration files in <code>tests/</code>. Tooling: <code>build.rs</code> + <code>benches/</code>.</p>
       </div>
@@ -141,8 +141,8 @@
             <td style="color:var(--green);"><strong>stryke</strong></td>
             <td>2026</td>
             <td class="num">0.08</td>
-            <td class="num">195,564 Rust + 109,527 stk</td>
-            <td class="num">4,043</td>
+            <td class="num">230,982 Rust + 109,527 stk</td>
+            <td class="num">6,182</td>
             <td>Cranelift</td>
             <td><strong>1,349 / 1,349 (100%)</strong></td>
           </tr>
@@ -214,7 +214,7 @@
         </div>
         <div class="feature-card">
           <h4>By Built-in Capability</h4>
-          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 4,043 callables vs ~80&ndash;250 for the reference set.</p>
+          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 6,182 callables vs ~80&ndash;250 for the reference set.</p>
         </div>
         <div class="feature-card">
           <h4>Rosetta Code Completion</h4>
@@ -228,34 +228,34 @@
       <!-- SECTION 2: SUBSYSTEM BREAKDOWN          -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">#</span>SUBSYSTEM BREAKDOWN</h2>
-      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 19.5% &mdash; the language ships with 4,043 callable names (3,511 primaries + 1,342 aliases) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / HTTP / database / network / AI / web domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is 23%.</p>
+      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 27.7% &mdash; the language ships with 6,182 callable names (5,649 primaries + 1,839 aliases) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / HTTP / database / network / AI / web / math / physics / chemistry / biology / signal / finance domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is 21%.</p>
 
       <table class="file-table">
         <thead><tr><th>Subsystem</th><th>Key Files</th><th class="num">Lines</th><th class="num">%</th><th style="min-width:120px;">Share</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins, builtins_extended, list_builtins</code></td><td class="num">43,217</td><td class="num">18.3%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:18.3%"></div></div></td><td>5k callable spellings (4.5k primary): string, array, hash, regex, math, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
-          <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">22,213</td><td class="num">9.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:9.4%"></div></div></td><td>436-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
-          <tr><td style="color:var(--accent);">Tree Walker (vm_helper)</td><td><code>vm_helper</code></td><td class="num">20,880</td><td class="num">8.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:8.8%"></div></div></td><td>Tree-walking interpreter + runtime helpers: scope graph, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, ...), reflection-hash population, package-stash refresh, AOP intercepts</td></tr>
-          <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">18,785</td><td class="num">7.9%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:7.9%"></div></div></td><td>Recursive-descent parser, 183 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing</td></tr>
-          <tr><td style="color:var(--accent);">AI / Web</td><td><code>ai, ai_sugar, web, web_orm, mcp</code></td><td class="num">13,367</td><td class="num">6.0%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:6.0%"></div></div></td><td>Anthropic / OpenAI client, tool-use protocol, AI sugar (<code>ai</code> as native verb), MCP server / client, web framework (route DSL, controllers, ORM, sessions, templates), JSON / form / multipart parsers</td></tr>
-          <tr><td style="color:var(--accent);">Value System</td><td><code>value, nanbox, scope, capture, convert, deconvert</code></td><td class="num">9,488</td><td class="num">4.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:4.0%"></div></div></td><td>NaN-boxed <code>PerlValue</code>: int / float / string / array / hash / code / regex / undef. Scoping (pad slots, closures, <code>local</code>/<code>my</code>/<code>our</code>/<code>oursync</code>), type coercion, capture cells</td></tr>
-          <tr><td style="color:var(--accent);">Codecs / Data</td><td><code>native_codec, native_data, map_stream, map_grep_fast, sort_fast</code></td><td class="num">6,362</td><td class="num">2.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.7%"></div></div></td><td>JSON / YAML / TOML / CSV / MessagePack encode-decode, streaming map/grep iterators, optimized sort</td></tr>
-          <tr><td style="color:var(--accent);">Distribution</td><td><code>cluster, controller, agent, remote_wire, pkg/*, script_cache, pcache</code></td><td class="num">6,251</td><td class="num">2.6%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.6%"></div></div></td><td>Multi-host cluster execution, agent / controller protocol, wire format, package manager (<code>pkg</code> &mdash; manifest, lockfile, store, resolver), bytecode cache</td></tr>
-          <tr><td style="color:var(--accent);">CLI &amp; REPL</td><td><code>main, repl</code></td><td class="num">5,451</td><td class="num">2.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.3%"></div></div></td><td>CLI entry: argv parsing, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), reedline-based REPL with utop-style menu, columnar completion, history</td></tr>
-          <tr><td style="color:var(--accent);">JIT</td><td><code>jit</code></td><td class="num">5,172</td><td class="num">2.2%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.2%"></div></div></td><td>Cranelift block-level JIT: hot-path detection, native code emission for tight numeric loops, deoptimization stubs back to bytecode VM</td></tr>
-          <tr><td style="color:var(--accent);">LSP</td><td><code>lsp</code></td><td class="num">4,603</td><td class="num">1.9%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.9%"></div></div></td><td>Language Server Protocol: hover descriptions, completion, diagnostics, go-to-definition, document symbols</td></tr>
-          <tr><td style="color:var(--accent);">Format / Deparse</td><td><code>fmt, deparse, format</code></td><td class="num">4,288</td><td class="num">1.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.8%"></div></div></td><td><code>perltidy</code>-compatible code formatter, AST&rarr;source deparser (<code>B::Deparse</code> equivalent), Perl <code>format</code>/<code>write</code> system</td></tr>
-          <tr><td style="color:var(--accent);">Misc / Error</td><td><code>error, mro, lib, bench_fusion, fib_like_tail, pending_destroy, bins/gen_docs, parse_smoke_*, run_semantics_more</code></td><td class="num">3,250</td><td class="num">1.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.4%"></div></div></td><td>Rich error reporter, MRO (C3 / DFS), library entry, fusion-pass optimizers, finalizer queue, doc generator, smoke tests</td></tr>
-          <tr><td style="color:var(--accent);">Parallel Runtime</td><td><code>par_lines, par_list, par_pipeline, par_walk, ppool, pchannel, pwatch, pmap_progress, parallel_trace, stress</code></td><td class="num">4,029</td><td class="num">1.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.7%"></div></div></td><td>Rayon work-stealing: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>, parallel file walking, async pipelines, progress tracking, channels, stress-testing primitives (<code>heat</code>, <code>fire</code>)</td></tr>
-          <tr><td style="color:var(--accent);">Perl Compat</td><td><code>perl_decode, perl_fs, perl_inc, perl_regex, perl_signal, perl_pty, special_vars, english</code></td><td class="num">3,578</td><td class="num">1.5%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.5%"></div></div></td><td><code>@INC</code>, <code>%ENV</code>, <code>%SIG</code>, file ops, Perl regex engine, signal handling, PTY support, magic special variables, <code>use English</code></td></tr>
-          <tr><td style="color:var(--accent);">Lexer</td><td><code>lexer</code></td><td class="num">3,484</td><td class="num">1.5%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.5%"></div></div></td><td>Tokenizer for Perl 5 + stryke extensions: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, Unicode identifiers, sigil disambiguation</td></tr>
-          <tr><td style="color:var(--accent);">Tooling</td><td><code>debugger, profiler, static_analysis</code></td><td class="num">2,187</td><td class="num">1.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.0%"></div></div></td><td>Step debugger, sampling profiler, static analyzer with lints</td></tr>
-          <tr><td style="color:var(--accent);">FFI / AOT</td><td><code>rust_ffi, rust_sugar, aot, data_section, aop</code></td><td class="num">1,809</td><td class="num">0.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.8%"></div></div></td><td>Embed-Rust closure FFI, AOT bytecode caching, data-section relocations, AOP intercepts</td></tr>
-          <tr><td style="color:var(--accent);">Crypto / Pack</td><td><code>crypt_util, jwt, pack, secrets</code></td><td class="num">1,667</td><td class="num">0.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.8%"></div></div></td><td>Symmetric / asymmetric encryption, password hashing, JWT encode/decode, <code>pack</code>/<code>unpack</code> templates, secret-store helpers</td></tr>
-          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">40,590</td><td class="num">17.2%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:17.2%"></div></div></td><td>5,086 <code>#[test]</code> functions across 100+ files: parser, lexer, builtins, parallel, regex, values, OO, semantics, CLI, LSP, runtime, fix-regression suite</td></tr>
-          <tr><td style="color:var(--text-muted);">Build / Bench</td><td><code>build.rs, benches/, fuzz/</code></td><td class="num">156</td><td class="num">0.07%</td><td><div class="bar-wrap"><div class="bar-fill yellow" style="width:0.07%"></div></div></td><td>Build-time reflection generator (<code>BUILTIN_ARMS</code>, <code>CATEGORY_MAP</code>, <code>DESCRIPTIONS</code>), JIT vs interpreter micro-bench, libfuzzer harnesses</td></tr>
+          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins, builtins_extended, list_builtins, math_wolfram*</code></td><td class="num">75,466</td><td class="num">27.7%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:27.7%"></div></div></td><td>6,182 callable spellings (5,649 primary): string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
+          <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">22,213</td><td class="num">8.1%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:8.1%"></div></div></td><td>436-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
+          <tr><td style="color:var(--accent);">Tree Walker (vm_helper)</td><td><code>vm_helper</code></td><td class="num">20,892</td><td class="num">7.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:7.7%"></div></div></td><td>Tree-walking interpreter + runtime helpers: scope graph, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, ...), reflection-hash population, package-stash refresh, AOP intercepts</td></tr>
+          <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">19,915</td><td class="num">7.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:7.3%"></div></div></td><td>Recursive-descent parser, 183 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing, builtin-name whitelist</td></tr>
+          <tr><td style="color:var(--accent);">AI / Web</td><td><code>ai, ai_sugar, web, web_orm, mcp</code></td><td class="num">13,367</td><td class="num">4.9%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:4.9%"></div></div></td><td>Anthropic / OpenAI client, tool-use protocol, AI sugar (<code>ai</code> as native verb), MCP server / client, web framework (route DSL, controllers, ORM, sessions, templates), JSON / form / multipart parsers</td></tr>
+          <tr><td style="color:var(--accent);">Value System</td><td><code>value, nanbox, scope, capture, convert, deconvert</code></td><td class="num">9,488</td><td class="num">3.5%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:3.5%"></div></div></td><td>NaN-boxed <code>PerlValue</code>: int / float / string / array / hash / code / regex / undef. Scoping (pad slots, closures, <code>local</code>/<code>my</code>/<code>our</code>/<code>oursync</code>), type coercion, capture cells</td></tr>
+          <tr><td style="color:var(--accent);">Codecs / Data</td><td><code>native_codec, native_data, map_stream, map_grep_fast, sort_fast</code></td><td class="num">6,362</td><td class="num">2.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.3%"></div></div></td><td>JSON / YAML / TOML / CSV / MessagePack encode-decode, streaming map/grep iterators, optimized sort</td></tr>
+          <tr><td style="color:var(--accent);">Distribution</td><td><code>cluster, controller, agent, remote_wire, pkg/*, script_cache, pcache</code></td><td class="num">6,251</td><td class="num">2.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.3%"></div></div></td><td>Multi-host cluster execution, agent / controller protocol, wire format, package manager (<code>pkg</code> &mdash; manifest, lockfile, store, resolver), bytecode cache</td></tr>
+          <tr><td style="color:var(--accent);">LSP</td><td><code>lsp</code></td><td class="num">6,594</td><td class="num">2.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.4%"></div></div></td><td>Language Server Protocol: hover descriptions, completion, diagnostics, go-to-definition, document symbols</td></tr>
+          <tr><td style="color:var(--accent);">CLI &amp; REPL</td><td><code>main, repl</code></td><td class="num">5,451</td><td class="num">2.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.0%"></div></div></td><td>CLI entry: argv parsing, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), reedline-based REPL with utop-style menu, columnar completion, history</td></tr>
+          <tr><td style="color:var(--accent);">JIT</td><td><code>jit</code></td><td class="num">5,172</td><td class="num">1.9%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.9%"></div></div></td><td>Cranelift block-level JIT: hot-path detection, native code emission for tight numeric loops, deoptimization stubs back to bytecode VM</td></tr>
+          <tr><td style="color:var(--accent);">Format / Deparse</td><td><code>fmt, deparse, format</code></td><td class="num">4,288</td><td class="num">1.6%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.6%"></div></div></td><td><code>perltidy</code>-compatible code formatter, AST&rarr;source deparser (<code>B::Deparse</code> equivalent), Perl <code>format</code>/<code>write</code> system</td></tr>
+          <tr><td style="color:var(--accent);">Parallel Runtime</td><td><code>par_lines, par_list, par_pipeline, par_walk, ppool, pchannel, pwatch, pmap_progress, parallel_trace, stress</code></td><td class="num">4,029</td><td class="num">1.5%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.5%"></div></div></td><td>Rayon work-stealing: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>, parallel file walking, async pipelines, progress tracking, channels, stress-testing primitives (<code>heat</code>, <code>fire</code>)</td></tr>
+          <tr><td style="color:var(--accent);">Perl Compat</td><td><code>perl_decode, perl_fs, perl_inc, perl_regex, perl_signal, perl_pty, special_vars, english</code></td><td class="num">3,578</td><td class="num">1.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.3%"></div></div></td><td><code>@INC</code>, <code>%ENV</code>, <code>%SIG</code>, file ops, Perl regex engine, signal handling, PTY support, magic special variables, <code>use English</code></td></tr>
+          <tr><td style="color:var(--accent);">Lexer</td><td><code>lexer</code></td><td class="num">3,506</td><td class="num">1.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.3%"></div></div></td><td>Tokenizer for Perl 5 + stryke extensions: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, Unicode identifiers, sigil disambiguation</td></tr>
+          <tr><td style="color:var(--accent);">Misc / Error</td><td><code>error, mro, lib, bench_fusion, fib_like_tail, pending_destroy, bins/gen_docs, parse_smoke_*, run_semantics_more</code></td><td class="num">3,250</td><td class="num">1.2%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.2%"></div></div></td><td>Rich error reporter, MRO (C3 / DFS), library entry, fusion-pass optimizers, finalizer queue, doc generator, smoke tests</td></tr>
+          <tr><td style="color:var(--accent);">Tooling</td><td><code>debugger, profiler, static_analysis</code></td><td class="num">2,187</td><td class="num">0.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.8%"></div></div></td><td>Step debugger, sampling profiler, static analyzer with lints</td></tr>
+          <tr><td style="color:var(--accent);">FFI / AOT</td><td><code>rust_ffi, rust_sugar, aot, data_section, aop</code></td><td class="num">1,809</td><td class="num">0.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.7%"></div></div></td><td>Embed-Rust closure FFI, AOT bytecode caching, data-section relocations, AOP intercepts</td></tr>
+          <tr><td style="color:var(--accent);">Crypto / Pack</td><td><code>crypt_util, jwt, pack, secrets</code></td><td class="num">1,667</td><td class="num">0.6%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.6%"></div></div></td><td>Symmetric / asymmetric encryption, password hashing, JWT encode/decode, <code>pack</code>/<code>unpack</code> templates, secret-store helpers</td></tr>
+          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">55,559</td><td class="num">20.4%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:20.4%"></div></div></td><td>5,086 <code>#[test]</code> functions across 100+ files: parser, lexer, builtins, parallel, regex, values, OO, semantics, CLI, LSP, runtime, fix-regression suite</td></tr>
+          <tr><td style="color:var(--text-muted);">Build / Bench</td><td><code>build.rs, benches/, fuzz/</code></td><td class="num">669</td><td class="num">0.25%</td><td><div class="bar-wrap"><div class="bar-fill yellow" style="width:0.25%"></div></div></td><td>Build-time reflection generator (<code>BUILTIN_ARMS</code>, <code>CATEGORY_MAP</code>, <code>DESCRIPTIONS</code>), JIT vs interpreter micro-bench, libfuzzer harnesses</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">236,310</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
+        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">272,551</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -269,28 +269,28 @@
       <table class="file-table">
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td>strykelang/builtins.rs</td><td class="num">28,851</td><td>Core builtin dispatch table; 1,411 builtin functions covering string/array/hash/regex/math/I/O/file/process/OO domains</td></tr>
-          <tr><td>strykelang/vm_helper.rs</td><td class="num">20,880</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks, special-variable handling, reflection-hash population, package-stash refresh</td></tr>
-          <tr><td>strykelang/parser.rs</td><td class="num">16,624</td><td>Recursive-descent parser; 183 <code>parse_*</code> functions across 247 total fns; precedence climbing, heredocs</td></tr>
-          <tr><td>strykelang/builtins_extended.rs</td><td class="num">12,518</td><td>Extended builtins: crypto, JWT, codecs (JSON/YAML/TOML/CSV/MsgPack), HTTP, email, QR, compression</td></tr>
+          <tr><td>strykelang/builtins.rs</td><td class="num">31,091</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 6,182 callable spellings</td></tr>
+          <tr><td>strykelang/math_wolfram*.rs</td><td class="num">30,003</td><td>30 batch files (math_wolfram, math_wolfram2&hellip;30) <code>include!</code>'d into builtins.rs: ~1,740 fns spanning Wolfram-class math, physics, chemistry, biology, signal, finance, ML, geometry, special functions</td></tr>
+          <tr><td>strykelang/vm_helper.rs</td><td class="num">20,892</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks, special-variable handling, reflection-hash population, package-stash refresh</td></tr>
+          <tr><td>strykelang/parser.rs</td><td class="num">17,754</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
+          <tr><td>strykelang/builtins_extended.rs</td><td class="num">12,524</td><td>Extended builtins: crypto, JWT, codecs (JSON/YAML/TOML/CSV/MsgPack), HTTP, email, QR, compression</td></tr>
           <tr><td>strykelang/vm.rs</td><td class="num">10,282</td><td>Bytecode VM: register+stack hybrid, 436 opcodes, hot-path detection, exception unwinder</td></tr>
           <tr><td>strykelang/compiler.rs</td><td class="num">9,476</td><td>AST&rarr;bytecode: constant folding, register allocation, peephole optimization, basic-block formation</td></tr>
           <tr><td>tests/suite/fix_regressions.rs</td><td class="num">7,654</td><td>Regression test suite &mdash; one test per fixed bug; pin behaviors so refactors can&rsquo;t silently re-break</td></tr>
           <tr><td>strykelang/ai.rs</td><td class="num">6,603</td><td>Anthropic / OpenAI API client, tool-use protocol, batch / pmap fan-out, MCP integration, vision / audio modalities</td></tr>
+          <tr><td>strykelang/lsp.rs</td><td class="num">6,594</td><td>Language Server Protocol: hover descriptions, completion, diagnostics, document symbols</td></tr>
           <tr><td>strykelang/run_semantics_tests.rs</td><td class="num">5,417</td><td>Perl-semantics correctness suite: behaviors that must match perl byte-for-byte</td></tr>
           <tr><td>strykelang/jit.rs</td><td class="num">5,172</td><td>Cranelift JIT: IR generation, native code emission, deoptimization stubs, calling-convention bridge</td></tr>
           <tr><td>strykelang/crate_api_tests.rs</td><td class="num">5,164</td><td>Public crate-API test suite: validates the embeddable interface (<code>stryke::eval</code>, <code>VMHelper</code>, ...)</td></tr>
           <tr><td>strykelang/main.rs</td><td class="num">4,974</td><td>CLI: argv, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), shebang dispatch, builtin-as-command</td></tr>
-          <tr><td>strykelang/lsp.rs</td><td class="num">4,603</td><td>Language Server Protocol: hover descriptions, completion, diagnostics, document symbols</td></tr>
           <tr><td>strykelang/value.rs</td><td class="num">4,546</td><td><code>PerlValue</code>: NaN-boxed union, conversions, stringify / numify, magic context handling</td></tr>
           <tr><td>strykelang/web.rs</td><td class="num">3,554</td><td>Web framework: route DSL, controllers, sessions, cookies, flash, multipart parsing, static / template rendering</td></tr>
-          <tr><td>strykelang/lexer.rs</td><td class="num">3,484</td><td>Tokenizer: 102 fns; heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, sigil disambiguation</td></tr>
+          <tr><td>strykelang/lexer.rs</td><td class="num">3,506</td><td>Tokenizer: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, sigil disambiguation</td></tr>
           <tr><td>strykelang/native_codec.rs</td><td class="num">3,353</td><td>Built-in JSON / YAML / TOML / CSV / MessagePack encode-decode</td></tr>
-          <tr><td>strykelang/scope.rs</td><td class="num">2,936</td><td>Lexical scoping: pad slots, closures, <code>my</code>/<code>local</code>/<code>our</code>/<code>oursync</code>, <code>BEGIN</code>/<code>END</code>/<code>INIT</code>/<code>CHECK</code></td></tr>
+          <tr><td>strykelang/scope.rs</td><td class="num">2,948</td><td>Lexical scoping: pad slots, closures, <code>my</code>/<code>local</code>/<code>our</code>/<code>oursync</code>, <code>BEGIN</code>/<code>END</code>/<code>INIT</code>/<code>CHECK</code></td></tr>
           <tr><td>strykelang/bytecode.rs</td><td class="num">2,455</td><td>Opcode definitions (436 variants), instruction encoding, disassembler</td></tr>
-          <tr><td>strykelang/deparse.rs</td><td class="num">2,118</td><td>AST&rarr;source: <code>B::Deparse</code> equivalent, round-trip fidelity for <code>perl -MO=Deparse</code></td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOP 20 SUBTOTAL</td><td class="num">160,664</td><td>68.0% of repo</td></tr></tfoot>
+        <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOP 20 SUBTOTAL</td><td class="num">193,962</td><td>84.0% of repo</td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -307,11 +307,11 @@
        ▼
   ┌─────────────┐     ┌─────────────┐     ┌──────────────┐
   │  lexer.rs   │────▶│  parser.rs  │────▶│ compiler.rs  │
-  │  (3,484)    │     │  (16,624)   │     │  (9,476)     │
+  │  (3,506)    │     │  (17,754)   │     │  (9,476)     │
   │  Tokenizer  │     │  AST node   │     │  436 opcodes │
   │  heredocs   │     │  variants   │     │  const fold  │
   │  regex lit  │     │  prec climb │     │  reg alloc   │
-  │  q/qq/qw/qr │     │  183 parse_*│     │  peephole    │
+  │  q/qq/qw/qr │     │  whitelist  │     │  peephole    │
   └─────────────┘     └─────────────┘     └──────┬───────┘
                                                   │
                               ┌────────────────────┤
@@ -329,17 +329,19 @@
                             ▼
                   ┌───────────────────┐
                   │   builtins.rs     │
-                  │   (28,851)        │
-                  │   4,043 callables │
+                  │   (31,091)        │
+                  │   6,182 callables │
                   │   + extended      │
-                  │   (12,518)        │
+                  │   (12,524)        │
+                  │   + math_wolfram* │
+                  │   (30,003 / 30 f) │
                   └─────────┬─────────┘
                             │
            ┌────────────────┼─────────────────┐
            │                │                 │
     ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐
     │  value.rs   │  │  scope.rs   │  │  parallel   │
-    │  (4,546)    │  │  (2,936)    │  │  (4,029)    │
+    │  (4,546)    │  │  (2,948)    │  │  (4,029)    │
     │  NaN-boxed  │  │  my/local/  │  │  pmap/pgrep │
     │  PerlValue  │  │  oursync    │  │  rayon work │
     └─────────────┘  └─────────────┘  └─────────────┘</pre>
@@ -353,17 +355,17 @@
       <p class="tutorial-subtitle">Builtins are partitioned at build time by <code>build.rs</code>, which scans <code>parser.rs</code> and <code>builtins.rs</code> to generate <code>CORE_CATEGORY_MAP</code> (Perl 5 core), <code>EXT_CATEGORY_MAP</code> (stryke extensions), and <code>ALL_CATEGORY_MAP</code> (every callable spelling, primaries plus aliases). The reflection tables back the runtime <code>%b</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> hashes (plus their <code>%stryke::*</code> long-form aliases). At runtime stryke also exposes <code>%parameters</code> (zsh-style live binding view) and per-package stashes (<code>%main::</code>, <code>%Foo::</code>) refreshed lazily on read.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">4,043</div><div class="stat-label">Total Callables</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">3,511</div><div class="stat-label">Primaries</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">1,342</div><div class="stat-label">Aliases</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">6,182</div><div class="stat-label">Total Callables</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">5,649</div><div class="stat-label">Primaries</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">1,839</div><div class="stat-label">Aliases</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">213</div><div class="stat-label">Perl 5 Core</div></div>
-        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">3,298</div><div class="stat-label">Stryke Extensions</div></div>
+        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">5,436</div><div class="stat-label">Stryke Extensions</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">2,845</div><div class="stat-label">LSP Descriptions</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">2,505</div><div class="stat-label">Match Arms</div></div>
-        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">142</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">188</div><div class="stat-label">Categories</div></div>
       </div>
 
-      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">117 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 1,342-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">117 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 1,839-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation.</p>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--accent);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// CATEGORIES</h3>
       <div class="mapping-grid">
@@ -597,7 +599,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 236,310 RUST LINES &middot; 109,527 STRYKE LINES &middot; 5,086 TESTS &middot; 4,043 BUILTINS &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 272,551 RUST LINES &middot; 109,527 STRYKE LINES &middot; 5,086 TESTS &middot; 6,182 BUILTINS &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
