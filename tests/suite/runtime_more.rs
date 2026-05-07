@@ -305,8 +305,8 @@ fn sub_adds_two_via_return() {
 fn sub_calls_sub() {
     assert_eq!(
         eval_int(
-            "fn incr ($x) { $x + 1 } \
-             fn twice ($y) { incr($y) + incr($y) } \
+            "fn add_one ($x) { $x + 1 } \
+             fn twice ($y) { add_one($y) + add_one($y) } \
              twice(5)",
         ),
         12

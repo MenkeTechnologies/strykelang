@@ -49,7 +49,7 @@ fn inside_block_bare_underscore_is_topic_capture_not_coderef() {
     // coderef. Result list is `[2,4,6]`, not three coderefs.
     let v = run(r#"my @doubled = map { my $i = _; $i * 2 } 1, 2, 3;
                    join(",", @doubled);"#)
-        .expect("run");
+    .expect("run");
     assert_eq!(v.to_string(), "2,4,6");
 }
 
@@ -57,7 +57,7 @@ fn inside_block_bare_underscore_is_topic_capture_not_coderef() {
 fn inside_fn_body_bare_underscore_is_first_arg_not_coderef() {
     let v = run(r#"fn dbl { my $x = _; $x * 2 }
                    dbl(21);"#)
-        .expect("run");
+    .expect("run");
     assert_eq!(v.to_string(), "42");
 }
 
@@ -96,9 +96,11 @@ fn top_level_my_with_match_rhs_is_not_wrapped() {
     // `match { _ => ... }` arm-pattern `_` is `Pattern::Any`, not a topic
     // reference. The first RHS token is `match`, so the wrap heuristic must
     // leave the value as the match result, not a coderef.
-    let v = run(r#"my $r = match (5) { _ if $_ > 10 => "big", _ => "small" };
-                   $r;"#)
-        .expect("run");
+    let v = run(
+        r#"my $r = match (5) { _ if $_ > 10 => "big", _ => "small" };
+                   $r;"#,
+    )
+    .expect("run");
     assert_eq!(v.to_string(), "small");
 }
 

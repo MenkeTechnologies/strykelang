@@ -85,7 +85,7 @@ fn builtin_fermat_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // Trial division smallest prime factor
 fn builtin_trial_smallest_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut n = i1(args);
+    let n = i1(args);
     if n <= 1 { return Ok(PerlValue::integer(n)); }
     if n % 2 == 0 { return Ok(PerlValue::integer(2)); }
     let mut p = 3_i64;
@@ -93,7 +93,6 @@ fn builtin_trial_smallest_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
         if n % p == 0 { return Ok(PerlValue::integer(p)); }
         p += 2;
     }
-    let _ = n;
     Ok(PerlValue::integer(n))
 }
 

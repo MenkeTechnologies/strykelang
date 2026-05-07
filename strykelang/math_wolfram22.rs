@@ -163,6 +163,7 @@ fn builtin_generation_time(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Shannon diversity index H = -sum(p_i * ln p_i)
+#[allow(dead_code)]
 fn builtin_shannon_diversity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -174,6 +175,7 @@ fn builtin_shannon_diversity(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Simpson diversity D = sum(p_i^2)
+#[allow(dead_code)]
 fn builtin_simpson_diversity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let counts: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();

@@ -463,6 +463,7 @@ fn builtin_bh_adjusted_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Bonferroni correction
+#[allow(dead_code)]
 fn builtin_bonferroni(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);

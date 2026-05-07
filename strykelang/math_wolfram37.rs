@@ -1,6 +1,6 @@
-// Batch 37 — algebraic topology, knot theory, lie algebras, representation theory.
+/// Batch 37 — algebraic topology, knot theory, lie algebras, representation theory.
 
-// Euler characteristic of a CW-complex from face counts (alternating sum)
+/// Euler characteristic of a CW-complex from face counts (alternating sum)
 fn builtin_euler_char_complex(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let s: f64 = v.iter().enumerate()
@@ -9,14 +9,14 @@ fn builtin_euler_char_complex(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(s))
 }
 
-// β₀ — number of connected components for a graph adjacency vector
+/// β₀ — number of connected components for a graph adjacency vector
 fn builtin_betti_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let edges = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer((n - edges).max(1)))
 }
 
-// β₁ — first Betti number from V, E, F (V - E + F → β₁ = 1 - χ for surfaces)
+/// β₁ — first Betti number from V, E, F (V - E + F → β₁ = 1 - χ for surfaces)
 fn builtin_betti_one(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = i1(args);
     let e = args.get(1).map(|x| x.to_number() as i64).unwrap_or(0);
@@ -24,38 +24,38 @@ fn builtin_betti_one(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(e - v - f + 2))
 }
 
-// β₂ — typically 1 for closed oriented surfaces / 0 otherwise
+/// β₂ — typically 1 for closed oriented surfaces / 0 otherwise
 fn builtin_betti_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let chi = i1(args);
     Ok(PerlValue::integer(if chi <= 2 { 1 } else { 0 }))
 }
 
-// Genus of a closed orientable surface from χ: g = (2 - χ) / 2
+/// Genus of a closed orientable surface from χ: g = (2 - χ) / 2
 fn builtin_genus_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let chi = f1(args);
     Ok(PerlValue::float((2.0 - chi) / 2.0))
 }
 
-// First Chern number for 2D vector bundle: c₁ = ∫ F / (2π)
+/// First Chern number for 2D vector bundle: c₁ = ∫ F / (2π)
 fn builtin_chern_first_2d(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let int_f = f1(args);
     Ok(PerlValue::float(int_f / (2.0 * std::f64::consts::PI)))
 }
 
-// Arithmetic genus of plane curve degree d: pa = (d-1)(d-2)/2
+/// Arithmetic genus of plane curve degree d: pa = (d-1)(d-2)/2
 fn builtin_genus_curve_arith(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = i1(args);
     Ok(PerlValue::integer((d - 1) * (d - 2) / 2))
 }
 
-// Geometric genus = arithmetic - δ (count of singularity contributions)
+/// Geometric genus = arithmetic - δ (count of singularity contributions)
 fn builtin_genus_curve_geo(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let pa = i1(args);
     let delta = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer((pa - delta).max(0)))
 }
 
-// Hodge diamond entry h^{p,q} for projective space (PⁿC): δ_{p,q} for p,q ≤ n
+/// Hodge diamond entry h^{p,q} for projective space (PⁿC): δ_{p,q} for p,q ≤ n
 fn builtin_hodge_diamond_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = i1(args);
     let q = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -63,20 +63,20 @@ fn builtin_hodge_diamond_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if p == q && p <= n && p >= 0 { 1 } else { 0 }))
 }
 
-// Poincaré duality test: bₖ(M) == bₙ₋ₖ(M) for closed oriented n-manifold
+/// Poincaré duality test: bₖ(M) == bₙ₋ₖ(M) for closed oriented n-manifold
 fn builtin_poincare_duality(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let bk = f1(args);
     let bnk = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::integer(if (bk - bnk).abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// π₁(lens space L(p,q)) ≅ Z/p — return order
+/// π₁(lens space L(p,q)) ≅ Z/p — return order
 fn builtin_fundamental_group_zn(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = i1(args);
     Ok(PerlValue::integer(p.abs().max(1)))
 }
 
-// Rank of the kth homology group from boundary map ranks
+/// Rank of the kth homology group from boundary map ranks
 fn builtin_homology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dim_ck = f1(args);
     let rank_dk = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -84,12 +84,12 @@ fn builtin_homology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((dim_ck - rank_dk - rank_dk1).max(0.0)))
 }
 
-// Cohomology rank — same as homology over field by universal coefficient
+/// Cohomology rank — same as homology over field by universal coefficient
 fn builtin_cohomology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_homology_rank(args)
 }
 
-// πₖ(Sⁿ): canonical small cases (only the obvious ones)
+/// πₖ(Sⁿ): canonical small cases (only the obvious ones)
 fn builtin_homotopy_group_sphere_pi(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = i1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -99,32 +99,32 @@ fn builtin_homotopy_group_sphere_pi(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::integer(-1))
 }
 
-// Mapping class group of torus is SL(2, ℤ); return its dimension as group (∞ → -1 sentinel)
+/// Mapping class group of torus is SL(2, ℤ); return its dimension as group (∞ → -1 sentinel)
 fn builtin_mapping_class_torus(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     Ok(PerlValue::integer(if n == 2 { -1 } else { 1 }))
 }
 
-// Linking number of two disjoint oriented loops (signed crossings / 2)
+/// Linking number of two disjoint oriented loops (signed crossings / 2)
 fn builtin_linking_number_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let signed_crossings = f1(args);
     Ok(PerlValue::float(signed_crossings / 2.0))
 }
 
-// Writhe of a polygonal knot (sum of signed crossings)
+/// Writhe of a polygonal knot (sum of signed crossings)
 fn builtin_writhe_polygon(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let s: f64 = v.iter().map(|x| x.to_number()).sum();
     Ok(PerlValue::float(s))
 }
 
-// Torsion coefficient T(n) = order of torsion part for Z/n
+/// Torsion coefficient T(n) = order of torsion part for Z/n
 fn builtin_torsion_coefficient(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     Ok(PerlValue::integer(n.abs()))
 }
 
-// Volume of standard n-simplex of side 1: √(n+1) / (n! 2^(n/2))
+/// Volume of standard n-simplex of side 1: √(n+1) / (n! 2^(n/2))
 fn builtin_simplex_volume_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args).max(0) as f64;
     let mut fact = 1.0;
@@ -132,22 +132,22 @@ fn builtin_simplex_volume_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(((n + 1.0).sqrt()) / (fact * 2f64.powf(n / 2.0))))
 }
 
-// Simplicial volume bound (Gromov norm proxy ‖M‖ for surfaces)
+/// Simplicial volume bound (Gromov norm proxy ‖M‖ for surfaces)
 fn builtin_simplicial_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g = f1(args);
     Ok(PerlValue::float(((4.0 * g - 4.0).max(0.0)) * 1.0))
 }
 
-// Number of simplices in a nerve complex with k cover sets, all intersecting
+/// Number of simplices in a nerve complex with k cover sets, all intersecting
 fn builtin_nerve_complex_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = i1(args);
     if k <= 0 { return Ok(PerlValue::integer(0)); }
     Ok(PerlValue::integer((1_i64 << k.min(62)) - 1))
 }
 
-// Čech 0th cohomology Ȟ⁰(U; F) = ker δ⁰: count of connected components from cover
-// adjacency. Args: array of overlap-set sizes per cover element. Components =
-// covers - max-spanning-overlaps (forest count).
+/// Čech 0th cohomology Ȟ⁰(U; F) = ker δ⁰: count of connected components from cover
+/// adjacency. Args: array of overlap-set sizes per cover element. Components =
+/// covers - max-spanning-overlaps (forest count).
 fn builtin_cech_zero_cohomology(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let overlaps = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let n = overlaps.len() as i64;
@@ -156,7 +156,7 @@ fn builtin_cech_zero_cohomology(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer((n - edges).max(1)))
 }
 
-// de Rham H⁰(M; ℝ) = ℝ^{components(M)}. Compute components from adjacency-pair list.
+/// de Rham H⁰(M; ℝ) = ℝ^{components(M)}. Compute components from adjacency-pair list.
 fn builtin_de_rham_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let pairs = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(pairs.len() as i64 + 1);
@@ -177,7 +177,7 @@ fn builtin_de_rham_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(roots.len() as f64))
 }
 
-// Poincaré polynomial Σ bₖ tᵏ evaluated at t
+/// Poincaré polynomial Σ bₖ tᵏ evaluated at t
 fn builtin_poincare_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -185,28 +185,28 @@ fn builtin_poincare_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(s))
 }
 
-// Helme-Guizon-Rong chromatic homology Hⁱ,ⱼ(G) of a graph G categorifies the
-// chromatic polynomial: Σ (−1)ⁱ qʲ rank Hⁱ,ⱼ = chromatic_polynomial(G; q) (the
-// graded Euler characteristic). Total rank is bounded below by the sum of
-// |coefficients| of the chromatic polynomial. Args: array of chromatic-poly
-// coefficients [c₀, c₁, ..., c_n].
+/// Helme-Guizon-Rong chromatic homology Hⁱ,ⱼ(G) of a graph G categorifies the
+/// chromatic polynomial: Σ (−1)ⁱ qʲ rank Hⁱ,ⱼ = chromatic_polynomial(G; q) (the
+/// graded Euler characteristic). Total rank is bounded below by the sum of
+/// |coefficients| of the chromatic polynomial. Args: array of chromatic-poly
+/// coefficients [c₀, c₁, ..., c_n].
 fn builtin_chromatic_homology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let coefs = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let s: i64 = coefs.iter().map(|x| (x.to_number().abs()) as i64).sum();
     Ok(PerlValue::integer(s))
 }
 
-// Khovanov q-grading shift on a state with n+ positive and n- negative crossings
+/// Khovanov q-grading shift on a state with n+ positive and n- negative crossings
 fn builtin_khovanov_q_grading(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_plus = i1(args);
     let n_minus = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(n_plus - 2 * n_minus))
 }
 
-// Hochschild cohomology HH⁰(A) = Z(A): center of an algebra given its multiplication
-// table on a basis. Args: flat n×n structure constants matrix; returns dim of Z(A) =
-// dim ker[a, ·] for the universal element computed as nullity of [eᵢ, eⱼ] commutator
-// table. Approximation: count basis elements that commute with every other basis vector.
+/// Hochschild cohomology HH⁰(A) = Z(A): center of an algebra given its multiplication
+/// table on a basis. Args: flat n×n structure constants matrix; returns dim of Z(A) =
+/// dim ker[a, ·] for the universal element computed as nullity of [eᵢ, eⱼ] commutator
+/// table. Approximation: count basis elements that commute with every other basis vector.
 fn builtin_hochschild_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let n = (v.len() as f64).sqrt() as usize;
@@ -223,11 +223,11 @@ fn builtin_hochschild_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(central.max(1) as f64))
 }
 
-// Connes' SBI long exact sequence:
-//   ... → HC_{n-2} →ᴮ HH_n → HC_n →ˢ HC_{n-2} → HH_{n-1} → ...
-// For dimensions over a field this gives  dim HC_n = dim HH_n + dim HC_{n-2}
-// − dim ker(S: HC_n → HC_{n-2}) − dim coker(B: HC_{n-2} → HH_n). Args:
-// dim HH_n, dim HC_{n-2}, rank S, rank B.
+/// Connes' SBI long exact sequence:
+///   ... → HC_{n-2} →ᴮ HH_n → HC_n →ˢ HC_{n-2} → HH_{n-1} → ...
+/// For dimensions over a field this gives  dim HC_n = dim HH_n + dim HC_{n-2}
+/// − dim ker(S: HC_n → HC_{n-2}) − dim coker(B: HC_{n-2} → HH_n). Args:
+/// dim HH_n, dim HC_{n-2}, rank S, rank B.
 fn builtin_cyclic_homology_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let hh_n = f1(args);
     let hc_nm2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -236,9 +236,9 @@ fn builtin_cyclic_homology_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((hh_n + hc_nm2 - rank_s - rank_b).max(0.0)))
 }
 
-// Group cohomology dim Hⁿ(G; M): for cyclic group Z/m on trivial module M = Z,
-// H⁰ = M, Hⁿ = ker(N)/im(σ-1) for odd n, and coker for even n > 0.
-// Returns rank of cohomology in degree n given group order m.
+/// Group cohomology dim Hⁿ(G; M): for cyclic group Z/m on trivial module M = Z,
+/// H⁰ = M, Hⁿ = ker(N)/im(σ-1) for odd n, and coker for even n > 0.
+/// Returns rank of cohomology in degree n given group order m.
 fn builtin_group_cohomology_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = i1(args).max(1);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -247,8 +247,8 @@ fn builtin_group_cohomology_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if n % 2 == 0 { Ok(PerlValue::float(1.0)) } else { Ok(PerlValue::float(0.0)) }
 }
 
-// Group homology dim Hₙ(G; ℤ): for finite cyclic group Z/m, Hₙ = ℤ/m for odd n,
-// and 0 for even n > 0; H₀ = ℤ. Return rank/order indicator.
+/// Group homology dim Hₙ(G; ℤ): for finite cyclic group Z/m, Hₙ = ℤ/m for odd n,
+/// and 0 for even n > 0; H₀ = ℤ. Return rank/order indicator.
 fn builtin_group_homology_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = i1(args).max(1);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -257,7 +257,7 @@ fn builtin_group_homology_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if n % 2 == 1 { Ok(PerlValue::float(m as f64)) } else { Ok(PerlValue::float(0.0)) }
 }
 
-// Abelianization quotient G/[G,G] for finite group of order n with commutator subgroup of order m
+/// Abelianization quotient G/[G,G] for finite group of order n with commutator subgroup of order m
 fn builtin_abelianization_quotient(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -265,103 +265,103 @@ fn builtin_abelianization_quotient(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::integer(n / m))
 }
 
-// Lower bound on free group rank from generators - relations
+/// Lower bound on free group rank from generators - relations
 fn builtin_free_group_rank_lower(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let gens = i1(args);
     let rels = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer((gens - rels).max(0)))
 }
 
-// Lower bound on nilpotency class — log₂ of group order minimum
+/// Lower bound on nilpotency class — log₂ of group order minimum
 fn builtin_nilpotency_class_lower(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     if n <= 1.0 { return Ok(PerlValue::integer(0)); }
     Ok(PerlValue::integer(n.log2().ceil() as i64))
 }
 
-// Upper bound on solvable length log₂(log₂ n) + 1
+/// Upper bound on solvable length log₂(log₂ n) + 1
 fn builtin_solvable_length_upper(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     if n <= 2.0 { return Ok(PerlValue::integer(1)); }
     Ok(PerlValue::integer(n.log2().log2().ceil() as i64 + 1))
 }
 
-// Schreier index theorem: rank of subgroup H of free group F_n of index k = k(n-1) + 1
+/// Schreier index theorem: rank of subgroup H of free group F_n of index k = k(n-1) + 1
 fn builtin_schreier_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     Ok(PerlValue::integer(k * (n - 1) + 1))
 }
 
-// Todd genus evaluated at first Chern class (linear order: c1/2)
+/// Todd genus evaluated at first Chern class (linear order: c1/2)
 fn builtin_todd_genus_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c1 = f1(args);
     Ok(PerlValue::float(c1 / 2.0))
 }
 
-// Hirzebruch signature for 4k-manifold: ⟨L_k, [M]⟩ ≈ p₁/3 in dim 4
+/// Hirzebruch signature for 4k-manifold: ⟨L_k, [M]⟩ ≈ p₁/3 in dim 4
 fn builtin_hirzebruch_signature(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p1 = f1(args);
     Ok(PerlValue::float(p1 / 3.0))
 }
 
-// Chern-Simons action level k SU(2) on S³: k/(4π²)·∫ tr(A∧dA + 2A³/3)
+/// Chern-Simons action level k SU(2) on S³: k/(4π²)·∫ tr(A∧dA + 2A³/3)
 fn builtin_chern_simons_action(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = f1(args);
     let int_val = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(k * int_val / (4.0 * std::f64::consts::PI * std::f64::consts::PI)))
 }
 
-// Gauss-Bonnet ∫ K dA = 2π χ(M)
+/// Gauss-Bonnet ∫ K dA = 2π χ(M)
 fn builtin_gauss_bonnet_total(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let chi = f1(args);
     Ok(PerlValue::float(2.0 * std::f64::consts::PI * chi))
 }
 
-// Lower bound on Seifert genus from Alexander polynomial degree / 2
+/// Lower bound on Seifert genus from Alexander polynomial degree / 2
 fn builtin_seifert_genus_lower(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let deg_alex = i1(args);
     Ok(PerlValue::integer((deg_alex / 2).max(0)))
 }
 
-// Alexander polynomial evaluated at t = 1 (always returns ±1 for knots)
+/// Alexander polynomial evaluated at t = 1 (always returns ±1 for knots)
 fn builtin_alexander_polynomial_at_one(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if (i1(args) % 2).abs() == 0 { 1 } else { -1 }))
 }
 
-// Jones polynomial at q = -1 gives (-1)^c · Δ(-1)
+/// Jones polynomial at q = -1 gives (-1)^c · Δ(-1)
 fn builtin_jones_polynomial_at_minus_one(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let determinant = i1(args);
     Ok(PerlValue::integer(determinant.abs()))
 }
 
-// Jones polynomial at q = i gives ±(√2)^(c-1)
+/// Jones polynomial at q = i gives ±(√2)^(c-1)
 fn builtin_jones_polynomial_at_i(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c = i1(args);
     Ok(PerlValue::float(2f64.sqrt().powi((c - 1) as i32)))
 }
 
-// HOMFLY polynomial evaluation at (l, m)
+/// HOMFLY polynomial evaluation at (l, m)
 fn builtin_homfly_evaluation(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(l * l - m * m + 1.0))
 }
 
-// Kauffman bracket evaluation
+/// Kauffman bracket evaluation
 fn builtin_kauffman_bracket_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     Ok(PerlValue::float(-(a * a) - 1.0 / (a * a)))
 }
 
-// Cabling pair signature: (p, q) torus knot signature ≈ -(p-1)(q-1)
+/// Cabling pair signature: (p, q) torus knot signature ≈ -(p-1)(q-1)
 fn builtin_cabling_pair_signature(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = i1(args);
     let q = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     Ok(PerlValue::integer(-(p - 1) * (q - 1)))
 }
 
-// Determinant of a Seifert form 2x2 matrix [[a,b],[c,d]] returns ad - bc
+/// Determinant of a Seifert form 2x2 matrix [[a,b],[c,d]] returns ad - bc
 fn builtin_seifert_form_2x2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -370,19 +370,19 @@ fn builtin_seifert_form_2x2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a * d - b * c))
 }
 
-// Turaev's reformulation of Alexander polynomial — one step (∇(z) = -∇(z) under crossing change)
+/// Turaev's reformulation of Alexander polynomial — one step (∇(z) = -∇(z) under crossing change)
 fn builtin_turaev_alexander_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = f1(args);
     Ok(PerlValue::float(z * z - 1.0))
 }
 
-// V polynomial (Jones-style) evaluated at q
+/// V polynomial (Jones-style) evaluated at q
 fn builtin_v_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
     Ok(PerlValue::float(-q.powi(2) - q.powi(-2)))
 }
 
-// Skein relation step for Jones polynomial: q V₊ - q⁻¹ V₋ = (q^(1/2) - q^(-1/2)) V₀
+/// Skein relation step for Jones polynomial: q V₊ - q⁻¹ V₋ = (q^(1/2) - q^(-1/2)) V₀
 fn builtin_polynomial_jones_skein(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
     let v_plus = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -392,24 +392,24 @@ fn builtin_polynomial_jones_skein(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((q * v_plus - v_minus / q) / denom))
 }
 
-// Number of cells in a Δ-complex with given f-vector
+/// Number of cells in a Δ-complex with given f-vector
 fn builtin_delta_complex_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(v.iter().map(|x| x.to_number()).sum()))
 }
 
-// Zeta function of a 2-element poset evaluated at s
+/// Zeta function of a 2-element poset evaluated at s
 fn builtin_poset_zeta_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = f1(args);
     Ok(PerlValue::float(1.0 + s))
 }
 
-// Möbius function of a 2-element poset
-fn builtin_mobius_poset_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
+/// Möbius function of a 2-element poset
+fn builtin_mobius_poset_two(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(-1))
 }
 
-// Möbius function for pair (a, b) in divisibility poset
+/// Möbius function for pair (a, b) in divisibility poset
 fn builtin_mobius_function_pair(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -431,34 +431,34 @@ fn builtin_mobius_function_pair(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(sign))
 }
 
-// Möbius inversion step f(n) = Σ_{d|n} μ(n/d) g(d)
+/// Möbius inversion step f(n) = Σ_{d|n} μ(n/d) g(d)
 fn builtin_mobius_inversion_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mu_val = f1(args);
     let g_val = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(mu_val * g_val))
 }
 
-// Dimension of incidence algebra of an n-element chain = n(n+1)/2
+/// Dimension of incidence algebra of an n-element chain = n(n+1)/2
 fn builtin_incidence_algebra_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     Ok(PerlValue::integer(n * (n + 1) / 2))
 }
 
-// Number of paths of length k in a quiver with adjacency matrix sum a (scalar approx)
+/// Number of paths of length k in a quiver with adjacency matrix sum a (scalar approx)
 fn builtin_quiver_path_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(a.powf(k)))
 }
 
-// Representation dimension step: dim V ⊗ W = dim V · dim W
+/// Representation dimension step: dim V ⊗ W = dim V · dim W
 fn builtin_representation_dim_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = f1(args);
     let w = args.get(1).map(|x| x.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(v * w))
 }
 
-// Order of Weyl group of Aₙ = (n+1)!
+/// Order of Weyl group of Aₙ = (n+1)!
 fn builtin_weyl_group_order(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let mut p = 1_i64;
@@ -466,18 +466,18 @@ fn builtin_weyl_group_order(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(p))
 }
 
-// Number of roots in root system Aₙ = n(n+1)
+/// Number of roots in root system Aₙ = n(n+1)
 fn builtin_root_system_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     Ok(PerlValue::integer(n * (n + 1)))
 }
 
-// Determinant of Cartan matrix A₂ = 3
+/// Determinant of Cartan matrix A₂ = 3
 fn builtin_cartan_determinant_a2(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(3))
 }
 
-// Cartan matrix B₂ entry (i, j)
+/// Cartan matrix B₂ entry (i, j)
 fn builtin_cartan_matrix_b2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -488,26 +488,26 @@ fn builtin_cartan_matrix_b2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(0))
 }
 
-// Killing form on su(2): B(X, Y) = 4 tr(XY) — return scalar 4xy
+/// Killing form on su(2): B(X, Y) = 4 tr(XY) — return scalar 4xy
 fn builtin_killing_form_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(4.0 * x * y))
 }
 
-// Casimir eigenvalue for su(2) spin-j representation: j(j+1)
+/// Casimir eigenvalue for su(2) spin-j representation: j(j+1)
 fn builtin_casimir_eigenvalue_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let j = f1(args);
     Ok(PerlValue::float(j * (j + 1.0)))
 }
 
-// Universal enveloping algebra dimension in degree ≤ k for sl₂: (k+1)(k+2)(k+3)/6
+/// Universal enveloping algebra dimension in degree ≤ k for sl₂: (k+1)(k+2)(k+3)/6
 fn builtin_universal_enveloping_dim(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = i1(args);
     Ok(PerlValue::integer((k + 1) * (k + 2) * (k + 3) / 6))
 }
 
-// Verma module character step ch L_λ at q
+/// Verma module character step ch L_λ at q
 fn builtin_verma_character_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lam = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -515,14 +515,14 @@ fn builtin_verma_character_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(q.powf(lam) / (1.0 - q)))
 }
 
-// Plethystic substitution f[g] evaluated as f(g(x))
+/// Plethystic substitution f[g] evaluated as f(g(x))
 fn builtin_plethystic_substitution_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f_val = f1(args);
     let g_val = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(f_val * g_val))
 }
 
-// Schur polynomial s_λ at single variable x: x^|λ|
+/// Schur polynomial s_λ at single variable x: x^|λ|
 fn builtin_schur_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lam = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -530,7 +530,7 @@ fn builtin_schur_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x.powf(size)))
 }
 
-// Hall inner product on symmetric functions ⟨pₙ, pₙ⟩ = n
+/// Hall inner product on symmetric functions ⟨pₙ, pₙ⟩ = n
 fn builtin_hall_inner_product_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(n);
@@ -538,16 +538,16 @@ fn builtin_hall_inner_product_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(0))
 }
 
-// Size of plactic class containing word of length n with k distinct letters
+/// Size of plactic class containing word of length n with k distinct letters
 fn builtin_plactic_class_size(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
     Ok(PerlValue::integer(k.pow(n.min(20).max(0) as u32)))
 }
 
-// RSK correspondence is a bijection S_n ↔ {(P, Q) standard Young tableaux of
-// the same shape λ ⊢ n}. Hence Σ_{λ ⊢ n} f_λ² = n! (sum-of-squared dimensions
-// identity). Returns n! exactly.
+/// RSK correspondence is a bijection S_n ↔ {(P, Q) standard Young tableaux of
+/// the same shape λ ⊢ n}. Hence Σ_{λ ⊢ n} f_λ² = n! (sum-of-squared dimensions
+/// identity). Returns n! exactly.
 fn builtin_robinson_schensted_pair(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let mut f = 1_i64;
@@ -555,7 +555,7 @@ fn builtin_robinson_schensted_pair(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::integer(f))
 }
 
-// Number of Yamanouchi words of given content
+/// Number of Yamanouchi words of given content
 fn builtin_yamanouchi_word_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let n: i64 = c.iter().map(|v| v.to_number() as i64).sum();
@@ -571,7 +571,7 @@ fn builtin_yamanouchi_word_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(num / denom))
 }
 
-// Size of RSK image for permutations of [n] = n!
+/// Size of RSK image for permutations of [n] = n!
 fn builtin_rsk_size(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let mut f = 1_i64;
@@ -579,7 +579,7 @@ fn builtin_rsk_size(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(f))
 }
 
-// Character of su(2) spin-j on rotation θ: sin((2j+1)θ/2) / sin(θ/2)
+/// Character of su(2) spin-j on rotation θ: sin((2j+1)θ/2) / sin(θ/2)
 fn builtin_character_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let j = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -588,14 +588,14 @@ fn builtin_character_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(((2.0 * j + 1.0) * theta / 2.0).sin() / denom))
 }
 
-// Character of fundamental rep of SU(N) on diagonal element x
+/// Character of fundamental rep of SU(N) on diagonal element x
 fn builtin_character_sun(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let x = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(n as f64 * x))
 }
 
-// Quantum dimension of su(2) spin-j at q: [2j+1]_q = (q^(j+1/2) - q^-(j+1/2))/(q^(1/2) - q^-(1/2))
+/// Quantum dimension of su(2) spin-j at q: [2j+1]_q = (q^(j+1/2) - q^-(j+1/2))/(q^(1/2) - q^-(1/2))
 fn builtin_quantum_dimension_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let j = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);
@@ -605,7 +605,7 @@ fn builtin_quantum_dimension_su2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((q.powf(two_j_plus_1 / 2.0) - q.powf(-two_j_plus_1 / 2.0)) / denom))
 }
 
-// Quantum integer [n]_q = (qⁿ - q⁻ⁿ) / (q - q⁻¹)
+/// Quantum integer [n]_q = (qⁿ - q⁻ⁿ) / (q - q⁻¹)
 fn builtin_quantum_dimension_q(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     let q = args.get(1).map(|v| v.to_number()).unwrap_or(2.0);
@@ -614,7 +614,7 @@ fn builtin_quantum_dimension_q(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((q.powf(n) - q.powf(-n)) / denom))
 }
 
-// One step of fusion rule N^c_{ab} for SU(2)_k: 1 if |a-b| ≤ c ≤ min(a+b, 2k - a - b) and parity ok
+/// One step of fusion rule N^c_{ab} for SU(2)_k: 1 if |a-b| ≤ c ≤ min(a+b, 2k - a - b) and parity ok
 fn builtin_fusion_rule_su2_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -626,7 +626,7 @@ fn builtin_fusion_rule_su2_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if ok { 1 } else { 0 }))
 }
 
-// Modular S-matrix entry S_{a,b} for SU(2)_k
+/// Modular S-matrix entry S_{a,b} for SU(2)_k
 fn builtin_modular_data_s_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -636,17 +636,17 @@ fn builtin_modular_data_s_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(pre * ((a + 1.0) * (b + 1.0) * std::f64::consts::PI / n).sin()))
 }
 
-// Modular T-matrix diagonal entry T_{a,a} = exp(2πi (h_a - c/24))
+/// Modular T-matrix diagonal entry T_{a,a} = exp(2πi (h_a - c/24))
 fn builtin_modular_data_t_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let h = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((2.0 * std::f64::consts::PI * (h - c / 24.0)).cos()))
 }
 
-// Verlinde formula for SU(2)_k WZW conformal blocks on a genus-g surface with
-// no marked points (closed): dim V_g(SU(2)_k) =
-//   ((k+2)/2)^{g-1} · Σ_{j=1}^{k+1} (sin(jπ/(k+2)))^{2−2g}.
-// Args: genus g, level k.
+/// Verlinde formula for SU(2)_k WZW conformal blocks on a genus-g surface with
+/// no marked points (closed): dim V_g(SU(2)_k) =
+///   ((k+2)/2)^{g-1} · Σ_{j=1}^{k+1} (sin(jπ/(k+2)))^{2−2g}.
+/// Args: genus g, level k.
 fn builtin_verlinde_count_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g = i1(args).max(0);
     let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
@@ -661,9 +661,9 @@ fn builtin_verlinde_count_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((n / 2.0).powi((g - 1) as i32) * s))
 }
 
-// Evaluate a quantum knot invariant given as Laurent polynomial in q.
-// Args: array of coefficients [c_min_pow, c_{min+1}, ...], min_pow, q.
-// Computes Σ c_k · q^(min_pow + k).
+/// Evaluate a quantum knot invariant given as Laurent polynomial in q.
+/// Args: array of coefficients [c_min_pow, c_{min+1}, ...], min_pow, q.
+/// Computes Σ c_k · q^(min_pow + k).
 fn builtin_quantum_invariant_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let coefs = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let min_pow = args.get(1).map(|v| v.to_number() as i32).unwrap_or(0);
@@ -674,36 +674,36 @@ fn builtin_quantum_invariant_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(s))
 }
 
-// Number of basic operations in a binary operad with 2 generators = 2^n
+/// Number of basic operations in a binary operad with 2 generators = 2^n
 fn builtin_operad_count_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args).max(0) as u32;
     Ok(PerlValue::integer(1_i64 << n.min(62)))
 }
 
-// Dimension of moduli space of genus-g curves with n marked points: 3g - 3 + n
+/// Dimension of moduli space of genus-g curves with n marked points: 3g - 3 + n
 fn builtin_moduli_dimension_curves(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g = i1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(3 * g - 3 + n))
 }
 
-// Hodge polynomial Σ h^{p,q} u^p v^q evaluated at (u, v) = (1, 1) returns Σ h^{p,q}
+/// Hodge polynomial Σ h^{p,q} u^p v^q evaluated at (u, v) = (1, 1) returns Σ h^{p,q}
 fn builtin_hodge_polynomial_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(v.iter().map(|x| x.to_number()).sum()))
 }
 
-// Mirror symmetry check: h^{p,q}(M) == h^{n-p,q}(M̃)
+/// Mirror symmetry check: h^{p,q}(M) == h^{n-p,q}(M̃)
 fn builtin_mirror_symmetry_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let h = f1(args);
     let h_mirror = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::integer(if (h - h_mirror).abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// Genus-0 Gromov-Witten invariant N_d of ℙ²: number of rational degree-d curves
-// through 3d-1 generic points. Kontsevich recursion:
-//   N_d = Σ_{d₁+d₂=d, d₁,d₂≥1} N_{d₁}·N_{d₂}·d₁²·d₂·[d₂·C(3d-4, 3d₁-2) - d₁·C(3d-4, 3d₁-1)]
-// Initial values: N_1 = 1 (the line through 2 points). Args: degree d.
+/// Genus-0 Gromov-Witten invariant N_d of ℙ²: number of rational degree-d curves
+/// through 3d-1 generic points. Kontsevich recursion:
+///   N_d = Σ_{d₁+d₂=d, d₁,d₂≥1} N_{d₁}·N_{d₂}·d₁²·d₂·[d₂·C(3d-4, 3d₁-2) - d₁·C(3d-4, 3d₁-1)]
+/// Initial values: N_1 = 1 (the line through 2 points). Args: degree d.
 fn builtin_gromov_witten_invariant(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = i1(args).max(1) as usize;
     let mut n: Vec<f64> = vec![0.0; d + 1];
@@ -732,10 +732,10 @@ fn builtin_gromov_witten_invariant(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(n[d]))
 }
 
-// Donaldson series for a 4-manifold X of simple type (Witten conjecture):
-//   D_X(α) = exp(Q(α)/2) · Σ_s SW(s) · exp(⟨s, α⟩)
-// Args: Q(α,α) intersection form value, then pairs of (basic class pairing ⟨s, α⟩,
-// SW value at s). Returns scalar D_X(α).
+/// Donaldson series for a 4-manifold X of simple type (Witten conjecture):
+///   D_X(α) = exp(Q(α)/2) · Σ_s SW(s) · exp(⟨s, α⟩)
+/// Args: Q(α,α) intersection form value, then pairs of (basic class pairing ⟨s, α⟩,
+/// SW value at s). Returns scalar D_X(α).
 fn builtin_donaldson_invariant(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
     let pairings = arg_to_vec(args.get(1).unwrap_or(&PerlValue::array(vec![])));
@@ -746,11 +746,11 @@ fn builtin_donaldson_invariant(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(prefactor * sum))
 }
 
-// Seiberg-Witten invariant SW(s) for Kähler surface X of general type. For
-// canonical class K_X with c₁²(K) > 0: SW(±K) = ±1, all other spin-c are 0.
-// For elliptic surface E(n) (n ≥ 2): SW(s) = ±C(n-2, k) · Δ_E(t)|_{t=ξ} pattern.
-// Args: c1_squared, k_dot_c1 (pairing with canonical class), surface_type
-// (0=Kähler general type, 1=elliptic E(n), 2=other).
+/// Seiberg-Witten invariant SW(s) for Kähler surface X of general type. For
+/// canonical class K_X with c₁²(K) > 0: SW(±K) = ±1, all other spin-c are 0.
+/// For elliptic surface E(n) (n ≥ 2): SW(s) = ±C(n-2, k) · Δ_E(t)|_{t=ξ} pattern.
+/// Args: c1_squared, k_dot_c1 (pairing with canonical class), surface_type
+/// (0=Kähler general type, 1=elliptic E(n), 2=other).
 fn builtin_seiberg_witten_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c1_sq = f1(args);
     let k_pair = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -772,12 +772,12 @@ fn builtin_seiberg_witten_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
-// Heegaard Floer hat-rank ĤF(Y) for closed 3-manifolds:
-//   ĤF(S³) = ℤ (rank 1).
-//   ĤF(L(p, q)) = ℤ^p (rank p, lens space).
-//   ĤF(Σ_g × S¹) = (genus-related polynomial, rank = Σ C(2g, k)² ≈ 2^{2g}).
-//   ĤF(#ⁿ S¹×S²) = (Λ*H¹) ⊗ ℤ — rank 2^n.
-// Args: manifold_type (0=S³, 1=lens L(p,q), 2=Σ_g×S¹, 3=#ⁿS¹×S²), parameter.
+/// Heegaard Floer hat-rank ĤF(Y) for closed 3-manifolds:
+///   ĤF(S³) = ℤ (rank 1).
+///   ĤF(L(p, q)) = ℤ^p (rank p, lens space).
+///   ĤF(Σ_g × S¹) = (genus-related polynomial, rank = Σ C(2g, k)² ≈ 2^{2g}).
+///   ĤF(#ⁿ S¹×S²) = (Λ*H¹) ⊗ ℤ — rank 2^n.
+/// Args: manifold_type (0=S³, 1=lens L(p,q), 2=Σ_g×S¹, 3=#ⁿS¹×S²), parameter.
 fn builtin_floer_homology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mtype = i1(args);
     let p = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
@@ -799,9 +799,9 @@ fn builtin_floer_homology_rank(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
-// Rasmussen s-invariant. For positive braid closure (incl. T(p, q) torus knots):
-//   s(K) = -σ(K) (Rasmussen 2010 for positive knots; for T(p,q): s = (p-1)(q-1)).
-// Args: knot_type (0=positive braid use σ, 1=torus T(p,q)), σ (or p), q (if torus).
+/// Rasmussen s-invariant. For positive braid closure (incl. T(p, q) torus knots):
+///   s(K) = -σ(K) (Rasmussen 2010 for positive knots; for T(p,q): s = (p-1)(q-1)).
+/// Args: knot_type (0=positive braid use σ, 1=torus T(p,q)), σ (or p), q (if torus).
 fn builtin_khovanov_rasmussen_s(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let kind = i1(args);
     if kind == 1 {
@@ -813,9 +813,9 @@ fn builtin_khovanov_rasmussen_s(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-sigma))
 }
 
-// Ozsváth-Szabó τ invariant. For torus knot T(p, q): τ(T(p,q)) = (p-1)(q-1)/2.
-// For knots with τ = g₄(K) (e.g. positive knots), τ realizes the slice genus.
-// Args: knot_type (0=generic, 1=torus T(p,q)), and either g₄ or (p, q).
+/// Ozsváth-Szabó τ invariant. For torus knot T(p, q): τ(T(p,q)) = (p-1)(q-1)/2.
+/// For knots with τ = g₄(K) (e.g. positive knots), τ realizes the slice genus.
+/// Args: knot_type (0=generic, 1=torus T(p,q)), and either g₄ or (p, q).
 fn builtin_ozsvath_szabo_tau(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let kind = i1(args);
     if kind == 1 {
@@ -827,16 +827,16 @@ fn builtin_ozsvath_szabo_tau(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(g4))
 }
 
-// Heegaard genus lower bound: g(M) ≥ rank(H₁(M)) (Heegaard splittings descend to π₁).
+/// Heegaard genus lower bound: g(M) ≥ rank(H₁(M)) (Heegaard splittings descend to π₁).
 fn builtin_heegaard_genus_lower(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rank_h1 = i1(args).max(0);
     Ok(PerlValue::integer(rank_h1))
 }
 
-// Fintushel-Stern knot-surgery formula: SW(X_K) = SW(X) · Δ_K(t²)|_{t = exp(2t·c)}
-// expanded as Laurent polynomial in t. Compute Δ_K(t²) at parameter q from
-// symmetric Alexander polynomial coefficients [a_n, ..., a_1, a_0, a_1, ..., a_n].
-// Args: SW(X), array of Alexander coefficients (lower triangle), evaluation parameter q.
+/// Fintushel-Stern knot-surgery formula: SW(X_K) = SW(X) · Δ_K(t²)|_{t = exp(2t·c)}
+/// expanded as Laurent polynomial in t. Compute Δ_K(t²) at parameter q from
+/// symmetric Alexander polynomial coefficients [a_n, ..., a_1, a_0, a_1, ..., a_n].
+/// Args: SW(X), array of Alexander coefficients (lower triangle), evaluation parameter q.
 fn builtin_fintushel_stern_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sw_x = f1(args);
     let coefs = arg_to_vec(args.get(1).unwrap_or(&PerlValue::array(vec![])));
@@ -850,11 +850,11 @@ fn builtin_fintushel_stern_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(sw_x * alex))
 }
 
-// Bauer-Furuta degree refinement: for 4-manifold X with b₁ = 0 and b₂⁺ = 1,
-// BF map gives a stable cohomotopy class refining SW. The refined "Bauer-Furuta
-// invariant" reduces to SW × ε where ε is a sign from the Furuta inequality
-// 10/8: b₂(X) ≥ (10/8)|σ(X)| + 2 (when X is spin closed, σ ≡ 0 mod 16). Args:
-// b₂(X), σ(X), spin (1 if spin else 0).
+/// Bauer-Furuta degree refinement: for 4-manifold X with b₁ = 0 and b₂⁺ = 1,
+/// BF map gives a stable cohomotopy class refining SW. The refined "Bauer-Furuta
+/// invariant" reduces to SW × ε where ε is a sign from the Furuta inequality
+/// 10/8: b₂(X) ≥ (10/8)|σ(X)| + 2 (when X is spin closed, σ ≡ 0 mod 16). Args:
+/// b₂(X), σ(X), spin (1 if spin else 0).
 fn builtin_bauer_furuta_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b2 = f1(args);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -867,7 +867,7 @@ fn builtin_bauer_furuta_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(sigma / 16.0))
 }
 
-// Geometric intersection number i(α, β) for curves on a surface
+/// Geometric intersection number i(α, β) for curves on a surface
 fn builtin_geometric_intersection_number(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let b = arg_to_vec(args.get(1).unwrap_or(&PerlValue::array(vec![])));
@@ -875,7 +875,7 @@ fn builtin_geometric_intersection_number(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::float(s))
 }
 
-// Algebraic intersection number ⟨α, β⟩ (signed)
+/// Algebraic intersection number ⟨α, β⟩ (signed)
 fn builtin_algebraic_intersection_number(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     let b = arg_to_vec(args.get(1).unwrap_or(&PerlValue::array(vec![])));

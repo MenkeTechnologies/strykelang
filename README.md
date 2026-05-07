@@ -81,7 +81,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **5,649 standard library functions** (6,182 callable spellings including aliases)
+- **8,084 standard library functions** (8,617 callable spellings including aliases)
 
 ---
 
@@ -191,7 +191,7 @@ GolfScript, Pyth, 05AB1E, Jelly — these are shorter but are write-only puzzles
 | `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
 | Typed structs/enums/classes | **yes** | no | native | native | no | no | native |
 | JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
-| Single binary | **31MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
+| Single binary | **33MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
 
 ---
 

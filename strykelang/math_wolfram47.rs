@@ -4,7 +4,7 @@ fn b47_to_floats(v: &PerlValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
-// Perspective projection x: x' = x / (w · tan(fov/2) · aspect)
+/// Perspective projection x: x' = x / (w · tan(fov/2) · aspect)
 fn builtin_gfx_perspective_proj_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -15,7 +15,7 @@ fn builtin_gfx_perspective_proj_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x / denom))
 }
 
-// Perspective projection y
+/// Perspective projection y
 fn builtin_gfx_perspective_proj_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let y = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -25,7 +25,7 @@ fn builtin_gfx_perspective_proj_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(y / denom))
 }
 
-// Orthographic projection (linear scaling)
+/// Orthographic projection (linear scaling)
 fn builtin_gfx_orthographic_proj(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let lo = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
@@ -34,14 +34,14 @@ fn builtin_gfx_orthographic_proj(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(2.0 * (x - lo) / (hi - lo) - 1.0))
 }
 
-// View matrix step (single component of M = R^T · T)
+/// View matrix step (single component of M = R^T · T)
 fn builtin_gfx_view_matrix_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(r * t))
 }
 
-// LookAt forward = normalize(target - eye)_x
+/// LookAt forward = normalize(target - eye)_x
 fn builtin_gfx_lookat_forward(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dx = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -49,17 +49,17 @@ fn builtin_gfx_lookat_forward(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(dx / n))
 }
 
-// LookAt right = normalize(forward × up)
+/// LookAt right = normalize(forward × up)
 fn builtin_gfx_lookat_right(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f = f1(args);
     let u = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(f * u))
 }
 
-// LookAt up vector via cross product: up_corrected = right × forward (NOT
-// world-up, since the canonical right-handed view-matrix orthonormalizes).
-// Returns the requested component of (right × forward). Args: comp (0=x, 1=y,
-// 2=z), right_x, right_y, right_z, fwd_x, fwd_y, fwd_z.
+/// LookAt up vector via cross product: up_corrected = right × forward (NOT
+/// world-up, since the canonical right-handed view-matrix orthonormalizes).
+/// Returns the requested component of (right × forward). Args: comp (0=x, 1=y,
+/// 2=z), right_x, right_y, right_z, fwd_x, fwd_y, fwd_z.
 fn builtin_gfx_lookat_up(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let comp = i1(args);
     let rx = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -76,19 +76,19 @@ fn builtin_gfx_lookat_up(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
-// Quaternion to axis-angle (returns angle from w)
+/// Quaternion to axis-angle (returns angle from w)
 fn builtin_gfx_quat_to_axis_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let w = f1(args);
     Ok(PerlValue::float(2.0 * w.clamp(-1.0, 1.0).acos()))
 }
 
-// Axis-angle to quaternion w = cos(θ/2)
+/// Axis-angle to quaternion w = cos(θ/2)
 fn builtin_gfx_axis_angle_to_quat(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = f1(args);
     Ok(PerlValue::float((theta / 2.0).cos()))
 }
 
-// Quaternion slerp step at t
+/// Quaternion slerp step at t
 fn builtin_gfx_quat_slerp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q0 = f1(args);
     let q1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -100,7 +100,7 @@ fn builtin_gfx_quat_slerp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(((1.0 - t) * omega).sin() / sin_o * q0 + (t * omega).sin() / sin_o * q1))
 }
 
-// Quaternion nlerp (normalized lerp)
+/// Quaternion nlerp (normalized lerp)
 fn builtin_gfx_quat_nlerp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q0 = f1(args);
     let q1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -108,7 +108,7 @@ fn builtin_gfx_quat_nlerp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((1.0 - t) * q0 + t * q1))
 }
 
-// Quaternion dot product
+/// Quaternion dot product
 fn builtin_gfx_quat_dot_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = b47_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     let b = b47_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
@@ -116,12 +116,12 @@ fn builtin_gfx_quat_dot_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((0..n).map(|i| a[i] * b[i]).sum()))
 }
 
-// Quaternion inverse: -q (for unit quaternion conjugate)
+/// Quaternion inverse: -q (for unit quaternion conjugate)
 fn builtin_gfx_quat_inverse_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-f1(args)))
 }
 
-// Quaternion to Euler pitch
+/// Quaternion to Euler pitch
 fn builtin_gfx_quat_to_euler_pitch(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -130,7 +130,7 @@ fn builtin_gfx_quat_to_euler_pitch(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float((2.0 * (qw * qx + qy * qz)).atan2(1.0 - 2.0 * (qx * qx + qy * qy))))
 }
 
-// Quat to Euler yaw
+/// Quat to Euler yaw
 fn builtin_gfx_quat_to_euler_yaw(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -139,7 +139,7 @@ fn builtin_gfx_quat_to_euler_yaw(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((2.0 * (qw * qz + qx * qy)).atan2(1.0 - 2.0 * (qy * qy + qz * qz))))
 }
 
-// Quat to Euler roll
+/// Quat to Euler roll
 fn builtin_gfx_quat_to_euler_roll(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let qw = f1(args);
     let qx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -149,7 +149,7 @@ fn builtin_gfx_quat_to_euler_roll(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(v.asin()))
 }
 
-// Euler to quat x = sin(roll/2)cos(pitch/2)cos(yaw/2) - cos(roll/2)sin(pitch/2)sin(yaw/2)
+/// Euler to quat x = sin(roll/2)cos(pitch/2)cos(yaw/2) - cos(roll/2)sin(pitch/2)sin(yaw/2)
 fn builtin_gfx_euler_to_quat_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let roll = f1(args);
     let pitch = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -182,7 +182,7 @@ fn builtin_gfx_euler_to_quat_w(args: &[PerlValue]) -> PerlResult<PerlValue> {
         + (roll / 2.0).sin() * (pitch / 2.0).sin() * (yaw / 2.0).sin()))
 }
 
-// Rotation matrix XX entry
+/// Rotation matrix XX entry
 fn builtin_gfx_rotation_matrix_xx(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = f1(args);
     Ok(PerlValue::float(theta.cos()))
@@ -198,8 +198,8 @@ fn builtin_gfx_rotation_matrix_zz(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(theta.cos()))
 }
 
-// Translation matrix entry T(i, j): identity except T(i, 3) = t_i for i ∈ {0,1,2}.
-// Args: row, col, t_x, t_y, t_z. Returns the matrix element at (row, col).
+/// Translation matrix entry T(i, j): identity except T(i, 3) = t_i for i ∈ {0,1,2}.
+/// Args: row, col, t_x, t_y, t_z. Returns the matrix element at (row, col).
 fn builtin_gfx_translation_matrix_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -216,7 +216,7 @@ fn builtin_gfx_translation_matrix_step(args: &[PerlValue]) -> PerlResult<PerlVal
     Ok(PerlValue::float(0.0))
 }
 
-// Scale matrix entry S(i, j): diag(s_x, s_y, s_z, 1).
+/// Scale matrix entry S(i, j): diag(s_x, s_y, s_z, 1).
 fn builtin_gfx_scale_matrix_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -229,7 +229,7 @@ fn builtin_gfx_scale_matrix_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(0.0))
 }
 
-// Shear matrix XY entry: identity + shear factor h at (0, 1).
+/// Shear matrix XY entry: identity + shear factor h at (0, 1).
 fn builtin_gfx_shear_matrix_xy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let row = i1(args);
     let col = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -239,7 +239,7 @@ fn builtin_gfx_shear_matrix_xy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(0.0))
 }
 
-// Homogeneous divide: x/w
+/// Homogeneous divide: x/w
 fn builtin_gfx_homogeneous_divide(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -247,14 +247,14 @@ fn builtin_gfx_homogeneous_divide(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x / w))
 }
 
-// NDC to screen X: (x + 1) / 2 · width
+/// NDC to screen X: (x + 1) / 2 · width
 fn builtin_gfx_screen_space_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float((x + 1.0) * 0.5 * w))
 }
 
-// NDC to screen Y: (1 - y) / 2 · height
+/// NDC to screen Y: (1 - y) / 2 · height
 fn builtin_gfx_screen_space_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let y = f1(args);
     let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -269,7 +269,7 @@ fn builtin_gfx_ndc_to_screen_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_screen_space_y(args)
 }
 
-// Screen to NDC X: 2 · x / W - 1
+/// Screen to NDC X: 2 · x / W - 1
 fn builtin_gfx_screen_to_ndc_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let w = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -284,14 +284,14 @@ fn builtin_gfx_screen_to_ndc_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 - 2.0 * y / h))
 }
 
-// Polygon clip step (in vs out vertex)
+/// Polygon clip step (in vs out vertex)
 fn builtin_gfx_clip_polygon_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v_in = i1(args);
     let v_out = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(v_in - v_out))
 }
 
-// Sutherland-Hodgman intersect parameter t
+/// Sutherland-Hodgman intersect parameter t
 fn builtin_gfx_sutherland_hodgman(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dot1 = f1(args);
     let dot2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -300,7 +300,7 @@ fn builtin_gfx_sutherland_hodgman(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(dot1 / denom))
 }
 
-// Cohen-Sutherland code: 4-bit outcode for a point
+/// Cohen-Sutherland code: 4-bit outcode for a point
 fn builtin_gfx_cohen_sutherland_code(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -314,7 +314,7 @@ fn builtin_gfx_cohen_sutherland_code(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::integer(code))
 }
 
-// Liang-Barsky t-value
+/// Liang-Barsky t-value
 fn builtin_gfx_liang_barsky_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -322,27 +322,27 @@ fn builtin_gfx_liang_barsky_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(q / p))
 }
 
-// Bresenham step X (slope < 1)
+/// Bresenham step X (slope < 1)
 fn builtin_gfx_bresenham_step_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let err = f1(args);
     let dx = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(err - dx))
 }
 
-// Bresenham step Y
+/// Bresenham step Y
 fn builtin_gfx_bresenham_step_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let err = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(err + dy))
 }
 
-// Xiaolin Wu intensity
+/// Xiaolin Wu intensity
 fn builtin_gfx_xiaolin_wu_intensity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let frac = f1(args);
     Ok(PerlValue::float(1.0 - frac.fract().abs()))
 }
 
-// AABB intersect check
+/// AABB intersect check
 fn builtin_gfx_aabb_intersect_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a_min = f1(args);
     let a_max = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -351,7 +351,7 @@ fn builtin_gfx_aabb_intersect_check(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::integer(if a_max >= b_min && b_max >= a_min { 1 } else { 0 }))
 }
 
-// OBB overlap step (SAT axis)
+/// OBB overlap step (SAT axis)
 fn builtin_gfx_obb_overlap_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let proj_a = f1(args);
     let proj_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -359,7 +359,7 @@ fn builtin_gfx_obb_overlap_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if proj_a + proj_b > dist.abs() { 1 } else { 0 }))
 }
 
-// Sphere intersect t-distance
+/// Sphere intersect t-distance
 fn builtin_gfx_sphere_intersect_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b = f1(args);
     let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -368,7 +368,7 @@ fn builtin_gfx_sphere_intersect_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-b - disc.sqrt()))
 }
 
-// Ray-triangle intersection t (Möller-Trumbore)
+/// Ray-triangle intersection t (Möller-Trumbore)
 fn builtin_gfx_ray_triangle_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dot_n_d = f1(args);
     let dot_n_p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -376,9 +376,9 @@ fn builtin_gfx_ray_triangle_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-dot_n_p / dot_n_d))
 }
 
-// Ray-plane intersection: plane (N, d) where N·X + d = 0, ray O + tD.
-// t = −(N·O + d) / (N·D). Returns −1 if parallel or behind.
-// Args: N·O+d, N·D.
+/// Ray-plane intersection: plane (N, d) where N·X + d = 0, ray O + tD.
+/// t = −(N·O + d) / (N·D). Returns −1 if parallel or behind.
+/// Args: N·O+d, N·D.
 fn builtin_gfx_ray_plane_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_o_plus_d = f1(args);
     let n_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -387,7 +387,7 @@ fn builtin_gfx_ray_plane_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if t >= 0.0 { t } else { -1.0 }))
 }
 
-// Ray-box slab method t
+/// Ray-box slab method t
 fn builtin_gfx_ray_box_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let t_min = f1(args);
     let t_max = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -395,12 +395,12 @@ fn builtin_gfx_ray_box_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(t_min))
 }
 
-// Ray-sphere t
+/// Ray-sphere t
 fn builtin_gfx_ray_sphere_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_sphere_intersect_t(args)
 }
 
-// Ray-disk t (planar disk + radius check)
+/// Ray-disk t (planar disk + radius check)
 fn builtin_gfx_ray_disk_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let t = f1(args);
     let dist_sq = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -408,7 +408,7 @@ fn builtin_gfx_ray_disk_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if dist_sq <= r_sq { t } else { -1.0 }))
 }
 
-// Ray-cylinder t (infinite cylinder)
+/// Ray-cylinder t (infinite cylinder)
 fn builtin_gfx_ray_cylinder_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -418,13 +418,13 @@ fn builtin_gfx_ray_cylinder_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((-b - disc.sqrt()) / a))
 }
 
-// Ray-cone intersection: infinite double cone x² + y² = (z·tan θ)² with
-// half-angle θ. Substitute O+tD into D_x²+D_y²−tan²θ·D_z² scaled, get
-// at²+bt+c=0 with
-//   a = D_x² + D_y² − k²·D_z²,
-//   b = 2(O_x D_x + O_y D_y − k²·O_z D_z),
-//   c = O_x² + O_y² − k²·O_z²,    k = tan θ.
-// Args: a, b, c. Returns nearest non-negative root or −1.
+/// Ray-cone intersection: infinite double cone x² + y² = (z·tan θ)² with
+/// half-angle θ. Substitute O+tD into D_x²+D_y²−tan²θ·D_z² scaled, get
+/// at²+bt+c=0 with
+///   a = D_x² + D_y² − k²·D_z²,
+///   b = 2(O_x D_x + O_y D_y − k²·O_z D_z),
+///   c = O_x² + O_y² − k²·O_z²,    k = tan θ.
+/// Args: a, b, c. Returns nearest non-negative root or −1.
 fn builtin_gfx_ray_cone_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -443,11 +443,11 @@ fn builtin_gfx_ray_cone_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if cand >= 0.0 { cand } else { -1.0 }))
 }
 
-// Ray-ellipsoid intersection (axis-aligned ellipsoid x²/a² + y²/b² + z²/c² = 1):
-// substitute O' = (O_x/a, O_y/b, O_z/c), D' = (D_x/a, D_y/b, D_z/c) so the
-// problem reduces to sphere of radius 1 at origin: |O' + tD'|² = 1.
-// at² + 2bt + c = 0 with a = |D'|², b = O'·D', c = |O'|² − 1.
-// Args: |D'|², O'·D', |O'|² (caller scales by axes first).
+/// Ray-ellipsoid intersection (axis-aligned ellipsoid x²/a² + y²/b² + z²/c² = 1):
+/// substitute O' = (O_x/a, O_y/b, O_z/c), D' = (D_x/a, D_y/b, D_z/c) so the
+/// problem reduces to sphere of radius 1 at origin: |O' + tD'|² = 1.
+/// at² + 2bt + c = 0 with a = |D'|², b = O'·D', c = |O'|² − 1.
+/// Args: |D'|², O'·D', |O'|² (caller scales by axes first).
 fn builtin_gfx_ray_ellipsoid_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -463,10 +463,10 @@ fn builtin_gfx_ray_ellipsoid_t(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if cand >= 0.0 { cand } else { -1.0 }))
 }
 
-// Ray-torus quartic: solving t⁴ + a·t³ + b·t² + c·t + d = 0 for a torus with
-// major radius R, minor radius r intersected by a ray. Args: 4 quartic coefs.
-// Use Ferrari resolvent's discriminant sign as a step: returns smallest real
-// root within [0, ∞) via Bairstow-style approximate factorization fallback.
+/// Ray-torus quartic: solving t⁴ + a·t³ + b·t² + c·t + d = 0 for a torus with
+/// major radius R, minor radius r intersected by a ray. Args: 4 quartic coefs.
+/// Use Ferrari resolvent's discriminant sign as a step: returns smallest real
+/// root within [0, ∞) via Bairstow-style approximate factorization fallback.
 fn builtin_gfx_ray_torus_t_approx(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -483,7 +483,7 @@ fn builtin_gfx_ray_torus_t_approx(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if t >= 0.0 { t } else { -1.0 }))
 }
 
-// Barycentric α
+/// Barycentric α
 fn builtin_gfx_barycentric_alpha(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let area_a = f1(args);
     let total = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -501,42 +501,42 @@ fn builtin_gfx_barycentric_gamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 - alpha - beta))
 }
 
-// Phong diffuse: max(0, N·L)
+/// Phong diffuse: max(0, N·L)
 fn builtin_gfx_phong_diffuse_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(f1(args).max(0.0)))
 }
 
-// Phong specular: max(0, R·V)^n
+/// Phong specular: max(0, R·V)^n
 fn builtin_gfx_phong_specular_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_v = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(32.0);
     Ok(PerlValue::float(r_v.max(0.0).powf(n)))
 }
 
-// Phong ambient term: k_a · I_a (intensity of ambient light scaled by ambient
-// reflectance coefficient). Args: k_a, I_a.
+/// Phong ambient term: k_a · I_a (intensity of ambient light scaled by ambient
+/// reflectance coefficient). Args: k_a, I_a.
 fn builtin_gfx_phong_ambient_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k_a = f1(args);
     let i_a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(k_a * i_a))
 }
 
-// Blinn-Phong specular (Blinn 1977): I = (N·H)^n with H = (L+V)/|L+V| (half
-// vector). Derives the Phong shape using the half vector instead of reflection
-// vector, giving smoother elongated highlights at grazing angles. Caller passes
-// N·H, exponent n_blinn ≈ 4·n_phong empirically. Args: N·H, n_blinn.
+/// Blinn-Phong specular (Blinn 1977): I = (N·H)^n with H = (L+V)/|L+V| (half
+/// vector). Derives the Phong shape using the half vector instead of reflection
+/// vector, giving smoother elongated highlights at grazing angles. Caller passes
+/// N·H, exponent n_blinn ≈ 4·n_phong empirically. Args: N·H, n_blinn.
 fn builtin_gfx_blinn_specular_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_dot_h = f1(args);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(128.0);
     Ok(PerlValue::float(n_dot_h.max(0.0).powf(n)))
 }
 
-// Lambert term: max(0, N·L)
+/// Lambert term: max(0, N·L)
 fn builtin_gfx_lambert_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(f1(args).max(0.0)))
 }
 
-// Oren-Nayar term (approximation)
+/// Oren-Nayar term (approximation)
 fn builtin_gfx_oren_nayar_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_l = f1(args);
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -544,7 +544,7 @@ fn builtin_gfx_oren_nayar_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(n_l.max(0.0) * a))
 }
 
-// Cook-Torrance D (GGX)
+/// Cook-Torrance D (GGX)
 fn builtin_gfx_cook_torrance_d_ggx(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_h = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -554,7 +554,7 @@ fn builtin_gfx_cook_torrance_d_ggx(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(alpha2 / (std::f64::consts::PI * denom * denom)))
 }
 
-// Cook-Torrance G (Smith)
+/// Cook-Torrance G (Smith)
 fn builtin_gfx_cook_torrance_g_smith(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_v = f1(args);
     let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -563,19 +563,19 @@ fn builtin_gfx_cook_torrance_g_smith(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(n_v / (n_v * (1.0 - k) + k)))
 }
 
-// Cook-Torrance F (Schlick): f0 + (1 - f0)(1 - cosθ)^5
+/// Cook-Torrance F (Schlick): f0 + (1 - f0)(1 - cosθ)^5
 fn builtin_gfx_cook_torrance_f_schlick(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f0 = f1(args);
     let cos_theta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(f0 + (1.0 - f0) * (1.0 - cos_theta).powi(5)))
 }
 
-// Disney principled D
+/// Disney principled D
 fn builtin_gfx_disney_principled_d(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_cook_torrance_d_ggx(args)
 }
 
-// Microfacet BRDF combined: D·F·G / (4·N·V·N·L)
+/// Microfacet BRDF combined: D·F·G / (4·N·V·N·L)
 fn builtin_gfx_microfacet_brdf_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = f1(args);
     let f = args.get(1).map(|v| v.to_number()).unwrap_or(0.5);
@@ -586,13 +586,13 @@ fn builtin_gfx_microfacet_brdf_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(d * f * g / (4.0 * n_v * n_l)))
 }
 
-// Subsurface scattering term (Burley diffuse)
+/// Subsurface scattering term (Burley diffuse)
 fn builtin_gfx_subsurface_scattering_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_l = f1(args);
     Ok(PerlValue::float(n_l.max(0.0).powf(0.5)))
 }
 
-// Translucent falloff: exp(-d/τ)
+/// Translucent falloff: exp(-d/τ)
 fn builtin_gfx_translucent_falloff(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = f1(args);
     let tau = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -600,17 +600,17 @@ fn builtin_gfx_translucent_falloff(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float((-d / tau).exp()))
 }
 
-// Normal distribution function GGX (alias)
+/// Normal distribution function GGX (alias)
 fn builtin_gfx_normal_distribution_ggx(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_cook_torrance_d_ggx(args)
 }
 
-// Geometric attenuation Smith
+/// Geometric attenuation Smith
 fn builtin_gfx_geometric_attenuation_smith(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_cook_torrance_g_smith(args)
 }
 
-// Fresnel dielectric (full)
+/// Fresnel dielectric (full)
 fn builtin_gfx_fresnel_dielectric_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cos_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -623,14 +623,14 @@ fn builtin_gfx_fresnel_dielectric_step(args: &[PerlValue]) -> PerlResult<PerlVal
     Ok(PerlValue::float(0.5 * (r_para * r_para + r_perp * r_perp)))
 }
 
-// Fresnel reflectance for conductors (complex IOR n + iκ). The exact formula
-// (NOT Schlick): for incident angle θ with cos_i = c,
-//   t₁ = (n² + κ²) cos²θ
-//   t₂ = 2 n cos θ
-//   r_∥² = (t₁ − t₂ + 1) / (t₁ + t₂ + 1)
-//   r_⊥² = ((n² + κ²) − t₂ + cos²θ) / ((n² + κ²) + t₂ + cos²θ)
-//   F_conductor = (r_∥² + r_⊥²) / 2.
-// Distinct from Schlick (real-IOR approximation). Args: cos_i, n, κ.
+/// Fresnel reflectance for conductors (complex IOR n + iκ). The exact formula
+/// (NOT Schlick): for incident angle θ with cos_i = c,
+///   t₁ = (n² + κ²) cos²θ
+///   t₂ = 2 n cos θ
+///   r_∥² = (t₁ − t₂ + 1) / (t₁ + t₂ + 1)
+///   r_⊥² = ((n² + κ²) − t₂ + cos²θ) / ((n² + κ²) + t₂ + cos²θ)
+///   F_conductor = (r_∥² + r_⊥²) / 2.
+/// Distinct from Schlick (real-IOR approximation). Args: cos_i, n, κ.
 fn builtin_gfx_fresnel_conductor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cos_i = f1(args).clamp(0.0, 1.0);
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -644,7 +644,7 @@ fn builtin_gfx_fresnel_conductor_step(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float((r_par + r_perp) / 2.0))
 }
 
-// Index of refraction sin θ_i / sin θ_t
+/// Index of refraction sin θ_i / sin θ_t
 fn builtin_gfx_index_of_refraction(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sin_i = f1(args);
     let sin_t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -652,7 +652,7 @@ fn builtin_gfx_index_of_refraction(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(sin_i / sin_t))
 }
 
-// Snell's law angle: θ_t = asin((n1/n2) sin θ_i)
+/// Snell's law angle: θ_t = asin((n1/n2) sin θ_i)
 fn builtin_gfx_snells_law_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -663,7 +663,7 @@ fn builtin_gfx_snells_law_angle(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(sin_t.asin()))
 }
 
-// Total internal reflection check
+/// Total internal reflection check
 fn builtin_gfx_total_internal_reflection(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta_i = f1(args);
     let n1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.5);
@@ -673,7 +673,7 @@ fn builtin_gfx_total_internal_reflection(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::integer(if theta_i > crit { 1 } else { 0 }))
 }
 
-// Refract direction X (Snell)
+/// Refract direction X (Snell)
 fn builtin_gfx_refract_direction_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i_x = f1(args);
     let n_x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -685,7 +685,7 @@ fn builtin_gfx_refract_direction_x(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(eta * i_x + (eta * cos_i - cos_t) * n_x))
 }
 
-// Reflect direction X: I - 2 (N·I) N
+/// Reflect direction X: I - 2 (N·I) N
 fn builtin_gfx_reflect_direction_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i_x = f1(args);
     let n_x = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -693,20 +693,20 @@ fn builtin_gfx_reflect_direction_x(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(i_x - 2.0 * n_dot_i * n_x))
 }
 
-// Environment map U (longitude)
+/// Environment map U (longitude)
 fn builtin_gfx_environment_map_uv_u(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dx = f1(args);
     let dz = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(0.5 + dz.atan2(dx) / (2.0 * std::f64::consts::PI)))
 }
 
-// Environment map V (latitude)
+/// Environment map V (latitude)
 fn builtin_gfx_environment_map_uv_v(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dy = f1(args);
     Ok(PerlValue::float(0.5 - dy.asin() / std::f64::consts::PI))
 }
 
-// Cube map face index from direction (max abs component)
+/// Cube map face index from direction (max abs component)
 fn builtin_gfx_cube_map_face_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -719,7 +719,7 @@ fn builtin_gfx_cube_map_face_index(args: &[PerlValue]) -> PerlResult<PerlValue> 
     else { Ok(PerlValue::integer(if dz > 0.0 { 4 } else { 5 })) }
 }
 
-// Octahedral encode X
+/// Octahedral encode X
 fn builtin_gfx_octahedral_encode_x(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -729,7 +729,7 @@ fn builtin_gfx_octahedral_encode_x(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(dx / denom))
 }
 
-// Octahedral encode Y
+/// Octahedral encode Y
 fn builtin_gfx_octahedral_encode_y(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dx = f1(args);
     let dy = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -739,30 +739,30 @@ fn builtin_gfx_octahedral_encode_y(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(dy / denom))
 }
 
-// Spherical harmonic Y_0^0 = 1/(2√π)
+/// Spherical harmonic Y_0^0 = 1/(2√π)
 fn builtin_gfx_spherical_harmonic_y00(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(0.5 / std::f64::consts::PI.sqrt()))
 }
 
-// Y_1^0 = √(3/(4π)) z
+/// Y_1^0 = √(3/(4π)) z
 fn builtin_gfx_spherical_harmonic_y10(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = f1(args);
     Ok(PerlValue::float((3.0 / (4.0 * std::f64::consts::PI)).sqrt() * z))
 }
 
-// Y_1^1 = √(3/(4π)) x
+/// Y_1^1 = √(3/(4π)) x
 fn builtin_gfx_spherical_harmonic_y11(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     Ok(PerlValue::float((3.0 / (4.0 * std::f64::consts::PI)).sqrt() * x))
 }
 
-// Y_2^0 = √(5/(16π)) (3z² - 1)
+/// Y_2^0 = √(5/(16π)) (3z² - 1)
 fn builtin_gfx_spherical_harmonic_y20(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = f1(args);
     Ok(PerlValue::float((5.0 / (16.0 * std::f64::consts::PI)).sqrt() * (3.0 * z * z - 1.0)))
 }
 
-// Zonal harmonic Z_l(θ) = √((2l+1)/(4π)) P_l(cos θ): zonal slice of Y_l^0.
+/// Zonal harmonic Z_l(θ) = √((2l+1)/(4π)) P_l(cos θ): zonal slice of Y_l^0.
 fn builtin_gfx_zonal_harmonic_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = f1(args);
     let l = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
@@ -778,34 +778,34 @@ fn builtin_gfx_zonal_harmonic_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(((2.0 * l as f64 + 1.0) / (4.0 * std::f64::consts::PI)).sqrt() * p1))
 }
 
-// Irradiance SH evaluation (3-band)
+/// Irradiance SH evaluation (3-band)
 fn builtin_gfx_irradiance_sh_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l = b47_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(l.iter().sum()))
 }
 
-// Radiance SH evaluation (point)
+/// Radiance SH evaluation (point)
 fn builtin_gfx_radiance_sh_eval(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_irradiance_sh_eval(args)
 }
 
-// Skybox UV U
+/// Skybox UV U
 fn builtin_gfx_skybox_uv_u(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_environment_map_uv_u(args)
 }
 
-// Skybox UV V
+/// Skybox UV V
 fn builtin_gfx_skybox_uv_v(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_environment_map_uv_v(args)
 }
 
-// Reinhard tonemap: x / (1 + x)
+/// Reinhard tonemap: x / (1 + x)
 fn builtin_gfx_tonemap_reinhard(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     Ok(PerlValue::float(x / (1.0 + x)))
 }
 
-// ACES filmic tone mapping
+/// ACES filmic tone mapping
 fn builtin_gfx_tonemap_aces(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let a = 2.51;
@@ -816,7 +816,7 @@ fn builtin_gfx_tonemap_aces(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(((x * (a * x + b)) / (x * (c * x + d) + e)).clamp(0.0, 1.0)))
 }
 
-// Uncharted2 tone mapping
+/// Uncharted2 tone mapping
 fn builtin_gfx_tonemap_uncharted2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let a = 0.15;
@@ -828,12 +828,12 @@ fn builtin_gfx_tonemap_uncharted2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(((x * (a * x + c * b) + d * e) / (x * (a * x + b) + d * f)) - e / f))
 }
 
-// Filmic tonemap (alias)
+/// Filmic tonemap (alias)
 fn builtin_gfx_tonemap_filmic(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_tonemap_aces(args)
 }
 
-// Gamma correction: x^(1/γ)
+/// Gamma correction: x^(1/γ)
 fn builtin_gfx_gamma_correct_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(2.2);
@@ -841,19 +841,19 @@ fn builtin_gfx_gamma_correct_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x.max(0.0).powf(1.0 / gamma)))
 }
 
-// sRGB → linear
+/// sRGB → linear
 fn builtin_gfx_srgb_to_linear(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     Ok(PerlValue::float(if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }))
 }
 
-// Linear → sRGB
+/// Linear → sRGB
 fn builtin_gfx_linear_to_srgb(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     Ok(PerlValue::float(if x <= 0.0031308 { 12.92 * x } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 }))
 }
 
-// Bayer 4×4 matrix value
+/// Bayer 4×4 matrix value
 fn builtin_gfx_dither_bayer_4x4(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args).clamp(0, 3) as usize;
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0).clamp(0, 3) as usize;
@@ -866,13 +866,13 @@ fn builtin_gfx_dither_bayer_4x4(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m[i][j] / 16.0))
 }
 
-// Floyd-Steinberg error diffusion (single coefficient — bottom-right)
+/// Floyd-Steinberg error diffusion (single coefficient — bottom-right)
 fn builtin_gfx_dither_floyd_steinberg(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let err = f1(args);
     Ok(PerlValue::float(err * 7.0 / 16.0))
 }
 
-// OKLab L = (l)^(1/3)
+/// OKLab L = (l)^(1/3)
 fn builtin_gfx_oklab_l_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l = f1(args);
     Ok(PerlValue::float(l.cbrt()))
@@ -888,21 +888,21 @@ fn builtin_gfx_oklab_b_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(s.cbrt()))
 }
 
-// OKLCh chroma = √(a² + b²)
+/// OKLCh chroma = √(a² + b²)
 fn builtin_gfx_oklch_chroma(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((a * a + b * b).sqrt()))
 }
 
-// OKLCh hue = atan2(b, a)
+/// OKLCh hue = atan2(b, a)
 fn builtin_gfx_oklch_hue(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(b.atan2(a)))
 }
 
-// PCG hash step
+/// PCG hash step
 fn builtin_gfx_pcg_hash_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = i1(args) as u64;
     let state = s.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
@@ -911,7 +911,7 @@ fn builtin_gfx_pcg_hash_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(result as i64))
 }
 
-// XOR-shift step (32-bit)
+/// XOR-shift step (32-bit)
 fn builtin_gfx_xorshift_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut s = i1(args) as u32;
     s ^= s << 13;
@@ -920,7 +920,7 @@ fn builtin_gfx_xorshift_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(s as i64))
 }
 
-// Halton sequence step base b
+/// Halton sequence step base b
 fn builtin_gfx_halton_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut i = i1(args).max(1) as u64;
     let b = args.get(1).map(|v| v.to_number() as u64).unwrap_or(2).max(2);
@@ -934,10 +934,10 @@ fn builtin_gfx_halton_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r))
 }
 
-// Sobol sequence (Antonov-Saleev recurrence, dimension 1, primitive polynomial
-// x+1, direction numbers V_k = 2^(B−k) for k=1..B). Gray-code update:
-//   x_{i+1} = x_i ⊕ V_{c_i+1}, where c_i = trailing-zero count of (i+1).
-// Returns x_i / 2^B as f64. Args: index i (≥0).
+/// Sobol sequence (Antonov-Saleev recurrence, dimension 1, primitive polynomial
+/// x+1, direction numbers V_k = 2^(B−k) for k=1..B). Gray-code update:
+///   x_{i+1} = x_i ⊕ V_{c_i+1}, where c_i = trailing-zero count of (i+1).
+/// Returns x_i / 2^B as f64. Args: index i (≥0).
 fn builtin_gfx_sobol_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     const B: u32 = 32;
     let n = i1(args).max(0) as u64;
@@ -950,10 +950,10 @@ fn builtin_gfx_sobol_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x as f64 / (1u64 << B) as f64))
 }
 
-// Van der Corput sequence φ_b(n): radical-inverse in base b. Write n in base b
-// as Σ a_k b^k; then φ_b(n) = Σ a_k b^(−k−1). Default base 2 (the original
-// Van der Corput sequence). Bit-reversal in base 2 implemented directly with
-// 32-bit reverse for speed; general-base falls back to digit-by-digit.
+/// Van der Corput sequence φ_b(n): radical-inverse in base b. Write n in base b
+/// as Σ a_k b^k; then φ_b(n) = Σ a_k b^(−k−1). Default base 2 (the original
+/// Van der Corput sequence). Bit-reversal in base 2 implemented directly with
+/// 32-bit reverse for speed; general-base falls back to digit-by-digit.
 fn builtin_gfx_van_der_corput(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args).max(0) as u64;
     let b = args.get(1).map(|v| v.to_number() as u64).unwrap_or(2).max(2);
@@ -972,11 +972,11 @@ fn builtin_gfx_van_der_corput(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r))
 }
 
-// Low-discrepancy step: discrepancy bound D*_N for an N-point sequence in d
-// dimensions, per the Koksma-Hlawka theorem: D*_N(seq) ≤ C·(log N)^d / N for
-// (t, d)-sequences (Halton, Sobol, Faure). Returns the asymptotic upper bound
-// for given algorithm choice. Args: N (samples), d (dimensions), algo
-// (0 = Halton, 1 = Sobol with C ≈ 1, 2 = Faure with smaller C).
+/// Low-discrepancy step: discrepancy bound D*_N for an N-point sequence in d
+/// dimensions, per the Koksma-Hlawka theorem: D*_N(seq) ≤ C·(log N)^d / N for
+/// (t, d)-sequences (Halton, Sobol, Faure). Returns the asymptotic upper bound
+/// for given algorithm choice. Args: N (samples), d (dimensions), algo
+/// (0 = Halton, 1 = Sobol with C ≈ 1, 2 = Faure with smaller C).
 fn builtin_gfx_low_discrepancy_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args).max(2.0);
     let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
@@ -985,7 +985,7 @@ fn builtin_gfx_low_discrepancy_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(c * n.ln().powf(d) / n))
 }
 
-// Blue noise value (Bayer-like simulated)
+/// Blue noise value (Bayer-like simulated)
 fn builtin_gfx_blue_noise_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -993,7 +993,7 @@ fn builtin_gfx_blue_noise_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((h as f64) / (u32::MAX as f64)))
 }
 
-// Perlin noise (1-D simplified gradient noise)
+/// Perlin noise (1-D simplified gradient noise)
 fn builtin_gfx_perlin_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let xi = x.floor();
@@ -1002,10 +1002,10 @@ fn builtin_gfx_perlin_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(u))
 }
 
-// Perlin's simplex noise (2-D): skew F = (√3 − 1)/2 to the simplex grid; for
-// each of three corners compute attenuation t² and contribute t⁴·(g·d) where
-// g is a unit pseudo-gradient picked from a 12-vector palette by hashed corner
-// coords. Sum of three corners gives the noise. Real algorithm.
+/// Perlin's simplex noise (2-D): skew F = (√3 − 1)/2 to the simplex grid; for
+/// each of three corners compute attenuation t² and contribute t⁴·(g·d) where
+/// g is a unit pseudo-gradient picked from a 12-vector palette by hashed corner
+/// coords. Sum of three corners gives the noise. Real algorithm.
 fn builtin_gfx_simplex_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -1045,7 +1045,7 @@ fn builtin_gfx_simplex_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(70.0 * (n0 + n1 + n2)))
 }
 
-// fBm: sum of octaves with persistence
+/// fBm: sum of octaves with persistence
 fn builtin_gfx_fbm_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
     let oct = args.get(1).map(|v| v.to_number()).unwrap_or(4.0);
@@ -1053,22 +1053,22 @@ fn builtin_gfx_fbm_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(n * (1.0 - persistence.powf(oct)) / (1.0 - persistence).max(1e-9)))
 }
 
-// Worley noise (cell distance)
+/// Worley noise (cell distance)
 fn builtin_gfx_worley_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b47_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(v.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
-// Voronoi distance (alias)
+/// Voronoi distance (alias)
 fn builtin_gfx_voronoi_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_gfx_worley_noise_step(args)
 }
 
-// Bridson curl noise (2-D divergence-free vector field): given a scalar
-// potential ψ(x, y), the divergence-free flow is V = (∂ψ/∂y, −∂ψ/∂x).
-// Approximate the partial via central differences on noise samples ψ at
-// offsets ±h. Returns the requested component (0=Vx, 1=Vy).
-// Args: comp (0/1), psi_xp, psi_xm, psi_yp, psi_ym, h.
+/// Bridson curl noise (2-D divergence-free vector field): given a scalar
+/// potential ψ(x, y), the divergence-free flow is V = (∂ψ/∂y, −∂ψ/∂x).
+/// Approximate the partial via central differences on noise samples ψ at
+/// offsets ±h. Returns the requested component (0=Vx, 1=Vy).
+/// Args: comp (0/1), psi_xp, psi_xm, psi_yp, psi_ym, h.
 fn builtin_gfx_curl_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let comp = i1(args);
     let psi_xp = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -1081,10 +1081,10 @@ fn builtin_gfx_curl_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if comp == 0 { dpsi_dy } else { -dpsi_dx }))
 }
 
-// Generic gradient noise (1-D): pick a random unit gradient g_i ∈ {−1, +1} at
-// each integer lattice node, dot-product with the offset to that node, and
-// quintic-interpolate (Perlin's improved fade). Distinct from value noise
-// (which interpolates lattice values, not gradients). Args: x.
+/// Generic gradient noise (1-D): pick a random unit gradient g_i ∈ {−1, +1} at
+/// each integer lattice node, dot-product with the offset to that node, and
+/// quintic-interpolate (Perlin's improved fade). Distinct from value noise
+/// (which interpolates lattice values, not gradients). Args: x.
 fn builtin_gfx_gradient_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let xi = x.floor() as i64;
@@ -1099,9 +1099,9 @@ fn builtin_gfx_gradient_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(g0 * (1.0 - u) + g1 * u))
 }
 
-// Value noise: assign a random value v(i, j) ∈ [0, 1) to each integer lattice
-// node and bilinearly smooth-step interpolate. Differs from Perlin (which
-// dot-products against a gradient at each corner). Args: x, y.
+/// Value noise: assign a random value v(i, j) ∈ [0, 1) to each integer lattice
+/// node and bilinearly smooth-step interpolate. Differs from Perlin (which
+/// dot-products against a gradient at each corner). Args: x, y.
 fn builtin_gfx_value_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -1124,21 +1124,21 @@ fn builtin_gfx_value_noise_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a * (1.0 - v) + b * v))
 }
 
-// Signed distance to box: max(|p| - b)
+/// Signed distance to box: max(|p| - b)
 fn builtin_gfx_signed_distance_box(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(p.abs() - b))
 }
 
-// SDF sphere: |p| - r
+/// SDF sphere: |p| - r
 fn builtin_gfx_signed_distance_sphere(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(p.abs() - r))
 }
 
-// SDF capsule: |p - a + (b-a)·t| - r where t = clamp(...)
+/// SDF capsule: |p - a + (b-a)·t| - r where t = clamp(...)
 fn builtin_gfx_signed_distance_capsule(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dist = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);

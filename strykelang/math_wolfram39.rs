@@ -4,7 +4,7 @@ fn b39_to_floats(v: &PerlValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
-// Contraction T^a_a = Σ T^i_i (trace of two-index tensor as flat list)
+/// Contraction T^a_a = Σ T^i_i (trace of two-index tensor as flat list)
 fn builtin_tensor_contract_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b39_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     let n = (v.len() as f64).sqrt() as usize;
@@ -12,33 +12,33 @@ fn builtin_tensor_contract_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(s))
 }
 
-// Outer product two scalars (dyadic) returns u·v
+/// Outer product two scalars (dyadic) returns u·v
 fn builtin_tensor_outer_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let u = f1(args);
     let v = args.get(1).map(|x| x.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(u * v))
 }
 
-// Trace at a specific index (alias to contract_two for 2-index tensor)
+/// Trace at a specific index (alias to contract_two for 2-index tensor)
 fn builtin_tensor_trace_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_tensor_contract_two(args)
 }
 
-// Symmetrize T_(ab) = (T_ab + T_ba) / 2
+/// Symmetrize T_(ab) = (T_ab + T_ba) / 2
 fn builtin_tensor_symmetrize_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((a + b) / 2.0))
 }
 
-// Antisymmetrize T_[ab] = (T_ab - T_ba) / 2
+/// Antisymmetrize T_[ab] = (T_ab - T_ba) / 2
 fn builtin_tensor_antisymmetrize_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((a - b) / 2.0))
 }
 
-// Levi-Civita ε_{ijk} (3D)
+/// Levi-Civita ε_{ijk} (3D)
 fn builtin_levi_civita_three(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -48,7 +48,7 @@ fn builtin_levi_civita_three(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(s))
 }
 
-// Levi-Civita ε_{ijkl} (4D, sign of permutation)
+/// Levi-Civita ε_{ijkl} (4D, sign of permutation)
 fn builtin_levi_civita_four(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v: Vec<i64> = (0..4)
         .map(|k| args.get(k).map(|x| x.to_number() as i64).unwrap_or(k as i64))
@@ -63,21 +63,21 @@ fn builtin_levi_civita_four(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if a == [0, 1, 2, 3] { Ok(PerlValue::integer(sign)) } else { Ok(PerlValue::integer(0)) }
 }
 
-// Kronecker delta in 3D: δ^i_j
+/// Kronecker delta in 3D: δ^i_j
 fn builtin_kronecker_three(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(if i == j && (0..3).contains(&i) { 1 } else { 0 }))
 }
 
-// Kronecker delta in 4D
+/// Kronecker delta in 4D
 fn builtin_kronecker_four(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(if i == j && (0..4).contains(&i) { 1 } else { 0 }))
 }
 
-// Minkowski metric η_{μν} step: diag(-1,1,1,1)
+/// Minkowski metric η_{μν} step: diag(-1,1,1,1)
 fn builtin_metric_minkowski_eta_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mu = i1(args);
     let nu = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -85,7 +85,7 @@ fn builtin_metric_minkowski_eta_step(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::integer(if mu == 0 { -1 } else { 1 }))
 }
 
-// Schwarzschild metric component g_{tt} = -(1 - 2M/r)
+/// Schwarzschild metric component g_{tt} = -(1 - 2M/r)
 fn builtin_metric_schwarzschild_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
@@ -93,7 +93,7 @@ fn builtin_metric_schwarzschild_step(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(-(1.0 - 2.0 * m / r)))
 }
 
-// Kerr metric tt component (slow-rotation limit) g_{tt} ≈ -(1 - 2Mr/Σ), Σ = r²
+/// Kerr metric tt component (slow-rotation limit) g_{tt} ≈ -(1 - 2Mr/Σ), Σ = r²
 fn builtin_metric_kerr_step_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
@@ -104,11 +104,11 @@ fn builtin_metric_kerr_step_simple(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(-(1.0 - 2.0 * m * r / sigma)))
 }
 
-// FRW lapse depends on time gauge:
-//   gauge 0 (cosmic / synchronous time t):  N(t) = 1
-//   gauge 1 (conformal time η, ds² = a² (−dη² + dx²)):  N(η) = a(η)
-//   gauge 2 (e-fold N as time):  N = 1/H(N)
-// Args: gauge_id, scale_factor a, Hubble H.
+/// FRW lapse depends on time gauge:
+///   gauge 0 (cosmic / synchronous time t):  N(t) = 1
+///   gauge 1 (conformal time η, ds² = a² (−dη² + dx²)):  N(η) = a(η)
+///   gauge 2 (e-fold N as time):  N = 1/H(N)
+/// Args: gauge_id, scale_factor a, Hubble H.
 fn builtin_metric_frw_lapse(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let gauge = i1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -121,7 +121,7 @@ fn builtin_metric_frw_lapse(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
-// Christoffel symbols of the first kind: Γ_{abc} = ½(∂g_ab + ∂g_ac - ∂g_bc)
+/// Christoffel symbols of the first kind: Γ_{abc} = ½(∂g_ab + ∂g_ac - ∂g_bc)
 fn builtin_christoffel_first_kind_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dg_ab = f1(args);
     let dg_ac = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -129,15 +129,15 @@ fn builtin_christoffel_first_kind_step(args: &[PerlValue]) -> PerlResult<PerlVal
     Ok(PerlValue::float(0.5 * (dg_ab + dg_ac - dg_bc)))
 }
 
-// Christoffel of the second kind: Γ^a_{bc} = g^{ad} Γ_{dbc}
+/// Christoffel of the second kind: Γ^a_{bc} = g^{ad} Γ_{dbc}
 fn builtin_christoffel_second_kind_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g_inv = f1(args);
     let gamma_first = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(g_inv * gamma_first))
 }
 
-// Riemann tensor R^a_{bcd} = ∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + Γ^a_{ce} Γ^e_{bd} - Γ^a_{de} Γ^e_{bc}
-// Args: ∂cΓbd, ∂dΓbc, ΓceΓebd_sum, ΓdeΓebc_sum
+/// Riemann tensor R^a_{bcd} = ∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + Γ^a_{ce} Γ^e_{bd} - Γ^a_{de} Γ^e_{bc}
+/// Args: ∂cΓbd, ∂dΓbc, ΓceΓebd_sum, ΓdeΓebc_sum
 fn builtin_riemann_tensor_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dc_g_bd = f1(args);
     let dd_g_bc = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -146,25 +146,25 @@ fn builtin_riemann_tensor_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(dc_g_bd - dd_g_bc + gce_gebd - gde_gebc))
 }
 
-// Riemann normal-coordinate form: R_{abcd} ≈ -1/3 (g_ac g_bd - g_ad g_bc) K
+/// Riemann normal-coordinate form: R_{abcd} ≈ -1/3 (g_ac g_bd - g_ad g_bc) K
 fn builtin_riemann_curvature_normal_form(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = f1(args);
     Ok(PerlValue::float(-k / 3.0))
 }
 
-// Ricci R_{ab} = R^c_{acb}: contraction of Riemann over upper index = c. Sum diagonal.
+/// Ricci R_{ab} = R^c_{acb}: contraction of Riemann over upper index = c. Sum diagonal.
 fn builtin_ricci_tensor_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_components = b39_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(r_components.iter().sum()))
 }
 
-// Scalar curvature R step from Ricci trace
+/// Scalar curvature R step from Ricci trace
 fn builtin_scalar_curvature_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b39_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(v.iter().sum()))
 }
 
-// Einstein tensor G_{ab} = R_{ab} - ½ g_{ab} R
+/// Einstein tensor G_{ab} = R_{ab} - ½ g_{ab} R
 fn builtin_einstein_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_ab = f1(args);
     let g_ab = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -172,8 +172,8 @@ fn builtin_einstein_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r_ab - 0.5 * g_ab * r))
 }
 
-// Weyl tensor C_{abcd} = R_{abcd} - (n-2)⁻¹·(g_{a[c}R_{d]b} - g_{b[c}R_{d]a})
-//                        + 2/((n-1)(n-2))·R·g_{a[c}g_{d]b}
+/// Weyl tensor C_{abcd} = R_{abcd} - (n-2)⁻¹·(g_{a[c}R_{d]b} - g_{b[c}R_{d]a})
+///                        + 2/((n-1)(n-2))·R·g_{a[c}g_{d]b}
 fn builtin_weyl_tensor_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let riemann = f1(args);
     let ricci_term = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -183,7 +183,7 @@ fn builtin_weyl_tensor_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(riemann - ricci_term / (n - 2.0) + 2.0 * scalar_term / ((n - 1.0) * (n - 2.0))))
 }
 
-// Schouten tensor S = (R_{ab} - R/(2(n-1)) g_{ab}) / (n-2)
+/// Schouten tensor S = (R_{ab} - R/(2(n-1)) g_{ab}) / (n-2)
 fn builtin_schouten_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_ab = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -193,8 +193,8 @@ fn builtin_schouten_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((r_ab - r * g / (2.0 * (n - 1.0))) / (n - 2.0)))
 }
 
-// Geodesic equation step: d²x^a/dτ² + Γ^a_{bc} (dx^b/dτ)(dx^c/dτ) = 0
-// Returns -Γ^a_{bc} · u^b · u^c (the acceleration component).
+/// Geodesic equation step: d²x^a/dτ² + Γ^a_{bc} (dx^b/dτ)(dx^c/dτ) = 0
+/// Returns -Γ^a_{bc} · u^b · u^c (the acceleration component).
 fn builtin_geodesic_equation_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let gamma = f1(args);
     let u_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -202,7 +202,7 @@ fn builtin_geodesic_equation_step_zero(args: &[PerlValue]) -> PerlResult<PerlVal
     Ok(PerlValue::float(-gamma * u_b * u_c))
 }
 
-// Parallel transport step: V'^a + Γ^a_{bc} V^b dx^c/dτ = 0
+/// Parallel transport step: V'^a + Γ^a_{bc} V^b dx^c/dτ = 0
 fn builtin_parallel_transport_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v_a = f1(args);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -211,7 +211,7 @@ fn builtin_parallel_transport_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(v_a - gamma * v_b * dxc))
 }
 
-// Covariant derivative ∇_μ V^a = ∂_μ V^a + Γ^a_{μb} V^b
+/// Covariant derivative ∇_μ V^a = ∂_μ V^a + Γ^a_{μb} V^b
 fn builtin_covariant_derivative_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dva = f1(args);
     let gamma = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -219,19 +219,19 @@ fn builtin_covariant_derivative_step(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(dva + gamma * v_b))
 }
 
-// Christoffel symbol normalization: g^ad Γ_{dbc}
+/// Christoffel symbol normalization: g^ad Γ_{dbc}
 fn builtin_christoffel_symbol_normalize(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_christoffel_second_kind_step(args)
 }
 
-// Ricci identity [∇_a, ∇_b] V^c = R^c_{dab} V^d → linear contribution
+/// Ricci identity [∇_a, ∇_b] V^c = R^c_{dab} V^d → linear contribution
 fn builtin_ricci_identity_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let v_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(r * v_d))
 }
 
-// First Bianchi identity check: R_{abcd} + R_{acdb} + R_{adbc} = 0
+/// First Bianchi identity check: R_{abcd} + R_{acdb} + R_{adbc} = 0
 fn builtin_bianchi_first_identity_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r1 = f1(args);
     let r2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -239,11 +239,11 @@ fn builtin_bianchi_first_identity_check(args: &[PerlValue]) -> PerlResult<PerlVa
     Ok(PerlValue::integer(if (r1 + r2 + r3).abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// Second (differential) Bianchi identity:
-//   ∇_a R^d_{ebc} + ∇_b R^d_{eca} + ∇_c R^d_{eab} = 0.
-// Differs from the first Bianchi (algebraic, on lower indices). Verifies the
-// cyclic sum of three covariant-derivative components vanishes.
-// Args: ∇_a R, ∇_b R (cyclic permutation), ∇_c R.
+/// Second (differential) Bianchi identity:
+///   ∇_a R^d_{ebc} + ∇_b R^d_{eca} + ∇_c R^d_{eab} = 0.
+/// Differs from the first Bianchi (algebraic, on lower indices). Verifies the
+/// cyclic sum of three covariant-derivative components vanishes.
+/// Args: ∇_a R, ∇_b R (cyclic permutation), ∇_c R.
 fn builtin_bianchi_second_identity_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let nabla_a = f1(args);
     let nabla_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -251,21 +251,21 @@ fn builtin_bianchi_second_identity_check(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::integer(if (nabla_a + nabla_b + nabla_c).abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// Killing equation step ∇_a ξ_b + ∇_b ξ_a = 0 — return value
+/// Killing equation step ∇_a ξ_b + ∇_b ξ_a = 0 — return value
 fn builtin_killing_vector_lie_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let nab = f1(args);
     let nba = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(nab + nba))
 }
 
-// Lie derivative scalar: L_X f = X^a ∂_a f
+/// Lie derivative scalar: L_X f = X^a ∂_a f
 fn builtin_lie_derivative_scalar_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x_a = f1(args);
     let df = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(x_a * df))
 }
 
-// Lie derivative vector: L_X V^a = X^b ∂_b V^a - V^b ∂_b X^a
+/// Lie derivative vector: L_X V^a = X^b ∂_b V^a - V^b ∂_b X^a
 fn builtin_lie_derivative_vector_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x_b = f1(args);
     let dv = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -274,14 +274,14 @@ fn builtin_lie_derivative_vector_step(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(x_b * dv - v_b * dx))
 }
 
-// Exterior derivative of one-form ω: dω_{ab} = ∂_a ω_b - ∂_b ω_a
+/// Exterior derivative of one-form ω: dω_{ab} = ∂_a ω_b - ∂_b ω_a
 fn builtin_exterior_derivative_one_form(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dao_b = f1(args);
     let dbo_a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(dao_b - dbo_a))
 }
 
-// Hodge star on a 1-form in flat 3D: *ω_i = ε_{ijk} ω^k δ_{j(i+1)}
+/// Hodge star on a 1-form in flat 3D: *ω_i = ε_{ijk} ω^k δ_{j(i+1)}
 fn builtin_hodge_star_one_form(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let w1 = f1(args);
     let w2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -289,10 +289,10 @@ fn builtin_hodge_star_one_form(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(w1 + w2 + w3))
 }
 
-// Codifferential on a k-form in an n-dim Riemannian manifold:
-//   δ = (−1)^{n(k+1) + 1} · ∗ d ∗.
-// Sign depends on (n, k). Caller supplies the value of (∗ d ∗ ω); this fn
-// applies the correct sign. Args: ∗d∗ω value, dimension n, form degree k.
+/// Codifferential on a k-form in an n-dim Riemannian manifold:
+///   δ = (−1)^{n(k+1) + 1} · ∗ d ∗.
+/// Sign depends on (n, k). Caller supplies the value of (∗ d ∗ ω); this fn
+/// applies the correct sign. Args: ∗d∗ω value, dimension n, form degree k.
 fn builtin_codifferential_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = f1(args);
     let n = args.get(1).map(|v| v.to_number() as i64).unwrap_or(4);
@@ -302,27 +302,27 @@ fn builtin_codifferential_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(sign * v))
 }
 
-// Laplace-de Rham operator Δ = dδ + δd
+/// Laplace-de Rham operator Δ = dδ + δd
 fn builtin_laplace_de_rham_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dd = f1(args);
     let dd2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(dd + dd2))
 }
 
-// Riemannian volume form sqrt(|det g|) dⁿx
+/// Riemannian volume form sqrt(|det g|) dⁿx
 fn builtin_volume_form_riemannian(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let det_g = f1(args);
     Ok(PerlValue::float(det_g.abs().sqrt()))
 }
 
-// Hodge inner product ⟨α, β⟩ = ∫ α ∧ *β
+/// Hodge inner product ⟨α, β⟩ = ∫ α ∧ *β
 fn builtin_hodge_inner_product_one(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(a * b))
 }
 
-// Sectional curvature K(σ) for two-plane σ given Riemann tensor scalar
+/// Sectional curvature K(σ) for two-plane σ given Riemann tensor scalar
 fn builtin_sectional_curvature_two_plane(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_xyxy = f1(args);
     let denom = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -330,60 +330,60 @@ fn builtin_sectional_curvature_two_plane(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::float(r_xyxy / denom))
 }
 
-// Gauss-Codazzi step: tangent component of R
+/// Gauss-Codazzi step: tangent component of R
 fn builtin_gauss_codazzi_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r_intrinsic = f1(args);
     let k_term = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(r_intrinsic + k_term))
 }
 
-// Mainardi-Codazzi step: ∇_X k(Y, Z) = ∇_Y k(X, Z)
+/// Mainardi-Codazzi step: ∇_X k(Y, Z) = ∇_Y k(X, Z)
 fn builtin_mainardi_codazzi_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lhs = f1(args);
     let rhs = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(lhs - rhs))
 }
 
-// Weingarten map W(X) = -∇_X N
+/// Weingarten map W(X) = -∇_X N
 fn builtin_weingarten_map_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dn = f1(args);
     Ok(PerlValue::float(-dn))
 }
 
-// Shape operator eigenvalues — return mean of two principal curvatures
+/// Shape operator eigenvalues — return mean of two principal curvatures
 fn builtin_shape_operator_eig(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k1 = f1(args);
     let k2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((k1 + k2) / 2.0))
 }
 
-// Mean curvature H = (k1 + k2) / 2
+/// Mean curvature H = (k1 + k2) / 2
 fn builtin_mean_curvature_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k1 = f1(args);
     let k2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((k1 + k2) / 2.0))
 }
 
-// Gaussian curvature K = k1·k2
+/// Gaussian curvature K = k1·k2
 fn builtin_gaussian_curvature_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k1 = f1(args);
     let k2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(k1 * k2))
 }
 
-// Extrinsic principal curvatures (max, mean form): return greater of two
+/// Extrinsic principal curvatures (max, mean form): return greater of two
 fn builtin_extrinsic_principal_curv(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k1 = f1(args);
     let k2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(k1.max(k2)))
 }
 
-// Intrinsic (Gauss) curvature K of a 2-surface from its first fundamental form
-// coefficients (E, F, G) and Brioschi formula's discriminant det = EG − F²:
-//   K_intrinsic = K_ext only when extrinsic frame is normal-aligned. In general,
-//   K = (1 / det(I)²) · [det(M₁) − det(M₂)] (Brioschi). For diagonal I (F=0,
-//   constant E, G), reduces to K = (1/(2EG))·[−E_vv − G_uu] (e.g. surface of revolution).
-// Args: E, G, E_vv, G_uu.
+/// Intrinsic (Gauss) curvature K of a 2-surface from its first fundamental form
+/// coefficients (E, F, G) and Brioschi formula's discriminant det = EG − F²:
+///   K_intrinsic = K_ext only when extrinsic frame is normal-aligned. In general,
+///   K = (1 / det(I)²) · [det(M₁) − det(M₂)] (Brioschi). For diagonal I (F=0,
+///   constant E, G), reduces to K = (1/(2EG))·[−E_vv − G_uu] (e.g. surface of revolution).
+/// Args: E, G, E_vv, G_uu.
 fn builtin_intrinsic_principal_curv(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let e = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -394,34 +394,34 @@ fn builtin_intrinsic_principal_curv(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(-(e_vv + g_uu) / denom))
 }
 
-// Geodesic curvature κ_g of a curve on a surface
+/// Geodesic curvature κ_g of a curve on a surface
 fn builtin_geodesic_curvature_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let kappa = f1(args);
     let kappa_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float((kappa * kappa - kappa_n * kappa_n).max(0.0).sqrt()))
 }
 
-// Darboux frame step: rotation rate around tangent
+/// Darboux frame step: rotation rate around tangent
 fn builtin_darboux_frame_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let kappa_g = f1(args);
     let kappa_n = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(kappa_g + kappa_n))
 }
 
-// Fermi normal coordinate metric step (linear in geodesic deviation)
+/// Fermi normal coordinate metric step (linear in geodesic deviation)
 fn builtin_fermi_normal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let xx = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(1.0 - r * xx / 3.0))
 }
 
-// Synge world function σ(x, x') = ½ d(x, x')²
+/// Synge world function σ(x, x') = ½ d(x, x')²
 fn builtin_synge_world_function(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d = f1(args);
     Ok(PerlValue::float(0.5 * d * d))
 }
 
-// Raychaudhuri equation step for expansion: dθ/dτ = -⅓θ² - σ² + ω² - R_{ab}u^au^b
+/// Raychaudhuri equation step for expansion: dθ/dτ = -⅓θ² - σ² + ω² - R_{ab}u^au^b
 fn builtin_raychaudhuri_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = f1(args);
     let sigma2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -430,7 +430,7 @@ fn builtin_raychaudhuri_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-theta * theta / 3.0 - sigma2 + omega2 - r_uu))
 }
 
-// Expansion scalar θ = ∇_μ u^μ from velocity gradient ∂_μ u^μ + Γ^μ_{μν} u^ν
+/// Expansion scalar θ = ∇_μ u^μ from velocity gradient ∂_μ u^μ + Γ^μ_{μν} u^ν
 fn builtin_expansion_scalar_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let div_u = f1(args);
     let gamma_trace = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -438,23 +438,23 @@ fn builtin_expansion_scalar_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(div_u + gamma_trace * u))
 }
 
-// Shear tensor σ_{ab} (norm)
+/// Shear tensor σ_{ab} (norm)
 fn builtin_shear_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b39_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     Ok(PerlValue::float(v.iter().map(|x| x * x).sum::<f64>().sqrt()))
 }
 
-// Twist (vorticity) tensor ω_{ab} = ½(∇_a u_b − ∇_b u_a)·h^a_c·h^b_d (the
-// antisymmetric part of the projected ∇u). Distinct from σ_{ab} (symmetric
-// trace-free, the SHEAR). The norm ω² = ½ ω_{ab}·ω^{ab}. Caller passes the
-// flat antisymmetric components in row-major order; we return ω² = ½·Σ ωᵢⱼ².
+/// Twist (vorticity) tensor ω_{ab} = ½(∇_a u_b − ∇_b u_a)·h^a_c·h^b_d (the
+/// antisymmetric part of the projected ∇u). Distinct from σ_{ab} (symmetric
+/// trace-free, the SHEAR). The norm ω² = ½ ω_{ab}·ω^{ab}. Caller passes the
+/// flat antisymmetric components in row-major order; we return ω² = ½·Σ ωᵢⱼ².
 fn builtin_twist_tensor_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b39_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     let s: f64 = v.iter().map(|x| x * x).sum();
     Ok(PerlValue::float(0.5 * s))
 }
 
-// Optical scalars: combine expansion, shear, twist
+/// Optical scalars: combine expansion, shear, twist
 fn builtin_optical_scalars_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta = f1(args);
     let sigma = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -462,7 +462,7 @@ fn builtin_optical_scalars_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(theta + sigma + omega))
 }
 
-// Peeling step for Ψ₄ (gravitational radiation): Ψ₄ ~ 1/r at infinity
+/// Peeling step for Ψ₄ (gravitational radiation): Ψ₄ ~ 1/r at infinity
 fn builtin_peeling_step_psi4(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let psi4 = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -470,7 +470,7 @@ fn builtin_peeling_step_psi4(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(psi4 / r))
 }
 
-// AdS metric step (radial part): -((1 + r²/L²)) dt² + dr²/(1 + r²/L²) + r² dΩ²
+/// AdS metric step (radial part): -((1 + r²/L²)) dt² + dr²/(1 + r²/L²) + r² dΩ²
 fn builtin_ads_metric_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -478,7 +478,7 @@ fn builtin_ads_metric_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-(1.0 + r * r / (l * l))))
 }
 
-// de Sitter metric step
+/// de Sitter metric step
 fn builtin_de_sitter_metric_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -486,7 +486,7 @@ fn builtin_de_sitter_metric_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-(1.0 - r * r / (l * l))))
 }
 
-// Warped product metric step: g = g_B + f(t)² g_F
+/// Warped product metric step: g = g_B + f(t)² g_F
 fn builtin_warped_product_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g_b = f1(args);
     let f_t = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -494,7 +494,7 @@ fn builtin_warped_product_step_zero(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(g_b + f_t * f_t * g_f))
 }
 
-// Kaluza-Klein step: total metric g_5D from g_4D + φ A_a A_b
+/// Kaluza-Klein step: total metric g_5D from g_4D + φ A_a A_b
 fn builtin_kaluza_klein_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let g4 = f1(args);
     let phi = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -503,20 +503,20 @@ fn builtin_kaluza_klein_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(g4 + phi * a_a * a_b))
 }
 
-// Brans-Dicke action term ∫ φ R √-g
+/// Brans-Dicke action term ∫ φ R √-g
 fn builtin_brans_dicke_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let phi = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(phi * r))
 }
 
-// Horndeski Lagrangian density. Sub-Lagrangian L_i selected by index 2..5:
-//   L₂ = G₂(φ, X)
-//   L₃ = -G₃(φ, X) □φ
-//   L₄ = G₄(φ, X) R + G₄,X · [(□φ)² - (∇_μ ∇_ν φ)²]
-//   L₅ = G₅(φ, X) G^{μν} ∇_μ ∇_ν φ - (1/6) G₅,X · [(□φ)³ - 3 □φ (∇²φ)² + 2 (∇³φ)³]
-// Args: term index (2..5), G_i, scalar curvature R or G_μν·∇∇φ, box_phi, box²,
-// G_i,X, [box³, box·sq, cube].
+/// Horndeski Lagrangian density. Sub-Lagrangian L_i selected by index 2..5:
+///   L₂ = G₂(φ, X)
+///   L₃ = -G₃(φ, X) □φ
+///   L₄ = G₄(φ, X) R + G₄,X · [(□φ)² - (∇_μ ∇_ν φ)²]
+///   L₅ = G₅(φ, X) G^{μν} ∇_μ ∇_ν φ - (1/6) G₅,X · [(□φ)³ - 3 □φ (∇²φ)² + 2 (∇³φ)³]
+/// Args: term index (2..5), G_i, scalar curvature R or G_μν·∇∇φ, box_phi, box²,
+/// G_i,X, [box³, box·sq, cube].
 fn builtin_horndeski_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -536,15 +536,15 @@ fn builtin_horndeski_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
 }
 
-// Einstein-dilaton step: R + ∇φ · ∇φ
+/// Einstein-dilaton step: R + ∇φ · ∇φ
 fn builtin_einstein_dilaton_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let dphi2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(r + dphi2))
 }
 
-// Gauss-Bonnet term G = R² - 4 R_{ab} R^{ab} + R_{abcd} R^{abcd} (vanishes in 2D
-// as a topological invariant, equals 4πχ for closed surfaces)
+/// Gauss-Bonnet term G = R² - 4 R_{ab} R^{ab} + R_{abcd} R^{abcd} (vanishes in 2D
+/// as a topological invariant, equals 4πχ for closed surfaces)
 fn builtin_gauss_bonnet_term_2d(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let r_ab_sq = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -552,86 +552,86 @@ fn builtin_gauss_bonnet_term_2d(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r * r - 4.0 * r_ab_sq + riem_sq))
 }
 
-// Chern-Pontryagin term in 4D ∫ R_{abcd} *R^{abcd}
+/// Chern-Pontryagin term in 4D ∫ R_{abcd} *R^{abcd}
 fn builtin_chern_pontryagin_4d_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r2 = f1(args);
     Ok(PerlValue::float(r2))
 }
 
-// ADM mass M_ADM = (1/16π) ∮ (∂_j h_{ij} - ∂_i h_{jj}) dS^i
+/// ADM mass M_ADM = (1/16π) ∮ (∂_j h_{ij} - ∂_i h_{jj}) dS^i
 fn builtin_adm_mass_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let surface_int = f1(args);
     Ok(PerlValue::float(surface_int / (16.0 * std::f64::consts::PI)))
 }
 
-// Komar mass M_K = -(1/8π) ∮ ∇^a ξ^b dS_{ab}
+/// Komar mass M_K = -(1/8π) ∮ ∇^a ξ^b dS_{ab}
 fn builtin_komar_mass_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let surface_int = f1(args);
     Ok(PerlValue::float(-surface_int / (8.0 * std::f64::consts::PI)))
 }
 
-// Bondi mass at null infinity
+/// Bondi mass at null infinity
 fn builtin_bondi_mass_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m_initial = f1(args);
     let news_norm = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(m_initial - news_norm))
 }
 
-// Brown-York quasilocal energy E_qlocal = (1/8π) ∮ (k - k₀) √σ d²x
+/// Brown-York quasilocal energy E_qlocal = (1/8π) ∮ (k - k₀) √σ d²x
 fn builtin_brown_york_quasilocal(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k_diff = f1(args);
     let area_elem = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(k_diff * area_elem / (8.0 * std::f64::consts::PI)))
 }
 
-// Isolated horizon charge
+/// Isolated horizon charge
 fn builtin_isolated_horizon_charge(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let area_int = f1(args);
     Ok(PerlValue::float(area_int / (4.0 * std::f64::consts::PI)))
 }
 
-// Trapped surface check: θ_+ < 0 AND θ_- < 0
+/// Trapped surface check: θ_+ < 0 AND θ_- < 0
 fn builtin_trapped_surface_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta_plus = f1(args);
     let theta_minus = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::integer(if theta_plus < 0.0 && theta_minus < 0.0 { 1 } else { 0 }))
 }
 
-// Apparent horizon step (θ_+ = 0)
+/// Apparent horizon step (θ_+ = 0)
 fn builtin_apparent_horizon_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let theta_plus = f1(args);
     Ok(PerlValue::integer(if theta_plus.abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// Event horizon check at r = 2M for Schwarzschild
+/// Event horizon check at r = 2M for Schwarzschild
 fn builtin_event_horizon_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::integer(if (r - 2.0 * m).abs() < 1e-9 { 1 } else { 0 }))
 }
 
-// Cosmological constant term Λ g_{ab}
+/// Cosmological constant term Λ g_{ab}
 fn builtin_cosmological_constant_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lambda = f1(args);
     let g = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     Ok(PerlValue::float(lambda * g))
 }
 
-// de Sitter radius L_dS = √(3/Λ)
+/// de Sitter radius L_dS = √(3/Λ)
 fn builtin_de_sitter_radius_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lambda = f1(args);
     if lambda <= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
     Ok(PerlValue::float((3.0 / lambda).sqrt()))
 }
 
-// Anti-de Sitter radius L_AdS = √(-3/Λ)
+/// Anti-de Sitter radius L_AdS = √(-3/Λ)
 fn builtin_anti_de_sitter_radius_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let lambda = f1(args);
     if lambda >= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
     Ok(PerlValue::float((-3.0 / lambda).sqrt()))
 }
 
-// Penrose diagram conformal factor sec(t) sec(r)
+/// Penrose diagram conformal factor sec(t) sec(r)
 fn builtin_penrose_diagram_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let t = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -641,13 +641,13 @@ fn builtin_penrose_diagram_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 / (ct * cr)))
 }
 
-// Conformal compactification step: Ω = (1 + r²)⁻¹
+/// Conformal compactification step: Ω = (1 + r²)⁻¹
 fn builtin_conformal_compactification_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
     Ok(PerlValue::float(1.0 / (1.0 + r * r)))
 }
 
-// Schwarzschild → Kruskal coordinate U = -e^(-u/4M), V = e^(v/4M)
+/// Schwarzschild → Kruskal coordinate U = -e^(-u/4M), V = e^(v/4M)
 fn builtin_schwarzschild_kruskal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let u = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -655,7 +655,7 @@ fn builtin_schwarzschild_kruskal_step(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(-(-u / (4.0 * m)).exp()))
 }
 
-// Gullstrand-Painlevé time T = t + 2√(2Mr) - 4M ln((√r + √(2M))/(√r - √(2M)))
+/// Gullstrand-Painlevé time T = t + 2√(2Mr) - 4M ln((√r + √(2M))/(√r - √(2M)))
 fn builtin_gullstrand_painleve_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let t = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -665,7 +665,7 @@ fn builtin_gullstrand_painleve_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(t + 2.0 * (2.0 * m * r).sqrt() - 4.0 * m * inner.ln()))
 }
 
-// Kerr-Newman charge term q²/r²
+/// Kerr-Newman charge term q²/r²
 fn builtin_kerr_newman_charge_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
@@ -673,7 +673,7 @@ fn builtin_kerr_newman_charge_term(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(q * q / (r * r)))
 }
 
-// Boyer-Lindquist coordinate change step: dt' = dt + (2Mr/Δ) dr
+/// Boyer-Lindquist coordinate change step: dt' = dt + (2Mr/Δ) dr
 fn builtin_boyer_lindquist_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
@@ -682,7 +682,7 @@ fn builtin_boyer_lindquist_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(2.0 * m * r / delta))
 }
 
-// Hartle-Thorne metric (slow rotation) component g_tt
+/// Hartle-Thorne metric (slow rotation) component g_tt
 fn builtin_hartle_thorne_metric(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
@@ -691,7 +691,7 @@ fn builtin_hartle_thorne_metric(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-(1.0 - 2.0 * m / r) + j * j / r.powi(4)))
 }
 
-// Oppenheimer-Volkoff equation step: dP/dr = -(ρ + P)(M(r) + 4πr³P) / (r² - 2rM(r))
+/// Oppenheimer-Volkoff equation step: dP/dr = -(ρ + P)(M(r) + 4πr³P) / (r² - 2rM(r))
 fn builtin_oppenheimer_volkoff_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rho = f1(args);
     let p = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -702,7 +702,7 @@ fn builtin_oppenheimer_volkoff_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(-(rho + p) * (m_r + 4.0 * std::f64::consts::PI * r.powi(3) * p) / denom))
 }
 
-// Post-Newtonian correction step: GM/c²r
+/// Post-Newtonian correction step: GM/c²r
 fn builtin_post_newtonian_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -710,7 +710,7 @@ fn builtin_post_newtonian_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m / r))
 }
 
-// Shapiro time delay Δt = (2GM/c³) ln((r₁ + r₂ + d)/(r₁ + r₂ - d))
+/// Shapiro time delay Δt = (2GM/c³) ln((r₁ + r₂ + d)/(r₁ + r₂ - d))
 fn builtin_shapiro_delay_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let r1 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -721,7 +721,7 @@ fn builtin_shapiro_delay_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(2.0 * m * ((r1 + r2 + d) / denom).ln()))
 }
 
-// Mercury perihelion advance ω̇ = 6πGM / (c²a(1 - e²))
+/// Mercury perihelion advance ω̇ = 6πGM / (c²a(1 - e²))
 fn builtin_mercury_perihelion_advance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -731,7 +731,7 @@ fn builtin_mercury_perihelion_advance(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(6.0 * std::f64::consts::PI * m / denom))
 }
 
-// Quadrupole gravitational wave amplitude: h ~ G/(c⁴r) Q̈
+/// Quadrupole gravitational wave amplitude: h ~ G/(c⁴r) Q̈
 fn builtin_gravitational_wave_quadrupole(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q_dd = f1(args);
     let r = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -739,21 +739,21 @@ fn builtin_gravitational_wave_quadrupole(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::float(q_dd / r))
 }
 
-// Plus polarization amplitude h+
+/// Plus polarization amplitude h+
 fn builtin_plus_polarization_amp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let h0 = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(h0 * (1.0 + theta.cos().powi(2)) / 2.0))
 }
 
-// Cross polarization amplitude h×
+/// Cross polarization amplitude h×
 fn builtin_cross_polarization_amp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let h0 = f1(args);
     let theta = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(h0 * theta.cos()))
 }
 
-// Chirp mass M_c = (m₁m₂)^(3/5) / (m₁+m₂)^(1/5)
+/// Chirp mass M_c = (m₁m₂)^(3/5) / (m₁+m₂)^(1/5)
 fn builtin_chirp_mass_inspiral_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m1 = f1(args);
     let m2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -762,7 +762,7 @@ fn builtin_chirp_mass_inspiral_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float((m1 * m2).powf(0.6) / total.powf(0.2)))
 }
 
-// ISCO radius for Kerr: r_ISCO = M (3 + Z₂ - sign(a)√((3-Z₁)(3+Z₁+2Z₂)))
+/// ISCO radius for Kerr: r_ISCO = M (3 + Z₂ - sign(a)√((3-Z₁)(3+Z₁+2Z₂)))
 fn builtin_isco_radius_kerr_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
     let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -773,7 +773,7 @@ fn builtin_isco_radius_kerr_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m * (3.0 + z2 - sign_a * ((3.0 - z1) * (3.0 + z1 + 2.0 * z2)).sqrt())))
 }
 
-// Spin-orbit coupling term in PN expansion: ξ_SO = (s/m²)·sin θ
+/// Spin-orbit coupling term in PN expansion: ξ_SO = (s/m²)·sin θ
 fn builtin_spin_orbit_coupling_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = f1(args);
     let m = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -782,20 +782,20 @@ fn builtin_spin_orbit_coupling_term(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(s * theta.sin() / (m * m)))
 }
 
-// Spin-spin coupling
+/// Spin-spin coupling
 fn builtin_spin_spin_coupling_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s1 = f1(args);
     let s2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(s1 * s2))
 }
 
-// Hawking area increase: dA / dt ≥ 0
+/// Hawking area increase: dA / dt ≥ 0
 fn builtin_hawking_area_increase(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let da_dt = f1(args);
     Ok(PerlValue::integer(if da_dt >= 0.0 { 1 } else { 0 }))
 }
 
-// Unruh temperature T = ℏ a / (2πck_B)
+/// Unruh temperature T = ℏ a / (2πck_B)
 fn builtin_unruh_temperature_full(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
     let hbar = 1.054_571_817e-34;
@@ -804,13 +804,13 @@ fn builtin_unruh_temperature_full(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(hbar * a / (2.0 * std::f64::consts::PI * c * kb)))
 }
 
-// Bekenstein entropy S = A / (4 ℓ_P²) with ℓ_P = 1
+/// Bekenstein entropy S = A / (4 ℓ_P²) with ℓ_P = 1
 fn builtin_bekenstein_entropy_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let area = f1(args);
     Ok(PerlValue::float(area / 4.0))
 }
 
-// Holographic entanglement entropy S = (Area_minimal / 4G_N)
+/// Holographic entanglement entropy S = (Area_minimal / 4G_N)
 fn builtin_holographic_entanglement_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let area = f1(args);
     let g_n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -818,12 +818,12 @@ fn builtin_holographic_entanglement_step(args: &[PerlValue]) -> PerlResult<PerlV
     Ok(PerlValue::float(area / (4.0 * g_n)))
 }
 
-// Ryu-Takayanagi formula step
+/// Ryu-Takayanagi formula step
 fn builtin_ryu_takayanagi_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_holographic_entanglement_step(args)
 }
 
-// Swampland distance conjecture check: |Δφ| < d_c (returns 1 if inside)
+/// Swampland distance conjecture check: |Δφ| < d_c (returns 1 if inside)
 fn builtin_swampland_distance_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let dphi = f1(args);
     let d_c = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);

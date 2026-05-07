@@ -3,6 +3,7 @@
 const C_LIGHT: f64 = 2.99792458e8;
 const EPS_0: f64 = 8.854187817e-12;
 const MU_0: f64 = 1.25663706212e-6;
+#[allow(dead_code)]
 const E_CHARGE: f64 = 1.602176634e-19;
 
 // Coulomb force

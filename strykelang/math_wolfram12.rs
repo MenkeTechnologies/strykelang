@@ -162,6 +162,7 @@ fn builtin_ionic_strength(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s: f64 = concs.iter().zip(charges.iter()).map(|(c, z)| c * z * z).sum();
     Ok(PerlValue::float(0.5 * s))
 }
+#[allow(dead_code)]
 fn builtin_buffer_capacity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c = f1(args); let pka = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let ph = args.get(2).map(|x| x.to_number()).unwrap_or(7.0);
@@ -183,6 +184,7 @@ fn builtin_de_broglie_wavelength_kg(args: &[PerlValue]) -> PerlResult<PerlValue>
 
 // ── Biology / population ────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn builtin_logistic_growth(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n0 = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let k = args.get(2).map(|x| x.to_number()).unwrap_or(1.0);
