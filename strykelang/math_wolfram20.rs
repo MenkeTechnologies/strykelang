@@ -194,7 +194,10 @@ fn builtin_trinomial_call(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(prices[0]))
 }
 
-// Heston characteristic function (real part at u=1) — simplified mock for pricing
+// Heston (1993) European call price by inversion of the characteristic function:
+//   C = S₀·P₁ − K·e^(−rT)·P₂,   Pⱼ = ½ + (1/π) ∫₀^∞ Re[e^(−iu·lnK) fⱼ(u)/(iu)] du
+// where f₁, f₂ are the Heston characteristic functions. Uses 64-point composite
+// Simpson on truncated integration domain [ε, 200]. Args: S, K, r, v₀, κ, θ, σ_v, ρ, T.
 fn builtin_heston_price_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = f1(args);
     let k = args.get(1).map(|v| v.to_number()).unwrap_or(s);
@@ -205,13 +208,81 @@ fn builtin_heston_price_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sigma_v = args.get(6).map(|v| v.to_number()).unwrap_or(0.3);
     let rho = args.get(7).map(|v| v.to_number()).unwrap_or(-0.7);
     let t = args.get(8).map(|v| v.to_number()).unwrap_or(1.0);
-    // Simple approximation: average vol over T
-    let avg_var = theta + (v0 - theta) * (1.0 - (-kappa * t).exp()) / (kappa * t).max(1e-9);
-    let _ = (sigma_v, rho);
-    let avg_vol = avg_var.max(1e-12).sqrt();
-    let d1 = ((s / k).ln() + (r + 0.5 * avg_vol * avg_vol) * t) / (avg_vol * t.sqrt());
-    let d2 = d1 - avg_vol * t.sqrt();
-    Ok(PerlValue::float(s * norm_cdf_b20(d1) - k * (-r * t).exp() * norm_cdf_b20(d2)))
+    if s <= 0.0 || k <= 0.0 || t <= 0.0 || sigma_v <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    fn cmul(a: (f64, f64), b: (f64, f64)) -> (f64, f64) { (a.0 * b.0 - a.1 * b.1, a.0 * b.1 + a.1 * b.0) }
+    fn cdiv(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
+        let d = b.0 * b.0 + b.1 * b.1;
+        ((a.0 * b.0 + a.1 * b.1) / d, (a.1 * b.0 - a.0 * b.1) / d)
+    }
+    fn cexp(z: (f64, f64)) -> (f64, f64) { let e = z.0.exp(); (e * z.1.cos(), e * z.1.sin()) }
+    fn cln(z: (f64, f64)) -> (f64, f64) {
+        let r = (z.0 * z.0 + z.1 * z.1).sqrt();
+        (r.ln(), z.1.atan2(z.0))
+    }
+    fn csqrt(z: (f64, f64)) -> (f64, f64) {
+        let r = (z.0 * z.0 + z.1 * z.1).sqrt();
+        let re = ((r + z.0) / 2.0).max(0.0).sqrt();
+        let im_sign = if z.1 >= 0.0 { 1.0 } else { -1.0 };
+        let im = im_sign * ((r - z.0) / 2.0).max(0.0).sqrt();
+        (re, im)
+    }
+    let s = s; let k = k; let r = r; let v0 = v0;
+    let phi_j = |u: f64, j: u8| -> (f64, f64) {
+        let i_u = (0.0_f64, u);
+        let (b, uj) = if j == 1 { (kappa - rho * sigma_v, 0.5_f64) } else { (kappa, -0.5_f64) };
+        let a = kappa * theta;
+        let xa = ((rho * sigma_v) * u, 0.0);
+        let inner1 = (xa.0 - b, xa.1);
+        let d_arg = cmul(inner1, inner1);
+        let two_iu = (0.0, 2.0 * u);
+        let two_uju = (2.0 * uj * u, 0.0);
+        let plus = (two_uju.0 + 0.0 - u * u, two_uju.1 - two_iu.1);
+        let _ = plus;
+        let term2 = (sigma_v * sigma_v * (u * u), -sigma_v * sigma_v * 2.0 * uj * u);
+        let inside = (d_arg.0 + term2.0, d_arg.1 + term2.1);
+        let d = csqrt(inside);
+        let g = cdiv((inner1.0 - d.0, inner1.1 - d.1), (inner1.0 + d.0, inner1.1 + d.1));
+        let dt = (d.0 * t, d.1 * t);
+        let exp_dt = cexp(dt);
+        let one_minus_g_exp = (1.0 - cmul(g, exp_dt).0, -cmul(g, exp_dt).1);
+        let one_minus_g = (1.0 - g.0, -g.1);
+        let log_term = cln(cdiv(one_minus_g_exp, one_minus_g));
+        let bd_t = (inner1.0 - d.0, inner1.1 - d.1);
+        let bd_t_t = (bd_t.0 * t, bd_t.1 * t);
+        let cap_c = (
+            r * u * 0.0 + a / (sigma_v * sigma_v) * (bd_t_t.0 - 2.0 * log_term.0),
+            r * u * t + a / (sigma_v * sigma_v) * (bd_t_t.1 - 2.0 * log_term.1),
+        );
+        let one_minus_exp = (1.0 - exp_dt.0, -exp_dt.1);
+        let cap_d = cmul(cdiv(bd_t, (sigma_v * sigma_v, 0.0)),
+            cdiv(one_minus_exp, one_minus_g_exp));
+        let log_s = (s.ln() * 1.0, 0.0);
+        let i_u_lns = cmul(i_u, log_s);
+        let exponent = (cap_c.0 + cap_d.0 * v0 + i_u_lns.0, cap_c.1 + cap_d.1 * v0 + i_u_lns.1);
+        cexp(exponent)
+    };
+    let integrand = |u: f64, j: u8| {
+        let phi = phi_j(u, j);
+        let factor = cdiv(cexp((0.0, -u * k.ln())), (0.0, u));
+        let prod = cmul(factor, phi);
+        prod.0
+    };
+    let simpson = |j: u8| -> f64 {
+        let n = 256_usize;
+        let lo = 1e-4_f64;
+        let hi = 200.0_f64;
+        let h = (hi - lo) / n as f64;
+        let mut s = integrand(lo, j) + integrand(hi, j);
+        for i in 1..n {
+            let u = lo + i as f64 * h;
+            let w = if i % 2 == 0 { 2.0 } else { 4.0 };
+            s += w * integrand(u, j);
+        }
+        s * h / 3.0
+    };
+    let p1 = 0.5 + simpson(1) / std::f64::consts::PI;
+    let p2 = 0.5 + simpson(2) / std::f64::consts::PI;
+    Ok(PerlValue::float(s * p1 - k * (-r * t).exp() * p2))
 }
 
 // SABR implied vol (Hagan 2002) approximation

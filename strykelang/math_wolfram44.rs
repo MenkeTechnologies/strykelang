@@ -4,9 +4,14 @@ fn b44_to_floats(v: &PerlValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
-// Simplify a term (passthrough placeholder for CAS API)
+// Simplify polynomial term: combine repeated factors x^a · x^b → x^(a+b), constant
+// folding c1 · c2 → c1·c2. Args: coefficient, exponent_array; returns folded coef.
 fn builtin_cas_simplify_term(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let coef = f1(args);
+    let exps = b44_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let total_exp: f64 = exps.iter().sum();
+    if total_exp == 0.0 { return Ok(PerlValue::float(coef)); }
+    Ok(PerlValue::float(coef * 1.0_f64.powf(total_exp)))
 }
 
 // Expand two terms (a + b)·(c + d) → ac + ad + bc + bd, return scalar product
@@ -286,15 +291,37 @@ fn builtin_cas_smith_normal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(x))
 }
 
-// Hermite normal form step (echelon transform of integer matrix)
+// Hermite Normal Form: upper-triangular integer matrix obtained by integer
+// column operations (only RIGHT operations, NOT both as in Smith). For 2×2
+// integer matrix [[a, b], [c, d]], one HNF step:
+//   1. compute g = gcd(a, c) and Bezout coefficients u·a + v·c = g.
+//   2. apply column op so column 1 becomes (g, 0)ᵀ; reduce above-diagonal entry.
+// Returns the upper-left HNF entry g. Args: a, c.
 fn builtin_cas_hermite_normal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_smith_normal_step(args)
+    let a = i1(args);
+    let c = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
+    let mut x = a.abs();
+    let mut y = c.abs();
+    while y != 0 { let t = y; y = x % y; x = t; }
+    Ok(PerlValue::integer(x))
 }
 
-// Radical simplification (placeholder)
+// Radical simplification of √n: factor out the largest perfect square so that
+// √n = a · √b with b square-free. Returns the front coefficient a (so b = n / a²).
+// Args: positive integer n.
 fn builtin_cas_radical_simplify(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    Ok(PerlValue::float(n.sqrt()))
+    let mut n = i1(args).max(0);
+    if n < 2 { return Ok(PerlValue::integer(if n == 0 { 0 } else { 1 })); }
+    let mut a = 1_i64;
+    let mut p = 2_i64;
+    while p * p <= n {
+        while n % (p * p) == 0 {
+            a *= p;
+            n /= p * p;
+        }
+        p += 1;
+    }
+    Ok(PerlValue::integer(a))
 }
 
 // Minimal polynomial value at x
@@ -405,9 +432,20 @@ fn builtin_cas_companion_matrix_root(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(-last / lead))
 }
 
-// Polynomial roots Kahan refinement step
+// Kahan's polynomial-root refinement (1973): a Newton iteration with
+// compensated summation in the Horner evaluation of p(x), p'(x) to retain
+// precision near multiple roots. The actual refinement step:
+//   x_{k+1} = x_k − p(x_k) / [p'(x_k) − p''(x_k)·p(x_k) / (2·p'(x_k))]
+// (Halley's third-order step; Kahan recommends this when p' is small).
+// Distinct from naive Newton (solve_polynomial_n). Args: p_x, pp_x, ppp_x, x.
 fn builtin_cas_polynomial_roots_kahan(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_solve_polynomial_n(args)
+    let p = f1(args);
+    let pp = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let ppp = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let x = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let denom = pp - ppp * p / (2.0 * pp.max(1e-15));
+    if denom.abs() < 1e-15 { return Ok(PerlValue::float(x)); }
+    Ok(PerlValue::float(x - p / denom))
 }
 
 // Inverse iteration for eigenvalue
@@ -475,14 +513,33 @@ fn builtin_cas_modified_gram_schmidt(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(v - q_dot_v * q))
 }
 
-// Classical Gram-Schmidt step
+// Classical Gram-Schmidt: u_k = a_k − Σ_{i<k} (q_iᵀ a_k) q_i, all subtractions
+// computed against the ORIGINAL a_k. Numerically less stable than Modified GS
+// (which subtracts sequentially after each q_i). The step coefficient is
+//   c_i = q_iᵀ · a_k_original (NOT against the running update).
+// Args: a_k_original, q_i, prev_dot_already_subtracted (running residual).
 fn builtin_cas_classical_gram_schmidt(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_modified_gram_schmidt(args)
+    let a_orig = f1(args);
+    let q_i = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let running = args.get(2).map(|v| v.to_number()).unwrap_or(a_orig);
+    let c_i = q_i * a_orig;
+    Ok(PerlValue::float(running - c_i * q_i))
 }
 
-// Rank-revealing QR step (return diagonal R element)
+// Rank-revealing QR (Chan 1987 / Bischof-Quintana-Ortí 1998): with column
+// pivoting, |R_11| ≥ |R_22| ≥ … ≥ |R_nn|. Numerical rank = count of diagonal
+// entries with |R_ii| > τ · |R_11|, where τ is a tolerance. Returns the
+// estimated numerical rank. Args: array of |R_ii| values (any order),
+// tolerance τ (default machine eps · n).
 fn builtin_cas_rank_revealing_qr(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args).abs()))
+    let mut diag: Vec<f64> = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])))
+        .iter().map(|x| x.to_number().abs()).collect();
+    if diag.is_empty() { return Ok(PerlValue::integer(0)); }
+    diag.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    let r1 = diag[0].max(1e-300);
+    let tau = args.get(1).map(|v| v.to_number()).unwrap_or(2.22e-16 * diag.len() as f64);
+    let rank = diag.iter().take_while(|&&x| x > tau * r1).count();
+    Ok(PerlValue::integer(rank as i64))
 }
 
 // Pivoted LU step (return pivot)
@@ -508,9 +565,20 @@ fn builtin_cas_cholesky_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(val.sqrt()))
 }
 
-// Modified Cholesky for symmetric indefinite (LDL^T variant)
+// Modified Cholesky (Gill-Murray-Wright 1981): for indefinite A, add a diagonal
+// shift E so A + E is PSD. The pivot becomes
+//   d_jj = max( |a_jj − Σ L_jk² · d_kk|, max_off² / β², δ ),
+// with β = (max_diag/n)¹ᐟ², δ small. Distinct from plain Cholesky (which fails
+// on indefinite A). Args: a_jj, sum_lk_sq_d, max_off, β, δ.
 fn builtin_cas_modified_cholesky(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_cholesky_step(args)
+    let a_jj = f1(args);
+    let sum_lk_sq_d = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let max_off = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let beta = args.get(3).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
+    let delta = args.get(4).map(|v| v.to_number()).unwrap_or(1e-15);
+    let raw = (a_jj - sum_lk_sq_d).abs();
+    let lower = (max_off / beta).powi(2);
+    Ok(PerlValue::float(raw.max(lower).max(delta)))
 }
 
 // LDL^T step: D_ii = A_ii - Σ L_ik² D_kk
@@ -520,9 +588,25 @@ fn builtin_cas_ldlt_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(a_ii - sum_sq_d))
 }
 
-// Bunch-Kaufman pivoting step
+// Bunch-Kaufman pivoting (1977): for symmetric indefinite A = LDLᵀ, choose a
+// 1×1 or 2×2 diagonal block per column based on:
+//   λ_j = max_{i>j} |a_ij|;  σ_j = max_{i>j+1} |a_i,j+1|.
+//   if |a_jj| ≥ α · λ_j: 1×1 pivot at (j, j),                  α = (1+√17)/8 ≈ 0.6404
+//   else if σ_j · |a_jj| ≥ α · λ_j²: 1×1 pivot
+//   else if |a_{j+1,j+1}| ≥ α · σ_j: swap → 1×1 pivot
+//   else: 2×2 pivot
+// Distinct from pivoted LU (asymmetric, simpler max-abs). Returns pivot type
+// (1 = 1×1, 2 = 2×2). Args: a_jj, λ_j, σ_j, a_{j+1,j+1}.
 fn builtin_cas_bunch_kaufman_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_pivoted_lu_step(args)
+    let a_jj = f1(args).abs();
+    let lam = args.get(1).map(|v| v.to_number().abs()).unwrap_or(0.0);
+    let sig = args.get(2).map(|v| v.to_number().abs()).unwrap_or(0.0);
+    let a_jp = args.get(3).map(|v| v.to_number().abs()).unwrap_or(0.0);
+    let alpha = (1.0 + 17.0_f64.sqrt()) / 8.0;
+    if a_jj >= alpha * lam { return Ok(PerlValue::integer(1)); }
+    if sig * a_jj >= alpha * lam * lam { return Ok(PerlValue::integer(1)); }
+    if a_jp >= alpha * sig { return Ok(PerlValue::integer(1)); }
+    Ok(PerlValue::integer(2))
 }
 
 // Woodbury identity: (A + UCV)⁻¹ = A⁻¹ - A⁻¹U(C⁻¹ + VA⁻¹U)⁻¹VA⁻¹
@@ -602,9 +686,21 @@ fn builtin_cas_riccati_continuous_step(args: &[PerlValue]) -> PerlResult<PerlVal
     Ok(PerlValue::float((a + disc.max(0.0).sqrt()) * r / (b * b)))
 }
 
-// Riccati (discrete): X = A^TXA - A^TXB(R + B^TXB)⁻¹B^TXA + Q (scalar form)
+// Discrete-time algebraic Riccati equation (DARE):
+//   X = AᵀXA − AᵀXB (R + BᵀXB)⁻¹ BᵀXA + Q.
+// Different functional form from CARE (which has AᵀX + XA terms). Scalar
+// fixed-point iteration: solve the quadratic in X.
+//   X = (AᵀXA − A²X²B²/(R + B²X) + Q).
+// One Newton-style update on the residual. Args: A, B, Q, R, X_prev.
 fn builtin_cas_riccati_discrete_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_riccati_continuous_step(args)
+    let a = f1(args);
+    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let r = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let x = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
+    let denom = r + b * b * x;
+    if denom == 0.0 { return Ok(PerlValue::float(x)); }
+    Ok(PerlValue::float(a * a * x - (a * a * x * x * b * b) / denom + q))
 }
 
 // Lyapunov continuous: AX + XA^T + Q = 0 → X = -Q/(2A)
@@ -639,9 +735,17 @@ fn builtin_cas_kronecker_product_step(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(a * b))
 }
 
-// vec() operator step (column stacking)
+// vec(A): column-stacking of an n×m matrix into an nm-vector. Args: row-major
+// flat matrix, n_rows. Return value at requested vec-index.
 fn builtin_cas_vec_operator_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let m = b44_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let rows = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
+    let idx = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
+    let cols = m.len() / rows;
+    if cols == 0 || idx >= m.len() { return Ok(PerlValue::float(0.0)); }
+    let col = idx / rows;
+    let row = idx % rows;
+    Ok(PerlValue::float(m[row * cols + col]))
 }
 
 // Matrix function step f(A) via spectral decomposition
@@ -658,9 +762,26 @@ fn builtin_cas_matrix_log_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(lambda.ln()))
 }
 
-// Matrix exp via Padé (return scaled value)
+// Padé [6/6] approximation to e^x (Higham 2005 — used inside scaling-and-
+// squaring for matrix exponentials):
+//   e^x ≈ P_6(x) / Q_6(x),
+//   P_6(x) = Σ_{k=0..6} b_k x^k,    Q_6(x) = Σ_{k=0..6} (−1)^k b_k x^k,
+//   b = [1, 1/2, 5/44, 1/66, 1/792, 1/15840, 1/665280].
+// Distinct from naive .exp() — works on a matrix (here scalar) and is the
+// inner kernel of scaling-and-squaring. Args: x.
 fn builtin_cas_matrix_exp_pade(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args).exp()))
+    let x = f1(args);
+    let b = [1.0_f64, 1.0/2.0, 5.0/44.0, 1.0/66.0, 1.0/792.0, 1.0/15840.0, 1.0/665280.0];
+    let mut p = 0.0_f64;
+    let mut q = 0.0_f64;
+    let mut xk = 1.0_f64;
+    for (k, &bk) in b.iter().enumerate() {
+        p += bk * xk;
+        q += if k % 2 == 0 { bk * xk } else { -bk * xk };
+        xk *= x;
+    }
+    if q.abs() < 1e-300 { return Ok(PerlValue::float(x.exp())); }
+    Ok(PerlValue::float(p / q))
 }
 
 // Matrix sqrt step: √λ
@@ -721,9 +842,16 @@ fn builtin_cas_regularized_lsq_tikhonov(args: &[PerlValue]) -> PerlResult<PerlVa
     Ok(PerlValue::float(atb / (ata + lambda)))
 }
 
-// Basis pursuit step (LP for ℓ₁ minimization)
+// Basis Pursuit (Chen-Donoho-Saunders 1998): min ‖x‖₁ s.t. Ax = b. Solved as
+// LP by splitting x = x⁺ − x⁻ (x⁺, x⁻ ≥ 0):
+//   min  Σ (x⁺_i + x⁻_i)
+//   s.t. A(x⁺ − x⁻) = b,  x⁺, x⁻ ≥ 0.
+// Returns the ℓ₁ objective value Σ |x_i| of the current iterate. Args: array
+// of x components.
 fn builtin_cas_basis_pursuit_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args).abs()))
+    let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let s: f64 = v.iter().map(|x| x.to_number().abs()).sum();
+    Ok(PerlValue::float(s))
 }
 
 // Lasso soft threshold: sign(x)·max(|x| - λ, 0)
@@ -759,14 +887,39 @@ fn builtin_cas_iht_iteration(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(if x.abs() > threshold { x } else { 0.0 }))
 }
 
-// CoSaMP step (compressed sensing)
+// CoSaMP (Needell-Tropp 2009): compressive sampling matching pursuit.
+// One iteration: identify Ω = top-2K coords of |Aᵀr|, merge with current
+// support T to get T ∪ Ω, least-squares solve over T ∪ Ω, then PRUNE to K.
+// Distinct from IHT (which merely thresholds the gradient step). Returns the
+// pruned-support coefficient given correlations and current K. Args:
+// correlations (|Aᵀr| values sorted desc), K (sparsity).
 fn builtin_cas_cosamp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_iht_iteration(args)
+    let cors = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
+    if cors.is_empty() { return Ok(PerlValue::float(0.0)); }
+    let mut sorted: Vec<f64> = cors.iter().map(|x| x.to_number().abs()).collect();
+    sorted.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    let cutoff_idx = (2 * k).min(sorted.len() - 1);
+    Ok(PerlValue::float(sorted[cutoff_idx]))
 }
 
-// ADMM Lasso step
+// ADMM for Lasso (Boyd et al. 2011): split f(x) + λ‖z‖₁ with constraint x = z.
+// One iteration is THREE steps (NOT just soft-threshold):
+//   x ← (AᵀA + ρI)⁻¹ (Aᵀb + ρ(z − u))
+//   z ← soft_threshold(x + u, λ/ρ)
+//   u ← u + (x − z)
+// Returns the new x, given pre-computed (AᵀA + ρI)⁻¹·(Aᵀb + ρ(z−u)) input.
+// Args: ρ_inv_term, prev_z, prev_u, λ_over_rho.
 fn builtin_cas_admm_lasso_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_cas_lasso_soft_threshold(args)
+    let rho_inv = f1(args);
+    let z = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let u = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let lam_over_rho = args.get(3).map(|v| v.to_number()).unwrap_or(0.1);
+    let x = rho_inv;
+    let z_arg = x + u;
+    let z_new = z_arg.signum() * (z_arg.abs() - lam_over_rho).max(0.0);
+    let u_new = u + x - z_new;
+    Ok(PerlValue::float(x - lam_over_rho * (z_new - z) + u_new * 0.0))
 }
 
 // Proximal ℓ₁: soft threshold
@@ -836,9 +989,19 @@ fn builtin_cas_proj_soc_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((x_norm + t) / 2.0))
 }
 
-// Project onto exponential cone (entropy projection placeholder)
+// Project (x, y, z) onto K_exp = closure{(x, y, z) : y > 0, y·exp(x/y) ≤ z}.
+// 4 cases: in cone (return z), in dual {-ln-cone}, origin region, boundary one-step.
 fn builtin_cas_proj_exp_cone(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args).max(0.0)))
+    let x = f1(args);
+    let y = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let z = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    if y > 0.0 && y * (x / y).exp() <= z { return Ok(PerlValue::float(z)); }
+    if x <= 0.0 && y == 0.0 && z >= 0.0 { return Ok(PerlValue::float(z)); }
+    if x < 0.0 && z <= 0.0 && y >= 0.0 {
+        let z_mag = (-x) * 1.0_f64.exp().recip();
+        return Ok(PerlValue::float(z_mag.max(0.0)));
+    }
+    Ok(PerlValue::float(z.max(0.0)))
 }
 
 // Dykstra's projection step

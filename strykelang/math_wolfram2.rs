@@ -207,9 +207,19 @@ fn builtin_mersenne_q(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if s == 0 { 1 } else { 0 }))
 }
 
-/// `lucas_lehmer_test p` — same as mersenne_q for prime p (alias kept for clarity).
+/// `lucas_lehmer_test p` — Lucas-Lehmer test for Mersenne primality of M_p = 2^p − 1
+/// (p ≥ 3): seed s_0 = 4, iterate s_{n+1} = (s_n² − 2) mod M_p for n = 0..p-2;
+/// M_p is prime iff s_{p-2} = 0. Returns 1 if M_p prime, 0 otherwise.
 fn builtin_lucas_lehmer_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_mersenne_q(args)
+    let p = i1(args);
+    if p < 2 { return Ok(PerlValue::integer(0)); }
+    if p == 2 { return Ok(PerlValue::integer(1)); }
+    let m: u128 = (1u128 << (p as u32)) - 1;
+    let mut s: u128 = 4;
+    for _ in 0..(p - 2) {
+        s = (s.wrapping_mul(s).wrapping_sub(2)) % m;
+    }
+    Ok(PerlValue::integer(if s == 0 { 1 } else { 0 }))
 }
 
 /// `continued_fraction X [, N]` — first N coefficients of the simple continued

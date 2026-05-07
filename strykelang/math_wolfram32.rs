@@ -177,9 +177,14 @@ fn builtin_bit_flip_prob(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array(vec![PerlValue::float(1.0 - p), PerlValue::float(p)]))
 }
 
-// Phase-flip channel
+// Phase-flip channel ρ → (1−p)ρ + p Z ρ Z. On the Bloch vector r = (x, y, z),
+// this damps the off-diagonal coherences but leaves Z invariant:
+// r' = ((1−2p)·x, (1−2p)·y, z). Returns the new Bloch components for input p.
+// Distinct from bit-flip (which preserves X and damps Y, Z).
 fn builtin_phase_flip_prob(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_bit_flip_prob(args)
+    let p = f1(args).clamp(0.0, 1.0);
+    let f = 1.0 - 2.0 * p;
+    Ok(PerlValue::array(vec![PerlValue::float(f), PerlValue::float(f), PerlValue::float(1.0)]))
 }
 
 // Depolarizing channel ρ → (1-p)ρ + p I/2
@@ -411,13 +416,52 @@ fn builtin_spin_casimir(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(hbar * hbar * j * (j + 1.0)))
 }
 
-// Clebsch-Gordan stub (j1, j2, m1, m2 → j, m simple symmetric)
+// Clebsch-Gordan coefficient ⟨j₁ m₁; j₂ m₂ | j m⟩ via the Racah/closed-form
+// formula:
+//   ⟨j₁ m₁; j₂ m₂ | j m⟩ = δ_{m, m₁+m₂} · √((2j+1) Δ(j₁ j₂ j))
+//   · √(∏ four (j±m)! ratios) · Σ_k (−1)^k / [k! (j₁+j₂−j−k)!
+//   (j₁−m₁−k)! (j₂+m₂−k)! (j−j₂+m₁+k)! (j−j₁−m₂+k)!]
+// Args: j1, m1, j2, m2, j, m (all in half-integer units doubled to integers
+// by the caller, i.e. pass 2j₁ etc. — convention: integer doubled values).
 fn builtin_cg_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m1 = f1(args);
-    let m2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let m = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    if (m1 + m2 - m).abs() > 1e-9 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(1.0))
+    let two_j1 = i1(args);
+    let two_m1 = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
+    let two_j2 = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
+    let two_m2 = args.get(3).map(|v| v.to_number() as i64).unwrap_or(0);
+    let two_j  = args.get(4).map(|v| v.to_number() as i64).unwrap_or(two_j1 + two_j2);
+    let two_m  = args.get(5).map(|v| v.to_number() as i64).unwrap_or(two_m1 + two_m2);
+    if two_m1 + two_m2 != two_m { return Ok(PerlValue::float(0.0)); }
+    if two_j < (two_j1 - two_j2).abs() || two_j > two_j1 + two_j2 { return Ok(PerlValue::float(0.0)); }
+    if (two_j1 + two_j2 + two_j) % 2 != 0 { return Ok(PerlValue::float(0.0)); }
+    fn fact(n: i64) -> f64 {
+        if n < 0 { return f64::NAN; }
+        let mut p = 1.0_f64;
+        for k in 2..=n { p *= k as f64; }
+        p
+    }
+    let ja = (two_j1 + two_j2 - two_j) / 2;
+    let jb = (two_j1 - two_j2 + two_j) / 2;
+    let jc = (-two_j1 + two_j2 + two_j) / 2;
+    let jd = (two_j1 + two_j2 + two_j) / 2 + 1;
+    if ja < 0 || jb < 0 || jc < 0 { return Ok(PerlValue::float(0.0)); }
+    let triangle = fact(ja) * fact(jb) * fact(jc) / fact(jd);
+    let m1p = (two_j1 + two_m1) / 2; let m1m = (two_j1 - two_m1) / 2;
+    let m2p = (two_j2 + two_m2) / 2; let m2m = (two_j2 - two_m2) / 2;
+    let mp  = (two_j  + two_m ) / 2; let mm  = (two_j  - two_m ) / 2;
+    let prefac = ((two_j as f64 + 1.0) * triangle * fact(m1p) * fact(m1m)
+        * fact(m2p) * fact(m2m) * fact(mp) * fact(mm)).max(0.0).sqrt();
+    let k_lo = 0_i64.max((two_j2 - two_j - two_m1) / 2).max((two_j1 - two_j + two_m2) / 2);
+    let k_hi = ja.min((two_j1 - two_m1) / 2).min((two_j2 + two_m2) / 2);
+    let mut sum = 0.0_f64;
+    for k in k_lo..=k_hi {
+        let denom = fact(k) * fact(ja - k) * fact((two_j1 - two_m1) / 2 - k)
+            * fact((two_j2 + two_m2) / 2 - k)
+            * fact((two_j - two_j2 + two_m1) / 2 + k)
+            * fact((two_j - two_j1 - two_m2) / 2 + k);
+        let sign = if k % 2 == 0 { 1.0 } else { -1.0 };
+        if denom > 0.0 { sum += sign / denom; }
+    }
+    Ok(PerlValue::float(prefac * sum))
 }
 
 // Wigner 3-j upper bound (rough sanity)

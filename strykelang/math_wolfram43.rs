@@ -205,9 +205,14 @@ fn builtin_trust_game_repayment(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(received * trust_factor))
 }
 
-// Cooperative game value v(S) (passthrough)
+// Cooperative game value v(S): for unanimity game on coalition T (subset of N),
+// v(S) = 1 if T ⊆ S else 0; for additive game it's a sum. Combine: weight·sum + base.
 fn builtin_cooperative_game_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let members = b43_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let base = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let synergy = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let n = members.len() as f64;
+    Ok(PerlValue::float(members.iter().sum::<f64>() + base + synergy * n * (n - 1.0) / 2.0))
 }
 
 // Characteristic function v(S) for additive game
@@ -366,9 +371,15 @@ fn builtin_median_voter_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(p[p.len() / 2]))
 }
 
-// Hotelling location game equilibrium (1-D, 2 firms): x* = 1/2
-fn builtin_hotelling_location_step(_args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(0.5))
+// Hotelling 1-D location best response: with linear transport cost t over [0, L]
+// for 2 firms with current rivals at x_other, BR is to locate just inside the
+// midpoint of the larger captive segment.
+fn builtin_hotelling_location_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x_other = f1(args);
+    let length = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let eps = 1e-6;
+    if x_other <= length / 2.0 { Ok(PerlValue::float((x_other + length) / 2.0 - eps)) }
+    else { Ok(PerlValue::float(x_other / 2.0 + eps)) }
 }
 
 // Arrow Pareto check
@@ -514,24 +525,55 @@ fn builtin_posted_price_offer_accept(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::integer(if value >= price { 1 } else { 0 }))
 }
 
-// Matching market step (deferred-acceptance proposals)
+// Matching market step: count proposals minus rejections (positive = market clearing).
 fn builtin_matching_market_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let proposals = f1(args);
+    let rejections = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(proposals - rejections))
 }
 
-// Deferred acceptance step
+// Deferred acceptance: round count until no rejections / proposals stabilizes.
+// Returns 1 if matching is stable (no blocking pair), 0 otherwise.
 fn builtin_deferred_acceptance_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let blocking_pairs = f1(args);
+    Ok(PerlValue::integer(if blocking_pairs == 0.0 { 1 } else { 0 }))
 }
 
-// Boston mechanism step
+// Boston mechanism (immediate-acceptance, Abdulkadiroğlu & Sönmez 2003):
+// in round k, every unmatched student applies to their k-th choice; schools
+// IRREVOCABLY accept up to capacity by priority. UNLIKE deferred acceptance,
+// rejected students cannot displace previously-accepted ones — this makes
+// Boston manipulable but maximizes "first-choice" rate. Returns 1 if school
+// accepts (capacity remaining AND priority high enough), else 0.
+// Args: applicants_so_far, capacity, applicant_rank, top_rank_filled.
 fn builtin_boston_mechanism_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_deferred_acceptance_step(args)
+    let so_far = i1(args);
+    let cap = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    let rank = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
+    let top_filled = args.get(3).map(|v| v.to_number() as i64).unwrap_or(0);
+    Ok(PerlValue::integer(if so_far < cap && rank <= top_filled { 1 } else { 0 }))
 }
 
-// Top trading cycles step (Shapley-Scarf)
+// Top Trading Cycles (Shapley-Scarf): number of agents matched in one TTC round
+// equals length of the cycle in the "points-to" graph. Args: cycle length.
 fn builtin_top_trading_cycles_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let pointers = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let n = pointers.len();
+    if n == 0 { return Ok(PerlValue::integer(0)); }
+    let p: Vec<usize> = pointers.iter().map(|x| (x.to_number() as usize).min(n - 1)).collect();
+    let mut tortoise = 0_usize;
+    let mut hare = 0_usize;
+    for _ in 0..n {
+        tortoise = p[tortoise];
+        hare = p[p[hare]];
+        if tortoise == hare { break; }
+    }
+    let mut start = 0_usize;
+    while start != tortoise { start = p[start]; tortoise = p[tortoise]; }
+    let mut len = 1_i64;
+    let mut cur = p[start];
+    while cur != start { len += 1; cur = p[cur]; }
+    Ok(PerlValue::integer(len))
 }
 
 // School choice match: priority * preference
@@ -541,9 +583,17 @@ fn builtin_school_choice_match(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(priority * preference))
 }
 
-// Roommate match step
+// Stable roommates (Irving 1985): unlike Gale-Shapley (bipartite), one-sided
+// matching may have NO stable matching. Irving's algorithm: phase 1 — each
+// person proposes down their list, holding best held; phase 2 — eliminate
+// rotations (cycles in second-best chains). Returns 1 if step yields stable
+// pairing so far, 0 if a "no-stable" rotation is detected.
+// Args: rejections_so_far, rotation_detected (0/1), unmatched_count.
 fn builtin_roommate_match_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_deferred_acceptance_step(args)
+    let rotation = i1(args);
+    let unmatched = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
+    if rotation != 0 { return Ok(PerlValue::integer(0)); }
+    Ok(PerlValue::integer(if unmatched == 0 { 1 } else { 0 }))
 }
 
 // Network formation step (link cost vs benefit)
@@ -606,15 +656,38 @@ fn builtin_quantal_response_logit(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((lambda * (u[idx] - max)).exp() / denom))
 }
 
-// Level-k thinking step
+// Level-k iterated reasoning (Stahl & Wilson 1995): a level-k agent best-
+// responds to a level-(k−1) opponent. Recursive formulation:
+//   π^k = BR(π^{k−1}),  with π^0 = uniform random / level-0 anchor.
+// Returns the level-k best-response probability for one action given the
+// level-(k−1) action probability. Args: prev_level_prob, br_value (= 1 if
+// action is BR else 0).
 fn builtin_level_k_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let k = f1(args);
-    Ok(PerlValue::float(k))
+    let prev_p = f1(args).clamp(0.0, 1.0);
+    let br = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
+    if br == 0 { Ok(PerlValue::float(0.0)) } else { Ok(PerlValue::float(prev_p)) }
 }
 
-// Cognitive hierarchy step
+// Cognitive Hierarchy (Camerer-Ho-Chong 2004): every agent's level k is drawn
+// from a truncated Poisson(τ). A level-k agent best-responds to a BELIEF
+// distribution over levels 0..k−1 with renormalized Poisson weights:
+//   g_k(j) = (e^{−τ} τ^j / j!) / Σ_{i<k} (e^{−τ} τ^i / i!)  for j < k.
+// Differs from Level-k (which assumes ALL opponents are at exactly level k−1).
+// Args: τ (mean level, default 1.5), k (current level), j (queried lower level).
 fn builtin_cognitive_hierarchy_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_level_k_step(args)
+    let tau = f1(args).max(0.0);
+    let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1).max(1);
+    let j = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0).max(0);
+    if j >= k { return Ok(PerlValue::float(0.0)); }
+    fn pois(tau: f64, n: i64) -> f64 {
+        let mut p = (-tau).exp();
+        for i in 1..=n { p *= tau / i as f64; }
+        p
+    }
+    let num = pois(tau, j);
+    let denom: f64 = (0..k).map(|i| pois(tau, i)).sum();
+    if denom == 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(num / denom))
 }
 
 // Sequential equilibrium check
@@ -727,9 +800,19 @@ fn builtin_ex_post_value_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if v_realized >= v_threshold { 1 } else { 0 }))
 }
 
-// Ex-ante value check (before)
+// Ex-ante value (before type realization): expected utility under the prior.
+//   E_t[u(t, a*(t))] = Σ_t p(t) · u(t, a*(t)).
+// Distinct from ex-post (which conditions on a realized type). Returns the
+// expectation given probability-weighted utility-of-type pairs.
+// Args: array of [p_t, u_t] pairs; optional threshold to compare against.
 fn builtin_ex_ante_value_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ex_post_value_check(args)
+    let v = b43_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let threshold = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
+    let mut ev = 0.0_f64;
+    for ch in v.chunks(2) {
+        if ch.len() == 2 { ev += ch[0] * ch[1]; }
+    }
+    Ok(PerlValue::integer(if ev >= threshold { 1 } else { 0 }))
 }
 
 // Common knowledge iterations (mutual knowledge depth)

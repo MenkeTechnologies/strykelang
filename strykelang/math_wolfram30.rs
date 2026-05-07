@@ -304,14 +304,55 @@ fn builtin_bpm_to_midi_tick_us(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(60_000_000.0 / (bpm * ppqn)))
 }
 
-// Loudness equal-loudness contour ISO 226 — return relative SPL adjustment (placeholder)
+// ISO 226:2003 equal-loudness contour: SPL Lp at frequency f for loudness level Ln (phons).
+// Uses the spec's αf, Lu, Tf tables at the 29 standard frequencies and the formula
+//   A_f = 4.47e-3·(10^(0.025·Ln) − 1.15) + (0.4 · 10^((Tf + Lu)/10 − 9))^αf
+//   Lp  = (10/αf)·log₁₀(A_f) − Lu + 94
+// Arguments are interpolated (log-frequency, linear in tables) between adjacent bands.
 fn builtin_iso226_phon_adjustment(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let f = f1(args);
     let phon = args.get(1).map(|v| v.to_number()).unwrap_or(60.0);
-    let _ = phon;
     if f <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    const FREQ: [f64; 29] = [
+        20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0,
+        200.0, 250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0,
+        1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0,
+        10000.0, 12500.0,
+    ];
+    const ALPHA_F: [f64; 29] = [
+        0.532, 0.506, 0.480, 0.455, 0.432, 0.409, 0.387, 0.367, 0.349, 0.330,
+        0.315, 0.301, 0.288, 0.276, 0.267, 0.259, 0.253, 0.250, 0.246, 0.244,
+        0.243, 0.243, 0.243, 0.242, 0.242, 0.245, 0.254, 0.271, 0.301,
+    ];
+    const LU: [f64; 29] = [
+        -31.6, -27.2, -23.0, -19.1, -15.9, -13.0, -10.3, -8.1, -6.2, -4.5,
+        -3.1, -2.0, -1.1, -0.4, 0.0, 0.3, 0.5, 0.0, -2.7, -4.1,
+        -1.0, 1.7, 2.5, 1.2, -2.1, -7.1, -11.2, -10.7, -3.1,
+    ];
+    const TF: [f64; 29] = [
+        78.5, 68.7, 59.5, 51.1, 44.0, 37.5, 31.5, 26.5, 22.1, 17.9,
+        14.4, 11.4, 8.6, 6.2, 4.4, 3.0, 2.2, 2.4, 3.5, 1.7,
+        -1.3, -4.2, -6.0, -5.4, -1.5, 6.0, 12.6, 13.9, 12.3,
+    ];
     let log_f = f.log10();
-    Ok(PerlValue::float(20.0 * (log_f - 3.0).powi(2) - 10.0))
+    let logs: Vec<f64> = FREQ.iter().map(|x| x.log10()).collect();
+    let (mut i_lo, mut i_hi) = (0usize, FREQ.len() - 1);
+    if log_f <= logs[0] { i_lo = 0; i_hi = 0; }
+    else if log_f >= logs[FREQ.len() - 1] { i_lo = FREQ.len() - 1; i_hi = i_lo; }
+    else {
+        for i in 0..FREQ.len() - 1 {
+            if log_f >= logs[i] && log_f <= logs[i + 1] { i_lo = i; i_hi = i + 1; break; }
+        }
+    }
+    let t = if i_lo == i_hi { 0.0 } else { (log_f - logs[i_lo]) / (logs[i_hi] - logs[i_lo]) };
+    let lerp = |a: f64, b: f64| a + t * (b - a);
+    let alpha = lerp(ALPHA_F[i_lo], ALPHA_F[i_hi]);
+    let lu = lerp(LU[i_lo], LU[i_hi]);
+    let tf = lerp(TF[i_lo], TF[i_hi]);
+    let af = 4.47e-3 * (10f64.powf(0.025 * phon) - 1.15)
+           + (0.4 * 10f64.powf((tf + lu) / 10.0 - 9.0)).powf(alpha);
+    let lp = (10.0 / alpha) * af.log10() - lu + 94.0;
+    Ok(PerlValue::float(lp))
 }
 
 // dB to linear amplitude

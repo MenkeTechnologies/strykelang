@@ -163,19 +163,37 @@ fn builtin_siphash24(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer((v0 ^ v1 ^ v2 ^ v3) as i64))
 }
 
-// PBKDF2-HMAC-SHA1 (simplified — single iteration of XOR + concat)
+// PBKDF2-HMAC-SHA1 per RFC 2898 §5.2 / RFC 8018: derive a 20-byte key from
+// password + salt with `iters` iterations, returned as the i64 reading of the
+// first 8 bytes (big-endian). Real construction:
+//   T = U_1 XOR U_2 XOR ... XOR U_iter
+//   U_1 = HMAC-SHA1(P, S || INT(1));  U_j = HMAC-SHA1(P, U_{j-1})
 fn builtin_pbkdf2_hmac_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use hmac::{Hmac, Mac};
+    type HSha1 = Hmac<sha1::Sha1>;
     let pw = args.first().map(|v| v.to_string()).unwrap_or_default();
     let salt = args.get(1).map(|v| v.to_string()).unwrap_or_default();
-    let iters = args.get(2).map(|v| v.to_number() as usize).unwrap_or(1);
-    let mut h = 5381_u64;
-    for b in pw.bytes().chain(salt.bytes()) {
-        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    let iters = args.get(2).map(|v| v.to_number() as usize).unwrap_or(1).max(1);
+    let mut mac = match <HSha1 as Mac>::new_from_slice(pw.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return Ok(PerlValue::integer(0)),
+    };
+    mac.update(salt.as_bytes());
+    mac.update(&[0, 0, 0, 1]);
+    let mut u = mac.finalize().into_bytes().to_vec();
+    let mut t = u.clone();
+    for _ in 1..iters {
+        let mut m = match <HSha1 as Mac>::new_from_slice(pw.as_bytes()) {
+            Ok(m) => m,
+            Err(_) => break,
+        };
+        m.update(&u);
+        u = m.finalize().into_bytes().to_vec();
+        for (a, b) in t.iter_mut().zip(u.iter()) { *a ^= *b; }
     }
-    for _ in 0..iters {
-        h = h.wrapping_mul(0x100000001b3).rotate_left(7);
-    }
-    Ok(PerlValue::integer(h as i64))
+    let mut acc = 0_u64;
+    for &byte in t.iter().take(8) { acc = (acc << 8) | byte as u64; }
+    Ok(PerlValue::integer(acc as i64))
 }
 
 // Scrypt salsa20/8 word mixer (single round)
@@ -200,17 +218,44 @@ fn builtin_bcrypt_cost_iters(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(1_i64 << cost))
 }
 
-// Argon2 memory mixer (placeholder — single XOR over blocks)
+// Argon2 G compression on two 1024-byte blocks per RFC 9106 §3.5: R = X ⊕ Y;
+// apply Blake2b's permutation P to columns (8 GB rounds), then to rows; XOR R.
+// We implement the canonical GB round-function (Blake2b's G with rotations
+// 32, 24, 16, 63) over each 16-word group and treat the array as a single
+// row pass (one full P invocation), which is the load-bearing primitive.
 fn builtin_argon2_block_mix(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let xs: Vec<u64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number() as u64).collect();
     let ys: Vec<u64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number() as u64).collect();
     let len = xs.len().max(ys.len());
+    let mut r: Vec<u64> = (0..len).map(|i| xs.get(i).copied().unwrap_or(0)
+        ^ ys.get(i).copied().unwrap_or(0)).collect();
+    let z = r.clone();
+    fn gb(v: &mut [u64], a: usize, b: usize, c: usize, d: usize) {
+        v[a] = v[a].wrapping_add(v[b]).wrapping_add(2u64.wrapping_mul(
+            (v[a] as u32 as u64).wrapping_mul(v[b] as u32 as u64)));
+        v[d] = (v[d] ^ v[a]).rotate_right(32);
+        v[c] = v[c].wrapping_add(v[d]).wrapping_add(2u64.wrapping_mul(
+            (v[c] as u32 as u64).wrapping_mul(v[d] as u32 as u64)));
+        v[b] = (v[b] ^ v[c]).rotate_right(24);
+        v[a] = v[a].wrapping_add(v[b]).wrapping_add(2u64.wrapping_mul(
+            (v[a] as u32 as u64).wrapping_mul(v[b] as u32 as u64)));
+        v[d] = (v[d] ^ v[a]).rotate_right(16);
+        v[c] = v[c].wrapping_add(v[d]).wrapping_add(2u64.wrapping_mul(
+            (v[c] as u32 as u64).wrapping_mul(v[d] as u32 as u64)));
+        v[b] = (v[b] ^ v[c]).rotate_right(63);
+    }
+    for chunk_start in (0..len).step_by(16) {
+        if chunk_start + 16 > len { break; }
+        let s = &mut r[chunk_start..chunk_start + 16];
+        gb(s, 0, 4,  8, 12); gb(s, 1, 5,  9, 13);
+        gb(s, 2, 6, 10, 14); gb(s, 3, 7, 11, 15);
+        gb(s, 0, 5, 10, 15); gb(s, 1, 6, 11, 12);
+        gb(s, 2, 7,  8, 13); gb(s, 3, 4,  9, 14);
+    }
     let out: Vec<PerlValue> = (0..len).map(|i| {
-        let a = *xs.get(i).unwrap_or(&0);
-        let b = *ys.get(i).unwrap_or(&0);
-        PerlValue::integer((a ^ b) as i64)
+        PerlValue::integer((r[i] ^ z[i]) as i64)
     }).collect();
     Ok(PerlValue::array(out))
 }
@@ -549,22 +594,38 @@ fn builtin_monobit_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // Runs test (NIST)
 
-// Approximate entropy (very simplified)
+// Pincus's approximate entropy ApEn(m, r): φᵐ(r) − φᵐ⁺¹(r), where
+// φᵐ(r) = (n−m+1)⁻¹ Σ_{i=1}^{n−m+1} ln C_i^m(r), and
+// C_i^m(r) = (#{j: max_{k<m}|x_{i+k}−x_{j+k}| ≤ r}) / (n−m+1).
+// Args: data array, embedding dim m (default 2), tolerance r (default 0.2·σ).
 fn builtin_approximate_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let bits: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number() as i64).collect();
-    let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
-    let n = bits.len();
-    if n < m { return Ok(PerlValue::float(0.0)); }
-    let mut counts: std::collections::HashMap<Vec<i64>, usize> = std::collections::HashMap::new();
-    for i in 0..=n - m {
-        let pat = bits[i..i+m].to_vec();
-        *counts.entry(pat).or_insert(0) += 1;
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let m = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2).max(1);
+    let n = xs.len();
+    if n < m + 1 { return Ok(PerlValue::float(0.0)); }
+    let r_user = args.get(2).map(|v| v.to_number());
+    let r = r_user.unwrap_or_else(|| {
+        let mean: f64 = xs.iter().sum::<f64>() / n as f64;
+        let var: f64 = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
+        0.2 * var.sqrt()
+    });
+    fn phi(xs: &[f64], n: usize, m: usize, r: f64) -> f64 {
+        let blocks = n - m + 1;
+        let mut sum_ln = 0.0_f64;
+        for i in 0..blocks {
+            let mut count = 0_usize;
+            for j in 0..blocks {
+                let mut max_d = 0.0_f64;
+                for k in 0..m {
+                    let d = (xs[i + k] - xs[j + k]).abs();
+                    if d > max_d { max_d = d; }
+                }
+                if max_d <= r { count += 1; }
+            }
+            sum_ln += (count as f64 / blocks as f64).ln();
+        }
+        sum_ln / blocks as f64
     }
-    let total = (n - m + 1) as f64;
-    let h: f64 = counts.values().map(|&c| {
-        let p = c as f64 / total;
-        -p * p.ln()
-    }).sum();
-    Ok(PerlValue::float(h))
+    Ok(PerlValue::float(phi(&xs, n, m, r) - phi(&xs, n, m + 1, r)))
 }

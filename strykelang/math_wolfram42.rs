@@ -19,7 +19,8 @@ fn builtin_stefan_boltzmann_radiation(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(eps * B42_SIGMA * t.powi(4)))
 }
 
-// Grey body emissivity passthrough
+// Grey-body emissivity ε ∈ [0, 1]: by definition a grey body has frequency-
+// independent ε. This validates and returns ε in its physical range.
 fn builtin_emissivity_grey_body(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let eps = f1(args);
     Ok(PerlValue::float(eps.clamp(0.0, 1.0)))
@@ -288,9 +289,16 @@ fn builtin_equivalent_potential_temp(args: &[PerlValue]) -> PerlResult<PerlValue
     Ok(PerlValue::float(theta * (B42_LV * q / (B42_CP_DRY * t)).exp()))
 }
 
-// Saturation equivalent potential temp
+// Saturation equivalent potential temperature θ_es uses the SATURATION mixing
+// ratio q_s(T, p) instead of actual q. θ_es = θ · exp(L_v · q_s / (c_p · T)).
+// Differs from θ_e: θ_e at the parcel's actual moisture, θ_es at saturation.
+// Args: θ, q_s, T.
 fn builtin_saturation_equivalent_pt(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_equivalent_potential_temp(args)
+    let theta = f1(args);
+    let q_s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(288.0);
+    if t == 0.0 { return Ok(PerlValue::float(theta)); }
+    Ok(PerlValue::float(theta * (B42_LV * q_s / (B42_CP_DRY * t)).exp()))
 }
 
 // Isentropic potential vorticity (IPV)
@@ -386,19 +394,33 @@ fn builtin_reynolds_full_number(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(u * l / nu))
 }
 
-// Schmidt number Sc = ν/D
+// Schmidt number Sc = ν / D (kinematic viscosity over mass diffusivity).
+// Args: ν, D.
 fn builtin_schmidt_number_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_peclet_number_step(args)
+    let nu = f1(args);
+    let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    if d == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(nu / d))
 }
 
-// Sherwood number Sh = kL/D
+// Sherwood number Sh = k_c · L / D (mass-transfer coefficient × length / diffusivity).
+// Args: k_c, L, D.
 fn builtin_sherwood_number_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_peclet_number_step(args)
+    let k_c = f1(args);
+    let l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let d = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if d == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(k_c * l / d))
 }
 
-// Nusselt number Nu = hL/k
+// Nusselt number Nu = h · L / k (convective coefficient × length / fluid k).
+// Args: h, L, k_fluid.
 fn builtin_nusselt_full_number(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_peclet_number_step(args)
+    let h = f1(args);
+    let l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let k = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if k == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(h * l / k))
 }
 
 // Grashof number Gr = gβΔTL³/ν²
@@ -453,9 +475,15 @@ fn builtin_mach_full_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(u / c))
 }
 
-// Biot number Bi = hL/k
+// Biot number Bi = h · L_c / k_solid: convective surface heat transfer over
+// internal-conduction resistance. Different from Nusselt (uses k_fluid).
+// Args: h, L_c, k_solid.
 fn builtin_biot_number_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_peclet_number_step(args)
+    let h = f1(args);
+    let l = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let k_solid = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    if k_solid == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(h * l / k_solid))
 }
 
 // Fourier number Fo = αt/L²
@@ -483,9 +511,27 @@ fn builtin_hurst_exponent_estimate(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(log_rs / log_n))
 }
 
-// Detrended fluctuation α (similar to Hurst)
+// Peng's Detrended Fluctuation Analysis: integrate signal y(k)=Σ_{i≤k}(x_i−x̄),
+// split into N/n boxes of size n, fit a polynomial trend in each box, take the
+// rms of the residuals: F(n) = sqrt((1/N) Σ_k (y_k − ŷ_k)²). DFA exponent α
+// is the slope of log F(n) vs log n. Args: array [log F(n_i)], array [log n_i].
 fn builtin_detrended_fluct_alpha(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_hurst_exponent_estimate(args)
+    let log_f = b42_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let log_n = b42_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let n = log_f.len().min(log_n.len());
+    if n < 2 { return Ok(PerlValue::float(0.5)); }
+    let nf = n as f64;
+    let mean_x: f64 = log_n.iter().take(n).sum::<f64>() / nf;
+    let mean_y: f64 = log_f.iter().take(n).sum::<f64>() / nf;
+    let mut num = 0.0_f64;
+    let mut den = 0.0_f64;
+    for i in 0..n {
+        let dx = log_n[i] - mean_x;
+        num += dx * (log_f[i] - mean_y);
+        den += dx * dx;
+    }
+    if den.abs() < 1e-15 { return Ok(PerlValue::float(0.5)); }
+    Ok(PerlValue::float(num / den))
 }
 
 // Power spectrum slope (1/f^β)
@@ -581,9 +627,18 @@ fn builtin_soi_oscillation_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(dp / sd))
 }
 
-// PDO index from EOF1 of N. Pacific SST
+// PDO index = standardized projection of N.Pacific SST anomaly onto leading EOF.
+// Args: array of monthly SST anomalies, leading EOF pattern. Compute (a · eof) /
+// ‖eof‖ as scalar projection.
 fn builtin_pdo_index_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let anom = b42_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let eof = b42_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let n = anom.len().min(eof.len());
+    if n == 0 { return Ok(PerlValue::float(0.0)); }
+    let dot: f64 = (0..n).map(|i| anom[i] * eof[i]).sum();
+    let norm: f64 = eof.iter().take(n).map(|x| x * x).sum::<f64>().sqrt();
+    if norm == 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(dot / norm))
 }
 
 // MJO phase from RMM1, RMM2: atan2(RMM2, RMM1) in [0, 8]
@@ -606,9 +661,12 @@ fn builtin_hadley_cell_max_lat(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(30.0 + solstice_offset))
 }
 
-// Ferrel cell mid-latitude index
-fn builtin_ferrel_cell_step(_args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(45.0))
+// Ferrel cell mid-latitude (between Hadley edge ~30° and polar edge ~60°);
+// shifts with seasonal Hadley descent latitude φ_H: ferrel_mid = (φ_H + 60)/2
+fn builtin_ferrel_cell_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let hadley_edge = f1(args);
+    let polar_edge = args.get(1).map(|v| v.to_number()).unwrap_or(60.0);
+    Ok(PerlValue::float((hadley_edge + polar_edge) / 2.0))
 }
 
 // ITCZ position latitude
@@ -635,19 +693,35 @@ fn builtin_polar_vortex_radius(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1500.0 * (1.0 - pv_strength * 0.1)))
 }
 
-// Arctic Oscillation index
+// Arctic Oscillation: leading EOF of monthly 1000 hPa height anomaly over
+// 20°N–90°N (Thompson & Wallace 1998). Standardized PC1 = (anom · eof) / σ_eof.
+// Different physical field from PDO (which is N. Pacific SST EOF1).
+// Args: anom array (height), eof pattern array.
 fn builtin_arctic_oscillation_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let anom = b42_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let eof = b42_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    let n = anom.len().min(eof.len());
+    if n == 0 { return Ok(PerlValue::float(0.0)); }
+    let dot: f64 = (0..n).map(|i| anom[i] * eof[i]).sum();
+    let norm: f64 = eof.iter().take(n).map(|x| x * x).sum::<f64>().sqrt();
+    if norm == 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(dot / norm))
 }
 
-// Indian monsoon index (rainfall anomaly)
+// Indian summer monsoon index = (anomalous JJAS rainfall - mean) / σ
 fn builtin_indian_monsoon_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    let v = b42_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if v.len() < 2 { return Ok(PerlValue::float(0.0)); }
+    let mean: f64 = v.iter().sum::<f64>() / v.len() as f64;
+    let var: f64 = v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (v.len() - 1) as f64;
+    let cur = args.get(1).map(|v| v.to_number()).unwrap_or(mean);
+    if var <= 0.0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float((cur - mean) / var.sqrt()))
 }
 
-// African monsoon index
+// African monsoon index — same standardized-anomaly construction
 fn builtin_african_monsoon_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args)))
+    builtin_indian_monsoon_index(args)
 }
 
 // Quasi-Biennial Oscillation step (years 2-3 cycle)
@@ -675,9 +749,11 @@ fn builtin_geomagnetic_kp_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(r.clamp(0.0, 9.0)))
 }
 
-// Total ozone in Dobson Units
+// Total column ozone in Dobson Units: 1 DU = 2.69e16 molecules/cm². Convert
+// integrated O₃ molecule count per cm² → DU.
 fn builtin_ozone_dobson_total(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(f1(args).max(0.0)))
+    let molecules_per_cm2 = f1(args);
+    Ok(PerlValue::float((molecules_per_cm2 / 2.69e16).max(0.0)))
 }
 
 // Chlorine radical decay first-order: Cl(t) = Cl₀ exp(-kt)

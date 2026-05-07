@@ -188,14 +188,31 @@ fn builtin_ml_layer_norm_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((x - mean) / (var + eps).sqrt()))
 }
 
-// BatchNorm: same form, computed over batch
+// BatchNorm (Ioffe & Szegedy 2015): normalize across the batch dimension only,
+// keeping per-channel statistics. y = γ(x − μ_B)/√(σ²_B + ε) + β. Args: x, μ_B,
+// σ²_B, γ, β, ε. NOTE: μ_B/σ²_B come from the batch — different from LayerNorm
+// which uses per-sample mean/var across feature dims.
 fn builtin_ml_batch_norm_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_layer_norm_step(args)
+    let x = f1(args);
+    let mu_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let var_b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let gamma = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let beta = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let eps = args.get(5).map(|v| v.to_number()).unwrap_or(1e-5);
+    Ok(PerlValue::float(gamma * (x - mu_b) / (var_b + eps).sqrt() + beta))
 }
 
-// GroupNorm
+// GroupNorm (Wu & He 2018): split channels into G groups, normalize within
+// each group's spatial × channel-block. Computes group-mean μ_g and var σ²_g
+// over (C/G · H · W) elements. Args: x, μ_g, σ²_g, γ, β, eps.
 fn builtin_ml_group_norm_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_layer_norm_step(args)
+    let x = f1(args);
+    let mu_g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let var_g = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let gamma = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let beta = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let eps = args.get(5).map(|v| v.to_number()).unwrap_or(1e-5);
+    Ok(PerlValue::float(gamma * (x - mu_g) / (var_g + eps).sqrt() + beta))
 }
 
 // RMSNorm: x / √(mean(x²) + ε)
@@ -206,9 +223,17 @@ fn builtin_ml_rms_norm_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x / (mean_sq + eps).sqrt()))
 }
 
-// InstanceNorm
+// InstanceNorm (Ulyanov et al. 2016): normalize per-sample × per-channel over
+// spatial (H×W) only. Differs from BatchNorm (no batch axis) and LayerNorm
+// (no channel axis). Args: x, μ_HW, σ²_HW, γ, β, eps.
 fn builtin_ml_instance_norm_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_layer_norm_step(args)
+    let x = f1(args);
+    let mu = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let var = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let gamma = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let beta = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let eps = args.get(5).map(|v| v.to_number()).unwrap_or(1e-5);
+    Ok(PerlValue::float(gamma * (x - mu) / (var + eps).sqrt() + beta))
 }
 
 // WeightNorm: w / |w|
@@ -243,9 +268,15 @@ fn builtin_ml_huber_loss_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if x.abs() <= delta { Ok(PerlValue::float(0.5 * x * x)) } else { Ok(PerlValue::float(delta * (x.abs() - 0.5 * delta))) }
 }
 
-// Smooth L1 (β=1.0 standard)
+// Smooth L1 loss (Girshick 2015): same shape as Huber but normalized by β so
+// the slope at large x is 1 (matching pure L1). For |x| < β: 0.5·x²/β; for
+// |x| ≥ β: |x| − 0.5·β. Differs from Huber by the 1/β scaling.
+// Args: x, β (default 1.0).
 fn builtin_ml_smooth_l1_loss(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_huber_loss_step(args)
+    let x = f1(args);
+    let beta = args.get(1).map(|v| v.to_number()).unwrap_or(1.0).max(1e-12);
+    if x.abs() < beta { Ok(PerlValue::float(0.5 * x * x / beta)) }
+    else { Ok(PerlValue::float(x.abs() - 0.5 * beta)) }
 }
 
 // Focal loss: -α(1-p)^γ log(p) for binary
@@ -445,9 +476,17 @@ fn builtin_ml_inverse_sqrt_lr(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 / t.sqrt()))
 }
 
-// Cyclic LR step
+// Smith's cyclic LR: triangular wave between lr_min and lr_max, periodic.
+// cycle = ⌊1 + t / (2·step_size)⌋; x = |t/step_size − 2·cycle + 1|;
+// lr = lr_min + (lr_max − lr_min)·max(0, 1 − x). Args: t, step_size, lr_min, lr_max.
 fn builtin_ml_cyclic_lr_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_one_cycle_lr(args)
+    let t = f1(args);
+    let step = args.get(1).map(|v| v.to_number()).unwrap_or(2000.0).max(1.0);
+    let lr_min = args.get(2).map(|v| v.to_number()).unwrap_or(0.0001);
+    let lr_max = args.get(3).map(|v| v.to_number()).unwrap_or(0.006);
+    let cycle = (1.0 + t / (2.0 * step)).floor();
+    let x = (t / step - 2.0 * cycle + 1.0).abs();
+    Ok(PerlValue::float(lr_min + (lr_max - lr_min) * (1.0 - x).max(0.0)))
 }
 
 // SGD step: θ ← θ - η g
@@ -483,9 +522,18 @@ fn builtin_ml_adagrad_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(theta - eta * g / (s + 1e-8).sqrt()))
 }
 
-// RMSProp step
+// RMSProp (Hinton 2012): exponentially-decayed running average of squared
+// gradients (NOT cumulative like AdaGrad):  v_t = ρ·v_{t-1} + (1-ρ)·g²;
+// θ ← θ − η · g / (√v_t + ε). Args: θ, η, g, prev_v, ρ, ε.
 fn builtin_ml_rmsprop_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adagrad_step(args)
+    let theta = f1(args);
+    let eta = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
+    let g = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_v = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let rho = args.get(4).map(|v| v.to_number()).unwrap_or(0.9);
+    let eps = args.get(5).map(|v| v.to_number()).unwrap_or(1e-8);
+    let v = rho * prev_v + (1.0 - rho) * g * g;
+    Ok(PerlValue::float(theta - eta * g / (v.sqrt() + eps)))
 }
 
 // Adam step
@@ -517,14 +565,45 @@ fn builtin_ml_adamax_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(eta * m_hat / u))
 }
 
-// Nadam step
+// Nadam (Dozat 2016): Nesterov-momentum-aware Adam. Lookahead m̂' instead of m̂:
+//   m̂' = β₁ · m̂_t + (1 − β₁) · g / (1 − β₁^t).
+//   θ ← θ − η · m̂' / (√v̂ + ε).
+// Args: m_hat, v_hat, g, β₁, t (step), η, ε.
 fn builtin_ml_nadam_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adam_step(args)
+    let m_hat = f1(args);
+    let v_hat = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let g = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let b1 = args.get(3).map(|v| v.to_number()).unwrap_or(0.9);
+    let t = args.get(4).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
+    let eta = args.get(5).map(|v| v.to_number()).unwrap_or(1e-3);
+    let eps = args.get(6).map(|v| v.to_number()).unwrap_or(1e-8);
+    let bias_correct = 1.0 - b1.powf(t);
+    let m_lookahead = b1 * m_hat + (1.0 - b1) * g / bias_correct;
+    Ok(PerlValue::float(eta * m_lookahead / (v_hat.sqrt() + eps)))
 }
 
-// RAdam (rectified Adam) step
+// RAdam (Liu et al. 2020): rectifies Adam's variance. ρ_∞ = 2/(1−β₂) − 1;
+//   ρ_t = ρ_∞ − 2t·β₂^t / (1−β₂^t).
+//   if ρ_t > 4: r_t = √((ρ_t − 4)(ρ_t − 2)ρ_∞ / ((ρ_∞ − 4)(ρ_∞ − 2)ρ_t));
+//               step = η · r_t · m̂ / (√v̂ + ε).
+//   else:       step = η · m̂  (fallback to SGD-with-momentum).
+// Args: m_hat, v_hat, β₂, t, η, ε.
 fn builtin_ml_radam_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adam_step(args)
+    let m_hat = f1(args);
+    let v_hat = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let b2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.999);
+    let t = args.get(3).map(|v| v.to_number()).unwrap_or(1.0).max(1.0);
+    let eta = args.get(4).map(|v| v.to_number()).unwrap_or(1e-3);
+    let eps = args.get(5).map(|v| v.to_number()).unwrap_or(1e-8);
+    let rho_inf = 2.0 / (1.0 - b2) - 1.0;
+    let rho_t = rho_inf - 2.0 * t * b2.powf(t) / (1.0 - b2.powf(t));
+    if rho_t > 4.0 {
+        let r = (((rho_t - 4.0) * (rho_t - 2.0) * rho_inf)
+            / ((rho_inf - 4.0) * (rho_inf - 2.0) * rho_t)).sqrt();
+        Ok(PerlValue::float(eta * r * m_hat / (v_hat.sqrt() + eps)))
+    } else {
+        Ok(PerlValue::float(eta * m_hat))
+    }
 }
 
 // Lookahead step: θ_slow + α(θ_fast - θ_slow)
@@ -545,9 +624,19 @@ fn builtin_ml_lamb_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(eta * phi_w / phi_g * r))
 }
 
-// LARS step (layerwise adaptive rate scaling)
+// LARS (You et al. 2017): per-layer learning-rate scaling proportional to the
+// ratio ‖w_l‖ / (‖∇w_l‖ + λ‖w_l‖). NO Adam-style m, v moments (that's LAMB).
+//   η_l = η · trust · ‖w‖ / (‖g‖ + λ‖w‖);   w ← w − η_l · (g + λ·w).
+// Args: η, w_norm, g_norm, weight_decay λ, trust coefficient.
 fn builtin_ml_lars_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_lamb_step(args)
+    let eta = f1(args);
+    let w_norm = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    let g_norm = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
+    let wd = args.get(3).map(|v| v.to_number()).unwrap_or(1e-4);
+    let trust = args.get(4).map(|v| v.to_number()).unwrap_or(1e-3);
+    let denom = g_norm + wd * w_norm;
+    if denom.abs() < 1e-15 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(eta * trust * w_norm / denom))
 }
 
 // Yogi step (adaptive method)
@@ -565,14 +654,36 @@ fn builtin_ml_amsgrad_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(v_hat.max(v_hat_max)))
 }
 
-// AdaBelief step (adaptive belief)
+// AdaBelief (Zhuang et al. 2020): replaces Adam's v_t = E[g²] with the variance
+// of g around the moving mean: s_t = β₂·s_{t-1} + (1−β₂)·(g − m_t)² + ε.
+// Update: θ ← θ − η · m̂ / (√ŝ + ε). Args: m_hat, g, m_running, prev_s, β₂, η, ε.
 fn builtin_ml_adabelief_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adam_step(args)
+    let m_hat = f1(args);
+    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let m_running = args.get(2).map(|v| v.to_number()).unwrap_or(m_hat);
+    let prev_s = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let b2 = args.get(4).map(|v| v.to_number()).unwrap_or(0.999);
+    let eta = args.get(5).map(|v| v.to_number()).unwrap_or(1e-3);
+    let eps = args.get(6).map(|v| v.to_number()).unwrap_or(1e-8);
+    let s = b2 * prev_s + (1.0 - b2) * (g - m_running).powi(2) + eps;
+    Ok(PerlValue::float(eta * m_hat / (s.sqrt() + eps)))
 }
 
-// Shampoo step (Newton-style preconditioning)
+// Shampoo (Gupta-Koren-Singer 2018): full-matrix preconditioner.  For a
+// parameter matrix W ∈ ℝ^{m×n} with grad G, accumulate
+//   L_t = L_{t-1} + G·Gᵀ,    R_t = R_{t-1} + Gᵀ·G,
+// then update W ← W − η · L_t^{−1/4} · G · R_t^{−1/4}.  Returns the scalar
+// preconditioner factor (l⁻¹ᐟ⁴ · r⁻¹ᐟ⁴) given two diagonal traces.
+// Args: g (scalar gradient), prev_l, prev_r, η.
 fn builtin_ml_shampoo_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adam_step(args)
+    let g = f1(args);
+    let prev_l = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_r = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let eta = args.get(3).map(|v| v.to_number()).unwrap_or(1e-3);
+    let l = prev_l + g * g;
+    let r = prev_r + g * g;
+    let pre = (l.max(1e-12).powf(-0.25)) * (r.max(1e-12).powf(-0.25));
+    Ok(PerlValue::float(eta * pre * g))
 }
 
 // Lion step: θ ← θ - η sign(c)
@@ -583,9 +694,25 @@ fn builtin_ml_lion_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(theta - eta * c.signum()))
 }
 
-// Sophia step (Newton-Schulz preconditioning)
+// Sophia-G (Liu et al. 2023): clipped Hessian-aware update.
+//   m_t = β₁·m_{t-1} + (1−β₁)·g.
+//   h_t = β₂·h_{t-1} + (1−β₂)·diag(H)   (Hessian diagonal estimate).
+//   θ ← θ − η · clip(m_t / max(h_t, ε), −ρ, ρ).
+// Args: prev_m, g, prev_h, h_diag (estimate), β₁, β₂, η, ρ, ε.
 fn builtin_ml_sophia_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_adam_step(args)
+    let prev_m = f1(args);
+    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_h = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let h_diag = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
+    let b1 = args.get(4).map(|v| v.to_number()).unwrap_or(0.965);
+    let b2 = args.get(5).map(|v| v.to_number()).unwrap_or(0.99);
+    let eta = args.get(6).map(|v| v.to_number()).unwrap_or(6e-4);
+    let rho = args.get(7).map(|v| v.to_number()).unwrap_or(0.04);
+    let eps = args.get(8).map(|v| v.to_number()).unwrap_or(1e-12);
+    let m = b1 * prev_m + (1.0 - b1) * g;
+    let h = b2 * prev_h + (1.0 - b2) * h_diag;
+    let raw = m / h.abs().max(eps);
+    Ok(PerlValue::float(eta * raw.clamp(-rho, rho)))
 }
 
 // Gradient clipping by norm: g · min(1, c/||g||)
@@ -649,9 +776,13 @@ fn builtin_ml_glorot_init_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((6.0 / (n_in + n_out)).sqrt()))
 }
 
-// Orthogonal init returns 1.0 (proper init done elsewhere)
-fn builtin_ml_orthogonal_init(_args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(1.0))
+// Orthogonal init scaling: gain · √(2 / (1 + α²)) for tanh-style; default gain=1.
+// Returns the σ-scaling factor for an orthogonal weight matrix QR-decomposed from
+// a Gaussian draw. Args: gain, leaky_alpha.
+fn builtin_ml_orthogonal_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let gain = f1(args);
+    let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(gain * (2.0 / (1.0 + alpha * alpha)).sqrt()))
 }
 
 // Truncated normal init: N(0, σ) clipped to [-2σ, 2σ]
@@ -665,17 +796,19 @@ fn builtin_ml_kaiming_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_ml_he_init_value(args)
 }
 
-// LeCun init: N(0, √(1/n_in))
+// LeCun init (LeCun et al. 1998): σ = √(1/n_in). DIFFERS from Xavier (Glorot)
+// which uses √(2/(n_in+n_out)). Args: n_in.
 fn builtin_ml_lecun_init_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_ml_xavier_init_value(args)
+    let n_in = f1(args).max(1.0);
+    Ok(PerlValue::float((1.0_f64 / n_in).sqrt()))
 }
 
-// Zero init
+// Zero init: returns 0 for any (i, j) tensor index. Defining property.
 fn builtin_ml_zero_init(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(0.0))
 }
 
-// Constant init
+// Constant init: every cell = c (returns c). Defining property.
 fn builtin_ml_constant_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(f1(args)))
 }
@@ -693,14 +826,23 @@ fn builtin_ml_one_hot_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(if cls == i { 1 } else { 0 }))
 }
 
-// Label to id (passthrough)
+// Label-to-id via lookup in vocabulary array. Args: label_index, vocab array.
+// Returns offset of matching entry, -1 if missing.
 fn builtin_ml_label_to_id(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let label = i1(args);
+    let vocab = b45_to_floats(args.get(1).unwrap_or(&PerlValue::array(vec![])));
+    for (i, v) in vocab.iter().enumerate() {
+        if v.round() as i64 == label { return Ok(PerlValue::integer(i as i64)); }
+    }
+    Ok(PerlValue::integer(-1))
 }
 
-// Id to label step
+// Id-to-label: bounds check + return id (the id IS the label after vocab lookup).
 fn builtin_ml_id_to_label_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::integer(i1(args)))
+    let id = i1(args);
+    let vocab_size = args.get(1).map(|v| v.to_number() as i64).unwrap_or(i64::MAX);
+    if id < 0 || id >= vocab_size { return Ok(PerlValue::integer(-1)); }
+    Ok(PerlValue::integer(id))
 }
 
 // Top-k token logit sum

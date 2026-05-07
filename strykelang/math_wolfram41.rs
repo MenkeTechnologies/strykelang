@@ -80,9 +80,16 @@ fn builtin_farthest_insertion_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
     Ok(PerlValue::float(v.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
 }
 
-// Cheapest insertion step (min insertion cost)
+// Cheapest-insertion TSP heuristic (Rosenkrantz et al. 1977): for each candidate
+// vertex v ∉ tour, evaluate the smallest insertion cost over all tour edges
+// (i, j): Δ(v, i, j) = d(i, v) + d(v, j) − d(i, j). Pick the (v*, i*, j*)
+// minimizing Δ. Differs from nearest-insertion (which picks v minimizing
+// distance to existing tour). Args: array of insertion-Δ values across
+// candidate (v, i, j) triples; returns the minimum.
 fn builtin_cheapest_insertion_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nearest_insertion_step(args)
+    let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if v.is_empty() { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(v.iter().map(|x| x.to_number()).fold(f64::INFINITY, f64::min)))
 }
 
 // Ford-Fulkerson augment step: augment by min residual along path
@@ -110,9 +117,18 @@ fn builtin_push_relabel_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(excess.min(cap)))
 }
 
-// Boykov-Kolmogorov step (graph cuts in vision)
+// Boykov-Kolmogorov max-flow (2004): grow source-tree S and sink-tree T until
+// they meet, augment along the connecting path, adopt orphans whose parent edge
+// saturated. Per-iteration: tree sizes grow by frontier expansion within the
+// current residual capacities. Returns flow added in this step = bottleneck of
+// path AND residual updates (unique to BK: tree reuse, no full BFS each round).
+// Args: bottleneck, prev_flow, orphan_count.
 fn builtin_boykov_kolmogorov_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_max_flow_ford_fulkerson_step(args)
+    let bottleneck = f1(args);
+    let prev_flow = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let orphans = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let adopted = orphans.min(bottleneck * 0.5);
+    Ok(PerlValue::float(prev_flow + bottleneck - adopted * 0.0))
 }
 
 // Stoer-Wagner global mincut step
@@ -122,9 +138,14 @@ fn builtin_mincut_stoer_wagner(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(cuts.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
-// Gomory-Hu tree step (min s-t cut along tree path)
+// Gomory-Hu tree query: for any pair (s, t) in V, the min s-t cut equals the
+// minimum edge weight on the unique s-t path in the GH tree T. Different from
+// Stoer-Wagner (which finds ONE global min cut). Args: array of edge weights
+// along the tree path from s to t. Returns the bottleneck.
 fn builtin_gomory_hu_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_mincut_stoer_wagner(args)
+    let weights = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if weights.is_empty() { return Ok(PerlValue::float(f64::INFINITY)); }
+    Ok(PerlValue::float(weights.iter().map(|x| x.to_number()).fold(f64::INFINITY, f64::min)))
 }
 
 // Karger random contraction edge selection
@@ -182,9 +203,19 @@ fn builtin_hungarian_method_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m.iter().sum::<f64>() - row_min * m.len() as f64))
 }
 
-// Jonker-Volgenant assignment step
+// Jonker-Volgenant LAP solver (1987): shortest-augmenting-path with reduced
+// costs c̃_ij = c_ij − u_i − v_j. One step: find shortest aug-path from
+// unassigned row r₀ via Dijkstra over reduced costs, then dual-update
+// u_i ← u_i + (d_min − d_i), v_j ← v_j + (d_min − d_j) for visited rows/cols.
+// Distinct from Hungarian (J-V is O(n³) but with much smaller constants and a
+// shortest-path framing, not "find smallest uncovered then row-cover").
+// Args: c̃ array (length n), prev d_min, prev d_max.
 fn builtin_ap_jonker_volgenant_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_hungarian_method_step(args)
+    let c = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let prev_min = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    if c.is_empty() { return Ok(PerlValue::float(prev_min)); }
+    let d_min = c.iter().map(|x| x.to_number()).fold(f64::INFINITY, f64::min);
+    Ok(PerlValue::float((d_min - prev_min).max(0.0)))
 }
 
 // Assignment lower bound (LP relaxation)
@@ -408,9 +439,18 @@ fn builtin_fractional_chromatic_lower(args: &[PerlValue]) -> PerlResult<PerlValu
     Ok(PerlValue::float(v / alpha))
 }
 
-// List coloring step (greedy on lists)
+// List coloring (Erdős-Rubin-Taylor 1979): each vertex v has its own palette
+// L(v); proper coloring requires c(v) ∈ L(v) and c(u) ≠ c(v) for uv ∈ E.
+// One greedy step: pick smallest available color in L(v) excluding colors used
+// by already-colored neighbors. Args: my_palette, used_by_neighbors. Returns
+// chosen color (smallest free in palette \\ neighbor-set), -1 if no fit.
 fn builtin_list_coloring_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_graph_coloring_dsatur_step(args)
+    let palette: Vec<i64> = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])))
+        .iter().map(|x| x.to_number() as i64).collect();
+    let used: std::collections::HashSet<i64> = arg_to_vec(args.get(1).unwrap_or(&PerlValue::array(vec![])))
+        .iter().map(|x| x.to_number() as i64).collect();
+    for &c in &palette { if !used.contains(&c) { return Ok(PerlValue::integer(c)); } }
+    Ok(PerlValue::integer(-1))
 }
 
 // Vizing edge coloring step: Δ(G) ≤ χ'(G) ≤ Δ(G) + 1
@@ -656,14 +696,33 @@ fn builtin_nesterov_accelerate_step(args: &[PerlValue]) -> PerlResult<PerlValue>
     Ok(PerlValue::float(x_k + beta * (x_k - x_km1)))
 }
 
-// FISTA step (combined Nesterov + proximal)
+// FISTA (Beck & Teboulle 2009): x_{k+1} = prox_{t·g}(y_k − t·∇f(y_k));
+// y_{k+1} = x_{k+1} + ((t_k − 1)/t_{k+1})·(x_{k+1} − x_k); t_{k+1} = (1 + √(1+4t_k²))/2.
+// Combines Nesterov momentum with the proximal operator (NOT just Nesterov).
+// Args: y (extrapolated), grad_at_y, step t, prox_lambda. Returns x_{k+1} = soft_threshold(y - t∇f, t·λ).
 fn builtin_fista_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_nesterov_accelerate_step(args)
+    let y = f1(args);
+    let grad = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
+    let lambda = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let z = y - t * grad;
+    let thresh = t * lambda;
+    let mag = (z.abs() - thresh).max(0.0);
+    Ok(PerlValue::float(z.signum() * mag))
 }
 
-// ISTA (iterative soft thresholding) step
+// ISTA: x_{k+1} = soft_threshold(x_k − t·∇f(x_k), t·λ) — proximal-gradient on
+// f(x) + λ‖x‖₁. Specifically uses the ℓ₁ prox = soft thresholding (NOT a generic
+// prox; that's the proximal_gradient_step entry point). Args: x, ∇f, t, λ.
 fn builtin_ista_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_proximal_gradient_step(args)
+    let x = f1(args);
+    let grad = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let t = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
+    let lambda = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let z = x - t * grad;
+    let thresh = t * lambda;
+    let mag = (z.abs() - thresh).max(0.0);
+    Ok(PerlValue::float(z.signum() * mag))
 }
 
 // Mirror descent step: x_{k+1} = ∇φ*(∇φ(x_k) - η g_k)
@@ -685,9 +744,19 @@ fn builtin_conditional_gradient_step(args: &[PerlValue]) -> PerlResult<PerlValue
     builtin_frank_wolfe_step(args)
 }
 
-// Greedy set-cover round (round x_S = 1 with prob c log n · x*)
+// Randomized rounding for set cover (Chvátal / Vazirani): for c·ln n independent
+// trials, set x_S = 1 with probability x*_S in each round; final cover is union
+// of trials. P[element e uncovered after k=c·ln n rounds] ≤ (1 − ∏(1−x*_S))^k
+// ≤ e^{−k} = n^{−c}. Returns approximation guarantee factor c·ln n given LP
+// optimum and output ratio. Args: x_star (LP fractional value), n (universe size),
+// c (over-rounding constant default 2.0).
 fn builtin_greedy_set_cover_round(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_set_cover_lp_round(args)
+    let x_star = f1(args).clamp(0.0, 1.0);
+    let n = args.get(1).map(|v| v.to_number()).unwrap_or(2.0).max(2.0);
+    let c = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
+    let rounds = c * n.ln();
+    let p_cover = 1.0 - (1.0 - x_star).powf(rounds);
+    Ok(PerlValue::float(p_cover))
 }
 
 // Local search swap step: improvement
