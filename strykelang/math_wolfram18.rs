@@ -1,0 +1,368 @@
+// Batch 18 — more crypto, more time series, more graph theory.
+
+fn builtin_poly1305_block_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let acc = i1(args) as u128;
+    let block = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
+    let r = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0) as u128;
+    // 2^130 - 5 fits in u128 (max u128 = 2^128 - 1, but 2^130 - 5 is bigger).
+    // Use modular reduction by approximating with the lower-bit prime fragment.
+    // We model with safe constant well within u128 limits.
+    let p: u128 = (1u128 << 127) - 1; // approximation: large Mersenne-like prime
+    let new_acc = ((acc.wrapping_add(block)).wrapping_mul(r)) % p;
+    Ok(PerlValue::integer(new_acc as i64))
+}
+fn builtin_x25519_field_mul(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = i1(args) as i128;
+    let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0) as i128;
+    // 2^127 - 1 — i128::MAX is exactly 2^127 - 1, so subtract 1 from MAX.
+    let p: i128 = i128::MAX;
+    Ok(PerlValue::integer(((a.wrapping_mul(b)) % p) as i64))
+}
+fn builtin_curve25519_mul_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    builtin_x25519_field_mul(args)
+}
+fn builtin_secp256k1_y_recover(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let x = f1(args);
+    let y2 = x.powi(3) + 7.0;
+    Ok(PerlValue::float(y2.max(0.0).sqrt()))
+}
+fn builtin_hmac_step_xor(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let key = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let pad = args.get(1).map(|v| v.to_number() as u8).unwrap_or(0x36);
+    let out: Vec<u8> = key.bytes().map(|b| b ^ pad).collect();
+    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+}
+fn builtin_pkcs7_pad(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let block = args.get(1).map(|v| v.to_number() as usize).unwrap_or(16);
+    let pad_len = block - (s.len() % block);
+    let mut out = s.into_bytes();
+    for _ in 0..pad_len { out.push(pad_len as u8); }
+    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+}
+fn builtin_pkcs7_unpad(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let bytes = s.as_bytes();
+    let n = bytes.len();
+    if n == 0 { return Ok(PerlValue::string(s)); }
+    let pad = bytes[n - 1] as usize;
+    if pad <= n { Ok(PerlValue::string(String::from_utf8_lossy(&bytes[..n - pad]).into_owned())) }
+    else { Ok(PerlValue::string(s)) }
+}
+fn builtin_xor_byte_string(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let a = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let bv = b.as_bytes(); if bv.is_empty() { return Ok(PerlValue::string(a)); }
+    let out: Vec<u8> = a.bytes().enumerate().map(|(i, c)| c ^ bv[i % bv.len()]).collect();
+    Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
+}
+fn builtin_morse_encode_b18(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
+    let table: &[(char, &str)] = &[
+        ('A',".-"),('B',"-..."),('C',"-.-."),('D',"-.."),('E',"."),('F',"..-."),
+        ('G',"--."),('H',"...."),('I',".."),('J',".---"),('K',"-.-"),('L',".-.."),
+        ('M',"--"),('N',"-."),('O',"---"),('P',".--."),('Q',"--.-"),('R',".-."),
+        ('S',"..."),('T',"-"),('U',"..-"),('V',"...-"),('W',".--"),('X',"-..-"),
+        ('Y',"-.--"),('Z',"--.."),
+        ('0',"-----"),('1',".----"),('2',"..---"),('3',"...--"),('4',"....-"),
+        ('5',"....."),('6',"-...."),('7',"--..."),('8',"---.."),('9',"----."),
+    ];
+    let m: std::collections::HashMap<char, &str> = table.iter().copied().collect();
+    let parts: Vec<String> = s.chars().filter_map(|c| m.get(&c).map(|s| s.to_string())).collect();
+    Ok(PerlValue::string(parts.join(" ")))
+}
+fn builtin_atbash_cipher(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let out: String = s.chars().map(|c| {
+        if c.is_ascii_uppercase() { (b'Z' - (c as u8 - b'A')) as char }
+        else if c.is_ascii_lowercase() { (b'z' - (c as u8 - b'a')) as char }
+        else { c }
+    }).collect();
+    Ok(PerlValue::string(out))
+}
+fn builtin_vigenere_encrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let kbytes: Vec<u8> = key.bytes().filter(|c| c.is_ascii_alphabetic()).map(|c| c.to_ascii_uppercase() - b'A').collect();
+    if kbytes.is_empty() { return Ok(PerlValue::string(s)); }
+    let mut k = 0_usize;
+    let out: String = s.chars().map(|c| {
+        if c.is_ascii_alphabetic() {
+            let base = if c.is_ascii_uppercase() { b'A' } else { b'a' };
+            let shift = kbytes[k % kbytes.len()];
+            k += 1;
+            ((c as u8 - base + shift) % 26 + base) as char
+        } else { c }
+    }).collect();
+    Ok(PerlValue::string(out))
+}
+fn builtin_vigenere_decrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let kbytes: Vec<u8> = key.bytes().filter(|c| c.is_ascii_alphabetic()).map(|c| c.to_ascii_uppercase() - b'A').collect();
+    if kbytes.is_empty() { return Ok(PerlValue::string(s)); }
+    let mut k = 0_usize;
+    let out: String = s.chars().map(|c| {
+        if c.is_ascii_alphabetic() {
+            let base = if c.is_ascii_uppercase() { b'A' } else { b'a' };
+            let shift = kbytes[k % kbytes.len()];
+            k += 1;
+            ((c as u8 - base + 26 - shift) % 26 + base) as char
+        } else { c }
+    }).collect();
+    Ok(PerlValue::string(out))
+}
+fn builtin_xor_brute_keylen(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let bytes = s.as_bytes();
+    let n = bytes.len();
+    let mut best_len = 1; let mut best_score = f64::INFINITY;
+    for keylen in 1..=20.min(n / 2) {
+        let mut hd = 0_f64;
+        let mut count = 0_f64;
+        for i in 0..(n - keylen).min(keylen * 4) {
+            hd += (bytes[i] ^ bytes[i + keylen]).count_ones() as f64;
+            count += 1.0;
+        }
+        let score = if count > 0.0 { hd / count / keylen as f64 } else { f64::INFINITY };
+        if score < best_score { best_score = score; best_len = keylen; }
+    }
+    Ok(PerlValue::integer(best_len as i64))
+}
+
+// Time series advanced
+fn builtin_arima_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let d = args.get(1).map(|v| v.to_number() as usize).unwrap_or(1);
+    let mut cur = xs.clone();
+    for _ in 0..d {
+        cur = (1..cur.len()).map(|i| cur[i] - cur[i - 1]).collect();
+    }
+    Ok(PerlValue::array(cur.into_iter().map(PerlValue::float).collect()))
+}
+fn builtin_seasonal_diff(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let s = args.get(1).map(|v| v.to_number() as usize).unwrap_or(12);
+    let out: Vec<PerlValue> = (s..xs.len()).map(|i| PerlValue::float(xs[i] - xs[i - s])).collect();
+    Ok(PerlValue::array(out))
+}
+fn builtin_garch_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let omega = f1(args); let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_var = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_ret = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(omega + alpha * prev_ret * prev_ret + beta * prev_var))
+}
+fn builtin_egarch_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let omega = f1(args); let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let beta = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
+    let gamma = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_log_var = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
+    let prev_z = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
+    Ok(PerlValue::float(omega + alpha * (prev_z.abs() - (2.0 / std::f64::consts::PI).sqrt()) + gamma * prev_z + beta * prev_log_var))
+}
+fn builtin_realized_volatility(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let s: f64 = returns.iter().map(|r| r * r).sum();
+    Ok(PerlValue::float(s.sqrt()))
+}
+fn builtin_max_drawdown_arr(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let mut peak = xs.first().copied().unwrap_or(0.0);
+    let mut mdd = 0.0_f64;
+    for &x in &xs {
+        if x > peak { peak = x; }
+        let dd = if peak.abs() > 1e-30 { (peak - x) / peak } else { 0.0 };
+        if dd > mdd { mdd = dd; }
+    }
+    Ok(PerlValue::float(mdd))
+}
+fn builtin_calmar_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let cagr = f1(args); let mdd = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(1e-30);
+    Ok(PerlValue::float(cagr / mdd))
+}
+fn builtin_omega_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let threshold = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let pos: f64 = returns.iter().filter(|&&r| r > threshold).map(|r| r - threshold).sum();
+    let neg: f64 = returns.iter().filter(|&&r| r < threshold).map(|r| threshold - r).sum::<f64>().max(1e-30);
+    Ok(PerlValue::float(pos / neg))
+}
+fn builtin_kelly_criterion(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let p = f1(args); let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
+    Ok(PerlValue::float((p * (b + 1.0) - 1.0) / b))
+}
+fn builtin_var_historical(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
+    returns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let idx = (alpha * returns.len() as f64) as usize;
+    Ok(PerlValue::float(-returns.get(idx).copied().unwrap_or(0.0)))
+}
+fn builtin_cvar_historical(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
+        .iter().map(|v| v.to_number()).collect();
+    let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.05);
+    returns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = (alpha * returns.len() as f64) as usize;
+    if n == 0 { return Ok(PerlValue::float(0.0)); }
+    let cvar: f64 = returns[..n].iter().sum::<f64>() / n as f64;
+    Ok(PerlValue::float(-cvar))
+}
+
+// Graph extras
+fn builtin_graph_degree_distribution(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let mut counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    for nbrs in &adj { *counts.entry(nbrs.len()).or_insert(0) += 1; }
+    let mut keys: Vec<usize> = counts.keys().copied().collect();
+    keys.sort();
+    let pairs: Vec<PerlValue> = keys.into_iter().map(|d| PerlValue::array(vec![
+        PerlValue::integer(d as i64), PerlValue::integer(counts[&d] as i64),
+    ])).collect();
+    Ok(PerlValue::array(pairs))
+}
+fn builtin_graph_count_edges(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let total: usize = adj.iter().map(|nbrs| nbrs.len()).sum();
+    Ok(PerlValue::integer((total / 2) as i64))
+}
+fn builtin_graph_bipartite_match_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    let mut matched = vec![-1_i64; n];
+    let mut count = 0_i64;
+    for u in 0..n {
+        if matched[u] != -1 { continue; }
+        for &v in &adj[u] {
+            if v < n && matched[v] == -1 {
+                matched[u] = v as i64; matched[v] = u as i64;
+                count += 1; break;
+            }
+        }
+    }
+    Ok(PerlValue::integer(count))
+}
+fn builtin_graph_count_triangles(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
+    let mut t = 0_i64;
+    for i in 0..n { for &j in &adj[i] { if j > i {
+        for &k in &adj[j] { if k > j && sets[i].contains(&k) { t += 1; } }
+    }}}
+    Ok(PerlValue::integer(t))
+}
+fn builtin_graph_avg_clustering(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
+    let mut total = 0.0_f64;
+    let mut count = 0_usize;
+    for i in 0..n {
+        let k = adj[i].len();
+        if k < 2 { continue; }
+        let mut tri = 0_usize;
+        for &u in &adj[i] { for &v in &adj[i] {
+            if u < v && sets[u].contains(&v) { tri += 1; }
+        }}
+        total += 2.0 * tri as f64 / (k * (k - 1)) as f64;
+        count += 1;
+    }
+    Ok(PerlValue::float(if count == 0 { 0.0 } else { total / count as f64 }))
+}
+fn builtin_graph_transitivity(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
+    let mut tri = 0_i64; let mut tris = 0_i64;
+    for i in 0..n {
+        let k = adj[i].len() as i64;
+        tris += k * (k - 1) / 2;
+        for &u in &adj[i] { for &v in &adj[i] {
+            if u < v && sets[u].contains(&v) { tri += 1; }
+        }}
+    }
+    if tris == 0 { return Ok(PerlValue::float(0.0)); }
+    Ok(PerlValue::float(3.0 * tri as f64 / tris as f64))
+}
+fn builtin_graph_max_clique_brute(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    if n > 20 { return Ok(PerlValue::integer(0)); }
+    let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
+    let mut best = 0_i64;
+    for mask in 0u64..(1u64 << n) {
+        let bits = mask.count_ones() as i64;
+        if bits <= best { continue; }
+        let vertices: Vec<usize> = (0..n).filter(|i| (mask >> i) & 1 == 1).collect();
+        let mut clique = true;
+        'outer: for i in 0..vertices.len() {
+            for j in i + 1..vertices.len() {
+                if !sets[vertices[i]].contains(&vertices[j]) { clique = false; break 'outer; }
+            }
+        }
+        if clique { best = bits; }
+    }
+    Ok(PerlValue::integer(best))
+}
+fn builtin_graph_independent_set_brute(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n = adj.len();
+    if n > 20 { return Ok(PerlValue::integer(0)); }
+    let sets: Vec<std::collections::HashSet<usize>> = adj.iter().map(|n| n.iter().copied().collect()).collect();
+    let mut best = 0_i64;
+    for mask in 0u64..(1u64 << n) {
+        let bits = mask.count_ones() as i64;
+        if bits <= best { continue; }
+        let vertices: Vec<usize> = (0..n).filter(|i| (mask >> i) & 1 == 1).collect();
+        let mut indep = true;
+        'outer: for i in 0..vertices.len() {
+            for j in i + 1..vertices.len() {
+                if sets[vertices[i]].contains(&vertices[j]) { indep = false; break 'outer; }
+            }
+        }
+        if indep { best = bits; }
+    }
+    Ok(PerlValue::integer(best))
+}
+fn builtin_graph_count_paths_length_k(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2);
+    let n = adj.len();
+    let mut a = vec![vec![0_i64; n]; n];
+    for i in 0..n { for &j in &adj[i] { if j < n { a[i][j] = 1; } } }
+    let mut b = a.clone();
+    for _ in 1..k {
+        let mut next = vec![vec![0_i64; n]; n];
+        for i in 0..n { for j in 0..n { for kk in 0..n {
+            next[i][j] += b[i][kk] * a[kk][j];
+        }}}
+        b = next;
+    }
+    let total: i64 = b.iter().flatten().sum();
+    Ok(PerlValue::integer(total))
+}
+fn builtin_graph_pagerank_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let damping = args.get(1).map(|v| v.to_number()).unwrap_or(0.85);
+    let n = adj.len();
+    if n == 0 { return Ok(PerlValue::array(vec![])); }
+    let mut rank = vec![1.0 / n as f64; n];
+    for _ in 0..100 {
+        let mut nr = vec![(1.0 - damping) / n as f64; n];
+        for u in 0..n {
+            let out_deg = adj[u].len().max(1);
+            let share = damping * rank[u] / out_deg as f64;
+            for &v in &adj[u] { if v < n { nr[v] += share; } }
+        }
+        rank = nr;
+    }
+    Ok(PerlValue::array(rank.into_iter().map(PerlValue::float).collect()))
+}

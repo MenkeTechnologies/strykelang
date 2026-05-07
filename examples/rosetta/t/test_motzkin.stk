@@ -3,29 +3,29 @@
 
 my %memo
 
-fn motzkin($n) {
+fn Rosetta::Motzkin::compute($n) {
     if ($n < 2) {
         1
     } elsif (exists $memo{$n}) {
         $memo{$n}
     } else {
-        my $res = motzkin($n-1)
+        my $res = Rosetta::Motzkin::compute($n-1)
         for my $i (0..$n-2) {
-            $res += motzkin($i) * motzkin($n-2-$i)
+            $res += Rosetta::Motzkin::compute($i) * Rosetta::Motzkin::compute($n-2-$i)
         }
         $memo{$n} = $res
         $res
     }
 }
 
-assert_eq motzkin(0), 1, "M0"
-assert_eq motzkin(1), 1, "M1"
-assert_eq motzkin(2), 2, "M2"
-assert_eq motzkin(3), 4, "M3"
-assert_eq motzkin(4), 9, "M4"
-assert_eq motzkin(5), 21, "M5"
-assert_eq motzkin(10), 2188, "M10"
+assert_eq Rosetta::Motzkin::compute(0), 1, "M0"
+assert_eq Rosetta::Motzkin::compute(1), 1, "M1"
+assert_eq Rosetta::Motzkin::compute(2), 2, "M2"
+assert_eq Rosetta::Motzkin::compute(3), 4, "M3"
+assert_eq Rosetta::Motzkin::compute(4), 9, "M4"
+assert_eq Rosetta::Motzkin::compute(5), 21, "M5"
+assert_eq Rosetta::Motzkin::compute(10), 2188, "M10"
 
-10 |> motzkin |> assert_eq(2188, "pipe motzkin")
+10 |> Rosetta::Motzkin::compute |> assert_eq(2188, "pipe motzkin")
 
 test_run

@@ -799,7 +799,7 @@ fn matrix_exp_real(a: &[Vec<f64>]) -> Vec<Vec<f64>> {
         182.0,
         1.0,
     ];
-    let mut a2 = mat_mul(&a_scaled, &a_scaled);
+    let a2 = mat_mul(&a_scaled, &a_scaled);
     let a4 = mat_mul(&a2, &a2);
     let a6 = mat_mul(&a4, &a2);
     let mut id = vec![vec![0.0_f64; n]; n];
@@ -1656,7 +1656,7 @@ fn builtin_decompose_classical(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut trend = vec![f64::NAN; n];
     for i in half..n - half {
         let mut s = 0.0_f64;
-        let mut count = 0_usize;
+        let count;
         if period % 2 == 0 {
             // Centred 2×p MA.
             s += 0.5 * xs[i - half];

@@ -15,7 +15,7 @@ fn Rosetta::PrimeFactors::prime_factors($n) {
     \@factors
 }
 
-fn is_sphenic($n) {
+fn Rosetta::Sphenic::check($n) {
     my $factors_ref = Rosetta::PrimeFactors::prime_factors($n)
     my @factors = @$factors_ref
     if (len(@factors) != 3) {
@@ -27,13 +27,13 @@ fn is_sphenic($n) {
     }
 }
 
-assert_ok is_sphenic(30), "30 is sphenic (2*3*5)"
-assert_ok is_sphenic(42), "42 is sphenic (2*3*7)"
-assert_ok is_sphenic(66), "66 is sphenic (2*3*11)"
-assert_ok !is_sphenic(60), "60 is not (2*2*3*5)"
-assert_ok !is_sphenic(8), "8 is not (2*2*2)"
-assert_ok !is_sphenic(12), "12 is not (2*2*3)"
+assert_ok Rosetta::Sphenic::check(30), "30 is sphenic (2*3*5)"
+assert_ok Rosetta::Sphenic::check(42), "42 is sphenic (2*3*7)"
+assert_ok Rosetta::Sphenic::check(66), "66 is sphenic (2*3*11)"
+assert_ok !Rosetta::Sphenic::check(60), "60 is not (2*2*3*5)"
+assert_ok !Rosetta::Sphenic::check(8), "8 is not (2*2*2)"
+assert_ok !Rosetta::Sphenic::check(12), "12 is not (2*2*3)"
 
-30 |> is_sphenic |> assert_ok("pipe sphenic")
+30 |> Rosetta::Sphenic::check |> assert_ok("pipe sphenic")
 
 test_run
