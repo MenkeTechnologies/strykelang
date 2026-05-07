@@ -329,11 +329,6 @@ fn builtin_string_normalize_spaces(args: &[PerlValue]) -> PerlResult<PerlValue> 
 
 // ── Dates / calendars ───────────────────────────────────────────────────────
 
-fn builtin_is_leap_year_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let y = i1(args);
-    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
-    Ok(PerlValue::integer(if leap { 1 } else { 0 }))
-}
 fn builtin_days_in_year(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let y = i1(args);
     let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
@@ -453,21 +448,6 @@ fn builtin_simple_interest_compute(args: &[PerlValue]) -> PerlResult<PerlValue> 
     let t = args.get(2).map(|x| x.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(p * r * t))
 }
-fn builtin_continuous_compound_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pv = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    let t = args.get(2).map(|x| x.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(pv * (r * t).exp()))
-}
-fn builtin_present_value_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let fv = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    let n = args.get(2).map(|x| x.to_number() as i32).unwrap_or(0);
-    Ok(PerlValue::float(fv / (1.0 + r).powi(n)))
-}
-fn builtin_future_value_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pv = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    let n = args.get(2).map(|x| x.to_number() as i32).unwrap_or(0);
-    Ok(PerlValue::float(pv * (1.0 + r).powi(n)))
-}
 fn builtin_perpetuity_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cash = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float(cash / r))
@@ -495,11 +475,6 @@ fn builtin_capm_expected_return(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rm = args.get(2).map(|x| x.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(rf + beta * (rm - rf)))
 }
-fn builtin_sharpe_ratio_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rp = f1(args); let rf = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    let sigma = args.get(2).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
-    Ok(PerlValue::float((rp - rf) / sigma))
-}
 fn builtin_treynor_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rp = f1(args); let rf = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let beta = args.get(2).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
@@ -515,11 +490,6 @@ fn builtin_information_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let rp = f1(args); let rb = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let tracking = args.get(2).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float((rp - rb) / tracking))
-}
-fn builtin_sortino_ratio_b13(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rp = f1(args); let rf = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    let downside = args.get(2).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
-    Ok(PerlValue::float((rp - rf) / downside))
 }
 
 // ── Fluid mechanics ─────────────────────────────────────────────────────────

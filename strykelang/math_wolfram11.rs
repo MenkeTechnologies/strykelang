@@ -223,13 +223,6 @@ fn builtin_crc16_ccitt(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // ── Linear-algebra atoms ────────────────────────────────────────────────────
 
-fn builtin_dot_product_b11(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    Ok(PerlValue::float(a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()))
-}
 fn builtin_l1_norm(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -428,16 +421,6 @@ fn builtin_running_variance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::array(out))
 }
-fn builtin_iqr_b11(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let n = xs.len();
-    if n < 2 { return Ok(PerlValue::float(0.0)); }
-    let q1 = xs[n / 4];
-    let q3 = xs[3 * n / 4];
-    Ok(PerlValue::float(q3 - q1))
-}
 fn builtin_outlier_iqr_q(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
@@ -491,10 +474,6 @@ fn builtin_log_sum_exp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let s: f64 = xs.iter().map(|x| (x - m).exp()).sum();
     Ok(PerlValue::float(m + s.ln()))
-}
-fn builtin_softplus_b11(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    Ok(PerlValue::float(if x > 30.0 { x } else { (1.0 + x.exp()).ln() }))
 }
 fn builtin_log_sigmoid(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);

@@ -1,21 +1,6 @@
 // Batch 22 — biology / ecology / population dynamics / epidemiology.
 
 // Lotka-Volterra predator-prey step (returns next state [x, y])
-fn builtin_lotka_volterra_step_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let y = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let beta = args.get(3).map(|v| v.to_number()).unwrap_or(0.5);
-    let delta = args.get(4).map(|v| v.to_number()).unwrap_or(0.5);
-    let gamma = args.get(5).map(|v| v.to_number()).unwrap_or(1.0);
-    let dt = args.get(6).map(|v| v.to_number()).unwrap_or(0.01);
-    let dx = alpha * x - beta * x * y;
-    let dy = delta * x * y - gamma * y;
-    Ok(PerlValue::array(vec![
-        PerlValue::float(x + dt * dx),
-        PerlValue::float(y + dt * dy),
-    ]))
-}
 
 // Logistic growth dN/dt = rN(1 - N/K)
 fn builtin_logistic_growth_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -57,19 +42,8 @@ fn builtin_allee_growth_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Exponential growth N(t) = N0 e^(rt)
-fn builtin_exponential_growth_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n0 = f1(args);
-    let r = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);
-    let t = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(n0 * (r * t).exp()))
-}
 
 // Doubling time T = ln(2)/r
-fn builtin_doubling_time_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args);
-    if r <= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(2.0_f64.ln() / r))
-}
 
 // Population doubling rate from N0/N1/Δt
 fn builtin_growth_rate_from_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -81,24 +55,6 @@ fn builtin_growth_rate_from_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // SIR model step (returns [S, I, R])
-fn builtin_sir_step_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = f1(args);
-    let i = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let r = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let beta = args.get(3).map(|v| v.to_number()).unwrap_or(0.3);
-    let gamma = args.get(4).map(|v| v.to_number()).unwrap_or(0.1);
-    let dt = args.get(5).map(|v| v.to_number()).unwrap_or(0.01);
-    let n = s + i + r;
-    if n == 0.0 { return Ok(PerlValue::array(vec![PerlValue::float(s), PerlValue::float(i), PerlValue::float(r)])); }
-    let ds = -beta * s * i / n;
-    let di = beta * s * i / n - gamma * i;
-    let dr = gamma * i;
-    Ok(PerlValue::array(vec![
-        PerlValue::float(s + dt * ds),
-        PerlValue::float(i + dt * di),
-        PerlValue::float(r + dt * dr),
-    ]))
-}
 
 // SEIR model step
 fn builtin_seir_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -281,16 +237,6 @@ fn builtin_berger_parker(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Jaccard similarity = |A∩B| / |A∪B|
-fn builtin_jaccard_similarity_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a: std::collections::HashSet<String> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_string()).collect();
-    let b: std::collections::HashSet<String> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_string()).collect();
-    let inter = a.intersection(&b).count();
-    let uni = a.union(&b).count();
-    if uni == 0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(inter as f64 / uni as f64))
-}
 
 // Sorensen-Dice similarity 2|A∩B| / (|A|+|B|)
 fn builtin_sorensen_dice(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -340,15 +286,6 @@ fn builtin_rao_quadratic_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Hardy-Weinberg expected genotype freq (p², 2pq, q²)
-fn builtin_hardy_weinberg_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = f1(args);
-    let q = 1.0 - p;
-    Ok(PerlValue::array(vec![
-        PerlValue::float(p * p),
-        PerlValue::float(2.0 * p * q),
-        PerlValue::float(q * q),
-    ]))
-}
 
 // Selection coefficient → next allele freq
 fn builtin_selection_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -361,15 +298,6 @@ fn builtin_selection_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Fst from population freqs
-fn builtin_fst_b22(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p1 = f1(args);
-    let p2 = args.get(1).map(|v| v.to_number()).unwrap_or(p1);
-    let p_avg = 0.5 * (p1 + p2);
-    let h_t = 2.0 * p_avg * (1.0 - p_avg);
-    let h_s = 0.5 * (2.0 * p1 * (1.0 - p1) + 2.0 * p2 * (1.0 - p2));
-    if h_t == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float((h_t - h_s) / h_t))
-}
 
 // Nei's genetic distance D = -ln(I)
 fn builtin_nei_genetic_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {

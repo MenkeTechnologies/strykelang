@@ -121,18 +121,6 @@ fn builtin_logistic_loss(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Cross-entropy (multi-class)
-fn builtin_cross_entropy_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let y_true: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let y_pred: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let mut sum = 0.0;
-    for i in 0..y_true.len().min(y_pred.len()) {
-        let p = y_pred[i].clamp(1e-12, 1.0 - 1e-12);
-        sum -= y_true[i] * p.ln();
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // KL divergence
 #[allow(dead_code)]
@@ -167,24 +155,8 @@ fn builtin_js_div(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Wasserstein distance 1D (sorted)
-fn builtin_wasserstein_1d_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mut a: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let mut b: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    a.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    b.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let n = a.len().min(b.len());
-    let mut sum = 0.0;
-    for i in 0..n { sum += (a[i] - b[i]).abs(); }
-    Ok(PerlValue::float(sum / n.max(1) as f64))
-}
 
 // Sigmoid
-fn builtin_sigmoid_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    Ok(PerlValue::float(1.0 / (1.0 + (-x).exp())))
-}
 // Sigmoid derivative
 fn builtin_sigmoid_grad(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
@@ -197,34 +169,14 @@ fn builtin_tanh_grad(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 - x.tanh().powi(2)))
 }
 // ReLU
-fn builtin_relu_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    Ok(PerlValue::float(x.max(0.0)))
-}
 // ReLU derivative
 fn builtin_relu_grad(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
     Ok(PerlValue::float(if x > 0.0 { 1.0 } else { 0.0 }))
 }
 // Leaky ReLU
-fn builtin_leaky_relu_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(0.01);
-    Ok(PerlValue::float(if x > 0.0 { x } else { alpha * x }))
-}
 // ELU
-fn builtin_elu_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let alpha = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(if x > 0.0 { x } else { alpha * (x.exp() - 1.0) }))
-}
 // SELU
-fn builtin_selu_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let alpha = 1.6732632423543772;
-    let scale = 1.0507009873554805;
-    Ok(PerlValue::float(scale * if x > 0.0 { x } else { alpha * (x.exp() - 1.0) }))
-}
 // Swish (SiLU)
 #[allow(dead_code)]
 fn builtin_swish(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -232,16 +184,7 @@ fn builtin_swish(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(x / (1.0 + (-x).exp())))
 }
 // GELU
-fn builtin_gelu_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let pi = std::f64::consts::PI;
-    Ok(PerlValue::float(0.5 * x * (1.0 + ((2.0 / pi).sqrt() * (x + 0.044715 * x.powi(3))).tanh())))
-}
 // Mish
-fn builtin_mish_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    Ok(PerlValue::float(x * (x.exp().ln_1p()).tanh()))
-}
 // Softsign
 fn builtin_softsign(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = f1(args);
@@ -321,14 +264,6 @@ fn builtin_specificity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(tn / (tn + fp)))
 }
 // NPV (negative predictive value)
-fn builtin_npv_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cv = builtin_confusion_counts(args)?;
-    let v = arg_to_vec(&cv);
-    let tn = v[2].to_number();
-    let fn_ = v[3].to_number();
-    if tn + fn_ == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(tn / (tn + fn_)))
-}
 // Balanced accuracy
 fn builtin_balanced_accuracy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cv = builtin_confusion_counts(args)?;
@@ -408,16 +343,6 @@ fn builtin_mahalanobis_1d(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Soft-max normalization
-fn builtin_softmax_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    if xs.is_empty() { return Ok(PerlValue::array(vec![])); }
-    let m = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let exp_x: Vec<f64> = xs.iter().map(|&x| (x - m).exp()).collect();
-    let sum: f64 = exp_x.iter().sum();
-    let out: Vec<PerlValue> = exp_x.into_iter().map(|x| PerlValue::float(x / sum)).collect();
-    Ok(PerlValue::array(out))
-}
 
 // Log-softmax
 fn builtin_log_softmax(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -439,17 +364,6 @@ fn builtin_one_hot(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Argmax
-fn builtin_argmax_b27(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    if xs.is_empty() { return Ok(PerlValue::integer(-1)); }
-    let mut best = 0_usize;
-    let mut best_v = xs[0];
-    for (i, &v) in xs.iter().enumerate() {
-        if v > best_v { best_v = v; best = i; }
-    }
-    Ok(PerlValue::integer(best as i64))
-}
 
 // Top-k indices
 fn builtin_topk_indices(args: &[PerlValue]) -> PerlResult<PerlValue> {

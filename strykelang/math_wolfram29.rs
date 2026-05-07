@@ -64,15 +64,6 @@ fn builtin_pochhammer(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Falling factorial
-fn builtin_falling_factorial_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let a = f1(args);
-    let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
-    let mut p = 1.0_f64;
-    for k in 0..n {
-        p *= a - k as f64;
-    }
-    Ok(PerlValue::float(p))
-}
 
 // Mathieu (Floquet) cosine ce_n(z, q) — first-order series approximation
 fn builtin_mathieu_ce0(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -246,34 +237,8 @@ fn builtin_exp_integral_e1(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Sin² integral / Fresnel S(x) — series
-fn builtin_fresnel_s_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let pi_2 = std::f64::consts::PI / 2.0;
-    let mut sum = 0.0;
-    let mut term = pi_2 * x.powi(3) / 3.0;
-    for n in 0..200 {
-        sum += term / (4 * n + 3) as f64;
-        let next = -term * pi_2 * pi_2 * x.powi(4) / ((2 * n + 2) * (2 * n + 3) * (4 * n + 7)) as f64;
-        term = next;
-        if term.abs() < 1e-15 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Fresnel C(x)
-fn builtin_fresnel_c_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let pi_2 = std::f64::consts::PI / 2.0;
-    let mut sum = x;
-    let mut term = x;
-    for n in 0..200 {
-        let next = -term * pi_2 * pi_2 * x.powi(4) / ((2 * n + 1) * (2 * n + 2) * (4 * n + 5)) as f64;
-        sum += next / (4 * n + 5) as f64 * (4 * n + 1) as f64;
-        term = next;
-        if term.abs() < 1e-15 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Dawson function D(x) = e^{-x²} ∫₀ˣ e^{t²} dt — series for small x
 fn builtin_dawson_function(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -399,65 +364,14 @@ fn builtin_polylog_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Hurwitz zeta ζ(s, a) — series for s > 1
-fn builtin_hurwitz_zeta_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = f1(args);
-    let a = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if s <= 1.0 { return Ok(PerlValue::float(f64::NAN)); }
-    let mut sum = 0.0;
-    for n in 0..10000 {
-        let term = (a + n as f64).powf(-s);
-        sum += term;
-        if term < 1e-18 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Dirichlet eta η(s) = (1 - 2^{1-s}) ζ(s) — direct alternating series
-fn builtin_dirichlet_eta_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = f1(args);
-    let mut sum = 0.0;
-    for n in 1..=10000 {
-        let sign = if n % 2 == 0 { -1.0 } else { 1.0 };
-        let term = sign * (n as f64).powf(-s);
-        sum += term;
-        if term.abs() < 1e-18 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Dirichlet beta β(s) = sum (-1)^n / (2n+1)^s
-fn builtin_dirichlet_beta_b29(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = f1(args);
-    let mut sum = 0.0;
-    for n in 0..10000 {
-        let sign = if n % 2 == 0 { 1.0 } else { -1.0 };
-        let term = sign / (2.0 * n as f64 + 1.0).powf(s);
-        sum += term;
-        if term.abs() < 1e-18 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Catalan number n-th approximation via beta function
-fn builtin_catalan_constant_b29() -> PerlResult<PerlValue> {
-    let mut sum = 0.0;
-    for n in 0..10000 {
-        let sign = if n % 2 == 0 { 1.0 } else { -1.0 };
-        let term = sign / (2.0 * n as f64 + 1.0).powi(2);
-        sum += term;
-        if term.abs() < 1e-18 { break; }
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Apéry's constant ζ(3) numerical
-fn builtin_apery_constant_b29() -> PerlResult<PerlValue> {
-    let mut sum = 0.0;
-    for n in 1..100000 {
-        sum += 1.0 / (n as f64).powi(3);
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Inverse tangent integral Ti₂(x) = sum (-1)^k x^{2k+1}/(2k+1)^2
 fn builtin_ti2(args: &[PerlValue]) -> PerlResult<PerlValue> {

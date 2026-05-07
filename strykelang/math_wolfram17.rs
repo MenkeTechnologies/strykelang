@@ -148,19 +148,6 @@ fn builtin_polygon_area_signed(args: &[PerlValue]) -> PerlResult<PerlValue> {
     for i in 0..n { let j = (i + 1) % n; s += pts[i].0 * pts[j].1 - pts[j].0 * pts[i].1; }
     Ok(PerlValue::float(s / 2.0))
 }
-fn builtin_polygon_perimeter_b17(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pts: Vec<(f64, f64)> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|p| { let v = arg_to_vec(p); (
-            v.first().map(|x| x.to_number()).unwrap_or(0.0),
-            v.get(1).map(|x| x.to_number()).unwrap_or(0.0),
-        )}).collect();
-    let n = pts.len(); if n < 2 { return Ok(PerlValue::float(0.0)); }
-    let mut s = 0.0_f64;
-    for i in 0..n { let j = (i + 1) % n;
-        s += ((pts[j].0 - pts[i].0).powi(2) + (pts[j].1 - pts[i].1).powi(2)).sqrt();
-    }
-    Ok(PerlValue::float(s))
-}
 fn builtin_polygon_convex_q(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let pts: Vec<(f64, f64)> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter().map(|p| { let v = arg_to_vec(p); (

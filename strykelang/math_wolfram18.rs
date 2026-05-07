@@ -56,21 +56,6 @@ fn builtin_xor_byte_string(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let out: Vec<u8> = a.bytes().enumerate().map(|(i, c)| c ^ bv[i % bv.len()]).collect();
     Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
 }
-fn builtin_morse_encode_b18(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string().to_ascii_uppercase()).unwrap_or_default();
-    let table: &[(char, &str)] = &[
-        ('A',".-"),('B',"-..."),('C',"-.-."),('D',"-.."),('E',"."),('F',"..-."),
-        ('G',"--."),('H',"...."),('I',".."),('J',".---"),('K',"-.-"),('L',".-.."),
-        ('M',"--"),('N',"-."),('O',"---"),('P',".--."),('Q',"--.-"),('R',".-."),
-        ('S',"..."),('T',"-"),('U',"..-"),('V',"...-"),('W',".--"),('X',"-..-"),
-        ('Y',"-.--"),('Z',"--.."),
-        ('0',"-----"),('1',".----"),('2',"..---"),('3',"...--"),('4',"....-"),
-        ('5',"....."),('6',"-...."),('7',"--..."),('8',"---.."),('9',"----."),
-    ];
-    let m: std::collections::HashMap<char, &str> = table.iter().copied().collect();
-    let parts: Vec<String> = s.chars().filter_map(|c| m.get(&c).map(|s| s.to_string())).collect();
-    Ok(PerlValue::string(parts.join(" ")))
-}
 fn builtin_atbash_cipher(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let out: String = s.chars().map(|c| {
