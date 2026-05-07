@@ -4065,12 +4065,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Modular Forms",
-        &[
-            "dedekind_eta",
-            "klein_j",
-            "modular_lambda",
-            "ramanujan_tau",
-        ],
+        &["dedekind_eta", "klein_j", "modular_lambda", "ramanujan_tau"],
     ),
     (
         "Si / Ci / Ei / Li / Fresnel Integrals",
@@ -4236,12 +4231,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Mathieu / Heun",
-        &[
-            "mathieu_a",
-            "mathieu_ce",
-            "mathieu_se",
-            "heun_g",
-        ],
+        &["mathieu_a", "mathieu_ce", "mathieu_se", "heun_g"],
     ),
     (
         "Wavelets",
@@ -4614,7 +4604,11 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "CAS-Lite",
-        &["factor_quadratic", "complete_square", "partial_fraction_simple"],
+        &[
+            "factor_quadratic",
+            "complete_square",
+            "partial_fraction_simple",
+        ],
     ),
     (
         "Quadrature (Specialised)",
@@ -4693,10 +4687,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "dilate_2d",
         ],
     ),
-    (
-        "Loss Functions",
-        &["mse_loss", "mae_loss", "huber_loss"],
-    ),
+    ("Loss Functions", &["mse_loss", "mae_loss", "huber_loss"]),
     (
         "Spatial / Geographic",
         &[
@@ -4786,10 +4777,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         "Hidden Markov Models",
         &["hmm_forward", "hmm_viterbi", "hmm_backward"],
     ),
-    (
-        "Survival Analysis",
-        &["kaplan_meier", "log_rank_test"],
-    ),
+    ("Survival Analysis", &["kaplan_meier", "log_rank_test"]),
     (
         "Sequence Alignment",
         &["needleman_wunsch", "smith_waterman"],
@@ -4853,7 +4841,12 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Splines & Curves",
-        &["bezier_eval", "catmull_rom_eval", "cubic_hermite_eval", "bspline_basis"],
+        &[
+            "bezier_eval",
+            "catmull_rom_eval",
+            "cubic_hermite_eval",
+            "bspline_basis",
+        ],
     ),
     (
         "Music & Audio",
@@ -4913,7 +4906,11 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Probabilistic Distances",
-        &["hellinger_distance", "wasserstein_1d", "chi_squared_divergence"],
+        &[
+            "hellinger_distance",
+            "wasserstein_1d",
+            "chi_squared_divergence",
+        ],
     ),
     (
         "Distributions (Tail / Inflated)",
@@ -4964,10 +4961,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         "Image Processing (Edges / Bilateral)",
         &["canny_edge_intensity", "bilateral_filter_basic"],
     ),
-    (
-        "Clustering Helpers",
-        &["kmeans_pp_init", "elbow_score"],
-    ),
+    ("Clustering Helpers", &["kmeans_pp_init", "elbow_score"]),
     (
         "Combinatorics (Tableaux / Boustrophedon)",
         &[
@@ -4979,7 +4973,12 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Number Theory (Tetration / Smoothness)",
-        &["tetration", "ackermann_limited", "perfect_power_q", "b_smooth_q"],
+        &[
+            "tetration",
+            "ackermann_limited",
+            "perfect_power_q",
+            "b_smooth_q",
+        ],
     ),
     (
         "Network Coreness & Structure",
@@ -5007,10 +5006,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "sutherland_hodgman_clip",
         ],
     ),
-    (
-        "Time-Series Smoothing",
-        &["kalman_rts_smoother"],
-    ),
+    ("Time-Series Smoothing", &["kalman_rts_smoother"]),
     (
         "Bioinformatics",
         &[
@@ -5041,10 +5037,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "convexity_bond",
         ],
     ),
-    (
-        "Image Quality Metrics",
-        &["ssim", "psnr", "mssim"],
-    ),
+    ("Image Quality Metrics", &["ssim", "psnr", "mssim"]),
     (
         "Acoustics",
         &[
@@ -5063,10 +5056,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "allele_frequencies",
         ],
     ),
-    (
-        "Epidemiology",
-        &["sir_step", "sir_r0", "doubling_time"],
-    ),
+    ("Epidemiology", &["sir_step", "sir_r0", "doubling_time"]),
     (
         "Inequality Measures",
         &[
@@ -5113,10 +5103,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         "Network Triad Analysis",
         &["homophily_index", "dyad_census", "triad_census"],
     ),
-    (
-        "Misc Inverses",
-        &["sigmoid_inverse"],
-    ),
+    ("Misc Inverses", &["sigmoid_inverse"]),
     (
         "Parallel I/O",
         &[

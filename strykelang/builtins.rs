@@ -3409,30 +3409,16 @@ pub(crate) fn try_builtin(
         "golden_section" | "golden" | "gss" => Some(builtin_golden_section(interp, args, line)),
 
         // ── Batch 3 callback-taking math builtins ─────────────────────────
-        "numerical_gradient" | "ngrad" => {
-            Some(builtin_numerical_gradient(interp, args, line))
-        }
-        "numerical_jacobian" | "njac" => {
-            Some(builtin_numerical_jacobian(interp, args, line))
-        }
-        "numerical_hessian" | "nhess" => {
-            Some(builtin_numerical_hessian(interp, args, line))
-        }
-        "numerical_divergence" | "ndiv" => {
-            Some(builtin_numerical_divergence(interp, args, line))
-        }
+        "numerical_gradient" | "ngrad" => Some(builtin_numerical_gradient(interp, args, line)),
+        "numerical_jacobian" | "njac" => Some(builtin_numerical_jacobian(interp, args, line)),
+        "numerical_hessian" | "nhess" => Some(builtin_numerical_hessian(interp, args, line)),
+        "numerical_divergence" | "ndiv" => Some(builtin_numerical_divergence(interp, args, line)),
         "numerical_curl" | "ncurl" => Some(builtin_numerical_curl(interp, args, line)),
-        "numerical_laplacian" | "nlap" => {
-            Some(builtin_numerical_laplacian(interp, args, line))
-        }
+        "numerical_laplacian" | "nlap" => Some(builtin_numerical_laplacian(interp, args, line)),
         "nelder_mead" | "simplex_min" => Some(builtin_nelder_mead(interp, args, line)),
-        "gradient_descent" | "gd_min" => {
-            Some(builtin_gradient_descent(interp, args, line))
-        }
+        "gradient_descent" | "gd_min" => Some(builtin_gradient_descent(interp, args, line)),
         "bfgs_minimize" | "bfgs" => Some(builtin_bfgs_minimize(interp, args, line)),
-        "levenberg_marquardt" | "lev_marq" => {
-            Some(builtin_levenberg_marquardt(interp, args, line))
-        }
+        "levenberg_marquardt" | "lev_marq" => Some(builtin_levenberg_marquardt(interp, args, line)),
         "romberg" | "romberg_int" => Some(builtin_romberg(interp, args, line)),
         "gauss_legendre_quad" | "glquad" | "gl_quad" => {
             Some(builtin_gauss_legendre_quad(interp, args, line))
@@ -3440,15 +3426,11 @@ pub(crate) fn try_builtin(
         "monte_carlo_integrate" | "mc_int" => {
             Some(builtin_monte_carlo_integrate(interp, args, line))
         }
-        "adaptive_simpson" | "asimp" => {
-            Some(builtin_adaptive_simpson(interp, args, line))
-        }
+        "adaptive_simpson" | "asimp" => Some(builtin_adaptive_simpson(interp, args, line)),
 
         // ── Batch 4 callback-taking builtins ─────────────────────────────
         "forward_diff" | "fdiff" => Some(builtin_forward_diff(interp, args, line)),
-        "forward_diff_grad" | "fdiff_grad" => {
-            Some(builtin_forward_diff_grad(interp, args, line))
-        }
+        "forward_diff_grad" | "fdiff_grad" => Some(builtin_forward_diff_grad(interp, args, line)),
         "rk45_dormand_prince" | "rk45" | "dopri5" => {
             Some(builtin_rk45_dormand_prince(interp, args, line))
         }
@@ -3460,9 +3442,7 @@ pub(crate) fn try_builtin(
         "gauss_chebyshev_quad" | "gc_quad" => {
             Some(builtin_gauss_chebyshev_quad(interp, args, line))
         }
-        "gauss_hermite_quad" | "gh_quad" => {
-            Some(builtin_gauss_hermite_quad(interp, args, line))
-        }
+        "gauss_hermite_quad" | "gh_quad" => Some(builtin_gauss_hermite_quad(interp, args, line)),
         "gauss_laguerre_quad" | "glag_quad" => {
             Some(builtin_gauss_laguerre_quad(interp, args, line))
         }
@@ -3470,13 +3450,9 @@ pub(crate) fn try_builtin(
             Some(builtin_clenshaw_curtis_quad(interp, args, line))
         }
         "tanh_sinh_quad" | "ts_quad" => Some(builtin_tanh_sinh_quad(interp, args, line)),
-        "gauss_legendre_2d" | "gl_2d" => {
-            Some(builtin_gauss_legendre_2d(interp, args, line))
-        }
+        "gauss_legendre_2d" | "gl_2d" => Some(builtin_gauss_legendre_2d(interp, args, line)),
         "monte_carlo_2d" | "mc_2d" => Some(builtin_monte_carlo_2d(interp, args, line)),
-        "simulated_annealing" | "sa_min" => {
-            Some(builtin_simulated_annealing(interp, args, line))
-        }
+        "simulated_annealing" | "sa_min" => Some(builtin_simulated_annealing(interp, args, line)),
         "particle_swarm" | "pso_min" => Some(builtin_particle_swarm(interp, args, line)),
         "richardson_extrapolation" | "richardson" => {
             Some(builtin_richardson_extrapolation(interp, args, line))
@@ -3489,9 +3465,7 @@ pub(crate) fn try_builtin(
         "metropolis_hastings" | "mh_sampler" => {
             Some(builtin_metropolis_hastings(interp, args, line))
         }
-        "gibbs_sampler_step" | "gibbs_step" => {
-            Some(builtin_gibbs_sampler_step(interp, args, line))
-        }
+        "gibbs_sampler_step" | "gibbs_step" => Some(builtin_gibbs_sampler_step(interp, args, line)),
         "euler_maruyama" | "em_sde" => Some(builtin_euler_maruyama(interp, args, line)),
         "milstein" | "milstein_sde" => Some(builtin_milstein(interp, args, line)),
         "heat_eq_1d" => Some(builtin_heat_eq_1d(interp, args, line)),
@@ -3510,7 +3484,9 @@ pub(crate) fn try_builtin(
         "heun_method" => Some(builtin_heun_method(interp, args, line)),
         "rk45_cash_karp" | "rkck" => Some(builtin_rk45_cash_karp(interp, args, line)),
         "milne_pc" | "milne" => Some(builtin_milne_pc(interp, args, line)),
-        "modified_midpoint_ode" | "modmidpoint" => Some(builtin_modified_midpoint_ode(interp, args, line)),
+        "modified_midpoint_ode" | "modmidpoint" => {
+            Some(builtin_modified_midpoint_ode(interp, args, line))
+        }
         "backward_euler" | "implicit_euler" => Some(builtin_backward_euler(interp, args, line)),
         "crank_nicolson_ode" | "cn_ode" => Some(builtin_crank_nicolson_ode(interp, args, line)),
         "brent_root" | "brent" => Some(builtin_brent_root(interp, args, line)),
@@ -3620,9 +3596,7 @@ pub(crate) fn try_builtin(
 
         // ── Hypergeometric ──────────────────────────────────────────────
         "hypergeometric_2f1" | "hyper_2f1" => Some(builtin_hypergeometric_2f1(args)),
-        "hypergeometric_1f1" | "hyper_1f1" | "kummer_m" => {
-            Some(builtin_hypergeometric_1f1(args))
-        }
+        "hypergeometric_1f1" | "hyper_1f1" | "kummer_m" => Some(builtin_hypergeometric_1f1(args)),
         "hypergeometric_0f1" | "hyper_0f1" => Some(builtin_hypergeometric_0f1(args)),
         "hypergeometric_pfq" | "hyper_pfq" => Some(builtin_hypergeometric_pfq(args)),
         "hypergeometric_u" | "tricomi_u" => Some(builtin_hypergeometric_u(args)),
@@ -3684,9 +3658,7 @@ pub(crate) fn try_builtin(
         "inverse_gamma_regularized" | "gamma_lr_inv" => {
             Some(builtin_inverse_gamma_regularized(args))
         }
-        "inverse_beta_regularized" | "beta_reg_inv" => {
-            Some(builtin_inverse_beta_regularized(args))
-        }
+        "inverse_beta_regularized" | "beta_reg_inv" => Some(builtin_inverse_beta_regularized(args)),
         "inverse_jacobi_sn" => Some(builtin_inverse_jacobi_sn(args)),
 
         // ── Piecewise / symbolic primitives ─────────────────────────────
@@ -3721,12 +3693,8 @@ pub(crate) fn try_builtin(
         "motzkin_number" | "motzkin" => Some(builtin_motzkin_number(args)),
         "narayana_number" | "narayana" => Some(builtin_narayana_number(args)),
         "delannoy_number" | "delannoy" => Some(builtin_delannoy_number(args)),
-        "schroder_number" | "schroder" | "large_schroder" => {
-            Some(builtin_schroder_number(args))
-        }
-        "small_schroder_number" | "small_schroder" => {
-            Some(builtin_small_schroder_number(args))
-        }
+        "schroder_number" | "schroder" | "large_schroder" => Some(builtin_schroder_number(args)),
+        "small_schroder_number" | "small_schroder" => Some(builtin_small_schroder_number(args)),
         "eulerian_number" => Some(builtin_eulerian_number(args)),
         "bernoulli_polynomial" => Some(builtin_bernoulli_polynomial(args)),
         "euler_polynomial" => Some(builtin_euler_polynomial(args)),
@@ -3741,9 +3709,7 @@ pub(crate) fn try_builtin(
         "tensor_contract" => Some(builtin_tensor_contract(args)),
         "matrix_rank" | "mrank" => Some(builtin_matrix_rank(args)),
         "companion_matrix" | "companion" => Some(builtin_companion_matrix(args)),
-        "characteristic_polynomial" | "charpoly" => {
-            Some(builtin_characteristic_polynomial(args))
-        }
+        "characteristic_polynomial" | "charpoly" => Some(builtin_characteristic_polynomial(args)),
         "singular_values" | "svals" => Some(builtin_singular_values(args)),
         "nullspace" | "null_space" | "kernel" => Some(builtin_nullspace(args)),
 
@@ -3752,9 +3718,7 @@ pub(crate) fn try_builtin(
         "polynomial_quotient" | "polyquot" => Some(builtin_polynomial_quotient(args)),
         "polynomial_remainder" | "polyrem" => Some(builtin_polynomial_remainder(args)),
         "polynomial_resultant" | "resultant" => Some(builtin_polynomial_resultant(args)),
-        "polynomial_discriminant" | "discriminant" => {
-            Some(builtin_polynomial_discriminant(args))
-        }
+        "polynomial_discriminant" | "discriminant" => Some(builtin_polynomial_discriminant(args)),
         "polynomial_roots" | "polyroots" => Some(builtin_polynomial_roots(args)),
 
         // ── Tier E: more distributions ──────────────────────────────────
@@ -3793,9 +3757,7 @@ pub(crate) fn try_builtin(
 
         // ── Tier I: graph algorithms ────────────────────────────────────
         "topo_sort_adj" => Some(builtin_topo_sort_adj(args)),
-        "scc_tarjan" | "tarjan_scc" | "strongly_connected" => {
-            Some(builtin_scc_tarjan(args))
-        }
+        "scc_tarjan" | "tarjan_scc" | "strongly_connected" => Some(builtin_scc_tarjan(args)),
         "bipartite_q" | "is_bipartite" => Some(builtin_bipartite_q(args)),
         "max_flow_edmonds_karp" | "max_flow" | "edmonds_karp" => {
             Some(builtin_max_flow_edmonds_karp(args))
@@ -3837,9 +3799,7 @@ pub(crate) fn try_builtin(
         "quat_conj" => Some(builtin_quat_conj(args)),
         "quat_norm" => Some(builtin_quat_norm(args)),
         "quat_inv" => Some(builtin_quat_inv(args)),
-        "quat_from_axis_angle" | "axis_angle_to_quat" => {
-            Some(builtin_quat_from_axis_angle(args))
-        }
+        "quat_from_axis_angle" | "axis_angle_to_quat" => Some(builtin_quat_from_axis_angle(args)),
         "quat_to_axis_angle" => Some(builtin_quat_to_axis_angle(args)),
         "quat_to_matrix" => Some(builtin_quat_to_matrix(args)),
         "quat_from_matrix" | "matrix_to_quat" => Some(builtin_quat_from_matrix(args)),
@@ -3852,9 +3812,7 @@ pub(crate) fn try_builtin(
         "kl_divergence" | "kl_div" => Some(builtin_kl_divergence(args)),
         "js_divergence" | "js_div" => Some(builtin_js_divergence(args)),
         "mutual_information" | "mi" => Some(builtin_mutual_information(args)),
-        "cross_entropy_arr" | "cross_entropy_dist" => {
-            Some(builtin_cross_entropy_arr(args))
-        }
+        "cross_entropy_arr" | "cross_entropy_dist" => Some(builtin_cross_entropy_arr(args)),
         "renyi_entropy" => Some(builtin_renyi_entropy(args)),
         "tsallis_entropy" => Some(builtin_tsallis_entropy(args)),
 
@@ -3874,17 +3832,11 @@ pub(crate) fn try_builtin(
         // ── Batch 3: stat mech ───────────────────────────────────────────
         "bose_einstein" => Some(builtin_bose_einstein(args)),
         "fermi_dirac" => Some(builtin_fermi_dirac(args)),
-        "maxwell_boltzmann_speed" | "mb_speed" => {
-            Some(builtin_maxwell_boltzmann_speed(args))
-        }
+        "maxwell_boltzmann_speed" | "mb_speed" => Some(builtin_maxwell_boltzmann_speed(args)),
         "partition_function" | "z_partition" => Some(builtin_partition_function(args)),
-        "helmholtz_free_energy" | "free_energy_f" => {
-            Some(builtin_helmholtz_free_energy(args))
-        }
+        "helmholtz_free_energy" | "free_energy_f" => Some(builtin_helmholtz_free_energy(args)),
         "boltzmann_factor" => Some(builtin_boltzmann_factor(args)),
-        "einstein_specific_heat" | "einstein_cv" => {
-            Some(builtin_einstein_specific_heat(args))
-        }
+        "einstein_specific_heat" | "einstein_cv" => Some(builtin_einstein_specific_heat(args)),
 
         // ── Batch 3: optics ──────────────────────────────────────────────
         "fresnel_reflection_te" => Some(builtin_fresnel_reflection_te(args)),
@@ -3932,19 +3884,13 @@ pub(crate) fn try_builtin(
 
         // ── Batch 3: 2D geometry ─────────────────────────────────────────
         "graham_scan" | "convex_hull_2d" => Some(builtin_graham_scan(args)),
-        "line_line_intersect_2d" | "ll_intersect_2d" => {
-            Some(builtin_line_line_intersect_2d(args))
-        }
-        "point_segment_distance" | "p_seg_dist" => {
-            Some(builtin_point_segment_distance(args))
-        }
+        "line_line_intersect_2d" | "ll_intersect_2d" => Some(builtin_line_line_intersect_2d(args)),
+        "point_segment_distance" | "p_seg_dist" => Some(builtin_point_segment_distance(args)),
 
         // ── Batch 4: statistical tests ───────────────────────────────────
         "bartlett_test" => Some(builtin_bartlett_test(args)),
         "levene_test" => Some(builtin_levene_test(args)),
-        "fishers_exact_test_2x2" | "fishers_exact" => {
-            Some(builtin_fishers_exact_test_2x2(args))
-        }
+        "fishers_exact_test_2x2" | "fishers_exact" => Some(builtin_fishers_exact_test_2x2(args)),
         "mcnemar_test" => Some(builtin_mcnemar_test(args)),
         "runs_test" | "wald_wolfowitz" => Some(builtin_runs_test(args)),
         "friedman_test" => Some(builtin_friedman_test(args)),
@@ -3958,9 +3904,7 @@ pub(crate) fn try_builtin(
         "durbin_watson_stat" | "durbin_watson" => Some(builtin_durbin_watson_stat(args)),
 
         // ── Batch 4: distance metrics ────────────────────────────────────
-        "mahalanobis_distance" | "mahalanobis_dist" => {
-            Some(builtin_mahalanobis_distance(args))
-        }
+        "mahalanobis_distance" | "mahalanobis_dist" => Some(builtin_mahalanobis_distance(args)),
         "cosine_distance" => Some(builtin_cosine_distance(args)),
         "canberra_distance" => Some(builtin_canberra_distance(args)),
         "bray_curtis_distance" | "bray_curtis" => Some(builtin_bray_curtis_distance(args)),
@@ -3968,12 +3912,8 @@ pub(crate) fn try_builtin(
         "chi_squared_distance" => Some(builtin_chi_squared_distance(args)),
 
         // ── Batch 4: more distributions ──────────────────────────────────
-        "multivariate_normal_pdf" | "mvn_pdf" => {
-            Some(builtin_multivariate_normal_pdf(args))
-        }
-        "multivariate_normal_sample" | "rmvn" => {
-            Some(builtin_multivariate_normal_sample(args))
-        }
+        "multivariate_normal_pdf" | "mvn_pdf" => Some(builtin_multivariate_normal_pdf(args)),
+        "multivariate_normal_sample" | "rmvn" => Some(builtin_multivariate_normal_sample(args)),
         "dirichlet_pdf" => Some(builtin_dirichlet_pdf(args)),
         "dirichlet_sample" | "rdirichlet" => Some(builtin_dirichlet_sample(args)),
         "skellam_pmf" => Some(builtin_skellam_pmf(args)),
@@ -3998,9 +3938,7 @@ pub(crate) fn try_builtin(
         // ── Batch 4: bootstrap/resampling ────────────────────────────────
         "bootstrap_mean_ci" | "boot_mean_ci" => Some(builtin_bootstrap_mean_ci(args)),
         "jackknife_estimate" | "jackknife" => Some(builtin_jackknife_estimate(args)),
-        "permutation_test_diff" | "perm_test_diff" => {
-            Some(builtin_permutation_test_diff(args))
-        }
+        "permutation_test_diff" | "perm_test_diff" => Some(builtin_permutation_test_diff(args)),
 
         // ── Batch 4: time series extras ──────────────────────────────────
         "acf_at_lag" => Some(builtin_acf_at_lag(args)),
@@ -4015,9 +3953,7 @@ pub(crate) fn try_builtin(
         "subsets_of_size" => Some(builtin_subsets_of_size(args)),
 
         // ── Batch 4: DP utilities ────────────────────────────────────────
-        "longest_increasing_subseq" | "lis" => {
-            Some(builtin_longest_increasing_subseq(args))
-        }
+        "longest_increasing_subseq" | "lis" => Some(builtin_longest_increasing_subseq(args)),
         "knapsack_01" | "knapsack" => Some(builtin_knapsack_01(args)),
         "subset_sum_target" | "subset_sum" => Some(builtin_subset_sum_target(args)),
         "coin_change_min" | "coin_change_minimum" => Some(builtin_coin_change_min(args)),
@@ -4028,12 +3964,8 @@ pub(crate) fn try_builtin(
         // ── Batch 4: ML metrics ──────────────────────────────────────────
         "one_hot_encode" | "onehot" => Some(builtin_one_hot_encode(args)),
         "label_encode" => Some(builtin_label_encode(args)),
-        "categorical_cross_entropy" | "cce" => {
-            Some(builtin_categorical_cross_entropy(args))
-        }
-        "classification_metrics" | "binary_metrics" => {
-            Some(builtin_classification_metrics(args))
-        }
+        "categorical_cross_entropy" | "cce" => Some(builtin_categorical_cross_entropy(args)),
+        "classification_metrics" | "binary_metrics" => Some(builtin_classification_metrics(args)),
         "roc_auc" | "auroc" => Some(builtin_roc_auc(args)),
 
         // ── Batch 4: DSP / image filters ─────────────────────────────────
@@ -4042,26 +3974,18 @@ pub(crate) fn try_builtin(
         "sobel_y" => Some(builtin_sobel_y(args)),
         "prewitt_x" => Some(builtin_prewitt_x(args)),
         "prewitt_y" => Some(builtin_prewitt_y(args)),
-        "laplacian_of_gaussian" | "log_kernel" => {
-            Some(builtin_laplacian_of_gaussian(args))
-        }
+        "laplacian_of_gaussian" | "log_kernel" => Some(builtin_laplacian_of_gaussian(args)),
 
         // ── Batch 4: stochastic processes ────────────────────────────────
         "brownian_path" | "wiener_path" => Some(builtin_brownian_path(args)),
-        "geometric_brownian_path" | "gbm_path" => {
-            Some(builtin_geometric_brownian_path(args))
-        }
+        "geometric_brownian_path" | "gbm_path" => Some(builtin_geometric_brownian_path(args)),
         "poisson_process" => Some(builtin_poisson_process(args)),
         "random_walk_1d" => Some(builtin_random_walk_1d(args)),
 
         // ── Batch 4: compression / info-theoretic ────────────────────────
-        "lempel_ziv_complexity" | "lz_complexity" => {
-            Some(builtin_lempel_ziv_complexity(args))
-        }
+        "lempel_ziv_complexity" | "lz_complexity" => Some(builtin_lempel_ziv_complexity(args)),
         "huffman_code_lengths" | "huffman" => Some(builtin_huffman_code_lengths(args)),
-        "shannon_entropy_rate" | "block_entropy_rate" => {
-            Some(builtin_shannon_entropy_rate(args))
-        }
+        "shannon_entropy_rate" | "block_entropy_rate" => Some(builtin_shannon_entropy_rate(args)),
 
         // ── Batch 4: physics / quantum ───────────────────────────────────
         "planck_blackbody" | "blackbody" => Some(builtin_planck_blackbody(args)),
@@ -4149,9 +4073,7 @@ pub(crate) fn try_builtin(
         // ── Batch 5: spatial / geographic ────────────────────────────────
         "vincenty_distance" | "vincenty" => Some(builtin_vincenty_distance(args)),
         "mercator_project" => Some(builtin_mercator_project(args)),
-        "destination_from_bearing" | "dest_bearing" => {
-            Some(builtin_destination_from_bearing(args))
-        }
+        "destination_from_bearing" | "dest_bearing" => Some(builtin_destination_from_bearing(args)),
 
         // ── Batch 5: integer sequences ───────────────────────────────────
         "recaman" | "recaman_seq" => Some(builtin_recaman(args)),
@@ -4181,12 +4103,8 @@ pub(crate) fn try_builtin(
         "triangle_3d_area" => Some(builtin_triangle_3d_area(args)),
         "tetrahedron_volume" => Some(builtin_tetrahedron_volume(args)),
         "plane_from_3_points" | "plane_from_pts" => Some(builtin_plane_from_3_points(args)),
-        "point_to_plane_distance" | "pt_plane_dist" => {
-            Some(builtin_point_to_plane_distance(args))
-        }
-        "ray_triangle_intersect" | "moller_trumbore" => {
-            Some(builtin_ray_triangle_intersect(args))
-        }
+        "point_to_plane_distance" | "pt_plane_dist" => Some(builtin_point_to_plane_distance(args)),
+        "ray_triangle_intersect" | "moller_trumbore" => Some(builtin_ray_triangle_intersect(args)),
         "ray_sphere_intersect" => Some(builtin_ray_sphere_intersect(args)),
         "aabb_overlap" => Some(builtin_aabb_overlap(args)),
 
@@ -4211,9 +4129,7 @@ pub(crate) fn try_builtin(
         "ph_to_concentration" | "ph_to_h" => Some(builtin_ph_to_concentration(args)),
 
         // ── Batch 6: SDE non-callback ────────────────────────────────────
-        "ornstein_uhlenbeck_path" | "ou_path" => {
-            Some(builtin_ornstein_uhlenbeck_path(args))
-        }
+        "ornstein_uhlenbeck_path" | "ou_path" => Some(builtin_ornstein_uhlenbeck_path(args)),
 
         // ── Batch 6: HMM ─────────────────────────────────────────────────
         "hmm_forward" => Some(builtin_hmm_forward(args)),
@@ -4232,9 +4148,7 @@ pub(crate) fn try_builtin(
         "gibbs_free_energy" | "delta_g" => Some(builtin_gibbs_free_energy(args)),
         "henderson_hasselbalch" | "hh_eq" => Some(builtin_henderson_hasselbalch(args)),
         "radioactive_decay" => Some(builtin_radioactive_decay(args)),
-        "half_life_to_constant" | "hl_to_lambda" => {
-            Some(builtin_half_life_to_constant(args))
-        }
+        "half_life_to_constant" | "hl_to_lambda" => Some(builtin_half_life_to_constant(args)),
 
         // ── Batch 6: control theory ──────────────────────────────────────
         "pid_step" => Some(builtin_pid_step(args)),
@@ -4303,12 +4217,8 @@ pub(crate) fn try_builtin(
 
         // ── Batch 6: random graphs ───────────────────────────────────────
         "erdos_renyi_random" | "erdos_renyi" => Some(builtin_erdos_renyi_random(args)),
-        "barabasi_albert_random" | "barabasi_albert" => {
-            Some(builtin_barabasi_albert_random(args))
-        }
-        "watts_strogatz_random" | "watts_strogatz" => {
-            Some(builtin_watts_strogatz_random(args))
-        }
+        "barabasi_albert_random" | "barabasi_albert" => Some(builtin_barabasi_albert_random(args)),
+        "watts_strogatz_random" | "watts_strogatz" => Some(builtin_watts_strogatz_random(args)),
 
         // ── Batch 6: color science ───────────────────────────────────────
         "rgb_to_lab" => Some(builtin_rgb_to_lab(args)),
@@ -4318,9 +4228,7 @@ pub(crate) fn try_builtin(
         // ── Batch 6: integer sequences ───────────────────────────────────
         "bell_triangle" => Some(builtin_bell_triangle(args)),
         "surjection_count" => Some(builtin_surjection_count(args)),
-        "distinct_partition_count" | "q_partition" => {
-            Some(builtin_distinct_partition_count(args))
-        }
+        "distinct_partition_count" | "q_partition" => Some(builtin_distinct_partition_count(args)),
         "fibonacci_q" | "is_fib_number" => Some(builtin_fibonacci_q(args)),
 
         // ── Batch 7: stats corrections ───────────────────────────────────
@@ -4344,9 +4252,7 @@ pub(crate) fn try_builtin(
         }
         "photon_momentum" => Some(builtin_photon_momentum(args)),
         "photon_energy_ev" => Some(builtin_photon_energy_ev(args)),
-        "dipole_radiation_power" | "larmor_power" => {
-            Some(builtin_dipole_radiation_power(args))
-        }
+        "dipole_radiation_power" | "larmor_power" => Some(builtin_dipole_radiation_power(args)),
         "parallax_to_distance" => Some(builtin_parallax_to_distance(args)),
         "hawking_temperature" => Some(builtin_hawking_temperature(args)),
 
@@ -4365,9 +4271,7 @@ pub(crate) fn try_builtin(
         "minimax_2x2" => Some(builtin_minimax_2x2(args)),
 
         // ── Batch 7: graphics ────────────────────────────────────────────
-        "barycentric_coords_2d" | "barycentric_2d" => {
-            Some(builtin_barycentric_coords_2d(args))
-        }
+        "barycentric_coords_2d" | "barycentric_2d" => Some(builtin_barycentric_coords_2d(args)),
         "bresenham_line" => Some(builtin_bresenham_line(args)),
         "bilinear_interp_2d" => Some(builtin_bilinear_interp_2d(args)),
         "point_in_polygon_2d" => Some(builtin_point_in_polygon_2d(args)),
@@ -4382,12 +4286,8 @@ pub(crate) fn try_builtin(
         "savitzky_golay_filter" | "sg_filter" => Some(builtin_savitzky_golay_filter(args)),
 
         // ── Batch 7: image processing ────────────────────────────────────
-        "canny_edge_intensity" | "canny_intensity" => {
-            Some(builtin_canny_edge_intensity(args))
-        }
-        "bilateral_filter_basic" | "bilateral_filter" => {
-            Some(builtin_bilateral_filter_basic(args))
-        }
+        "canny_edge_intensity" | "canny_intensity" => Some(builtin_canny_edge_intensity(args)),
+        "bilateral_filter_basic" | "bilateral_filter" => Some(builtin_bilateral_filter_basic(args)),
 
         // ── Batch 7: clustering ──────────────────────────────────────────
         "kmeans_pp_init" | "kpp_init" => Some(builtin_kmeans_pp_init(args)),
@@ -4395,9 +4295,7 @@ pub(crate) fn try_builtin(
 
         // ── Batch 7: combinatorics ───────────────────────────────────────
         "young_tableaux_count" | "syt_count" => Some(builtin_young_tableaux_count(args)),
-        "euler_alt_permutation" | "euler_zigzag" => {
-            Some(builtin_euler_alt_permutation(args))
-        }
+        "euler_alt_permutation" | "euler_zigzag" => Some(builtin_euler_alt_permutation(args)),
         "genocchi_number" => Some(builtin_genocchi_number(args)),
         "lattice_paths_count" => Some(builtin_lattice_paths_count(args)),
 
@@ -4418,9 +4316,7 @@ pub(crate) fn try_builtin(
 
         // ── Batch 7: quantum ─────────────────────────────────────────────
         "bell_state_phi_plus" | "bell_phi_plus" => Some(builtin_bell_state_phi_plus(args)),
-        "bell_state_psi_minus" | "bell_psi_minus" => {
-            Some(builtin_bell_state_psi_minus(args))
-        }
+        "bell_state_psi_minus" | "bell_psi_minus" => Some(builtin_bell_state_psi_minus(args)),
         "density_matrix_purity" | "rho_purity" => Some(builtin_density_matrix_purity(args)),
         "concurrence_2qubit" => Some(builtin_concurrence_2qubit(args)),
 
@@ -4436,9 +4332,7 @@ pub(crate) fn try_builtin(
         // ── Batch 8: bioinformatics ──────────────────────────────────────
         "gc_content" => Some(builtin_gc_content(args)),
         "codon_to_aa" => Some(builtin_codon_to_aa(args)),
-        "reverse_complement_dna" | "rev_comp_dna" => {
-            Some(builtin_reverse_complement_dna(args))
-        }
+        "reverse_complement_dna" | "rev_comp_dna" => Some(builtin_reverse_complement_dna(args)),
         "hamming_dna" => Some(builtin_hamming_dna(args)),
         "blosum62_pair_score" | "blosum62" => Some(builtin_blosum62_pair_score(args)),
         "kmer_count" => Some(builtin_kmer_count(args)),
@@ -4447,16 +4341,12 @@ pub(crate) fn try_builtin(
         "great_circle_bearing" | "gc_bearing" => Some(builtin_great_circle_bearing(args)),
         "midpoint_lat_lon" | "mid_geo" => Some(builtin_midpoint_lat_lon(args)),
         "utm_zone_for" => Some(builtin_utm_zone_for(args)),
-        "area_polygon_lat_lon" | "geo_polygon_area" => {
-            Some(builtin_area_polygon_lat_lon(args))
-        }
+        "area_polygon_lat_lon" | "geo_polygon_area" => Some(builtin_area_polygon_lat_lon(args)),
 
         // ── Batch 8: finance ─────────────────────────────────────────────
         "crr_binomial_option" | "crr_option" => Some(builtin_crr_binomial_option(args)),
         "bond_price_clean" => Some(builtin_bond_price_clean(args)),
-        "bond_yield_to_maturity" | "bond_ytm" => {
-            Some(builtin_bond_yield_to_maturity(args))
-        }
+        "bond_yield_to_maturity" | "bond_ytm" => Some(builtin_bond_yield_to_maturity(args)),
         "modified_duration_bond" => Some(builtin_modified_duration_bond(args)),
         "convexity_bond" | "bond_convexity" => Some(builtin_convexity_bond(args)),
 
@@ -4501,9 +4391,7 @@ pub(crate) fn try_builtin(
         "larmor_radius" | "gyroradius" => Some(builtin_larmor_radius(args)),
 
         // ── Batch 8: string similarity ───────────────────────────────────
-        "jaro_winkler_similarity" | "jaro_winkler" => {
-            Some(builtin_jaro_winkler_similarity(args))
-        }
+        "jaro_winkler_similarity" | "jaro_winkler" => Some(builtin_jaro_winkler_similarity(args)),
         "metaphone_simple" => Some(builtin_metaphone_simple(args)),
 
         // ── Batch 8: rating systems ──────────────────────────────────────
@@ -4517,12 +4405,8 @@ pub(crate) fn try_builtin(
         "vargha_delaney_a12" | "a12" => Some(builtin_vargha_delaney_a12(args)),
 
         // ── Batch 8: control transient ───────────────────────────────────
-        "step_response_2nd_order" | "step_2nd" => {
-            Some(builtin_step_response_2nd_order(args))
-        }
-        "overshoot_2nd_order" | "overshoot_pct" => {
-            Some(builtin_overshoot_2nd_order(args))
-        }
+        "step_response_2nd_order" | "step_2nd" => Some(builtin_step_response_2nd_order(args)),
+        "overshoot_2nd_order" | "overshoot_pct" => Some(builtin_overshoot_2nd_order(args)),
 
         // ── Batch 8: matrix norms ────────────────────────────────────────
         "frobenius_norm" => Some(builtin_frobenius_norm(args)),
@@ -4606,9 +4490,7 @@ pub(crate) fn try_builtin(
         "flesch_reading_ease" => Some(builtin_flesch_reading_ease(args)),
         "flesch_kincaid_grade" => Some(builtin_flesch_kincaid_grade(args)),
         "gunning_fog" => Some(builtin_gunning_fog(args)),
-        "automated_readability_index" | "ari" => {
-            Some(builtin_automated_readability_index(args))
-        }
+        "automated_readability_index" | "ari" => Some(builtin_automated_readability_index(args)),
         "lix" => Some(builtin_lix(args)),
 
         // ── Batch 9: regression diagnostics ──────────────────────────────
@@ -5681,7 +5563,6 @@ pub(crate) fn try_builtin(
         "expected_coverage" => Some(builtin_expected_coverage(args)),
         "lander_waterman_gaps" => Some(builtin_lander_waterman_gaps(args)),
         "bh_adjusted_p" => Some(builtin_bh_adjusted_p(args)),
-        "bonferroni" => Some(builtin_bonferroni(args)),
         "zscore_count" => Some(builtin_zscore_count(args)),
         "go_enrichment_p" => Some(builtin_go_enrichment_p(args)),
         "blosum45_score" => Some(builtin_blosum45_score(args)),
@@ -7630,6 +7511,754 @@ pub(crate) fn try_builtin(
         "cyber_circuit" => Some(builtin_cyber_circuit(args)),
         "cyber_skull" => Some(builtin_cyber_skull(args)),
         "cyber_eye" => Some(builtin_cyber_eye(args)),
+        // ── Batch 52: calendrical algorithms (Reingold & Dershowitz) ─────
+        "fixed_from_gregorian" => Some(builtin_fixed_from_gregorian(args)),
+        "gregorian_from_fixed" => Some(builtin_gregorian_from_fixed(args)),
+        "fixed_from_julian" => Some(builtin_fixed_from_julian(args)),
+        "julian_from_fixed" => Some(builtin_julian_from_fixed(args)),
+        "iso_week_date" => Some(builtin_iso_week_date(args)),
+        "hebrew_leap_year" => Some(builtin_hebrew_leap_year(args)),
+        "hebrew_year_length" => Some(builtin_hebrew_year_length(args)),
+        "fixed_from_hebrew" => Some(builtin_fixed_from_hebrew(args)),
+        "islamic_leap_year" => Some(builtin_islamic_leap_year(args)),
+        "fixed_from_islamic" => Some(builtin_fixed_from_islamic(args)),
+        "persian_arithmetic_leap" => Some(builtin_persian_arithmetic_leap(args)),
+        "fixed_from_persian" => Some(builtin_fixed_from_persian(args)),
+        "coptic_from_fixed" => Some(builtin_coptic_from_fixed(args)),
+        "ethiopic_from_fixed" => Some(builtin_ethiopic_from_fixed(args)),
+        "french_revolutionary_leap" => Some(builtin_french_revolutionary_leap(args)),
+        "fixed_from_french" => Some(builtin_fixed_from_french(args)),
+        "chinese_year_zodiac" => Some(builtin_chinese_year_zodiac(args)),
+        "chinese_lunation_winter" => Some(builtin_chinese_lunation_winter(args)),
+        "hindu_solar_year" => Some(builtin_hindu_solar_year(args)),
+        "hindu_lunisolar_month" => Some(builtin_hindu_lunisolar_month(args)),
+        "maya_long_count_from_fixed" => Some(builtin_maya_long_count_from_fixed(args)),
+        "mayan_haab_from_fixed" => Some(builtin_mayan_haab_from_fixed(args)),
+        "mayan_tzolkin_from_fixed" => Some(builtin_mayan_tzolkin_from_fixed(args)),
+        "badi_year_from_fixed" => Some(builtin_badi_year_from_fixed(args)),
+        "bahai_from_fixed" => Some(builtin_bahai_from_fixed(args)),
+        "easter_gregorian_year" => Some(builtin_easter_gregorian_year(args)),
+        "easter_orthodox_year" => Some(builtin_easter_orthodox_year(args)),
+        "easter_julian_year" => Some(builtin_easter_julian_year(args)),
+        "day_of_week_zeller" => Some(builtin_day_of_week_zeller(args)),
+        "iso_day_number" => Some(builtin_iso_day_number(args)),
+        "weekday_name_short" => Some(builtin_weekday_name_short(args)),
+        "leap_year_gregorian" => Some(builtin_leap_year_gregorian(args)),
+
+        // ── Batch 53: R / SciPy distributions and tests ──────────────────
+        "dnorm" => Some(builtin_dnorm(args)),
+        "dt" => Some(builtin_dt(args)),
+        "df_dist" => Some(builtin_df_dist(args)),
+        "dchisq" => Some(builtin_dchisq(args)),
+        "glm" => Some(builtin_glm(args)),
+        "aov" => Some(builtin_aov(args)),
+        "shapiro_wilk" => Some(builtin_shapiro_wilk(args)),
+        "anderson_darling" => Some(builtin_anderson_darling(args)),
+        "kolmogorov_smirnov" => Some(builtin_kolmogorov_smirnov(args)),
+        "spearmanr" => Some(builtin_spearmanr(args)),
+        "kendalltau" => Some(builtin_kendalltau(args)),
+        "pearsonr" => Some(builtin_pearsonr(args)),
+        "mannwhitneyu" => Some(builtin_mannwhitneyu(args)),
+        "wilcoxon" => Some(builtin_wilcoxon(args)),
+        "kruskal_h" => Some(builtin_kruskal_h(args)),
+
+        // ── Batch 54: APL/J/K array primitives ───────────────────────────
+        "iota_n" => Some(builtin_iota_n(args)),
+        "reduce_axis" => Some(builtin_reduce_axis(args)),
+        "scan_axis" => Some(builtin_scan_axis(args)),
+        "fold_axis" => Some(builtin_fold_axis(args)),
+        "rotate_axis" => Some(builtin_rotate_axis(args)),
+        "transpose_axis" => Some(builtin_transpose_axis(args)),
+        "reshape_dim" => Some(builtin_reshape_dim(args)),
+        "encode_base" => Some(builtin_encode_base(args)),
+        "decode_base" => Some(builtin_decode_base(args)),
+        "nub_list" => Some(builtin_nub_list(args)),
+        "nub_count" => Some(builtin_nub_count(args)),
+        "membership_idx" => Some(builtin_membership_idx(args)),
+        "deal_n_k" => Some(builtin_deal_n_k(args)),
+        "roll_n" => Some(builtin_roll_n(args)),
+        "permute_idx" => Some(builtin_permute_idx(args)),
+        "invert_perm" => Some(builtin_invert_perm(args)),
+
+        // ── Batch 55: astronomy / astrometry (Meeus + IAU) ───────────────
+        "julian_day" => Some(builtin_julian_day(args)),
+        "jd_to_calendar" => Some(builtin_jd_to_calendar(args)),
+        "tt_to_tdb" => Some(builtin_tt_to_tdb(args)),
+        "ra_dec_to_alt_az" => Some(builtin_ra_dec_to_alt_az(args)),
+        "alt_az_to_ra_dec" => Some(builtin_alt_az_to_ra_dec(args)),
+        "precession_iau2006" => Some(builtin_precession_iau2006(args)),
+        "nutation_iau2000a" => Some(builtin_nutation_iau2000a(args)),
+        "aberration_annual" => Some(builtin_aberration_annual(args)),
+        "proper_motion_apply" => Some(builtin_proper_motion_apply(args)),
+        "parallax_correction" => Some(builtin_parallax_correction(args)),
+        "sun_position_low" => Some(builtin_sun_position_low(args)),
+        "sun_distance_au" => Some(builtin_sun_distance_au(args)),
+        "moon_position_low" => Some(builtin_moon_position_low(args)),
+        "moon_phase_age" => Some(builtin_moon_phase_age(args)),
+        "lunation_index" => Some(builtin_lunation_index(args)),
+        "eclipse_magnitude" => Some(builtin_eclipse_magnitude(args)),
+        "saros_cycle" => Some(builtin_saros_cycle(args)),
+        "metonic_cycle" => Some(builtin_metonic_cycle(args)),
+        "orbit_kepler3" => Some(builtin_orbit_kepler3(args)),
+        "orbital_period_au" => Some(builtin_orbital_period_au(args)),
+        "orbit_eccentric_anomaly" => Some(builtin_orbit_eccentric_anomaly(args)),
+        "escape_velocity_body" => Some(builtin_escape_velocity_body(args)),
+        "hill_sphere_radius" => Some(builtin_hill_sphere_radius(args)),
+        "tisserand_param" => Some(builtin_tisserand_param(args)),
+        "tle_mean_motion" => Some(builtin_tle_mean_motion(args)),
+        "sgp4_propagate_step" => Some(builtin_sgp4_propagate_step(args)),
+        "airy_disk_radius" => Some(builtin_airy_disk_radius(args)),
+        "rayleigh_criterion" => Some(builtin_rayleigh_criterion(args)),
+        "strehl_ratio" => Some(builtin_strehl_ratio(args)),
+        "au_to_km" => Some(builtin_au_to_km(args)),
+
+        // ── Batch 56: sports analytics — ratings & sabermetric ───────────
+        "elo_expected" => Some(builtin_elo_expected(args)),
+        "elo_update" => Some(builtin_elo_update(args)),
+        "glicko_rating" => Some(builtin_glicko_rating(args)),
+        "trueskill_update" => Some(builtin_trueskill_update(args)),
+        "trueskill_match_quality" => Some(builtin_trueskill_match_quality(args)),
+        "pythagorean_expectation" => Some(builtin_pythagorean_expectation(args)),
+        "war_above_replacement" => Some(builtin_war_above_replacement(args)),
+        "woba_weight" => Some(builtin_woba_weight(args)),
+        "wrc_plus" => Some(builtin_wrc_plus(args)),
+        "ops_plus" => Some(builtin_ops_plus(args)),
+        "era_plus" => Some(builtin_era_plus(args)),
+        "fip" => Some(builtin_fip(args)),
+        "xfip" => Some(builtin_xfip(args)),
+        "siera" => Some(builtin_siera(args)),
+        "babip" => Some(builtin_babip(args)),
+        "wpa" => Some(builtin_wpa(args)),
+        "win_probability" => Some(builtin_win_probability(args)),
+        "leverage_index" => Some(builtin_leverage_index(args)),
+        "clutch_score" => Some(builtin_clutch_score(args)),
+        "shooting_pct" => Some(builtin_shooting_pct(args)),
+        "save_pct" => Some(builtin_save_pct(args)),
+        "corsi_for" => Some(builtin_corsi_for(args)),
+        "fenwick_for" => Some(builtin_fenwick_for(args)),
+        "goals_above_avg" => Some(builtin_goals_above_avg(args)),
+        "tackle_efficiency" => Some(builtin_tackle_efficiency(args)),
+        "yards_per_attempt" => Some(builtin_yards_per_attempt(args)),
+        "qbr_metric" => Some(builtin_qbr_metric(args)),
+        "epa_per_play" => Some(builtin_epa_per_play(args)),
+
+        // ── Batch 57: Excel/Sheets lookups + bond/loan financial math ────
+        "vlookup" => Some(builtin_vlookup(args)),
+        "hlookup" => Some(builtin_hlookup(args)),
+        "xlookup" => Some(builtin_xlookup(args)),
+        "index_match" => Some(builtin_index_match(args)),
+        "indirect" => Some(builtin_indirect(args)),
+        "choose" => Some(builtin_choose(args)),
+        "offset" => Some(builtin_offset(args)),
+        "sumif" => Some(builtin_sumif(args)),
+        "countif" => Some(builtin_countif(args)),
+        "averageif" => Some(builtin_averageif(args)),
+        "sumifs" => Some(builtin_sumifs(args)),
+        "countifs" => Some(builtin_countifs(args)),
+        "averageifs" => Some(builtin_averageifs(args)),
+        "sumproduct" => Some(builtin_sumproduct(args)),
+        "rank_eq" => Some(builtin_rank_eq(args)),
+        "rank_avg" => Some(builtin_rank_avg(args)),
+        "percentrank" => Some(builtin_percentrank(args)),
+        "quartile_inc" => Some(builtin_quartile_inc(args)),
+        "quartile_exc" => Some(builtin_quartile_exc(args)),
+        "xnpv" => Some(builtin_xnpv(args)),
+        "ppmt" => Some(builtin_ppmt(args)),
+        "ipmt" => Some(builtin_ipmt(args)),
+        "rate" => Some(builtin_rate(args)),
+        "macauley_duration" => Some(builtin_macauley_duration(args)),
+        "convexity" => Some(builtin_convexity(args)),
+        "yield_to_maturity" => Some(builtin_yield_to_maturity(args)),
+        "accrued_interest" => Some(builtin_accrued_interest(args)),
+        "clean_price" => Some(builtin_clean_price(args)),
+        "dirty_price" => Some(builtin_dirty_price(args)),
+        "coupon_count" => Some(builtin_coupon_count(args)),
+        "skill_score" => Some(builtin_skill_score(args)),
+        "reliability_diagram" => Some(builtin_reliability_diagram(args)),
+        "taylor_diagram_score" => Some(builtin_taylor_diagram_score(args)),
+
+        // ── Batch 58: GIS — geohash, H3, S2, UTM, MGRS, projections ──────
+        "geohash_neighbors" => Some(builtin_geohash_neighbors(args)),
+        "h3_index" => Some(builtin_h3_index(args)),
+        "h3_geo_to_h3" => Some(builtin_h3_geo_to_h3(args)),
+        "h3_h3_to_geo" => Some(builtin_h3_h3_to_geo(args)),
+        "h3_k_ring" => Some(builtin_h3_k_ring(args)),
+        "h3_neighbor" => Some(builtin_h3_neighbor(args)),
+        "h3_resolution" => Some(builtin_h3_resolution(args)),
+        "s2_cell_id" => Some(builtin_s2_cell_id(args)),
+        "s2_cell_at_lat_lng" => Some(builtin_s2_cell_at_lat_lng(args)),
+        "s2_cell_neighbors" => Some(builtin_s2_cell_neighbors(args)),
+        "utm_from_lat_lng" => Some(builtin_utm_from_lat_lng(args)),
+        "utm_to_lat_lng" => Some(builtin_utm_to_lat_lng(args)),
+        "mgrs_encode" => Some(builtin_mgrs_encode(args)),
+        "mgrs_decode" => Some(builtin_mgrs_decode(args)),
+        "lat_lng_to_xy_mercator" => Some(builtin_lat_lng_to_xy_mercator(args)),
+        "lat_lng_to_xy_lambert" => Some(builtin_lat_lng_to_xy_lambert(args)),
+        "haversine_dist" => Some(builtin_haversine_dist(args)),
+        "vincenty_dist" => Some(builtin_vincenty_dist(args)),
+        "andoyer_dist" => Some(builtin_andoyer_dist(args)),
+        "rhumb_line_bearing" => Some(builtin_rhumb_line_bearing(args)),
+        "destination_point" => Some(builtin_destination_point(args)),
+        "tile_xyz_to_lat_lng" => Some(builtin_tile_xyz_to_lat_lng(args)),
+        "lat_lng_to_tile_xyz" => Some(builtin_lat_lng_to_tile_xyz(args)),
+        "polygon_winding_order" => Some(builtin_polygon_winding_order(args)),
+        "point_in_polygon_ray" => Some(builtin_point_in_polygon_ray(args)),
+        "point_in_polygon_winding" => Some(builtin_point_in_polygon_winding(args)),
+        "segment_intersection" => Some(builtin_segment_intersection(args)),
+        "segment_distance_point" => Some(builtin_segment_distance_point(args)),
+        "convex_hull_chan" => Some(builtin_convex_hull_chan(args)),
+
+        // ── Batch 59: robotics & control ─────────────────────────────────
+        "pid_anti_windup" => Some(builtin_pid_anti_windup(args)),
+        "pid_ziegler_nichols" => Some(builtin_pid_ziegler_nichols(args)),
+        "smith_predictor_step" => Some(builtin_smith_predictor_step(args)),
+        "lqr_gain_continuous" => Some(builtin_lqr_gain_continuous(args)),
+        "lqr_gain_discrete" => Some(builtin_lqr_gain_discrete(args)),
+        "lqg_step" => Some(builtin_lqg_step(args)),
+        "h_infinity_norm" => Some(builtin_h_infinity_norm(args)),
+        "bode_gain_margin" => Some(builtin_bode_gain_margin(args)),
+        "bode_phase_margin" => Some(builtin_bode_phase_margin(args)),
+        "nyquist_encirclement" => Some(builtin_nyquist_encirclement(args)),
+        "nichols_chart_step" => Some(builtin_nichols_chart_step(args)),
+        "servo_position_velocity" => Some(builtin_servo_position_velocity(args)),
+        "servo_torque_step" => Some(builtin_servo_torque_step(args)),
+        "imu_madgwick_step" => Some(builtin_imu_madgwick_step(args)),
+        "imu_mahony_step" => Some(builtin_imu_mahony_step(args)),
+        "quaternion_from_imu" => Some(builtin_quaternion_from_imu(args)),
+        "denavit_hartenberg_h" => Some(builtin_denavit_hartenberg_h(args)),
+        "forward_kinematics_dh" => Some(builtin_forward_kinematics_dh(args)),
+        "inverse_kinematics_2link" => Some(builtin_inverse_kinematics_2link(args)),
+        "jacobian_2dof" => Some(builtin_jacobian_2dof(args)),
+        "manipulability_yoshikawa" => Some(builtin_manipulability_yoshikawa(args)),
+        "singularity_check_2link" => Some(builtin_singularity_check_2link(args)),
+        "path_dubins_lsl" => Some(builtin_path_dubins_lsl(args)),
+        "path_dubins_rsr" => Some(builtin_path_dubins_rsr(args)),
+        "path_reeds_shepp" => Some(builtin_path_reeds_shepp(args)),
+        "rrt_extend" => Some(builtin_rrt_extend(args)),
+        "rrt_star_rewire" => Some(builtin_rrt_star_rewire(args)),
+        "prm_node_connect" => Some(builtin_prm_node_connect(args)),
+
+        // ── Batch 60: actuarial science ──────────────────────────────────
+        "life_expectancy_e0" => Some(builtin_life_expectancy_e0(args)),
+        "force_of_mortality" => Some(builtin_force_of_mortality(args)),
+        "select_ultimate" => Some(builtin_select_ultimate(args)),
+        "annuity_due_an" => Some(builtin_annuity_due_an(args)),
+        "annuity_immediate_an" => Some(builtin_annuity_immediate_an(args)),
+        "term_life_a_n_t" => Some(builtin_term_life_a_n_t(args)),
+        "whole_life_a" => Some(builtin_whole_life_a(args)),
+        "endowment_pure_e" => Some(builtin_endowment_pure_e(args)),
+        "endowment_combined_a" => Some(builtin_endowment_combined_a(args)),
+        "premium_net" => Some(builtin_premium_net(args)),
+        "level_premium" => Some(builtin_level_premium(args)),
+        "reserve_prospective" => Some(builtin_reserve_prospective(args)),
+        "reserve_retrospective" => Some(builtin_reserve_retrospective(args)),
+        "gross_premium_load" => Some(builtin_gross_premium_load(args)),
+        "experience_factor" => Some(builtin_experience_factor(args)),
+        "mortality_table_q" => Some(builtin_mortality_table_q(args)),
+        "select_period_step" => Some(builtin_select_period_step(args)),
+        "multi_decrement_q" => Some(builtin_multi_decrement_q(args)),
+        "multi_state_pij" => Some(builtin_multi_state_pij(args)),
+        "credibility_buhlmann" => Some(builtin_credibility_buhlmann(args)),
+        "loss_severity_lognormal" => Some(builtin_loss_severity_lognormal(args)),
+        "loss_frequency_poisson" => Some(builtin_loss_frequency_poisson(args)),
+        "ruin_probability_lundberg" => Some(builtin_ruin_probability_lundberg(args)),
+        "cramer_lundberg_step" => Some(builtin_cramer_lundberg_step(args)),
+        "bornhuetter_ferguson" => Some(builtin_bornhuetter_ferguson(args)),
+        "chain_ladder_step" => Some(builtin_chain_ladder_step(args)),
+        "ibnr_estimate" => Some(builtin_ibnr_estimate(args)),
+        "run_off_triangle_step" => Some(builtin_run_off_triangle_step(args)),
+
+        // ── Batch 61: epidemiology / public health ───────────────────────
+        "r_naught_basic" => Some(builtin_r_naught_basic(args)),
+        "r_effective_t" => Some(builtin_r_effective_t(args)),
+        "doubling_time_growth" => Some(builtin_doubling_time_growth(args)),
+        "sirs_step" => Some(builtin_sirs_step(args)),
+        "seirs_step" => Some(builtin_seirs_step(args)),
+        "susceptible_to_infected" => Some(builtin_susceptible_to_infected(args)),
+        "attack_rate" => Some(builtin_attack_rate(args)),
+        "vaccination_coverage_required" => Some(builtin_vaccination_coverage_required(args)),
+        "cfr_case_fatality" => Some(builtin_cfr_case_fatality(args)),
+        "ifr_infection_fatality" => Some(builtin_ifr_infection_fatality(args)),
+        "dalys_disability_weight" => Some(builtin_dalys_disability_weight(args)),
+        "qaly_lifetime" => Some(builtin_qaly_lifetime(args)),
+        "ylll_pml" => Some(builtin_ylll_pml(args)),
+        "rt_serial_interval" => Some(builtin_rt_serial_interval(args)),
+        "generation_time_step" => Some(builtin_generation_time_step(args)),
+        "gini_inequality_health" => Some(builtin_gini_inequality_health(args)),
+        "standardized_mortality_smr" => Some(builtin_standardized_mortality_smr(args)),
+        "indirect_age_adjusted" => Some(builtin_indirect_age_adjusted(args)),
+        "direct_age_adjusted" => Some(builtin_direct_age_adjusted(args)),
+        "odds_ratio_2x2" => Some(builtin_odds_ratio_2x2(args)),
+        "risk_ratio_2x2" => Some(builtin_risk_ratio_2x2(args)),
+        "number_needed_to_treat" => Some(builtin_number_needed_to_treat(args)),
+        "attributable_fraction_pop" => Some(builtin_attributable_fraction_pop(args)),
+        "preventive_fraction" => Some(builtin_preventive_fraction(args)),
+        "contact_tracing_eff" => Some(builtin_contact_tracing_eff(args)),
+        "cluster_attack_rate" => Some(builtin_cluster_attack_rate(args)),
+        "transmission_pair_index" => Some(builtin_transmission_pair_index(args)),
+
+        // ── Batch 62: archive/encoding format primitives ─────────────────
+        "tar_header_checksum" => Some(builtin_tar_header_checksum(args)),
+        "tar_pad_512" => Some(builtin_tar_pad_512(args)),
+        "tar_member_record" => Some(builtin_tar_member_record(args)),
+        "zip_local_header" => Some(builtin_zip_local_header(args)),
+        "zip_central_dir" => Some(builtin_zip_central_dir(args)),
+        "zip_eocd" => Some(builtin_zip_eocd(args)),
+        "gzip_member_step" => Some(builtin_gzip_member_step(args)),
+        "gzip_crc32_init" => Some(builtin_gzip_crc32_init(args)),
+        "gzip_isize" => Some(builtin_gzip_isize(args)),
+        "deflate_dynamic_huffman" => Some(builtin_deflate_dynamic_huffman(args)),
+        "deflate_static_block" => Some(builtin_deflate_static_block(args)),
+        "lz4_block_step" => Some(builtin_lz4_block_step(args)),
+        "lz4_match_offset" => Some(builtin_lz4_match_offset(args)),
+        "zstd_frame_header" => Some(builtin_zstd_frame_header(args)),
+        "brotli_huffman_table" => Some(builtin_brotli_huffman_table(args)),
+        "brotli_meta_block" => Some(builtin_brotli_meta_block(args)),
+        "lzma_range_step" => Some(builtin_lzma_range_step(args)),
+        "quoted_printable_encode" => Some(builtin_quoted_printable_encode(args)),
+        "uuencode_step" => Some(builtin_uuencode_step(args)),
+        "modhex_encode" => Some(builtin_modhex_encode(args)),
+        "percent_encode_full" => Some(builtin_percent_encode_full(args)),
+        "punycode_encode" => Some(builtin_punycode_encode(args)),
+        "idn_to_ascii" => Some(builtin_idn_to_ascii(args)),
+        "idn_to_unicode" => Some(builtin_idn_to_unicode(args)),
+        "msgpack_pack_int" => Some(builtin_msgpack_pack_int(args)),
+        "msgpack_pack_str" => Some(builtin_msgpack_pack_str(args)),
+        "cbor_encode_uint" => Some(builtin_cbor_encode_uint(args)),
+        "cbor_encode_str" => Some(builtin_cbor_encode_str(args)),
+
+        // ── Batch 63: chemistry & biochemistry ───────────────────────────
+        "molecular_weight_compound" => Some(builtin_molecular_weight_compound(args)),
+        "molarity_dilution" => Some(builtin_molarity_dilution(args)),
+        "gas_constant_value" => Some(builtin_gas_constant_value(args)),
+        "eyring_rate" => Some(builtin_eyring_rate(args)),
+        "van_t_hoff_kp" => Some(builtin_van_t_hoff_kp(args)),
+        "henderson_buffer" => Some(builtin_henderson_buffer(args)),
+        "titration_ph_endpoint" => Some(builtin_titration_ph_endpoint(args)),
+        "isoelectric_point_protein" => Some(builtin_isoelectric_point_protein(args)),
+        "ka_to_pka" => Some(builtin_ka_to_pka(args)),
+        "pkb_to_kb" => Some(builtin_pkb_to_kb(args)),
+        "amphoteric_check" => Some(builtin_amphoteric_check(args)),
+        "oxidation_number" => Some(builtin_oxidation_number(args)),
+        "half_reaction_balance" => Some(builtin_half_reaction_balance(args)),
+        "redox_potential_cell" => Some(builtin_redox_potential_cell(args)),
+        "electrolysis_mass" => Some(builtin_electrolysis_mass(args)),
+        "spectrophotometer_beer_lambert" => Some(builtin_spectrophotometer_beer_lambert(args)),
+        "epsilon_extinction" => Some(builtin_epsilon_extinction(args)),
+        "transmittance_to_a" => Some(builtin_transmittance_to_a(args)),
+        "crystal_field_ligand" => Some(builtin_crystal_field_ligand(args)),
+        "jahn_teller_check" => Some(builtin_jahn_teller_check(args)),
+        "vsepr_geometry" => Some(builtin_vsepr_geometry(args)),
+        "lewis_dot_count" => Some(builtin_lewis_dot_count(args)),
+        "formal_charge" => Some(builtin_formal_charge(args)),
+        "resonance_count" => Some(builtin_resonance_count(args)),
+        "ramachandran_phi_psi" => Some(builtin_ramachandran_phi_psi(args)),
+        "rg_radius_of_gyration" => Some(builtin_rg_radius_of_gyration(args)),
+        "spectroscopic_factor" => Some(builtin_spectroscopic_factor(args)),
+        "avogadro_constant" => Some(builtin_avogadro_constant(args)),
+
+        // ── Batch 64: music theory ───────────────────────────────────────
+        "cents_between_freqs" => Some(builtin_cents_between_freqs(args)),
+        "note_name_from_midi" => Some(builtin_note_name_from_midi(args)),
+        "interval_quality_size" => Some(builtin_interval_quality_size(args)),
+        "scale_pitches_major" => Some(builtin_scale_pitches_major(args)),
+        "scale_pitches_minor" => Some(builtin_scale_pitches_minor(args)),
+        "mode_pitches_dorian" => Some(builtin_mode_pitches_dorian(args)),
+        "mode_pitches_phrygian" => Some(builtin_mode_pitches_phrygian(args)),
+        "mode_pitches_lydian" => Some(builtin_mode_pitches_lydian(args)),
+        "chord_root_inversion" => Some(builtin_chord_root_inversion(args)),
+        "chord_quality_classify" => Some(builtin_chord_quality_classify(args)),
+        "chord_voicing_close" => Some(builtin_chord_voicing_close(args)),
+        "key_signature_sharps" => Some(builtin_key_signature_sharps(args)),
+        "key_signature_flats" => Some(builtin_key_signature_flats(args)),
+        "tempo_to_ms" => Some(builtin_tempo_to_ms(args)),
+        "beat_to_seconds" => Some(builtin_beat_to_seconds(args)),
+        "time_sig_subdivision" => Some(builtin_time_sig_subdivision(args)),
+        "equal_tempered_freq" => Some(builtin_equal_tempered_freq(args)),
+        "just_intonation_freq" => Some(builtin_just_intonation_freq(args)),
+        "pythagorean_freq" => Some(builtin_pythagorean_freq(args)),
+        "mean_tone_freq" => Some(builtin_mean_tone_freq(args)),
+        "werckmeister_iii" => Some(builtin_werckmeister_iii(args)),
+        "kirnberger_iii" => Some(builtin_kirnberger_iii(args)),
+        "dynamics_db_level" => Some(builtin_dynamics_db_level(args)),
+        "harmonics_partial" => Some(builtin_harmonics_partial(args)),
+
+        // ── Batch 65: geology, seismology, mineralogy ────────────────────
+        "moment_magnitude_mw" => Some(builtin_moment_magnitude_mw(args)),
+        "richter_local_ml" => Some(builtin_richter_local_ml(args)),
+        "surface_wave_ms" => Some(builtin_surface_wave_ms(args)),
+        "body_wave_mb" => Some(builtin_body_wave_mb(args)),
+        "gutenberg_richter_b" => Some(builtin_gutenberg_richter_b(args)),
+        "omori_aftershock" => Some(builtin_omori_aftershock(args)),
+        "pga_attenuation" => Some(builtin_pga_attenuation(args)),
+        "arias_intensity" => Some(builtin_arias_intensity(args)),
+        "shake_map_pga" => Some(builtin_shake_map_pga(args)),
+        "liquefaction_potential_index" => Some(builtin_liquefaction_potential_index(args)),
+        "spt_n_correction" => Some(builtin_spt_n_correction(args)),
+        "mineral_mohs_hardness" => Some(builtin_mineral_mohs_hardness(args)),
+        "streak_color_index" => Some(builtin_streak_color_index(args)),
+        "specific_gravity_water" => Some(builtin_specific_gravity_water(args)),
+        "feldspar_classify" => Some(builtin_feldspar_classify(args)),
+        "silicate_classify" => Some(builtin_silicate_classify(args)),
+        "igneous_qapf" => Some(builtin_igneous_qapf(args)),
+        "metamorphic_grade" => Some(builtin_metamorphic_grade(args)),
+        "crustal_density_depth" => Some(builtin_crustal_density_depth(args)),
+        "pwave_velocity_depth" => Some(builtin_pwave_velocity_depth(args)),
+        "swave_velocity_depth" => Some(builtin_swave_velocity_depth(args)),
+        "gradient_geothermal" => Some(builtin_gradient_geothermal(args)),
+        "heat_flow_radiogenic" => Some(builtin_heat_flow_radiogenic(args)),
+
+        // ── Batch 66: BLAS / LAPACK Level-1, -2, -3 primitives ───────────
+        "dgemm" => Some(builtin_dgemm(args)),
+        "sgemm" => Some(builtin_sgemm(args)),
+        "zgemm" => Some(builtin_zgemm(args)),
+        "cgemm" => Some(builtin_cgemm(args)),
+        "dgemv" => Some(builtin_dgemv(args)),
+        "sgemv" => Some(builtin_sgemv(args)),
+        "dtrsm" => Some(builtin_dtrsm(args)),
+        "strsm" => Some(builtin_strsm(args)),
+        "dgesv" => Some(builtin_dgesv(args)),
+        "dgetrf" => Some(builtin_dgetrf(args)),
+        "dgeqrf" => Some(builtin_dgeqrf(args)),
+        "dgesvd" => Some(builtin_dgesvd(args)),
+        "dsyevd" => Some(builtin_dsyevd(args)),
+        "dpotrf" => Some(builtin_dpotrf(args)),
+        "daxpy" => Some(builtin_daxpy(args)),
+        "ddot" => Some(builtin_ddot(args)),
+        "dnrm2" => Some(builtin_dnrm2(args)),
+        "dscal" => Some(builtin_dscal(args)),
+        "dasum" => Some(builtin_dasum(args)),
+        "idamax" => Some(builtin_idamax(args)),
+        "dsyrk" => Some(builtin_dsyrk(args)),
+        "dgerqf" => Some(builtin_dgerqf(args)),
+        "dorgqr" => Some(builtin_dorgqr(args)),
+        "dorglq" => Some(builtin_dorglq(args)),
+        "drot" => Some(builtin_drot(args)),
+        "drotg" => Some(builtin_drotg(args)),
+        "dpbsv" => Some(builtin_dpbsv(args)),
+        "dgbsv" => Some(builtin_dgbsv(args)),
+        "dtbsv" => Some(builtin_dtbsv(args)),
+        "dtrsv" => Some(builtin_dtrsv(args)),
+        "ddrot" => Some(builtin_ddrot(args)),
+        "dgemm3m" => Some(builtin_dgemm3m(args)),
+        "dgels" => Some(builtin_dgels(args)),
+        "dgelsd" => Some(builtin_dgelsd(args)),
+
+        // ── Batch 67: logic, proof, SAT/SMT, type theory, model checking ─
+        "cnf_unit_propagate" => Some(builtin_cnf_unit_propagate(args)),
+        "cnf_pure_literal_elim" => Some(builtin_cnf_pure_literal_elim(args)),
+        "cnf_dpll_branch" => Some(builtin_cnf_dpll_branch(args)),
+        "dpll_clause_learning" => Some(builtin_dpll_clause_learning(args)),
+        "two_watched_literals" => Some(builtin_two_watched_literals(args)),
+        "walksat_step" => Some(builtin_walksat_step(args)),
+        "resolution_step" => Some(builtin_resolution_step(args)),
+        "subsumption_check" => Some(builtin_subsumption_check(args)),
+        "tableau_branch_close" => Some(builtin_tableau_branch_close(args)),
+        "sequent_left_intro" => Some(builtin_sequent_left_intro(args)),
+        "sequent_right_intro" => Some(builtin_sequent_right_intro(args)),
+        "nbe_normalize" => Some(builtin_nbe_normalize(args)),
+        "church_numeral_n" => Some(builtin_church_numeral_n(args)),
+        "encode_pair" => Some(builtin_encode_pair(args)),
+        "encode_succ" => Some(builtin_encode_succ(args)),
+        "simply_typed_check" => Some(builtin_simply_typed_check(args)),
+        "hindley_milner_step" => Some(builtin_hindley_milner_step(args)),
+        "unification_robinson" => Some(builtin_unification_robinson(args)),
+        "bdd_apply" => Some(builtin_bdd_apply(args)),
+        "bdd_restrict" => Some(builtin_bdd_restrict(args)),
+        "bdd_quantify" => Some(builtin_bdd_quantify(args)),
+        "aig_simplify_step" => Some(builtin_aig_simplify_step(args)),
+        "smt_qf_lia_solve_step" => Some(builtin_smt_qf_lia_solve_step(args)),
+        "smt_qf_uf_combine" => Some(builtin_smt_qf_uf_combine(args)),
+        "model_checking_ctl" => Some(builtin_model_checking_ctl(args)),
+        "model_checking_ltl" => Some(builtin_model_checking_ltl(args)),
+        "bisimulation_step" => Some(builtin_bisimulation_step(args)),
+        "coq_tactic_apply" => Some(builtin_coq_tactic_apply(args)),
+        "coq_unify_term" => Some(builtin_coq_unify_term(args)),
+        "refl_check" => Some(builtin_refl_check(args)),
+        "sym_check" => Some(builtin_sym_check(args)),
+        "trans_check" => Some(builtin_trans_check(args)),
+
+        // ── Batch 68: compilers / parsing ────────────────────────────────
+        "nfa_to_dfa" => Some(builtin_nfa_to_dfa(args)),
+        "subset_construction" => Some(builtin_subset_construction(args)),
+        "dfa_minimize_hopcroft" => Some(builtin_dfa_minimize_hopcroft(args)),
+        "regex_to_nfa_thompson" => Some(builtin_regex_to_nfa_thompson(args)),
+        "glushkov_construction" => Some(builtin_glushkov_construction(args)),
+        "brzozowski_derivative" => Some(builtin_brzozowski_derivative(args)),
+        "ll1_first_set" => Some(builtin_ll1_first_set(args)),
+        "ll1_follow_set" => Some(builtin_ll1_follow_set(args)),
+        "ll1_predict_table" => Some(builtin_ll1_predict_table(args)),
+        "lr0_items_step" => Some(builtin_lr0_items_step(args)),
+        "lalr_lookahead_compute" => Some(builtin_lalr_lookahead_compute(args)),
+        "lr1_canonical_collection" => Some(builtin_lr1_canonical_collection(args)),
+        "earley_scan" => Some(builtin_earley_scan(args)),
+        "earley_predict" => Some(builtin_earley_predict(args)),
+        "earley_complete" => Some(builtin_earley_complete(args)),
+        "packrat_parse_step" => Some(builtin_packrat_parse_step(args)),
+        "ascent_parser_step" => Some(builtin_ascent_parser_step(args)),
+        "pratt_parse_step" => Some(builtin_pratt_parse_step(args)),
+        "shunting_yard_step" => Some(builtin_shunting_yard_step(args)),
+        "regex_compile_thompson" => Some(builtin_regex_compile_thompson(args)),
+        "regex_match_dfa" => Some(builtin_regex_match_dfa(args)),
+        "lex_keyword_classify" => Some(builtin_lex_keyword_classify(args)),
+        "peg_seq" => Some(builtin_peg_seq(args)),
+        "peg_choice" => Some(builtin_peg_choice(args)),
+        "peg_repeat" => Some(builtin_peg_repeat(args)),
+        "peg_lookahead" => Some(builtin_peg_lookahead(args)),
+        "dfa_simulate_step" => Some(builtin_dfa_simulate_step(args)),
+        "bytecode_disasm_step" => Some(builtin_bytecode_disasm_step(args)),
+        "ssa_phi_insert" => Some(builtin_ssa_phi_insert(args)),
+        "dom_tree_idom" => Some(builtin_dom_tree_idom(args)),
+        "dominance_frontier" => Some(builtin_dominance_frontier(args)),
+
+        // ── Batch 69: computational linguistics ──────────────────────────
+        "porter_stem_step" => Some(builtin_porter_stem_step(args)),
+        "snowball_stem_english" => Some(builtin_snowball_stem_english(args)),
+        "snowball_stem_french" => Some(builtin_snowball_stem_french(args)),
+        "lemmatize_wordnet" => Some(builtin_lemmatize_wordnet(args)),
+        "lemmatize_lemmy" => Some(builtin_lemmatize_lemmy(args)),
+        "stem_lancaster" => Some(builtin_stem_lancaster(args)),
+        "soundex_phonetic" => Some(builtin_soundex_phonetic(args)),
+        "metaphone_phonetic" => Some(builtin_metaphone_phonetic(args)),
+        "caverphone_2" => Some(builtin_caverphone_2(args)),
+        "nysiis_phonetic" => Some(builtin_nysiis_phonetic(args)),
+        "match_rating_codex" => Some(builtin_match_rating_codex(args)),
+        "daitch_mokotoff" => Some(builtin_daitch_mokotoff(args)),
+        "viterbi_pos_tag" => Some(builtin_viterbi_pos_tag(args)),
+        "forward_backward_pos" => Some(builtin_forward_backward_pos(args)),
+        "crf_log_likelihood" => Some(builtin_crf_log_likelihood(args)),
+        "bigram_perplexity" => Some(builtin_bigram_perplexity(args)),
+        "trigram_perplexity" => Some(builtin_trigram_perplexity(args)),
+        "ner_bilou_decode" => Some(builtin_ner_bilou_decode(args)),
+        "constituency_cyk" => Some(builtin_constituency_cyk(args)),
+        "dependency_parse_eisner" => Some(builtin_dependency_parse_eisner(args)),
+        "transition_arc_eager" => Some(builtin_transition_arc_eager(args)),
+        "transition_arc_standard" => Some(builtin_transition_arc_standard(args)),
+        "word_alignment_ibm1" => Some(builtin_word_alignment_ibm1(args)),
+        "word_alignment_ibm2" => Some(builtin_word_alignment_ibm2(args)),
+        "lexicalized_parse" => Some(builtin_lexicalized_parse(args)),
+        "coreference_singleton" => Some(builtin_coreference_singleton(args)),
+        "anaphora_distance" => Some(builtin_anaphora_distance(args)),
+        "head_finding_collins" => Some(builtin_head_finding_collins(args)),
+        "tree_kernel_collins" => Some(builtin_tree_kernel_collins(args)),
+
+        // ── Batch 70: Postgres SQL strings, JSON, regex, aggregates ──────
+        "btrim" => Some(builtin_btrim(args)),
+        "translate" => Some(builtin_translate(args)),
+        "ascii" => Some(builtin_ascii(args)),
+        "regexp_split" => Some(builtin_regexp_split(args)),
+        "regexp_matches" => Some(builtin_regexp_matches(args)),
+        "regexp_replace" => Some(builtin_regexp_replace(args)),
+        "json_build_object" => Some(builtin_json_build_object(args)),
+        "jsonb_set" => Some(builtin_jsonb_set(args)),
+        "json_array_length" => Some(builtin_json_array_length(args)),
+        "json_extract_path" => Some(builtin_json_extract_path(args)),
+        "json_strip_nulls" => Some(builtin_json_strip_nulls(args)),
+        "jsonb_pretty" => Some(builtin_jsonb_pretty(args)),
+        "jsonb_path_query" => Some(builtin_jsonb_path_query(args)),
+        "json_each" => Some(builtin_json_each(args)),
+        "jsonb_array_length" => Some(builtin_jsonb_array_length(args)),
+        "jsonb_object_keys" => Some(builtin_jsonb_object_keys(args)),
+        "jsonb_typeof" => Some(builtin_jsonb_typeof(args)),
+        "array_to_jsonb" => Some(builtin_array_to_jsonb(args)),
+        "ts_match" => Some(builtin_ts_match(args)),
+        "ts_rank" => Some(builtin_ts_rank(args)),
+        "ts_headline" => Some(builtin_ts_headline(args)),
+        "substring_similarity" => Some(builtin_substring_similarity(args)),
+        "levenshtein_dist" => Some(builtin_levenshtein_dist(args)),
+        "word_similarity" => Some(builtin_word_similarity(args)),
+        "strict_word_similarity" => Some(builtin_strict_word_similarity(args)),
+        "hstore_to_array" => Some(builtin_hstore_to_array(args)),
+        "array_to_hstore" => Some(builtin_array_to_hstore(args)),
+        "string_agg" => Some(builtin_string_agg(args)),
+        "array_agg" => Some(builtin_array_agg(args)),
+        "corr_agg" => Some(builtin_corr_agg(args)),
+        "covar_pop" => Some(builtin_covar_pop(args)),
+        "covar_samp" => Some(builtin_covar_samp(args)),
+        "regr_slope" => Some(builtin_regr_slope(args)),
+        "regr_intercept" => Some(builtin_regr_intercept(args)),
+        "regr_r2" => Some(builtin_regr_r2(args)),
+        "percentile_cont" => Some(builtin_percentile_cont(args)),
+        "percentile_disc" => Some(builtin_percentile_disc(args)),
+        "mode_agg" => Some(builtin_mode_agg(args)),
+        "array_to_string" => Some(builtin_array_to_string(args)),
+        "array_position" => Some(builtin_array_position(args)),
+        "array_positions" => Some(builtin_array_positions(args)),
+        "array_remove" => Some(builtin_array_remove(args)),
+        "array_replace" => Some(builtin_array_replace(args)),
+        "xmlforest" => Some(builtin_xmlforest(args)),
+        "xmlagg" => Some(builtin_xmlagg(args)),
+
+        // ── Batch 71: Redis-flavour primitives ───────────────────────────
+        "zadd" => Some(builtin_zadd(args)),
+        "zrem" => Some(builtin_zrem(args)),
+        "zrangebyscore" => Some(builtin_zrangebyscore(args)),
+        "zrank" => Some(builtin_zrank(args)),
+        "zrevrank" => Some(builtin_zrevrank(args)),
+        "zincrby" => Some(builtin_zincrby(args)),
+        "zcard" => Some(builtin_zcard(args)),
+        "zcount" => Some(builtin_zcount(args)),
+        "zlexcount" => Some(builtin_zlexcount(args)),
+        "lpush" => Some(builtin_lpush(args)),
+        "rpush" => Some(builtin_rpush(args)),
+        "lrange" => Some(builtin_lrange(args)),
+        "lrem" => Some(builtin_lrem(args)),
+        "hset" => Some(builtin_hset(args)),
+        "hget" => Some(builtin_hget(args)),
+        "hgetall" => Some(builtin_hgetall(args)),
+        "hlen" => Some(builtin_hlen(args)),
+        "hkeys" => Some(builtin_hkeys(args)),
+        "hvals" => Some(builtin_hvals(args)),
+        "hmset" => Some(builtin_hmset(args)),
+        "hincrby" => Some(builtin_hincrby(args)),
+        "sadd" => Some(builtin_sadd(args)),
+        "srem" => Some(builtin_srem(args)),
+        "smembers" => Some(builtin_smembers(args)),
+        "sinter" => Some(builtin_sinter(args)),
+        "sunion" => Some(builtin_sunion(args)),
+        "sdiff" => Some(builtin_sdiff(args)),
+        "scard" => Some(builtin_scard(args)),
+        "sismember" => Some(builtin_sismember(args)),
+        "spop" => Some(builtin_spop(args)),
+        "setex" => Some(builtin_setex(args)),
+        "setnx" => Some(builtin_setnx(args)),
+        "expire" => Some(builtin_expire(args)),
+        "ttl" => Some(builtin_ttl(args)),
+        "pttl" => Some(builtin_pttl(args)),
+        "persist" => Some(builtin_persist(args)),
+        "incr" => Some(builtin_incr(args)),
+        "decr" => Some(builtin_decr(args)),
+        "incrby" => Some(builtin_incrby(args)),
+        "decrby" => Some(builtin_decrby(args)),
+        "getset" => Some(builtin_getset(args)),
+        "mset" => Some(builtin_mset(args)),
+        "mget" => Some(builtin_mget(args)),
+        "renamenx" => Some(builtin_renamenx(args)),
+        "dbsize" => Some(builtin_dbsize(args)),
+        "type_redis" => Some(builtin_type_redis(args)),
+        "exists_key" => Some(builtin_exists_key(args)),
+        "strlen" => Some(builtin_strlen(args)),
+        "getrange" => Some(builtin_getrange(args)),
+        "setrange" => Some(builtin_setrange(args)),
+        "append_redis" => Some(builtin_append_redis(args)),
+        "bitcount" => Some(builtin_bitcount(args)),
+        "bitop" => Some(builtin_bitop(args)),
+        "bitpos" => Some(builtin_bitpos(args)),
+        "pfadd" => Some(builtin_pfadd(args)),
+        "pfcount" => Some(builtin_pfcount(args)),
+        "geoadd" => Some(builtin_geoadd(args)),
+        "geodist" => Some(builtin_geodist(args)),
+        "geohash" => Some(builtin_geohash(args)),
+        "xadd" => Some(builtin_xadd(args)),
+        "xlen" => Some(builtin_xlen(args)),
+        "xrange" => Some(builtin_xrange(args)),
+        "object_encoding" => Some(builtin_object_encoding(args)),
+        "debug_object" => Some(builtin_debug_object(args)),
+        "cluster_slots" => Some(builtin_cluster_slots(args)),
+
+        // ── Batch 72: NumPy + scipy.special ──────────────────────────────
+        "argpartition" => Some(builtin_argpartition(args)),
+        "bincount" => Some(builtin_bincount(args)),
+        "nonzero_count" => Some(builtin_nonzero_count(args)),
+        "flatnonzero" => Some(builtin_flatnonzero(args)),
+        "searchsorted" => Some(builtin_searchsorted(args)),
+        "digitize" => Some(builtin_digitize(args)),
+        "histogram_bin_edges" => Some(builtin_histogram_bin_edges(args)),
+        "unique_count" => Some(builtin_unique_count(args)),
+        "polyfit_rmse" => Some(builtin_polyfit_rmse(args)),
+        "ellipk" => Some(builtin_ellipk(args)),
+        "ellipe" => Some(builtin_ellipe(args)),
+        "hyp1f1" => Some(builtin_hyp1f1(args)),
+        "hyp2f1" => Some(builtin_hyp2f1(args)),
+        "mathieu_b" => Some(builtin_mathieu_b(args)),
+        "spherical_jn" => Some(builtin_spherical_jn(args)),
+        "spherical_yn" => Some(builtin_spherical_yn(args)),
+        "jv" => Some(builtin_jv(args)),
+        "yn" => Some(builtin_yn(args)),
+        "iv" => Some(builtin_iv(args)),
+        "kv" => Some(builtin_kv(args)),
+        "airyai" => Some(builtin_airyai(args)),
+        "airybi" => Some(builtin_airybi(args)),
+        "polygamma" => Some(builtin_polygamma(args)),
+        "trigamma" => Some(builtin_trigamma(args)),
+        "loggamma" => Some(builtin_loggamma(args)),
+        "factorial2" => Some(builtin_factorial2(args)),
+        "factorialk" => Some(builtin_factorialk(args)),
+        "owens_t" => Some(builtin_owens_t(args)),
+        "marcum_q" => Some(builtin_marcum_q(args)),
+        "voigt_profile" => Some(builtin_voigt_profile(args)),
+        "chebyt" => Some(builtin_chebyt(args)),
+        "chebyu" => Some(builtin_chebyu(args)),
+        "sph_harm" => Some(builtin_sph_harm(args)),
+        "wofz" => Some(builtin_wofz(args)),
+        "erfcx" => Some(builtin_erfcx(args)),
+        "erfi" => Some(builtin_erfi(args)),
+        "dawsn" => Some(builtin_dawsn(args)),
+        "interp1d" => Some(builtin_interp1d(args)),
+        "convolve_full" => Some(builtin_convolve_full(args)),
+        "convolve_valid" => Some(builtin_convolve_valid(args)),
+        "correlate_full" => Some(builtin_correlate_full(args)),
+        "kron_product" => Some(builtin_kron_product(args)),
+        "simpson_rule" => Some(builtin_simpson_rule(args)),
+        "romberg_quad" => Some(builtin_romberg_quad(args)),
+        "fixed_quad" => Some(builtin_fixed_quad(args)),
+        "ode45_step" => Some(builtin_ode45_step(args)),
+        "ode_lsoda" => Some(builtin_ode_lsoda(args)),
+        "solve_ivp_step" => Some(builtin_solve_ivp_step(args)),
+        "root_brentq" => Some(builtin_root_brentq(args)),
+        "root_newton" => Some(builtin_root_newton(args)),
+        "root_secant" => Some(builtin_root_secant(args)),
+        "fmin_powell" => Some(builtin_fmin_powell(args)),
+        "fmin_cobyla" => Some(builtin_fmin_cobyla(args)),
+
+        // ── Batch 73: economics, mechanism design, game theory ───────────
+        "cobb_douglas" => Some(builtin_cobb_douglas(args)),
+        "ces_production" => Some(builtin_ces_production(args)),
+        "leontief_input" => Some(builtin_leontief_input(args)),
+        "leontief_output" => Some(builtin_leontief_output(args)),
+        "slutsky_decompose" => Some(builtin_slutsky_decompose(args)),
+        "marshallian_demand" => Some(builtin_marshallian_demand(args)),
+        "hicksian_demand" => Some(builtin_hicksian_demand(args)),
+        "expenditure_function" => Some(builtin_expenditure_function(args)),
+        "indirect_utility" => Some(builtin_indirect_utility(args)),
+        "gale_shapley_step" => Some(builtin_gale_shapley_step(args)),
+        "deferred_acceptance" => Some(builtin_deferred_acceptance(args)),
+        "top_trading_cycle" => Some(builtin_top_trading_cycle(args)),
+        "vcg_payment" => Some(builtin_vcg_payment(args)),
+        "myerson_optimal" => Some(builtin_myerson_optimal(args)),
+        "gini_market" => Some(builtin_gini_market(args)),
+        "hhi_concentration" => Some(builtin_hhi_concentration(args)),
+        "cournot_eq" => Some(builtin_cournot_eq(args)),
+        "stackelberg_eq" => Some(builtin_stackelberg_eq(args)),
+        "bertrand_eq" => Some(builtin_bertrand_eq(args)),
+        "monopoly_lerner" => Some(builtin_monopoly_lerner(args)),
+        "consumer_surplus" => Some(builtin_consumer_surplus(args)),
+        "producer_surplus" => Some(builtin_producer_surplus(args)),
+        "deadweight_loss" => Some(builtin_deadweight_loss(args)),
+        "tax_incidence" => Some(builtin_tax_incidence(args)),
+        "pareto_efficiency" => Some(builtin_pareto_efficiency(args)),
+        "edgeworth_box_alloc" => Some(builtin_edgeworth_box_alloc(args)),
+        "social_welfare_utilitarian" => Some(builtin_social_welfare_utilitarian(args)),
+        "social_welfare_rawls" => Some(builtin_social_welfare_rawls(args)),
+        "social_welfare_nash" => Some(builtin_social_welfare_nash(args)),
+        "arrow_independence" => Some(builtin_arrow_independence(args)),
+        "vickrey_auction" => Some(builtin_vickrey_auction(args)),
+        "first_price_seal" => Some(builtin_first_price_seal(args)),
+        "english_auction" => Some(builtin_english_auction(args)),
+        "dutch_auction" => Some(builtin_dutch_auction(args)),
+        "core_coalition" => Some(builtin_core_coalition(args)),
+        "stable_matching_count" => Some(builtin_stable_matching_count(args)),
+        "gale_optimal" => Some(builtin_gale_optimal(args)),
+        "pareto_dominance" => Some(builtin_pareto_dominance(args)),
+        "lerner_index" => Some(builtin_lerner_index(args)),
+        "price_elasticity" => Some(builtin_price_elasticity(args)),
+        "supply_elasticity" => Some(builtin_supply_elasticity(args)),
+        "income_elasticity" => Some(builtin_income_elasticity(args)),
+        "engel_curve" => Some(builtin_engel_curve(args)),
+        "cross_elasticity" => Some(builtin_cross_elasticity(args)),
+        "diff_in_diff" => Some(builtin_diff_in_diff(args)),
+        "did_estimator" => Some(builtin_did_estimator(args)),
+        "rdd_estimate" => Some(builtin_rdd_estimate(args)),
 
         _ => crate::rust_ffi::try_call(name, args, line),
     }
@@ -32750,6 +33379,28 @@ include!("math_wolfram48.rs");
 include!("math_wolfram49.rs");
 include!("math_wolfram50.rs");
 include!("math_wolfram51.rs");
+include!("math_wolfram52.rs");
+include!("math_wolfram53.rs");
+include!("math_wolfram54.rs");
+include!("math_wolfram55.rs");
+include!("math_wolfram56.rs");
+include!("math_wolfram57.rs");
+include!("math_wolfram58.rs");
+include!("math_wolfram59.rs");
+include!("math_wolfram60.rs");
+include!("math_wolfram61.rs");
+include!("math_wolfram62.rs");
+include!("math_wolfram63.rs");
+include!("math_wolfram64.rs");
+include!("math_wolfram65.rs");
+include!("math_wolfram66.rs");
+include!("math_wolfram67.rs");
+include!("math_wolfram68.rs");
+include!("math_wolfram69.rs");
+include!("math_wolfram70.rs");
+include!("math_wolfram71.rs");
+include!("math_wolfram72.rs");
+include!("math_wolfram73.rs");
 
 #[cfg(test)]
 mod tests {
