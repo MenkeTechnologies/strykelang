@@ -30,15 +30,6 @@ fn builtin_bs_put(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(k * (-r * t).exp() * norm_cdf_b20(-d2) - s * norm_cdf_b20(-d1)))
 }
 // BS vega
-fn builtin_bs_vega_b20(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = f1(args);
-    let k = args.get(1).map(|v| v.to_number()).unwrap_or(s);
-    let r = args.get(2).map(|v| v.to_number()).unwrap_or(0.05);
-    let sigma = args.get(3).map(|v| v.to_number()).unwrap_or(0.2);
-    let t = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
-    let d1 = ((s / k).ln() + (r + 0.5 * sigma * sigma) * t) / (sigma * t.sqrt());
-    Ok(PerlValue::float(s * t.sqrt() * norm_pdf_b20(d1)))
-}
 // BS theta call
 fn builtin_bs_theta_call(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = f1(args);
@@ -65,24 +56,6 @@ fn builtin_bs_rho_call(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Implied vol via bisection
-fn builtin_implied_vol_b20(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let market = f1(args);
-    let s = args.get(1).map(|v| v.to_number()).unwrap_or(100.0);
-    let k = args.get(2).map(|v| v.to_number()).unwrap_or(100.0);
-    let r = args.get(3).map(|v| v.to_number()).unwrap_or(0.05);
-    let t = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
-    let mut lo = 0.0001_f64;
-    let mut hi = 5.0_f64;
-    for _ in 0..100 {
-        let mid = 0.5 * (lo + hi);
-        let d1 = ((s / k).ln() + (r + 0.5 * mid * mid) * t) / (mid * t.sqrt());
-        let d2 = d1 - mid * t.sqrt();
-        let price = s * norm_cdf_b20(d1) - k * (-r * t).exp() * norm_cdf_b20(d2);
-        if (price - market).abs() < 1e-8 { return Ok(PerlValue::float(mid)); }
-        if price > market { hi = mid; } else { lo = mid; }
-    }
-    Ok(PerlValue::float(0.5 * (lo + hi)))
-}
 
 // Bachelier (normal) call
 fn builtin_bachelier_call(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -598,22 +571,8 @@ fn builtin_sharpe_annualized(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Treynor ratio
-fn builtin_treynor_ratio_b20(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r_p = f1(args);
-    let r_f = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let beta = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if beta == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float((r_p - r_f) / beta))
-}
 
 // Information ratio
-fn builtin_information_ratio_b20(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r_p = f1(args);
-    let r_b = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let te = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if te == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float((r_p - r_b) / te))
-}
 
 // Jensen's alpha
 fn builtin_jensen_alpha(args: &[PerlValue]) -> PerlResult<PerlValue> {

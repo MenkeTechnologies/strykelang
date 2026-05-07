@@ -2,10 +2,6 @@
 
 // ── Physics / classical ─────────────────────────────────────────────────────
 
-fn builtin_kinetic_energy_b12(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m = f1(args); let v = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(0.5 * m * v * v))
-}
 fn builtin_relativistic_kinetic(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args); let v = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     let c = 2.997_924_58e8_f64;
@@ -98,10 +94,6 @@ fn builtin_gravitational_pe(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = args.get(2).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float(-6.674e-11 * m1 * m2 / r))
 }
-fn builtin_orbital_velocity_circular_b12(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m = f1(args); let r = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
-    Ok(PerlValue::float((6.674e-11 * m / r).sqrt()))
-}
 fn builtin_freefall_time(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let h = f1(args); let g = args.get(1).map(|x| x.to_number()).unwrap_or(9.81);
     Ok(PerlValue::float((2.0 * h / g).sqrt()))
@@ -122,10 +114,6 @@ fn builtin_lens_focal_length(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let do_ = f1(args); let di = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(1.0 / (1.0 / do_ + 1.0 / di)))
 }
-fn builtin_magnification_lens_b12(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let do_ = f1(args); let di = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(-di / do_))
-}
 
 // ── Chemistry ───────────────────────────────────────────────────────────────
 
@@ -140,9 +128,6 @@ fn builtin_planck_const_h(_args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 fn builtin_gas_constant_r(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(8.314_462_618))
-}
-fn builtin_faraday_constant_b12(_args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(PerlValue::float(96485.33212))
 }
 fn builtin_concentration_dilute(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c1 = f1(args); let v1 = args.get(1).map(|x| x.to_number()).unwrap_or(0.0);

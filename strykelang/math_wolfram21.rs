@@ -20,13 +20,6 @@ fn builtin_pka_from_ka(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-ka.log10()))
 }
 // Henderson-Hasselbalch: pH = pKa + log([A-]/[HA])
-fn builtin_henderson_hasselbalch_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pka = f1(args);
-    let a_minus = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let ha = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if ha <= 0.0 || a_minus <= 0.0 { return Ok(PerlValue::float(pka)); }
-    Ok(PerlValue::float(pka + (a_minus / ha).log10()))
-}
 // Henderson base form (pOH from pKb)
 fn builtin_henderson_base(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let pkb = f1(args);
@@ -89,22 +82,7 @@ fn builtin_zero_order_concentration(args: &[PerlValue]) -> PerlResult<PerlValue>
 }
 
 // Michaelis-Menten v = Vmax*[S]/(Km+[S])
-fn builtin_michaelis_menten_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let vmax = f1(args);
-    let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let km = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if km + s == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(vmax * s / (km + s)))
-}
 // Lineweaver-Burk inverse
-fn builtin_lineweaver_burk_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let v = f1(args);
-    let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let vmax = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let km = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
-    if v == 0.0 || s == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(km / (vmax * s) + 1.0 / vmax))
-}
 
 // Ideal gas n = PV/RT
 fn builtin_ideal_gas_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -114,15 +92,6 @@ fn builtin_ideal_gas_n(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(p * v / (R_GAS * t)))
 }
 // Van der Waals (P+a*n^2/V^2)(V-nb) = nRT — return predicted pressure
-fn builtin_van_der_waals_p_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let t = args.get(2).map(|v| v.to_number()).unwrap_or(298.15);
-    let a = args.get(3).map(|v| v.to_number()).unwrap_or(0.1);
-    let b = args.get(4).map(|v| v.to_number()).unwrap_or(0.001);
-    if v - n * b == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(n * R_GAS * t / (v - n * b) - a * n * n / (v * v)))
-}
 // Redlich-Kwong P
 fn builtin_redlich_kwong_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
@@ -145,19 +114,7 @@ fn builtin_compressibility_z(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Daltons partial pressure: P_i = x_i * P
-fn builtin_partial_pressure_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let p = args.get(1).map(|v| v.to_number()).unwrap_or(101325.0);
-    Ok(PerlValue::float(x * p))
-}
 // Mole fraction n_i / sum(n)
-fn builtin_mole_fraction_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let ns = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let i = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
-    let sum: f64 = ns.iter().map(|v| v.to_number()).sum();
-    if sum == 0.0 || i >= ns.len() { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(ns[i].to_number() / sum))
-}
 
 // Equilibrium Kc from rates
 fn builtin_kc_from_rates(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -201,12 +158,6 @@ fn builtin_le_chatelier_dir(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Gibbs free energy change: ΔG = ΔH - TΔS
-fn builtin_gibbs_free_energy_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let dh = f1(args);
-    let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
-    let ds = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(dh - t * ds))
-}
 // ΔG° = -RT ln K
 fn builtin_dg_from_k(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let k = f1(args).max(1e-30);
@@ -246,14 +197,6 @@ fn builtin_antoine_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Nernst equation E = E° - (RT/nF) ln Q
-fn builtin_nernst_equation_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let e0 = f1(args);
-    let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0).max(1e-30);
-    let t = args.get(3).map(|v| v.to_number()).unwrap_or(298.15);
-    if n == 0.0 { return Ok(PerlValue::float(e0)); }
-    Ok(PerlValue::float(e0 - R_GAS * t / (n * F_FARADAY) * q.ln()))
-}
 // EMF from half-cell potentials
 fn builtin_emf_from_half_cells(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cathode = f1(args);
@@ -270,12 +213,6 @@ fn builtin_faraday_mass_deposited(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Beer-Lambert law A = ε * c * l
-fn builtin_beer_lambert_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let eps = f1(args);
-    let c = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let l = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(eps * c * l))
-}
 // Transmittance T = 10^(-A)
 fn builtin_transmittance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
@@ -293,15 +230,6 @@ fn builtin_ksp_from_concs(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(prod))
 }
 // Ionic strength I = 0.5 * sum(c_i * z_i^2)
-fn builtin_ionic_strength_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let zs = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    let sum: f64 = cs.iter().enumerate().map(|(i, c)| {
-        let z = zs.get(i).map(|v| v.to_number()).unwrap_or(0.0);
-        c.to_number() * z * z
-    }).sum();
-    Ok(PerlValue::float(0.5 * sum))
-}
 // Debye-Hückel limiting law log γ = -A z^2 sqrt(I)
 fn builtin_debye_huckel(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let z = f1(args);
@@ -355,19 +283,7 @@ fn builtin_moles_from_mass(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(m / mm))
 }
 // Molarity = moles/volume
-fn builtin_molarity_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if v == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(n / v))
-}
 // Molality = moles/kg solvent
-fn builtin_molality_b21(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    let kg = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if kg == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(n / kg))
-}
 // Dilution: c1*v1 = c2*v2 — solve for v2
 fn builtin_dilution_v2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c1 = f1(args);

@@ -1,18 +1,7 @@
 // Batch 30 — final mixed: astronomy, music, color, units, miscellaneous.
 
 // Distance modulus: m - M = 5 log10(d/10pc)
-fn builtin_distance_modulus_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let d_pc = f1(args);
-    if d_pc <= 0.0 { return Ok(PerlValue::float(f64::NEG_INFINITY)); }
-    Ok(PerlValue::float(5.0 * (d_pc / 10.0).log10()))
-}
 // Apparent magnitude from absolute and distance
-fn builtin_apparent_magnitude_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let abs_mag = f1(args);
-    let d_pc = args.get(1).map(|v| v.to_number()).unwrap_or(10.0);
-    if d_pc <= 0.0 { return Ok(PerlValue::float(f64::NEG_INFINITY)); }
-    Ok(PerlValue::float(abs_mag + 5.0 * (d_pc / 10.0).log10()))
-}
 // Absolute magnitude from apparent and distance
 fn builtin_absolute_magnitude(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let app_mag = f1(args);
@@ -150,55 +139,7 @@ fn builtin_note_name_to_midi(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // RGB to HSL
-fn builtin_rgb_to_hsl_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args) / 255.0;
-    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
-    let b = args.get(2).map(|v| v.to_number()).unwrap_or(0.0) / 255.0;
-    let max = r.max(g.max(b));
-    let min = r.min(g.min(b));
-    let l = (max + min) / 2.0;
-    let mut h = 0.0_f64;
-    let mut s = 0.0_f64;
-    if max != min {
-        let d = max - min;
-        s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
-        h = if max == r {
-            (g - b) / d + (if g < b { 6.0 } else { 0.0 })
-        } else if max == g {
-            (b - r) / d + 2.0
-        } else {
-            (r - g) / d + 4.0
-        };
-        h /= 6.0;
-    }
-    Ok(PerlValue::array(vec![PerlValue::float(h * 360.0), PerlValue::float(s), PerlValue::float(l)]))
-}
 // HSL to RGB
-fn builtin_hsl_to_rgb_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let h = f1(args) / 360.0;
-    let s = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let l = args.get(2).map(|v| v.to_number()).unwrap_or(0.5);
-    fn h_to_rgb(p: f64, q: f64, mut t: f64) -> f64 {
-        if t < 0.0 { t += 1.0; }
-        if t > 1.0 { t -= 1.0; }
-        if t < 1.0 / 6.0 { return p + (q - p) * 6.0 * t; }
-        if t < 0.5 { return q; }
-        if t < 2.0 / 3.0 { return p + (q - p) * (2.0 / 3.0 - t) * 6.0; }
-        p
-    }
-    let (r, g, b) = if s == 0.0 {
-        (l, l, l)
-    } else {
-        let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
-        let p = 2.0 * l - q;
-        (h_to_rgb(p, q, h + 1.0 / 3.0), h_to_rgb(p, q, h), h_to_rgb(p, q, h - 1.0 / 3.0))
-    };
-    Ok(PerlValue::array(vec![
-        PerlValue::float(r * 255.0),
-        PerlValue::float(g * 255.0),
-        PerlValue::float(b * 255.0),
-    ]))
-}
 // RGB to YIQ
 fn builtin_rgb_to_yiq(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args) / 255.0;
@@ -249,15 +190,6 @@ fn builtin_xyz_to_lab(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::array(vec![PerlValue::float(l), PerlValue::float(a), PerlValue::float(b)]))
 }
 // CIE76 ΔE
-fn builtin_delta_e_76_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let l1 = f1(args);
-    let a1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let b1 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let l2 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    let a2 = args.get(4).map(|v| v.to_number()).unwrap_or(0.0);
-    let b2 = args.get(5).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(((l1 - l2).powi(2) + (a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt()))
-}
 // CIE94 ΔE (graphic arts default)
 fn builtin_delta_e_94(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l1 = f1(args);
@@ -284,48 +216,8 @@ fn builtin_delta_e_94(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Celsius/Fahrenheit/Kelvin
-fn builtin_c_to_f_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let c = f1(args);
-    Ok(PerlValue::float(c * 9.0 / 5.0 + 32.0))
-}
-fn builtin_f_to_c_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let f = f1(args);
-    Ok(PerlValue::float((f - 32.0) * 5.0 / 9.0))
-}
-fn builtin_c_to_k_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let c = f1(args);
-    Ok(PerlValue::float(c + 273.15))
-}
-fn builtin_k_to_c_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let k = f1(args);
-    Ok(PerlValue::float(k - 273.15))
-}
-fn builtin_f_to_k_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let f = f1(args);
-    Ok(PerlValue::float((f - 32.0) * 5.0 / 9.0 + 273.15))
-}
-fn builtin_k_to_f_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let k = f1(args);
-    Ok(PerlValue::float((k - 273.15) * 9.0 / 5.0 + 32.0))
-}
 
 // Distance unit conversions
-fn builtin_inches_to_cm_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let i = f1(args);
-    Ok(PerlValue::float(i * 2.54))
-}
-fn builtin_cm_to_inches_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cm = f1(args);
-    Ok(PerlValue::float(cm / 2.54))
-}
-fn builtin_miles_to_km_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let mi = f1(args);
-    Ok(PerlValue::float(mi * 1.609344))
-}
-fn builtin_km_to_miles_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let km = f1(args);
-    Ok(PerlValue::float(km / 1.609344))
-}
 fn builtin_feet_to_meters(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let ft = f1(args);
     Ok(PerlValue::float(ft * 0.3048))
@@ -343,14 +235,6 @@ fn builtin_lb_to_kg(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_kg_to_lb(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let kg = f1(args);
     Ok(PerlValue::float(kg / 0.45359237))
-}
-fn builtin_oz_to_g_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let oz = f1(args);
-    Ok(PerlValue::float(oz * 28.3495))
-}
-fn builtin_g_to_oz_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let g = f1(args);
-    Ok(PerlValue::float(g / 28.3495))
 }
 
 // Speed
@@ -376,14 +260,6 @@ fn builtin_knots_to_kmh(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Pressure
-fn builtin_psi_to_pa_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let psi = f1(args);
-    Ok(PerlValue::float(psi * 6894.757))
-}
-fn builtin_pa_to_psi_b30(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pa = f1(args);
-    Ok(PerlValue::float(pa / 6894.757))
-}
 fn builtin_atm_to_pa(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let atm = f1(args);
     Ok(PerlValue::float(atm * 101325.0))

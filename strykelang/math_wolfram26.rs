@@ -21,14 +21,6 @@ fn builtin_fnv1a_64(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(h as i64))
 }
 // DJB2 hash
-fn builtin_djb2_hash_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let mut h = 5381_u32;
-    for b in s.bytes() {
-        h = h.wrapping_mul(33).wrapping_add(b as u32);
-    }
-    Ok(PerlValue::integer(h as i64))
-}
 // SDBM hash
 fn builtin_sdbm_hash(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
@@ -308,42 +300,10 @@ fn builtin_wyhash_mix(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // CRC-32 (poly 0xedb88320)
-fn builtin_crc32_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let mut crc = 0xffffffff_u32;
-    for b in s.bytes() {
-        crc ^= b as u32;
-        for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb88320 } else { crc >> 1 };
-        }
-    }
-    Ok(PerlValue::integer((crc ^ 0xffffffff) as i64))
-}
 
 // CRC-16 CCITT (poly 0x1021)
-fn builtin_crc16_ccitt_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let mut crc = 0xffff_u16;
-    for b in s.bytes() {
-        crc ^= (b as u16) << 8;
-        for _ in 0..8 {
-            crc = if crc & 0x8000 != 0 { (crc << 1) ^ 0x1021 } else { crc << 1 };
-        }
-    }
-    Ok(PerlValue::integer(crc as i64))
-}
 
 // Adler-32
-fn builtin_adler32_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let mut a = 1_u32;
-    let mut b = 0_u32;
-    for byte in s.bytes() {
-        a = (a + byte as u32) % 65521;
-        b = (b + a) % 65521;
-    }
-    Ok(PerlValue::integer(((b << 16) | a) as i64))
-}
 
 // XOR cipher (returns string of XOR with single key byte)
 fn builtin_xor_cipher_byte(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -354,27 +314,8 @@ fn builtin_xor_cipher_byte(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Caesar cipher
-fn builtin_caesar_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let shift = (args.get(1).map(|v| v.to_number() as i64).unwrap_or(3).rem_euclid(26)) as u8;
-    let out: String = s.chars().map(|c| {
-        if c.is_ascii_uppercase() { ((c as u8 - b'A' + shift) % 26 + b'A') as char }
-        else if c.is_ascii_lowercase() { ((c as u8 - b'a' + shift) % 26 + b'a') as char }
-        else { c }
-    }).collect();
-    Ok(PerlValue::string(out))
-}
 
 // ROT13
-fn builtin_rot13_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let out: String = s.chars().map(|c| {
-        if c.is_ascii_uppercase() { ((c as u8 - b'A' + 13) % 26 + b'A') as char }
-        else if c.is_ascii_lowercase() { ((c as u8 - b'a' + 13) % 26 + b'a') as char }
-        else { c }
-    }).collect();
-    Ok(PerlValue::string(out))
-}
 
 // Rail fence cipher encrypt
 fn builtin_railfence_encrypt(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -607,22 +548,6 @@ fn builtin_monobit_test(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Runs test (NIST)
-fn builtin_runs_test_b26(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let bits: Vec<i64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number() as i64).collect();
-    let n = bits.len();
-    if n < 2 { return Ok(PerlValue::float(1.0)); }
-    let pi: f64 = bits.iter().filter(|&&b| b != 0).count() as f64 / n as f64;
-    if (pi - 0.5).abs() >= 2.0 / (n as f64).sqrt() { return Ok(PerlValue::float(0.0)); }
-    let mut v = 1_usize;
-    for i in 1..n {
-        if bits[i] != bits[i - 1] { v += 1; }
-    }
-    let num = (v as f64 - 2.0 * n as f64 * pi * (1.0 - pi)).abs();
-    let den = 2.0 * (2.0 * n as f64).sqrt() * pi * (1.0 - pi);
-    if den == 0.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(libm::erfc(num / den)))
-}
 
 // Approximate entropy (very simplified)
 fn builtin_approximate_entropy(args: &[PerlValue]) -> PerlResult<PerlValue> {

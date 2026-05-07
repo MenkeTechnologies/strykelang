@@ -137,109 +137,10 @@ fn builtin_gauss_kronrod_15(
 }
 
 // Romberg integration (Richardson extrapolation on trapezoid)
-fn builtin_romberg_b19(
-    interp: &mut VMHelper,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
-    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let max_n = args.get(3).map(|v| v.to_number() as usize).unwrap_or(8).max(2);
-    let mut r = vec![vec![0.0; max_n]; max_n];
-    let h = b - a;
-    let fa = call_user_1(interp, &f, a, line)?;
-    let fb = call_user_1(interp, &f, b, line)?;
-    r[0][0] = 0.5 * h * (fa + fb);
-    for k in 1..max_n {
-        let mut step_sum = 0.0;
-        let pts = 1 << (k - 1);
-        let h_k = h / (pts as f64 * 2.0);
-        for i in 0..pts {
-            let x = a + (2 * i + 1) as f64 * h_k;
-            step_sum += call_user_1(interp, &f, x, line)?;
-        }
-        r[k][0] = 0.5 * r[k - 1][0] + h_k * step_sum;
-        for j in 1..=k {
-            let p = 4_f64.powi(j as i32);
-            r[k][j] = (p * r[k][j - 1] - r[k - 1][j - 1]) / (p - 1.0);
-        }
-    }
-    Ok(PerlValue::float(r[max_n - 1][max_n - 1]))
-}
 
 // Adaptive Simpson
-fn builtin_adaptive_simpson_b19(
-    interp: &mut VMHelper,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
-    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let tol = args.get(3).map(|v| v.to_number()).unwrap_or(1e-8);
-    fn simpson_quad(
-        interp: &mut VMHelper,
-        f: &PerlValue,
-        a: f64,
-        b: f64,
-        line: usize,
-    ) -> PerlResult<f64> {
-        let m = 0.5 * (a + b);
-        let fa = call_user_1(interp, f, a, line)?;
-        let fb = call_user_1(interp, f, b, line)?;
-        let fm = call_user_1(interp, f, m, line)?;
-        Ok(((b - a) / 6.0) * (fa + 4.0 * fm + fb))
-    }
-    #[allow(clippy::too_many_arguments)]
-    fn recur(
-        interp: &mut VMHelper,
-        f: &PerlValue,
-        a: f64,
-        b: f64,
-        tol: f64,
-        whole: f64,
-        depth: usize,
-        line: usize,
-    ) -> PerlResult<f64> {
-        let m = 0.5 * (a + b);
-        let left = simpson_quad(interp, f, a, m, line)?;
-        let right = simpson_quad(interp, f, m, b, line)?;
-        if depth == 0 || (left + right - whole).abs() < 15.0 * tol {
-            return Ok(left + right + (left + right - whole) / 15.0);
-        }
-        let l = recur(interp, f, a, m, tol / 2.0, left, depth - 1, line)?;
-        let r = recur(interp, f, m, b, tol / 2.0, right, depth - 1, line)?;
-        Ok(l + r)
-    }
-    let whole = simpson_quad(interp, &f, a, b, line)?;
-    Ok(PerlValue::float(recur(interp, &f, a, b, tol, whole, 30, line)?))
-}
 
 // Double exponential (tanh-sinh) quadrature for [-1,1]
-fn builtin_tanh_sinh_quad_b19(
-    interp: &mut VMHelper,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
-    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let a = args.get(1).map(|v| v.to_number()).unwrap_or(-1.0);
-    let b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let n = args.get(3).map(|v| v.to_number() as usize).unwrap_or(40).max(10);
-    let h = 6.0 / n as f64;
-    let half = (b - a) / 2.0;
-    let mid = (b + a) / 2.0;
-    let mut sum = 0.0;
-    for k in -(n as isize)..=(n as isize) {
-        let t = k as f64 * h;
-        let phi = (std::f64::consts::FRAC_PI_2 * t.sinh()).tanh();
-        let dphi = std::f64::consts::FRAC_PI_2 * t.cosh()
-            / (std::f64::consts::FRAC_PI_2 * t.sinh()).cosh().powi(2);
-        let x = mid + half * phi;
-        sum += dphi * call_user_1(interp, &f, x, line)?;
-    }
-    Ok(PerlValue::float(half * h * sum))
-}
 
 // Midpoint rule
 fn builtin_midpoint_rule(
@@ -881,27 +782,6 @@ fn builtin_regula_falsi(
 }
 
 // Bisection method explicit
-fn builtin_bisection_b19(
-    interp: &mut VMHelper,
-    args: &[PerlValue],
-    line: usize,
-) -> PerlResult<PerlValue> {
-    let f = args.first().cloned().unwrap_or(PerlValue::UNDEF);
-    let mut a = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let mut b = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let tol = args.get(3).map(|v| v.to_number()).unwrap_or(1e-10);
-    let mut fa = call_user_1(interp, &f, a, line)?;
-    let fb = call_user_1(interp, &f, b, line)?;
-    if fa * fb > 0.0 { return Ok(PerlValue::float(f64::NAN)); }
-    while (b - a).abs() > tol {
-        let c = 0.5 * (a + b);
-        let fc = call_user_1(interp, &f, c, line)?;
-        if fc.abs() < tol { return Ok(PerlValue::float(c)); }
-        if fa * fc < 0.0 { b = c; }
-        else { a = c; fa = fc; }
-    }
-    Ok(PerlValue::float(0.5 * (a + b)))
-}
 
 // Secant method explicit
 fn builtin_secant_root(
@@ -958,40 +838,8 @@ fn builtin_gradient_descent_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Adam optimizer step (returns updated [x, m, v])
-fn builtin_adam_step_b19(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let m = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let v = args.get(3).map(|v| v.to_number()).unwrap_or(0.0);
-    let t = args.get(4).map(|v| v.to_number()).unwrap_or(1.0);
-    let lr = args.get(5).map(|v| v.to_number()).unwrap_or(0.001);
-    let b1 = args.get(6).map(|v| v.to_number()).unwrap_or(0.9);
-    let b2 = args.get(7).map(|v| v.to_number()).unwrap_or(0.999);
-    let eps = 1e-8;
-    let m1 = b1 * m + (1.0 - b1) * g;
-    let v1 = b2 * v + (1.0 - b2) * g * g;
-    let m_hat = m1 / (1.0 - b1.powf(t));
-    let v_hat = v1 / (1.0 - b2.powf(t));
-    let x1 = x - lr * m_hat / (v_hat.sqrt() + eps);
-    Ok(PerlValue::array(vec![
-        PerlValue::float(x1),
-        PerlValue::float(m1),
-        PerlValue::float(v1),
-    ]))
-}
 
 // RMSprop step
-fn builtin_rmsprop_step_b19(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let x = f1(args);
-    let g = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let v = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let lr = args.get(3).map(|v| v.to_number()).unwrap_or(0.001);
-    let rho = args.get(4).map(|v| v.to_number()).unwrap_or(0.9);
-    let eps = 1e-8;
-    let v1 = rho * v + (1.0 - rho) * g * g;
-    let x1 = x - lr * g / (v1.sqrt() + eps);
-    Ok(PerlValue::array(vec![PerlValue::float(x1), PerlValue::float(v1)]))
-}
 
 // Nesterov momentum step
 fn builtin_nesterov_step(args: &[PerlValue]) -> PerlResult<PerlValue> {

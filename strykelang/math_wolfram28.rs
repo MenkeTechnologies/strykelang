@@ -25,28 +25,6 @@ fn builtin_triangle_area_pts(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Centroid of polygon (2D)
-fn builtin_polygon_centroid_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = pts.len();
-    if n == 0 { return Ok(PerlValue::array(vec![])); }
-    let mut cx = 0.0; let mut cy = 0.0; let mut a = 0.0;
-    for i in 0..n {
-        let p = arg_to_vec(&pts[i]);
-        let q = arg_to_vec(&pts[(i + 1) % n]);
-        let xi = p[0].to_number(); let yi = p[1].to_number();
-        let xj = q[0].to_number(); let yj = q[1].to_number();
-        let cross = xi * yj - xj * yi;
-        a += cross;
-        cx += (xi + xj) * cross;
-        cy += (yi + yj) * cross;
-    }
-    a *= 0.5;
-    if a == 0.0 { return Ok(PerlValue::array(vec![PerlValue::float(0.0), PerlValue::float(0.0)])); }
-    Ok(PerlValue::array(vec![
-        PerlValue::float(cx / (6.0 * a)),
-        PerlValue::float(cy / (6.0 * a)),
-    ]))
-}
 
 // Triangle inradius
 fn builtin_triangle_inradius(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -95,15 +73,7 @@ fn builtin_regular_ngon_circumradius(args: &[PerlValue]) -> PerlResult<PerlValue
 }
 
 // Sphere volume
-fn builtin_sphere_volume_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args);
-    Ok(PerlValue::float(4.0 / 3.0 * std::f64::consts::PI * r * r * r))
-}
 // Sphere surface area
-fn builtin_sphere_surface_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args);
-    Ok(PerlValue::float(4.0 * std::f64::consts::PI * r * r))
-}
 // n-ball volume (general)
 fn builtin_n_ball_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args) as usize;
@@ -121,11 +91,6 @@ fn builtin_n_ball_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(pi.powf(n as f64 / 2.0) / gamma_int_half(n + 2) * r.powi(n as i32)))
 }
 // Cylinder volume
-fn builtin_cylinder_volume_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args);
-    let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(std::f64::consts::PI * r * r * h))
-}
 // Cylinder surface
 fn builtin_cylinder_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
@@ -133,11 +98,6 @@ fn builtin_cylinder_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(2.0 * std::f64::consts::PI * r * (r + h)))
 }
 // Cone volume
-fn builtin_cone_volume_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r = f1(args);
-    let h = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(std::f64::consts::PI * r * r * h / 3.0))
-}
 // Cone surface
 fn builtin_cone_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let r = f1(args);
@@ -146,19 +106,7 @@ fn builtin_cone_surface(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(std::f64::consts::PI * r * (r + l)))
 }
 // Torus volume
-fn builtin_torus_volume_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r_major = f1(args);
-    let r_minor = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let pi = std::f64::consts::PI;
-    Ok(PerlValue::float(2.0 * pi * pi * r_major * r_minor * r_minor))
-}
 // Torus surface
-fn builtin_torus_surface_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let r_major = f1(args);
-    let r_minor = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let pi = std::f64::consts::PI;
-    Ok(PerlValue::float(4.0 * pi * pi * r_major * r_minor))
-}
 // Ellipsoid volume
 fn builtin_ellipsoid_volume(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
@@ -177,24 +125,6 @@ fn builtin_ellipsoid_surface_approx(args: &[PerlValue]) -> PerlResult<PerlValue>
 }
 
 // Tetrahedron volume from 4 points
-fn builtin_tetrahedron_volume_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let pts = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    if pts.len() < 4 { return Ok(PerlValue::float(0.0)); }
-    let p0 = arg_to_vec(&pts[0]);
-    let p1 = arg_to_vec(&pts[1]);
-    let p2 = arg_to_vec(&pts[2]);
-    let p3 = arg_to_vec(&pts[3]);
-    let v1 = [p1[0].to_number() - p0[0].to_number(), p1[1].to_number() - p0[1].to_number(), p1[2].to_number() - p0[2].to_number()];
-    let v2 = [p2[0].to_number() - p0[0].to_number(), p2[1].to_number() - p0[1].to_number(), p2[2].to_number() - p0[2].to_number()];
-    let v3 = [p3[0].to_number() - p0[0].to_number(), p3[1].to_number() - p0[1].to_number(), p3[2].to_number() - p0[2].to_number()];
-    let cross = [
-        v2[1] * v3[2] - v2[2] * v3[1],
-        v2[2] * v3[0] - v2[0] * v3[2],
-        v2[0] * v3[1] - v2[1] * v3[0],
-    ];
-    let det = v1[0] * cross[0] + v1[1] * cross[1] + v1[2] * cross[2];
-    Ok(PerlValue::float(det.abs() / 6.0))
-}
 
 // Distance point to line (2D)
 fn builtin_dist_point_line_2d(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -262,15 +192,6 @@ fn builtin_bbox_from_points(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Manhattan distance
-fn builtin_manhattan_distance_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let q = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    let mut sum = 0.0;
-    for i in 0..p.len().min(q.len()) {
-        sum += (p[i].to_number() - q[i].to_number()).abs();
-    }
-    Ok(PerlValue::float(sum))
-}
 
 // Euclidean distance N-dim
 fn builtin_euclidean_distance_nd(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -285,46 +206,10 @@ fn builtin_euclidean_distance_nd(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Chebyshev distance
-fn builtin_chebyshev_distance_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let q = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    let mut max_d = 0.0_f64;
-    for i in 0..p.len().min(q.len()) {
-        let d = (p[i].to_number() - q[i].to_number()).abs();
-        if d > max_d { max_d = d; }
-    }
-    Ok(PerlValue::float(max_d))
-}
 
 // Minkowski distance
-fn builtin_minkowski_distance_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let q = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    let pp = args.get(2).map(|v| v.to_number()).unwrap_or(2.0);
-    if pp <= 0.0 { return Ok(PerlValue::float(0.0)); }
-    let mut sum = 0.0;
-    for i in 0..p.len().min(q.len()) {
-        sum += (p[i].to_number() - q[i].to_number()).abs().powf(pp);
-    }
-    Ok(PerlValue::float(sum.powf(1.0 / pp)))
-}
 
 // Cosine distance
-fn builtin_cosine_distance_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let p = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let q = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF));
-    let mut dot = 0.0; let mut np = 0.0; let mut nq = 0.0;
-    for i in 0..p.len().min(q.len()) {
-        let pi = p[i].to_number();
-        let qi = q[i].to_number();
-        dot += pi * qi;
-        np += pi * pi;
-        nq += qi * qi;
-    }
-    let denom = (np * nq).sqrt();
-    if denom == 0.0 { return Ok(PerlValue::float(1.0)); }
-    Ok(PerlValue::float(1.0 - dot / denom))
-}
 
 // Hamming distance for strings
 fn builtin_hamming_distance_str(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -336,18 +221,6 @@ fn builtin_hamming_distance_str(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Sphere surface from circle great-circle distance (haversine)
-fn builtin_haversine_distance_b28(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let lat1 = f1(args).to_radians();
-    let lon1 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
-    let lat2 = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
-    let lon2 = args.get(3).map(|v| v.to_number()).unwrap_or(0.0).to_radians();
-    let r = args.get(4).map(|v| v.to_number()).unwrap_or(6371000.0);
-    let dlat = lat2 - lat1;
-    let dlon = lon2 - lon1;
-    let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().asin();
-    Ok(PerlValue::float(r * c))
-}
 
 // Vincenty distance simplified (great circle using law of cosines)
 fn builtin_great_circle_law_of_cos(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -553,5 +426,5 @@ fn builtin_covariance_matrix_pts(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // Simplex volume (n+1 points in n-D, using Cayley-Menger determinant approximation for n=3)
 fn builtin_simplex_volume_3d(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    builtin_tetrahedron_volume_b28(args)
+    builtin_tetrahedron_volume(args)
 }

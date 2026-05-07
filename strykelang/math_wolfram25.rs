@@ -148,25 +148,6 @@ fn builtin_hilbert_envelope(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Goertzel single-frequency power
-fn builtin_goertzel_b25(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let target_freq = args.get(1).map(|v| v.to_number()).unwrap_or(440.0);
-    let sample_rate = args.get(2).map(|v| v.to_number()).unwrap_or(44100.0);
-    let n = xs.len();
-    let k = (0.5 + (n as f64 * target_freq) / sample_rate).floor();
-    let omega = 2.0 * std::f64::consts::PI * k / n as f64;
-    let cos_w = omega.cos();
-    let coeff = 2.0 * cos_w;
-    let mut q1 = 0.0_f64;
-    let mut q2 = 0.0_f64;
-    for &x in &xs {
-        let q0 = coeff * q1 - q2 + x;
-        q2 = q1;
-        q1 = q0;
-    }
-    Ok(PerlValue::float(q1 * q1 + q2 * q2 - q1 * q2 * coeff))
-}
 
 // Biquad filter: process one sample, given state
 // Returns [y, x1, x2, y1, y2]
@@ -413,62 +394,10 @@ fn builtin_fir_lowpass_design(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Convolve 1D
-fn builtin_convolve_b25(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let h: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let n = xs.len();
-    let m = h.len();
-    let mut out = vec![0.0; n + m - 1];
-    for i in 0..n {
-        for j in 0..m {
-            out[i + j] += xs[i] * h[j];
-        }
-    }
-    Ok(PerlValue::array(out.into_iter().map(PerlValue::float).collect()))
-}
 
 // Crosscorrelation
-fn builtin_xcorr_b25(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let n = xs.len();
-    let m = ys.len();
-    let len = n + m - 1;
-    let mut out = vec![0.0; len];
-    for k in 0..len {
-        let lag = k as isize - (m - 1) as isize;
-        let mut s = 0.0;
-        for i in 0..n {
-            let j = i as isize - lag;
-            if j >= 0 && (j as usize) < m { s += xs[i] * ys[j as usize]; }
-        }
-        out[k] = s;
-    }
-    Ok(PerlValue::array(out.into_iter().map(PerlValue::float).collect()))
-}
 
 // Power spectral density via periodogram (DFT-based)
-fn builtin_periodogram_b25(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let xs: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
-        .iter().map(|v| v.to_number()).collect();
-    let n = xs.len();
-    let pi = std::f64::consts::PI;
-    let mut psd = vec![0.0; n / 2 + 1];
-    for k in 0..=n/2 {
-        let mut re = 0.0; let mut im = 0.0;
-        for t in 0..n {
-            let theta = -2.0 * pi * k as f64 * t as f64 / n as f64;
-            re += xs[t] * theta.cos();
-            im += xs[t] * theta.sin();
-        }
-        psd[k] = (re * re + im * im) / n as f64;
-    }
-    Ok(PerlValue::array(psd.into_iter().map(PerlValue::float).collect()))
-}
 
 // Spectrogram (windowed periodogram)
 fn builtin_spectrogram_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {

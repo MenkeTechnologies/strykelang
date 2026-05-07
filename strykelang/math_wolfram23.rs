@@ -6,14 +6,6 @@ const MU_0: f64 = 1.25663706212e-6;
 const E_CHARGE: f64 = 1.602176634e-19;
 
 // Coulomb force
-fn builtin_coulomb_force_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let q1 = f1(args);
-    let q2 = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let r = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if r == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    let k = 1.0 / (4.0 * std::f64::consts::PI * EPS_0);
-    Ok(PerlValue::float(k * q1 * q2 / (r * r)))
-}
 // Electric field magnitude E = kq/r²
 fn builtin_efield_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let q = f1(args);
@@ -31,19 +23,7 @@ fn builtin_epotential_point(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(k * q / r))
 }
 // Capacitance parallel plate C = ε₀εrA/d
-fn builtin_capacitance_parallel_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let area = f1(args);
-    let d = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let er = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    if d == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(EPS_0 * er * area / d))
-}
 // Energy stored in capacitor U = ½CV²
-fn builtin_capacitor_energy_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let c = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(0.5 * c * v * v))
-}
 // Capacitor charge Q=CV
 fn builtin_capacitor_charge(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let c = f1(args);
@@ -70,31 +50,8 @@ fn builtin_power_i2r(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(i * i * r))
 }
 // Resistance series sum
-fn builtin_resistance_series_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let sum: f64 = rs.iter().map(|v| v.to_number()).sum();
-    Ok(PerlValue::float(sum))
-}
 // Resistance parallel
-fn builtin_resistance_parallel_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let sum: f64 = rs.iter().filter_map(|v| {
-        let r = v.to_number();
-        if r == 0.0 { None } else { Some(1.0 / r) }
-    }).sum();
-    if sum == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(1.0 / sum))
-}
 // Capacitance series
-fn builtin_capacitance_series_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let sum: f64 = cs.iter().filter_map(|v| {
-        let c = v.to_number();
-        if c == 0.0 { None } else { Some(1.0 / c) }
-    }).sum();
-    if sum == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(1.0 / sum))
-}
 // Capacitance parallel sum
 fn builtin_capacitance_parallel_sum(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cs = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
@@ -123,22 +80,7 @@ fn builtin_lorentz_force_mag(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(q * v * b))
 }
 // Cyclotron frequency f = qB/(2πm)
-fn builtin_cyclotron_frequency_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let q = f1(args);
-    let b = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    let m = args.get(2).map(|v| v.to_number()).unwrap_or(9.10938356e-31);
-    if m == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(q.abs() * b / (2.0 * std::f64::consts::PI * m)))
-}
 // Larmor radius r = mv/(qB)
-fn builtin_larmor_radius_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let q = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
-    let b = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
-    if q * b == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(m * v / (q.abs() * b)))
-}
 // Faraday induced EMF ε = -dΦ/dt (just magnitude)
 fn builtin_faraday_emf(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
@@ -148,11 +90,6 @@ fn builtin_faraday_emf(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(-n * dphi / dt))
 }
 // Inductor energy U = ½LI²
-fn builtin_inductor_energy_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let l = f1(args);
-    let i = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(0.5 * l * i * i))
-}
 // LC frequency f = 1/(2π√(LC))
 fn builtin_lc_frequency(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let l = f1(args);
@@ -220,19 +157,7 @@ fn builtin_snell_theta2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(arg.asin()))
 }
 // Critical angle θc = asin(n2/n1)
-fn builtin_critical_angle_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n1 = f1(args);
-    let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if n1 == 0.0 || n2 / n1 > 1.0 { return Ok(PerlValue::float(f64::NAN)); }
-    Ok(PerlValue::float((n2 / n1).asin()))
-}
 // Brewster angle θB = atan(n2/n1)
-fn builtin_brewster_angle_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n1 = f1(args);
-    let n2 = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    if n1 == 0.0 { return Ok(PerlValue::float(f64::NAN)); }
-    Ok(PerlValue::float((n2 / n1).atan()))
-}
 // Refractive index from speeds: n = c/v
 fn builtin_index_from_speed(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = f1(args);
@@ -336,21 +261,7 @@ fn builtin_lorentz_gamma(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(1.0 / (1.0 - beta_sq).sqrt()))
 }
 // Time dilation Δt' = γΔt
-fn builtin_time_dilation_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let dt0 = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let beta_sq = (v / C_LIGHT).powi(2);
-    if beta_sq >= 1.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(dt0 / (1.0 - beta_sq).sqrt()))
-}
 // Length contraction L = L0/γ
-fn builtin_length_contraction_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let l0 = f1(args);
-    let v = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let beta_sq = (v / C_LIGHT).powi(2);
-    if beta_sq >= 1.0 { return Ok(PerlValue::float(0.0)); }
-    Ok(PerlValue::float(l0 * (1.0 - beta_sq).sqrt()))
-}
 // Relativistic momentum p = γmv
 fn builtin_rel_momentum(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
@@ -401,17 +312,7 @@ fn builtin_rel_velocity_add(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float((u + v) / denom))
 }
 // Compton wavelength shift Δλ = (h/(m_e c))(1 - cos θ)
-fn builtin_compton_shift_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let theta = f1(args);
-    let lambda_c = 2.4263102367e-12;
-    Ok(PerlValue::float(lambda_c * (1.0 - theta.cos())))
-}
 // Photon momentum p = h/λ
-fn builtin_photon_momentum_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let lambda = f1(args);
-    if lambda == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float(6.62607015e-34 / lambda))
-}
 
 // Wave on string speed v = √(T/μ)
 fn builtin_wave_string_speed(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -477,20 +378,7 @@ fn builtin_sound_db(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Plasma frequency ωp = √(ne²/(ε₀m))
-fn builtin_plasma_frequency_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    let m = args.get(1).map(|v| v.to_number()).unwrap_or(9.10938356e-31);
-    if m <= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float((n * E_CHARGE * E_CHARGE / (EPS_0 * m)).max(0.0).sqrt()))
-}
 // Debye length λD = √(ε₀kT/(n e²))
-fn builtin_debye_length_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = f1(args);
-    let t = args.get(1).map(|v| v.to_number()).unwrap_or(300.0);
-    let kb = 1.380649e-23;
-    if n <= 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
-    Ok(PerlValue::float((EPS_0 * kb * t / (n * E_CHARGE * E_CHARGE)).max(0.0).sqrt()))
-}
 // Alfvén speed vA = B/√(μ₀ρ)
 fn builtin_alfven_speed(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let b = f1(args);
@@ -499,11 +387,6 @@ fn builtin_alfven_speed(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(b / (MU_0 * rho).sqrt()))
 }
 // Schwarzschild radius rs = 2GM/c²
-fn builtin_schwarzschild_radius_b23(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m = f1(args);
-    let g = 6.674e-11;
-    Ok(PerlValue::float(2.0 * g * m / (C_LIGHT * C_LIGHT)))
-}
 // Gravitational time dilation factor √(1 - 2GM/(rc²))
 fn builtin_grav_time_dilation(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);

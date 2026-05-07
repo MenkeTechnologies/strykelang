@@ -58,22 +58,6 @@ fn builtin_mtf_decode(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::string(String::from_utf8_lossy(&out).into_owned()))
 }
-fn builtin_run_length_encode_str_b16(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let mut out: Vec<PerlValue> = Vec::new();
-    let mut chars = s.chars();
-    if let Some(first) = chars.next() {
-        let mut cur = first; let mut cnt = 1_i64;
-        for c in chars {
-            if c == cur { cnt += 1; } else {
-                out.push(PerlValue::array(vec![PerlValue::string(cur.to_string()), PerlValue::integer(cnt)]));
-                cur = c; cnt = 1;
-            }
-        }
-        out.push(PerlValue::array(vec![PerlValue::string(cur.to_string()), PerlValue::integer(cnt)]));
-    }
-    Ok(PerlValue::array(out))
-}
 fn builtin_lyndon_factorize(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bytes = s.as_bytes();

@@ -127,50 +127,6 @@ fn builtin_kosaraju_scc(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Find articulation points (cut vertices)
-fn builtin_articulation_points_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = adj.len();
-    let mut visited = vec![false; n];
-    let mut disc = vec![0_usize; n];
-    let mut low = vec![0_usize; n];
-    let mut parent = vec![usize::MAX; n];
-    let mut ap = vec![false; n];
-    let mut time = 0_usize;
-
-    #[allow(clippy::too_many_arguments)]
-    fn dfs(
-        u: usize, adj: &[Vec<usize>], visited: &mut [bool], disc: &mut [usize],
-        low: &mut [usize], parent: &mut [usize], ap: &mut [bool], time: &mut usize,
-    ) {
-        let mut children = 0;
-        visited[u] = true;
-        disc[u] = *time;
-        low[u] = *time;
-        *time += 1;
-        for &v in &adj[u] {
-            if v >= adj.len() { continue; }
-            if !visited[v] {
-                children += 1;
-                parent[v] = u;
-                dfs(v, adj, visited, disc, low, parent, ap, time);
-                low[u] = low[u].min(low[v]);
-                if parent[u] == usize::MAX && children > 1 { ap[u] = true; }
-                if parent[u] != usize::MAX && low[v] >= disc[u] { ap[u] = true; }
-            } else if v != parent[u] {
-                low[u] = low[u].min(disc[v]);
-            }
-        }
-    }
-    for i in 0..n {
-        if !visited[i] {
-            dfs(i, &adj, &mut visited, &mut disc, &mut low, &mut parent, &mut ap, &mut time);
-        }
-    }
-    let out: Vec<PerlValue> = ap.into_iter().enumerate()
-        .filter_map(|(i, is)| if is { Some(PerlValue::integer(i as i64)) } else { None })
-        .collect();
-    Ok(PerlValue::array(out))
-}
 
 // Find bridges (cut edges)
 fn builtin_bridges(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -305,91 +261,10 @@ fn builtin_hopcroft_karp(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Closeness centrality (unweighted, BFS)
-fn builtin_closeness_centrality_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = adj.len();
-    let mut out = vec![0.0; n];
-    for s in 0..n {
-        let mut dist = vec![-1_i64; n];
-        dist[s] = 0;
-        let mut q = std::collections::VecDeque::new();
-        q.push_back(s);
-        while let Some(u) = q.pop_front() {
-            for &v in &adj[u] {
-                if v < n && dist[v] == -1 {
-                    dist[v] = dist[u] + 1;
-                    q.push_back(v);
-                }
-            }
-        }
-        let sum: i64 = dist.iter().filter(|&&d| d >= 0).sum();
-        out[s] = if sum > 0 { (n as f64 - 1.0) / sum as f64 } else { 0.0 };
-    }
-    Ok(PerlValue::array(out.into_iter().map(PerlValue::float).collect()))
-}
 
 // Betweenness centrality (Brandes algorithm)
-fn builtin_betweenness_centrality_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = adj.len();
-    let mut bc = vec![0.0; n];
-    for s in 0..n {
-        let mut stack: Vec<usize> = vec![];
-        let mut pred: Vec<Vec<usize>> = vec![vec![]; n];
-        let mut sigma = vec![0.0; n];
-        sigma[s] = 1.0;
-        let mut dist = vec![-1_i64; n];
-        dist[s] = 0;
-        let mut q = std::collections::VecDeque::new();
-        q.push_back(s);
-        while let Some(v) = q.pop_front() {
-            stack.push(v);
-            for &w in &adj[v] {
-                if w >= n { continue; }
-                if dist[w] < 0 {
-                    dist[w] = dist[v] + 1;
-                    q.push_back(w);
-                }
-                if dist[w] == dist[v] + 1 {
-                    sigma[w] += sigma[v];
-                    pred[w].push(v);
-                }
-            }
-        }
-        let mut delta = vec![0.0; n];
-        while let Some(w) = stack.pop() {
-            for &v in &pred[w] {
-                if sigma[w] > 0.0 {
-                    delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w]);
-                }
-            }
-            if w != s { bc[w] += delta[w]; }
-        }
-    }
-    Ok(PerlValue::array(bc.into_iter().map(PerlValue::float).collect()))
-}
 
 // Eigenvector centrality (power iteration)
-fn builtin_eigenvector_centrality_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let iters = args.get(1).map(|v| v.to_number() as usize).unwrap_or(100);
-    let n = adj.len();
-    let mut x = vec![1.0 / n.max(1) as f64; n];
-    for _ in 0..iters {
-        let mut new_x = vec![0.0; n];
-        for u in 0..n {
-            for &v in &adj[u] {
-                if v < n { new_x[v] += x[u]; }
-            }
-        }
-        let norm: f64 = new_x.iter().map(|v| v * v).sum::<f64>().sqrt();
-        if norm > 0.0 {
-            for v in &mut new_x { *v /= norm; }
-        }
-        x = new_x;
-    }
-    Ok(PerlValue::array(x.into_iter().map(PerlValue::float).collect()))
-}
 
 // Katz centrality
 fn builtin_katz_centrality(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -588,25 +463,6 @@ fn builtin_has_cycle_undirected(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // BFS distances from source
-fn builtin_bfs_distances_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let s = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
-    let n = adj.len();
-    let mut dist = vec![-1_i64; n];
-    if s >= n { return Ok(PerlValue::array(dist.into_iter().map(PerlValue::integer).collect())); }
-    dist[s] = 0;
-    let mut q = std::collections::VecDeque::new();
-    q.push_back(s);
-    while let Some(u) = q.pop_front() {
-        for &v in &adj[u] {
-            if v < n && dist[v] == -1 {
-                dist[v] = dist[u] + 1;
-                q.push_back(v);
-            }
-        }
-    }
-    Ok(PerlValue::array(dist.into_iter().map(PerlValue::integer).collect()))
-}
 
 // Diameter (BFS from each)
 fn builtin_diameter_bfs(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -632,29 +488,6 @@ fn builtin_diameter_bfs(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Eccentricity per node
-fn builtin_eccentricity_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = adj.len();
-    let mut out = vec![0_i64; n];
-    for s in 0..n {
-        let mut dist = vec![-1_i64; n];
-        dist[s] = 0;
-        let mut q = std::collections::VecDeque::new();
-        q.push_back(s);
-        let mut m = 0_i64;
-        while let Some(u) = q.pop_front() {
-            for &v in &adj[u] {
-                if v < n && dist[v] == -1 {
-                    dist[v] = dist[u] + 1;
-                    q.push_back(v);
-                    if dist[v] > m { m = dist[v]; }
-                }
-            }
-        }
-        out[s] = m;
-    }
-    Ok(PerlValue::array(out.into_iter().map(PerlValue::integer).collect()))
-}
 
 // Radius = min eccentricity
 fn builtin_radius_bfs(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -690,13 +523,6 @@ fn builtin_num_edges(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 // Density = 2E / (N(N-1))
-fn builtin_density_b24(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let adj = parse_adj_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
-    let n = adj.len() as f64;
-    if n <= 1.0 { return Ok(PerlValue::float(0.0)); }
-    let total: usize = adj.iter().map(|n| n.len()).sum();
-    Ok(PerlValue::float(total as f64 / (n * (n - 1.0))))
-}
 
 // k-core decomposition (returns coreness)
 fn builtin_k_coreness(args: &[PerlValue]) -> PerlResult<PerlValue> {
