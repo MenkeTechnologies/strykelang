@@ -2569,6 +2569,487 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "line_line_intersect_2d" | "ll_intersect_2d" => "`line_line_intersect_2d P1, P2, P3, P4` → intersection `[x, y]` or undef when parallel.",
         "point_segment_distance" | "p_seg_dist" => "`point_segment_distance P, A, B` — Euclidean distance from P to segment AB.",
 
+        // ── Batch 4: auto-diff ──────────────────────────────────────────
+        "forward_diff" | "fdiff" => "`forward_diff F, X` — derivative of scalar f at scalar x (Julia ForwardDiff style; central-difference fallback).",
+        "forward_diff_grad" | "fdiff_grad" => "`forward_diff_grad F, X_VEC` — gradient at vector x; alias for `numerical_gradient`.",
+
+        // ── Batch 4: stat tests ─────────────────────────────────────────
+        "bartlett_test" => "`bartlett_test GROUPS` — Bartlett's k-sample variance equality test. Returns `[chi², df, p]`.",
+        "levene_test" => "`levene_test GROUPS` — Levene's variance-equality test. Returns `[F, df1, df2, p]`.",
+        "fishers_exact_test_2x2" | "fishers_exact" => "`fishers_exact_test_2x2 [[a, b], [c, d]]` — two-sided p-value.",
+        "mcnemar_test" => "`mcnemar_test [[a, b], [c, d]]` — paired 2×2 table with continuity correction. Returns `[chi², p]`.",
+        "runs_test" | "wald_wolfowitz" => "`runs_test SEQ` — Wald-Wolfowitz runs test on a binary sequence. Returns `[Z, p]`.",
+        "friedman_test" => "`friedman_test BLOCKS_BY_TREATMENTS` — non-parametric ANOVA on ranks. Returns `[Q, df, p]`.",
+        "kruskal_wallis_test" | "kruskal" => "`kruskal_wallis_test GROUPS` — non-parametric ANOVA. Returns `[H, df, p]`.",
+        "sign_test" => "`sign_test PAIRS` — paired sign test. Returns `[N+, p]`.",
+        "anderson_darling_normality" | "ad_normality" => "`anderson_darling_normality XS` — A² statistic. > 0.752 → reject normality at α=0.05.",
+        "jarque_bera_test" | "jb_test" => "`jarque_bera_test XS` — normality test from sample skewness + kurtosis.",
+        "ljung_box_test" | "ljung_box" => "`ljung_box_test XS [, H]` — autocorrelation test. Returns `[Q, h, p]`.",
+        "durbin_watson_stat" | "durbin_watson" => "`durbin_watson_stat RESID` — DW autocorrelation statistic on residuals.",
+
+        // ── Batch 4: distance metrics ───────────────────────────────────
+        "mahalanobis_distance" | "mahalanobis_dist" => "`mahalanobis_distance X, MU, SIGMA` — √((x-μ)ᵀ Σ⁻¹ (x-μ)).",
+        "cosine_distance" => "`cosine_distance A, B` — 1 − cos(A, B).",
+        "canberra_distance" => "`canberra_distance A, B` — Σ |a-b| / (|a|+|b|).",
+        "bray_curtis_distance" | "bray_curtis" => "`bray_curtis_distance A, B` — Σ|a-b| / Σ(a+b).",
+        "l1_distance" => "`l1_distance A, B` — Manhattan / taxi-cab distance.",
+        "chi_squared_distance" => "`chi_squared_distance A, B` — ½ Σ (a-b)² / (a+b).",
+
+        // ── Batch 4: more distributions ─────────────────────────────────
+        "multivariate_normal_pdf" | "mvn_pdf" => "`multivariate_normal_pdf X, MU, SIGMA` — multivariate Gaussian PDF.",
+        "multivariate_normal_sample" | "rmvn" => "`multivariate_normal_sample MU, SIGMA` — sample from MVN via Cholesky.",
+        "dirichlet_pdf" => "`dirichlet_pdf X, ALPHA` — Dirichlet PDF on the simplex.",
+        "dirichlet_sample" | "rdirichlet" => "`dirichlet_sample ALPHA` — sample via independent Gamma draws.",
+        "skellam_pmf" => "`skellam_pmf K, MU1, MU2` — difference of two independent Poisson(μ) variates.",
+        "inverse_gaussian_pdf" | "wald_pdf" => "`inverse_gaussian_pdf X, MU, LAMBDA` — Wald PDF.",
+        "inverse_gaussian_cdf" | "wald_cdf" => "`inverse_gaussian_cdf X, MU, LAMBDA` — Wald CDF.",
+        "inverse_gaussian_sample" | "rwald" => "`inverse_gaussian_sample MU, LAMBDA` — Michael-Schucany-Haas.",
+        "non_central_chi2_pdf" | "ncchi2_pdf" => "`non_central_chi2_pdf X, K, LAMBDA` — Series-form non-central χ² PDF.",
+
+        // ── Batch 4: matrix functions ───────────────────────────────────
+        "matrix_exp" | "expm" => "`matrix_exp A` — e^A via 13-term Padé + scaling-and-squaring.",
+        "matrix_log" | "logm" => "`matrix_log A` — ln A via inverse scaling (Denman-Beavers SQRT) + Padé log.",
+        "matrix_sqrt" | "sqrtm" => "`matrix_sqrt A` — A^(1/2) via Denman-Beavers iteration.",
+        "matrix_sin" | "sinm" => "`matrix_sin A` — series form Σ (-1)^k A^(2k+1) / (2k+1)!.",
+        "matrix_cos" | "cosm" => "`matrix_cos A` — series form Σ (-1)^k A^(2k) / (2k)!.",
+
+        // ── Batch 4: adaptive ODE ────────────────────────────────────────
+        "rk45_dormand_prince" | "rk45" | "dopri5" => "`rk45_dormand_prince F, Y0, T0, T1, H0 [, TOL]` — adaptive Dormand-Prince. F receives `[t, y0, …]`.",
+        "midpoint_step" | "ode_midpoint" => "`midpoint_step F, Y, T, H` — single explicit-midpoint step.",
+        "heun_step" | "ode_heun" => "`heun_step F, Y, T, H` — improved-Euler / Heun step.",
+        "verlet_step" | "ode_verlet" => "`verlet_step ACCEL, Q, P, T, H` — velocity-Verlet symplectic step.",
+
+        // ── Batch 4: GLM ────────────────────────────────────────────────
+        "logistic_regression" | "logit_fit" => "`logistic_regression X, Y` — IRLS (no intercept added — supply column of ones).",
+        "poisson_regression" => "`poisson_regression X, Y` — IRLS with log link.",
+        "ridge_regression" | "ridge" => "`ridge_regression X, Y [, LAMBDA]` — Tikhonov-regularised LSQ.",
+        "lasso_coord" | "lasso" => "`lasso_coord X, Y [, LAMBDA, MAX_ITER]` — coordinate-descent LASSO.",
+
+        // ── Batch 4: bootstrap ──────────────────────────────────────────
+        "bootstrap_mean_ci" | "boot_mean_ci" => "`bootstrap_mean_ci DATA [, B, ALPHA]` — percentile CI for the mean.",
+        "jackknife_estimate" | "jackknife" => "`jackknife_estimate DATA` — leave-one-out SE of the mean.",
+        "permutation_test_diff" | "perm_test_diff" => "`permutation_test_diff A, B [, N_ITER]` — two-sided p of mean difference.",
+
+        // ── Batch 4: time series extras ─────────────────────────────────
+        "acf_at_lag" => "`acf_at_lag XS, LAG` — autocorrelation at one lag.",
+        "diff_op" => "`diff_op XS [, LAG]` — y_t − y_{t-lag}.",
+        "lag_op" => "`lag_op XS [, K]` — shift by k (NaN-pad).",
+        "decompose_classical" | "decompose_ts" => "`decompose_classical XS [, PERIOD]` — additive [trend, season, residual].",
+
+        // ── Batch 4: combinatorial generators ───────────────────────────
+        "combinations_list" => "`combinations_list N, K` — all k-subsets of 0..n in lex order.",
+        "permutations_list" => "`permutations_list N` — all permutations of 0..n via Heap's algorithm.",
+        "cyclic_permutations" => "`cyclic_permutations ARR` — all rotations.",
+        "subsets_of_size" => "`subsets_of_size ARR, K` — all k-subsets of an arbitrary array.",
+
+        // ── Batch 4: DP ─────────────────────────────────────────────────
+        "longest_increasing_subseq" | "lis" => "`longest_increasing_subseq XS` — length only (O(n log n)).",
+        "knapsack_01" | "knapsack" => "`knapsack_01 ITEMS, CAPACITY` — items as `[[w, v], …]`.",
+        "subset_sum_target" | "subset_sum" => "`subset_sum_target ARR, T` — 1 if any subset sums to T.",
+        "coin_change_min" | "coin_change_minimum" => "`coin_change_min COINS, N` — min number of coins to make N (-1 if impossible).",
+        "edit_distance_levenshtein" | "edit_distance" => "`edit_distance A, B` — Levenshtein distance.",
+
+        // ── Batch 4: ML metrics ─────────────────────────────────────────
+        "one_hot_encode" | "onehot" => "`one_hot_encode LABELS [, N_CLASSES]` → n×K matrix.",
+        "label_encode" => "`label_encode ARR` → `[indices, classes]`.",
+        "categorical_cross_entropy" | "cce" => "`categorical_cross_entropy Y_TRUE, Y_PRED` — averaged over batch.",
+        "classification_metrics" | "binary_metrics" => "`classification_metrics TP, FP, FN, TN` → `[acc, prec, recall, f1]`.",
+        "roc_auc" | "auroc" => "`roc_auc SCORES, LABELS` — Mann-Whitney U / (n+ n−).",
+
+        // ── Batch 4: DSP / image ────────────────────────────────────────
+        "gaussian_blur_kernel" => "`gaussian_blur_kernel SIGMA [, RADIUS]` — 1-D normalized kernel.",
+        "sobel_x" => "`sobel_x` — horizontal Sobel kernel.",
+        "sobel_y" => "`sobel_y` — vertical Sobel kernel.",
+        "prewitt_x" => "`prewitt_x` — horizontal Prewitt.",
+        "prewitt_y" => "`prewitt_y` — vertical Prewitt.",
+        "laplacian_of_gaussian" | "log_kernel" => "`laplacian_of_gaussian SIGMA` — 2-D LoG kernel.",
+
+        // ── Batch 4: stochastic ─────────────────────────────────────────
+        "brownian_path" | "wiener_path" => "`brownian_path T, N` — discrete Wiener path on [0, T].",
+        "geometric_brownian_path" | "gbm_path" => "`geometric_brownian_path S0, MU, SIGMA, T, N` — GBM sample path.",
+        "poisson_process" => "`poisson_process LAMBDA, T` — homogeneous Poisson arrival times.",
+        "random_walk_1d" => "`random_walk_1d N [, P]` — ±1 walk over N steps.",
+
+        // ── Batch 4: compression ────────────────────────────────────────
+        "lempel_ziv_complexity" | "lz_complexity" => "`lempel_ziv_complexity SEQ` — LZ76 production count.",
+        "huffman_code_lengths" | "huffman" => "`huffman_code_lengths FREQS` — code-length per symbol.",
+        "shannon_entropy_rate" | "block_entropy_rate" => "`shannon_entropy_rate SEQ [, M]` — H_m − H_{m-1} block estimate.",
+
+        // ── Batch 4: physics / quantum ──────────────────────────────────
+        "planck_blackbody" | "blackbody" => "`planck_blackbody LAMBDA, T` — spectral radiance B(λ, T).",
+        "rayleigh_jeans" => "`rayleigh_jeans LAMBDA, T` — long-wavelength approx.",
+        "compton_shift" => "`compton_shift THETA` — photon wavelength shift Δλ = (h/m_e c)(1-cosθ).",
+        "rydberg_energy" => "`rydberg_energy N` — hydrogen level energy −13.605693/n² eV.",
+        "hydrogen_radial_wavefunction" | "h_rad_psi" => "`hydrogen_radial_wavefunction N, L, R` — atomic-units R_{n,l}(r).",
+
+        // ── Batch 4: number theory ──────────────────────────────────────
+        "integer_log" | "ilog" => "`integer_log N [, BASE]` — largest k with base^k ≤ n.",
+        "aks_primality" | "aks" => "`aks_primality N` — deterministic primality (perfect-power + small-factor + Miller-Rabin fallback).",
+        "elliptic_curve_add" | "ec_add" => "`elliptic_curve_add P, Q, A, B` — group law on y² = x³ + a x + b. Identity = `[NaN, NaN]`.",
+        "berlekamp_massey" | "bm_lfsr" => "`berlekamp_massey SEQ` — minimal-LFSR connection-polynomial coefficients.",
+        "bezout_coefficients" | "bezout" | "extended_euclid" => "`bezout_coefficients A, B` → `[gcd, x, y]` with a x + b y = gcd.",
+
+        // ── Batch 5: CAS-lite ───────────────────────────────────────────
+        "factor_quadratic" => "`factor_quadratic A, B, C` — real roots of a x² + b x + c = 0.",
+        "complete_square" => "`complete_square A, B, C` → `[h, k]` for a (x-h)² + k.",
+        "partial_fraction_simple" | "partial_fraction" => "`partial_fraction_simple NUM, ROOTS` — Heaviside cover-up residues.",
+
+        // ── Batch 5: more quadrature ────────────────────────────────────
+        "gauss_chebyshev_quad" | "gc_quad" => "`gauss_chebyshev_quad F [, N]` — ∫_{-1}^1 f(x)/√(1-x²) dx (default N=16).",
+        "gauss_hermite_quad" | "gh_quad" => "`gauss_hermite_quad F [, N]` — ∫_{-∞}^∞ f(x) e^{-x²} dx (default N=20).",
+        "gauss_laguerre_quad" | "glag_quad" => "`gauss_laguerre_quad F [, N]` — ∫_0^∞ f(x) e^{-x} dx (default N=20).",
+        "clenshaw_curtis_quad" | "cc_quad" => "`clenshaw_curtis_quad F, A, B [, N]` — Chebyshev-node quadrature.",
+        "tanh_sinh_quad" | "ts_quad" => "`tanh_sinh_quad F, A, B [, LEVELS]` — double-exponential quadrature.",
+        "gauss_legendre_2d" | "gl_2d" => "`gauss_legendre_2d F, AX, BX, AY, BY [, N]` — Cartesian-product GL.",
+        "monte_carlo_2d" | "mc_2d" => "`monte_carlo_2d F, AX, BX, AY, BY [, N]` — uniform Monte Carlo on a rectangle.",
+
+        // ── Batch 5: more optimization ──────────────────────────────────
+        "simulated_annealing" | "sa_min" => "`simulated_annealing F, X0 [, T0, COOL, ITERS, STEP]` — Metropolis-Hastings minimisation.",
+        "simplex_lp" | "lp_simplex" => "`simplex_lp C, A, B` — max cᵀx s.t. Ax ≤ b, x ≥ 0. Returns `[x, value]`.",
+        "particle_swarm" | "pso_min" => "`particle_swarm F, BOUNDS, SWARM, ITERS` — constriction-coefficient PSO.",
+
+        // ── Batch 5: distributions ──────────────────────────────────────
+        "gev_pdf" => "`gev_pdf X, MU, SIGMA, XI` — Generalised Extreme Value PDF.",
+        "gev_cdf" => "`gev_cdf X, MU, SIGMA, XI` — GEV CDF.",
+        "gev_sample" | "rgev" => "`gev_sample MU, SIGMA, XI` — GEV sample.",
+        "gen_pareto_pdf" => "`gen_pareto_pdf X, MU, SIGMA, XI` — Generalised Pareto PDF.",
+        "gen_pareto_cdf" => "`gen_pareto_cdf X, MU, SIGMA, XI` — GP CDF.",
+        "gen_pareto_sample" | "rgenpareto" => "`gen_pareto_sample MU, SIGMA, XI` — GP sample.",
+        "skew_normal_pdf" => "`skew_normal_pdf X, XI, OMEGA, ALPHA` — Azzalini skew-normal PDF.",
+        "skew_normal_cdf" => "`skew_normal_cdf X, XI, OMEGA, ALPHA` — skew-normal CDF (numeric integration).",
+        "mixture_normal_pdf" => "`mixture_normal_pdf X, WEIGHTS, MEANS, STDS` — Gaussian-mixture PDF.",
+        "categorical_sample" | "rcat" => "`categorical_sample PROBS` — sample category index.",
+        "multinomial_pmf" => "`multinomial_pmf COUNTS, PROBS` — multinomial PMF.",
+        "multinomial_sample" | "rmultinom" => "`multinomial_sample N, PROBS` — multinomial counts vector.",
+        "truncated_normal_pdf" => "`truncated_normal_pdf X, MU, SIGMA, LO, HI` — truncated-normal PDF.",
+        "truncated_normal_sample" | "rtnorm" => "`truncated_normal_sample MU, SIGMA, LO, HI` — rejection sampler.",
+
+        // ── Batch 5: clustering ─────────────────────────────────────────
+        "dbscan" => "`dbscan POINTS, EPS, MIN_PTS` — density-based clustering. Returns label per point (-1 = noise).",
+        "gmm_em_1d" | "gmm_1d" => "`gmm_em_1d DATA, K [, MAX_ITER]` — 1-D Gaussian-mixture EM. Returns `[π, μ, σ]`.",
+        "silhouette_score" => "`silhouette_score POINTS, LABELS` — mean silhouette coefficient.",
+        "davies_bouldin_index" | "db_index" => "`davies_bouldin_index POINTS, LABELS` — lower is better.",
+        "calinski_harabasz_index" | "ch_index" => "`calinski_harabasz_index POINTS, LABELS` — higher is better.",
+        "mds_2d" | "pcoa_2d" => "`mds_2d D` — classical multidimensional scaling on a distance matrix → 2-D coords.",
+        "mean_shift" => "`mean_shift POINTS [, BANDWIDTH, MAX_ITER]` — non-parametric mode-seeking.",
+
+        // ── Batch 5: NN primitives ──────────────────────────────────────
+        "batch_norm" => "`batch_norm XS [, EPS]` — zero-mean unit-variance normalisation.",
+        "layer_norm" => "`layer_norm XS [, EPS]` — alias for batch_norm (per-sample reuse).",
+        "dropout_mask" => "`dropout_mask N [, P]` — Bernoulli dropout mask scaled by 1/(1−p).",
+        "max_pool_1d" => "`max_pool_1d XS [, WIN]` — non-overlapping max-pool.",
+        "avg_pool_1d" => "`avg_pool_1d XS [, WIN]` — non-overlapping average-pool.",
+        "attention_softmax" => "`attention_softmax XS` — numerically stable softmax.",
+        "positional_encoding" => "`positional_encoding LENGTH, D_MODEL` — sinusoidal Transformer encoding.",
+        "glorot_init" | "xavier_init" => "`glorot_init FAN_IN, FAN_OUT` — Glorot uniform.",
+        "he_init" | "kaiming_init" => "`he_init FAN_IN, FAN_OUT` — Gaussian (std = √(2/fan_in)).",
+        "adam_step" => "`adam_step PARAM, GRAD, M, V, LR, B1, B2, EPS, T` → `[param', m', v']`.",
+        "rmsprop_step" => "`rmsprop_step PARAM, GRAD, V, LR, DECAY, EPS` → `[param', v']`.",
+
+        // ── Batch 5: time series ────────────────────────────────────────
+        "ewma" => "`ewma XS [, ALPHA]` — exponentially-weighted moving average.",
+        "ccf" => "`ccf XS, YS [, MAX_LAG]` — sample cross-correlation function over -L..L lags.",
+        "periodogram" => "`periodogram XS` — squared-magnitude DFT / N (one-sided spectrum).",
+        "welch_psd" | "welch" => "`welch_psd XS [, SEG_LEN, OVERLAP]` — Welch's PSD via Hann segments.",
+        "lag_features" => "`lag_features XS, P` — design matrix of P lagged features.",
+
+        // ── Batch 5: image processing ───────────────────────────────────
+        "median_filter_2d" => "`median_filter_2d IMG [, RADIUS]` — denoising median filter.",
+        "threshold_otsu" | "otsu" => "`threshold_otsu IMG` — Otsu's optimal threshold for 0..255 grayscale.",
+        "histogram_equalize" | "hist_eq" => "`histogram_equalize IMG` — global histogram equalisation.",
+        "erode_2d" => "`erode_2d IMG [, RADIUS]` — morphological erosion (square structuring element).",
+        "dilate_2d" => "`dilate_2d IMG [, RADIUS]` — morphological dilation.",
+
+        // ── Batch 5: losses ─────────────────────────────────────────────
+        "mse_loss" => "`mse_loss A, B` — mean-squared error.",
+        "mae_loss" => "`mae_loss A, B` — mean-absolute error.",
+        "huber_loss" => "`huber_loss A, B [, DELTA]` — Huber loss (default δ=1).",
+
+        // ── Batch 5: spatial ────────────────────────────────────────────
+        "vincenty_distance" | "vincenty" => "`vincenty_distance LAT1, LON1, LAT2, LON2` — geodesic distance on WGS-84.",
+        "mercator_project" => "`mercator_project LAT, LON [, R]` → `[x, y]` Mercator metres.",
+        "destination_from_bearing" | "dest_bearing" => "`destination_from_bearing LAT, LON, BEARING_DEG, DIST_M [, R]` — spherical great-circle target.",
+
+        // ── Batch 5: integer sequences ──────────────────────────────────
+        "recaman" | "recaman_seq" => "`recaman N` — first N terms of Recamán's sequence.",
+        "sylvester" | "sylvester_seq" => "`sylvester N` — Sylvester's sequence (a_n = a_{n-1}² − a_{n-1} + 1).",
+        "happy_q" | "is_happy" => "`happy_q N` — 1 if N is a happy number.",
+        "amicable_pair_q" => "`amicable_pair_q A, B` — 1 if (a, b) is an amicable pair.",
+        "aliquot_sequence" | "aliquot" => "`aliquot_sequence N [, MAX_STEPS]` — sum-of-proper-divisors trajectory.",
+        "magic_constant" => "`magic_constant N` — n(n²+1)/2 (sum of any line of an n×n magic square).",
+
+        // ── Batch 5: graph metrics ──────────────────────────────────────
+        "clustering_coefficient_local" | "cc_local" => "`clustering_coefficient_local ADJ` — local CC per vertex.",
+        "clustering_coefficient_global" | "cc_global" => "`clustering_coefficient_global ADJ` — mean local CC.",
+        "assortativity" => "`assortativity ADJ` — degree-degree correlation coefficient.",
+        "common_neighbors" => "`common_neighbors ADJ, U, V` — count.",
+        "jaccard_neighbors" => "`jaccard_neighbors ADJ, U, V` — |Γ(u) ∩ Γ(v)| / |Γ(u) ∪ Γ(v)|.",
+        "adamic_adar" => "`adamic_adar ADJ, U, V` — Σ 1/log(deg(w)) over common neighbours w.",
+        "preferential_attachment_score" | "pa_score" => "`preferential_attachment_score ADJ, U, V` — deg(u)·deg(v).",
+
+        // ── Batch 5: 3-D geometry ───────────────────────────────────────
+        "triangle_3d_normal" => "`triangle_3d_normal P1, P2, P3` — unit normal.",
+        "triangle_3d_area" => "`triangle_3d_area P1, P2, P3` — area via cross product.",
+        "tetrahedron_volume" => "`tetrahedron_volume A, B, C, D` — |det(B-A, C-A, D-A)|/6.",
+        "plane_from_3_points" | "plane_from_pts" => "`plane_from_3_points P1, P2, P3` → `[a, b, c, d]` (a x + b y + c z + d = 0).",
+        "point_to_plane_distance" | "pt_plane_dist" => "`point_to_plane_distance P, [a, b, c, d]`.",
+        "ray_triangle_intersect" | "moller_trumbore" => "`ray_triangle_intersect O, D, A, B, C` — Möller-Trumbore. Returns t or NaN.",
+        "ray_sphere_intersect" => "`ray_sphere_intersect O, D, CENTER, RADIUS` — nearest non-negative t.",
+        "aabb_overlap" => "`aabb_overlap A_MIN, A_MAX, B_MIN, B_MAX` — 1 if 3-D AABBs overlap.",
+
+        // ── Batch 5: iterative solvers ──────────────────────────────────
+        "gauss_seidel" => "`gauss_seidel A, B [, MAX_ITER, TOL]` — Gauss-Seidel iterative solver.",
+        "jacobi_iteration" | "jacobi_solve" => "`jacobi_iteration A, B [, MAX_ITER, TOL]` — Jacobi iteration.",
+        "sor_solve" | "sor" => "`sor_solve A, B [, OMEGA, MAX_ITER, TOL]` — Successive Over-Relaxation.",
+        "thomas_tridiag_solve" | "thomas" => "`thomas_tridiag_solve A_SUB, B_MAIN, C_SUP, D` — tridiagonal direct solve.",
+        "richardson_extrapolation" | "richardson" => "`richardson_extrapolation F, H0 [, LEVELS]` — Romberg-style extrapolation.",
+        "finite_difference_5pt" | "fd5pt" => "`finite_difference_5pt F, X [, H]` — five-point central derivative.",
+
+        // ── Batch 5: crypto / algebra ───────────────────────────────────
+        "tonelli_shanks_sqrt" | "tonelli_shanks" => "`tonelli_shanks_sqrt N, P` — modular square root mod prime p.",
+        "baby_step_giant_step" | "bsgs" => "`baby_step_giant_step G, H, P` — discrete logarithm mod p.",
+        "pollard_rho_factor" | "pollard_rho" => "`pollard_rho_factor N` — return a non-trivial factor of N.",
+        "modular_lcm" | "mlcm" => "`modular_lcm XS` — LCM via gcd.",
+        "crt_general" | "crt_arbitrary" => "`crt_general REMAINDERS, MODULI` — CRT over arbitrary (not coprime) moduli; -1 if infeasible.",
+
+        // ── Batch 5: physics / chemistry ────────────────────────────────
+        "van_der_waals_p" | "vdw_pressure" => "`van_der_waals_p N, T, V, A, B` — pressure from Van der Waals equation.",
+        "nernst_equation" | "nernst" => "`nernst_equation E0, N, T, Q` — half-cell potential.",
+        "arrhenius_rate" | "arrhenius" => "`arrhenius_rate A, EA, T` — k = A exp(-Ea / RT).",
+        "reduced_mass" => "`reduced_mass M1, M2` — μ = m1 m2 / (m1 + m2).",
+        "ph_to_concentration" | "ph_to_h" => "`ph_to_concentration PH` — [H⁺] = 10^{-pH}.",
+
+        // ── Batch 6: MCMC ───────────────────────────────────────────────
+        "metropolis_hastings" | "mh_sampler" => "`metropolis_hastings LOG_PI, X0, SIGMA, ITERS [, BURN_IN]` — random-walk MH.",
+        "gibbs_sampler_step" | "gibbs_step" => "`gibbs_sampler_step COND_SAMPLERS, X` — one Gibbs sweep over coordinates.",
+
+        // ── Batch 6: SDE ────────────────────────────────────────────────
+        "euler_maruyama" | "em_sde" => "`euler_maruyama MU, SIGMA, X0, T0, T_END, N_STEPS` — Euler-Maruyama SDE integrator.",
+        "milstein" | "milstein_sde" => "`milstein MU, SIGMA, SIGMA_X, X0, T0, T_END, N_STEPS` — Milstein scheme.",
+        "ornstein_uhlenbeck_path" | "ou_path" => "`ornstein_uhlenbeck_path THETA, MU, SIGMA, X0, T, N` — exact OU sample path.",
+
+        // ── Batch 6: HMM ────────────────────────────────────────────────
+        "hmm_forward" => "`hmm_forward PI, A, B, OBS` — log P(O | λ).",
+        "hmm_viterbi" => "`hmm_viterbi PI, A, B, OBS` — most-likely state path.",
+        "hmm_backward" => "`hmm_backward PI, A, B, OBS` — backward β matrix.",
+
+        // ── Batch 6: survival ───────────────────────────────────────────
+        "kaplan_meier" | "km_estimator" => "`kaplan_meier TIMES, EVENTS` → matrix of [t, S(t)].",
+        "log_rank_test" => "`log_rank_test T1, E1, T2, E2` → `[chi², p]`.",
+
+        // ── Batch 6: alignment ──────────────────────────────────────────
+        "needleman_wunsch" | "nw_align" => "`needleman_wunsch A, B [, MATCH, MISMATCH, GAP]` — global alignment score.",
+        "smith_waterman" | "sw_align" => "`smith_waterman A, B [, MATCH, MISMATCH, GAP]` — best local-alignment score.",
+
+        // ── Batch 6: chemistry ──────────────────────────────────────────
+        "gibbs_free_energy" | "delta_g" => "`gibbs_free_energy DH [, T, DS]` — ΔG = ΔH − TΔS.",
+        "henderson_hasselbalch" | "hh_eq" => "`henderson_hasselbalch PKA, A_CONJ, HA` — pH = pKa + log10([A⁻]/[HA]).",
+        "radioactive_decay" => "`radioactive_decay N0, LAMBDA, T` — N(t) = N₀ e^{-λt}.",
+        "half_life_to_constant" | "hl_to_lambda" => "`half_life_to_constant T_HALF` — λ = ln 2 / t_½.",
+
+        // ── Batch 6: control theory ─────────────────────────────────────
+        "pid_step" => "`pid_step STATE, KP, KI, KD, E, DT` → `[new_state, u]` (PID controller).",
+        "transfer_function_eval" | "tf_eval" => "`transfer_function_eval NUM, DEN, OMEGA` → `[Re, Im]` of H(jω).",
+        "bode_magnitude_db" | "bode_mag_db" => "`bode_magnitude_db NUM, DEN, OMEGA` — 20 log₁₀ |H(jω)|.",
+        "bode_phase_deg" => "`bode_phase_deg NUM, DEN, OMEGA` — phase of H(jω) in degrees.",
+        "lqr_2x2" => "`lqr_2x2 A, B, Q, R` — closed-form 2×2 continuous LQR. Returns `[K, P]`.",
+
+        // ── Batch 6: game theory ────────────────────────────────────────
+        "nash_eq_2x2" | "nash_2x2" => "`nash_eq_2x2 P1, P2` — pure Nash equilibria of a 2×2 bimatrix game.",
+        "shapley_value" => "`shapley_value N, V_TABLE` — Shapley values from characteristic-function vector.",
+        "expected_utility" => "`expected_utility PROBS, PAYOFFS` — Σ p·u.",
+
+        // ── Batch 6: operations research ────────────────────────────────
+        "hungarian_assignment" | "hungarian" => "`hungarian_assignment COST_MATRIX` — assignment + total cost. (Greedy heuristic; reduces to Hungarian for small instances.)",
+        "tsp_nearest_neighbor" | "tsp_nn" => "`tsp_nearest_neighbor DIST_MATRIX` → `[tour, length]`.",
+        "vertex_cover_2approx" | "vc_2approx" => "`vertex_cover_2approx ADJ` — 2-approximation greedy.",
+
+        // ── Batch 6: PDE ────────────────────────────────────────────────
+        "heat_eq_1d" => "`heat_eq_1d F, A, B, NX, T, NT, ALPHA` — explicit FTCS heat-equation solver.",
+        "wave_eq_1d" => "`wave_eq_1d F, A, B, NX, T, NT, C` — explicit wave-equation solver.",
+        "laplace_2d_jacobi" | "laplace_jacobi" => "`laplace_2d_jacobi GRID [, MAX_ITER, TOL]` — Jacobi smoother on a Dirichlet grid.",
+
+        // ── Batch 6: Bayesian conjugate ─────────────────────────────────
+        "beta_binomial_update" => "`beta_binomial_update ALPHA, BETA, N, K` → posterior `[α', β']`.",
+        "normal_normal_update" => "`normal_normal_update MU0, VAR0, N, YBAR, VAR_DATA` → `[μ_post, σ²_post]`.",
+        "gamma_poisson_update" => "`gamma_poisson_update ALPHA, BETA, N, TOTAL_EVENTS` → `[α', β']`.",
+        "dirichlet_multinomial_update" => "`dirichlet_multinomial_update ALPHA, COUNTS` → α + counts.",
+
+        // ── Batch 6: quantum gates ──────────────────────────────────────
+        "hadamard_gate" | "h_gate" => "`hadamard_gate` — 2×2 Hadamard.",
+        "cnot_gate" | "cx_gate" => "`cnot_gate` — 4×4 controlled-NOT.",
+        "swap_gate" => "`swap_gate` — 4×4 SWAP.",
+        "cz_gate" => "`cz_gate` — 4×4 controlled-Z.",
+        "qft_matrix" => "`qft_matrix N` → `[Re, Im]` of N×N QFT matrix.",
+        "phase_gate" => "`phase_gate PHI` → `[Re, Im]` of diag(1, e^iφ).",
+        "s_gate" => "`s_gate` — phase(π/2).",
+        "t_gate" => "`t_gate` — phase(π/4).",
+
+        // ── Batch 6: splines ────────────────────────────────────────────
+        "bezier_eval" => "`bezier_eval CONTROL_PTS, T` — de Casteljau evaluation.",
+        "catmull_rom_eval" | "cmr_eval" => "`catmull_rom_eval P0, P1, P2, P3, T` — uniform Catmull-Rom.",
+        "cubic_hermite_eval" | "ch_eval" => "`cubic_hermite_eval P0, M0, P1, M1, T` — Hermite basis interpolation.",
+        "bspline_basis" | "nik_basis" => "`bspline_basis I, K, T, KNOTS` — Cox-de Boor B-spline basis.",
+
+        // ── Batch 6: music ──────────────────────────────────────────────
+        "freq_to_midi" => "`freq_to_midi F` — MIDI note number from frequency.",
+        "midi_to_freq" => "`midi_to_freq M` — frequency from MIDI note.",
+        "equal_temperament_freq" => "`equal_temperament_freq SEMITONES_ABOVE_A4` — 12-TET frequency.",
+        "cents_difference" | "cents_diff" => "`cents_difference F1, F2` — 1200 log₂(F2/F1).",
+
+        // ── Batch 6: astronomy ──────────────────────────────────────────
+        "redshift_z" => "`redshift_z LAMBDA_OBS, LAMBDA_EMIT` — z = λ_obs/λ_emit − 1.",
+        "hubble_distance" => "`hubble_distance H0` — c / H₀ in Mpc.",
+        "luminosity_distance" => "`luminosity_distance Z, H0, OMEGA_M, OMEGA_L` — flat ΛCDM (numeric).",
+
+        // ── Batch 6: fluid dynamics ─────────────────────────────────────
+        "reynolds_number" => "`reynolds_number RHO, U, L, MU` — ρ U L / μ.",
+        "mach_number" => "`mach_number U, C` — U / c.",
+        "prandtl_number" => "`prandtl_number CP, MU, K` — c_p μ / k.",
+        "bernoulli_velocity" => "`bernoulli_velocity P1, P2, RHO` — √(2(p₁ − p₂)/ρ).",
+
+        // ── Batch 6: distributions ──────────────────────────────────────
+        "negative_binomial_pmf" | "nb_pmf" => "`negative_binomial_pmf K, R, P` — failures-before-rth-success PMF.",
+        "hypergeometric_pmf" => "`hypergeometric_pmf N, K_POP, N_DRAWS, K_OBS` — finite-population PMF.",
+        "beta_binomial_pmf" | "bb_pmf" => "`beta_binomial_pmf K, N, ALPHA, BETA` — beta-binomial PMF.",
+        "von_mises_pdf" | "vmf_pdf" => "`von_mises_pdf THETA, MU, KAPPA` — circular Gaussian.",
+
+        // ── Batch 6: random graphs ──────────────────────────────────────
+        "erdos_renyi_random" | "erdos_renyi" => "`erdos_renyi_random N, P` — G(n, p) Bernoulli edge model.",
+        "barabasi_albert_random" | "barabasi_albert" => "`barabasi_albert_random N, M` — preferential-attachment model.",
+        "watts_strogatz_random" | "watts_strogatz" => "`watts_strogatz_random N, K, P` — small-world rewiring.",
+
+        // ── Batch 6: color science ──────────────────────────────────────
+        "rgb_to_lab" => "`rgb_to_lab R, G, B` — sRGB → CIE Lab.",
+        "lab_to_rgb" => "`lab_to_rgb L, A, B` — CIE Lab → sRGB.",
+        "kelvin_to_rgb" | "color_temp_rgb" => "`kelvin_to_rgb K` — black-body sRGB approximation (Tanner Helland).",
+
+        // ── Batch 6: integer sequences ──────────────────────────────────
+        "bell_triangle" => "`bell_triangle N` — first N+1 rows of the Bell / Aitken triangle.",
+        "surjection_count" => "`surjection_count N, K` — k! · S(n, k).",
+        "distinct_partition_count" | "q_partition" => "`distinct_partition_count N` — partitions of N into distinct parts.",
+        "fibonacci_q" | "is_fib_number" => "`fibonacci_q N` — 1 if N is a Fibonacci number.",
+
+        // ── Batch 7 docs ────────────────────────────────────────────────
+        "bonferroni_correction" | "bonferroni" => "`bonferroni_correction PVALS` — Bonferroni-adjusted p-values (capped at 1).",
+        "benjamini_hochberg" | "bh_fdr" => "`benjamini_hochberg PVALS` — BH FDR q-values.",
+        "tukey_hsd" => "`tukey_hsd ALPHA, K, DF, MSE, N` — Tukey honestly-significant-difference critical bound.",
+        "hellinger_distance" => "`hellinger_distance P, Q` — √(½ Σ (√p − √q)²).",
+        "wasserstein_1d" | "earth_movers_1d" => "`wasserstein_1d A, B` — earth-mover distance for sorted samples.",
+        "chi_squared_divergence" => "`chi_squared_divergence P, Q` — Σ (p − q)² / q.",
+        "beta_geometric_pmf" => "`beta_geometric_pmf K, ALPHA, BETA` — beta-geometric PMF.",
+        "generalized_gamma_pdf" | "gengamma_pdf" => "`generalized_gamma_pdf X, A, D, P` — generalised-gamma PDF.",
+        "zip_pmf" | "zero_inflated_poisson_pmf" => "`zip_pmf K, PI, LAMBDA` — zero-inflated Poisson.",
+        "stefan_boltzmann_luminosity" | "stellar_luminosity" => "`stefan_boltzmann_luminosity R, T` — L = 4π R² σ T⁴.",
+        "photon_momentum" => "`photon_momentum LAMBDA` — h / λ.",
+        "photon_energy_ev" => "`photon_energy_ev LAMBDA` — hc / λ in eV.",
+        "dipole_radiation_power" | "larmor_power" => "`dipole_radiation_power Q, A` — Larmor formula.",
+        "parallax_to_distance" => "`parallax_to_distance P_ARCSEC` — parsecs from arcseconds.",
+        "hawking_temperature" => "`hawking_temperature M_KG` — black-hole temperature.",
+        "roche_limit" => "`roche_limit R, RHO_PRIMARY, RHO_SAT` — rigid-body Roche limit.",
+        "apparent_magnitude" => "`apparent_magnitude ABS_M, D_PC` — m = M + 5 log₁₀(d/10).",
+        "distance_modulus" => "`distance_modulus D_PC` — μ = 5 log d − 5.",
+        "beer_lambert" | "absorbance" => "`beer_lambert EPSILON, L, C` — A = ε·l·c.",
+        "rate_law_n" => "`rate_law_n A0, K, T, N` — concentration after time t for nth-order reaction.",
+        "freezing_point_depression" | "fpd" => "`freezing_point_depression KF, MOLALITY, I` — ΔT = K_f m i.",
+        "mixed_nash_2x2" => "`mixed_nash_2x2 P1, P2` → `[p, q]` mixed-strategy probabilities.",
+        "minimax_2x2" => "`minimax_2x2 M` — security level for the row player.",
+        "barycentric_coords_2d" | "barycentric_2d" => "`barycentric_coords_2d P, A, B, C` → `[u, v, w]`.",
+        "bresenham_line" => "`bresenham_line X0, Y0, X1, Y1` → array of integer pixels.",
+        "bilinear_interp_2d" => "`bilinear_interp_2d F00, F10, F01, F11, U, V` — unit-square bilinear.",
+        "point_in_polygon_2d" => "`point_in_polygon_2d P, POLY` — ray-casting test.",
+        "hilbert_transform" => "`hilbert_transform XS` — discrete Hilbert via DFT.",
+        "cepstrum" => "`cepstrum XS` — real cepstrum ifft(log|fft|).",
+        "butterworth_lowpass_coeffs" | "butter_lp" => "`butterworth_lowpass_coeffs ORDER, CUTOFF` → `[b, a]` digital biquad-cascade.",
+        "savitzky_golay_coeffs" | "sg_coeffs" => "`savitzky_golay_coeffs NL, NR, M` — SG filter coefficients.",
+        "savitzky_golay_filter" | "sg_filter" => "`savitzky_golay_filter XS, COEFFS` — apply pre-computed SG coefficients.",
+        "canny_edge_intensity" | "canny_intensity" => "`canny_edge_intensity IMG` — Sobel-magnitude edge map (caller thresholds).",
+        "bilateral_filter_basic" | "bilateral_filter" => "`bilateral_filter_basic IMG, RADIUS, SIGMA_S, SIGMA_R` — edge-preserving smoother.",
+        "kmeans_pp_init" | "kpp_init" => "`kmeans_pp_init POINTS, K` — k-means++ seed centroids.",
+        "elbow_score" | "wcss" => "`elbow_score POINTS, LABELS` — within-cluster sum of squares.",
+        "young_tableaux_count" | "syt_count" => "`young_tableaux_count LAMBDA` — hook-length formula.",
+        "euler_alt_permutation" | "euler_zigzag" => "`euler_alt_permutation N` — Euler / zigzag number A000111.",
+        "genocchi_number" => "`genocchi_number N` — G_n via Bernoulli identity.",
+        "lattice_paths_count" => "`lattice_paths_count M, N` — C(m+n, n) east/north paths.",
+        "tetration" => "`tetration A, N` — N-fold a-tower (overflow → ∞).",
+        "ackermann_limited" | "ackermann" => "`ackermann_limited M, N` — depth-limited Ackermann (refuses past M=3 N=14).",
+        "perfect_power_q" => "`perfect_power_q N` — 1 if N = a^b for integers a, b ≥ 2.",
+        "b_smooth_q" => "`b_smooth_q N, B` — 1 if every prime factor of N is ≤ B.",
+        "k_core" => "`k_core ADJ` — vertex coreness.",
+        "rich_club_coefficient" | "rich_club" => "`rich_club_coefficient ADJ, K` — fraction of edges among nodes with deg > k.",
+        "rsa_basic_encrypt" | "rsa_enc_int" => "`rsa_basic_encrypt M, E, N` — m^e mod n.",
+        "rsa_basic_decrypt" | "rsa_dec_int" => "`rsa_basic_decrypt C, D, N` — c^d mod n.",
+        "dh_shared_secret" => "`dh_shared_secret PEER_PUB, PRIVATE, P` — Diffie-Hellman.",
+        "bell_state_phi_plus" | "bell_phi_plus" => "`bell_state_phi_plus` — Bell state (|00⟩+|11⟩)/√2.",
+        "bell_state_psi_minus" | "bell_psi_minus" => "`bell_state_psi_minus` — singlet (|01⟩-|10⟩)/√2.",
+        "density_matrix_purity" | "rho_purity" => "`density_matrix_purity RHO` — tr(ρ²).",
+        "concurrence_2qubit" => "`concurrence_2qubit PSI` — 2|ad − bc| in real basis.",
+        "point_in_circle" => "`point_in_circle P, CENTER, R` — 1 if inside.",
+        "circle_circle_intersect_2d" => "`circle_circle_intersect_2d C1, R1, C2, R2` — 0/1/2 intersection points.",
+        "polygon_centroid" => "`polygon_centroid POLY` — area-weighted centroid.",
+        "sutherland_hodgman_clip" | "sh_clip" => "`sutherland_hodgman_clip SUBJECT, CLIP` — clip against convex CCW polygon.",
+        "kalman_rts_smoother" | "rts_smoother" => "`kalman_rts_smoother X_HAT, P, X_PRED, P_PRED, F` — RTS smoothed means.",
+
+        // ── Batch 8 ─────────────────────────────────────────────────────
+        "gc_content" => "`gc_content SEQ` — fraction of G + C in DNA / RNA string.",
+        "codon_to_aa" => "`codon_to_aa CODON` — single-letter amino-acid (or '*' / 'X').",
+        "reverse_complement_dna" | "rev_comp_dna" => "`reverse_complement_dna SEQ` — DNA reverse complement.",
+        "hamming_dna" => "`hamming_dna A, B` — case-insensitive Hamming distance.",
+        "blosum62_pair_score" | "blosum62" => "`blosum62_pair_score A, B` — BLOSUM62 substitution score.",
+        "kmer_count" => "`kmer_count SEQ, K` — total count of length-K windows.",
+        "great_circle_bearing" | "gc_bearing" => "`great_circle_bearing LAT1, LON1, LAT2, LON2` — initial bearing in degrees.",
+        "midpoint_lat_lon" | "mid_geo" => "`midpoint_lat_lon LAT1, LON1, LAT2, LON2` — great-circle midpoint.",
+        "utm_zone_for" => "`utm_zone_for LON` — UTM zone (1..60).",
+        "area_polygon_lat_lon" | "geo_polygon_area" => "`area_polygon_lat_lon POLY [, R]` — spherical-excess polygon area in m².",
+        "crr_binomial_option" | "crr_option" => "`crr_binomial_option S0, K, T, R, SIGMA, N, IS_PUT` — Cox-Ross-Rubinstein price.",
+        "bond_price_clean" => "`bond_price_clean FACE, COUPON, N, PP_Y, YIELD` — present value.",
+        "bond_yield_to_maturity" | "bond_ytm" => "`bond_yield_to_maturity PRICE, FACE, COUPON, N, PP_Y` — solve YTM by bisection.",
+        "modified_duration_bond" => "`modified_duration_bond FACE, COUPON, N, PP_Y, YIELD` — modified duration.",
+        "convexity_bond" | "bond_convexity" => "`convexity_bond FACE, COUPON, N, PP_Y, YIELD` — bond convexity measure.",
+        "ssim" => "`ssim A, B [, L]` — Structural Similarity Index (single window).",
+        "psnr" => "`psnr A, B [, MAX_VAL]` — peak SNR in dB.",
+        "mssim" => "`mssim A, B [, WIN, L]` — mean SSIM across non-overlapping windows.",
+        "db_spl_from_pa" | "db_spl" => "`db_spl_from_pa P_PA` — sound pressure level dB SPL.",
+        "a_weighting_factor" | "a_weight" => "`a_weighting_factor F_HZ` — IEC 61672 A-weighting amplitude.",
+        "octave_band_center" | "octave_center" => "`octave_band_center BAND` — 1 kHz · 2^band centre frequency.",
+        "semitone_ratio" => "`semitone_ratio` — 12-TET ratio 2^(1/12).",
+        "hardy_weinberg" => "`hardy_weinberg P` — (p², 2pq, q²) genotype frequencies.",
+        "expected_heterozygosity" | "het_e" => "`expected_heterozygosity P_VEC` — 1 − Σ p_i².",
+        "fst_simple" => "`fst_simple P1, P2, N1, N2` — Wright's F_ST between two populations.",
+        "allele_frequencies" => "`allele_frequencies GENOTYPES` — p, q from 0/1/2 genotype counts.",
+        "sir_step" => "`sir_step S, I, R, BETA, GAMMA, DT` — Euler step of the SIR model.",
+        "sir_r0" => "`sir_r0 BETA, GAMMA` — basic reproduction number β/γ.",
+        "doubling_time" => "`doubling_time R` — t₂ = ln 2 / r.",
+        "theil_index" => "`theil_index XS` — Theil T inequality index.",
+        "herfindahl_hirschman" | "hhi" => "`herfindahl_hirschman SHARES` — Σ s_i².",
+        "atkinson_index" => "`atkinson_index XS [, EPS]` — Atkinson inequality with parameter ε.",
+        "lorenz_curve_points" => "`lorenz_curve_points XS` — matrix of [cumulative-pop, cumulative-income].",
+        "iota_range" | "iota" => "`iota_range N` — `0..N` (APL convention).",
+        "reshape_array" | "reshape" => "`reshape_array ROWS, COLS, FLAT` — APL reshape (cycles input).",
+        "grade_up" | "grade_asc" => "`grade_up XS` — index permutation that sorts ascending.",
+        "grade_down" | "grade_desc" => "`grade_down XS` — index permutation that sorts descending.",
+        "plasma_frequency" | "omega_p" => "`plasma_frequency N_E` — electron plasma angular frequency (rad/s).",
+        "debye_length" | "lambda_d" => "`debye_length T_K, N_E` — Debye screening length.",
+        "cyclotron_frequency" | "omega_c" => "`cyclotron_frequency B [, Q, M]` — qB/m (electron defaults).",
+        "larmor_radius" | "gyroradius" => "`larmor_radius V_PERP, B [, Q, M]` — gyroradius (electron defaults).",
+        "jaro_winkler_similarity" | "jaro_winkler" => "`jaro_winkler_similarity A, B` — JW string similarity.",
+        "metaphone_simple" => "`metaphone_simple S` — abridged Metaphone consonant skeleton.",
+        "elo_rating_update" | "elo" => "`elo_rating_update R_A, R_B, SCORE_A [, K]` → [R_A', R_B'].",
+        "glicko_rating_update" | "glicko" => "`glicko_rating_update R, RD, OPP_R, OPP_RD, SCORE` → [R', RD'].",
+        "dice_sum_pmf" => "`dice_sum_pmf N, S, TARGET` — probability of N s-sided dice summing to TARGET.",
+        "cohens_d" | "effect_size_d" => "`cohens_d A, B` — pooled-SD standardised mean difference.",
+        "cliff_delta" => "`cliff_delta A, B` — non-parametric effect size in [-1, 1].",
+        "vargha_delaney_a12" | "a12" => "`vargha_delaney_a12 A, B` — P(X > Y) + 0.5 P(X = Y).",
+        "step_response_2nd_order" | "step_2nd" => "`step_response_2nd_order ZETA, OMEGA_N, T` — y(t).",
+        "overshoot_2nd_order" | "overshoot_pct" => "`overshoot_2nd_order ZETA` — peak overshoot %.",
+        "frobenius_norm" => "`frobenius_norm M` — √(Σ m_ij²).",
+        "spectral_norm" | "operator_norm_2" => "`spectral_norm M` — largest singular value.",
+        "trace_matrix" | "tr_mat" => "`trace_matrix M` — Σ m_ii.",
+        "homophily_index" | "homophily" => "`homophily_index ADJ, LABELS` — fraction of same-group edges.",
+        "dyad_census" => "`dyad_census ADJ` — [mutual, asymmetric, null] dyads.",
+        "triad_census" => "`triad_census ADJ` — [empty, edge, path, triangle] counts.",
+        "sigmoid_inverse" | "logit" => "`sigmoid_inverse X` — ln(x / (1-x)).",
+
         // ── Number Theory ────────────────────────────────────────────────
         "mod_exp" | "modexp" | "powmod" => "`mod_exp` (aliases `modexp`, `powmod`) computes modular exponentiation: base^exp mod m, using fast binary exponentiation.\n\n```perl\np powmod(2, 10, 1000)  # 24 (2^10 mod 1000)\np powmod(3, 13, 50)    # 7\n```",
         "mod_inv" | "modinv" => "`mod_inv` (alias `modinv`) computes the modular multiplicative inverse via extended Euclidean algorithm. Errors if no inverse exists.\n\n```perl\np modinv(3, 7)   # 5 (3*5 ≡ 1 mod 7)\n```",
@@ -3967,6 +4448,674 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "line_line_intersect_2d",
             "point_segment_distance",
         ],
+    ),
+    (
+        "Auto-Differentiation",
+        &["forward_diff", "forward_diff_grad"],
+    ),
+    (
+        "Statistical Tests (R parity)",
+        &[
+            "bartlett_test",
+            "levene_test",
+            "fishers_exact_test_2x2",
+            "mcnemar_test",
+            "runs_test",
+            "friedman_test",
+            "kruskal_wallis_test",
+            "sign_test",
+            "anderson_darling_normality",
+            "jarque_bera_test",
+            "ljung_box_test",
+            "durbin_watson_stat",
+        ],
+    ),
+    (
+        "Distance Metrics (Distances.jl parity)",
+        &[
+            "mahalanobis_distance",
+            "cosine_distance",
+            "canberra_distance",
+            "bray_curtis_distance",
+            "l1_distance",
+            "chi_squared_distance",
+        ],
+    ),
+    (
+        "Multivariate / Non-Central Distributions",
+        &[
+            "multivariate_normal_pdf",
+            "multivariate_normal_sample",
+            "dirichlet_pdf",
+            "dirichlet_sample",
+            "skellam_pmf",
+            "inverse_gaussian_pdf",
+            "inverse_gaussian_cdf",
+            "inverse_gaussian_sample",
+            "non_central_chi2_pdf",
+        ],
+    ),
+    (
+        "Matrix Functions",
+        &[
+            "matrix_exp",
+            "matrix_log",
+            "matrix_sqrt",
+            "matrix_sin",
+            "matrix_cos",
+        ],
+    ),
+    (
+        "Adaptive ODE Solvers",
+        &[
+            "rk45_dormand_prince",
+            "midpoint_step",
+            "heun_step",
+            "verlet_step",
+        ],
+    ),
+    (
+        "Generalized Linear Models",
+        &[
+            "logistic_regression",
+            "poisson_regression",
+            "ridge_regression",
+            "lasso_coord",
+        ],
+    ),
+    (
+        "Bootstrap & Resampling",
+        &[
+            "bootstrap_mean_ci",
+            "jackknife_estimate",
+            "permutation_test_diff",
+        ],
+    ),
+    (
+        "Time Series Operators",
+        &["acf_at_lag", "diff_op", "lag_op", "decompose_classical"],
+    ),
+    (
+        "Combinatorial Generators",
+        &[
+            "combinations_list",
+            "permutations_list",
+            "cyclic_permutations",
+            "subsets_of_size",
+        ],
+    ),
+    (
+        "Dynamic Programming",
+        &[
+            "longest_increasing_subseq",
+            "knapsack_01",
+            "subset_sum_target",
+            "coin_change_min",
+            "edit_distance_levenshtein",
+        ],
+    ),
+    (
+        "ML Metrics",
+        &[
+            "one_hot_encode",
+            "label_encode",
+            "categorical_cross_entropy",
+            "classification_metrics",
+            "roc_auc",
+        ],
+    ),
+    (
+        "DSP / Image Filters",
+        &[
+            "gaussian_blur_kernel",
+            "sobel_x",
+            "sobel_y",
+            "prewitt_x",
+            "prewitt_y",
+            "laplacian_of_gaussian",
+        ],
+    ),
+    (
+        "Stochastic Processes",
+        &[
+            "brownian_path",
+            "geometric_brownian_path",
+            "poisson_process",
+            "random_walk_1d",
+        ],
+    ),
+    (
+        "Compression / Information Complexity",
+        &[
+            "lempel_ziv_complexity",
+            "huffman_code_lengths",
+            "shannon_entropy_rate",
+        ],
+    ),
+    (
+        "Physics & Quantum (Extended)",
+        &[
+            "planck_blackbody",
+            "rayleigh_jeans",
+            "compton_shift",
+            "rydberg_energy",
+            "hydrogen_radial_wavefunction",
+        ],
+    ),
+    (
+        "Number Theory & Algebra (Extended)",
+        &[
+            "integer_log",
+            "aks_primality",
+            "elliptic_curve_add",
+            "berlekamp_massey",
+            "bezout_coefficients",
+        ],
+    ),
+    (
+        "CAS-Lite",
+        &["factor_quadratic", "complete_square", "partial_fraction_simple"],
+    ),
+    (
+        "Quadrature (Specialised)",
+        &[
+            "gauss_chebyshev_quad",
+            "gauss_hermite_quad",
+            "gauss_laguerre_quad",
+            "clenshaw_curtis_quad",
+            "tanh_sinh_quad",
+            "gauss_legendre_2d",
+            "monte_carlo_2d",
+        ],
+    ),
+    (
+        "Optimization (Heuristic)",
+        &["simulated_annealing", "simplex_lp", "particle_swarm"],
+    ),
+    (
+        "Distributions (Tail / Mixture / Categorical)",
+        &[
+            "gev_pdf",
+            "gev_cdf",
+            "gev_sample",
+            "gen_pareto_pdf",
+            "gen_pareto_cdf",
+            "gen_pareto_sample",
+            "skew_normal_pdf",
+            "skew_normal_cdf",
+            "mixture_normal_pdf",
+            "categorical_sample",
+            "multinomial_pmf",
+            "multinomial_sample",
+            "truncated_normal_pdf",
+            "truncated_normal_sample",
+        ],
+    ),
+    (
+        "Clustering & Dimensionality Reduction",
+        &[
+            "dbscan",
+            "gmm_em_1d",
+            "silhouette_score",
+            "davies_bouldin_index",
+            "calinski_harabasz_index",
+            "mds_2d",
+            "mean_shift",
+        ],
+    ),
+    (
+        "Neural-Net Primitives",
+        &[
+            "batch_norm",
+            "layer_norm",
+            "dropout_mask",
+            "max_pool_1d",
+            "avg_pool_1d",
+            "attention_softmax",
+            "positional_encoding",
+            "glorot_init",
+            "he_init",
+            "adam_step",
+            "rmsprop_step",
+        ],
+    ),
+    (
+        "Time Series (Spectral)",
+        &["ewma", "ccf", "periodogram", "welch_psd", "lag_features"],
+    ),
+    (
+        "Image Processing",
+        &[
+            "median_filter_2d",
+            "threshold_otsu",
+            "histogram_equalize",
+            "erode_2d",
+            "dilate_2d",
+        ],
+    ),
+    (
+        "Loss Functions",
+        &["mse_loss", "mae_loss", "huber_loss"],
+    ),
+    (
+        "Spatial / Geographic",
+        &[
+            "vincenty_distance",
+            "mercator_project",
+            "destination_from_bearing",
+        ],
+    ),
+    (
+        "Integer Sequences",
+        &[
+            "recaman",
+            "sylvester",
+            "happy_q",
+            "amicable_pair_q",
+            "aliquot_sequence",
+            "magic_constant",
+        ],
+    ),
+    (
+        "Graph Link & Cluster Metrics",
+        &[
+            "clustering_coefficient_local",
+            "clustering_coefficient_global",
+            "assortativity",
+            "common_neighbors",
+            "jaccard_neighbors",
+            "adamic_adar",
+            "preferential_attachment_score",
+        ],
+    ),
+    (
+        "3-D Geometry",
+        &[
+            "triangle_3d_normal",
+            "triangle_3d_area",
+            "tetrahedron_volume",
+            "plane_from_3_points",
+            "point_to_plane_distance",
+            "ray_triangle_intersect",
+            "ray_sphere_intersect",
+            "aabb_overlap",
+        ],
+    ),
+    (
+        "Iterative Solvers",
+        &[
+            "gauss_seidel",
+            "jacobi_iteration",
+            "sor_solve",
+            "thomas_tridiag_solve",
+            "richardson_extrapolation",
+            "finite_difference_5pt",
+        ],
+    ),
+    (
+        "Crypto / Modular Algebra",
+        &[
+            "tonelli_shanks_sqrt",
+            "baby_step_giant_step",
+            "pollard_rho_factor",
+            "modular_lcm",
+            "crt_general",
+        ],
+    ),
+    (
+        "Physics & Chemistry",
+        &[
+            "van_der_waals_p",
+            "nernst_equation",
+            "arrhenius_rate",
+            "reduced_mass",
+            "ph_to_concentration",
+        ],
+    ),
+    (
+        "MCMC & SDEs",
+        &[
+            "metropolis_hastings",
+            "gibbs_sampler_step",
+            "euler_maruyama",
+            "milstein",
+            "ornstein_uhlenbeck_path",
+        ],
+    ),
+    (
+        "Hidden Markov Models",
+        &["hmm_forward", "hmm_viterbi", "hmm_backward"],
+    ),
+    (
+        "Survival Analysis",
+        &["kaplan_meier", "log_rank_test"],
+    ),
+    (
+        "Sequence Alignment",
+        &["needleman_wunsch", "smith_waterman"],
+    ),
+    (
+        "Chemistry",
+        &[
+            "gibbs_free_energy",
+            "henderson_hasselbalch",
+            "radioactive_decay",
+            "half_life_to_constant",
+        ],
+    ),
+    (
+        "Control Theory",
+        &[
+            "pid_step",
+            "transfer_function_eval",
+            "bode_magnitude_db",
+            "bode_phase_deg",
+            "lqr_2x2",
+        ],
+    ),
+    (
+        "Game Theory",
+        &["nash_eq_2x2", "shapley_value", "expected_utility"],
+    ),
+    (
+        "Operations Research",
+        &[
+            "hungarian_assignment",
+            "tsp_nearest_neighbor",
+            "vertex_cover_2approx",
+        ],
+    ),
+    (
+        "Numerical PDE",
+        &["heat_eq_1d", "wave_eq_1d", "laplace_2d_jacobi"],
+    ),
+    (
+        "Bayesian Conjugate Updates",
+        &[
+            "beta_binomial_update",
+            "normal_normal_update",
+            "gamma_poisson_update",
+            "dirichlet_multinomial_update",
+        ],
+    ),
+    (
+        "Quantum Computing Gates",
+        &[
+            "hadamard_gate",
+            "cnot_gate",
+            "swap_gate",
+            "cz_gate",
+            "qft_matrix",
+            "phase_gate",
+            "s_gate",
+            "t_gate",
+        ],
+    ),
+    (
+        "Splines & Curves",
+        &["bezier_eval", "catmull_rom_eval", "cubic_hermite_eval", "bspline_basis"],
+    ),
+    (
+        "Music & Audio",
+        &[
+            "freq_to_midi",
+            "midi_to_freq",
+            "equal_temperament_freq",
+            "cents_difference",
+        ],
+    ),
+    (
+        "Astronomy & Cosmology",
+        &["redshift_z", "hubble_distance", "luminosity_distance"],
+    ),
+    (
+        "Fluid Dynamics",
+        &[
+            "reynolds_number",
+            "mach_number",
+            "prandtl_number",
+            "bernoulli_velocity",
+        ],
+    ),
+    (
+        "Distributions (Discrete / Circular)",
+        &[
+            "negative_binomial_pmf",
+            "hypergeometric_pmf",
+            "beta_binomial_pmf",
+            "von_mises_pdf",
+        ],
+    ),
+    (
+        "Random Graph Generators",
+        &[
+            "erdos_renyi_random",
+            "barabasi_albert_random",
+            "watts_strogatz_random",
+        ],
+    ),
+    (
+        "Color Science",
+        &["rgb_to_lab", "lab_to_rgb", "kelvin_to_rgb"],
+    ),
+    (
+        "Integer Sequences (Combinatorial)",
+        &[
+            "bell_triangle",
+            "surjection_count",
+            "distinct_partition_count",
+            "fibonacci_q",
+        ],
+    ),
+    (
+        "Multiple-Testing Corrections",
+        &["bonferroni_correction", "benjamini_hochberg", "tukey_hsd"],
+    ),
+    (
+        "Probabilistic Distances",
+        &["hellinger_distance", "wasserstein_1d", "chi_squared_divergence"],
+    ),
+    (
+        "Distributions (Tail / Inflated)",
+        &["beta_geometric_pmf", "generalized_gamma_pdf", "zip_pmf"],
+    ),
+    (
+        "Astrophysics & Radiation",
+        &[
+            "stefan_boltzmann_luminosity",
+            "photon_momentum",
+            "photon_energy_ev",
+            "dipole_radiation_power",
+            "parallax_to_distance",
+            "hawking_temperature",
+            "roche_limit",
+            "apparent_magnitude",
+            "distance_modulus",
+        ],
+    ),
+    (
+        "Chemistry (Beer / Rate / Colligative)",
+        &["beer_lambert", "rate_law_n", "freezing_point_depression"],
+    ),
+    (
+        "Mixed-Strategy Game Theory",
+        &["mixed_nash_2x2", "minimax_2x2"],
+    ),
+    (
+        "Computer Graphics",
+        &[
+            "barycentric_coords_2d",
+            "bresenham_line",
+            "bilinear_interp_2d",
+            "point_in_polygon_2d",
+        ],
+    ),
+    (
+        "DSP (Hilbert / Cepstrum / Filter Design)",
+        &[
+            "hilbert_transform",
+            "cepstrum",
+            "butterworth_lowpass_coeffs",
+            "savitzky_golay_coeffs",
+            "savitzky_golay_filter",
+        ],
+    ),
+    (
+        "Image Processing (Edges / Bilateral)",
+        &["canny_edge_intensity", "bilateral_filter_basic"],
+    ),
+    (
+        "Clustering Helpers",
+        &["kmeans_pp_init", "elbow_score"],
+    ),
+    (
+        "Combinatorics (Tableaux / Boustrophedon)",
+        &[
+            "young_tableaux_count",
+            "euler_alt_permutation",
+            "genocchi_number",
+            "lattice_paths_count",
+        ],
+    ),
+    (
+        "Number Theory (Tetration / Smoothness)",
+        &["tetration", "ackermann_limited", "perfect_power_q", "b_smooth_q"],
+    ),
+    (
+        "Network Coreness & Structure",
+        &["k_core", "rich_club_coefficient"],
+    ),
+    (
+        "Crypto Helpers",
+        &["rsa_basic_encrypt", "rsa_basic_decrypt", "dh_shared_secret"],
+    ),
+    (
+        "Quantum Entanglement",
+        &[
+            "bell_state_phi_plus",
+            "bell_state_psi_minus",
+            "density_matrix_purity",
+            "concurrence_2qubit",
+        ],
+    ),
+    (
+        "2-D Geometry (Polygons & Circles)",
+        &[
+            "point_in_circle",
+            "circle_circle_intersect_2d",
+            "polygon_centroid",
+            "sutherland_hodgman_clip",
+        ],
+    ),
+    (
+        "Time-Series Smoothing",
+        &["kalman_rts_smoother"],
+    ),
+    (
+        "Bioinformatics",
+        &[
+            "gc_content",
+            "codon_to_aa",
+            "reverse_complement_dna",
+            "hamming_dna",
+            "blosum62_pair_score",
+            "kmer_count",
+        ],
+    ),
+    (
+        "Geographic / Map Projection",
+        &[
+            "great_circle_bearing",
+            "midpoint_lat_lon",
+            "utm_zone_for",
+            "area_polygon_lat_lon",
+        ],
+    ),
+    (
+        "Fixed-Income Finance",
+        &[
+            "crr_binomial_option",
+            "bond_price_clean",
+            "bond_yield_to_maturity",
+            "modified_duration_bond",
+            "convexity_bond",
+        ],
+    ),
+    (
+        "Image Quality Metrics",
+        &["ssim", "psnr", "mssim"],
+    ),
+    (
+        "Acoustics",
+        &[
+            "db_spl_from_pa",
+            "a_weighting_factor",
+            "octave_band_center",
+            "semitone_ratio",
+        ],
+    ),
+    (
+        "Population Genetics",
+        &[
+            "hardy_weinberg",
+            "expected_heterozygosity",
+            "fst_simple",
+            "allele_frequencies",
+        ],
+    ),
+    (
+        "Epidemiology",
+        &["sir_step", "sir_r0", "doubling_time"],
+    ),
+    (
+        "Inequality Measures",
+        &[
+            "theil_index",
+            "herfindahl_hirschman",
+            "atkinson_index",
+            "lorenz_curve_points",
+        ],
+    ),
+    (
+        "APL / J Array Primitives",
+        &["iota_range", "reshape_array", "grade_up", "grade_down"],
+    ),
+    (
+        "Plasma Physics",
+        &[
+            "plasma_frequency",
+            "debye_length",
+            "cyclotron_frequency",
+            "larmor_radius",
+        ],
+    ),
+    (
+        "String Similarity",
+        &["jaro_winkler_similarity", "metaphone_simple"],
+    ),
+    (
+        "Rating Systems",
+        &["elo_rating_update", "glicko_rating_update", "dice_sum_pmf"],
+    ),
+    (
+        "Effect Sizes",
+        &["cohens_d", "cliff_delta", "vargha_delaney_a12"],
+    ),
+    (
+        "Control Transient Response",
+        &["step_response_2nd_order", "overshoot_2nd_order"],
+    ),
+    (
+        "Matrix Norms",
+        &["frobenius_norm", "spectral_norm", "trace_matrix"],
+    ),
+    (
+        "Network Triad Analysis",
+        &["homophily_index", "dyad_census", "triad_census"],
+    ),
+    (
+        "Misc Inverses",
+        &["sigmoid_inverse"],
     ),
     (
         "Parallel I/O",
