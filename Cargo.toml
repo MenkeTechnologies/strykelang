@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.12.8"
+version = "0.12.9"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -8,6 +8,7 @@ authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/strykelang"
 documentation = "https://docs.rs/strykelang"
 exclude = ["/parity/", "/.github/", "/examples/"]
+autobins = false
 
 [lib]
 name = "stryke"
@@ -19,11 +20,11 @@ path = "strykelang/main.rs"
 
 [[bin]]
 name = "st"
-path = "strykelang/main.rs"
+path = "strykelang/bins/st.rs"
 
 [[bin]]
 name = "s"
-path = "strykelang/main.rs"
+path = "strykelang/bins/s.rs"
 
 [[bin]]
 name = "gen-docs"

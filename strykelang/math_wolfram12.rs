@@ -388,10 +388,12 @@ fn builtin_efficiency_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p_out = f1(args); let p_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float(p_out / p_in))
 }
+#[allow(non_snake_case)]
 fn builtin_dB_voltage(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v_out = f1(args); let v_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float(20.0 * (v_out / v_in).log10()))
 }
+#[allow(non_snake_case)]
 fn builtin_dB_power(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p_out = f1(args); let p_in = args.get(1).map(|x| x.to_number()).unwrap_or(0.0).max(1e-30);
     Ok(PerlValue::float(10.0 * (p_out / p_in).log10()))

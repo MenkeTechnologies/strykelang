@@ -1335,7 +1335,7 @@ fn builtin_beta_binomial_pmf(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let alpha = args.get(2).map(|v| v.to_number()).unwrap_or(1.0);
     let beta = args.get(3).map(|v| v.to_number()).unwrap_or(1.0);
-    use statrs::function::beta::{beta, ln_beta};
+    use statrs::function::beta::ln_beta;
     use statrs::function::gamma::ln_gamma;
     let log_binom = ln_gamma(n + 1.0) - ln_gamma(k + 1.0) - ln_gamma(n - k + 1.0);
     let log_b1 = ln_beta(k + alpha, n - k + beta);

@@ -1147,7 +1147,7 @@ fn builtin_homophily_index(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_dyad_census(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let adj = parse_adj_list(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
     let n = adj.len();
-    let mut sets: Vec<std::collections::HashSet<usize>> = adj
+    let sets: Vec<std::collections::HashSet<usize>> = adj
         .iter()
         .map(|nbrs| nbrs.iter().copied().collect())
         .collect();

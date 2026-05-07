@@ -190,7 +190,7 @@ fn gauss_laguerre_nodes_weights(n: usize) -> (Vec<f64>, Vec<f64>) {
     for i in 0..n {
         t[i][i] = (2 * i + 1) as f64;
         if i + 1 < n {
-            let v = (i as f64 + 1.0);
+            let v = i as f64 + 1.0;
             t[i][i + 1] = v;
             t[i + 1][i] = v;
         }
@@ -1442,6 +1442,7 @@ fn builtin_he_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// Single Adam optimisation step. Args: param, grad, m, v, lr, beta1, beta2,
 /// eps, t. Returns [param', m', v'].
+#[allow(dead_code)]
 fn builtin_adam_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let param: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
@@ -1485,6 +1486,7 @@ fn builtin_adam_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// Single RMSProp step. Args: param, grad, v_old, lr, decay, eps. Returns [param', v'].
+#[allow(dead_code)]
 fn builtin_rmsprop_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let param: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
@@ -1604,7 +1606,7 @@ fn builtin_welch_psd(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut count = 0_usize;
     let mut start = 0_usize;
     while start + seg_len <= n {
-        let mut win: Vec<f64> = (0..seg_len)
+        let win: Vec<f64> = (0..seg_len)
             .map(|i| {
                 let w = 0.5 - 0.5 * (2.0 * std::f64::consts::PI * i as f64 / (seg_len as f64 - 1.0)).cos();
                 xs[start + i] * w
@@ -1894,7 +1896,6 @@ fn builtin_vincenty_distance(args: &[PerlValue]) -> PerlResult<PerlValue> {
                         * (cos_2_sigma_m
                             + c * cos_sigma * (-1.0 + 2.0 * cos_2_sigma_m * cos_2_sigma_m)));
         if (lambda_new - lambda).abs() < 1e-12 {
-            lambda = lambda_new;
             let u_sq = cos_sq_alpha * (a * a - b * b) / (b * b);
             let big_a = 1.0 + u_sq / 16384.0
                 * (4096.0 + u_sq * (-768.0 + u_sq * (320.0 - 175.0 * u_sq)));

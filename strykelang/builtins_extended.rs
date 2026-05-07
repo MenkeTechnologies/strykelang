@@ -2111,6 +2111,7 @@ fn builtin_modified_duration(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `sharpe_ratio RETURNS, RISK_FREE_RATE` — Sharpe ratio.
+#[allow(dead_code)]
 fn builtin_sharpe_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
@@ -2130,6 +2131,7 @@ fn builtin_sharpe_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `sortino_ratio RETURNS, RISK_FREE_RATE` — Sortino ratio (downside deviation).
+#[allow(dead_code)]
 fn builtin_sortino_ratio(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let returns: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(PerlValue::UNDEF))
         .iter()
@@ -2178,6 +2180,7 @@ fn builtin_max_drawdown(args: &[PerlValue]) -> PerlResult<PerlValue> {
 }
 
 /// `continuous_compound PRINCIPAL, RATE, TIME` — continuous compounding.
+#[allow(dead_code)]
 fn builtin_continuous_compound(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let principal = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     let rate = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
@@ -5513,6 +5516,7 @@ fn builtin_thin_lens(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }))
 }
 
+#[allow(dead_code)]
 fn builtin_magnification_lens(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let di = args.first().map(|v| v.to_number()).unwrap_or(1.0);
     let d_o = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
@@ -5611,6 +5615,7 @@ fn builtin_gas_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(8.314462618))
 }
 
+#[allow(dead_code)]
 fn builtin_faraday_constant(_args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(96485.33212))
 }
@@ -7084,6 +7089,7 @@ fn builtin_mish(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(x * (x.exp().ln_1p()).tanh()))
 }
+#[allow(dead_code)]
 fn builtin_softplus(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let x = args.first().map(|v| v.to_number()).unwrap_or(0.0);
     Ok(PerlValue::float(x.exp().ln_1p()))
