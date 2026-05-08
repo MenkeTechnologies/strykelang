@@ -153,8 +153,10 @@ fn hebrew_month_length(year: i64, month: i64) -> i64 {
         2 => if year_len == 355 || year_len == 385 { 30 } else { 29 },
         8 => 30,
         9 => if year_len == 353 || year_len == 383 { 29 } else { 30 },
-        12 => if leap { 30 } else { 29 },
-        13 => if leap { 29 } else { 0 },
+        12 if leap => 30,
+        12 => 29,
+        13 if leap => 29,
+        13 => 0,
         _ => 0,
     }
 }

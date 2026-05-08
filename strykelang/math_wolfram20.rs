@@ -226,7 +226,6 @@ fn builtin_heston_price_simple(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let im = im_sign * ((r - z.0) / 2.0).max(0.0).sqrt();
         (re, im)
     }
-    let s = s; let k = k; let r = r; let v0 = v0;
     let phi_j = |u: f64, j: u8| -> (f64, f64) {
         let i_u = (0.0_f64, u);
         let (b, uj) = if j == 1 { (kappa - rho * sigma_v, 0.5_f64) } else { (kappa, -0.5_f64) };

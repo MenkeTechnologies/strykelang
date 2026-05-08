@@ -56,11 +56,11 @@ fn builtin_pam250_score(args: &[PerlValue]) -> PerlResult<PerlValue> {
     if a.is_empty() || b.is_empty() { return Ok(PerlValue::integer(0)); }
     let ca = a.chars().next().unwrap();
     let cb = b.chars().next().unwrap();
+    let same_group = |g: &str| g.contains(ca) && g.contains(cb);
     if ca == cb { Ok(PerlValue::integer(7)) }
-    else if "ILMV".contains(ca) && "ILMV".contains(cb) { Ok(PerlValue::integer(3)) }
-    else if "FYW".contains(ca) && "FYW".contains(cb) { Ok(PerlValue::integer(4)) }
-    else if "DE".contains(ca) && "DE".contains(cb) { Ok(PerlValue::integer(3)) }
-    else if "KR".contains(ca) && "KR".contains(cb) { Ok(PerlValue::integer(3)) }
+    else if same_group("ILMV") { Ok(PerlValue::integer(3)) }
+    else if same_group("FYW") { Ok(PerlValue::integer(4)) }
+    else if same_group("DE") || same_group("KR") { Ok(PerlValue::integer(3)) }
     else { Ok(PerlValue::integer(-2)) }
 }
 
@@ -482,7 +482,7 @@ fn builtin_zscore_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // GO term enrichment p-value (one-sided hypergeometric)
 fn builtin_go_enrichment_p(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n_total = i1(args).max(1) as i64;
+    let n_total = i1(args).max(1);
     let k_success = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let n_draw = args.get(2).map(|v| v.to_number() as i64).unwrap_or(0);
     let k_obs = args.get(3).map(|v| v.to_number() as i64).unwrap_or(0);

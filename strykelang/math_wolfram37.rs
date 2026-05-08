@@ -1,4 +1,4 @@
-/// Batch 37 — algebraic topology, knot theory, lie algebras, representation theory.
+// Batch 37 — algebraic topology, knot theory, lie algebras, representation theory.
 
 /// Euler characteristic of a CW-complex from face counts (alternating sum)
 fn builtin_euler_char_complex(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -482,7 +482,7 @@ fn builtin_cartan_matrix_b2(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let i = i1(args);
     let j = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     let m = [[2_i64, -2], [-1, 2]];
-    if i >= 0 && i < 2 && j >= 0 && j < 2 {
+    if (0..2).contains(&i) && (0..2).contains(&j) {
         return Ok(PerlValue::integer(m[i as usize][j as usize]));
     }
     Ok(PerlValue::integer(0))
@@ -542,7 +542,7 @@ fn builtin_hall_inner_product_two(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_plactic_class_size(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let k = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
-    Ok(PerlValue::integer(k.pow(n.min(20).max(0) as u32)))
+    Ok(PerlValue::integer(k.pow(n.clamp(0, 20) as u32)))
 }
 
 /// RSK correspondence is a bijection S_n ↔ {(P, Q) standard Young tableaux of

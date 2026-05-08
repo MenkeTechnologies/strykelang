@@ -85,7 +85,7 @@ fn builtin_alt_az_to_ra_dec(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_precession_iau2006(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
-    let xi_a = 2.650545 + t * (2306.083227 + t * (0.298_8499 + t *
+    let xi_a = 2.650545 + t * (2306.083227 + t * (0.298_849_9 + t *
         (0.018_018_28 + t * (-0.000_005_971 + t * -0.000_000_316_5))));
     Ok(PerlValue::float(xi_a))
 }
@@ -95,8 +95,8 @@ fn builtin_precession_iau2006(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_nutation_iau2000a(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
-    let omega = (125.044_555 - 1934.136_261 * t).to_radians();
-    let l = (357.527_723_3 + 35999.050_34 * t).to_radians();
+    let omega = (125.044_555 - 1_934.136_261 * t).to_radians();
+    let l = (357.527_723_3 + 35_999.050_34 * t).to_radians();
     let lp = (134.962_981_4 + 477_198.867_4 * t).to_radians();
     let f = (93.271_910 + 483_202.017_5 * t).to_radians();
     let d = (297.850_363 + 445_267.111_5 * t).to_radians();
@@ -166,9 +166,9 @@ fn builtin_sun_distance_au(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_moon_position_low(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let jd = f1(args);
     let t = (jd - B55_J2000) / 36525.0;
-    let lp = 218.316 + 481_267.8813 * t;
-    let m = (134.963 + 477_198.8676 * t).to_radians();
-    let mp = (357.527 + 35999.050_3 * t).to_radians();
+    let lp = 218.316 + 481_267.881_3 * t;
+    let m = (134.963 + 477_198.867_6 * t).to_radians();
+    let mp = (357.527 + 35_999.050_3 * t).to_radians();
     let f = (93.272 + 483_202.017 * t).to_radians();
     let lambda = lp + 6.289 * m.sin() - 1.274 * (2.0 * f - m).sin()
         + 0.658 * (2.0 * f).sin() - 0.186 * mp.sin();
@@ -206,7 +206,7 @@ fn builtin_eclipse_magnitude(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// Saros cycle: one saros = 18.031 years ≈ 6585.32 days.
 fn builtin_saros_cycle(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let jd = f1(args);
-    let saros_days = 6585.321_347;
+    let saros_days = 6_585.321_347;
     Ok(PerlValue::integer(((jd - 2_018_999.0) / saros_days).floor() as i64))
 }
 
@@ -272,7 +272,7 @@ fn builtin_tisserand_param(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// TLE mean motion (rev/day) → semi-major axis (km). a = (mu / (n·2π/86400)²)^(1/3).
 fn builtin_tle_mean_motion(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n_rev_day = f1(args).max(1e-9);
-    let mu_km3_s2 = 398_600.4418_f64;
+    let mu_km3_s2 = 398_600.441_8_f64;
     let n_rad_s = n_rev_day * 2.0 * std::f64::consts::PI / 86400.0;
     Ok(PerlValue::float((mu_km3_s2 / (n_rad_s * n_rad_s)).cbrt()))
 }

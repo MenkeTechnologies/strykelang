@@ -849,7 +849,7 @@ fn builtin_nlp_bigbird_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// Routing attention: top-k routing of clusters. Cost ≈ N·c·d for c clusters.
 fn builtin_nlp_routing_attn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = f1(args);
-    let c = args.get(1).map(|v| v.to_number()).unwrap_or((n as f64).sqrt());
+    let c = args.get(1).map(|v| v.to_number()).unwrap_or(n.sqrt());
     let d = args.get(2).map(|v| v.to_number()).unwrap_or(64.0);
     Ok(PerlValue::float(n * c * d))
 }

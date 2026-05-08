@@ -207,7 +207,7 @@ fn builtin_brotli_distance_code_count(args: &[PerlValue]) -> PerlResult<PerlValu
 /// Zstandard window log size for level
 fn builtin_zstd_window_size_log(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let level = i1(args);
-    Ok(PerlValue::integer(15 + level.min(7).max(0)))
+    Ok(PerlValue::integer(15 + level.clamp(0, 7)))
 }
 
 /// MPEG quantization value: q · qmat[i,j]
@@ -826,6 +826,7 @@ fn builtin_sinkhorn_iteration_step(args: &[PerlValue]) -> PerlResult<PerlValue> 
 /// Sliced p-Wasserstein (Rabin et al. 2011): project both empirical measures
 /// onto L random unit directions θ_l, compute 1-D Wasserstein per slice (sort
 /// + |F⁻¹(u) − G⁻¹(u)|), average. SW_p(μ, ν) = (1/L · Σ_l W_p(θ_l#μ, θ_l#ν)^p)^(1/p).
+///
 /// Args: array of pre-projected slice distances [w₁, w₂, ..., w_L], p (default 1).
 fn builtin_sliced_wasserstein(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let slices = b40_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));

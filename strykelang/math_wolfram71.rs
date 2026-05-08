@@ -215,7 +215,7 @@ fn builtin_scard(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_sismember(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let s = b71_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     let needle = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::integer(if s.iter().any(|&x| x == needle) { 1 } else { 0 }))
+    Ok(PerlValue::integer(if s.contains(&needle) { 1 } else { 0 }))
 }
 
 /// SPOP — random member's index (deterministic given seed). Args: cardinality, seed.

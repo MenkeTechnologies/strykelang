@@ -215,9 +215,9 @@ fn builtin_idn_to_unicode(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_msgpack_pack_int(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args);
     let (prefix, size) = if (0..128).contains(&n) { (n as u8, 1) }
-        else if n >= 0 && n <= 0xFF { (0xCC, 2) }
-        else if n >= 0 && n <= 0xFFFF { (0xCD, 3) }
-        else if n >= 0 && n <= 0xFFFF_FFFF { (0xCE, 5) }
+        else if (0..=0xFF).contains(&n) { (0xCC, 2) }
+        else if (0..=0xFFFF).contains(&n) { (0xCD, 3) }
+        else if (0..=0xFFFF_FFFF).contains(&n) { (0xCE, 5) }
         else { (0xCF, 9) };
     Ok(PerlValue::integer((prefix as i64) * 100 + size))
 }

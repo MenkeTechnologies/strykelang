@@ -13,13 +13,13 @@ fn b69_ends_with(s: &[i64], suffix: &[i64]) -> bool {
 /// Returns code-points after step.
 fn builtin_porter_stem_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut s = b69_to_codepoints(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if b69_ends_with(&s, &[b's' as i64, b's' as i64, b'e' as i64, b's' as i64]) {
+    if b69_ends_with(&s, &[b's' as i64, b's' as i64, b'e' as i64, b's' as i64])
+        || b69_ends_with(&s, &[b'i' as i64, b'e' as i64, b's' as i64])
+    {
         s.truncate(s.len() - 2);
-    } else if b69_ends_with(&s, &[b'i' as i64, b'e' as i64, b's' as i64]) {
-        s.truncate(s.len() - 2);
-    } else if b69_ends_with(&s, &[b's' as i64, b's' as i64]) {
-        // unchanged
-    } else if b69_ends_with(&s, &[b's' as i64]) {
+    } else if !b69_ends_with(&s, &[b's' as i64, b's' as i64])
+        && b69_ends_with(&s, &[b's' as i64])
+    {
         s.pop();
     }
     Ok(PerlValue::array(s.into_iter().map(PerlValue::integer).collect()))
