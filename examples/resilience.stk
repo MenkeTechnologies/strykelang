@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Resilience and Instrumentation Demo
+# Demonstrates retry, bench, timer, and eval_timeout.
+
+# 1. Retry with backoff.
+p "--- Resilience: Retrying unstable operation ---"
+my $tries = 0
+eval {
+    retry {
+        $tries++
+        p "  Attempt $tries..."
+        die "Network error" if $tries < 3
+    } times => 3, backoff => linear, delay => 0.1
+}
+if ($@) { p "  Failed after 3 tries: $@" }
+else    { p "  Succeeded on attempt $tries" }
+
+# 2. Benchmarking.
+p "\n--- Performance: Benchmarking sort algorithms ---"
+my @large_data = map { rand(1000) } 1:5000
+
+my $report = bench {
+    my @sorted = sort { _0 <=> _1 } @large_data
+} 10
+
+p "Sort Benchmark (10 iterations): $report"
+
+# 3. Timeout Control.
+p "\n--- Control: Executing with timeout ---"
+eval {
+    eval_timeout 0.5 {
+        p "  Starting slow task..."
+        sleep 2
+        p "  This should NOT be printed"
+    }
+}
+if ($@ =~ /timeout/) {
+    p "  Task timed out as expected."
+}
+
+# 4. High-resolution timing.
+p "\n--- Instrumentation: Manual timing ---"
+my $start = now_ns()
+for (1:1_000_000) { my $x = _ * _ }
+my $end = now_ns()
+printf "  Million multiplications took %.4f ms\n", ($end - $start) / 1_000_000

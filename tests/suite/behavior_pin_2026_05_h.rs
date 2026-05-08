@@ -191,17 +191,20 @@ fn typed_param_with_bool_accepts_one_and_zero() {
     );
 }
 
-// ── ref() on stryke-native class instance is empty today ────────────────────
+// ── ref() on stryke-native class instance returns the class name (BUG-048 FIXED) ──
 
 #[test]
-fn ref_of_stryke_class_instance_is_empty_today() {
-    // BUG-048: `ref($obj)` for a stryke `class C { ... }` instance returns
-    // the empty string instead of the class name. `$obj->isa("C")` works.
+fn ref_of_stryke_class_instance_returns_class_name() {
+    // BUG-048 (now FIXED): `ref($obj)` for a stryke `class C { ... }`
+    // instance returned the empty string instead of the class name. The
+    // `ClassInst` arm was missing from `PerlValue::ref_type` — added it
+    // alongside the `StructInst` / `EnumInst` arms so `ref()` emits
+    // `def.name` for class instances too.
     let out = eval_string(
         r#"class C { v: Int = 0 } my $c = C(v => 5);
            ref($c) . "|" . ($c->isa("C") ? "Y" : "N")"#,
     );
-    assert_eq!(out, "|Y");
+    assert_eq!(out, "C|Y");
 }
 
 #[test]

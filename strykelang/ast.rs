@@ -602,6 +602,16 @@ impl PerlTypeName {
                     } else {
                         Err(format!("expected {}, got {}", name, c.def.name))
                     }
+                } else if let Some(b) = v.as_blessed_ref() {
+                    // Old-style `bless {...}, "Class"` — accept as the
+                    // nominal type if the class name matches. Lets typed-
+                    // my survive any escape hatch that reaches the value
+                    // through the Perl 5 OO path.
+                    if b.class == *name {
+                        Ok(())
+                    } else {
+                        Err(format!("expected {}, got {}", name, b.class))
+                    }
                 } else {
                     Err(format!("expected {}, got {}", name, v.type_name()))
                 }

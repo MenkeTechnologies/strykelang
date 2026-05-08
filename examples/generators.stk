@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Generators and Iterators Demo
+# Demonstrates gen, yield, and streaming pipelines
+
+print "--- Infinite Fibonacci Generator ---\n"
+
+my $fib_gen = gen {
+    mysync $fa = 0
+    mysync $fb = 1
+    while (1) {
+        yield $fa
+        my $tmp = $fa + $fb
+        $fa = $fb
+        $fb = $tmp
+    }
+}
+
+# Generators can yield multiple times manually
+my $step_gen = gen {
+    yield "Initializing...";
+    yield "Scanning...";
+    yield "Complete.";
+}
+
+for (1..3) {
+    my $res = $step_gen->next
+    print "  Step: ", $res->[0], "\n"
+}
+
+print "\n--- Lazy Streaming with Ranges ---\n"
+# Stryke ranges (1:100) and maps/greps/take support lazy streaming
+# This is often more robust than manual generators for simple sequences
+my @processed = (1:100 
+    |> maps { $_ * 2 } 
+    |> greps { $_ % 4 == 0 } 
+    |> take 5 
+    |> collect)
+
+print "First 5 multiples of 4 from lazy stream: ", join(", ", @processed), "\n"
+
+print "\n--- Manual Generator Control ---\n"
+my $simple = gen { yield "A"; yield "B" }
+
+while (1) {
+    my $res = $simple->next
+    last unless $res->[1] # [value, active]
+    print "  Next value: ", $res->[0], "\n"
+}

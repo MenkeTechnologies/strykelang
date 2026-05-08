@@ -2151,6 +2151,7 @@ impl PerlValue {
             HeapObject::SqliteConn(_) => PerlValue::string("SqliteConn".into()),
             HeapObject::StructInst(s) => PerlValue::string(s.def.name.clone()),
             HeapObject::EnumInst(e) => PerlValue::string(e.def.name.clone()),
+            HeapObject::ClassInst(c) => PerlValue::string(c.def.name.clone()),
             HeapObject::Bytes(_) => PerlValue::string("BYTES".into()),
             HeapObject::Blessed(b) => PerlValue::string(b.class.clone()),
             _ => PerlValue::string(String::new()),

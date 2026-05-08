@@ -1,0 +1,42 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Advanced Pipelines Demo
+# Demonstrates lazy evaluation, parallel pipelines, and complex chaining.
+
+print "--- Lazy Sequential Pipeline ---\n"
+my @data = 1:20
+
+# Pipeline is lazy: nothing happens until collect is called.
+my @processed = (@data |> pipeline)
+    ->filter(fn { _ % 2 == 0 })
+    ->map(fn { _ ** 2 })
+    ->take(5)
+    ->collect
+
+print "First 5 evens squared: ", join(", ", @processed), "\n"
+
+print "\n--- Parallel Pipeline ---\n"
+# par_pipeline runs stages in parallel across the thread pool.
+my @results = ((1:100) |> par_pipeline)
+    ->filter(fn { sleep 0.01; _ % 3 == 0 })
+    ->map(fn { sleep 0.01; _ * 10 })
+    ->take(10)
+    ->collect
+
+print "First 10 multiples of 3 times 10: ", join(", ", @results), "\n"
+
+print "\n--- Fused Map-Reduce ---\n"
+# Calculate sum of squares of numbers from 1 to 1000 in parallel.
+my $sum_squares = ((1:1000) |> pmap_reduce { _ * _ } { _0 + _1 })
+
+print "Sum of squares (1:1000): $sum_squares\n"
+
+print "\n--- Parallel Tree Reduce ---\n"
+# preduce uses a tree-based reduction for maximum parallelism.
+my $max_val = 1:1000
+    |> pmap { rand(1000) }
+    |> preduce { _0 > _1 ? _0 : _1 }
+
+printf "Max of 1000 random numbers: %.2f\n", $max_val

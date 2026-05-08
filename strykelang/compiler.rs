@@ -1640,6 +1640,41 @@ impl Compiler {
         }
     }
 
+    /// Emit the right `DeclareScalarTyped*` op for a `typed my $x : Ty`
+    /// declaration. Handles primitive types (Int/Str/Float/…) via the
+    /// 1-byte type encoding, and user-defined struct/class/enum types
+    /// via the name-pool encoding (`DeclareScalarTypedUser`).
+    fn emit_declare_scalar_typed(
+        &mut self,
+        name_idx: u16,
+        ty: &crate::ast::PerlTypeName,
+        line: usize,
+        frozen: bool,
+    ) {
+        let name = self.chunk.names[name_idx as usize].clone();
+        self.register_declare(Sigil::Scalar, &name, frozen);
+        if let Some(ty_byte) = ty.as_byte() {
+            if frozen {
+                self.chunk
+                    .emit(Op::DeclareScalarTypedFrozen(name_idx, ty_byte), line);
+            } else {
+                self.chunk
+                    .emit(Op::DeclareScalarTyped(name_idx, ty_byte), line);
+            }
+            return;
+        }
+        // User-defined type — encode the name through the name pool.
+        let (type_name, is_enum) = match ty {
+            crate::ast::PerlTypeName::Struct(n) => (n.clone(), false),
+            crate::ast::PerlTypeName::Enum(n) => (n.clone(), true),
+            _ => unreachable!("non-byte non-user type slipped past as_byte()"),
+        };
+        let type_name_idx = self.chunk.intern_name(&type_name);
+        let flag = (u8::from(frozen) << 1) | u8::from(is_enum);
+        self.chunk
+            .emit(Op::DeclareScalarTypedUser(name_idx, type_name_idx, flag), line);
+    }
+
     fn emit_declare_array(&mut self, name_idx: u16, line: usize, frozen: bool) {
         let name = self.chunk.names[name_idx as usize].clone();
         self.register_declare(Sigil::Array, &name, frozen);
@@ -1681,23 +1716,7 @@ impl Compiler {
                         if is_my {
                             let name_idx = self.chunk.intern_name(&decl.name);
                             if let Some(ref ty) = decl.type_annotation {
-                                let ty_byte = ty.as_byte().ok_or_else(|| {
-                                    CompileError::Unsupported(format!(
-                                        "typed my with struct type `{}`",
-                                        ty.display_name()
-                                    ))
-                                })?;
-                                let name = self.chunk.names[name_idx as usize].clone();
-                                self.register_declare(Sigil::Scalar, &name, frozen);
-                                if frozen {
-                                    self.chunk.emit(
-                                        Op::DeclareScalarTypedFrozen(name_idx, ty_byte),
-                                        line,
-                                    );
-                                } else {
-                                    self.chunk
-                                        .emit(Op::DeclareScalarTyped(name_idx, ty_byte), line);
-                                }
+                                self.emit_declare_scalar_typed(name_idx, ty, line, frozen);
                             } else {
                                 self.emit_declare_scalar(name_idx, line, frozen);
                             }
@@ -1746,23 +1765,7 @@ impl Compiler {
                         if is_my {
                             let name_idx = self.chunk.intern_name(&decl.name);
                             if let Some(ref ty) = decl.type_annotation {
-                                let ty_byte = ty.as_byte().ok_or_else(|| {
-                                    CompileError::Unsupported(format!(
-                                        "typed my with struct type `{}`",
-                                        ty.display_name()
-                                    ))
-                                })?;
-                                let name = self.chunk.names[name_idx as usize].clone();
-                                self.register_declare(Sigil::Scalar, &name, frozen);
-                                if frozen {
-                                    self.chunk.emit(
-                                        Op::DeclareScalarTypedFrozen(name_idx, ty_byte),
-                                        line,
-                                    );
-                                } else {
-                                    self.chunk
-                                        .emit(Op::DeclareScalarTyped(name_idx, ty_byte), line);
-                                }
+                                self.emit_declare_scalar_typed(name_idx, ty, line, frozen);
                             } else {
                                 self.emit_declare_scalar(name_idx, line, frozen);
                             }

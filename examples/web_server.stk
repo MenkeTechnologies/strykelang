@@ -1,0 +1,45 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Web Server Demo
+# Usage: s serve 8080 web_server.stk
+# Or just run it: s examples/web_server.stk (if it calls serve itself)
+
+# The handler function receives $req
+fn handler($req) {
+    my $path = $req->{path}
+    my $method = $req->{method}
+    
+    print "[LOG] $method $path from $req->{peer}\n"
+    
+    if ($path eq "/") {
+        return {
+            status => 200,
+            headers => { "Content-Type" => "text/html" },
+            body => "<h1>Welcome to Stryke</h1><p>Running on port $req->{port}</p><a href='/api/info'>View API Info</a>"
+        }
+    } elsif ($path eq "/api/info") {
+        my $info = +{
+            engine  => "Stryke",
+            version => "0.12.14",
+            uptime  => sys_uptime(),
+            cores   => pool_info()->{cpus},
+        }
+        return {
+            status => 200,
+            headers => { "Content-Type" => "application/json" },
+            body => to_json($info)
+        }
+    } else {
+        return undef # 404
+    }
+}
+
+# If we are running this script directly, we can start the server.
+# The `serve` builtin can be called from code.
+if ($0 eq __FILE__ || $0 =~ /web_server\.stk$/) {
+    my $port = $ARGV[0] // 8080
+    print "Starting Stryke server on port $port...\n"
+    serve($port, \&handler)
+}
