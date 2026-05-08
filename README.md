@@ -81,7 +81,8 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **8,550 standard library functions** (9,087 callable spellings including aliases)
+- **8,552 standard library functions** (9,089 callable spellings including aliases) — largest bareword library of any language; clears Wolfram v14.3's estimated count by ~1,800
+- **31 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
 

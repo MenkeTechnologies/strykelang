@@ -20,6 +20,33 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-119** — Serializers (`to_json`, `to_xml`, `to_yaml`, `to_toml`,
+  `to_html`, `ddump`) treated stryke `class` / `struct` / `enum`
+  instances as opaque scalars and emitted the receiver's `Display`
+  stringification (`"Outer(name => x, inner => Inner(v => 7))"`)
+  wrapped in the target format. Root cause: serializers worked off the
+  raw `PerlValue` tree without any recursive flatten step. Fix: new
+  `strykelang/serialize_normalize.rs` module exposes `deep_normalize`
+  — recursively converts ClassInstance / StructInstance / EnumInstance
+  / nested HashRef / ArrayRef into plain hashref/arrayref shapes the
+  existing serializer logic already handles. Hooked at the root of
+  `normalize_serialize_root` so every serializer benefits at once,
+  plus `builtin_ddump`. Inheritance fields resolve via a thread-local
+  `CLASS_DEFS_REGISTRY` populated from `VMHelper::execute` and each
+  `ClassDecl` statement. Companion: `$obj->to_hash_rec` (alias
+  `to_hash_deep`) gives users an explicit entry point for the same
+  flatten on struct and class instances.
+  Pin tests:
+  `to_hash_rec_flattens_nested_class_instances`,
+  `to_hash_rec_alias_to_hash_deep_is_equivalent`,
+  `to_hash_shallow_keeps_nested_class_instance`,
+  `to_hash_rec_walks_arrayref_of_classes`,
+  `to_hash_rec_works_for_struct_too`,
+  `to_json_recursive_on_nested_class`,
+  `to_json_recursive_on_struct`,
+  `ddump_recursive_returns_normalized_string`,
+  `to_yaml_recursive_on_class`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
 - **BUG-118** — `%$obj` (and `keys %$obj` / `values %$obj`) on a stryke
   `ClassInstance` regressed to "Can't dereference non-reference as hash"
   after BUG-114's fix turned class instances into real `ClassInstance`

@@ -69,6 +69,7 @@ pub mod rust_sugar;
 pub mod scope;
 pub mod script_cache;
 pub mod secrets;
+pub mod serialize_normalize;
 mod sort_fast;
 pub mod special_vars;
 pub mod static_analysis;

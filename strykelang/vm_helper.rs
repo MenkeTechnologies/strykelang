@@ -5967,6 +5967,12 @@ impl VMHelper {
     }
 
     pub fn execute(&mut self, program: &Program) -> PerlResult<PerlValue> {
+        // Snapshot the (possibly empty) class registry into the
+        // thread-local that the free-function serializers consult, so
+        // that `to_json($obj)` can resolve inheritance fields without
+        // taking a `&VMHelper`. Done unconditionally — cheap clone of
+        // an Arc<HashMap>-shaped structure.
+        crate::serialize_normalize::install_class_defs(self.class_defs.clone());
         // `-n`/`-p`: compile and run only the prelude, store chunk for per-line re-execution.
         if self.line_mode_skip_main {
             crate::compile_and_run_prelude(program, self)?;
@@ -7604,7 +7610,13 @@ impl VMHelper {
                         .collect();
                     self.scope.declare_array(&isa_key, parents);
                 }
-                self.class_defs.insert(def.name.clone(), Arc::new(def));
+                let arc_def = Arc::new(def);
+                self.class_defs
+                    .insert(arc_def.name.clone(), Arc::clone(&arc_def));
+                // Mirror the new class into the serializer-visible
+                // thread-local registry so `to_json($obj)` etc. can walk
+                // its inheritance chain.
+                crate::serialize_normalize::register_class_def(arc_def);
                 Ok(PerlValue::UNDEF)
             }
             StmtKind::TraitDecl { def } => {
