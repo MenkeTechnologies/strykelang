@@ -107,24 +107,15 @@ parity_test!(warn_literal, r#"warn "watch out""#);
 // SEMANTIC GAP: stryke `open` dies on failure; Perl returns false + sets $!.
 // Fixing this is a bigger change than a message tweak — see vm_helper
 // `open_builtin_execute`. Promote to assertive once fixed.
-parity_test!(
-    #[ignore = "TODO: open should return false + set $! on failure, not die"]
-    open_nonexistent,
-    r#"open my $f, "<", "/no/such/file/exists" or die $!"#
-);
+parity_test!(open_nonexistent, r#"open my $f, "<", "/no/such/file/exists" or die $!"#);
 
 // ── strict ───────────────────────────────────────────────────────────────
 // SEMANTIC GAP: strict-vars is a runtime check in stryke, a compile-time
 // check in perl — the latter appends "Execution of -e aborted due to
 // compilation errors." Fix by flagging these errors distinctly so
 // main.rs can append the trailing line.
+parity_test!(strict_undeclared_scalar, "use strict; $undef_var_parity_test_xyz");
 parity_test!(
-    #[ignore = "TODO: compile-time error should append `Execution of -e aborted...`"]
-    strict_undeclared_scalar,
-    "use strict; $undef_var_parity_test_xyz"
-);
-parity_test!(
-    #[ignore = "TODO: strict-refs message text differs from perl"]
     strict_symbolic_ref,
     r#"use strict 'refs'; my $name = "foo"; ${$name} = 1"#
 );
@@ -133,16 +124,5 @@ parity_test!(
 // SEMANTIC GAP: perl 5.24+ rejects `push SCALAR`; stryke silently accepts.
 // Needs a parser rule to reject non-array first arg of push (plus matching
 // "Execution of -e aborted..." trailing line).
-parity_test!(
-    #[ignore = "TODO: `push SCALAR` should be forbidden at parse time"]
-    push_to_scalar,
-    "my $s = 0; push $s, 1"
-);
-// SEMANTIC GAP: under no-strict, perl treats `@$s` where $s is a number
-// as a symbolic ref to `@{'42'}` and silently returns an empty array;
-// stryke errors. Minor but visible.
-parity_test!(
-    #[ignore = "TODO: `@$s` on non-ref should symbolic-deref under no-strict"]
-    deref_non_ref,
-    "my $s = 42; my @a = @$s"
-);
+parity_test!(push_to_scalar, "my $s = 0; push $s, 1");
+parity_test!(deref_non_ref, "my $s = 42; my @a = @$s");

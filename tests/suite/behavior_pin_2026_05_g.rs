@@ -234,19 +234,18 @@ fn caller_without_arg_returns_three_field_list() {
 #[test]
 fn backslash_at_prototype_does_not_auto_take_ref_today() {
     // BUG-041: `sub f (\@) { ... }` should auto-take `\@a` when called with
-    // `f(@a)`. Stryke passes the raw array elements instead.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(
+    // `f(@a)`. Stryke passes the raw array elements instead. With the perl-
+    // parity symbolic-deref-under-no-strict fix, `@{$_[0]}` on a number now
+    // yields an empty array (not a runtime error), so the broken sort
+    // returns "" instead of erroring — pin the silent-empty-output until
+    // the real prototype handling lands.
+    let v = eval_string(
         r#"sub sortme (\@) { sort @{$_[0]} }
            my @a = (3,1,2);
            my @r = sortme @a;
            "@r""#,
     );
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime error, got {:?}",
-        kind
-    );
+    assert_eq!(v, "");
 }
 
 // ── delete on slices ─────────────────────────────────────────────────────────
