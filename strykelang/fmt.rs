@@ -1154,6 +1154,28 @@ pub fn format_expr(e: &Expr) -> String {
                 None => base,
             }
         }
+        ExprKind::ParExpr { block, list } => format!(
+            "par {{ {} }} {}",
+            format_block_inline(block),
+            format_expr(list)
+        ),
+        ExprKind::ParReduceExpr {
+            extract_block,
+            reduce_block,
+            list,
+        } => match reduce_block {
+            Some(rb) => format!(
+                "par_reduce {{ {} }} {{ {} }} {}",
+                format_block_inline(extract_block),
+                format_block_inline(rb),
+                format_expr(list)
+            ),
+            None => format!(
+                "par_reduce {{ {} }} {}",
+                format_block_inline(extract_block),
+                format_expr(list)
+            ),
+        },
         ExprKind::PForExpr {
             block,
             list,

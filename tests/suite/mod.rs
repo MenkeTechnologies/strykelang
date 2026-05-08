@@ -88,6 +88,7 @@ mod new_builtins;
 mod no_interop;
 mod numeric_builtins;
 mod pack_unpack_runtime;
+mod par_chunk_macros;
 mod parallel;
 mod parse_accepts;
 mod parse_accepts_extra;

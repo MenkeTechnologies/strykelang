@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.13 · 8280 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.14 · 8282 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -169,7 +169,7 @@
       <ul class="chapter-index">
         <li><a href="#ch-parallel-primitives">Parallel Primitives</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">11</span></li>
-        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">7</span></li>
+        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">15</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
@@ -327,7 +327,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6685</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6687</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -632,7 +632,7 @@ my $both = $s-&gt;union(set(3, 4, 5))
     </section>
     <section class="tutorial-section" id="ch-pipeline-pipe-forward">
       <h2>Pipeline &amp; Pipe-Forward</h2>
-      <p class="chapter-meta">7 topics</p>
+      <p class="chapter-meta">15 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>|&gt;</code></h3>
         <p>Pipe-forward operator — threads LHS as first argument of RHS call.</p>
@@ -666,6 +666,51 @@ fn take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
 ~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
 </code></pre>
         <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>_</code> placeholder always takes precedence.</p>
+      </article>
+      <article class="doc-entry" id="doc-thread-stream">
+        <h3><a class="doc-anchor" href="#doc-thread-stream">#</a> <code>~s&gt;</code></h3>
+        <p>Per-item streaming thread macro — each stage runs as an independent worker thread connected to the next via a bounded channel, so items flow through the pipeline concurrently without materializing intermediate arrays.</p>
+        <pre><code class="lang-perl">~s&gt; [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 } # 5 items processed
+~s&gt; @lines map { json_decode } grep { _-&gt;{ok} } map { _-&gt;{val} }
+~s&gt; gen { yield_lines &quot;huge.log&quot; } map { parse } grep { /ERROR/ }
+</code></pre>
+        <p>Use <code>~s&gt;</code> when stages have differing latencies (e.g. I/O + CPU mix) so faster workers can pull ahead while slower ones are still processing earlier items. Output order is non-deterministic. Spellings: <code>~s&gt;</code>, <code>~s&gt;&gt;</code> (thread-last variant). The macro&#39;s final value is the count of items the last stage emitted.</p>
+      </article>
+      <article class="doc-entry" id="doc-thread-par">
+        <h3><a class="doc-anchor" href="#doc-thread-par">#</a> <code>~p&gt;</code></h3>
+        <p>Chunk-parallel thread macro — splits the input into chunks, runs the entire pipeline on each chunk in parallel via rayon, and auto-merges chunk results. Equivalent to <code>par_reduce { stage1 |&gt; stage2 |&gt; ... } SRC</code>.</p>
+        <pre><code class="lang-perl">~p&gt; c(&quot;**.rs&quot;) letters freq        # histogram of all letters across all .rs files
+~p&gt; @big_array map { _ * 2 } sum   # parallel map+sum
+~p&gt; $huge_string letters freq |then| values |&gt; sum    # switch back to sequential
+~p&gt; $huge_string letters freq ||&gt; values |&gt; sum       # same, terser boundary
+</code></pre>
+        <p>The auto-merger picks a strategy by inspecting the first chunk&#39;s result type: hash-of-numbers merges key-wise with <code>+</code> (canonical histogram), numeric scalars sum, arrays concat, strings concat. Use <code>par_reduce</code> directly for explicit control. The boundary markers <code>||&gt;</code> and <code>|then|</code> are aliases that switch from chunk-parallel back to sequential <code>~&gt;</code> mode for stages that operate on the merged whole. <code>|&gt;</code> also terminates the parallel section. Spellings: <code>~p&gt;</code>, <code>~p&gt;&gt;</code> (thread-last variant).</p>
+      </article>
+      <article class="doc-entry" id="doc-par-block">
+        <h3><a class="doc-anchor" href="#doc-par-block">#</a> <code>par { BLOCK }</code></h3>
+        <p>Generic parallel-chunk thread-stage — only valid inside <code>~&gt;</code>/<code>~&gt;&gt;</code>. Splits the threaded value into chunks, runs <code>BLOCK</code> on each chunk in parallel, and flattens the chunk outputs into a single list.</p>
+        <pre><code class="lang-perl">my @a = ~&gt; &quot;Hello, World 123&quot; par { letters }    # H e l l o W o r l d
+~&gt; @huge par { map { _ ** 2 } |&gt; sum } |&gt; sum p   # parallel sum-of-squares
+</code></pre>
+        <p>Each chunk gets a fresh sub-VM with the chunk bound to <code>_</code> and <code>$_[0]</code>. List-returning ops keep their values; the runtime auto-flattens. Use <code>par_reduce</code> when you need a final merge step rather than a flat concat.</p>
+      </article>
+      <article class="doc-entry" id="doc-par-reduce">
+        <h3><a class="doc-anchor" href="#doc-par-reduce">#</a> <code>par_reduce { extract } [ { merge } ]</code></h3>
+        <p>Chunk-extract-merge thread-stage. The single-block form runs <code>extract</code> per chunk and auto-merges results by type (hash<sub>num</sub>→key-wise add, number→sum, array→concat, string→concat). The two-block form binds <code>$a</code>/<code>$b</code> in the explicit reducer.</p>
+        <pre><code class="lang-perl">~&gt; &quot;abc def abc&quot; par_reduce { letters |&gt; freq }      # canonical histogram merge
+~&gt; @nums par_reduce { sum }                          # parallel sum
+~&gt; &quot;abcdefgh&quot; par_reduce { length(_) } { $a + $b }   # explicit pairwise reducer
+</code></pre>
+        <p>Below the chunk threshold the runtime falls back to single-chunk eval; the result must still match the bare extract block&#39;s output. Multi-chunk paths require the merger (auto or explicit) to be associative and commutative for correct results across non-deterministic chunk-completion orders.</p>
+      </article>
+      <article class="doc-entry" id="doc-par-then">
+        <h3><a class="doc-anchor" href="#doc-par-then">#</a> <code>||&gt;</code> / <code>|then|</code></h3>
+        <p>Boundary markers that terminate the chunk-parallel section of a <code>~p&gt;</code> macro and switch the merged result into a sequential <code>~&gt;</code> continuation. Both spellings are byte-equivalent — <code>||&gt;</code> is terse, <code>|then|</code> reads in English.</p>
+        <pre><code class="lang-perl">~p&gt; &quot;abc def abc&quot; letters freq ||&gt; values |&gt; sum     # 9
+~p&gt; &quot;abc def abc&quot; letters freq |then| values |&gt; sum  # 9
+~p&gt; @data map { _ * 2 } sum ||&gt; sqrt p                # parallel sum, sequential sqrt+print
+</code></pre>
+        <p>Use either marker when you need a post-merge stage that operates on the whole reduced value rather than per-chunk. Stages before the marker run chunked-and-merged; stages after run sequentially on the merged whole. <code>|&gt;</code> also terminates a <code>~p&gt;</code> macro and is the simplest exit when the next stage is just a single pipe-forward call.</p>
       </article>
       <article class="doc-entry" id="doc-pipeline">
         <h3><a class="doc-anchor" href="#doc-pipeline">#</a> <code>pipeline</code></h3>
@@ -11549,7 +11594,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6685 topics</p>
+      <p class="chapter-meta">6687 topics</p>
       <article class="doc-entry" id="doc-stryke-rust-compile">
         <h3><a class="doc-anchor" href="#doc-stryke-rust-compile">#</a> <code>__stryke_rust_compile</code></h3>
         <p><code>__stryke_rust_compile</code> — internal builtin.</p>
@@ -48463,6 +48508,22 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
         <pre><code class="lang-perl">my $result = pflt $x 
 # or in a pipeline:
 @list |&gt; map pflt |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pfreq">
+        <h3><a class="doc-anchor" href="#doc-pfreq">#</a> <code>pfreq</code></h3>
+        <p><code>pfreq</code> — pipeline / string helpers builtin. Alias for <code>pfrequencies</code>.</p>
+        <pre><code class="lang-perl">my $result = pfreq $x 
+# or in a pipeline:
+@list |&gt; map pfreq |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-pfrequencies">
+        <h3><a class="doc-anchor" href="#doc-pfrequencies">#</a> <code>pfrequencies</code></h3>
+        <p><code>pfrequencies</code> — pipeline / string helpers builtin.</p>
+        <pre><code class="lang-perl">my $result = pfrequencies $x 
+# or in a pipeline:
+@list |&gt; map pfrequencies |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pft">

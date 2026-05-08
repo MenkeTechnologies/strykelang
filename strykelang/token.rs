@@ -115,6 +115,22 @@ pub enum Token {
     ThreadArrow,
     /// `~>>` / `->>` — thread-last macro: injects as last arg
     ThreadArrowLast,
+    /// `~s>` — streaming thread-first. Per-stage semantics match `~>`
+    /// (insert threaded value as first arg / topic), but each stage runs
+    /// in its own worker connected by bounded channels — items flow one
+    /// at a time. Concurrent (per-item flow with backpressure), not
+    /// chunk-parallel.
+    ThreadArrowStream,
+    /// `~s>>` — streaming thread-last. Per-stage semantics match `~>>`
+    /// (insert threaded value as last arg).
+    ThreadArrowStreamLast,
+    /// `~p>` — parallel-chunk thread-first. Whole pipeline runs per chunk
+    /// in parallel, results auto-merged at end (sugar for
+    /// `par_reduce { stage1 |> stage2 |> ... } SOURCE`). `||>` or
+    /// `|then|` switch from parallel-chunk back to pipe-forward / `~>`.
+    ThreadArrowPar,
+    /// `~p>>` — parallel-chunk thread-last counterpart of `~p>`.
+    ThreadArrowParLast,
     /// Two-dot range / inclusive flip-flop (`..`).
     Range,
     /// Three-dot range / exclusive flip-flop (`...`); list expansion matches `..` (Perl).
@@ -176,6 +192,10 @@ impl Token {
                 | Token::FileTest(_)
                 | Token::ThreadArrow
                 | Token::ThreadArrowLast
+                | Token::ThreadArrowStream
+                | Token::ThreadArrowStreamLast
+                | Token::ThreadArrowPar
+                | Token::ThreadArrowParLast
         )
     }
 }
