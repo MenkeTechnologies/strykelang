@@ -29,6 +29,31 @@ type SharedHashEntry = (
     Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>,
 );
 
+/// `main` is the default package — `$main::X` ≡ `$X`, `@main::INC` ≡
+/// `@INC`, `%main::ENV` ≡ `%ENV`. Storage uses the bare key, so every
+/// scope getter has to short-circuit `main::name` (with no further
+/// `::`) through the unqualified lookup. Returns the bare suffix when
+/// the name has the exact `main::ident` shape; `None` otherwise (incl.
+/// `main::Pkg::name`, where `Pkg` is a real subpackage that must keep
+/// its qualified storage key).
+#[inline]
+pub(crate) fn strip_main_prefix(name: &str) -> Option<&str> {
+    let rest = name.strip_prefix("main::")?;
+    if rest.contains("::") {
+        return None;
+    }
+    Some(rest)
+}
+
+/// Canonicalize a `main::name` query into the bare `name` form.
+/// Shadow-binds `$name` so the rest of the function body operates on
+/// the canonical key. No allocation — the borrow is reused.
+macro_rules! canon_main {
+    ($name:ident) => {
+        let $name: &str = $crate::scope::strip_main_prefix($name).unwrap_or($name);
+    };
+}
+
 /// Arrays installed by [`crate::vm_helper::VMHelper::new`] on the outer frame. They must not be
 /// copied into [`Scope::capture`] / [`Scope::restore_capture`] for closures, or the restored copy
 /// would shadow the live handles (stale `@INC`, `%ENV`, topic `@_`, etc.).
@@ -187,6 +212,7 @@ impl Frame {
 
     #[inline]
     fn get_scalar(&self, name: &str) -> Option<&PerlValue> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if let Some(v) = self.get_scalar_from_slot(name) {
             return Some(v);
         }
@@ -197,6 +223,7 @@ impl Frame {
     /// hot compiled paths use `get_scalar_slot(idx)` directly.
     #[inline]
     fn get_scalar_from_slot(&self, name: &str) -> Option<&PerlValue> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
                 if n == name {
@@ -209,6 +236,7 @@ impl Frame {
 
     #[inline]
     fn has_scalar(&self, name: &str) -> bool {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if self
             .scalar_slot_names
             .iter()
@@ -221,6 +249,7 @@ impl Frame {
 
     #[inline]
     fn set_scalar(&mut self, name: &str, val: PerlValue) {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
                 if n == name {
@@ -258,6 +287,7 @@ impl Frame {
     /// scope's topic.
     #[inline]
     fn set_scalar_raw(&mut self, name: &str, val: PerlValue) {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for (i, sn) in self.scalar_slot_names.iter().enumerate() {
             if let Some(ref n) = sn {
                 if n == name {
@@ -277,6 +307,7 @@ impl Frame {
 
     #[inline]
     fn get_array(&self, name: &str) -> Option<&Vec<PerlValue>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             if let Some(ref v) = self.sub_underscore {
                 return Some(v);
@@ -287,6 +318,7 @@ impl Frame {
 
     #[inline]
     fn has_array(&self, name: &str) -> bool {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" && self.sub_underscore.is_some() {
             return true;
         }
@@ -296,6 +328,7 @@ impl Frame {
 
     #[inline]
     fn get_array_mut(&mut self, name: &str) -> Option<&mut Vec<PerlValue>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             return self.sub_underscore.as_mut();
         }
@@ -307,6 +340,7 @@ impl Frame {
 
     #[inline]
     fn set_array(&mut self, name: &str, val: Vec<PerlValue>) {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if name == "_" {
             if let Some(pos) = self.arrays.iter().position(|(k, _)| k == name) {
                 self.arrays.swap_remove(pos);
@@ -323,17 +357,20 @@ impl Frame {
 
     #[inline]
     fn get_hash(&self, name: &str) -> Option<&IndexMap<String, PerlValue>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         self.hashes.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
 
     #[inline]
     fn has_hash(&self, name: &str) -> bool {
+        let name = strip_main_prefix(name).unwrap_or(name);
         self.hashes.iter().any(|(k, _)| k == name)
             || self.shared_hashes.iter().any(|(k, _)| k == name)
     }
 
     #[inline]
     fn get_hash_mut(&mut self, name: &str) -> Option<&mut IndexMap<String, PerlValue>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         self.hashes
             .iter_mut()
             .find(|(k, _)| k == name)
@@ -342,6 +379,7 @@ impl Frame {
 
     #[inline]
     fn set_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        let name = strip_main_prefix(name).unwrap_or(name);
         if let Some(entry) = self.hashes.iter_mut().find(|(k, _)| k == name) {
             entry.1 = val;
         } else {
@@ -881,6 +919,7 @@ impl Scope {
         frozen: bool,
         ty: Option<PerlTypeName>,
     ) -> Result<(), PerlError> {
+        canon_main!(name);
         if let Some(ref t) = ty {
             t.check_value(&val)
                 .map_err(|msg| PerlError::type_error(format!("`${}`: {}", name, msg), 0))?;
@@ -957,6 +996,10 @@ impl Scope {
 
     #[inline]
     pub fn get_scalar(&self, name: &str) -> PerlValue {
+        // `$main::X` aliases the bare `$X` (default-package equivalence).
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.get_scalar(rest);
+        }
         for frame in self.frames.iter().rev() {
             if let Some(val) = frame.get_scalar(name) {
                 // Transparently unwrap Atomic — read through the lock
@@ -1034,6 +1077,7 @@ impl Scope {
     /// True if any frame has a lexical scalar binding for `name` (`my` / `our` / assignment).
     #[inline]
     pub fn scalar_binding_exists(&self, name: &str) -> bool {
+        canon_main!(name);
         for frame in self.frames.iter().rev() {
             if frame.has_scalar(name) {
                 return true;
@@ -1063,6 +1107,7 @@ impl Scope {
     /// True if any frame or atomic slot holds an array named `name`.
     #[inline]
     pub fn array_binding_exists(&self, name: &str) -> bool {
+        canon_main!(name);
         if self.find_atomic_array(name).is_some() {
             return true;
         }
@@ -1077,6 +1122,9 @@ impl Scope {
     /// True if any frame or atomic slot holds a hash named `name`.
     #[inline]
     pub fn hash_binding_exists(&self, name: &str) -> bool {
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.hash_binding_exists(rest);
+        }
         if self.find_atomic_hash(name).is_some() {
             return true;
         }
@@ -1092,6 +1140,9 @@ impl Scope {
     /// Used by scope.capture() to preserve the Arc for sharing across threads.
     #[inline]
     pub fn get_scalar_raw(&self, name: &str) -> PerlValue {
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.get_scalar_raw(rest);
+        }
         for frame in self.frames.iter().rev() {
             if let Some(val) = frame.get_scalar(name) {
                 return val.clone();
@@ -1168,6 +1219,7 @@ impl Scope {
         name: &str,
         rhs: &PerlValue,
     ) -> Result<PerlValue, PerlError> {
+        canon_main!(name);
         self.check_parallel_scalar_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if let Some(entry) = frame.scalars.iter_mut().find(|(k, _)| k == name) {
@@ -1201,6 +1253,9 @@ impl Scope {
 
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.set_scalar(&rest.to_string(), val);
+        }
         self.check_parallel_scalar_write(name)?;
         // Topic variants (`_`, `_<+`, `_N`, `_N<+`) are framework-managed
         // positional aliases. User assignments to them stay LOCAL to the
@@ -1457,6 +1512,7 @@ impl Scope {
     // ── Atomic array/hash declarations ──
 
     pub fn declare_atomic_array(&mut self, name: &str, val: Vec<PerlValue>) {
+        canon_main!(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
                 .atomic_arrays
@@ -1465,6 +1521,7 @@ impl Scope {
     }
 
     pub fn declare_atomic_hash(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        canon_main!(name);
         if let Some(frame) = self.frames.last_mut() {
             frame
                 .atomic_hashes
@@ -1474,6 +1531,7 @@ impl Scope {
 
     /// Find an atomic array by name (returns the Arc for sharing).
     fn find_atomic_array(&self, name: &str) -> Option<&AtomicArray> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(aa) = frame.atomic_arrays.iter().find(|(k, _)| k == name) {
                 return Some(&aa.1);
@@ -1484,6 +1542,7 @@ impl Scope {
 
     /// Find an atomic hash by name.
     fn find_atomic_hash(&self, name: &str) -> Option<&AtomicHash> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(ah) = frame.atomic_hashes.iter().find(|(k, _)| k == name) {
                 return Some(&ah.1);
@@ -1506,6 +1565,7 @@ impl Scope {
     }
 
     pub fn declare_array_frozen(&mut self, name: &str, val: Vec<PerlValue>, frozen: bool) {
+        canon_main!(name);
         // Package stash names (`Foo::BAR`) live in the outermost frame so nested blocks/subs
         // cannot shadow `@C::ISA` with an empty array (breaks inheritance / SUPER).
         let idx = if name.contains("::") {
@@ -1527,6 +1587,14 @@ impl Scope {
     }
 
     pub fn get_array(&self, name: &str) -> Vec<PerlValue> {
+        // `@main::X` aliases the bare `@X` because `main` is the default
+        // package — `@main::INC` ≡ `@INC`, `@main::ARGV` ≡ `@ARGV`,
+        // `@main::fpath` ≡ `@fpath`. The bare form is what's actually
+        // stored, so the qualified form has to short-circuit through
+        // the unqualified lookup.
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.get_array(rest);
+        }
         // Check atomic arrays first
         if let Some(aa) = self.find_atomic_array(name) {
             return aa.0.lock().clone();
@@ -1555,6 +1623,9 @@ impl Scope {
     /// Used to pass `@_` to [`crate::list_builtins::native_dispatch`] without cloning the vector.
     #[inline]
     pub fn get_array_borrow(&self, name: &str) -> Option<&[PerlValue]> {
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.get_array_borrow(rest);
+        }
         if self.find_atomic_array(name).is_some() {
             return None;
         }
@@ -1685,6 +1756,7 @@ impl Scope {
 
     /// Find the shared Arc for `@name`, if any.
     fn find_shared_array(&self, name: &str) -> Option<Arc<parking_lot::RwLock<Vec<PerlValue>>>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(entry) = frame.shared_arrays.iter().find(|(k, _)| k == name) {
                 return Some(Arc::clone(&entry.1));
@@ -1702,6 +1774,7 @@ impl Scope {
         &self,
         name: &str,
     ) -> Option<Arc<parking_lot::RwLock<IndexMap<String, PerlValue>>>> {
+        let name = strip_main_prefix(name).unwrap_or(name);
         for frame in self.frames.iter().rev() {
             if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
                 return Some(Arc::clone(&entry.1));
@@ -1848,6 +1921,7 @@ impl Scope {
 
     /// Get array length — works for both regular and atomic arrays.
     pub fn array_len(&self, name: &str) -> usize {
+        canon_main!(name);
         if let Some(aa) = self.find_atomic_array(name) {
             return aa.0.lock().len();
         }
@@ -1893,6 +1967,7 @@ impl Scope {
     /// Direct element access — works for both regular and atomic arrays.
     #[inline]
     pub fn get_array_element(&self, name: &str, index: i64) -> PerlValue {
+        canon_main!(name);
         if let Some(aa) = self.find_atomic_array(name) {
             let arr = aa.0.lock();
             let idx = if index < 0 {
@@ -1973,6 +2048,7 @@ impl Scope {
 
     /// Perl `exists $a[$i]` — true when the slot index is within the current array length.
     pub fn exists_array_element(&self, name: &str, index: i64) -> bool {
+        canon_main!(name);
         if let Some(aa) = self.find_atomic_array(name) {
             let arr = aa.0.lock();
             let idx = if index < 0 {
@@ -2038,6 +2114,7 @@ impl Scope {
         val: IndexMap<String, PerlValue>,
         frozen: bool,
     ) {
+        canon_main!(name);
         if let Some(frame) = self.frames.last_mut() {
             // Remove any existing shared Arc — re-declaration disconnects old refs.
             frame.shared_hashes.retain(|(k, _)| k != name);
@@ -2050,6 +2127,7 @@ impl Scope {
 
     /// Declare a hash in the bottom (global) frame, not the current lexical frame.
     pub fn declare_hash_global(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        canon_main!(name);
         if let Some(frame) = self.frames.first_mut() {
             frame.set_hash(name, val);
         }
@@ -2057,6 +2135,7 @@ impl Scope {
 
     /// Declare a frozen hash in the bottom (global) frame — prevents user reassignment.
     pub fn declare_hash_global_frozen(&mut self, name: &str, val: IndexMap<String, PerlValue>) {
+        canon_main!(name);
         if let Some(frame) = self.frames.first_mut() {
             frame.set_hash(name, val);
             frame.frozen_hashes.insert(name.to_string());
@@ -2065,15 +2144,21 @@ impl Scope {
 
     /// Returns `true` if a lexical (non-bottom) frame declares `%name`.
     pub fn has_lexical_hash(&self, name: &str) -> bool {
+        canon_main!(name);
         self.frames.iter().skip(1).any(|f| f.has_hash(name))
     }
 
     /// Returns `true` if ANY frame (including global) declares `%name`.
     pub fn any_frame_has_hash(&self, name: &str) -> bool {
+        canon_main!(name);
         self.frames.iter().any(|f| f.has_hash(name))
     }
 
     pub fn get_hash(&self, name: &str) -> IndexMap<String, PerlValue> {
+        // `%main::X` aliases the bare `%X` (default-package equivalence).
+        if let Some(rest) = strip_main_prefix(name) {
+            return self.get_hash(rest);
+        }
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().clone();
         }
@@ -2165,6 +2250,7 @@ impl Scope {
 
     #[inline]
     pub fn get_hash_element(&self, name: &str, key: &str) -> PerlValue {
+        canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().get(key).cloned().unwrap_or(PerlValue::UNDEF);
         }
@@ -2290,6 +2376,7 @@ impl Scope {
     }
 
     pub fn delete_hash_element(&mut self, name: &str, key: &str) -> Result<PerlValue, PerlError> {
+        canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             return Ok(ah.0.lock().shift_remove(key).unwrap_or(PerlValue::UNDEF));
         }
@@ -2299,6 +2386,7 @@ impl Scope {
 
     #[inline]
     pub fn exists_hash_element(&self, name: &str, key: &str) -> bool {
+        canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             return ah.0.lock().contains_key(key);
         }
@@ -2316,6 +2404,7 @@ impl Scope {
     /// allocates one `PerlValue::string` per key).
     #[inline]
     pub fn for_each_hash_value(&self, name: &str, mut visit: impl FnMut(&PerlValue)) {
+        canon_main!(name);
         if let Some(ah) = self.find_atomic_hash(name) {
             let g = ah.0.lock();
             for v in g.values() {

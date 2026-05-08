@@ -203,10 +203,10 @@ fn docs_toc_flag_exits_zero() {
 
 // ── No-args + non-interactive guards ────────────────────────────────────────
 
-/// `stryke docs` with no args and a piped stdin (i.e. AI-agent /
+/// `stryke docs` with no args and a piped stdin (i.e.
 /// CI-style invocation) dumps the intro page and exits 0 — never
 /// enters the TUI loop. Pinned because the regression that prompted
-/// BUG-112 broke this in three different shapes (gemini wrapper).
+/// BUG-112 broke this in three different shapes
 #[test]
 fn docs_no_args_with_piped_stdin_exits_zero() {
     let Some((rc, stdout, _)) = run_docs(&[]) else {
@@ -260,11 +260,9 @@ fn docs_with_generic_no_tty_env_exits_zero() {
     assert_eq!(out.status.code(), Some(0));
 }
 
-// ── Pipe to head (Gemini's original repro) ──────────────────────────────────
 
 /// `stryke docs pmap | head -3` emits the first three lines and exits
 /// cleanly — verifying the behavior the user originally hit when
-/// Gemini ran the command through a pipe wrapper.
 #[test]
 fn docs_pmap_pipes_to_head_cleanly() {
     let Some(bin) = stryke_binary() else {

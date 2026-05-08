@@ -2736,6 +2736,13 @@ impl VMHelper {
 
     #[inline]
     pub(crate) fn touch_env_hash(&mut self, hash_name: &str) {
+        // `%main::ENV` ≡ `%ENV`, `%main::parameters` ≡ `%parameters`,
+        // `%main::a` ≡ `%a`, etc. Strip the `main::` qualifier so the
+        // lazy-materialize / reflection-hash branches fire on the
+        // canonical bare name. Without this, `exists $main::ENV{PATH}`
+        // returns 0 on a fresh interpreter because ENV never gets
+        // materialized.
+        let hash_name: &str = crate::scope::strip_main_prefix(hash_name).unwrap_or(hash_name);
         if hash_name == "ENV" {
             self.materialize_env_if_needed();
         } else if hash_name == "parameters"

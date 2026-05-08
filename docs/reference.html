@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.17 · 8299 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.18 · 8309 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -327,7 +327,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6699</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6709</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -11595,7 +11595,99 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6699 topics</p>
+      <p class="chapter-meta">6709 topics</p>
+      <article class="doc-entry" id="doc-pc">
+        <h3><a class="doc-anchor" href="#doc-pc">#</a> <code>%pc</code></h3>
+        <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
+        <pre><code class="lang-perl">p pc        # 3.0856775814913673e16 m
+p pc / ly   # ~3.26 light years
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-aliases">
+        <h3><a class="doc-anchor" href="#doc-stryke-aliases">#</a> <code>%stryke::aliases</code></h3>
+        <p><code>%stryke::aliases</code> (short: <code>%a</code>) — alias spelling → canonical primary.</p>
+        <p>Keys are the 2nd-and-later names in each <code>try_builtin</code> match arm. For O(1) *reverse* lookup (primary → all its aliases), use <code>%stryke::primaries</code> / <code>%p</code>.</p>
+        <pre><code class="lang-perl">p $a{tj}                                  # &quot;to_json&quot;
+p $a{bn}                                  # &quot;basename&quot;
+p scalar keys %a                          # total alias count
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-all">
+        <h3><a class="doc-anchor" href="#doc-stryke-all">#</a> <code>%stryke::all</code></h3>
+        <p><code>%stryke::all</code> (short: <code>%all</code>) — every callable *spelling* (primaries <strong>and</strong> aliases) → category. Aliases inherit their primary&#39;s category.</p>
+        <p>Use <code>%all</code> when you want &quot;how many names can I type?&quot; or want to look up an alias&#39;s category without hopping through <code>%aliases</code>. Use <code>%builtins</code> when you want unique operations.</p>
+        <pre><code class="lang-perl">p scalar keys %all   # total callable-spellings count
+p $all{tj}           # &quot;serialization&quot;  (alias resolves via inheritance)
+p $all{to_json}      # &quot;serialization&quot;
+keys %all |&gt; pager   # browse every spelling
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-builtins">
+        <h3><a class="doc-anchor" href="#doc-stryke-builtins">#</a> <code>%stryke::builtins</code></h3>
+        <p><code>%stryke::builtins</code> (short: <code>%b</code>) — every <strong>primary</strong> callable name → its category. Primaries-only, so <code>scalar keys %b</code> is a clean unique-operation count. For the &quot;everything you can type&quot; view (primaries + aliases), use <code>%stryke::all</code> / <code>%all</code>.</p>
+        <pre><code class="lang-perl">p $b{pmap}               # &quot;parallel&quot;
+p $b{to_json}            # &quot;serialization&quot;
+p scalar keys %b         # unique-op count
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-categories">
+        <h3><a class="doc-anchor" href="#doc-stryke-categories">#</a> <code>%stryke::categories</code></h3>
+        <p><code>%stryke::categories</code> (short: <code>%c</code>) — category string → arrayref of names in that category.</p>
+        <p>Inverted index on <code>%builtins</code>. Gives O(1) reverse-lookup for &quot;list every op of kind X&quot; queries that would otherwise be O(n) <code>grep</code>s. Name lists are alphabetized.</p>
+        <pre><code class="lang-perl">$c{parallel} |&gt; e p                  # every parallel op
+p scalar @{ $c{parallel} }           # how many?
+p join &quot;, &quot;, @{ $c{&quot;array / list&quot;} } # joined roster
+keys %c |&gt; sort |&gt; p                 # all category names
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-descriptions">
+        <h3><a class="doc-anchor" href="#doc-stryke-descriptions">#</a> <code>%stryke::descriptions</code></h3>
+        <p><code>%stryke::descriptions</code> (short: <code>%d</code>) — name → one-line summary.</p>
+        <p>First sentence of each LSP hover doc (<code>doc_for_label_text</code>), harvested at build time. Sparse — only names that have a hover doc appear, so <code>exists $d{$name}</code> doubles as &quot;is this documented?&quot;.</p>
+        <pre><code class="lang-perl">p $d{pmap}                                # one-line summary
+p $d{to_json}                             # &quot;Serialize a PerlValue to a JSON string.&quot;
+p scalar keys %d                          # count of documented ops
+keys %d |&gt; grep { $d{_} =~ /parallel/i } |&gt; sort |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-extensions">
+        <h3><a class="doc-anchor" href="#doc-stryke-extensions">#</a> <code>%stryke::extensions</code></h3>
+        <p><code>%stryke::extensions</code> (short: <code>%e</code>) — stryke-only names, name → category.</p>
+        <p>Disjoint from <code>%perl_compats</code>. Everything <code>--compat</code> mode rejects at parse time, plus dispatch primaries like <code>basename</code>/<code>ddump</code> that are extensions at runtime even without a parser entry.</p>
+        <pre><code class="lang-perl">p $e{pmap}                                # &quot;parallel&quot;
+keys %e |&gt; grep /^p/ |&gt; sort |&gt; p         # every p* parallel op
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-perl-compats">
+        <h3><a class="doc-anchor" href="#doc-stryke-perl-compats">#</a> <code>%stryke::perl_compats</code></h3>
+        <p><code>%stryke::perl_compats</code> (short: <code>%pc</code>) — Perl 5 core names only, name → category.</p>
+        <p>Subset of <code>%builtins</code> restricted to names from <code>is_perl5_core</code>. Direct O(1) access for the &quot;show me just Perl core&quot; query.</p>
+        <pre><code class="lang-perl">p $pc{map}                    # &quot;array / list&quot;
+p scalar keys %pc             # core-only count
+keys %pc |&gt; sort |&gt; p         # enumerate every Perl core name
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-stryke-primaries">
+        <h3><a class="doc-anchor" href="#doc-stryke-primaries">#</a> <code>%stryke::primaries</code></h3>
+        <p><code>%stryke::primaries</code> (short: <code>%p</code>) — primary dispatcher name → arrayref of its aliases.</p>
+        <p>Inverted <code>%aliases</code>. Primaries with no aliases still have an entry (empty arrayref), so <code>exists $p{foo}</code> reliably answers &quot;is foo a dispatch primary?&quot; O(1).</p>
+        <pre><code class="lang-perl">$p{to_json} |&gt; e p              # [&quot;tj&quot;]
+p scalar @{ $p{basename} }      # how many aliases does basename have?
+# find every primary that has at least one alias:
+keys %p |&gt; grep { scalar @{$p{_}} } |&gt; sort |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-core">
+        <h3><a class="doc-anchor" href="#doc-core">#</a> <code>CORE</code></h3>
+        <p><code>CORE::</code> — pseudo-namespace alias for every dispatch primary. Every callable bare name is also reachable as <code>CORE::name</code>, with identical semantics. The prefix exists so user code that shadows a builtin (<code>fn print { ... }</code>) can still reach the original via <code>CORE::print(...)</code>.</p>
+        <p>The set is built dynamically: any name in <code>keys %stryke::builtins</code> is a valid <code>CORE::name</code>. There&#39;s no separate <code>%CORE::</code> table — it&#39;s a virtual namespace resolved at dispatch time.</p>
+        <pre><code class="lang-perl">fn print { my $x = shift; warn &quot;shadowed: $x&quot; }
+CORE::print &quot;this still works\n&quot;            # bypasses the user fn
+my $r = CORE::sum(1, 2, 3)                   # 6
+map { CORE::sprintf(&quot;%d&quot;, _) } @nums         # any builtin
+</code></pre>
+        <p>The <code>s docs CORE::name</code> form resolves to the bare-name page (the alias and primary share docs). Aliases (<code>tj</code>, <code>bn</code>, <code>e</code>, …) also support <code>CORE::tj</code> / <code>CORE::bn</code> / <code>CORE::e</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-core-pipe">
         <h3><a class="doc-anchor" href="#doc-core-pipe">#</a> <code>CORE::pipe</code></h3>
         <p>Create a unidirectional pipe, returning a pair of connected filehandles: one for reading and one for writing. Data written to the write end can be read from the read end, making pipes the fundamental building block for inter-process communication. Commonly used with <code>fork</code> so the parent and child can exchange data.</p>
@@ -39439,6 +39531,25 @@ p len(lsp_words)                                              # ~18,000 entries
 @list |&gt; map mahalanobis_1d |&gt; p
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-main">
+        <h3><a class="doc-anchor" href="#doc-main">#</a> <code>main</code></h3>
+        <p><code>main::</code> — the default package every script starts in. <code>our</code> variables and <code>fn</code> declarations without an explicit <code>package</code> directive land in <code>main::</code>; bare references like <code>$x</code> / <code>@a</code> / <code>%h</code> resolve to <code>$main::x</code> / <code>@main::a</code> / <code>%main::h</code> when looked up via the symbol table.</p>
+        <p>Use <code>main::</code> qualifier when you need to disambiguate inside a nested package, or when introspecting a script from a library context.</p>
+        <pre><code class="lang-perl">our $verbose = 1
+p $main::verbose                              # 1 — same scalar
+
+# Inside a class, the bare name resolves to the class — main:: gets you out:
+class Foo {
+    fn check { p $main::verbose }            # reads top-level our
+}
+
+# %main:: is the symbol-table stash. Lists every name declared
+# at the top level (subs, our, our @, our %).
+p scalar keys %main::                         # symbol-table size
+keys %main:: |&gt; sort |&gt; p                    # browse every top-level name
+</code></pre>
+        <p>Related namespaces: <code>CORE::</code> (every builtin), <code>stryke::</code> (reflection hashes — <code>%stryke::builtins</code> etc.), and <code>Pkg::</code> for any user-declared <code>package Pkg</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-main-sequence-lifetime">
         <h3><a class="doc-anchor" href="#doc-main-sequence-lifetime">#</a> <code>main_sequence_lifetime</code></h3>
         <p><code>main_sequence_lifetime</code> — batch 31 builtin.</p>
@@ -47738,13 +47849,6 @@ p page_size                              # 4096 (x86_64)
         <pre><code class="lang-perl">my $result = parse_int $x 
 # or in a pipeline:
 @list |&gt; map parse_int |&gt; p
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-parsec">
-        <h3><a class="doc-anchor" href="#doc-parsec">#</a> <code>parsec</code></h3>
-        <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
-        <pre><code class="lang-perl">p pc        # 3.0856775814913673e16 m
-p pc / ly   # ~3.26 light years
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-partial-pressure">

@@ -105,6 +105,28 @@ pub fn aliases_hash_map() -> indexmap::IndexMap<String, PerlValue> {
     m
 }
 
+/// Resolve an alias spelling to its primary dispatch name. Returns
+/// `None` if `name` is itself a primary (or unknown). Used by the
+/// `s docs <topic>` resolver so `s docs CORE::tj` finds `to_json`.
+pub fn primary_for_alias(name: &str) -> Option<&'static str> {
+    let primary_set: std::collections::HashSet<&'static str> =
+        CATEGORY_MAP.iter().map(|(n, _)| *n).collect();
+    if primary_set.contains(name) {
+        return None;
+    }
+    for arm in BUILTIN_ARMS {
+        let Some((primary, rest)) = arm.split_first() else {
+            continue;
+        };
+        for alias in rest {
+            if *alias == name {
+                return Some(primary);
+            }
+        }
+    }
+    None
+}
+
 /// `%perl_compats` — Perl 5 core name → category. Subset of `%builtins`
 /// restricted to names from `is_perl5_core`. Disjoint from `%extensions`.
 /// Direct access for the "show me just Perl core" query.
@@ -22806,6 +22828,30 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
 ///     — sigil-prefixed entries are inert there (never matched against
 ///     a bare-name lookup).
 ///   * The LSP completion provider uses every entry as a candidate.
+///
+/// Internal compiler-generated scratch names (`__foreach_list__`,
+/// `__foreach_i__`, `__pf_foreach_list__`, `__pf_foreach_i__`,
+/// `__list_assign_tmp__`, `__list_assign_swap__`, …) are interned into
+/// scope when the compiler emits postfix-foreach / list-assign / etc.,
+/// then leak through `refresh_parameters_hash`. Filter them so they
+/// never surface in `lsp_words` / completion / `s docs --list-all`.
+/// Perl-defined `__NAME__` tokens (`__FILE__`, `__LINE__`,
+/// `__PACKAGE__`, `__SUB__`, `__DATA__`, `__END__`) stay because
+/// they're user-facing.
+fn is_internal_scratch_name(name: &str) -> bool {
+    let bare = match name.as_bytes().first() {
+        Some(b'$') | Some(b'@') | Some(b'%') | Some(b'&') => &name[1..],
+        _ => name,
+    };
+    if matches!(
+        bare,
+        "__FILE__" | "__LINE__" | "__PACKAGE__" | "__SUB__" | "__DATA__" | "__END__"
+    ) {
+        return false;
+    }
+    bare.starts_with("__") && bare.ends_with("__") && bare.len() > 4
+}
+
 fn builtin_lsp_completion_words(
     interp: &mut VMHelper,
     _args: &[PerlValue],
@@ -22841,6 +22887,9 @@ fn builtin_lsp_completion_words(
     interp.refresh_parameters_hash();
     let params_snapshot = interp.scope.get_hash("parameters");
     for name in params_snapshot.keys() {
+        if is_internal_scratch_name(name) {
+            continue;
+        }
         set.insert(name.clone());
         // Also emit the `main::`-qualified spelling for every
         // unqualified binding so tab-complete on `$main::<TAB>` /
@@ -22879,6 +22928,11 @@ fn builtin_lsp_completion_words(
     // are reserved keywords that the parser handles directly and that
     // tab-complete should still suggest after the first character.
     const KEYWORDS: &[&str] = &[
+        // Pseudo-namespaces that have hand-written hover docs but
+        // aren't dispatch primaries. Including them as completion
+        // words makes `s docs CORE` / `s docs main` resolve.
+        "CORE",
+        "main",
         "fn",
         "match",
         "when",
@@ -22928,6 +22982,114 @@ fn builtin_lsp_completion_words(
     ];
     for k in KEYWORDS {
         set.insert((*k).to_string());
+    }
+
+    // Source 4: Perl special variables. These are documented punctuation
+    // names — the runtime may not have them in scope when `lsp_words`
+    // runs (e.g. no `<>` read yet, no eval error pending), so the scope
+    // walk above misses them. Hard-code the canonical list so LSP /
+    // REPL / `s docs --list-all` always offer them on `$<TAB>`.
+    const SPECIAL_VARS: &[&str] = &[
+        // Topic + match-related scalars
+        "$_",
+        "$&",
+        "$`",
+        "$'",
+        "$+",
+        "$^N",
+        "$^R",
+        // Regex captures (1..9 — beyond that users use @+ / @-)
+        "$1",
+        "$2",
+        "$3",
+        "$4",
+        "$5",
+        "$6",
+        "$7",
+        "$8",
+        "$9",
+        // I/O record / field / list separators
+        "$/",
+        "$\\",
+        "$,",
+        "$;",
+        "$\"",
+        "$.",
+        // Process / runtime state
+        "$0",
+        "$$",
+        "$!",
+        "$?",
+        "$@",
+        "$|",
+        "$<",
+        "$>",
+        "$(",
+        "$)",
+        // ^FOO control vars
+        "$^O",
+        "$^V",
+        "$^X",
+        "$^W",
+        "$^I",
+        "$^T",
+        "$^P",
+        "$^F",
+        "$^A",
+        "$^C",
+        "$^D",
+        "$^E",
+        "$^H",
+        "$^L",
+        "$^M",
+        "$^N",
+        "$^R",
+        "$^S",
+        // ARGV current-input scalar
+        "$ARGV",
+        // stryke version (mirrored from %stryke::VERSION)
+        "$stryke::VERSION",
+        // Punctuation arrays
+        "@_",
+        "@+",
+        "@-",
+        "@F",
+        "@ARGV",
+        "@INC",
+        "@ENV",
+        "@^CAPTURE",
+        "@^CAPTURE_ALL",
+        // Punctuation hashes
+        "%ENV",
+        "%SIG",
+        "%INC",
+        "%ENV",
+        "%^H",
+    ];
+    for v in SPECIAL_VARS {
+        set.insert((*v).to_string());
+        // Also emit `main::`-qualified spellings for the named ones so
+        // tab-complete on `$main::<TAB>` / `@main::<TAB>` / `%main::<TAB>`
+        // surfaces them too. Skip punctuation-only names (`$_`, `$/`,
+        // …) since `main::/` etc are not valid Perl spellings.
+        if v.len() <= 1 {
+            continue;
+        }
+        let (sigil, rest) = v.split_at(1);
+        if !matches!(sigil, "$" | "@" | "%") {
+            continue;
+        }
+        if rest.contains("::") {
+            continue;
+        }
+        if rest
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic() || c == '_')
+            .unwrap_or(false)
+        {
+            set.insert(format!("{sigil}main::{rest}"));
+        }
     }
 
     Ok(PerlValue::array(
