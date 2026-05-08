@@ -3496,48 +3496,98 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         N,
     } = theme;
 
-    // Build one doc page per primary in `%stryke::builtins` (CATEGORY_MAP)
-    // so `s docs --list` count matches `len(keys %b)` exactly. Pre-fix
-    // a dedup-by-text-pointer pass dropped ~288 primaries whenever a
-    // hand-written entry was shared (`"sum" | "sum0" => "..."` returns
-    // the same `&'static str` to both, so the second name was skipped).
-    // Auto-stubbed pages already get a unique pointer per name via
-    // `Box::leak` in `doc_text_for`.
+    // Build doc pages in `DOC_CATEGORIES` order so the book reads in the
+    // same sequence as `docs/reference.html` (which `gen_docs.rs` walks
+    // identically). The previous build walked `category_map_iter()` —
+    // alphabetical-by-name in `CATEGORY_MAP` — which interleaved
+    // chapters across the entire book, broke `[` / `]` chapter
+    // navigation (chapter changed on nearly every page boundary), and
+    // tagged each page with the `CATEGORY_MAP` source-comment label
+    // ("Base conversion", "Bit ops", …) that didn't match the
+    // intro/TOC chapter names from `DOC_CATEGORIES`.
     //
-    // Each primary's category is its `%b` value; uncategorized fallback
-    // is "Other".
+    // Three passes:
+    //   1. `DOC_CATEGORIES` — curated chapter order, topic order
+    //      preserved; the user-facing book sequence.
+    //   2. Every `CATEGORY_MAP` primary not yet placed → "Other", so
+    //      `s docs --list` count still equals `len(keys %b)`.
+    //   3. Hand-written hover entries (keywords, operators, sigil
+    //      reflection hashes) not yet placed → "Other".
+    //
+    // Dedup is by name only — auto-stubbed pages share `&'static str`
+    // pointers across aliases (`"sum" | "sum0" => "..."` returns the
+    // same str) but each primary still gets its own rendered page
+    // because `render_page_content` writes the topic name into the
+    // heading.
     let mut entries: Vec<(&str, &str, String)> = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for (name, category) in stryke::builtins::category_map_iter() {
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for &(chapter, topics) in stryke::lsp::DOC_CATEGORIES {
+        for &t in topics {
+            if !seen.insert(t) {
+                continue;
+            }
+            if let Some(text) = stryke::lsp::doc_text_for(t) {
+                let rendered = render_page_content(t, text, C, G, D, N);
+                entries.push((chapter, t, rendered));
+            }
+        }
+    }
+    // Group remaining primaries by their CATEGORY_MAP source-comment
+    // category so each chapter is a contiguous block — without this
+    // every leftover (~7800 entries) collapsed into a single giant
+    // "Other" chapter while DOC_CATEGORIES carried only ~855 hand-
+    // listed entries. CATEGORY_MAP is alphabetical-by-name, so the
+    // categories interleave; sort by (category, name) here to make
+    // every category a contiguous run.
+    //
+    // Empty / missing category strings keep the "Other" fallback so
+    // truly uncategorized primaries still have a home.
+    let mut leftover: Vec<(&'static str, &'static str)> = stryke::builtins::category_map_iter()
+        .filter(|(name, _)| !seen.contains(name))
+        .map(|(name, cat)| {
+            let chapter = if cat.is_empty() { "Other" } else { cat };
+            (chapter, name)
+        })
+        .collect();
+    leftover.sort_by(|a, b| a.0.cmp(b.0).then(a.1.cmp(b.1)));
+    for (chapter, name) in leftover {
+        if !seen.insert(name) {
+            continue;
+        }
         if let Some(text) = stryke::lsp::doc_text_for(name) {
-            let cat = if category.is_empty() {
-                "Other"
-            } else {
-                category
-            };
             let rendered = render_page_content(name, text, C, G, D, N);
-            entries.push((cat, name, rendered));
-            seen.insert(name);
+            entries.push((chapter, name, rendered));
         }
     }
     // Hand-written hover entries that aren't dispatch primaries — and
-    // ALSO aren't aliases (every alias resolves to a primary's page in
-    // pass 1). Keywords, operators, sigil-prefixed reflection hashes
-    // (`~>`, `match`, `%a`, …) are the only second-pass additions, so
-    // `--list` count matches `len(keys %b)` plus a small tail of
-    // hand-documented language constructs.
+    // ALSO aren't aliases (every alias resolves to a primary's page).
+    // Keywords, operators, sigil-prefixed reflection hashes (`~>`,
+    // `match`, `%a`, …) are the only third-pass additions.
     for topic in stryke::lsp::doc_topics() {
         if seen.contains(topic) {
             continue;
         }
         // Skip every callable spelling — primaries are already in
-        // pass 1, aliases share their primary's page.
+        // earlier passes, aliases share their primary's page.
         if stryke::builtins::is_callable_spelling(topic) {
+            continue;
+        }
+        // `CORE::name` / `main::name` qualified spellings are tab-
+        // complete sugar (every callable is reachable via either
+        // qualifier) and should NOT show up as separate browsing
+        // entries — `s docs --list` would otherwise be flooded with
+        // duplicates of every primary. They keep working as queries
+        // because the topic resolver strips the prefix; only the
+        // *list* stays clean. The bare `CORE` and `main` namespace
+        // pages still appear via the KEYWORDS list in
+        // `builtin_lsp_completion_words`.
+        if topic.starts_with("CORE::") || topic.starts_with("main::") {
             continue;
         }
         if let Some(text) = stryke::lsp::doc_text_for(topic) {
             let rendered = render_page_content(topic, text, C, G, D, N);
             entries.push(("Other", topic, rendered));
+            seen.insert(topic);
         }
     }
     if entries.is_empty() {
@@ -3550,9 +3600,20 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let content_area = term_height().saturating_sub(14).max(4);
     let mut pages = build_fixed_pages(&entries, content_area);
 
-    // Insert intro page at position 0
+    // Insert intro page at position 0. Chapter list / count are
+    // derived from the actual placed entries (preserves DOC_CATEGORIES
+    // order, drops chapters whose topics all lack hover text, and
+    // includes the trailing "Other" leftover chapter when present).
     let entry_count = entries.len();
-    let chapter_count = stryke::lsp::DOC_CATEGORIES.len();
+    let mut chapter_counts: Vec<(&str, usize)> = Vec::new();
+    for (cat, _, _) in &entries {
+        if let Some(slot) = chapter_counts.iter_mut().find(|(c, _)| *c == *cat) {
+            slot.1 += 1;
+        } else {
+            chapter_counts.push((*cat, 1));
+        }
+    }
+    let chapter_count = chapter_counts.len();
     let mut intro = format!(
         "\
   {D}>> THE STRYKE ENCYCLOPEDIA // INTERACTIVE REFERENCE SYSTEM <<{N}\n\
@@ -3577,16 +3638,42 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
   {D}── CHAPTERS ───────────────────────────────────────────────────{N}\n\
 "
     );
-    for (i, &(cat, topics)) in stryke::lsp::DOC_CATEGORIES.iter().enumerate() {
+    // Only the curated DOC_CATEGORIES chapters get listed on the intro
+    // page — leftover CATEGORY_MAP source-comment chapters (~320 small
+    // topical buckets) and the trailing "Other" hover-entry chapter
+    // would overflow any terminal. Their counts are summarized as one
+    // tail line; full breakdown lives in the TOC (`t`).
+    let major_chapters: std::collections::HashSet<&str> = stryke::lsp::DOC_CATEGORIES
+        .iter()
+        .map(|(c, _)| *c)
+        .collect();
+    let mut major_topics = 0usize;
+    let mut minor_topics = 0usize;
+    let mut minor_chapter_count = 0usize;
+    let mut display_idx = 0usize;
+    for (cat, count) in chapter_counts.iter() {
+        if major_chapters.contains(cat) {
+            display_idx += 1;
+            major_topics += count;
+            intro.push_str(&format!(
+                "  {C}{:>2}.{N} {B}{:<40}{N} {D}{} topics{N}\n",
+                display_idx, cat, count,
+            ));
+        } else {
+            minor_chapter_count += 1;
+            minor_topics += count;
+        }
+    }
+    if minor_chapter_count > 0 {
         intro.push_str(&format!(
-            "  {C}{:>2}.{N} {B}{:<32}{N} {D}{} topics{N}\n",
-            i + 1,
-            cat,
-            topics.len(),
+            "  {D}…{N}  {B}{:<40}{N} {D}{} topics{N}\n",
+            format!("+ {} more chapters", minor_chapter_count),
+            minor_topics,
         ));
     }
+    let _ = major_topics;
     intro.push_str(&format!(
-        "\n  {D}press {C}j{D} or {C}space{D} to begin >>>{N}\n"
+        "\n  {D}press {C}t{D} for full table of contents, {C}j{D} or {C}space{D} to begin >>>{N}\n"
     ));
     // Pad intro to content area height
     let intro_page = pad_to_height(&intro, content_area);
@@ -3612,7 +3699,8 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         println!("  {C}-h, --help{N}                          {D}// Show this help{N}");
         println!("  {C}-t, --toc{N}                           {D}// Table of contents{N}");
         println!("  {C}-s, --search <pattern>{N}              {D}// Search pages{N}");
-        println!("  {C}-l, --list{N}                          {D}// List all pages{N}");
+        println!("  {C}-l, --list{N}                          {D}// List all pages (one per primary + keywords){N}");
+        println!("  {C}-L, --list-all{N}                      {D}// Every callable spelling (primaries + aliases + CORE::*, main::*) — for shell tab-complete{N}");
         println!(
             "  {C}TOPIC{N}                               {D}// Jump to topic (stryke docs pmap){N}"
         );
@@ -3652,12 +3740,75 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         return 0;
     }
 
-    // --list: compact list
+    // --list: compact list of distinct topic *pages* (one entry per
+    // primary + a small "Other" tail of keywords / namespaces). What
+    // a human wants when browsing — no alias / qualifier noise.
     if args.first().map(|s| s.as_str()) == Some("-l")
         || args.first().map(|s| s.as_str()) == Some("--list")
     {
         for (i, (_, topic, _)) in entries.iter().enumerate() {
             println!("{:>3}. {}", i + 1, topic);
+        }
+        return 0;
+    }
+
+    // --list-all: every callable *spelling* the user might type after
+    // `s docs` — primaries + aliases + `CORE::name` / `main::name`
+    // qualified spellings + sigil-prefixed reflection hashes +
+    // language keywords. Drives zsh / bash tab-complete:
+    //
+    //     _stryke_docs() {
+    //         local -a t=(${(f)"$(s docs --list-all 2>/dev/null \
+    //             | sed 's/^ *[0-9]*\. //')"})
+    //         _describe 'docs topic' t
+    //     }
+    //
+    // Format matches `--list` (` N. name`) so existing completion
+    // shims keep working.
+    if args.first().map(|s| s.as_str()) == Some("--list-all")
+        || args.first().map(|s| s.as_str()) == Some("-L")
+    {
+        let mut all: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        // Every page topic from `--list` (primaries + keywords/Other).
+        for (_, topic, _) in &entries {
+            all.insert(topic.to_string());
+        }
+        // Every aliased callable (so `tj`, `bn`, etc. show up).
+        for (name, _) in stryke::builtins::category_map_iter() {
+            all.insert(name.to_string());
+        }
+        for entry in stryke::builtins::aliases_hash_map().keys() {
+            all.insert(entry.clone());
+        }
+        // CORE:: + main:: qualified spellings of every callable.
+        let bare_callables: Vec<String> = stryke::builtins::category_map_iter()
+            .map(|(n, _)| n.to_string())
+            .chain(
+                stryke::builtins::aliases_hash_map()
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+            .collect();
+        for n in &bare_callables {
+            all.insert(format!("CORE::{n}"));
+            all.insert(format!("main::{n}"));
+        }
+        // Sigil-prefixed reflection hashes / standard globals — every
+        // entry from `lsp_completion_words.txt` that starts with a
+        // sigil. Cheap: it's an `include_str!`'d static slice.
+        for line in include_str!("lsp_completion_words.txt").lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            // Sigil-prefixed entries and qualified entries (CORE::,
+            // main::, stryke::) flow through here unconditionally —
+            // they're all valid topic queries.
+            all.insert(line.to_string());
+        }
+        for (i, name) in all.iter().enumerate() {
+            println!("{:>5}. {}", i + 1, name);
         }
         return 0;
     }
@@ -3684,8 +3835,13 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         return 0;
     }
 
-    // Single topic or page number — find which page contains it
+    // Single topic or page number — find which page contains it.
+    // `topic_entry_idx` stays Some(idx) when the user named a specific
+    // builtin / keyword (so we render JUST that entry, `man pmap` style)
+    // and stays None when they passed a page number or no arg (in which
+    // case we render the full page for browsing).
     let mut start_page: usize = 0;
+    let mut topic_entry_idx: Option<usize> = None;
     if !args.is_empty() {
         let arg = &args[0];
         // Try page number
@@ -3694,15 +3850,85 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                 start_page = n - 1;
             }
         } else {
-            // Try topic name → find which page contains that entry
-            let lower = arg.to_lowercase();
+            // Try topic name → find which page contains that entry.
+            //
+            // Pseudo-namespace prefixes (`CORE::name`, `main::name`)
+            // are dispatch aliases — every callable bare name is also
+            // reachable as `CORE::name`, and every top-level binding
+            // resolves through `main::name`. Strip the prefix and look
+            // up the bare name's page so `s docs CORE::print` ≡
+            // `s docs print` and `s docs main::pmap` ≡ `s docs pmap`.
+            //
+            // The bare prefix itself (`CORE`, `main`, `stryke`) keeps
+            // its own dedicated namespace topic page via the hand-
+            // written hover entries in `lsp.rs`, so `s docs CORE`
+            // explains the namespace and `s docs CORE::print`
+            // navigates to `print`.
+            let resolved: String = if let Some(rest) = arg.strip_prefix("CORE::") {
+                rest.to_string()
+            } else if let Some(rest) = arg.strip_prefix("main::") {
+                rest.to_string()
+            } else if let Some(rest) = arg.strip_prefix("stryke::") {
+                // `stryke::builtins`, `stryke::all`, `stryke::aliases`,
+                // … all have hand-written hover entries under the
+                // sigil-prefixed `%stryke::NAME` spelling — that's the
+                // primary key. Try the sigil form first; only fall
+                // through to the bare name if the sigil form has no
+                // entry. Without the sigil-priority, `s docs
+                // stryke::all` mis-resolved to the `all` builtin (a
+                // separate primary that happens to share the suffix).
+                let sigil = format!("%stryke::{}", rest);
+                let sigil_low = sigil.to_lowercase();
+                if entries
+                    .iter()
+                    .any(|(_, t, _)| t.to_lowercase() == sigil_low)
+                {
+                    sigil
+                } else {
+                    rest.to_string()
+                }
+            } else {
+                arg.clone()
+            };
+            let lower = resolved.to_lowercase();
             let entry_idx = entries
                 .iter()
                 .position(|(_, t, _)| t.to_lowercase() == lower)
                 .or_else(|| {
+                    // Alias resolution: after `CORE::tj` strips to
+                    // `tj`, the bare alias isn't in `entries` (filtered
+                    // out as a callable spelling — its primary's page
+                    // is what users want). Look the alias up in
+                    // `%stryke::aliases` and try the primary.
+                    if let Some(primary) = stryke::builtins::primary_for_alias(&resolved) {
+                        let lp = primary.to_lowercase();
+                        if let Some(i) = entries.iter().position(|(_, t, _)| t.to_lowercase() == lp)
+                        {
+                            return Some(i);
+                        }
+                    }
+                    None
+                })
+                .or_else(|| {
+                    // Sigil-prefixed reflection-hash entries: `s docs
+                    // stryke::builtins` should resolve to the
+                    // `%stryke::builtins` page.
+                    let sigil_form = format!("%{}", resolved);
+                    let lp = sigil_form.to_lowercase();
+                    entries.iter().position(|(_, t, _)| t.to_lowercase() == lp)
+                })
+                .or_else(|| {
+                    // Substring fallback only when the query is
+                    // distinctive (≥ 3 chars) AND the topic STARTS
+                    // WITH the query. `contains` was too permissive —
+                    // `s docs CORE` matched `blosum45_score` because
+                    // "score" contains "core".
+                    if lower.len() < 3 {
+                        return None;
+                    }
                     entries
                         .iter()
-                        .position(|(_, t, _)| t.to_lowercase().contains(&lower))
+                        .position(|(_, t, _)| t.to_lowercase().starts_with(&lower))
                 });
             match entry_idx {
                 Some(eidx) => {
@@ -3711,6 +3937,7 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                         .iter()
                         .position(|(_, _, indices)| indices.contains(&eidx))
                         .unwrap_or(0);
+                    topic_entry_idx = Some(eidx);
                 }
                 None => {
                     eprintln!("stryke docs: no documentation for '{}'", arg);
@@ -3736,7 +3963,20 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let interactive_ok =
         !target_specified && io::stdout().is_terminal() && io::stdin().is_terminal() && !no_tty_env;
     if !interactive_ok {
-        print!("{}", pages[start_page].1);
+        // `man pmap` mode: when the user named a specific topic (via a
+        // bareword arg, NOT a page number), render only that entry's
+        // content. Otherwise (no arg, or numeric page number), render
+        // the full packed page so browsers see the planned layout.
+        if let Some(eidx) = topic_entry_idx {
+            print!("{}", entries[eidx].2);
+            // entries[*].2 doesn't always end with \n — make sure
+            // shell prompts land on their own line.
+            if !entries[eidx].2.ends_with('\n') {
+                println!();
+            }
+        } else {
+            print!("{}", pages[start_page].1);
+        }
         return 0;
     }
 
