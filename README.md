@@ -81,7 +81,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`src/vm.rs`, `src/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **8,552 standard library functions** (9,089 callable spellings including aliases) — largest bareword library of any language; clears Wolfram v14.3's estimated count by ~1,800
+- **8,587 standard library functions** (9,114 callable spellings including aliases) — largest bareword library of any language; clears Wolfram v14.3's estimated count by ~1,800
 - **31 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~3.6 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -216,6 +216,10 @@ stryke docs                                  # interactive reference book (vim-s
 stryke docs pmap                             # jump straight to a topic
 stryke docs --toc                            # table of contents
 stryke docs --search parallel                # search all pages
+stryke 'doctor'                               # runtime health check — version / flags / paths / toolchain
+stryke 'health'                               # alias for `doctor`
+stryke 'lsp_words |> ep'                      # dump every name LSP tab-complete knows about
+stryke 'p now'                                # current Unix-epoch seconds (alias of `time`)
 stryke serve                                # static file server for $PWD on port 8000
 stryke serve 8080 app.stk                   # HTTP server with handler script
 stryke serve 3000 -e '"hello " . $req->{path}'  # one-liner HTTP server

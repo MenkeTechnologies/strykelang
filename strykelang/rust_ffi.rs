@@ -6,8 +6,8 @@
 //!
 //! 1. Base64-decode the block body produced by [`crate::rust_sugar::desugar_rust_blocks`].
 //! 2. SHA-256 the body → `<hash>` cache key.
-//! 3. If `~/.cache/stryke/ffi/<hash>.(dylib|so)` exists, dlopen and register.
-//! 4. Otherwise: spit the body into `~/.cache/stryke/ffi/<hash>.rs` wrapped in a minimal
+//! 3. If `~/.stryke/ffi/<hash>.(dylib|so)` exists, dlopen and register.
+//! 4. Otherwise: spit the body into `~/.stryke/ffi/<hash>.rs` wrapped in a minimal
 //!    crate stub, invoke `rustc --crate-type=cdylib --edition=2021 -O`, then dlopen.
 //! 5. Scan the body source for `pub extern "C" fn NAME(args) -> ret` using a tiny tokenizer,
 //!    match each signature against the enumerated v1 table below, and register one entry
@@ -162,7 +162,7 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
     hasher.update(body.as_bytes());
     let hash = hex_short(&hasher.finalize());
 
-    // Cache dir: `~/.cache/stryke/ffi/<hash>.*`.
+    // Cache dir: `~/.stryke/ffi/<hash>.*`.
     let cache_dir = ffi_cache_dir().map_err(|e| PerlError::runtime(e, line))?;
     let lib_path = cache_dir.join(format!("lib{}{}", hash, dylib_ext()));
 
@@ -212,14 +212,19 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> PerlResult<()> {
 }
 
 fn ffi_cache_dir() -> Result<PathBuf, String> {
-    let base = if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
-        PathBuf::from(xdg)
+    // Stryke keeps every cache / store under a single `~/.stryke/`
+    // root (matches `~/.cargo/`, `~/.rustup/` style — not XDG / Library
+    // paths). Honors `$STRYKE_HOME` for callers that override the root.
+    // Pre-fix this used `~/.cache/stryke/ffi` via `XDG_CACHE_HOME`,
+    // splitting stryke state across two unrelated parents.
+    let base = if let Ok(home) = std::env::var("STRYKE_HOME") {
+        PathBuf::from(home)
     } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".cache")
+        PathBuf::from(home).join(".stryke")
     } else {
-        return Err("rust FFI: cannot locate cache directory (no $HOME)".to_string());
+        return Err("rust FFI: cannot locate stryke home (no $HOME)".to_string());
     };
-    let dir = base.join("stryke").join("ffi");
+    let dir = base.join("ffi");
     fs::create_dir_all(&dir)
         .map_err(|e| format!("rust FFI: create cache dir {}: {}", dir.display(), e))?;
     Ok(dir)

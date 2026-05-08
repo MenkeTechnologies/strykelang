@@ -1082,7 +1082,7 @@ pub enum ExprKind {
     /// pairwise across chunks instead of concatenated.
     ///
     /// - One block: auto-merger picks based on result type (number → `+`,
-    ///   hash<num> → key-wise `+`, array → concat, string → concat).
+    ///   `hash<num>` → key-wise `+`, array → concat, string → concat).
     /// - Two blocks: explicit pairwise reducer with `$a`/`$b`.
     ParReduceExpr {
         extract_block: Block,

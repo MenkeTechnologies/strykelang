@@ -715,7 +715,7 @@ fn builtin_os_namespace_isolation(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer((flags & ns_mask).count_ones() as i64))
 }
 
-/// cgroup v1 controller count from /sys/fs/cgroup/<ctl>/. The 12 standard v1
+/// cgroup v1 controller count from `/sys/fs/cgroup/<ctl>/`. The 12 standard v1
 /// controllers: cpu, cpuacct, cpuset, blkio, devices, freezer, hugetlb,
 /// memory, net_cls, net_prio, perf_event, pids. Args: bitmask of enabled.
 fn builtin_os_cgroup_v1_count(args: &[PerlValue]) -> PerlResult<PerlValue> {

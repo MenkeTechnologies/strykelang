@@ -22426,6 +22426,56 @@ fn builtin_quantile(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `quantiles \@DATA, \@PROBS` — batch quantile lookup. Returns a list with
 /// one element per probability in `\@PROBS`, computed via the same linear
+/// Best-effort recursive size of `path`. Returns 0 on any I/O error,
+/// caps the walk at ~250 entries so a runaway store doesn't make the
+/// `doctor` builtin slow.
+fn walk_size_bytes(path: &std::path::Path) -> Option<u64> {
+    let md = std::fs::metadata(path).ok()?;
+    if md.is_file() {
+        return Some(md.len());
+    }
+    let mut total = 0u64;
+    let mut visited = 0usize;
+    let mut stack = vec![path.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        if visited > 250 {
+            break;
+        }
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for ent in rd.flatten() {
+            visited += 1;
+            if visited > 250 {
+                break;
+            }
+            let Ok(m) = ent.metadata() else { continue };
+            if m.is_file() {
+                total += m.len();
+            } else if m.is_dir() {
+                stack.push(ent.path());
+            }
+        }
+    }
+    Some(total)
+}
+
+/// Human-readable bytes (KB/MB/GB) — for `doctor`'s path summary.
+fn human_bytes(n: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+    if n >= GB {
+        format!("{:.1} GB", n as f64 / GB as f64)
+    } else if n >= MB {
+        format!("{:.1} MB", n as f64 / MB as f64)
+    } else if n >= KB {
+        format!("{:.1} KB", n as f64 / KB as f64)
+    } else {
+        format!("{} B", n)
+    }
+}
+
 /// `doctor` / `health` — runtime diagnostics. Prints a colored
 /// report covering version, paths, runtime flags, environment overrides,
 /// builtin counts, worker-pool size, and toolchain availability. Returns
@@ -22554,22 +22604,59 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
     let rayon_threads = rayon::current_num_threads();
     out.push_str(&format!("  {c}rayon pool{n}          {g}{}{n}\n", rayon_threads));
 
-    // ── Cache & config dirs ─────────────────────────────────────
+    // ── Stryke home & cache dirs ────────────────────────────────
+    // Stryke uses a single `~/.stryke/` root for everything (matches
+    // `~/.cargo/`, `~/.rustup/` style — not XDG / Library paths).
+    // Honor `$STRYKE_HOME` if set (mirrors `pkg::store::Store::open`).
     out.push_str(&format!("\n{b}>>  paths{n}\n"));
-    let cache_dir = dirs::cache_dir()
-        .map(|p| p.join("stryke"))
+    let stryke_home = std::env::var("STRYKE_HOME")
+        .ok()
+        .map(std::path::PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|p| p.join(".stryke")))
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "<unavailable>".to_string());
-    let config_dir = dirs::config_dir()
-        .map(|p| p.join("stryke"))
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "<unavailable>".to_string());
+    let report_path = |p: &str| -> String {
+        let pb = std::path::PathBuf::from(p);
+        if pb.exists() {
+            let size = walk_size_bytes(&pb).unwrap_or(0);
+            format!("{} {d}({}){n}", p, human_bytes(size), d = d, n = n)
+        } else {
+            format!("{} {d}(missing){n}", p, d = d, n = n)
+        }
+    };
     let home = dirs::home_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "<unavailable>".to_string());
-    out.push_str(&format!("  {c}home{n}        {}\n", home));
-    out.push_str(&format!("  {c}cache{n}       {}\n", cache_dir));
-    out.push_str(&format!("  {c}config{n}      {}\n", config_dir));
+    out.push_str(&format!("  {c}$HOME{n}             {}\n", home));
+    out.push_str(&format!(
+        "  {c}stryke home{n}       {}\n",
+        report_path(&stryke_home)
+    ));
+    let scripts_cache = format!("{}/scripts.rkyv", stryke_home);
+    let store_dir = format!("{}/store", stryke_home);
+    let bin_dir = format!("{}/bin", stryke_home);
+    let history = format!("{}/history", stryke_home);
+    let ffi_cache = format!("{}/ffi", stryke_home);
+    out.push_str(&format!(
+        "  {c}bytecode cache{n}    {}\n",
+        report_path(&scripts_cache)
+    ));
+    out.push_str(&format!(
+        "  {c}package store{n}     {}\n",
+        report_path(&store_dir)
+    ));
+    out.push_str(&format!(
+        "  {c}global bin{n}        {}\n",
+        report_path(&bin_dir)
+    ));
+    out.push_str(&format!(
+        "  {c}repl history{n}      {}\n",
+        report_path(&history)
+    ));
+    out.push_str(&format!(
+        "  {c}rust FFI cache{n}    {}\n",
+        report_path(&ffi_cache)
+    ));
 
     // ── Toolchain detection (best-effort) ───────────────────────
     out.push_str(&format!("\n{b}>>  toolchain{n}\n"));
@@ -22626,9 +22713,9 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
         &mut warnings,
     ));
     out.push_str(&check(
-        "cache dir resolved",
-        !cache_dir.starts_with('<'),
-        &cache_dir,
+        "stryke home resolved",
+        !stryke_home.starts_with('<'),
+        &stryke_home,
         &mut warnings,
     ));
     let categorized = CATEGORY_MAP
@@ -22706,14 +22793,20 @@ fn builtin_lsp_completion_words(
         set.insert((*n).to_string());
     }
 
-    // Source 2: every sigil-prefixed binding that's live in the current
-    // scope at call time — `%a`, `%all`, `%b`, `%parameters`, `@ARGV`,
-    // `@INC`, `@fpath`, `@path`, `$_`, `$stryke::VERSION`, etc. Read
-    // through the same `parameters_pairs()` walker that backs the
-    // live `%parameters` reflection hash, so any future shared global
-    // (zsh-style or otherwise) auto-flows into the completion list
-    // without a hardcoded update.
-    for (name, _kind) in interp.scope.parameters_pairs() {
+    // Source 2: every sigil-prefixed binding the runtime knows about —
+    // `%a`, `%all`, `%b`, `%parameters`, `@ARGV`, `@INC`, `@fpath`,
+    // `@path`, `$_`, `$stryke::VERSION`, etc.
+    //
+    // The reflection hashes (`%a`/`%b`/`%c`/…/`%stryke::*`) are lazily
+    // installed on first access to keep cold-start under 4 ms. We have
+    // to force that lazy init *before* refreshing `%parameters`, or
+    // the snapshot misses every reflection hash on a script that
+    // never read them. Then `refresh_parameters_hash` walks the now-
+    // complete scope and rebuilds the materialized table.
+    interp.ensure_reflection_hashes();
+    interp.refresh_parameters_hash();
+    let params_snapshot = interp.scope.get_hash("parameters");
+    for name in params_snapshot.keys() {
         set.insert(name.clone());
         // Also emit the `main::`-qualified spelling for every
         // unqualified binding so tab-complete on `$main::<TAB>` /
