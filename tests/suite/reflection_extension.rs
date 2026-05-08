@@ -58,7 +58,10 @@ fn all_aliases_inherit_primary_category() {
 /// Short alias `%all` mirrors `%stryke::all` (both bind the same map).
 #[test]
 fn all_short_alias_mirrors_long_name() {
-    assert_eq!(eval_string(r#"$all{pmap}"#), eval_string(r#"$stryke::all{pmap}"#),);
+    assert_eq!(
+        eval_string(r#"$all{pmap}"#),
+        eval_string(r#"$stryke::all{pmap}"#),
+    );
     assert_eq!(eval_int(r#"len(keys %all) - len(keys %stryke::all)"#), 0);
 }
 
@@ -86,12 +89,19 @@ fn all_keys_are_clean_bare_names() {
 /// appear there at startup.
 #[test]
 fn parameters_lists_reflection_hashes() {
-    for hname in ["%a", "%b", "%c", "%d", "%e", "%p", "%pc", "%all", "%parameters"] {
+    for hname in [
+        "%a",
+        "%b",
+        "%c",
+        "%d",
+        "%e",
+        "%p",
+        "%pc",
+        "%all",
+        "%parameters",
+    ] {
         let exists = eval_int(&format!(r#"exists $parameters{{ q({}) }} ? 1 : 0"#, hname));
-        assert_eq!(
-            exists, 1,
-            "%parameters should list reflection hash {hname}"
-        );
+        assert_eq!(exists, 1, "%parameters should list reflection hash {hname}");
     }
 }
 
@@ -157,10 +167,40 @@ fn lsp_words_covers_every_callable_in_all() {
 #[test]
 fn lsp_words_includes_list_builtins() {
     for n in [
-        "sum", "sum0", "min", "max", "minstr", "maxstr", "mean", "median", "stddev", "variance",
-        "pairs", "unpairs", "pairkeys", "pairvalues", "pairmap", "pairgrep", "pairfirst",
-        "blessed", "refaddr", "reftype", "weaken", "isweak", "uniq", "uniqstr", "uniqint",
-        "uniqnum", "shuffle", "sample", "chunked", "windowed", "head", "tail", "take", "drop",
+        "sum",
+        "sum0",
+        "min",
+        "max",
+        "minstr",
+        "maxstr",
+        "mean",
+        "median",
+        "stddev",
+        "variance",
+        "pairs",
+        "unpairs",
+        "pairkeys",
+        "pairvalues",
+        "pairmap",
+        "pairgrep",
+        "pairfirst",
+        "blessed",
+        "refaddr",
+        "reftype",
+        "weaken",
+        "isweak",
+        "uniq",
+        "uniqstr",
+        "uniqint",
+        "uniqnum",
+        "shuffle",
+        "sample",
+        "chunked",
+        "windowed",
+        "head",
+        "tail",
+        "take",
+        "drop",
     ] {
         let present = eval_int(&format!(
             r#"
@@ -176,7 +216,18 @@ fn lsp_words_includes_list_builtins() {
 /// `keys %<TAB>` tab-completes.
 #[test]
 fn lsp_words_includes_sigil_prefixed_reflection_hashes() {
-    for n in ["%a", "%b", "%c", "%d", "%e", "%p", "%pc", "%all", "%parameters", "%ENV"] {
+    for n in [
+        "%a",
+        "%b",
+        "%c",
+        "%d",
+        "%e",
+        "%p",
+        "%pc",
+        "%all",
+        "%parameters",
+        "%ENV",
+    ] {
         let present = eval_int(&format!(
             r#"
             my @w = lsp_words;
@@ -194,7 +245,13 @@ fn lsp_words_includes_sigil_prefixed_reflection_hashes() {
 /// on `CORE::<TAB>` needs to surface them.
 #[test]
 fn lsp_words_includes_core_prefixed_spellings() {
-    for n in ["CORE::print", "CORE::sprintf", "CORE::sum", "CORE::map", "CORE::grep"] {
+    for n in [
+        "CORE::print",
+        "CORE::sprintf",
+        "CORE::sum",
+        "CORE::map",
+        "CORE::grep",
+    ] {
         let present = eval_int(&format!(
             r#"
             my %w = map {{ $_ => 1 }} lsp_words;
@@ -324,10 +381,14 @@ fn lsp_words_covers_on_disk_snapshot() {
 /// dispatch arm breaks the test loudly.
 #[test]
 fn recently_added_builtins_present_everywhere() {
-    for n in ["doctor", "health", "lsp_words", "lsp_completion_words", "quantiles"] {
-        let in_all = eval_int(&format!(
-            r#"exists $stryke::all{{ q({n}) }} ? 1 : 0"#
-        ));
+    for n in [
+        "doctor",
+        "health",
+        "lsp_words",
+        "lsp_completion_words",
+        "quantiles",
+    ] {
+        let in_all = eval_int(&format!(r#"exists $stryke::all{{ q({n}) }} ? 1 : 0"#));
         assert_eq!(in_all, 1, "{n} missing from %stryke::all");
         let in_lsp = eval_int(&format!(
             r#"

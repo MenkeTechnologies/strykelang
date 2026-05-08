@@ -32,7 +32,9 @@ thread_local! {
 /// Replace this thread's class registry with `defs`. Returns the
 /// previous registry so callers can restore it on exit (RAII pattern is
 /// preferred — see [`ClassDefsGuard`]).
-pub(crate) fn install_class_defs(defs: HashMap<String, Arc<ClassDef>>) -> HashMap<String, Arc<ClassDef>> {
+pub(crate) fn install_class_defs(
+    defs: HashMap<String, Arc<ClassDef>>,
+) -> HashMap<String, Arc<ClassDef>> {
     CLASS_DEFS_REGISTRY.with(|cell| std::mem::replace(&mut *cell.borrow_mut(), defs))
 }
 
@@ -52,7 +54,8 @@ pub(crate) fn register_class_def(def: Arc<ClassDef>) {
 fn class_field_names(def: &ClassDef) -> Vec<String> {
     let mut names = Vec::new();
     for parent_name in &def.extends {
-        let parent_def_opt = CLASS_DEFS_REGISTRY.with(|cell| cell.borrow().get(parent_name).cloned());
+        let parent_def_opt =
+            CLASS_DEFS_REGISTRY.with(|cell| cell.borrow().get(parent_name).cloned());
         if let Some(parent_def) = parent_def_opt {
             names.extend(class_field_names(&parent_def));
         }

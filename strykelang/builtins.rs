@@ -62,6 +62,22 @@ pub fn builtins_hash_map() -> indexmap::IndexMap<String, PerlValue> {
         .collect()
 }
 
+/// Public `(name, category)` iterator over every dispatch primary.
+/// Mirrors `keys %stryke::builtins` / `keys %b` exactly; used by the
+/// `stryke docs` subcommand to build one doc page per primary so
+/// `s docs --list` count == `len(keys %b)`.
+pub fn category_map_iter() -> impl Iterator<Item = (&'static str, &'static str)> {
+    CATEGORY_MAP.iter().map(|&(n, c)| (n, c))
+}
+
+/// True if `name` is a callable spelling — primary OR alias — in `%all`.
+/// Lets the docs subcommand skip alias spellings on its second-pass
+/// "documented topics" sweep so `--list` doesn't double-count
+/// primary+alias pairs.
+pub fn is_callable_spelling(name: &str) -> bool {
+    ALL_CATEGORY_MAP.iter().any(|(n, _)| *n == name)
+}
+
 /// `%aliases` — alias name → primary dispatcher name (e.g. `tj` → `to_json`).
 /// Source: 2nd+ names in each `try_builtin` match arm.
 ///
@@ -22533,8 +22549,17 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
 
     // ── Runtime flags ───────────────────────────────────────────
     out.push_str(&format!("\n{b}>>  runtime flags{n}\n"));
-    let yn = |v: bool| if v { format!("{g}on{n}") } else { format!("{d}off{n}") };
-    out.push_str(&format!("  {c}--compat{n}            {}\n", yn(crate::compat_mode())));
+    let yn = |v: bool| {
+        if v {
+            format!("{g}on{n}")
+        } else {
+            format!("{d}off{n}")
+        }
+    };
+    out.push_str(&format!(
+        "  {c}--compat{n}            {}\n",
+        yn(crate::compat_mode())
+    ));
     out.push_str(&format!(
         "  {c}--no-interop{n}        {}\n",
         yn(crate::no_interop_mode())
@@ -22583,13 +22608,19 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
         }
         seen.len()
     };
-    out.push_str(&format!("  {c}primaries{n}           {g}{}{n}\n", primaries));
+    out.push_str(&format!(
+        "  {c}primaries{n}           {g}{}{n}\n",
+        primaries
+    ));
     out.push_str(&format!("  {c}aliases{n}             {g}{}{n}\n", aliases));
     out.push_str(&format!(
         "  {c}all spellings (%all){n} {g}{}{n}\n",
         all_spellings
     ));
-    out.push_str(&format!("  {c}categories{n}          {g}{}{n}\n", categories));
+    out.push_str(&format!(
+        "  {c}categories{n}          {g}{}{n}\n",
+        categories
+    ));
     out.push_str(&format!(
         "  {c}list builtins{n}       {g}{}{n}\n",
         crate::list_builtins::LIST_BUILTIN_NAMES.len()
@@ -22602,7 +22633,10 @@ fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<Perl
         .unwrap_or(1);
     out.push_str(&format!("  {c}logical cpus{n}        {g}{}{n}\n", n_cpus));
     let rayon_threads = rayon::current_num_threads();
-    out.push_str(&format!("  {c}rayon pool{n}          {g}{}{n}\n", rayon_threads));
+    out.push_str(&format!(
+        "  {c}rayon pool{n}          {g}{}{n}\n",
+        rayon_threads
+    ));
 
     // ── Stryke home & cache dirs ────────────────────────────────
     // Stryke uses a single `~/.stryke/` root for everything (matches

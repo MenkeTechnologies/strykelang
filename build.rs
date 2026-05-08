@@ -35,7 +35,8 @@ fn main() {
     // `is_perl5_core` uses `matches!(name, …)` (parens), `stryke_extension_name`
     // uses `match name { … }` (braces). Different block markers per fn.
     let core_cats = extract_categorized_names(&parser_src, "fn is_perl5_core", "matches!");
-    let mut ext_cats = extract_categorized_names(&parser_src, "fn stryke_extension_name", "match name");
+    let mut ext_cats =
+        extract_categorized_names(&parser_src, "fn stryke_extension_name", "match name");
     // List builtins are dispatched via `list_builtins::dispatch_by_name`,
     // not the main `try_builtin` arms — so build.rs has to scan them
     // separately or `%b` / `%all` won't list `sum` / `min` / `max` /

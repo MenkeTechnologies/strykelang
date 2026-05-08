@@ -18,7 +18,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
     if Command::new("perl").arg("-e").arg("1").output().is_err() {
         return None;
     }
-    let stryke = pe_binary()?;
+    let stryke = stryke_binary()?;
 
     let perl_err = Command::new("perl")
         .arg("-e")
@@ -36,7 +36,7 @@ fn run_both(code: &str) -> Option<(String, String)> {
     Some((normalize(&perl_err), normalize(&pe_err)))
 }
 
-fn pe_binary() -> Option<PathBuf> {
+fn stryke_binary() -> Option<PathBuf> {
     // Prefer release (what the user actually ships), fall back to debug.
     for candidate in ["target/release/stryke", "target/debug/stryke"] {
         let p = PathBuf::from(candidate);

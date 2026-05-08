@@ -3496,35 +3496,46 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         N,
     } = theme;
 
-    // Build topic entries from categorized list, then pick up any uncategorized leftovers.
-    // Deduplicate aliases that map to the same doc text (e.g. thread/t, hmac/hmac_sha256).
+    // Build one doc page per primary in `%stryke::builtins` (CATEGORY_MAP)
+    // so `s docs --list` count matches `len(keys %b)` exactly. Pre-fix
+    // a dedup-by-text-pointer pass dropped ~288 primaries whenever a
+    // hand-written entry was shared (`"sum" | "sum0" => "..."` returns
+    // the same `&'static str` to both, so the second name was skipped).
+    // Auto-stubbed pages already get a unique pointer per name via
+    // `Box::leak` in `doc_text_for`.
+    //
+    // Each primary's category is its `%b` value; uncategorized fallback
+    // is "Other".
     let mut entries: Vec<(&str, &str, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    let mut seen_text_ptrs = std::collections::HashSet::new();
-    for &(category, topics) in stryke::lsp::DOC_CATEGORIES {
-        for &topic in topics {
-            if let Some(text) = stryke::lsp::doc_text_for(topic) {
-                let ptr = text.as_ptr() as usize;
-                if !seen_text_ptrs.insert(ptr) {
-                    seen.insert(topic);
-                    continue; // alias — same doc already rendered under canonical name
-                }
-                let rendered = render_page_content(topic, text, C, G, D, N);
-                entries.push((category, topic, rendered));
-                seen.insert(topic);
-            }
+    for (name, category) in stryke::builtins::category_map_iter() {
+        if let Some(text) = stryke::lsp::doc_text_for(name) {
+            let cat = if category.is_empty() {
+                "Other"
+            } else {
+                category
+            };
+            let rendered = render_page_content(name, text, C, G, D, N);
+            entries.push((cat, name, rendered));
+            seen.insert(name);
         }
     }
-    // Pick up every documented topic not yet in a category
+    // Hand-written hover entries that aren't dispatch primaries — and
+    // ALSO aren't aliases (every alias resolves to a primary's page in
+    // pass 1). Keywords, operators, sigil-prefixed reflection hashes
+    // (`~>`, `match`, `%a`, …) are the only second-pass additions, so
+    // `--list` count matches `len(keys %b)` plus a small tail of
+    // hand-documented language constructs.
     for topic in stryke::lsp::doc_topics() {
         if seen.contains(topic) {
             continue;
         }
+        // Skip every callable spelling — primaries are already in
+        // pass 1, aliases share their primary's page.
+        if stryke::builtins::is_callable_spelling(topic) {
+            continue;
+        }
         if let Some(text) = stryke::lsp::doc_text_for(topic) {
-            let ptr = text.as_ptr() as usize;
-            if !seen_text_ptrs.insert(ptr) {
-                continue; // alias already rendered
-            }
             let rendered = render_page_content(topic, text, C, G, D, N);
             entries.push(("Other", topic, rendered));
         }

@@ -17,7 +17,7 @@ use std::process::Command;
 
 use crate::common::{eval_int, eval_string, GLOBAL_FLAGS_LOCK};
 
-fn pe_binary() -> Option<PathBuf> {
+fn stryke_binary() -> Option<PathBuf> {
     for cand in ["target/release/stryke", "target/debug/stryke"] {
         let p = PathBuf::from(cand);
         if p.exists() {
@@ -28,7 +28,7 @@ fn pe_binary() -> Option<PathBuf> {
 }
 
 fn run_doctor() -> Option<String> {
-    let bin = pe_binary()?;
+    let bin = stryke_binary()?;
     let _guard = GLOBAL_FLAGS_LOCK.read();
     let out = Command::new(&bin).args(["-e", "doctor"]).output().ok()?;
     Some(String::from_utf8_lossy(&out.stdout).to_string())
@@ -134,8 +134,11 @@ fn doctor_paths_all_under_stryke_home() {
             }
             // Any path under `.cache/stryke`, `.config/stryke`, or
             // `Library/Caches/stryke` would be a regression.
-            for stale in [".cache/stryke", "Library/Caches/stryke", "Library/Application Support/stryke"]
-            {
+            for stale in [
+                ".cache/stryke",
+                "Library/Caches/stryke",
+                "Library/Application Support/stryke",
+            ] {
                 if line.contains(stale) {
                     bad.push(line.to_string());
                 }
@@ -256,7 +259,7 @@ fn doctor_summary_reports_healthy_when_no_warnings() {
 /// and confirm the flag line shows `on`.
 #[test]
 fn doctor_shows_no_interop_when_flag_set() {
-    let Some(bin) = pe_binary() else {
+    let Some(bin) = stryke_binary() else {
         eprintln!("skip: stryke binary not built");
         return;
     };
@@ -295,10 +298,7 @@ fn doctor_sanity_checks_run() {
         "stryke home resolved",
         "no uncategorized primaries",
     ] {
-        assert!(
-            out.contains(check),
-            "sanity check missing: {check}\n{out}",
-        );
+        assert!(out.contains(check), "sanity check missing: {check}\n{out}",);
     }
 }
 
@@ -333,7 +333,7 @@ fn doctor_counts_stable_across_runs() {
 /// users who expect a clean compat surface).
 #[test]
 fn doctor_disabled_under_compat_mode() {
-    let Some(bin) = pe_binary() else {
+    let Some(bin) = stryke_binary() else {
         eprintln!("skip: stryke binary not built");
         return;
     };
@@ -343,11 +343,13 @@ fn doctor_disabled_under_compat_mode() {
         .output()
         .expect("run stryke");
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert_ne!(out.status.code(), Some(0), "doctor should fail under --compat");
+    assert_ne!(
+        out.status.code(),
+        Some(0),
+        "doctor should fail under --compat"
+    );
     assert!(
-        stderr.contains("doctor")
-            || stderr.contains("extension")
-            || stderr.contains("--compat"),
+        stderr.contains("doctor") || stderr.contains("extension") || stderr.contains("--compat"),
         "expected compat-rejection message, got: {stderr:?}",
     );
 }

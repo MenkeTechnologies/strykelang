@@ -15,21 +15,29 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-fn pe_binary() -> Option<PathBuf> {
-    for cand in ["target/release/stryke", "target/debug/stryke"] {
-        let p = PathBuf::from(cand);
-        if p.exists() {
-            return Some(p);
-        }
-    }
-    None
+fn stryke_binary() -> Option<PathBuf> {
+    // Prefer whichever binary is newer — `cargo test` rebuilds debug
+    // every run, so a stale release/ binary from an old build (still
+    // common since `cargo build --release` is a separate step) would
+    // make this test diverge from current source. Same logic as the
+    // `stryke_binary` helpers in error_parity / aot_build, but with a
+    // freshness comparator instead of a fixed preference.
+    let cands = [
+        PathBuf::from("target/release/stryke"),
+        PathBuf::from("target/debug/stryke"),
+    ];
+    cands
+        .iter()
+        .filter(|p| p.exists())
+        .max_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok())
+        .cloned()
 }
 
 /// Run `stryke docs ARGS...` with stdin piped (so `is_terminal()` on
 /// stdin returns false — kicks the subcommand into non-interactive
 /// mode).
 fn run_docs(args: &[&str]) -> Option<(i32, String, String)> {
-    let bin = pe_binary()?;
+    let bin = stryke_binary()?;
     let mut cmd = Command::new(&bin);
     cmd.arg("docs").args(args).stdin(Stdio::null());
     let out = cmd.output().ok()?;
@@ -81,12 +89,56 @@ fn docs_with_unknown_topic_exits_one() {
     };
     assert_eq!(rc, 1);
     assert!(
-        stderr.contains("no documentation for") || stderr.contains("definitely_not_a_real_builtin_xyz"),
+        stderr.contains("no documentation for")
+            || stderr.contains("definitely_not_a_real_builtin_xyz"),
         "expected unknown-topic hint in stderr, got: {stderr:?}",
     );
 }
 
 // ── Flags ────────────────────────────────────────────────────────────────────
+
+/// `--list` enumerates every dispatch primary in `%b` exactly once
+/// — pre-fix, dedup-by-text-pointer dropped ~288 primaries when a
+/// hand-written hover entry was shared (`"sum" | "sum0" => "..."`
+/// returned the same `&'static str` for both, so `sum0` was skipped).
+/// The parity guarantee `--list ⊇ %b` is what makes "browse every
+/// builtin" a useful affordance.
+#[test]
+fn docs_list_covers_every_dispatch_primary() {
+    let Some((rc, stdout, _)) = run_docs(&["--list"]) else {
+        eprintln!("skip: stryke binary not built");
+        return;
+    };
+    assert_eq!(rc, 0);
+    let bin = stryke_binary().unwrap();
+    // Strip the ` 12. name` prefix and collect listed topics.
+    let listed: std::collections::HashSet<String> = stdout
+        .lines()
+        .filter_map(|l| {
+            let t = l.trim_start();
+            // Format is `NN. name` — drop digits-and-dot prefix.
+            let after_num = t.find(". ")?;
+            Some(t[after_num + 2..].trim().to_string())
+        })
+        .collect();
+    // Pull every primary from `%b` via the same binary.
+    let primaries_out = std::process::Command::new(&bin)
+        .args(["-e", r#"for (sort keys %b) { print "$_\n" }"#])
+        .output()
+        .expect("run %b dump");
+    let primaries: std::collections::HashSet<String> =
+        String::from_utf8_lossy(&primaries_out.stdout)
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+    let missing: Vec<&String> = primaries.difference(&listed).collect();
+    assert!(
+        missing.is_empty(),
+        "%b has {} primaries missing from `s docs --list`: {:?}",
+        missing.len(),
+        missing.iter().take(5).collect::<Vec<_>>(),
+    );
+}
 
 /// `--list` / `-l` emit one topic per line.
 #[test]
@@ -121,7 +173,10 @@ fn docs_search_flag_returns_matches() {
     assert_eq!(rc, 0);
     let lower = stdout.to_lowercase();
     assert!(lower.contains("pmap"), "search 'parallel' should hit pmap");
-    assert!(lower.contains("pgrep"), "search 'parallel' should hit pgrep");
+    assert!(
+        lower.contains("pgrep"),
+        "search 'parallel' should hit pgrep"
+    );
 }
 
 /// `--help` prints usage and exits 0.
@@ -160,7 +215,8 @@ fn docs_no_args_with_piped_stdin_exits_zero() {
     };
     assert_eq!(rc, 0, "no-args + piped stdin should not enter TUI");
     assert!(
-        stdout.contains("STRYKE ENCYCLOPEDIA") || stdout.contains("INTERACTIVE REFERENCE")
+        stdout.contains("STRYKE ENCYCLOPEDIA")
+            || stdout.contains("INTERACTIVE REFERENCE")
             || stdout.contains("Introduction"),
         "expected intro-page banner, got first 200: {:?}",
         stdout.chars().take(200).collect::<String>(),
@@ -171,7 +227,7 @@ fn docs_no_args_with_piped_stdin_exits_zero() {
 /// terminal — opt-out for users who want scripted-only behavior.
 #[test]
 fn docs_with_stryke_no_tty_env_exits_zero() {
-    let Some(bin) = pe_binary() else {
+    let Some(bin) = stryke_binary() else {
         eprintln!("skip: stryke binary not built");
         return;
     };
@@ -190,7 +246,7 @@ fn docs_with_stryke_no_tty_env_exits_zero() {
 /// `NO_TTY=1` (the generic form, no `STRYKE_` prefix) is honored too.
 #[test]
 fn docs_with_generic_no_tty_env_exits_zero() {
-    let Some(bin) = pe_binary() else {
+    let Some(bin) = stryke_binary() else {
         eprintln!("skip: stryke binary not built");
         return;
     };
@@ -211,17 +267,14 @@ fn docs_with_generic_no_tty_env_exits_zero() {
 /// Gemini ran the command through a pipe wrapper.
 #[test]
 fn docs_pmap_pipes_to_head_cleanly() {
-    let Some(bin) = pe_binary() else {
+    let Some(bin) = stryke_binary() else {
         eprintln!("skip: stryke binary not built");
         return;
     };
     // Use sh to chain the pipe portably.
     let out = Command::new("sh")
         .arg("-c")
-        .arg(format!(
-            "{} docs pmap | head -3",
-            bin.display()
-        ))
+        .arg(format!("{} docs pmap | head -3", bin.display()))
         .output()
         .expect("run pipe");
     assert_eq!(
