@@ -2786,6 +2786,7 @@ pub(crate) fn try_builtin(
         "correlation" | "corr" => Some(builtin_correlation(args)),
         "iqr" => Some(builtin_iqr(args)),
         "quantile" | "qntl" => Some(builtin_quantile(args)),
+        "quantiles" | "qntls" => Some(builtin_quantiles(args)),
         "clamp_int" | "clpi" => Some(builtin_clamp_int(args)),
         "in_range" | "inrng" => Some(builtin_in_range(args)),
         "wrap_range" | "wrprng" => Some(builtin_wrap_range(args)),
@@ -22394,6 +22395,50 @@ fn builtin_quantile(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(
         sorted[lo] * (1.0 - frac) + sorted[hi.min(sorted.len() - 1)] * frac,
     ))
+}
+
+/// `quantiles \@DATA, \@PROBS` — batch quantile lookup. Returns a list with
+/// one element per probability in `\@PROBS`, computed via the same linear
+/// interpolation as `quantile`. Sorts the data exactly once across all
+/// probability points so callers don't pay an O(n log n) sort per quantile.
+fn builtin_quantiles(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    if args.len() < 2 {
+        return Ok(PerlValue::array(Vec::new()));
+    }
+    // Data side: accept either a single arrayref or a flat list of all but
+    // the last argument (which is the probability list).
+    let data_vec: Vec<PerlValue> = if let Some(r) = args[0].as_array_ref() {
+        r.read().clone()
+    } else {
+        flatten_args(&args[..args.len() - 1])
+    };
+    if data_vec.is_empty() {
+        return Ok(PerlValue::array(Vec::new()));
+    }
+    let mut sorted: Vec<f64> = data_vec.iter().map(|x| x.to_number()).collect();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    // Probability side: an arrayref of probabilities (canonical) or a flat
+    // tail list of probabilities after the data arg.
+    let last = &args[args.len() - 1];
+    let probs: Vec<f64> = if let Some(r) = last.as_array_ref() {
+        r.read().iter().map(|v| v.to_number()).collect()
+    } else {
+        args[1..].iter().map(|v| v.to_number()).collect()
+    };
+    let n_minus_1 = (sorted.len() - 1) as f64;
+    let max_idx = sorted.len() - 1;
+    let out: Vec<PerlValue> = probs
+        .iter()
+        .map(|p| {
+            let p = p.clamp(0.0, 1.0);
+            let idx = p * n_minus_1;
+            let lo = idx.floor() as usize;
+            let hi = idx.ceil() as usize;
+            let frac = idx - lo as f64;
+            PerlValue::float(sorted[lo] * (1.0 - frac) + sorted[hi.min(max_idx)] * frac)
+        })
+        .collect();
+    Ok(PerlValue::array(out))
 }
 
 /// `clamp_int VALUE, MIN, MAX` — clamp integer value.

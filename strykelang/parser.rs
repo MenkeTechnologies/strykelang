@@ -494,6 +494,12 @@ impl Parser {
                 | "if" | "unless" | "while" | "until" | "for" | "foreach"
                 | "return" | "last" | "next" | "redo" | "package" | "require"
                 | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
+                // stryke-specific declaration keywords that start a new
+                // statement on a fresh line. Without these, a bare `use
+                // strict` / `use warnings` followed by `fn foo { ... }`
+                // on the next line swallows `foo` as an import argument.
+                | "fn" | "class" | "abstract" | "final" | "trait"
+                | "state" | "mysync" | "oursync"
             )
         )
     }
@@ -739,7 +745,11 @@ impl Parser {
                     self.advance(); // consume "frozen"/"const"
                     if let Token::Ident(ref kw) = self.peek().clone() {
                         if kw == "my" {
-                            let mut stmt = self.parse_my_our_local("my", false)?;
+                            // Accept type annotations the same way `typed
+                            // my $x : Int` does — `const`/`frozen` is
+                            // orthogonal to typing, and `: Type` after a
+                            // name is unambiguous in either form.
+                            let mut stmt = self.parse_my_our_local("my", true)?;
                             if let StmtKind::My(ref mut decls) = stmt.kind {
                                 for decl in decls.iter_mut() {
                                     decl.frozen = true;
@@ -13831,7 +13841,7 @@ impl Parser {
             | "magnitude" | "mag" | "normalize_vec" | "nrmv"
             | "distance" | "dist" | "manhattan_distance" | "mdist"
             | "covariance" | "cov" | "correlation" | "corr"
-            | "iqr" | "quantile" | "qntl" | "clamp_int" | "clpi"
+            | "iqr" | "quantile" | "qntl" | "quantiles" | "qntls" | "clamp_int" | "clpi"
             | "in_range" | "inrng" | "wrap_range" | "wrprng"
             | "sum_squares" | "sumsq" | "rms" | "cumsum" | "csum" | "cumprod" | "cprod_acc" | "diff"
             // ── Extended stdlib: Date/Time ───────────────────────────────────

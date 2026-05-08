@@ -2946,6 +2946,15 @@ impl VMHelper {
         ) || name.chars().all(|c| c.is_ascii_digit())
             || name.starts_with('^')
             || (name.starts_with('#') && name.len() > 1)
+            // Stryke implicit closure-param slots (`$_0`, `$_1`, …, `$_99`).
+            // These are auto-bound inside any block that takes positional
+            // arguments (sort comparators, reduce blocks, sub bodies, map/
+            // grep blocks). Treat them like the digit-only match groups —
+            // exempt globally so a strict-vars check inside a `preduce {
+            // $_0 + $_1 }` block doesn't reject them as undeclared.
+            || (name.starts_with('_')
+                && name.len() > 1
+                && name[1..].chars().all(|c| c.is_ascii_digit()))
     }
 
     fn check_strict_scalar_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
@@ -18863,6 +18872,18 @@ impl VMHelper {
             return Ok(crate::native_data::struct_new_with_defaults(
                 &def, &provided, &defaults, line,
             )?);
+        }
+        // Stryke `class` declarations route through `class_construct` so the
+        // result is a real `ClassInstance` (typed-my checks, isa walk, BUILD
+        // hooks, etc.). Without this, `Class->new` for a registered class
+        // fell through to the default Perl-style blessed-hashref path,
+        // breaking `typed my $x : Class = Class->new` even though the
+        // runtime check for `Struct(name)` was already in place. Skip
+        // `args[0]` (the class-name receiver) since `class_construct`
+        // expects user args only.
+        if let Some(def) = self.class_defs.get(class).cloned() {
+            let user_args: Vec<PerlValue> = args.into_iter().skip(1).collect();
+            return self.class_construct(&def, user_args, line);
         }
         // Default OO constructor: Class->new(%args) → bless {%args}, class
         let mut map = IndexMap::new();

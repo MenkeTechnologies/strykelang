@@ -3,24 +3,28 @@ use strict
 use warnings
 
 my $text = "The quick brown fox jumps over the lazy dog"
-print "upper: ", $text |> uc, "\n"
-print "lower: ", $text |> lc, "\n"
-print "ucfirst: ", $text |> ucfirst, "\n"
-print "length: ", $text |> len, "\n"
-print "substr(0,9): ", substr $text, 0, 9, "\n"
-print "index(fox): ", index $text, "fox", "\n"
-print "reverse: ", split "", $text  |> rev |> join "", "\n"
+p "upper: ",       $text |> uc
+p "lower: ",       $text |> lc
+p "ucfirst: ",     $text |> ucfirst
+p "length: ",      $text |> len
+p "substr(0,9): ", substr($text, 0, 9)
+p "index(fox): ",  index($text, "fox")
+p "reverse: ",     ($text |> split "" |> rev |> join "")
 
 my @words = split " ", $text
-print "word count: ", @words |> scalar, "\n"
-print "words: ", @words |> join " | ", "\n"
+p "word count: ", len(@words)
+p "words: ",      (@words |> join " | ")
+
 my $copy = $text
 $copy =~ s/fox/cat/
-print "substituted: ${copy}\n"
+p "substituted: $copy"
+
 if ($text =~ /(\w+)\s+(\w+)$/) {
-    print "last two words: ${1} ${2}\n"
+    p "last two words: $1 $2"
 }
-my @long_words = @words |> grep { length $_ > 3 }
-print "long words: ", @long_words |> join ", ", "\n"
-my @lengths = @words |> map { length $_ }
-print "word lengths: ", @lengths |> join ", ", "\n"
+
+my @long_words = @words |> grep { len(_) > 3 }
+p "long words: ", (@long_words |> join ", ")
+
+my @lengths = @words |> map { len(_) }
+p "word lengths: ", (@lengths |> join ", ")

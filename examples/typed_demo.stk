@@ -1,0 +1,40 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Typed Functions and Data
+# Demonstrates optional typing and advanced function syntax.
+
+# Typed parameters (runtime checked).
+fn calculate_risk($threat_level: Int, $impact: Float) {
+    $threat_level * $impact
+}
+
+# Typed variables (require 'typed' keyword).
+typed my $level  : Int   = 5
+typed my $impact : Float = 2.5
+typed my $risk   : Float = calculate_risk($level, $impact)
+
+printf "Threat Level: %d, Impact: %.1f, Total Risk: %.2f\n", $level, $impact, $risk
+
+# Type mismatch will throw a runtime error (catch via eval).
+p "\nTesting type safety..."
+eval {
+    typed my $bad_level : Int = "very high"  # should fail
+}
+if ($@) {
+    p "Caught expected type error: $@"
+}
+
+# Pipeline with typed transformations.
+p "\nProcessing parallel data stream..."
+my @raw_data = 1:10
+my $total_processed_risk = @raw_data
+    |> pmap { calculate_risk(_, 1.5) }
+    |> preduce { _0 + _1 }
+
+printf "Total Processed Risk: %.2f\n", $total_processed_risk
+
+# Typed anonymous functions.
+my $formatter = fn ($v: Float) : Str { sprintf "RISK: %.2f", $v }
+p $formatter->($risk)

@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Functional Patterns Demo
+# Demonstrates match, memoize, and partial application.
+
+# 1. Pattern Matching
+print "--- Pattern Matching ---\n"
+fn process_event {
+    match (_0->{type}) {
+        "LOGIN"  => "User " . _0->{user} . " logged in",
+        "LOGOUT" => "User " . _0->{user} . " logged out",
+        "ERROR"  => "Critical error: " . _0->{msg},
+        _        => "Unknown event type"
+    }
+}
+
+my @events = (
+    +{ type => "LOGIN", user => "cyberpunk" },
+    +{ type => "ERROR", msg => "Buffer overflow" },
+    +{ type => "IDLE" }
+)
+
+for (@events) {
+    print "  ", process_event(_), "\n"
+}
+
+# 2. Memoization
+print "\n--- Memoization: Caching expensive lookups ---\n"
+# Simulate an expensive call. memoize wraps it so duplicate inputs hit
+# the cache instead of recomputing.
+fn slow_lookup { sleep 0.01; _0 * _0 + 7 }
+
+memoize(\&slow_lookup)
+
+# Hit each input twice; the second pass should be near-instant.
+my @inputs = (1, 2, 3, 4, 5, 1, 2, 3, 4, 5)
+my $start  = now_ns()
+my @res    = map { slow_lookup(_) } @inputs
+my $end    = now_ns()
+printf "  10 calls (5 unique) -> @res in %.2f ms\n", ($end - $start) / 1_000_000
+
+# 3. Partial Application and Currying
+print "\n--- Functional Primitives ---\n"
+fn multiply = _0 * _1
+
+# partial pre-fills arguments.
+my $triple = partial(\&multiply, 3)
+print "  Triple 10: ", $triple->(10), "\n"
+
+# curry transforms to chainable single-arg calls.
+my $curried_mul = curry(\&multiply)
+my $times5 = $curried_mul->(5)
+print "  Curried 5 * 4: ", $times5->(4), "\n"

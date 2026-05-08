@@ -73,6 +73,11 @@ pub enum Op {
     DeclareScalarTyped(u16, u8),
     /// `frozen typed my $x : Type` — immutable after initialization + type-checked.
     DeclareScalarTypedFrozen(u16, u8),
+    /// `typed my $x : Foo` where `Foo` is a user-defined struct/class/enum type.
+    /// First u16 = scalar name index; second u16 = type-name pool index; the u8
+    /// flag encodes (frozen << 1) | is_enum so a single op covers all four
+    /// permutations (frozen × {struct/class, enum}).
+    DeclareScalarTypedUser(u16, u16, u8),
 
     // ── State variables (persist across calls) ──
     /// `state $x = EXPR` — pop TOS as initializer on first call only.

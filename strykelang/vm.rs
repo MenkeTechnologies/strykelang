@@ -1448,6 +1448,25 @@ impl<'a> VM<'a> {
                 let v =
                     crate::native_data::struct_new_with_defaults(&def, &provided, &defaults, line)?;
                 self.push(v);
+            } else if let Some(def) = self.interp.class_defs.get(&class).cloned() {
+                // Stryke `class` declarations route through `class_construct`
+                // so the result is a real `ClassInstance` (typed-my checks,
+                // isa walk, BUILD hooks). Without this the bytecode path
+                // fell through to the default Perl-style blessed-hashref
+                // below, breaking method dispatch for `$self` binding.
+                // Mirrors the tree-walker fix in `vm_helper::builtin_new`.
+                // Skip `all_args[0]` (the class-name receiver) since
+                // `class_construct` expects user args only.
+                let line = self.line();
+                let user_args: Vec<PerlValue> = all_args.into_iter().skip(1).collect();
+                let v = self
+                    .interp
+                    .class_construct(&def, user_args, line)
+                    .map_err(|e| match e {
+                        crate::vm_helper::FlowOrError::Error(stryke) => stryke,
+                        _ => PerlError::runtime("class_construct flow", line),
+                    })?;
+                self.push(v);
             } else {
                 let mut map = IndexMap::new();
                 let mut i = 1;
@@ -2867,6 +2886,27 @@ impl<'a> VM<'a> {
                         self.interp
                             .scope
                             .declare_scalar_frozen(n, val, true, Some(ty))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        Ok(())
+                    }
+                    Op::DeclareScalarTypedUser(name_idx, type_idx, flag) => {
+                        let val = self.pop();
+                        let n = names[*name_idx as usize].as_str();
+                        let type_name = names[*type_idx as usize].clone();
+                        let is_enum = (flag & 0b01) != 0;
+                        let is_frozen = (flag & 0b10) != 0;
+                        let ty = if is_enum {
+                            PerlTypeName::Enum(type_name)
+                        } else {
+                            // Struct variant covers struct, class, and any
+                            // user-defined nominal type — `check_value` for
+                            // `Struct(name)` already accepts class instances
+                            // via `c.isa(name)`.
+                            PerlTypeName::Struct(type_name)
+                        };
+                        self.interp
+                            .scope
+                            .declare_scalar_frozen(n, val, is_frozen, Some(ty))
                             .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
@@ -8170,6 +8210,15 @@ impl<'a> VM<'a> {
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
                                 local_interp.scope.set_sort_pair(a.clone(), b.clone());
+                                // Populate slot-based positional args so the
+                                // bytecode block can read `$_0`/`$_1` (and the
+                                // bareword `_0`/`_1`) through the slot fast
+                                // path. `set_sort_pair` only sets the named
+                                // scalars; without slots, an `$_0` reference
+                                // resolves to undef in worker bytecode.
+                                local_interp
+                                    .scope
+                                    .set_closure_args(&[a.clone(), b.clone()]);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -8197,6 +8246,9 @@ impl<'a> VM<'a> {
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
                                 local_interp.scope.set_sort_pair(a.clone(), b.clone());
+                                local_interp
+                                    .scope
+                                    .set_closure_args(&[a.clone(), b.clone()]);
                                 local_interp.scope_push_hook();
                                 let ord = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => {

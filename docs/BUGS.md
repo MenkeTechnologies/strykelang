@@ -20,6 +20,127 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-116** — `psort { $_0 <=> $_1 } @list` (and the bareword `_0`/`_1`
+  form) silently returned the input unsorted when the comparator block
+  read the implicit-param slots. The worker invoked the block via
+  `run_block_region` directly (bytecode region) instead of `call_sub`,
+  and `set_sort_pair` only populated named scalars (`$a`, `$b`,
+  `$_0`, `$_1`) — *not* the slot-based positional args that the
+  bytecode reads through `Op::GetScalarSlot`. Fix in `vm.rs`:
+  `Op::PSortWithBlock` worker now also calls
+  `set_closure_args(&[a, b])` for both the bytecode-region and
+  tree-walker fallback paths so slot 0/1 hold the comparator pair.
+  Sequential `sort` was unaffected because it routes through
+  `call_sub` which sets up slots normally.
+  Pin tests: `psort_comparator_reads_implicit_slot_zero_and_one`,
+  `psort_comparator_reads_bareword_underscore_slots`,
+  `psort_dollar_a_b_form_still_works`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
+- **BUG-115** — `use strict; preduce { $_0 + $_1 } @list` (and any
+  reduce/sort block that read implicit-param slots) was rejected at
+  parse time with "Global symbol $_0 requires explicit package name".
+  Root cause: `VMHelper::strict_scalar_exempt` whitelisted `$a`/`$b`
+  and digit-only match groups (`$1`, `$2`, …) but missed stryke's
+  positional-slot spelling `$_0` / `$_1` / … `$_99`. Fix: added a
+  `name.starts_with('_') && rest.all_digits()` arm to the exempt
+  predicate. Critical under `--no-interop`, where `$a`/`$b` are
+  rejected and `$_0`/`$_1` are the only valid comparator-slot names.
+  Pin tests: `strict_vars_exempts_implicit_param_slots`,
+  `strict_vars_exempts_higher_implicit_param_slots`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
+- **BUG-114 / BUG-048 (FIXED)** — Stryke `class C { ... }` instances
+  weren't recognized as class instances by the rest of the runtime. The
+  bytecode method dispatcher (`vm.rs::run_method_op`) inlined a copy of
+  the default `Class->new` path that produced a `BlessedRef` instead of
+  a `ClassInstance`, which cascaded into three visible bugs:
+  (1) `$self->{field}` inside instance methods couldn't find class
+  fields; (2) `ref($self)` returned the empty string because
+  `PerlValue::ref_type` had no `ClassInst` arm; (3) `typed my $b : C =
+  C->new` always failed the runtime type check. Fixes:
+  - `vm.rs::run_method_op` now checks `class_defs` before the
+    Perl-blessed-hashref fallback and routes through `class_construct`
+    (skipping `all_args[0]` which holds the class-name receiver).
+  - `vm_helper::builtin_new` got the same routing for the tree-walker
+    path (initial fix during BUG-111 work).
+  - `value::ref_type` learned a `HeapObject::ClassInst(c) =>
+    c.def.name` arm so `ref($obj)` returns the class name.
+  Pin tests:
+  `class_method_binds_self_to_receiver`,
+  `class_method_self_field_deref_returns_field_value`,
+  `class_method_self_works_through_inheritance`,
+  `class_new_with_named_args_assigns_fields`,
+  `ref_on_class_instance_returns_class_name`
+  in `tests/suite/behavior_pin_2026_05_at.rs`. The pre-existing
+  `behavior_pin_2026_05_h::ref_of_stryke_class_instance_returns_class_name`
+  flipped from documenting the bug to guarding the fix.
+- **BUG-113** — `const my $x : Int = 5` (and `frozen my $x : Type`)
+  was rejected at parse time with "Unexpected token Colon". The
+  `frozen`/`const` parser branch called `parse_my_our_local("my",
+  false)`, which suppressed the type-annotation accept inside
+  `parse_var_decl`. Const/frozen-ness is orthogonal to typing, so the
+  flag is now `true` for both spellings — `const my $b : Box =
+  Box->new`, `frozen my $n : Int = 9`, and the user-type variants all
+  work. Pin tests:
+  `const_my_with_int_type_annotation_works`,
+  `const_my_with_user_type_annotation_works`,
+  `const_my_with_class_type_annotation_works`,
+  `frozen_my_with_type_annotation_works`,
+  `const_my_typed_still_rejects_reassignment`,
+  `const_my_typed_str_rejects_int`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
+- **BUG-112** — `s docs <TOPIC>` entered the interactive TUI when a
+  caller named a specific topic (or when AI wrappers like Gemini's
+  exec invoked it with mixed-tty plumbing), blocking until the user
+  pressed `q`. Two compounding causes: (1) the TTY check only
+  inspected stdout, so wrappers that kept stdout as a tty while
+  piping stdin slipped through; (2) even with both ttys, naming a
+  topic should be a one-shot lookup (`man pmap` semantics), not a
+  book-browser entry point. Fix in `main.rs::run_doc_subcommand`:
+  the interactive loop now requires *no positional argument*, plus
+  both `stdin().is_terminal()` and `stdout().is_terminal()`, with
+  `STRYKE_NO_TTY=1` / `NO_TTY=1` as explicit overrides. Any
+  positional `TOPIC` or page number → dump the page and exit 0.
+  Bare `s docs` on a real terminal still launches the TUI.
+- **BUG-111** — `typed my $x : UserType = ...` where `UserType` is a
+  user-defined struct, class, or enum was rejected at compile time
+  with `VM compile error (unsupported): typed my with struct type
+  \`Foo\``. Root cause: `Op::DeclareScalarTyped` only carried a 1-byte
+  type tag and `PerlTypeName::as_byte()` returned None for `Struct(_)`
+  / `Enum(_)`. Fix: added `Op::DeclareScalarTypedUser(name_idx,
+  type_name_idx, flags)` that resolves the type name through the
+  chunk's name pool, plus a `compiler::emit_declare_scalar_typed`
+  helper that picks the right op. A second compounding bug —
+  `builtin_new` didn't check `class_defs`, so `Class->new` for a
+  registered class produced a default-OO blessed-hashref instead of
+  a `ClassInstance`, defeating the runtime `check_value` —
+  was fixed by routing class lookups through `class_construct`.
+  `check_value::Struct(name)` was also extended to accept
+  `BlessedRef` whose `class` matches, so old-style `bless {...},
+  "MyClass"` round-trips through typed-my. Pin tests:
+  `typed_my_with_struct_compiles_and_runs`,
+  `typed_my_with_struct_rejects_wrong_struct`,
+  `typed_my_with_class_compiles_and_runs`,
+  `typed_my_with_class_rejects_wrong_class`,
+  `typed_my_with_class_accepts_old_style_blessed_ref`,
+  `typed_my_with_class_rejects_blessed_ref_of_wrong_class`,
+  `typed_my_with_enum_compiles_and_runs`,
+  `typed_my_primitive_int_still_routes_through_byte_op`,
+  `typed_my_primitive_str_still_rejects_int`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
+- **BUG-110** — `use strict` / `use warnings` / `use VERSION` followed by
+  `fn foo { ... }` on the next line no longer swallows `foo` as an
+  import argument. The `next_is_new_stmt_keyword` detector in
+  `parser.rs` learned the stryke-specific declaration keywords (`fn`,
+  `class`, `abstract`, `final`, `trait`, `state`, `mysync`, `oursync`)
+  so a fresh-line keyword terminates the implicit import-list. Same-
+  line uses (`use strict fn foo { ... }`) stay rejected because the
+  detector only fires across line boundaries. Pin tests:
+  `use_strict_followed_by_fn_on_next_line_does_not_swallow_name`,
+  `use_warnings_followed_by_fn_on_next_line_does_not_swallow_name`,
+  `use_strict_followed_by_state_decl_does_not_swallow`,
+  `use_feature_with_string_arg_still_consumes_argument`,
+  `use_strict_followed_by_fn_on_same_line_still_consumes_name`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
 - **BUG-027** — `$#a = N` now resizes `@a` to length `N + 1` (truncates
   if shrinking, pads with `undef` if growing). Routed `#name` writes
   through `VMHelper::set_special_var`, which calls
@@ -2844,6 +2965,165 @@ plus `package_decl_parses_three_segments`,
 `tests/suite/behavior_pin_2026_05_ap.rs`.
 
 Severity: **parity** (FIXED).
+
+
+## BUG-108 — `par`/`par_reduce`/`~p>` over a real `@a` array reads scalar count
+
+The chunk-parallel macros work correctly on string sources (chunked per
+char) and pass arrayrefs through as a single chunk, but a bare `@a`
+source is read in scalar context *before* chunking, so each worker
+sees `$_` = the array length and `@_` = `(length,)` instead of the
+intended array slice.
+
+```sh
+$ s -e 'my @a = (10, 20, 30); my $r = ~> @a par_reduce { sum(@_) }; print "$r\n"'
+3
+$ s -e 'my @a = (10, 20, 30); my $r = ~p> @a sum; print "$r\n"'
+3
+$ s -e 'my @a = (10, 20, 30); my @r = ~> @a par { sum(@_) }; print "[@r]\n"'
+[]
+$ s -e 'my $r = ~p> 1:5 sum; print "$r\n"'
+0
+$ s -e 'my $r = ~p> [1,2,3] sum; print "$r\n"'
+0
+```
+
+Expected:
+
+```sh
+$ s -e 'my @a = (10, 20, 30); my $r = ~p> @a sum; print "$r\n"'
+60
+$ s -e 'my $r = ~p> 1:5 sum; print "$r\n"'
+15
+```
+
+Root cause sits in the chunk-source coercion in
+`vm_helper.rs::par_chunk_value` — for `PerlValue::Array` it currently
+falls through the scalar-coercion path. Range expressions reach the
+coercion as a numeric scalar (`0`); arrayrefs survive but the worker
+never deref's them, so `sum` gets a scalar that numifies to 0.
+
+**Workaround:** wrap the array in an explicit deref before threading,
+or use `~> @a par { map { ... } @_ }` with the `@_` form (still
+broken). The only path that works today is string-input or arrayref
+that the body handles with explicit `@$_` deref.
+
+Pinning tests:
+`par_reduce_array_source_currently_sees_scalar_count_not_elements`,
+`par_reduce_array_source_explicit_reducer_is_also_broken`,
+`par_chunk_block_array_source_returns_empty_list`,
+`p_arrow_array_source_sees_count_not_elements`,
+`p_arrow_range_source_returns_zero`,
+`p_arrow_arrayref_source_falls_back_to_single_chunk_with_zero_sum`,
+`p_arrow_string_source_chunks_per_char_and_works`
+in `tests/suite/behavior_pin_2026_05_at.rs`.
+
+Severity: **bug**.
+
+
+## BUG-109 — `sum(\@a)` and `sum([1,2,3])` return 0 instead of summing
+
+`sum` does not auto-deref a single arrayref argument, so calling it
+through any thread-stage that hands it a ref produces zero. The same
+likely affects `min`, `max`, `mean`, etc. — anything that takes a
+list-of-numbers.
+
+```sh
+$ s -e 'p sum([1,2,3])'
+0
+$ s -e 'my @a = (10,20,30); p sum(\@a)'
+0
+$ s -e 'my $r = [10,20,30]; p sum(@$r)'   # workaround
+60
+```
+
+Expected: `sum([1,2,3])` returns 6, `sum(\@a)` returns 60. Either
+auto-deref a single arrayref arg or document the limitation as
+intentional.
+
+This bug compounds with **BUG-108**: even if chunking handed each
+worker an arrayref, `sum` would still report 0.
+
+Pinning tests:
+`sum_on_arrayref_returns_zero_not_sum`,
+`sum_on_array_ref_via_backslash_returns_zero`,
+`sum_on_explicit_deref_works`
+in `tests/suite/behavior_pin_2026_05_at.rs`.
+
+Severity: **bug**.
+
+
+## PARITY-040 — Scalar-context `..` flip-flop operator is unimplemented
+
+The classic `print if N..M` line-range flip-flop produces no output
+in stryke; Perl emits the lines whose `$.`-counter falls in the
+specified range. This breaks the canonical `awk '/start/,/end/'`
+translation idiom that motivates flip-flops in the first place.
+
+```sh
+$ s -e 'for (1..10) { print "$_," if 3..5 } print "\n"'
+
+$ perl -e 'for (1..10) { print "$_," if 3..5 } print "\n"'
+3,4,5,
+```
+
+The list-context `..` works correctly (range expansion); only the
+scalar-context flip-flop / flip-flap (`...`) variants are missing.
+A full fix needs hidden per-occurrence state, the `E0`/`E1` edge-
+counter Perl exposes, and the tri-dot non-eager variant.
+
+Pinning test:
+`flip_flop_scalar_context_does_not_match_perl_lines`
+in `tests/suite/behavior_pin_2026_05_at.rs`.
+
+Severity: **parity**.
+
+
+## PARITY-041 — Arrayref/hashref in numeric context returns 0, not the heap address
+
+```sh
+$ s -e 'my $r = [1,2,3]; print "num=", $r + 0, "\n"'
+num=0
+$ perl -e 'my $r = [1,2,3]; print "num=", $r + 0, "\n"'
+num=4354497000
+```
+
+Perl exposes the heap address of a ref when it's used in numeric
+context. Scripts that test `if ($ref + 0)` for definedness, or
+compare two refs with `==` (numeric ref-equality), break under
+stryke. Stringification of refs (`"$ref"`) still produces the
+expected `ARRAY(0x...)` / `HASH(0x...)` text.
+
+Pinning test:
+`arrayref_in_numeric_context_returns_zero_not_address`
+in `tests/suite/behavior_pin_2026_05_at.rs`.
+
+Severity: **parity**.
+
+
+## PARITY-042 — `chr(N)` for N > 0x10FFFF or N < 0 returns the empty string
+
+```sh
+$ s -e 'my $c = chr(0x110000); print length($c), "\n"'
+0
+$ s -e 'my $c = chr(-1); print length($c), "\n"'
+0
+$ perl -e 'my $c = chr(0x110000); print length($c), "\n"'   # warns + emits
+1
+```
+
+Stryke clamps to the valid Unicode range; Perl warns but still emits
+a (potentially malformed) character up to chr <= 0x7FFFFFFF. The
+stryke behavior is intentionally stricter for UTF-8 hygiene; pinning
+both edge cases so a future change is deliberate.
+
+Pinning tests:
+`chr_above_max_unicode_returns_empty_string`,
+`chr_negative_returns_empty_string`,
+`chr_max_valid_unicode_works`
+in `tests/suite/behavior_pin_2026_05_at.rs`.
+
+Severity: **parity** (intentional-strictness).
 
 
 ## NOT-A-BUG observations (pinned, but documented as deliberate)

@@ -1,0 +1,44 @@
+#!/usr/bin/env stryke
+use strict;
+use warnings;
+
+# Stryke Data Analysis Demo
+# Demonstrates parallel map-reduce for high-performance statistics.
+
+# Generate some random "sensor" data.
+print "Generating sensor data...\n"
+my @sensors = 1:1000 |> pmap {
+    +{
+        id    => _,
+        temp  => 20 + rand(15),
+        power => rand(100),
+    }
+}
+
+print "Analyzing ", len(@sensors), " data points in parallel...\n"
+
+# 1. Average temperature.
+my $total_temp = @sensors
+    |> pmap { _->{temp} }
+    |> preduce { _0 + _1 }
+my $avg_temp = $total_temp / len(@sensors)
+printf "Average Temperature: %.2f C\n", $avg_temp
+
+# 2. Maximum power.
+my $max_power = @sensors
+    |> pmap { _->{power} }
+    |> preduce { _0 > _1 ? _0 : _1 }
+printf "Maximum Power Usage: %.2f W\n", $max_power
+
+# 3. Count sensors above the critical threshold.
+my $high_temp_count = @sensors
+    |> pmap { _->{temp} > 30 ? 1 : 0 }
+    |> preduce { _0 + _1 }
+print "Sensors in critical state (>30C): $high_temp_count\n"
+
+# 4. Sum of power for sensors above the average temperature.
+my $sum_power_hot = @sensors
+    |> pgrep { _->{temp} > $avg_temp }
+    |> pmap { _->{power} }
+    |> preduce { _0 + _1 }
+printf "Total Power (above avg temp): %.2f W\n", $sum_power_hot

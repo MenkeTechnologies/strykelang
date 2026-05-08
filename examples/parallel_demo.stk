@@ -1,23 +1,23 @@
 #!/usr/bin/env stryke
 use strict
 use warnings
-my @data = (1 .. 100)
-my @doubled = @data |> pmap { $_ * 2 }
 
-print "pmap: first 10 doubled = ", @doubled[0 .. 9] |> join ", ", "\n"
+my @data = 1:100
+my @doubled = @data |> pmap { _ * 2 }
 
-my @evens = @data |> pgrep $_ % 2 == 0
-print "pgrep: ", @evens |> scalar, " even numbers found\n"
+p "pmap: first 10 doubled = ", join(", ", @doubled[0:9])
 
-my @sorted = @data |> rev |> psort { $a <=> $b }
+my @evens = @data |> pgrep _ % 2 == 0
+p "pgrep: ", len(@evens), " even numbers found"
 
-print "psort: first 10 = ", @sorted[(0 .. 9)] |> join ", ", "\n"
-print "pfor: processing...\n"
+my @sorted = (@data |> rev |> psort { _0 <=> _1 })
+p "psort: first 10 = ", join(", ", @sorted[0:9])
 
-pfor { my $square = ($_ * $_); } @data
-print "pfor: done\n"
-my @result = @data |> pgrep { $_ % 3 == 0 } |> pmap { $_ ** 2 }
+p "pfor: processing..."
+pfor { my $square = _ * _ } @data
+p "pfor: done"
 
-print "chained: squares of multiples of 3 = ", @result[(0 .. 4)] |> join ", ", "...\n"
+my @result = @data |> pgrep { _ % 3 == 0 } |> pmap { _ ** 2 }
+p "chained: squares of multiples of 3 = ", join(", ", @result[0:4]), "..."
 
-print "All parallel operations completed successfully!\n"
+p "All parallel operations completed successfully!"
