@@ -21,18 +21,27 @@ fn main() {
     println!("cargo:rerun-if-changed=strykelang/builtins.rs");
     println!("cargo:rerun-if-changed=strykelang/parser.rs");
     println!("cargo:rerun-if-changed=strykelang/lsp.rs");
+    println!("cargo:rerun-if-changed=strykelang/list_builtins.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
     let builtins_src =
         fs::read_to_string("strykelang/builtins.rs").expect("read strykelang/builtins.rs");
     let parser_src = fs::read_to_string("strykelang/parser.rs").expect("read strykelang/parser.rs");
     let lsp_src = fs::read_to_string("strykelang/lsp.rs").expect("read strykelang/lsp.rs");
+    let list_builtins_src = fs::read_to_string("strykelang/list_builtins.rs")
+        .expect("read strykelang/list_builtins.rs");
 
     let arms = extract_try_builtin_arms(&builtins_src);
     // `is_perl5_core` uses `matches!(name, …)` (parens), `stryke_extension_name`
     // uses `match name { … }` (braces). Different block markers per fn.
     let core_cats = extract_categorized_names(&parser_src, "fn is_perl5_core", "matches!");
-    let ext_cats = extract_categorized_names(&parser_src, "fn stryke_extension_name", "match name");
+    let mut ext_cats = extract_categorized_names(&parser_src, "fn stryke_extension_name", "match name");
+    // List builtins are dispatched via `list_builtins::dispatch_by_name`,
+    // not the main `try_builtin` arms — so build.rs has to scan them
+    // separately or `%b` / `%all` won't list `sum` / `min` / `max` /
+    // `pairs` / etc. Fold them into the extension category list with
+    // a uniform "list / aggregate" bucket.
+    ext_cats.extend(extract_list_builtin_names(&list_builtins_src));
     // Descriptions: /// doc comments from builtins.rs (primary source for ~1100 fns)
     // merged with hand-written lsp.rs entries (keywords, operators, reflection hashes).
     let mut descriptions = extract_builtin_doc_comments(&builtins_src, &arms);
@@ -208,7 +217,19 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
         }
         match c {
             b'{' => inner += 1,
-            b'}' => inner -= 1,
+            b'}' => {
+                inner -= 1;
+                // Block-bodied arms (`"name" => { ... }`) end at this
+                // `}` whether or not a trailing comma follows. Reset
+                // arm_start so the next arm's LHS scan doesn't span
+                // back into this arm's body — without this, names like
+                // `__stryke_rust_compile` (declared with a block body)
+                // got merged with the next arm's pattern strings,
+                // polluting reflection with phantom multi-name arms.
+                if inner == 0 {
+                    arm_start = i + 1;
+                }
+            }
             b',' if inner == 0 => arm_start = i + 1,
             b'=' if inner == 0 && bb.get(i + 1) == Some(&b'>') => {
                 let mut names = Vec::new();
@@ -217,6 +238,15 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
                 // they're duplicate dispatch entries for the plain name already
                 // in the same arm and pollute reflection with pseudo-primaries.
                 names.retain(|n| !n.contains("::"));
+                // Drop quoted strings that aren't valid bare-name dispatch
+                // identifiers — block-body arms without a trailing comma
+                // leak comment text and error-message string literals from
+                // the previous arm's body into the next arm's LHS scan
+                // ("I want a timestamp", "_thread_par_run: expected …").
+                // A real builtin name is `[A-Za-z_!?]` then `[A-Za-z0-9_]*`,
+                // optionally with a leading sigil — none contain spaces,
+                // punctuation, or colons.
+                names.retain(|n| is_valid_builtin_name(n));
                 if !names.is_empty() {
                     arms.push(names);
                 }
@@ -228,6 +258,58 @@ fn extract_try_builtin_arms(src: &str) -> Vec<Vec<String>> {
         i += 1;
     }
     arms
+}
+
+/// True if `s` is a public bare-name builtin identifier eligible for
+/// reflection / completion. Filters out:
+///   - Comment text and error-message string literals (any name that
+///     would fail an `[A-Za-z_][A-Za-z0-9_]*` ident shape).
+///   - Internal entry points whose name starts with `_` (stryke uses a
+///     leading underscore — `_thread_par_run`, `__stryke_rust_compile`
+///     — for runtime-only dispatch arms; users should never call them
+///     and the LSP shouldn't suggest them).
+fn is_valid_builtin_name(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let first = s.chars().next().unwrap();
+    if !first.is_ascii_alphabetic() {
+        return false;
+    }
+    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Parse `pub const LIST_BUILTIN_NAMES: &[&str] = &[ ... ]` from
+/// `list_builtins.rs` and return one `(name, category)` pair per entry.
+/// All list builtins land in the "list / aggregate" category (sum, min,
+/// max, pairs, blessed, refaddr, …); `%b` users can re-categorize at
+/// the source if finer-grained groupings become useful.
+fn extract_list_builtin_names(src: &str) -> Vec<(String, String)> {
+    let marker = "pub const LIST_BUILTIN_NAMES";
+    let Some(start) = src.find(marker) else {
+        return Vec::new();
+    };
+    // Skip past the type annotation (`&[&str]` has its own `[`/`]`).
+    // The actual array opens at the `[` AFTER `= &`. Anchor on `= &[`
+    // so future signature edits (`Vec<&str>` etc.) still match cleanly
+    // — the literal `&[` after the equals is the arr-open marker.
+    let after = &src[start..];
+    let Some(rel) = after.find("= &[") else {
+        return Vec::new();
+    };
+    let body_start = start + rel + "= &[".len();
+    let bytes = src.as_bytes();
+    let body_end = find_matching_close(bytes, body_start, b'[', b']');
+    let body = &src[body_start..body_end];
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let mut names = Vec::new();
+        extract_quoted(line, &mut names);
+        for n in names {
+            out.push((n, "list / aggregate".to_string()));
+        }
+    }
+    out
 }
 
 /// Parse a function with `// ── category ──` section comments above groups
@@ -282,7 +364,12 @@ fn extract_categorized_names(
         let mut names = Vec::new();
         extract_quoted(line, &mut names);
         for n in names {
-            pairs.push((n, current_cat.clone()));
+            // Same filter as `extract_try_builtin_arms` — drop
+            // internal/private names and anything that isn't a clean
+            // identifier (LHS scans can pick up garbage).
+            if is_valid_builtin_name(&n) {
+                pairs.push((n, current_cat.clone()));
+            }
         }
     }
     pairs

@@ -13520,7 +13520,7 @@ impl Parser {
             | "gammaincc" | "gamma_ui" | "gammainc_reg" | "gamma_lr"
             | "gammaincc_reg" | "gamma_ur"
             // ── date / time ─────────────────────────────────────────────────
-            | "datetime_utc" | "datetime_now_tz"
+            | "datetime_utc" | "datetime_now_tz" | "now"
             | "datetime_format_tz" | "datetime_add_seconds"
             | "datetime_from_epoch"
             | "datetime_parse_rfc3339" | "datetime_parse_local"
@@ -13873,7 +13873,10 @@ impl Parser {
             | "magnitude" | "mag" | "normalize_vec" | "nrmv"
             | "distance" | "dist" | "manhattan_distance" | "mdist"
             | "covariance" | "cov" | "correlation" | "corr"
-            | "iqr" | "quantile" | "qntl" | "quantiles" | "qntls" | "clamp_int" | "clpi"
+            | "iqr" | "quantile" | "qntl" | "quantiles" | "qntls"
+            | "lsp_completion_words" | "lsp_words"
+            | "doctor" | "health"
+            | "clamp_int" | "clpi"
             | "in_range" | "inrng" | "wrap_range" | "wrprng"
             | "sum_squares" | "sumsq" | "rms" | "cumsum" | "csum" | "cumprod" | "cprod_acc" | "diff"
             // ── Extended stdlib: Date/Time ───────────────────────────────────
