@@ -1,30 +1,52 @@
 #!/usr/bin/env stryke
 # Rosetta Code: HTTP
+#
+# Hits a local in-process server (NOT httpbin.org) so the test runs
+# offline and isn't flaky on third-party outages.
 
 fn Rosetta::HTTP::get($url) {
     fetch($url)
 }
 
-my $url = "http://httpbin.org/get"
-my $res = Rosetta::HTTP::get($url)
+# Pick a high port unlikely to collide with developer services.
+my $port = 9871
+my $base = "http://127.0.0.1:$port"
 
-assert_ok defined($res), "fetch returned something"
-assert_ok $res =~ /httpbin\.org/, "response contains expected domain"
+# Start a tiny echo server in the background. The handler reflects
+# `path` and `query` back as a JSON blob the test can pattern-match.
+# `$req->{query}` is the raw query string ("a=1"), so serialize it
+# verbatim with the path.
+async {
+    serve $port, fn {
+        my $req  = _0
+        my $body = sprintf '{"path":"%s","query":"%s"}',
+            $req->{path},
+            $req->{query} // ""
+        return +{ status => 200, body => $body }
+    }
+}
 
-# Parallel fetch example
+# Give the server a moment to bind. (`serve` is synchronous inside the
+# async block; the bind happens before its first request handler runs.)
+sleep 0.2
+
+# Single fetch round-trip.
+my $res = Rosetta::HTTP::get("$base/get")
+assert_ok defined($res),                  "fetch returned something"
+assert_ok $res =~ /"path":"\/get"/,       "response contains expected path"
+
+# Parallel fetch — fan out via `fetch_async`, collect via `await`.
 my @urls = (
-    "http://httpbin.org/get?a=1",
-    "http://httpbin.org/get?b=2",
-    "http://httpbin.org/get?c=3"
+    "$base/get?a=1",
+    "$base/get?b=2",
+    "$base/get?c=3",
 )
+my @tasks   = map { fetch_async(_) } @urls
+my @results = map { await _ }        @tasks
 
-# Use fetch_async to get tasks, then await them
-my @tasks = map { fetch_async(_) } @urls
-my @results = map { await _ } @tasks
-
-assert_eq cnt(@results), 3, "parallel fetch got 3 results"
-assert_ok $results[0] =~ /"a": "1"/, "result 0 has a=1"
-assert_ok $results[1] =~ /"b": "2"/, "result 1 has b=2"
-assert_ok $results[2] =~ /"c": "3"/, "result 2 has c=3"
+assert_eq cnt(@results), 3,             "parallel fetch got 3 results"
+assert_ok $results[0] =~ /"query":"a=1"/, "result 0 has a=1"
+assert_ok $results[1] =~ /"query":"b=2"/, "result 1 has b=2"
+assert_ok $results[2] =~ /"query":"c=3"/, "result 2 has c=3"
 
 test_run

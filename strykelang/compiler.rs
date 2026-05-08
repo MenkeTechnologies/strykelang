@@ -1671,8 +1671,10 @@ impl Compiler {
         };
         let type_name_idx = self.chunk.intern_name(&type_name);
         let flag = (u8::from(frozen) << 1) | u8::from(is_enum);
-        self.chunk
-            .emit(Op::DeclareScalarTypedUser(name_idx, type_name_idx, flag), line);
+        self.chunk.emit(
+            Op::DeclareScalarTypedUser(name_idx, type_name_idx, flag),
+            line,
+        );
     }
 
     fn emit_declare_array(&mut self, name_idx: u16, line: usize, frozen: bool) {

@@ -1,27 +1,39 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Web scraping
+#
+# Hits a local in-process server (NOT example.com) so the test runs
+# offline and isn't flaky on third-party outages.
 
 fn Rosetta::WebScraping::scrape($url) {
-    # fetch is a stryke builtin for HTTP GET
     my $html = fetch($url)
-    
-    # Extract the title using regex
     if ($html =~ /<title>(.*?)<\/title>/i) {
         return $1
     }
-    return undef
+    undef
 }
 
 fn Rosetta::WebScraping::demo() {
-    my $url = "https://example.com"
-    "Fetching $url and scraping title..." |> p
-    
-    my $title = Rosetta::WebScraping::scrape($url)
+    my $port = 9872
+    my $base = "http://127.0.0.1:$port"
+
+    # Background server that returns a small HTML doc with a known title.
+    async {
+        serve $port, fn {
+            return +{
+                status => 200,
+                body   => "<html><head><title>Example Domain</title></head>"
+                        . "<body><p>Hello from a local test server.</p></body></html>",
+            }
+        }
+    }
+    sleep 0.2
+
+    "Fetching $base and scraping title..." |> p
+    my $title = Rosetta::WebScraping::scrape($base)
     "Scraped title: $title" |> p
-    
-    # Assertions
-    assert_ok defined($title), "Title should be defined"
-    assert_eq $title, "Example Domain", "Title should match example.com"
+
+    assert_ok defined($title),               "Title should be defined"
+    assert_eq $title, "Example Domain",      "Title should match local fixture"
 }
 
 Rosetta::WebScraping::demo()

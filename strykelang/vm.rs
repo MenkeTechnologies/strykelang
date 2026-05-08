@@ -1459,13 +1459,13 @@ impl<'a> VM<'a> {
                 // `class_construct` expects user args only.
                 let line = self.line();
                 let user_args: Vec<PerlValue> = all_args.into_iter().skip(1).collect();
-                let v = self
-                    .interp
-                    .class_construct(&def, user_args, line)
-                    .map_err(|e| match e {
-                        crate::vm_helper::FlowOrError::Error(stryke) => stryke,
-                        _ => PerlError::runtime("class_construct flow", line),
-                    })?;
+                let v =
+                    self.interp
+                        .class_construct(&def, user_args, line)
+                        .map_err(|e| match e {
+                            crate::vm_helper::FlowOrError::Error(stryke) => stryke,
+                            _ => PerlError::runtime("class_construct flow", line),
+                        })?;
                 self.push(v);
             } else {
                 let mut map = IndexMap::new();
@@ -8216,9 +8216,7 @@ impl<'a> VM<'a> {
                                 // path. `set_sort_pair` only sets the named
                                 // scalars; without slots, an `$_0` reference
                                 // resolves to undef in worker bytecode.
-                                local_interp
-                                    .scope
-                                    .set_closure_args(&[a.clone(), b.clone()]);
+                                local_interp.scope.set_closure_args(&[a.clone(), b.clone()]);
                                 let mut vm = shared.worker_vm(&mut local_interp);
                                 let mut op_count = 0u64;
                                 match vm.run_block_region(start, end, &mut op_count) {
@@ -8246,9 +8244,7 @@ impl<'a> VM<'a> {
                                     .restore_atomics(&atomic_arrays, &atomic_hashes);
                                 local_interp.enable_parallel_guard();
                                 local_interp.scope.set_sort_pair(a.clone(), b.clone());
-                                local_interp
-                                    .scope
-                                    .set_closure_args(&[a.clone(), b.clone()]);
+                                local_interp.scope.set_closure_args(&[a.clone(), b.clone()]);
                                 local_interp.scope_push_hook();
                                 let ord = match local_interp.exec_block_no_scope(&block) {
                                     Ok(v) => {

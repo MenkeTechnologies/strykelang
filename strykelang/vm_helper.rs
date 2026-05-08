@@ -8528,6 +8528,49 @@ impl VMHelper {
                     self.touch_env_hash(&name);
                     return Ok(PerlValue::hash(self.scope.get_hash(&name)));
                 }
+                // Stryke `class C { ... }` instances answer to `%$obj` by
+                // flattening their field name/value pairs — the same shape
+                // a Perl-style blessed hashref produces. This keeps the
+                // canonical introspection idiom (`keys %$obj`, `values
+                // %$obj`) working for stryke-native OO too. Order matches
+                // the inheritance-collected field order from
+                // `collect_class_fields_full`.
+                if let Some(c) = val.as_class_inst() {
+                    let all_fields = self.collect_class_fields_full(&c.def);
+                    let values = c.get_values();
+                    let mut map = IndexMap::new();
+                    for (i, (name, _, _, _, _)) in all_fields.iter().enumerate() {
+                        if let Some(v) = values.get(i) {
+                            map.insert(name.clone(), v.clone());
+                        }
+                    }
+                    return Ok(PerlValue::hash(map));
+                }
+                // Same for stryke `struct S { ... }` instances — keep them
+                // introspectable through the Perl-style hash-deref idiom.
+                if let Some(s) = val.as_struct_inst() {
+                    let values = s.get_values();
+                    let mut map = IndexMap::new();
+                    for (i, field) in s.def.fields.iter().enumerate() {
+                        if let Some(v) = values.get(i) {
+                            map.insert(field.name.clone(), v.clone());
+                        }
+                    }
+                    return Ok(PerlValue::hash(map));
+                }
+                // Blessed-ref escape hatch: when the inner data is a hash,
+                // unwrap and treat the deref as if it targeted the inner
+                // hash. Old Perl OO code that wrote `%$self` on a blessed
+                // hashref keeps working without an extra unbless step.
+                if let Some(b) = val.as_blessed_ref() {
+                    let inner = b.data.read().clone();
+                    if let Some(r) = inner.as_hash_ref() {
+                        return Ok(PerlValue::hash(r.read().clone()));
+                    }
+                    if let Some(h) = inner.as_hash_map() {
+                        return Ok(PerlValue::hash(h));
+                    }
+                }
                 if val.is_undef() {
                     if self.strict_refs {
                         return Err(PerlError::runtime(
@@ -15617,6 +15660,56 @@ impl VMHelper {
         chain
     }
 
+    /// Recursively flatten class/struct instances and the hashes/arrays
+    /// they contain into a plain hashref tree. Atoms (numbers, strings,
+    /// undef, code refs, regex refs, blessed-non-hash refs, …) round-trip
+    /// unchanged. Used by `$obj->to_hash_rec` for both class and struct
+    /// receivers.
+    pub(crate) fn deep_to_hash_value(&self, v: &PerlValue) -> PerlValue {
+        // Class instance: hashref of fields, recursing into each value.
+        if let Some(c) = v.as_class_inst() {
+            let all_fields = self.collect_class_fields_full(&c.def);
+            let values = c.get_values();
+            let mut map = IndexMap::new();
+            for (i, (name, _, _, _, _)) in all_fields.iter().enumerate() {
+                if let Some(elem) = values.get(i) {
+                    map.insert(name.clone(), self.deep_to_hash_value(elem));
+                }
+            }
+            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        }
+        // Struct instance: same shape, declaration order.
+        if let Some(s) = v.as_struct_inst() {
+            let values = s.get_values();
+            let mut map = IndexMap::new();
+            for (i, field) in s.def.fields.iter().enumerate() {
+                if let Some(elem) = values.get(i) {
+                    map.insert(field.name.clone(), self.deep_to_hash_value(elem));
+                }
+            }
+            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        }
+        // Hashref: clone keys, recurse into values.
+        if let Some(r) = v.as_hash_ref() {
+            let inner = r.read().clone();
+            let mut map = IndexMap::new();
+            for (k, val) in inner.into_iter() {
+                map.insert(k, self.deep_to_hash_value(&val));
+            }
+            return PerlValue::hash_ref(Arc::new(RwLock::new(map)));
+        }
+        // Arrayref: recurse into elements.
+        if let Some(r) = v.as_array_ref() {
+            let inner = r.read().clone();
+            let out: Vec<PerlValue> = inner.iter().map(|e| self.deep_to_hash_value(e)).collect();
+            return PerlValue::array_ref(Arc::new(RwLock::new(out)));
+        }
+        // Everything else (scalars, blessed refs, code refs, enums, …)
+        // round-trips unchanged. Enum instances stringify naturally
+        // through their existing `Display` so callers see a stable name.
+        v.clone()
+    }
+
     /// Collect all fields from a class and its parent hierarchy (parent fields first).
     /// Returns (name, default, type, visibility, owning_class_name).
     fn collect_class_fields(
@@ -16114,6 +16207,17 @@ impl VMHelper {
                     }
                     return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
                 }
+                "to_hash_rec" | "to_hash_deep" => {
+                    // Like to_hash but recurse: nested struct/class/hash/
+                    // array values become plain hashref/arrayref trees.
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "struct to_hash_rec takes no arguments",
+                            line,
+                        )));
+                    }
+                    return Some(Ok(self.deep_to_hash_value(receiver)));
+                }
                 "fields" => {
                     // Field list: $p->fields returns field names
                     if !args.is_empty() {
@@ -16293,6 +16397,19 @@ impl VMHelper {
                         }
                     }
                     return Some(Ok(PerlValue::hash_ref(Arc::new(RwLock::new(map)))));
+                }
+                "to_hash_rec" | "to_hash_deep" => {
+                    // Recursive flatten: nested class/struct/hash/array
+                    // values become plain hashref/arrayref trees, so the
+                    // result is JSON-serializable end-to-end without any
+                    // surviving ClassInstance/StructInstance leaves.
+                    if !args.is_empty() {
+                        return Some(Err(PerlError::runtime(
+                            "class to_hash_rec takes no arguments",
+                            line,
+                        )));
+                    }
+                    return Some(Ok(self.deep_to_hash_value(receiver)));
                 }
                 "fields" => {
                     if !args.is_empty() {
