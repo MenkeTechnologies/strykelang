@@ -107,14 +107,20 @@ parity_test!(warn_literal, r#"warn "watch out""#);
 // SEMANTIC GAP: stryke `open` dies on failure; Perl returns false + sets $!.
 // Fixing this is a bigger change than a message tweak — see vm_helper
 // `open_builtin_execute`. Promote to assertive once fixed.
-parity_test!(open_nonexistent, r#"open my $f, "<", "/no/such/file/exists" or die $!"#);
+parity_test!(
+    open_nonexistent,
+    r#"open my $f, "<", "/no/such/file/exists" or die $!"#
+);
 
 // ── strict ───────────────────────────────────────────────────────────────
 // SEMANTIC GAP: strict-vars is a runtime check in stryke, a compile-time
 // check in perl — the latter appends "Execution of -e aborted due to
 // compilation errors." Fix by flagging these errors distinctly so
 // main.rs can append the trailing line.
-parity_test!(strict_undeclared_scalar, "use strict; $undef_var_parity_test_xyz");
+parity_test!(
+    strict_undeclared_scalar,
+    "use strict; $undef_var_parity_test_xyz"
+);
 parity_test!(
     strict_symbolic_ref,
     r#"use strict 'refs'; my $name = "foo"; ${$name} = 1"#

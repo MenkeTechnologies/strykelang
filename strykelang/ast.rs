@@ -1057,6 +1057,28 @@ pub enum ExprKind {
         list: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
+    /// `par { BLOCK } INPUT` — generic parallel-chunk wrapper. Splits INPUT
+    /// (string → UTF-8-aligned byte chunks; array/list → element-chunks)
+    /// into N pieces (N = available rayon threads), evaluates BLOCK per
+    /// chunk in parallel with `$_` bound to the chunk, then concatenates
+    /// results. Lets any whole-input op (`letters`, `chars`, `uc`, `freq`,
+    /// regex `//g`, etc.) parallelize without needing a `pX` variant.
+    ParExpr {
+        block: Block,
+        list: Box<Expr>,
+    },
+    /// `par_reduce { extract } [ { merge } ] INPUT` — chunk-extract-merge.
+    /// Same chunker as `par {}`, but each chunk's result is reduced
+    /// pairwise across chunks instead of concatenated.
+    ///
+    /// - One block: auto-merger picks based on result type (number → `+`,
+    ///   hash<num> → key-wise `+`, array → concat, string → concat).
+    /// - Two blocks: explicit pairwise reducer with `$a`/`$b`.
+    ParReduceExpr {
+        extract_block: Block,
+        reduce_block: Option<Block>,
+        list: Box<Expr>,
+    },
     /// `par_lines PATH, fn { ... } [, progress => EXPR]` — optional stderr progress (per line).
     ParLinesExpr {
         path: Box<Expr>,

@@ -1891,6 +1891,36 @@ impl Lexer {
                     self.last_was_term = false;
                     return Ok(Token::ThreadArrow);
                 }
+                // `~s>` (streaming thread-first) / `~s>>` (streaming thread-last)
+                // — per-item streaming thread-macros that lower to
+                // `par_pipeline_streaming`: each stage runs in its own worker
+                // connected by bounded channels, items flow one-at-a-time.
+                if self.peek() == Some('s') && self.peek_at(1) == Some('>') {
+                    self.advance(); // consume 's'
+                    self.advance(); // consume first '>'
+                    if self.peek() == Some('>') {
+                        self.advance(); // consume second '>'
+                        self.last_was_term = false;
+                        return Ok(Token::ThreadArrowStreamLast);
+                    }
+                    self.last_was_term = false;
+                    return Ok(Token::ThreadArrowStream);
+                }
+                // `~p>` (parallel-chunk thread-first) / `~p>>` (thread-last)
+                // — sugar for `par_reduce { stage1 |> stage2 |> ... } SOURCE`.
+                // `||>` or `|then|` mid-pipeline switches back to a normal
+                // `~>` continuation operating on the merged result.
+                if self.peek() == Some('p') && self.peek_at(1) == Some('>') {
+                    self.advance(); // consume 'p'
+                    self.advance(); // consume first '>'
+                    if self.peek() == Some('>') {
+                        self.advance(); // consume second '>'
+                        self.last_was_term = false;
+                        return Ok(Token::ThreadArrowParLast);
+                    }
+                    self.last_was_term = false;
+                    return Ok(Token::ThreadArrowPar);
+                }
                 self.last_was_term = false;
                 Ok(Token::BitNot)
             }

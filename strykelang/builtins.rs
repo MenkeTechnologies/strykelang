@@ -414,6 +414,7 @@ pub(crate) fn try_builtin(
         "flatten" | "fl" => Some(builtin_flatten(interp, args)),
         "interleave" | "il" => Some(builtin_interleave(interp, args)),
         "frequencies" | "freq" | "frq" => Some(builtin_frequencies(args)),
+        "pfrequencies" | "pfreq" | "pfrq" => Some(builtin_pfrequencies(args)),
         "ddump" | "dd" => Some(builtin_ddump(args)),
         "stringify" | "str" => Some(builtin_stringify(args)),
         "input" => Some(builtin_input(interp, args, line)),
@@ -2508,6 +2509,38 @@ pub(crate) fn try_builtin(
             } else {
                 Some(interp.builtin_par_pipeline_stream_new(args, line))
             }
+        }
+        // Internal entry point used by `~p>` / `~p>>` thread-macro lowering.
+        // Args: source_value, [stage_closures], thread_last_int.
+        "_thread_par_run" => {
+            if args.len() != 3 {
+                return Some(Err(crate::error::PerlError::runtime(
+                    "_thread_par_run: expected 3 args (source, stages, thread_last)",
+                    line,
+                )));
+            }
+            let stages_v = &args[1];
+            let stage_list = stages_v.map_flatten_outputs(true);
+            let mut subs = Vec::with_capacity(stage_list.len());
+            for v in stage_list {
+                match v.as_code_ref() {
+                    Some(s) => subs.push(s),
+                    None => {
+                        return Some(Err(crate::error::PerlError::runtime(
+                            "_thread_par_run: each stage must be a CODE ref",
+                            line,
+                        )));
+                    }
+                }
+            }
+            let thread_last = args[2].to_int() != 0;
+            Some(crate::par_pipeline::run_thread_par(
+                interp,
+                args[0].clone(),
+                subs,
+                thread_last,
+                line,
+            ))
         }
         "jwt_encode" => Some(builtin_jwt_encode(args, line)),
         "jwt_decode" => Some(builtin_jwt_decode(args, line)),
@@ -9702,6 +9735,50 @@ fn builtin_frequencies(args: &[PerlValue]) -> PerlResult<PerlValue> {
             let entry = counts.entry(key).or_insert(PerlValue::integer(0));
             *entry = PerlValue::integer(entry.to_int() + 1);
         }
+    }
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
+}
+
+/// `pfrequencies` / `pfreq` / `pfrq` — Rayon-parallel frequency count. Builds
+/// per-thread ahash maps with `fold_chunks(64K)` (large chunks amortise the
+/// thread-spawn cost), then merges via reduce. Output preserves count-desc
+/// then lex order so successive runs are byte-stable. Falls back to serial
+/// for inputs under the break-even point.
+fn builtin_pfrequencies(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let mut all = Vec::new();
+    for a in args {
+        all.extend(a.map_flatten_outputs(true));
+    }
+    // Below this length the rayon spawn / merge overhead exceeds the gain
+    // from parallel hashing — measured empirically at ~64K elements.
+    if all.len() < 65_536 {
+        return builtin_frequencies(args);
+    }
+    let merged: std::collections::HashMap<String, u64> = all
+        .par_iter()
+        .with_min_len(16_384)
+        .fold(
+            || std::collections::HashMap::<String, u64>::with_capacity(256),
+            |mut acc, v| {
+                *acc.entry(v.to_string()).or_insert(0) += 1;
+                acc
+            },
+        )
+        .reduce(std::collections::HashMap::<String, u64>::new, |a, b| {
+            // Merge smaller into larger so the hot-loop iterates the smaller set.
+            let (mut big, small) = if a.len() >= b.len() { (a, b) } else { (b, a) };
+            for (k, v) in small {
+                *big.entry(k).or_insert(0) += v;
+            }
+            big
+        });
+    // Stable order: count desc, then key asc.
+    let mut entries: Vec<(String, u64)> = merged.into_iter().collect();
+    entries.sort_unstable_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let mut counts: indexmap::IndexMap<String, PerlValue> =
+        indexmap::IndexMap::with_capacity(entries.len());
+    for (k, v) in entries {
+        counts.insert(k, PerlValue::integer(v as i64));
     }
     Ok(PerlValue::hash_ref(Arc::new(RwLock::new(counts))))
 }

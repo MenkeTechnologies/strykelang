@@ -6045,9 +6045,11 @@ par_fetch
 par_find_files
 par_info
 par_line_count
+par
 par_lines
 par_pipeline
 par_pipeline_stream
+par_reduce
 par_sed
 par_walk
 parabolic_d0

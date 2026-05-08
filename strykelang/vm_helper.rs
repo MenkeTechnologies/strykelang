@@ -2101,7 +2101,8 @@ impl VMHelper {
         // Perl's $! is the bare description ("No such file or directory"),
         // not Rust's "<desc> (os error N)" form. Strip the trailing parenthetical.
         let s = e.to_string();
-        let stripped = s.rfind(" (os error ")
+        let stripped = s
+            .rfind(" (os error ")
             .map(|i| s[..i].to_string())
             .unwrap_or(s);
         self.errno = stripped;
@@ -8484,7 +8485,8 @@ impl VMHelper {
                         return Err(PerlError::runtime(
                             "Can't use an undefined value as an ARRAY reference",
                             line,
-                        ).into());
+                        )
+                        .into());
                     }
                     return Ok(PerlValue::array(vec![]));
                 }
@@ -8522,7 +8524,8 @@ impl VMHelper {
                         return Err(PerlError::runtime(
                             "Can't use an undefined value as a HASH reference",
                             line,
-                        ).into());
+                        )
+                        .into());
                     }
                     return Ok(PerlValue::hash(IndexMap::new()));
                 }
@@ -11195,6 +11198,149 @@ impl VMHelper {
                 pmap_progress.finish();
                 Ok(PerlValue::array(results))
             }
+            ExprKind::ParExpr { block, list } => {
+                // Generic parallel-chunk wrapper: split input on a sensible
+                // boundary (UTF-8 char-aligned for strings, element-aligned
+                // for arrays), evaluate the block per chunk in parallel
+                // with `$_` bound to the chunk, then concatenate results.
+                //
+                // Chunk count is capped at min(n_threads, 8) because each
+                // chunk pays a fixed `VMHelper::new()` setup cost (env-var
+                // parsing, PATH/FPATH split, term-info ioctl, IndexMap
+                // declarations). On 18-core machines, splitting 18 ways
+                // makes setup overhead dominate the actual work.
+                let list_val = self.eval_expr(list)?;
+                let n_threads = rayon::current_num_threads().clamp(1, 8);
+                let chunks = par_chunk_value(&list_val, n_threads);
+                if chunks.len() < 2 {
+                    // Below break-even (small input or unsupported value type):
+                    // run the block once with the original input as `$_`.
+                    self.scope.set_topic(list_val);
+                    let v = self.exec_block(block)?;
+                    return Ok(v);
+                }
+                let block_clone = block.clone();
+                let subs = self.subs.clone();
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+                let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+                let err_w = Arc::clone(&first_err);
+                let per_chunk: Vec<Vec<PerlValue>> = chunks
+                    .into_par_iter()
+                    .map(|chunk| {
+                        if err_w.lock().is_some() {
+                            return Vec::new();
+                        }
+                        let mut local_interp = VMHelper::new();
+                        local_interp.subs = subs.clone();
+                        local_interp.scope.restore_capture(&scope_capture);
+                        local_interp
+                            .scope
+                            .restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local_interp.enable_parallel_guard();
+                        local_interp.scope.set_topic(chunk);
+                        match local_interp.exec_block(&block_clone) {
+                            Ok(v) => v.map_flatten_outputs(true),
+                            Err(e) => {
+                                let mut g = err_w.lock();
+                                if g.is_none() {
+                                    *g = Some(format!("par: {:?}", e));
+                                }
+                                Vec::new()
+                            }
+                        }
+                    })
+                    .collect();
+                if let Some(msg) = first_err.lock().take() {
+                    return Err(FlowOrError::Error(PerlError::runtime(msg, line)));
+                }
+                let total: usize = per_chunk.iter().map(|v| v.len()).sum();
+                let mut out = Vec::with_capacity(total);
+                for v in per_chunk {
+                    out.extend(v);
+                }
+                Ok(PerlValue::array(out))
+            }
+            ExprKind::ParReduceExpr {
+                extract_block,
+                reduce_block,
+                list,
+            } => {
+                // Chunk INPUT, run extract per chunk in parallel, then
+                // reduce pairwise across chunks. With an explicit reduce
+                // block the user controls merging via `$a` / `$b`. Without
+                // one, the merger is auto-picked based on the first
+                // chunk's result type:
+                //   - hash<num>  → key-wise add (canonical histogram merge)
+                //   - number     → numeric `+`
+                //   - array/list → concat
+                //   - string     → concat
+                let list_val = self.eval_expr(list)?;
+                let n_threads = rayon::current_num_threads().clamp(1, 8);
+                let chunks = par_chunk_value(&list_val, n_threads);
+                if chunks.len() < 2 {
+                    // Single-chunk fallback: bind input as both $_ and $_[0]
+                    // so blocks built via the pipe_rhs_wrap path (which uses
+                    // `$_[0]`) work the same as topic-style blocks.
+                    self.scope.declare_array("_", vec![list_val.clone()]);
+                    self.scope.set_topic(list_val);
+                    return self.exec_block(extract_block);
+                }
+                let extract = extract_block.clone();
+                let subs = self.subs.clone();
+                let (scope_capture, atomic_arrays, atomic_hashes) =
+                    self.scope.capture_with_atomics();
+                let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+                let err_w = Arc::clone(&first_err);
+                let per_chunk: Vec<PerlValue> = chunks
+                    .into_par_iter()
+                    .map(|chunk| {
+                        if err_w.lock().is_some() {
+                            return PerlValue::UNDEF;
+                        }
+                        let mut local = VMHelper::new();
+                        local.subs = subs.clone();
+                        local.scope.restore_capture(&scope_capture);
+                        local.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                        local.enable_parallel_guard();
+                        // Bind chunk as both `$_` (topic) and `$_[0]`.
+                        // The topic form is used by `par_reduce { letters
+                        // |> freq }` style blocks; the `$_[0]` form is
+                        // used when `~p>` lowers to `par_reduce` via the
+                        // pipe_rhs_wrap path.
+                        local.scope.declare_array("_", vec![chunk.clone()]);
+                        local.scope.set_topic(chunk);
+                        match local.exec_block(&extract) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                let mut g = err_w.lock();
+                                if g.is_none() {
+                                    *g = Some(format!("par_reduce: {:?}", e));
+                                }
+                                PerlValue::UNDEF
+                            }
+                        }
+                    })
+                    .collect();
+                if let Some(msg) = first_err.lock().take() {
+                    return Err(FlowOrError::Error(PerlError::runtime(msg, line)));
+                }
+                if per_chunk.is_empty() {
+                    return Ok(PerlValue::UNDEF);
+                }
+                // Explicit reducer: pairwise via user block with $a/$b bound.
+                if let Some(rb) = reduce_block {
+                    let mut acc = per_chunk[0].clone();
+                    for v in per_chunk.into_iter().skip(1) {
+                        self.scope.declare_scalar("a", acc.clone());
+                        self.scope.declare_scalar("b", v);
+                        acc = self.exec_block(rb)?;
+                    }
+                    return Ok(acc);
+                }
+                // Auto-merge.
+                Ok(par_reduce_auto_merge(per_chunk))
+            }
             ExprKind::PForExpr {
                 block,
                 list,
@@ -13477,8 +13623,7 @@ impl VMHelper {
         }
         // Plain primitive scalar value: under no-strict, perl symbolic-derefs
         // through the string. With `strict 'refs'`, emit perl's exact diagnostic.
-        if ref_val.is_integer_like() || ref_val.is_float_like() || ref_val.is_string_like()
-        {
+        if ref_val.is_integer_like() || ref_val.is_float_like() || ref_val.is_string_like() {
             let s = ref_val.to_string();
             if self.strict_refs {
                 return Err(PerlError::runtime(
@@ -20233,6 +20378,135 @@ fn par_walk_recursive(
 /// - When a carry exits the leftmost letter, a fresh `a` or `A` is
 ///   prepended (case-matched to the first character of the original).
 ///
+/// Split a `PerlValue` into approximately `n_threads` chunks for the
+/// `par { BLOCK }` runtime. Strings are partitioned on UTF-8 char-aligned
+/// byte boundaries; arrays/lists on element boundaries. Other scalar
+/// types (int, float, undef, ref) return a single-chunk Vec containing
+/// the value unchanged — the caller should handle this fallback.
+///
+/// Returned chunks are themselves `PerlValue` so the worker can bind
+/// each to `$_` and invoke the user's block.
+fn par_chunk_value(v: &PerlValue, n_threads: usize) -> Vec<PerlValue> {
+    let n = n_threads.max(1);
+    // String input: split on char boundaries.
+    if let Some(s) = v.as_str() {
+        let bytes = s.as_bytes();
+        if bytes.len() < 16_384 || n < 2 {
+            return vec![PerlValue::string(s)];
+        }
+        let target = bytes.len().div_ceil(n);
+        let mut splits = vec![0usize];
+        let mut cursor = target;
+        while cursor < bytes.len() {
+            // Walk forward until we hit a UTF-8 leading byte (`0xxxxxxx` or `11xxxxxx`).
+            while cursor < bytes.len() && (bytes[cursor] & 0xC0) == 0x80 {
+                cursor += 1;
+            }
+            splits.push(cursor);
+            cursor += target;
+        }
+        splits.push(bytes.len());
+        return splits
+            .windows(2)
+            .map(|w| {
+                let chunk = std::str::from_utf8(&bytes[w[0]..w[1]]).unwrap_or("");
+                PerlValue::string(chunk.to_string())
+            })
+            .collect();
+    }
+    // Array / list input: split on element boundaries.
+    if let Some(arr) = v.as_array_vec() {
+        if arr.len() < 32 || n < 2 {
+            return vec![PerlValue::array(arr)];
+        }
+        let target = arr.len().div_ceil(n);
+        let mut chunks = Vec::with_capacity(n);
+        for slice in arr.chunks(target) {
+            chunks.push(PerlValue::array(slice.to_vec()));
+        }
+        return chunks;
+    }
+    if let Some(arr_ref) = v.as_array_ref() {
+        let arr = arr_ref.read().clone();
+        if arr.len() < 32 || n < 2 {
+            return vec![PerlValue::array(arr)];
+        }
+        let target = arr.len().div_ceil(n);
+        let mut chunks = Vec::with_capacity(n);
+        for slice in arr.chunks(target) {
+            chunks.push(PerlValue::array(slice.to_vec()));
+        }
+        return chunks;
+    }
+    // Fallback: single chunk holding the original value.
+    vec![v.clone()]
+}
+
+/// Auto-merge a list of `par_reduce` per-chunk results when no explicit
+/// reduce block is supplied. Picks the merger by inspecting the first
+/// chunk's value type:
+///
+/// - **Hash with numeric values** → key-wise add (canonical histogram merge)
+/// - **Number** → numeric `+`
+/// - **Array / list** → concat
+/// - **String** → concat
+/// - **Anything else** → return chunks as a flat array (caller can post-process)
+fn par_reduce_auto_merge(chunks: Vec<PerlValue>) -> PerlValue {
+    if chunks.is_empty() {
+        return PerlValue::UNDEF;
+    }
+    let first = &chunks[0];
+    // Hash<number> add-merge.
+    if let Some(_h) = first.as_hash_ref() {
+        let mut out: indexmap::IndexMap<String, f64> = indexmap::IndexMap::new();
+        for chunk in &chunks {
+            if let Some(hr) = chunk.as_hash_ref() {
+                for (k, v) in hr.read().iter() {
+                    *out.entry(k.clone()).or_insert(0.0) += v.to_number();
+                }
+            }
+        }
+        // Round-trip integer values back to integers so `freq`-style
+        // hashes stay integer-typed downstream.
+        let mut indexmap_out: indexmap::IndexMap<String, PerlValue> = indexmap::IndexMap::new();
+        for (k, v) in out {
+            let pv = if v == v.trunc() && v.abs() < 1e15 {
+                PerlValue::integer(v as i64)
+            } else {
+                PerlValue::float(v)
+            };
+            indexmap_out.insert(k, pv);
+        }
+        return PerlValue::hash_ref(Arc::new(parking_lot::RwLock::new(indexmap_out)));
+    }
+    // Numeric add-merge (int or float).
+    if first.is_integer_like() || first.is_float_like() {
+        let s: f64 = chunks.iter().map(|v| v.to_number()).sum();
+        if s == s.trunc() && s.abs() < 1e15 {
+            return PerlValue::integer(s as i64);
+        }
+        return PerlValue::float(s);
+    }
+    // Array concat.
+    if first.as_array_vec().is_some() || first.as_array_ref().is_some() {
+        let mut out = Vec::new();
+        for v in &chunks {
+            out.extend(v.map_flatten_outputs(true));
+        }
+        return PerlValue::array(out);
+    }
+    // String concat.
+    if first.is_string_like() {
+        let mut out = String::new();
+        for v in &chunks {
+            out.push_str(&v.to_string());
+        }
+        return PerlValue::string(out);
+    }
+    // Fallback: flat list of chunk results.
+    PerlValue::array(chunks)
+}
+
 /// Decrement has no magic counterpart in Perl 5; this helper is for `++`
 /// only.
 fn perl_magic_str_inc(s: &str) -> Option<String> {

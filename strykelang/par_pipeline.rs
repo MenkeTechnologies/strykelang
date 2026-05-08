@@ -317,6 +317,167 @@ pub(crate) fn run_par_pipeline(
     Ok(PerlValue::integer(items.len() as i64))
 }
 
+/// Worker loop for `~p>` / `~p>>` stages. Differs from `run_worker` in two
+/// ways: (a) the stage body is evaluated and its result is flattened via
+/// `map_flatten_outputs` before being sent downstream, so a list/array-
+/// returning stage like `map { ... }` propagates each element as a
+/// separate item (instead of returning `1` — the scalar-context list
+/// count); (b) when the result is undef the item is silently dropped
+/// (filter semantics) so `grep { ... }` works as expected.
+#[allow(clippy::too_many_arguments)]
+fn run_thread_par_worker(
+    sub: Arc<PerlSub>,
+    subs: HashMap<String, Arc<PerlSub>>,
+    capture: Vec<(String, PerlValue)>,
+    atomic_arrays: Vec<(String, AtomicArray)>,
+    atomic_hashes: Vec<(String, AtomicHash)>,
+    rx: Receiver<PerlValue>,
+    tx_out: Option<Sender<PerlValue>>,
+    err: Arc<Mutex<Option<String>>>,
+    last_stage_counter: Option<Arc<AtomicUsize>>,
+) {
+    while let Ok(item) = rx.recv() {
+        if err.lock().is_some() {
+            break;
+        }
+        let mut interp = VMHelper::new();
+        interp.subs = subs.clone();
+        interp.scope.restore_capture(&capture);
+        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+        if let Some(env) = sub.closure_env.as_ref() {
+            interp.scope.restore_capture(env);
+        }
+        interp.enable_parallel_guard();
+        interp.scope.set_topic(item);
+        interp.scope_push_hook();
+        let raw = match interp.exec_block_no_scope(&sub.body) {
+            Ok(v) => v,
+            Err(FlowOrError::Flow(Flow::Return(v))) => v,
+            Err(e) => {
+                interp.scope_pop_hook();
+                let mut g = err.lock();
+                if g.is_none() {
+                    *g = Some(flow_err_msg(e));
+                }
+                break;
+            }
+        };
+        interp.scope_pop_hook();
+
+        // Flatten list/array results into individual downstream items.
+        // `map_flatten_outputs(true)` peels one level of array-ref so
+        // `map { ... }` (which returns an array-ref in scalar context)
+        // propagates each element. Plain scalars come back as a single-
+        // element vec.
+        let items: Vec<PerlValue> = if raw.is_undef() {
+            Vec::new() // filter / drop semantics
+        } else {
+            raw.map_flatten_outputs(true)
+        };
+
+        for out in items {
+            if let Some(c) = &last_stage_counter {
+                c.fetch_add(1, Ordering::SeqCst);
+            }
+            if let Some(t) = &tx_out {
+                if t.send(out).is_err() {
+                    let mut g = err.lock();
+                    if g.is_none() {
+                        *g = Some("~p>: downstream closed".into());
+                    }
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// Entry point for the `~p>` / `~p>>` thread-macro variants. Takes a
+/// pre-evaluated `source_value` (anything that flattens to a list — array
+/// ref, atomic array, single scalar, etc.), an array of stage closures,
+/// and a `thread_last` flag. Iterates the source list and feeds each item
+/// through the streaming pipeline (`run_par_pipeline_streaming`). Each
+/// stage gets one worker by default; stages receive each item as `$_`.
+///
+/// `thread_last` is currently informational — `~p>` and `~p>>` differ only
+/// in how the threaded value is conceptually inserted into the stage call,
+/// and our stages already use `$_` (topic) which is position-agnostic.
+pub(crate) fn run_thread_par(
+    interp: &mut VMHelper,
+    source_value: PerlValue,
+    stage_closures: Vec<Arc<PerlSub>>,
+    _thread_last: bool,
+    line: usize,
+) -> PerlResult<PerlValue> {
+    if stage_closures.is_empty() {
+        return Err(PerlError::runtime(
+            "~p>: requires at least one stage after the source",
+            line,
+        ));
+    }
+    let k = stage_closures.len();
+    let cap: usize = 256;
+    let subs = interp.subs.clone();
+    let (capture, atomic_arrays, atomic_hashes) = interp.scope.capture_with_atomics();
+
+    let err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let processed = Arc::new(AtomicUsize::new(0));
+
+    // Materialise source into a Vec the source-feeder thread will iterate.
+    let items: Vec<PerlValue> = source_value.map_flatten_outputs(true);
+
+    let mut txs: Vec<Sender<PerlValue>> = Vec::with_capacity(k);
+    let mut rxs: Vec<Receiver<PerlValue>> = Vec::with_capacity(k);
+    for _ in 0..k {
+        let (tx, rx) = bounded(cap);
+        txs.push(tx);
+        rxs.push(rx);
+    }
+    let tx0 = txs.remove(0);
+
+    std::thread::scope(|scope| {
+        // Source thread: drain `items` into the first stage's input channel.
+        scope.spawn(move || {
+            for item in items {
+                if tx0.send(item).is_err() {
+                    break;
+                }
+            }
+        });
+
+        // One worker per stage (matches par_pipeline_streaming semantics).
+        for (stage_idx, stage_sub) in stage_closures.iter().enumerate() {
+            let rx = rxs[stage_idx].clone();
+            let tx_out = if stage_idx + 1 < k {
+                Some(txs[stage_idx].clone())
+            } else {
+                None
+            };
+            let last_ctr = if stage_idx + 1 == k {
+                Some(Arc::clone(&processed))
+            } else {
+                None
+            };
+            let sub = Arc::clone(stage_sub);
+            let subs_w = subs.clone();
+            let cap_w = capture.clone();
+            let aa_w = atomic_arrays.clone();
+            let ah_w = atomic_hashes.clone();
+            let err_w = Arc::clone(&err);
+            scope.spawn(move || {
+                run_thread_par_worker(sub, subs_w, cap_w, aa_w, ah_w, rx, tx_out, err_w, last_ctr);
+            });
+        }
+        txs.clear();
+        rxs.clear();
+    });
+
+    if let Some(msg) = err.lock().take() {
+        return Err(PerlError::runtime(msg, line));
+    }
+    Ok(PerlValue::integer(processed.load(Ordering::SeqCst) as i64))
+}
+
 /// Run a **streaming** parallel pipeline: items flow through bounded channels
 /// between stages concurrently (order not preserved when a stage has multiple workers).
 /// Returns the number of items processed by the **last** stage (scalar).

@@ -121,6 +121,11 @@ pub struct Parser {
     /// function arguments. Used by thread macro to prevent `t Color::Red p` from
     /// interpreting `p` as an argument to the enum constructor instead of a stage.
     suppress_parenless_call: u32,
+    /// Pre-built input expression for the next `parse_thread_macro_inner`
+    /// call. Used by `~p>` continuation parsing (`||>` / `|then|`) to
+    /// thread the par_reduce result into a normal `~>` continuation
+    /// without re-parsing a source expression.
+    pending_thread_input: Option<Expr>,
     /// When > 0, `parse_multiplication` will not consume `Token::Slash` as division.
     /// Used by thread macro so `/pattern/` is left for the stage parser to handle.
     suppress_slash_as_div: u32,
@@ -185,6 +190,7 @@ impl Parser {
             error_file: file.into(),
             declared_subs: std::collections::HashSet::new(),
             suppress_parenless_call: 0,
+            pending_thread_input: None,
             suppress_slash_as_div: 0,
             suppress_m_regex: 0,
             suppress_colon_range: 0,
@@ -1580,6 +1586,8 @@ impl Parser {
                 | "flatten"
                 | "frequencies"
                 | "freq"
+                | "pfrequencies"
+                | "pfreq"
                 | "interleave"
                 | "ddump"
                 | "stringify"
@@ -1698,6 +1706,7 @@ impl Parser {
                 | "pipeline"
                 | "pmap_chunked"
                 | "pmap_reduce"
+                | "par_reduce"
                 | "pmap_on"
                 | "pflat_map_on"
                 | "pmap"
@@ -2027,12 +2036,34 @@ impl Parser {
     /// `CodeRef`. The outer `pipe_forward_apply` then calls it with `lhs` as
     /// `$_[0]`, giving `LHS |> t s1 s2 s3` == `LHS |> s1 |> s2 |> s3`.
     fn parse_thread_macro(&mut self, _line: usize, thread_last: bool) -> PerlResult<Expr> {
+        self.parse_thread_macro_inner(_line, thread_last, None)
+    }
+
+    /// Shared core for `~>` / `~>>` / `~s>` / `~s>>`. When
+    /// `parallel_collector` is `Some` (streaming-mode entry from `~s>` /
+    /// `~s>>`), after each stage is parsed we push the (just-built) stage
+    /// expression into the collector and reset `result` to `$_` so the
+    /// next stage parses against a fresh topic. The collector ends up
+    /// with one Expr per stage where each stage's input is `$_`, ready
+    /// to be wrapped as a `fn { ... }` closure for the per-item
+    /// streaming runtime (`_thread_par_run`).
+    fn parse_thread_macro_inner(
+        &mut self,
+        _line: usize,
+        thread_last: bool,
+        mut parallel_collector: Option<&mut Vec<Expr>>,
+    ) -> PerlResult<Expr> {
         // Set thread-last mode for pipe_forward_apply calls within this macro
         let saved_thread_last = self.thread_last_mode;
         self.thread_last_mode = thread_last;
 
         let pipe_rhs_wrap = self.in_pipe_rhs();
-        let mut result = if pipe_rhs_wrap {
+        // `pending_thread_input` (set by `~p>` continuation parsing after
+        // `||>` / `|then|`) supplies a pre-built input expression so we
+        // skip parsing a source.
+        let mut result = if let Some(pre) = self.pending_thread_input.take() {
+            pre
+        } else if pipe_rhs_wrap {
             Expr {
                 kind: ExprKind::ArrayElement {
                     array: "_".to_string(),
@@ -2050,6 +2081,21 @@ impl Parser {
             let expr = self.parse_thread_input();
             self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
             expr?
+        };
+        // Capture the source expression for parallel mode BEFORE any stage
+        // is parsed, then reset `result` to `$_` so the first stage's parse
+        // reads the topic instead of the source.
+        let source_for_par = if parallel_collector.is_some() {
+            let src = std::mem::replace(
+                &mut result,
+                Expr {
+                    kind: ExprKind::ScalarVar("_".into()),
+                    line: _line,
+                },
+            );
+            Some(src)
+        } else {
+            None
         };
 
         // Track line where the last stage ended (initially the input expression's line).
@@ -2079,6 +2125,18 @@ impl Parser {
                 | Token::ArrayVar(_)
                 | Token::HashVar(_)
                 | Token::Comma => break,
+                // `||>` (LogOr + NumGt): chunk-parallel → sequential boundary
+                // for `~p>` macros. Other thread macros never see this in
+                // practice; if it appears, terminate the macro and let the
+                // outer parser handle it.
+                Token::LogOr if matches!(self.peek_at(1), Token::NumGt) => break,
+                // `|then|` (BitOr + Ident("then") + BitOr): same boundary.
+                Token::BitOr
+                    if matches!(self.peek_at(1), Token::Ident(ref n) if n == "then")
+                        && matches!(self.peek_at(2), Token::BitOr) =>
+                {
+                    break
+                }
                 Token::Ident(ref kw)
                     if matches!(
                         kw.as_str(),
@@ -2297,6 +2355,27 @@ impl Parser {
                                 reduce_block,
                                 list: Box::new(placeholder),
                                 progress: None,
+                            },
+                            line: stage_line,
+                        };
+                        result = self.pipe_forward_apply(result, stage, stage_line)?;
+                    // `par_reduce { extract } [ { merge } ]` — chunk-extract-merge.
+                    // First block runs per chunk in parallel; optional second
+                    // block reduces pairwise across chunks (omit for auto-merge
+                    // by result type).
+                    } else if func_name == "par_reduce" {
+                        let extract_block = self.parse_block_or_bareword_block()?;
+                        let reduce_block = if matches!(self.peek(), Token::LBrace) {
+                            Some(self.parse_block()?)
+                        } else {
+                            None
+                        };
+                        let placeholder = self.pipe_placeholder_list(stage_line);
+                        let stage = Expr {
+                            kind: ExprKind::ParReduceExpr {
+                                extract_block,
+                                reduce_block,
+                                list: Box::new(placeholder),
                             },
                             line: stage_line,
                         };
@@ -2613,10 +2692,80 @@ impl Parser {
                 }
             };
             last_stage_end_line = self.prev_line();
+            // Parallel mode: each iteration of the loop has produced a
+            // stage expression where `$_` is the input. Push it into the
+            // collector and reset `result` to `$_` so the next stage
+            // parses against a fresh topic.
+            if let Some(stages) = parallel_collector.as_mut() {
+                let stage_body = std::mem::replace(
+                    &mut result,
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: stage_line,
+                    },
+                );
+                stages.push(stage_body);
+            }
         }
 
         // Restore thread-last mode
         self.thread_last_mode = saved_thread_last;
+
+        // Parallel mode: lower to `_thread_par_run(source_expr, [stage_closures], thread_last)`.
+        // The runtime treats the source value as a list-of-items and feeds
+        // each item into stage 1 via a bounded channel. Each stage runs in
+        // its own worker; stages are wrapped as `fn { body }` closures so
+        // the runtime sets `$_` to the current item before invoking.
+        if let Some(stages) = parallel_collector {
+            let source_expr = source_for_par.unwrap_or(result);
+            if stages.is_empty() {
+                return Err(self.syntax_err(
+                    "~p> / ~p>> require at least one stage after the source",
+                    _line,
+                ));
+            }
+            // Wrap each stage body in `[ ... ]` (an ArrayRef) so list-returning
+            // ops like `map`/`grep` propagate their full output instead of
+            // collapsing to a scalar count. The runtime worker peels one
+            // level of array-ref via `map_flatten_outputs(true)` so each
+            // element flows downstream as its own item.
+            let stage_closures: Vec<Expr> = stages
+                .drain(..)
+                .map(|body| {
+                    let body_line = body.line;
+                    let wrapped = Expr {
+                        kind: ExprKind::ArrayRef(vec![body]),
+                        line: body_line,
+                    };
+                    Expr {
+                        kind: ExprKind::CodeRef {
+                            params: vec![],
+                            body: vec![Statement {
+                                label: None,
+                                kind: StmtKind::Expression(wrapped),
+                                line: body_line,
+                            }],
+                        },
+                        line: body_line,
+                    }
+                })
+                .collect();
+            let stages_arr = Expr {
+                kind: ExprKind::ArrayRef(stage_closures),
+                line: _line,
+            };
+            let thread_last_flag = Expr {
+                kind: ExprKind::Integer(if thread_last { 1 } else { 0 }),
+                line: _line,
+            };
+            return Ok(Expr {
+                kind: ExprKind::FuncCall {
+                    name: "_thread_par_run".into(),
+                    args: vec![source_expr, stages_arr, thread_last_flag],
+                },
+                line: _line,
+            });
+        }
 
         if pipe_rhs_wrap {
             // Wrap as `fn { …stages threaded from $_[0]… }` so the outer
@@ -2780,6 +2929,10 @@ impl Parser {
             },
             "frequencies" | "freq" | "frq" => ExprKind::FuncCall {
                 name: "frequencies".to_string(),
+                args: vec![arg],
+            },
+            "pfrequencies" | "pfreq" | "pfrq" => ExprKind::FuncCall {
+                name: "pfrequencies".to_string(),
                 args: vec![arg],
             },
             "dedup" | "dup" => ExprKind::FuncCall {
@@ -3146,6 +3299,13 @@ impl Parser {
             }),
             "fore" | "e" | "ep" => Ok(Expr {
                 kind: ExprKind::ForEachExpr {
+                    block,
+                    list: Box::new(placeholder),
+                },
+                line,
+            }),
+            "par" => Ok(Expr {
+                kind: ExprKind::ParExpr {
                     block,
                     list: Box::new(placeholder),
                 },
@@ -6407,15 +6567,16 @@ impl Parser {
                 match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
                     | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
-                    | "shuffled" | "frequencies" | "freq" | "interleave" | "ddump"
-                    | "stringify" | "str" | "lines" | "words" | "chars" | "digits" | "letters"
-                    | "letters_uc" | "letters_lc" | "punctuation" | "numbers" | "graphemes"
-                    | "columns" | "sentences" | "paragraphs" | "sections" | "trim" | "avg"
-                    | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml" | "to_html"
-                    | "from_json" | "from_csv" | "from_toml" | "from_yaml" | "from_xml"
-                    | "to_markdown" | "to_table" | "xopen" | "clip" | "sparkline" | "bar_chart"
-                    | "flame" | "stddev" | "squared" | "sq" | "square" | "cubed" | "cb"
-                    | "cube" | "normalize" | "snake_case" | "camel_case" | "kebab_case" => {
+                    | "shuffled" | "frequencies" | "freq" | "pfrequencies" | "pfreq"
+                    | "interleave" | "ddump" | "stringify" | "str" | "lines" | "words"
+                    | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
+                    | "punctuation" | "numbers" | "graphemes" | "columns" | "sentences"
+                    | "paragraphs" | "sections" | "trim" | "avg" | "to_json" | "to_csv"
+                    | "to_toml" | "to_yaml" | "to_xml" | "to_html" | "from_json" | "from_csv"
+                    | "from_toml" | "from_yaml" | "from_xml" | "to_markdown" | "to_table"
+                    | "xopen" | "clip" | "sparkline" | "bar_chart" | "flame" | "stddev"
+                    | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "normalize"
+                    | "snake_case" | "camel_case" | "kebab_case" => {
                         if args.is_empty() {
                             args.push(lhs);
                         } else {
@@ -6847,6 +7008,19 @@ impl Parser {
                 flat_outputs,
                 on_cluster,
                 stream,
+            },
+            ExprKind::ParExpr { block, list: _ } => ExprKind::ParExpr {
+                block,
+                list: Box::new(lhs),
+            },
+            ExprKind::ParReduceExpr {
+                extract_block,
+                reduce_block,
+                list: _,
+            } => ExprKind::ParReduceExpr {
+                extract_block,
+                reduce_block,
+                list: Box::new(lhs),
             },
             ExprKind::PMapChunkedExpr {
                 chunk_size,
@@ -7625,6 +7799,99 @@ impl Parser {
         let result = self.parse_range();
         self.suppress_slash_as_div = self.suppress_slash_as_div.saturating_sub(1);
         result
+    }
+
+    /// Parse `~p>` / `~p>>` parallel-chunk thread-macros. Equivalent to
+    /// `par_reduce { stage1 |> stage2 |> ... } SOURCE`, with optional
+    /// `||>` or `|then|` mid-pipeline boundary that switches to a normal
+    /// `~>` / `~>>` continuation operating on the auto-merged result.
+    fn parse_thread_macro_chunk_par(&mut self, line: usize, thread_last: bool) -> PerlResult<Expr> {
+        // Source: same parsing rules as `~>`.
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_add(1);
+        let source_expr = self.parse_thread_input();
+        self.suppress_parenless_call = self.suppress_parenless_call.saturating_sub(1);
+        let source_expr = source_expr?;
+
+        // Per-chunk stage chain: we want `result` to start as `$_` (topic)
+        // since the par_reduce runtime binds the chunk to the topic. The
+        // existing `pipe_rhs_wrap` path inits `result` to `$_[0]`, and
+        // par_reduce's runtime also declares `@_` = [chunk] for the
+        // worker invocation, so `$_[0]` == `$_` inside the block.
+        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_add(1);
+        let chunk_chain = self.parse_thread_macro_inner(line, thread_last, None);
+        self.pipe_rhs_depth = self.pipe_rhs_depth.saturating_sub(1);
+        let chunk_chain = chunk_chain?;
+
+        // `parse_thread_macro_inner` (under pipe_rhs_depth > 0) wraps its
+        // result as `fn { ... stages applied to $_[0] ... }`. Unwrap to
+        // get the bare Block (`Vec<Statement>`) for the `par_reduce`
+        // extract slot.
+        let extract_block: Block = match chunk_chain.kind {
+            ExprKind::CodeRef { params: _, body } => body,
+            _ => vec![Statement {
+                label: None,
+                kind: StmtKind::Expression(chunk_chain),
+                line,
+            }],
+        };
+
+        let par_reduce = Expr {
+            kind: ExprKind::ParReduceExpr {
+                extract_block,
+                reduce_block: None,
+                list: Box::new(source_expr),
+            },
+            line,
+        };
+
+        // Check for `||>` / `|then|` boundary; if present, parse the
+        // continuation as a normal `~>` / `~>>` thread macro with the
+        // par_reduce result as its input.
+        if self.eat_chunk_par_split_boundary() {
+            return self.parse_thread_macro_continuation(par_reduce, line, thread_last);
+        }
+        Ok(par_reduce)
+    }
+
+    /// Parse a `~>` / `~>>` continuation after a `||>` / `|then|`
+    /// chunk-parallel-to-sequential boundary. Reuses
+    /// `parse_thread_macro_inner` with `result_init: Some(prior)` so the
+    /// stage loop threads from the par_reduce result instead of parsing
+    /// a fresh source expression.
+    fn parse_thread_macro_continuation(
+        &mut self,
+        prior: Expr,
+        line: usize,
+        thread_last: bool,
+    ) -> PerlResult<Expr> {
+        self.pending_thread_input = Some(prior);
+        let res = self.parse_thread_macro_inner(line, thread_last, None);
+        self.pending_thread_input = None;
+        res
+    }
+
+    /// Try to consume `||>` (LogOr followed by `>`) or `|then|`
+    /// (`Pipe Ident("then") Pipe`) as the chunk-parallel → sequential
+    /// switch marker. Returns true if a boundary was consumed.
+    fn eat_chunk_par_split_boundary(&mut self) -> bool {
+        // `||>` = `LogOr` token (already merged in lex) followed by `>`.
+        if matches!(self.peek(), Token::LogOr) && matches!(self.peek_at(1), Token::NumGt) {
+            self.advance(); // ||
+            self.advance(); // >
+            return true;
+        }
+        // `|then|` = `BitOr` + `Ident("then")` + `BitOr`.
+        if matches!(self.peek(), Token::BitOr) {
+            if let Token::Ident(name) = self.peek_at(1).clone() {
+                if name == "then" && matches!(self.peek_at(2), Token::BitOr) {
+                    self.advance(); // |
+                    self.advance(); // then
+                    self.advance(); // |
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Perl `..` / `...` operator — precedence sits between `?:` and `||` (`perlop`), so
@@ -8862,6 +9129,24 @@ impl Parser {
                 self.advance();
                 self.parse_thread_macro(line, true)
             }
+            Token::ThreadArrowStream => {
+                self.advance();
+                let mut stages = Vec::new();
+                self.parse_thread_macro_inner(line, false, Some(&mut stages))
+            }
+            Token::ThreadArrowStreamLast => {
+                self.advance();
+                let mut stages = Vec::new();
+                self.parse_thread_macro_inner(line, true, Some(&mut stages))
+            }
+            Token::ThreadArrowPar => {
+                self.advance();
+                self.parse_thread_macro_chunk_par(line, false)
+            }
+            Token::ThreadArrowParLast => {
+                self.advance();
+                self.parse_thread_macro_chunk_par(line, true)
+            }
             Token::Ident(ref name) => {
                 let name = name.clone();
                 // Handle s///
@@ -9696,11 +9981,9 @@ impl Parser {
                         | ExprKind::Float(_)
                         | ExprKind::String(_)
                 ) {
-                    return Err(self.syntax_err(
-                        "Experimental push on scalar is now forbidden",
-                        line,
-                    )
-                    .with_near("at EOF"));
+                    return Err(self
+                        .syntax_err("Experimental push on scalar is now forbidden", line)
+                        .with_near("at EOF"));
                 }
                 Ok(Expr {
                     kind: ExprKind::Push {
@@ -13080,7 +13363,8 @@ impl Parser {
             | "trim" | "avg" | "stddev"
             | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt" | "pow" | "pw"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
-            | "frequencies" | "freq" | "interleave" | "ddump" | "stringify" | "str" | "top"
+            | "frequencies" | "freq" | "pfrequencies" | "pfreq"
+            | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
             | "from_json" | "from_csv" | "from_toml" | "from_yaml" | "from_xml"
