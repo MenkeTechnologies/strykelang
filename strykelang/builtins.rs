@@ -2460,9 +2460,22 @@ pub(crate) fn try_builtin(
             let b = args.get(1).unwrap_or(&undef);
             crate::native_codec::datetime_strftime(a, b)
         }),
-        "datetime_now_tz" | "now" => Some(crate::native_codec::datetime_now_tz(
+        "datetime_now_tz" => Some(crate::native_codec::datetime_now_tz(
             args.first().unwrap_or(&undef),
         )),
+        "now" => {
+            // Bare `now` returns Unix seconds-since-epoch (alias of
+            // `time`) — the most common "I want a timestamp" use case.
+            // `now(TZ)` keeps the timezone-aware datetime form via
+            // `datetime_now_tz`. Without this guard, `s now` errored
+            // with `unknown timezone ""` because `datetime_now_tz`
+            // demanded a TZ argument.
+            if args.is_empty() {
+                Some(builtin_time())
+            } else {
+                Some(crate::native_codec::datetime_now_tz(&args[0]))
+            }
+        }
         "datetime_format_tz" => Some(crate::native_codec::datetime_format_tz(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),
@@ -2787,6 +2800,8 @@ pub(crate) fn try_builtin(
         "iqr" => Some(builtin_iqr(args)),
         "quantile" | "qntl" => Some(builtin_quantile(args)),
         "quantiles" | "qntls" => Some(builtin_quantiles(args)),
+        "lsp_completion_words" | "lsp_words" => Some(builtin_lsp_completion_words(interp, args)),
+        "doctor" | "health" => Some(builtin_doctor(interp, args)),
         "clamp_int" | "clpi" => Some(builtin_clamp_int(args)),
         "in_range" | "inrng" => Some(builtin_in_range(args)),
         "wrap_range" | "wrprng" => Some(builtin_wrap_range(args)),
@@ -22411,6 +22426,388 @@ fn builtin_quantile(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 /// `quantiles \@DATA, \@PROBS` — batch quantile lookup. Returns a list with
 /// one element per probability in `\@PROBS`, computed via the same linear
+/// `doctor` / `health` — runtime diagnostics. Prints a colored
+/// report covering version, paths, runtime flags, environment overrides,
+/// builtin counts, worker-pool size, and toolchain availability. Returns
+/// the number of warnings found (0 = healthy).
+///
+/// Designed to be a stryke-script-callable builtin (`s -e 'doctor'`)
+/// rather than a CLI subcommand, so it can introspect the live runtime
+/// state — `%b` / `%all` counts, current `compat_mode()` /
+/// `no_interop_mode()` settings, scope-level bindings, etc.
+fn builtin_doctor(interp: &mut VMHelper, _args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use std::io::IsTerminal;
+    let isatty = std::io::stdout().is_terminal();
+    let (c, g, y, r, b, d, n) = if isatty {
+        (
+            "\x1b[36m",   // cyan
+            "\x1b[32m",   // green
+            "\x1b[1;33m", // yellow
+            "\x1b[31m",   // red
+            "\x1b[1m",    // bold
+            "\x1b[2m",    // dim
+            "\x1b[0m",    // reset
+        )
+    } else {
+        ("", "", "", "", "", "", "")
+    };
+
+    let mut warnings = 0usize;
+    let mut out = String::new();
+
+    let banner = format!(
+        "{c}╔══════════════════════════════════════════════╗{n}\n\
+         {c}║{n}  {b}STRYKE DOCTOR{n}  {d}//{n}  {g}runtime diagnostics{n}    {c}║{n}\n\
+         {c}╚══════════════════════════════════════════════╝{n}\n"
+    );
+    out.push_str(&banner);
+
+    // ── Version & binary ────────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  identity{n}\n"));
+    out.push_str(&format!(
+        "  {c}version{n}     {g}{}{n}\n",
+        env!("CARGO_PKG_VERSION")
+    ));
+    let exe = std::env::current_exe()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "<unknown>".to_string());
+    out.push_str(&format!("  {c}binary{n}      {}\n", exe));
+    let build_profile = if cfg!(debug_assertions) {
+        format!("{y}debug{n} {d}(use cargo build --release for production){n}")
+    } else {
+        format!("{g}release{n}")
+    };
+    out.push_str(&format!("  {c}build{n}       {}\n", build_profile));
+    let triple = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
+    out.push_str(&format!("  {c}target{n}      {}\n", triple));
+
+    // ── Runtime flags ───────────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  runtime flags{n}\n"));
+    let yn = |v: bool| if v { format!("{g}on{n}") } else { format!("{d}off{n}") };
+    out.push_str(&format!("  {c}--compat{n}            {}\n", yn(crate::compat_mode())));
+    out.push_str(&format!(
+        "  {c}--no-interop{n}        {}\n",
+        yn(crate::no_interop_mode())
+    ));
+    out.push_str(&format!(
+        "  {c}use bigint{n}          {}\n",
+        yn(crate::bigint_pragma())
+    ));
+    out.push_str(&format!(
+        "  {c}strict_vars{n}         {}\n",
+        yn(interp.strict_vars)
+    ));
+    out.push_str(&format!(
+        "  {c}strict_refs{n}         {}\n",
+        yn(interp.strict_refs)
+    ));
+
+    // ── Environment overrides ───────────────────────────────────
+    out.push_str(&format!("\n{b}>>  environment{n}\n"));
+    let env_check = |name: &str| -> String {
+        match std::env::var(name) {
+            Ok(v) if !v.is_empty() => format!("{g}{}{n}", v),
+            _ => format!("{d}unset{n}"),
+        }
+    };
+    for var in [
+        "STRYKE_NO_TTY",
+        "NO_TTY",
+        "STRYKE_NO_JIT",
+        "STRYKE_NO_CACHE",
+        "STRYKE_PROFILE",
+        "RUST_LOG",
+    ] {
+        out.push_str(&format!("  {c}{:18}{n} {}\n", var, env_check(var)));
+    }
+
+    // ── Builtin / reflection counts ─────────────────────────────
+    out.push_str(&format!("\n{b}>>  reflection{n}\n"));
+    let primaries = CATEGORY_MAP.len();
+    let all_spellings = ALL_CATEGORY_MAP.len();
+    let aliases = all_spellings.saturating_sub(primaries);
+    let categories = {
+        let mut seen = std::collections::HashSet::new();
+        for (_, c) in CATEGORY_MAP {
+            seen.insert(*c);
+        }
+        seen.len()
+    };
+    out.push_str(&format!("  {c}primaries{n}           {g}{}{n}\n", primaries));
+    out.push_str(&format!("  {c}aliases{n}             {g}{}{n}\n", aliases));
+    out.push_str(&format!(
+        "  {c}all spellings (%all){n} {g}{}{n}\n",
+        all_spellings
+    ));
+    out.push_str(&format!("  {c}categories{n}          {g}{}{n}\n", categories));
+    out.push_str(&format!(
+        "  {c}list builtins{n}       {g}{}{n}\n",
+        crate::list_builtins::LIST_BUILTIN_NAMES.len()
+    ));
+
+    // ── Concurrency ─────────────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  concurrency{n}\n"));
+    let n_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    out.push_str(&format!("  {c}logical cpus{n}        {g}{}{n}\n", n_cpus));
+    let rayon_threads = rayon::current_num_threads();
+    out.push_str(&format!("  {c}rayon pool{n}          {g}{}{n}\n", rayon_threads));
+
+    // ── Cache & config dirs ─────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  paths{n}\n"));
+    let cache_dir = dirs::cache_dir()
+        .map(|p| p.join("stryke"))
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "<unavailable>".to_string());
+    let config_dir = dirs::config_dir()
+        .map(|p| p.join("stryke"))
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "<unavailable>".to_string());
+    let home = dirs::home_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "<unavailable>".to_string());
+    out.push_str(&format!("  {c}home{n}        {}\n", home));
+    out.push_str(&format!("  {c}cache{n}       {}\n", cache_dir));
+    out.push_str(&format!("  {c}config{n}      {}\n", config_dir));
+
+    // ── Toolchain detection (best-effort) ───────────────────────
+    out.push_str(&format!("\n{b}>>  toolchain{n}\n"));
+    let which = |bin: &str| -> Option<String> {
+        std::process::Command::new(bin)
+            .arg("--version")
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout)
+                        .ok()
+                        .map(|s| s.lines().next().unwrap_or("").to_string())
+                } else {
+                    None
+                }
+            })
+    };
+    for bin in ["rustc", "cargo", "perl", "git", "rg"] {
+        match which(bin) {
+            Some(v) => out.push_str(&format!("  {g}✓{n} {c}{:6}{n}  {d}{}{n}\n", bin, v)),
+            None => {
+                out.push_str(&format!("  {y}—{n} {c}{:6}{n}  {d}not on PATH{n}\n", bin));
+            }
+        }
+    }
+
+    // ── Sanity checks ───────────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  sanity{n}\n"));
+    let check = |label: &str, ok: bool, detail: &str, warn: &mut usize| -> String {
+        if ok {
+            format!("  {g}✓{n} {c}{:32}{n}  {d}{}{n}\n", label, detail)
+        } else {
+            *warn += 1;
+            format!("  {r}✗{n} {c}{:32}{n}  {d}{}{n}\n", label, detail)
+        }
+    };
+    out.push_str(&check(
+        "primaries non-empty",
+        primaries > 0,
+        &format!("{} dispatch primaries", primaries),
+        &mut warnings,
+    ));
+    out.push_str(&check(
+        "all-spellings ⊇ primaries",
+        all_spellings >= primaries,
+        &format!("{} ≥ {}", all_spellings, primaries),
+        &mut warnings,
+    ));
+    out.push_str(&check(
+        "rayon pool ≥ 1",
+        rayon_threads >= 1,
+        &format!("{} threads", rayon_threads),
+        &mut warnings,
+    ));
+    out.push_str(&check(
+        "cache dir resolved",
+        !cache_dir.starts_with('<'),
+        &cache_dir,
+        &mut warnings,
+    ));
+    let categorized = CATEGORY_MAP
+        .iter()
+        .filter(|(_, c)| *c != "uncategorized")
+        .count();
+    let uncategorized = primaries.saturating_sub(categorized);
+    out.push_str(&check(
+        "no uncategorized primaries",
+        uncategorized == 0,
+        &format!("{} uncategorized", uncategorized),
+        &mut warnings,
+    ));
+
+    // ── Summary ─────────────────────────────────────────────────
+    out.push_str(&format!("\n{b}>>  summary{n}\n"));
+    if warnings == 0 {
+        out.push_str(&format!("  {g}✓ healthy{n}  {d}no warnings{n}\n"));
+    } else {
+        out.push_str(&format!(
+            "  {y}⚠ {} warning{}{n}\n",
+            warnings,
+            if warnings == 1 { "" } else { "s" }
+        ));
+    }
+
+    print!("{}", out);
+    Ok(PerlValue::integer(warnings as i64))
+}
+
+/// `lsp_completion_words` (alias `lsp_words`) — emits every name LSP
+/// tab-complete should know about, sorted ASCII. Three sources merged:
+///
+///   1. **`%stryke::all` keys** (`~9089` bare callable spellings,
+///      primaries + aliases) — the bulk of the list.
+///   2. **Sigil-prefixed reflection hashes / special vars** — `%a`,
+///      `%b`, `%all`, `%parameters`, `%ENV`, `@ARGV`, `$stryke::VERSION`,
+///      `@+`, `@-`, etc. Required so tab-complete works on
+///      `keys %<TAB>` and similar.
+///   3. **Stryke-language keywords** that aren't in `%all` (`fn`,
+///      `match`, `class`, `struct`, `enum`, `mysync`, `oursync`,
+///      `frozen`, `const`, `typed`, …) so users can complete them
+///      after typing the first letter.
+///
+/// The file `strykelang/lsp_completion_words.txt` is the canonical
+/// snapshot. Regenerate it with:
+///
+/// ```sh
+/// stryke -e 'lsp_completion_words |> e p' > strykelang/lsp_completion_words.txt
+/// ```
+///
+/// Two consumers read the file:
+///   * `static_analysis.rs` checks bare-name hits via `is_sub_defined`
+///     — sigil-prefixed entries are inert there (never matched against
+///     a bare-name lookup).
+///   * The LSP completion provider uses every entry as a candidate.
+fn builtin_lsp_completion_words(
+    interp: &mut VMHelper,
+    _args: &[PerlValue],
+) -> PerlResult<PerlValue> {
+    use std::collections::BTreeSet;
+    let mut set: BTreeSet<String> = BTreeSet::new();
+
+    // Source 1: every bare-name dispatch spelling (primary + alias)
+    // that `build.rs` parsed from the main `try_builtin` arms.
+    for (n, _) in ALL_CATEGORY_MAP {
+        set.insert((*n).to_string());
+    }
+
+    // Source 1b: list builtins routed through `list_builtins::dispatch_by_name`
+    // (sum, min, max, pairs, blessed, refaddr, etc.). build.rs also picks
+    // these up now (scans `LIST_BUILTIN_NAMES`) so they show in `%b`/`%all`,
+    // but include them here too as a belt-and-braces guard against drift.
+    for n in crate::list_builtins::LIST_BUILTIN_NAMES {
+        set.insert((*n).to_string());
+    }
+
+    // Source 2: every sigil-prefixed binding that's live in the current
+    // scope at call time — `%a`, `%all`, `%b`, `%parameters`, `@ARGV`,
+    // `@INC`, `@fpath`, `@path`, `$_`, `$stryke::VERSION`, etc. Read
+    // through the same `parameters_pairs()` walker that backs the
+    // live `%parameters` reflection hash, so any future shared global
+    // (zsh-style or otherwise) auto-flows into the completion list
+    // without a hardcoded update.
+    for (name, _kind) in interp.scope.parameters_pairs() {
+        set.insert(name.clone());
+        // Also emit the `main::`-qualified spelling for every
+        // unqualified binding so tab-complete on `$main::<TAB>` /
+        // `@main::<TAB>` / `%main::<TAB>` surfaces every live name.
+        if !name.contains("::") && name.len() > 1 {
+            let (sigil, rest) = name.split_at(1);
+            if matches!(sigil, "$" | "@" | "%") {
+                set.insert(format!("{sigil}main::{rest}"));
+            }
+        }
+    }
+
+    // Source 3: every callable bare-name also lives under the `CORE::`
+    // pseudo-package — `CORE::print`, `CORE::sum`, `CORE::sprintf`, etc.
+    // all dispatch identically at runtime (`try_builtin` strips the
+    // prefix). Surface the prefixed spelling so tab-complete on
+    // `CORE::<TAB>` finds every builtin.
+    let bare_names: Vec<String> = set
+        .iter()
+        .filter(|n| {
+            // Bare-name candidates: no sigil prefix, no `::`, real ident.
+            !n.is_empty()
+                && !n.contains("::")
+                && !n.starts_with('$')
+                && !n.starts_with('@')
+                && !n.starts_with('%')
+                && !n.starts_with('&')
+        })
+        .cloned()
+        .collect();
+    for n in bare_names {
+        set.insert(format!("CORE::{n}"));
+    }
+
+    // Source 3: stryke language keywords. `%all` covers builtins; these
+    // are reserved keywords that the parser handles directly and that
+    // tab-complete should still suggest after the first character.
+    const KEYWORDS: &[&str] = &[
+        "fn",
+        "match",
+        "when",
+        "given",
+        "class",
+        "struct",
+        "enum",
+        "trait",
+        "abstract",
+        "final",
+        "mysync",
+        "oursync",
+        "frozen",
+        "const",
+        "typed",
+        "state",
+        "my",
+        "our",
+        "local",
+        "package",
+        "use",
+        "no",
+        "require",
+        "return",
+        "last",
+        "next",
+        "redo",
+        "if",
+        "elsif",
+        "else",
+        "unless",
+        "while",
+        "until",
+        "for",
+        "foreach",
+        "do",
+        "eval",
+        "die",
+        "warn",
+        "BEGIN",
+        "END",
+        "INIT",
+        "CHECK",
+        "UNITCHECK",
+        "DESTROY",
+        "BUILD",
+    ];
+    for k in KEYWORDS {
+        set.insert((*k).to_string());
+    }
+
+    Ok(PerlValue::array(
+        set.into_iter().map(PerlValue::string).collect(),
+    ))
+}
+
 /// interpolation as `quantile`. Sorts the data exactly once across all
 /// probability points so callers don't pay an O(n log n) sort per quantile.
 fn builtin_quantiles(args: &[PerlValue]) -> PerlResult<PerlValue> {
