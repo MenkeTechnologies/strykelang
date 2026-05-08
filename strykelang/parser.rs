@@ -9685,6 +9685,23 @@ impl Parser {
                 let (first, rest) = args
                     .split_first()
                     .ok_or_else(|| self.syntax_err("push requires arguments", line))?;
+                // Perl 5.24+ rejects `push SCALAR, ...` at parse time. Reject any
+                // first arg that is unambiguously a scalar (literal scalar var or
+                // numeric/string literal). Array refs (`@$x`), bindings, slices,
+                // and `our @a` style remain permitted.
+                if matches!(
+                    first.kind,
+                    ExprKind::ScalarVar(_)
+                        | ExprKind::Integer(_)
+                        | ExprKind::Float(_)
+                        | ExprKind::String(_)
+                ) {
+                    return Err(self.syntax_err(
+                        "Experimental push on scalar is now forbidden",
+                        line,
+                    )
+                    .with_near("at EOF"));
+                }
                 Ok(Expr {
                     kind: ExprKind::Push {
                         array: Box::new(first.clone()),

@@ -11,6 +11,10 @@ pub struct PerlError {
     /// When `die` is called with a ref argument, the original value is preserved here
     /// so that `$@` can hold the ref (not just its stringification).
     pub die_value: Option<PerlValue>,
+    /// For Syntax errors, optional suffix shown after `at -e line N`. Perl
+    /// emits `, near "TOKEN"` or `, at EOF` depending on where the parse
+    /// failed; absent (`None`) yields the standard period-terminated form.
+    pub near: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,7 +45,15 @@ impl PerlError {
             line,
             file: file.into(),
             die_value: None,
+            near: None,
         }
+    }
+
+    /// Attach a `, near "..."` or `, at EOF` suffix used by Perl's
+    /// compile-error formatter. Only takes effect for `ErrorKind::Syntax`.
+    pub fn with_near(mut self, near: impl Into<String>) -> Self {
+        self.near = Some(near.into());
+        self
     }
 
     pub fn syntax(message: impl Into<String>, line: usize) -> Self {
@@ -86,6 +98,25 @@ impl fmt::Display for PerlError {
         match self.kind {
             ErrorKind::Die => write!(f, "{}", self.message),
             ErrorKind::Exit(_) => write!(f, ""),
+            // Compile-time syntax errors get the `, near "..."` / `, at EOF`
+            // suffix (when set) plus the trailing
+            // `Execution of <file> aborted due to compilation errors.` line
+            // — matches stock perl for `stryke --compat` parity.
+            ErrorKind::Syntax => {
+                if let Some(near) = &self.near {
+                    write!(
+                        f,
+                        "{} at {} line {}, {}\nExecution of {} aborted due to compilation errors.",
+                        self.message, self.file, self.line, near, self.file,
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{} at {} line {}.\nExecution of {} aborted due to compilation errors.",
+                        self.message, self.file, self.line, self.file,
+                    )
+                }
+            }
             // Perl 5 ends runtime errors with `.` after the line number
             // (`Illegal division by zero at -e line 1.`). Matches stock
             // perl for `stryke --compat` parity — see `tests/suite/error_parity.rs`.

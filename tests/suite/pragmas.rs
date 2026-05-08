@@ -83,9 +83,14 @@ fn strict_refs_allows_symbolic_deref_when_refs_off() {
 
 #[test]
 fn strict_vars_rejects_unqualified_global_read() {
+    // Perl rejects this at compile time (`Global symbol "$x" requires
+    // explicit package name…`) and stryke now mirrors that — the
+    // CompileError::Frozen→PerlError mapping uses ErrorKind::Syntax for
+    // this category so the formatter can append the trailing
+    // "Execution of -e aborted due to compilation errors." line.
     assert_eq!(
         eval_err_kind("use strict; use strict 'vars'; $xyzzy"),
-        ErrorKind::Runtime
+        ErrorKind::Syntax
     );
 }
 

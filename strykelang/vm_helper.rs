@@ -2098,7 +2098,13 @@ impl VMHelper {
 
     /// Update `$!` / `errno_code` from a [`std::io::Error`] (dualvar numeric + string).
     pub(crate) fn apply_io_error_to_errno(&mut self, e: &std::io::Error) {
-        self.errno = e.to_string();
+        // Perl's $! is the bare description ("No such file or directory"),
+        // not Rust's "<desc> (os error N)" form. Strip the trailing parenthetical.
+        let s = e.to_string();
+        let stripped = s.rfind(" (os error ")
+            .map(|i| s[..i].to_string())
+            .unwrap_or(s);
+        self.errno = stripped;
         self.errno_code = e.raw_os_error().unwrap_or(0);
     }
 
@@ -4087,10 +4093,13 @@ impl VMHelper {
                 self.pipe_children.insert(handle_name, child);
             }
             "<" => {
-                let file = std::fs::File::open(&path).map_err(|e| {
-                    self.apply_io_error_to_errno(&e);
-                    PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                })?;
+                let file = match std::fs::File::open(&path) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        self.apply_io_error_to_errno(&e);
+                        return Ok(PerlValue::integer(0));
+                    }
+                };
                 let shared = Arc::new(Mutex::new(file));
                 self.io_file_slots
                     .insert(handle_name.clone(), Arc::clone(&shared));
@@ -4100,10 +4109,13 @@ impl VMHelper {
                 );
             }
             ">" => {
-                let file = std::fs::File::create(&path).map_err(|e| {
-                    self.apply_io_error_to_errno(&e);
-                    PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                })?;
+                let file = match std::fs::File::create(&path) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        self.apply_io_error_to_errno(&e);
+                        return Ok(PerlValue::integer(0));
+                    }
+                };
                 let shared = Arc::new(Mutex::new(file));
                 self.io_file_slots
                     .insert(handle_name.clone(), Arc::clone(&shared));
@@ -4113,14 +4125,17 @@ impl VMHelper {
                 );
             }
             ">>" => {
-                let file = std::fs::OpenOptions::new()
+                let file = match std::fs::OpenOptions::new()
                     .append(true)
                     .create(true)
                     .open(&path)
-                    .map_err(|e| {
+                {
+                    Ok(f) => f,
+                    Err(e) => {
                         self.apply_io_error_to_errno(&e);
-                        PerlError::runtime(format!("Can't open '{}': {}", path, e), line)
-                    })?;
+                        return Ok(PerlValue::integer(0));
+                    }
+                };
                 let shared = Arc::new(Mutex::new(file));
                 self.io_file_slots
                     .insert(handle_name.clone(), Arc::clone(&shared));
@@ -8464,7 +8479,22 @@ impl VMHelper {
                 if let Some(name) = val.as_array_binding_name() {
                     return Ok(PerlValue::array(self.scope.get_array(&name)));
                 }
-                if let Some(s) = val.as_str() {
+                if val.is_undef() {
+                    if self.strict_refs {
+                        return Err(PerlError::runtime(
+                            "Can't use an undefined value as an ARRAY reference",
+                            line,
+                        ).into());
+                    }
+                    return Ok(PerlValue::array(vec![]));
+                }
+                // Plain primitive scalar (int, float, string): under no-strict, perl
+                // treats this as a symbolic ref `@{$val_as_string}` and silently
+                // returns the (likely empty) named array. Under strict refs, error.
+                // Heap objects (Pair, Generator, blessed-non-ref) fall through to
+                // the dereference-error so we don't silently swallow real bugs.
+                if val.is_integer_like() || val.is_float_like() || val.is_string_like() {
+                    let s = val.to_string();
                     if self.strict_refs {
                         return Err(PerlError::runtime(
                             format!(
@@ -8487,7 +8517,17 @@ impl VMHelper {
                     self.touch_env_hash(&name);
                     return Ok(PerlValue::hash(self.scope.get_hash(&name)));
                 }
-                if let Some(s) = val.as_str() {
+                if val.is_undef() {
+                    if self.strict_refs {
+                        return Err(PerlError::runtime(
+                            "Can't use an undefined value as a HASH reference",
+                            line,
+                        ).into());
+                    }
+                    return Ok(PerlValue::hash(IndexMap::new()));
+                }
+                if val.is_integer_like() || val.is_float_like() || val.is_string_like() {
+                    let s = val.to_string();
                     if self.strict_refs {
                         return Err(PerlError::runtime(
                             format!(
@@ -13433,6 +13473,25 @@ impl VMHelper {
         }
         if let Some(r) = ref_val.as_scalar_ref() {
             *r.write() = val;
+            return Ok(PerlValue::UNDEF);
+        }
+        // Plain primitive scalar value: under no-strict, perl symbolic-derefs
+        // through the string. With `strict 'refs'`, emit perl's exact diagnostic.
+        if ref_val.is_integer_like() || ref_val.is_float_like() || ref_val.is_string_like()
+        {
+            let s = ref_val.to_string();
+            if self.strict_refs {
+                return Err(PerlError::runtime(
+                    format!(
+                        "Can't use string (\"{}\") as a SCALAR ref while \"strict refs\" in use",
+                        s
+                    ),
+                    line,
+                )
+                .into());
+            }
+            self.set_special_var(&s, &val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
             return Ok(PerlValue::UNDEF);
         }
         Err(PerlError::runtime("Can't assign to non-scalar reference", line).into())

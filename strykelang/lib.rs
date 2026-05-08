@@ -324,7 +324,12 @@ pub fn try_vm_execute(
     let chunk = match comp.compile_program(program) {
         Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {
-            return Some(Err(PerlError::runtime(detail, line)));
+            let err = if detail.starts_with("Global symbol") {
+                PerlError::syntax(detail, line)
+            } else {
+                PerlError::runtime(detail, line)
+            };
+            return Some(Err(err));
         }
         Err(compiler::CompileError::Unsupported(reason)) => {
             return Some(Err(PerlError::runtime(
@@ -512,7 +517,12 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) ->
     let mut chunk = match comp.compile_program(program) {
         Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {
-            return Err(PerlError::runtime(detail, line));
+            let err = if detail.starts_with("Global symbol") {
+                PerlError::syntax(detail, line)
+            } else {
+                PerlError::runtime(detail, line)
+            };
+            return Err(err);
         }
         Err(compiler::CompileError::Unsupported(reason)) => {
             return Err(PerlError::runtime(
@@ -641,7 +651,17 @@ fn compile_error_to_perl(e: compiler::CompileError) -> PerlError {
         compiler::CompileError::Unsupported(msg) => {
             PerlError::runtime(format!("compile: {}", msg), 0)
         }
-        compiler::CompileError::Frozen { line, detail } => PerlError::runtime(detail, line),
+        compiler::CompileError::Frozen { line, detail } => {
+            // strict-vars violations (`Global symbol "$x" requires explicit
+            // package name…`) are compile-time errors in perl, so emit them
+            // as `Syntax` so the formatter appends `Execution of -e aborted
+            // due to compilation errors.` for parity.
+            if detail.starts_with("Global symbol") {
+                PerlError::syntax(detail, line)
+            } else {
+                PerlError::runtime(detail, line)
+            }
+        }
     }
 }
 
