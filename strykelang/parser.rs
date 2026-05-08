@@ -10269,7 +10269,8 @@ impl Parser {
                     && (matches!(
                         self.peek(),
                         Token::Semicolon | Token::RParen | Token::Eof | Token::PipeForward
-                    ) || self.peek_line() > prev) {
+                    ) || self.peek_line() > prev)
+                {
                     self.pipe_placeholder_list(line)
                 } else if self.peek_line() > prev {
                     // Newline boundary: argument is on a later line —
