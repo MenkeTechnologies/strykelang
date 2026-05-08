@@ -1203,7 +1203,7 @@ impl Parser {
     }
 
     /// `StmtKind::Expression` or a bare block (`StmtKind::Block`) as an [`Expr`] for postfix
-    /// `while` / `until` / `for` / `foreach` (mirrors `do { }` → [`ExprKind::Do`](ExprKind::Do)([`CodeRef`](ExprKind::CodeRef))).
+    /// `while` / `until` / `for` / `foreach` (mirrors `do { }` → [`ExprKind::Do`]\([`ExprKind::CodeRef`]\)).
     fn stmt_into_postfix_body_expr(stmt: Statement) -> Option<Expr> {
         match stmt.kind {
             StmtKind::Expression(expr) => Some(expr),

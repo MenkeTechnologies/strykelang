@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. 8,552 builtins (9,089 spellings), bytecode VM + Cranelift JIT.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. 8,587 builtins (9,114 spellings), bytecode VM + Cranelift JIT.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.15 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,552 builtins (9,089 spellings)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.17 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,587 builtins (9,114 spellings)</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -171,7 +171,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 8,552 builtins (9,089 callable spellings), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 8,587 builtins (9,114 callable spellings), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -341,6 +341,17 @@ s 'p to_yaml read_json "data.json"'</pre>
         <div class="oneliner">s 'package Foo; our $X = 1; sub hello {} ; p sort keys %Foo::'  <span class="comment"># X, hello (our + sub, not my)</span></div>
         <div class="oneliner">s '--compat' -e 'print scalar keys %all'  <span class="comment"># 0 — extensions off in --compat</span></div>
 
+        <h3>Diagnostics &amp; tab-complete dump</h3>
+        <div class="oneliner">s 'doctor'                                                  <span class="comment"># runtime health: version, flags, paths, toolchain (returns warning count)</span></div>
+        <div class="oneliner">s 'health'                                                  <span class="comment"># alias of doctor</span></div>
+        <div class="oneliner">s 'lsp_words |&gt; ep'                                       <span class="comment"># every name LSP tab-complete knows about (~18k entries)</span></div>
+        <div class="oneliner">s 'lsp_words |&gt; ep' &gt; strykelang/lsp_completion_words.txt   <span class="comment"># regenerate the static-analyzer / completion snapshot</span></div>
+        <div class="oneliner">s 'p len(lsp_words)'                                        <span class="comment"># count: bare names + sigil globals + CORE:: + main:: + keywords</span></div>
+        <div class="oneliner">s 'p now'                                                  <span class="comment"># Unix epoch seconds (alias of time)</span></div>
+        <div class="oneliner">s 'p now("UTC")'                                           <span class="comment"># ISO-8601 datetime string in any IANA timezone</span></div>
+        <div class="oneliner">s 'my @qs = quantiles([1..1000], [0.25, 0.5, 0.75]); p @qs'   <span class="comment"># batch quantile lookup, single sort across all probs</span></div>
+        <div class="oneliner">s 'class P { v: Int = 0 }; my $p = P-&gt;new(v=&gt;7); p $p-&gt;to_hash_rec'  <span class="comment"># recursively flatten class/struct trees to plain hashref</span></div>
+
         <h3>~p&gt; chunk-parallel — string sources</h3>
         <div class="oneliner">s '~p&gt; "the quick brown fox jumps over the lazy dog" letters freq |&gt; ddump'   <span class="comment"># parallel letter histogram of one string</span></div>
         <div class="oneliner">s 'my $n = ~p&gt; "the quick brown fox jumps over the lazy dog" letters freq ||&gt; values |&gt; sum; p $n'  <span class="comment"># 35 — parallel extract, sequential merge</span></div>
@@ -411,7 +422,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>8,552 primary operations across 9,089 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
+        <p>8,587 primary operations across 9,114 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -1481,7 +1492,7 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>8,552 builtins / 9,089 spellings in 31&nbsp;MB single static binary, zero-import</td>
+              <td>8,587 builtins / 9,114 spellings in 31&nbsp;MB single static binary, zero-import</td>
               <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~3.6&nbsp;KB amortized per builtin, ~200&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>
