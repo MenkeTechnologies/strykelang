@@ -34,11 +34,11 @@ fn builtin_poly1305_block_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let d4 = (h[0] as u128) * (r_l[4] as u128) + (h[1] as u128) * (r_l[3] as u128)
            + (h[2] as u128) * (r_l[2] as u128) + (h[3] as u128) * (r_l[1] as u128) + (h[4] as u128) * (r_l[0] as u128);
     let mut c;
-    h[0] = (d0 & 0x3ffffff) as u64; c = (d0 >> 26) as u128;
-    let d1c = d1 + c; h[1] = (d1c & 0x3ffffff) as u64; c = (d1c >> 26) as u128;
-    let d2c = d2 + c; h[2] = (d2c & 0x3ffffff) as u64; c = (d2c >> 26) as u128;
-    let d3c = d3 + c; h[3] = (d3c & 0x3ffffff) as u64; c = (d3c >> 26) as u128;
-    let d4c = d4 + c; h[4] = (d4c & 0x3ffffff) as u64; c = (d4c >> 26) as u128;
+    h[0] = (d0 & 0x3ffffff) as u64; c = d0 >> 26;
+    let d1c = d1 + c; h[1] = (d1c & 0x3ffffff) as u64; c = d1c >> 26;
+    let d2c = d2 + c; h[2] = (d2c & 0x3ffffff) as u64; c = d2c >> 26;
+    let d3c = d3 + c; h[3] = (d3c & 0x3ffffff) as u64; c = d3c >> 26;
+    let d4c = d4 + c; h[4] = (d4c & 0x3ffffff) as u64; c = d4c >> 26;
     h[0] = h[0].wrapping_add((c as u64).wrapping_mul(5));
     let extra = h[0] >> 26; h[0] &= 0x3ffffff;
     h[1] = h[1].wrapping_add(extra);

@@ -5,7 +5,7 @@
 //! See `Interpreter::run_intercepts_for_call` and `Op::RegisterAdvice`.
 //!
 //! Surface (parsed by `parser::parse_advice_decl`):
-//! ```ignore
+//! ```text
 //! before "<glob>" { ... }   # run before the matched sub; sees $INTERCEPT_NAME, @INTERCEPT_ARGS
 //! after  "<glob>" { ... }   # run after; sees $INTERCEPT_MS, $INTERCEPT_US, $? (retval)
 //! around "<glob>" { ... }   # wrap; must call proceed() to invoke the original

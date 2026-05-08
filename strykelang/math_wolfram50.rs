@@ -1,4 +1,4 @@
-/// Batch 50 — OS internals: schedulers, I/O, memory, power, control groups.
+// Batch 50 — OS internals: schedulers, I/O, memory, power, control groups.
 
 /// Priority aging step: prio_eff = prio_static + age_factor·age
 fn builtin_os_priority_aging_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
@@ -675,11 +675,10 @@ fn builtin_os_selinux_context_match(args: &[PerlValue]) -> PerlResult<PerlValue>
 }
 
 /// Smack label dominance check (Schaufler 2007): unlike SELinux's exact-context
-/// match, Smack uses dominance with privileged labels.
-///   _   floor (always allowed access to anyone)
-///   ^   hat (privileged read)
-///   *   star (anyone access)
-///   ?   question (denied unless explicit allow)
+/// match, Smack uses dominance with privileged labels (`_` floor allows anyone,
+/// `^` hat is privileged-read, `*` star grants any-access, `?` question denies
+/// unless explicitly allowed).
+///
 /// Returns 1 if subject_label dominates object_label per Smack rules.
 /// Args: subj_label (encoded 0..3 for _,^,*,?), obj_label, exact_match (0/1).
 fn builtin_os_smack_label_compare(args: &[PerlValue]) -> PerlResult<PerlValue> {

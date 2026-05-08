@@ -236,7 +236,7 @@ fn builtin_net_aqm_pie_drop_rate(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// FQ-CoDel (RFC 8290): per-flow stochastic queue + CoDel drop. Each flow gets
 /// a slot via 5-tuple hash. CoDel marks/drops when sojourn time > target=5ms for
 /// >100ms (interval). Drop schedule: count++; next_drop = interval / √count.
-/// Returns next_drop_time. Args: count, interval (default 100ms).
+/// > Returns next_drop_time. Args: count, interval (default 100ms).
 fn builtin_net_aqm_fq_codel_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let count = f1(args).max(1.0);
     let interval = args.get(1).map(|v| v.to_number()).unwrap_or(0.1);

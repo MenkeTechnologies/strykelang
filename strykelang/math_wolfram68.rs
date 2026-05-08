@@ -8,7 +8,7 @@ fn b68_to_floats(v: &PerlValue) -> Vec<f64> {
 /// NFA → DFA via subset construction. Returns DFA state count given NFA size n
 /// (worst case 2ⁿ; we cap at 1<<20 to avoid overflow).
 fn builtin_nfa_to_dfa(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = i1(args).max(0).min(20);
+    let n = i1(args).clamp(0, 20);
     Ok(PerlValue::integer(1_i64 << n))
 }
 

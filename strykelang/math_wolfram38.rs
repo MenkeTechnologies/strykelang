@@ -223,7 +223,7 @@ fn builtin_debye_length_electrolyte(args: &[PerlValue]) -> PerlResult<PerlValue>
     let eps_r = f1(args);
     let t = args.get(1).map(|v| v.to_number()).unwrap_or(298.15);
     let i_strength = args.get(2).map(|v| v.to_number()).unwrap_or(0.1);
-    let eps0 = 8.854_187_8128e-12;
+    let eps0 = 8.854_187_812_8e-12;
     let denom = 2.0 * i_strength * 1000.0 * 6.022e23 * B38_E_CHARGE.powi(2);
     if denom <= 0.0 { return Ok(PerlValue::float(0.0)); }
     Ok(PerlValue::float(((eps_r * eps0 * B38_KB * t) / denom).sqrt()))
@@ -253,7 +253,7 @@ fn builtin_gouy_chapman_potential(args: &[PerlValue]) -> PerlResult<PerlValue> {
 fn builtin_stern_layer_capacitance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let eps_r = f1(args);
     let d_s = args.get(1).map(|v| v.to_number()).unwrap_or(0.5e-9);
-    let eps0 = 8.854_187_8128e-12;
+    let eps0 = 8.854_187_812_8e-12;
     if d_s <= 0.0 { return Ok(PerlValue::float(0.0)); }
     Ok(PerlValue::float(eps_r * eps0 / d_s))
 }
@@ -276,7 +276,7 @@ fn builtin_zeta_potential_estimate(args: &[PerlValue]) -> PerlResult<PerlValue> 
     let mu = f1(args);
     let eta = args.get(1).map(|v| v.to_number()).unwrap_or(1e-3);
     let eps_r = args.get(2).map(|v| v.to_number()).unwrap_or(78.5);
-    let eps0 = 8.854_187_8128e-12;
+    let eps0 = 8.854_187_812_8e-12;
     Ok(PerlValue::float(mu * eta / (eps_r * eps0)))
 }
 
@@ -286,7 +286,7 @@ fn builtin_electroosmotic_velocity(args: &[PerlValue]) -> PerlResult<PerlValue> 
     let e_field = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
     let eps_r = args.get(2).map(|v| v.to_number()).unwrap_or(78.5);
     let eta = args.get(3).map(|v| v.to_number()).unwrap_or(1e-3);
-    let eps0 = 8.854_187_8128e-12;
+    let eps0 = 8.854_187_812_8e-12;
     Ok(PerlValue::float(-eps_r * eps0 * zeta * e_field / eta))
 }
 
@@ -475,7 +475,7 @@ fn builtin_mott_schottky_capacitance(args: &[PerlValue]) -> PerlResult<PerlValue
     let nd = args.get(2).map(|v| v.to_number()).unwrap_or(1e22);
     let eps_r = args.get(3).map(|v| v.to_number()).unwrap_or(10.0);
     let t = args.get(4).map(|v| v.to_number()).unwrap_or(298.15);
-    let eps0 = 8.854_187_8128e-12;
+    let eps0 = 8.854_187_812_8e-12;
     let denom = eps_r * eps0 * B38_E_CHARGE * nd;
     if denom == 0.0 { return Ok(PerlValue::float(f64::INFINITY)); }
     Ok(PerlValue::float(2.0 / denom * (v - v_fb - B38_KB * t / B38_E_CHARGE)))

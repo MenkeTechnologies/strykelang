@@ -1,4 +1,4 @@
-/// Batch 51 — security: KDFs, MFA, PKI, web security, TLS, ciphers.
+// Batch 51 — security: KDFs, MFA, PKI, web security, TLS, ciphers.
 
 /// Argon2 memory cost m: chosen so that derivation takes ≥ target_ms on a known
 /// reference machine. RFC 9106 recommends m ≥ 2^16 KiB (=64 MiB) for Argon2id.
@@ -73,7 +73,7 @@ fn builtin_sec_scrypt_r_param(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// has fewer cores than defender. Args: defender_cores.
 fn builtin_sec_scrypt_p_param(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cores = f1(args).max(1.0);
-    Ok(PerlValue::integer(cores.min(8.0).max(1.0) as i64))
+    Ok(PerlValue::integer(cores.clamp(1.0, 8.0) as i64))
 }
 
 /// Balloon hashing (Boneh, Corrigan-Gibbs, Schechter 2016): mix block i with
@@ -117,7 +117,7 @@ fn builtin_sec_bcrypt_cost_factor(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// bcrypt round step
 fn builtin_sec_bcrypt_round_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let cost = i1(args);
-    Ok(PerlValue::integer(1_i64 << cost.min(31).max(0)))
+    Ok(PerlValue::integer(1_i64 << cost.clamp(0, 31)))
 }
 
 /// zxcvbn-like password strength (0..4)
@@ -243,6 +243,7 @@ fn builtin_sec_webauthn_attestation_check(args: &[PerlValue]) -> PerlResult<Perl
 ///   1. Signed clientDataHash matches expected RP-issued challenge.
 ///   2. authData flags include UP, optionally UV; signCount strictly > stored.
 ///   3. ECDSA/EdDSA signature verifies under the credential's public key.
+///
 /// Args: signature_ok (0/1), flags byte (UP=0x01, UV=0x04), sign_count, stored.
 fn builtin_sec_fido2_assertion_check(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sig_ok = i1(args);
@@ -258,7 +259,7 @@ fn builtin_sec_fido2_assertion_check(args: &[PerlValue]) -> PerlResult<PerlValue
 /// if valid. Args: array of [issuer_id, subject_id] pairs from leaf to root.
 fn builtin_sec_certificate_chain_depth(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if v.len() < 2 || v.len() % 2 != 0 { return Ok(PerlValue::integer(0)); }
+    if v.len() < 2 || !v.len().is_multiple_of(2) { return Ok(PerlValue::integer(0)); }
     let n = v.len() / 2;
     for i in 1..n {
         let issuer_prev = v[2 * (i - 1)].to_number() as i64;
@@ -299,7 +300,7 @@ fn builtin_sec_x509_subject_match(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// pattern under RFC 6125 (left-most label only). Args: san_array, host_array.
 fn builtin_sec_san_match_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sans = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let host = i1(&args[1..]) as i64;
+    let host = i1(&args[1..]);
     let count = sans.iter().filter(|s| {
         let v = s.to_number() as i64;
         v == host || v == -1
@@ -418,8 +419,8 @@ fn builtin_sec_url_safe_encode_check(args: &[PerlValue]) -> PerlResult<PerlValue
     let cps = arg_to_vec(args.first().unwrap_or(&PerlValue::array(vec![])));
     for c in &cps {
         let cp = c.to_number() as u32;
-        let safe = (cp >= 0x30 && cp <= 0x39) || (cp >= 0x41 && cp <= 0x5a)
-            || (cp >= 0x61 && cp <= 0x7a) || cp == 0x2d || cp == 0x5f
+        let safe = (0x30..=0x39).contains(&cp) || (0x41..=0x5a).contains(&cp)
+            || (0x61..=0x7a).contains(&cp) || cp == 0x2d || cp == 0x5f
             || cp == 0x2e || cp == 0x7e || cp == 0x25;
         if !safe { return Ok(PerlValue::integer(0)); }
     }
@@ -557,7 +558,7 @@ fn builtin_sec_oauth2_pkce_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     h.update(&bytes);
     let digest = h.finalize();
     let b64 = base64::Engine::encode(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD, &digest);
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD, digest);
     Ok(PerlValue::integer(if b64 == challenge { 1 } else { 0 }))
 }
 

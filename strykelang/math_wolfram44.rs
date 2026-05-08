@@ -296,6 +296,7 @@ fn builtin_cas_smith_normal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// integer matrix [[a, b], [c, d]], one HNF step:
 ///   1. compute g = gcd(a, c) and Bezout coefficients u·a + v·c = g.
 ///   2. apply column op so column 1 becomes (g, 0)ᵀ; reduce above-diagonal entry.
+///
 /// Returns the upper-left HNF entry g. Args: a, c.
 fn builtin_cas_hermite_normal_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = i1(args);

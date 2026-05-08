@@ -788,7 +788,7 @@ fn builtin_ml_orthogonal_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// Truncated normal init: N(0, σ) clipped to [-2σ, 2σ]
 fn builtin_ml_truncnormal_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let sigma = f1(args);
-    Ok(PerlValue::float(sigma * 0.8862269254527580))
+    Ok(PerlValue::float(sigma * 0.886_226_925_452_758))
 }
 
 /// Kaiming init (alias of He)
