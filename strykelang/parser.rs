@@ -11251,8 +11251,29 @@ impl Parser {
                     || matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name))
                 {
                     let block = self.parse_block_or_bareword_cmp_block()?;
+                    // Mirror `sort`'s pipe-RHS handling — after the block,
+                    // a newline (or any standard terminator token) inside a
+                    // `|> psort { ... }` chain means the list comes from the
+                    // pipe LHS, not from continued parsing into the next
+                    // statement. Without this check `(@list) |> psort {
+                    // _0 <=> _1 }\nmy $n = ...` silently swallowed `my $n =
+                    // ...` as the list operand.
+                    let block_end_line = self.prev_line();
                     self.eat(&Token::Comma);
-                    let (list, progress) = self.parse_assign_expr_list_optional_progress()?;
+                    let use_placeholder = self.in_pipe_rhs()
+                        && (matches!(
+                            self.peek(),
+                            Token::Semicolon
+                                | Token::RBrace
+                                | Token::RParen
+                                | Token::Eof
+                                | Token::PipeForward
+                        ) || self.peek_line() > block_end_line);
+                    let (list, progress) = if use_placeholder {
+                        (self.pipe_placeholder_list(line), None)
+                    } else {
+                        self.parse_assign_expr_list_optional_progress()?
+                    };
                     Ok(Expr {
                         kind: ExprKind::PSortExpr {
                             cmp: Some(block),

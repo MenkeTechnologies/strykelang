@@ -3720,12 +3720,10 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     // `STRYKE_NO_TTY=1` / `NO_TTY=1` force non-interactive even on a
     // real terminal.
     let target_specified = !args.is_empty();
-    let no_tty_env = std::env::var_os("STRYKE_NO_TTY").is_some()
-        || std::env::var_os("NO_TTY").is_some();
-    let interactive_ok = !target_specified
-        && io::stdout().is_terminal()
-        && io::stdin().is_terminal()
-        && !no_tty_env;
+    let no_tty_env =
+        std::env::var_os("STRYKE_NO_TTY").is_some() || std::env::var_os("NO_TTY").is_some();
+    let interactive_ok =
+        !target_specified && io::stdout().is_terminal() && io::stdin().is_terminal() && !no_tty_env;
     if !interactive_ok {
         print!("{}", pages[start_page].1);
         return 0;

@@ -98,7 +98,9 @@ fn par_reduce_empty_string_returns_empty_hashref() {
 fn par_reduce_empty_array_returns_empty_for_numeric_extract() {
     // `~> () par_reduce { sum }` — empty list, no chunks, falls back to
     // returning empty/undef (stringifies to "").
-    let out = eval_string(r#"my @e = (); my $r = ~> @e par_reduce { sum }; defined($r) ? "def:$r" : "undef""#);
+    let out = eval_string(
+        r#"my @e = (); my $r = ~> @e par_reduce { sum }; defined($r) ? "def:$r" : "undef""#,
+    );
     // Pinning whichever of "undef" / "def:0" / "def:" we currently emit.
     assert!(
         out == "undef" || out == "def:" || out == "def:0",
@@ -225,9 +227,7 @@ fn par_reduce_numeric_extract_below_threshold_returns_bare_value() {
 #[test]
 fn p_arrow_then_pipe_continues_sequentially() {
     // `~p> ... ||> ...` is parser-level; values |> sum on the merged hash.
-    let n = eval_int(
-        r#"~p> "abc def abc" letters freq ||> values |> sum"#,
-    );
+    let n = eval_int(r#"~p> "abc def abc" letters freq ||> values |> sum"#);
     assert_eq!(n, 9);
 }
 
@@ -647,4 +647,105 @@ fn psort_dollar_a_b_form_still_works() {
            join(",", @s)"#,
     );
     assert_eq!(s, "1,2,3");
+}
+
+// ── psort block-stage terminates at newline in pipe-RHS context =============
+//
+// Pre-fix, `(LIST) |> psort { ... }\n<NEXT_STMT>` silently swallowed
+// `<NEXT_STMT>` as the list operand because the bareword `psort` parser
+// always called `parse_assign_expr_list_optional_progress()` after the
+// block — no in-pipe-RHS / newline check, unlike `sort`'s block-form which
+// already had the `peek_line() > block_end_line` early-out. Fix in
+// `parser.rs::psort` arm: mirror sort's gating so a newline (or any of the
+// standard terminator tokens) inside `|> psort { ... }` switches to the
+// pipe placeholder. Statement boundary is the `}` + newline; explicit `\`
+// continuation would be required to chain across lines, but this test
+// pins the no-continuation case.
+
+#[test]
+fn psort_block_in_pipe_rhs_terminates_at_newline() {
+    let n = eval_int(
+        "my @s = (1, 2, 3) |> psort { _0 <=> _1 }\n\
+         my $n = len(@s);\n\
+         $n",
+    );
+    assert_eq!(n, 3);
+}
+
+#[test]
+fn psort_block_chain_with_pipe_forward_continues_on_same_line() {
+    // The fix must NOT break legitimate continuations on the same line.
+    let s = eval_string(
+        r#"my @r = (3, 1, 2) |> psort { _0 <=> _1 } |> rev;
+           join(",", @r)"#,
+    );
+    assert_eq!(s, "3,2,1");
+}
+
+#[test]
+fn psort_block_followed_by_explicit_list_still_works() {
+    // Non-pipe form `psort { BLOCK } LIST` must keep eating the list.
+    let s = eval_string(
+        r#"my @s = psort { _0 <=> _1 } (3, 1, 2);
+           join(",", @s)"#,
+    );
+    assert_eq!(s, "1,2,3");
+}
+
+// ── %$obj hash-deref on stryke class/struct instances =====================
+//
+// Pre-fix, `%$obj` on a stryke `ClassInstance` errored "Can't dereference
+// non-reference as hash" because BUG-114's fix turned class instances
+// into real `ClassInstance` values instead of blessed hashrefs. The
+// canonical Perl OO introspection idiom (`keys %$self`, `values %$obj`)
+// is widely used in Rosetta-style code and shouldn't break under
+// stryke's native class system.
+//
+// Fix: `vm_helper.rs::dereference` Hash arm flattens `ClassInstance`
+// fields into a fresh `IndexMap` (using the inheritance-resolved field
+// order from `collect_class_fields_full`). Same treatment for
+// `StructInstance`. Plus an unbless step for `BlessedRef` whose payload
+// is a hash, so old-style Perl OO blessed hashrefs keep working too.
+
+#[test]
+fn keys_percent_deref_on_class_instance_returns_field_names() {
+    let s = eval_string(
+        r#"class Person { name: Str = "" age: Int = 0 }
+           my $p = Person->new(name => "Bob", age => 25)
+           join(",", sort keys %$p)"#,
+    );
+    assert_eq!(s, "age,name");
+}
+
+#[test]
+fn values_percent_deref_on_class_instance_returns_field_values() {
+    let s = eval_string(
+        r#"class Point { x: Int = 0 y: Int = 0 }
+           my $p = Point->new(x => 7, y => 9)
+           # Sort numerically so the test is order-independent across
+           # IndexMap iteration variants.
+           my @vs = sort { _0 <=> _1 } values %$p
+           join(",", @vs)"#,
+    );
+    assert_eq!(s, "7,9");
+}
+
+#[test]
+fn percent_deref_on_struct_instance_returns_field_map() {
+    let s = eval_string(
+        r#"struct Pt { x => Int, y => Int }
+           my $p = Pt->new(x => 3, y => 4)
+           join(",", sort keys %$p)"#,
+    );
+    assert_eq!(s, "x,y");
+}
+
+#[test]
+fn percent_deref_on_blessed_hashref_unwraps_inner_hash() {
+    // Old-style `bless {...}, "Foo"` — `%$obj` returns the inner hash.
+    let s = eval_string(
+        r#"my $b = bless { a => 1, b => 2 }, "Foo"
+           join(",", sort keys %$b)"#,
+    );
+    assert_eq!(s, "a,b");
 }

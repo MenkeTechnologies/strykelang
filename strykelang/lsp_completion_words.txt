@@ -41,6 +41,9 @@ $~
 BEGIN
 END
 __stryke_rust_compile
+_thread_par_run
+_thread_par_run: each stage must be a CODE ref
+_thread_par_run: expected 3 args (source, stages, thread_last)
 a0
 a12
 a256
@@ -6045,11 +6048,9 @@ par_fetch
 par_find_files
 par_info
 par_line_count
-par
 par_lines
 par_pipeline
 par_pipeline_stream
-par_reduce
 par_sed
 par_walk
 parabolic_d0
@@ -6233,6 +6234,9 @@ pflat_map_on
 pflat_maps
 pflt
 pfor
+pfreq
+pfrequencies
+pfrq
 pft
 pg
 pga_attenuation
@@ -6600,6 +6604,7 @@ qlnorm
 qm
 qnorm
 qntl
+qntls
 qpe_iteration
 qpois
 qq
@@ -6621,6 +6626,7 @@ quadratic_roots
 quantal_response_logit
 quantile
 quantile_p
+quantiles
 quantize
 quanto_adjustment
 quantum_dimension_q

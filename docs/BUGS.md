@@ -20,6 +20,42 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-118** — `%$obj` (and `keys %$obj` / `values %$obj`) on a stryke
+  `ClassInstance` regressed to "Can't dereference non-reference as hash"
+  after BUG-114's fix turned class instances into real `ClassInstance`
+  values instead of Perl-style blessed hashrefs. Broke
+  `examples/rosetta/t/test_reflection_list_properties.stk` and any
+  Perl-style introspection idiom (`for my $k (keys %$self) { ... }`).
+  Fix in `vm_helper::dereference` Hash arm: flatten `ClassInstance`
+  fields into a fresh `IndexMap` (using `collect_class_fields_full`'s
+  inheritance-resolved order), same for `StructInstance` fields, plus
+  an unbless step for `BlessedRef` whose payload is a hash so old-style
+  Perl OO patterns keep working too.
+  Pin tests:
+  `keys_percent_deref_on_class_instance_returns_field_names`,
+  `values_percent_deref_on_class_instance_returns_field_values`,
+  `percent_deref_on_struct_instance_returns_field_map`,
+  `percent_deref_on_blessed_hashref_unwraps_inner_hash`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
+- **BUG-117** — `(LIST) |> psort { ... }` followed by a newline silently
+  swallowed the next statement as the list operand. Root cause: the
+  bareword `psort` parser always called
+  `parse_assign_expr_list_optional_progress()` after the comparator
+  block, with no in-pipe-RHS / newline check — unlike `sort`'s
+  block-form which already had a `peek_line() > block_end_line`
+  early-out. Without this gate, `my @s = (1,2,3) |> psort { _0 <=>
+  _1 }\nmy $n = len(@s)` parsed the second `my $n = ...` as the
+  psort list operand and dropped the binding entirely. Fix in
+  `parser.rs::psort` arm: mirror sort's gating — record
+  `block_end_line` after the block, then if `in_pipe_rhs() &&
+  (terminator-token || peek_line > block_end_line)`, switch to
+  `pipe_placeholder_list`. Same-line continuations (`|> psort {
+  ... } |> rev`) keep working because the next token IS `|>`.
+  Pin tests:
+  `psort_block_in_pipe_rhs_terminates_at_newline`,
+  `psort_block_chain_with_pipe_forward_continues_on_same_line`,
+  `psort_block_followed_by_explicit_list_still_works`
+  in `tests/suite/behavior_pin_2026_05_at.rs`.
 - **BUG-116** — `psort { $_0 <=> $_1 } @list` (and the bareword `_0`/`_1`
   form) silently returned the input unsorted when the comparator block
   read the implicit-param slots. The worker invoked the block via
