@@ -749,3 +749,128 @@ fn percent_deref_on_blessed_hashref_unwraps_inner_hash() {
     );
     assert_eq!(s, "a,b");
 }
+
+// ── to_hash_rec / to_hash_deep recursive flatten ===========================
+//
+// `$obj->to_hash` produces a *shallow* hashref — nested class instances
+// remain class instances. `$obj->to_hash_rec` (alias `to_hash_deep`)
+// walks the whole tree and turns every reachable class/struct/enum
+// instance into a plain hashref, every hashref/arrayref into a fresh
+// hashref/arrayref with normalized values. Result is JSON-serializable
+// end-to-end with no surviving stryke-OO leaves.
+
+#[test]
+fn to_hash_rec_flattens_nested_class_instances() {
+    let s = eval_string(
+        r#"class Inner { v: Int = 0 }
+           class Outer { name: Str = "" inner: Any = 0 }
+           my $i = Inner->new(v => 7)
+           my $o = Outer->new(name => "x", inner => $i)
+           my $h = $o->to_hash_rec
+           ref($h) . "/" . ref($h->{inner}) . "/" . $h->{inner}->{v}"#,
+    );
+    assert_eq!(s, "HASH/HASH/7");
+}
+
+#[test]
+fn to_hash_rec_alias_to_hash_deep_is_equivalent() {
+    let s = eval_string(
+        r#"class C { v: Int = 0 }
+           my $c = C->new(v => 9)
+           my $a = $c->to_hash_rec
+           my $b = $c->to_hash_deep
+           $a->{v} . "|" . $b->{v}"#,
+    );
+    assert_eq!(s, "9|9");
+}
+
+#[test]
+fn to_hash_shallow_keeps_nested_class_instance() {
+    // Pin the contrast — to_hash MUST stay shallow so callers can
+    // choose whichever depth fits.
+    let s = eval_string(
+        r#"class Inner { v: Int = 0 }
+           class Outer { inner: Any = 0 }
+           my $i = Inner->new(v => 7)
+           my $o = Outer->new(inner => $i)
+           ref($o->to_hash->{inner})"#,
+    );
+    assert_eq!(s, "Inner");
+}
+
+#[test]
+fn to_hash_rec_walks_arrayref_of_classes() {
+    let s = eval_string(
+        r#"class Item { v: Int = 0 }
+           class Bag { items: Any = 0 }
+           my $b = Bag->new(items => [Item->new(v => 1), Item->new(v => 2)])
+           my $h = $b->to_hash_rec
+           ref($h->{items}) . "/" . $h->{items}->[0]->{v} . "+" . $h->{items}->[1]->{v}"#,
+    );
+    assert_eq!(s, "ARRAY/1+2");
+}
+
+#[test]
+fn to_hash_rec_works_for_struct_too() {
+    let s = eval_string(
+        r#"struct Pt { x => Int, y => Int }
+           struct Line { a => Any, b => Any }
+           my $line = Line->new(a => Pt->new(x => 0, y => 0), b => Pt->new(x => 3, y => 4))
+           my $h = $line->to_hash_rec
+           $h->{a}->{x} . "," . $h->{a}->{y} . "->" . $h->{b}->{x} . "," . $h->{b}->{y}"#,
+    );
+    assert_eq!(s, "0,0->3,4");
+}
+
+// ── Recursive serialization for class/struct/enum =========================
+//
+// `to_json($class_inst)` used to wrap the class's `Display`
+// stringification in JSON quotes (`"Outer(name => x, inner => Inner(v
+// => 7))"`). Same regression for to_xml / to_yaml / to_toml / ddump.
+// Fix: every serializer now runs `serialize_normalize::deep_normalize`
+// at the root — class/struct/enum trees are flattened into plain
+// hashref/arrayref shapes the existing serializers already handle.
+
+#[test]
+fn to_json_recursive_on_nested_class() {
+    let s = eval_string(
+        r#"class Inner { v: Int = 0 }
+           class Outer { name: Str = "" inner: Any = 0 }
+           my $i = Inner->new(v => 7)
+           my $o = Outer->new(name => "x", inner => $i)
+           to_json($o)"#,
+    );
+    assert_eq!(s, r#"{"name":"x","inner":{"v":7}}"#);
+}
+
+#[test]
+fn to_json_recursive_on_struct() {
+    let s = eval_string(
+        r#"struct Pt { x => Int, y => Int }
+           to_json(Pt->new(x => 3, y => 4))"#,
+    );
+    assert_eq!(s, r#"{"x":3,"y":4}"#);
+}
+
+#[test]
+fn ddump_recursive_returns_normalized_string() {
+    // ddump returns its rendering as a string (it's not a printer);
+    // pin that the rendering reaches the inner field rather than
+    // stopping at the class-display string.
+    let out = eval_string(
+        r#"class C { v: Int = 0 }
+           my $c = C->new(v => 42)
+           ddump($c)"#,
+    );
+    assert!(out.contains("'v' => 42"), "expected 'v' => 42 in: {out}");
+}
+
+#[test]
+fn to_yaml_recursive_on_class() {
+    let s = eval_string(
+        r#"class P { name: Str = "" age: Int = 0 }
+           to_yaml(P->new(name => "Alice", age => 30))"#,
+    );
+    assert!(s.contains("name: Alice"), "expected name: Alice in: {s}");
+    assert!(s.contains("age: 30"), "expected age: 30 in: {s}");
+}

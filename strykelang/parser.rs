@@ -10264,12 +10264,23 @@ impl Parser {
                 // `(rev 1)..3`). Defaults to $_ when no argument given.
                 // Only use pipe placeholder when directly in pipe RHS (not inside a block).
                 // RBrace means we're inside a block like `map { rev }` - use $_ default.
+                let prev = self.prev_line();
                 let a = if self.in_pipe_rhs()
-                    && matches!(
+                    && (matches!(
                         self.peek(),
                         Token::Semicolon | Token::RParen | Token::Eof | Token::PipeForward
-                    ) {
+                    ) || self.peek_line() > prev) {
                     self.pipe_placeholder_list(line)
+                } else if self.peek_line() > prev {
+                    // Newline boundary: argument is on a later line —
+                    // default to `$_` so the next statement parses as
+                    // its own thing instead of being slurped as the
+                    // implicit operand. (Same rule as
+                    // `parse_one_arg_or_default`.)
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".into()),
+                        line: prev,
+                    }
                 } else if matches!(
                     self.peek(),
                     Token::Semicolon
@@ -17299,6 +17310,23 @@ impl Parser {
     }
 
     fn parse_one_arg_or_default(&mut self) -> PerlResult<Expr> {
+        // Treat a line boundary as a hard arg terminator: if the next
+        // token is on a *later* line than the named-unary keyword we
+        // just consumed, default the operand to `$_` and stop. Without
+        // this, `my $x = uc` followed by `my $y = 5` on the next line
+        // mis-parses by silently swallowing `my $y = 5` as the implicit
+        // argument to `uc`. Stryke (like Perl/shell) terminates
+        // statements at newline; continuation requires explicit `\`.
+        // The check skips when the *next* token is itself a binary /
+        // postfix operator that legitimately continues the expression
+        // (handled by the existing operator stop-list below).
+        let prev = self.prev_line();
+        if self.peek_line() > prev {
+            return Ok(Expr {
+                kind: ExprKind::ScalarVar("_".into()),
+                line: prev,
+            });
+        }
         // Default to `$_` when the next token cannot start an argument expression
         // because it has lower precedence than a named unary operator. Perl 5
         // named unary precedence sits above ternary / comparison / logical / bitwise

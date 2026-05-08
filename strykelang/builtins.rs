@@ -9787,6 +9787,7 @@ fn builtin_pfrequencies(args: &[PerlValue]) -> PerlResult<PerlValue> {
 /// `ddump EXPR, ...` — indented pretty printer for stryke data structures.
 /// Prints to STDOUT and returns the formatted string so callers can capture it.
 fn builtin_ddump(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use crate::serialize_normalize::deep_normalize;
     let mut buf = String::new();
     for (i, val) in args.iter().enumerate() {
         if i > 0 {
@@ -9795,7 +9796,11 @@ fn builtin_ddump(args: &[PerlValue]) -> PerlResult<PerlValue> {
         let name = format!("$VAR{}", i + 1);
         buf.push_str(&name);
         buf.push_str(" = ");
-        ddump_value(&mut buf, val, 0);
+        // Flatten class/struct/enum trees first so ddump never has to
+        // know about stryke-native OO types — it always sees plain
+        // hashref / arrayref / scalar shape.
+        let normalized = deep_normalize(val);
+        ddump_value(&mut buf, &normalized, 0);
         buf.push(';');
     }
     buf.push('\n');
@@ -11435,11 +11440,18 @@ fn builtin_to_file(args: &[PerlValue], line: usize) -> PerlResult<PerlValue> {
 /// `as_array_ref()` — a flat array would be stringified as a scalar, making
 /// every row render as `"ARRAY(0x…)"`.
 fn normalize_serialize_root(args: &[PerlValue]) -> PerlValue {
-    match args.len() {
+    // Recursively flatten any class/struct/enum instances into plain
+    // hashref/arrayref trees so the underlying serializer (JSON / YAML
+    // / TOML / XML / HTML / ddump) only ever sees plain Perl-shape
+    // data. Without this, `to_json($class_instance)` produced the
+    // class's `Display` stringification wrapped in JSON quotes.
+    use crate::serialize_normalize::deep_normalize;
+    let raw = match args.len() {
         0 => PerlValue::UNDEF,
         1 => args[0].clone(),
         _ => PerlValue::array_ref(Arc::new(RwLock::new(args.to_vec()))),
-    }
+    };
+    deep_normalize(&raw)
 }
 
 /// `to_json VALUE` — serialize a PerlValue to a JSON string.

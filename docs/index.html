@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. 8,550 builtins (9,087 spellings), bytecode VM + Cranelift JIT.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. 8,552 builtins (9,089 spellings), bytecode VM + Cranelift JIT.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.15 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,550 builtins (9,087 spellings)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.15 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,552 builtins (9,089 spellings)</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -171,7 +171,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 8,550 builtins (9,087 callable spellings), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 8,552 builtins (9,089 callable spellings), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -341,15 +341,41 @@ s 'p to_yaml read_json "data.json"'</pre>
         <div class="oneliner">s 'package Foo; our $X = 1; sub hello {} ; p sort keys %Foo::'  <span class="comment"># X, hello (our + sub, not my)</span></div>
         <div class="oneliner">s '--compat' -e 'print scalar keys %all'  <span class="comment"># 0 — extensions off in --compat</span></div>
 
-        <h3>Chunk-parallel &amp; streaming threading</h3>
-        <div class="oneliner">s '~p&gt; c("**.rs") letters freq histo p'                              <span class="comment"># parallel histogram of every letter across .rs</span></div>
-        <div class="oneliner">s '~p&gt; @big_array map { _ * 2 } sum p'                               <span class="comment"># parallel map+sum, auto-merge by +</span></div>
-        <div class="oneliner">s '~p&gt; "abc def abc" letters freq ||&gt; values |&gt; sum p'              <span class="comment"># 9 — parallel extract, sequential tail</span></div>
-        <div class="oneliner">s '~p&gt; "abc def abc" letters freq |then| values |&gt; sum p'           <span class="comment"># same, English boundary marker</span></div>
-        <div class="oneliner">s '~&gt; "Hello, World 123" par { letters } p'                         <span class="comment"># generic par { BLOCK } chunk wrapper</span></div>
-        <div class="oneliner">s '~&gt; "abcdefgh" par_reduce { length(_) } { $a + $b } p'             <span class="comment"># 8 — explicit pairwise reducer</span></div>
-        <div class="oneliner">s '~s&gt; [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 } p'              <span class="comment"># per-item streaming pipeline (channels)</span></div>
-        <div class="oneliner">s '~s&gt; gen { yield_lines "huge.log" } map { parse } grep { /ERROR/ } p'  <span class="comment"># streaming log filter</span></div>
+        <h3>~p&gt; chunk-parallel — string sources</h3>
+        <div class="oneliner">s '~p&gt; "the quick brown fox jumps over the lazy dog" letters freq |&gt; ddump'   <span class="comment"># parallel letter histogram of one string</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; "the quick brown fox jumps over the lazy dog" letters freq ||&gt; values |&gt; sum; p $n'  <span class="comment"># 35 — parallel extract, sequential merge</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; "the quick brown fox jumps over the lazy dog" letters freq |then| values |&gt; sum; p $n'  <span class="comment"># 35 — English boundary marker</span></div>
+        <div class="oneliner">s 'my $r = ~&gt; "abcdefghij" par_reduce { length(_) }; p $r'                              <span class="comment"># 10 — par_reduce auto-sum, single-block form</span></div>
+        <div class="oneliner">s 'my $r = ~&gt; "abcdefghij" par_reduce { length(_) } { _0 + _1 }; p $r'                  <span class="comment"># 10 — explicit pairwise reducer</span></div>
+        <div class="oneliner">s 'my $m = ~&gt; "the quick brown fox" words par_reduce { len(_) } { _0 &gt; _1 ? _0 : _1 }; p $m'  <span class="comment"># 5 — max word length via custom reducer</span></div>
+
+        <h3>~p&gt; chunk-parallel — corpus workloads</h3>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") letters freq; p len(keys %$h)'                          <span class="comment"># distinct letters across every .stk file</span></div>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") words freq; p len(keys %$h)'                            <span class="comment"># unique-word count across the corpus</span></div>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") sentences freq; p len(keys %$h)'                        <span class="comment"># unique-sentence count</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; c("**.stk") par_reduce { length(_) }; p $n'                         <span class="comment"># total chars across the corpus (auto-sum)</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; c("**.stk") par_reduce { my @l = split(/\n/,_); len(@l) }; p $n'    <span class="comment"># total lines across the corpus</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; c("**.rs") par_reduce { my @m = (_ =~ /unsafe/g); len(@m) }; p $n'  <span class="comment"># count regex hits across all files</span></div>
+        <div class="oneliner">s 'my $n = ~p&gt; c("**.stk") par_reduce { /threading/ ? 1 : 0 }; p $n'               <span class="comment"># files containing a pattern (truthy chunks)</span></div>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") words map { lc } map { substr(_,0,3) } freq; p $h-&gt;{the}'  <span class="comment"># histogram of 3-letter prefixes</span></div>
+
+        <h3>~p&gt; chunk-parallel — top-N highlights</h3>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") letters freq; p (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..4]'  <span class="comment"># top 5 letters across .stk</span></div>
+        <div class="oneliner">s 'my $h = ~p&gt; c("**.stk") words freq; p (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..9]'   <span class="comment"># top 10 words across .stk</span></div>
+
+        <h3>par { BLOCK } — generic chunk wrapper</h3>
+        <div class="oneliner">s 'my @a = ~&gt; "Hello, World 123" par { letters }; p "@a"'                          <span class="comment"># H e l l o W o r l d — letters per chunk</span></div>
+        <div class="oneliner">s 'my @r = ~&gt; "Hello, World" par { uc }; p "@r"'                                  <span class="comment"># per-chunk uppercase</span></div>
+
+        <h3>~s&gt; per-item streaming — basics</h3>
+        <div class="oneliner">s 'my $n = ~s&gt; [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 }; p "$n items"'        <span class="comment"># basic two-stage stream</span></div>
+        <div class="oneliner">s 'my $n = ~s&gt; [1..10] grep { _ % 2 == 0 } map { _ * _ }; p "$n matched"'         <span class="comment"># filter then transform</span></div>
+        <div class="oneliner">s 'my $n = ~s&gt; [1..5] map { sleep 0.05; _ * _ }; p "$n items"'                    <span class="comment"># mixed I/O+CPU — workers overlap</span></div>
+
+        <h3>~s&gt; per-item streaming — real workloads</h3>
+        <div class="oneliner">s 'my @raw = ({\"v\":10}, {\"v\":20}, {\"v\":30}); my $n = ~s&gt; [@raw] map { _-&gt;{v} * 2 }; p $n'  <span class="comment"># streaming JSON-shape transform</span></div>
+        <div class="oneliner">s 'my @log = ("INFO ok","ERROR oops","WARN slow","ERROR bad"); my $n = ~s&gt; [@log] grep { /ERROR/ } map { uc }; p $n'  <span class="comment"># streaming log filter (errors → upper)</span></div>
+        <div class="oneliner">s 'mysync $sum = 0; my $n = ~s&gt; [10,20,30,40,50] map { $sum += _; _ }; p "$n items, sum=$sum"'   <span class="comment"># streaming with shared mysync accumulator</span></div>
 
         <h3>Notes</h3>
         <ul>
@@ -385,7 +411,7 @@ f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>8,550 primary operations across 9,087 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
+        <p>8,552 primary operations across 9,089 spellings. Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live count.</p>
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -1261,6 +1287,144 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
         <p>Full migration rationale, file-by-file diff, and reproducible bench harness at <a href="../docs/CACHE_RKYV_MIGRATION.md"><code>docs/CACHE_RKYV_MIGRATION.md</code></a>.</p>
       </section>
 
+      <section class="tutorial-section" id="threading-vs-clojure-racket">
+        <h2>Threading macros vs Racket / Clojure</h2>
+        <p>Every other language with arrow-threading treats the arrow as <em>pure compile-time syntax</em>: a macroexpansion-time AST rewrite into nested calls. Concurrency, when wanted, is a separate primitive (<code>pmap</code>, <code>future</code>, <code>core.async</code>, racket <code>place</code>s). Stryke is the first language to bake execution semantics directly into the threading-arrow family — same surface grammar, distinct runtime models.</p>
+
+        <table class="reflection-table">
+          <thead>
+            <tr><th>Operator</th><th>Lang</th><th>Desugar / runtime</th><th>Concurrency</th><th>Backpressure</th><th>Per-chunk</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>(-&gt; x (f a))</code></td>
+              <td>Clojure</td>
+              <td>macroexpand &rarr; <code>(f x a)</code> at compile time</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>(-&gt;&gt; x (f a))</code></td>
+              <td>Clojure</td>
+              <td>macroexpand &rarr; <code>(f a x)</code> (LHS as last arg)</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>(as-&gt; x $ (f $) (g $))</code></td>
+              <td>Clojure</td>
+              <td>macroexpand with explicit <code>$</code> slot</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>(cond-&gt; x p? (f))</code> / <code>(some-&gt;)</code></td>
+              <td>Clojure</td>
+              <td>conditional / nil-short-circuit macros</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>(~&gt; x (f a))</code> / <code>(~&gt;&gt; x ...)</code></td>
+              <td>Racket (<code>threading</code>)</td>
+              <td>macroexpand to nested call (lib macro)</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>x |&gt; f</code></td>
+              <td>Elixir / F# / OCaml / R / Hack / JS proposal</td>
+              <td>parse-time / inline-fn rewrite to function application</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr style="border-top:2px solid var(--accent);">
+              <td><code>~&gt; SRC stage1 stage2</code></td>
+              <td><strong>stryke</strong></td>
+              <td>parse-time rewrite (compatible with Racket <code>~&gt;</code> / Clojure <code>-&gt;</code>)</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>~&gt;&gt; SRC stage1 stage2</code></td>
+              <td><strong>stryke</strong></td>
+              <td>parse-time, thread-last (Clojure <code>-&gt;&gt;</code> compatible)</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td><code>|&gt; rhs</code></td>
+              <td><strong>stryke</strong></td>
+              <td>parse-time pipe-forward (Elixir-compatible spelling)</td>
+              <td>none — sequential</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+            <tr style="background: rgba(0, 229, 255, 0.05);">
+              <td><code>~s&gt;</code> / <code>~s&gt;&gt;</code></td>
+              <td><strong>stryke</strong></td>
+              <td>each stage compiled to a worker thread connected by bounded channels (per-item streaming)</td>
+              <td><strong>concurrent</strong> across stages</td>
+              <td><strong>yes</strong> — bounded channels</td>
+              <td>n/a (per-item)</td>
+            </tr>
+            <tr style="background: rgba(0, 229, 255, 0.05);">
+              <td><code>~p&gt;</code> / <code>~p&gt;&gt;</code></td>
+              <td><strong>stryke</strong></td>
+              <td>input split on type-aware chunk boundaries; whole pipeline runs per-chunk via rayon work-stealing pool with auto-merger</td>
+              <td><strong>parallel</strong> (N workers, N=CPU)</td>
+              <td>n/a (eager)</td>
+              <td><strong>yes</strong> — UTF-8 / element-aligned</td>
+            </tr>
+            <tr style="background: rgba(0, 229, 255, 0.05);">
+              <td><code>par { BLOCK }</code> / <code>par_reduce { … } [{ … }]</code></td>
+              <td><strong>stryke</strong></td>
+              <td>generic parallel-chunk thread-stage with auto-merge (hash-of-num &rarr; key-wise add, num &rarr; sum, array/string &rarr; concat)</td>
+              <td><strong>parallel</strong></td>
+              <td>n/a</td>
+              <td><strong>yes</strong></td>
+            </tr>
+            <tr style="background: rgba(0, 229, 255, 0.05);">
+              <td><code>||&gt;</code> / <code>|then|</code></td>
+              <td><strong>stryke</strong></td>
+              <td>boundary marker: switches the rest of a <code>~p&gt;</code> chain back to sequential <code>~&gt;</code> mode (terminal merge stages run on the merged whole)</td>
+              <td>boundary &mdash; switches mode</td>
+              <td>n/a</td>
+              <td>n/a</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>What's structurally novel</h3>
+        <ul>
+          <li><strong>Pure-syntax tradition:</strong> Clojure / Racket / Elixir / F# / OCaml / R / Hack / JS treat threading as compile-time AST rewrite. To get parallelism you call a separate function (Clojure <code>pmap</code>, Racket <code>future</code>, Elixir <code>Task.async</code>, OCaml <code>Domain.spawn</code>) — never via the arrow.</li>
+          <li><strong>Stryke axis-2 — execution model:</strong> <code>~s&gt;</code> and <code>~p&gt;</code> use the <em>same surface grammar</em> as <code>~&gt;</code> but emit different bytecode. One-token swap changes "evaluate sequentially" to "spawn a per-stage worker pool with channels" or "split into chunks and reduce in a tree." No re-plumbing required.</li>
+          <li><strong>Boundary markers:</strong> <code>||&gt;</code> / <code>|then|</code> are the world's-first operator that <em>changes the threading mode mid-chain</em>. Lets a single declaration mix parallel chunked extraction with sequential terminal stages without breaking the macro.</li>
+          <li><strong>Auto-merger for parallel chunks:</strong> <code>par_reduce { extract }</code> picks a merge strategy by inspecting the first chunk's result type (hash &rarr; key-wise add, scalar &rarr; sum, array &rarr; concat, string &rarr; concat). Canonical histogram merge in one stage; no plumbing.</li>
+          <li><strong>Compatibility floor:</strong> <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>|&gt;</code> behave exactly like Racket <code>~&gt;</code> / Clojure <code>-&gt;&gt;</code> / Elixir <code>|&gt;</code>. Polyglots get the familiar semantics for free; the parallel forms are pure addition.</li>
+        </ul>
+
+        <h3>Equivalent rewrite vs. one-token swap</h3>
+        <p>To get the equivalent of <code>~p&gt; @data map { _ * 2 } sum</code> in Clojure today, you write:</p>
+<pre>(-&gt;&gt; data
+     (partition-all (chunk-size))
+     (pmap (fn [chunk] (-&gt;&gt; chunk
+                            (map #(* 2 %))
+                            (reduce +))))
+     (reduce +))</pre>
+        <p>Five lines, three nested operations, two manual reduces, and an explicit chunk size. Stryke compresses the same shape to:</p>
+<pre>~p&gt; @data map { _ * 2 } sum</pre>
+        <p>Same input, same output, same parallelism — different operator. The chunk split, worker dispatch, and tree-merge are the operator's job.</p>
+      </section>
+
       <section class="tutorial-section">
         <h2>Inventions</h2>
         <p>Designs that originated in stryke. Other languages are invited to absorb, adapt, or build on any of these under MIT — see <a href="../CREATORS.md">CREATORS.md § Porting stryke ideas</a> for the attribution norm. The list also doubles as the canonical reference porters cite.</p>
@@ -1281,14 +1445,19 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
               <td>Threading macros with execution semantics baked into the operator: <code>~s&gt;</code> / <code>~s&gt;&gt;</code> run each stage as a worker connected by bounded channels (per-item streaming with backpressure), <code>~p&gt;</code> / <code>~p&gt;&gt;</code> chunk the input and run the whole pipeline per-chunk in parallel with an auto-merger (canonical histogram merge for hash-of-numeric, numeric add, array/string concat). <code>||&gt;</code> / <code>|then|</code> mid-pipeline boundary switches a <code>~p&gt;</code> back to sequential <code>~&gt;</code> for terminal stages. No other language overloads its threading macros with concurrent / chunk-parallel semantics — Clojure's <code>-&gt;</code> family is purely syntactic.</td>
             </tr>
             <tr>
+              <td><strong>Mid-chain threading-mode-switch operator</strong></td>
+              <td><code>||&gt;</code> &middot; <code>|then|</code></td>
+              <td>Boundary marker that terminates the chunk-parallel section of a <code>~p&gt;</code> chain and switches the merged result into a sequential <code>~&gt;</code> continuation for terminal stages that operate on the whole. Pure-syntax pipe operators in F# / Hack / Elixir / OCaml / Scala / Julia / R / Clojure / Racket have no equivalent because their threading macros lack execution semantics in the first place — there is no &ldquo;mode&rdquo; to switch out of. The English alias <code>|then|</code> reads as English without changing semantics.</td>
+            </tr>
+            <tr>
               <td><strong>Generic parallel-chunk wrapper</strong></td>
               <td><code>par { BLOCK }</code> &middot; <code>par_reduce { extract } [{ merge }]</code></td>
               <td>Replaces the explosion of per-fn parallel-prefixed builtins (<code>pletters</code>, <code>pchars</code>, <code>pwords</code>, <code>puc</code>, <code>plc</code>, <code>psplit</code>, <code>pjoin</code>, <code>psum</code>, <code>pmin</code>, <code>pmax</code>, <code>pany</code>, <code>pall</code>, <code>pcount</code>, <code>pfind</code>, ...) with one wrapper that splits input on type-aware chunk boundaries (UTF-8 char-aligned for strings, element-aligned for arrays) and runs any block per chunk in parallel. <code>par_reduce</code> adds an auto-detected merger so frequency-style fused extract+count pipelines (<code>par_reduce { letters |&gt; freq }</code>) achieve 3.5&times;+ wall speedup without materialising 50M-element intermediate vectors. No prior language exposes &ldquo;take any block, parallelize it across chunks of input&rdquo; as a single composable primitive.</td>
             </tr>
             <tr>
               <td><strong>Implicit-positional closure params with depth</strong></td>
-              <td><code>_0</code> &middot; <code>_0&lt;</code> &middot; <code>_0&lt;&lt;</code> &middot; <code>_N&lt;&lt;&lt;&lt;</code></td>
-              <td>Two-axis closure-arg notation: <code>N</code> selects positional slot, <code>&lt;</code> count selects closure-nesting depth outward. Four-way alias for slot 0 (<code>_</code>, <code>$_</code>, <code>_0</code>, <code>$_0</code>) unifies Scala / Perl / Mathematica / sigil-positional traditions.</td>
+              <td><code>_</code> &middot; <code>_&lt;</code> &middot; <code>_&lt;&lt;</code> &middot; <code>_&lt;3</code> &middot; <code>_0</code> &middot; <code>_0&lt;</code> &middot; <code>_0&lt;&lt;</code> &middot; <code>_N&lt;&lt;&lt;&lt;</code></td>
+              <td>Two-axis closure-arg notation: <code>N</code> selects positional slot, <code>&lt;</code> count selects closure-nesting depth outward (<code>_&lt;</code> = depth 1, <code>_&lt;&lt;&lt;&lt;&lt;</code> = depth 5, <code>_&lt;N</code> = indexed shortcut). Four-way alias for slot 0 (<code>_</code>, <code>$_</code>, <code>_0</code>, <code>$_0</code>) unifies Scala / Perl / Mathematica / sigil-positional traditions. Bare <code>_&lt;</code> is the sigil-less slot-0 outer-topic shortcut; equivalent to <code>$_&lt;</code>, <code>_0&lt;</code>, <code>$_0&lt;</code>.</td>
             </tr>
             <tr>
               <td><strong>Polymorphic literal-typed range</strong></td>
@@ -1312,8 +1481,8 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>8,550 builtins / 9,087 spellings, zero-import</td>
-              <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq.</td>
+              <td>8,552 builtins / 9,089 spellings in 31&nbsp;MB single static binary, zero-import</td>
+              <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~3.6&nbsp;KB amortized per builtin, ~200&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>
               <td><strong>Live-binding hash with kind strings</strong></td>

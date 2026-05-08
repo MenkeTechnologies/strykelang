@@ -169,7 +169,7 @@
       <ul class="chapter-index">
         <li><a href="#ch-parallel-primitives">Parallel Primitives</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">11</span></li>
-        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">12</span></li>
+        <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">14</span></li>
         <li><a href="#ch-streaming-iterators">Streaming Iterators</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-list-operations">List Operations</a> <span class="chapter-count">62</span></li>
         <li><a href="#ch-stryke-extensions">stryke Extensions</a> <span class="chapter-count">19</span></li>
@@ -632,7 +632,7 @@ my $both = $s-&gt;union(set(3, 4, 5))
     </section>
     <section class="tutorial-section" id="ch-pipeline-pipe-forward">
       <h2>Pipeline &amp; Pipe-Forward</h2>
-      <p class="chapter-meta">12 topics</p>
+      <p class="chapter-meta">14 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>|&gt;</code></h3>
         <p>Pipe-forward operator — threads LHS as first argument of RHS call.</p>
@@ -712,6 +712,133 @@ fn take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
 ~p&gt; @data map { _ * 2 } sum ||&gt; sqrt p               # parallel sum, sequential sqrt
 </code></pre>
         <p>Both spellings are byte-equivalent; <code>||&gt;</code> is terse, <code>|then|</code> reads in English. Use either when you need a post-merge stage that operates on the whole reduced value rather than per-chunk. <code>|&gt;</code> also terminates a <code>~p&gt;</code> macro.</p>
+      </article>
+      <article class="doc-entry" id="doc-threading-vs-clojure-racket">
+        <h3><a class="doc-anchor" href="#doc-threading-vs-clojure-racket">#</a> Threading-macro family vs Racket / Clojure</h3>
+        <p>Stryke&#39;s sequential threading arrows behave like the Racket / Clojure / Elixir / F# tradition — pure compile-time AST rewrite, zero runtime cost, no concurrency. The novel additions (<code>~s&gt;</code>, <code>~p&gt;</code>, <code>par</code>, <code>par_reduce</code>, <code>||&gt;</code>) bake execution semantics directly into the operator.</p>
+        <table style="width:100%; border-collapse:collapse; font-size:0.85em; margin: 1em 0;">
+          <thead>
+            <tr style="border-bottom:2px solid #555; text-align:left;">
+              <th style="padding:6px 10px;">Operator</th>
+              <th style="padding:6px 10px;">Lang</th>
+              <th style="padding:6px 10px;">Runtime</th>
+              <th style="padding:6px 10px;">Concurrency</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:4px 10px;"><code>(-&gt; x (f a))</code></td><td style="padding:4px 10px;">Clojure</td><td style="padding:4px 10px;">macroexpand to <code>(f x a)</code></td><td style="padding:4px 10px;">none</td></tr>
+            <tr><td style="padding:4px 10px;"><code>(-&gt;&gt; x (f a))</code></td><td style="padding:4px 10px;">Clojure</td><td style="padding:4px 10px;">macroexpand to <code>(f a x)</code> (last-arg)</td><td style="padding:4px 10px;">none</td></tr>
+            <tr><td style="padding:4px 10px;"><code>(as-&gt; x $ (f $))</code></td><td style="padding:4px 10px;">Clojure</td><td style="padding:4px 10px;">macroexpand with explicit <code>$</code></td><td style="padding:4px 10px;">none</td></tr>
+            <tr><td style="padding:4px 10px;"><code>(~&gt; x (f a))</code> / <code>(~&gt;&gt;)</code></td><td style="padding:4px 10px;">Racket</td><td style="padding:4px 10px;">lib macro, expand-time</td><td style="padding:4px 10px;">none</td></tr>
+            <tr><td style="padding:4px 10px;"><code>x |&gt; f</code></td><td style="padding:4px 10px;">Elixir / F# / OCaml / R / Hack</td><td style="padding:4px 10px;">parse-time function-app rewrite</td><td style="padding:4px 10px;">none</td></tr>
+            <tr style="border-top:2px solid #00e5ff;"><td style="padding:4px 10px;"><code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>|&gt;</code></td><td style="padding:4px 10px;"><strong>stryke</strong></td><td style="padding:4px 10px;">parse-time rewrite (Clojure / Racket / Elixir compatible)</td><td style="padding:4px 10px;">none</td></tr>
+            <tr style="background:rgba(0,229,255,0.05);"><td style="padding:4px 10px;"><code>~s&gt;</code> / <code>~s&gt;&gt;</code></td><td style="padding:4px 10px;"><strong>stryke</strong></td><td style="padding:4px 10px;">per-stage worker threads + bounded channels</td><td style="padding:4px 10px;"><strong>concurrent</strong> w/ backpressure</td></tr>
+            <tr style="background:rgba(0,229,255,0.05);"><td style="padding:4px 10px;"><code>~p&gt;</code> / <code>~p&gt;&gt;</code></td><td style="padding:4px 10px;"><strong>stryke</strong></td><td style="padding:4px 10px;">chunk + rayon work-stealing pool + auto-merge</td><td style="padding:4px 10px;"><strong>parallel</strong></td></tr>
+            <tr style="background:rgba(0,229,255,0.05);"><td style="padding:4px 10px;"><code>par { … }</code> / <code>par_reduce</code></td><td style="padding:4px 10px;"><strong>stryke</strong></td><td style="padding:4px 10px;">generic parallel-chunk wrapper, type-aware boundary split</td><td style="padding:4px 10px;"><strong>parallel</strong></td></tr>
+            <tr style="background:rgba(0,229,255,0.05);"><td style="padding:4px 10px;"><code>||&gt;</code> / <code>|then|</code></td><td style="padding:4px 10px;"><strong>stryke</strong></td><td style="padding:4px 10px;">mid-chain mode boundary (parallel &rarr; sequential)</td><td style="padding:4px 10px;">switches mode</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Equivalent rewrite in Clojure</strong> for <code>~p&gt; @data map { _ * 2 } sum</code>:</p>
+        <pre><code class="lang-clojure">(-&gt;&gt; data
+     (partition-all (chunk-size))
+     (pmap (fn [chunk] (-&gt;&gt; chunk (map #(* 2 %)) (reduce +))))
+     (reduce +))
+</code></pre>
+        <p>Same input/output/parallelism, five lines vs. one. The chunk split, worker dispatch, and tree-merge are the operator&#39;s job in stryke.</p>
+      </article>
+      <article class="doc-entry" id="doc-threading-gallery">
+        <h3><a class="doc-anchor" href="#doc-threading-gallery">#</a> Threading-macro example gallery</h3>
+        <p>Full runnable showcase: <code>examples/threading_macros.stk</code>. Each block below is a one-liner that runs end-to-end on a fresh stryke install.</p>
+
+        <h4>~p&gt; chunk-parallel — string sources</h4>
+<pre><code class="lang-perl"># Parallel letter histogram, then top-3.
+my $h = ~p&gt; "the quick brown fox jumps over the lazy dog" letters freq
+my @top = (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..2]   # o=4, e=3, t=2
+
+# Total alphabetic char count via mid-chain mode boundary.
+my $alpha = ~p&gt; "the quick brown fox jumps over the lazy dog" \
+    letters freq ||&gt; values |&gt; sum                              # 35
+
+# par_reduce auto-sum (single-block form, type-aware merger).
+my $r = ~&gt; "abcdefghij" par_reduce { length(_) }                # 10
+
+# par_reduce with explicit pairwise reducer (max-of-word-len).
+my $m = ~&gt; "the quick brown fox" words \
+    par_reduce { len(_) } { _0 &gt; _1 ? _0 : _1 }                # 5
+</code></pre>
+
+        <h4>~p&gt; chunk-parallel — corpus workloads</h4>
+<pre><code class="lang-perl"># Letter histogram across every .stk file in the project.
+my $h = ~p&gt; c("**.stk") letters freq
+
+# Unique-word count across the corpus.
+my $words = ~p&gt; c("**.stk") words freq
+p len(keys %$words)
+
+# Total character count via auto-sum.
+my $chars = ~p&gt; c("**.stk") par_reduce { length(_) }
+
+# Total line count.
+my $lines = ~p&gt; c("**.stk") par_reduce {
+    my @l = split(/\n/, _); len(@l)
+}
+
+# Pattern-match count across .rs files.
+my $unsafe = ~p&gt; c("**.rs") par_reduce {
+    my @m = (_ =~ /unsafe/g); len(@m)
+}                                                              # 953 occurrences
+
+# Files containing a pattern (truthy chunk count).
+my $hits = ~p&gt; c("**.stk") par_reduce { /threading/ ? 1 : 0 }
+
+# Top-10 most common words.
+my $h = ~p&gt; c("**.stk") words freq
+my @top10 = (sort { $h-&gt;{$_1} &lt;=&gt; $h-&gt;{$_0} } keys %$h)[0..9]
+</code></pre>
+
+        <h4>par { BLOCK } — generic chunk wrapper</h4>
+<pre><code class="lang-perl"># Each chunk produces its own letter array; runtime auto-flattens.
+my @a = ~&gt; "Hello, World 123" par { letters }                  # H e l l o W o r l d
+</code></pre>
+
+        <h4>~s&gt; per-item streaming — basics</h4>
+<pre><code class="lang-perl"># Two-stage map chain through bounded channels.
+my $n = ~s&gt; [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 }       # 5 items processed
+
+# Filter then transform.
+my $matched = ~s&gt; [1..10] grep { _ % 2 == 0 } map { _ * _ }    # 5 matched
+
+# Mixed I/O + CPU — workers overlap so total wall time is far below 5×50ms.
+my $r = ~s&gt; [1..5] map { sleep 0.05; _ * _ }                   # 5 items
+</code></pre>
+
+        <h4>~s&gt; per-item streaming — real workloads</h4>
+<pre><code class="lang-perl"># Streaming JSON-shape transform (input is decoded values).
+my @raw = ({v =&gt; 10}, {v =&gt; 20}, {v =&gt; 30})
+my $n = ~s&gt; [@raw] map { _-&gt;{v} * 2 }                          # 3 items
+
+# Streaming log filter — keep ERROR lines only, uppercase them.
+my @log = ("INFO ok", "ERROR oops", "WARN slow", "ERROR bad")
+my $errs = ~s&gt; [@log] grep { /ERROR/ } map { uc }              # 2
+
+# Streaming with shared mysync accumulator across workers.
+mysync $sum = 0
+my $n = ~s&gt; [10, 20, 30, 40, 50] map { $sum += _; _ }
+# $sum == 150, $n == 5
+</code></pre>
+
+        <h4>Speedup</h4>
+        <p>The same letter-frequency histogram run sequentially vs chunk-parallel on the project&#39;s ~110k lines of Rust source:</p>
+<pre><code class="lang-perl">my $start = now_ns()
+my $h_seq = ~&gt; c("**.rs") letters freq
+my $seq_ms = (now_ns() - $start) / 1_000_000
+$start = now_ns()
+my $h_par = ~p&gt; c("**.rs") letters freq
+my $par_ms = (now_ns() - $start) / 1_000_000
+printf "seq: %.0f ms  par: %.0f ms  (%.2fx)\n",
+    $seq_ms, $par_ms, $seq_ms / $par_ms
+# seq: 3531 ms  par:  893 ms  (3.96x)
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-pipeline">
         <h3><a class="doc-anchor" href="#doc-pipeline">#</a> <code>pipeline</code></h3>
