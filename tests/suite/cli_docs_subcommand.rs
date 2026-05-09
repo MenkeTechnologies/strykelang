@@ -86,6 +86,21 @@ fn docs_with_unknown_topic_exits_one() {
     );
 }
 
+fn strip_numbered_docs_list_line(line: &str) -> Option<String> {
+    let t = line.trim_start();
+    // `--list` / `println!("{:>3}. {}", i + 1, topic)` → one or more digits, ". ", topic.
+    let dot = t.find(". ")?;
+    let num = t[..dot].trim();
+    if num.is_empty() || !num.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let name = t[dot + 2..].trim();
+    if name.is_empty() {
+        return None;
+    }
+    Some(name.to_string())
+}
+
 // ── Flags ────────────────────────────────────────────────────────────────────
 
 /// `--list` enumerates every dispatch primary in `%b` exactly once
@@ -105,18 +120,19 @@ fn docs_list_covers_every_dispatch_primary() {
     // Strip the ` 12. name` prefix and collect listed topics.
     let listed: std::collections::HashSet<String> = stdout
         .lines()
-        .filter_map(|l| {
-            let t = l.trim_start();
-            // Format is `NN. name` — drop digits-and-dot prefix.
-            let after_num = t.find(". ")?;
-            Some(t[after_num + 2..].trim().to_string())
-        })
+        .filter_map(strip_numbered_docs_list_line)
         .collect();
     // Pull every primary from `%b` via the same binary.
     let primaries_out = std::process::Command::new(&bin)
         .args(["-e", r#"for (sort keys %b) { print "$_\n" }"#])
         .output()
         .expect("run %b dump");
+    assert!(
+        primaries_out.status.success(),
+        "%b dump failed: status={:?} stderr={}",
+        primaries_out.status.code(),
+        String::from_utf8_lossy(&primaries_out.stderr),
+    );
     let primaries: std::collections::HashSet<String> =
         String::from_utf8_lossy(&primaries_out.stdout)
             .lines()

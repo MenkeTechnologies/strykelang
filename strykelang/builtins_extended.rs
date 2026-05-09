@@ -6923,8 +6923,10 @@ fn builtin_dijkstra(args: &[PerlValue]) -> PerlResult<PerlValue> {
             }
         }
     }
+    let mut pairs: Vec<(String, f64)> = dist.into_iter().collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
     let mut result = indexmap::IndexMap::new();
-    for (k, v) in dist {
+    for (k, v) in pairs {
         result.insert(k, PerlValue::float(v));
     }
     Ok(PerlValue::hash(result))

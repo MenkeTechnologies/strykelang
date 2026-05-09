@@ -703,17 +703,34 @@ fn builtin_bilateral_filter_basic(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // ── 11. Clustering helpers ───────────────────────────────────────────────────
 
+fn kmeans_pp_deterministic_seed(pts: &[Vec<f64>], k: usize) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    k.hash(&mut h);
+    pts.len().hash(&mut h);
+    for row in pts {
+        row.len().hash(&mut h);
+        for &x in row {
+            x.to_bits().hash(&mut h);
+        }
+    }
+    h.finish()
+}
+
 /// k-means++ initialisation: choose k seed centroids weighted by squared
 /// distance to nearest already-chosen centroid.
 fn builtin_kmeans_pp_init(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    use rand::rngs::StdRng;
     use rand::Rng;
+    use rand::SeedableRng;
     let pts = matrix_from_value(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(2).max(1);
     let n = pts.len();
     if n == 0 {
         return Ok(matrix_to_value(&[]));
     }
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(kmeans_pp_deterministic_seed(&pts, k));
     let mut centers: Vec<Vec<f64>> = vec![pts[rng.gen_range(0..n)].clone()];
     while centers.len() < k {
         let mut min_sq = vec![f64::INFINITY; n];
