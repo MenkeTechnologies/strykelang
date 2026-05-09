@@ -1,0 +1,272 @@
+#!/usr/bin/env stryke
+# Extract every fenced code block from the docs sources and run each
+# through `stryke -c` (parse only) so syntax errors in documentation
+# surface as a punch list.
+#
+# Sources:
+#   * README.md         markdown ` ```perl ` fences
+#   * strykelang/lsp.rs hover-doc Rust string literals containing
+#                       ` ```perl\n…\n``` ` escape sequences
+#   * docs/index.html   `<pre>…</pre>` blocks (HTML entities decoded,
+#                       <span> tags stripped)
+#
+# Usage:
+#   s scripts/check_doc_examples.stk [--source FILE] [--show OK]
+
+my $ROOT = groot
+my $TMP  = "/tmp/stryke_doc_check"
+my $BIN  = "$ROOT/target/debug/stryke"
+mkdir $TMP unless -d $TMP
+
+# ── code/non-code heuristic ────────────────────────────────────────────────────
+#
+# A block is treated as code only when its first non-blank line starts
+# with a stryke-ish token (`p`, `fn`, `my`, `our`, `~>`, etc.). Output
+# text, shell prompts, and tree diagrams are skipped.
+fn looks_like_stryke_code($code) {
+    for my $l (split /\n/, $code) {
+        next if $l =~ /^\s*$/
+        next if $l =~ /^\s*#/
+        return 0 if $l =~ /^\s*\$\s/                  # `$ stryke ...`
+        return 0 if $l =~ /^\s*[└├│─]/                 # tree drawing
+        return 0 if $l =~ /^\s*\[[a-z]/                # `[terminate] ...`
+        return 1 if $l =~ /^\s*(p|pp|ep|fn|my|our|use|no|require|package|sub|class|struct|enum|trait|for|foreach|while|until|if|unless|return|local|state|do|eval|BEGIN|END|INIT|CHECK)\b/
+        return 1 if $l =~ /^\s*[~|]/                   # ~> / ~p> / |>
+        return 1 if $l =~ /^\s*[\$\@\%]/               # sigil
+        return 1 if $l =~ /^\s*\w+\s*=/                # assignment
+        return 1 if $l =~ /^\s*\w+\s*\(/               # call
+        return 0
+    }
+    0
+}
+
+# ── per-file extractors ────────────────────────────────────────────────────────
+
+# `README.md` / generic markdown — capture every ```perl … ``` fence.
+fn extract_markdown($path) {
+    my @lines = c($path) |> split /\n/, _
+    my @blocks
+    my $in_block = 0
+    my $start_line = 0
+    my $buf = ""
+    for my $i (0 : $#lines) {
+        my $line = $lines[$i]
+        if (!$in_block && $line =~ /^```(?:perl|stryke)\s*$/) {
+            $in_block = 1
+            $start_line = $i + 1
+            $buf = ""
+        } elsif ($in_block && $line =~ /^```\s*$/) {
+            push @blocks, { file => $path, line => $start_line, code => $buf }
+            $in_block = 0
+        } elsif ($in_block) {
+            $buf .= $line . "\n"
+        }
+    }
+    @blocks
+}
+
+# `lsp.rs` hover docs — string literals like
+# `"... ```perl\nCODE\n``` ..."` where Rust escapes (\n, \\, \") have to
+# be reversed before the code is runnable. Walk char-by-char to collect
+# every double-quoted string spanning to the matching unescaped quote,
+# then look for ```perl … ``` inside the unescaped result.
+fn extract_rust_strings($path) {
+    my $text = c $path
+    my @strs
+    my $i = 0
+    my $n = length $text
+    while ($i < $n) {
+        my $c = substr $text, $i, 1
+        # Skip line + block comments.
+        if ($c eq '/' && substr($text, $i + 1, 1) eq '/') {
+            while ($i < $n && substr($text, $i, 1) ne "\n") { $i++ }
+            next
+        }
+        if ($c eq '/' && substr($text, $i + 1, 1) eq '*') {
+            $i += 2
+            while ($i < $n - 1 && !(substr($text, $i, 1) eq '*' && substr($text, $i + 1, 1) eq '/')) { $i++ }
+            $i += 2
+            next
+        }
+        if ($c ne '"') { $i++; next }
+        my $start = $i + 1
+        $i++
+        while ($i < $n) {
+            my $cc = substr $text, $i, 1
+            if ($cc eq '\\') { $i += 2; next }
+            if ($cc eq '"') { last }
+            $i++
+        }
+        push @strs, substr $text, $start, $i - $start
+        $i++
+    }
+    @strs
+}
+
+# Reverse the common Rust string escapes used in hover docs.
+# Multi-line `~>` needs `\` line continuations — without them stryke
+# terminates each stage at its newline, only the last s/// fires (on
+# `$_`, not the threaded value), and the fn returns its match count.
+fn unescape_rust($s) {
+    ~> $s \
+        s/\\n/\n/g \
+        s/\\t/\t/g \
+        s/\\r/\r/g \
+        s/\\"/"/g \
+        s/\\'/'/g \
+        s/\\\\/\\/g
+}
+
+fn extract_lsp_blocks($path) {
+    my @blocks
+    for my $raw (extract_rust_strings $path) {
+        next unless index($raw, '```perl') >= 0
+        my @lines = unescape_rust($raw) |> split /\n/, _
+        my $in_block = 0
+        my $buf = ""
+        for my $line (@lines) {
+            if (!$in_block && $line =~ /^```(?:perl|stryke)\s*$/) {
+                $in_block = 1
+                $buf = ""
+            } elsif ($in_block && $line =~ /^```\s*$/) {
+                push @blocks, { file => $path, line => 0, code => $buf }
+                $in_block = 0
+            } elsif ($in_block) {
+                $buf .= $line . "\n"
+            }
+        }
+    }
+    @blocks
+}
+
+# `docs/index.html` — every `<pre>...</pre>` block. Decode `&lt;` /
+# `&gt;` / `&amp;` / `&quot;` and strip `<span ...>...</span>` wrappers
+# (they only carry styling for the comment-coloring trick).
+fn extract_html_blocks($path) {
+    my $text = c $path
+    my @blocks
+    my $i = 0
+    my $n = length $text
+    while ($i < $n) {
+        my $open = index $text, '<pre', $i
+        last if $open < 0
+        my $close_open = index $text, '>', $open
+        last if $close_open < 0
+        my $close = index $text, '</pre>', $close_open
+        last if $close < 0
+        # Strip <span> wrappers, decode entities, drop leading newline.
+        # `\` continues the `~>` chain across newlines.
+        my $body = ~> substr($text, $close_open + 1, $close - $close_open - 1) \
+            s|<span[^>]*>||g \
+            s|</span>||g \
+            s/&lt;/</g \
+            s/&gt;/>/g \
+            s/&quot;/"/g \
+            s/&#10003;/✓/g \
+            s/&#10007;/✗/g \
+            s/&amp;/&/g \
+            s/^\n+//
+        push @blocks, { file => $path, line => 0, code => $body }
+        $i = $close + 6
+    }
+    @blocks
+}
+
+# ── run -c on each block ───────────────────────────────────────────────────────
+
+fn check_block($block, $idx) {
+    my $tmp = "$TMP/$idx.stk"
+    # Prepend `no strict;` so doc examples don't have to declare every
+    # symbol they reference. `-c` (parse-only) is looser than `--check`
+    # and is the right level of strictness for docs.
+    spew $tmp, "no strict;\nno warnings;\n" . $block->{code}
+    my $out = `$BIN -c $tmp 2>&1`
+    +{
+        ok   => ($? >> 8) == 0,
+        out  => $out,
+        tmp  => $tmp,
+        file => $block->{file},
+        line => $block->{line},
+        code => $block->{code},
+    }
+}
+
+# ── main ───────────────────────────────────────────────────────────────────────
+
+my $source = "all"
+my $show   = "fail"
+my $top    = 0
+my @argv   = @ARGV
+while (my $arg = shift @argv) {
+    if    ($arg eq "--source") { $source = shift @argv }
+    elsif ($arg eq "--show")   { $show   = shift @argv }
+    elsif ($arg eq "--top")    { $top    = shift @argv }
+}
+
+my @all
+push @all, extract_markdown   "$ROOT/README.md"            if $source eq "all" || $source eq "readme"
+push @all, extract_lsp_blocks "$ROOT/strykelang/lsp.rs"    if $source eq "all" || $source eq "lsp"
+push @all, extract_html_blocks "$ROOT/docs/index.html"     if $source eq "all" || $source eq "html"
+
+my @code_blocks = grep { looks_like_stryke_code _->{code} } @all
+my $total       = scalar @code_blocks
+my $skipped     = scalar(@all) - $total
+
+p "total blocks: ", scalar @all
+p "code blocks: $total (skipped $skipped non-code)"
+
+# Each check_block call shells out to `stryke -c`. `pmap` parallelizes
+# those subprocess invocations across rayon's work-stealing pool —
+# order-preserving and an order of magnitude faster than a serial loop
+# on 1000+ blocks. `with_index` yields `[value, idx]` arrayrefs so the
+# block can recover both via destructure.
+my @results = pmap {
+    my ($b, $idx) = @{ _ }
+    check_block $b, $idx
+} with_index @code_blocks
+
+my @failures = grep { !_->{ok} } @results
+my @oks      = grep {  _->{ok} } @results
+
+p "passed:  ", scalar @oks
+p "failed:  ", scalar @failures
+p ""
+
+# Group failures by their first error line so common patterns surface.
+if ($top > 0 && @failures) {
+    p "── failure categories (top $top) ────────────────────────────────────"
+    my %bucket
+    for my $f (@failures) {
+        my $first = ""
+        for my $e (split /\n/, $f->{out}) {
+            next if $e =~ /^\s*$/
+            $first = $e
+            last
+        }
+        # Strip varying tail (paths, line numbers) so similar errors collapse.
+        $first =~ s| at /[^ ]+ line \d+\.||
+        $first =~ s|line \d+|line N|g
+        $bucket{$first} //= 0
+        $bucket{$first}++
+    }
+    my @keys = sort { $bucket{$_1} <=> $bucket{$_0} } keys %bucket
+    my $n = 0
+    for my $k (@keys) {
+        last if $n >= $top
+        $n++
+        printf "  %4d  %s\n", $bucket{$k}, $k
+    }
+    p ""
+}
+
+if (@failures && $show ne "none") {
+    p "── failures ─────────────────────────────────────────────────────────"
+    for my $f (@failures) {
+        p ""
+        p "$f->{file}:$f->{line}  ($f->{tmp})"
+        p "  code:"
+        ~> $f->{code} split(/\n/) e { p "    $_" }
+        p "  error:"
+        ~> $f->{out}  split(/\n/) e { p "    $_" }
+    }
+}
