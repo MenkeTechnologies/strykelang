@@ -2768,10 +2768,16 @@ impl Parser {
                 kind: ExprKind::Integer(if thread_last { 1 } else { 0 }),
                 line: _line,
             };
+            // Argument order: stages, thread_last, source... — source
+            // is LAST so its list expansion (`(1,2,3)`, `@a`, ranges)
+            // lands in the variadic tail. Pre-fix the source was first
+            // and any list source flattened across the slot, breaking
+            // the `args.len() == 3` invariant in `_thread_par_run` and
+            // hitting "expected 3 args" for `~s> (1,2,3) sum` etc.
             return Ok(Expr {
                 kind: ExprKind::FuncCall {
                     name: "_thread_par_run".into(),
-                    args: vec![source_expr, stages_arr, thread_last_flag],
+                    args: vec![stages_arr, thread_last_flag, source_expr],
                 },
                 line: _line,
             });

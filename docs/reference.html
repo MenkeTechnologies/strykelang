@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.18 · 8309 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.19 · 8309 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -344,8 +344,8 @@ my @hashes = pmap sha256 @blobs, progress =&gt; 1
 
 # Bare-fn form (works for builtins and user-defined subs)
 my @hashes = pmap sha256, @blobs, progress =&gt; 1
-sub double { $_0 * 2 }
-my @r = pmap double, (1:1_000_000)
+fn dbl = _ * 2
+my @r = pmap dbl, (1:1_000_000)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pmaps">
@@ -374,8 +374,8 @@ my @primes = pgrep { is_prime } 2:1_000_000
 @files |&gt; pgrep { -s _ &gt; 1024 } |&gt; e p
 
 # Bare-fn form
-sub even { $_0 % 2 == 0 }
-my @e = pgrep even, 1:10        # (2,4,6,8,10)
+fn Demo::even = _ % 2 == 0
+my @e = pgrep Demo::even, 1:10  # (2,4,6,8,10)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-pgreps">
@@ -396,8 +396,8 @@ pfor { compress_file } glob(&quot;*.log&quot;)
     p &quot;done: $_&quot; }
 
 # Bare-fn form
-sub work { print &quot;did $_0\n&quot; }
-pfor work, (1, 2, 3)
+fn task = ep &quot;did $_&quot;
+pfor task, (1, 2, 3)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-psort">
@@ -460,7 +460,7 @@ my $product = preduce { $a * $b } 1:100
 my @out = pflat_map expand @list
 
 # Bare-fn form
-sub expand { ($_0, $_0 * 10) }
+fn expand = (_, _ * 10)
 my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
 </code></pre>
       </article>
@@ -472,16 +472,16 @@ my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
       </article>
       <article class="doc-entry" id="doc-fan">
         <h3><a class="doc-anchor" href="#doc-fan">#</a> <code>fan</code></h3>
-        <p>Execute BLOCK or FUNC N times in parallel (<code>_</code>/<code>$_0</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
+        <p>Execute BLOCK or FUNC N times in parallel (<code>_</code> = index 0..N-1). With no count, defaults to the rayon pool size (<code>stryke -j</code>).</p>
         <p>Two equivalent surface syntaxes: • Block form — <code>fan N { BLOCK }</code> or <code>fan { BLOCK }</code> • Bare-fn form — <code>fan N, FUNC</code> or <code>fan FUNC</code></p>
         <pre><code class="lang-perl"># Block form
 fan 8 { work(_) }
 fan { work(_) } progress =&gt; 1
 
 # Bare-fn form
-sub work { print &quot;tick $_0\n&quot; }
-fan 8, work
-fan work, progress =&gt; 1   # uses pool size
+fn tick = ep &quot;tick $_&quot;
+fan 8, tick
+fan tick, progress =&gt; 1   # uses pool size
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fan-cap">
@@ -491,7 +491,7 @@ fan work, progress =&gt; 1   # uses pool size
 my @results = fan_cap 8 { compute(_) }
 
 # Bare-fn form
-sub compute { $_0 * $_0 }
+fn compute = _ * _
 my @squares = fan_cap 8, compute
 </code></pre>
       </article>
@@ -648,7 +648,7 @@ $url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
         <p>Thread-first macro — chain stages where the threaded value is injected as the <strong>first</strong> argument (like Clojure&#39;s <code>-&gt;</code>).</p>
         <pre><code class="lang-perl">~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { $_0 &lt;=&gt; $_1 } |&gt; join &quot;,&quot; |&gt; p
 ~&gt; &quot; hello &quot; tm uc rv lc ufc sc cc kc tj p  # short aliases
-fn div { $_0 / $_1 }
+fn div = _0 / _1
 ~&gt; 10 div(2) p                               # div(10, 2) = 5
 ~&gt; 10 div(_, 2) p                           # explicit _ position: div(10, 2) = 5
 </code></pre>
@@ -657,7 +657,7 @@ fn div { $_0 / $_1 }
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>-&gt;&gt;</code></h3>
         <p>Thread-last macro — chain stages where the threaded value is injected as the <strong>last</strong> argument (like Clojure&#39;s <code>-&gt;&gt;</code>).</p>
-        <pre><code class="lang-perl">fn div { $_0 / $_1 }
+        <pre><code class="lang-perl">fn div = _0 / _1
 ~&gt;&gt; 10 div(2) p                              # div(2, 10) = 0.2
 -&gt;&gt; 10 div(_, 2) p                          # explicit _ overrides: div(10, 2) = 5
 

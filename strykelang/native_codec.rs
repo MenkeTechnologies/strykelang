@@ -1686,6 +1686,17 @@ pub(crate) fn ecdsa_p256_sign(priv_hex: &PerlValue, message: &PerlValue) -> Perl
     use p256::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p256_sign: invalid hex: {}", e), 0))?;
+    // `GenericArray::from_slice` (used by `.into()`) panics on length
+    // mismatch — explicit length check returns a proper PerlError.
+    if priv_bytes.len() != 32 {
+        return Err(PerlError::runtime(
+            format!(
+                "ecdsa_p256_sign: private key must be 32 bytes (got {})",
+                priv_bytes.len()
+            ),
+            0,
+        ));
+    }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p256_sign: invalid key: {}", e), 0))?;
     let sig: p256::ecdsa::Signature = sk.sign(&bytes_from_value(message));
@@ -1734,6 +1745,15 @@ pub(crate) fn ecdsa_p384_sign(priv_hex: &PerlValue, message: &PerlValue) -> Perl
     use p384::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p384_sign: invalid hex: {}", e), 0))?;
+    if priv_bytes.len() != 48 {
+        return Err(PerlError::runtime(
+            format!(
+                "ecdsa_p384_sign: private key must be 48 bytes (got {})",
+                priv_bytes.len()
+            ),
+            0,
+        ));
+    }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
         .map_err(|e| PerlError::runtime(format!("ecdsa_p384_sign: invalid key: {}", e), 0))?;
     let sig: p384::ecdsa::Signature = sk.sign(&bytes_from_value(message));
@@ -1785,6 +1805,15 @@ pub(crate) fn ecdsa_secp256k1_sign(
     use k256::ecdsa::{signature::Signer, SigningKey};
     let priv_bytes = hex::decode(priv_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdsa_secp256k1_sign: invalid hex: {}", e), 0))?;
+    if priv_bytes.len() != 32 {
+        return Err(PerlError::runtime(
+            format!(
+                "ecdsa_secp256k1_sign: private key must be 32 bytes (got {})",
+                priv_bytes.len()
+            ),
+            0,
+        ));
+    }
     let sk = SigningKey::from_bytes(priv_bytes.as_slice().into())
         .map_err(|e| PerlError::runtime(format!("ecdsa_secp256k1_sign: invalid key: {}", e), 0))?;
     let sig: k256::ecdsa::Signature = sk.sign(&bytes_from_value(message));
@@ -1836,6 +1865,15 @@ pub(crate) fn ecdh_p256(
         .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid hex public key: {}", e), 0))?;
+    if priv_bytes.len() != 32 {
+        return Err(PerlError::runtime(
+            format!(
+                "ecdh_p256: private key must be 32 bytes (got {})",
+                priv_bytes.len()
+            ),
+            0,
+        ));
+    }
     let point = EncodedPoint::from_bytes(&pub_bytes)
         .map_err(|e| PerlError::runtime(format!("ecdh_p256: invalid point: {}", e), 0))?;
     let their_pk = PublicKey::from_encoded_point(&point)
@@ -1857,6 +1895,15 @@ pub(crate) fn ecdh_p384(
         .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid hex private key: {}", e), 0))?;
     let pub_bytes = hex::decode(their_pub_hex.to_string().trim())
         .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid hex public key: {}", e), 0))?;
+    if priv_bytes.len() != 48 {
+        return Err(PerlError::runtime(
+            format!(
+                "ecdh_p384: private key must be 48 bytes (got {})",
+                priv_bytes.len()
+            ),
+            0,
+        ));
+    }
     let point = EncodedPoint::from_bytes(&pub_bytes)
         .map_err(|e| PerlError::runtime(format!("ecdh_p384: invalid point: {}", e), 0))?;
     let their_pk = PublicKey::from_encoded_point(&point)

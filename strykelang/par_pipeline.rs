@@ -317,13 +317,19 @@ pub(crate) fn run_par_pipeline(
     Ok(PerlValue::integer(items.len() as i64))
 }
 
-/// Worker loop for `~p>` / `~p>>` stages. Differs from `run_worker` in two
+/// Worker loop for `~s>` / `~s>>` stages. Differs from `run_worker` in two
 /// ways: (a) the stage body is evaluated and its result is flattened via
 /// `map_flatten_outputs` before being sent downstream, so a list/array-
 /// returning stage like `map { ... }` propagates each element as a
 /// separate item (instead of returning `1` — the scalar-context list
 /// count); (b) when the result is undef the item is silently dropped
 /// (filter semantics) so `grep { ... }` works as expected.
+///
+/// The last stage's outputs accumulate into `last_stage_collector` (when
+/// provided) so the macro can return the actual emitted values, not just
+/// a count. Order is preserved because the pipeline runs one worker per
+/// stage in series — each stage's downstream channel is consumed in send
+/// order.
 #[allow(clippy::too_many_arguments)]
 fn run_thread_par_worker(
     sub: Arc<PerlSub>,
@@ -334,7 +340,7 @@ fn run_thread_par_worker(
     rx: Receiver<PerlValue>,
     tx_out: Option<Sender<PerlValue>>,
     err: Arc<Mutex<Option<String>>>,
-    last_stage_counter: Option<Arc<AtomicUsize>>,
+    last_stage_collector: Option<Arc<Mutex<Vec<PerlValue>>>>,
 ) {
     while let Ok(item) = rx.recv() {
         if err.lock().is_some() {
@@ -376,17 +382,17 @@ fn run_thread_par_worker(
         };
 
         for out in items {
-            if let Some(c) = &last_stage_counter {
-                c.fetch_add(1, Ordering::SeqCst);
-            }
             if let Some(t) = &tx_out {
                 if t.send(out).is_err() {
                     let mut g = err.lock();
                     if g.is_none() {
-                        *g = Some("~p>: downstream closed".into());
+                        *g = Some("~s>: downstream closed".into());
                     }
                     return;
                 }
+            } else if let Some(c) = &last_stage_collector {
+                // Last stage — accumulate the emitted value.
+                c.lock().push(out);
             }
         }
     }
@@ -411,7 +417,7 @@ pub(crate) fn run_thread_par(
 ) -> PerlResult<PerlValue> {
     if stage_closures.is_empty() {
         return Err(PerlError::runtime(
-            "~p>: requires at least one stage after the source",
+            "~s>: requires at least one stage after the source",
             line,
         ));
     }
@@ -421,7 +427,12 @@ pub(crate) fn run_thread_par(
     let (capture, atomic_arrays, atomic_hashes) = interp.scope.capture_with_atomics();
 
     let err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    let processed = Arc::new(AtomicUsize::new(0));
+    // Last-stage collector: emitted values accumulate here so the macro
+    // returns the actual stream output. Pre-fix this was an
+    // `AtomicUsize` count and the macro returned the count instead of
+    // the values, which made `join(',', ~s> [1,2,3] map {…})` return
+    // "3" instead of "2,4,6".
+    let collected: Arc<Mutex<Vec<PerlValue>>> = Arc::new(Mutex::new(Vec::new()));
 
     // Materialise source into a Vec the source-feeder thread will iterate.
     let items: Vec<PerlValue> = source_value.map_flatten_outputs(true);
@@ -453,8 +464,8 @@ pub(crate) fn run_thread_par(
             } else {
                 None
             };
-            let last_ctr = if stage_idx + 1 == k {
-                Some(Arc::clone(&processed))
+            let last_collector = if stage_idx + 1 == k {
+                Some(Arc::clone(&collected))
             } else {
                 None
             };
@@ -465,7 +476,9 @@ pub(crate) fn run_thread_par(
             let ah_w = atomic_hashes.clone();
             let err_w = Arc::clone(&err);
             scope.spawn(move || {
-                run_thread_par_worker(sub, subs_w, cap_w, aa_w, ah_w, rx, tx_out, err_w, last_ctr);
+                run_thread_par_worker(
+                    sub, subs_w, cap_w, aa_w, ah_w, rx, tx_out, err_w, last_collector,
+                );
             });
         }
         txs.clear();
@@ -475,7 +488,8 @@ pub(crate) fn run_thread_par(
     if let Some(msg) = err.lock().take() {
         return Err(PerlError::runtime(msg, line));
     }
-    Ok(PerlValue::integer(processed.load(Ordering::SeqCst) as i64))
+    let out = std::mem::take(&mut *collected.lock());
+    Ok(PerlValue::array(out))
 }
 
 /// Run a **streaming** parallel pipeline: items flow through bounded channels

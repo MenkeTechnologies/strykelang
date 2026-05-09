@@ -5428,6 +5428,45 @@ impl VMHelper {
     }
 
     pub(crate) fn chomp_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
+        // Perl's `chomp` on `@arr` / `%hash` iterates and chomps every
+        // element in place, returning the *total count* of newlines
+        // removed. Pre-fix this collapsed the array/hash to its
+        // stringified form, chomped that, and reassigned a scalar
+        // back — silently destroying the container.
+        match &target.kind {
+            ExprKind::ArrayVar(name) => {
+                let arr = self.scope.get_array(name);
+                let mut total = 0i64;
+                let mut new_arr = Vec::with_capacity(arr.len());
+                for v in arr {
+                    let mut s = v.to_string();
+                    if s.ends_with('\n') {
+                        s.pop();
+                        total += 1;
+                    }
+                    new_arr.push(PerlValue::string(s));
+                }
+                self.scope.set_array(name, new_arr).map_err(FlowOrError::Error)?;
+                return Ok(PerlValue::integer(total));
+            }
+            ExprKind::HashVar(name) => {
+                let h = self.scope.get_hash(name);
+                let mut total = 0i64;
+                let mut new_h: indexmap::IndexMap<String, PerlValue> =
+                    indexmap::IndexMap::with_capacity(h.len());
+                for (k, v) in h {
+                    let mut s = v.to_string();
+                    if s.ends_with('\n') {
+                        s.pop();
+                        total += 1;
+                    }
+                    new_h.insert(k, PerlValue::string(s));
+                }
+                self.scope.set_hash(name, new_h).map_err(FlowOrError::Error)?;
+                return Ok(PerlValue::integer(total));
+            }
+            _ => {}
+        }
         let mut s = val.to_string();
         let removed = if s.ends_with('\n') {
             s.pop();
@@ -5441,6 +5480,43 @@ impl VMHelper {
 
     /// Shared `chop` implementation (mutates `target`).
     pub(crate) fn chop_inplace_execute(&mut self, val: PerlValue, target: &Expr) -> ExecResult {
+        // Perl's `chop @arr` / `chop %hash` chops every element in
+        // place and returns the *last character chopped*. Without
+        // this branch the call stringified the whole container,
+        // chopped one byte off the joined form, and reassigned a
+        // scalar back — destroying the array.
+        match &target.kind {
+            ExprKind::ArrayVar(name) => {
+                let arr = self.scope.get_array(name);
+                let mut last = PerlValue::UNDEF;
+                let mut new_arr = Vec::with_capacity(arr.len());
+                for v in arr {
+                    let mut s = v.to_string();
+                    if let Some(c) = s.pop() {
+                        last = PerlValue::string(c.to_string());
+                    }
+                    new_arr.push(PerlValue::string(s));
+                }
+                self.scope.set_array(name, new_arr).map_err(FlowOrError::Error)?;
+                return Ok(last);
+            }
+            ExprKind::HashVar(name) => {
+                let h = self.scope.get_hash(name);
+                let mut last = PerlValue::UNDEF;
+                let mut new_h: indexmap::IndexMap<String, PerlValue> =
+                    indexmap::IndexMap::with_capacity(h.len());
+                for (k, v) in h {
+                    let mut s = v.to_string();
+                    if let Some(c) = s.pop() {
+                        last = PerlValue::string(c.to_string());
+                    }
+                    new_h.insert(k, PerlValue::string(s));
+                }
+                self.scope.set_hash(name, new_h).map_err(FlowOrError::Error)?;
+                return Ok(last);
+            }
+            _ => {}
+        }
         let mut s = val.to_string();
         let chopped = s
             .pop()
