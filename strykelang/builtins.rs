@@ -2561,16 +2561,19 @@ pub(crate) fn try_builtin(
                 Some(interp.builtin_par_pipeline_stream_new(args, line))
             }
         }
-        // Internal entry point used by `~p>` / `~p>>` thread-macro lowering.
-        // Args: source_value, [stage_closures], thread_last_int.
+        // Internal entry point used by `~s>` / `~s>>` thread-macro lowering.
+        // Args: [stage_closures], thread_last_int, source... — source is
+        // VARIADIC at the tail so list sources (`(1,2,3)`, `@a`, ranges)
+        // expand cleanly without breaking arity checking. Source = args[2..]
+        // collected as a single list value.
         "_thread_par_run" => {
-            if args.len() != 3 {
+            if args.len() < 2 {
                 return Some(Err(crate::error::PerlError::runtime(
-                    "_thread_par_run: expected 3 args (source, stages, thread_last)",
+                    "_thread_par_run: expected at least 2 args (stages, thread_last, source...)",
                     line,
                 )));
             }
-            let stages_v = &args[1];
+            let stages_v = &args[0];
             let stage_list = stages_v.map_flatten_outputs(true);
             let mut subs = Vec::with_capacity(stage_list.len());
             for v in stage_list {
@@ -2584,10 +2587,22 @@ pub(crate) fn try_builtin(
                     }
                 }
             }
-            let thread_last = args[2].to_int() != 0;
+            let thread_last = args[1].to_int() != 0;
+            // Source: tail of args. If exactly one tail value AND it's
+            // already an arrayref / array, pass it through unchanged so
+            // `~s> [1,2,3] ...` keeps the existing single-source-arg
+            // semantics (the runtime peels arrayrefs via
+            // `map_flatten_outputs(true)`). Otherwise wrap the variadic
+            // tail as a fresh list so `(1,2,3)` / `@a` / range sources
+            // become one source value.
+            let source = if args.len() == 3 {
+                args[2].clone()
+            } else {
+                crate::value::PerlValue::array(args[2..].to_vec())
+            };
             Some(crate::par_pipeline::run_thread_par(
                 interp,
-                args[0].clone(),
+                source,
                 subs,
                 thread_last,
                 line,
