@@ -2,7 +2,7 @@
 fn Exercism::PascalsTriangle::rows($n) {
     return [] if $n <= 0
     my @t = ([1])
-    for my $i (1..$n - 1) {
+    for my $i (1:$n - 1) {
         my $prev = $t[-1]
         my @row = (1)
         ~> 1:$i - 1 ep { push @row, $prev->[_ - 1] + $prev->[_] }

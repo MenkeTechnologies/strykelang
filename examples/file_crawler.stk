@@ -1,47 +1,43 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke File Crawler Demo
 # High-performance parallel file system operations
 
 print cyber_banner("FILE CRAWLER")
-print "\nSearching for .stk files in the current directory...\n"
+p "\nSearching for .stk files in the current directory..."
 
 # mysync declares variables shared across parallel blocks with atomic updates
 mysync @stk_files
 
 par_walk ".", {
-    if ($_ =~ /\.stk$/) {
-        push @stk_files, $_
+    if (_ =~ /\.stk$/) {
+        push @stk_files, _
     }
 }
 
-print "Found ", len(@stk_files), " Stryke scripts.\n"
+p "Found ", len(@stk_files), " Stryke scripts."
 
-print "\nCounting total lines across all scripts in parallel...\n"
+p "\nCounting total lines across all scripts in parallel..."
 mysync $total_lines = 0
 for my $file (@stk_files) {
     # par_lines uses mmap for fast line scanning
     mysync $file_lines = 0
     par_lines $file, { $file_lines++ }
     $total_lines += $file_lines
-    print "  $file: $file_lines lines\n"
+    p "  $file: $file_lines lines"
 }
 
-print "\nTOTAL CODE LINES: $total_lines\n"
+p "\nTOTAL CODE LINES: $total_lines"
 
-print "\nSearching for 'cyber_banner' usage in parallel...\n"
+p "\nSearching for 'cyber_banner' usage in parallel..."
 mysync @matches
 for my $file (@stk_files) {
     par_lines $file, {
-        if ($_ =~ /cyber_banner/) {
+        if (_ =~ /cyber_banner/) {
             push @matches, "$file: $_"
         }
     }
 }
 
-print "Usage of 'cyber_banner':\n"
-for my $m (@matches) {
-    print "  $m"
-}
+p "Usage of 'cyber_banner':"
+p "  $_" for @matches

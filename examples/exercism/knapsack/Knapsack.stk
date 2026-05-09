@@ -4,7 +4,7 @@ fn Exercism::Knapsack::maximum_value($items, $cap) {
     for my $it (@$items) {
         my $w = $it->{weight}
         my $v = $it->{value}
-        for my $c (rev($w..$cap)) {
+        for my $c (rev($w:$cap)) {
             $dp[$c] = max($dp[$c], $dp[$c - $w] + $v)
         }
     }

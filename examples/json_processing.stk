@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke JSON Processing Demo
 # Demonstrates pipe operator |>, to_json, and from_json
@@ -15,26 +13,26 @@ my $data = +{
     }
 }
 
-print "--- Original Data ---\n"
-print "Name: ", $data->{project}, "\n"
-print "Tags: ", join(", ", @{$data->{tags}}), "\n"
+p "--- Original Data ---"
+p "Name: ", $data->{project}
+p "Tags: ", join(", ", @{$data->{tags}})
 
 # Serialize to JSON
 my $json = $data |> to_json()
-print "\n--- Serialized JSON ---\n"
-print $json, "\n"
+p "\n--- Serialized JSON ---"
+p($json)
 
 # Deserialize back
 my $recovered = $json |> from_json()
-print "\n--- Recovered Data ---\n"
-print "Author: ", $recovered->{meta}->{author}, "\n"
+p "\n--- Recovered Data ---"
+p "Author: ", $recovered->{meta}->{author}
 
 # Manipulate and pipe back to JSON
-print "\n--- Piped Manipulation ---\n"
-my @filtered_tags = @{$recovered->{tags}} 
-    |> grep { length $_ > 4 } 
-    |> map { uc $_ } 
+p "\n--- Piped Manipulation ---"
+my @filtered_tags = @{$recovered->{tags}}
+    |> grep { length _ > 4 }
+    |> map { uc _ }
 
 my $mini_json = \@filtered_tags |> to_json()
 
-print "Uppercase tags > 4 chars: $mini_json\n"
+p "Uppercase tags > 4 chars: $mini_json"

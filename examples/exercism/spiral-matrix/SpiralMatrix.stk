@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 fn Exercism::SpiralMatrix::spiral_matrix($n) {
     return [] if $n <= 0
-    my @m = map { [(0) x $n] } 1..$n
+    my @m = map { [(0) x $n] } 1:$n
     my @dirs = ([0,1], [1,0], [0,-1], [-1,0])
     my ($r, $c, $d) = (0, 0, 0)
-    for my $v (1..$n * $n) {
+    for my $v (1:$n * $n) {
         $m[$r][$c] = $v
         my ($dr, $dc) = @{$dirs[$d]}
         my $nr = $r + $dr

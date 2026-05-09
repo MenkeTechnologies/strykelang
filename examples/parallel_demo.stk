@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict
-use warnings
 
 my @data = 1:100
 my @doubled = @data |> pmap { _ * 2 }

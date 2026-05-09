@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Advanced OOP Demo
 # Demonstrates traits (interfaces), classes, and polymorphism
@@ -28,17 +26,15 @@ class NetworkScanner extends Device impl Connectable, Readable {
     ip: Str = "127.0.0.1"
     
     fn connect {
-        print "  [CONN] Connecting to " . $self->ip . "...\n"
-        return 1
+        p "  [CONN] Connecting to " . $self->ip . "..."
+        1
     }
-    
+
     fn disconnect {
-        print "  [CONN] Disconnected from " . $self->ip . ".\n"
+        p "  [CONN] Disconnected from " . $self->ip . "."
     }
-    
-    fn read_data {
-        return +{ status => "UP", services => ["http", "ssh"] }
-    }
+
+    fn read_data { +{ status => "UP", services => ["http", "ssh"] } }
     
     # Override base method
     fn identify {
@@ -49,29 +45,27 @@ class NetworkScanner extends Device impl Connectable, Readable {
 class DiskMonitor extends Device impl Readable {
     mount: Str = "/"
     
-    fn read_data {
-        return +{ mount => $self->mount, usage => "45%" }
-    }
+    fn read_data { +{ mount => $self->mount, usage => "45%" } }
 }
 
-print "--- OOP POLYMORPHISM ---\n"
+p "--- OOP POLYMORPHISM ---"
 
 my $scanner = NetworkScanner(id => 101, name => "EdgeScanner", ip => "192.168.1.50")
 my $monitor = DiskMonitor(id => 202, name => "RootDisk", mount => "/var/log")
 
-print $scanner->identify(), "\n"
-print $monitor->identify(), "\n"
+p $scanner->identify()
+p $monitor->identify()
 
-print "\n--- TRAIT-BASED DISPATCH ---\n"
+p "\n--- TRAIT-BASED DISPATCH ---"
 
 # Both implement Readable
 my @readables = ($scanner, $monitor)
 for my $r (@readables) {
     my $data = $r->read_data()
-    print "Data from ", $r->name, ": ", to_json($data), "\n"
+    p "Data from ", $r->name, ": ", to_json($data)
 }
 
-print "\n--- TYPED CLASS INSTANCE ---\n"
+p "\n--- TYPED CLASS INSTANCE ---"
 my $safe_scanner = $scanner
 $safe_scanner->connect()
 $safe_scanner->disconnect()

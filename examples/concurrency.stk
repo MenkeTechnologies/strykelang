@@ -1,42 +1,39 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Concurrency Demo
 # Demonstrates async, spawn, and await
 
 fn slow_operation($n, $delay) {
-    # sleep is a standard Perl-ism
     sleep $delay
-    return $n * $n
+    $n * $n
 }
 
-print "Starting async tasks...\n"
+p "Starting async tasks..."
 
 # async returns a handle
-my $task1 = async { slow_operation(10, 0.5) };
-my $task2 = spawn { slow_operation(20, 1.0) }; # spawn is an alias for async
+my $task1 = async { slow_operation(10, 0.5) }
+my $task2 = spawn { slow_operation(20, 1.0) } # spawn is an alias for async
 
-print "Tasks are running in the background. Doing other work...\n"
+p "Tasks are running in the background. Doing other work..."
 my $sum = 0
-for (1 .. 100000) { $sum += $_ }
-print "Other work done. Sum = $sum\n"
+$sum += _ for 1:100000
+p "Other work done. Sum = $sum"
 
-print "Awaiting tasks...\n"
+p "Awaiting tasks..."
 my $res1 = await $task1
 my $res2 = await $task2
 
-print "Task 1 result: $res1\n"
-print "Task 2 result: $res2\n"
+p "Task 1 result: $res1"
+p "Task 2 result: $res2"
 
 # You can also await a list of tasks
-print "\nRunning multiple parallel tasks...\n"
-my @task_list = map { 
-    my $val = $_; 
-    async { slow_operation($val, 0.2) } 
-} (1 .. 5)
+p "\nRunning multiple parallel tasks..."
+my @task_list = map {
+    my $val = _
+    async { slow_operation($val, 0.2) }
+} (1:5)
 
-my @results = map { await $_ } @task_list
-print "Results: ", join(", ", @results), "\n"
+my @results = map { await _ } @task_list
+p "Results: ", join(", ", @results)
 
-print "\nAll concurrency tests passed.\n"
+p "\nAll concurrency tests passed."
