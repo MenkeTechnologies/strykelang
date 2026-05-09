@@ -9,35 +9,26 @@
 //!     `STRYKE_NO_TTY=1` dumps the intro page and exits 0 instead of
 //!     blocking on a TUI loop.
 //!
-//! Skipped silently when the stryke binary hasn't been built — same
-//! pattern as `tests/suite/error_parity.rs`.
+//! `run_docs` returns `None` only if spawning `stryke docs` fails (rare —
+//! the exe path comes from [`env!("CARGO_BIN_EXE_stryke")]`, same as other
+//! integration CLI suites).
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-fn stryke_binary() -> Option<PathBuf> {
-    // Prefer whichever binary is newer — `cargo test` rebuilds debug
-    // every run, so a stale release/ binary from an old build (still
-    // common since `cargo build --release` is a separate step) would
-    // make this test diverge from current source. Same logic as the
-    // `stryke_binary` helpers in error_parity / aot_build, but with a
-    // freshness comparator instead of a fixed preference.
-    let cands = [
-        PathBuf::from("target/release/stryke"),
-        PathBuf::from("target/debug/stryke"),
-    ];
-    cands
-        .iter()
-        .filter(|p| p.exists())
-        .max_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok())
-        .cloned()
+/// Path to the `stryke` executable built for this test run (`cargo test`
+/// sets `CARGO_BIN_EXE_*`). Relative `target/debug/stryke` probes break when
+/// the integration harness cwd is not the crate root — and can disagree with
+/// `%b` / `--list` parity if a different `stryke` appears earlier on `$PATH`.
+fn stryke_binary() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_stryke"))
 }
 
 /// Run `stryke docs ARGS...` with stdin piped (so `is_terminal()` on
 /// stdin returns false — kicks the subcommand into non-interactive
 /// mode).
 fn run_docs(args: &[&str]) -> Option<(i32, String, String)> {
-    let bin = stryke_binary()?;
+    let bin = stryke_binary();
     let mut cmd = Command::new(&bin);
     cmd.arg("docs").args(args).stdin(Stdio::null());
     let out = cmd.output().ok()?;
@@ -110,7 +101,7 @@ fn docs_list_covers_every_dispatch_primary() {
         return;
     };
     assert_eq!(rc, 0);
-    let bin = stryke_binary().unwrap();
+    let bin = stryke_binary();
     // Strip the ` 12. name` prefix and collect listed topics.
     let listed: std::collections::HashSet<String> = stdout
         .lines()
@@ -227,10 +218,7 @@ fn docs_no_args_with_piped_stdin_exits_zero() {
 /// terminal — opt-out for users who want scripted-only behavior.
 #[test]
 fn docs_with_stryke_no_tty_env_exits_zero() {
-    let Some(bin) = stryke_binary() else {
-        eprintln!("skip: stryke binary not built");
-        return;
-    };
+    let bin = stryke_binary();
     let out = Command::new(&bin)
         .arg("docs")
         .arg("pmap")
@@ -246,10 +234,7 @@ fn docs_with_stryke_no_tty_env_exits_zero() {
 /// `NO_TTY=1` (the generic form, no `STRYKE_` prefix) is honored too.
 #[test]
 fn docs_with_generic_no_tty_env_exits_zero() {
-    let Some(bin) = stryke_binary() else {
-        eprintln!("skip: stryke binary not built");
-        return;
-    };
+    let bin = stryke_binary();
     let out = Command::new(&bin)
         .arg("docs")
         .arg("pmap")
@@ -264,10 +249,7 @@ fn docs_with_generic_no_tty_env_exits_zero() {
 /// cleanly — verifying the behavior the user originally hit when
 #[test]
 fn docs_pmap_pipes_to_head_cleanly() {
-    let Some(bin) = stryke_binary() else {
-        eprintln!("skip: stryke binary not built");
-        return;
-    };
+    let bin = stryke_binary();
     // Use sh to chain the pipe portably.
     let out = Command::new("sh")
         .arg("-c")

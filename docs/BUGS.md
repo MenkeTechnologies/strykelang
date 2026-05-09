@@ -1,9 +1,8 @@
 # BUGS.md — Known parity gaps and surprising behaviors
 
 Captured 2026-05-04 from a behavior-pinning sweep against `stryke v0.11.12` on
-macOS aarch64; continuously updated since. The pin-test corpus now lives in
-`tests/suite/behavior_pin_2026_05*.rs` (43 batches as of 2026-05-06,
-the unsuffixed file plus `_b..z` and `_aa..ap`), and contains ~3000+ cases.
+macOS aarch64; continuously updated since. Additional behavior pins live in
+`tests/suite/behavior_pin_2026_05*.rs` (rolling `_a..z`, `_aa..` batches).
 Entries below pair each documented bug with the pinning tests that lock the
 *current* output.
 
@@ -410,6 +409,328 @@ pattern, BUG-089 breaks every state-tracking closure, and BUG-037 breaks
 every coderef-call-with-array-arg. Together they make most functional-
 style libraries unusable until fixed.
 
+## BUG-120 — `cosine_distance` with a zero-length vector operand returns **1** — **`polish`**
+
+When either argument has Euclidean norm ~0 (`cosine_similarity` is undefined),
+`builtin_cosine_distance` clamps to **1** (maximum distance). That matches the
+Rust guard `na < 1e-15 || nb < 1e-15` but differs from ecosystems that propagate
+NaN instead of a finite sentinel.
+
+Pin test: `cosine_distance_zero_operand_is_unit_bx` in
+`tests/suite/behavior_pin_2026_05_bx.rs`.
+
+## BUG-121 — `median_absolute_deviation` uses `sorted[len/2]` as the central value — **`bug`**
+
+For even-sized samples the implementation takes `vals[vals.len() / 2]` after
+sorting rather than the mean of the two middle order statistics (the usual
+definition of the sample median). The subsequent median of absolute deviations
+is therefore skewed whenever the even-length middle pair straddles a wide gap.
+
+Example: `median_absolute_deviation(1, 2, 100, 101)` returns **98** because
+the code treats the “median” of the data as **100**; the conventional median
+would be **51**, yielding a much smaller MAD (~49.5).
+
+Pin test: `median_absolute_deviation_even_n_spread_bx` in
+`tests/suite/behavior_pin_2026_05_bx.rs`.
+
+## BUG-122 — `js_divergence` / `js_div` vs `jensen_shannon_div` disagree (nats vs bits) — **`bug`**
+
+`js_divergence` (in `math_wolfram3.rs`) builds KL terms with **natural**
+logarithms. `jensen_shannon_div` is wired to `kullback_jensen_div`
+(`math_wolfram40.rs`), which uses **log2** in each KL term. The two therefore
+differ by a factor of **`ln 2`** for the same distributions even though docs
+refer to both as Jensen–Shannon-style quantities.
+
+Illustrative non-uniform pair (pinned numerically):
+
+- `sprintf("%.12f", jensen_shannon_div(...)) → "0.031596722287"`
+- `sprintf("%.12f", js_div(...))          → "0.021901178968"`
+
+Pin tests: `jensen_shannon_div_triple_bx`, `js_divergence_triple_nats_bx` in
+`tests/suite/behavior_pin_2026_05_bx.rs`.
+
+## BUG-123 — `chi_squared_distance` vs `chisquare_metric` differ by a factor of **2** — **`bug`**
+
+Both walk the elementwise \(\sum_i (p_i-q_i)^2/(p_i+q_i)\)
+pattern, but `chi_squared_distance` (`math_wolfram4.rs`) multiplies by
+**`0.5`** while `chisquare_metric` (`math_wolfram40.rs`) omits it. Names
+give no indication which convention applies.
+
+Pins: `chisquare_metric_axis_pair_by`, `chisquare_metric_equals_twice_chi_squared_distance_by`
+in `tests/suite/behavior_pin_2026_05_by.rs`.
+
+## BUG-124 — `csiszar_phi_div` is \(\sum_i q_i \ln(p_i/q_i) = -\mathrm{KL}(Q\|P)\), not an unsigned ϕ-form — **`bug`**
+
+Rust comment claims “Csiszár ϕ-divergence: \(\sum q \, \phi(p/q)\)” with the
+usual convex \(\phi\) so the sum is \(\mathrm{KL}(P\|Q)\) nonnegative. The
+implementation instead accumulates **`q_i * ln(p_i/q_i)`**, which yields
+**\(-\mathrm{KL}(Q\|P)\)** and can surface **negative floats** whenever
+\(Q\neq P\).
+
+Pin test: `csiszar_phi_div_coin_pair_by` in
+`tests/suite/behavior_pin_2026_05_by.rs`.
+
+## BUG-125 — `relative_entropy_kl` measures KL in **bits**; `kl_divergence` / `kl_div` use **nats** — **`bug`**
+
+`builtin_relative_entropy_kl` (`math_wolfram40.rs`) uses `(p/q).log2()`.
+The older `builtin_kl_divergence` path (`math_wolfram3.rs`) uses `.ln()`
+throughout. Multiply the former by \(\ln 2\) to reproduce the latter for the
+same \(P,Q\).
+
+Pin tests: `relative_entropy_kl_uses_bits_by`,
+`relative_entropy_kl_times_ln2_matches_kl_div_by` in
+`tests/suite/behavior_pin_2026_05_by.rs`.
+
+## BUG-126 — Entropy/share builtins read only **`args.first()`**, dropping comma-arg tails — **`bug`**
+
+Many helpers flatten **one** positional argument (`arg_to_vec(&args[0])` or read
+via `args.first()` as a lone arrayref/scalar). Supplying probabilities or values
+**as Perl variads** (`f(p1, p2, p3)`, no square brackets) therefore keeps only the
+leading scalar and ignores the comma-separated tails. Pass a single **array ref**
+explicitly (`f([ p1, p2, … ])`) to aggregate the intended list today.
+
+Demonstrated builtins (non-exhaustive):
+
+| Builtin | Pins |
+|---------|------|
+| `joint_entropy_step` | `joint_entropy_four_uniform_coin_bits_array_bz`, `joint_entropy_variadic_trailing_probs_ignored_tail_bz` |
+| `herfindahl_hirschman`, `hhi` | `herfindahl_hirschman_normalized_quarter_shares_array_bz`, `hhi_variadic_trailing_shares_use_first_squared_only_tail_bz` |
+| `gini_impurity` | `gini_impurity_three_class_normalized_array_bz`, `gini_impurity_variadic_first_probability_only_tail_bz` |
+| `entropy_bits` | `entropy_bits_four_coin_array_equals_two_tail_bz`, `entropy_bits_variadic_degenerate_after_truncation_tail_bz` |
+| `log_sum_exp`, `lse` | `log_sum_exp_array_maximum_dominated_stable_bz`, `log_sum_exp_variadic_first_scalar_only_tail_bz` |
+| `lorenz_curve_points` | `lorenz_curve_points_sorted_three_in_array_ca`, `lorenz_curve_points_variadic_truncated_tail_ca` |
+| `grade_up` | `grade_up_permutation_three_ca`, `grade_up_variadic_first_element_only_ca` |
+| `grade_down` | `grade_down_permutation_three_ca`, `grade_down_variadic_first_scalar_only_ca` |
+| `npv` | `npv_array_discounts_four_uniform_periods_ce`, `npv_variadic_second_bucket_only_counts_lead_outflow_ce` |
+| `irr` | `irr_array_newton_positive_rate_ce`, `irr_variadic_first_flow_only_interprets_second_as_guess_ce`, `irr_satisfies_npv_near_zero_residual_ce` |
+| `payback_period` | `payback_requires_array_bucket_second_arg_ce` (variadic commas miss the **`args[1]`** array bucket → **`undef`**) |
+| `discounted_payback` | `discounted_payback_requires_array_middle_bucket_ce` (same **`args[1]`** coupling) |
+| `resistance_parallel` | `resistance_parallel_three_resistors_array_cf`, `resistance_parallel_variadic_ignores_trailing_cf` |
+| `resistance_series` | `resistance_series_array_sum_cf`, `resistance_series_variadic_first_only_cf` |
+| `capacitance_parallel` / `capacitance_series` | **`capacitance_parallel_series_array_buckets_cf`** (`arg_to_vec` on **`args.first()`** only) |
+| `inductance_parallel` / `inductance_series` | **`inductance_parallel_formula_matches_reciprocal_cf`**, **`inductance_series_linear_sum_cf`** |
+| `charcodes_to_string` | **`charcodes_to_string_array_round_trip_hi_cg`**, **`charcodes_to_string_variadic_second_codepoint_dropped_tail_cg`** |
+| `squared` / `sq` | **`squared_three_ch`**, **`squared_variadic_second_operand_ignored_ch`**, **`sq_alias_matches_squared_ch`** |
+| `cubed` / `cb` | **`cubed_two_ch`**, **`cubed_variadic_second_operand_ignored_ch`**, **`cb_alias_matches_cubed_ch`** |
+| `uniq` | **`uniq_variadic_deduplicates_neighbors_ch`**, **`uniq_single_array_bucket_treated_as_atom_ch`** |
+| `sum` / `sum0` / `product` | see **BUG-140** |
+
+
+Pins documenting **tail truncation** split across **`tests/suite/behavior_pin_2026_05_bz.rs`**,
+**`behavior_pin_2026_05_ca.rs`** (Lorenz + `grade_*`), **`behavior_pin_2026_05_ce.rs`** (NPV/IRR + paybacks), and **`behavior_pin_2026_05_cf.rs`**
+(passive **R/L/C** ladders). Companion geo/string pins live in **`behavior_pin_2026_05_cg.rs`**
+(geohashes, projections, kernels, AES/Simon graph helpers).
+
+**`behavior_pin_2026_05_ca.rs`** also pins assorted ML helpers (`confusion_counts`, `mcc`,
+`hinge_loss`, …) strictly for reproducible floats — **not** tail-drop cases.
+
+List / stats companion pins: **`tests/suite/behavior_pin_2026_05_ch.rs`** (also **`chain_from`**
+**`ARRAYREF`** pitfall — **BUG-142**) and **`behavior_pin_2026_05_ci.rs`** (streaming / `to_list` traps — **BUG-143** … **BUG-146**).
+
+## BUG-127 — `iota_range` ignores arguments after the first — **`polish`**
+
+`builtin_iota_range` consumes only \(N\) from `args[0]`. Passing `iota_range(5,
+99)` (or longer comma tails) parses as Perl variadic call sites normally do but
+everything after **`5`** is discarded with no arity error, so callers can
+mistakenly believe they threaded multiple ranges.
+
+Pins: `iota_range_zero_until_n_exclusive_cb`,
+`iota_range_trailing_numeric_args_ignored_matches_five_only_cb` in
+`tests/suite/behavior_pin_2026_05_cb.rs`.
+
+## BUG-128 — `lambert_w0` (and **`wright_omega(0)`**) returns **NaN** at **`W(1)`** — **`bug`**
+
+`builtin_lambert_w0` selects the Halley initializer **`ln(x) - ln(ln(x))`** whenever
+\(x \ge 1\). Exactly at **`x == 1`**, \(\ln(\ln 1) = \ln 0\) is undefined in IEEE
+floating point, polluting **`w`** with **NaN** before the iterations can recover.
+Adjacent values (including **`exp(1)`**) still converge normally.
+
+Because **`wright_omega(z)`** is implemented as **`lambert_w0(exp(z))`**, plugging
+\(z = 0\) reduces to **`W(1)`** and hits the same NaN (**`Ω` absent** despite the
+literature \(\omega(0)=\Omega\) within branch conventions).
+
+Pins (contrast finite principal branch neighbors vs NaN sentinel):
+
+| Case | Pins |
+|------|------|
+| Working paths | `lambert_w_omega_constant_cc`, `lambert_w_at_exp_two_known_branch_cc`, `lambert_w0_at_e_equals_one_principal_cc`, `lambert_w0_above_one_finite_two_cc`, `wright_omega_exponential_branch_cc` |
+| NaN regressions | `lambert_w0_at_exactly_one_is_nan_bug_cc`, `wright_omega_zero_is_nan_bug_cc` |
+
+Batch: **`tests/suite/behavior_pin_2026_05_cc.rs`** (also aggregates many analytic/combinatorial pins unrelated to Lambert).
+
+## BUG-129 — `convolve_*`/`correlate_full`/`kron_product` return **sizes**, not convolution values — **`bug`**
+
+`math_wolfram72.rs` computes only scalar dimensions (`len(a)+len(b)-1`, valid overlap counts,
+Kronecker flat cardinality). Callers naming these after textbook convolution expect full
+summed outputs (like **`cross_correlation`** already emits).
+
+Pins: `convolve_full_reports_output_length_minus_one_stub_cd`,
+`convolve_valid_reports_overlap_extent_stub_cd`, `correlate_full_same_impl_as_conv_stub_cd`,
+`kron_product_cardinality_multiplier_stub_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`,
+plus **`cross_correlation_sliding_sumdefinition_cd`** for the real sliding-sum variant.
+
+## BUG-130 — `detrend_linear` returns **slope**, not **detrended samples** — **`polish`**
+
+Despite the noun-like name mirroring MATLAB's `detrend`, the builtin returns **`num/den`** from
+the single least-squares line fit — a scalar slope estimate only. Users expecting residual series
+subtract the fit manually today.
+
+Pin: `detrend_linear_pure_ramp_slope_one_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`.
+
+## BUG-131 — `medfilt_1d` is not a (**2k+1**) sliding-window median filter — **`bug`**
+
+Implementation flattens the entire operand, globally sorts **all samples**, then returns **one**
+median of the multiset. There is **no positional windowing** contrary to Rustdoc ("1-D median filter:
+median of (**2k+1**)-sized window centred at i").
+
+Pin: `medfilt_one_d_global_sorted_median_cd` in `tests/suite/behavior_pin_2026_05_cd.rs`.
+
+## BUG-132 — **`bs_*` greeks** (`bs_delta`, **`bs_theta`**, **`bs_rho`**) are **call** formulas — **`polish`**
+
+`builtin_bs_delta` returns **`N(d1)`** only — textbook **put \(\Delta\)** is **`N(d1) - 1`** (pins show the
+**\(-1\)** parity gap next to **`bs_delta`**). **`bs_theta`** and **`bs_rho`** inline the derivatives of the **call**
+price (**`-r · K · e^{-rT} · N(d2)`** curvature terms), **not** the put equivalents (which flip signs on pieces
+stemming from \(\partial N(-d\*)/\partial T\) / \(\rho\)).
+
+Pins documenting current call-only Greeks: **`bs_delta_returns_call_delta_cdf_d1_ce`**,
+**`bs_put_delta_equals_call_delta_minus_one_ce`**, **`bs_theta_call_style_negative_ce`**, **`bs_rho_call_style_positive_ce`**
+in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
+
+## BUG-133 — **`depreciation_double`** ignores the **salvage**/middle operand — **`bug`**
+
+`builtin_depreciation_double` reads **`cost`** (`args[0]`) and **`life`** from **`args[2]`**, skipping **`args[1]`**
+entirely. Callers threading **`double_declining(cost, salvage, life)`** like **`depreciation_linear`** silently drop
+ **`salvage`**, overstating depreciation relative to accountants' double-declining convention that floor-values against
+scrap.
+
+Pins: **`depreciation_double_ignores_salvage_middle_arg_ce`**, **`depreciation_double_middle_arg_does_not_affect_rate_ce`**
+in **`tests/suite/behavior_pin_2026_05_ce.rs`**.
+
+## BUG-134 — **`weber_number`** clamps a **missing** \(\sigma\) to **1e-30** — **`bug`**
+
+`builtin_weber_number` computes **`ρ v² L / σ`** with **`σ = max(args[3].unwrap_or(0.0), 1e-30)`**. Omitting \(\sigma\)
+therefore divides by **\(10^{-30}\)** rather than returning an arity error — orders of magnitude larger than
+reasonable surface-tension values. The companion **`weber_number_step`** defaults **`σ = 0.072`** (`N/m`), which is
+the usual water–air ballpark.
+
+Pins: **`weber_number_requires_sigma_fourth_arg_cf`**, **`weber_number_step_matches_definition_with_default_sigma_cf`**,
+**`weber_number_omitting_sigma_explodes_via_tiny_denominator_cf`** in **`tests/suite/behavior_pin_2026_05_cf.rs`**.
+
+## BUG-135 — **`dB_voltage`** / **`dB_power`** missing reference becomes **1e-30** → **spurious giant dB** — **`bug`**
+
+Both helpers clamp the reference argument with **`.max(1e-30)`** (`math_wolfram12.rs`). Calling **`dB_voltage(V)`** with
+only the numerator sets **`V_in = 1e-30`**, yielding **`20·log10(V / 10⁻³⁰)` ≈ 606 dB** instead of a controlled default
+like **1 V** or **`undef`**.
+
+Pins: **`db_voltage_two_reference_cf`**, **`db_power_two_reference_cf`**, **`db_voltage_missing_reference_balloons_cf`**
+in **`tests/suite/behavior_pin_2026_05_cf.rs`**.
+
+## BUG-136 — **`geohash_neighbor`** nudges \(\Delta\)lat/\(\Delta\)lon with **tiny isotropic **`2^{-(5·len/2)}`** (\(i32\)**) **step** → **effective no-op at common precisions** — **`bug`**
+
+`builtin_geohash_neighbor` decodes **`s`**, then shifts **lat** / **lon** by **one magnitude** (**`step = 1 /
+2^{(\texttt{len} \cdot 5 / 2)}`** in Rust integer division) every direction. Typical **~6-character** hashes use a **sub-cell**
+**\(\Delta\)** versus the **child-bit** quantization of **`geohash_encode`** — perturbations Round-trip inside the **same**
+base-32 string (**`geohash_neighbor_cardinals_are_identity_at_precision_six_cg`**). Applying the **same \(\Delta\)**
+to **latitude** and **longitude** also ignores customary **North–South** vs **East–West** bin anisotropy. **`match dir.as_str()`**
+fall-through assigns **\((0, 0)\)** for unknown direction tokens (**`geohash_neighbor_unknown_direction_leaves_hash_unchanged_cg`**)
+instead of an error.
+
+Pins: **`geohash_neighbor_cardinals_are_identity_at_precision_six_cg`**, **`geohash_neighbor_unknown_direction_leaves_hash_unchanged_cg`**
+in **`tests/suite/behavior_pin_2026_05_cg.rs`**.
+
+## BUG-137 — **`box_blur_kernel`** first argument is **half-width radius `r`**, output side **`2r+1`** — **`polish`**
+
+`builtin_box_blur_kernel` computes **`n = 2·r + 1`** from `args.first()` as an integer **radius** (`math_wolfram14.rs`). Callers
+supplying **`box_blur_kernel(7)`** expecting a **\(7\times7\)** stencil actually materialize a **\(15\times15\)** (**`2·7+1`**) kernel.
+The entry value is **`1 / n²`** (uniform norm).
+
+Pin: **`box_blur_kernel_radius_three_is_seven_squared_weights_cg`** in **`tests/suite/behavior_pin_2026_05_cg.rs`**.
+
+## BUG-138 — **`clamp` call-shape heuristic** vs **`clamp_list(LIST...)`** — **`polish`**
+
+`builtin_clamp` is documented as **`clamp MIN, MAX, LIST...`** (and pipeline-friendly `LIST |>
+clamp MIN, MAX`). When callers pass **`([v1, v2, ...], lo, hi)`** expecting per-element clamping
+like other languages, the implementation still treats **`args[0]`** / **`args[1]`** as **min/max
+scalars** (with **`args[0].to_number()`** taking the **first list element** as the min) and only
+the **third argument** expands into the value list. Result: silent mis-clamps (single scalar
+return) instead of a tuple. Use **`clamp_list(lo, hi, ...)`** for the **`lo, hi` first** layout today.
+
+Pins: **`clamp_wrong_shape_list_first_reads_min_from_first_element_ch`**,
+**`clamp_min_max_then_values_tuple_ch`**, **`clamp_list_explicit_vector_form_ch`**
+in **`tests/suite/behavior_pin_2026_05_ch.rs`**.
+
+## BUG-139 — **`normalize`** docs mention **`OUT_MIN, OUT_MAX, LIST`**; implementation always **`0..1`** — **`polish`**
+
+Rustdoc on **`builtin_normalize`** sketches a **`normalize OUT_MIN, OUT_MAX, LIST`** form. The body
+fixes **`out_min`** / **`out_max`** at **`0.0` / `1.0`** and flattens **all** positional arguments into
+the sample multiset, so leading “range” operands become ordinary data rows.
+
+Pin: **`normalize_extra_leading_scalars_folded_into_source_strip_ch`** in
+**`tests/suite/behavior_pin_2026_05_ch.rs`**.
+
+## BUG-140 — **`sum` / `sum0` / `product`** skip **`ARRAYREF`** innards for a lone **`[...]`** operand — **`bug`**
+
+`list_builtins::sum`, `sum0`, `product` only recurse when **`as_array_vec()`** succeeds (dense
+ heap **`HeapObject::Array`**). A typical inline **`sum([10,11])`** / **`product([6,7])`** arrayref
+hits the **`else`** arm and **`to_number()`** the container as a single scalar (**`0`** today),
+rather than iterating elements. Prefer **`sum(10, 11)`**, **`sum_list([10,11])`** (pinned), or **`sum
+@ary`** after materializing **`@ary`** without the boxed-ref ambiguity.
+
+Pins: **`sum_single_inline_array_yields_zero_bug_ch`**, **`sum_list_reads_array_contents_ch`**,
+**`product_single_inline_array_discards_interior_bug_ch`**, **`sum_variadic_two_addends_ch`**,
+**`product_variadic_two_factors_ch`** in **`tests/suite/behavior_pin_2026_05_ch.rs`** ( **`sum0`**
+empty path: **`sum0_empty_is_zero_ch`** ).
+
+## BUG-141 — **`frequencies` / string operands** — one scalar ⇒ one hash key (**`polish`**)
+
+Flattening treats a **`Str`** Perl value as a **single countable item**, so **`frequencies("aab")`**
+returns **`{"aab" => 1}`** unless the string is first split into graphemes (**`chars(...)`** /
+**`split("", ...)`**). Not a hashing bug once element cardinality is understood, but differs from
+“count characters” intuition.
+
+Pins: **`frequencies_whole_string_counts_as_one_key_ch`**, **`frequencies_chars_aab_two_keys_ch`**,
+**`pfrequencies_matches_frequencies_large_multiset_parallel_path_ch`** in
+**`tests/suite/behavior_pin_2026_05_ch.rs`**.
+
+## BUG-142 — **`chain_from([[...],[...]])`** leaves inner **`ARRAYREF`** buckets as opaque atoms — **`bug`**
+
+`builtin_chain_from` does `flatten_args` then **`item.to_list()`** per segment. **`PerlValue::to_list`**
+only expands **`HeapObject::Array`** (`Array` storages); a typical literal inner **`[..., ...]`**
+is stored as **`ArrayRef`** (RW handle), whose **`to_list`** arm falls through **`_ ⇒
+vec![self.clone()]`**. A single outer array argument **`([[1,2],[3]])`** therefore concatenates **four**
+**list-valued slots** instead of draining their elements. Spreading the same buckets as Perl variadic
+arguments (**`chain_from([1,2],[3],[4])`**) already worked.
+
+Pins: **`chain_from_variadic_top_level_lists_concat_ch`**,
+**`chain_from_single_outer_arrayref_leaves_inner_lists_unmerged_bug_ch`** in
+**`tests/suite/behavior_pin_2026_05_ch.rs`**.
+
+## BUG-143 — **`PerlValue::to_list` + iterator plumbing** treat many **`ARRAYREF`** / “one arg” shapes as **atoms** — **`bug` / `polish`**
+
+- **`HeapObject::ArrayRef`** (typical literal **`[ … ]`**) falls through **`PerlValue::to_list`’s `_` arm** and becomes a **single opaque cell** instead of cloning the inner vector (unlike **`HeapObject::Array`**). Any helper that only calls **`to_list()`** (rather than **`map_flatten_outputs`**) mis-counts operands: pinned for **`head`** / **`tail`** / **`drop`** / **`take`** with **`head([1,2,3], 2)`**.
+- Streaming builtins that special-case “one non-iterator argument” still route through **`into_pull_iter`**: that path also uses **`to_list`**, so **`ARRAYREF` sources** expose **one streamed item** (breaks **`chunk(2, [...])`** expectations). Variadic / iterator call shapes work today — e.g. **`chunk(2, range(1, 5))`**, **`dedup(1, 1, 2)`**.
+- **`enumerate`**, **`dedup`**, **`chunk`**: when passed a **single** list argument, the implementation wraps **`PerlValue::array(args.to_vec())`** for the pull source, so **`enumerate([a,b])`** yields **one** indexed row **`[0, list]`** (the whole list as the item) rather than per-element indices (contrast **`enumerate(range(1, 3))`**).
+- **`PerlIterator::collect_all` on `CycleIterator` is intentionally `vec![]`** (infinite source guard), but **`flatten_args` / `map_flatten_outputs` call `collect_all`** for iterators — so compositions like **`take_n(6, cycle([1, 2, 3]))`** materialize **`()`** today.
+
+Pins throughout **`tests/suite/behavior_pin_2026_05_ci.rs`** (file module doc enumerates the **`_ci`** suffix names).
+
+## BUG-144 — **`transpose([[row1],[row2]])` does *not* transpose an AoA** — **`polish`**
+
+`builtin_transpose` only ingests **top-level actuals** whose **`.as_array_ref()`** succeeds — one nested bracket form **`([[1,2],[3,4]])`** is parsed as **one row** whose columns are the **inner row refs**, not a 2×2 matrix. Use **`transpose`** with **multiple row operands** (**`transpose([1, 2], [3, 4])`**).
+
+Pins: **`transpose_single_nested_outer_array_clusters_rows_bug_ci`**, **`transpose_two_row_arguments_column_major_ci`**.
+
+## BUG-145 — **`unzip_pairs(zip(...))`** shreds pair rows because **`flatten_args` deep-merges** tuple innards — **`bug`**
+
+`zip` already returns an array of pair rows, but **`builtin_unzip_pairs` calls `flatten_args`**, and each **dense inner array** expands to **raw scalars**, so the unzip walk pairs **`(1,9), (2), (8, undef)`** style garbage. Pass an explicit pair list (**`unzip_pairs([[1, 9], [2, 8]])`**) or rebuild pairs without an intermediate **`zip`** unless / until **`flatten_args` stops peeling pair innards**.
+
+Pins: **`unzip_pairs_explicit_pair_rows_ci`**, **`unzip_pairs_after_zip_over_flattens_to_scalars_bug_ci`**.
+
+## BUG-146 — **`take_n(_, cycle(...))` is vacuous**: **`CycleIterator::collect_all` → `[]` under `flatten_args`** — **`bug`**
+
+**`flatten_args`** expands iterators via **`map_flatten_outputs`**, which invokes **`PerlIterator::collect_all`**. **Infinite `cycle` iterators return an empty snapshot** (“do not eagerly loop forever”), leaving **`take_n`** with **no input elements**, so stringify is **`()`** today.
+
+Pin: **`take_n_cycle_iterator_yields_empty_today_bug_ci`**.
 
 ## PARITY-001 — Magic string increment is not implemented — **FIXED**
 
