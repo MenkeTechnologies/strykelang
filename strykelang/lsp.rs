@@ -1218,15 +1218,12 @@ pub fn builtin_completion_words() -> &'static Vec<String> {
 }
 
 fn perl_keyword_kind(word: &str) -> Option<CompletionItemKind> {
-    const KW: &[&str] = &[
-        "and", "async", "await", "catch", "class", "continue", "default", "do", "else", "elsif",
-        "eval", "extends", "finally", "for", "foreach", "given", "if", "impl", "last", "local",
-        "my", "next", "no", "not", "or", "our", "package", "priv", "pub", "redo", "return",
-        "spawn", "state", "struct", "trait", "try", "typed", "unless", "until", "use", "when",
-        "while",
-    ];
-    KW.binary_search(&word).ok()?;
-    Some(CompletionItemKind::KEYWORD)
+    // Single source of truth: `crate::builtins::KEYWORDS` (also drives `%k`).
+    if crate::builtins::is_stryke_keyword(word) {
+        Some(CompletionItemKind::KEYWORD)
+    } else {
+        None
+    }
 }
 
 fn doc_markup(text: &'static str) -> Documentation {

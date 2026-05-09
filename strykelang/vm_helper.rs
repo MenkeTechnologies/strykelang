@@ -1646,6 +1646,7 @@ impl VMHelper {
         let descriptions_map = crate::builtins::descriptions_hash_map();
         let categories_map = crate::builtins::categories_hash_map();
         let primaries_map = crate::builtins::primaries_hash_map();
+        let keywords_map = crate::builtins::keywords_hash_map();
         let all_map = crate::builtins::all_hash_map();
         self.scope
             .declare_hash_global_frozen("stryke::builtins", builtins_map.clone());
@@ -1662,6 +1663,8 @@ impl VMHelper {
         self.scope
             .declare_hash_global_frozen("stryke::primaries", primaries_map.clone());
         self.scope
+            .declare_hash_global_frozen("stryke::keywords", keywords_map.clone());
+        self.scope
             .declare_hash_global_frozen("stryke::all", all_map.clone());
         // Short aliases: only declare if no user-declared hash with that name
         // exists, to avoid overwriting `my %e` etc.
@@ -1673,6 +1676,7 @@ impl VMHelper {
             ("d", descriptions_map),
             ("c", categories_map),
             ("p", primaries_map),
+            ("k", keywords_map),
             ("all", all_map),
         ] {
             if !self.scope.any_frame_has_hash(name) {
@@ -2771,6 +2775,7 @@ impl VMHelper {
                 | "d"
                 | "c"
                 | "p"
+                | "k"
                 | "all"
                 | "stryke::builtins"
                 | "stryke::perl_compats"
@@ -2779,6 +2784,7 @@ impl VMHelper {
                 | "stryke::descriptions"
                 | "stryke::categories"
                 | "stryke::primaries"
+                | "stryke::keywords"
                 | "stryke::all" => {
                     self.ensure_reflection_hashes();
                 }

@@ -16934,6 +16934,7 @@ impl Parser {
                 | "d"
                 | "c"
                 | "p"
+                | "k"
                 | "all"
                 | "stryke::builtins"
                 | "stryke::perl_compats"
@@ -16942,6 +16943,7 @@ impl Parser {
                 | "stryke::descriptions"
                 | "stryke::categories"
                 | "stryke::primaries"
+                | "stryke::keywords"
                 | "stryke::all"
         )
     }

@@ -1702,9 +1702,9 @@ fn delete_hash_key_removes_slot() {
     assert_eq!(
         eval_int(
             r#"no strict 'vars';
-            my %k = (u => 1, v => 2);
-            delete $k{u};
-            (!exists $k{u} && $k{v} == 2) ? 1 : 0"#
+            my %kk = (u => 1, v => 2);
+            delete $kk{u};
+            (!exists $kk{u} && $kk{v} == 2) ? 1 : 0"#
         ),
         1
     );

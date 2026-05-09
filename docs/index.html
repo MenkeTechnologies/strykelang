@@ -149,7 +149,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.20 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,590 builtins (9,117 spellings)</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.12.21 · Server farms first · 100% TDP load testing · Distributed agents · Cranelift JIT · 8,590 builtins (9,117 spellings)</p>
         </div>
         <div class="tutorial-toolbar">
           <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -276,8 +276,9 @@ s 'p to_yaml read_json "data.json"'</pre>
             <tr><th>Long name</th><th>Short</th><th>Key → Value</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>%stryke::builtins</code></td><td><code>%b</code></td><td><strong>primary</strong> callable name → category. Clean unique-op count.</td></tr>
-            <tr><td><code>%stryke::all</code></td><td><code>%all</code></td><td><strong>every spelling</strong> (primary + alias) → category. Aliases inherit their primary's tag. Use for <code>scalar keys %all</code>.</td></tr>
+            <tr><td><code>%stryke::builtins</code></td><td><code>%b</code></td><td><strong>primary</strong> callable name → category. Callable-only — keywords live in <code>%k</code>, never <code>%b</code>.</td></tr>
+            <tr><td><code>%stryke::keywords</code></td><td><code>%k</code></td><td>stryke language keyword → category (<code>"control"</code>, <code>"decl"</code>, <code>"exception"</code>, <code>"phase"</code>, <code>"concurrency"</code>, <code>"oo"</code>, <code>"aop"</code>, <code>"operator"</code>, <code>"quote"</code>, <code>"visibility"</code>, <code>"special"</code>). Disjoint from <code>%b</code>.</td></tr>
+            <tr><td><code>%stryke::all</code></td><td><code>%all</code></td><td><strong>every name</strong> stryke recognizes — <code>%a + %b + %k</code>. Use for <code>scalar keys %all</code>.</td></tr>
             <tr><td><code>%stryke::perl_compats</code></td><td><code>%pc</code></td><td>subset of <code>%b</code>: Perl 5 core only, name → category</td></tr>
             <tr><td><code>%stryke::extensions</code></td><td><code>%e</code></td><td>subset of <code>%b</code>: stryke-only, name → category</td></tr>
             <tr><td><code>%stryke::aliases</code></td><td><code>%a</code></td><td>alias → canonical primary</td></tr>
@@ -318,13 +319,16 @@ s 'p to_yaml read_json "data.json"'</pre>
           </tbody>
         </table>
 
-        <p><strong><code>--compat</code> boundary:</strong> the eight reflection hashes (<code>%b</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> + their <code>%stryke::*</code> long names) and <code>%parameters</code> are stryke-only — <code>--compat</code> turns them off entirely so they don't collide with user-declared hashes of the same name. Package stashes (<code>%main::</code>) and <code>%ENV</code> / <code>%INC</code> / <code>%SIG</code> stay on in every mode (Perl 5 spec).</p>
+        <p><strong><code>--compat</code> boundary:</strong> the nine reflection hashes (<code>%b</code> / <code>%k</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> + their <code>%stryke::*</code> long names) and <code>%parameters</code> are stryke-only — <code>--compat</code> turns them off entirely so they don't collide with user-declared hashes of the same name. Package stashes (<code>%main::</code>) and <code>%ENV</code> / <code>%INC</code> / <code>%SIG</code> stay on in every mode (Perl 5 spec).</p>
 
         <h3>Examples</h3>
         <div class="oneliner">s 'p $b{pmap}'                              <span class="comment"># "parallel"</span></div>
         <div class="oneliner">s 'p $b{to_json}'                           <span class="comment"># "serialization"</span></div>
+        <div class="oneliner">s 'p $k{if}'                                <span class="comment"># "control"</span></div>
+        <div class="oneliner">s 'p $k{class}'                             <span class="comment"># "decl"</span></div>
         <div class="oneliner">s 'p $all{tj}'                              <span class="comment"># "serialization"  (alias resolves via %all)</span></div>
-        <div class="oneliner">s 'p scalar keys %all'                      <span class="comment"># total callable spellings (primaries + aliases)</span></div>
+        <div class="oneliner">s 'p $all{while}'                           <span class="comment"># "control"        (keyword resolves via %all)</span></div>
+        <div class="oneliner">s 'p scalar keys %all'                      <span class="comment"># total names — callables + aliases + keywords</span></div>
         <div class="oneliner">s 'p $pc{map}'                              <span class="comment"># "array / list"   (Perl core only)</span></div>
         <div class="oneliner">s 'p $e{pmap}'                              <span class="comment"># "parallel"       (extensions only)</span></div>
         <div class="oneliner">s 'p $a{tj}'                                <span class="comment"># "to_json"</span></div>
@@ -333,9 +337,10 @@ s 'p to_yaml read_json "data.json"'</pre>
         <div class="oneliner">s '$p{to_json} |&gt; e p'                       <span class="comment"># every alias of to_json</span></div>
         <div class="oneliner">s 'keys %pc |&gt; sort |&gt; p'                    <span class="comment"># every Perl compat, sorted</span></div>
         <div class="oneliner">s 'keys %e  |&gt; sort |&gt; p'                    <span class="comment"># every stryke extension</span></div>
+        <div class="oneliner">s 'keys %k  |&gt; sort |&gt; p'                    <span class="comment"># every keyword, sorted</span></div>
         <div class="oneliner">s 'keys %all |&gt; less'                       <span class="comment"># browse every spelling in $PAGER</span></div>
         <div class="oneliner">s 'my %f; $f{$b{_}}++ for keys %b; dd \%f'  <span class="comment"># per-category frequency</span></div>
-        <div class="oneliner">s 'for my $h (qw(b all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
+        <div class="oneliner">s 'for my $h (qw(b k all pc e a d c p)) { printf "%%%-4s %d\n", $h, scalar keys %$h }'  <span class="comment"># catalog</span></div>
         <div class="oneliner">s 'p sort keys %{ merge_hash(\%all, \%parameters) }'  <span class="comment"># every callable + every live binding, sorted</span></div>
         <div class="oneliner">s 'my @scalars = grep { /^\$/ } keys %parameters; p @scalars'  <span class="comment"># live scalars only</span></div>
         <div class="oneliner">s 'package Foo; our $X = 1; sub hello {} ; p sort keys %Foo::'  <span class="comment"># X, hello (our + sub, not my)</span></div>

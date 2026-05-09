@@ -55,9 +55,18 @@ include!(concat!(env!("OUT_DIR"), "/reflection.rs"));
 ///
 /// Uses `indexmap` to preserve the sort order from `build.rs` (alphabetical),
 /// so `keys %b` is stable across runs.
+///
+/// Filters out names that also appear in `KEYWORDS` so `%b` is **callable-only**
+/// — `if`, `while`, `my`, `eval`, etc. live in `%k`, not `%b`. They show up in
+/// the underlying `CATEGORY_MAP` because parser-section comments list them for
+/// docs; this filter keeps the user-facing hash clean. Invariant:
+/// `%b ∩ %k = ∅`.
 pub fn builtins_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    let keyword_set: std::collections::HashSet<&'static str> =
+        KEYWORDS.iter().map(|(n, _)| *n).collect();
     CATEGORY_MAP
         .iter()
+        .filter(|(n, _)| !keyword_set.contains(n))
         .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
         .collect()
 }
@@ -129,10 +138,14 @@ pub fn primary_for_alias(name: &str) -> Option<&'static str> {
 
 /// `%perl_compats` — Perl 5 core name → category. Subset of `%builtins`
 /// restricted to names from `is_perl5_core`. Disjoint from `%extensions`.
-/// Direct access for the "show me just Perl core" query.
+/// Direct access for the "show me just Perl core" query. Keyword-filtered
+/// so the partition `%b = %pc ∪ %e` holds (keywords live in `%k`).
 pub fn perl_compats_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    let keyword_set: std::collections::HashSet<&'static str> =
+        KEYWORDS.iter().map(|(n, _)| *n).collect();
     CORE_CATEGORY_MAP
         .iter()
+        .filter(|(n, _)| !keyword_set.contains(n))
         .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
         .collect()
 }
@@ -141,23 +154,44 @@ pub fn perl_compats_hash_map() -> indexmap::IndexMap<String, PerlValue> {
 /// restricted to everything not in `is_perl5_core`. Union of
 /// `stryke_extension_name` entries and dispatch primaries; the latter
 /// get `"uncategorized"` if they don't match a section header.
+/// Keyword-filtered so the partition `%b = %pc ∪ %e` holds (keywords
+/// live in `%k`).
 pub fn extensions_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    let keyword_set: std::collections::HashSet<&'static str> =
+        KEYWORDS.iter().map(|(n, _)| *n).collect();
     EXT_CATEGORY_MAP
         .iter()
+        .filter(|(n, _)| !keyword_set.contains(n))
         .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
         .collect()
 }
 
-/// `%all` — every callable spelling (primaries + aliases) → category.
+/// `%all` — every name stryke recognizes (`%a + %b + %k`) → category.
 /// `%builtins` is primaries-only so op counts stay clean; `%all` is the
-/// "everything you can type" view. `scalar keys %all` is a direct total
-/// callable-spellings count; `$all{tj}` returns the primary's category
-/// without a hop through `%aliases`.
+/// "everything you can type" view, including syntactic keywords (`if`,
+/// `sub`, `fn`, `class`, …) so callers can ask "is this a known name?"
+/// in one lookup. `$all{tj}` returns the primary's category without a
+/// hop through `%aliases`; `$all{if}` returns `"control"`.
+///
+/// Filters keyword-spellings out of the underlying `ALL_CATEGORY_MAP` so
+/// the `KEYWORDS` category wins authoritatively. Without this, `if` /
+/// `while` / `eval` would carry their parser-section "control flow" tag
+/// from CATEGORY_MAP rather than the cleaner `"control"` / `"exception"`
+/// tags from `KEYWORDS`. Invariant: `%all = %a + %b + %k`, all disjoint.
 pub fn all_hash_map() -> indexmap::IndexMap<String, PerlValue> {
-    ALL_CATEGORY_MAP
+    let keyword_set: std::collections::HashSet<&'static str> =
+        KEYWORDS.iter().map(|(n, _)| *n).collect();
+    let mut m: indexmap::IndexMap<String, PerlValue> = ALL_CATEGORY_MAP
         .iter()
+        .filter(|(n, _)| !keyword_set.contains(n))
         .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
-        .collect()
+        .collect();
+    // Keywords appended after the callable spellings — preserves `keys %all`
+    // ordering (alphabetical callables first, then alphabetical keywords).
+    for (n, c) in KEYWORDS {
+        m.insert(n.to_string(), PerlValue::string(c.to_string()));
+    }
+    m
 }
 
 /// `%categories` — category string → arrayref of names in that category.
@@ -214,6 +248,123 @@ pub fn descriptions_hash_map() -> indexmap::IndexMap<String, PerlValue> {
         .iter()
         .map(|(n, d)| (n.to_string(), PerlValue::string(d.to_string())))
         .collect()
+}
+
+/// Sorted (keyword, category) table — single source of truth for stryke
+/// language keywords. Disjoint from `CATEGORY_MAP`: keywords are syntactic
+/// (`if`, `my`, `sub`, `fn`, `class`, …) while `%builtins` are callable
+/// dispatch primaries (`map`, `print`, `pmap`, …). Every entry must be
+/// alphabetized so `keys %k` is stable and `is_stryke_keyword`'s
+/// `binary_search` stays valid. Mirrors `parser.rs::RESERVED_FUNCTION_NAMES`
+/// + the statement-context handlers in `parser.rs::parse_statement` plus
+/// the compile-time pseudo-tokens (`__FILE__`, `__LINE__`, …).
+///
+/// Categories: `control`, `decl`, `exception`, `phase`, `concurrency`,
+/// `oo`, `aop`, `operator`, `quote`, `visibility`, `special`.
+pub const KEYWORDS: &[(&str, &str)] = &[
+    ("BEGIN", "phase"),
+    ("CHECK", "phase"),
+    ("END", "phase"),
+    ("INIT", "phase"),
+    ("UNITCHECK", "phase"),
+    ("__DATA__", "special"),
+    ("__END__", "special"),
+    ("__FILE__", "special"),
+    ("__LINE__", "special"),
+    ("__PACKAGE__", "special"),
+    ("__SUB__", "special"),
+    ("after", "aop"),
+    ("and", "operator"),
+    ("around", "aop"),
+    ("async", "concurrency"),
+    ("await", "concurrency"),
+    ("before", "aop"),
+    ("catch", "exception"),
+    ("class", "decl"),
+    ("cmp", "operator"),
+    ("const", "decl"),
+    ("continue", "control"),
+    ("default", "control"),
+    ("defer", "exception"),
+    ("do", "control"),
+    ("else", "control"),
+    ("elsif", "control"),
+    ("enum", "decl"),
+    ("eq", "operator"),
+    ("eval", "exception"),
+    ("extends", "oo"),
+    ("finally", "exception"),
+    ("fn", "decl"),
+    ("for", "control"),
+    ("foreach", "control"),
+    ("frozen", "decl"),
+    ("ge", "operator"),
+    ("given", "control"),
+    ("goto", "control"),
+    ("gt", "operator"),
+    ("if", "control"),
+    ("impl", "decl"),
+    ("last", "control"),
+    ("le", "operator"),
+    ("local", "decl"),
+    ("lt", "operator"),
+    ("m", "quote"),
+    ("match", "control"),
+    ("my", "decl"),
+    ("mysync", "concurrency"),
+    ("ne", "operator"),
+    ("next", "control"),
+    ("no", "decl"),
+    ("not", "operator"),
+    ("or", "operator"),
+    ("our", "decl"),
+    ("oursync", "decl"),
+    ("package", "decl"),
+    ("priv", "visibility"),
+    ("pub", "visibility"),
+    ("q", "quote"),
+    ("qq", "quote"),
+    ("qr", "quote"),
+    ("qw", "quote"),
+    ("qx", "quote"),
+    ("redo", "control"),
+    ("require", "decl"),
+    ("return", "control"),
+    ("s", "quote"),
+    ("spawn", "concurrency"),
+    ("state", "decl"),
+    ("struct", "decl"),
+    ("sub", "decl"),
+    ("tr", "quote"),
+    ("trait", "decl"),
+    ("try", "exception"),
+    ("typed", "decl"),
+    ("unless", "control"),
+    ("until", "control"),
+    ("use", "decl"),
+    ("when", "control"),
+    ("while", "control"),
+    ("x", "operator"),
+    ("xor", "operator"),
+    ("y", "quote"),
+];
+
+/// `%keywords` (`%k`) — stryke language keyword name → category
+/// (`"control"`, `"decl"`, `"exception"`, `"phase"`, `"concurrency"`,
+/// `"oo"`, `"operator"`, `"visibility"`). Disjoint from `%b` (callable
+/// builtins) and `%a` (aliases): a name is in exactly one of the three.
+/// `%all = %a + %b + %k` — the union of every name stryke recognizes.
+pub fn keywords_hash_map() -> indexmap::IndexMap<String, PerlValue> {
+    KEYWORDS
+        .iter()
+        .map(|(n, c)| (n.to_string(), PerlValue::string(c.to_string())))
+        .collect()
+}
+
+/// O(1) keyword check. Replaces the LSP's local `KW` slice + binary_search
+/// with a single source of truth shared with `%k`.
+pub fn is_stryke_keyword(name: &str) -> bool {
+    KEYWORDS.binary_search_by_key(&name, |(n, _)| *n).is_ok()
 }
 
 /// Returns `true` if `name` is a known builtin function (primary or alias).
@@ -23016,63 +23167,23 @@ fn builtin_lsp_completion_words(
         set.insert(format!("CORE::{n}"));
     }
 
-    // Source 3: stryke language keywords. `%all` covers builtins; these
-    // are reserved keywords that the parser handles directly and that
-    // tab-complete should still suggest after the first character.
-    const KEYWORDS: &[&str] = &[
-        // Pseudo-namespaces that have hand-written hover docs but
-        // aren't dispatch primaries. Including them as completion
-        // words makes `s docs CORE` / `s docs main` resolve.
-        "CORE",
-        "main",
-        "fn",
-        "match",
-        "when",
-        "given",
-        "class",
-        "struct",
-        "enum",
-        "trait",
-        "abstract",
-        "final",
-        "mysync",
-        "oursync",
-        "frozen",
-        "const",
-        "typed",
-        "state",
-        "my",
-        "our",
-        "local",
-        "package",
-        "use",
-        "no",
-        "require",
-        "return",
-        "last",
-        "next",
-        "redo",
-        "if",
-        "elsif",
-        "else",
-        "unless",
-        "while",
-        "until",
-        "for",
-        "foreach",
-        "do",
-        "eval",
-        "die",
-        "warn",
-        "BEGIN",
-        "END",
-        "INIT",
-        "CHECK",
-        "UNITCHECK",
-        "DESTROY",
-        "BUILD",
-    ];
-    for k in KEYWORDS {
+    // Source 3: stryke language keywords. `%all` covers callable builtins;
+    // these are reserved keywords that the parser handles directly and
+    // that tab-complete should still suggest after the first character.
+    // Single source of truth: the module-level `KEYWORDS` table (also
+    // drives `%k`).
+    for (name, _) in KEYWORDS {
+        set.insert((*name).to_string());
+    }
+    // Source 3b: completion-only extras that aren't in any reflection
+    // map — pseudo-namespaces with hand-written hover docs (`CORE`,
+    // `main`), lifecycle hooks (`DESTROY`, `BUILD`), and a few not-yet-
+    // keyword identifiers (`abstract`, `final`) that LSP completion
+    // should still surface. Excluded here: `die` / `warn` (callable
+    // builtins, already in `CATEGORY_MAP` → covered by Source 1) and
+    // every name in `%k` (covered by Source 3 above).
+    const COMPLETION_EXTRAS: &[&str] = &["CORE", "main", "abstract", "final", "DESTROY", "BUILD"];
+    for k in COMPLETION_EXTRAS {
         set.insert((*k).to_string());
     }
 
