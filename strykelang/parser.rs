@@ -13404,7 +13404,8 @@ impl Parser {
             | "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition"
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── pipeline / string helpers ───────────────────────────────────
-            | "input" | "lines" | "words" | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
+            | "input" | "lines" | "words" | "chars" | "cindex" | "crindex"
+            | "digits" | "letters" | "letters_uc" | "letters_lc"
             | "punctuation" | "punct"
             | "sentences" | "sents"
             | "paragraphs" | "paras" | "sections" | "sects"
@@ -13596,6 +13597,7 @@ impl Parser {
             | "is_string" | "is_str" | "is_int" | "is_integer" | "is_float"
             // ── hash helpers ────────────────────────────────────────────────
             | "invert" | "merge_hash"
+            | "hash_map_values" | "hash_filter_keys" | "hash_filter_values"
             | "has_key" | "hk" | "has_any_key" | "has_all_keys"
             // ── boolean combinators ─────────────────────────────────────────
             | "both" | "either" | "neither" | "xor_bool" | "bool_to_int" | "b2i"
@@ -14039,7 +14041,7 @@ impl Parser {
             | "adjacent_difference" | "append_elem" | "consecutive_pairs" | "contains_elem"
             | "count_elem" | "drop_every" | "duplicate_count" | "elem_at" | "find_first"
             | "first_elem" | "flatten_once" | "fold_left" | "from_digits" | "from_pairs"
-            | "group_by_size" | "hash_filter_keys" | "hash_from_list" | "hash_map_values"
+            | "group_by_size" | "hash_from_list"
             | "hash_merge_deep" | "hash_to_list" | "hash_zip" | "head_n" | "histogram_bins"
             | "index_of_elem" | "init_list" | "interleave_lists" | "last_elem" | "least_common"
             | "list_compact" | "list_eq" | "list_flatten_deep" | "max_list" | "mean_list"

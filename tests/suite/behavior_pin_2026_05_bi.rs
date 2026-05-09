@@ -12,7 +12,10 @@ fn validation_predicates_bi() {
     assert_eq!(eval_int(r#"is_anagram("hello", "world")"#), 0);
 
     // is_pangram (case-insensitive)
-    assert_eq!(eval_int(r#"is_pangram("The quick brown fox jumps over the lazy dog")"#), 1);
+    assert_eq!(
+        eval_int(r#"is_pangram("The quick brown fox jumps over the lazy dog")"#),
+        1
+    );
     assert_eq!(eval_int(r#"is_pangram("Hello world")"#), 0);
 
     // is_printable

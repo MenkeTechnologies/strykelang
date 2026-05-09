@@ -6,10 +6,7 @@ use crate::common::*;
 
 #[test]
 fn list_reverse_bq() {
-    assert_eq!(
-        eval_string(r#"join(",", reverse(1, 2, 3))"#),
-        "3,2,1"
-    );
+    assert_eq!(eval_string(r#"join(",", reverse(1, 2, 3))"#), "3,2,1");
 }
 
 #[test]
@@ -61,10 +58,7 @@ fn logs_parse_abs_bq() {
         eval_string(r#"sprintf("%.10f", log10(1000))"#),
         "3.0000000000"
     );
-    assert_eq!(
-        eval_string(r#"sprintf("%.6f", log1p_exp(2))"#),
-        "2.126928"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6f", log1p_exp(2))"#), "2.126928");
     assert_eq!(eval_int("abs_diff(40, 7)"), 33);
     assert_eq!(eval_int("parse_float(\"-3e2\")"), -300);
     assert_eq!(eval_int("int(\"099\")"), 99);
@@ -102,10 +96,7 @@ fn running_min_max_diff_bq() {
         eval_string(r#"join(",", running_min(10, 4, 6, 2))"#),
         "10,4,4,2"
     );
-    assert_eq!(
-        eval_string(r#"join(",", diff(1, 4, 7, 7))"#),
-        "3,3,0"
-    );
+    assert_eq!(eval_string(r#"join(",", diff(1, 4, 7, 7))"#), "3,3,0");
 }
 
 #[test]
@@ -124,22 +115,13 @@ fn case_twiddle_bq() {
 
 #[test]
 fn round_places_bq() {
-    assert_eq!(
-        eval_string(r#"sprintf("%.2f", round(1.2345, 2))"#),
-        "1.23"
-    );
-    assert_eq!(
-        eval_string(r#"sprintf("%.3f", round(1.2345, 3))"#),
-        "1.235"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.2f", round(1.2345, 2))"#), "1.23");
+    assert_eq!(eval_string(r#"sprintf("%.3f", round(1.2345, 3))"#), "1.235");
 }
 
 #[test]
 fn join_strings_bq() {
-    assert_eq!(
-        eval_string(r#"join("", "hel", "lo")"#),
-        "hello"
-    );
+    assert_eq!(eval_string(r#"join("", "hel", "lo")"#), "hello");
     assert_eq!(
         eval_string(r#"join("|", split(",", "a,b,c,d", 3))"#),
         "a|b|c,d"
@@ -184,20 +166,14 @@ fn signum_bq() {
 
 #[test]
 fn divmod_neg_bq() {
-    assert_eq!(
-        eval_string(r#"join(",", divmod(-10, 3))"#),
-        "-3,-1"
-    );
+    assert_eq!(eval_string(r#"join(",", divmod(-10, 3))"#), "-3,-1");
 }
 
 #[test]
 fn cons_prepend_append_contains_bq() {
     assert_eq!(eval_string(r#"join(",", prepend(0, 1, 2))"#), "0,1,2");
     assert_eq!(eval_string(r#"join(",", append_elem(9, 7, 8))"#), "7,8,9");
-    assert_eq!(
-        eval_string(r#"join(",", cons(9, 10, 11))"#),
-        "9,10,11"
-    );
+    assert_eq!(eval_string(r#"join(",", cons(9, 10, 11))"#), "9,10,11");
     assert_eq!(eval_int("contains_elem(3, 1, 2, 3, 4)"), 1);
 }
 
@@ -209,10 +185,7 @@ fn flatten_factorial_fib_log_exp_bq() {
     );
     assert_eq!(eval_int("factorial(0)"), 1);
     assert_eq!(eval_int("fibonacci(0)"), 0);
-    assert_eq!(
-        eval_string(r#"sprintf("%.6f", exp(log(12)))"#),
-        "12.000000"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6f", exp(log(12)))"#), "12.000000");
 }
 
 #[test]

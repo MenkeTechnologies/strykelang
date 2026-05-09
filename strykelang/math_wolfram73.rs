@@ -5,6 +5,10 @@ fn b73_to_floats(v: &PerlValue) -> Vec<f64> {
     arg_to_vec(v).iter().map(|x| x.to_number()).collect()
 }
 
+fn b73_to_ints(v: &PerlValue) -> Vec<i64> {
+    arg_to_vec(v).iter().map(|x| x.to_number() as i64).collect()
+}
+
 /// Cobb-Douglas Y = A · K^α · L^β.
 fn builtin_cobb_douglas(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let a = f1(args);
@@ -93,10 +97,45 @@ fn builtin_deferred_acceptance(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(n))
 }
 
-/// Top trading cycle: cycle length detected.
+/// Top trading cycles: length of the directed cycle found from `start` in the
+/// functional graph `next[i]` (favourite-good pointers). Args: `next`, optional
+/// `start` (default `0`).
 fn builtin_top_trading_cycle(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = i1(args).max(0);
-    Ok(PerlValue::integer(if n > 0 { n.min(3) } else { 0 }))
+    let nxt = b73_to_ints(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if nxt.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let n = nxt.len();
+    let start_raw = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
+    let start = start_raw.rem_euclid(n as i64) as usize;
+    let adj: Vec<usize> = nxt
+        .iter()
+        .map(|&x| (x.rem_euclid(n as i64) as usize).min(n.saturating_sub(1)))
+        .collect();
+    let mut slow = start;
+    let mut fast = start;
+    let mut hops = 0_usize;
+    loop {
+        slow = adj[slow];
+        fast = adj[adj[fast]];
+        hops += 1;
+        if slow == fast {
+            break;
+        }
+        if hops > n + n {
+            return Ok(PerlValue::integer(0));
+        }
+    }
+    let mut len = 1_usize;
+    let mut p = adj[slow];
+    while p != slow {
+        len += 1;
+        p = adj[p];
+        if len > n {
+            return Ok(PerlValue::integer(n as i64));
+        }
+    }
+    Ok(PerlValue::integer(len as i64))
 }
 
 /// VCG payment: bidder pays externality = max-without-i  -  total-without-i-portion.
@@ -233,10 +272,14 @@ fn builtin_social_welfare_nash(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(u.iter().product()))
 }
 
-/// Arrow IIA check: whether ranking of {a,b} is independent of c.
+/// **Local** Independence of Irrelevant Alternatives: `1` iff the strict
+/// comparison of `a` vs `b` (encoded as `−1` / `0` / `+1` or caller convention)
+/// is unchanged when alternative `c` is absent — pass full-set comparison then
+/// `{a,b}`-only comparison.
 fn builtin_arrow_independence(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let same_rank = i1(args);
-    Ok(PerlValue::integer(if same_rank != 0 { 1 } else { 0 }))
+    let cmp_with = i1(args);
+    let cmp_without = args.get(1).map(|v| v.to_number() as i64).unwrap_or(cmp_with);
+    Ok(PerlValue::integer(if cmp_with == cmp_without { 1 } else { 0 }))
 }
 
 /// Vickrey (2nd-price) auction payment = 2nd-highest bid.
@@ -263,24 +306,93 @@ fn builtin_dutch_auction(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_first_price_seal(args)
 }
 
-/// Core coalition: number of coalitions with non-empty core.
+/// ** Nonempty coalition count** for a set of `n` players: `2^n − 1` (subsets
+/// other than ∅). *Not* a cooperative-game **core** non-emptiness test.
 fn builtin_core_coalition(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let n = i1(args).max(0);
-    Ok(PerlValue::integer(if n > 0 { 1_i64 << (n - 1) } else { 0 }))
+    let n = i1(args).max(0) as u32;
+    if n == 0 {
+        return Ok(PerlValue::integer(0));
+    }
+    if n >= 63 {
+        return Ok(PerlValue::integer(i64::MAX));
+    }
+    Ok(PerlValue::integer((1_i64 << n) - 1))
 }
 
-/// Stable matching count for n×n: Catalan-like upper bound.
+/// Loose **upper bound** on the number of distinct stable matchings in an
+/// `n×n` marriage market: `n!`.
 fn builtin_stable_matching_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args).max(0);
     let mut acc = 1_i64;
-    for k in 1..=n { acc = acc.saturating_mul(k); }
+    for k in 1..=n {
+        acc = acc.saturating_mul(k);
+    }
     Ok(PerlValue::integer(acc))
 }
 
-/// Gale-optimal matching: each man gets best stable partner.
+/// Gale–Shapley (**men-optimal** stable matching). Args: `n`, arrayref of `n`
+/// men's permutations (woman indices), arrayref of `n` women's ordered lists of
+/// men. Returns array: wife index for each man, or `−1` if alone.
 fn builtin_gale_optimal(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let rank = i1(args);
-    Ok(PerlValue::integer(rank.max(0)))
+    let n = i1(args).max(0) as usize;
+    if n == 0 {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let men_outer = arg_to_vec(args.get(1).unwrap_or(&PerlValue::UNDEF));
+    let women_outer = arg_to_vec(args.get(2).unwrap_or(&PerlValue::UNDEF));
+    if men_outer.len() < n || women_outer.len() < n {
+        return Ok(PerlValue::array(vec![]));
+    }
+    let mut men: Vec<Vec<usize>> = Vec::with_capacity(n);
+    for m in 0..n {
+        let row = arg_to_vec(&men_outer[m]);
+        men.push(row.iter().map(|x| x.to_number() as usize).collect());
+    }
+    let mut w_rank: Vec<Vec<usize>> = vec![vec![usize::MAX; n]; n];
+    for w in 0..n {
+        let row = arg_to_vec(&women_outer[w]);
+        for (r, cell) in row.iter().enumerate().take(n) {
+            let mm = cell.to_number() as usize;
+            if mm < n {
+                w_rank[w][mm] = r;
+            }
+        }
+    }
+    let mut wife: Vec<Option<usize>> = vec![None; n];
+    let mut husband: Vec<Option<usize>> = vec![None; n];
+    let mut next_p = vec![0_usize; n];
+    let mut free: std::collections::VecDeque<usize> = (0..n).collect();
+    while let Some(m) = free.pop_front() {
+        if next_p[m] >= men[m].len() {
+            continue;
+        }
+        let w = men[m][next_p[m]];
+        next_p[m] += 1;
+        if w >= n {
+            continue;
+        }
+        match husband[w] {
+            None => {
+                husband[w] = Some(m);
+                wife[m] = Some(w);
+            }
+            Some(m0) => {
+                let rw = &w_rank[w];
+                if rw[m] < rw[m0] {
+                    husband[w] = Some(m);
+                    wife[m] = Some(w);
+                    wife[m0] = None;
+                    free.push_back(m0);
+                } else {
+                    free.push_back(m);
+                }
+            }
+        }
+    }
+    let out: Vec<PerlValue> = (0..n)
+        .map(|m| PerlValue::integer(wife[m].map(|w| w as i64).unwrap_or(-1)))
+        .collect();
+    Ok(PerlValue::array(out))
 }
 
 /// Pareto dominance: 1 if a dominates b component-wise.

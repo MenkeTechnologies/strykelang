@@ -9,6 +9,110 @@ fn b75_to_ints(v: &PerlValue) -> Vec<i64> {
     arg_to_vec(v).iter().map(|x| x.to_number() as i64).collect()
 }
 
+/// Tarjan/E-maxx style edge-stack biconnected components (vertex biconnected /
+/// 2-vertex-connected blocks). `edges` are undirected simple pairs; multi-edges
+/// are ignored after de-duplication.
+fn b75_biconnected_component_count(mut n: usize, raw: &[(usize, usize)]) -> i64 {
+    use std::collections::HashSet;
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for &(mut u, mut v) in raw {
+        if u == v {
+            continue;
+        }
+        if u > v {
+            std::mem::swap(&mut u, &mut v);
+        }
+        if seen.insert((u, v)) {
+            pairs.push((u, v));
+            n = n.max(u + 1).max(v + 1);
+        }
+    }
+    if n == 0 || pairs.is_empty() {
+        return 0;
+    }
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
+    for (u, v) in pairs {
+        adj[u].push(v);
+        adj[v].push(u);
+    }
+
+    let mut tin: Vec<i32> = vec![-1; n];
+    let mut low: Vec<i32> = vec![0; n];
+    let mut visited = vec![false; n];
+    let mut timer: i32 = 0;
+    let mut st: Vec<(usize, usize)> = Vec::new();
+    let mut bcc = 0_i64;
+
+    fn dfs(
+        v: usize,
+        parent: i32,
+        adj: &[Vec<usize>],
+        tin: &mut [i32],
+        low: &mut [i32],
+        visited: &mut [bool],
+        timer: &mut i32,
+        st: &mut Vec<(usize, usize)>,
+        bcc: &mut i64,
+    ) {
+        visited[v] = true;
+        tin[v] = *timer;
+        low[v] = *timer;
+        *timer += 1;
+        for &to in &adj[v] {
+            if to as i32 == parent {
+                continue;
+            }
+            if visited[to] {
+                low[v] = low[v].min(tin[to]);
+                if tin[to] < tin[v] {
+                    st.push((v, to));
+                }
+            } else {
+                st.push((v, to));
+                dfs(
+                    to,
+                    v as i32,
+                    adj,
+                    tin,
+                    low,
+                    visited,
+                    timer,
+                    st,
+                    bcc,
+                );
+                low[v] = low[v].min(low[to]);
+                if low[to] >= tin[v] {
+                    *bcc += 1;
+                    loop {
+                        let e = st.pop().expect("bcc pop matches push");
+                        if e == (v, to) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for start in 0..n {
+        if !visited[start] {
+            dfs(
+                start,
+                -1,
+                &adj,
+                &mut tin,
+                &mut low,
+                &mut visited,
+                &mut timer,
+                &mut st,
+                &mut bcc,
+            );
+        }
+    }
+    bcc
+}
+
 // ───── shortest paths ─────
 
 /// Dijkstra relaxation step: returns new tentative dist d[u] + w(u,v) if smaller.
@@ -66,11 +170,13 @@ fn builtin_yen_k_shortest(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(root_cost + spur_cost))
 }
 
-/// IDA* iterative deepening A* threshold update.
+/// IDA* threshold update: next threshold = smallest f-value **strictly above**
+/// the current bound among pruned nodes (`min_exceeded`); if none, pass
+/// `inf` / omit second arg.
 fn builtin_ida_star(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cur_threshold = f1(args);
+    let _cur_threshold = f1(args);
     let min_exceeded = args.get(1).map(|v| v.to_number()).unwrap_or(f64::INFINITY);
-    Ok(PerlValue::float(cur_threshold.max(min_exceeded)))
+    Ok(PerlValue::float(min_exceeded))
 }
 
 // ───── traversals ─────
@@ -135,10 +241,12 @@ fn builtin_boruvka_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(weights.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
-/// Reverse-delete step: remove heaviest edge whose deletion preserves connectivity.
+/// Reverse-delete MST helper: `still_connected` should be 1 if the graph
+/// remains **connected** after deleting the candidate edge, 0 if it becomes
+/// disconnected (then the edge is a bridge and must not be removed).
 fn builtin_reverse_delete_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let connected = i1(args);
-    Ok(PerlValue::integer(if connected != 0 { 1 } else { 0 }))
+    let still_connected = i1(args);
+    Ok(PerlValue::integer(if still_connected != 0 { 1 } else { 0 }))
 }
 
 // ───── max flow / min cut ─────
@@ -165,16 +273,30 @@ fn builtin_dinic_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(path_caps.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
-/// Push-relabel relabel: h[u] = 1 + min(h[v]) over residual edges.
+/// Push–relabel relabel step (integer heights): `h[u] = 1 + min(h[v])` over
+/// residual neighbors `v` with positive residual capacity. Pass neighbor
+/// heights as a flat list; isolated `u` yields height 0 (no admissible edge).
 fn builtin_push_relabel_relabel(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let min_h = i1(args);
-    Ok(PerlValue::integer(1 + min_h))
+    let neigh = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    if neigh.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let min_h = neigh
+        .iter()
+        .filter(|h| h.is_finite())
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    if !min_h.is_finite() {
+        return Ok(PerlValue::integer(0));
+    }
+    Ok(PerlValue::integer(1 + min_h.round() as i64))
 }
 
-/// Stoer-Wagner min cut phase: cut weight = w(s, t) at last vertex addition.
+/// Stoer–Wagner “last addition” phase weight: sum of edge weights from the
+/// current cut candidate vertex to the rest of the working set `A`.
 fn builtin_stoer_wagner_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let cut_weight = f1(args);
-    Ok(PerlValue::float(cut_weight))
+    let ws = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    Ok(PerlValue::float(ws.iter().sum()))
 }
 
 /// Karger random edge contraction: select edge index via deterministic LCG
@@ -382,10 +504,17 @@ fn builtin_vertex_connectivity(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(v_min.min(edge_conn).min(min_deg)))
 }
 
-/// Biconnected components: count of articulation+1 (rough).
+/// Biconnected components (2-vertex-connected blocks). Args: edge list as in
+/// `hopcroft_karp` — array of `[u,v]` pairs; optional `n` = vertex count (else
+/// inferred from max endpoint).
 fn builtin_biconnected_components(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let articulations = i1(args).max(0);
-    Ok(PerlValue::integer(articulations + 1))
+    let edges = parse_edges_b24(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let n_arg = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
+    let mut n = n_arg;
+    for &(u, v) in &edges {
+        n = n.max(u + 1).max(v + 1);
+    }
+    Ok(PerlValue::integer(b75_biconnected_component_count(n, &edges)))
 }
 
 /// Diameter: max shortest-path distance in graph.
@@ -416,14 +545,82 @@ fn builtin_warshall_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(r_ij | (r_ik & r_kj)))
 }
 
-/// TSP held-karp DP: g(S, j) = min over i ∈ S\{j} of g(S\{j}, i) + d(i, j).
+/// Held–Karp exact TSP on a **directed** graph: flat row-major `n×n` weight
+/// matrix, optional scalar `n` (otherwise `√(len)`). Hard cap `n ≤ 20` for
+/// bitmask DP.
 fn builtin_tsp_held_karp(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let dists = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let prev = args.get(1).map(b75_to_floats).unwrap_or_default();
-    let n = dists.len().min(prev.len());
-    let mut best = f64::INFINITY;
-    for i in 0..n { best = best.min(prev[i] + dists[i]); }
-    Ok(PerlValue::float(best))
+    let flat = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let inferred = {
+        let len = flat.len();
+        let r = (len as f64).sqrt().round() as usize;
+        if r > 0 && r * r == len { r } else { 0 }
+    };
+    let n = if let Some(v) = args.get(1) {
+        let nv = v.to_number() as usize;
+        if nv > 0 && nv * nv <= flat.len() {
+            nv
+        } else {
+            inferred
+        }
+    } else {
+        inferred
+    };
+    if n == 0 || flat.len() < n * n {
+        return Ok(PerlValue::float(0.0));
+    }
+    if n > 20 {
+        return Ok(PerlValue::float(f64::INFINITY));
+    }
+    let mut dist = vec![vec![0.0_f64; n]; n];
+    for i in 0..n {
+        for j in 0..n {
+            dist[i][j] = flat[i * n + j];
+        }
+    }
+    const INF: f64 = f64::INFINITY;
+    let full_mask = 1usize << n;
+    let mut dp = vec![vec![INF; n]; full_mask];
+    dp[1][0] = 0.0;
+    for mask in 1..full_mask {
+        for j in 0..n {
+            if (mask & (1 << j)) == 0 {
+                continue;
+            }
+            if mask == 1 && j == 0 {
+                continue;
+            }
+            let pm = mask ^ (1 << j);
+            if pm == 0 {
+                continue;
+            }
+            let mut best = INF;
+            for i in 0..n {
+                if i == j || (pm & (1 << i)) == 0 {
+                    continue;
+                }
+                let cand = dp[pm][i] + dist[i][j];
+                if cand < best {
+                    best = cand;
+                }
+            }
+            dp[mask][j] = best;
+        }
+    }
+    let all = full_mask - 1;
+    let mut ans = INF;
+    for j in 1..n {
+        if dp[all][j] < INF {
+            let v = dp[all][j] + dist[j][0];
+            if v < ans {
+                ans = v;
+            }
+        }
+    }
+    if ans.is_infinite() {
+        Ok(PerlValue::float(0.0))
+    } else {
+        Ok(PerlValue::float(ans))
+    }
 }
 
 /// TSP nearest-neighbour heuristic step: pick min unvisited distance.
@@ -432,13 +629,13 @@ fn builtin_tsp_nn_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(unvisited.iter().cloned().fold(f64::INFINITY, f64::min)))
 }
 
-/// Christofides TSP upper bound: MST(G) + matching(odd-degree vertices)/2.
-/// Args: MST cost, weight of minimum-weight perfect matching on the odd-degree
-/// subgraph. Returns ≤ 1.5·OPT for metric TSP.
+/// Christofides metric-TSP upper bound: `MST + MWPM` where `MWPM` is a
+/// minimum-weight perfect matching on the odd-degree vertices of the MST
+/// (full matching cost, not half).
 fn builtin_tsp_christofides(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mst_cost = f1(args);
     let matching_cost = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(mst_cost + matching_cost / 2.0))
+    Ok(PerlValue::float(mst_cost + matching_cost))
 }
 
 /// Greedy graph colouring: pick smallest colour not used by neighbours.
@@ -450,47 +647,79 @@ fn builtin_graph_coloring_greedy(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(c))
 }
 
-/// Welsh-Powell algorithm step: order vertices by descending degree.
+/// Welsh–Powell palette size bound: `Δ(G) + 1` (always a valid number of
+/// colours for a greedy colouring that proceeds in non-increasing degree order).
 fn builtin_welsh_powell(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let degrees = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    if degrees.is_empty() { return Ok(PerlValue::integer(0)); }
-    let max = degrees.iter().cloned().fold(0.0_f64, f64::max);
-    Ok(PerlValue::integer(max as i64 + 1))
+    if degrees.is_empty() {
+        return Ok(PerlValue::integer(0));
+    }
+    let max_d = degrees.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    Ok(PerlValue::integer(max_d as i64 + 1))
 }
 
 // ───── isomorphism / matching ─────
 
-/// VF2 candidate consistency check: degree of u == degree of mapped v.
+/// VF2 feasibility: degree of the pattern vertex must match that of the mapped
+/// host vertex (necessary, not sufficient).
 fn builtin_vf2_consistent(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let deg_u = i1(args);
     let deg_v = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(if deg_u == deg_v { 1 } else { 0 }))
 }
 
-/// Subgraph isomorphism: smaller graph degree must be ≤ host degree.
+/// Subgraph isomorphism feasibility: pattern degree must not exceed host degree.
 fn builtin_subgraph_isomorphism(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let deg_pat = i1(args);
     let deg_host = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
     Ok(PerlValue::integer(if deg_pat <= deg_host { 1 } else { 0 }))
 }
 
-/// Maximum bipartite matching (Hungarian) augmenting path step.
+/// Hungarian preprocessing: one full **row + column reduction** of a square
+/// cost matrix (subtract row minima, then column minima). Args: flattened
+/// `n×n` costs, then `n`. Returns the **total dual adjustment** (sum of all
+/// subtracted row and column minima).
 fn builtin_hungarian_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let matched = i1(args);
-    Ok(PerlValue::integer(matched + 1))
+    let flat = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let n = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
+    if n == 0 || flat.len() < n * n {
+        return Ok(PerlValue::float(0.0));
+    }
+    let mut a = flat[..n * n].to_vec();
+    let mut reduction = 0.0_f64;
+    for i in 0..n {
+        let row: Vec<f64> = (0..n).map(|j| a[i * n + j]).collect();
+        let mn = row.iter().cloned().fold(f64::INFINITY, f64::min);
+        if mn.is_finite() {
+            reduction += mn;
+            for j in 0..n {
+                a[i * n + j] -= mn;
+            }
+        }
+    }
+    for j in 0..n {
+        let col: Vec<f64> = (0..n).map(|i| a[i * n + j]).collect();
+        let mn = col.iter().cloned().fold(f64::INFINITY, f64::min);
+        if mn.is_finite() {
+            reduction += mn;
+            for i in 0..n {
+                a[i * n + j] -= mn;
+            }
+        }
+    }
+    Ok(PerlValue::float(reduction))
 }
 
-/// Hopcroft-Karp BFS-layered phase: count of vertex-disjoint augmenting paths
-/// found in this phase. Args: array of layer-0 free-left-vertex degrees;
-/// returns sum of saturated paths (one per qualifying free vertex).
+/// One **phase** of Hopcroft–Karp: re-use the full bipartite cardinality matcher
+/// (`hopcroft_karp`) on the same argument layout: `edges`, `n_left`, `n_right`.
 fn builtin_hopcroft_karp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let degs = b75_to_ints(args.first().unwrap_or(&PerlValue::array(vec![])));
-    Ok(PerlValue::integer(degs.iter().filter(|&&d| d > 0).count() as i64))
+    builtin_hopcroft_karp(args)
 }
 
 // ───── max clique / vertex cover ─────
 
-/// Bron-Kerbosch maximum clique recursion: returns 1 if R is maximal.
+/// Bron–Kerbosch recursion **terminal**: report a maximal clique when both `P`
+/// and `X` are empty (only `R` nonempty in the search context). Args: |P|, |X|.
 fn builtin_bron_kerbosch(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let p_size = i1(args);
     let x_size = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
@@ -511,13 +740,23 @@ fn builtin_max_independent_set(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer((n - vc).max(0)))
 }
 
-/// Dominating set greedy step: pick vertex covering most uncovered.
+/// Greedy dominating set: pick the vertex that **covers the most still-uncovered**
+/// vertices. Args: nonnegative “coverage” scores per vertex; returns the index
+/// of the maximum.
 fn builtin_dominating_set_greedy(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let uncovered = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    Ok(PerlValue::float(uncovered.iter().cloned().fold(0.0_f64, f64::max)))
+    let cov = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+    let mut best_i = 0_usize;
+    let mut best_v = f64::NEG_INFINITY;
+    for (i, &c) in cov.iter().enumerate() {
+        if c > best_v {
+            best_v = c;
+            best_i = i;
+        }
+    }
+    Ok(PerlValue::integer(if cov.is_empty() { -1 } else { best_i as i64 }))
 }
 
-/// Hamiltonian cycle DP: 2^n · n table state.
+/// Held–Karp Hamiltonian-path/TSP DP state-count: `n · 2^n` bit-DP subproblems.
 fn builtin_hamiltonian_path(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let n = i1(args).clamp(1, 20);
     Ok(PerlValue::integer((1_i64 << n) * n))
@@ -525,13 +764,15 @@ fn builtin_hamiltonian_path(args: &[PerlValue]) -> PerlResult<PerlValue> {
 
 // ───── flow / spanning ─────
 
-/// Minimum Steiner tree heuristic (Mehlhorn): cost = MST(metric closure).
+/// Mehlhorn 1988 Steiner 2-approximation returns a tree whose cost is at most
+/// the **metric closure MST** weight fed in (caller supplies that MST cost).
 fn builtin_min_steiner_tree(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let metric_mst = f1(args);
     Ok(PerlValue::float(metric_mst))
 }
 
-/// k-shortest spanning trees: weight of k-th smallest spanning tree.
+/// `k`-th order statistic among **candidate spanning-tree weights** (caller
+/// precomputes the multiset; this picks the k-th smallest after sorting).
 fn builtin_k_shortest_spanning(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let mut weights = b75_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
     let k = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);

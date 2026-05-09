@@ -221,43 +221,142 @@ fn builtin_min_cut_value(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_max_flow_ek(args)
 }
 
-// Hopcroft-Karp simplified bipartite matching
+// Hopcroft–Karp maximum bipartite matching (O(E √V)).
+const HK_NIL: isize = -1;
+const HK_INF: i32 = i32::MAX / 4;
+
+fn hk_bfs_hopcroft(
+    adj: &[Vec<usize>],
+    pair_u: &[isize],
+    pair_v: &[isize],
+    n_left: usize,
+    n_right: usize,
+) -> (bool, Vec<i32>) {
+    let mut dist = vec![HK_INF; n_left];
+    let mut q = std::collections::VecDeque::new();
+    for u in 0..n_left {
+        if pair_u[u] == HK_NIL {
+            dist[u] = 0;
+            q.push_back(u);
+        }
+    }
+    let mut found_free_right = false;
+    while let Some(u) = q.pop_front() {
+        for &v in &adj[u] {
+            if v >= n_right {
+                continue;
+            }
+            let pu = pair_v[v];
+            if pu == HK_NIL {
+                found_free_right = true;
+            } else if dist[pu as usize] == HK_INF {
+                dist[pu as usize] = dist[u] + 1;
+                q.push_back(pu as usize);
+            }
+        }
+    }
+    (found_free_right, dist)
+}
+
+fn hk_dfs_hopcroft(
+    u: usize,
+    adj: &[Vec<usize>],
+    pair_u: &mut [isize],
+    pair_v: &mut [isize],
+    dist: &[i32],
+    n_right: usize,
+) -> bool {
+    for &v in &adj[u] {
+        if v >= n_right {
+            continue;
+        }
+        let pu = pair_v[v];
+        if pu == HK_NIL {
+            pair_u[u] = v as isize;
+            pair_v[v] = u as isize;
+            return true;
+        }
+        if dist[pu as usize] == dist[u] + 1
+            && hk_dfs_hopcroft(pu as usize, adj, pair_u, pair_v, dist, n_right)
+        {
+            pair_u[u] = v as isize;
+            pair_v[v] = u as isize;
+            return true;
+        }
+    }
+    false
+}
+
+/// `edges` — array of `[u, v]` (left, right); `n_left`, `n_right` — partition sizes.
+fn hopcroft_karp_max_matching(
+    edges: &[(usize, usize)],
+    n_left: usize,
+    n_right: usize,
+) -> usize {
+    if n_left == 0 || n_right == 0 {
+        return 0;
+    }
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n_left];
+    for &(u, v) in edges {
+        if u < n_left && v < n_right {
+            adj[u].push(v);
+        }
+    }
+    let mut pair_u = vec![HK_NIL; n_left];
+    let mut pair_v = vec![HK_NIL; n_right];
+    let mut matching = 0_usize;
+    loop {
+        let (found, dist) = hk_bfs_hopcroft(&adj, &pair_u, &pair_v, n_left, n_right);
+        if !found {
+            break;
+        }
+        for u in 0..n_left {
+            if pair_u[u] == HK_NIL && hk_dfs_hopcroft(u, &adj, &mut pair_u, &mut pair_v, &dist, n_right) {
+                matching += 1;
+            }
+        }
+    }
+    matching
+}
+
+/// First **phase** of Hopcroft–Karp starting from an empty matching: number of
+/// edges stacked in a maximal set of shortest vertex-disjoint augmenting paths
+/// (equals number of successful DFS augmentations in the first BFS layer).
+fn hopcroft_karp_first_phase_augmentations(
+    edges: &[(usize, usize)],
+    n_left: usize,
+    n_right: usize,
+) -> usize {
+    if n_left == 0 || n_right == 0 {
+        return 0;
+    }
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n_left];
+    for &(u, v) in edges {
+        if u < n_left && v < n_right {
+            adj[u].push(v);
+        }
+    }
+    let mut pair_u = vec![HK_NIL; n_left];
+    let mut pair_v = vec![HK_NIL; n_right];
+    let (found, dist) = hk_bfs_hopcroft(&adj, &pair_u, &pair_v, n_left, n_right);
+    if !found {
+        return 0;
+    }
+    let mut aug = 0_usize;
+    for u in 0..n_left {
+        if pair_u[u] == HK_NIL && hk_dfs_hopcroft(u, &adj, &mut pair_u, &mut pair_v, &dist, n_right) {
+            aug += 1;
+        }
+    }
+    aug
+}
+
 fn builtin_hopcroft_karp(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let edges = parse_edges_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
     let n_left = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let n_right = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
-    let mut adj: Vec<Vec<usize>> = vec![vec![]; n_left];
-    for &(u, v) in &edges {
-        if u < n_left { adj[u].push(v); }
-    }
-    let mut match_l = vec![usize::MAX; n_left];
-    let mut match_r = vec![usize::MAX; n_right];
-
-    fn try_kuhn(
-        u: usize, adj: &[Vec<usize>], visited: &mut [bool],
-        match_l: &mut [usize], match_r: &mut [usize],
-    ) -> bool {
-        for &v in &adj[u] {
-            if v >= visited.len() { continue; }
-            if visited[v] { continue; }
-            visited[v] = true;
-            if match_r[v] == usize::MAX || try_kuhn(match_r[v], adj, visited, match_l, match_r) {
-                match_l[u] = v;
-                match_r[v] = u;
-                return true;
-            }
-        }
-        false
-    }
-
-    let mut count = 0_usize;
-    for u in 0..n_left {
-        let mut visited = vec![false; n_right];
-        if try_kuhn(u, &adj, &mut visited, &mut match_l, &mut match_r) {
-            count += 1;
-        }
-    }
-    Ok(PerlValue::integer(count as i64))
+    let m = hopcroft_karp_max_matching(&edges, n_left, n_right);
+    Ok(PerlValue::integer(m as i64))
 }
 
 // Closeness centrality (unweighted, BFS)

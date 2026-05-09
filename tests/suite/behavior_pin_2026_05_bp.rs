@@ -7,10 +7,7 @@ use crate::common::*;
 
 #[test]
 fn string_overlap_bp() {
-    assert_eq!(
-        eval_string(r#"common_prefix("abcdef", "abcdgh")"#),
-        "abcd"
-    );
+    assert_eq!(eval_string(r#"common_prefix("abcdef", "abcdgh")"#), "abcd");
     assert_eq!(
         eval_string(r#"common_suffix("file.txt", "name.txt")"#),
         "e.txt"
@@ -69,10 +66,7 @@ fn zip_fill_argsort_bp() {
         eval_string(r#"stringify(zip_fill(0, [1, 2], [9]))"#),
         "([1, 9], [2, 0])"
     );
-    assert_eq!(
-        eval_string(r#"join(",", argsort(30, 10, 20))"#),
-        "1,2,0"
-    );
+    assert_eq!(eval_string(r#"join(",", argsort(30, 10, 20))"#), "1,2,0");
 }
 
 #[test]
@@ -109,17 +103,17 @@ fn whitespace_and_lines_bp() {
         eval_string(r#"normalize_whitespace("  a  b\tc  ")"#),
         "a b c"
     );
-    assert_eq!(
-        eval_int(r#"line_count("a\nb\nc\n")"#),
-        3
-    );
+    assert_eq!(eval_int(r#"line_count("a\nb\nc\n")"#), 3);
 }
 
 #[test]
 fn semver_ipv4_cidr_bp() {
     assert_eq!(eval_int(r#"version_cmp("1.10.0", "1.9.0")"#), 1);
     assert_eq!(eval_int(r#"is_semver("1.2.3-rc.1")"#), 1);
-    assert_eq!(eval_string(r#"stringify(ipv4_to_int("10.0.0.1"))"#), "167772161");
+    assert_eq!(
+        eval_string(r#"stringify(ipv4_to_int("10.0.0.1"))"#),
+        "167772161"
+    );
     assert_eq!(eval_int(r#"is_valid_cidr("192.168.0.0/24")"#), 1);
 }
 
@@ -145,18 +139,13 @@ fn quantifiers_all_any_none_bp() {
 fn hash_eq_and_pairs_bp() {
     assert_eq!(eval_int(r#"hash_eq({ a => 1 }, { a => 1 })"#), 1);
     assert_eq!(eval_int(r#"hash_eq({ a => 1 }, { a => 2 })"#), 0);
-    assert_eq!(
-        eval_int(r#"scalar pairs_from_hash({ a => 1, b => 2 })"#),
-        2
-    );
+    assert_eq!(eval_int(r#"scalar pairs_from_hash({ a => 1, b => 2 })"#), 2);
 }
 
 #[test]
 fn sorted_keys_bp() {
     assert_eq!(
-        eval_string(
-            r#"join(",", sort { $a cmp $b } keys({ b => 1, a => 2 }))"#
-        ),
+        eval_string(r#"join(",", sort { $a cmp $b } keys({ b => 1, a => 2 }))"#),
         "a,b"
     );
 }
@@ -172,9 +161,7 @@ fn with_index_bp() {
 #[test]
 fn histogram_bins_bp() {
     assert_eq!(
-        eval_string(
-            r#"join(",", histogram_bins(10, 20, 35, 41, 55, bin_width => 25))"#
-        ),
+        eval_string(r#"join(",", histogram_bins(10, 20, 35, 41, 55, bin_width => 25))"#),
         "1,0,0,1,1,0,1,1,0,1"
     );
 }
@@ -189,10 +176,7 @@ fn list_repeat_batch_cycle_bp() {
         eval_string(r#"stringify(batch(2, 1, 2, 3, 4, 5))"#),
         "([1, 2], [3, 4], [5])"
     );
-    assert_eq!(
-        eval_string(r#"join(",", interpose(99, 7, 8))"#),
-        "7,99,8"
-    );
+    assert_eq!(eval_string(r#"join(",", interpose(99, 7, 8))"#), "7,99,8");
     assert_eq!(
         eval_string(r#"join(",", reductions({ $_[0] + $_[1] }, 1, 2, 3, 4))"#),
         "1,3,6,10"
@@ -205,21 +189,12 @@ fn list_repeat_batch_cycle_bp() {
 
 #[test]
 fn uniqnum_and_spaceship_bp() {
-    assert_eq!(
-        eval_string(r#"join(",", uniqnum(1.0, "1", 2, 2))"#),
-        "1,2"
-    );
+    assert_eq!(eval_string(r#"join(",", uniqnum(1.0, "1", 2, 2))"#), "1,2");
     assert_eq!(eval_int("(10 <=> 20)"), -1);
-    assert_eq!(
-        eval_int(r#"scalar ("10" cmp "9")"#),
-        -1
-    );
+    assert_eq!(eval_int(r#"scalar ("10" cmp "9")"#), -1);
 }
 
 #[test]
 fn pack_hex_bp() {
-    assert_eq!(
-        eval_string(r#"hex_encode(pack("n", 4660))"#),
-        "1234"
-    );
+    assert_eq!(eval_string(r#"hex_encode(pack("n", 4660))"#), "1234");
 }

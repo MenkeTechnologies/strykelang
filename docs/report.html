@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: 309k Rust lines + 110k stryke lines, 6.1k tests, 8.5k builtins (9.1k spellings), 436 VM opcodes, 20k parity cases.">
+  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: 315k Rust lines + 111k stryke lines, 6.6k tests, 8.6k builtins (9.1k spellings), 436 VM opcodes, 20k parity cases.">
   <title>strykelang &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,13 +92,13 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 436-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. <strong>268k production Rust lines + 110k stryke-program lines + 8,587 builtins (9,114 callable spellings) + 1,349/1,349 Rosetta tasks</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 436-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. <strong>267k production Rust lines + 110k stryke-program lines + 8,590 builtins (9,117 callable spellings) + 1,349/1,349 Rosetta tasks</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-val">309,285</div><div class="stat-label">Rust Lines</div></div>
-        <div class="stat-card"><div class="stat-val">109,527</div><div class="stat-label">Stryke Lines (.stk)</div></div>
-        <div class="stat-card"><div class="stat-val accent">8,587</div><div class="stat-label">Builtins (Primary)</div></div>
-        <div class="stat-card"><div class="stat-val green">6,076</div><div class="stat-label">Test Functions</div></div>
+        <div class="stat-card"><div class="stat-val">314,665</div><div class="stat-label">Rust Lines</div></div>
+        <div class="stat-card"><div class="stat-val">110,676</div><div class="stat-label">Stryke Lines (.stk)</div></div>
+        <div class="stat-card"><div class="stat-val accent">8,590</div><div class="stat-label">Builtins (Primary)</div></div>
+        <div class="stat-card"><div class="stat-val green">6,591</div><div class="stat-label">Test Functions</div></div>
         <div class="stat-card"><div class="stat-val">436</div><div class="stat-label">VM Opcodes</div></div>
         <div class="stat-card"><div class="stat-val">334</div><div class="stat-label">AST Variants</div></div>
         <div class="stat-card"><div class="stat-val">20,058</div><div class="stat-label">Parity Cases</div></div>
@@ -108,7 +108,7 @@
       </div>
 
       <div style="margin:1.2rem 0;">
-        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 309,285 lines</p>
+        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 314,665 lines</p>
         <div class="bar-wrap" style="height:26px;">
           <div class="bar-fill cyan" style="width:86.8%;"></div>
           <span class="bar-pct" style="font-size:12px;">268,383 production / 40,902 tests / 105 tooling &middot; 86.8% production</span>
@@ -141,8 +141,8 @@
             <td style="color:var(--green);"><strong>stryke</strong></td>
             <td>2026</td>
             <td class="num">0.08</td>
-            <td class="num">230,982 Rust + 109,527 stk</td>
-            <td class="num">8,587</td>
+            <td class="num">230,982 Rust + 110,676 stk</td>
+            <td class="num">8,590</td>
             <td>Cranelift</td>
             <td><strong>1,349 / 1,349 (100%)</strong></td>
           </tr>
@@ -210,11 +210,11 @@
         </div>
         <div class="feature-card">
           <h4>By Test Surface</h4>
-          <p><code>6,076</code> <code>#[test]</code> functions + <code>20,058</code> Perl-parity cases + <code>22,236</code> assertions in the Rosetta corpus. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
+          <p><code>6,591</code> <code>#[test]</code> functions + <code>20,058</code> Perl-parity cases + <code>22,236</code> assertions in the Rosetta corpus. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
         </div>
         <div class="feature-card">
           <h4>By Built-in Capability</h4>
-          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 8,587 builtins (9,114 spellings) vs ~80&ndash;250 for the reference set.</p>
+          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 8,590 builtins (9,117 spellings) vs ~80&ndash;250 for the reference set.</p>
         </div>
         <div class="feature-card">
           <h4>Rosetta Code Completion</h4>
@@ -223,11 +223,11 @@
       </div>
 
       <h3 class="tutorial-title" style="font-size:1.05em;margin-top:24px;"><span class="step-hash">#</span>Builtin Count vs Other Bareword-Fn Languages</h3>
-      <p class="tutorial-subtitle">Stryke's <strong>8,587</strong> primary builtins exceed every other language whose stdlib is exposed as bareword fns &mdash; including Wolfram Language, the only prior holder of "world's largest builtin set" branding. APL/J/K/q have hundreds of primitives, but as glyphs (<code>+/</code>, <code>⌽</code>, <code>~:</code>) rather than barewords; R has ~2k+, but split across <code>library()</code>'d packages rather than always-loaded. Stryke is the only bareword-fn language past the 8k threshold.</p>
+      <p class="tutorial-subtitle">Stryke's <strong>8,590</strong> primary builtins exceed every other language whose stdlib is exposed as bareword fns &mdash; including Wolfram Language, the only prior holder of "world's largest builtin set" branding. APL/J/K/q have hundreds of primitives, but as glyphs (<code>+/</code>, <code>⌽</code>, <code>~:</code>) rather than barewords; R has ~2k+, but split across <code>library()</code>'d packages rather than always-loaded. Stryke is the only bareword-fn language past the 8k threshold.</p>
       <table class="file-table">
         <thead><tr><th>Language</th><th class="num">Bareword Builtins</th><th>Source / Probe</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);"><strong>stryke</strong></td><td class="num"><strong>8,587</strong></td><td><code>len(keys %b)</code> at runtime &mdash; dynamic, not hardcoded</td></tr>
+          <tr><td style="color:var(--accent);"><strong>stryke</strong></td><td class="num"><strong>8,590</strong></td><td><code>len(keys %b)</code> at runtime &mdash; dynamic, not hardcoded</td></tr>
           <tr><td>Wolfram Language v14.1</td><td class="num">~7,000</td><td>Stephen Wolfram blog ("7,000 or so" at v14.1, +89 net new from v14.0's 6,602)</td></tr>
           <tr><td>Wolfram Language v14.3 (est.)</td><td class="num">7,100&ndash;7,300</td><td>Extrapolated from per-version deltas; exact count not published</td></tr>
           <tr><td>Ruby Kernel</td><td class="num">~250</td><td><code>Kernel.methods.size</code></td></tr>
@@ -239,18 +239,18 @@
           <tr><td>AWK</td><td class="num">~30</td><td>gawk manual</td></tr>
         </tbody>
       </table>
-      <p style="margin-top:12px;">Wolfram is the only language that has marketed builtin count as a competitive metric. Stryke's 8,587 clears Wolfram v14.1's stated count by ~1,000 and exceeds the highest plausible v14.3 estimate by ~800. Bareword-fn rivalry past the 8k mark: stryke is alone in the category.</p>
+      <p style="margin-top:12px;">Wolfram is the only language that has marketed builtin count as a competitive metric. Stryke's 8,590 clears Wolfram v14.1's stated count by ~1,000 and exceeds the highest plausible v14.3 estimate by ~800. Bareword-fn rivalry past the 8k mark: stryke is alone in the category.</p>
 
       <h4 style="margin-top:18px;">Density: builtins per byte of binary</h4>
       <table class="file-table">
         <thead><tr><th>Toolchain</th><th class="num">Builtins</th><th class="num">Install Size</th><th class="num">Bytes / Builtin</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>9,114</strong></td><td class="num"><strong>31 MB</strong></td><td class="num"><strong>~3.6 KB</strong></td></tr>
+          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>9,117</strong></td><td class="num"><strong>31 MB</strong></td><td class="num"><strong>~3.6 KB</strong></td></tr>
           <tr><td>Wolfram Engine v14 (free tier)</td><td class="num">~7,000</td><td class="num">~5&ndash;6 GB</td><td class="num">~750 KB</td></tr>
           <tr><td>MATLAB R2025a + toolboxes</td><td class="num">thousands</td><td class="num">30+ GB</td><td class="num">n/a</td></tr>
         </tbody>
       </table>
-      <p style="margin-top:8px;">~200&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with all 9,114 names dispatchable. Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "9,114 barewords + 31 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
+      <p style="margin-top:8px;">~200&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with all 9,117 names dispatchable. Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "9,117 barewords + 31 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
 
       <hr class="section-rule">
 
@@ -258,12 +258,12 @@
       <!-- SECTION 2: SUBSYSTEM BREAKDOWN          -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">#</span>SUBSYSTEM BREAKDOWN</h2>
-      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 34.4% &mdash; the language ships with 8,587 builtins (9,114 callable spellings = 8,587 primaries + 527 aliases) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / HTTP / database / network / AI / web / math / physics / chemistry / biology / signal / finance domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is 21%.</p>
+      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 34.4% &mdash; the language ships with 8,590 builtins (9,117 callable spellings = 8,590 primaries + 527 aliases) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / HTTP / database / network / AI / web / math / physics / chemistry / biology / signal / finance domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is 21%.</p>
 
       <table class="file-table">
         <thead><tr><th>Subsystem</th><th>Key Files</th><th class="num">Lines</th><th class="num">%</th><th style="min-width:120px;">Share</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins, builtins_extended, list_builtins, math_wolfram*</code></td><td class="num">106,420</td><td class="num">34.4%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:34.4%"></div></div></td><td>8,587 builtins / 9,114 callable spellings: string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
+          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins, builtins_extended, list_builtins, math_wolfram*</code></td><td class="num">106,420</td><td class="num">34.4%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:34.4%"></div></div></td><td>8,590 builtins / 9,117 callable spellings: string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
           <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">22,213</td><td class="num">8.1%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:8.1%"></div></div></td><td>436-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
           <tr><td style="color:var(--accent);">Tree Walker (vm_helper)</td><td><code>vm_helper</code></td><td class="num">20,892</td><td class="num">7.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:7.7%"></div></div></td><td>Tree-walking interpreter + runtime helpers: scope graph, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, ...), reflection-hash population, package-stash refresh, AOP intercepts</td></tr>
           <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">19,915</td><td class="num">7.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:7.3%"></div></div></td><td>Recursive-descent parser, 183 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing, builtin-name whitelist</td></tr>
@@ -282,10 +282,10 @@
           <tr><td style="color:var(--accent);">Tooling</td><td><code>debugger, profiler, static_analysis</code></td><td class="num">2,187</td><td class="num">0.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.8%"></div></div></td><td>Step debugger, sampling profiler, static analyzer with lints</td></tr>
           <tr><td style="color:var(--accent);">FFI / AOT</td><td><code>rust_ffi, rust_sugar, aot, data_section, aop</code></td><td class="num">1,809</td><td class="num">0.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.7%"></div></div></td><td>Embed-Rust closure FFI, AOT bytecode caching, data-section relocations, AOP intercepts</td></tr>
           <tr><td style="color:var(--accent);">Crypto / Pack</td><td><code>crypt_util, jwt, pack, secrets</code></td><td class="num">1,667</td><td class="num">0.6%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.6%"></div></div></td><td>Symmetric / asymmetric encryption, password hashing, JWT encode/decode, <code>pack</code>/<code>unpack</code> templates, secret-store helpers</td></tr>
-          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">40,902</td><td class="num">13.2%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:13.2%"></div></div></td><td>6,076 <code>#[test]</code> functions across 100+ files: parser, lexer, builtins, parallel, regex, values, OO, semantics, CLI, LSP, runtime, fix-regression suite</td></tr>
+          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">40,902</td><td class="num">13.2%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:13.2%"></div></div></td><td>6,591 <code>#[test]</code> functions across 100+ files: parser, lexer, builtins, parallel, regex, values, OO, semantics, CLI, LSP, runtime, fix-regression suite</td></tr>
           <tr><td style="color:var(--text-muted);">Build / Bench</td><td><code>build.rs, benches/, fuzz/</code></td><td class="num">669</td><td class="num">0.25%</td><td><div class="bar-wrap"><div class="bar-fill yellow" style="width:0.25%"></div></div></td><td>Build-time reflection generator (<code>BUILTIN_ARMS</code>, <code>CATEGORY_MAP</code>, <code>DESCRIPTIONS</code>), JIT vs interpreter micro-bench, libfuzzer harnesses</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">309,285</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
+        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">314,665</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -299,7 +299,7 @@
       <table class="file-table">
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td>strykelang/builtins.rs</td><td class="num">34,038</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 8,587 builtins (9,114 callable spellings)</td></tr>
+          <tr><td>strykelang/builtins.rs</td><td class="num">34,038</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 8,590 builtins (9,117 callable spellings)</td></tr>
           <tr><td>strykelang/math_wolfram*.rs</td><td class="num">58,010</td><td>82 batch files (math_wolfram, math_wolfram2&hellip;82) <code>include!</code>'d into builtins.rs: 4,643 fns spanning Wolfram-class math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, calendrical, astronomy, BLAS/LAPACK, sabermetrics, Excel/financial, GIS, robotics/control, actuarial, epidemiology, archive/encoding, music theory, geology, logic/SAT/SMT, compilers/parsing, linguistics, Postgres SQL/JSON, Redis, scipy.special, economics/game theory</td></tr>
           <tr><td>strykelang/vm_helper.rs</td><td class="num">20,892</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks, special-variable handling, reflection-hash population, package-stash refresh</td></tr>
           <tr><td>strykelang/parser.rs</td><td class="num">17,754</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
@@ -360,8 +360,8 @@
                   ┌───────────────────┐
                   │   builtins.rs     │
                   │   (31,091)        │
-                  │   8,587 builtins  │
-                  │   9,114 spellings │
+                  │   8,590 builtins  │
+                  │   9,117 spellings │
                   │   + extended      │
                   │   (12,524)        │
                   │   + math_wolfram* │
@@ -386,21 +386,22 @@
       <p class="tutorial-subtitle">Builtins are partitioned at build time by <code>build.rs</code>, which scans <code>parser.rs</code> and <code>builtins.rs</code> to generate <code>CORE_CATEGORY_MAP</code> (Perl 5 core), <code>EXT_CATEGORY_MAP</code> (stryke extensions), and <code>ALL_CATEGORY_MAP</code> (every callable spelling, primaries plus aliases). The reflection tables back the runtime <code>%b</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> hashes (plus their <code>%stryke::*</code> long-form aliases). At runtime stryke also exposes <code>%parameters</code> (zsh-style live binding view) and per-package stashes (<code>%main::</code>, <code>%Foo::</code>) refreshed lazily on read.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">8,587</div><div class="stat-label">Builtins (Primary)</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">537</div><div class="stat-label">Aliases</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">9,114</div><div class="stat-label">Total Spellings</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">8,590</div><div class="stat-label">Builtins (Primary)</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">527</div><div class="stat-label">Aliases</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">9,117</div><div class="stat-label">Total Spellings</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">213</div><div class="stat-label">Perl 5 Core</div></div>
-        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">5,436</div><div class="stat-label">Stryke Extensions</div></div>
-        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">2,845</div><div class="stat-label">LSP Descriptions</div></div>
+        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">8,377</div><div class="stat-label">Stryke Extensions</div></div>
+        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">3,852</div><div class="stat-label">LSP Descriptions</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">2,505</div><div class="stat-label">Match Arms</div></div>
-        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">188</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">241</div><div class="stat-label">Categories</div></div>
       </div>
 
-      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">117 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 537-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation. Invariant: <code>keys %a + keys %b == keys %all</code>.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">117 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 527-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation. Invariant: <code>keys %a + keys %b == keys %all</code>.</p>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--accent);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// CATEGORIES</h3>
       <div class="mapping-grid">
-        <div class="mapping-card"><h4>String</h4><p><code>chomp</code>, <code>uc</code>, <code>lc</code>, <code>sprintf</code>, <code>substr</code>, <code>index</code>, <code>reverse</code>, <code>split</code>, <code>join</code>, <code>tr///</code>, <code>s///</code>, <code>m//</code></p></div>
+        <div class="mapping-card"><h4>String (byte)</h4><p>Perl 5 layer: <code>length</code>, <code>substr</code>, <code>index</code>, <code>rindex</code>, <code>pos</code> &mdash; byte-indexed, kept for compat. <code>chomp</code>, <code>uc</code>, <code>lc</code>, <code>sprintf</code>, <code>reverse</code>, <code>split</code>, <code>join</code>, <code>tr///</code>, <code>s///</code>, <code>m//</code></p></div>
+        <div class="mapping-card"><h4>String (codepoint)</h4><p>Stryke layer: <code>len</code>, <code>$s[i]</code>, <code>$s[a:b]</code>, <code>cindex</code>, <code>crindex</code> &mdash; codepoint-indexed, all share a coordinate system. Never mix with byte-layer outputs.</p></div>
         <div class="mapping-card"><h4>Array</h4><p><code>push</code>, <code>pop</code>, <code>shift</code>, <code>unshift</code>, <code>map</code>, <code>grep</code>, <code>sort</code>, <code>reverse</code>, <code>splice</code>, <code>wantarray</code></p></div>
         <div class="mapping-card"><h4>Hash</h4><p><code>keys</code>, <code>values</code>, <code>each</code>, <code>exists</code>, <code>delete</code>, <code>tied</code>, <code>tie</code>, <code>untie</code></p></div>
         <div class="mapping-card"><h4>Numeric</h4><p><code>abs</code>, <code>int</code>, <code>sqrt</code>, <code>sin</code>, <code>cos</code>, <code>atan2</code>, <code>exp</code>, <code>log</code>, <code>hex</code>, <code>oct</code>, <code>rand</code>, <code>srand</code></p></div>
@@ -417,6 +418,22 @@
         <div class="mapping-card"><h4>Filesystem Stream</h4><p><code>fr</code> (file rec), <code>fw</code> (file write), <code>fa</code> (file append), <code>slurp</code>, <code>spurt</code>, <code>walk</code></p></div>
         <div class="mapping-card"><h4>Reflection</h4><p><code>%b</code> / <code>%all</code> / <code>%pc</code> / <code>%e</code> / <code>%a</code> / <code>%d</code> / <code>%c</code> / <code>%p</code> (eight build-time reflection hashes), <code>%parameters</code> (live bindings, zsh <code>$parameters</code>), <code>%main::</code> / <code>%Pkg::</code> (package stashes), <code>caller</code>, <code>__PACKAGE__</code>, <code>__SUB__</code></p></div>
       </div>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--accent);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// STRING COORDINATES &mdash; BYTES VS CODEPOINTS</h3>
+      <p style="font-size:11px;color:var(--text-muted);">Stryke runs string code in two coordinate systems. Perl 5 builtins stay byte-indexed for binary-protocol and <code>.pm</code>-source compat. Stryke extensions are codepoint-indexed so search positions and slice bounds line up. Never auto-converted &mdash; mixing across systems silently misaligns on any non-ASCII content.</p>
+      <table class="reflection-table" style="font-size:11px;">
+        <thead>
+          <tr><th>Operation</th><th>Stryke (codepoints)</th><th>Perl 5 (bytes)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Length</td><td><code>len $s</code></td><td><code>length $s</code></td></tr>
+          <tr><td>Index char</td><td><code>$s[$i]</code></td><td><code>substr $s, $i, 1</code></td></tr>
+          <tr><td>Slice</td><td><code>$s[$a:$b]</code> (inclusive)</td><td><code>substr $s, $start, $len</code></td></tr>
+          <tr><td>Search forward</td><td><code>cindex $s, $needle [, $from]</code></td><td><code>index $s, $needle [, $from]</code></td></tr>
+          <tr><td>Search backward</td><td><code>crindex $s, $needle [, $from]</code></td><td><code>rindex $s, $needle [, $from]</code></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">For <code>"hello ─ world"</code> (15 bytes, 13 codepoints): <code>length</code> = 15, <code>len</code> = 13, <code>index $s, "world"</code> = 9, <code>cindex $s, "world"</code> = 7.</p>
 
       <hr class="section-rule">
 
@@ -518,7 +535,7 @@
       <p class="tutorial-subtitle">Two complementary suites. Unit + integration tests are <code>#[test]</code> functions in Rust; parity tests are <code>.pl</code> scripts that must produce byte-identical output between system perl and stryke. CI runs both on every push.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card"><div class="stat-val green">6,076</div><div class="stat-label">#[test] Functions</div></div>
+        <div class="stat-card"><div class="stat-val green">6,591</div><div class="stat-label">#[test] Functions</div></div>
         <div class="stat-card"><div class="stat-val">2,126</div><div class="stat-label">Unit Tests</div></div>
         <div class="stat-card"><div class="stat-val">2,794</div><div class="stat-label">Integration Tests</div></div>
         <div class="stat-card"><div class="stat-val accent">20,058</div><div class="stat-label">Parity Cases</div></div>
@@ -630,7 +647,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 309,285 RUST LINES &middot; 109,527 STRYKE LINES &middot; 6,076 TESTS &middot; 8,587 BUILTINS / 9,114 SPELLINGS &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 314,665 RUST LINES &middot; 110,676 STRYKE LINES &middot; 6,591 TESTS &middot; 8,590 BUILTINS / 9,117 SPELLINGS &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 

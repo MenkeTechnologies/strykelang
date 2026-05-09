@@ -74,17 +74,22 @@ fn extract_rust_strings($path) {
     my $text = c $path
     my @strs
     my $i = 0
-    my $n = length $text
+    my $n = len $text
+    # Codepoint-coordinate scan: `len` / `[i]` / `[a:b]` are all
+    # codepoint-based and stay aligned. The Perl 5 byte-coordinate
+    # equivalents (`length` / `substr` / `index`) would also work, but
+    # mixing the two would silently misalign on any non-ASCII char
+    # (lsp.rs has ─, ✓, ✗) — see README [0x08b].
     while ($i < $n) {
-        my $c = substr $text, $i, 1
+        my $c = $text[$i]
         # Skip line + block comments.
-        if ($c eq '/' && substr($text, $i + 1, 1) eq '/') {
-            while ($i < $n && substr($text, $i, 1) ne "\n") { $i++ }
+        if ($c eq '/' && $text[$i + 1] eq '/') {
+            while ($i < $n && $text[$i] ne "\n") { $i++ }
             next
         }
-        if ($c eq '/' && substr($text, $i + 1, 1) eq '*') {
+        if ($c eq '/' && $text[$i + 1] eq '*') {
             $i += 2
-            while ($i < $n - 1 && !(substr($text, $i, 1) eq '*' && substr($text, $i + 1, 1) eq '/')) { $i++ }
+            while ($i < $n - 1 && !($text[$i] eq '*' && $text[$i + 1] eq '/')) { $i++ }
             $i += 2
             next
         }
@@ -92,12 +97,12 @@ fn extract_rust_strings($path) {
         my $start = $i + 1
         $i++
         while ($i < $n) {
-            my $cc = substr $text, $i, 1
+            my $cc = $text[$i]
             if ($cc eq '\\') { $i += 2; next }
             if ($cc eq '"') { last }
             $i++
         }
-        push @strs, substr $text, $start, $i - $start
+        push @strs, $text[$start : $i - 1]
         $i++
     }
     @strs
@@ -146,17 +151,18 @@ fn extract_html_blocks($path) {
     my $text = c $path
     my @blocks
     my $i = 0
-    my $n = length $text
+    my $n = len $text
     while ($i < $n) {
-        my $open = index $text, '<pre', $i
+        my $open = cindex $text, '<pre', $i
         last if $open < 0
-        my $close_open = index $text, '>', $open
+        my $close_open = cindex $text, '>', $open
         last if $close_open < 0
-        my $close = index $text, '</pre>', $close_open
+        my $close = cindex $text, '</pre>', $close_open
         last if $close < 0
-        # Strip <span> wrappers, decode entities, drop leading newline.
-        # `\` continues the `~>` chain across newlines.
-        my $body = ~> substr($text, $close_open + 1, $close - $close_open - 1) \
+        # `cindex` + `[a:b]` are both codepoint-based — same coordinate
+        # system, no off-by-N on UTF-8 entities like ✓ / ✗. `\`
+        # continues the `~>` chain across newlines.
+        my $body = ~> $text[$close_open + 1 : $close - 1] \
             s|<span[^>]*>||g \
             s|</span>||g \
             s/&lt;/</g \
@@ -209,10 +215,10 @@ push @all, extract_lsp_blocks "$ROOT/strykelang/lsp.rs"    if $source eq "all" |
 push @all, extract_html_blocks "$ROOT/docs/index.html"     if $source eq "all" || $source eq "html"
 
 my @code_blocks = grep { looks_like_stryke_code _->{code} } @all
-my $total       = scalar @code_blocks
-my $skipped     = scalar(@all) - $total
+my $total       = len @code_blocks
+my $skipped     = len(@all) - $total
 
-p "total blocks: ", scalar @all
+p "total blocks: ", len @all
 p "code blocks: $total (skipped $skipped non-code)"
 
 # Each check_block call shells out to `stryke -c`. `pmap` parallelizes
@@ -228,8 +234,8 @@ my @results = pmap {
 my @failures = grep { !_->{ok} } @results
 my @oks      = grep {  _->{ok} } @results
 
-p "passed:  ", scalar @oks
-p "failed:  ", scalar @failures
+p "passed:  ", len @oks
+p "failed:  ", len @failures
 p ""
 
 # Group failures by their first error line so common patterns surface.

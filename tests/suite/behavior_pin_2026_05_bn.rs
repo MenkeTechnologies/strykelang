@@ -7,8 +7,14 @@ use crate::common::*;
 
 #[test]
 fn interpolation_and_correlations_bn() {
-    assert_eq!(eval_string(r#"sprintf("%.4f", lerp(10, 20, 0.25))"#), "12.5000");
-    assert_eq!(eval_string(r#"sprintf("%.4f", inv_lerp(0, 100, 25))"#), "0.2500");
+    assert_eq!(
+        eval_string(r#"sprintf("%.4f", lerp(10, 20, 0.25))"#),
+        "12.5000"
+    );
+    assert_eq!(
+        eval_string(r#"sprintf("%.4f", inv_lerp(0, 100, 25))"#),
+        "0.2500"
+    );
     assert_eq!(
         eval_string(r#"sprintf("%.6f", inverse_lerp(0, 100, 25))"#),
         "0.250000"
@@ -111,7 +117,10 @@ fn music_intervals_bn() {
 
     assert_eq!(eval_int(r#"interval_semitones("M3")"#), 3);
     assert_eq!(eval_int(r#"transpose_semi(440, 12)"#), 880);
-    assert_eq!(eval_string(r#"sprintf("%.4f", bpm_to_period(120))"#), "0.5000");
+    assert_eq!(
+        eval_string(r#"sprintf("%.4f", bpm_to_period(120))"#),
+        "0.5000"
+    );
     assert_eq!(eval_int("midi_to_pitch_class(60)"), 0);
     assert_eq!(eval_int(r#"key_signature_for("D")"#), 2);
     assert_eq!(eval_string(r#"circle_of_fifths_step("C", 1)"#), "G");
@@ -135,11 +144,23 @@ fn combinatorics_sequences_bn() {
 #[test]
 fn trig_remap_rotate_and_small_stats_bn() {
     assert_eq!(eval_string(r#"sprintf("%.10f", d2r(180))"#), "3.1415926536");
-    assert_eq!(eval_string(r#"sprintf("%.2f", r2d(3.141592653589793))"#), "180.00");
-    assert_eq!(eval_string(r#"sprintf("%.1f", angle_between_deg(1, 0))"#), "0.0");
-    assert_eq!(eval_string(r#"sprintf("%.1f", angle_between_deg(0, 1))"#), "90.0");
+    assert_eq!(
+        eval_string(r#"sprintf("%.2f", r2d(3.141592653589793))"#),
+        "180.00"
+    );
+    assert_eq!(
+        eval_string(r#"sprintf("%.1f", angle_between_deg(1, 0))"#),
+        "0.0"
+    );
+    assert_eq!(
+        eval_string(r#"sprintf("%.1f", angle_between_deg(0, 1))"#),
+        "90.0"
+    );
 
-    assert_eq!(eval_string(r#"sprintf("%.1f", remap(5, 0, 10, 100, 200))"#), "150.0");
+    assert_eq!(
+        eval_string(r#"sprintf("%.1f", remap(5, 0, 10, 100, 200))"#),
+        "150.0"
+    );
     assert_eq!(eval_int("copysign(3, -2)"), -3);
 
     assert_eq!(
@@ -157,12 +178,18 @@ fn trig_remap_rotate_and_small_stats_bn() {
         "[6.12323399573677e-17, 1]"
     );
 
-    assert_eq!(eval_string(r#"sprintf("%.2f", moon_phase(2451545))"#), "0.83");
+    assert_eq!(
+        eval_string(r#"sprintf("%.2f", moon_phase(2451545))"#),
+        "0.83"
+    );
 }
 
 #[test]
 fn physical_constants_bn() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", speed_of_light())"#), "299792458");
+    assert_eq!(
+        eval_string(r#"sprintf("%.0f", speed_of_light())"#),
+        "299792458"
+    );
     assert_eq!(eval_string(r#"stringify(avogadro())"#), "6.02214076e+23");
     assert_eq!(eval_string(r#"stringify(planck())"#), "6.62607015e-34");
     assert_eq!(eval_string(r#"stringify(boltzmann())"#), "1.380649e-23");
@@ -174,10 +201,7 @@ fn physical_constants_bn() {
 
 #[test]
 fn cumulatives_and_adjacent_bn() {
-    assert_eq!(
-        eval_string(r#"join(",", cumsum(1, 2, 3, 4))"#),
-        "1,3,6,10"
-    );
+    assert_eq!(eval_string(r#"join(",", cumsum(1, 2, 3, 4))"#), "1,3,6,10");
     assert_eq!(eval_string(r#"join(",", cumprod(2, 3, 4))"#), "2,6,24");
     assert_eq!(
         eval_string(r#"join(",", adjacent_difference(1, 4, 9, 16))"#),
@@ -190,10 +214,7 @@ fn string_distance_radix_digits_bn() {
     assert_eq!(eval_int(r#"levenshtein("kitten", "sitting")"#), 3);
     assert_eq!(eval_int(r#"from_base('FF', 16)"#), 255);
     assert_eq!(eval_string(r#"to_base(255, 16)"#), "ff");
-    assert_eq!(
-        eval_string(r#"join(",", digits_of(12345))"#),
-        "1,2,3,4,5"
-    );
+    assert_eq!(eval_string(r#"join(",", digits_of(12345))"#), "1,2,3,4,5");
 }
 
 #[test]
@@ -203,10 +224,7 @@ fn erf_hyperbolic_cov_matrix_bn() {
 
     assert_eq!(eval_string(r#"sprintf("%.6f", acosh(1))"#), "0.000000");
     assert_eq!(eval_string(r#"sprintf("%.6f", asinh(1))"#), "0.881374");
-    assert_eq!(
-        eval_string(r#"sprintf("%.6f", atanh(0.5))"#),
-        "0.549306"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6f", atanh(0.5))"#), "0.549306");
 
     assert_eq!(
         eval_string(r#"stringify(covariance_matrix_pts([[1, 2], [3, 4], [5, 6]]))"#),
@@ -222,10 +240,7 @@ fn ml_activations_softmax_norms_bn() {
     );
 
     assert_eq!(eval_string(r#"sprintf("%.6f", sigmoid(0))"#), "0.500000");
-    assert_eq!(
-        eval_string(r#"sprintf("%.6f", sigmoid(2))"#),
-        "0.880797"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6f", sigmoid(2))"#), "0.880797");
 
     assert_eq!(eval_string(r#"sprintf("%.6f", tanh(1))"#), "0.761594");
     assert_eq!(eval_string(r#"sprintf("%.6f", gelu(0))"#), "0.000000");
@@ -244,10 +259,7 @@ fn ml_activations_softmax_norms_bn() {
 #[test]
 fn roots_logs_bits_percentiles_bn() {
     assert_eq!(eval_int("cbrt(27)"), 3);
-    assert_eq!(
-        eval_string(r#"sprintf("%.6f", exp2(4))"#),
-        "16.000000"
-    );
+    assert_eq!(eval_string(r#"sprintf("%.6f", exp2(4))"#), "16.000000");
     assert_eq!(
         eval_string(r#"sprintf("%.10f", log2(1024))"#),
         "10.0000000000"

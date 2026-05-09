@@ -14,7 +14,11 @@ fn zsh_glob_sort_and_slice_qualifier_works() {
     // It should return exactly 1 file if there are matching files.
     let out = eval_string(r#"my @f = glob("strykelang/*.rs(om[1])"); join(",", @f)"#);
     let count = out.split(',').filter(|s| !s.is_empty()).count();
-    assert_eq!(count, 1, "expected slicing glob qualifier to return exactly 1 element, got: {}", out);
+    assert_eq!(
+        count, 1,
+        "expected slicing glob qualifier to return exactly 1 element, got: {}",
+        out
+    );
 }
 
 #[test]
