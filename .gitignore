@@ -15,3 +15,6 @@
 # Noisy diff content; upload as CI artifact instead of committing.
 # `parity_summary.json` stays tracked — it feeds the docs badge.
 /parity/parity_failures.log
+
+# Downloaded fonts for scripts/reference_pdf.sh
+docs/.fonts/

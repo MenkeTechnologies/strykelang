@@ -6886,6 +6886,7 @@ fn builtin_dijkstra(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let source = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     let graph_map = graph_val
         .as_hash_map()
+        .or_else(|| graph_val.as_hash_ref().map(|r| r.read().clone()))
         .ok_or_else(|| PerlError::runtime("dijkstra: first arg must be a hash", 0))?;
     let mut dist: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
     let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
