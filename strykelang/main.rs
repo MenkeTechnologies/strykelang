@@ -3523,12 +3523,13 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     for &(chapter, topics) in stryke::lsp::DOC_CATEGORIES {
         for &t in topics {
-            if !seen.insert(t) {
+            if seen.contains(t) {
                 continue;
             }
             if let Some(text) = stryke::lsp::doc_text_for(t) {
                 let rendered = render_page_content(t, text, C, G, D, N);
                 entries.push((chapter, t, rendered));
+                seen.insert(t);
             }
         }
     }
@@ -3551,12 +3552,13 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
         .collect();
     leftover.sort_by(|a, b| a.0.cmp(b.0).then(a.1.cmp(b.1)));
     for (chapter, name) in leftover {
-        if !seen.insert(name) {
+        if seen.contains(name) {
             continue;
         }
         if let Some(text) = stryke::lsp::doc_text_for(name) {
             let rendered = render_page_content(name, text, C, G, D, N);
             entries.push((chapter, name, rendered));
+            seen.insert(name);
         }
     }
     // Hand-written hover entries that aren't dispatch primaries — and

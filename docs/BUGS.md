@@ -19,6 +19,19 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-205** — **`kmeans_pp_init`** / **`kpp_init`** used **`rand::thread_rng()`**, so the same **`POINTS`** /
+  **`K`** could yield **different** centroid tuples across runs (and parallel **`cargo test`** workers),
+  flaking **`gini_theil_kmeans_pp_de`**. **Fix:** derive **`StdRng`** from **`seed_from_u64`** over a
+  **`DefaultHasher`** of **`K`**, **`n`**, and every coordinate’s **`f64::to_bits`** (**`math_wolfram7.rs`**).
+  Pin: **`gini_theil_kmeans_pp_de`** in **`tests/suite/behavior_pin_2026_05_de.rs`**.
+- **BUG-201** — **`dijkstra`** returned distances in a hash whose **`stringify` /
+  iteration order was nondeterministic** because **`builtin_dijkstra`**
+  (**`builtins_extended.rs`**) drained a **`HashMap`** into an **`IndexMap`**
+  via raw **`HashMap`** iteration. **Fix:** collect **`(node, dist)`** pairs,
+  **`sort_by` string keys**, then insert into the result **`IndexMap`** so
+  outputs and pins are stable.
+  Pin: **`dijkstra_hash_shortest_distances_di`** in
+  **`tests/suite/behavior_pin_2026_05_di.rs`**.
 - **BUG-119** — Serializers (`to_json`, `to_xml`, `to_yaml`, `to_toml`,
   `to_html`, `ddump`) treated stryke `class` / `struct` / `enum`
   instances as opaque scalars and emitted the receiver's `Display`
@@ -514,6 +527,7 @@ Demonstrated builtins (non-exhaustive):
 | `cubed` / `cb` | **`cubed_two_ch`**, **`cubed_variadic_second_operand_ignored_ch`**, **`cb_alias_matches_cubed_ch`** |
 | `uniq` | **`uniq_variadic_deduplicates_neighbors_ch`**, **`uniq_single_array_bucket_treated_as_atom_ch`** |
 | `sum` / `sum0` / `product` | see **BUG-140** |
+| `mutual_information`, `mi` | **`mutual_information_flat_list_joint_de`**, **`mutual_information_two_by_two_matrix_de`**, **`mutual_information_second_operand_silent_de`** (**`args[1]`** discarded — joint only from **`args[0]`**) |
 
 
 Pins documenting **tail truncation** split across **`tests/suite/behavior_pin_2026_05_bz.rs`**,
@@ -547,7 +561,16 @@ two-arg numeric — **BUG-176**),
 **`behavior_pin_2026_05_cz.rs`** (**`pmt`** arg order — **BUG-179**; **`format_percent`** — **BUG-180**),
 **`behavior_pin_2026_05_da.rs`** (**`anova_oneway`** nested AoA — **BUG-181**; **`trapz` / `simpson`** second operand — **BUG-182**),
 **`behavior_pin_2026_05_db.rs`**: **BUG-183** (search/bounds needle-first), **BUG-184** (`dice_coefficient` strings), **BUG-185** (`winsorize` percent-first),
-**`behavior_pin_2026_05_dc.rs`**: **BUG-186** (`unzip` vs row pairs), **BUG-187** (`clamp_list` inverted bounds panic).
+**`behavior_pin_2026_05_dc.rs`**: **BUG-186** (`unzip` vs row pairs), **BUG-187** (`clamp_list` inverted bounds panic),
+**`behavior_pin_2026_05_dd.rs`**: **BUG-188** (`datetime_strftime` arg order), **BUG-189** (`mahalanobis` malformed rows panic), **`product([…])`** tail of **BUG-140**.
+**`behavior_pin_2026_05_de.rs`**: **BUG-126** (`mutual_information` / `mi` ignores the second operand), **BUG-190** (`rbinom` two-arg **`prob` → `size`**), **BUG-191** (`numerical_gradient` **`my ($x)=@_`** vs coordinate **`ARRAY`**) — pins also cover **BB / hypergeom**, **windows**, **info divergences**, **graph** summaries, **moments**, **`hungarian_assignment`**, **`kmeans_pp_init`** (**BUG-205** **FIXED** — deterministic seed).
+**`behavior_pin_2026_05_df.rs`**: **BUG-192** (`lerp` is **`(A, B, T)`**, not shader-style **`(T, A, B)`**) plus pins for **gamma / polygamma**, **Jacobians & Hessians**, **Weibull / lognormal / survival**, **scores & distances**, **clustering indices**, **χ² & F**, **GL quadrature**, **`rk4` / `euler_ode`**, **`brent_root`**.
+**`behavior_pin_2026_05_dg.rs`**: **BUG-193** (Black–Scholes IDE **`S,K,r,T,σ`** vs runtime **`S,K,T,r,σ`**), **BUG-194** (`hamming_distance` **`ARRAY`** operands), **BUG-195** (`romberg_quad` combine step) — also **Greeks**, **special functions**, **geometry**, **EM / k-means**, **number theory**, **string metrics**.
+**`behavior_pin_2026_05_dh.rs`**: **BUG-196** (`crt` / `chinese_remainder` needs **two list buckets**), **BUG-197** (`simplex_volume_3d([[…]])` vs **`tetrahedron_volume`**), **BUG-198** (`derangements` ≠ subfactorial) — plus **ζ-series**, **splines / EWMA**, **special functions**, **bond analytics**, **graph & tests**, **CF / hash / NT**.
+**`behavior_pin_2026_05_di.rs`**: **BUG-199** (`graph_is_tree` / **`parse_adj_list`** — adjacency **lists** vs 0/1 **matrix** rows), **BUG-200** (`snowball_stem_english` needs **codepoint lists**), **BUG-201** (**FIXED** — **`dijkstra`** result key order) — plus **3D geo**, **paths & flows**, **ML loss slices**, **codec**, **tensor bits**.
+**`behavior_pin_2026_05_dj.rs`**: **BUG-202** (**`prim_mst`** disconnected / **zero-weight** edges) — plus **interpolation**, **orthogonal polynomials**, **Gray / Conway**, **activations**, **range maps**.
+**`behavior_pin_2026_05_dk.rs`**: **BUG-203** (**`dijkstra_relax`** clamps **negative** edge weights) — **PDF** suite pins, **graph / search micro-ops**, **jump hash**, **SDF / noise**, **Chebyshev / Hermite**, **Mandelbrot / Hanoi**.
+**`behavior_pin_2026_05_dl.rs`**: **BUG-204** (**`db_simhash_bit`** name vs **sign** semantics) — **Wolfram48 DB/sketch/cost** pins, **quantiles**, **multiset / multinomial**, **elliptic / polylog / Zernike / spherical harmonic**.
 
 ## BUG-127 — `iota_range` ignores arguments after the first — **`polish`**
 
@@ -700,7 +723,8 @@ rather than iterating elements. Prefer **`sum(10, 11)`**, **`sum_list([10,11])`*
 
 Pins: **`sum_single_inline_array_yields_zero_bug_ch`**, **`sum_list_reads_array_contents_ch`**,
 **`product_single_inline_array_discards_interior_bug_ch`**, **`sum_variadic_two_addends_ch`**,
-**`product_variadic_two_factors_ch`** in **`tests/suite/behavior_pin_2026_05_ch.rs`** ( **`sum0`**
+**`product_variadic_two_factors_ch`** in **`tests/suite/behavior_pin_2026_05_ch.rs`**, plus **`fmod_copysign_trunc_product_sum0_dd`**
+in **`tests/suite/behavior_pin_2026_05_dd.rs`** ( **`sum0`**
 empty path: **`sum0_empty_is_zero_ch`** ).
 
 ## BUG-141 — **`frequencies` / string operands** — one scalar ⇒ one hash key (**`polish`**)
@@ -1154,6 +1178,102 @@ Pins: **`zip_interleave_unzip_flat_dc`**, **`unzip_nested_aof_pairs_mispairs_bug
 **`builtin_clamp_list`** forwards to **`f64::clamp`**, which **`panic!`s** when **`min > max`**. Example: **`stryke -e 'clamp_list(5,0,1)'`** aborts the process instead of raising **`PerlError`**. Valid calls use **`lo ≤ hi`**.
 
 No stable integration pin (subprocess abort); reproduction is the one-liner above.
+
+## BUG-188 — **`datetime_strftime`** is **`(EPOCH, FMT)`**, not strftime-first — **`polish`**
+
+**`native_codec::datetime_strftime(epoch, fmt)`** (**`builtins.rs`** dispatch **`datetime_strftime` / `dtf`**) takes **Unix epoch** as **`args[0]`** and the **chrono format string** as **`args[1]`**. Reversing the operands feeds **`"%Y"`** through **`to_number`** as the “epoch” and uses the integer epoch as the **format pattern**, yielding useless output (pinned string differs from a real strftime of that instant).
+
+Pins: **`datetime_strftime_epoch_then_fmt_dd`**, **`datetime_strftime_swapped_args_returns_epoch_dd`** in **`tests/suite/behavior_pin_2026_05_dd.rs`**.
+
+## BUG-189 — **`mahalanobis`** **Rust-panics** when row dimension mismatches **`center`** — **`bug`**
+
+**`builtin_mahalanobis`** builds **`data`** rows from **`arg_to_vec`** on **`args[0]`**. A **flat** vector **`[0, 0]`** becomes a **single** \(\mathbb{R}^1\) row, but **`center = [1, 1]`** has **\(p=2\)** — **`diff[j]`** indexes past the row length and **panics**. **`mahalanobis([[0, 0]], …)`** is the safe shape (one **2-D** observation per row).
+
+Repro: **`stryke -e 'say mahalanobis([0,0],[1,1],[[1,0],[0,1]])'`** (process abort). Pin for the working path: **`mahalanobis_two_row_obs_dd`** in **`tests/suite/behavior_pin_2026_05_dd.rs`**.
+
+## BUG-190 — **`rbinom(N, P)`** (two arguments) threads **`P`** into **`size`**, not **`prob`** — **`polish`**
+
+**`builtin_rbinom`** (**`builtins_extended.rs`**) is **`rbinom(n, size, prob)`** with **`prob`** defaulting to **0.5** when omitted. A **two-argument** call **`rbinom(4, 0.5)`** therefore sets **`size = to_number(0.5) as usize → 0`** (Bernoulli trials loop runs **zero** times ⇒ **`k = 0`** every draw). This matches neither R’s **`rbinom(n, size, prob)`** surface when the user meant **`size = 1`**, nor an **`rbinom(n, prob)`** shorthand.
+
+Pins: **`rbinom_two_arg_interprets_prob_as_size_bug190_de`** in **`tests/suite/behavior_pin_2026_05_de.rs`**.
+
+## BUG-191 — **`numerical_gradient`** supplies **`$_[0]`** as the coordinate **arrayref**; **`my ($x) = @_`** treats **`$x`** as the **ref** — **`polish`**
+
+**`builtin_numerical_gradient`** (**`math_wolfram3.rs`**) perturbs each coordinate and invokes the user sub via **`call_user_n`**, passing the current position vector for Perl as **`$_[0]`** (**`ARRAY`**). Writing **`sub { my ($x) = @_; … }`** binds **`$x`** to that **reference**. Numeric uses of **`$x`** apply **ref numification** (here **`· + ·`** drives **`length`/`1`**-style behavior), not the float **`xᵢ`**, so **`f(x+h) ≈ f(x−h)`** and the central difference reports **0**. Correct pattern: **`sub { my $a = $_[0]; my @y = @$a; … }`** (or index **`$_[0][$i]`** explicitly).
+
+Pins: **`numerical_gradient_my_x_at_wrong_grad_bug191_de`**, **`numerical_gradient_arrayref_callback_de`** in **`tests/suite/behavior_pin_2026_05_de.rs`**.
+
+## BUG-192 — **`lerp`** is **`lerp(A, B, T)`**, not **`lerp(T, A, B)`** — **`polish`**
+
+**`builtin_lerp`** (**`builtins.rs`**) implements **`a + (b - a) * t`** with **`args[0] → a`**, **`args[1] → b`**, **`args[2] → t`**. Graphics / GLSL call sites often use **`mix(a,b,t)`** or a mentally **`lerp(t, a, b)`** order; here **`lerp(0.5, 10, 20)`** binds **`a=0.5`**, **`b=10`**, **`t=20`** ⇒ **`0.5 + 9.5·20 = 190.5`** instead of the halfway **15** from **`lerp(10, 20, 0.5)`**.
+
+Pins: **`lerp_inv_lerp_smoothstep_remap_df`** (canonical **`lerp(10, 20, 0.5) → 15`**), **`lerp_shader_style_args_numify_to_giant_bug192_df`** in **`tests/suite/behavior_pin_2026_05_df.rs`**.
+
+## BUG-193 — IDE **`black_scholes_{call,put}`** / **`bscall` / `bsput`** docs use **`S, K, r, T, σ`**, but **`builtins_extended.rs`** is **`S, K, T, r, σ`** — **`polish`**
+
+**`builtin_black_scholes_call` / `builtin_black_scholes_put`** read **`t ← args[2]`**, **`r ← args[3]`**, **`σ ← args[4]`** (see struct comments in **`builtins_extended.rs`**). **`lsp.rs`** advertises **`($S, $K, $r, $T, $sigma)`**, swapping **time** and **rate** relative to the implementation. The shipped example **`bscall(100, 100, 0.05, 1, 0.2)`** is therefore **not** the pinned ATM price **`~10.45`**; the matching call is **`black_scholes_call(100, 100, 1, 0.05, 0.2)`**.
+
+Pins: **`black_scholes_call_put_spot_strike_time_rate_vol_bug193_dg`**, **`bscall_doc_order_swaps_time_and_rate_bug193_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**.
+
+## BUG-194 — **`hamming_distance`** stringifies **`ARRAY`** operands — often identical **`ARRAY(0x…)`** shells — **`bug`**
+
+**`builtin_hamming_distance`** (**`builtins.rs`**) compares **`args[k].to_string()`** codepointwise. For **`ARRAY`** refs, **`Display`** collapses distinct buckets to the same **`ARRAY(0x…)`** pattern in common shells, so **`hamming_distance([1, 0, 1], [1, 1, 0])`** can report **`0`** mismatches even though the lists differ. Use **`string` / numeric character codes** / a list-aware metric when comparing vectors.
+
+Pins: **`hamming_distance_strings_vs_arrayrefs_bug194_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**. See also **BUG-168** (DSP **`hamming`** vs string **`hamming_distance`** names).
+
+## BUG-195 — **`romberg_quad`** is a **Richardson / trapezoid combine step** `(4^m·T_{n,m-1} − T_{n-1,m-1})/(4^m − 1)`, **not** `romberg(f, a, b, …)` integration — **`polish`**
+
+**`builtin_romberg_quad`** (**`math_wolfram72.rs`**) ignores a callback and operates on **three scalars** already extracted from the Romberg table. Passing **`sub { … }`** as in **`romberg`** silently numifies to garbage / defaults. Use **`romberg`** for interval quadrature; use **`romberg_quad(t_n_mm1, t_nm1_mm1, m)`** only for the explicit extrapolation step.
+
+Pins: **`romberg_integrate_vs_quad_combine_bug195_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**.
+
+## BUG-196 — **`crt` / `chinese_remainder`** needs **`[r…], [m…]`** buckets — variadic **`crt(r1, m1, r2, m2)`** is silently wrong — **`polish`**
+
+**`builtin_chinese_remainder`** (**`builtins_extended.rs`**) builds **`rems`** from **`arg_to_vec(args[0])`** and **`mods`** from **`arg_to_vec(args[1])`**. Passing four scalars **`crt(2, 5, 3, 7)`** leaves **`args[1]=5`** only — **`mods`** becomes **`[5]`** (one modulus), **`rems`** **`[2]`**, and the routine returns **`2`** instead of **`17`** for the **\(5·7\)** system. Use **`crt([2, 3], [5, 7])`** / **`chinese_remainder([…], […])`** as **`math_wolfram` / `lsp.rs`** show.
+
+Pins: **`chinese_remainder_buckets_vs_flat_scalars_bug196_dh`** in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
+
+## BUG-197 — **`simplex_volume_3d`** is an alias of **`tetrahedron_volume`** and does **not** unpack a **4×3** point matrix — **`polish`**
+
+**`builtin_simplex_volume_3d`** (**`math_wolfram28.rs`**) forwards **`args`** unchanged to **`builtin_tetrahedron_volume`**, which reads **`args[0..3]`** as **three 3-vectors** (`vec3` each) and leaves **`d`** at the default **`(0,0,0)`** when a **single** nested **`[[p0],[p1],[p2],[p3]]`** matrix is passed. **`simplex_volume_3d([[…]])`** therefore returns **`0`** for the unit simplex. Pass **four** operands: **`tetrahedron_volume([0,0,0], [1,0,0], [0,1,0], [0,0,1])`**.
+
+Pins: **`tetrahedron_volume_unit_simplex_dh`**, **`simplex_volume_3d_matrix_arg_yields_zero_bug197_dh`** in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
+
+## BUG-198 — **`derangements(n)`** does **not** implement the subfactorial **`!n`** — **`bug`**
+
+The closed form for derangement counts is **`!n = n! \sum_{k=0}^n (-1)^k / k!`**, with **`!4 = 9`**. **`builtin_derangements`** (**`builtins_extended.rs`**) uses a bespoke loop **`c = (a+b)*(n-1)`** on a sliding pair, which produces **`derangements(4) = 36`** (here **`4!`**) instead of **`9`**. IDE/docs examples that cite **`derangements(4) → 9`** therefore disagree with the VM.
+
+Pins: **`derangements_stirling_bernoulli_harmonic_bug198_dh`** (**`derangements(4) → 36`**) in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
+
+## BUG-199 — **`graph_is_tree`**, **`graph_density`, …** use **`parse_adj_list`** — treat operands as **neighbor-index lists**, not 0/1 **adjacency matrices** — **`polish`**
+
+**`parse_adj_list`** (**`math_wolfram2.rs`**) walks each top-level row with **`arg_to_vec`** and **`to_number`**, producing **lists of neighbor indices**. A “matrix” **`[[0, 1], [1, 0]]`** is **not** interpreted as “no self-loop, one cross-edge”: row **0** becomes neighbors **`{0, 1}`** (including a **self-loop**), so **`edges ≠ n−1`** and **`graph_is_tree`** returns **`0`**. **\(K_2\)** as a path must be **`[[1], [0]]`**.
+
+Pins: **`graph_tree_count_edges_max_degree_bug199_matrix_vs_list_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
+
+## BUG-200 — **`snowball_stem_english`** consumes **Unicode codepoint integers**, not **Perl strings** — **`polish`**
+
+**`builtin_snowball_stem_english`** (**`math_wolfram69.rs`**) calls **`b69_to_codepoints`** on **`args[0]`**. A string like **`"running"`** does not unpack into letters here, so the stem collapses to a bogus numeric **`0`** in **`stringify`**. Pass **`[114, 117, …]`** / the codepoint form the helper expects.
+
+Pins: **`snowball_stem_english_codepoints_not_string_bug200_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
+
+## BUG-202 — **`prim_mst`** ignores **zero-weight edges** and **misreports disconnected graphs** — **`bug`**
+
+**`builtin_prim_mst`** (**`builtins_extended.rs`**) relaxes only entries with **`w[u][v] > 0.0`**, so **weight `0` is indistinguishable from “no edge.”** On a **fully disconnected** positive-weight‑free matrix (e.g. **2×2 zeros**), later Prim iterations **re-process the start vertex** with key **`0`**, and the summed total is **`0`** instead of **non‑finite** or a **connectivity error**. The same **`> 0`** gate means an **isolated vertex** next to a positive‑weight component yields a **finite total matching only the spanned component**, with **no indication** that the graph is not connected end‑to‑end.
+
+Pins: **`prim_mst_disconnected_all_zero_matrix_bug202_dj`**, **`prim_mst_path_plus_isolated_vertex_silent_bug202_dj`**, plus positive **`prim_mst_triangle_unit_weights_dj`** / **`prim_mst_single_edge_k2_dj`** controls in **`tests/suite/behavior_pin_2026_05_dj.rs`**.
+
+## BUG-203 — **`dijkstra_relax`** clamps **negative edge weights to zero** — **`polish`**
+
+**`builtin_dijkstra_relax`** (**`math_wolfram75.rs`**) applies **`w_uv.max(0.0)`**, so **negative** tentative updates are **silently replaced with `d_u + 0`**. **`builtin_bellman_ford_relax`** in the same module **does not** clamp, so the pair diverges for the same triple **`(d_u, w, d_v)`** whenever **`w < 0`**. Call sites using **`dijkstra_relax`** for pedagogy or delta-stepping with signed edges can get **incorrect** candidate distances.
+
+Pins: **`dijkstra_relax_clamps_negative_weight_bug203_dk`** vs **`bellman_ford_relax_negative_weight_to_dist_dk`** in **`tests/suite/behavior_pin_2026_05_dk.rs`**.
+
+## BUG-204 — **`db_simhash_bit`** reads like **bit index** but implements **scalar sign** — **`polish`**
+
+**`builtin_db_simhash_bit`** (**`math_wolfram48.rs`**) returns **`1`** when **`args[0] ≥ 0`** and **`0`** when negative — a **two-level sign quantization**, not a **bit position** extracted from a 64-bit hash word (as the name / inline doc “**bit index**” suggests). Real SimHash combines per-feature hashed bits; this helper is closer to **`signbit` / per-dimension thresholding**.
+
+Pins: **`db_simhash_positive_is_one_bug204_dl`**, **`db_simhash_negative_is_zero_bug204_dl`** in **`tests/suite/behavior_pin_2026_05_dl.rs`**.
 
 ## PARITY-001 — Magic string increment is not implemented — **FIXED**
 
