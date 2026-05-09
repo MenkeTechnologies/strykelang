@@ -1,0 +1,79 @@
+# build_destroy.stk — auto-called BUILD (custom constructor) and DESTROY
+# (destructor) hooks for stryke classes. Both are method-name conventions
+# the runtime auto-dispatches:
+#
+#   BUILD   — runs after field init, parent → child order
+#   DESTROY — runs on object reap,  child → parent order
+#
+# Run:  s examples/build_destroy.stk
+
+# ─────────────────────────────────────────────────────────────────────────
+# 1. BUILD as a custom constructor — invariant checks + computed defaults.
+# ─────────────────────────────────────────────────────────────────────────
+
+class Rectangle {
+    width:  Float
+    height: Float
+    area:   Float = 0
+
+    fn BUILD {
+        # Invariant: dimensions must be positive.
+        die "width must be > 0"  if $self->width  <= 0
+        die "height must be > 0" if $self->height <= 0
+        # Computed field — fill in once, after the auto-constructor populates
+        # width / height. Cheaper than a getter that recomputes on every read.
+        $self->area($self->width * $self->height)
+    }
+}
+
+my $r = Rectangle(width => 4, height => 5)
+p "rectangle area = " . $r->area    # 20
+
+# A bad input fires the die from BUILD before the object escapes.
+my $bad = eval { Rectangle(width => -1, height => 5) }
+p "rejected bad rect: $@" if $@
+
+# ─────────────────────────────────────────────────────────────────────────
+# 2. BUILD chain — parent runs before child.
+# ─────────────────────────────────────────────────────────────────────────
+
+class Animal {
+    name:  Str
+    trail: Str = ""
+
+    fn BUILD { $self->trail($self->trail . "Animal:" . $self->name . ";") }
+}
+
+class Dog extends Animal {
+    breed: Str = "Mixed"
+
+    fn BUILD { $self->trail($self->trail . "Dog:" . $self->breed . ";") }
+}
+
+my $d = Dog(name => "Rex", breed => "Lab")
+p "build trail = " . $d->trail      # Animal:Rex;Dog:Lab;
+
+# ─────────────────────────────────────────────────────────────────────────
+# 3. DESTROY chain — child runs before parent.
+# ─────────────────────────────────────────────────────────────────────────
+
+class Resource {
+    label: Str
+
+    fn DESTROY { Resource::audit(Resource::audit() . "R:" . $self->label . ";") }
+    static audit: Str = ""
+}
+
+class FileResource extends Resource {
+    path: Str
+
+    fn DESTROY { Resource::audit(Resource::audit() . "F:" . $self->path . ";") }
+}
+
+# Scoped block forces DESTROY to fire when the lexical goes away.
+{
+    my $f = FileResource(label => "logger", path => "/tmp/app.log")
+    p "live: " . $f->label . " → " . $f->path
+}
+
+p "destroy trail = " . Resource::audit()   # F:/tmp/app.log;R:logger;

@@ -1102,29 +1102,50 @@ my $a = Tracker(name =&gt; "a")
 my $b = Tracker(name =&gt; "b")
 p Tracker::total()                     <span class="comment"># 2</span></pre>
 
-        <h3>BUILD / DESTROY hooks</h3>
-        <p><code>BUILD</code> runs after field init (parent first, then child). <code>DESTROY</code> runs in reverse (child first, then parent).</p>
+        <h3>BUILD / DESTROY hooks (custom constructor / destructor)</h3>
+        <p><code>fn BUILD</code> is the custom-constructor hook — runs automatically after field init, parent first then child. Use it for invariant checks, default-injection of computed fields, or post-init wiring. <code>fn DESTROY</code> is the destructor — runs automatically when the object is reaped, child first then parent. Both are method-name conventions the runtime auto-dispatches; no caller-side init step.</p>
+<pre>class Connection {
+    host: Str
+    port: Int = 5432
+    socket: Any = undef
+    connected_at: Float = 0
+
+    <span class="comment"># Custom constructor — auto-called after fields populate. Open the
+    <span class="comment"># socket, stamp the connect time, validate inputs.</span>
+    fn BUILD {
+        die "host required" unless length $self-&gt;host
+        $self-&gt;socket(open_tcp($self-&gt;host, $self-&gt;port))
+        $self-&gt;connected_at(time())
+    }
+
+    <span class="comment"># Destructor — auto-called on object reap. Close the socket.</span>
+    fn DESTROY {
+        close_tcp($self-&gt;socket) if defined $self-&gt;socket
+    }
+}
+
+my $c = Connection(host =&gt; "db.example.com")   <span class="comment"># BUILD fires</span>
+<span class="comment"># ... use $c ...</span>
+<span class="comment"># DESTROY fires when $c goes out of scope</span></pre>
+
+        <p>Inheritance ordering — parent <code>BUILD</code> first so child code can see parent invariants; child <code>DESTROY</code> first so subclass state unwinds before parent state:</p>
 <pre>class Base {
     log: Str = ""
-    fn BUILD { $self-&gt;log("base") }
+    fn BUILD   { $self-&gt;log("base") }
+    fn DESTROY { Base::audit(Base::audit() . "base,") }
+    static audit: Str = ""
 }
 class Child extends Base {
-    fn BUILD { $self-&gt;log($self-&gt;log . "+child") }
+    fn BUILD   { $self-&gt;log($self-&gt;log . "+child") }
+    fn DESTROY { Base::audit(Base::audit() . "child,") }
 }
-my $c = Child()
-p $c-&gt;log                             <span class="comment"># "base+child"</span>
 
-<span class="comment"># DESTROY — child runs first</span>
-class Base {
-    static log: Str = ""
-    fn DESTROY { Base::log(Base::log() . "base,") }
-}
-class Child extends Base {
-    fn DESTROY { Base::log(Base::log() . "child,") }
-}
 my $c = Child()
+p $c-&gt;log                             <span class="comment"># "base+child"   (parent BUILD ran first)</span>
 $c-&gt;destroy()
-p Base::log()                          <span class="comment"># "child,base,"</span></pre>
+p Base::audit()                       <span class="comment"># "child,base,"  (child DESTROY ran first)</span></pre>
+
+        <p>Runnable demo: <a href="https://github.com/MenkeTechnologies/stryke/blob/main/examples/build_destroy.stk"><code>examples/build_destroy.stk</code></a>.</p>
 
         <h3>Traits</h3>
         <p>Interface contracts with required and default methods. Enforced at class declaration.</p>
