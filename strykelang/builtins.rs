@@ -954,6 +954,13 @@ pub(crate) fn try_builtin(
         "last_eq" => Some(builtin_last_eq(args)),
         "index_of" => Some(builtin_index_of(args)),
         "last_index_of" => Some(builtin_last_index_of(args)),
+        // `cindex` / `crindex` — codepoint-indexed string search.
+        // Paired with `[i]` / `[a:b]` slice semantics so all positions
+        // are in the same coordinate system. Perl 5 `index` / `rindex`
+        // stay byte-indexed for compat. (`find` is already the
+        // List::Util `first`-style array search.)
+        "cindex" => Some(builtin_cindex(args)),
+        "crindex" => Some(builtin_crindex(args)),
         "positions_of" => Some(builtin_positions_of(args)),
         "batch" => Some(builtin_batch(args)),
         "binary_search" | "bsearch" => Some(builtin_binary_search(args)),
@@ -1229,8 +1236,9 @@ pub(crate) fn try_builtin(
         "count_elem" => Some(builtin_count_elem(args)),
         "remove_elem" => Some(builtin_remove_elem(args)),
         "remove_first_elem" => Some(builtin_remove_first_elem(args)),
-        "hash_map_values" => Some(builtin_hash_map_values(args)),
-        "hash_filter_keys" => Some(builtin_hash_filter_keys(args)),
+        "hash_map_values" => Some(builtin_hash_map_values(interp, args, line)),
+        "hash_filter_keys" => Some(builtin_hash_filter_keys(interp, args, line)),
+        "hash_filter_values" => Some(builtin_hash_filter_values(interp, args, line)),
         "hash_merge_deep" => Some(builtin_hash_merge_deep(args)),
         "hash_to_list" => Some(builtin_hash_to_list(args)),
         "hash_from_list" => Some(builtin_hash_from_list(args)),
@@ -9673,7 +9681,12 @@ fn builtin_count_size_cnt(args: &[PerlValue]) -> PerlResult<PerlValue> {
             return Ok(PerlValue::integer(b.len() as i64));
         }
         if a.is_string_like() {
-            return Ok(PerlValue::integer(a.to_string().len() as i64));
+            // `len` is a stryke extension and counts codepoints, mirroring
+            // `[i]` / `[a:b]` slice semantics. Perl 5's `length` keeps
+            // byte semantics for compat — see `BuiltinId::Length` in
+            // vm.rs. The split lets the stryke layer be coherent across
+            // `len` / `[]` / `find` while leaving Perl-counters untouched.
+            return Ok(PerlValue::integer(a.to_string().chars().count() as i64));
         }
         return Ok(PerlValue::integer(a.map_flatten_outputs(true).len() as i64));
     }
@@ -16909,6 +16922,70 @@ fn builtin_index_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
     }
     Ok(PerlValue::integer(-1))
 }
+/// `cindex STRING, SUBSTRING [, FROM]` — codepoint-indexed equivalent
+/// of Perl's `index`. Returns the first codepoint position where
+/// SUBSTRING occurs in STRING (at or after FROM), or `-1` on miss.
+/// FROM is also a codepoint position. Paired with `[i]` / `[a:b]`
+/// slice operators so search positions and slice bounds share one
+/// coordinate system. Perl 5 `index` stays byte-indexed for compat;
+/// use `cindex` for stryke code that mixes search + slice. (`find` is
+/// already taken by `List::Util`-style array search.)
+fn builtin_cindex(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let hay = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let need = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let from = args.get(2).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+    if need.is_empty() {
+        // Match Perl 5 `index` convention: empty needle matches at FROM.
+        return Ok(PerlValue::integer(from as i64));
+    }
+    // Walk the haystack codepoint-by-codepoint; on each codepoint
+    // boundary check if the remaining slice starts with `need`. Keeps
+    // the byte arithmetic out of the public coordinate system.
+    let mut cp_idx = 0usize;
+    let mut byte_idx = 0usize;
+    for c in hay.chars() {
+        if cp_idx >= from && hay[byte_idx..].starts_with(&need) {
+            return Ok(PerlValue::integer(cp_idx as i64));
+        }
+        cp_idx += 1;
+        byte_idx += c.len_utf8();
+    }
+    // Tail position (one past last char) — `find "abc", ""` style with
+    // FROM = len already returned above; nothing else to match here.
+    Ok(PerlValue::integer(-1))
+}
+
+/// `crindex STRING, SUBSTRING [, FROM]` — codepoint-indexed equivalent
+/// of Perl's `rindex`. Returns the last codepoint position where
+/// SUBSTRING occurs in STRING (at or before FROM, defaulting to
+/// end-of-string), or `-1` on miss.
+fn builtin_crindex(args: &[PerlValue]) -> PerlResult<PerlValue> {
+    let hay = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let need = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let total_cps = hay.chars().count();
+    let from = args
+        .get(2)
+        .map(|v| (v.to_int().max(0) as usize).min(total_cps))
+        .unwrap_or(total_cps);
+    if need.is_empty() {
+        return Ok(PerlValue::integer(from as i64));
+    }
+    let mut last: i64 = -1;
+    let mut cp_idx = 0usize;
+    let mut byte_idx = 0usize;
+    for c in hay.chars() {
+        if cp_idx > from {
+            break;
+        }
+        if hay[byte_idx..].starts_with(&need) {
+            last = cp_idx as i64;
+        }
+        cp_idx += 1;
+        byte_idx += c.len_utf8();
+    }
+    Ok(PerlValue::integer(last))
+}
+
 /// `last_index_of` — Last index of. Returns an integer.
 fn builtin_last_index_of(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let Some(tgt) = args.first() else {
@@ -27340,13 +27417,115 @@ fn builtin_remove_first_elem(args: &[PerlValue]) -> PerlResult<PerlValue> {
             .collect(),
     ))
 }
-/// `hash_map_values` — Apply function to each hash value (placeholder).
-fn builtin_hash_map_values(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+/// `hash_map_values HASH, CODEREF` — new hash with same keys; each value is
+/// `CODEREF->(value)` in scalar context.
+fn builtin_hash_map_values(
+    interp: &mut VMHelper,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    use indexmap::IndexMap;
+    let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_map_values: first argument must be a hash reference",
+            line,
+        ));
+    };
+    let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_map_values: second argument must be a code reference",
+            line,
+        ));
+    };
+    let guard = hr.read();
+    let mut out: IndexMap<String, PerlValue> = IndexMap::with_capacity(guard.len());
+    for (k, v) in guard.iter() {
+        let new_v = exec_to_perl_result(
+            interp.call_sub(&sub, vec![v.clone()], WantarrayCtx::Scalar, line),
+            "hash_map_values",
+            line,
+        )?;
+        out.insert(k.clone(), new_v);
+    }
+    drop(guard);
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
 }
-/// `hash_filter_keys` — Filter hash by key predicate (placeholder).
-fn builtin_hash_filter_keys(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))
+
+/// `hash_filter_keys HASH, CODEREF` — entries whose **key** passes
+/// `CODEREF->(key_string)` (scalar, truthy keeps).
+fn builtin_hash_filter_keys(
+    interp: &mut VMHelper,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    use indexmap::IndexMap;
+    let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_filter_keys: first argument must be a hash reference",
+            line,
+        ));
+    };
+    let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_filter_keys: second argument must be a code reference",
+            line,
+        ));
+    };
+    let guard = hr.read();
+    let mut out: IndexMap<String, PerlValue> = IndexMap::new();
+    for (k, v) in guard.iter() {
+        let keep = exec_to_perl_result(
+            interp.call_sub(
+                &sub,
+                vec![PerlValue::string(k.clone())],
+                WantarrayCtx::Scalar,
+                line,
+            ),
+            "hash_filter_keys",
+            line,
+        )?;
+        if keep.is_true() {
+            out.insert(k.clone(), v.clone());
+        }
+    }
+    drop(guard);
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
+}
+
+/// `hash_filter_values HASH, CODEREF` — entries whose **value** passes
+/// `CODEREF->(value)` (scalar, truthy keeps).
+fn builtin_hash_filter_values(
+    interp: &mut VMHelper,
+    args: &[PerlValue],
+    line: usize,
+) -> PerlResult<PerlValue> {
+    use indexmap::IndexMap;
+    let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_filter_values: first argument must be a hash reference",
+            line,
+        ));
+    };
+    let Some(sub) = args.get(1).and_then(|v| v.as_code_ref()) else {
+        return Err(PerlError::runtime(
+            "hash_filter_values: second argument must be a code reference",
+            line,
+        ));
+    };
+    let guard = hr.read();
+    let mut out: IndexMap<String, PerlValue> = IndexMap::new();
+    for (k, v) in guard.iter() {
+        let keep = exec_to_perl_result(
+            interp.call_sub(&sub, vec![v.clone()], WantarrayCtx::Scalar, line),
+            "hash_filter_values",
+            line,
+        )?;
+        if keep.is_true() {
+            out.insert(k.clone(), v.clone());
+        }
+    }
+    drop(guard);
+    Ok(PerlValue::hash_ref(Arc::new(RwLock::new(out))))
 }
 /// `hash_merge_deep` — Deep merge of hashes.
 fn builtin_hash_merge_deep(args: &[PerlValue]) -> PerlResult<PerlValue> {

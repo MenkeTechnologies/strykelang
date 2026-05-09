@@ -78,8 +78,9 @@ NEW_FNS = [
     ("remove_elem", [], 'let t = args.first().map(|v| v.to_string()).unwrap_or_default(); let xs = flatten_args(&args[1..]); Ok(PerlValue::array(xs.into_iter().filter(|v| v.to_string() != t).collect()))', "Remove all occurrences of element."),
     ("remove_first_elem", [], 'let t = args.first().map(|v| v.to_string()).unwrap_or_default(); let xs = flatten_args(&args[1..]); let mut removed = false; Ok(PerlValue::array(xs.into_iter().filter(|v| { if !removed && v.to_string() == t { removed = true; false } else { true } }).collect()))', None),
     # ── More hash ──
-    ("hash_map_values", [], 'Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))', "Apply function to each hash value (placeholder)."),
-    ("hash_filter_keys", [], 'Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))', "Filter hash by key predicate (placeholder)."),
+    ("hash_map_values", [], 'Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))', "HASH then CODEREF: new hash, same keys; sub receives each value (scalar). Real impl: builtin_hash_map_values in builtins.rs."),
+    ("hash_filter_keys", [], 'Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))', "HASH then CODEREF: keep entries where sub(key string) is truthy. Real impl: builtin_hash_filter_keys in builtins.rs."),
+    ("hash_filter_values", [], 'Ok(args.first().cloned().unwrap_or(PerlValue::UNDEF))', "HASH then CODEREF: keep entries where sub(value) is truthy. Real impl: builtin_hash_filter_values in builtins.rs."),
     ("hash_merge_deep", [], 'builtin_merge_hash(args)', "Deep merge of hashes."),
     ("hash_to_list", [], 'let Some(hr) = args.first().and_then(|v| v.as_hash_ref()) else { return Ok(PerlValue::array(vec![])); }; let mut out = Vec::new(); for (k, v) in hr.read().iter() { out.push(PerlValue::string(k.clone())); out.push(v.clone()); } Ok(PerlValue::array(out))', "Flatten hash to alternating key-value list."),
     ("hash_from_list", [], 'let xs = flatten_args(args); let mut m = indexmap::IndexMap::new(); let mut it = xs.into_iter(); while let Some(k) = it.next() { let v = it.next().unwrap_or(PerlValue::UNDEF); m.insert(k.to_string(), v); } Ok(PerlValue::hash_ref(Arc::new(RwLock::new(m))))', "Build hash from alternating key-value list."),

@@ -5446,7 +5446,9 @@ impl VMHelper {
                     }
                     new_arr.push(PerlValue::string(s));
                 }
-                self.scope.set_array(name, new_arr).map_err(FlowOrError::Error)?;
+                self.scope
+                    .set_array(name, new_arr)
+                    .map_err(FlowOrError::Error)?;
                 return Ok(PerlValue::integer(total));
             }
             ExprKind::HashVar(name) => {
@@ -5462,7 +5464,9 @@ impl VMHelper {
                     }
                     new_h.insert(k, PerlValue::string(s));
                 }
-                self.scope.set_hash(name, new_h).map_err(FlowOrError::Error)?;
+                self.scope
+                    .set_hash(name, new_h)
+                    .map_err(FlowOrError::Error)?;
                 return Ok(PerlValue::integer(total));
             }
             _ => {}
@@ -5497,7 +5501,9 @@ impl VMHelper {
                     }
                     new_arr.push(PerlValue::string(s));
                 }
-                self.scope.set_array(name, new_arr).map_err(FlowOrError::Error)?;
+                self.scope
+                    .set_array(name, new_arr)
+                    .map_err(FlowOrError::Error)?;
                 return Ok(last);
             }
             ExprKind::HashVar(name) => {
@@ -5512,7 +5518,9 @@ impl VMHelper {
                     }
                     new_h.insert(k, PerlValue::string(s));
                 }
-                self.scope.set_hash(name, new_h).map_err(FlowOrError::Error)?;
+                self.scope
+                    .set_hash(name, new_h)
+                    .map_err(FlowOrError::Error)?;
                 return Ok(last);
             }
             _ => {}

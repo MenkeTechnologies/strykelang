@@ -19,18 +19,9 @@ fn interleave_concat_br() {
 
 #[test]
 fn take_tail_drop_list_then_count_br() {
-    assert_eq!(
-        eval_string(r#"join(",", take(1, 2, 3, 4, 5, 3))"#),
-        "1,2,3"
-    );
-    assert_eq!(
-        eval_string(r#"join(",", tail(1, 2, 3, 4, 5, 3))"#),
-        "3,4,5"
-    );
-    assert_eq!(
-        eval_string(r#"join(",", drop(1, 2, 3, 4, 5, 2))"#),
-        "3,4,5"
-    );
+    assert_eq!(eval_string(r#"join(",", take(1, 2, 3, 4, 5, 3))"#), "1,2,3");
+    assert_eq!(eval_string(r#"join(",", tail(1, 2, 3, 4, 5, 3))"#), "3,4,5");
+    assert_eq!(eval_string(r#"join(",", drop(1, 2, 3, 4, 5, 2))"#), "3,4,5");
 }
 
 #[test]
@@ -52,18 +43,9 @@ fn trim_words_chars_digits_numbers_br() {
         eval_string(r#"stringify(words("aa bb\tcc"))"#),
         "(\"aa\", \"bb\", \"cc\")"
     );
-    assert_eq!(
-        eval_string(r#"stringify(chars("π"))"#),
-        "(\"π\")"
-    );
-    assert_eq!(
-        eval_string(r#"join(",", digits("z9y8x7"))"#),
-        "9,8,7"
-    );
-    assert_eq!(
-        eval_string(r#"join(",", numbers("p12q-3r"))"#),
-        "12,-3"
-    );
+    assert_eq!(eval_string(r#"stringify(chars("π"))"#), "(\"π\")");
+    assert_eq!(eval_string(r#"join(",", digits("z9y8x7"))"#), "9,8,7");
+    assert_eq!(eval_string(r#"join(",", numbers("p12q-3r"))"#), "12,-3");
 }
 
 #[test]
@@ -88,10 +70,7 @@ fn frequencies_pfrequencies_br() {
 
 #[test]
 fn compact_first_or_br() {
-    assert_eq!(
-        eval_string(r#"join(",", compact(undef, "", 0, 7))"#),
-        "0,7"
-    );
+    assert_eq!(eval_string(r#"join(",", compact(undef, "", 0, 7))"#), "0,7");
     assert_eq!(eval_int(r#"first_or(-9, ())"#), -9);
     assert_eq!(eval_int(r#"first_or(-9, 42, 43)"#), 42);
 }
@@ -121,9 +100,7 @@ fn count_by_bucket_br() {
 #[test]
 fn zip_with_add_br() {
     assert_eq!(
-        eval_string(
-            r#"my @r = zip_with { $_[0] + $_[1] } [3, 4], [300, 400]; join(",", @r)"#
-        ),
+        eval_string(r#"my @r = zip_with { $_[0] + $_[1] } [3, 4], [300, 400]; join(",", @r)"#),
         "303,404"
     );
 }
@@ -184,10 +161,7 @@ fn uniq_sort_default_br() {
         eval_string(r#"join(",", uniq(5, 1, 5, 2, 1, 9))"#),
         "5,1,2,9"
     );
-    assert_eq!(
-        eval_string(r#"join(",", sort (9, -1, 4))"#),
-        "-1,4,9"
-    );
+    assert_eq!(eval_string(r#"join(",", sort (9, -1, 4))"#), "-1,4,9");
 }
 
 #[test]
