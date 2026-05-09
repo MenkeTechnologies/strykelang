@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/stryke" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.12.19 · 8309 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.12.20 · 8312 topics · 161 chapters · generated from <code>src/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -327,7 +327,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">6709</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">6712</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -519,8 +519,8 @@ do_other_work()
 my $val = await $task
 
 # Overlapping multiple fetches:
-my @tasks = map { async { fetch(&quot;https://api.example.com/$_&quot;) } } 1:10
-my @results = map await @tasks
+my @tasks = map { async { fetch(&quot;https://api.example.com/$_&quot;) } } 1:10;
+my @results = map { await _ } @tasks
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-spawn">
@@ -530,8 +530,8 @@ my @results = map await @tasks
         <pre><code class="lang-perl">my $task = spawn { expensive_io() }
 my $val = await $task
 
-my @handles = map { spawn { process } } @items
-my @out = map await @handles
+my @handles = map { spawn { process } } @items;
+my @out = map { await _ } @handles
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-await">
@@ -662,8 +662,8 @@ fn div = _0 / _1
 -&gt;&gt; 10 div(_, 2) p                          # explicit _ overrides: div(10, 2) = 5
 
 # Thread-last is useful for list-consuming functions:
-fn take_n { @_[0..$_[-1]-1] }               # take_n(list, n)
-~&gt;&gt; (1,2,3,4,5) take_n(3) p                  # take_n(1,2,3,4,5, 3) = (1,2,3)
+fn first_n { @_[0..$_[-1]-1] }              # first_n(list, n)
+~&gt;&gt; (1,2,3,4,5) first_n(3) p                 # first_n(1,2,3,4,5, 3) = (1,2,3)
 </code></pre>
         <p>Spellings: <code>~&gt;&gt;</code>, <code>-&gt;&gt;</code>. The explicit <code>_</code> placeholder always takes precedence.</p>
       </article>
@@ -1551,7 +1551,7 @@ p deq({x =&gt; [1,2]}, {x =&gt; [1,2]})            # 1
       <article class="doc-entry" id="doc-fn">
         <h3><a class="doc-anchor" href="#doc-fn">#</a> <code>fn</code></h3>
         <p>Define a named or anonymous function with optional typed parameters and default values. Named functions are installed into the current package; anonymous functions (closures) capture their enclosing lexical scope. Functions are first-class values — assign them to scalars, store in arrays, pass as callbacks. The last expression evaluated is the implicit return value unless an explicit <code>return</code> is used.</p>
-        <pre><code class="lang-perl">fn double($x) { $x * 2 }
+        <pre><code class="lang-perl">fn dbl($x) { $x * 2 }
 my $f = fn { _ * 2 }
 my $add = fn ($a: Int, $b: Int) { $a + $b }
 
@@ -2444,9 +2444,9 @@ spurt &quot;document.pdf.sha384&quot;, $sig
         <h3><a class="doc-anchor" href="#doc-sha512">#</a> <code>sha512</code></h3>
         <p><code>sha512</code> (alias <code>s512</code>) computes the SHA-512 cryptographic hash and returns a 128-character hex string. SHA-512 provides the largest digest size in the SHA-2 family and is the strongest option when maximum collision resistance is needed. On 64-bit systems, SHA-512 is often faster than SHA-256 because it operates on 64-bit words natively. Use this for high-security applications or when you need a longer hash.</p>
         <pre><code class="lang-perl">p sha512 &quot;hello world&quot;   # 309ecc489c12d6eb...
-my $hash = sha512(slurp &quot;firmware.bin&quot;)
-p $hash
-my @hashes = map sha512 @files
+my $hash = sha512(slurp &quot;firmware.bin&quot;);
+p $hash;
+my @hashes = map { sha512 } @files
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sha1">
@@ -2463,9 +2463,9 @@ Note: prefer SHA-256 for any security-related use case.
         <h3><a class="doc-anchor" href="#doc-crc32">#</a> <code>crc32</code></h3>
         <p><code>crc32</code> computes the CRC-32 checksum of the input data and returns it as an unsigned 32-bit integer. CRC-32 is not a cryptographic hash — it is a fast error-detection code used in network protocols (Ethernet, ZIP, PNG), file integrity checks, and hash table bucketing. It is extremely fast compared to SHA functions, making it suitable for high-throughput deduplication or quick change detection where collision resistance is not required.</p>
         <pre><code class="lang-perl">p crc32 &quot;hello world&quot;   # 222957957
-my $chk = crc32(slurp &quot;archive.zip&quot;)
-p sprintf &quot;0x%08x&quot;, $chk  # hex representation
-my @checksums = map crc32 @chunks
+my $chk = crc32(slurp &quot;archive.zip&quot;);
+p sprintf &quot;0x%08x&quot;, $chk;  # hex representation
+my @checksums = map { crc32 } @chunks
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hmac-sha256">
@@ -2481,8 +2481,8 @@ p $webhook_sig eq $expected ? &quot;valid&quot; : &quot;tampered&quot;
         <h3><a class="doc-anchor" href="#doc-blake2b">#</a> <code>blake2b</code></h3>
         <p><code>blake2b</code> (alias <code>b2b</code>) computes the BLAKE2b-512 cryptographic hash and returns a 128-character hex string. BLAKE2b is faster than SHA-256 while being at least as secure. It is used in Argon2 password hashing, libsodium, WireGuard, and many modern cryptographic protocols. Prefer BLAKE2b or BLAKE3 for new projects over SHA-256.</p>
         <pre><code class="lang-perl">p blake2b &quot;hello world&quot;   # 021ced8799...
-my $hash = b2b(slurp &quot;large-file.bin&quot;)
-my @hashes = map blake2b @messages
+my $hash = b2b(slurp &quot;large-file.bin&quot;);
+my @hashes = map { blake2b } @messages
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-blake2s">
@@ -7279,12 +7279,13 @@ chop @words  # strips trailing newline from each
       </article>
       <article class="doc-entry" id="doc-length">
         <h3><a class="doc-anchor" href="#doc-length">#</a> <code>length</code></h3>
-        <p><code>length STRING</code> — return the number of characters in a string, or the number of elements when given an array.</p>
-        <p>In string context, <code>length</code> counts Unicode characters, not bytes — so <code>length &quot;\x{1F600}&quot;</code> is 1 in stryke even though the emoji occupies 4 bytes in UTF-8. When passed an array, stryke returns the element count (equivalent to <code>scalar @arr</code>), which diverges slightly from Perl where <code>length @arr</code> stringifies the array first. This dual behavior is intentional in stryke for convenience. To get byte length instead of character length, use <code>bytes::length</code> or encode first. Always use <code>length</code> rather than comparing against the empty string when checking for non-empty input.</p>
-        <pre><code class="lang-perl">p length &quot;hello&quot;  # 5
-my @a = (1:10)
-p length @a       # 10
-p length &quot;\x{1F600}&quot;  # 1 (single emoji codepoint)
+        <p><code>length STRING</code> — return the <strong>byte</strong> length of a string. Perl 5 builtin; pairs with <code>index</code> / <code>rindex</code> / <code>substr</code> (all byte-based) so positions and lengths share a coordinate system.</p>
+        <p><code>length &quot;hello&quot;</code> is 5; <code>length &quot;─&quot;</code> is 3 (the box-drawing char takes 3 bytes in UTF-8). For codepoint count, use <code>len</code> (stryke extension), which mirrors <code>[i]</code> / <code>[a:b]</code> slice semantics.</p>
+        <pre><code class="lang-perl">p length &quot;hello&quot;      # 5
+p length &quot;─&quot;          # 3 (bytes)
+p len &quot;─&quot;             # 1 (codepoint)
+p length &quot;\x{1F600}&quot;  # 4 (bytes — emoji is 4-byte UTF-8)
+p len &quot;\x{1F600}&quot;     # 1 (codepoint)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-substr">
@@ -7300,8 +7301,8 @@ p $s
       </article>
       <article class="doc-entry" id="doc-index">
         <h3><a class="doc-anchor" href="#doc-index">#</a> <code>index</code></h3>
-        <p><code>index STRING, SUBSTRING [, POSITION]</code> — return the zero-based position of the first occurrence of SUBSTRING within STRING, or -1 if not found.</p>
-        <p>The optional POSITION argument lets you start the search at a given offset, which is essential for scanning forward through a string in a loop (call <code>index</code> repeatedly, advancing POSITION past each hit). In stryke, <code>index</code> operates on UTF-8 character positions, not byte offsets, so it is safe for multi-byte strings. For finding the *last* occurrence, use <code>rindex</code> instead. A common pattern is pairing <code>index</code> with <code>substr</code> to extract fields from fixed-format data without the overhead of a regex or <code>split</code>.</p>
+        <p><code>index STRING, SUBSTRING [, POSITION]</code> — return the zero-based <strong>byte</strong> position of the first occurrence of SUBSTRING within STRING, or -1 if not found. Pairs with <code>substr</code> and <code>length</code> (both byte-based) for Perl 5 compat.</p>
+        <p>The optional POSITION argument lets you start the search at a given offset, which is essential for scanning forward through a string in a loop (call <code>index</code> repeatedly, advancing POSITION past each hit). For multi-byte strings where you want <strong>codepoint</strong> positions paired with <code>[i]</code> / <code>[a:b]</code> slice operators, use <code>cindex</code> (stryke extension) instead — <code>index</code> is byte-indexed because <code>length</code> and <code>substr</code> are, and changing it would break Perl 5 binary-protocol code.</p>
         <pre><code class="lang-perl">my $i = index &quot;hello world&quot;, &quot;world&quot;  # 6
 p $i
 my $s = &quot;a.b.c.d&quot;
@@ -7314,8 +7315,8 @@ while (($pos = index $s, &quot;.&quot;, $pos) != -1) {
       </article>
       <article class="doc-entry" id="doc-rindex">
         <h3><a class="doc-anchor" href="#doc-rindex">#</a> <code>rindex</code></h3>
-        <p><code>rindex STRING, SUBSTRING [, POSITION]</code> — return the zero-based position of the last occurrence of SUBSTRING within STRING, searching backward from POSITION (or the end).</p>
-        <p><code>rindex</code> mirrors <code>index</code> but searches from right to left, making it ideal for extracting file extensions, final path components, or the last delimiter in a string. The optional POSITION argument caps how far right the search begins — characters after POSITION are ignored. Returns -1 when the substring is not found. In stryke, positions are UTF-8 character offsets. Combine with <code>substr</code> for efficient right-side extraction without regex.</p>
+        <p><code>rindex STRING, SUBSTRING [, POSITION]</code> — return the zero-based <strong>byte</strong> position of the last occurrence of SUBSTRING within STRING, searching backward from POSITION (or the end). Mirror of <code>index</code>; pairs with <code>substr</code> and <code>length</code> for Perl 5 compat.</p>
+        <p><code>rindex</code> searches from right to left, making it ideal for extracting file extensions, final path components, or the last delimiter in a string. The optional POSITION argument caps how far right the search begins — characters after POSITION are ignored. Returns -1 when the substring is not found. For codepoint positions paired with <code>[]</code> slice operators, use <code>crindex</code>.</p>
         <pre><code class="lang-perl">my $path = &quot;foo/bar/baz.tar.gz&quot;
 my $i = rindex $path, &quot;/&quot;     # 7
 p substr $path, $i + 1        # baz.tar.gz
@@ -7726,11 +7727,11 @@ p $cnt          # 3
       <article class="doc-entry" id="doc-caller">
         <h3><a class="doc-anchor" href="#doc-caller">#</a> <code>caller</code></h3>
         <p><code>caller [LEVEL]</code> — returns information about the calling subroutine&#39;s context. In list context it returns <code>(package, filename, line)</code> for the given call-stack level (default 0, the immediate caller). With higher levels you can walk up the call stack for debugging or generating stack traces. In scalar context, <code>caller</code> returns just the package name. In stryke, <code>caller</code> works with <code>fn</code>-defined subroutines and integrates with the runtime&#39;s frame tracking. This is invaluable for building custom error reporters or trace utilities.</p>
-        <pre><code class="lang-perl">fn trace {
+        <pre><code class="lang-perl">fn here {
     my ($pkg, $f, $ln) = caller()
     p &quot;$f:$ln&quot;
 }
-trace()   # prints current file:line
+here()   # prints current file:line
 fn deep {
     my ($pkg, $f, $ln) = caller(1)
     p &quot;grandparent: $f:$ln&quot;
@@ -7927,7 +7928,7 @@ for my $item (@work) {
       <article class="doc-entry" id="doc-return">
         <h3><a class="doc-anchor" href="#doc-return">#</a> <code>return</code></h3>
         <p>Return a value from a subroutine.</p>
-        <pre><code class="lang-perl">fn clamp($v, $lo, $hi) {
+        <pre><code class="lang-perl">fn pin_val($v, $lo, $hi) {
     return $lo if $v &lt; $lo
     return $hi if $v &gt; $hi
     $v
@@ -8164,9 +8165,9 @@ p $Counter::total        # 5
 # For parallel mutation, use oursync:
 package C
 oursync $shared = 0
-fn inc { $shared++ }
+fn bump { $shared++ }
 package main
-fan 10000 { C::inc() }   # always exactly 10000
+fan 10000 { C::bump() }   # always exactly 10000
 </code></pre>
         <p>Prefer <code>my</code> for local state; <code>our</code> for cross-package read-mostly globals; <code>oursync</code> for cross-package mutation under parallelism.</p>
       </article>
@@ -8184,12 +8185,12 @@ close $fh
       <article class="doc-entry" id="doc-state">
         <h3><a class="doc-anchor" href="#doc-state">#</a> <code>state</code></h3>
         <p>Declare a persistent lexical variable that retains its value across calls to the enclosing subroutine. Unlike <code>my</code>, which reinitializes on each call, <code>state</code> initializes only once — the first time execution reaches the declaration — and preserves the value for all subsequent calls. This is perfect for counters, caches, and memoization without resorting to globals or closures over external variables. In stryke, <code>state</code> variables are per-thread when used inside <code>~&gt; { }</code> or <code>fan</code> blocks; they are not shared across workers.</p>
-        <pre><code class="lang-perl">fn counter {
+        <pre><code class="lang-perl">fn ctr {
     state $n = 0
     ++$n
 }
-p counter() for 1:5   # 1 2 3 4 5
-fn memo($x) {
+p ctr() for 1:5   # 1 2 3 4 5
+fn cache_lookup($x) {
     state %cache
     $cache{$x} //= expensive($x)
 }
@@ -8200,10 +8201,10 @@ fn memo($x) {
         <h3><a class="doc-anchor" href="#doc-package">#</a> <code>package</code></h3>
         <p>Set the current package namespace for all subsequent declarations. Package names are conventionally <code>CamelCase</code> with <code>::</code> separators (e.g. <code>Math::Utils</code>). All unqualified function and <code>our</code> variable names are installed into the current package. In stryke, packages work identically to standard Perl — they provide namespace isolation but are not classes by themselves (use <code>struct</code> or <code>bless</code> for OOP). Switching packages mid-file is allowed but discouraged; prefer one package per file.</p>
         <pre><code class="lang-perl">package Math::Utils
-fn factorial($n) { $n &lt;= 1 ? 1 : $n * factorial($n - 1) }
-fn fib($n) { $n &lt; 2 ? $n : fib($n - 1) + fib($n - 2) }
+fn calc_fact($n) { $n &lt;= 1 ? 1 : $n * calc_fact($n - 1) }
+fn calc_fib($n) { $n &lt; 2 ? $n : calc_fib($n - 1) + calc_fib($n - 2) }
 package main
-p Math::Utils::factorial(10)   # 3628800
+p Math::Utils::calc_fact(10)   # 3628800
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-use">
@@ -11595,7 +11596,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">6709 topics</p>
+      <p class="chapter-meta">6712 topics</p>
       <article class="doc-entry" id="doc-pc">
         <h3><a class="doc-anchor" href="#doc-pc">#</a> <code>%pc</code></h3>
         <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
@@ -11679,11 +11680,10 @@ keys %p |&gt; grep { scalar @{$p{_}} } |&gt; sort |&gt; p
       </article>
       <article class="doc-entry" id="doc-core">
         <h3><a class="doc-anchor" href="#doc-core">#</a> <code>CORE</code></h3>
-        <p><code>CORE::</code> — pseudo-namespace alias for every dispatch primary. Every callable bare name is also reachable as <code>CORE::name</code>, with identical semantics. The prefix exists so user code that shadows a builtin (<code>fn print { ... }</code>) can still reach the original via <code>CORE::print(...)</code>.</p>
+        <p><code>CORE::</code> — pseudo-namespace alias for every dispatch primary. Every callable bare name is also reachable as <code>CORE::name</code>, with identical semantics. The qualified spelling exists for tab-complete affordance and explicit-namespace style; stryke rejects redefining a builtin (<code>fn print { ... }</code> is a parse error), so there is nothing to shadow at runtime.</p>
         <p>The set is built dynamically: any name in <code>keys %stryke::builtins</code> is a valid <code>CORE::name</code>. There&#39;s no separate <code>%CORE::</code> table — it&#39;s a virtual namespace resolved at dispatch time.</p>
-        <pre><code class="lang-perl">fn print { my $x = shift; warn &quot;shadowed: $x&quot; }
-CORE::print &quot;this still works\n&quot;            # bypasses the user fn
-my $r = CORE::sum(1, 2, 3)                   # 6
+        <pre><code class="lang-perl">CORE::print &quot;hello world\n&quot;                  # ≡ print &quot;hello world\n&quot;
+my $r = CORE::sum(1, 2, 3)                   # 6 — qualified call
 map { CORE::sprintf(&quot;%d&quot;, _) } @nums         # any builtin
 </code></pre>
         <p>The <code>s docs CORE::name</code> form resolves to the bare-name page (the alias and primary share docs). Aliases (<code>tj</code>, <code>bn</code>, <code>e</code>, …) also support <code>CORE::tj</code> / <code>CORE::bn</code> / <code>CORE::e</code>.</p>
@@ -18648,6 +18648,17 @@ p &quot;95%% CI: $lo to $hi&quot;
 my ($lo99, $hi99) = @{ci([10,12,14,11,13], 0.99)}
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cindex">
+        <h3><a class="doc-anchor" href="#doc-cindex">#</a> <code>cindex</code></h3>
+        <p><code>cindex STRING, SUBSTRING [, FROM]</code> — codepoint-indexed equivalent of Perl 5&#39;s <code>index</code>. Returns the zero-based codepoint position of the first occurrence, or -1 on miss. FROM is also a codepoint position. Pairs with <code>[i]</code> / <code>[a:b]</code> slice operators and <code>len</code> so search positions and slice bounds share one coordinate system.</p>
+        <p>Use <code>cindex</code> whenever your code mixes string search with <code>[]</code> slicing — Perl 5 <code>index</code> returns byte positions and silently misaligns when fed into <code>[]</code> (which is codepoint-based). <code>index</code> stays byte-indexed because <code>length</code> and <code>substr</code> are, and changing it would break Perl-5 binary-protocol code; <code>cindex</code> is the stryke-extension counterpart.</p>
+        <pre><code class="lang-perl">my $s = &quot;hello ─ world&quot;
+p index  $s, &quot;world&quot;        # 9 (bytes — `─` is 3 bytes)
+p cindex $s, &quot;world&quot;        # 7 (codepoints)
+my $i = cindex $s, &quot;world&quot;
+p $s[$i : len($s) - 1]      # &quot;world&quot; — slice bounds line up
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cinv">
         <h3><a class="doc-anchor" href="#doc-cinv">#</a> <code>cinv</code></h3>
         <p><code>cinv</code> — extended stdlib batch 3 builtin. Alias for <code>count_inversions</code>.</p>
@@ -19084,11 +19095,13 @@ my $d3 = $dog-&gt;clone()        # deep copy
       </article>
       <article class="doc-entry" id="doc-cnt">
         <h3><a class="doc-anchor" href="#doc-cnt">#</a> <code>cnt</code></h3>
-        <p><code>count</code> (aliases <code>len</code>, <code>cnt</code>) returns the number of elements in a list, the number of characters in a string, the number of key-value pairs in a hash, or the cardinality of a set. It is a universal length function that dispatches based on the type of its argument. This replaces the need to use <code>scalar @array</code> or <code>length $string</code> — <code>cnt</code> is shorter and works uniformly across types. In a pipeline, it naturally reduces a collection to a single number.</p>
-        <p>Note: <code>size</code> is NOT a count alias — it returns a file&#39;s byte size (see <code>size</code>).</p>
+        <p><code>count</code> (aliases <code>len</code>, <code>cnt</code>) returns the number of elements in a list, the <strong>codepoint count</strong> of a string, the number of key-value pairs in a hash, or the cardinality of a set. Universal length-like function that dispatches on the type of its argument. Replaces <code>scalar @array</code> / <code>length $string</code> for stryke code; on strings it pairs with <code>[i]</code> / <code>[a:b]</code> and <code>cindex</code> / <code>crindex</code>, all of which use codepoint positions.</p>
+        <p>For byte length on a string, use Perl 5&#39;s <code>length</code> (kept byte-based for compat with <code>index</code> / <code>rindex</code> / <code>substr</code>). <code>size</code> is NOT a count alias — it returns a file&#39;s byte size.</p>
         <pre><code class="lang-perl">my @arr = (1, 2, 3, 4, 5)
 p cnt @arr          # 5
 p len &quot;hello&quot;       # 5
+p len &quot;─&quot;           # 1 (codepoint)
+p length &quot;─&quot;        # 3 (bytes)
 my %h = (a =&gt; 1, b =&gt; 2)
 p cnt \%h           # 2
 rl(&quot;file.txt&quot;) |&gt; cnt |&gt; p  # line count
@@ -20623,6 +20636,16 @@ p $ci-&gt;{slope_lower}
         <pre><code class="lang-perl">my $result = crf_log_likelihood $x 
 # or in a pipeline:
 @list |&gt; map crf_log_likelihood |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-crindex">
+        <h3><a class="doc-anchor" href="#doc-crindex">#</a> <code>crindex</code></h3>
+        <p><code>crindex STRING, SUBSTRING [, FROM]</code> — codepoint-indexed equivalent of Perl 5&#39;s <code>rindex</code>. Returns the last codepoint position where SUBSTRING occurs (at or before FROM, defaulting to end-of-string), or -1 on miss. Counterpart to <code>cindex</code>; pairs with <code>[]</code> slice operators and <code>len</code>.</p>
+        <pre><code class="lang-perl">my $path = &quot;foo/bar/─/baz.gz&quot;
+p rindex  $path, &quot;/&quot;        # 13 (bytes)
+p crindex $path, &quot;/&quot;        # 11 (codepoints)
+my $i = crindex $path, &quot;/&quot;
+p $path[$i + 1 : len($path) - 1]   # &quot;baz.gz&quot;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-critang">
@@ -31410,10 +31433,18 @@ p harmonic(100)  # 5.1874
       </article>
       <article class="doc-entry" id="doc-hash-filter-keys">
         <h3><a class="doc-anchor" href="#doc-hash-filter-keys">#</a> <code>hash_filter_keys</code></h3>
-        <p><code>hash_filter_keys</code> — list helpers (batch 4) builtin.</p>
+        <p><code>hash_filter_keys</code> — hash helpers builtin.</p>
         <pre><code class="lang-perl">my $result = hash_filter_keys $x 
 # or in a pipeline:
 @list |&gt; map hash_filter_keys |&gt; p
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hash-filter-values">
+        <h3><a class="doc-anchor" href="#doc-hash-filter-values">#</a> <code>hash_filter_values</code></h3>
+        <p><code>hash_filter_values</code> — hash helpers builtin.</p>
+        <pre><code class="lang-perl">my $result = hash_filter_values $x 
+# or in a pipeline:
+@list |&gt; map hash_filter_values |&gt; p
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-hash-from-list">
@@ -31442,7 +31473,7 @@ p harmonic(100)  # 5.1874
       </article>
       <article class="doc-entry" id="doc-hash-map-values">
         <h3><a class="doc-anchor" href="#doc-hash-map-values">#</a> <code>hash_map_values</code></h3>
-        <p><code>hash_map_values</code> — list helpers (batch 4) builtin.</p>
+        <p><code>hash_map_values</code> — hash helpers builtin.</p>
         <pre><code class="lang-perl">my $result = hash_map_values $x 
 # or in a pipeline:
 @list |&gt; map hash_map_values |&gt; p

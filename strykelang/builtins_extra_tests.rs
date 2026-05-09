@@ -104,20 +104,44 @@ fn test_builtin_hex_oct() {
 #[test]
 fn test_builtin_chop() {
     // Basic chop
-    assert_eq!(run("my $s = 'hello'; chop $s; $s").expect("run").to_string(), "hell");
-    assert_eq!(run("my $s = 'hell'; chop $s; $s").expect("run").to_string(), "hel");
+    assert_eq!(
+        run("my $s = 'hello'; chop $s; $s")
+            .expect("run")
+            .to_string(),
+        "hell"
+    );
+    assert_eq!(
+        run("my $s = 'hell'; chop $s; $s").expect("run").to_string(),
+        "hel"
+    );
 
     // Chop string ending with newline
-    assert_eq!(run("my $s = 'hello\\n'; chop $s; $s").expect("run").to_string(), "hello\\");
+    assert_eq!(
+        run("my $s = 'hello\\n'; chop $s; $s")
+            .expect("run")
+            .to_string(),
+        "hello\\"
+    );
 
-    assert_eq!(run("my $s = 'hello\\r\\n'; chop $s; $s").expect("run").to_string(), "hello\\r\\"); // chops the last char, which is '\n', and then adds a literal backslash
+    assert_eq!(
+        run("my $s = 'hello\\r\\n'; chop $s; $s")
+            .expect("run")
+            .to_string(),
+        "hello\\r\\"
+    ); // chops the last char, which is '\n', and then adds a literal backslash
 
     // Chop empty string
     assert_eq!(run("my $s = ''; chop $s; $s").expect("run").to_string(), "");
 
     // Chop single character string
-    assert_eq!(run("my $s = 'a'; chop $s; $s").expect("run").to_string(), "");
-    assert_eq!(run("my $s = '👍'; chop $s; $s").expect("run").to_string(), ""); // Chop is byte-based, not unicode-aware. Removed all bytes of the emoji.
+    assert_eq!(
+        run("my $s = 'a'; chop $s; $s").expect("run").to_string(),
+        ""
+    );
+    assert_eq!(
+        run("my $s = '👍'; chop $s; $s").expect("run").to_string(),
+        ""
+    ); // Chop is byte-based, not unicode-aware. Removed all bytes of the emoji.
 
     // `chop @arr` chops the last byte off every element in place
     // (Perl semantics) and returns the *last character chopped*.
@@ -125,24 +149,32 @@ fn test_builtin_chop() {
     // joined form, and reassigned a scalar back — silently destroying
     // the array. Now matches `perl -e` byte-for-byte.
     assert_eq!(
-        run("my @a = ('abc', 'defg'); chop @a; join(',', @a)").expect("run").to_string(),
+        run("my @a = ('abc', 'defg'); chop @a; join(',', @a)")
+            .expect("run")
+            .to_string(),
         "ab,def"
     );
     // Single-quoted `'a\n'` is the 3-byte literal `a \\ n`. chop
     // removes `n` → `a\`. `'b'` → `''`. Joined: `a\,`.
     assert_eq!(
-        run("my @a = ('a\\n', 'b'); chop @a; join(',', @a)").expect("run").to_string(),
+        run("my @a = ('a\\n', 'b'); chop @a; join(',', @a)")
+            .expect("run")
+            .to_string(),
         "a\\,"
     );
     // Empty element survives chop (`pop` returns undef, no-op);
     // `'b'` chops to `''`. Join: `,`.
     assert_eq!(
-        run("my @a = ('', 'b'); chop @a; join(',', @a)").expect("run").to_string(),
+        run("my @a = ('', 'b'); chop @a; join(',', @a)")
+            .expect("run")
+            .to_string(),
         ","
     );
     // `chop @arr` returns the last character chopped overall.
     assert_eq!(
-        run("my @a = ('xyz', 'abc'); chop @a").expect("run").to_string(),
+        run("my @a = ('xyz', 'abc'); chop @a")
+            .expect("run")
+            .to_string(),
         "c"
     );
 }
@@ -151,7 +183,9 @@ fn test_builtin_chop() {
 fn test_builtin_prime_factors() {
     // Prime factors of a positive composite number
     assert_eq!(
-        run("join(',', prime_factors(12))").expect("run").to_string(),
+        run("join(',', prime_factors(12))")
+            .expect("run")
+            .to_string(),
         "2,2,3"
     );
 
@@ -175,13 +209,17 @@ fn test_builtin_prime_factors() {
 
     // Prime factors of a negative number (empty list, as abs value <= 1 is handled in Rust code)
     assert_eq!(
-        run("join(',', prime_factors(-12))").expect("run").to_string(),
+        run("join(',', prime_factors(-12))")
+            .expect("run")
+            .to_string(),
         ""
     );
 
     // Prime factors of a larger composite number
     assert_eq!(
-        run("join(',', prime_factors(100))").expect("run").to_string(),
+        run("join(',', prime_factors(100))")
+            .expect("run")
+            .to_string(),
         "2,2,5,5"
     );
 
@@ -193,7 +231,9 @@ fn test_builtin_prime_factors() {
 
     // Prime factors with distinct primes
     assert_eq!(
-        run("join(',', prime_factors(30))").expect("run").to_string(),
+        run("join(',', prime_factors(30))")
+            .expect("run")
+            .to_string(),
         "2,3,5"
     );
 }
@@ -211,28 +251,36 @@ fn test_thread_macro_streaming_basic() {
 
     // Basic streaming map: emits each transformed item.
     assert_eq!(
-        run("join(',', ~s> [1, 2, 3] map { $_ * 2 })").expect("run").to_string(),
+        run("join(',', ~s> [1, 2, 3] map { $_ * 2 })")
+            .expect("run")
+            .to_string(),
         "2,4,6"
     );
 
     // Streaming with filter (grep): drops items where the predicate
     // is false (the worker treats `undef` as the drop signal).
     assert_eq!(
-        run("join(',', ~s> [1, 2, 3, 4] grep { $_ % 2 })").expect("run").to_string(),
+        run("join(',', ~s> [1, 2, 3, 4] grep { $_ % 2 })")
+            .expect("run")
+            .to_string(),
         "1,3"
     );
 
     // Empty list source: collector stays empty; `join` of empty list
     // is the empty string.
     assert_eq!(
-        run("join(',', ~s> [] map { $_ * 2 })").expect("run").to_string(),
+        run("join(',', ~s> [] map { $_ * 2 })")
+            .expect("run")
+            .to_string(),
         ""
     );
 
     // Chained stages: items flow through every stage in declared
     // order; the last stage's emissions are the macro's value.
     assert_eq!(
-        run("join(',', ~s> [1,2,3] map { $_ + 1 } map { $_ * 2 })").expect("run").to_string(),
+        run("join(',', ~s> [1,2,3] map { $_ + 1 } map { $_ * 2 })")
+            .expect("run")
+            .to_string(),
         "4,6,8"
     );
 
@@ -243,17 +291,23 @@ fn test_thread_macro_streaming_basic() {
     // first and Perl flattening filled it with multiple positional
     // args. Now both work.
     assert_eq!(
-        run("join(',', ~s> (1,2,3) map { $_ * 10 })").expect("run").to_string(),
+        run("join(',', ~s> (1,2,3) map { $_ * 10 })")
+            .expect("run")
+            .to_string(),
         "10,20,30"
     );
     assert_eq!(
-        run("my @a = (4,5,6); join(',', ~s> @a map { $_ + 100 })").expect("run").to_string(),
+        run("my @a = (4,5,6); join(',', ~s> @a map { $_ + 100 })")
+            .expect("run")
+            .to_string(),
         "104,105,106"
     );
 
     // Range source: `1..5` flattens identically.
     assert_eq!(
-        run("join(',', ~s> 1..5 map { $_ * $_ })").expect("run").to_string(),
+        run("join(',', ~s> 1..5 map { $_ * $_ })")
+            .expect("run")
+            .to_string(),
         "1,4,9,16,25"
     );
 }
@@ -273,14 +327,13 @@ fn test_thread_macro_parallel_basic() {
     );
 
     // Empty list source
-    assert_eq!(
-        run("~p> [] sum").expect("run").to_int(),
-        0
-    );
+    assert_eq!(run("~p> [] sum").expect("run").to_int(), 0);
 
     // Histogram-like (freq): check one value
     assert_eq!(
-        run("my $h = ~p> \"hello\" letters freq; $h->{l}").expect("run").to_int(),
+        run("my $h = ~p> \"hello\" letters freq; $h->{l}")
+            .expect("run")
+            .to_int(),
         2
     );
 }
@@ -321,7 +374,12 @@ fn test_builtin_pmt() {
     // $100,000 at 5% for 30 years (360 payments), payment at beginning of period
     // Expected: approx -534.59 (slightly less than end-of-period payment)
     assert!(
-        (run("pmt(0.05/12, 360, 100000, 0, 1)").expect("run").to_number() + 534.59).abs() < 0.01,
+        (run("pmt(0.05/12, 360, 100000, 0, 1)")
+            .expect("run")
+            .to_number()
+            + 534.59)
+            .abs()
+            < 0.01,
         "PMT with TYPE 1 failed"
     );
 
@@ -331,4 +389,3 @@ fn test_builtin_pmt() {
         "PMT with negative PV failed"
     );
 }
-

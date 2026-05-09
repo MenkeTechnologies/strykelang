@@ -477,7 +477,15 @@ pub(crate) fn run_thread_par(
             let err_w = Arc::clone(&err);
             scope.spawn(move || {
                 run_thread_par_worker(
-                    sub, subs_w, cap_w, aa_w, ah_w, rx, tx_out, err_w, last_collector,
+                    sub,
+                    subs_w,
+                    cap_w,
+                    aa_w,
+                    ah_w,
+                    rx,
+                    tx_out,
+                    err_w,
+                    last_collector,
                 );
             });
         }

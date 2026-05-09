@@ -260,7 +260,6 @@ fn docs_with_generic_no_tty_env_exits_zero() {
     assert_eq!(out.status.code(), Some(0));
 }
 
-
 /// `stryke docs pmap | head -3` emits the first three lines and exits
 /// cleanly — verifying the behavior the user originally hit when
 #[test]

@@ -43,6 +43,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x07\] CLI Flags](#0x07-cli-flags)
 - [\[0x08\] Supported Perl Features](#0x08-supported-perl-features)
 - [\[0x08a\] `--no-interop` Mode](#0x08a---no-interop-mode)
+- [\[0x08b\] String Coordinates — Bytes vs Codepoints](#0x08b-string-coordinates--bytes-vs-codepoints)
 - [\[0x09\] Architecture](#0x09-architecture)
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
@@ -1765,6 +1766,39 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | `scalar %h` (Perl's hash-fill diagnostic, e.g. `"3/8"`) | dead semantics — never load-bearing | use `len keys %h` for the count |
 
 Default mode (no `--no-interop`) still accepts every Perl-ism listed above for compat with stock `.pm` / `.pl` sources.
+
+---
+
+## [0x08b] STRING COORDINATES — BYTES VS CODEPOINTS
+
+Stryke runs string code in two coordinate systems. Perl 5 builtins stay byte-indexed for binary-protocol / `.pm`-source compat. Stryke extensions are codepoint-indexed so search positions and slice bounds line up. They are never auto-converted — pick one coordinate system per expression, keep it consistent, and never mix a byte-position output into a codepoint-position input.
+
+| Operation | Stryke (codepoints) | Perl 5 (bytes) |
+|---|---|---|
+| Length | `len $s` | `length $s` |
+| Index | `$s[$i]` | `substr $s, $i, 1` |
+| Slice | `$s[$a:$b]` (inclusive both ends) | `substr $s, $start, $len` |
+| Search forward | `cindex $s, $needle [, $from]` | `index $s, $needle [, $from]` |
+| Search backward | `crindex $s, $needle [, $from]` | `rindex $s, $needle [, $from]` |
+| Match position | — | `pos $s` (regex `\G` anchor) |
+
+Concrete example:
+
+```perl
+my $s = "hello ─ world"     # `─` is 3 bytes / 1 codepoint
+length $s                    # 15 (bytes)
+len    $s                    # 13 (codepoints)
+index  $s, "world"           # 9  (byte position — past the 3-byte `─`)
+cindex $s, "world"           # 7  (codepoint position)
+$s[7]                        # "w"
+substr $s, 9, 1              # "w"
+$s[7:11]                     # "world"  — codepoint slice
+substr $s, 9, 5              # "world"  — byte substr
+```
+
+**Rule:** never feed an `index` / `pos` / `length` result into a `[$a:$b]` slice, and never feed a `cindex` / `crindex` / `len` result into `substr` / `index`. The coordinate systems silently misalign on any string containing non-ASCII bytes.
+
+`--no-interop` does **not** force this split — both systems remain available because Perl 5 binary-protocol code legitimately needs byte positions. The split is a coordinate-system choice, not a stylistic one.
 
 ---
 

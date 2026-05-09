@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.12.19"
+version = "0.12.20"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -54,7 +54,12 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 symphonia = { version = "0.5", features = ["wav", "flac", "aiff", "pcm", "adpcm"] }
 mp3lame-encoder = "0.2"
 id3 = "1.16"
-git2 = "0.20"
+# `vendored-openssl` so the release CI matrix (musl, aarch64-linux,
+# macOS) doesn't fail looking for a system OpenSSL — git2 → libgit2-sys
+# → libssh2-sys pulls in openssl-sys; with this feature the openssl
+# build statically compiles its own copy. Required for the cross /
+# musl / mac targets in `.github/workflows/release.yml`.
+git2 = { version = "0.20", features = ["vendored-libgit2", "vendored-openssl"] }
 sysinfo = { version = "0.38", default-features = false, features = ["system"] }
 memmap2 = "0.9"
 rkyv = { version = "0.7", features = ["validation", "archive_le", "size_32"] }

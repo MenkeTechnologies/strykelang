@@ -45,7 +45,7 @@ fn can_returns_coderef_that_fails_to_invoke() {
     let err = eval_err_kind(
         r#"class Box { fn area { 42 } }
            my $b = Box->new;
-           my $m = $b->can("area");"#
+           my $m = $b->can("area");"#,
     );
     let msg = format!("{:?}", err);
     assert!(

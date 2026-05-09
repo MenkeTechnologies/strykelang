@@ -64,7 +64,9 @@ fn format_write_parser_issue() {
     let err = parse_err_kind(r#"format REPORT ="#);
     let msg = format!("{:?}", err);
     assert!(
-        msg.contains("Syntax") || msg.contains("Extra tokens in format") || msg.contains("Expected"),
+        msg.contains("Syntax")
+            || msg.contains("Extra tokens in format")
+            || msg.contains("Expected"),
         "expected syntax error for format parsing, got {:?}",
         err
     );

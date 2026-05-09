@@ -20,13 +20,67 @@ fn builtin_subset_construction(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::integer(seen.len() as i64))
 }
 
-/// Hopcroft minimisation: partition refinement until stable. Returns number of
-/// equivalence classes (≤ original state count).
+/// DFA **state minimisation** (Myhill–Nerode partition refinement). Args when
+/// `n ≥ 4`: `n` (states), `sigma` (alphabet size), flat row-major transitions
+/// `n·sigma` next-state indices, final flags length `n`. With fewer arguments,
+/// falls back to counting **distinct** float signatures (legacy coarse estimate).
 fn builtin_dfa_minimize_hopcroft(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let signatures = b68_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    let mut classes = std::collections::HashSet::new();
-    for s in signatures { classes.insert(s.to_bits()); }
-    Ok(PerlValue::integer(classes.len() as i64))
+    use std::collections::{HashMap, HashSet};
+    if args.len() < 4 {
+        let signatures = b68_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
+        let mut classes = HashSet::new();
+        for s in signatures {
+            classes.insert(s.to_bits());
+        }
+        return Ok(PerlValue::integer(classes.len() as i64));
+    }
+    let n = args[0].to_number() as usize;
+    let sigma = args[1].to_number() as usize;
+    let sigma = sigma.max(1);
+    if n == 0 {
+        return Ok(PerlValue::integer(0));
+    }
+    let trans_flat = b68_to_floats(args.get(2).unwrap_or(&PerlValue::array(vec![])));
+    let finals = b68_to_floats(args.get(3).unwrap_or(&PerlValue::array(vec![])));
+    if trans_flat.len() < n * sigma {
+        return Ok(PerlValue::integer(0));
+    }
+    let mut trans: Vec<usize> = trans_flat
+        .iter()
+        .take(n * sigma)
+        .map(|&x| x as usize)
+        .collect();
+    for t in &mut trans {
+        *t = (*t).min(n.saturating_sub(1));
+    }
+    let mut part: Vec<usize> = (0..n)
+        .map(|i| if finals.get(i).copied().unwrap_or(0.0) != 0.0 { 1 } else { 0 })
+        .collect();
+    loop {
+        let mut buckets: HashMap<Vec<usize>, usize> = HashMap::new();
+        let mut next_id = 0_usize;
+        let mut new_part = vec![0_usize; n];
+        for i in 0..n {
+            let mut sig = Vec::with_capacity(1 + sigma);
+            sig.push(part[i]);
+            for a in 0..sigma {
+                let nx = trans[i * sigma + a].min(n.saturating_sub(1));
+                sig.push(part[nx]);
+            }
+            let id = *buckets.entry(sig).or_insert_with(|| {
+                let id = next_id;
+                next_id += 1;
+                id
+            });
+            new_part[i] = id;
+        }
+        if new_part == part {
+            break;
+        }
+        part = new_part;
+    }
+    let k = part.iter().copied().max().map(|m| m + 1).unwrap_or(0);
+    Ok(PerlValue::integer(k as i64))
 }
 
 /// Thompson regex → NFA: 2 states per single-char + per-operator overhead.

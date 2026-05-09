@@ -7,7 +7,9 @@ fn try_block_without_catch_errors() {
     let err = parse_err_kind(r#"try { die "error" };"#);
     let msg = format!("{:?}", err);
     assert!(
-        msg.contains("Syntax") || msg.contains("Expected") || msg.contains("expected 'catch' after try block"),
+        msg.contains("Syntax")
+            || msg.contains("Expected")
+            || msg.contains("expected 'catch' after try block"),
         "expected syntax error for try without catch, got {:?}",
         err
     );
@@ -18,7 +20,9 @@ fn eof_without_parens_parses_wrong() {
     let err = parse_err_kind(r#"until (eof $fh) { }"#);
     let msg = format!("{:?}", err);
     assert!(
-        msg.contains("Syntax") || msg.contains("Expected") || msg.contains("Expected RParen, got ScalarVar"),
+        msg.contains("Syntax")
+            || msg.contains("Expected")
+            || msg.contains("Expected RParen, got ScalarVar"),
         "expected syntax error for eof parsing, got {:?}",
         err
     );

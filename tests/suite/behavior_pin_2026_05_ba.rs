@@ -18,7 +18,7 @@ fn die_with_hashref_preserves_ref_now() {
     // Was a known gap, but now works correctly.
     let out = eval_string(
         r#"eval { die { a => 1 } };
-           ref($@)"#
+           ref($@)"#,
     );
     assert_eq!(out, "HASH");
 }
@@ -26,9 +26,7 @@ fn die_with_hashref_preserves_ref_now() {
 #[test]
 fn regex_named_captures_work_now() {
     // Was a known gap, but now works correctly.
-    let out = eval_string(
-        r#""abc" =~ /(?<name>b)/ ? $+{name} : "none""#
-    );
+    let out = eval_string(r#""abc" =~ /(?<name>b)/ ? $+{name} : "none""#);
     assert_eq!(out, "b");
 }
 
@@ -37,7 +35,7 @@ fn pack_unpack_a_format_works_now() {
     // Was a known gap, but now works correctly.
     let out = eval_string(
         r#"my ($u) = unpack("A4", "test  ");
-           $u"#
+           $u"#,
     );
     assert_eq!(out, "test");
 }
@@ -54,8 +52,9 @@ fn two_closures_sharing_state_works_in_compat_now() {
                my $f2 = sub { $n++ };
                $f1->();
                $f2->();
-               $n"#
-        ).to_string();
+               $n"#,
+        )
+        .to_string();
         stryke::set_compat_mode(false);
         val
     });

@@ -50,5 +50,8 @@ fn retry_backoff_arg_validation_fails_parsing() {
 fn pipe_forward_on_my_decl_with_glob_parses_successfully() {
     // This used to fail parsing, but now it successfully parses
     let program = stryke::parse(r#"my @datasets = par_csv_read glob("data/*.csv") |> join(",");"#);
-    assert!(program.is_ok(), "Expected pipe forward to parse successfully");
+    assert!(
+        program.is_ok(),
+        "Expected pipe forward to parse successfully"
+    );
 }

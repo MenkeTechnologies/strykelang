@@ -24,7 +24,9 @@ fn reserved_word_y_as_function_name_errors() {
     let err = parse_err_kind("fn y { }");
     let msg = format!("{:?}", err);
     assert!(
-        msg.contains("`y` is a reserved word") || msg.contains("Syntax") || msg.contains("Expected"),
+        msg.contains("`y` is a reserved word")
+            || msg.contains("Syntax")
+            || msg.contains("Expected"),
         "expected error about reserved word, got {:?}",
         err
     );
