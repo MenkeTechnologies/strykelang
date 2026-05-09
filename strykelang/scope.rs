@@ -1254,7 +1254,7 @@ impl Scope {
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: PerlValue) -> Result<(), PerlError> {
         if let Some(rest) = strip_main_prefix(name) {
-            return self.set_scalar(&rest.to_string(), val);
+            return self.set_scalar(rest, val);
         }
         self.check_parallel_scalar_write(name)?;
         // Topic variants (`_`, `_<+`, `_N`, `_N<+`) are framework-managed

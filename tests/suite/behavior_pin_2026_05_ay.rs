@@ -4,9 +4,7 @@ use crate::common::*;
 
 #[test]
 fn indented_heredoc_does_not_strip_whitespace_today() {
-    let out = eval_string(
-        "<<~EOF\n  test\nEOF\n"
-    );
+    let out = eval_string("<<~EOF\n  test\nEOF\n");
     assert_eq!(out, "  test\n");
 }
 

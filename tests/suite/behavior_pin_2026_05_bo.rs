@@ -35,15 +35,11 @@ fn polygon_and_nd_geometry_bo() {
         "3.00,4.00"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.10f", euclidean_distance_nd([1, 2, 3], [1, 5, 11]))"#
-        ),
+        eval_string(r#"sprintf("%.10f", euclidean_distance_nd([1, 2, 3], [1, 5, 11]))"#),
         "8.5440037453"
     );
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.6f", point_to_plane_distance(0, 0, 0, 1, 1, 1, sqrt(3)))"#
-        ),
+        eval_string(r#"sprintf("%.6f", point_to_plane_distance(0, 0, 0, 1, 1, 1, sqrt(3)))"#),
         "0.000000"
     );
 }
@@ -90,10 +86,7 @@ fn primes_factorials_combin_bo() {
 
 #[test]
 fn hashing_encoding_bo() {
-    assert_eq!(
-        eval_string(r#"substring(md5("hello"), 0, 8)"#),
-        "5d41402a"
-    );
+    assert_eq!(eval_string(r#"substring(md5("hello"), 0, 8)"#), "5d41402a");
     assert_eq!(
         eval_string(r#"substring(sha256("abc"), 0, 16)"#),
         "ba7816bf8f01cfea"
@@ -108,14 +101,8 @@ fn hashing_encoding_bo() {
 
 #[test]
 fn strings_case_padding_bo() {
-    assert_eq!(
-        eval_string(r#"slugify("Hello World!")"#),
-        "hello-world"
-    );
-    assert_eq!(
-        eval_string(r#"title_case("hello world")"#),
-        "Hello World"
-    );
+    assert_eq!(eval_string(r#"slugify("Hello World!")"#), "hello-world");
+    assert_eq!(eval_string(r#"title_case("hello world")"#), "Hello World");
     assert_eq!(eval_string(r#"camel_case("foo_bar")"#), "fooBar");
     assert_eq!(eval_string(r#"snake_case("FooBar")"#), "foo_bar");
 
@@ -159,10 +146,7 @@ fn list_take_drop_rotate_bo() {
         eval_string(r#"join(",", swap_pairs(1, 2, 3, 4))"#),
         "2,1,4,3"
     );
-    assert_eq!(
-        eval_string(r#"join(",", uniq(1, 2, 2, 3, 1))"#),
-        "1,2,3"
-    );
+    assert_eq!(eval_string(r#"join(",", uniq(1, 2, 2, 3, 1))"#), "1,2,3");
 }
 
 #[test]
@@ -170,9 +154,7 @@ fn polynomials_det_bo() {
     assert_eq!(eval_int("horner([1, 2, 3], 10)"), 321);
     assert_eq!(eval_int("polyval([1, 0, -1], 3)"), -8);
     assert_eq!(
-        eval_string(
-            r#"sprintf("%.0f", det([[1, 2, 3], [0, 1, 4], [5, 6, 0]]))"#
-        ),
+        eval_string(r#"sprintf("%.0f", det([[1, 2, 3], [0, 1, 4], [5, 6, 0]]))"#),
         "1"
     );
 }
@@ -186,15 +168,11 @@ fn bits_bo() {
 #[test]
 fn json_scalar_roundtrip_bo() {
     assert_eq!(
-        eval_int(
-            r##"my $h = json_decode('{"answer":41}'); $h->{"answer"}"##
-        ),
+        eval_int(r##"my $h = json_decode('{"answer":41}'); $h->{"answer"}"##),
         41
     );
     assert_eq!(
-        eval_string(
-            r##"substring(json_encode({ ping => 'pong' }), 0, 20)"##
-        ),
+        eval_string(r##"substring(json_encode({ ping => 'pong' }), 0, 20)"##),
         r##"{"ping":"pong"}"##
     );
 }
@@ -230,20 +208,14 @@ fn round_divmod_minmax_bo() {
     assert_eq!(eval_int("round(2.5)"), 3);
     assert_eq!(eval_int("ceil_div(10, 3)"), 4);
     assert_eq!(eval_string(r#"join(",", divmod(10, 3))"#), "3,1");
-    assert_eq!(
-        eval_string(r#"longest("a", "bbb", "cc")"#),
-        "bbb"
-    );
+    assert_eq!(eval_string(r#"longest("a", "bbb", "cc")"#), "bbb");
 }
 
 #[test]
 fn min_max_split_join_bo() {
     assert_eq!(eval_int("min(3, 1, 4, 1, 5)"), 1);
     assert_eq!(eval_int("max(3, 1, 4, 1, 5)"), 5);
-    assert_eq!(
-        eval_string(r#"join("-", split(",", "a,b,c"))"#),
-        "a-b-c"
-    );
+    assert_eq!(eval_string(r#"join("-", split(",", "a,b,c"))"#), "a-b-c");
 }
 
 #[test]
@@ -269,10 +241,7 @@ fn tally_replicate_iota_window_bo() {
         eval_string(r#"stringify(tally(1, 2, 2, 3))"#),
         "+{1 => 1, 2 => 2, 3 => 1}"
     );
-    assert_eq!(
-        eval_string(r#"join(",", repeat_elem(9, 3))"#),
-        "9,9,9"
-    );
+    assert_eq!(eval_string(r#"join(",", repeat_elem(9, 3))"#), "9,9,9");
     assert_eq!(eval_string(r#"join(",", iota(5))"#), "0,1,2,3,4");
     assert_eq!(
         eval_string(r#"stringify(windowed_circular(2, 1, 2, 3))"#),

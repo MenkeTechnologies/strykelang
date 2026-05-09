@@ -14,20 +14,26 @@ fn color_ops_bk() {
 
     // color_grayscale(r, g, b)
     // 0.2126 * 255 + 0 + 0 = 54.213 -> 54
-    let gray = eval(r#"color_grayscale(255, 0, 0)"#).as_array_vec().unwrap();
+    let gray = eval(r#"color_grayscale(255, 0, 0)"#)
+        .as_array_vec()
+        .unwrap();
     assert_eq!(gray[0].to_int(), 54);
     assert_eq!(gray[1].to_int(), 54);
     assert_eq!(gray[2].to_int(), 54);
 
     // color_blend(r1, g1, b1, r2, g2, b2, t)
-    let blend = eval(r#"color_blend(255, 0, 0, 0, 0, 255, 0.5)"#).as_array_vec().unwrap();
+    let blend = eval(r#"color_blend(255, 0, 0, 0, 0, 255, 0.5)"#)
+        .as_array_vec()
+        .unwrap();
     assert_eq!(blend[0].to_int(), 128);
     assert_eq!(blend[1].to_int(), 0);
     assert_eq!(blend[2].to_int(), 128);
-    
+
     // color_complement(r, g, b)
     // Red (0, 1, 0.5) in HSL -> complement is (180, 1, 0.5) -> Cyan (0, 255, 255)
-    let comp = eval(r#"color_complement(255, 0, 0)"#).as_array_vec().unwrap();
+    let comp = eval(r#"color_complement(255, 0, 0)"#)
+        .as_array_vec()
+        .unwrap();
     assert_eq!(comp[0].to_int(), 0);
     assert_eq!(comp[1].to_int(), 255);
     assert_eq!(comp[2].to_int(), 255);
@@ -75,7 +81,7 @@ fn matrix_ops_bk() {
 fn misc_uncategorized_bk() {
     // byte_size of numbers (converted to string)
     assert_eq!(eval_int("byte_size(12345)"), 5);
-    
+
     // to_string_val on undef
     assert_eq!(eval_string("to_string_val(undef)"), "");
 }

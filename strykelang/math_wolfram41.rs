@@ -104,31 +104,33 @@ fn builtin_edmonds_karp_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     builtin_max_flow_ford_fulkerson_step(args)
 }
 
-/// Dinic blocking flow (level graph max flow)
+/// Dinic **blocking-phase** throughput: sum of flow pushed along each augmenting
+/// path in one blocking DFS (caller supplies nonnegative per-path flow amounts).
 fn builtin_dinic_blocking_flow(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let v = b41_to_floats(args.first().unwrap_or(&PerlValue::array(vec![])));
-    Ok(PerlValue::float(v.iter().sum()))
+    if v.is_empty() {
+        return Ok(PerlValue::float(0.0));
+    }
+    Ok(PerlValue::float(v.iter().filter(|x| **x >= 0.0).sum()))
 }
 
-/// Push-relabel step: pre-flow value
+/// Push–relabel **push** at `u` toward `v`: excess left at `u` after pushing
+/// `min(excess(u), residual(u,v))`. Args: excess at `u`, residual capacity `c_f(u,v)`.
 fn builtin_push_relabel_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let excess = f1(args);
-    let cap = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    Ok(PerlValue::float(excess.min(cap)))
+    let res_cap = args.get(1).map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
+    let push = excess.min(res_cap);
+    Ok(PerlValue::float(excess - push))
 }
 
-/// Boykov-Kolmogorov max-flow (2004): grow source-tree S and sink-tree T until
-/// they meet, augment along the connecting path, adopt orphans whose parent edge
-/// saturated. Per-iteration: tree sizes grow by frontier expansion within the
-/// current residual capacities. Returns flow added in this step = bottleneck of
-/// path AND residual updates (unique to BK: tree reuse, no full BFS each round).
-/// Args: bottleneck, prev_flow, orphan_count.
+/// Boykov–Kolmogorov augmentation bookkeeping: new cumulative flow value given
+/// path bottleneck, prior total flow, and optional capacity used for **orphan**
+/// repair (default `0`). Returns `prev_flow + max(0, bottleneck - orphan_cost)`.
 fn builtin_boykov_kolmogorov_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let bottleneck = f1(args);
     let prev_flow = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
-    let orphans = args.get(2).map(|v| v.to_number()).unwrap_or(0.0);
-    let adopted = orphans.min(bottleneck * 0.5);
-    Ok(PerlValue::float(prev_flow + bottleneck - adopted * 0.0))
+    let orphan_cost = args.get(2).map(|v| v.to_number()).unwrap_or(0.0).max(0.0);
+    Ok(PerlValue::float(prev_flow + (bottleneck - orphan_cost).max(0.0)))
 }
 
 /// Stoer-Wagner global mincut step
@@ -169,24 +171,29 @@ fn builtin_karger_min_cut_count(args: &[PerlValue]) -> PerlResult<PerlValue> {
     Ok(PerlValue::float(2.0 / (n * (n - 1.0))))
 }
 
-/// Bipartite matching (König-Egerváry): max matching = min vertex cover
+/// Bipartite maximum matching — same as `hopcroft_karp` (edges, `n_left`, `n_right`).
 fn builtin_maximum_bipartite_matching(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let m = f1(args);
-    let n = args.get(1).map(|v| v.to_number()).unwrap_or(m);
-    Ok(PerlValue::float(m.min(n)))
+    builtin_hopcroft_karp(args)
 }
 
-/// Hopcroft-Karp phase: O(√V) phases
+/// First Hopcroft–Karp **phase** (empty initial matching): number of matches added
+/// in one BFS layering + blocking DFS sweep (vertex-disjoint shortest augmentations).
 fn builtin_hopcroft_karp_phase(args: &[PerlValue]) -> PerlResult<PerlValue> {
-    let v = f1(args);
-    Ok(PerlValue::float(v.sqrt()))
+    let edges = parse_edges_b24(&args.first().cloned().unwrap_or(PerlValue::UNDEF));
+    let n_left = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
+    let n_right = args.get(2).map(|v| v.to_number() as usize).unwrap_or(0);
+    let aug = hopcroft_karp_first_phase_augmentations(&edges, n_left, n_right);
+    Ok(PerlValue::integer(aug as i64))
 }
 
-/// Blossom match step (Edmonds): contract odd cycle
+/// Cardinality after one **successful** augmentation in general (non-bipartite)
+/// matching: size increases by exactly 1 when an augmenting path exists. Args: current
+/// size `m`, non-zero second arg iff a path was found and used this step.
 fn builtin_blossom_match_step(args: &[PerlValue]) -> PerlResult<PerlValue> {
     let m = f1(args);
-    let augment = args.get(1).map(|v| v.to_number()).unwrap_or(1.0);
-    Ok(PerlValue::float(m + augment))
+    let aug = args.get(1).map(|v| v.to_number()).unwrap_or(0.0);
+    let inc = if aug != 0.0 { 1.0 } else { 0.0 };
+    Ok(PerlValue::float(m + inc))
 }
 
 /// Kuhn (Hungarian) weighted matching step

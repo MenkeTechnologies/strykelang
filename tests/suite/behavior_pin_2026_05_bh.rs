@@ -50,5 +50,8 @@ fn git_authors_invalid_path_errors() {
 fn git_log_invalid_path_does_not_error_today() {
     // BUG: git_log doesn't error out on invalid paths currently, unlike the others.
     let out = eval_string("eval { git_log('/nonexistent') }; $@");
-    assert_eq!(out, "", "expected no error for git_log on invalid path today");
+    assert_eq!(
+        out, "",
+        "expected no error for git_log on invalid path today"
+    );
 }

@@ -7,14 +7,21 @@ fn special_var_os_name_is_populated() {
     let out = eval_string(r#"$^O"#);
     // Should be something like "darwin", "linux", "windows" depending on host,
     // but definitely not empty.
-    assert!(!out.is_empty() && out != "1", "expected $^O to be populated");
+    assert!(
+        !out.is_empty() && out != "1",
+        "expected $^O to be populated"
+    );
 }
 
 #[test]
 fn special_var_version_is_populated() {
     let out = eval_string(r#"$^V"#);
     // Should be "vX.Y.Z"
-    assert!(out.starts_with('v'), "expected $^V to start with v, got {}", out);
+    assert!(
+        out.starts_with('v'),
+        "expected $^V to start with v, got {}",
+        out
+    );
 }
 
 #[test]
@@ -27,7 +34,11 @@ fn special_var_global_phase_tracks_execution() {
 fn special_var_script_start_time_is_positive() {
     let out = eval_string(r#"$^T"#);
     let t: i64 = out.parse().unwrap_or(0);
-    assert!(t > 1_700_000_000, "expected $^T to be a recent epoch timestamp, got {}", out);
+    assert!(
+        t > 1_700_000_000,
+        "expected $^T to be a recent epoch timestamp, got {}",
+        out
+    );
 }
 
 #[test]
