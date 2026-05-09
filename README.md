@@ -2416,12 +2416,13 @@ in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
 #### Hashes
 
-Eight hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
+Nine hashes; every direct lookup (`$h{name}`) is **O(1)**. Forward maps:
 
 | Long name | Short | Key → Value |
 | --- | --- | --- |
-| `%stryke::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. |
-| `%stryke::all` | `%all` | **every spelling** (primary + alias) → category. Aliases inherit their primary's tag. Use this for `scalar keys %all`. |
+| `%stryke::builtins` | `%b` | **primary** callable name → category (`"parallel"`, `"string"`, …). Primaries-only — clean unique-op count. No keywords. |
+| `%stryke::keywords` | `%k` | stryke language keyword → category (`"control"`, `"decl"`, `"exception"`, `"phase"`, `"concurrency"`, `"oo"`, `"operator"`, `"visibility"`). Disjoint from `%b`. |
+| `%stryke::all` | `%all` | **every name** stryke recognizes — `%a + %b + %k`. Aliases inherit their primary's tag; keywords carry their `%k` category. Use this for `scalar keys %all`. |
 | `%stryke::perl_compats` | `%pc` | subset of `%b`: Perl 5 core only, name → category |
 | `%stryke::extensions` | `%e` | subset of `%b`: stryke-only, name → category |
 | `%stryke::aliases` | `%a` | alias → canonical primary (`$a{tj}` → `"to_json"`) |
@@ -2445,6 +2446,9 @@ stryke 'p $e{pmap}'              # "parallel"
 stryke 'p $a{tj}'                # "to_json"
 stryke 'p $d{pmap}'              # LSP one-liner
 stryke 'p $all{tj}'              # "serialization"  (alias resolved via %all)
+stryke 'p $k{if}'                # "control"
+stryke 'p $k{class}'             # "decl"
+stryke 'p $all{while}'           # "control"        (keyword resolved via %all)
 stryke 'p scalar @{$c{parallel}}'  # number of parallel ops
 stryke '$p{to_json} |> e p'        # every alias of to_json
 
@@ -2471,7 +2475,7 @@ stryke 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
 stryke 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-stryke 'for my $h (qw(b all pc e a d c p)) {
+stryke 'for my $h (qw(b k all pc e a d c p)) {
          printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```
@@ -2482,7 +2486,7 @@ stryke 'for my $h (qw(b all pc e a d c p)) {
   keys %h`) are O(n), but the two inverted indexes (`%c`, `%p`) give you
   O(1) reverse-lookups for the two most common "find names by property"
   queries.
-- Hash sigil namespace is separate from scalars and subs, so `%a`/`%b`/`%c`/`%d`/`%e`/`%p`/`%pc`
+- Hash sigil namespace is separate from scalars and subs, so `%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%p`/`%pc`
   don't collide with `$a`/`$b` sort specials or the `e` extension sub.
 - Short aliases are value copies of the long `%stryke::*` names — currently
   read-only in practice, so the copy never diverges.

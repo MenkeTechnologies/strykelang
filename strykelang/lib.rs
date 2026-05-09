@@ -905,6 +905,9 @@ mod parser_extra_tests;
 mod builtins_extra_tests;
 
 #[cfg(test)]
+mod keywords_hash_tests;
+
+#[cfg(test)]
 mod thread_extra_tests;
 
 #[cfg(test)]
