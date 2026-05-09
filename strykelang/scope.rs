@@ -400,6 +400,15 @@ pub struct Scope {
     /// are exempt. Requires at least two frames (captured + block locals); use [`Self::push_frame`]
     /// before running a block body on a worker.
     parallel_guard: bool,
+    /// Frame depth at the moment `parallel_guard` was enabled. Frames at depth
+    /// `>= parallel_guard_baseline` were pushed AFTER the guard turned on, so
+    /// they are worker-local and writable; frames at depth `< baseline` are the
+    /// captured outer scope and writes to those need `mysync`. Without this,
+    /// any nested block (e.g. `for my $y (@x) { ... }` inside `pmap`) would
+    /// push a new frame that makes `@x` look "captured" relative to the
+    /// innermost frame, even though `@x` was declared INSIDE the worker's own
+    /// block. Reset to 0 when the guard is disabled.
+    parallel_guard_baseline: usize,
     /// Highest positional slot index ever activated by [`Self::set_closure_args`].
     /// Once a slot is touched, every subsequent frame shifts that slot's outer
     /// chain (`_N<`, `_N<<`, ...) even if the new frame has fewer args. This
@@ -421,6 +430,7 @@ impl Scope {
             frames: Vec::with_capacity(32),
             frame_pool: Vec::with_capacity(32),
             parallel_guard: false,
+            parallel_guard_baseline: 0,
             max_active_slot: 0,
         };
         s.frames.push(Frame::new());
@@ -428,9 +438,13 @@ impl Scope {
     }
 
     /// Enable [`Self::parallel_guard`] for parallel worker interpreters (pmap, fan, …).
+    /// Snapshots the current frame depth as the baseline — any frames pushed
+    /// after this call are worker-local and writable; frames already present
+    /// are the captured outer scope.
     #[inline]
     pub fn set_parallel_guard(&mut self, enabled: bool) {
         self.parallel_guard = enabled;
+        self.parallel_guard_baseline = if enabled { self.frames.len() } else { 0 };
     }
 
     #[inline]
@@ -477,7 +491,10 @@ impl Scope {
         if crate::special_vars::is_regex_match_scalar_name(name) {
             return Ok(());
         }
-        let inner = self.frames.len().saturating_sub(1);
+        // Worker-local frames are at depth >= baseline; any frame at that
+        // depth or deeper is fine to write (it was created by THIS worker's
+        // block, even if a nested for/if/sub pushed an inner frame after it).
+        let baseline = self.parallel_guard_baseline;
         for (i, frame) in self.frames.iter().enumerate().rev() {
             if frame.has_scalar(name) {
                 if let Some(v) = frame.get_scalar(name) {
@@ -485,7 +502,7 @@ impl Scope {
                         return Ok(());
                     }
                 }
-                if i != inner {
+                if i < baseline {
                     // Direct the user to the right shared-state primitive based on
                     // whether the captured variable is package-global (`our` →
                     // `oursync`) or lexical (`my` → `mysync`).
@@ -618,12 +635,12 @@ impl Scope {
                 };
                 let name = name_owned.as_str();
                 if !name.is_empty() && !Self::parallel_allowed_topic_scalar(name) {
-                    let inner = len.saturating_sub(1);
+                    let baseline = self.parallel_guard_baseline;
                     for (fi, frame) in self.frames.iter().enumerate().rev() {
                         if frame.has_scalar(name)
                             || (idx < frame.scalar_slots.len() && frame.owns_scalar_slot_index(idx))
                         {
-                            if fi != inner {
+                            if fi < baseline {
                                 return Err(PerlError::runtime(
                                     format!(
                                         "cannot assign to captured outer lexical `${}` inside a parallel block (use `mysync`)",
@@ -1660,7 +1677,8 @@ impl Scope {
         {
             return Ok(());
         }
-        let inner = self.frames.len().saturating_sub(1);
+        // Worker-local frames are at depth >= baseline.
+        let baseline = self.parallel_guard_baseline;
         match self.resolve_array_frame_idx(name) {
             None => Err(PerlError::runtime(
                 format!(
@@ -1669,7 +1687,7 @@ impl Scope {
                 ),
                 0,
             )),
-            Some(idx) if idx != inner => Err(PerlError::runtime(
+            Some(idx) if idx < baseline => Err(PerlError::runtime(
                 format!(
                     "cannot modify captured non-mysync array `@{}` in a parallel block",
                     name
@@ -2189,7 +2207,8 @@ impl Scope {
         {
             return Ok(());
         }
-        let inner = self.frames.len().saturating_sub(1);
+        // Worker-local frames are at depth >= baseline.
+        let baseline = self.parallel_guard_baseline;
         match self.resolve_hash_frame_idx(name) {
             None => Err(PerlError::runtime(
                 format!(
@@ -2198,7 +2217,7 @@ impl Scope {
                 ),
                 0,
             )),
-            Some(idx) if idx != inner => Err(PerlError::runtime(
+            Some(idx) if idx < baseline => Err(PerlError::runtime(
                 format!(
                     "cannot modify captured non-mysync hash `%{}` in a parallel block",
                     name

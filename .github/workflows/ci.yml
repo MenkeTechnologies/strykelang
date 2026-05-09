@@ -102,11 +102,20 @@ jobs:
         run: ./target/release/s test examples/rosetta/t
       - name: Run stryke test on exercism project
         # Each exercise is its own dir with `t/test_*.stk` inside, where
-        # the test does `require "./Module.stk"`. The script cds into each
-        # before invoking `s test t` so the relative require resolves.
+        # the test does `require "./Module.stk"`. The runner is itself a
+        # stryke script — pmap-parallelized, ~2.7x faster than the bash
+        # version that ran exercises sequentially.
         env:
-          ST: ${{ github.workspace }}/target/release/s
-        run: bash examples/exercism_run_all.sh --summary
+          ST: ${{ github.workspace }}/target/release/stryke
+        run: ./target/release/stryke examples/exercism_run_all.stk --summary
+      - name: Idiomatic-stryke check on top-level examples
+        # `--no-interop` rejects Perl-isms ($a/$b, sub/say/reverse). Demos
+        # under examples/*.stk are showcases — they MUST parse clean under
+        # strict mode so they teach idiomatic stryke, not Perl 5. The
+        # checker is itself a stryke script (pmap-parallelized).
+        env:
+          ST: ${{ github.workspace }}/target/release/stryke
+        run: ./target/release/stryke examples/check_no_interop.stk
       - name: Run ruby interp
         run: ./target/release/stryke examples/ruby/Ruby.stk
       - name: Run Scheme R5RS-subset interpreter (~5k lines, 356 tests)

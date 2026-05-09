@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+# Run `stryke test` on every exercism exercise + `--no-interop` syntax check
+# on each solution file. Each pmap worker prints its own OK/FAIL line as
+# soon as the exercise finishes — output is live, in worker-completion order.
+#
+# Usage: stryke /path/to/examples/exercism_run_all.stk [--summary]   (any cwd)
+# Env:   ST=path/to/stryke      (defaults to "stryke" on PATH)
+# Exit:  0 if every exercise tests-green AND --no-interop-clean, 1 otherwise.
+
+$| = 1   # autoflush so per-worker prints hit the terminal immediately
+
+my $summary = grep { _ eq "--summary" } @ARGV
+my $st      = $ENV{ST} // "stryke"
+my $ex_dir  = dirname(__FILE__) . "/exercism"
+
+my @dirs = sort(glob("$ex_dir/*/"))
+die "no exercises found in $ex_dir" unless len(@dirs)
+
+mysync $pass = 0
+mysync @failed
+
+# Each exercise: --no-interop -c every solution .stk, then `s test t`.
+# Both run via cd <dir> && ... so worker threads don't race on cwd.
+# The worker prints its own OK/FAIL — that's the live progress.
+pmap {
+    my $d    = _
+    my $name = (split("/", $d))[-1]
+
+    my $err = ""
+    for my $sol (glob("$d/*.stk")) {
+        if (system("$st --no-interop -c \"$sol\" >/dev/null 2>&1") != 0) {
+            $err = "--no-interop"
+            last
+        }
+    }
+    if (!$err && system("cd \"$d\" && $st test t >/dev/null 2>&1") != 0) {
+        $err = "test"
+    }
+
+    if ($err) {
+        push @failed, +{ name => $name, err => $err }
+        ep "  FAIL $name [$err]"
+    } else {
+        $pass++
+        p "  OK   $name" unless $summary
+    }
+} @dirs
+
+my $total = $pass + len(@failed)
+p ""
+p "exercism: $pass/$total passed (", len(@failed), " failed)"
+
+if (len(@failed)) {
+    p "failed:"
+    p "  $_->{name} [$_->{err}]" for @failed
+    exit 1
+}

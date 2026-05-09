@@ -1611,6 +1611,25 @@ fn pmap_chunked_preserves_order_and_values() {
     assert_eq!(ri(s), 20);
 }
 
+/// Regression: a `for my $y (@x)` loop inside a `pmap` block was misclassifying
+/// `@x` (declared inside the worker's own block) as a "captured" array because
+/// the for-loop pushed a new frame, making `@x` non-innermost. The parallel
+/// guard then rejected the iterator's writeback and the closure returned UNDEF.
+/// Fix: track `parallel_guard_baseline` as the depth at guard-enable; allow
+/// writes to any frame at that depth or deeper.
+#[test]
+fn pmap_inner_for_loop_over_local_array_returns_block_value() {
+    let s = r#"
+        my @r = pmap {
+            my @x = (1, 2, 3);
+            for my $y (@x) { 1 }
+            99
+        } (1, 2, 3);
+        $r[0] + $r[1] + $r[2];
+    "#;
+    assert_eq!(ri(s), 297);
+}
+
 #[test]
 fn reduce_left_fold_sum_and_concat() {
     assert_eq!(ri(r#"(1, 2, 3, 4) |> reduce { $a + $b };"#), 10);
