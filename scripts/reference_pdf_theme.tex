@@ -1,0 +1,120 @@
+% Cyberpunk dark theme for docs/reference.pdf, mirroring docs/index.html.
+% Injected by scripts/reference_pdf.sh via --include-in-header. The bash
+% script substitutes @FONT_DIR@ with an absolute path to docs/.fonts/.
+
+\usepackage{xcolor}
+\usepackage{pagecolor}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+
+% Palette from docs/hud-static.css (data-theme="dark").
+\definecolor{bgPrimary}{HTML}{05050A}
+\definecolor{bgCard}{HTML}{0D0D1A}
+\definecolor{accentPink}{HTML}{FF2A6D}
+\definecolor{neonCyan}{HTML}{05D9E8}
+\definecolor{neonMagenta}{HTML}{D300C5}
+\definecolor{neonGreen}{HTML}{39FF14}
+\definecolor{textPrim}{HTML}{E0F0FF}
+\definecolor{textDim}{HTML}{7A8BA8}
+\definecolor{borderDim}{HTML}{1A1A3E}
+
+\pagecolor{bgPrimary}
+\color{textPrim}
+
+% Variable Orbitron — wght axis, 400 regular / 700 bold / 900 black.
+\setsansfont{Orbitron}[
+    Path=@FONT_DIR@,
+    Extension=.ttf,
+    UprightFont=Orbitron-VF,
+    UprightFeatures={RawFeature={+axis={wght=400}}},
+    BoldFont=Orbitron-VF,
+    BoldFeatures={RawFeature={+axis={wght=700}}},
+    Scale=MatchLowercase,
+]
+
+% Static Share Tech Mono — single weight.
+\setmonofont{ShareTechMono}[
+    Path=@FONT_DIR@,
+    Extension=.ttf,
+    UprightFont=ShareTechMono-Regular,
+    Scale=MatchLowercase,
+]
+
+% Headings: Orbitron, neon. Pandoc emits report-class \chapter / \section /
+% \subsection. titlesec*-form is "easy" and supports section and below; for
+% \chapter use the full \titleformat with empty label/spacing slots since
+% secnumdepth is forced negative (no numbering).
+\titleformat{\chapter}[hang]{\sffamily\bfseries\Huge\color{neonCyan}}{}{0pt}{}
+\titlespacing*{\chapter}{0pt}{20pt}{20pt}
+\titleformat*{\section}{\sffamily\bfseries\LARGE\color{neonMagenta}}
+\titleformat*{\subsection}{\sffamily\bfseries\Large\color{accentPink}}
+\titleformat*{\subsubsection}{\sffamily\bfseries\large\color{neonCyan}}
+
+% Hyperref already configured by pandoc; override link colors to neon.
+% \AtBeginDocument because pandoc loads hyperref AFTER our header-include,
+% so \hypersetup is undefined when this file runs. linktoc=all ensures the
+% TOC entries (text + page number) inherit linkcolor; without it, dotted
+% leaders and page numbers stay near-invisible NavyBlue on the dark bg.
+\AtBeginDocument{%
+    \hypersetup{%
+        linkcolor=neonCyan,%
+        urlcolor=neonMagenta,%
+        citecolor=neonGreen,%
+        filecolor=neonCyan,%
+        linktoc=all,%
+    }%
+}
+
+% Pandoc syntax-highlight blocks live inside a \Shaded environment defined
+% in pandoc's template. Override its background to bgCard with a thin border.
+% \AtBeginDocument because pandoc defines \Shaded after our header-include.
+\AtBeginDocument{%
+    \renewenvironment{Shaded}{%
+        \begin{tcolorbox}[%
+            colback=bgCard,colframe=borderDim,boxrule=0.4pt,arc=1pt,%
+            left=4pt,right=4pt,top=2pt,bottom=2pt,%
+            before skip=4pt,after skip=4pt%
+        ]\color{neonGreen}\ttfamily\small%
+    }{\end{tcolorbox}}%
+}
+
+% Inline `code` and \texttt: bright cyan.
+\renewcommand{\texttt}[1]{{\ttfamily\color{neonCyan}#1}}
+
+% TOC color tweak: dotted leaders → dim, page numbers → cyan.
+\makeatletter
+\renewcommand{\@dotsep}{1.5}
+\makeatother
+
+% Cyberpunk cover page — replaces pandoc's default \maketitle. Big stryke
+% wordmark in Orbitron, neon cyan/magenta accents, version + date in dim
+% terminal-style mono. \@title / \@author / \@date are populated by pandoc
+% from --metadata.
+\makeatletter
+\renewcommand{\maketitle}{%
+    \begin{titlepage}%
+    \begin{center}%
+    \vspace*{2cm}
+    {\sffamily\bfseries\fontsize{12pt}{14pt}\selectfont\color{neonCyan}%
+        \rule[0.4ex]{1.5cm}{0.4pt}\hspace{0.5em}// STRYKE //\hspace{0.5em}\rule[0.4ex]{1.5cm}{0.4pt}}%
+    \par\vspace{2.5cm}%
+    {\sffamily\bfseries\fontsize{72pt}{80pt}\selectfont\color{textPrim}\@title\par}%
+    \vspace{1cm}%
+    {\color{neonMagenta}\rule{0.5\linewidth}{1pt}\par}%
+    \vspace{0.8cm}%
+    {\sffamily\bfseries\fontsize{20pt}{24pt}\selectfont\color{neonMagenta}%
+        LANGUAGE REFERENCE\par}%
+    \vspace{0.4cm}%
+    {\sffamily\fontsize{10pt}{12pt}\selectfont\color{textDim}%
+        \itshape every builtin · keyword · alias · extension\par}%
+    \vfill
+    {\ttfamily\color{neonGreen}\Large \@date\par}%
+    \vspace{0.5cm}%
+    {\ttfamily\color{textDim}\normalsize \@author\par}%
+    \vspace{1.5cm}%
+    {\sffamily\fontsize{8pt}{10pt}\selectfont\color{borderDim}%
+        \rule[0.4ex]{1cm}{0.3pt}\hspace{0.4em}MENKETECHNOLOGIES\hspace{0.4em}\rule[0.4ex]{1cm}{0.3pt}\par}%
+    \end{center}%
+    \end{titlepage}%
+}
+\makeatother

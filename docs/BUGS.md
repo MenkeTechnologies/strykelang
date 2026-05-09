@@ -525,7 +525,29 @@ Pins documenting **tail truncation** split across **`tests/suite/behavior_pin_20
 `hinge_loss`, …) strictly for reproducible floats — **not** tail-drop cases.
 
 List / stats companion pins: **`tests/suite/behavior_pin_2026_05_ch.rs`** (also **`chain_from`**
-**`ARRAYREF`** pitfall — **BUG-142**) and **`behavior_pin_2026_05_ci.rs`** (streaming / `to_list` traps — **BUG-143** … **BUG-146**).
+**`ARRAYREF`** pitfall — **BUG-142**), **`behavior_pin_2026_05_ci.rs`** (streaming / `to_list` traps — **BUG-143** … **BUG-146**),
+and **`behavior_pin_2026_05_cj.rs`** (list glue + **`permutations([...])`** — **BUG-147**, **`concat`** — **BUG-148**),
+**`behavior_pin_2026_05_ck.rs`** (**`without([...], LIST)`** — **BUG-149**; multiset order — **BUG-150**),
+**`behavior_pin_2026_05_cl.rs`** (**BUG-151** … **BUG-155** — clamp / strings / `hamming` / `substr` / **`reverse([...])`**),
+**`behavior_pin_2026_05_cm.rs`** (**`seq`** / **`crc32`** multi-arg — **BUG-156**, **BUG-157**),
+**`behavior_pin_2026_05_cn.rs`** (**`parse_int("0xff")`** — **BUG-158**; **`transpose`** nested AoA — **BUG-159**; regex helper arg order — **BUG-160**),
+**`behavior_pin_2026_05_co.rs`** (**`percentile`** / **`quantile`** conventions — **BUG-161**; **`take`** / **`product`** **`ARRAYREF`** buckets cross-ref **BUG-143** / **BUG-140**),
+**`behavior_pin_2026_05_cp.rs`** (scalar planar **`chebyshev` / `slope` / `midpoint`** vs vector distances — **BUG-162**),
+**`behavior_pin_2026_05_cq.rs`** (**`running_reduce`** + **`$a`/`$b`** — **BUG-163**; **`uri_resolve` / `uri_normalize`** byte vectors — **BUG-164**),
+**`behavior_pin_2026_05_cr.rs`** (**`string_take_while` / `string_drop_while`** charset-prefix semantics — **BUG-165**; **`nth`** on **`ARRAYREF`** — **BUG-166**; **`gcd` / `lcm`** two-operand only — **BUG-167**),
+**`behavior_pin_2026_05_cs.rs`** (**`hamming`** vs **`hamming_distance`** — **BUG-168**; **`matrix_transpose`** — cross-ref **BUG-159** / variadic transpose),
+**`behavior_pin_2026_05_ct.rs`** (**`hhi` / `herfindahl_hirschman`** share vector — **BUG-169**),
+**`behavior_pin_2026_05_cu.rs`** (**`moving_average` / `batch` / `chunk_n`** arity — **BUG-170**),
+**`behavior_pin_2026_05_cv.rs`** (**`ml_binary_cross_entropy`** open interval — **BUG-171**),
+**`behavior_pin_2026_05_cw.rs`** (**`jaccard_similarity`** string-set collapse on vector args — **BUG-172**; **`mode([…])`** bracket
+operand — **BUG-173**),
+**`behavior_pin_2026_05_cx.rs`** (**`windowed` / `chunked`** — **BUG-174**; **`trimmed_mean`** — **BUG-175**; **`base_convert`**
+two-arg numeric — **BUG-176**),
+**`behavior_pin_2026_05_cy.rs`** (**`graph_density`** — **BUG-177**; **`transpose`** vs **`matrix_transpose`** — **BUG-178**),
+**`behavior_pin_2026_05_cz.rs`** (**`pmt`** arg order — **BUG-179**; **`format_percent`** — **BUG-180**),
+**`behavior_pin_2026_05_da.rs`** (**`anova_oneway`** nested AoA — **BUG-181**; **`trapz` / `simpson`** second operand — **BUG-182**),
+**`behavior_pin_2026_05_db.rs`**: **BUG-183** (search/bounds needle-first), **BUG-184** (`dice_coefficient` strings), **BUG-185** (`winsorize` percent-first),
+**`behavior_pin_2026_05_dc.rs`**: **BUG-186** (`unzip` vs row pairs), **BUG-187** (`clamp_list` inverted bounds panic).
 
 ## BUG-127 — `iota_range` ignores arguments after the first — **`polish`**
 
@@ -731,6 +753,407 @@ Pins: **`unzip_pairs_explicit_pair_rows_ci`**, **`unzip_pairs_after_zip_over_fla
 **`flatten_args`** expands iterators via **`map_flatten_outputs`**, which invokes **`PerlIterator::collect_all`**. **Infinite `cycle` iterators return an empty snapshot** (“do not eagerly loop forever”), leaving **`take_n`** with **no input elements**, so stringify is **`()`** today.
 
 Pin: **`take_n_cycle_iterator_yields_empty_today_bug_ci`**.
+
+## BUG-147 — **`permutations([...])`** (one argument) vacates: first slot **`to_int` → 0** — **`polish`**
+
+**`permutations N, LIST`** is documented as taking a numeric **\(N\)** first. A **single** bracket
+array actual **`permutations([1, 2, 3])`** still parses as one argument; **`PerlValue::to_int`** on an
+**`ARRAYREF` is `0`**, the implementation treats **`n == 0`**, and returns **`()`** instead of
+**full-list permutations**. Call **`permutations(scalar(@xs), \@xs)`** / **`permutations(len(\@xs), \@xs)`**
+or the explicit **`permutations(3, [1, 2, 3])`** shape.
+
+Pins: **`permutations_k_equals_list_length_three_cj`**, **`permutations_single_arrayref_numifies_to_zero_empty_bug_cj`**
+in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
+
+## BUG-148 — **`concat` / `chain`** on **`ARRAYREF` operands** streams **one cell per argument** — **`polish`**
+
+**`builtin_concat`** wraps each actual in **`into_pull_iter`**. A plain **`[...]`** value is an **`ARRAYREF`**
+whose iterator surfaces **the whole list as one pulled item**, not element-by-element. Stringifying the
+concat iterator therefore looks like **one bucket per argument** — e.g. **`([1, 2], [3], [4, 5])`** —
+whereas **`chain_from([1, 2], [3], [4, 5])`** flattens top-level list slots today.
+
+Pins: **`concat_iterator_one_bucket_per_arrayref_arg_cj`**, **`chain_from_three_lists_eager_flat_cj`**
+in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
+
+## BUG-149 — **`without([...], LIST)`** does not subtract members: filter compares **ref display string** — **`bug`**
+
+**`builtin_without`** takes **`drop = args.first()`** and drops list elements where **`v.to_string() ==
+drop.to_string()`**. When **`drop`** is an **`ARRAYREF`**, **`drop.to_string()`** is the opaque
+**`ARRAY(0x…)`** banner — no list element stringifies the same way, so **nothing is removed** and the
+tail list is returned intact. To drop values present in another collection, flatten to scalars /
+use a predicate loop / multiset helper instead of passing **`[…]`** as the selector.
+
+Pins: **`without_scalar_filters_by_string_equality_ck`**, **`without_arrayref_first_compare_ref_display_no_drops_bug_ck`**
+in **`tests/suite/behavior_pin_2026_05_ck.rs`**.
+
+## BUG-150 — **`multiset_intersection` / `multiset_difference` (and multiset union)** emit **HashMap iteration order** — **`polish`**
+
+**`math_wolfram10.rs`** multiset builtins walk **`HashMap`** / **`HashSet`** keys when building the result
+vector. **`stringify(...)`** order is therefore **non-deterministic** run-to-run. Sort explicitly when
+stable output matters (**`sort { $a cmp $b } multiset_intersection(...)`**).
+
+Pins: **`multiset_difference_sorted_join_counts_ck`**, **`multiset_intersection_sorted_join_counts_ck`**
+in **`tests/suite/behavior_pin_2026_05_ck.rs`** (sorted joins; unsorted shapes are intentionally not pinned).
+
+## BUG-151 — **`clamp` three-scalar Perl order **`clamp($x,$min,$max)`** is mis-read as **`clamp($min,$max,@list)`** — **`polish`**
+
+**`builtin_clamp`** treats **three** operands as **`min, max, first list value`** when the flattened
+tail after the first two args is **non-empty** (even for a **single** trailing scalar). So
+**`clamp(11, 0, 10)`** becomes **min=11**, **max=0**, values **`[10]`**, and **`10 < 11`** clamps to
+**`11`** instead of **`10`**. For scalars, use **`clamp(0, 10, 11)`** (stryke **min,max,value** order)
+or **`clamp_list`**.
+
+Pins: **`clamp_scalar_inside_range_cl`**, **`clamp_value_min_max_order_misread_as_min_max_list_bug_cl`**
+in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
+
+## BUG-152 — **`reverse($scalar)`** path-dependent string: **tail/assign** reverse; **`join("", …)`** does not — **`bug` / `polish`**
+
+For a **string scalar** **`$s`**, **`reverse($s)`** as a **statement tail** or **`my $t = reverse($s); $t`** stringifies **`cba`**, but **`join("", reverse($s))`** stays **`abc`** today — list flattening / topic context treats the operand differently than assignment / return-value stringification.
+
+Pins: **`reverse_scalar_tail_expr_stringifies_reversed_cl`**, **`reverse_scalar_after_let_binding_reversed_cl`**, **`reverse_scalar_join_list_context_stays_forward_bug_cl`**
+in **`tests/suite/behavior_pin_2026_05_cl.rs`**. (**`reverse_str`** remains the explicit grapheme reversal helper.)
+
+## BUG-153 — bare **`hamming`** is the **DSP window**, not **string Hamming distance** — **`polish`**
+
+Dispatch maps **`"hamming"`** to **`window_hamming`**. For **edit distance** on two strings, use
+**`hamming_distance`** or **`hamming_distance_str`**.
+
+Pins: **`hamming_distance_bit_flip_one_cl`** in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
+
+## BUG-154 — **`substr` on UTF‑8 uses **byte** offsets (not grapheme indices)** — **`polish`**
+
+**`substr("αβγ", 1, 1)`** lands **inside** the first UTF-8 codepoint and returns **empty**; stepping
+**two** bytes from the start (**`substr(..., 0, 2)`**) yields **`α`**. Use **`char_at` /
+`graphemes` + indexing** when you mean **character** positions.
+
+Pins: **`substr_ascii_slice_cl`**, **`substr_utf8_byte_window_one_grapheme_cl`**, **`substr_utf8_one_byte_mid_codepoint_empty_bug_cl`**
+in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
+
+## BUG-155 — **`reverse([...])`** does not reverse **inner** elements (single **`ARRAYREF`** actual) — **`polish`**
+
+Like **`uniq([…])`** / iterator bucket pitfalls, a **single** bracket array passed to **`reverse`**
+is not **`map_flatten_outputs`**’d into a variadic list — **`stringify(reverse([1, 2, 3]))`** stays
+**`[1, 2, 3]`**. Use **`reverse_list`**, **`reverse(1,2,3)`**, or **`reverse @{ $aref }`**-style
+flattening when porting Perl.
+
+Pins: **`reverse_variadic_three_ints_cl`**, **`reverse_single_inline_arrayref_identity_shape_cl`**, **`reverse_list_drains_bracket_list_cl`**
+in **`tests/suite/behavior_pin_2026_05_cl.rs`**.
+
+## BUG-156 — **`seq` is not Bash/Raku numeric `seq FIRST LAST` — only first arg is used** — **`polish`**
+
+**`builtin_seq`** documents **`seq COLL`** — it turns one collection into a list (and **`UNDEF`**
+when empty). **`seq(2, 5)`** therefore only inspects **`2`** (stringifies as **`"2"`**), not a range;
+use **`range(2, 5)`** for inclusive integer steps.
+
+Pin: **`seq_two_args_only_first_used_bug_cm`** in **`tests/suite/behavior_pin_2026_05_cm.rs`**.
+
+## BUG-157 — **`crc32`** ignores **all bytes after `args.first()`** (extra operands silent) — **`polish`**
+
+Implementation hashes only **`perl_scalar_as_bytes(args[0])`**. **`crc32("a","b")`** is identical to
+**`crc32("a")`**, not **`crc32("ab")`**, so “split string” call sites silently diverge from intuition.
+
+Pin: **`crc32_separate_args_differs_from_concat_bug_cm`** in **`tests/suite/behavior_pin_2026_05_cm.rs`**.
+
+## BUG-158 — **`parse_int("0xff")` without an explicit radix is not hex** — **`polish`**
+
+**`parse_int`** only interprets a leading **`0x`** when the second-argument radix is **`16`**. A
+literal **`parse_int("0xff")`** numifies **`0`** and stops (**`0`**, not **`255`**). Use
+**`parse_int("ff", 16)`** (or **`hex` / `sprintf`**) for hex byte strings.
+
+Pin: **`parse_int_zero_x_without_radix_is_zero_bug_cn`** in **`tests/suite/behavior_pin_2026_05_cn.rs`**.
+
+## BUG-159 — **`transpose`** treats a **single** nested AoA as **one row** (use variadic rows or **`matrix_transpose`**) — **`polish`**
+
+**`transpose`** is documented as variadic rows: **`transpose(@row_a, @row_b, …)`**. Passing **one**
+value that is itself an AoA (**`transpose([[1,2],[3,4]])`**) flattens only the **outer** wrapper: the
+implementation iterates **`args`**, not **`args[0].rows`**, so you get a **1×2** “row of rowrefs” and a
+column-major shuffle — not a **2×2** transpose. **`matrix_transpose([[1,2],[3,4]])`** matches the
+usual matrix expectation.
+
+Pins: **`transpose_variadic_rows_cn`**, **`transpose_single_nested_aoa_columns_wrapped_bug_cn`**,
+**`matrix_transpose_nested_aoa_cn`** in **`tests/suite/behavior_pin_2026_05_cn.rs`**, and **`matrix_transpose_nested_two_by_two_cs`** in **`tests/suite/behavior_pin_2026_05_cs.rs`**.
+
+## BUG-160 — **`count_regex_matches`** argument order differs from **`split_regex` / `match_all` / `replace_regex`** — **`polish`**
+
+**`count_regex_matches(STR, PATTERN)`** puts the **haystack first**. The other regex helpers in the
+same family take **pattern-first** call sites: **`split_regex(PAT, STR)`**, **`match_all(PAT, STR)`**,
+**`replace_regex(PAT, REPL, STR)`**. Easy to permute arguments when mixing builtins in one script.
+
+Pins: **`count_regex_matches_digits_cn`**, **`split_regex_csv_cn`**, **`match_all_digit_pattern_first_cn`**,
+**`replace_regex_global_digits_cn`** in **`tests/suite/behavior_pin_2026_05_cn.rs`**.
+
+## BUG-161 — **`percentile`** vs **`quantile`**: **percent scale** (0–100) **and** operand order differs — **`polish`**
+
+**`builtin_percentile`** takes **`(P, LIST...)`** — the **probability mass** is **`args.first()`**, clamped to
+**`[0, 100]`**, and the sample is **`args[1..]`**. **`builtin_quantile`** takes **`(LIST..., P)`** — **all but the
+last** argument are data values, and **`P`** is **`args.last()`** in the **`[0, 1]`** interval with linear
+interpolation between sorted neighbors.
+
+So **`percentile(0.5, DATA)`** is **not** “half”; it is the **0.5th percentile** (bottom bucket after rounding).
+The median in **`percentile`** units is **`percentile(50, DATA)`**. **`quantile(DATA, 0.5)`** is the usual **`0.5`**
+quantile (**median**); the swapped call **`quantile(0.5, DATA)`** accidentally quantiles the scalar **`0.5`**
+with default/leftover semantics and does **not** match **`quantile(DATA, 0.5)`**.
+
+Pins: **`percentile_fifty_median_co`**, **`percentile_fraction_is_percent_units_not_quantile_bug_co`**,
+**`quantile_half_matches_intuition_co`**, **`quantile_probability_first_arg_is_not_list_plus_p_bug_co`**,
+**`percentile_zero_and_hundred_extrema_co`** in **`tests/suite/behavior_pin_2026_05_co.rs`**.
+
+## BUG-162 — Planar **`chebyshev_distance` / `slope` / `midpoint`** are **four-scalar** APIs; vector distances differ — **`polish`**
+
+**`chebyshev_distance`** is **`(x1, y1, x2, y2)`** on the Euclidean plane. Two bracket “point” operands
+(**`chebyshev_distance([0, 0], [3, 4])`**) are not unpacked into coordinates — the call numifies the
+container values and can return **`0`** instead of **`max(|Δx|, |Δy|)`**.
+
+**`slope`** and **`midpoint`** use the same **four-numeric-actual** shape **(`x1`, `y1`, `x2`, `y2`)**.
+Feeding two lists intended as paired samples does not compute a linear regression slope; it repartitions
+scalars and can yield **`inf`** when the effective **Δx** clamps to zero.
+
+Prefer **`distance` / `manhattan_distance` / `euclidean_distance`** (two vector operands) for
+coordinate-array workflows; use the scalar planar builtins only when you truly mean a two-point planar
+construction.
+
+Pins: **`chebyshev_distance_four_scalars_cp`**, **`chebyshev_two_vectors_coerces_to_zero_bug_cp`**,
+**`slope_four_coordinates_cp`**, **`slope_with_two_vector_args_vertical_line_inf_bug_cp`**,
+**`midpoint_four_coordinates_cp`** in **`tests/suite/behavior_pin_2026_05_cp.rs`**.
+
+## BUG-163 — **`running_reduce { $a + $b }`** does not see comparator scalars (zeros after first) — **`bug`**
+
+**`builtin_running_reduce`** invokes the reducer via **`call_sub`** on successive prefix tails, but the
+block’s **`$a` / `$b`** (or implicit sort-style bindings) are not populated for that code path the way
+**`$_0` / `$_1`** slots are for **`preduce`**-family workers. With **`$a + $b`**, the second operand is
+**`undef`**, so the running output collapses to **`0`** after the first element.
+
+**`running_reduce { $_0 + $_1 }`** (or an explicit two-argument **`sub`**) matches the intended fold.
+
+Pins: **`running_reduce_implicit_slot_add_cq`**, **`running_reduce_dollar_ab_zeros_after_first_bug_cq`** in
+**`tests/suite/behavior_pin_2026_05_cq.rs`**.
+
+## BUG-164 — **`uri_resolve` / `uri_normalize`** take **numeric byte vectors**, not **URI strings** — **`bug`**
+
+Both helpers feed **`b81_to_bytes`**, which expands the first argument with **`arg_to_vec`** and then casts
+each Perl value with **`to_number() as u8`**. Ordinary **`"http://…"`** strings therefore do not become
+UTF-8 bytes — they stringify as a lump scalar that **`arg_to_vec`** does not split into octets — and
+classification / “change counts” bear no relation to RFC 3986 on strings.
+
+Pass an explicit byte array (e.g. **`[104, 116, 116, 112, …]`** for **`http…`**) if you need the
+current implementation’s behaviour; do not assume **`uri_resolve(STR)`** performs reference resolution.
+
+Pins: **`uri_resolve_byte_vector_absolute_uri_cq`**, **`uri_resolve_plain_string_misclassified_relative_bug_cq`**,
+**`uri_normalize_counts_upper_bytes_cq`** in **`tests/suite/behavior_pin_2026_05_cq.rs`**.
+
+## BUG-165 — **`string_take_while` / `string_drop_while`** filter a **leading prefix** against an **allowed-char set**, not a Perl predicate — **`polish`**
+
+Both builtins (`math_wolfram11.rs`: **`builtin_string_take_while`**, **`builtin_string_drop_while`**) treat the
+second operand as a string of characters to match from the start of the first string (greedy charset scan).
+They are **not** list-style **`take_while { … }`** callback filters; passing a code ref or expecting regex-like
+behaviour will not work.
+
+Pins: **`string_take_while_charset_prefix_not_predicate_cr`**, **`string_drop_while_charset_prefix_not_predicate_cr`**
+in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
+
+## BUG-166 — **`nth(N, ARRAYREF)`** often returns **`undef`** because **`to_list`** does not unpack **`ArrayRef`** — **`bug`**
+
+**`builtin_nth`** falls back to **`v.to_list()`** for non-iterators. **`PerlValue::to_list`** expands
+**`HeapObject::Array`** but **`HeapObject::ArrayRef`** hits the default arm and becomes a **one-element list**
+containing the ref itself, so any positive index reads **`undef`**. **`nth(N, range(...))`** still works
+because **`range`** yields an iterator.
+
+Pins: **`nth_zero_indexed_from_range_iterator_cr`**, **`nth_inline_arrayref_undef_bug_cr`** in **`tests/suite/behavior_pin_2026_05_cr.rs`**.
+
+## BUG-167 — **`gcd`** and **`lcm`** use **only `args[0]`** and **`args[1]`**; further operands are ignored — **`polish`**
+
+**`builtin_gcd`** / **`builtin_lcm`** implement pairwise binary GCD/LCM on the first two arguments. Variadic tails
+silently drop. **`gcd(12, 18, 35)`** returns **`6`** ( **`gcd(12, 18)`** ) instead of **`1`**; **`lcm(4, 6, 10)`**
+returns **`12`** instead of **`60`**.
+
+Pins: **`gcd_trailing_operands_ignored_two_arg_only_cr`**, **`lcm_trailing_operands_ignored_two_arg_only_cr`** in
+**`tests/suite/behavior_pin_2026_05_cr.rs`**.
+
+## BUG-168 — Bare **`hamming`** is the **DSP window**; **string Hamming distance** is **`hamming_distance`** — **`polish`**
+
+**`window_hamming`** is exported under the bare name **`hamming`** (`builtins.rs` dispatch shares the alias with
+**`window_hamming`**). The unrelated string metric lives only on **`hamming_distance`**, which routes to
+**`builtin_hamming`** (characterwise mismatch count, equal lengths). Feeding two bitstrings into **`hamming(...)`**
+does **not** compare them — it builds a window whose size comes from **`args[0].to_int()`** after string→number
+coercion, producing window coefficients unrelated to the second “argument”.
+
+Use **`hamming_distance($a, $b)`** for edit counts; use **`hamming($n)`** or **`window_hamming($n)`** for the taper
+vector.
+
+Pins: **`dsp_hamming_window_four_stringify_cs`**, **`string_hamming_distance_bitstrings_cs`** in
+**`tests/suite/behavior_pin_2026_05_cs.rs`**.
+
+## BUG-169 — **`hhi` / `herfindahl_hirschman`** ingests **`arg_to_vec(args[0])` only** — variadic tails are not market shares — **`polish`**
+
+**`builtin_herfindahl_hirschman`** builds the share list exclusively from the **first** actual argument
+(**`math_wolfram8.rs`**). A natural call **`hhi(0.3, 0.3, 0.4)`** therefore uses **only** **`0.3`** (one firm with
+100 % share → **HHI = 0.09**), not three competing shares (**0.34** when passed as **`hhi([0.3, 0.3, 0.4])`**).
+
+Pass a **single** arrayref / list bucket for the full share vector.
+
+Pins: **`herfindahl_three_shares_array_ct`**, **`herfindahl_variadic_uses_first_share_only_bug_ct`** in
+**`tests/suite/behavior_pin_2026_05_ct.rs`**.
+
+## BUG-170 — **`moving_average`**, **`batch`**, **`chunk_n`**, **`group_of_n`** take **size/window first**, then data — reversed args misuse **`to_int(first)`** — **`polish`**
+
+These builtins all read **`n = args[0].to_int().max(1)`** ( **`builtins_extended.rs`** moving-average path; **`builtins.rs`** **`builtin_batch`**
+for **`chunk_n` / `group_of_n`** ) and treat **`flatten_args(args[1..])`** as the series. The first operand is therefore **not** “the list”.
+
+- **`moving_average([1,2,3], 5)`**: for a leading **`ARRAYREF`**, **`to_int()`** is **`0`** → **`max(1)`** forces window **`1`**, so the
+  implementation averages **only** the tail scalar **`5`** (output **`5`**) instead of signalling a **`(LIST, WINDOW)`** swap.
+  Correct: **`moving_average(3, 1, 2, 3, …)`** or **`moving_average(3, \@xs)`**.
+- **`chunk_n([1,2,3,4], 2)`**: first-arg array **`to_int()`** is **length `4`**; the tail is **`[2]`**, so **`batch`** emits a single
+  chunk of **`[2]`** — stringify **`[2]`**, not **`([1,2], [3, 4])`**.
+
+Pins: **`moving_average_window_first_three_cu`**, **`moving_average_arrayref_first_tail_only_bug_cu`**, **`chunk_n_size_first_cu`**,
+**`chunk_n_list_first_yields_single_tail_chunk_bug_cu`** in **`tests/suite/behavior_pin_2026_05_cu.rs`**.
+
+## BUG-171 — **`ml_binary_cross_entropy(Y, P)`** returns **`inf`** when **`P ≤ 0`** or **`P ≥ 1`** — **`polish`**
+
+**`builtin_ml_binary_cross_entropy`** (**`math_wolfram45.rs`**) guards **`ln P`** / **`ln(1−P)`** by rejecting **`p <= 0`** or **`p >= 1`**
+with **`inf`**, so “certain” probabilities (**`1`**, **`0`**) are not admissible even though the analytic limit is finite on one
+branch. Use **`P`** in **`(0, 1)`** (e.g. **`1 - ε`**) near the boundary.
+
+Pins: **`ml_binary_cross_entropy_interior_cv`**, **`ml_binary_cross_entropy_prob_one_is_inf_bug_cv`** in **`tests/suite/behavior_pin_2026_05_cv.rs`**.
+
+## BUG-172 — **`jaccard_similarity(A, B)`** on numeric vectors uses **stringified element sets** — **`polish`**
+
+**`builtin_jaccard_similarity`** (**`builtins.rs`**) builds **`HashSet<String>`** from **`flatten_args`** over each side. Any multiset / order /
+multiplicity information is lost: e.g. **`[1, 0, 1]`** and **`[0, 1, 1]`** both become **`{"0", "1"}`**, so the coefficient is **`1`**
+instead of the multiset Jaccard one would expect for binary masks. For multiset-aware similarity, use primitives that compare aligned
+vectors (or build explicit count maps). **`jaccard_index`** follows the same string-set pattern on **`arg_to_vec`** elements.
+
+Pins: **`jaccard_similarity_binary_masks_collapse_to_unit_bug_cw`**, **`jaccard_similarity_unique_elements_matches_index_cw`** (contrast)
+in **`tests/suite/behavior_pin_2026_05_cw.rs`**.
+
+## BUG-173 — **`mode([…])`** (single bracket list operand) does **not** return the element-wise mode — **`bug`**
+
+**`builtin_mode`** (**`builtins.rs`**) uses **`flatten_args`**. **Observed:** **`mode([1, 2, 2, 3])`** **`stringify`** as **`[1, 2, 2, 3]`**
+(the bracket list echoed), while **`mode(1, 2, 2, 3)`** correctly yields **`2`**. Prefer variadic arguments or **`mode_val([1, 2,
+2, 3])`** when the population lives in one array.
+
+Pins: **`mode_variadic_vs_single_arrayref_bug_cw`**, **`mode_val_arrayref_finds_modal_cw`** in **`tests/suite/behavior_pin_2026_05_cw.rs`**.
+
+## BUG-174 — **`windowed` / `chunked`** treat a **bracket list** **`[LIST], N`** as a **single** list cell — **`polish`**
+
+**`windowed_with_want`** / chunked sibling (**`list_builtins.rs`**) split **`args[..len−1]`** into raw **`PerlValue`** cells without
+**`flatten_args`** / **`to_list()`**. A **tuple** **`(1, 2, 3, 4)`** (or comma-arg tails) supplies **four** scalar slots, but **`[1, 2,
+3, 4]`** is **one** slot whose length is **`1`**, so **`N > len`** and the list result is empty (**`windowed`**) or a single outer chunk
+(**`chunked`**). Prefer **`windowed((…), N)`** (or **`LIST |> windowed(N)`** per compiler message) when the list is one grouped value.
+
+Pins: **`windowed_tuple_two_overlap_three_windows_cx`**, **`windowed_bracket_array_yields_empty_bug_cx`**, **`chunked_tuple_pairs_cx`**,
+**`chunked_bracket_array_single_outer_chunk_bug_cx`** in **`tests/suite/behavior_pin_2026_05_cx.rs`**.
+
+## BUG-175 — **`trimmed_mean`** first operand **`ARRAY` → `to_number()`** is **length**, not an error — **`bug`**
+
+**`builtin_trimmed_mean`** (**`builtins.rs`**) reads **`pct = args.first().to_number()`**. For an **`ARRAY`**, **`to_number`** is the
+element **count**. **`trimmed_mean([1, 2, 3, 4, 100], 20)`** therefore uses **`pct = 5`** (not **`20` %**) and **`collect_numbers([20])`**
+so the “sample” is **[20]** only — output **`20`** instead of a trimmed mean of the five originals. Correct surface: **`trimmed_mean(20,
+1, 2, 3, 4, 100)`** or **`trimmed_mean(20, [1, 2, 3, 4, 100])`** (percent **first**, **`0–100`** scale).
+
+Pins: **`trimmed_mean_twenty_percent_trim_cx`**, **`trimmed_mean_list_first_yields_mean_of_tail_only_bug_cx`** in
+**`tests/suite/behavior_pin_2026_05_cx.rs`**.
+
+## BUG-176 — **`base_convert(N, FROM)`** (two-arg numeric) numifies to **`"…"`** then parses in **`FROM`** radix — **`polish`**
+
+**`builtin_base_convert`** (**`builtins_extended.rs`**) takes **`args[0].to_string()`**, **`args[1]`** as **source** radix, **`args[2]`** as **target**
+radix (default **10**). **`base_convert(255, 16)`** therefore parses **`"255"`** as a **base-16** literal (**`0x255 = 597`**), not “decimal **255**
+converted to hex”. Safe pattern: **`base_convert("255", 10, 16)`** (string + explicit **from**/**to**).
+
+Pins: **`base_convert_decimal_string_to_hex_cx`**, **`base_convert_two_arg_numeric_parses_string_in_from_radix_bug_cx`** in
+**`tests/suite/behavior_pin_2026_05_cx.rs`**.
+
+## BUG-177 — **`graph_density`** expects an **adjacency list**, not **`(|V|, |E|)`** scalars — **`polish`**
+
+**`builtin_graph_density`** (**`math_wolfram13.rs`**) calls **`parse_adj_list`** on **`args.first()`** only. **`graph_density(4, 3)`** does **not**
+compute **3 / C(4, 2)**; the second argument is ignored and the numeric **`4`** is not a valid graph shell, so the density collapses to **0**
+(**`n < 2`** guard or empty parse). Pass **Adjacency lists** like **`[[1], [0, 2], [1]]`**.
+
+Pins: **`graph_density_three_node_path_cy`**, **`graph_density_spurious_numeric_pair_yields_zero_bug_cy`** in
+**`tests/suite/behavior_pin_2026_05_cy.rs`**.
+
+## BUG-178 — **`transpose`** on a **2×2 AoA** is **not** **`matrix_transpose`** — **`polish`**
+
+For **`[[1, 2], [3, 4]]`**, **`matrix_transpose`** flips rows/columns to **`[[1, 3], [2, 4]]`**, but **`transpose([[1, 2], [3, 4]])`**
+**`stringify`** as **`([[1, 2]], [[3, 4]])`** (pairs of row buckets), not the numeric adjoint layout. For linear-algebra transpose of
+numeric matrices, prefer **`matrix_transpose`** (cross-ref **BUG-159** nested **`transpose`** pins where applicable).
+
+Pins: **`matrix_transpose_two_by_two_cy`**, **`transpose_list_of_row_refs_not_matrix_transpose_bug_cy`** in
+**`tests/suite/behavior_pin_2026_05_cy.rs`**.
+
+## BUG-179 — **`pmt`** argument order is **`RATE, NPER, PV`** — **`polish`**
+
+**`builtin_pmt`** (**`builtins_extended.rs`**) reads **`rate = args[0]`**, **`nper = args[1]`**, **`pv = args[2]`**. **`pmt(10000,
+0.05/12, 360)`** is wrong if the first slot was meant to be principal: **`rate = 10000`** yields absurd payments. Excel-compatible order is
+**rate → periods → present value**.
+
+Pins: **`pmt_monthly_loan_standard_order_cz`**, **`pmt_principal_first_slot_absurd_payment_bug_cz`** in
+**`tests/suite/behavior_pin_2026_05_cz.rs`**.
+
+## BUG-180 — **`format_percent(x)`** prints **`x`** + **`%`**, not **`100·x`** from a **(0, 1)** probability — **`polish`**
+
+**`builtin_format_percent`** (**`builtins.rs`**) uses **`format!("{:.*}%", places, x)`**. A fraction like **`0.125`** becomes **`"0.1%"`** (default
+one decimal), not **`"12.5%"`**. Pass **already-percent values** (e.g. **`12.5`**) or pre-scale.
+
+Pins: **`format_percent_appends_raw_value_cz`**, **`format_percent_unit_fraction_not_scaled_bug_cz`** in
+**`tests/suite/behavior_pin_2026_05_cz.rs`**.
+
+## BUG-181 — **`anova_oneway([[...],[...]])`** nests **one** group — **`polish`**
+
+**`builtin_anova_oneway`** flattens **comma-separated arguments** into independent sample groups. A **single** outer arrayref
+**`[[1, 2, 3], [2, 3, 4]]`** is still **one** operand → **one** merged group, so the implementation reports **`anova: need at least 2 groups`**
+instead of a shape/type error. The intended call is variadic **`anova_oneway([1, 2, 3], [2, 3, 4])`** (or equivalent comma
+arguments).
+
+Pins: **`anova_oneway_variadic_two_groups_da`**, **`anova_oneway_nested_aoa_error_message_da`** in
+**`tests/suite/behavior_pin_2026_05_da.rs`**.
+
+## BUG-182 — **`trapz(YS, …)`** / **`simpson(YS, …)`** second slot is **`dx`**, not **`XS`** — **`polish`**
+
+**`builtin_trapz`** / **`builtin_simpson`** treat **`args[0]`** as the **Y** sample vector and **`args[1]`** as optional
+**`dx`** (scalar spacing). Passing **`trapz([x0,x1,…], [y0,y1,…])`** (NumPy-style paired abscissa/ordinate arrays) does **not**
+integrate against the X ordinate — the second array **numifies** to a scalar step (**0** when it does not look like a single
+number), yielding a **0** area with no arity error.
+
+Pins: **`trapz_simpson_evenly_spaced_y_with_dx_one_da`**, **`trapz_two_array_operands_second_becomes_dx_zero_da`** in
+**`tests/suite/behavior_pin_2026_05_da.rs`**.
+
+## BUG-183 — **`binary_search` / `lower_bound` / `upper_bound` / `equal_range`** take **needle first** — **`polish`**
+
+These builtins read **`args[0]`** as the **target scalar** and treat **`args[1..]`** (flattened) as the sorted list. The call
+**`binary_search([1, 3, 5], 5)`** uses the **array** as the numeric target (via **`to_number`**) and **`5`** alone as the list —
+yielding **not found** / bogus bounds — instead of a type error. Correct: **`binary_search(5, [1, 3, 5, 7])`**, **`lower_bound(5,
+…)`**, etc.
+
+Pins: **`binary_search_lower_upper_correct_needle_first_db`**, **`binary_search_swapped_args_not_found_db`**, **`lower_bound_swapped_args_returns_zero_db`** in **`tests/suite/behavior_pin_2026_05_db.rs`**.
+
+## BUG-184 — **`dice_coefficient`** (and **`overlap_coefficient`**) on **strings** are **single-token sets** — **`polish`**
+
+**`arg_to_vec("abc")`** is **one** cell (`"abc"`), not per-character grams. **`dice_coefficient("abc", "abd")`** compares **`{abc}`** vs **`{abd}`**
+(intersection **0**), not character bigrams / multiset overlap. Pass explicit lists (e.g. **`split(//, $s)`** or codepoint lists) when
+character-level Dice is intended.
+
+Pins: **`dice_coefficient_strings_singleton_tokens_db`**, **`dice_coefficient_numeric_lists_expected_db`** in **`tests/suite/behavior_pin_2026_05_db.rs`**.
+
+## BUG-185 — **`winsorize(PCT, DATA…)`** — **percent first** — **`polish`**
+
+**`builtin_winsorize`** (**`builtins_extended.rs`**) uses **`args[0]`** as **`pct`** and **`flatten_args(args[1..])`** as the samples. **`winsorize([1,…], 10)`**
+interprets the **array** as **`pct`** (after **`to_number`**) and **`10`** alone as the dataset — a silent garbage path. Correct:
+**`winsorize(10, 1, 2, …)`** or **`winsorize(10, [ … ])`**.
+
+Pins: **`winsorize_percent_first_bracket_list_db`**, **`winsorize_array_first_yields_scalar_noise_db`** in **`tests/suite/behavior_pin_2026_05_db.rs`**.
+
+## BUG-186 — **`unzip`** with one nested **`[[a,b],[c,d]]`** mis-pairs columns — **`polish`**
+
+**`builtin_unzip`** (**`builtins.rs`**) calls **`flatten_args`** on **`args`**, yielding **two** outer cells for **`[[1, 10], [2, 20]]`**, then walks that list pairwise as if it were a **flat** zipper of scalars — **`1`** with **`10`** land in the **A** column, **`[2, 20]`**’s string/int cells never participate as intended. Use **`unzip(1, 10, 2, 20)`** / **`unzip_pairs([[1, 10], [2, 20]])`** for pair rows.
+
+Pins: **`zip_interleave_unzip_flat_dc`**, **`unzip_nested_aof_pairs_mispairs_bug_dc`** in **`tests/suite/behavior_pin_2026_05_dc.rs`**.
+
+## BUG-187 — **`clamp_list`** **Rust-panics** when **`lo > hi`** — **`bug`**
+
+**`builtin_clamp_list`** forwards to **`f64::clamp`**, which **`panic!`s** when **`min > max`**. Example: **`stryke -e 'clamp_list(5,0,1)'`** aborts the process instead of raising **`PerlError`**. Valid calls use **`lo ≤ hi`**.
+
+No stable integration pin (subprocess abort); reproduction is the one-liner above.
 
 ## PARITY-001 — Magic string increment is not implemented — **FIXED**
 
