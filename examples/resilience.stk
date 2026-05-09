@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Resilience and Instrumentation Demo
 # Demonstrates retry, bench, timer, and eval_timeout.
@@ -44,6 +42,6 @@ if ($@ =~ /timeout/) {
 # 4. High-resolution timing.
 p "\n--- Instrumentation: Manual timing ---"
 my $start = now_ns()
-for (1:1_000_000) { my $x = _ * _ }
+_ * _ for 1:1_000_000
 my $end = now_ns()
 printf "  Million multiplications took %.4f ms\n", ($end - $start) / 1_000_000

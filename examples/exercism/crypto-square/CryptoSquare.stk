@@ -6,9 +6,9 @@ fn Exercism::CryptoSquare::cipher($s) {
     $cols++ while $cols * $cols < length($lc)
     my $rows = int((length($lc) + $cols - 1) / $cols)
     my @cols
-    for my $c (0..$cols - 1) {
+    for my $c (0:$cols - 1) {
         my @col
-        for my $r (0..$rows - 1) {
+        for my $r (0:$rows - 1) {
             my $i = $r * $cols + $c
             push @col, $i < length($lc) ? substr($lc, $i, 1) : " "
         }

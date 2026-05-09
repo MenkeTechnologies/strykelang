@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict
-use warnings
 
 my $text = "The quick brown fox jumps over the lazy dog"
 p "upper: ",       $text |> uc

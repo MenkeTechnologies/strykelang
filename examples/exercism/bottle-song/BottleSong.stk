@@ -9,12 +9,12 @@ fn Exercism::BottleSong::recite($args) {
     my @out
     for my $i (0:$verses - 1) {
         my $n  = $start - $i
-        my $b  = $n == 1 ? "bottle"  : "bottles"
+        my $w  = $n == 1 ? "bottle"  : "bottles"
         my $nn = $n - 1
-        my $bn = $nn == 1 ? "bottle" : "bottles"
-        my $line1 = Exercism::BottleSong::_word($n)  . " green $b hanging on the wall,"
+        my $wn = $nn == 1 ? "bottle" : "bottles"
+        my $line1 = Exercism::BottleSong::_word($n)  . " green $w hanging on the wall,"
         my $line3 = "And if one green bottle should accidentally fall,"
-        my $next  = $nn == 0 ? "no green bottles" : Exercism::BottleSong::_word($nn) . " green $bn"
+        my $next  = $nn == 0 ? "no green bottles" : Exercism::BottleSong::_word($nn) . " green $wn"
         my $line4 = "There'll be $next hanging on the wall."
         push @out, "$line1\n$line1\n$line3\n$line4"
     }

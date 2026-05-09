@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
-fn Exercism::Sublist::_contains($a, $b) {
-    my $na = 0 + @$a
-    my $nb = 0 + @$b
-    return 1 if $na == 0
-    return 0 if $na > $nb
-    for my $i (0..$nb - $na) {
+fn Exercism::Sublist::_contains($x, $y) {
+    my $nx = 0 + @$x
+    my $ny = 0 + @$y
+    return 1 if $nx == 0
+    return 0 if $nx > $ny
+    for my $i (0:$ny - $nx) {
         my $ok = 1
-        for my $j (0:$na - 1) { if ($a->[$j] ne $b->[$i + $j]) { $ok = 0; last } }
+        for my $j (0:$nx - 1) { if ($x->[$j] ne $y->[$i + $j]) { $ok = 0; last } }
         return 1 if $ok
     }
     0
 }
 
-fn Exercism::Sublist::compare($a, $b) {
-    my $a_in_b = Exercism::Sublist::_contains($a, $b)
-    return "equal"     if (0 + @$a) == (0 + @$b) && $a_in_b
-    return "sublist"   if $a_in_b
-    return "superlist" if Exercism::Sublist::_contains($b, $a)
+fn Exercism::Sublist::compare($x, $y) {
+    my $x_in_y = Exercism::Sublist::_contains($x, $y)
+    return "equal"     if (0 + @$x) == (0 + @$y) && $x_in_y
+    return "sublist"   if $x_in_y
+    return "superlist" if Exercism::Sublist::_contains($y, $x)
     "unequal"
 }

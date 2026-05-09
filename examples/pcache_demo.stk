@@ -1,34 +1,32 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Parallel Cache (pcache) Demo
 # Shows how to memoize expensive operations across parallel threads
 
 fn expensive_calc($n) {
-    print "  [CALC] Computing result for $n...\n"
+    p "  [CALC] Computing result for $n..."
     sleep 0.5 # Simulate heavy load
-    return $n * $n * $n
+    $n * $n * $n
 }
 
 # A list of inputs with many duplicates
 my @inputs = (1, 2, 3, 2, 1, 4, 3, 2, 5, 1, 4)
 
-print "Processing ", len(@inputs), " inputs with duplicates...\n"
-print "Using pcache to avoid redundant calculations:\n"
+p "Processing ", len(@inputs), " inputs with duplicates..."
+p "Using pcache to avoid redundant calculations:"
 
 my $start = now_ns()
 
 # pcache ensures that expensive_calc($n) is only run once for each unique $n
-my @results = pcache { expensive_calc($_) } @inputs
+my @results = pcache { expensive_calc } @inputs
 
 my $end = now_ns()
 my $duration = ($end - $start) / 1_000_000_000
 
-print "\nResults: ", join(", ", @results), "\n"
+p "\nResults: ", join(", ", @results)
 printf "Time taken: %.2f seconds\n", $duration
 
 # Without pcache, it would take ~5.5 seconds (11 * 0.5)
 # With pcache, it should take ~2.5 seconds (5 unique values * 0.5)
 # if run serially, or even less if run in parallel.
-print "\nSince there are 5 unique values (1, 2, 3, 4, 5), it only ran 5 times.\n"
+p "\nSince there are 5 unique values (1, 2, 3, 4, 5), it only ran 5 times."

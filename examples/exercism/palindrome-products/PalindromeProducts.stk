@@ -4,11 +4,11 @@ fn Exercism::PalindromeProducts::_pal = _ == ~> _ chars rev join("")
 fn Exercism::PalindromeProducts::_search($min, $max, $want_largest) {
     die "min must be <= max" if $min > $max
     my $best
-    for my $a ($min..$max) {
-        for my $b ($a..$max) {
-            my $p = $a * $b
+    for my $x ($min:$max) {
+        for my $y ($x:$max) {
+            my $p = $x * $y
             next if defined $best && ($want_largest ? $p <= $best->{value} : $p >= $best->{value})
-            $best = { value => $p, factors => [$a, $b] } if Exercism::PalindromeProducts::_pal($p)
+            $best = { value => $p, factors => [$x, $y] } if Exercism::PalindromeProducts::_pal($p)
         }
     }
     $best // { value => undef, factors => [] }

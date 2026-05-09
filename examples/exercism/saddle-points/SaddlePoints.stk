@@ -9,8 +9,8 @@ fn Exercism::SaddlePoints::saddle_points($m) {
         ~> 0:$rows-1 map { $m->[_][$c] } min
     }
     my @out
-    for my $r (0..$rows - 1) {
-        ~> 0..$cols - 1 ep {
+    for my $r (0:$rows - 1) {
+        ~> 0:$cols - 1 ep {
             push @out, [$r + 1, _ + 1] if $m->[$r][_] == $row_max[$r] && $m->[$r][_] == $col_min[_]
         }
     }

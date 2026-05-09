@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
-fn Exercism::Triangle::kind($a, $b, $c) {
-    die "TriangleError" if $a <= 0 || $b <= 0 || $c <= 0
-    die "TriangleError" if $a + $b <= $c || $a + $c <= $b || $b + $c <= $a
-      $a == $b && $b == $c ? "equilateral"
-    : $a == $b || $b == $c || $a == $c ? "isosceles"
+fn Exercism::Triangle::kind($x, $y, $z) {
+    die "TriangleError" if $x <= 0 || $y <= 0 || $z <= 0
+    die "TriangleError" if $x + $y <= $z || $x + $z <= $y || $y + $z <= $x
+      $x == $y && $y == $z ? "equilateral"
+    : $x == $y || $y == $z || $x == $z ? "isosceles"
     : "scalene"
 }

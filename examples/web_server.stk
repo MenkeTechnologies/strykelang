@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Web Server Demo
 # Usage: s serve 8080 web_server.stk
@@ -11,10 +9,10 @@ fn handler($req) {
     my $path = $req->{path}
     my $method = $req->{method}
     
-    print "[LOG] $method $path from $req->{peer}\n"
+    p "[LOG] $method $path from $req->{peer}"
     
     if ($path eq "/") {
-        return {
+        +{
             status => 200,
             headers => { "Content-Type" => "text/html" },
             body => "<h1>Welcome to Stryke</h1><p>Running on port $req->{port}</p><a href='/api/info'>View API Info</a>"
@@ -26,13 +24,13 @@ fn handler($req) {
             uptime  => sys_uptime(),
             cores   => pool_info()->{cpus},
         }
-        return {
+        +{
             status => 200,
             headers => { "Content-Type" => "application/json" },
             body => to_json($info)
         }
     } else {
-        return undef # 404
+        undef # 404
     }
 }
 
@@ -40,6 +38,6 @@ fn handler($req) {
 # The `serve` builtin can be called from code.
 if ($0 eq __FILE__ || $0 =~ /web_server\.stk$/) {
     my $port = $ARGV[0] // 8080
-    print "Starting Stryke server on port $port...\n"
+    p "Starting Stryke server on port $port..."
     serve($port, \&handler)
 }

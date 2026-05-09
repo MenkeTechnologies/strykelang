@@ -1,13 +1,11 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Data Science Demo
 # Demonstrates statistical functions and parallel computation
 
-print "--- Stats: Analyzing a large dataset ---\n"
+p "--- Stats: Analyzing a large dataset ---"
 # Generate 10k random samples
-my @data = map { rand(100) } (1 .. 10000)
+my @data = map { rand(100) } (1:10000)
 
 printf "  Samples:    %d\n", len(@data)
 printf "  Mean:       %.4f\n", mean(@data)
@@ -16,28 +14,28 @@ printf "  StdDev:     %.4f\n", stddev(@data)
 printf "  Variance:   %.4f\n", variance(@data)
 printf "  Sum:        %.4f\n", sum(@data)
 
-print "\n--- Regression: Simple Linear Fit ---\n"
+p "\n--- Regression: Simple Linear Fit ---"
 # y = 2x + 5 + noise
-my @x = (1 .. 10)
-my @y = map { 2 * $_ + 5 + (rand(2) - 1) } @x
+my @x = (1:10)
+my @y = map { 2 * _ + 5 + (rand(2) - 1) } @x
 
 # linear_regression returns [slope, intercept, r_squared]
 my $fit = linear_regression(\@x, \@y)
 if (ref($fit) eq "ARRAY") {
     printf "  Model:      y = %.2fx + %.2f (R^2 = %.4f)\n", @$fit
 } else {
-    print "  Regression failed or returned non-array\n"
+    p "  Regression failed or returned non-array"
 }
 
-print "\n--- Parallel Data Transformation ---\n"
+p "\n--- Parallel Data Transformation ---"
 # Use pmap to process large arrays across all cores
-my @squares = (1 .. 100000) |> pmap { $_ * $_ }
+my @squares = (1:100000) |> pmap { _ * _ }
 
-print "  Calculated ", len(@squares), " squares in parallel.\n"
+p "  Calculated ", len(@squares), " squares in parallel."
 printf "  Sample (index 99,999): %d\n", $squares[-1]
 
 # Quantiles (passing data and list of quantiles)
 my @qs = quantiles(\@data, [0.25, 0.5, 0.75])
-print "\n--- Distribution: Quantiles ---\n"
+p "\n--- Distribution: Quantiles ---"
 printf "  25%%: %.2f | 50%%: %.2f | 75%%: %.2f\n", @qs
-print "  Spark: ", sparkline(@qs), "\n"
+p "  Spark: ", sparkline(@qs)

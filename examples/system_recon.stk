@@ -1,30 +1,28 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke System Recon Mini-Demo
 # Uses cyberpunk style and system built-ins
 
 print cyber_banner("STRYKE MINIRECON")
-print "\n"
+p ""
 
 my $info = pool_info()
 my $ram_total = mem_total()
 my $uptime = sys_uptime()
 
-print "--- SYSTEM INTEL ---\n"
+p "--- SYSTEM INTEL ---"
 printf "  HOST:     %s\n", gethostname()
 printf "  OS:       %s (%s)\n", os_name(), $info->{arch}
 printf "  CORES:    %d total\n", $info->{cpus}
 printf "  RAM:      %s\n", human_bytes($ram_total)
 printf "  UPTIME:   %s\n", human_duration($uptime)
 
-print "\n--- NETWORK INTEL ---\n"
+p "\n--- NETWORK INTEL ---"
 printf "  IPv4:     %s\n", net_ipv4() // "N/A"
 printf "  MAC:      %s\n", net_mac() // "N/A"
 printf "  DNS:      %s\n", join(", ", net_dns_servers())
 
-print "\n--- DISK INTEL ---\n"
+p "\n--- DISK INTEL ---"
 my @disks = mounts()
 for my $m (@disks) {
     next unless $m->{total} > 0
@@ -34,4 +32,4 @@ for my $m (@disks) {
         human_bytes($m->{total} - $m->{used})
 }
 
-print "\n--- RECON COMPLETE ---\n"
+p "\n--- RECON COMPLETE ---"

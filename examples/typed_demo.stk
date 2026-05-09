@@ -1,6 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
-use warnings;
 
 # Stryke Typed Functions and Data
 # Demonstrates optional typing and advanced function syntax.
