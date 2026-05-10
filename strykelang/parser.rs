@@ -1885,6 +1885,7 @@ impl Parser {
                         }),
                         frozen: false,
                         type_annotation: None,
+                        list_context: false,
                     }]),
                     line,
                 });
@@ -1908,6 +1909,7 @@ impl Parser {
                         }),
                         frozen: false,
                         type_annotation: None,
+                        list_context: false,
                     }]),
                     line,
                 });
@@ -3441,6 +3443,7 @@ impl Parser {
                     initializer: None,
                     frozen: false,
                     type_annotation: None,
+                    list_context: false,
                 }];
                 implicit_decl = Some(Statement {
                     label: None,
@@ -4083,6 +4086,7 @@ impl Parser {
                 initializer: Some(match_expr),
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }]),
             line,
         );
@@ -5317,6 +5321,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }),
             ExprKind::ArrayVar(name) => Some(VarDecl {
                 sigil: Sigil::Array,
@@ -5324,6 +5329,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }),
             ExprKind::HashVar(name) => Some(VarDecl {
                 sigil: Sigil::Hash,
@@ -5331,6 +5337,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }),
             ExprKind::Typeglob(name) => Some(VarDecl {
                 sigil: Sigil::Typeglob,
@@ -5338,6 +5345,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }),
             _ => None,
         }
@@ -5387,6 +5395,7 @@ impl Parser {
                 initializer: Some(rhs),
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }],
             line,
         ));
@@ -5472,6 +5481,7 @@ impl Parser {
                             initializer: Some(slice),
                             frozen: false,
                             type_annotation: None,
+                            list_context: false,
                         }],
                         line,
                     ));
@@ -5496,6 +5506,7 @@ impl Parser {
                             name,
                             initializer: Some(arrow),
                             frozen: false,
+                            list_context: false,
                             type_annotation: None,
                         }],
                         line,
@@ -5578,6 +5589,7 @@ impl Parser {
                 initializer: Some(rhs),
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             }],
             line,
         ));
@@ -5619,6 +5631,7 @@ impl Parser {
                             initializer: Some(init),
                             frozen: false,
                             type_annotation: None,
+                            list_context: false,
                         }],
                         line,
                     ));
@@ -5702,8 +5715,9 @@ impl Parser {
         }
 
         let mut decls = Vec::new();
+        let used_parens = self.eat(&Token::LParen);
 
-        if self.eat(&Token::LParen) {
+        if used_parens {
             // my ($a, @b, %c)
             while !matches!(self.peek(), Token::RParen | Token::Eof) {
                 let decl = self.parse_var_decl(allow_type_annotation)?;
@@ -5715,6 +5729,12 @@ impl Parser {
             self.expect(&Token::RParen)?;
         } else {
             decls.push(self.parse_var_decl(allow_type_annotation)?);
+        }
+        // my ($x) = @a  → list context on the scalar (gets first element, not count)
+        if used_parens {
+            for decl in &mut decls {
+                decl.list_context = true;
+            }
         }
 
         // Optional initializer: my $x = expr — plus `our @EXPORT = our @EXPORT_OK = qw(...)` (Try::Tiny).
@@ -5886,6 +5906,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             },
             (Token::ArrayVar(name), _) => VarDecl {
                 sigil: Sigil::Array,
@@ -5893,6 +5914,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             },
             (Token::HashVar(name), line) => {
                 if !crate::compat_mode() {
@@ -5904,6 +5926,7 @@ impl Parser {
                     initializer: None,
                     frozen: false,
                     type_annotation: None,
+                    list_context: false,
                 }
             }
             (Token::Star, _line) => {
@@ -5920,6 +5943,7 @@ impl Parser {
                     initializer: None,
                     frozen: false,
                     type_annotation: None,
+                    list_context: false,
                 }
             }
             // `my ($a, undef, $c) = (1, 2, 3)` — Perl idiom for discarding a
@@ -5935,6 +5959,7 @@ impl Parser {
                 initializer: None,
                 frozen: false,
                 type_annotation: None,
+                list_context: false,
             },
             (tok, line) => {
                 return Err(self.syntax_err(

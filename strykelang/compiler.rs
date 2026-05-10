@@ -1771,7 +1771,13 @@ impl Compiler {
                 match decl.sigil {
                     Sigil::Scalar => {
                         if let Some(init) = &decl.initializer {
-                            self.compile_expr(init)?;
+                            if decl.list_context {
+                                // my ($x) = @a → list context, extract first element
+                                self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                                self.chunk.emit(Op::ListFirst, line);
+                            } else {
+                                self.compile_expr(init)?;
+                            }
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }

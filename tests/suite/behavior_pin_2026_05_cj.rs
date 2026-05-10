@@ -155,8 +155,12 @@ fn permutations_k_equals_list_length_three_cj() {
 }
 
 #[test]
-fn permutations_single_arrayref_numifies_to_zero_empty_bug_cj() {
-    assert_eq!(eval_string(r#"stringify(permutations([1, 2, 3]))"#), "()");
+fn permutations_single_arrayref_works_cj() {
+    // BUG-147 FIXED: permutations([...]) now works
+    assert_eq!(
+        eval_string(r#"stringify(permutations([1, 2, 3]))"#),
+        "([1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1])"
+    );
 }
 
 #[test]
@@ -186,11 +190,13 @@ fn split_string_delimiters_tuple_cj() {
 }
 
 #[test]
-fn sum_lone_inline_array_zero_today_bug_cj() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", sum([1, 2, 3]))"#), "0");
+fn sum_lone_inline_array_works_cj() {
+    // BUG-109/140 FIXED: sum auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.0f", sum([1, 2, 3]))"#), "6");
 }
 
 #[test]
-fn product_lone_inline_array_zero_today_bug_cj() {
-    assert_eq!(eval_string(r#"sprintf("%.0f", product([2, 3, 4]))"#), "0");
+fn product_lone_inline_array_works_cj() {
+    // BUG-109/140 FIXED: product auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.0f", product([2, 3, 4]))"#), "24");
 }

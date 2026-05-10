@@ -300,8 +300,9 @@ fn sum_variadic_two_addends_ch() {
 }
 
 #[test]
-fn sum_single_inline_array_yields_zero_bug_ch() {
-    assert_eq!(eval_string(r#"sprintf("%.13g", sum([10, 11]))"#), "0");
+fn sum_single_inline_array_works_ch() {
+    // BUG-109/140 FIXED: sum auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.13g", sum([10, 11]))"#), "21");
 }
 
 #[test]
@@ -320,8 +321,9 @@ fn product_variadic_two_factors_ch() {
 }
 
 #[test]
-fn product_single_inline_array_discards_interior_bug_ch() {
-    assert_eq!(eval_string(r#"sprintf("%.13g", product([6, 7]))"#), "0");
+fn product_single_inline_array_works_ch() {
+    // BUG-109/140 FIXED: product auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.13g", product([6, 7]))"#), "42");
 }
 
 #[test]

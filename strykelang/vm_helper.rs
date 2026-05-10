@@ -4893,7 +4893,25 @@ impl VMHelper {
                 }
             }
         } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
-            let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
+            // Check $/ for slurp mode (None/undef = read entire file)
+            let slurp_mode = self.irs.is_none();
+            let r: Result<usize, io::Error> = if slurp_mode {
+                // Slurp mode: read entire remaining content
+                let mut buf = Vec::new();
+                match reader.read_to_end(&mut buf) {
+                    Ok(n) => {
+                        if n > 0 {
+                            line_str = if self.open_pragma_utf8 {
+                                String::from_utf8_lossy(&buf).into_owned()
+                            } else {
+                                crate::perl_decode::decode_utf8_or_latin1_read_until(&buf)
+                            };
+                        }
+                        Ok(n)
+                    }
+                    Err(e) => Err(e),
+                }
+            } else if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
                 reader.read_until(b'\n', &mut buf).inspect(|n| {
                     if *n > 0 {
@@ -7873,9 +7891,16 @@ impl VMHelper {
                         let val = if let Some(init) = &decl.initializer {
                             let ctx = match decl.sigil {
                                 Sigil::Array | Sigil::Hash => WantarrayCtx::List,
+                                Sigil::Scalar if decl.list_context => WantarrayCtx::List,
                                 Sigil::Scalar | Sigil::Typeglob => WantarrayCtx::Scalar,
                             };
-                            self.eval_expr_ctx(init, ctx)?
+                            let v = self.eval_expr_ctx(init, ctx)?;
+                            // my ($x) = @arr → extract first element from list
+                            if decl.sigil == Sigil::Scalar && decl.list_context {
+                                v.to_list().first().cloned().unwrap_or(PerlValue::UNDEF)
+                            } else {
+                                v
+                            }
                         } else {
                             PerlValue::UNDEF
                         };
@@ -9443,12 +9468,19 @@ impl VMHelper {
                         self.read_arrow_hash_element(val, key.as_str(), line)
                     }
                     DerefKind::Call => {
-                        // $coderef->(args)
+                        // $coderef->(args) — args evaluated in list context so
+                        // `@a` / `(LIST)` flatten into the call list (matches
+                        // Perl's call list semantics; mirrors `FuncCall` arm).
                         let val = self.eval_expr(expr)?;
                         if let ExprKind::List(ref arg_exprs) = index.kind {
-                            let mut args = Vec::new();
+                            let mut args = Vec::with_capacity(arg_exprs.len());
                             for a in arg_exprs {
-                                args.push(self.eval_expr(a)?);
+                                let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
+                                if let Some(items) = v.as_array_vec() {
+                                    args.extend(items);
+                                } else {
+                                    args.push(v);
+                                }
                             }
                             // Auto-deref ScalarRef for closure self-reference: $f->()
                             let callable = if let Some(inner) = val.as_scalar_ref() {
@@ -10535,9 +10567,16 @@ impl VMHelper {
                 let arg_vals = if *pass_caller_arglist {
                     self.scope.get_array("_")
                 } else {
+                    // List-context + array-flatten so `$f(@a)` and `$f(LIST)`
+                    // pass elements rather than the array as one cell.
                     let mut v = Vec::with_capacity(args.len());
                     for a in args {
-                        v.push(self.eval_expr(a)?);
+                        let val = self.eval_expr_ctx(a, WantarrayCtx::List)?;
+                        if let Some(items) = val.as_array_vec() {
+                            v.extend(items);
+                        } else {
+                            v.push(val);
+                        }
                     }
                     v
                 };

@@ -264,10 +264,7 @@ pub fn run_test_worker_loop() -> i32 {
             ) = unsafe {
                 let saved = libc::dup(1);
                 if saved >= 0 {
-                    let devnull = libc::open(
-                        c"/dev/null".as_ptr(),
-                        libc::O_WRONLY,
-                    );
+                    let devnull = libc::open(c"/dev/null".as_ptr(), libc::O_WRONLY);
                     if devnull >= 0 {
                         libc::dup2(devnull, 1);
                         libc::close(devnull);

@@ -2785,6 +2785,16 @@ impl<'a> VM<'a> {
                         self.push(v.scalar_context());
                         Ok(())
                     }
+                    Op::ListFirst => {
+                        let v = self.pop();
+                        let first = if let Some(arr) = v.as_array_vec() {
+                            arr.first().cloned().unwrap_or(PerlValue::UNDEF)
+                        } else {
+                            v
+                        };
+                        self.push(first);
+                        Ok(())
+                    }
 
                     // ── Scalars ──
                     Op::GetScalar(idx) => {

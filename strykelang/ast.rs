@@ -645,6 +645,10 @@ pub struct VarDecl {
     pub frozen: bool,
     /// Set by `typed my $x : Int` (scalar only).
     pub type_annotation: Option<PerlTypeName>,
+    /// True when declared with parens: `my ($x) = @a` vs `my $x = @a`.
+    /// In list context, a scalar gets the first element; in scalar context, it gets the count.
+    #[serde(default)]
+    pub list_context: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

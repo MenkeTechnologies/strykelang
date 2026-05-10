@@ -123,8 +123,8 @@ fn fmod_copysign_trunc_product_sum0_dd() {
     assert_eq!(eval_string(r#"sprintf("%.10g", fmod(7, 3))"#), "1");
     assert_eq!(eval_string(r#"sprintf("%.10g", copysign(1, -5))"#), "-1");
     assert_eq!(eval_string(r#"sprintf("%.10g", trunc(-2.7))"#), "-2");
-    // Lone **`[...]`** operand: **`product`** numifies the ref (**BUG-140**); comma factors multiply.
-    assert_eq!(eval_string(r#"sprintf("%.10g", product([2, 3, 4]))"#), "0");
+    // BUG-109/140 FIXED: product now auto-derefs arrayrefs
+    assert_eq!(eval_string(r#"sprintf("%.10g", product([2, 3, 4]))"#), "24");
     assert_eq!(eval_string(r#"sprintf("%.10g", product(2, 3, 4))"#), "24");
     assert_eq!(eval_string(r#"sprintf("%.10g", sum0([]))"#), "0");
 }

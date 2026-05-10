@@ -314,16 +314,13 @@ fn test_thread_macro_streaming_basic() {
 
 #[test]
 fn test_thread_macro_parallel_basic() {
-    // Basic parallel sum on array
-    assert_eq!(
-        run("~p> [10, 20, 30] sum").expect("run").to_int(),
-        0 // BUG: Currently returns 0 instead of 60. Pins current buggy behavior.
-    );
+    // Basic parallel sum on array (BUG-109/140 FIXED: sum now handles arrayrefs)
+    assert_eq!(run("~p> [10, 20, 30] sum").expect("run").to_int(), 60);
 
-    // Simple map and sum
+    // map { } in ~p> pipeline still broken (returns scalar count of source)
     assert_eq!(
         run("~p> [1,2,3] map { $_ * 2 } sum").expect("run").to_int(),
-        0 // BUG: Expected 12. Pins current buggy behavior.
+        0 // BUG: ~p> doesn't dereference arrayref source before map
     );
 
     // Empty list source

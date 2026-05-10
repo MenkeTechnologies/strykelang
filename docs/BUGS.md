@@ -19,6 +19,22 @@ Severity legend:
 
 ## Recently fixed
 
+- **BUG-037** — Closure-wrapped coderef calls (`sub { $f->(@_) }`, `sub { $f->($first, @rest) }`)
+  passed `@_` / `@rest` as their scalar count instead of flattening into the
+  call list. Closure bodies run through the tree-walker (`vm_helper.rs`);
+  both `DerefKind::Call` and `ExprKind::IndirectCall` arms used
+  `eval_expr` (default `WantarrayCtx::Scalar`), which numifies an `ArrayVar`
+  to its element count. **Fix:** evaluate each argument in
+  `WantarrayCtx::List` and flatten array values via `as_array_vec()` into
+  the args vec, mirroring the existing `FuncCall` "Generic sub call" path
+  (`vm_helper.rs:10479-10491`). Top-level coderef calls already used the
+  bytecode `Op::ArrowCall` path, which always compiled args in list
+  context — only closure bodies were affected. Pins:
+  `closure_calling_coderef_with_at_underscore_flattens_to_count_today`,
+  `closure_calling_sigfn_via_coderef_with_array_arg_breaks_today`,
+  `closure_calling_sigfn_via_coderef_with_indexed_arg_works`,
+  `direct_call_inside_closure_works` in
+  `tests/suite/behavior_pin_2026_05_f.rs`.
 - **BUG-206** — **`sort { block }` corrupted the topic chain**, causing **`_<`**
   in subsequent pipeline stages (e.g., `grep { ... _< ... }`) to resolve to the
   **last sorted element** instead of the outer function's argument. Root cause:
@@ -423,20 +439,18 @@ These break common Perl idioms across the codebase:
 
 | ID | Summary |
 |----|---------|
-| BUG-037 | Closure-captured coderefs called with `@_` flatten to scalar count |
-| BUG-089 | Closures capture outer-scope `my` vars by value — outer counter idiom broken |
-| BUG-090 | `my ($head, @tail) = LIST` slurps full LIST into `@tail` |
-| BUG-095 | `my ($cb, @rest) = @_` slurps full `@_` into `@rest` (same root as BUG-090) |
-| BUG-101 | `my ($x) = @arr` returns scalar count instead of first element |
-| BUG-010 | `return (1, 2, 3)` collapses to last comma operand |
-| BUG-011 | `my $s = list_sub()` concatenates instead of taking last element |
-| BUG-018 | `local $/; <$fh>` does not enable slurp mode |
-| BUG-019 | `for (@a) { $_ *= 10 }` does not alias array element for mutation |
+| ~~BUG-037~~ | ~~Closure-captured coderefs called with `@_` flatten to scalar count~~ **FIXED** |
+| ~~BUG-089~~ | ~~Closures capture outer-scope `my` vars by value~~ **DESIGN-001** (intentional) |
+| ~~BUG-090~~ | ~~`my ($head, @tail) = LIST` slurps full LIST into `@tail`~~ **FIXED** |
+| ~~BUG-095~~ | ~~`my ($cb, @rest) = @_` slurps full `@_` into `@rest`~~ **FIXED** (same as BUG-090) |
+| ~~BUG-101~~ | ~~`my ($x) = @arr` returns scalar count instead of first element~~ **FIXED** |
+| ~~BUG-010~~ | ~~`return (1, 2, 3)` collapses to last comma operand~~ **FIXED** |
+| ~~BUG-011~~ | ~~`my $s = list_sub()` concatenates instead of taking last element~~ **FIXED** |
+| ~~BUG-018~~ | ~~`local $/; <$fh>` does not enable slurp mode~~ **FIXED** |
+| ~~BUG-019~~ | ~~`for (@a) { $_ *= 10 }` does not alias array element for mutation~~ **FIXED** |
 
-These compound: BUG-095 breaks every `($cb, @rest) = @_; $cb->(@rest)`
-pattern, BUG-089 breaks every state-tracking closure, and BUG-037 breaks
-every coderef-call-with-array-arg. Together they make most functional-
-style libraries unusable until fixed.
+Every entry in this table is now resolved (BUG-089 is the only remaining
+intentional non-fix, tracked as DESIGN-001).
 
 ## BUG-120 — `cosine_distance` with a zero-length vector operand returns **1** — **`polish`**
 
@@ -542,7 +556,7 @@ Demonstrated builtins (non-exhaustive):
 | `squared` / `sq` | **`squared_three_ch`**, **`squared_variadic_second_operand_ignored_ch`**, **`sq_alias_matches_squared_ch`** |
 | `cubed` / `cb` | **`cubed_two_ch`**, **`cubed_variadic_second_operand_ignored_ch`**, **`cb_alias_matches_cubed_ch`** |
 | `uniq` | **`uniq_variadic_deduplicates_neighbors_ch`**, **`uniq_single_array_bucket_treated_as_atom_ch`** |
-| `sum` / `sum0` / `product` | see **BUG-140** |
+| ~~`sum` / `sum0` / `product`~~ | ~~see **BUG-140**~~ **FIXED** |
 | `mutual_information`, `mi` | **`mutual_information_flat_list_joint_de`**, **`mutual_information_two_by_two_matrix_de`**, **`mutual_information_second_operand_silent_de`** (**`args[1]`** discarded — joint only from **`args[0]`**) |
 
 
@@ -729,19 +743,18 @@ the sample multiset, so leading “range” operands become ordinary data rows.
 Pin: **`normalize_extra_leading_scalars_folded_into_source_strip_ch`** in
 **`tests/suite/behavior_pin_2026_05_ch.rs`**.
 
-## BUG-140 — **`sum` / `sum0` / `product`** skip **`ARRAYREF`** innards for a lone **`[...]`** operand — **`bug`**
+## ~~BUG-140~~ — **`sum` / `sum0` / `product`** skip **`ARRAYREF`** innards for a lone **`[...]`** operand — **FIXED**
 
-`list_builtins::sum`, `sum0`, `product` only recurse when **`as_array_vec()`** succeeds (dense
- heap **`HeapObject::Array`**). A typical inline **`sum([10,11])`** / **`product([6,7])`** arrayref
-hits the **`else`** arm and **`to_number()`** the container as a single scalar (**`0`** today),
-rather than iterating elements. Prefer **`sum(10, 11)`**, **`sum_list([10,11])`** (pinned), or **`sum
-@ary`** after materializing **`@ary`** without the boxed-ref ambiguity.
+**Fixed 2026-05-10**: Added `as_array_ref()` handling in `sum`, `sum0`, `product`, `mean`,
+`median` to auto-dereference arrayrefs. Also added `flatten_to_numbers()` helper for consistent
+flattening across these functions.
 
-Pins: **`sum_single_inline_array_yields_zero_bug_ch`**, **`sum_list_reads_array_contents_ch`**,
-**`product_single_inline_array_discards_interior_bug_ch`**, **`sum_variadic_two_addends_ch`**,
-**`product_variadic_two_factors_ch`** in **`tests/suite/behavior_pin_2026_05_ch.rs`**, plus **`fmod_copysign_trunc_product_sum0_dd`**
-in **`tests/suite/behavior_pin_2026_05_dd.rs`** ( **`sum0`**
-empty path: **`sum0_empty_is_zero_ch`** ).
+```sh
+$ stryke -e 'say sum([1,2,3])'
+6                              # ✓ (was: 0)
+$ stryke -e 'say product([2,3,4])'
+24                             # ✓ (was: 0)
+```
 
 ## BUG-141 — **`frequencies` / string operands** — one scalar ⇒ one hash key (**`polish`**)
 
@@ -794,16 +807,17 @@ Pins: **`unzip_pairs_explicit_pair_rows_ci`**, **`unzip_pairs_after_zip_over_fla
 
 Pin: **`take_n_cycle_iterator_yields_empty_today_bug_ci`**.
 
-## BUG-147 — **`permutations([...])`** (one argument) vacates: first slot **`to_int` → 0** — **`polish`**
+## ~~BUG-147~~ — **`permutations([...])`** (one argument) vacates: first slot **`to_int` → 0** — **FIXED**
 
-**`permutations N, LIST`** is documented as taking a numeric **\(N\)** first. A **single** bracket
-array actual **`permutations([1, 2, 3])`** still parses as one argument; **`PerlValue::to_int`** on an
-**`ARRAYREF` is `0`**, the implementation treats **`n == 0`**, and returns **`()`** instead of
-**full-list permutations**. Call **`permutations(scalar(@xs), \@xs)`** / **`permutations(len(\@xs), \@xs)`**
-or the explicit **`permutations(3, [1, 2, 3])`** shape.
+**Fixed 2026-05-10**: `permutations([...])` now detects a single arrayref argument and
+returns all permutations of the array elements.
 
-Pins: **`permutations_k_equals_list_length_three_cj`**, **`permutations_single_arrayref_numifies_to_zero_empty_bug_cj`**
-in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
+```sh
+$ stryke -e 'say stringify(permutations([1,2,3]))'
+([1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1])
+```
+
+Tests: **`permutations_single_arrayref_works_cj`** in **`tests/suite/behavior_pin_2026_05_cj.rs`**.
 
 ## BUG-148 — **`concat` / `chain`** on **`ARRAYREF` operands** streams **one cell per argument** — **`polish`**
 
@@ -1968,22 +1982,18 @@ Tests: `numeric_inf_string_becomes_infinity` (covering `"Inf"`, `"inf"`,
 Severity: **parity** (FIXED).
 
 
-## BUG-018 — `local $/` does not enable slurp mode
+## ~~BUG-018~~ — `local $/` does not enable slurp mode — **FIXED**
+
+**Fixed 2026-05-10**: `readline_builtin_execute` now checks `self.irs`
+(the input record separator). When `None` (undef), it reads the entire
+remaining file content using `read_to_end()` instead of `read_until('\n')`.
 
 ```sh
 $ stryke -e 'open my $fh, "<", "/etc/hosts"; local $/; my $x = <$fh>; print length($x)'
-1                       # stryke
-$ perl   -e 'open my $fh, "<", "/etc/hosts"; local $/; my $x = <$fh>; print length($x)'
-357                     # whole file (whatever its size is)
+357                     # ✓ whole file
 ```
 
-Reading via `<$fh>` ignores `$/` undef and stops at the first newline (or
-even after one byte for some inputs). The `-0777` slurp flag is also
-broken on stdin.
-
-Tests: `open_then_slurp_with_undef_separator_reads_only_first_line_today`.
-
-Severity: **bug**. Slurping a file is one of Perl's most common idioms.
+Tests: `open_then_slurp_with_undef_separator_reads_whole_file`.
 
 
 ## BUG-019 — `for (@arr) { $_ ... }` does not alias array elements — **FIXED**
@@ -2356,7 +2366,7 @@ Severity: **bug**. Common idiom: `$obj->can($method) and $obj->$method(...)`
 relies on the returned ref actually calling through.
 
 
-## BUG-037 — Closures pass `@_` as scalar count when invoking a captured coderef
+## BUG-037 — Closures pass `@_` as scalar count when invoking a captured coderef — **FIXED**
 
 ```sh
 $ stryke -e '
@@ -2364,28 +2374,31 @@ sub mydbl { my $x = shift; $x * 2 }
 my $f = \&mydbl;
 my $h = sub { $f->(@_) };
 print $h->(5)'
-2                       # stryke (= scalar(@_) * 2)
-$ perl ...
-10                      # perl (= 5 * 2)
+10                      # stryke (post-fix) — matches perl
 ```
 
-Inside a closure body, calling a captured coderef with `@_` as argument
-flattens `@_` to its element count instead of its contents. The same body
-called directly by name (`mydbl(@_)` rather than `$f->(@_)`) works
-correctly. Manifests in:
+Root cause: closure bodies execute through the tree-walker (`vm_helper.rs`),
+not the bytecode VM. The `DerefKind::Call` arm (`$cr->(args)`) and the
+`IndirectCall` arm (`$cr(args)`) evaluated each argument with `eval_expr`,
+which defaults to `WantarrayCtx::Scalar`. In scalar context an `ArrayVar`
+returns `arr.len()` (`vm_helper.rs:9039-9048`), so `@_` (and any `@array`)
+passed as a coderef argument numified to its element count instead of
+flattening into the call list. Top-level coderef calls already used the
+bytecode `Op::ArrowCall` path, which compiles args in list context and
+flattens via `to_list()`, so the bug only manifested inside closure bodies.
 
-- `compose(f, g)`-style HOFs where the inner closure is `sub { $f->($g->(@_)) }`
-- curry/partial application where the outer arg is captured and `@_` carries the rest
-- any code that hands a coderef into a higher-order combinator
+Fix: both `DerefKind::Call` and `IndirectCall` arms in `vm_helper.rs` now
+evaluate each arg in `WantarrayCtx::List` and flatten array values via
+`as_array_vec()` into the args vec — mirrors the existing pattern in the
+`FuncCall` "Generic sub call" arm (`vm_helper.rs:10479-10491`).
 
-Tests: `closure_calling_coderef_with_at_underscore_flattens_to_count_today`,
-`closure_calling_sigfn_via_coderef_with_array_arg_breaks_today`,
-`direct_call_inside_closure_works` (the form that works),
-`closure_calling_sigfn_via_coderef_with_indexed_arg_works` (workaround
-using `$_[0]` per-index access).
-
-Severity: **bug** (high impact). Most functional-style libraries are
-unusable until this is fixed.
+Pin tests in `tests/suite/behavior_pin_2026_05_f.rs` (kept at original
+names so historical references resolve; assertions updated to post-fix
+values):
+`closure_calling_coderef_with_at_underscore_flattens_to_count_today` (now 10),
+`closure_calling_sigfn_via_coderef_with_array_arg_breaks_today` (now 7),
+`closure_calling_sigfn_via_coderef_with_indexed_arg_works` (was 7, unchanged),
+`direct_call_inside_closure_works` (was 7, unchanged).
 
 
 ## BUG-038 — `pos($s)` returns undef outside the `while (//g)` form
@@ -3519,25 +3532,15 @@ works).
 Severity: **bug**.
 
 
-## BUG-095 — `my ($scalar, @rest) = @_` slurps the FULL @_ into @rest
+## ~~BUG-095~~ — `my ($scalar, @rest) = @_` slurps the FULL @_ into @rest — **FIXED**
+
+Fixed alongside BUG-090. `Op::GetArrayFromIndex` now correctly slices the
+tail of the list for slurpy array declarations.
 
 ```sh
-$ stryke -e '
-sub myff { my ($cb, @rest) = @_; print scalar @rest }
-myff(sub { 1 }, 5, 7)'
-3                              # @rest captured all 3 — should be 2 (5, 7)
+$ stryke -e 'sub myff { my ($cb, @rest) = @_; print scalar @rest } myff(sub { 1 }, 5, 7)'
+2                              # ✓ @rest has (5, 7)
 ```
-
-`my ($cb, $val) = @_` and `my $cb = shift; my $val = shift` both work
-correctly. Only the slurpy-array destructuring form is wrong. Compounds
-with BUG-037 (closure coderef + flattened array → scalar count) when
-trying to forward args via `$cb->(@rest)`.
-
-Tests: `destructuring_my_scalar_array_returns_full_at_underscore_today`,
-`coderef_call_with_named_array_arg_loses_args_today`.
-
-Severity: **bug** (very high impact — breaks every `($head, @tail) = @_`
-idiom).
 
 
 ## ~~BUG-089~~ DESIGN-001 — Closures capture outer-scope vars by value, writes are a compile-time error
@@ -3739,35 +3742,23 @@ Tests: `reverse_with_bare_empty_parens_is_parse_error_today`,
 Severity: **bug** (small surface).
 
 
-## BUG-101 — `my ($x) = @arr` returns scalar count, not first element
+## ~~BUG-101~~ — `my ($x) = @arr` returns scalar count, not first element — **FIXED**
+
+**Fixed 2026-05-10**: Added `list_context` flag to `VarDecl` AST node.
+Parser sets it when declaration uses parens (`my ($x) = ...`). Compiler
+and tree-walker now compile/evaluate initializer in list context and
+extract first element for single-scalar list-context declarations.
 
 ```sh
 $ stryke -e 'my @a = (10, 20, 30); my ($x) = @a; print $x'
-3                              # count, not 10
-$ perl   -e 'my @a = (10, 20, 30); my ($x) = @a; print $x'
-10
+10                             # ✓ first element (was: 3)
 $ stryke -e 'sub t { my ($x) = @_; print $x } t("hello", "world")'
-2                              # count, not "hello"
+hello                          # ✓ first element (was: 2)
 ```
 
-In Perl, parens around the LHS make the assignment list-context: `my
-($x) = LIST` binds `$x` to the first element. Stryke treats it as
-scalar-context (same as `my $x = @arr`), giving the count.
-
-The literal-list source DOES work: `my ($x) = ("hello")` binds correctly.
-Only `@_` and named-array sources fail. Same family as BUG-090
-(slurpy destructure leaks).
-
-Workarounds: `my $x = shift` or `my $x = $_[0]`.
-
-Tests: `single_scalar_destructure_from_array_var_returns_count_today`,
-`single_scalar_destructure_from_at_underscore_returns_count_today`,
-`single_scalar_destructure_from_literal_list_works`,
-`shift_workaround_for_first_element_works`,
-`dollar_underscore_zero_workaround_for_first_element_works`.
-
-Severity: **bug** (very high impact). Affects every `my ($self) = @_;`
-or `my ($cb) = @_;` extraction pattern in OO + functional code.
+Tests: `single_scalar_destructure_from_array_var_returns_first_element`,
+`single_scalar_destructure_from_at_underscore_returns_first_element`,
+`single_scalar_destructure_from_literal_list_works`.
 
 
 ## BUG-102 — `refaddr(\&fn)` differs between repeated evaluations
@@ -3941,36 +3932,20 @@ in `tests/suite/behavior_pin_2026_05_at.rs`.
 Severity: ~~**bug**~~ **fixed**.
 
 
-## BUG-109 — `sum(\@a)` and `sum([1,2,3])` return 0 instead of summing
+## ~~BUG-109~~ — `sum(\@a)` and `sum([1,2,3])` return 0 instead of summing — **FIXED**
 
-`sum` does not auto-deref a single arrayref argument, so calling it
-through any thread-stage that hands it a ref produces zero. The same
-likely affects `min`, `max`, `mean`, etc. — anything that takes a
-list-of-numbers.
+**Fixed 2026-05-10**: `sum`, `sum0`, `product`, `mean`, `median` now auto-dereference
+arrayrefs. Same fix as BUG-140.
 
 ```sh
-$ s -e 'p sum([1,2,3])'
-0
-$ s -e 'my @a = (10,20,30); p sum(\@a)'
-0
-$ s -e 'my $r = [10,20,30]; p sum(@$r)'   # workaround
-60
+$ stryke -e 'say sum([1,2,3])'
+6                              # ✓ (was: 0)
+$ stryke -e 'my @a = (10,20,30); say sum(\@a)'
+60                             # ✓ (was: 0)
 ```
 
-Expected: `sum([1,2,3])` returns 6, `sum(\@a)` returns 60. Either
-auto-deref a single arrayref arg or document the limitation as
-intentional.
-
-This bug compounds with **BUG-108**: even if chunking handed each
-worker an arrayref, `sum` would still report 0.
-
-Pinning tests:
-`sum_on_arrayref_returns_zero_not_sum`,
-`sum_on_array_ref_via_backslash_returns_zero`,
-`sum_on_explicit_deref_works`
+Tests: `sum_on_arrayref_returns_sum`, `sum_on_array_ref_via_backslash_works`
 in `tests/suite/behavior_pin_2026_05_at.rs`.
-
-Severity: **bug**.
 
 
 ## PARITY-040 — Scalar-context `..` flip-flop operator is unimplemented
