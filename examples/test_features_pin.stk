@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-B (2026-05-10): Pipelines, AI, AOP, Nesting.
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Pipelines ──────────────────────────────────────────────────────────────
+
+my @list = (1:10)
+~> @list filter { _ % 2 == 0 } maps { _ * _ } |> sum |> aeq 220, "Complex pipeline"
+
+# ── AI Primitives (Mocked) ──────────────────────────────────────────────────
+
+ai_mock_install("(?i)joke", "Why did the chicken cross the road? To get to the other side.")
+ai "Tell me a joke" |> atrue >{ _ =~ /chicken/ }, "AI mock response"
+
+ai_mock_install("extract", '{"status":"ok","code":200}')
+ai("extract status", schema => +{ status => "str", code => "int" }) |> ->{ status } |> aeq "ok", "AI extraction"
+
+# ── AOP (Around) ─────────────────────────────────────────────────────────────
+
+fn target_fn = _ * 10
+around "target_fn" { proceed() + 5 }
+target_fn(2) |> aeq 25, "AOP around + proceed"
+
+# ── Nested Implicit Parameters ─────────────────────────────────────────────
+
+my $matrix_sum = 0
+~> (1:2) maps {
+    my $outer = _
+    ~> (1:2) maps { $matrix_sum += $outer + _ }
+} |> collect # drain iterator
+$matrix_sum |> aeq 12, "Nested loops with implicit _"
+
+# Sigil-free implicit nested
+my $s2 = 0
+~> (1:1) maps {
+    ~> (2:2) maps {
+        ~> (3:3) maps { $s2 = _ + _< + _<< }
+    }
+} |> collect
+$s2 |> aeq 6, "Triple nested implicit _ variants"
+
+# ── Parallel Collection Ops ────────────────────────────────────────────────
+
+my @input = (1, 1, 2, 3, 3, 4)
+~> @input puniq |> sort |> join(",") |> aeq "1,2,3,4", "puniq + sort"
+
+(1:100) |> pany { _ > 90 } |> aok "pany short-circuit"
+
+# ── Sorting with _0, _1 (no-interop requirement) ────────────────────────
+
+(3, 1, 4, 1, 5) |> psort { _0 <=> _1 } |> join(",") |> aeq "1,1,3,4,5", "psort with _0/_1"
+
+test_run

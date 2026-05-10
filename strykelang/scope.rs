@@ -1501,8 +1501,14 @@ impl Scope {
     pub fn set_sort_pair(&mut self, a: PerlValue, b: PerlValue) {
         let _ = self.set_scalar("a", a.clone());
         let _ = self.set_scalar("b", b.clone());
-        let _ = self.set_scalar("_0", a);
+        let _ = self.set_scalar("_0", a.clone());
         let _ = self.set_scalar("_1", b);
+        // Bind `$_` to slot 0 too — per the four-way aliasing rule
+        // (`_`, `$_`, `_0`, `$_0` are all equivalent for slot 0),
+        // bare `_` inside `sort { _ <=> _1 }` must resolve to slot 0.
+        // Without this, `_` falls through to whatever the outer scope's
+        // topic was and the sort silently produces garbage order.
+        let _ = self.set_scalar("_", a);
     }
 
     /// Register a `defer { BLOCK }` closure to run when this scope exits.

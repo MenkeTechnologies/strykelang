@@ -1,0 +1,62 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-C (2026-05-10): Bugs & Parity (from BUGS.md)
+
+# ── Magic String Increment (PARITY-001) ───────────────────────────────────
+
+my $s1 = "z"
+$s1++
+assert_eq($s1, "aa", "magic inc z -> aa")
+
+my $s2 = "Az"
+$s2++
+assert_eq($s2, "Ba", "magic inc Az -> Ba")
+
+my $s3 = ""
+$s3++
+assert_eq($s3, "1", "magic inc empty -> 1")
+
+# ── Vec Lvalue (PARITY-010) ────────────────────────────────────────────────
+
+my $bits = ""
+vec($bits, 0, 8) = 65
+assert_eq($bits, "A", "vec lvalue assignment")
+
+# ── Inf / NaN Numification (PARITY-015) ────────────────────────────────────
+
+my $inf = "Inf" + 0
+assert_eq("$inf", "Inf", "Inf numification and stringification")
+
+my $nan = sqrt(-1)
+assert_eq("$nan", "NaN", "NaN stringification")
+
+# ── For In-place Mutation (BUG-019) ────────────────────────────────────────
+
+my @list = (1, 2, 3)
+for (@list) { $_ *= 10 }
+assert_eq(join(",", @list), "10,20,30", "for loop in-place mutation")
+
+# ── Tail Binding (BUG-090) ──────────────────────────────────────────────────
+
+my ($head, @tail) = (10, 20, 30, 40)
+assert_eq($head, 10, "head binding")
+assert_eq(join(",", @tail), "20,30,40", "tail binding")
+
+# ── PSort with $_0, $_1 (BUG-116) ──────────────────────────────────────────
+
+my @unsorted = (5, 2, 8, 1)
+my @sorted = @unsorted |> psort { $_0 <=> $_1 }
+assert_eq(join(",", @sorted), "1,2,5,8", "psort with \$_0, \$_1")
+
+# ── Dijkstra Deterministic Order (BUG-201) ─────────────────────────────────
+
+my $graph = +{
+    A => [["B", 1], ["C", 4]],
+    B => [["C", 2]],
+    C => []
+}
+my $dists = dijkstra($graph, "A")
+# Dijkstra returns a flattened list of pairs, sorted by key
+assert_eq(tj($dists), '["A",0,"B",1,"C",3]', "dijkstra deterministic JSON")
+
+test_run

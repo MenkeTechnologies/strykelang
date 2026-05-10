@@ -1,0 +1,39 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-D (2026-05-10): Namespaces & Atomics (from NAMESPACE_FUNCTIONS.md)
+
+# ── Namespaced Functions ────────────────────────────────────────────────────
+
+fn Math::Utils::add_three($x, $y, $z) {
+    $x + $y + $z
+}
+
+assert_eq(Math::Utils::add_three(1, 2, 3), 6, "call namespaced function")
+
+# Verify it doesn't shadow a builtin if we named it similarly
+fn MyProject::sum(@list) {
+    # call builtin sum
+    sum(@list) + 100
+}
+
+assert_eq(MyProject::sum(1, 2, 3), 106, "namespaced function calling builtin")
+assert_eq(sum(1, 2, 3), 6, "builtin sum still works")
+
+# Atomics (Oursync) ───────────────────────────────────────────────────────
+
+package Counter;
+oursync $val = 0;
+
+fn Counter::bump() {
+    $val++
+}
+
+package main;
+
+# Run in parallel to verify atomicity
+fan 100 { Counter::bump() }
+
+# We must use package-qualified name to read it outside or be in the package
+assert_eq($Counter::val, 100, "oursync shared across workers")
+
+test_run

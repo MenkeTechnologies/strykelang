@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-I (2026-05-10): Perl Special Variables (from SPECIAL_VARIABLES.md)
+
+# ── Process & Script ───────────────────────────────────────────────────────
+
+assert_ok($$ > 0, "PID $$ is positive")
+assert_ok($0 =~ /test_perl_special_vars_pin\.stk$/, "Script name $0 is correct")
+assert_ok($^X =~ /stryke$/, "Executable path $^X contains stryke")
+
+# ── OS Errors ($! and $^E) ────────────────────────────────────────────────
+
+# Trigger an error
+eval { open(my $fh, "<", "/non/existent/path/999") }
+assert_ok($! != 0, "Errno $! is non-zero after failure")
+assert_ok("$!" =~ /No such file/i, "Errno string contains message")
+assert_ok($^E =~ /No such file/i, "Extended error $^E matches")
+
+# ── Eval Errors ($@) ──────────────────────────────────────────────────────
+
+eval { die "boom" }
+assert_ok($@ =~ /^boom at/, "$@ contains message and location")
+
+# ── Record Separators ($, and $\) ─────────────────────────────────────────
+
+# Setting $, affects print list joins
+{
+    local $, = "|";
+    # We can't easily capture stdout in script tests without backticks, 
+    # but we can verify they are assignable.
+    assert_eq($,, "|", "$, is assignable")
+}
+
+# ── Version ($] and $^V) ──────────────────────────────────────────────────
+
+assert_ok($] =~ /^5\./, "$] reports Perl 5 compatibility")
+assert_ok($^V =~ /^v\d+\.\d+/, "$^V reports semver")
+
+# ── Environment (%ENV) ────────────────────────────────────────────────────
+
+$ENV{STRYKE_PIN_TEST} = "active"
+assert_eq($ENV{STRYKE_PIN_TEST}, "active", "%ENV is writable and readable")
+
+# ── Match Offsets (@- and @+) ──────────────────────────────────────────────
+
+"abc123def" =~ /(\d+)/
+assert_eq($-[0], 3, "match start @-[0]")
+assert_eq($+[0], 6, "match end @+[0]")
+assert_eq($-[1], 3, "group 1 start @-[1]")
+assert_eq($+[1], 6, "group 1 end @+[1]")
+
+# ── Input Line Number ($.) ────────────────────────────────────────────────
+
+my $tmp = tempdir()
+spurt("$tmp/lines.txt", "a\nb\nc\n")
+open(my $fh, "<", "$tmp/lines.txt")
+<$fh>;
+assert_eq($., 1, "$. is 1 after first line")
+<$fh>;
+assert_eq($., 2, "$. is 2 after second line")
+close($fh)
+
+# ── Caret Specials (${^PHASE}, etc) ───────────────────────────────────────
+
+assert_eq(${^GLOBAL_PHASE}, "RUN", "Global phase is RUN during execution")
+
+test_run

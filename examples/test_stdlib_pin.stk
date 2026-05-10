@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-C (2026-05-10): Stdlib, Predicates, Math, Stats.
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── String Algorithms ──────────────────────────────────────────────────────
+
+levenshtein("kitten", "sitting") |> aeq 3, "levenshtein"
+soundex("Robert") |> aeq "R163", "soundex"
+"stryke" |> b64e |> b64d |> aeq "stryke", "base64 roundtrip"
+sha256("") |> aeq "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "sha256 empty"
+
+# ── Predicates & Number Theory ─────────────────────────────────────────────
+
+97 |> is_prime |> aok "is_prime(97)"
+100 |> is_prime |> not |> aok "!is_prime(100)"
+28 |> is_perfect |> aok "is_perfect(28)"
+1024 |> is_power_of_two |> aok "is_power_of_two"
+42 |> is_even |> aok "is_even"
+13 |> is_odd |> aok "is_odd"
+
+"racecar" |> is_palindrome |> aok "is_palindrome"
+'{"a":1}' |> is_json |> aok "is_json"
+'test@example.com' |> is_email |> aok "is_email"
+"127.0.0.1" |> is_ipv4_addr |> aok "is_ipv4"
+
+# ── Statistics & Math ──────────────────────────────────────────────────────
+
+(1:5) |> median |> aeq 3, "median odd"
+median(1, 2, 3, 4) |> aeq 2.5, "median even"
+
+qw(a b a c b a) |> freq |> ->{ a } |> aeq 3, "freq(a)"
+
+# Financial
+pmt(0.05/12, 120, 10000) |> maps { abs(_ + 106.06) < 0.1 } |> aok "pmt"
+
+# ── Data Structures ────────────────────────────────────────────────────────
+
+my %h = (x => 10, y => 20)
+len(keys %h) |> aeq 2, "len(keys hash)"
+exists($h{x}) |> aok "exists hash key"
+delete $h{x}
+exists($h{x}) |> not |> aok "delete hash key"
+
+my @a = (1:3)
+push @a, 4
+pop(@a) |> aeq 4, "push/pop"
+unshift @a, 0
+shift(@a) |> aeq 0, "unshift/shift"
+
+# ── JSON File Ops ──────────────────────────────────────────────────────────
+
+my $tmp = tempdir()
+my $json_file = "$tmp/test.json"
+my %config = (version => "v1", threads => 18)
+wj($json_file, \%config)
+rj($json_file) |> ->{ version } |> aeq "v1", "JSON roundtrip"
+
+test_run

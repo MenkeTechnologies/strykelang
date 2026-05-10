@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+
+# Pinning batch Native-G (2026-05-10): Concurrency & Channels
+
+# ── Async / Await ──────────────────────────────────────────────────────────
+
+my $task = async {
+    sleep(0.1)
+    42
+}
+my $val = await $task
+assert_eq($val, 42, "async/await basic")
+
+# Nested async
+my $t1 = async {
+    my $t2 = async { 10 }
+    (await $t2) + 20
+}
+assert_eq(await($t1), 30, "nested async/await")
+
+# ── Channels ───────────────────────────────────────────────────────────────
+
+our ($tx, $rx) = pchannel(10)
+$tx->send("hello")
+assert_eq($rx->recv(), "hello", "channel send/recv")
+
+# Multiple producers
+our ($tx2, $rx2) = pchannel(100)
+fan 4 {
+    # 'our' variables are visible in fan workers
+    $tx2->send($_)
+}
+
+my @vals = ()
+for (1..4) { push @vals, $rx2->recv() }
+assert_eq(sum(@vals), 0+1+2+3, "channel from multiple producers")
+
+# ── PSelect ────────────────────────────────────────────────────────────────
+
+our ($tx_a, $rx_a) = pchannel(1)
+our ($tx_b, $rx_b) = pchannel(1)
+
+$tx_b->send("B")
+# pselect returns [val, index]
+my $res = pselect($rx_a, $rx_b)
+assert_eq($res->[0], "B", "pselect value B")
+assert_eq($res->[1], 1, "pselect index 1")
+
+# ── Parallel Filesystem / IO ───────────────────────────────────────────────
+
+my $tmp = tempdir()
+spurt("$tmp/a.txt", "line1\nline2\n")
+
+# par_lines
+oursync $count = 0
+par_lines("$tmp/a.txt", fn { $count++ })
+assert_eq($count, 2, "par_lines count")
+
+# par_walk
+oursync @found = ()
+par_walk($tmp, fn { push @found, _ if /\.txt$/ })
+assert_eq(len(@found), 1, "par_walk found 1 file")
+
+# par_sed
+# Use /g to ensure multiple replacements; returns number of files modified (pinned behavior)
+my $n = par_sed(qr/line/g, "row", "$tmp/a.txt")
+assert_eq($n, 1, "par_sed return value (files modified)")
+assert_true(slurp("$tmp/a.txt") =~ /row1/, "par_sed content verified")
+
+test_run
